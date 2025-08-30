@@ -6,12 +6,13 @@
 export interface User {
   readonly id: string;
   readonly email: string;
-  readonly displayName: string | null;
-  readonly profilePicture: string | null;
+  readonly displayName: string;
+  readonly isAnonymous: boolean;
+  readonly profilePicture?: string | null;
   readonly preferences: UserPreferences;
-  readonly subscription: SubscriptionStatus;
+  readonly subscription?: SubscriptionStatus;
   readonly createdAt: Date;
-  readonly lastActiveAt: Date;
+  readonly lastLoginAt: Date;
 }
 
 export interface UserPreferences {
