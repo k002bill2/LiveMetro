@@ -68,7 +68,9 @@ export const useLocation = (options: UseLocationOptions = {}) => {
   }, [updateState, onLocationUpdate]);
 
   const handleError = useCallback((error: string) => {
-    console.error('Location error:', error);
+    if (__DEV__) {
+      console.error('Location error:', error);
+    }
     updateState({
       error,
       loading: false,
@@ -137,7 +139,9 @@ export const useLocation = (options: UseLocationOptions = {}) => {
    */
   const startTracking = useCallback(async () => {
     if (trackingRef.current) {
-      console.warn('Location tracking already active');
+      if (__DEV__) {
+        console.warn('Location tracking already active');
+      }
       return true;
     }
 
@@ -160,7 +164,9 @@ export const useLocation = (options: UseLocationOptions = {}) => {
       if (success) {
         trackingRef.current = true;
         updateState({ isTracking: true });
-        console.log('Location tracking started');
+        if (__DEV__) {
+          console.log('Location tracking started');
+        }
         return true;
       } else {
         handleError('위치 추적을 시작할 수 없습니다.');
@@ -177,32 +183,42 @@ export const useLocation = (options: UseLocationOptions = {}) => {
    */
   const stopTracking = useCallback(() => {
     if (!trackingRef.current) {
-      console.warn('Location tracking is not active');
+      if (__DEV__) {
+        console.warn('Location tracking is not active');
+      }
       return;
     }
 
     locationService.stopLocationTracking();
     trackingRef.current = false;
     updateState({ isTracking: false });
-    console.log('Location tracking stopped');
+    if (__DEV__) {
+      console.log('Location tracking stopped');
+    }
   }, [updateState]);
 
   /**
    * Handle app state changes for battery optimization
    */
   const handleAppStateChange = useCallback((nextAppState: AppStateStatus) => {
-    console.log('App state changed:', appStateRef.current, '->', nextAppState);
+    if (__DEV__) {
+      console.log('App state changed:', appStateRef.current, '->', nextAppState);
+    }
 
     if (appStateRef.current.match(/inactive|background/) && nextAppState === 'active') {
       // App has come to foreground - resume tracking if it was active
       if (trackingRef.current && !state.isTracking) {
-        console.log('Resuming location tracking');
+        if (__DEV__) {
+          console.log('Resuming location tracking');
+        }
         startTracking();
       }
     } else if (appStateRef.current === 'active' && nextAppState.match(/inactive|background/)) {
       // App is going to background - optionally stop tracking for battery saving
       if (state.isTracking && !options.enableBackgroundLocation) {
-        console.log('Pausing location tracking (background)');
+        if (__DEV__) {
+          console.log('Pausing location tracking (background)');
+        }
         stopTracking();
       }
     }

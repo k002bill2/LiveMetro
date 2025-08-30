@@ -6,7 +6,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { seoulSubwayApi, SeoulRealtimeArrival } from '../api/seoulSubwayApi';
 import { trainService } from '../train/trainService';
-import { Train, Station, TrainDelay, DelaySeverity } from '../../models/train';
+import { Train, Station, TrainDelay, DelaySeverity, TrainStatus } from '../../models/train';
 
 interface CachedData<T> {
   data: T;
@@ -30,8 +30,10 @@ interface DataSyncStatus {
 class DataManager {
   private readonly CACHE_PREFIX = '@livemetro_cache_';
   private readonly DEFAULT_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
-  private readonly OFFLINE_CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
-  private readonly MAX_RETRY_ATTEMPTS = 3;
+  // Cache duration for offline scenarios  
+  // private readonly OFFLINE_CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
+  // Maximum retry attempts for API calls
+  // private readonly MAX_RETRY_ATTEMPTS = 3;
   
   private syncStatus: DataSyncStatus = {
     lastSync: new Date(),
@@ -148,7 +150,6 @@ class DataManager {
             latitude: parseFloat(seoulStation.YPOS),
             longitude: parseFloat(seoulStation.XPOS)
           },
-          facilities: [],
           transfers: [],
           isActive: true
         };
@@ -175,8 +176,13 @@ class DataManager {
       const now = new Date();
 
       for (const train of realtimeData.trains) {
-        if (train.arrivalTime && train.arrivalTime > 300) { // More than 5 minutes
-          const delayMinutes = Math.floor(train.arrivalTime / 60);
+        if (train.arrivalTime) {
+          const arrivalTimeMs = train.arrivalTime.getTime();
+          const currentTimeMs = now.getTime();
+          const delayMs = arrivalTimeMs - currentTimeMs;
+          
+          if (delayMs > 5 * 60 * 1000) { // More than 5 minutes delay
+            const delayMinutes = Math.floor(delayMs / (60 * 1000));
           let severity: DelaySeverity;
 
           if (delayMinutes >= 20) severity = DelaySeverity.SEVERE;
@@ -185,18 +191,15 @@ class DataManager {
           else severity = DelaySeverity.MINOR;
 
           delays.push({
-            id: `delay_${train.id}_${now.getTime()}`,
-            lineId: train.lineId,
-            stationId: realtimeData.stationId,
             trainId: train.id,
+            lineId: train.lineId,
             severity,
             delayMinutes,
             reason: `예정보다 ${delayMinutes}분 지연`,
             reportedAt: now,
-            isActive: true,
-            affectedStations: [realtimeData.stationId],
-            estimatedResolutionTime: null
+            isActive: true
           });
+          }
         }
       }
 
@@ -372,7 +375,7 @@ class DataManager {
       direction: converted.direction === 'up' ? 'up' : 'down',
       arrivalTime: converted.arrivalTime ? new Date(Date.now() + converted.arrivalTime * 1000) : null,
       departureTime: null,
-      status: 'running',
+      status: TrainStatus.NORMAL,
       carriageCount: 10, // Standard Seoul subway
       currentLoad: null,
       lastUpdated: converted.lastUpdated,

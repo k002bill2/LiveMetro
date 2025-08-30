@@ -217,8 +217,8 @@ class SeoulSubwayApiService {
     
     // Extract minutes from messages like "2분후[1번째전]", "곧 도착[0번째전]"
     const minuteMatch = arrivalMsg.match(/(\d+)분후/);
-    if (minuteMatch) {
-      arrivalTime = parseInt(minuteMatch[1]) * 60; // Convert to seconds
+    if (minuteMatch && minuteMatch[1]) {
+      arrivalTime = parseInt(minuteMatch[1], 10) * 60; // Convert to seconds
     } else if (arrivalMsg.includes('곧 도착') || arrivalMsg.includes('진입')) {
       arrivalTime = 30; // 30 seconds for "arriving soon"
     }

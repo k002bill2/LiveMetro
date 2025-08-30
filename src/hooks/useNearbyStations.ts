@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLocation } from './useLocation';
-import { locationService, NearbyStation } from '../services/location/locationService';
+import { locationService, NearbyStation, LocationCoordinates } from '../services/location/locationService';
 import { trainService } from '../services/train/trainService';
 import { Station } from '../models/train';
 
@@ -53,7 +53,7 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
   const { location, loading: locationLoading, error: locationError } = useLocation({
     enableHighAccuracy: false,
     distanceFilter: 50, // Update when user moves 50m
-    onLocationUpdate: autoUpdate ? handleLocationUpdate : null,
+    onLocationUpdate: autoUpdate ? handleLocationUpdate : undefined,
   });
 
   const updateState = useCallback((updates: Partial<UseNearbyStationsState>) => {
@@ -111,7 +111,7 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
         radius
       ).slice(0, maxStations);
 
-      const closestStation = nearbyStations.length > 0 ? nearbyStations[0] : null;
+      const closestStation: NearbyStation | null = nearbyStations.length > 0 ? nearbyStations[0] : null;
 
       // Check if closest station changed
       if (closestStation?.id !== state.closestStation?.id && onClosestStationChanged) {
