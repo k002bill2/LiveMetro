@@ -3,7 +3,7 @@
  * Displays individual station information with selection state
  */
 
-import React from 'react';
+import React, { memo, useMemo, useCallback } from 'react';
 import {
   TouchableOpacity,
   View,
@@ -11,8 +11,10 @@ import {
   StyleSheet,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+// Haptics will be optional to avoid dependency issues
 
 import { Station } from '../../models/train';
+import { SPACING, BORDER_RADIUS, SHADOWS, TYPOGRAPHY, TOUCH_TARGET } from '../../utils/themeUtils';
 
 interface StationCardProps {
   station: Station;
@@ -22,15 +24,23 @@ interface StationCardProps {
   distance?: number;
 }
 
-export const StationCard: React.FC<StationCardProps> = ({
+export const StationCard: React.FC<StationCardProps> = memo(({
   station,
   isSelected = false,
   onPress,
   showDistance = false,
   distance,
 }) => {
-  const getLineColor = (lineId: string): string => {
-    // Seoul Subway Line Colors
+  // Memoize press handler
+  const handlePress = useCallback((): void => {
+    if (onPress) {
+      // Future: Add haptic feedback for better UX when available
+      onPress();
+    }
+  }, [onPress]);
+
+  // Memoize line color calculation
+  const lineColor = useMemo(() => {
     const lineColors: Record<string, string> = {
       '1': '#0d3692',  // Line 1 - Blue
       '2': '#00a84d',  // Line 2 - Green  
@@ -46,15 +56,18 @@ export const StationCard: React.FC<StationCardProps> = ({
       'sinbundang': '#d4003b', // Sinbundang Line
     };
     
-    return lineColors[lineId] || '#6b7280';
-  };
+    return lineColors[station.lineId] || '#6b7280';
+  }, [station.lineId]);
 
-  const formatDistance = (dist: number): string => {
-    if (dist < 1) {
-      return `${Math.round(dist * 1000)}m`;
+  // Memoize distance formatting
+  const formattedDistance = useMemo(() => {
+    if (!showDistance || distance === undefined) return null;
+    
+    if (distance < 1) {
+      return `${Math.round(distance * 1000)}m`;
     }
-    return `${dist.toFixed(1)}km`;
-  };
+    return `${distance.toFixed(1)}km`;
+  }, [distance, showDistance]);
 
   return (
     <TouchableOpacity
@@ -62,8 +75,13 @@ export const StationCard: React.FC<StationCardProps> = ({
         styles.container,
         isSelected && styles.selectedContainer,
       ]}
-      onPress={onPress}
+      onPress={handlePress}
       activeOpacity={0.7}
+      accessible={true}
+      accessibilityRole="button"
+      accessibilityLabel={`${station.name} 역, ${station.lineId}호선${station.transfers && station.transfers.length > 0 ? `, 환승역: ${station.transfers.join(', ')}호선` : ''}${showDistance && distance !== undefined ? `, 거리: ${formatDistance(distance)}` : ''}`}
+      accessibilityHint={isSelected ? "현재 선택된 역입니다" : "탭하여 이 역의 실시간 정보를 확인하세요"}
+      accessibilityState={{ selected: isSelected }}
     >
       <View style={styles.header}>
         <View style={styles.stationInfo}>
@@ -74,9 +92,9 @@ export const StationCard: React.FC<StationCardProps> = ({
             {station.nameEn}
           </Text>
         </View>
-        {showDistance && distance !== undefined && (
+        {formattedDistance && (
           <Text style={styles.distance}>
-            {formatDistance(distance)}
+            {formattedDistance}
           </Text>
         )}
       </View>
@@ -85,7 +103,7 @@ export const StationCard: React.FC<StationCardProps> = ({
         <View 
           style={[
             styles.lineIndicator,
-            { backgroundColor: getLineColor(station.lineId) }
+            { backgroundColor: lineColor }
           ]}
         />
         <Text style={styles.lineText}>
@@ -109,25 +127,22 @@ export const StationCard: React.FC<StationCardProps> = ({
       )}
     </TouchableOpacity>
   );
-};
+});
+
+// Set display name for debugging
+StationCard.displayName = 'StationCard';
 
 const styles = StyleSheet.create({
   container: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
-    marginRight: 12,
+    borderRadius: BORDER_RADIUS.lg,
+    padding: SPACING.md,
+    marginRight: SPACING.md,
     minWidth: 200,
+    minHeight: TOUCH_TARGET.comfortable,
     borderWidth: 1,
     borderColor: '#e5e7eb',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    ...SHADOWS.md,
   },
   selectedContainer: {
     borderColor: '#2563eb',
@@ -137,16 +152,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    marginBottom: SPACING.sm,
   },
   stationInfo: {
     flex: 1,
   },
   stationName: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: TYPOGRAPHY.weights.bold,
     color: '#111827',
-    marginBottom: 2,
+    marginBottom: SPACING.xs,
   },
   selectedText: {
     color: '#2563eb',

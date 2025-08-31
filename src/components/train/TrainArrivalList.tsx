@@ -3,7 +3,7 @@
  * Displays real-time train arrival information for a station
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 
 import { trainService } from '../../services/train/trainService';
 import { Train, TrainStatus } from '../../models/train';
+import { performanceMonitor, throttle } from '../../utils/performanceUtils';
 
 interface TrainArrivalListProps {
   stationId: string;
@@ -24,7 +25,7 @@ interface TrainArrivalItemProps {
   train: Train;
 }
 
-const TrainArrivalItem: React.FC<TrainArrivalItemProps> = ({ train }) => {
+const TrainArrivalItem: React.FC<TrainArrivalItemProps> = memo(({ train }) => {
   const getStatusColor = (status: TrainStatus): string => {
     switch (status) {
       case TrainStatus.NORMAL:
@@ -96,7 +97,12 @@ const TrainArrivalItem: React.FC<TrainArrivalItemProps> = ({ train }) => {
   };
 
   return (
-    <View style={styles.trainItem}>
+    <View 
+      style={styles.trainItem}
+      accessible={true}
+      accessibilityRole="summary"
+      accessibilityLabel={`${train.direction === 'up' ? '상행' : '하행'} 열차, ${getStatusText(train.status)} 상태, ${formatArrivalTime()}${train.delayMinutes > 0 ? `, ${train.delayMinutes}분 지연` : ''}`}
+    >
       <View style={styles.trainHeader}>
         <View style={styles.directionInfo}>
           <Ionicons 
@@ -141,27 +147,44 @@ const TrainArrivalItem: React.FC<TrainArrivalItemProps> = ({ train }) => {
       </View>
     </View>
   );
-};
+});
 
-export const TrainArrivalList: React.FC<TrainArrivalListProps> = ({ stationId }) => {
+// Set display name for debugging
+TrainArrivalItem.displayName = 'TrainArrivalItem';
+
+export const TrainArrivalList: React.FC<TrainArrivalListProps> = memo(({ stationId }) => {
   const [trains, setTrains] = useState<Train[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Memoize the update handler to prevent unnecessary re-renders
+  const handleTrainUpdate = useCallback((updatedTrains: Train[]) => {
+    performanceMonitor.startMeasure(`train_update_${stationId}`);
+    setTrains(updatedTrains);
+    setLoading(false);
+    setRefreshing(false);
+    performanceMonitor.endMeasure(`train_update_${stationId}`);
+  }, [stationId]);
+
+  // Throttle subscription updates to improve performance
+  const throttledUpdate = useMemo(
+    () => throttle(handleTrainUpdate, 1000),
+    [handleTrainUpdate]
+  );
 
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
 
     const subscribeToUpdates = (): void => {
       setLoading(true);
+      performanceMonitor.startMeasure(`subscription_${stationId}`);
       
       unsubscribe = trainService.subscribeToTrainUpdates(
         stationId,
-        (updatedTrains) => {
-          setTrains(updatedTrains);
-          setLoading(false);
-          setRefreshing(false);
-        }
+        throttledUpdate
       );
+      
+      performanceMonitor.endMeasure(`subscription_${stationId}`);
     };
 
     subscribeToUpdates();
@@ -171,18 +194,32 @@ export const TrainArrivalList: React.FC<TrainArrivalListProps> = ({ stationId })
         unsubscribe();
       }
     };
-  }, [stationId]);
+  }, [stationId, throttledUpdate]);
 
-  const onRefresh = (): void => {
+  const onRefresh = useCallback((): void => {
     setRefreshing(true);
     // The real-time subscription will automatically update the data
     setTimeout(() => {
       setRefreshing(false);
     }, 2000);
-  };
+  }, []);
+
+  // Memoize key extractor for FlatList performance
+  const keyExtractor = useCallback((item: Train) => item.id, []);
+
+  // Memoize render item to prevent unnecessary re-renders
+  const renderItem = useCallback(
+    ({ item }: { item: Train }) => <TrainArrivalItem train={item} />,
+    []
+  );
 
   const renderEmptyState = (): React.ReactElement => (
-    <View style={styles.emptyState}>
+    <View 
+      style={styles.emptyState}
+      accessible={true}
+      accessibilityRole="text"
+      accessibilityLabel="현재 도착 예정인 열차가 없습니다. 잠시 후 다시 확인해보세요"
+    >
       <Ionicons name="train-outline" size={48} color="#9ca3af" />
       <Text style={styles.emptyText}>
         현재 도착 예정인 열차가 없습니다
@@ -195,7 +232,12 @@ export const TrainArrivalList: React.FC<TrainArrivalListProps> = ({ stationId })
 
   if (loading && trains.length === 0) {
     return (
-      <View style={styles.loadingContainer}>
+      <View 
+        style={styles.loadingContainer}
+        accessible={true}
+        accessibilityRole="progressbar"
+        accessibilityLabel="실시간 열차 정보를 불러오고 있습니다"
+      >
         <Ionicons name="refresh" size={24} color="#2563eb" />
         <Text style={styles.loadingText}>
           실시간 열차 정보를 불러오고 있습니다...
@@ -207,17 +249,31 @@ export const TrainArrivalList: React.FC<TrainArrivalListProps> = ({ stationId })
   return (
     <FlatList
       data={trains}
-      renderItem={({ item }) => <TrainArrivalItem train={item} />}
-      keyExtractor={(item) => item.id}
+      renderItem={renderItem}
+      keyExtractor={keyExtractor}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
       ListEmptyComponent={renderEmptyState}
       showsVerticalScrollIndicator={false}
       contentContainerStyle={trains.length === 0 ? styles.emptyContainer : undefined}
+      // Performance optimizations
+      removeClippedSubviews={true}
+      maxToRenderPerBatch={10}
+      updateCellsBatchingPeriod={50}
+      initialNumToRender={10}
+      windowSize={10}
+      getItemLayout={(data, index) => ({
+        length: 100, // Estimated item height
+        offset: 100 * index,
+        index,
+      })}
     />
   );
-};
+});
+
+// Set display name for debugging
+TrainArrivalList.displayName = 'TrainArrivalList';
 
 const styles = StyleSheet.create({
   trainItem: {

@@ -10,7 +10,6 @@ import {
   ScrollView,
   RefreshControl,
   StyleSheet,
-  Alert,
   TouchableOpacity,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,21 +20,30 @@ import { trainService } from '../../services/train/trainService';
 import { LoadingScreen } from '../../components/common/LoadingScreen';
 import { StationCard } from '../../components/train/StationCard';
 import { TrainArrivalList } from '../../components/train/TrainArrivalList';
+import { useToast } from '../../components/common/Toast';
 
 import { Station } from '../../models/train';
 
 export const HomeScreen: React.FC = () => {
   const { user } = useAuth();
+  const { showError, showSuccess, showInfo, ToastComponent } = useToast();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [nearbyStations, setNearbyStations] = useState<Station[]>([]);
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
-  // const [trains, setTrains] = useState<Train[]>([]);
   const [locationPermission, setLocationPermission] = useState<boolean>(false);
+  const [isOnline, setIsOnline] = useState<boolean>(true);
 
   useEffect(() => {
     initializeScreen();
+    setupNetworkListener();
   }, []);
+
+  const setupNetworkListener = (): void => {
+    // Network state monitoring - simplified for MVP
+    // Future: Implement proper network state detection
+    setIsOnline(true);
+  };
 
   const initializeScreen = async (): Promise<void> => {
     try {
@@ -53,7 +61,7 @@ export const HomeScreen: React.FC = () => {
       }
     } catch (error) {
       console.error('Error initializing home screen:', error);
-      Alert.alert('오류', '데이터를 불러오는데 실패했습니다.');
+      showError('데이터를 불러오는데 실패했습니다. 네트워크 연결을 확인해주세요.');
     } finally {
       setLoading(false);
     }
@@ -132,7 +140,10 @@ export const HomeScreen: React.FC = () => {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status === 'granted') {
       setLocationPermission(true);
+      showSuccess('위치 권한이 허용되었습니다');
       await loadNearbyStations();
+    } else {
+      showInfo('위치 권한이 필요합니다. 설정에서 수동으로 허용해주세요.');
     }
   };
 
@@ -146,6 +157,8 @@ export const HomeScreen: React.FC = () => {
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
+      accessible={false}
+      contentInsetAdjustmentBehavior="automatic"
     >
       {/* Welcome Section */}
       <View style={styles.welcomeSection}>
@@ -157,9 +170,31 @@ export const HomeScreen: React.FC = () => {
         </Text>
       </View>
 
+      {/* Offline Banner */}
+      {!isOnline && (
+        <View 
+          style={styles.offlineBanner}
+          accessible={true}
+          accessibilityRole="text"
+          accessibilityLabel="현재 오프라인 상태입니다. 캐시된 정보가 표시됩니다"
+        >
+          <Ionicons name="cloud-offline-outline" size={20} color="#dc2626" />
+          <Text style={styles.offlineText}>
+            오프라인 상태 - 캐시된 정보가 표시됩니다
+          </Text>
+        </View>
+      )}
+
       {/* Location Permission Banner */}
       {!locationPermission && (
-        <TouchableOpacity style={styles.permissionBanner} onPress={requestLocationPermission}>
+        <TouchableOpacity 
+          style={styles.permissionBanner} 
+          onPress={requestLocationPermission}
+          accessible={true}
+          accessibilityRole="button"
+          accessibilityLabel="위치 권한 허용하기"
+          accessibilityHint="주변 지하철역 정보를 받기 위해 위치 권한을 허용하세요"
+        >
           <Ionicons name="location-outline" size={24} color="#2563eb" />
           <View style={styles.permissionText}>
             <Text style={styles.permissionTitle}>위치 권한 허용</Text>
@@ -178,7 +213,15 @@ export const HomeScreen: React.FC = () => {
         </Text>
         
         {nearbyStations.length === 0 ? (
-          <View style={styles.emptyState}>
+          <View 
+            style={styles.emptyState}
+            accessible={true}
+            accessibilityRole="text"
+            accessibilityLabel={locationPermission 
+              ? '주변에 지하철역이 없습니다. 다른 위치에서 시도해보세요' 
+              : '즐겨찾기에 추가된 역이 없습니다. 설정에서 자주 이용하는 역을 추가해보세요'
+            }
+          >
             <Ionicons name="train-outline" size={48} color="#9ca3af" />
             <Text style={styles.emptyText}>
               {locationPermission 
@@ -216,6 +259,8 @@ export const HomeScreen: React.FC = () => {
           <TrainArrivalList stationId={selectedStation.id} />
         </View>
       )}
+      
+      <ToastComponent />
     </ScrollView>
   );
 };
@@ -262,6 +307,24 @@ const styles = StyleSheet.create({
   permissionSubtitle: {
     fontSize: 14,
     color: '#3730a3',
+  },
+  offlineBanner: {
+    backgroundColor: '#fef2f2',
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 8,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#fecaca',
+  },
+  offlineText: {
+    fontSize: 14,
+    color: '#dc2626',
+    fontWeight: '600',
+    marginLeft: 8,
+    flex: 1,
   },
   section: {
     backgroundColor: '#ffffff',
