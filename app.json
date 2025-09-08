@@ -6,10 +6,12 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
+    "description": "Real-time Seoul subway notifications with delay alerts and alternative route suggestions for seamless commuting.",
+    "primaryColor": "#1976d2",
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#1976d2"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -18,49 +20,101 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.livemetro.app",
       "buildNumber": "1",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "LiveMetro needs your location to provide nearby station information and personalized commute alerts.",
-        "NSLocationAlwaysUsageDescription": "LiveMetro uses background location to send you timely notifications about your commute."
-      }
+        "NSLocationWhenInUseUsageDescription": "LiveMetro needs your location to provide nearby station information and personalized commute alerts for the Seoul subway system.",
+        "NSLocationAlwaysUsageDescription": "LiveMetro uses background location to send you timely notifications about delays and service interruptions on your commute routes.",
+        "UIBackgroundModes": [
+          "location",
+          "remote-notification"
+        ],
+        "NSCameraUsageDescription": "This app does not use the camera.",
+        "NSMicrophoneUsageDescription": "This app does not use the microphone.",
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "appStoreUrl": "https://apps.apple.com/app/livemetro/id-placeholder",
+      "category": "navigation"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#FFFFFF"
+        "backgroundColor": "#1976d2"
       },
       "package": "com.livemetro.app",
       "versionCode": 1,
+      "playStoreUrl": "https://play.google.com/store/apps/details?id=com.livemetro.app",
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION",
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE",
-        "WAKE_LOCK"
+        "WAKE_LOCK",
+        "ACCESS_BACKGROUND_LOCATION"
+      ],
+      "blockedPermissions": [
+        "CAMERA",
+        "RECORD_AUDIO"
       ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
-      "bundler": "metro"
+      "bundler": "metro",
+      "name": "LiveMetro - Seoul Subway Alerts",
+      "shortName": "LiveMetro",
+      "description": "Real-time Seoul subway notifications",
+      "themeColor": "#1976d2",
+      "backgroundColor": "#ffffff"
     },
     "plugins": [
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Allow LiveMetro to use your location for personalized subway alerts."
+          "locationAlwaysAndWhenInUsePermission": "LiveMetro uses your location to provide personalized subway alerts and nearby station information for the Seoul metropolitan area.",
+          "isIosBackgroundLocationEnabled": true,
+          "isAndroidBackgroundLocationEnabled": true
         }
       ],
       [
         "expo-notifications",
         {
           "icon": "./assets/notification-icon.png",
-          "color": "#000000"
+          "color": "#1976d2",
+          "sounds": ["./assets/notification-sound.wav"],
+          "mode": "production"
         }
       ]
     ],
+    "hooks": {
+      "postPublish": [
+        {
+          "file": "sentry-expo/upload-sourcemaps",
+          "config": {
+            "organization": "livemetro",
+            "project": "livemetro-app"
+          }
+        }
+      ]
+    },
     "extra": {
       "eas": {
         "projectId": "livemetro-3q5d-project"
-      }
-    }
+      },
+      "storybookEnabled": false,
+      "privacyPolicyUrl": "https://livemetro.app/privacy-policy",
+      "termsOfServiceUrl": "https://livemetro.app/terms-of-service",
+      "supportUrl": "https://livemetro.app/support",
+      "websiteUrl": "https://livemetro.app"
+    },
+    "privacy": "public",
+    "isDetached": false,
+    "scheme": "livemetro",
+    "platforms": [
+      "ios",
+      "android",
+      "web"
+    ],
+    "githubUrl": "https://github.com/livemetro/livemetro-app"
   }
 }

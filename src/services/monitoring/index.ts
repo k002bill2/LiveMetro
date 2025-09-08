@@ -244,10 +244,6 @@ export {
 };
 
 // Export types
-export type {
-  CrashReport,
-  PerformanceMetrics,
-  PerformanceThresholds,
-  HealthCheckResult,
-  HealthStatus,
-};
+export type { CrashReport } from './crashReportingService';
+export type { PerformanceMetrics, PerformanceThresholds } from './performanceMonitoringService';
+export type { HealthCheckResult, HealthStatus } from './healthCheckService';

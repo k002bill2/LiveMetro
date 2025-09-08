@@ -1,0 +1,78 @@
+{
+  "cli": {
+    "version": ">= 5.4.0"
+  },
+  "build": {
+    "development": {
+      "distribution": "internal",
+      "developmentClient": true,
+      "ios": {
+        "resourceClass": "m1-medium"
+      },
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "APP_ENV": "development"
+      }
+    },
+    "preview": {
+      "distribution": "internal",
+      "ios": {
+        "resourceClass": "m1-medium",
+        "simulator": true
+      },
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "APP_ENV": "preview"
+      }
+    },
+    "production": {
+      "ios": {
+        "resourceClass": "m1-medium",
+        "autoIncrement": "buildNumber",
+        "bundleIdentifier": "com.livemetro.app"
+      },
+      "android": {
+        "autoIncrement": "versionCode",
+        "buildType": "aab"
+      },
+      "env": {
+        "APP_ENV": "production",
+        "ENABLE_DEBUG_LOGGING": "false"
+      }
+    },
+    "production-ios": {
+      "extends": "production",
+      "ios": {
+        "resourceClass": "m1-medium",
+        "autoIncrement": "buildNumber",
+        "bundleIdentifier": "com.livemetro.app",
+        "distribution": "store"
+      }
+    },
+    "production-android": {
+      "extends": "production", 
+      "android": {
+        "autoIncrement": "versionCode",
+        "buildType": "aab",
+        "distribution": "store"
+      }
+    }
+  },
+  "submit": {
+    "production": {
+      "ios": {
+        "appleId": "your-apple-id@example.com",
+        "ascAppId": "placeholder-app-store-connect-app-id",
+        "appleTeamId": "PLACEHOLDER_TEAM_ID"
+      },
+      "android": {
+        "serviceAccountKeyPath": "./android/service-account-key.json",
+        "track": "internal"
+      }
+    }
+  }
+}

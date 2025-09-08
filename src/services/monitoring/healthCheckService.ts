@@ -5,7 +5,6 @@
 
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import NetInfo from '@react-native-community/netinfo';
 import { seoulSubwayApi } from '../api/seoulSubwayApi';
 import { dataManager } from '../data/dataManager';
 import { performanceMonitor } from '../../utils/performanceUtils';
@@ -182,22 +181,27 @@ class HealthCheckService {
     const startTime = Date.now();
     
     try {
-      const netInfo = await NetInfo.fetch();
+      // Simple network check using fetch to a reliable endpoint
+      const response = await fetch('https://www.google.com/favicon.ico', {
+        method: 'HEAD',
+        cache: 'no-cache',
+      });
+      
       const responseTime = Date.now() - startTime;
       
-      if (!netInfo.isConnected) {
+      if (!response.ok) {
         return {
-          status: 'unhealthy',
-          message: 'No network connection',
+          status: 'degraded',
+          message: 'Network connection unstable',
           responseTime,
           lastCheck: new Date().toISOString(),
         };
       }
       
-      if (netInfo.type === 'cellular' && netInfo.details?.cellularGeneration === '2g') {
+      if (responseTime > 3000) {
         return {
           status: 'degraded',
-          message: 'Slow network connection (2G)',
+          message: 'Slow network connection',
           responseTime,
           lastCheck: new Date().toISOString(),
         };
@@ -205,7 +209,7 @@ class HealthCheckService {
       
       return {
         status: 'healthy',
-        message: `Connected via ${netInfo.type}`,
+        message: 'Network connection stable',
         responseTime,
         lastCheck: new Date().toISOString(),
       };

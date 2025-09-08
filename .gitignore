@@ -66,3 +66,17 @@ firestore-debug.log
 
 # Local Netlify folder
 .netlify
+
+# Binary files and build artifacts
+*.apk
+*.ipa
+*.aab
+*.dex
+*.exe
+*.dmg
+*.zip
+
+# Large files
+*.mov
+*.mp4
+*.avi
