@@ -8,7 +8,7 @@ import * as Notifications from 'expo-notifications';
 import { notificationService, NotificationType } from '../services/notification/notificationService';
 import { dataManager } from '../services/data/dataManager';
 import { useAuth } from '../services/auth/AuthContext';
-import { TrainDelay } from '../models/train';
+import { TrainDelay, ServiceDisruption, TrainStatus } from '../models/train';
 
 interface UseNotificationsState {
   hasPermission: boolean;
@@ -52,6 +52,7 @@ export const useNotifications = (options: UseNotificationsOptions = {}) => {
 
   const monitoringRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
   const lastDelaysRef = useRef<Map<string, TrainDelay[]>>(new Map());
+  const lastDisruptionsRef = useRef<Map<string, ServiceDisruption[]>>(new Map());
 
   const updateState = useCallback((updates: Partial<UseNotificationsState>) => {
     setState(prevState => ({ ...prevState, ...updates }));
@@ -167,6 +168,49 @@ export const useNotifications = (options: UseNotificationsOptions = {}) => {
         }
 
         lastDelaysRef.current.set(stationName, delays);
+
+        if (enableEmergencyAlerts && state.hasPermission) {
+          try {
+            const disruptions = await dataManager.detectServiceDisruptions(stationName);
+            const previousDisruptions = lastDisruptionsRef.current.get(stationName) || [];
+
+            for (const disruption of disruptions) {
+              const alreadyReported = previousDisruptions.some(prev => prev.id === disruption.id);
+              if (alreadyReported) {
+                continue;
+              }
+
+              const shouldSendEmergency = user?.preferences?.notificationSettings ?
+                notificationService.shouldSendNotification(
+                  user.preferences.notificationSettings,
+                  NotificationType.EMERGENCY_ALERT
+                ) : true;
+
+              if (!shouldSendEmergency) {
+                continue;
+              }
+
+              const affectedLine = disruption.lineName || disruption.lineId;
+              const title = disruption.status === TrainStatus.SUSPENDED
+                ? `${affectedLine || stationName} 운행 중단`
+                : `${affectedLine || stationName} 긴급 장애`;
+
+              try {
+                await notificationService.sendEmergencyAlert(
+                  title,
+                  `${disruption.stationName}역 ${disruption.message}`,
+                  affectedLine ? [affectedLine] : []
+                );
+              } catch (notificationError) {
+                console.error('Error sending emergency alert:', notificationError);
+              }
+            }
+
+            lastDisruptionsRef.current.set(stationName, disruptions);
+          } catch (disruptionError) {
+            console.error(`Error detecting service disruptions for ${stationName}:`, disruptionError);
+          }
+        }
       } catch (error) {
         console.error(`Error monitoring delays for ${stationName}:`, error);
       }
@@ -180,7 +224,7 @@ export const useNotifications = (options: UseNotificationsOptions = {}) => {
     monitoringRef.current.set(stationName, timer);
 
     console.log(`Started delay monitoring for ${stationName}`);
-  }, [enableDelayAlerts, state.hasPermission, delayThresholdMinutes, user]);
+  }, [enableDelayAlerts, enableEmergencyAlerts, state.hasPermission, delayThresholdMinutes, user]);
 
   /**
    * Stop monitoring a station
@@ -191,6 +235,7 @@ export const useNotifications = (options: UseNotificationsOptions = {}) => {
       clearInterval(timer);
       monitoringRef.current.delete(stationName);
       lastDelaysRef.current.delete(stationName);
+      lastDisruptionsRef.current.delete(stationName);
       console.log(`Stopped delay monitoring for ${stationName}`);
     }
   }, []);
@@ -217,6 +262,7 @@ export const useNotifications = (options: UseNotificationsOptions = {}) => {
     });
     monitoringRef.current.clear();
     lastDelaysRef.current.clear();
+    lastDisruptionsRef.current.clear();
   }, []);
 
   /**

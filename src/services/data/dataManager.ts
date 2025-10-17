@@ -6,7 +6,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { seoulSubwayApi, SeoulRealtimeArrival } from '../api/seoulSubwayApi';
 import { trainService } from '../train/trainService';
-import { Train, Station, TrainDelay, DelaySeverity, TrainStatus } from '../../models/train';
+import { Train, Station, TrainDelay, DelaySeverity, TrainStatus, ServiceDisruption } from '../../models/train';
 
 interface CachedData<T> {
   data: T;
@@ -206,6 +206,80 @@ class DataManager {
       return delays;
     } catch (error) {
       console.error('Error detecting delays:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Detect service disruptions and suspensions from realtime feeds
+   */
+  async detectServiceDisruptions(stationName: string): Promise<ServiceDisruption[]> {
+    try {
+      const arrivals = await seoulSubwayApi.getRealtimeArrival(stationName);
+      if (!arrivals || arrivals.length === 0) {
+        return [];
+      }
+
+      const suspensionKeywords = ['운행중단', '운행 중단', '운행중지', '운행 중지', '전면중단', '전면 중단', '운행불가', '운행 불가'];
+      const incidentKeywords = ['장애', '고장', '사고', '탈선', '화재', '정전'];
+
+      const normalize = (value: string) => value.replace(/\s+/g, '').toLowerCase();
+
+      const disruptions: ServiceDisruption[] = [];
+      const now = new Date();
+
+      for (const arrival of arrivals) {
+        const messageParts = [arrival.arvlMsg2, arrival.arvlMsg3, arrival.btrainSttus].filter(Boolean) as string[];
+        if (messageParts.length === 0) {
+          continue;
+        }
+
+        const combinedMessage = messageParts.join(' ').trim();
+        if (!combinedMessage) {
+          continue;
+        }
+
+        const normalizedMessage = normalize(combinedMessage);
+
+        const isSuspension = suspensionKeywords.some(keyword => normalizedMessage.includes(normalize(keyword)));
+        const isIncident = !isSuspension && incidentKeywords.some(keyword => normalizedMessage.includes(normalize(keyword)));
+
+        if (!isSuspension && !isIncident) {
+          continue;
+        }
+
+        const status = isSuspension ? TrainStatus.SUSPENDED : TrainStatus.EMERGENCY;
+        const severity = isSuspension ? DelaySeverity.SEVERE : DelaySeverity.MAJOR;
+
+        const reportedAt = arrival.recptnDt ? new Date(arrival.recptnDt) : now;
+
+        let affectedDirections: ('up' | 'down')[] = [];
+        if (arrival.updnLine === '상행') {
+          affectedDirections = ['up'];
+        } else if (arrival.updnLine === '하행') {
+          affectedDirections = ['down'];
+        } else {
+          affectedDirections = ['up', 'down'];
+        }
+
+        const disruptionId = `${arrival.subwayId || arrival.trainLineNm || 'line'}_${arrival.statnId || arrival.statnNm}_${status}_${reportedAt.getTime()}`;
+
+        disruptions.push({
+          id: disruptionId,
+          lineId: arrival.subwayId || arrival.trainLineNm,
+          lineName: arrival.trainLineNm || arrival.subwayId || '',
+          stationName: arrival.statnNm,
+          status,
+          message: combinedMessage,
+          severity,
+          reportedAt,
+          affectedDirections
+        });
+      }
+
+      return disruptions;
+    } catch (error) {
+      console.error('Error detecting service disruptions:', error);
       return [];
     }
   }

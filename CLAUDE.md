@@ -1,7 +1,9 @@
-# CLAUDE.md - LiveMetro Development Guide
+# CLAUDE.md
 
-**Project**: LiveMetro - 실시간 서울 지하철 알림 앱  
-**Architecture**: React Native + TypeScript + Firebase + Seoul Open API  
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+**Project**: LiveMetro - 실시간 서울 지하철 알림 앱
+**Architecture**: React Native + TypeScript + Firebase + Seoul Open API
 **Development Status**: T-004 Complete - Production-ready real-time system  
 
 <vooster-docs>
@@ -41,12 +43,12 @@ Real-time data    Cloud sync/backup    Offline fallback
 ```
 
 **Core Systems Implemented**:
-- ✅ **Seoul API Integration** (`src/services/api/seoulSubwayApi.ts`)
-- ✅ **Push Notifications** (`src/services/notification/notificationService.ts`) 
-- ✅ **Location Services** (`src/services/location/locationService.ts`)
-- ✅ **Data Management** (`src/services/data/dataManager.ts`)
-- ✅ **Custom Hooks** (`src/hooks/`)
-- ✅ **Utility Functions** (`src/utils/`)
+- ✅ **Seoul API Integration** ([src/services/api/seoulSubwayApi.ts](src/services/api/seoulSubwayApi.ts))
+- ✅ **Push Notifications** ([src/services/notification/notificationService.ts](src/services/notification/notificationService.ts))
+- ✅ **Location Services** ([src/services/location/locationService.ts](src/services/location/locationService.ts))
+- ✅ **Data Management** ([src/services/data/dataManager.ts](src/services/data/dataManager.ts))
+- ✅ **Custom Hooks** ([src/hooks/](src/hooks/))
+- ✅ **Utility Functions** ([src/utils/](src/utils/))
 
 ## Domain-Driven Structure
 
@@ -125,10 +127,10 @@ await notificationService.sendDelayAlert(
 3. **Execution**: Systematic implementation with validation
 
 **Reference Documentation**:
-- `vooster-docs/step-by-step.md` - Development methodology
-- `vooster-docs/guideline.md` - Coding standards  
-- `vooster-docs/architecture.md` - Technical architecture
-- `vooster-docs/clean-code.md` - Code quality guidelines
+- [vooster-docs/step-by-step.md](vooster-docs/step-by-step.md) - Development methodology
+- [vooster-docs/guideline.md](vooster-docs/guideline.md) - Coding standards
+- [vooster-docs/architecture.md](vooster-docs/architecture.md) - Technical architecture
+- [vooster-docs/clean-code.md](vooster-docs/clean-code.md) - Code quality guidelines
 
 ## API Integration Details
 
@@ -161,10 +163,10 @@ import { useRealtimeTrains } from '@hooks/useRealtimeTrains';
 ## Common Development Tasks
 
 ### Adding New Station Features
-1. Update `models/train.ts` for new data types
-2. Extend `seoulSubwayApi.ts` with new endpoints  
-3. Create custom hook in `hooks/` for state management
-4. Add UI components in `components/train/`
+1. Update [src/models/train.ts](src/models/train.ts) for new data types
+2. Extend [src/services/api/seoulSubwayApi.ts](src/services/api/seoulSubwayApi.ts) with new endpoints
+3. Create custom hook in [src/hooks/](src/hooks/) for state management
+4. Add UI components in [src/components/train/](src/components/train/)
 5. Update utility functions if needed
 
 ### Location-Based Features
@@ -214,12 +216,12 @@ FIREBASE_APP_ID=your_app_id
 ## Deployment Considerations
 
 **iOS Specific**:
-- Location permission descriptions in `app.json`
+- Location permission descriptions in [app.json](app.json)
 - Background location requires special approval
 - Push notification certificates required
 
-**Android Specific**:  
-- Location permissions configured in `app.json`
+**Android Specific**:
+- Location permissions configured in [app.json](app.json)
 - Notification channels properly configured
 - Google Play Console setup for push notifications
 
@@ -254,3 +256,7 @@ FIREBASE_APP_ID=your_app_id
 ---
 
 *Generated for T-004 completion - Production-ready real-time Seoul subway notification system*
+
+## Task Master AI Instructions
+**Import Task Master's development workflow commands and guidelines, treat as if import is in the main CLAUDE.md file.**
+@./.taskmaster/CLAUDE.md

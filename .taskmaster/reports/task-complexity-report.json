@@ -1,0 +1,93 @@
+{
+	"meta": {
+		"generatedAt": "2025-10-02T16:16:56.709Z",
+		"tasksAnalyzed": 10,
+		"totalTasks": 10,
+		"analysisCount": 10,
+		"thresholdScore": 5,
+		"projectName": "Taskmaster",
+		"usedResearch": true
+	},
+	"complexityAnalysis": [
+		{
+			"taskId": 1,
+			"taskTitle": "위젯 및 애플 워치 컴플리케이션 구현",
+			"complexityScore": 9,
+			"recommendedSubtasks": 8,
+			"expansionPrompt": "iOS 위젯과 애플 워치 컴플리케이션은 각각 다른 플랫폼별 구현이 필요합니다. expo-widget-kit 설정, WidgetKit 프레임워크 구현, TimelineProvider 구성, WatchConnectivity 연동, 다양한 위젯 사이즈별 UI, 백그라운드 데이터 갱신 로직, 배터리 최적화, 그리고 물리적 기기 테스트로 세분화하세요.",
+			"reasoning": "네이티브 iOS 플랫폼 전용 기능으로 Expo 환경에서 까다로운 구현. WidgetKit과 WatchConnectivity는 복잡한 아키텍처를 요구하며, 백그라운드 업데이트와 배터리 최적화가 필수적입니다."
+		},
+		{
+			"taskId": 2,
+			"taskTitle": "오프라인 모드 및 캐시 전략 구현",
+			"complexityScore": 7,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "3-tier 캐싱 시스템 구현을 체계적으로 접근하세요. AsyncStorage 설정, SQLite 데이터베이스 스키마 설계, react-query/tanstack-query 통합, MMKV 고성능 저장소 구현, 네트워크 상태 감지 로직, 그리고 stale-while-revalidate 패턴 적용으로 나누어 구현하세요.",
+			"reasoning": "기존 dataManager와 AsyncStorage 인프라가 있어 기반은 마련되었으나, SQLite 통합과 복잡한 캐시 전략이 중간 수준의 복잡도를 요구합니다."
+		},
+		{
+			"taskId": 3,
+			"taskTitle": "사용자 제보 시스템 구현",
+			"complexityScore": 6,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "Firebase 기반 크라우드소싱 시스템을 단계별로 구축하세요. GPS 기반 역 자동 감지 로직, 제보 UI 컴포넌트 개발, Firebase Firestore 스키마 설계, 신뢰도 점수 알고리즘 구현, 그리고 스팸 필터링 Cloud Functions 개발로 세분화하세요.",
+			"reasoning": "Firebase 인프라와 기본 GPS 서비스가 이미 구축되어 있어 복잡도가 중간 수준입니다. 신뢰도 알고리즘과 스팸 필터링이 주요 복잡성 요소입니다."
+		},
+		{
+			"taskId": 4,
+			"taskTitle": "실시간 혼잡도 정보 시스템 구현",
+			"complexityScore": 8,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "ML 기반 혼잡도 예측 시스템을 체계적으로 구현하세요. 서울교통공사 API 연동, TensorFlow Lite 모델 통합, 사용자 제보 데이터와 공식 데이터 융합 알고리즘, 시간대별 패턴 학습 모델, 객차별 혼잡도 시각화 UI, 프리미엄 기능 게이팅, 그리고 실시간 예측 성능 최적화로 세분화하세요.",
+			"reasoning": "머신러닝 모델 통합과 실시간 데이터 처리가 높은 복잡도를 요구합니다. 사용자 제보 시스템에 의존하므 의존성도 고려해야 합니다."
+		},
+		{
+			"taskId": 5,
+			"taskTitle": "ML 기반 출퇴근 패턴 학습 및 예측 알림 시스템",
+			"complexityScore": 8,
+			"recommendedSubtasks": 7,
+			"expansionPrompt": "개인화된 ML 패턴 학습 시스템을 구현하세요. 온디바이스 ML 모델 설정, 사용자 이동 패턴 데이터 수집 로직, 요일별/계절별 패턴 분석 알고리즘, 지연 예측 기반 대안 경로 제안 엔진, proactive 알림 시스템, federated learning 프라이버시 보호, 그리고 예측 정확도 검증 메트릭으로 세분화하세요.",
+			"reasoning": "온디바이스 ML과 복잡한 패턴 분석이 높은 기술적 복잡도를 요구합니다. 개인정보보호와 federated learning 구현이 추가적인 도전 요소입니다."
+		},
+		{
+			"taskId": 6,
+			"taskTitle": "대체 노선 추천 엔진 구현",
+			"complexityScore": 9,
+			"recommendedSubtasks": 8,
+			"expansionPrompt": "멀티모달 경로 최적화 엔진을 단계별로 구현하세요. 외부 API (TMAP, 카카오맵, Google Directions) 통합, Dijkstra/A* 알고리즘 구현, 지하철+버스+택시+도보 조합 최적화 로직, 실시간 교통 상황 반영 시스템, react-native-maps 경로 시각화, 단계별 네비게이션 UI, 실시간 버스 도착 정보 연동, 그리고 경로 점수 기반 랭킹 시스템으로 세분화하세요.",
+			"reasoning": "다중 API 통합, 복잡한 그래프 알고리즘, 실시간 데이터 처리가 최고 수준의 복잡도를 요구합니다. 다양한 교통수단의 조합 최적화는 매우 도전적인 과제입니다."
+		},
+		{
+			"taskId": 7,
+			"taskTitle": "프리미엄 구독 결제 시스템 구현",
+			"complexityScore": 7,
+			"recommendedSubtasks": 6,
+			"expansionPrompt": "크로스플랫폼 인앱 결제 시스템을 체계적으로 구현하세요. App Store Connect/Google Play Console 설정, expo-in-app-purchases 또는 react-native-iap 통합, Firebase Cloud Functions 영수증 검증 서버 로직, 구독 상태 동기화 시스템, 프리미엄 기능 게이팅 구현, 그리고 결제 실패/환불 처리 로직으로 세분화하세요.",
+			"reasoning": "인앱 결제는 플랫폼별 복잡한 설정과 보안 요구사항이 있습니다. 영수증 검증과 구독 관리가 중간 수준의 복잡도를 요구합니다."
+		},
+		{
+			"taskId": 8,
+			"taskTitle": "광고 시스템 및 수익화 구현",
+			"complexityScore": 5,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "광고 수익화 시스템을 단계별로 구현하세요. Google AdMob SDK 설정 및 네이티브/배너 광고 통합, mediation 설정으로 여러 광고 네트워크 연동, 프리미엄 사용자 광고 제거 로직, 그리고 GDPR 준수 사용자 동의 관리 시스템으로 세분화하세요.",
+			"reasoning": "기본적인 광고 SDK 통합으로 비교적 단순합니다. 프리미엄 구독 시스템이 구현된 후 의존성 해결이 필요하지만 표준적인 구현 패턴을 따릅니다."
+		},
+		{
+			"taskId": 9,
+			"taskTitle": "성능 최적화 및 모니터링 구현",
+			"complexityScore": 6,
+			"recommendedSubtasks": 5,
+			"expansionPrompt": "종합 성능 모니터링 시스템을 확장하세요. 기존 crashReportingService 확장 및 Sentry/Flipper 통합, React Native Performance Monitor 설정, 이미지 캐싱 최적화 (expo-image/react-native-fast-image), code splitting과 lazy loading 구현, 그리고 Hermes 엔진 최적화 설정으로 세분화하세요.",
+			"reasoning": "기존 모니터링 인프라(crashReportingService, performanceUtils)가 구축되어 있어 복잡도가 중간 수준입니다. 확장과 최적화가 주요 작업입니다."
+		},
+		{
+			"taskId": 10,
+			"taskTitle": "접근성 개선 및 UI/UX 폴리시",
+			"complexityScore": 5,
+			"recommendedSubtasks": 4,
+			"expansionPrompt": "포괄적 접근성 개선을 체계적으로 진행하세요. 기존 접근성 속성 확장 및 스크린 리더 최적화, 색상 대비비 4.5:1 준수 및 다크모드 지원 구현, 색맹 사용자를 위한 패턴/아이콘 추가, 그리고 TTS 음성 안내 기능 (expo-speech) 및 햅틱 피드백 구현으로 세분화하세요.",
+			"reasoning": "기존 컴포넌트(StationCard 등)에 접근성 속성이 이미 구현되어 있어 기반이 마련되었습니다. WCAG 2.1 AA 준수를 위한 추가 개선이 주요 작업입니다."
+		}
+	]
+}

@@ -10,7 +10,8 @@ export type {
   Train,
   TrainDelay,
   CongestionData,
-  TrainSchedule
+  TrainSchedule,
+  ServiceDisruption
 } from './train';
 
 export {

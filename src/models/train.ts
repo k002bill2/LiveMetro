@@ -53,6 +53,18 @@ export interface TrainDelay {
   readonly reportedAt: Date;
 }
 
+export interface ServiceDisruption {
+  readonly id: string;
+  readonly lineId: string;
+  readonly lineName: string;
+  readonly stationName: string;
+  readonly status: TrainStatus;
+  readonly message: string;
+  readonly severity: DelaySeverity;
+  readonly reportedAt: Date;
+  readonly affectedDirections: readonly ('up' | 'down')[];
+}
+
 export enum DelaySeverity {
   MINOR = 'minor',        // 1-5 minutes
   MODERATE = 'moderate',  // 6-15 minutes

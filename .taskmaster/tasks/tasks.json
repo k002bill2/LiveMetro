@@ -1,0 +1,784 @@
+{
+  "master": {
+    "tasks": [
+      {
+        "id": 1,
+        "title": "위젯 및 애플 워치 컴플리케이션 구현",
+        "description": "iOS 잠금화면 위젯과 애플 워치 컴플리케이션을 통한 실시간 지하철 정보 표시 기능 개발",
+        "details": "expo-widget-kit 또는 react-native-widget-center를 활용하여 iOS 14+ 위젯 구현. 잠금화면에서 즐겨찾기 역의 실시간 도착 정보를 표시하고, 애플 워치 컴플리케이션으로 혼잡도와 지연 정보 제공. WidgetKit 프레임워크 사용하여 TimelineProvider 구현, 30초마다 자동 갱신되는 실시간 데이터 표시. 워치 컴플리케이션은 WatchConnectivity 프레임워크로 iPhone 앱과 데이터 동기화",
+        "testStrategy": "물리적 iOS 기기와 애플 워치에서 위젯 표시 확인, 백그라운드 데이터 갱신 주기 검증, 배터리 소모량 측정, 다양한 위젯 사이즈별 UI 렌더링 테스트",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "expo-widget-kit 설정 및 기본 위젯 구조 구현",
+            "description": "expo-widget-kit 라이브러리 설치 및 iOS 위젯 기본 설정 구성",
+            "dependencies": [],
+            "details": "expo-widget-kit 또는 react-native-widget-center 설치, app.json에 위젯 설정 추가, 기본 위젯 컴포넌트 생성 및 번들링 설정 구성",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "WidgetKit TimelineProvider 구현",
+            "description": "iOS WidgetKit 프레임워크를 활용한 시간선 제공자 구현",
+            "dependencies": [
+              "1.1"
+            ],
+            "details": "TimelineProvider 인터페이스 구현, 30초 간격 자동 갱신 로직 개발, 위젯 데이터 업데이트 스케줄링 및 백그라운드 처리 구현",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "위젯용 지하철 데이터 API 연동",
+            "description": "위젯에서 실시간 지하철 정보를 가져오는 데이터 레이어 구현",
+            "dependencies": [
+              "1.2"
+            ],
+            "details": "Seoul API 호출 최적화, 위젯 전용 데이터 포맷팅, 즐겨찾기 역 정보 필터링, 네트워크 오류 처리 및 캐시 fallback 로직 구현",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "다양한 위젯 사이즈별 UI 컴포넌트 개발",
+            "description": "Small, Medium, Large 위젯 사이즈별 최적화된 UI 레이아웃 구현",
+            "dependencies": [
+              "1.3"
+            ],
+            "details": "systemSmall, systemMedium, systemLarge 위젯 레이아웃 디자인, 지하철 도착 정보 표시 최적화, 노선 색상 및 아이콘 표시, 텍스트 크기 반응형 조정",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "WatchConnectivity 프레임워크 연동",
+            "description": "iPhone 앱과 Apple Watch 간 데이터 동기화 시스템 구현",
+            "dependencies": [
+              "1.4"
+            ],
+            "details": "WatchConnectivity 세션 설정, iPhone-Watch 양방향 데이터 전송, 즐겨찾기 역 동기화, 실시간 지하철 정보 전송 프로토콜 구현",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Apple Watch 컴플리케이션 개발",
+            "description": "Apple Watch 컴플리케이션을 통한 혼잡도 및 지연 정보 표시",
+            "dependencies": [
+              "1.5"
+            ],
+            "details": "Watch 컴플리케이션 템플릿 구현, 혼잡도 시각화 인디케이터, 지연 시간 표시, 복잡성 패밀리별 UI 최적화, 탭 제스처 핸들링",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "백그라운드 데이터 갱신 및 배터리 최적화",
+            "description": "백그라운드에서 효율적인 데이터 갱신 및 배터리 소모 최적화",
+            "dependencies": [
+              "1.6"
+            ],
+            "details": "Background App Refresh 최적화, 배터리 효율적인 업데이트 주기 설정, 불필요한 API 호출 방지, 저전력 모드 대응 로직 구현",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "물리적 기기 테스트 및 배포 준비",
+            "description": "실제 iPhone 및 Apple Watch에서 위젯과 컴플리케이션 동작 검증",
+            "dependencies": [
+              "1.7"
+            ],
+            "details": "실제 iOS 기기에서 위젯 표시 테스트, Apple Watch 컴플리케이션 동작 확인, 데이터 갱신 주기 검증, 배터리 소모량 측정, App Store 심사 준비",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 2,
+        "title": "오프라인 모드 및 캐시 전략 구현",
+        "description": "지하구간 및 네트워크 연결 불안정 상황에서의 오프라인 데이터 접근 기능 개발",
+        "details": "@react-native-async-storage/async-storage와 expo-sqlite를 활용한 하이브리드 캐싱 전략 구현. 최근 1시간 지하철 도착 정보, 즐겨찾기 역 데이터, 노선도 정보를 로컬 SQLite DB에 저장. react-query 또는 tanstack-query로 stale-while-revalidate 패턴 적용, 네트워크 상태 감지하여 자동 캐시/온라인 모드 전환. MMKV 라이브러리로 고성능 키-값 저장소 구현",
+        "testStrategy": "네트워크 연결 차단 상태에서 앱 기능 동작 확인, 캐시 데이터 정확성 검증, 지하철 구간 실제 테스트, 캐시 용량 제한 및 LRU 정책 테스트",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "AsyncStorage 및 MMKV 고성능 저장소 설정",
+            "description": "AsyncStorage 기본 설정과 MMKV 라이브러리를 활용한 고성능 키-값 저장소 구현",
+            "dependencies": [],
+            "details": "react-native-mmkv 또는 flipper-plugin-mmkv 설치 및 설정. AsyncStorage wrapper 클래스 구현하여 기본 캐시 데이터 저장. MMKV 인스턴스 생성 및 암호화 설정. 즐겨찾기 역 정보, 사용자 설정 등 자주 접근하는 데이터를 MMKV에 저장하는 캐시 매니저 클래스 구현. storage size 제한 및 정리 로직 포함",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "SQLite 데이터베이스 스키마 설계 및 구현",
+            "description": "expo-sqlite를 활용한 로컬 데이터베이스 스키마 설계 및 마이그레이션 시스템 구현",
+            "dependencies": [
+              "2.1"
+            ],
+            "details": "지하철 노선 정보, 역 정보, 실시간 도착 데이터를 위한 테이블 스키마 설계. 인덱스 최적화 및 쿼리 성능 고려. 데이터베이스 마이그레이션 시스템 구현. 최근 1시간 도착 정보 저장을 위한 TTL(Time To Live) 로직 구현. 압축된 JSON 형태로 복잡한 데이터 저장 및 검색 최적화",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "네트워크 상태 감지 및 연결 관리",
+            "description": "@react-native-netinfo를 활용한 네트워크 상태 실시간 감지 및 연결 상태 관리 시스템 구현",
+            "dependencies": [
+              "2.1",
+              "2.2"
+            ],
+            "details": "NetInfo 라이브러리로 WiFi, 셀룰러, 연결 끊김 상태 감지. 연결 품질 및 속도 측정. 지하철 구간 감지를 위한 GPS 기반 네트워크 상태 예측 로직. 오프라인/온라인 모드 자동 전환 및 사용자 알림. 연결 복구 시 자동 동기화 트리거 구현",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "TanStack Query 통합 및 캐시 전략 구현",
+            "description": "react-query(TanStack Query)를 활용한 stale-while-revalidate 패턴 및 하이브리드 캐시 전략 구현",
+            "dependencies": [
+              "2.2",
+              "2.3"
+            ],
+            "details": "TanStack Query 설정 및 QueryClient 구성. 지하철 도착 정보, 역 정보에 대한 Query 키 설계. stale time, cache time 최적화 설정. 오프라인 시 SQLite에서 데이터 조회, 온라인 시 API 호출 후 캐시 업데이트하는 하이브리드 로직 구현. Background refetch 및 retry 정책 설정",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "캐시 동기화 및 데이터 일관성 관리",
+            "description": "3-tier 캐시 시스템 간 데이터 동기화 및 일관성 보장 로직 구현",
+            "dependencies": [
+              "2.2",
+              "2.3",
+              "2.4"
+            ],
+            "details": "MMKV - AsyncStorage - SQLite 간 데이터 동기화 메커니즘 구현. 데이터 우선순위 및 fallback 로직 설계 (MMKV → SQLite → API). 캐시 invalidation 전략 및 자동 정리 시스템. 데이터 버전 관리 및 충돌 해결 로직. 사용자 액션에 따른 선택적 캐시 갱신",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "오프라인 모드 UI 및 사용자 경험 구현",
+            "description": "오프라인 상태 표시 및 캐시된 데이터 활용 사용자 인터페이스 구현",
+            "dependencies": [
+              "2.3",
+              "2.4",
+              "2.5"
+            ],
+            "details": "오프라인/온라인 상태 표시 컴포넌트 구현. 캐시된 데이터 표시 시 타임스탬프 및 신뢰도 표시. 데이터 업데이트 불가 상황에 대한 사용자 안내 메시지. 수동 새로고침 기능 및 로딩 상태 표시. 캐시 관리 설정 화면 (캐시 크기, 자동 정리 주기 등) 구현",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "사용자 제보 시스템 구현",
+        "description": "크라우드소싱 기반 지연·혼잡 정보 수집 및 검증 시스템 개발",
+        "details": "Firebase Firestore를 활용한 실시간 사용자 제보 수집 시스템 구현. GPS 위치 기반 역 자동 감지, 제보 신뢰도 점수 알고리즘(사용자 평판, 제보 빈도, 위치 정확도 기반), 스팸 필터링 Cloud Functions 개발. react-native-image-picker로 사진 첨부 기능, Firebase Storage 연동. 제보 카테고리: 지연, 혼잡도, 시설 문제, 사고 등. Moderation API 또는 OpenAI GPT-4로 부적절한 내용 자동 필터링",
+        "testStrategy": "다양한 위치에서 제보 정확성 검증, 스팸 필터링 효과성 테스트, 제보 신뢰도 알고리즘 A/B 테스트, 이미지 업로드 성능 측정",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "GPS 기반 역 자동 감지 로직 구현",
+            "description": "사용자의 현재 위치를 기반으로 가장 가까운 지하철역을 자동으로 감지하는 시스템 개발",
+            "dependencies": [],
+            "details": "react-native-location 또는 expo-location을 활용하여 GPS 좌표 수집, 지하철역 좌표 데이터베이스와 비교하여 최근접 역 계산. Haversine 공식을 사용한 거리 계산 알고리즘 구현, 지오펜싱으로 역 반경 100m 내 진입 감지. 위치 권한 요청 및 정확도 설정 최적화",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "제보 UI 컴포넌트 및 카테고리 시스템 개발",
+            "description": "사용자가 쉽게 제보할 수 있는 직관적인 인터페이스와 제보 카테고리 분류 시스템 구현",
+            "dependencies": [
+              "3.1"
+            ],
+            "details": "제보 카테고리(지연, 혼잡도, 시설 문제, 사고) 선택 UI, react-native-image-picker를 활용한 사진 첨부 기능, 텍스트 입력 및 미리 정의된 템플릿 제공. 별점 평가 시스템, 긴급도 표시 옵션, 실시간 제보 미리보기 기능 구현",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Firebase Firestore 제보 스키마 설계 및 구현",
+            "description": "제보 데이터를 효율적으로 저장하고 조회할 수 있는 Firestore 데이터베이스 구조 설계",
+            "dependencies": [],
+            "details": "제보 컬렉션 구조 설계(사용자ID, 역명, 제보타입, 위치정보, 타임스탬프, 사진URL, 신뢰도점수), 인덱스 최적화로 실시간 쿼리 성능 향상, Firebase Storage와 연동하여 이미지 파일 관리, 사용자별 제보 이력 추적 시스템 구현",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "신뢰도 점수 알고리즘 구현",
+            "description": "사용자 평판, 제보 빈도, 위치 정확도를 기반으로 한 제보 신뢰성 평가 시스템 개발",
+            "dependencies": [
+              "3.2",
+              "3.3"
+            ],
+            "details": "사용자 평판 점수(과거 제보 정확도, 계정 생성일, 활동 패턴), 제보 빈도 분석(스팸 의심 패턴 감지), GPS 위치 정확도 점수를 종합한 신뢰도 계산 알고리즘. 기계학습 기반 이상 패턴 감지, 제보 검증을 위한 크로스 체크 시스템 구현",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "스팸 필터링 Cloud Functions 개발",
+            "description": "부적절한 내용과 스팸 제보를 자동으로 감지하고 필터링하는 서버리스 함수 구현",
+            "dependencies": [
+              "3.3"
+            ],
+            "details": "Firebase Cloud Functions로 실시간 제보 모니터링, OpenAI GPT-4 또는 Google Cloud Natural Language API를 활용한 텍스트 내용 분석, 이미지 내 부적절한 콘텐츠 감지를 위한 Vision API 연동. 자동 신고 시스템, 관리자 검토 대기열, 사용자 계정 제재 시스템 구현",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 4,
+        "title": "실시간 혼잡도 정보 시스템 구현",
+        "description": "IoT 센서 데이터 및 크라우드소싱을 통한 객차별 혼잡도 정보 제공 기능 개발",
+        "details": "서울교통공사 실시간 혼잡도 API 연동 및 머신러닝 기반 혼잡도 예측 모델 구현. TensorFlow Lite 또는 React Native ML Kit으로 온디바이스 혼잡도 예측. 사용자 제보 데이터와 공식 센서 데이터를 결합한 하이브리드 혼잡도 계산. Firebase ML 또는 AWS SageMaker로 시간대별, 요일별 혼잡도 패턴 학습. 객차별 혼잡도는 프리미엄 기능으로 제공, 색상 코딩(녹색: 여유, 주황: 보통, 빨강: 혼잡)으로 시각화",
+        "testStrategy": "실제 지하철 혼잡도와 예측값 비교 검증, 머신러닝 모델 정확도 측정, 다양한 시간대/노선별 혼잡도 데이터 수집 및 분석",
+        "priority": "medium",
+        "dependencies": [
+          3
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "서울교통공사 혼잡도 API 연동 구현",
+            "description": "서울교통공사 실시간 혼잡도 API 연결 및 데이터 파싱 시스템 구축",
+            "dependencies": [],
+            "details": "서울교통공사에서 제공하는 실시간 혼잡도 API 엔드포인트 분석 및 연동. API 키 관리, 요청 제한 처리, 에러 핸들링 구현. 혼잡도 데이터 정규화 및 표준화 처리. src/services/api/crowdingApi.ts 파일에 API 클라이언트 구현",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "TensorFlow Lite 혼잡도 예측 모델 통합",
+            "description": "온디바이스 머신러닝 모델을 통한 실시간 혼잡도 예측 시스템 구현",
+            "dependencies": [
+              "4.1"
+            ],
+            "details": "TensorFlow Lite 또는 React Native ML Kit 설정 및 혼잡도 예측 모델 개발. 시간대, 요일, 날씨, 이벤트 데이터를 input feature로 활용. 모델 훈련을 위한 historical 데이터 수집 및 전처리. src/services/ml/crowdingPredictor.ts에 예측 엔진 구현",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "사용자 제보 데이터 수집 시스템 구현",
+            "description": "크라우드소싱을 통한 실시간 혼잡도 사용자 제보 기능 개발",
+            "dependencies": [],
+            "details": "사용자가 현재 탑승한 객차의 혼잡도를 쉽게 제보할 수 있는 UI 구현. 제보 데이터 검증 로직 및 스팸 필터링. Firebase Firestore에 제보 데이터 실시간 저장. 제보 인센티브 시스템 (포인트, 배지 등) 구현. src/components/crowding/ReportCrowding.tsx에 제보 컴포넌트 구현",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "하이브리드 혼잡도 계산 알고리즘 구현",
+            "description": "공식 센서 데이터와 사용자 제보를 결합한 정확도 높은 혼잡도 계산 시스템",
+            "dependencies": [
+              "4.1",
+              "4.2",
+              "4.3"
+            ],
+            "details": "공식 API 데이터와 사용자 제보 데이터의 가중치 기반 융합 알고리즘 개발. 데이터 신뢰도 평가 및 이상치 탐지 로직. 실시간 혼잡도 업데이트 및 캐싱 전략. 머신러닝 예측과 실제 데이터의 보정 메커니즘. src/services/data/crowdingCalculator.ts에 계산 엔진 구현",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "시간대별 혼잡도 패턴 학습 모델 구현",
+            "description": "Firebase ML 또는 AWS SageMaker를 활용한 혼잡도 패턴 분석 및 예측 모델",
+            "dependencies": [
+              "4.2",
+              "4.4"
+            ],
+            "details": "시간대별, 요일별, 계절별 혼잡도 패턴 데이터 수집 및 분석. Firebase ML 또는 AWS SageMaker로 클라우드 기반 학습 파이프라인 구축. 모델 업데이트 자동화 및 A/B 테스팅. 예측 정확도 모니터링 및 모델 성능 최적화. src/services/ml/patternLearning.ts에 학습 시스템 구현",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "객차별 혼잡도 시각화 UI 구현",
+            "description": "색상 코딩과 직관적인 그래픽으로 객차별 혼잡도를 표시하는 사용자 인터페이스",
+            "dependencies": [
+              "4.4"
+            ],
+            "details": "지하철 편성도 기반의 객차별 혼잡도 시각화 컴포넌트 개발. 녹색(여유), 주황(보통), 빨강(혼잡) 색상 코딩 시스템. 실시간 애니메이션 효과 및 터치 인터랙션. 접근성을 고려한 패턴/아이콘 추가 표시. src/components/crowding/TrainCrowdingMap.tsx에 시각화 컴포넌트 구현",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "프리미엄 기능 게이팅 및 성능 최적화",
+            "description": "객차별 혼잡도 프리미엄 기능 구현 및 실시간 예측 성능 최적화",
+            "dependencies": [
+              "4.5",
+              "4.6"
+            ],
+            "details": "프리미엄 구독 사용자만 객차별 세부 혼잡도 접근 가능하도록 게이팅 구현. 무료 사용자는 전체 열차 혼잡도만 제공. 실시간 예측 성능 최적화 (응답시간 3초 이내). 배터리 효율성을 고려한 백그라운드 업데이트 최적화. 메모리 사용량 최적화 및 캐시 전략 개선. src/services/premium/crowdingGating.ts에 게이팅 시스템 구현",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 5,
+        "title": "ML 기반 출퇴근 패턴 학습 및 예측 알림 시스템",
+        "description": "사용자 이동 패턴을 학습하여 맞춤형 사전 알림 및 경로 최적화 제안 기능 개발",
+        "details": "@react-native-ml-kit 또는 TensorFlow.js로 온디바이스 패턴 학습 구현. 사용자의 출발/도착 시간, 이용 노선, 환승 패턴을 분석하여 개인화된 통근 프로필 생성. 요일별, 계절별 패턴 변화 감지, 휴일/평일 구분 학습. 지연 예측 시 대안 경로 자동 제안, 평소보다 15분 일찍 출발 필요 시 proactive 알림. Firebase Analytics로 학습 데이터 수집, 개인정보 보호를 위해 federated learning 적용 고려",
+        "testStrategy": "최소 2주간 사용자 패턴 수집 후 예측 정확도 측정, 다양한 통근 패턴 사용자별 맞춤화 효과 검증, 예측 알림의 사용자 만족도 조사",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "온디바이스 ML 모델 설정 및 초기화",
+            "description": "@react-native-ml-kit 또는 TensorFlow.js를 활용한 기본 ML 모델 구조 구현",
+            "dependencies": [],
+            "details": "TensorFlow.js Lite 모델을 React Native에 통합하고, 패턴 학습을 위한 기본 신경망 아키텍처 설정. 모델 초기화, 메모리 관리, 추론 엔진 구성을 포함한 ML 인프라 구축",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "사용자 이동 패턴 데이터 수집 시스템 구현",
+            "description": "출발/도착 시간, 이용 노선, 환승 패턴 등 학습 데이터 수집 로직 개발",
+            "dependencies": [
+              "5.1"
+            ],
+            "details": "위치 기반 역 진입/진출 감지, 시간대별 이동 기록, 노선 사용 패턴, 환승 횟수 및 경로 데이터를 자동 수집하는 백그라운드 서비스 구현. 개인정보보호를 위한 로컬 데이터 처리",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "요일별/계절별 패턴 분석 알고리즘 개발",
+            "description": "시간 시계열 데이터 분석을 통한 패턴 변화 감지 및 분류 시스템 구현",
+            "dependencies": [
+              "5.2"
+            ],
+            "details": "요일별(평일/주말), 계절별, 휴일 패턴을 구분하는 시계열 분석 알고리즘 구현. 패턴 변화 감지를 위한 anomaly detection과 트렌드 분석 로직 개발",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "지연 예측 및 대안 경로 제안 엔진 구현",
+            "description": "실시간 지연 정보를 기반으로 최적 대안 경로를 자동 계산하고 제안하는 시스템 개발",
+            "dependencies": [
+              "5.3"
+            ],
+            "details": "현재 지연 상황과 사용자 패턴을 고려한 대안 경로 알고리즘 구현. 환승 최소화, 소요시간 단축, 혼잡도 회피를 고려한 다중 경로 최적화 엔진 개발",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Proactive 알림 시스템 구현",
+            "description": "예측된 지연 및 사용자 패턴 기반 사전 알림 및 출발 시간 제안 기능 개발",
+            "dependencies": [
+              "5.4"
+            ],
+            "details": "평소 출발 시간 대비 15분 일찍 출발 필요 시 자동 알림, 날씨/교통상황 고려한 동적 출발 시간 조정, 개인화된 알림 스케줄링 시스템 구현",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "Federated Learning 프라이버시 보호 시스템 구현",
+            "description": "개인정보보호를 위한 연합학습 기반 모델 업데이트 및 데이터 익명화 시스템 개발",
+            "dependencies": [
+              "5.5"
+            ],
+            "details": "사용자 기기에서 모델 훈련 후 파라미터만 서버로 전송하는 federated learning 구현. 차등 프라이버시(differential privacy) 적용, Firebase Analytics 연동을 통한 익명화된 집단 학습 데이터 수집",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "예측 정확도 검증 및 성능 메트릭 시스템 구현",
+            "description": "ML 모델의 예측 정확도를 측정하고 지속적으로 개선하는 평가 시스템 개발",
+            "dependencies": [
+              "5.6"
+            ],
+            "details": "예측 정확도, 알림 적중률, 사용자 만족도 등 핵심 성능 지표 측정 시스템 구현. A/B 테스트 프레임워크, 모델 성능 모니터링 대시보드, 자동 모델 재훈련 로직 개발",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 6,
+        "title": "대체 노선 추천 엔진 구현",
+        "description": "지연 발생 시 실시간 교통상황을 고려한 최적 대안 경로 제안 시스템 개발",
+        "details": "TMAP API, 카카오맵 API, Google Directions API를 활용한 멀티모달 경로 탐색 엔진 구현. 지하철 + 버스, 택시, 도보 조합 최적화 알고리즘 개발. Dijkstra 또는 A* 알고리즘 기반 실시간 경로 계산, 교통 상황, 예상 소요시간, 비용을 종합한 점수 기반 순위화. react-native-maps로 대안 경로 시각화, 단계별 네비게이션 제공. 실시간 버스 도착 정보 연동, 예상 도착시간 계산",
+        "testStrategy": "다양한 지연 시나리오에서 대안 경로 정확성 검증, 실제 이동시간과 예측시간 비교, 사용자의 경로 선택률 및 만족도 측정",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "외부 API 통합 및 인증 설정",
+            "description": "TMAP API, 카카오맵 API, Google Directions API 연동 및 인증 시스템 구현",
+            "dependencies": [],
+            "details": "각 API의 인증키 관리, API 클라이언트 모듈 구현, 요청 제한 및 에러 처리 로직 구현. 환경변수를 통한 API 키 관리, 요청 재시도 메커니즘 및 fallback 처리",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "교통수단별 데이터 모델 정의",
+            "description": "지하철, 버스, 택시, 도보 각 교통수단의 데이터 구조 및 인터페이스 설계",
+            "dependencies": [
+              "6.1"
+            ],
+            "details": "TypeScript 타입 정의, 각 교통수단의 비용/시간/거리 계산 모델, 실시간 상태 정보 구조체 설계, 노드와 엣지 기반 그래프 데이터 모델링",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "경로 탐색 알고리즘 엔진 구현",
+            "description": "Dijkstra 또는 A* 알고리즘 기반 최적 경로 계산 엔진 개발",
+            "dependencies": [
+              "6.2"
+            ],
+            "details": "그래프 자료구조 구현, 휴리스틱 함수 설계, 다중 목적 함수 최적화 (시간, 비용, 편의성), 실시간 가중치 업데이트 메커니즘",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "멀티모달 경로 조합 최적화",
+            "description": "지하철+버스+택시+도보 조합의 최적 연결점 탐색 및 환승 최적화",
+            "dependencies": [
+              "6.3"
+            ],
+            "details": "환승역 기반 경로 연결, 각 교통수단간 환승 시간 계산, 복합 교통수단 조합 생성 알고리즘, 환승 횟수 및 대기시간 최소화 로직",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "실시간 교통상황 반영 시스템",
+            "description": "실시간 교통 데이터 수집 및 경로 가중치 동적 업데이트 시스템 구현",
+            "dependencies": [
+              "6.4"
+            ],
+            "details": "실시간 버스 위치 및 도착 정보 연동, 지하철 지연 정보 반영, 도로 교통상황 데이터 통합, 동적 가중치 조정 알고리즘, 캐싱 전략",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "경로 점수 기반 랭킹 시스템",
+            "description": "시간, 비용, 편의성을 종합한 점수 계산 및 경로 순위화 시스템 개발",
+            "dependencies": [
+              "6.5"
+            ],
+            "details": "다중 기준 점수 함수 설계, 사용자 선호도 반영 가중치 시스템, 경로별 종합 점수 계산, 동적 순위 재정렬 메커니즘",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 7,
+            "title": "react-native-maps 경로 시각화",
+            "description": "지도 상에 대안 경로를 시각적으로 표시하고 상호작용 가능한 UI 구현",
+            "dependencies": [
+              "6.6"
+            ],
+            "details": "다중 경로 폴리라인 렌더링, 교통수단별 색상 구분, 환승점 마커 표시, 경로 선택 인터랙션, 줌 레벨별 상세도 조정",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 8,
+            "title": "단계별 네비게이션 UI 구현",
+            "description": "선택된 경로의 단계별 안내 및 실시간 진행상황 추적 인터페이스 개발",
+            "dependencies": [
+              "6.7"
+            ],
+            "details": "턴바이턴 네비게이션 컴포넌트, 각 단계별 예상 시간 표시, 실시간 위치 추적 및 경로 이탈 감지, 음성 안내 통합, 재경로 탐색 기능",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 7,
+        "title": "프리미엄 구독 결제 시스템 구현",
+        "description": "광고 제거, 고급 기능 제공을 위한 인앱 결제 및 구독 관리 시스템 개발",
+        "details": "expo-in-app-purchases 또는 react-native-iap를 활용한 월 3,900원 구독 시스템 구현. App Store Connect, Google Play Console 설정, 영수증 검증 서버 로직 Firebase Cloud Functions로 개발. 프리미엄 기능: 광고 제거, 혼잡도 정보, 무제한 즐겨찾기, 워치 컴플리케이션. 결제 상태 동기화, 구독 갱신/취소 처리, 환불 정책 준수. RevenueCat SDK 고려하여 구독 관리 복잡성 단순화",
+        "testStrategy": "샌드박스 환경에서 구독 플로우 테스트, 결제 실패 시나리오 처리 검증, 구독 갱신/취소 프로세스 테스트, 영수증 검증 보안 테스트",
+        "priority": "medium",
+        "dependencies": [
+          4
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "App Store Connect 및 Google Play Console 설정",
+            "description": "iOS와 Android 스토어에서 인앱 결제 및 구독 상품 설정",
+            "dependencies": [],
+            "details": "App Store Connect에서 구독 그룹 생성 및 월 3,900원 구독 상품 등록, Google Play Console에서 인앱 상품 및 구독 설정. 세금 정보, 은행 계좌, 결제 계약 체결. 샌드박스 테스터 계정 생성 및 테스트 환경 구성. 각 플랫폼별 검토 가이드라인 준수 및 스크린샷, 메타데이터 업데이트",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "인앱 결제 라이브러리 통합",
+            "description": "expo-in-app-purchases 또는 react-native-iap 라이브러리 설정 및 구독 로직 구현",
+            "dependencies": [
+              "7.1"
+            ],
+            "details": "expo-in-app-purchases 라이브러리 설치 및 설정, 구독 상품 조회, 구매 요청, 구매 복원 기능 구현. 플랫폼별 결제 플로우 처리, 결제 대기 상태 UI, 구매 성공/실패 처리. iOS의 StoreKit, Android의 Google Play Billing 라이브러리 연동. 구독 상태 확인 및 만료일 추적 로직",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "Firebase Cloud Functions 영수증 검증 서버 구현",
+            "description": "서버 측 영수증 검증 및 구독 상태 관리 로직 개발",
+            "dependencies": [
+              "7.2"
+            ],
+            "details": "Firebase Cloud Functions으로 영수증 검증 엔드포인트 구현. iOS App Store 영수증 검증 API, Google Play Developer API 연동. 사용자 구독 상태를 Firestore에 저장 및 실시간 동기화. 영수증 위조 방지를 위한 보안 검증 로직, JWT 토큰 기반 인증. 구독 갱신, 취소, 환불 웹훅 처리",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "구독 상태 동기화 및 사용자 관리",
+            "description": "클라이언트와 서버 간 구독 상태 실시간 동기화 시스템 구현",
+            "dependencies": [
+              "7.3"
+            ],
+            "details": "사용자 프로필에 구독 정보 연동, Firestore 실시간 리스너로 구독 상태 동기화. 앱 실행 시 구독 상태 자동 확인 및 갱신, 구독 만료 알림 기능. 여러 기기에서 동일 계정 구독 상태 공유, 오프라인 상태에서의 구독 정보 캐싱. 구독 갱신 실패 시 graceful degradation 처리",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "프리미엄 기능 게이팅 시스템 구현",
+            "description": "구독 상태에 따른 프리미엄 기능 접근 제어 및 UI 구현",
+            "dependencies": [
+              "7.4"
+            ],
+            "details": "광고 제거, 혼잡도 정보, 무제한 즐겨찾기, 워치 컴플리케이션 등 프리미엄 기능별 접근 제어. 구독 상태별 UI 컴포넌트 조건부 렌더링, 프리미엄 기능 소개 및 구독 유도 화면. 무료 사용자 대상 기능 제한 안내 UI, 구독 혜택 강조 배지 시스템. Context API 또는 Zustand로 전역 구독 상태 관리",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 6,
+            "title": "결제 실패 및 환불 처리 시스템 구현",
+            "description": "결제 오류, 구독 취소, 환불 요청에 대한 처리 로직 및 UI 구현",
+            "dependencies": [
+              "7.5"
+            ],
+            "details": "결제 실패 시 재시도 로직 및 사용자 안내, 구독 취소 프로세스 구현. 환불 정책 준수 및 자동 환불 처리 시스템, 고객 지원을 위한 구매 이력 관리. 결제 분쟁 처리를 위한 로그 시스템, 사용자별 구매 영수증 보관. 구독 일시정지, 할인 쿠폰 시스템 등 고급 구독 관리 기능. RevenueCat SDK 통합 검토 및 마이그레이션 준비",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "광고 시스템 및 수익화 구현",
+        "description": "네이티브 광고와 배너 광고를 통한 기본 수익 모델 구현",
+        "details": "expo-ads-admob 또는 react-native-google-mobile-ads로 Google AdMob 연동. 역 리스트 사이 네이티브 광고, 하단 배너 광고 배치, 전면 광고는 앱 시작 시에만 표시. 광고 로딩 실패 시 fallback 처리, 광고 블록커 감지 및 대응. Facebook Audience Network, Unity Ads 등 mediation 설정으로 eCPM 최적화. 프리미엄 사용자는 광고 완전 제거, GDPR 준수를 위한 사용자 동의 관리",
+        "testStrategy": "다양한 광고 형태별 CTR 측정, 광고 로딩 속도 및 앱 성능 영향 분석, 사용자 경험 저해 정도 모니터링, 수익 최적화 A/B 테스트",
+        "priority": "medium",
+        "dependencies": [
+          7
+        ],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "Google AdMob SDK 설정 및 기본 광고 단위 구현",
+            "description": "expo-ads-admob 또는 react-native-google-mobile-ads를 사용하여 Google AdMob SDK를 설정하고 배너, 네이티브, 전면 광고 단위를 구현합니다.",
+            "dependencies": [],
+            "details": "AdMob 계정 생성 및 앱 등록, 광고 단위 ID 발급, SDK 설치 및 초기화 코드 작성, 기본 배너 광고 컴포넌트 구현, 네이티브 광고 템플릿 생성, 전면 광고 로직 구현, 광고 로딩 상태 관리 및 에러 핸들링",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "광고 배치 및 사용자 경험 최적화",
+            "description": "역 리스트 사이 네이티브 광고, 하단 배너 광고를 전략적으로 배치하고 사용자 경험을 해치지 않도록 최적화합니다.",
+            "dependencies": [
+              "8.1"
+            ],
+            "details": "역 리스트 컴포넌트에 네이티브 광고 삽입 로직 구현, 하단 고정 배너 광고 레이아웃 설계, 앱 시작 시 전면 광고 표시 로직, 광고 로딩 실패 시 fallback UI 처리, 광고 블록커 감지 및 대응 로직, 사용자 인터랙션 방해 최소화 설정",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "광고 mediation 및 수익 최적화 설정",
+            "description": "Facebook Audience Network, Unity Ads 등 다양한 광고 네트워크를 mediation으로 연동하여 eCPM을 최적화합니다.",
+            "dependencies": [
+              "8.1"
+            ],
+            "details": "AdMob mediation 설정 및 광고 네트워크 연동, Facebook Audience Network SDK 추가, Unity Ads SDK 통합, waterfall 설정으로 eCPM 최적화, 광고 성과 추적 및 분석 코드 구현, A/B 테스트를 위한 광고 그룹 설정",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "프리미엄 사용자 광고 제거 및 GDPR 준수 시스템",
+            "description": "프리미엄 구독 사용자의 광고 완전 제거 로직과 GDPR 준수를 위한 사용자 동의 관리 시스템을 구현합니다.",
+            "dependencies": [
+              "8.2"
+            ],
+            "details": "프리미엄 구독 상태 확인 로직 구현, 구독자 광고 비활성화 처리, GDPR 준수 동의 관리 화면 개발, 사용자 데이터 수집 동의 처리, 개인화 광고 동의 관리, 동의 철회 기능 구현, 유럽 사용자 감지 및 별도 처리 로직",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 9,
+        "title": "성능 최적화 및 모니터링 구현",
+        "description": "앱 성능, 크래시, 사용자 경험을 모니터링하고 최적화하는 시스템 구현",
+        "details": "@react-native-firebase/crashlytics, Sentry, Flipper를 활용한 종합 모니터링 시스템 구현. 앱 실행 시간, API 응답 시간, 메모리 사용량, 배터리 소모 추적. React Native Performance Monitor로 JS 스레드 차단 감지, 렌더링 성능 측정. Image caching with expo-image 또는 react-native-fast-image로 이미지 로딩 최적화. Code splitting, lazy loading으로 초기 로딩 시간 단축. Hermes 엔진 최적화 설정",
+        "testStrategy": "다양한 기기에서 성능 벤치마크 테스트, 메모리 누수 감지, 배터리 소모량 측정, 크래시 발생률 모니터링, 사용자 이탈 지점 분석",
+        "priority": "high",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "기존 모니터링 시스템 확장 및 Sentry/Flipper 통합",
+            "description": "crashReportingService를 확장하고 Sentry, Flipper를 통합한 종합 모니터링 시스템 구축",
+            "dependencies": [],
+            "details": "@react-native-firebase/crashlytics 기반 기존 crashReportingService 확장, Sentry SDK 통합으로 에러 트래킹 개선, Flipper 플러그인 설정으로 개발 환경 디버깅 강화, 성능 메트릭 수집을 위한 통합 대시보드 구성",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "React Native Performance Monitor 설정 및 성능 측정",
+            "description": "JS 스레드 차단 감지, 렌더링 성능 측정을 위한 Performance Monitor 구현",
+            "dependencies": [
+              "9.1"
+            ],
+            "details": "React Native Performance Monitor 라이브러리 설정, JS 스레드 차단 임계값 모니터링, FPS 및 렌더링 성능 측정, performanceUtils 확장하여 앱 실행 시간, API 응답 시간, 메모리 사용량 추적 기능 구현",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "이미지 캐싱 최적화 구현",
+            "description": "expo-image 또는 react-native-fast-image를 활용한 이미지 로딩 성능 최적화",
+            "dependencies": [
+              "9.2"
+            ],
+            "details": "expo-image와 react-native-fast-image 성능 비교 분석, 최적 라이브러리 선택 및 구현, 이미지 캐싱 전략 설계, 지하철 노선도 및 아이콘 이미지 로딩 속도 개선, 메모리 사용량 최적화",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "Code Splitting 및 Lazy Loading 구현",
+            "description": "초기 로딩 시간 단축을 위한 코드 분할 및 지연 로딩 시스템 구현",
+            "dependencies": [
+              "9.3"
+            ],
+            "details": "React.lazy() 및 Suspense를 활용한 컴포넌트 지연 로딩, Metro bundler 설정 최적화, 화면별 코드 스플리팅 적용, 번들 크기 분석 및 최적화, 초기 렌더링 성능 개선",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 5,
+            "title": "Hermes 엔진 최적화 설정 및 배터리 소모 모니터링",
+            "description": "Hermes 엔진 최적화 설정 적용 및 배터리 소모량 추적 시스템 구현",
+            "dependencies": [
+              "9.4"
+            ],
+            "details": "Hermes 엔진 설정 최적화, 바이트코드 프리컴파일 활성화, 배터리 소모량 측정 라이브러리 통합, 백그라운드 작업 최적화, 성능 벤치마크 테스트 수행 및 결과 분석",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "접근성 개선 및 UI/UX 폴리시",
+        "description": "시각/청각 장애인 접근성 개선 및 전반적인 사용자 경험 향상",
+        "details": "react-native-accessibility-info를 활용한 스크린 리더 지원, VoiceOver/TalkBack 최적화. 색상 대비비 4.5:1 이상 준수, 다크모드 지원, 큰 텍스트 크기 대응. Haptic Feedback으로 촉각 피드백 제공, react-native-haptic-feedback 사용. 지하철 노선별 색상을 색맹 사용자도 구분 가능하도록 패턴/아이콘 추가. 음성 안내 기능으로 역 도착 정보 TTS 제공, expo-speech 활용. WCAG 2.1 AA 준수",
+        "testStrategy": "스크린 리더 사용자 테스트, 색맹 시뮬레이터로 색상 구분 검증, 다양한 접근성 도구로 compliance 체크, 실제 장애인 사용자 피드백 수집",
+        "priority": "medium",
+        "dependencies": [],
+        "status": "pending",
+        "subtasks": [
+          {
+            "id": 1,
+            "title": "스크린 리더 최적화 및 접근성 속성 확장",
+            "description": "기존 컴포넌트의 접근성 속성을 확장하고 VoiceOver/TalkBack 최적화 구현",
+            "dependencies": [],
+            "details": "react-native-accessibility-info를 활용하여 StationCard 등 기존 컴포넌트의 접근성 속성(accessibilityLabel, accessibilityHint, accessibilityRole) 확장. 스크린 리더 사용자를 위한 의미있는 레이블 및 힌트 추가, 포커스 순서 최적화, 동적 콘텐츠 변경 시 접근성 알림 구현",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 2,
+            "title": "색상 접근성 및 다크모드 구현",
+            "description": "WCAG 2.1 AA 준수 색상 대비비 4.5:1 이상 확보 및 다크모드 지원",
+            "dependencies": [
+              "10.1"
+            ],
+            "details": "현재 색상 시스템 분석 후 대비비 4.5:1 이상 확보, 색맹 사용자를 위한 지하철 노선별 패턴/아이콘 추가. React Native Appearance API를 활용한 다크모드 지원, 큰 텍스트 크기 대응 (Dynamic Type). 색상 접근성 테스트 도구로 검증",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 3,
+            "title": "햅틱 피드백 시스템 구현",
+            "description": "react-native-haptic-feedback를 활용한 촉각 피드백 시스템 개발",
+            "dependencies": [
+              "10.2"
+            ],
+            "details": "중요한 상호작용(알림 수신, 즐겨찾기 추가, 오류 발생 등)에 적절한 햅틱 피드백 제공. iOS와 Android 플랫폼별 햅틱 패턴 최적화, 사용자 설정에서 햅틱 피드백 on/off 옵션 제공, 배터리 효율성 고려한 피드백 강도 조절",
+            "status": "pending",
+            "testStrategy": ""
+          },
+          {
+            "id": 4,
+            "title": "TTS 음성 안내 기능 구현",
+            "description": "expo-speech를 활용한 역 도착 정보 음성 안내 시스템 개발",
+            "dependencies": [
+              "10.3"
+            ],
+            "details": "expo-speech로 지하철 도착 정보, 지연 알림, 중요 공지사항의 TTS 제공. 한국어 음성 최적화, 말하기 속도 조절 기능, 백그라운드에서도 동작하는 음성 안내. 사용자 설정에서 음성 안내 활성화/비활성화, 음량 조절 옵션 제공",
+            "status": "pending",
+            "testStrategy": ""
+          }
+        ]
+      }
+    ],
+    "metadata": {
+      "created": "2025-10-02T16:14:42.505Z",
+      "updated": "2025-10-02T16:14:42.505Z",
+      "description": "Tasks for master context"
+    }
+  }
+}

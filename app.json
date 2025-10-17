@@ -1,6 +1,7 @@
 {
   "expo": {
     "name": "LiveMetro",
+    "entryPoint": "./index.js",
     "slug": "livemetro-subway-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -38,11 +39,11 @@
       "category": "navigation"
     },
     "android": {
+      "package": "com.livemetro.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1976d2"
       },
-      "package": "com.livemetro.app",
       "versionCode": 1,
       "playStoreUrl": "https://play.google.com/store/apps/details?id=com.livemetro.app",
       "permissions": [
@@ -81,7 +82,6 @@
         {
           "icon": "./assets/notification-icon.png",
           "color": "#1976d2",
-          "sounds": ["./assets/notification-sound.wav"],
           "mode": "production"
         }
       ]
