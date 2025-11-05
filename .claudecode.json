@@ -1,0 +1,73 @@
+{
+  "permissions": {
+    "allowedTools": [
+      "Read",
+      "Edit",
+      "Write(src/**)",
+      "Write(.claude/**)",
+      "Write(dev/**)",
+      "Bash(npm *)",
+      "Bash(npx *)",
+      "Bash(git *)",
+      "Bash(pm2 *)",
+      "Bash(lsof:*)",
+      "Bash(xargs kill:*)"
+    ],
+    "deny": [
+      "Read(.env*)",
+      "Write(.env*)",
+      "Bash(sudo *)",
+      "Bash(rm -rf *)"
+    ]
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/skillActivation.js \"$prompt\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Write(src/**/*.tsx)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx eslint --fix \"$file\" 2>/dev/null || true"
+          }
+        ]
+      },
+      {
+        "matcher": "Write(src/**/*.ts)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npx eslint --fix \"$file\" 2>/dev/null || true"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/selfCheck.js"
+          }
+        ]
+      }
+    ]
+  },
+  "statusline": {
+    "enabled": true,
+    "showTokens": true,
+    "showCost": true,
+    "showModel": true
+  }
+}

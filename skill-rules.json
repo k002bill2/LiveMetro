@@ -1,0 +1,135 @@
+{
+  "react-native-development": {
+    "type": "domain",
+    "enforcement": "suggest",
+    "priority": "high",
+    "promptTriggers": {
+      "keywords": ["component", "screen", "react native", "UI", "layout", "navigation"],
+      "intentPatterns": [
+        "(create|add|build).*?(component|screen|page)",
+        "(update|fix).*?(UI|layout|style)",
+        "(implement|add).*?(navigation|routing)"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": ["src/components/**/*.tsx", "src/screens/**/*.tsx"],
+      "contentPatterns": ["import.*React", "export.*Component", "StyleSheet.create"]
+    }
+  },
+
+  "firebase-integration": {
+    "type": "domain",
+    "enforcement": "suggest",
+    "priority": "high",
+    "promptTriggers": {
+      "keywords": ["firebase", "firestore", "auth", "database", "cloud"],
+      "intentPatterns": [
+        "(setup|configure|add).*?(firebase|firestore)",
+        "(create|update).*?(collection|document)",
+        "(implement|add).*?(auth|login|signup)"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": ["src/services/firebase/**/*.ts"],
+      "contentPatterns": ["firebase", "firestore", "collection", "doc"]
+    }
+  },
+
+  "location-services": {
+    "type": "domain",
+    "enforcement": "suggest",
+    "priority": "high",
+    "promptTriggers": {
+      "keywords": ["location", "GPS", "geolocation", "tracking", "nearby"],
+      "intentPatterns": [
+        "(implement|add).*?(location|GPS|tracking)",
+        "(find|get).*?(nearby|stations|location)",
+        "(setup|configure).*?(geofencing|location)"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": ["src/services/location/**/*.ts"],
+      "contentPatterns": ["Location\\.", "getCurrentPositionAsync", "watchPositionAsync"]
+    }
+  },
+
+  "notification-system": {
+    "type": "domain",
+    "enforcement": "suggest",
+    "priority": "high",
+    "promptTriggers": {
+      "keywords": ["notification", "alert", "push", "message"],
+      "intentPatterns": [
+        "(send|create|schedule).*?(notification|alert|push)",
+        "(implement|add).*?(notification|alert)",
+        "(setup|configure).*?(push notification)"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": ["src/services/notification/**/*.ts"],
+      "contentPatterns": ["Notifications\\.", "scheduleNotificationAsync", "requestPermissionsAsync"]
+    }
+  },
+
+  "api-integration": {
+    "type": "domain",
+    "enforcement": "suggest",
+    "priority": "high",
+    "promptTriggers": {
+      "keywords": ["API", "endpoint", "fetch", "request", "seoul"],
+      "intentPatterns": [
+        "(call|fetch|request).*?(API|endpoint)",
+        "(implement|add).*?(API|integration)",
+        "(setup|configure).*?(API|client)"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": ["src/services/api/**/*.ts"],
+      "contentPatterns": ["fetch", "axios", "API", "endpoint"]
+    }
+  },
+
+  "data-management": {
+    "type": "guardrail",
+    "enforcement": "require",
+    "priority": "critical",
+    "promptTriggers": {
+      "keywords": ["cache", "storage", "AsyncStorage", "data", "persist"],
+      "intentPatterns": [
+        "(save|store|cache).*?(data|state)",
+        "(implement|add).*?(cache|storage)",
+        "(update|modify).*?(storage|AsyncStorage)"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": ["src/services/data/**/*.ts"],
+      "contentPatterns": ["AsyncStorage", "cache", "storage"]
+    }
+  },
+
+  "error-handling": {
+    "type": "guardrail",
+    "enforcement": "require",
+    "priority": "critical",
+    "promptTriggers": {
+      "keywords": ["error", "exception", "try", "catch", "handle"],
+      "intentPatterns": [
+        "(add|implement).*?(error|exception).*?handling",
+        "(fix|resolve).*?(error|bug|issue)"
+      ]
+    }
+  },
+
+  "performance-optimization": {
+    "type": "enhancement",
+    "enforcement": "suggest",
+    "priority": "medium",
+    "promptTriggers": {
+      "keywords": ["performance", "optimize", "slow", "lag", "cache"],
+      "intentPatterns": [
+        "(optimize|improve).*?(performance|speed)",
+        "(fix|resolve).*?(slow|lag|delay)"
+      ]
+    }
+  }
+}
