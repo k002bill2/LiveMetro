@@ -15,6 +15,7 @@ import { LoadingScreen } from '../components/common/LoadingScreen';
 import { WelcomeScreen } from '../screens/auth/WelcomeScreen';
 import { AuthScreen } from '../screens/auth/AuthScreen';
 import { HomeScreen } from '../screens/home/HomeScreen';
+import { SubwayMapScreen } from '../screens/map/SubwayMapScreen';
 import { FavoritesScreen } from '../screens/favorites/FavoritesScreen';
 import { AlertsScreen } from '../screens/alerts/AlertsScreen';
 import { SettingsScreen } from '../screens/settings/SettingsScreen';
@@ -28,6 +29,7 @@ export type RootStackParamList = {
 
 export type MainTabParamList = {
   Home: undefined;
+  Map: undefined;
   Favorites: undefined;
   Alerts: undefined;
   Settings: undefined;
@@ -46,6 +48,9 @@ const MainTabNavigator: React.FC = () => {
           switch (route.name) {
             case 'Home':
               iconName = focused ? 'home' : 'home-outline';
+              break;
+            case 'Map':
+              iconName = focused ? 'map' : 'map-outline';
               break;
             case 'Favorites':
               iconName = focused ? 'heart' : 'heart-outline';
@@ -81,16 +86,24 @@ const MainTabNavigator: React.FC = () => {
         },
       })}
     >
-      <Tab.Screen 
-        name="Home" 
+      <Tab.Screen
+        name="Home"
         component={HomeScreen}
         options={{
           title: '홈',
           tabBarLabel: '홈',
         }}
       />
-      <Tab.Screen 
-        name="Favorites" 
+      <Tab.Screen
+        name="Map"
+        component={SubwayMapScreen}
+        options={{
+          title: '노선도',
+          tabBarLabel: '노선도',
+        }}
+      />
+      <Tab.Screen
+        name="Favorites"
         component={FavoritesScreen}
         options={{
           title: '즐겨찾기',
