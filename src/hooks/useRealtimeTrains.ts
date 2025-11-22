@@ -3,7 +3,7 @@
  * Custom hook for subscribing to real-time train data with error handling and caching
  */
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { dataManager, RealtimeTrainData } from '../services/data/dataManager';
 import { Train } from '../models/train';
 
@@ -161,92 +161,4 @@ export const useRealtimeTrains = (
   };
 };
 
-/**
- * Hook for multiple stations real-time data
- */
-export const useMultipleRealtimeTrains = (
-  stationNames: string[],
-  options: UseRealtimeTrainsOptions = {}
-) => {
-  const [stationsData, setStationsData] = useState<Record<string, UseRealtimeTrainsState>>({});
-
-  const updateStationData = useCallback((stationName: string, data: Partial<UseRealtimeTrainsState>) => {
-    setStationsData(prev => ({
-      ...prev,
-      [stationName]: {
-        trains: [],
-        loading: false,
-        error: null,
-        lastUpdated: null,
-        isStale: false,
-        ...prev[stationName],
-        ...data,
-      }
-    }));
-  }, []);
-
-  // Initialize state for all stations
-  useEffect(() => {
-    const initialState: Record<string, UseRealtimeTrainsState> = {};
-    stationNames.forEach(stationName => {
-      initialState[stationName] = {
-        trains: [],
-        loading: true,
-        error: null,
-        lastUpdated: null,
-        isStale: false,
-      };
-    });
-    setStationsData(initialState);
-  }, [stationNames]);
-
-  // Create individual hooks for each station - moved outside component
-  const stationHooks = useMemo(() => 
-    stationNames.map(stationName => ({
-      stationName,
-      options: {
-        ...options,
-        onDataReceived: (data: RealtimeTrainData) => {
-          updateStationData(stationName, {
-            trains: data.trains,
-            loading: false,
-            error: null,
-            lastUpdated: data.lastUpdated,
-            isStale: false,
-          });
-          options.onDataReceived?.(data);
-        },
-        onError: (error: string) => {
-          updateStationData(stationName, {
-            error,
-            loading: false,
-          });
-          options.onError?.(error);
-        }
-      }
-    })), [stationNames, options, updateStationData]
-  );
-
-  const refetchAll = useCallback(() => {
-    // In real implementation, you would call refetch on each station hook
-    console.log('Refetching all station data');
-  }, []);
-
-  const unsubscribeAll = useCallback(() => {
-    // In real implementation, you would call unsubscribe on each station hook
-    console.log('Unsubscribing from all station data');
-  }, []);
-
-  const allLoading = Object.values(stationsData).some(data => data.loading);
-  const hasErrors = Object.values(stationsData).some(data => data.error);
-  const allStale = Object.values(stationsData).every(data => data.isStale);
-
-  return {
-    stationsData,
-    allLoading,
-    hasErrors,
-    allStale,
-    refetchAll,
-    unsubscribeAll,
-  };
-};
+// Future: useMultipleRealtimeTrains helper can be reintroduced when multi-station support ships.

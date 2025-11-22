@@ -79,7 +79,7 @@ export const StationCard: React.FC<StationCardProps> = memo(({
       activeOpacity={0.7}
       accessible={true}
       accessibilityRole="button"
-      accessibilityLabel={`${station.name} 역, ${station.lineId}호선${station.transfers && station.transfers.length > 0 ? `, 환승역: ${station.transfers.join(', ')}호선` : ''}${showDistance && distance !== undefined ? `, 거리: ${formatDistance(distance)}` : ''}`}
+      accessibilityLabel={`${station.name} 역, ${station.lineId}호선${station.transfers && station.transfers.length > 0 ? `, 환승역: ${station.transfers.join(', ')}호선` : ''}${formattedDistance ? `, 거리: ${formattedDistance}` : ''}`}
       accessibilityHint={isSelected ? "현재 선택된 역입니다" : "탭하여 이 역의 실시간 정보를 확인하세요"}
       accessibilityState={{ selected: isSelected }}
     >

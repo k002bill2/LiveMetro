@@ -302,3 +302,4 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
 });
+export default SettingsScreen;

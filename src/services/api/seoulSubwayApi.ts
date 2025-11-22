@@ -59,6 +59,33 @@ interface SeoulStationInfo {
   YPOS: string;
 }
 
+interface SeoulTimetableRow {
+  STATION_CD: string;
+  STATION_NM: string;
+  TRAIN_NO: string;
+  ARRIVETIME: string;
+  LEFTTIME: string;
+  ORIGIN_STATION_NM: string;
+  DEST_STATION_NM: string;
+  SUBWAYSNAME: string;
+  WEEK_TAG: string;
+  INOUT_TAG: string;
+  FLAG: string;
+  STATION_NM_ENG?: string;
+  TYPE?: string; // 급행 여부 등
+}
+
+interface SeoulTimetableResponse {
+  SearchSTNTimeTableByIDService?: {
+    list_total_count: number;
+    RESULT: {
+      CODE: string;
+      MESSAGE: string;
+    };
+    row: SeoulTimetableRow[];
+  };
+}
+
 class SeoulSubwayApiService {
   private readonly baseUrl: string;
   private readonly apiKey: string;
@@ -167,6 +194,41 @@ class SeoulSubwayApiService {
   }
 
   /**
+   * Get station timetable (schedule)
+   * @param stationCode Station code (e.g., '0222' for Gangnam)
+   * @param weekTag '1': Weekday, '2': Saturday, '3': Holiday/Sunday
+   * @param inoutTag '1': Up/Inner, '2': Down/Outer
+   */
+  async getStationTimetable(
+    stationCode: string, 
+    weekTag: '1' | '2' | '3' = '1', 
+    inoutTag: '1' | '2' = '1'
+  ): Promise<SeoulTimetableRow[]> {
+    try {
+      // Note: Timetable API uses a different base URL usually (openAPI.seoul.go.kr)
+      // But we'll try to use the configured base URL or fallback to the standard openAPI URL
+      const generalBaseUrl = process.env.SEOUL_OPEN_API_BASE_URL || 'http://openAPI.seoul.go.kr:8088';
+      const url = `${generalBaseUrl}/${this.apiKey}/json/SearchSTNTimeTableByIDService/1/500/${stationCode}/${weekTag}/${inoutTag}/`;
+      
+      const response = await this.fetchWithTimeout(url);
+      const data: SeoulTimetableResponse = await response.json();
+
+      if (data.SearchSTNTimeTableByIDService?.RESULT.CODE !== 'INFO-000') {
+        // INFO-200 means no data found, which is valid for empty schedules
+        if (data.SearchSTNTimeTableByIDService?.RESULT.CODE === 'INFO-200') {
+          return [];
+        }
+        throw new Error(`API Error: ${data.SearchSTNTimeTableByIDService?.RESULT.MESSAGE}`);
+      }
+
+      return data.SearchSTNTimeTableByIDService?.row || [];
+    } catch (error) {
+      console.error('Error fetching station timetable:', error);
+      throw new Error(`시간표 정보를 가져오는데 실패했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+    }
+  }
+
+  /**
    * Fetch with timeout support
    */
   private async fetchWithTimeout(url: string): Promise<Response> {
@@ -239,4 +301,4 @@ class SeoulSubwayApiService {
 
 // Export singleton instance
 export const seoulSubwayApi = new SeoulSubwayApiService();
-export type { SeoulRealtimeArrival, SeoulStationInfo };
+export type { SeoulRealtimeArrival, SeoulStationInfo, SeoulTimetableRow, SeoulTimetableResponse };

@@ -162,9 +162,10 @@ class CrashReportingService {
 
   private setupGlobalErrorHandlers(): void {
     // Global error handler for unhandled promise rejections
-    const originalHandler = global.ErrorUtils?.getGlobalHandler();
+    const errorUtils = (globalThis as { ErrorUtils?: { getGlobalHandler?: () => ((error: Error, isFatal?: boolean) => void) | null; setGlobalHandler?: (handler: (error: Error, isFatal?: boolean) => void) => void; } }).ErrorUtils;
+    const originalHandler = errorUtils?.getGlobalHandler?.();
     
-    global.ErrorUtils?.setGlobalHandler((error: Error, isFatal?: boolean) => {
+    errorUtils?.setGlobalHandler?.((error: Error, isFatal?: boolean) => {
       if (isFatal) {
         this.reportError(error, {
           metadata: { 
@@ -175,9 +176,7 @@ class CrashReportingService {
       }
       
       // Call original handler
-      if (originalHandler) {
-        originalHandler(error, isFatal);
-      }
+      originalHandler?.(error, isFatal);
     });
 
     // Unhandled promise rejection handler
@@ -261,8 +260,7 @@ class CrashReportingService {
       } else {
         // Production implementation would send to Sentry, Crashlytics, etc.
         const reportsToSend = [...this.reportQueue];
-        
-        // Example: await this.sendToService(reportsToSend);
+        await this.sendToService(reportsToSend);
         
         // Clear successfully sent reports
         this.reportQueue = [];

@@ -346,7 +346,7 @@ export const useNotifications = (options: UseNotificationsOptions = {}) => {
   const handleNotificationResponse = useCallback((response: Notifications.NotificationResponse) => {
     console.log('Notification response:', response);
 
-    const { actionIdentifier, notification } = response;
+    const { notification } = response;
     const { data } = notification.request.content;
 
     // Handle different notification types

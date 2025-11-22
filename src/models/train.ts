@@ -28,6 +28,7 @@ export interface Train {
   readonly direction: 'up' | 'down';
   readonly currentStationId: string;
   readonly nextStationId: string | null;
+  readonly finalDestination: string; // 종착역 이름 (예: "장암", "도봉산", "석남")
   readonly status: TrainStatus;
   readonly arrivalTime: Date | null;
   readonly delayMinutes: number;

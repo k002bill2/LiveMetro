@@ -3,6 +3,7 @@
  * Tools for monitoring and optimizing app performance
  */
 
+import React from 'react';
 import { InteractionManager, Platform } from 'react-native';
 
 interface PerformanceMetrics {

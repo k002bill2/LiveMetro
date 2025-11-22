@@ -25,6 +25,7 @@ import {
   // TrainStatus, // Will be used in future updates
   DelaySeverity 
 } from '../../models/train';
+import { seoulSubwayApi, SeoulTimetableRow } from '../api/seoulSubwayApi';
 
 class TrainService {
   private unsubscribeCallbacks: Map<string, Unsubscribe> = new Map();
@@ -40,8 +41,8 @@ class TrainService {
         ...doc.data()
       } as SubwayLine));
     } catch (error) {
-      console.error('Error fetching subway lines:', error);
-      throw new Error('지하철 노선 정보를 가져오는데 실패했습니다.');
+      console.error('Firebase error fetching subway lines:', error);
+      return []; // 에러 시 빈 배열 반환
     }
   }
 
@@ -55,15 +56,15 @@ class TrainService {
         where('lineId', '==', lineId),
         orderBy('sequence')
       );
-      
+
       const stationsSnapshot = await getDocs(stationsQuery);
       return stationsSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       } as Station));
     } catch (error) {
-      console.error('Error fetching stations:', error);
-      throw new Error('역 정보를 가져오는데 실패했습니다.');
+      console.error('Firebase error fetching stations:', error);
+      return []; // 에러 시 빈 배열 반환
     }
   }
 
@@ -73,18 +74,21 @@ class TrainService {
   async getStation(stationId: string): Promise<Station | null> {
     try {
       const stationDoc = await getDoc(doc(firestore, 'stations', stationId));
-      
+
       if (stationDoc.exists()) {
         return {
           id: stationDoc.id,
           ...stationDoc.data()
         } as Station;
       }
-      
+
+      // 데이터가 없을 때 에러를 던지지 않고 null 반환
+      console.warn(`Station not found in Firebase: ${stationId}`);
       return null;
     } catch (error) {
-      console.error('Error fetching station:', error);
-      throw new Error('역 정보를 가져오는데 실패했습니다.');
+      // Firebase 연결 오류 시에만 에러 로깅하고 null 반환
+      console.error('Firebase error fetching station:', error);
+      return null;
     }
   }
 
@@ -201,7 +205,7 @@ class TrainService {
       // Firebase doesn't support full-text search, so we'll implement a simple approach
       // In production, consider using Algolia or similar service for better search
       const stationsSnapshot = await getDocs(collection(firestore, 'stations'));
-      
+
       const allStations: Station[] = stationsSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -215,8 +219,8 @@ class TrainService {
 
       return filteredStations.slice(0, 20); // Limit results
     } catch (error) {
-      console.error('Error searching stations:', error);
-      throw new Error('역 검색에 실패했습니다.');
+      console.error('Firebase error searching stations:', error);
+      return []; // 에러 시 빈 배열 반환
     }
   }
 
@@ -224,15 +228,15 @@ class TrainService {
    * Get nearby stations based on user location
    */
   async getNearbyStations(
-    latitude: number, 
-    longitude: number, 
+    latitude: number,
+    longitude: number,
     radiusKm: number = 2
   ): Promise<Station[]> {
     try {
       // Simple distance calculation (not precise for production)
       // In production, use Geohash or Firebase Geofirestore for spatial queries
       const stationsSnapshot = await getDocs(collection(firestore, 'stations'));
-      
+
       const allStations: Station[] = stationsSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -257,8 +261,8 @@ class TrainService {
 
       return nearbyStations.slice(0, 10); // Return closest 10 stations
     } catch (error) {
-      console.error('Error fetching nearby stations:', error);
-      throw new Error('주변 역 정보를 가져오는데 실패했습니다.');
+      console.error('Firebase error fetching nearby stations:', error);
+      return []; // 에러 시 빈 배열 반환
     }
   }
 
@@ -292,7 +296,27 @@ class TrainService {
     });
     this.unsubscribeCallbacks.clear();
   }
+
+  /**
+   * Get station schedule (timetable) from Seoul Open API
+   * @param stationCode Station code
+   * @param weekTag '1': Weekday, '2': Saturday, '3': Holiday/Sunday
+   * @param direction '1': Up/Inner, '2': Down/Outer
+   */
+  async getStationSchedule(
+    stationCode: string, 
+    weekTag: '1' | '2' | '3' = '1', 
+    direction: '1' | '2' = '1'
+  ): Promise<SeoulTimetableRow[]> {
+    try {
+      return await seoulSubwayApi.getStationTimetable(stationCode, weekTag, direction);
+    } catch (error) {
+      console.error('Error fetching station schedule:', error);
+      return [];
+    }
+  }
 }
+
 
 // Export singleton instance
 export const trainService = new TrainService();

@@ -111,7 +111,7 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
         radius
       ).slice(0, maxStations);
 
-      const closestStation: NearbyStation | null = nearbyStations.length > 0 ? nearbyStations[0] : null;
+      const closestStation: NearbyStation | null = nearbyStations.at(0) ?? null;
 
       // Check if closest station changed
       if (closestStation?.id !== state.closestStation?.id && onClosestStationChanged) {
@@ -263,7 +263,10 @@ export const useStationDistance = (stationName: string) => {
         throw new Error(`"${stationName}" 역을 찾을 수 없습니다.`);
       }
 
-      const targetStation = stationInfo[0];
+      const targetStation = stationInfo.at(0);
+      if (!targetStation) {
+        throw new Error(`"${stationName}" 역을 찾을 수 없습니다.`);
+      }
       const distance = locationService.calculateDistance(
         location.latitude,
         location.longitude,

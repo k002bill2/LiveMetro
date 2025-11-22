@@ -125,7 +125,7 @@ export const getCommuteTimeCategory = (date: Date = new Date()): 'morning-rush' 
  * Parse time string (HH:mm) to Date object for today
  */
 export const parseTimeString = (timeString: string, baseDate?: Date): Date => {
-  const [hours, minutes] = timeString.split(':').map(num => parseInt(num, 10));
+  const [hours = 0, minutes = 0] = timeString.split(':').map(num => parseInt(num, 10));
   const date = baseDate ? new Date(baseDate) : new Date();
   
   date.setHours(hours, minutes, 0, 0);
@@ -240,7 +240,7 @@ export const isYesterday = (date: Date): boolean => {
  */
 export const getKoreanDayOfWeek = (date: Date = new Date()): string => {
   const days = ['일', '월', '화', '수', '목', '금', '토'];
-  return days[date.getDay()];
+  return days[date.getDay()] ?? '';
 };
 
 /**

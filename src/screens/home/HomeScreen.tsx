@@ -3,7 +3,7 @@
  * Main screen displaying real-time train information and nearby stations
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,9 +11,11 @@ import {
   RefreshControl,
   StyleSheet,
   TouchableOpacity,
+  Animated,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
+import { NavigationProp, useNavigation } from '@react-navigation/native';
 
 import { useAuth } from '../../services/auth/AuthContext';
 import { trainService } from '../../services/train/trainService';
@@ -23,8 +25,10 @@ import { TrainArrivalList } from '../../components/train/TrainArrivalList';
 import { useToast } from '../../components/common/Toast';
 
 import { Station } from '../../models/train';
+import { AppStackParamList } from '../../navigation/types';
 
 export const HomeScreen: React.FC = () => {
+  const navigation = useNavigation<NavigationProp<AppStackParamList>>();
   const { user } = useAuth();
   const { showError, showSuccess, showInfo, ToastComponent } = useToast();
   const [loading, setLoading] = useState(true);
@@ -33,6 +37,7 @@ export const HomeScreen: React.FC = () => {
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
   const [locationPermission, setLocationPermission] = useState<boolean>(false);
   const [isOnline, setIsOnline] = useState<boolean>(true);
+  const rotateAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     initializeScreen();
@@ -48,6 +53,28 @@ export const HomeScreen: React.FC = () => {
   const initializeScreen = async (): Promise<void> => {
     try {
       setLoading(true);
+
+      // Development: Mock 산곡역 data for testing
+      if (__DEV__) {
+        const mockSangokStation: Station = {
+          id: 'sangok',
+          name: '산곡',
+          nameEn: 'Sangok',
+          lineId: '7',
+          coordinates: {
+            latitude: 37.4988,
+            longitude: 126.7189,
+          },
+          transfers: [],
+        };
+
+        setNearbyStations([mockSangokStation]);
+        setSelectedStation(mockSangokStation);
+        setLocationPermission(true);
+        setLoading(false);
+        showSuccess('개발 모드: 산곡역으로 설정되었습니다');
+        return;
+      }
       
       // Request location permission
       const { status } = await Location.requestForegroundPermissionsAsync();
@@ -68,6 +95,12 @@ export const HomeScreen: React.FC = () => {
   };
 
   const loadNearbyStations = async (): Promise<void> => {
+    // Development: Skip in dev mode as we're using mock data
+    if (__DEV__) {
+      console.log('Development mode: Skipping loadNearbyStations');
+      return;
+    }
+
     try {
       const location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
@@ -80,13 +113,14 @@ export const HomeScreen: React.FC = () => {
       );
 
       setNearbyStations(stations);
-      
+
       // Auto-select the closest station
       if (stations.length > 0 && !selectedStation) {
         setSelectedStation(stations[0] || null);
       }
     } catch (error) {
       console.error('Error loading nearby stations:', error);
+      showError('주변 역 정보를 가져오는데 실패했습니다');
       await loadFavoriteStations();
     }
   };
@@ -119,10 +153,21 @@ export const HomeScreen: React.FC = () => {
 
   const onStationSelect = (station: Station): void => {
     setSelectedStation(station);
+    navigation.navigate('SubwayMap', { stationName: station.name });
   };
 
   const onRefresh = async (): Promise<void> => {
     setRefreshing(true);
+
+    // Rotate animation
+    Animated.loop(
+      Animated.timing(rotateAnim, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true,
+      })
+    ).start();
+
     try {
       if (locationPermission) {
         await loadNearbyStations();
@@ -133,6 +178,7 @@ export const HomeScreen: React.FC = () => {
       console.error('Error refreshing:', error);
     } finally {
       setRefreshing(false);
+      rotateAnim.setValue(0);
     }
   };
 
@@ -208,9 +254,11 @@ export const HomeScreen: React.FC = () => {
 
       {/* Station Selection */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>
-          {locationPermission ? '주변 역' : '즐겨찾기'}
-        </Text>
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>
+            {locationPermission ? '주변 역' : '즐겨찾기'}
+          </Text>
+        </View>
         
         {nearbyStations.length === 0 ? (
           <View 
@@ -253,9 +301,57 @@ export const HomeScreen: React.FC = () => {
       {/* Real-time Train Information */}
       {selectedStation && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            {selectedStation.name} 실시간 정보
-          </Text>
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>
+              {selectedStation.name} 실시간 정보
+            </Text>
+            <View style={styles.sectionHeaderActions}>
+              <TouchableOpacity
+                style={styles.detailButton}
+                onPress={() =>
+                  navigation.navigate('StationDetail', {
+                    stationId: selectedStation.id,
+                    stationName: selectedStation.name,
+                    lineId: selectedStation.lineId,
+                  })
+                }
+                accessible
+                accessibilityRole="button"
+                accessibilityLabel={`${selectedStation.name} 역 상세 정보 보기`}
+              >
+                <Text style={styles.detailButtonText}>상세보기</Text>
+                <Ionicons name="chevron-forward" size={18} color="#2563eb" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={onRefresh}
+                style={styles.refreshButton}
+                accessible={true}
+                accessibilityRole="button"
+                accessibilityLabel="실시간 정보 새로고침"
+                accessibilityHint="열차 도착 정보를 다시 불러옵니다"
+                disabled={refreshing}
+              >
+                <Animated.View
+                  style={{
+                    transform: [
+                      {
+                        rotate: rotateAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: ['0deg', '360deg'],
+                        }),
+                      },
+                    ],
+                  }}
+                >
+                  <Ionicons
+                    name="refresh"
+                    size={24}
+                    color={refreshing ? '#9ca3af' : '#2563eb'}
+                  />
+                </Animated.View>
+              </TouchableOpacity>
+            </View>
+          </View>
           <TrainArrivalList stationId={selectedStation.id} />
         </View>
       )}
@@ -283,6 +379,48 @@ const styles = StyleSheet.create({
   },
   subtitle: {
     fontSize: 16,
+    color: '#6b7280',
+  },
+  mapCard: {
+    backgroundColor: '#ffffff',
+    marginHorizontal: 16,
+    marginBottom: 8,
+    padding: 16,
+    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  mapCardContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  mapIconContainer: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#dbeafe',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  mapTextContainer: {
+    flex: 1,
+  },
+  mapTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#111827',
+    marginBottom: 4,
+  },
+  mapSubtitle: {
+    fontSize: 14,
     color: '#6b7280',
   },
   permissionBanner: {
@@ -331,12 +469,47 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     paddingVertical: 20,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  sectionHeaderActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: 12,
+  },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
     color: '#111827',
-    marginBottom: 16,
-    paddingHorizontal: 20,
+    flex: 1,
+  },
+  detailButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: '#c7d2fe',
+    backgroundColor: '#eef2ff',
+  },
+  detailButtonText: {
+    color: '#2563eb',
+    fontWeight: '600',
+    marginRight: 4,
+  },
+  refreshButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#f3f4f6',
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   stationList: {
     paddingLeft: 20,
@@ -360,3 +533,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+export default HomeScreen;

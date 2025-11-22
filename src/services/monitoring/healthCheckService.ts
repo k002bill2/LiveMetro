@@ -231,7 +231,7 @@ class HealthCheckService {
     
     try {
       // Test API with a common station
-      await seoulSubwayApi.getRealtimeArrivals('강남역');
+      await seoulSubwayApi.getRealtimeArrival('강남역');
       const responseTime = Date.now() - startTime;
       
       if (responseTime > 5000) {

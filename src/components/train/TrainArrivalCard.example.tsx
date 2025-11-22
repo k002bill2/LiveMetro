@@ -18,6 +18,7 @@ export const NormalTrainExample: React.FC = () => {
     direction: 'up',
     currentStationId: 'gangnam',
     nextStationId: 'yeoksam',
+    finalDestination: '시청',
     status: TrainStatus.NORMAL,
     arrivalTime: new Date(Date.now() + 3 * 60 * 1000), // 3 minutes from now
     delayMinutes: 0,
@@ -44,6 +45,7 @@ export const DelayedTrainExample: React.FC = () => {
     direction: 'down',
     currentStationId: 'seoul-station',
     nextStationId: 'city-hall',
+    finalDestination: '인천',
     status: TrainStatus.DELAYED,
     arrivalTime: new Date(Date.now() + 8 * 60 * 1000), // 8 minutes from now
     delayMinutes: 5,
@@ -69,6 +71,7 @@ export const ImmediateArrivalExample: React.FC = () => {
     direction: 'up',
     currentStationId: 'apgujeong',
     nextStationId: 'sinsa',
+    finalDestination: '대화',
     status: TrainStatus.NORMAL,
     arrivalTime: new Date(Date.now() + 30 * 1000), // 30 seconds from now
     delayMinutes: 0,
@@ -94,6 +97,7 @@ export const SuspendedTrainExample: React.FC = () => {
     direction: 'down',
     currentStationId: 'sadang',
     nextStationId: null,
+    finalDestination: '오이도',
     status: TrainStatus.SUSPENDED,
     arrivalTime: null,
     delayMinutes: 0,
@@ -113,7 +117,7 @@ export const SuspendedTrainExample: React.FC = () => {
  * Example: Multiple lines showcase
  */
 export const MultiLineShowcase: React.FC = () => {
-  const trains: Array<{ train: Train; lineName: string; stationName: string }> = [
+  const trains: { train: Train; lineName: string; stationName: string }[] = [
     {
       train: {
         id: 'train-line1',
@@ -121,6 +125,7 @@ export const MultiLineShowcase: React.FC = () => {
         direction: 'up',
         currentStationId: 'station1',
         nextStationId: 'station2',
+        finalDestination: '의정부',
         status: TrainStatus.NORMAL,
         arrivalTime: new Date(Date.now() + 2 * 60 * 1000),
         delayMinutes: 0,
@@ -136,6 +141,7 @@ export const MultiLineShowcase: React.FC = () => {
         direction: 'down',
         currentStationId: 'station3',
         nextStationId: 'station4',
+        finalDestination: '잠실',
         status: TrainStatus.NORMAL,
         arrivalTime: new Date(Date.now() + 4 * 60 * 1000),
         delayMinutes: 0,
@@ -151,6 +157,7 @@ export const MultiLineShowcase: React.FC = () => {
         direction: 'up',
         currentStationId: 'station5',
         nextStationId: 'station6',
+        finalDestination: '대화',
         status: TrainStatus.DELAYED,
         arrivalTime: new Date(Date.now() + 7 * 60 * 1000),
         delayMinutes: 3,
@@ -166,6 +173,7 @@ export const MultiLineShowcase: React.FC = () => {
         direction: 'down',
         currentStationId: 'station7',
         nextStationId: 'station8',
+        finalDestination: '왕십리',
         status: TrainStatus.NORMAL,
         arrivalTime: new Date(Date.now() + 5 * 60 * 1000),
         delayMinutes: 0,

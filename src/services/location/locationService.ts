@@ -35,7 +35,6 @@ class LocationService {
   private geofences: Map<string, GeofenceRegion> = new Map();
   private readonly MIN_DISTANCE_CHANGE = 10; // meters
   private readonly MIN_TIME_INTERVAL = 5000; // 5 seconds
-  private readonly MAX_AGE = 30000; // 30 seconds
 
   /**
    * Initialize location service and request permissions
@@ -76,7 +75,6 @@ class LocationService {
 
       const location = await Location.getCurrentPositionAsync({
         accuracy: highAccuracy ? Location.Accuracy.BestForNavigation : Location.Accuracy.Balanced,
-        maximumAge: this.MAX_AGE,
       });
 
       const coordinates: LocationCoordinates = {
@@ -249,7 +247,7 @@ class LocationService {
     allStations: Station[]
   ): NearbyStation | null {
     const nearbyStations = this.findNearbyStations(currentLocation, allStations, 5000); // 5km radius
-    return nearbyStations.length > 0 ? nearbyStations[0] : null;
+    return nearbyStations.at(0) ?? null;
   }
 
   /**
@@ -424,4 +422,3 @@ class LocationService {
 
 // Export singleton instance
 export const locationService = new LocationService();
-export type { LocationCoordinates, NearbyStation, GeofenceRegion };

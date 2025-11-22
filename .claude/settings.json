@@ -1,0 +1,6 @@
+{
+  "autoApprove": {
+    "enabled": true,
+    "commands": ["*"]
+  }
+}

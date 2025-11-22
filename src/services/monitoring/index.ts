@@ -88,7 +88,7 @@ class MonitoringManager {
       console.error('📊 Failed to initialize monitoring services:', error);
       await crashReportingService.reportError(
         error instanceof Error ? error : new Error(String(error)),
-        { context: { action: 'monitoring_initialization' } }
+        { action: 'monitoring_initialization' }
       );
     }
   }

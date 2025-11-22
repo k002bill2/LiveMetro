@@ -7,9 +7,7 @@ import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import {
   View,
   Text,
-  FlatList,
   StyleSheet,
-  RefreshControl,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -41,6 +39,11 @@ const TrainArrivalItem: React.FC<TrainArrivalItemProps> = memo(({ train }) => {
       default:
         return '#6b7280';
     }
+  };
+
+  const getDestinationName = (): string => {
+    // Use finalDestination from train data
+    return train.finalDestination;
   };
 
   const getStatusText = (status: TrainStatus): string => {
@@ -97,21 +100,21 @@ const TrainArrivalItem: React.FC<TrainArrivalItemProps> = memo(({ train }) => {
   };
 
   return (
-    <View 
+    <View
       style={styles.trainItem}
       accessible={true}
       accessibilityRole="summary"
-      accessibilityLabel={`${train.direction === 'up' ? '상행' : '하행'} 열차, ${getStatusText(train.status)} 상태, ${formatArrivalTime()}${train.delayMinutes > 0 ? `, ${train.delayMinutes}분 지연` : ''}`}
+      accessibilityLabel={`${getDestinationName()} 방면 열차, ${getStatusText(train.status)} 상태, ${formatArrivalTime()}${train.delayMinutes > 0 ? `, ${train.delayMinutes}분 지연` : ''}`}
     >
       <View style={styles.trainHeader}>
         <View style={styles.directionInfo}>
-          <Ionicons 
-            name={train.direction === 'up' ? 'arrow-up' : 'arrow-down'} 
-            size={16} 
-            color="#6b7280" 
+          <Ionicons
+            name="train"
+            size={16}
+            color="#6b7280"
           />
           <Text style={styles.direction}>
-            {train.direction === 'up' ? '상행' : '하행'}
+            {getDestinationName()} 방면
           </Text>
         </View>
         
@@ -155,14 +158,12 @@ TrainArrivalItem.displayName = 'TrainArrivalItem';
 export const TrainArrivalList: React.FC<TrainArrivalListProps> = memo(({ stationId }) => {
   const [trains, setTrains] = useState<Train[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
 
   // Memoize the update handler to prevent unnecessary re-renders
   const handleTrainUpdate = useCallback((updatedTrains: Train[]) => {
     performanceMonitor.startMeasure(`train_update_${stationId}`);
     setTrains(updatedTrains);
     setLoading(false);
-    setRefreshing(false);
     performanceMonitor.endMeasure(`train_update_${stationId}`);
   }, [stationId]);
 
@@ -173,17 +174,138 @@ export const TrainArrivalList: React.FC<TrainArrivalListProps> = memo(({ station
   );
 
   useEffect(() => {
+    // Development: Mock data for Sangok station (산곡역)
+    if (__DEV__ && stationId === 'sangok') {
+      let trainCounter = 5;
+
+      const generateInitialTrains = (): Train[] => {
+        const now = new Date();
+        return [
+          {
+            id: 'train-sangok-1',
+            lineId: '7',
+            direction: 'down',
+            currentStationId: 'bupyeong-gu-office',
+            nextStationId: 'sangok',
+            finalDestination: '석남',
+            status: TrainStatus.NORMAL,
+            arrivalTime: new Date(now.getTime() + 5 * 60 * 1000 + 5 * 1000), // 5분 5초 후
+            delayMinutes: 0,
+            lastUpdated: now,
+          },
+          {
+            id: 'train-sangok-2',
+            lineId: '7',
+            direction: 'up',
+            currentStationId: 'bupyeong-gu-office',
+            nextStationId: 'sangok',
+            finalDestination: '도봉산',
+            status: TrainStatus.NORMAL,
+            arrivalTime: new Date(now.getTime() + 8 * 60 * 1000 + 35 * 1000), // 8분 35초 후
+            delayMinutes: 0,
+            lastUpdated: now,
+          },
+          {
+            id: 'train-sangok-3',
+            lineId: '7',
+            direction: 'up',
+            currentStationId: 'gulpocheon',
+            nextStationId: 'sangok',
+            finalDestination: '대륭입구',
+            status: TrainStatus.NORMAL,
+            arrivalTime: new Date(now.getTime() + 18 * 60 * 1000), // 18분 후
+            delayMinutes: 0,
+            lastUpdated: now,
+          },
+          {
+            id: 'train-sangok-4',
+            lineId: '7',
+            direction: 'down',
+            currentStationId: 'seoknam',
+            nextStationId: 'sangok',
+            finalDestination: '석남',
+            status: TrainStatus.NORMAL,
+            arrivalTime: new Date(now.getTime() + 18 * 60 * 1000), // 18분 후
+            delayMinutes: 0,
+            lastUpdated: now,
+          },
+        ];
+      };
+
+      const initialTrains = generateInitialTrains();
+      setTrains(initialTrains);
+      setLoading(false);
+
+      // Real-time update every 10 seconds
+      const interval = setInterval(() => {
+        setTrains(prevTrains => {
+          const now = new Date();
+
+          // Filter out arrived trains (arrival time passed)
+          const updatedTrains = prevTrains.filter(train => {
+            if (!train.arrivalTime) {
+              return false;
+            }
+            const timeLeft = train.arrivalTime.getTime() - now.getTime();
+            return timeLeft > -10000; // Keep for 10 seconds after arrival
+          });
+
+          // Add new train if we have less than 4 trains
+          if (updatedTrains.length < 4) {
+            const newDirection = Math.random() > 0.5 ? 'up' : 'down';
+            const newArrivalMinutes = 6 + Math.random() * 4; // 6-10분 사이
+            const hasDelay = Math.random() > 0.8; // 20% 확률로 지연
+
+            // Random destination for up trains
+            const destinations: string[] = ['장암', '도봉산', '대륭입구'];
+            const randomDestination: string = destinations[Math.floor(Math.random() * destinations.length)] || '장암';
+            const finalDestination: string = newDirection === 'up' ? randomDestination : '석남';
+
+            const newTrain: Train = {
+              id: `train-sangok-${trainCounter++}`,
+              lineId: '7',
+              direction: newDirection,
+              currentStationId: newDirection === 'up' ? 'gulpocheon' : 'seoknam',
+              nextStationId: 'sangok',
+              finalDestination,
+              status: hasDelay ? TrainStatus.DELAYED : TrainStatus.NORMAL,
+              arrivalTime: new Date(now.getTime() + newArrivalMinutes * 60 * 1000),
+              delayMinutes: hasDelay ? Math.floor(Math.random() * 3) + 1 : 0,
+              lastUpdated: now,
+            };
+
+            updatedTrains.push(newTrain);
+          }
+
+          // Sort by arrival time
+          updatedTrains.sort((a, b) => {
+            const aTime = a.arrivalTime ? a.arrivalTime.getTime() : 0;
+            const bTime = b.arrivalTime ? b.arrivalTime.getTime() : 0;
+            return aTime - bTime;
+          });
+
+          // Update lastUpdated time for all trains
+          return updatedTrains.map(train => ({
+            ...train,
+            lastUpdated: now,
+          }));
+        });
+      }, 10000); // Update every 10 seconds
+
+      return () => clearInterval(interval);
+    }
+
     let unsubscribe: (() => void) | undefined;
 
     const subscribeToUpdates = (): void => {
       setLoading(true);
       performanceMonitor.startMeasure(`subscription_${stationId}`);
-      
+
       unsubscribe = trainService.subscribeToTrainUpdates(
         stationId,
         throttledUpdate
       );
-      
+
       performanceMonitor.endMeasure(`subscription_${stationId}`);
     };
 
@@ -195,23 +317,6 @@ export const TrainArrivalList: React.FC<TrainArrivalListProps> = memo(({ station
       }
     };
   }, [stationId, throttledUpdate]);
-
-  const onRefresh = useCallback((): void => {
-    setRefreshing(true);
-    // The real-time subscription will automatically update the data
-    setTimeout(() => {
-      setRefreshing(false);
-    }, 2000);
-  }, []);
-
-  // Memoize key extractor for FlatList performance
-  const keyExtractor = useCallback((item: Train) => item.id, []);
-
-  // Memoize render item to prevent unnecessary re-renders
-  const renderItem = useCallback(
-    ({ item }: { item: Train }) => <TrainArrivalItem train={item} />,
-    []
-  );
 
   const renderEmptyState = (): React.ReactElement => (
     <View 
@@ -247,28 +352,15 @@ export const TrainArrivalList: React.FC<TrainArrivalListProps> = memo(({ station
   }
 
   return (
-    <FlatList
-      data={trains}
-      renderItem={renderItem}
-      keyExtractor={keyExtractor}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-      ListEmptyComponent={renderEmptyState}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={trains.length === 0 ? styles.emptyContainer : undefined}
-      // Performance optimizations
-      removeClippedSubviews={true}
-      maxToRenderPerBatch={10}
-      updateCellsBatchingPeriod={50}
-      initialNumToRender={10}
-      windowSize={10}
-      getItemLayout={(data, index) => ({
-        length: 100, // Estimated item height
-        offset: 100 * index,
-        index,
-      })}
-    />
+    <View style={styles.container}>
+      {trains.length === 0 ? (
+        renderEmptyState()
+      ) : (
+        trains.map((train) => (
+          <TrainArrivalItem key={train.id} train={train} />
+        ))
+      )}
+    </View>
   );
 });
 
@@ -276,6 +368,9 @@ export const TrainArrivalList: React.FC<TrainArrivalListProps> = memo(({ station
 TrainArrivalList.displayName = 'TrainArrivalList';
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   trainItem: {
     backgroundColor: '#ffffff',
     padding: 16,

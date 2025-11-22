@@ -150,8 +150,7 @@ class DataManager {
             latitude: parseFloat(seoulStation.YPOS),
             longitude: parseFloat(seoulStation.XPOS)
           },
-          transfers: [],
-          isActive: true
+          transfers: []
         };
 
         await this.setCachedData(cacheKey, station, 24 * 60 * 60 * 1000);
@@ -196,8 +195,9 @@ class DataManager {
             severity,
             delayMinutes,
             reason: `예정보다 ${delayMinutes}분 지연`,
-            reportedAt: now,
-            isActive: true
+            affectedStations: [train.currentStationId],
+            estimatedResolutionTime: null,
+            reportedAt: now
           });
           }
         }
@@ -446,16 +446,13 @@ class DataManager {
       lineId: converted.lineId,
       currentStationId: converted.stationId,
       nextStationId: null,
+      finalDestination: converted.destinationStation || '종착역 미확인',
       direction: converted.direction === 'up' ? 'up' : 'down',
       arrivalTime: converted.arrivalTime ? new Date(Date.now() + converted.arrivalTime * 1000) : null,
-      departureTime: null,
       status: TrainStatus.NORMAL,
-      carriageCount: 10, // Standard Seoul subway
-      currentLoad: null,
       lastUpdated: converted.lastUpdated,
-      delay: converted.arrivalTime && converted.arrivalTime > 300 ? 
-        Math.floor(converted.arrivalTime / 60) : 0,
-      trainNumber: converted.trainNumber
+      delayMinutes: converted.arrivalTime && converted.arrivalTime > 300 ? 
+        Math.floor(converted.arrivalTime / 60) : 0
     };
   }
 

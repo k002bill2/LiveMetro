@@ -36,7 +36,7 @@ interface NotificationPayload {
 class NotificationService {
   private expoPushToken: string | null = null;
   private isInitialized: boolean = false;
-  private permissionStatus: Notifications.PermissionStatus | null = null;
+  private permissionStatus: Notifications.PermissionResponse | null = null;
 
   /**
    * Initialize notification service
@@ -132,7 +132,7 @@ class NotificationService {
         name: '지연 알림',
         importance: Notifications.AndroidImportance.HIGH,
         description: '지하철 지연 및 운행 중단 알림',
-        sound: true,
+        sound: 'default',
         vibrate: [0, 250, 250, 250],
       },
       {
@@ -140,7 +140,7 @@ class NotificationService {
         name: '긴급 알림',
         importance: Notifications.AndroidImportance.MAX,
         description: '긴급 상황 및 서비스 중단 알림',
-        sound: true,
+        sound: 'default',
         vibrate: [0, 500, 200, 500],
       },
       {
@@ -148,7 +148,7 @@ class NotificationService {
         name: '일반 알림',
         importance: Notifications.AndroidImportance.DEFAULT,
         description: '일반적인 앱 알림',
-        sound: true,
+        sound: 'default',
         vibrate: [0, 250],
       },
     ];
@@ -186,7 +186,7 @@ class NotificationService {
           body: payload.body,
           data: payload.data || {},
           priority: this.convertPriority(payload.priority),
-          sound: true,
+          sound: 'default',
           badge: 0,
         },
         trigger: null, // Send immediately
@@ -290,7 +290,7 @@ class NotificationService {
           title,
           body,
           data: { type: NotificationType.COMMUTE_REMINDER },
-          sound: true,
+          sound: 'default',
         },
         trigger: {
           date: scheduledTime,
@@ -345,8 +345,12 @@ class NotificationService {
       const currentMinute = currentTime.getMinutes();
       const currentTimeMinutes = currentHour * 60 + currentMinute;
 
-      const [startHour, startMinute] = settings.quietHours.startTime.split(':').map(Number);
-      const [endHour, endMinute] = settings.quietHours.endTime.split(':').map(Number);
+      const [startHour = 0, startMinute = 0] = settings.quietHours.startTime
+        .split(':')
+        .map(Number);
+      const [endHour = 0, endMinute = 0] = settings.quietHours.endTime
+        .split(':')
+        .map(Number);
       const startTimeMinutes = startHour * 60 + startMinute;
       const endTimeMinutes = endHour * 60 + endMinute;
 
@@ -393,7 +397,7 @@ class NotificationService {
   /**
    * Get permission status
    */
-  getPermissionStatus(): Notifications.PermissionStatus | null {
+  getPermissionStatus(): Notifications.PermissionResponse | null {
     return this.permissionStatus;
   }
 

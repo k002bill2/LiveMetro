@@ -72,6 +72,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
         console.warn('🔧 Development mode: Error would be reported to crash service', {
           message: error.message,
           stack: error.stack,
+          componentStack: errorInfo.componentStack,
         });
       } else {
         // Production error reporting

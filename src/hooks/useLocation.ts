@@ -23,8 +23,8 @@ interface UseLocationOptions {
   maximumAge?: number;
   distanceFilter?: number;
   enableBackgroundLocation?: boolean;
-  onLocationUpdate?: (location: LocationCoordinates) => void;
-  onError?: (error: string) => void;
+  onLocationUpdate?: ((location: LocationCoordinates) => void) | undefined;
+  onError?: ((error: string) => void) | undefined;
 }
 
 /**

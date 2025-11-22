@@ -173,17 +173,8 @@ export const TrainArrivalCard: React.FC<TrainArrivalCardProps> = memo(({
     return parts.join(', ');
   }, [lineName, directionInfo.text, arrivalDisplay.text, train.delayMinutes, statusInfo.text, stationName]);
 
-  const CardContainer = onPress ? TouchableOpacity : View;
-
-  return (
-    <CardContainer
-      style={[styles.container, style]}
-      onPress={onPress}
-      accessible
-      accessibilityRole={onPress ? 'button' : 'summary'}
-      accessibilityLabel={accessibilityLabel}
-      accessibilityHint={onPress ? '열차 상세 정보를 확인하려면 두 번 탭하세요' : undefined}
-    >
+  const cardContent = (
+    <>
       {/* Line Badge */}
       {lineName && (
         <View
@@ -297,7 +288,33 @@ export const TrainArrivalCard: React.FC<TrainArrivalCardProps> = memo(({
           />
         </View>
       )}
-    </CardContainer>
+    </>
+  );
+
+  if (onPress) {
+    return (
+      <TouchableOpacity
+        style={[styles.container, style]}
+        onPress={onPress}
+        accessible
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel}
+        accessibilityHint="열차 상세 정보를 확인하려면 두 번 탭하세요"
+      >
+        {cardContent}
+      </TouchableOpacity>
+    );
+  }
+
+  return (
+    <View
+      style={[styles.container, style]}
+      accessible
+      accessibilityRole="summary"
+      accessibilityLabel={accessibilityLabel}
+    >
+      {cardContent}
+    </View>
   );
 });
 
