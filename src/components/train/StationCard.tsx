@@ -22,6 +22,8 @@ interface StationCardProps {
   onPress?: () => void;
   showDistance?: boolean;
   distance?: number;
+  onSetStart?: () => void;
+  onSetEnd?: () => void;
 }
 
 export const StationCard: React.FC<StationCardProps> = memo(({
@@ -30,6 +32,8 @@ export const StationCard: React.FC<StationCardProps> = memo(({
   onPress,
   showDistance = false,
   distance,
+  onSetStart,
+  onSetEnd,
 }) => {
   // Memoize press handler
   const handlePress = useCallback((): void => {
@@ -120,6 +124,28 @@ export const StationCard: React.FC<StationCardProps> = memo(({
         </View>
       )}
 
+      {/* Route Search Buttons */}
+      <View style={styles.actionButtons}>
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.startButton]} 
+          onPress={(e) => {
+            e.stopPropagation();
+            onSetStart?.();
+          }}
+        >
+          <Text style={styles.actionButtonText}>출발</Text>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.endButton]} 
+          onPress={(e) => {
+            e.stopPropagation();
+            onSetEnd?.();
+          }}
+        >
+          <Text style={styles.actionButtonText}>도착</Text>
+        </TouchableOpacity>
+      </View>
+
       {isSelected && (
         <View style={styles.selectedIndicator}>
           <Ionicons name="checkmark-circle" size={20} color="#2563eb" />
@@ -206,5 +232,28 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 8,
     right: 8,
+  },
+  actionButtons: {
+    flexDirection: 'row',
+    marginTop: 12,
+    gap: 8,
+  },
+  actionButton: {
+    flex: 1,
+    paddingVertical: 6,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  startButton: {
+    backgroundColor: '#3b82f6',
+  },
+  endButton: {
+    backgroundColor: '#ef4444',
+  },
+  actionButtonText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
   },
 });

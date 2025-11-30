@@ -88,7 +88,7 @@ export const SubwayMapScreen: React.FC = () => {
   const [selectedStation, setSelectedStation] = useState<string | null>(null);
 
   // Generate map data once
-  const mapData = useMemo(() => generateMapLayout(SEOUL_METRO_LINES), []);
+  const mapData = useMemo(() => generateMapLayout(), []);
 
   const handleStationPress = (stationName: string): void => {
     setSelectedStation(stationName);

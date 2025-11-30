@@ -1,17 +1,23 @@
 ---
-description: Backend microservices debugging and management using PM2
+description: PM2 Backend Debugging and Process Management
 ---
 
-# PM2 Backend Debugging System
+# PM2 Backend Debugging Workflow
 
-## 🎯 PM2 Installation and Setup
+This workflow guides you through managing and debugging backend microservices using PM2.
 
-### Installation
+## 1. Installation (If not installed)
+
 ```bash
 npm install -g pm2
+# or
+pnpm add -g pm2
 ```
 
-### Create ecosystem.config.js
+## 2. Configuration (ecosystem.config.js)
+
+Ensure you have an `ecosystem.config.js` file in your project root.
+
 ```javascript
 module.exports = {
   apps: [
@@ -28,97 +34,55 @@ module.exports = {
         NODE_ENV: 'development',
         PORT: 3000
       }
-    }
-    // Additional services...
+    },
+    // Add other services here
   ]
 };
 ```
 
-## 🎮 PM2 Core Commands
+## 3. Common Commands
 
-### Basic Commands
+### Start Services
 ```bash
-# Start
 pm2 start ecosystem.config.js
-
-# Check status
-pm2 list
-
-# View logs
-pm2 logs                    # All services
-pm2 logs [service]          # Specific service
-pm2 logs [service] --lines 100  # Recent 100 lines
-
-# Restart
-pm2 restart all
-pm2 restart [service]
-
-# Stop
-pm2 stop all
-pm2 stop [service]
 ```
 
-### Monitoring
+### Check Status
 ```bash
-# Real-time monitoring
+pm2 status
 pm2 monit
-
-# Detailed information
-pm2 show [service]
 ```
 
-## 🔧 Using with Claude
-
-### Add to CLAUDE.md
-```markdown
-## Backend Services
-
-All backend services are managed by PM2:
-
-### Debugging
-\`\`\`bash
-# Check service status
-pm2 list
-
-# View logs for specific service
-pm2 logs [service-name] --lines 200
-
-# Restart problematic service
-pm2 restart [service-name]
-\`\`\`
-```
-
-### Claude Prompt Example
+### View Logs
 ```bash
-"The email service is returning 500 errors. 
-Check the logs and debug the issue."
+# All logs
+pm2 logs
 
-# Claude executes:
-# pm2 logs email --lines 200
-# pm2 show email
-# pm2 restart email
+# Specific service logs
+pm2 logs api-gateway
+pm2 logs email-service --lines 100
 ```
 
-## 📝 Log Management
-
-### Log Rotation Setup
+### Restarting
 ```bash
-# Install PM2 log rotation
-pm2 install pm2-logrotate
+# Restart specific service
+pm2 restart api-gateway
 
-# Configure
-pm2 set pm2-logrotate:max_size 10M
-pm2 set pm2-logrotate:retain 7
-pm2 set pm2-logrotate:compress true
+# Restart all
+pm2 restart all
 ```
 
-## 💡 Pro Tips
+## 4. Debugging Workflow
 
-### Development vs Production
-```bash
-# Development environment (watch mode)
-pm2 start app.js --watch --ignore-watch="node_modules"
+1.  **Identify the Issue**: Use `pm2 status` to see if any service is errored or restarting loop.
+2.  **Check Logs**: Use `pm2 logs [service-name] --err` to see error logs specifically.
+3.  **Analyze**: Look for stack traces or error messages in the logs.
+4.  **Fix**: Apply code fixes.
+5.  **Restart**: Run `pm2 restart [service-name]` to apply changes.
+6.  **Verify**: Check logs again to ensure the error is gone.
 
-# Production (cluster mode)
-pm2 start app.js -i max --env production
-```
+## 5. Pro Tips
+
+-   Use `pm2 flush` to clear old logs if they are too noisy.
+-   Use `pm2 reload` instead of `restart` for zero-downtime reloads (if supported).
+-   Watch mode: `pm2 start ecosystem.config.js --watch` (use carefully in dev).

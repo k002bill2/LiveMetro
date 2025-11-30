@@ -98,3 +98,6 @@ dev-debug.log
 # Task files
 # tasks.json
 # tasks/ 
+!/.gemini/antigravity/mcp_config.json
+!/.gemini/
+!/.gemini/**

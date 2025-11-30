@@ -1,0 +1,506 @@
+{
+  "designSystem": {
+    "name": "서울 지하철 노선도 디자인 시스템",
+    "version": "2.0",
+    "releaseYear": 2024,
+    "description": "40년 만에 개선된 서울 지하철 노선도 디자인 시스템 - 시각약자와 외국인을 배려한 유니버설 디자인",
+    
+    "designPrinciples": {
+      "primary": [
+        "접근성 우선 (Accessibility First)",
+        "가독성 최적화 (Readability Optimization)",
+        "유니버설 디자인 (Universal Design)",
+        "국제 표준 준수 (International Standard Compliance)"
+      ],
+      "keyImprovements": {
+        "taskFindingTime": "최대 55% 단축",
+        "transferFindingTime": "최대 69% 단축",
+        "foreignerImprovement": "내국인 대비 21.5% 더 높은 개선율"
+      }
+    },
+
+    "layoutSystem": {
+      "gridType": "8선형 (Octolinear)",
+      "gridDescription": "수평, 수직, 45도 대각선만 사용하는 국제표준 도식화 지도",
+      "origin": "1933년 헨리 벡이 런던 지하철에 처음 적용",
+      "allowedAngles": ["0°", "45°", "90°", "135°", "180°", "225°", "270°", "315°"],
+      "centralElement": {
+        "type": "순환선 (Loop Line)",
+        "line": "2호선",
+        "shape": "원형 (Circle)",
+        "position": "중심 배치"
+      }
+    },
+
+    "colorSystem": {
+      "philosophy": "색각이상자 배려 색상 시스템",
+      "features": [
+        "명도(Brightness) 차별화",
+        "채도(Saturation) 조정",
+        "패턴 보조 표기",
+        "색약자 구분 가능"
+      ],
+      
+      "lines": {
+        "line1": {
+          "name": "1호선",
+          "color": "#0052A4",
+          "colorName": "파란색 (Blue)",
+          "accessibility": "고명도 청색"
+        },
+        "line2": {
+          "name": "2호선",
+          "color": "#00A84D",
+          "colorName": "초록색 (Green)",
+          "accessibility": "중명도 녹색, 채도 조정으로 3호선과 구분",
+          "specialFeature": "순환선 - 원형 중심 배치"
+        },
+        "line3": {
+          "name": "3호선",
+          "color": "#EF7C1C",
+          "colorName": "주황색 (Orange)",
+          "accessibility": "고채도 주황색, 적록색약자 배려 명도 조정"
+        },
+        "line4": {
+          "name": "4호선",
+          "color": "#00A5DE",
+          "colorName": "하늘색 (Sky Blue)",
+          "accessibility": "1호선과 톤 차별화"
+        },
+        "line5": {
+          "name": "5호선",
+          "color": "#996CAC",
+          "colorName": "보라색 (Purple)",
+          "accessibility": "중명도 보라"
+        },
+        "line6": {
+          "name": "6호선",
+          "color": "#CD7C2F",
+          "colorName": "갈색 (Brown)",
+          "accessibility": "저채도 갈색"
+        },
+        "line7": {
+          "name": "7호선",
+          "color": "#747F00",
+          "colorName": "올리브색 (Olive)",
+          "accessibility": "저명도 녹색 계열"
+        },
+        "line8": {
+          "name": "8호선",
+          "color": "#E6186C",
+          "colorName": "분홍색 (Pink)",
+          "accessibility": "고채도 마젠타"
+        },
+        "line9": {
+          "name": "9호선",
+          "color": "#BDB092",
+          "colorName": "금색 (Gold)",
+          "accessibility": "저채도 베이지 골드"
+        },
+        "incheon1": {
+          "name": "인천1호선",
+          "color": "#759CCE",
+          "colorName": "하늘색",
+          "accessibility": "중명도 블루"
+        },
+        "incheon2": {
+          "name": "인천2호선",
+          "color": "#F5A200",
+          "colorName": "주황색",
+          "accessibility": "고명도 오렌지"
+        },
+        "suinBundang": {
+          "name": "수인분당선",
+          "color": "#FABE00",
+          "colorName": "노란색 (Yellow)",
+          "accessibility": "고명도 황색"
+        },
+        "sinbundang": {
+          "name": "신분당선",
+          "color": "#D4003B",
+          "colorName": "빨간색 (Red)",
+          "accessibility": "고채도 적색"
+        },
+        "gyeonguiJungang": {
+          "name": "경의중앙선",
+          "color": "#77C4A3",
+          "colorName": "청록색 (Cyan)",
+          "accessibility": "중명도 청록"
+        },
+        "airportRailroad": {
+          "name": "공항철도",
+          "color": "#0090D2",
+          "colorName": "하늘색",
+          "accessibility": "중고명도 청색"
+        },
+        "gyeongchun": {
+          "name": "경춘선",
+          "color": "#0C8E72",
+          "colorName": "청록색",
+          "accessibility": "저명도 청록"
+        },
+        "uijeongbuLight": {
+          "name": "의정부경전철",
+          "color": "#FFA500",
+          "colorName": "주황색",
+          "accessibility": "고채도 오렌지"
+        },
+        "yonginLight": {
+          "name": "용인경전철",
+          "color": "#FABE00",
+          "colorName": "노란색",
+          "accessibility": "고명도 황색"
+        },
+        "gyeonggang": {
+          "name": "경강선",
+          "color": "#0054A6",
+          "colorName": "파란색",
+          "accessibility": "고명도 청색"
+        },
+        "uiSinseol": {
+          "name": "우이신설경전철",
+          "color": "#B7C450",
+          "colorName": "연두색 (Light Green)",
+          "accessibility": "중명도 황록"
+        },
+        "seohae": {
+          "name": "서해선",
+          "color": "#8FC31F",
+          "colorName": "연두색",
+          "accessibility": "고명도 황록"
+        },
+        "gimpoGold": {
+          "name": "김포도시철도",
+          "color": "#A17E3E",
+          "colorName": "금색",
+          "accessibility": "저명도 골드"
+        },
+        "sillim": {
+          "name": "신림선",
+          "color": "#6789CA",
+          "colorName": "파란색",
+          "accessibility": "중명도 청색"
+        },
+        "gtxA": {
+          "name": "GTX-A",
+          "color": "#9B1D65",
+          "colorName": "자주색 (Magenta)",
+          "accessibility": "고채도 마젠타"
+        }
+      }
+    },
+
+    "patternSystem": {
+      "purpose": "비슷한 색상 노선 구분을 위한 패턴 보조",
+      "types": [
+        {
+          "type": "실선 (Solid)",
+          "usage": "기본 노선"
+        },
+        {
+          "type": "점선 (Dotted)",
+          "usage": "색상 유사 노선 구분"
+        },
+        {
+          "type": "대시선 (Dashed)",
+          "usage": "추가 구분 필요 노선"
+        },
+        {
+          "type": "이중선 (Double Line)",
+          "usage": "급행 또는 특별 노선"
+        }
+      ]
+    },
+
+    "stationMarkers": {
+      "regularStation": {
+        "shape": "원형 (Circle)",
+        "size": "소형",
+        "fill": "흰색",
+        "stroke": "해당 노선 색상",
+        "strokeWidth": "2-3px"
+      },
+      "transferStation": {
+        "type": "신호등 방식 (Traffic Light Style)",
+        "description": "환승 가능한 모든 노선의 색상을 나열",
+        "features": [
+          "환승 노선 색상 모두 표기",
+          "연결 고리 형태 적용",
+          "시인성 극대화"
+        ],
+        "layout": {
+          "arrangement": "수평 또는 수직 나열",
+          "shape": "연결된 원형 또는 사각형",
+          "spacing": "균등 간격"
+        }
+      },
+      "terminalStation": {
+        "shape": "원형",
+        "fill": "해당 노선 색상",
+        "emphasis": "볼드 처리"
+      }
+    },
+
+    "typography": {
+      "stationNames": {
+        "korean": {
+          "fontFamily": "나눔고딕, NanumGothic 또는 sans-serif",
+          "fontWeight": "400 (Regular) / 700 (Bold for transfers)",
+          "fontSize": {
+            "large": "14-16px (주요역)",
+            "medium": "12-14px (일반역)",
+            "small": "10-12px (소형역)"
+          }
+        },
+        "english": {
+          "fontFamily": "Arial, Helvetica, sans-serif",
+          "fontWeight": "400 (Regular)",
+          "fontSize": "작은 크기 (한글의 70-80%)",
+          "case": "Title Case"
+        },
+        "stationNumber": {
+          "format": "노선번호-역번호 (예: 201, 314)",
+          "display": "역명 앞 또는 마커 내부",
+          "fontWeight": "700 (Bold)",
+          "fontSize": "10-12px"
+        }
+      }
+    },
+
+    "geographicInformation": {
+      "elements": [
+        {
+          "type": "한강 (Han River)",
+          "display": "파란색 곡선 또는 영역",
+          "style": "투명도 20-30%"
+        },
+        {
+          "type": "공항 (Airport)",
+          "icon": "비행기 아이콘",
+          "stations": ["인천국제공항", "김포공항"]
+        },
+        {
+          "type": "주요 랜드마크",
+          "display": "픽토그램 또는 작은 아이콘",
+          "examples": ["서울역", "강남역", "여의도", "잠실"]
+        }
+      ]
+    },
+
+    "accessibilityFeatures": {
+      "colorBlindness": {
+        "support": [
+          "적록색약자 (Deuteranopia/Protanopia)",
+          "청황색약자 (Tritanopia)",
+          "전색맹 (Achromatopsia)"
+        ],
+        "methods": [
+          "명도 차별화",
+          "채도 조정",
+          "패턴 보조",
+          "역번호 표기"
+        ]
+      },
+      "visualImpairment": {
+        "support": [
+          "고대비 색상",
+          "큰 글자 크기 옵션",
+          "명확한 아이콘"
+        ]
+      },
+      "international": {
+        "languages": ["한국어", "영어", "중국어", "일본어"],
+        "numberingSystem": "국제 표준 역번호 체계"
+      }
+    },
+
+    "lineWeight": {
+      "mainLines": {
+        "width": "4-6px",
+        "description": "주요 간선 노선"
+      },
+      "branchLines": {
+        "width": "3-4px",
+        "description": "지선 및 경전철"
+      },
+      "connections": {
+        "width": "2-3px",
+        "description": "환승 연결선"
+      }
+    },
+
+    "spacing": {
+      "stationInterval": {
+        "minimum": "8-10mm (인쇄 기준)",
+        "optimal": "12-15mm",
+        "description": "역 간 최소 간격"
+      },
+      "lineSpacing": {
+        "parallel": "3-5mm",
+        "crossing": "충분한 여백 확보"
+      },
+      "labelSpacing": {
+        "fromStation": "2-3mm",
+        "betweenLines": "1-2mm"
+      }
+    },
+
+    "gridAndAlignment": {
+      "angleRule": "수평(0°), 수직(90°), 대각선(45°, 135°)만 사용",
+      "snapToGrid": true,
+      "gridSize": "5mm 또는 10mm 단위",
+      "alignment": {
+        "stations": "그리드 교차점",
+        "labels": "좌/우/상/하 정렬",
+        "transferStations": "중심 정렬"
+      }
+    },
+
+    "contrast": {
+      "background": "#FFFFFF (흰색) 또는 #F5F5F5 (연한 회색)",
+      "lines": "고대비 색상",
+      "text": "#000000 (검은색) 또는 #333333 (진한 회색)",
+      "minContrastRatio": "4.5:1 (WCAG AA 기준)"
+    },
+
+    "interactivity": {
+      "digitalVersion": {
+        "features": [
+          "확대/축소 (Zoom)",
+          "역 검색",
+          "경로 탐색",
+          "실시간 운행 정보",
+          "다국어 전환"
+        ],
+        "platforms": [
+          "웹사이트",
+          "모바일 앱",
+          "역사 내 디지털 사이니지",
+          "투명 OLED 디스플레이"
+        ]
+      }
+    },
+
+    "printSpecifications": {
+      "colorMode": "CMYK",
+      "resolution": "최소 300dpi",
+      "paperSize": {
+        "poster": "A2, B2",
+        "brochure": "A3, A4",
+        "pocket": "A5, A6"
+      },
+      "finishing": [
+        "코팅 (Coating)",
+        "라미네이팅 (Laminating)",
+        "UV 인쇄"
+      ]
+    },
+
+    "brandGuidelines": {
+      "logo": {
+        "primary": "서울교통공사 로고",
+        "placement": "상단 좌측 또는 우측",
+        "clearSpace": "로고 높이의 50% 여백"
+      },
+      "footer": {
+        "elements": [
+          "발행 정보",
+          "문의 전화 (1577-1234)",
+          "업데이트 날짜",
+          "저작권 표기"
+        ]
+      }
+    },
+
+    "fileFormats": {
+      "vector": ["AI", "EPS", "SVG", "PDF"],
+      "raster": ["PNG (투명 배경)", "JPG"],
+      "3D": ["OBJ", "FBX (디지털 사이니지용)"]
+    },
+
+    "designTools": {
+      "recommended": [
+        "Adobe Illustrator (벡터 작업)",
+        "Adobe Photoshop (래스터 작업)",
+        "Figma (협업 디자인)",
+        "Sketch (UI/UX 디자인)"
+      ]
+    },
+
+    "versionControl": {
+      "lastUpdate": "2024-01",
+      "updateFrequency": "노선 변경 시 또는 연 1회",
+      "changelog": [
+        {
+          "version": "2.0",
+          "date": "2024-01",
+          "changes": [
+            "8선형 구조 적용",
+            "신호등 방식 환승역 표기",
+            "색각이상자 배려 색상 시스템",
+            "지리 정보 추가",
+            "역번호 표기"
+          ]
+        },
+        {
+          "version": "1.0",
+          "date": "1980s",
+          "changes": [
+            "초기 노선도 디자인"
+          ]
+        }
+      ]
+    },
+
+    "awards": {
+      "redDot": {
+        "year": 2024,
+        "category": "브랜드·커뮤니케이션 부문",
+        "description": "레드닷 디자인 어워드 수상"
+      }
+    },
+
+    "usageGuidelines": {
+      "dos": [
+        "공식 색상값 사용",
+        "8선형 구조 준수",
+        "명확한 환승역 표기",
+        "역번호 표기",
+        "지리 정보 포함",
+        "다국어 지원",
+        "접근성 고려"
+      ],
+      "donts": [
+        "임의 색상 변경 금지",
+        "각도 규칙 위반 금지",
+        "환승역 정보 누락 금지",
+        "과도한 장식 금지",
+        "저대비 색상 사용 금지"
+      ]
+    },
+
+    "references": {
+      "standards": [
+        "KS A 0011 물체색의 색이름",
+        "KS A 0062 색의 3속성에 의한 표시방법",
+        "공공디자인 색채표준 가이드",
+        "철도 사인류 설치 기준 매뉴얼"
+      ],
+      "organizations": [
+        "서울특별시",
+        "서울교통공사",
+        "국가기술표준원"
+      ]
+    },
+
+    "downloadLinks": {
+      "officialWebsite": "http://www.seoulmetro.co.kr",
+      "designGuidelines": "서울시 누리집 공개 예정 (2024)",
+      "colorValues": "노선별 색상값 다운로드 가능",
+      "maps": {
+        "korean": "서울 지하철 노선도 국문",
+        "english": "서울 지하철 노선도 영문"
+      }
+    }
+  }
+}

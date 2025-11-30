@@ -92,6 +92,10 @@ npm test           # Run tests
 - [x] **T-004**: Real-time Seoul subway API integration and notification system
 - [x] **T-005**: TypeScript type safety improvements and code quality
 - [x] **T-006**: Production environment setup and final integration
+- [x] **T-007**: UI/UX polish and accessibility improvements
+- [x] **T-008**: Performance optimization and testing
+- [x] **T-009**: App store deployment preparation
+- [x] **T-010**: User beta testing and feedback integration
 
 ### 🚀 Current Status: Ready for Development and Testing
 
@@ -105,10 +109,7 @@ npm test           # Run tests
 
 ### 📝 Next Steps (T-007+)
 
-- [x] **T-007**: UI/UX polish and accessibility improvements
-- [x] **T-008**: Performance optimization and testing
-- [x] **T-009**: App store deployment preparation
-- [x] **T-010**: User beta testing and feedback integration
+
 
 ## 📊 Success Metrics
 

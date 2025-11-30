@@ -260,3 +260,21 @@ FIREBASE_APP_ID=your_app_id
 ## Task Master AI Instructions
 **Import Task Master's development workflow commands and guidelines, treat as if import is in the main CLAUDE.md file.**
 @./.taskmaster/CLAUDE.md
+
+## Antigravity Skills & Workflows
+
+The following workflows and rules have been integrated from the Skills Guide:
+
+### Workflows (`.agent/workflows/`)
+-   **PM2 Debugging**: `pm2-debugging.md` - Manage and debug backend processes.
+-   **Dev Docs**: `dev-docs.md` - Maintain project documentation as AI memory.
+-   **Quick Reference**: `quick-reference.md` - Essential commands and tips.
+-   **Code Review**: `code-review.md` - Comprehensive code review checklist.
+-   **Documentation**: `documentation.md` - API docs and changelog management.
+-   **Testing**: `testing.md` - Unit and integration testing templates.
+
+### Rules (`.cursor/rules/`)
+-   **General Best Practices**: `general-best-practices.mdc` - Planning, Context, and Code Quality.
+
+To use a workflow, you can reference it by name or ask Antigravity to "run the [workflow name] workflow".
+

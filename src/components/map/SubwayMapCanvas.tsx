@@ -1,65 +1,56 @@
 import React from 'react';
-import { StyleSheet, Dimensions } from 'react-native';
+import { StyleSheet, Dimensions, View } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
-import Animated, { useSharedValue, useAnimatedStyle } from 'react-native-reanimated';
-import Svg, { Circle, G, Text as SvgText, Rect, Path } from 'react-native-svg';
-import { MapData } from '../../utils/mapLayout';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import Svg, { G, Path, Rect, Circle, Text } from 'react-native-svg';
+import { MapData, createLinePaths, MAP_WIDTH, MAP_HEIGHT } from '../../utils/mapLayout';
+import { LINE_COLORS } from '../../utils/subwayMapData';
 
 interface SubwayMapCanvasProps {
-  mapData: MapData;
-  onStationPress: (stationId: string) => void;
+  onStationPress?: (stationName: string) => void;
   selectedStationId?: string | null;
   selectedLineId?: string | null;
   initialStationName?: string;
+  mapData: MapData;
 }
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-export const SubwayMapCanvas: React.FC<SubwayMapCanvasProps> = ({ 
-  mapData, 
+// 2024 Design System Constants
+const LINE_WIDTH_MAIN = 13; // Main lines (1-9호선) - 4-6px scaled
+const LINE_WIDTH_BRANCH = 10; // Branch lines - 3-4px scaled
+const STATION_RADIUS_REGULAR = 6; // Regular stations
+const STATION_RADIUS_TRANSFER = 9; // Transfer stations (enlarged for traffic light style)
+const STATION_STROKE_WIDTH = 2.5; // 2024 standard
+const STATION_STROKE_WIDTH_SELECTED = 4; // Selected emphasis
+
+export const SubwayMapCanvas: React.FC<SubwayMapCanvasProps> = ({
   onStationPress,
-  selectedStationId,
   selectedLineId,
-  initialStationName
+  selectedStationId,
+  mapData,
 }) => {
-  // Shared values for transformations
-  const scale = useSharedValue(1);
-  const savedScale = useSharedValue(1);
-  const translateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
-  const savedTranslateX = useSharedValue(0);
-  const savedTranslateY = useSharedValue(0);
+  // Calculate scale to fit SVG in screen with some padding
+  const fitScale = Math.min(
+    SCREEN_WIDTH / MAP_WIDTH,
+    SCREEN_HEIGHT / MAP_HEIGHT
+  ) * 0.9;
 
-  // Center the map initially
-  React.useEffect(() => {
-    let targetX = mapData.width / 2;
-    let targetY = mapData.height / 2;
-    let initialScale = Math.min(SCREEN_WIDTH / mapData.width, SCREEN_HEIGHT / mapData.height) * 0.8;
+  // Start with 150% zoom on center
+  const initialScale = fitScale * 1.5;
 
-    // If initialStationName is provided, center on that station
-    if (initialStationName) {
-      const targetNode = mapData.nodes.find(n => n.name === initialStationName);
-      if (targetNode) {
-        targetX = targetNode.x;
-        targetY = targetNode.y;
-        initialScale = 1.5; // Zoom in more for specific station
-      }
-    }
+  // Center the map - focus on the center of the map
+  const focusX = MAP_WIDTH / 2;
+  const focusY = MAP_HEIGHT / 2;
+  const initialTranslateX = SCREEN_WIDTH / 2 - focusX * initialScale;
+  const initialTranslateY = SCREEN_HEIGHT / 2 - focusY * initialScale;
 
-    scale.value = initialScale;
-    savedScale.value = initialScale;
-    
-    // Calculate translation to center targetX, targetY
-    // Center of screen is (SCREEN_WIDTH/2, SCREEN_HEIGHT/2)
-    // We want (targetX * scale + translateX) = SCREEN_WIDTH/2
-    // translateX = SCREEN_WIDTH/2 - targetX * scale
-    
-    translateX.value = (SCREEN_WIDTH / 2) - (targetX * initialScale);
-    translateY.value = (SCREEN_HEIGHT / 2) - (targetY * initialScale);
-    
-    savedTranslateX.value = translateX.value;
-    savedTranslateY.value = translateY.value;
-  }, [mapData, initialStationName]);
+  const scale = useSharedValue(initialScale);
+  const savedScale = useSharedValue(initialScale);
+  const translateX = useSharedValue(initialTranslateX);
+  const translateY = useSharedValue(initialTranslateY);
+  const savedTranslateX = useSharedValue(initialTranslateX);
+  const savedTranslateY = useSharedValue(initialTranslateY);
 
   const panGesture = Gesture.Pan()
     .onUpdate((e) => {
@@ -73,120 +64,172 @@ export const SubwayMapCanvas: React.FC<SubwayMapCanvasProps> = ({
 
   const pinchGesture = Gesture.Pinch()
     .onUpdate((e) => {
-      scale.value = savedScale.value * e.scale;
+      const newScale = savedScale.value * e.scale;
+      scale.value = Math.min(Math.max(newScale, fitScale * 0.5), fitScale * 5);
     })
     .onEnd(() => {
       savedScale.value = scale.value;
     });
 
-  const composedGesture = Gesture.Simultaneous(panGesture, pinchGesture);
-
-  const animatedStyle = useAnimatedStyle(() => {
-    return {
-      transform: [
-        { translateX: translateX.value },
-        { translateY: translateY.value },
-        { scale: scale.value },
-      ],
-    };
-  });
-
-  // Group edges by line for continuous paths
-  const linePaths = React.useMemo(() => {
-    const paths: Record<string, { d: string; color: string; lineId: string }> = {};
-    
-    mapData.edges.forEach(edge => {
-      if (!paths[edge.lineId]) {
-        paths[edge.lineId] = { d: `M ${edge.x1} ${edge.y1} L ${edge.x2} ${edge.y2}`, color: edge.color, lineId: edge.lineId };
-      } else {
-        paths[edge.lineId]!.d += ` L ${edge.x2} ${edge.y2}`;
-      }
+  const doubleTapGesture = Gesture.Tap()
+    .numberOfTaps(2)
+    .onEnd(() => {
+      // Reset to initial view
+      scale.value = withTiming(initialScale, { duration: 300 });
+      savedScale.value = initialScale;
+      translateX.value = withTiming(initialTranslateX, { duration: 300 });
+      translateY.value = withTiming(initialTranslateY, { duration: 300 });
+      savedTranslateX.value = initialTranslateX;
+      savedTranslateY.value = initialTranslateY;
     });
-    
-    return Object.values(paths);
+
+  const composedGesture = Gesture.Simultaneous(
+    panGesture,
+    pinchGesture,
+    doubleTapGesture
+  );
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+      { scale: scale.value },
+    ],
+  }));
+
+  const linePaths = React.useMemo(() => {
+    const paths = createLinePaths(mapData);
+    console.log('SubwayMapCanvas: mapData nodes:', mapData.nodes.length);
+    console.log('SubwayMapCanvas: linePaths keys:', Object.keys(paths));
+    return paths;
   }, [mapData]);
+
+  console.log('SubwayMapCanvas: Rendering with dimensions:', MAP_WIDTH, MAP_HEIGHT);
 
   return (
     <GestureHandlerRootView style={styles.container}>
       <GestureDetector gesture={composedGesture}>
-        <Animated.View style={[styles.mapContainer, animatedStyle]}>
-          <Svg width={mapData.width} height={mapData.height} viewBox={`0 0 ${mapData.width} ${mapData.height}`}>
-            {/* Background for better touch handling */}
-            <Rect x="0" y="0" width={mapData.width} height={mapData.height} fill="#f9fafb" />
-            
-            {/* Lines (Paths) */}
+        <Animated.View style={animatedStyle}>
+          <Svg
+            width={MAP_WIDTH}
+            height={MAP_HEIGHT}
+            viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
+          >
+            {/* Background */}
+            <Rect x="0" y="0" width={MAP_WIDTH} height={MAP_HEIGHT} fill="#FAFAFA" />
+
+            {/* Render all subway lines - 2024 Design System */}
             <G>
-              {linePaths.map((line, index) => {
-                const isDimmed = selectedLineId && selectedLineId !== line.lineId;
+              {Object.entries(linePaths).map(([lineId, { path, color }]) => {
+                // Determine line width based on line type
+                const isMainLine = ['1', '2', '3', '4', '5', '6', '7', '8', '9'].includes(lineId);
+                const lineWidth = isMainLine ? LINE_WIDTH_MAIN : LINE_WIDTH_BRANCH;
+
                 return (
                   <Path
-                    key={`line-${index}`}
-                    d={line.d}
-                    stroke={line.color}
-                    strokeWidth="18"
+                    key={lineId}
+                    d={path}
+                    stroke={color}
+                    strokeWidth={lineWidth}
                     strokeLinecap="round"
                     strokeLinejoin="round"
                     fill="none"
-                    opacity={isDimmed ? 0.2 : 1}
+                    opacity={selectedLineId && selectedLineId !== lineId ? 0.2 : 1}
                   />
                 );
               })}
             </G>
 
-            {/* Nodes (Stations) */}
+            {/* Render Stations - 2024 Design System with Traffic Light Transfer Style */}
             <G>
               {mapData.nodes.map((node) => {
-                const isSelected = selectedStationId === node.stationId;
-                const isDimmed = selectedLineId && selectedLineId !== node.lineId;
-                
-                const radius = node.isTransfer ? 16 : 10;
-                const strokeWidth = node.isTransfer ? 5 : 3;
-                
-                // Heuristic: Place label above if in top half of map, below otherwise
-                const isTopHalf = node.y < 1000;
-                const labelY = isTopHalf ? node.y - radius - 12 : node.y + radius + 24;
+                const isSelected = selectedStationId === node.name || selectedStationId === node.id;
+                const isDimmed = selectedLineId && selectedLineId !== node.lineId && !isSelected;
+
+                // 2024 Design: Calculate radius based on station type
+                const stationRadius = node.isTransfer ? STATION_RADIUS_TRANSFER : STATION_RADIUS_REGULAR;
+                const strokeWidth = isSelected ? STATION_STROKE_WIDTH_SELECTED : STATION_STROKE_WIDTH;
 
                 return (
-                  <G 
-                    key={node.id} 
-                    onPress={() => onStationPress(node.stationId)}
-                    opacity={isDimmed ? 0.2 : 1}
-                  >
-                    {/* Station Circle */}
+                  <G key={node.id} onPress={() => onStationPress?.(node.name)}>
+                    {/* Traffic Light Style for Transfer Stations */}
+                    {node.isTransfer && node.lines.length > 1 ? (
+                      <>
+                        {/* Multi-line transfer indicator (신호등 방식) */}
+                        {node.lines.map((lineId, index) => {
+                          const lineColor = LINE_COLORS[lineId] || node.color;
+                          const offsetX = (index - (node.lines.length - 1) / 2) * (stationRadius * 1.8);
+
+                          return (
+                            <Circle
+                              key={`${node.id}-${lineId}`}
+                              cx={node.x + offsetX}
+                              cy={node.y}
+                              r={stationRadius * 0.7}
+                              fill="white"
+                              stroke={lineColor}
+                              strokeWidth={strokeWidth}
+                              opacity={isDimmed ? 0.2 : 1}
+                            />
+                          );
+                        })}
+                        {/* Connection line between transfer dots */}
+                        {node.lines.length > 1 && (
+                          <G>
+                            {node.lines.slice(0, -1).map((_, index) => {
+                              const x1 = node.x + (index - (node.lines.length - 1) / 2) * (stationRadius * 1.8) + stationRadius * 0.7;
+                              const x2 = node.x + (index + 1 - (node.lines.length - 1) / 2) * (stationRadius * 1.8) - stationRadius * 0.7;
+
+                              return (
+                                <G key={`connector-${index}`}>
+                                  <Path
+                                    d={`M ${x1} ${node.y} L ${x2} ${node.y}`}
+                                    stroke="#DDD"
+                                    strokeWidth={strokeWidth * 0.6}
+                                    opacity={isDimmed ? 0.2 : 0.5}
+                                  />
+                                </G>
+                              );
+                            })}
+                          </G>
+                        )}
+                      </>
+                    ) : (
+                      /* Regular station (single line) */
+                      <Circle
+                        cx={node.x}
+                        cy={node.y}
+                        r={stationRadius}
+                        fill="white"
+                        stroke={isSelected ? '#000' : node.color}
+                        strokeWidth={strokeWidth}
+                        opacity={isDimmed ? 0.2 : 1}
+                      />
+                    )}
+
+                    {/* Station Name - 2024 Typography System */}
+                    {!isDimmed && (
+                      <Text
+                        x={node.x}
+                        y={node.y + (node.isTransfer ? 20 : 16)}
+                        fontSize={node.isTransfer ? "14" : "12"}
+                        fill="#000000"
+                        textAnchor="middle"
+                        alignmentBaseline="hanging"
+                        fontWeight={node.isTransfer ? "700" : "400"}
+                        fontFamily="system-ui, -apple-system"
+                      >
+                        {node.name}
+                      </Text>
+                    )}
+
+                    {/* Enlarged hit area for better touch interaction */}
                     <Circle
                       cx={node.x}
                       cy={node.y}
-                      r={radius}
-                      fill="white"
-                      stroke={node.color}
-                      strokeWidth={isSelected ? strokeWidth + 3 : strokeWidth}
+                      r={node.isTransfer ? 20 : 15}
+                      fill="transparent"
                     />
-                    
-                    {/* Station Name - Halo for readability */}
-                    <SvgText
-                      x={node.x}
-                      y={labelY}
-                      fontSize={node.isTransfer ? "16" : "13"}
-                      fontWeight={node.isTransfer || isSelected ? "bold" : "500"}
-                      fill="white"
-                      stroke="white"
-                      strokeWidth="4"
-                      textAnchor="middle"
-                    >
-                      {node.name}
-                    </SvgText>
-
-                    {/* Station Name - Text */}
-                    <SvgText
-                      x={node.x}
-                      y={labelY}
-                      fontSize={node.isTransfer ? "16" : "13"}
-                      fontWeight={node.isTransfer || isSelected ? "bold" : "500"}
-                      fill="#333"
-                      textAnchor="middle"
-                    >
-                      {node.name}
-                    </SvgText>
                   </G>
                 );
               })}
@@ -194,6 +237,15 @@ export const SubwayMapCanvas: React.FC<SubwayMapCanvasProps> = ({
           </Svg>
         </Animated.View>
       </GestureDetector>
+
+      {/* Line Legend */}
+      <View style={styles.legend}>
+        {Object.entries(linePaths).map(([id, { color }]) => (
+          <View key={id} style={styles.legendItem}>
+            <View style={[styles.legendDot, { backgroundColor: color }]} />
+          </View>
+        ))}
+      </View>
     </GestureHandlerRootView>
   );
 };
@@ -201,11 +253,29 @@ export const SubwayMapCanvas: React.FC<SubwayMapCanvasProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
-    overflow: 'hidden',
+    backgroundColor: '#FAFAFA',
   },
-  mapContainer: {
-    width: '100%',
-    height: '100%',
+  legend: {
+    position: 'absolute',
+    bottom: 100,
+    left: 16,
+    flexDirection: 'row',
+    backgroundColor: 'white',
+    borderRadius: 20,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  legendItem: {
+    marginHorizontal: 3,
+  },
+  legendDot: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
   },
 });
