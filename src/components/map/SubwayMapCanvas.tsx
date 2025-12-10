@@ -31,10 +31,7 @@ export const SubwayMapCanvas: React.FC<SubwayMapCanvasProps> = ({
   mapData,
 }) => {
   // Calculate scale to fit SVG in screen with some padding
-  const fitScale = Math.min(
-    SCREEN_WIDTH / MAP_WIDTH,
-    SCREEN_HEIGHT / MAP_HEIGHT
-  ) * 0.9;
+  const fitScale = Math.min(SCREEN_WIDTH / MAP_WIDTH, SCREEN_HEIGHT / MAP_HEIGHT) * 0.9;
 
   // Start with 150% zoom on center
   const initialScale = fitScale * 1.5;
@@ -53,7 +50,7 @@ export const SubwayMapCanvas: React.FC<SubwayMapCanvasProps> = ({
   const savedTranslateY = useSharedValue(initialTranslateY);
 
   const panGesture = Gesture.Pan()
-    .onUpdate((e) => {
+    .onUpdate(e => {
       translateX.value = savedTranslateX.value + e.translationX;
       translateY.value = savedTranslateY.value + e.translationY;
     })
@@ -63,7 +60,7 @@ export const SubwayMapCanvas: React.FC<SubwayMapCanvasProps> = ({
     });
 
   const pinchGesture = Gesture.Pinch()
-    .onUpdate((e) => {
+    .onUpdate(e => {
       const newScale = savedScale.value * e.scale;
       scale.value = Math.min(Math.max(newScale, fitScale * 0.5), fitScale * 5);
     })
@@ -83,18 +80,10 @@ export const SubwayMapCanvas: React.FC<SubwayMapCanvasProps> = ({
       savedTranslateY.value = initialTranslateY;
     });
 
-  const composedGesture = Gesture.Simultaneous(
-    panGesture,
-    pinchGesture,
-    doubleTapGesture
-  );
+  const composedGesture = Gesture.Simultaneous(panGesture, pinchGesture, doubleTapGesture);
 
   const animatedStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: translateX.value },
-      { translateY: translateY.value },
-      { scale: scale.value },
-    ],
+    transform: [{ translateX: translateX.value }, { translateY: translateY.value }, { scale: scale.value }],
   }));
 
   const linePaths = React.useMemo(() => {
@@ -110,11 +99,7 @@ export const SubwayMapCanvas: React.FC<SubwayMapCanvasProps> = ({
     <GestureHandlerRootView style={styles.container}>
       <GestureDetector gesture={composedGesture}>
         <Animated.View style={animatedStyle}>
-          <Svg
-            width={MAP_WIDTH}
-            height={MAP_HEIGHT}
-            viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
-          >
+          <Svg width={MAP_WIDTH} height={MAP_HEIGHT} viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}>
             {/* Background */}
             <Rect x="0" y="0" width={MAP_WIDTH} height={MAP_HEIGHT} fill="#FAFAFA" />
 
@@ -142,7 +127,7 @@ export const SubwayMapCanvas: React.FC<SubwayMapCanvasProps> = ({
 
             {/* Render Stations - 2024 Design System with Traffic Light Transfer Style */}
             <G>
-              {mapData.nodes.map((node) => {
+              {mapData.nodes.map(node => {
                 const isSelected = selectedStationId === node.name || selectedStationId === node.id;
                 const isDimmed = selectedLineId && selectedLineId !== node.lineId && !isSelected;
 
@@ -177,8 +162,14 @@ export const SubwayMapCanvas: React.FC<SubwayMapCanvasProps> = ({
                         {node.lines.length > 1 && (
                           <G>
                             {node.lines.slice(0, -1).map((_, index) => {
-                              const x1 = node.x + (index - (node.lines.length - 1) / 2) * (stationRadius * 1.8) + stationRadius * 0.7;
-                              const x2 = node.x + (index + 1 - (node.lines.length - 1) / 2) * (stationRadius * 1.8) - stationRadius * 0.7;
+                              const x1 =
+                                node.x +
+                                (index - (node.lines.length - 1) / 2) * (stationRadius * 1.8) +
+                                stationRadius * 0.7;
+                              const x2 =
+                                node.x +
+                                (index + 1 - (node.lines.length - 1) / 2) * (stationRadius * 1.8) -
+                                stationRadius * 0.7;
 
                               return (
                                 <G key={`connector-${index}`}>
@@ -212,11 +203,11 @@ export const SubwayMapCanvas: React.FC<SubwayMapCanvasProps> = ({
                       <Text
                         x={node.x}
                         y={node.y + (node.isTransfer ? 20 : 16)}
-                        fontSize={node.isTransfer ? "14" : "12"}
+                        fontSize={node.isTransfer ? '14' : '12'}
                         fill="#000000"
                         textAnchor="middle"
                         alignmentBaseline="hanging"
-                        fontWeight={node.isTransfer ? "700" : "400"}
+                        fontWeight={node.isTransfer ? '700' : '400'}
                         fontFamily="system-ui, -apple-system"
                       >
                         {node.name}
@@ -224,12 +215,7 @@ export const SubwayMapCanvas: React.FC<SubwayMapCanvasProps> = ({
                     )}
 
                     {/* Enlarged hit area for better touch interaction */}
-                    <Circle
-                      cx={node.x}
-                      cy={node.y}
-                      r={node.isTransfer ? 20 : 15}
-                      fill="transparent"
-                    />
+                    <Circle cx={node.x} cy={node.y} r={node.isTransfer ? 20 : 15} fill="transparent" />
                   </G>
                 );
               })}

@@ -7,6 +7,16 @@
 				"-y",
 				"chrome-devtools-mcp@latest"
 			]
+		},
+		"testsprite": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@testsprite/testsprite-mcp@latest"
+			],
+			"env": {
+				"TESTSPRITE_API_KEY": "${TESTSPRITE_API_KEY}"
+			}
 		}
 	}
 }
