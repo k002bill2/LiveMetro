@@ -1,6 +1,7 @@
 /**
- * Home Screen Component
+ * Home Screen Component - Modern Design
  * Main screen displaying real-time train information and nearby stations
+ * Minimal grayscale design with black accent
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -23,6 +24,7 @@ import { LoadingScreen } from '../../components/common/LoadingScreen';
 import { StationCard } from '../../components/train/StationCard';
 import { TrainArrivalList } from '../../components/train/TrainArrivalList';
 import { useToast } from '../../components/common/Toast';
+import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '../../styles/modernTheme';
 
 import { Station } from '../../models/train';
 import { AppStackParamList } from '../../navigation/types';
@@ -54,25 +56,25 @@ export const HomeScreen: React.FC = () => {
     try {
       setLoading(true);
 
-      // Development: Mock 산곡역 data for testing
+      // Development: Use 강남역 (Gangnam) for testing - Seoul API reliably returns data for this station
       if (__DEV__) {
-        const mockSangokStation: Station = {
-          id: 'sangok',
-          name: '산곡',
-          nameEn: 'Sangok',
-          lineId: '7',
+        const mockGangnamStation: Station = {
+          id: 'gangnam',
+          name: '강남',
+          nameEn: 'Gangnam',
+          lineId: '2',
           coordinates: {
-            latitude: 37.4988,
-            longitude: 126.7189,
+            latitude: 37.4979,
+            longitude: 127.0276,
           },
           transfers: [],
         };
 
-        setNearbyStations([mockSangokStation]);
-        setSelectedStation(mockSangokStation);
+        setNearbyStations([mockGangnamStation]);
+        setSelectedStation(mockGangnamStation);
         setLocationPermission(true);
         setLoading(false);
-        showSuccess('개발 모드: 산곡역으로 설정되었습니다');
+        showSuccess('개발 모드: 강남역으로 설정되었습니다');
         return;
       }
       
@@ -153,7 +155,10 @@ export const HomeScreen: React.FC = () => {
 
   const onStationSelect = (station: Station): void => {
     setSelectedStation(station);
-    navigation.navigate('SubwayMap', { stationName: station.name });
+    navigation.navigate('StationNavigator', {
+      stationId: station.id,
+      lineId: station.lineId,
+    });
   };
 
   const onRefresh = async (): Promise<void> => {
@@ -201,7 +206,11 @@ export const HomeScreen: React.FC = () => {
     <ScrollView
       style={styles.container}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={COLORS.black}
+        />
       }
       accessible={false}
       contentInsetAdjustmentBehavior="automatic"
@@ -218,13 +227,13 @@ export const HomeScreen: React.FC = () => {
 
       {/* Offline Banner */}
       {!isOnline && (
-        <View 
+        <View
           style={styles.offlineBanner}
           accessible={true}
           accessibilityRole="text"
           accessibilityLabel="현재 오프라인 상태입니다. 캐시된 정보가 표시됩니다"
         >
-          <Ionicons name="cloud-offline-outline" size={20} color="#dc2626" />
+          <Ionicons name="cloud-offline-outline" size={20} color={COLORS.text.secondary} />
           <Text style={styles.offlineText}>
             오프라인 상태 - 캐시된 정보가 표시됩니다
           </Text>
@@ -233,22 +242,22 @@ export const HomeScreen: React.FC = () => {
 
       {/* Location Permission Banner */}
       {!locationPermission && (
-        <TouchableOpacity 
-          style={styles.permissionBanner} 
+        <TouchableOpacity
+          style={styles.permissionBanner}
           onPress={requestLocationPermission}
           accessible={true}
           accessibilityRole="button"
           accessibilityLabel="위치 권한 허용하기"
           accessibilityHint="주변 지하철역 정보를 받기 위해 위치 권한을 허용하세요"
         >
-          <Ionicons name="location-outline" size={24} color="#2563eb" />
+          <Ionicons name="location-outline" size={24} color={COLORS.black} />
           <View style={styles.permissionText}>
             <Text style={styles.permissionTitle}>위치 권한 허용</Text>
             <Text style={styles.permissionSubtitle}>
               주변 역 정보를 보려면 위치 권한이 필요합니다
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color="#6b7280" />
+          <Ionicons name="chevron-forward" size={20} color={COLORS.gray[400]} />
         </TouchableOpacity>
       )}
 
@@ -261,25 +270,25 @@ export const HomeScreen: React.FC = () => {
         </View>
         
         {nearbyStations.length === 0 ? (
-          <View 
+          <View
             style={styles.emptyState}
             accessible={true}
             accessibilityRole="text"
-            accessibilityLabel={locationPermission 
-              ? '주변에 지하철역이 없습니다. 다른 위치에서 시도해보세요' 
+            accessibilityLabel={locationPermission
+              ? '주변에 지하철역이 없습니다. 다른 위치에서 시도해보세요'
               : '즐겨찾기에 추가된 역이 없습니다. 설정에서 자주 이용하는 역을 추가해보세요'
             }
           >
-            <Ionicons name="train-outline" size={48} color="#9ca3af" />
+            <Ionicons name="train-outline" size={48} color={COLORS.gray[300]} />
             <Text style={styles.emptyText}>
-              {locationPermission 
-                ? '주변에 지하철역이 없습니다' 
+              {locationPermission
+                ? '주변에 지하철역이 없습니다'
                 : '즐겨찾기에 추가된 역이 없습니다'
               }
             </Text>
             <Text style={styles.emptySubtext}>
-              {locationPermission 
-                ? '다른 위치에서 시도해보세요' 
+              {locationPermission
+                ? '다른 위치에서 시도해보세요'
                 : '설정에서 자주 이용하는 역을 추가해보세요'
               }
             </Text>
@@ -320,7 +329,7 @@ export const HomeScreen: React.FC = () => {
                 accessibilityLabel={`${selectedStation.name} 역 상세 정보 보기`}
               >
                 <Text style={styles.detailButtonText}>상세보기</Text>
-                <Ionicons name="chevron-forward" size={18} color="#2563eb" />
+                <Ionicons name="chevron-forward" size={18} color={COLORS.black} />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={onRefresh}
@@ -346,7 +355,7 @@ export const HomeScreen: React.FC = () => {
                   <Ionicons
                     name="refresh"
                     size={24}
-                    color={refreshing ? '#9ca3af' : '#2563eb'}
+                    color={refreshing ? COLORS.gray[400] : COLORS.black}
                   />
                 </Animated.View>
               </TouchableOpacity>
@@ -364,173 +373,139 @@ export const HomeScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: COLORS.white,
   },
   welcomeSection: {
-    backgroundColor: '#ffffff',
-    padding: 20,
-    marginBottom: 8,
+    backgroundColor: COLORS.white,
+    padding: SPACING.lg,
+    marginBottom: SPACING.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border.light,
   },
   welcomeText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#111827',
+    fontSize: TYPOGRAPHY.fontSize['2xl'],
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text.primary,
     marginBottom: 4,
+    letterSpacing: TYPOGRAPHY.letterSpacing.tight,
   },
   subtitle: {
-    fontSize: 16,
-    color: '#6b7280',
-  },
-  mapCard: {
-    backgroundColor: '#ffffff',
-    marginHorizontal: 16,
-    marginBottom: 8,
-    padding: 16,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  mapCardContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  mapIconContainer: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: '#dbeafe',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  mapTextContainer: {
-    flex: 1,
-  },
-  mapTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 4,
-  },
-  mapSubtitle: {
-    fontSize: 14,
-    color: '#6b7280',
+    fontSize: TYPOGRAPHY.fontSize.base,
+    color: COLORS.text.secondary,
   },
   permissionBanner: {
-    backgroundColor: '#dbeafe',
+    backgroundColor: COLORS.surface.card,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    marginHorizontal: 16,
-    marginBottom: 8,
-    borderRadius: 12,
+    padding: SPACING.lg,
+    marginHorizontal: SPACING.lg,
+    marginBottom: SPACING.sm,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.border.medium,
   },
   permissionText: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: SPACING.md,
   },
   permissionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#1e40af',
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text.primary,
     marginBottom: 2,
   },
   permissionSubtitle: {
-    fontSize: 14,
-    color: '#3730a3',
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.secondary,
   },
   offlineBanner: {
-    backgroundColor: '#fef2f2',
+    backgroundColor: COLORS.surface.card,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
-    marginHorizontal: 16,
-    marginBottom: 8,
-    borderRadius: 12,
+    padding: SPACING.lg,
+    marginHorizontal: SPACING.lg,
+    marginBottom: SPACING.sm,
+    borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: '#fecaca',
+    borderColor: COLORS.border.medium,
   },
   offlineText: {
-    fontSize: 14,
-    color: '#dc2626',
-    fontWeight: '600',
-    marginLeft: 8,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.secondary,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    marginLeft: SPACING.sm,
     flex: 1,
   },
   section: {
-    backgroundColor: '#ffffff',
-    marginBottom: 8,
-    paddingVertical: 20,
+    backgroundColor: COLORS.white,
+    marginBottom: SPACING.sm,
+    paddingVertical: SPACING.lg,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    marginBottom: 16,
+    paddingHorizontal: SPACING.lg,
+    marginBottom: SPACING.lg,
   },
   sectionHeaderActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    columnGap: 12,
+    columnGap: SPACING.md,
   },
   sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#111827',
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text.primary,
     flex: 1,
+    letterSpacing: TYPOGRAPHY.letterSpacing.tight,
   },
   detailButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 999,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.full,
     borderWidth: 1,
-    borderColor: '#c7d2fe',
-    backgroundColor: '#eef2ff',
+    borderColor: COLORS.border.medium,
+    backgroundColor: COLORS.surface.card,
   },
   detailButtonText: {
-    color: '#2563eb',
-    fontWeight: '600',
+    color: COLORS.black,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
     marginRight: 4,
+    fontSize: TYPOGRAPHY.fontSize.sm,
   },
   refreshButton: {
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: '#f3f4f6',
+    padding: SPACING.sm,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.surface.card,
     width: 40,
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
   },
   stationList: {
-    paddingLeft: 20,
+    paddingLeft: SPACING.lg,
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: 40,
-    paddingHorizontal: 20,
+    paddingVertical: SPACING['2xl'],
+    paddingHorizontal: SPACING.lg,
   },
   emptyText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#6b7280',
-    marginTop: 16,
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text.secondary,
+    marginTop: SPACING.lg,
     textAlign: 'center',
   },
   emptySubtext: {
-    fontSize: 14,
-    color: '#9ca3af',
-    marginTop: 8,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.tertiary,
+    marginTop: SPACING.sm,
     textAlign: 'center',
+    lineHeight: TYPOGRAPHY.lineHeight.relaxed * TYPOGRAPHY.fontSize.sm,
   },
 });
 export default HomeScreen;

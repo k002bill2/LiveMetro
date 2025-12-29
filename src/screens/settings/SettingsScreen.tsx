@@ -1,6 +1,7 @@
 /**
- * Settings Screen Component
+ * Settings Screen Component - Modern Design
  * User preferences and app configuration
+ * Minimal grayscale design with black accent
  */
 
 import React from 'react';
@@ -16,6 +17,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '../../services/auth/AuthContext';
+import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '../../styles/modernTheme';
 
 export const SettingsScreen: React.FC = () => {
   const { user, signOut } = useAuth();
@@ -55,7 +57,7 @@ export const SettingsScreen: React.FC = () => {
     <TouchableOpacity style={styles.settingItem} onPress={onPress}>
       <View style={styles.settingItemLeft}>
         <View style={styles.iconContainer}>
-          <Ionicons name={icon as any} size={20} color="#2563eb" />
+          <Ionicons name={icon as any} size={20} color={COLORS.black} />
         </View>
         <View style={styles.textContainer}>
           <Text style={styles.settingTitle}>{title}</Text>
@@ -63,7 +65,7 @@ export const SettingsScreen: React.FC = () => {
         </View>
       </View>
       {showChevron && (
-        <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+        <Ionicons name="chevron-forward" size={20} color={COLORS.gray[400]} />
       )}
     </TouchableOpacity>
   );
@@ -75,7 +77,7 @@ export const SettingsScreen: React.FC = () => {
         <View style={styles.section}>
           <View style={styles.profileCard}>
             <View style={styles.profileIcon}>
-              <Ionicons name="person" size={32} color="#2563eb" />
+              <Ionicons name="person" size={32} color={COLORS.black} />
             </View>
             <View style={styles.profileInfo}>
               <Text style={styles.profileName}>
@@ -170,7 +172,7 @@ export const SettingsScreen: React.FC = () => {
         {/* Sign Out */}
         <View style={styles.section}>
           <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-            <Ionicons name="log-out-outline" size={20} color="#dc2626" />
+            <Ionicons name="log-out-outline" size={20} color={COLORS.text.secondary} />
             <Text style={styles.signOutText}>로그아웃</Text>
           </TouchableOpacity>
         </View>
@@ -182,80 +184,74 @@ export const SettingsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: COLORS.white,
   },
   content: {
     flex: 1,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: SPACING.xl,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#374151',
-    marginBottom: 12,
-    marginHorizontal: 20,
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text.secondary,
+    marginBottom: SPACING.md,
+    marginHorizontal: SPACING.lg,
+    letterSpacing: TYPOGRAPHY.letterSpacing.wide,
+    textTransform: 'uppercase',
   },
   profileCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: COLORS.white,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 20,
-    marginHorizontal: 20,
-    borderRadius: 12,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    padding: SPACING.lg,
+    marginHorizontal: SPACING.lg,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.border.light,
   },
   profileIcon: {
     width: 56,
     height: 56,
-    backgroundColor: '#eff6ff',
-    borderRadius: 28,
+    backgroundColor: COLORS.surface.card,
+    borderRadius: RADIUS.full,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 16,
+    marginRight: SPACING.lg,
+    borderWidth: 1,
+    borderColor: COLORS.border.medium,
   },
   profileInfo: {
     flex: 1,
   },
   profileName: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#111827',
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text.primary,
     marginBottom: 4,
+    letterSpacing: TYPOGRAPHY.letterSpacing.tight,
   },
   profileEmail: {
-    fontSize: 14,
-    color: '#6b7280',
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.tertiary,
   },
   settingGroup: {
-    backgroundColor: '#ffffff',
-    marginHorizontal: 20,
-    borderRadius: 12,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
+    backgroundColor: COLORS.white,
+    marginHorizontal: SPACING.lg,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: COLORS.border.light,
+    overflow: 'hidden',
   },
   settingItem: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderBottomWidth: 0.5,
-    borderBottomColor: '#e5e7eb',
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border.light,
   },
   settingItemLeft: {
     flexDirection: 'row',
@@ -265,41 +261,41 @@ const styles = StyleSheet.create({
   iconContainer: {
     width: 36,
     height: 36,
-    backgroundColor: '#eff6ff',
-    borderRadius: 18,
+    backgroundColor: COLORS.surface.card,
+    borderRadius: RADIUS.full,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: SPACING.md,
   },
   textContainer: {
     flex: 1,
   },
   settingTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text.primary,
   },
   settingSubtitle: {
-    fontSize: 14,
-    color: '#6b7280',
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.tertiary,
     marginTop: 2,
   },
   signOutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#ffffff',
-    marginHorizontal: 20,
-    paddingVertical: 16,
-    borderRadius: 12,
+    backgroundColor: COLORS.white,
+    marginHorizontal: SPACING.lg,
+    paddingVertical: SPACING.lg,
+    borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: '#fecaca',
+    borderColor: COLORS.border.medium,
   },
   signOutText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#dc2626',
-    marginLeft: 8,
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text.secondary,
+    marginLeft: SPACING.sm,
   },
 });
 export default SettingsScreen;

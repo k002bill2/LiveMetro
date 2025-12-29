@@ -6,11 +6,19 @@ export type AppTabParamList = {
 };
 
 export type AppStackParamList = {
+  // Authenticated screens
   MainTabs: undefined;
   StationDetail: {
     stationId: string;
     stationName: string;
     lineId: string;
   };
-  SubwayMap: { stationName?: string } | undefined;
+  StationNavigator: {
+    stationId: string;
+    lineId: string;
+  };
+
+  // Unauthenticated screens
+  Welcome: undefined;
+  Auth: undefined;
 };

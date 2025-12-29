@@ -2,72 +2,83 @@
   "permissions": {
     "allowedTools": [
       "Read",
-      "Edit",
       "Write(src/**)",
-      "Write(.claude/**)",
-      "Write(dev/**)",
+      "Write(components/**)",
+      "Write(docs/**)",
+      "Edit(src/**)",
+      "Edit(components/**)",
+      "Edit(docs/**)",
       "Bash(npm *)",
       "Bash(npx *)",
       "Bash(git *)",
-      "Bash(pm2 *)",
-      "Bash(lsof:*)",
-      "Bash(xargs kill:*)"
+      "Bash(expo *)",
+      "Bash(eas *)",
+      "Grep",
+      "Glob"
     ],
     "deny": [
       "Read(.env*)",
       "Write(.env*)",
+      "Edit(.env*)",
+      "Read(google-services.json)",
+      "Write(google-services.json)",
       "Bash(sudo *)",
-      "Bash(rm -rf *)"
+      "Bash(rm -rf *)",
+      "Bash(killall *)"
     ]
   },
   "hooks": {
-    "UserPromptSubmit": [
-      {
-        "matcher": "*",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node .claude/hooks/skillActivation.js \"$prompt\""
-          }
-        ]
-      }
-    ],
     "PostToolUse": [
       {
-        "matcher": "Write(src/**/*.tsx)",
+        "matcher": "Write(*.ts)",
         "hooks": [
           {
             "type": "command",
-            "command": "npx eslint --fix \"$file\" 2>/dev/null || true"
+            "command": "npm run type-check 2>&1 | head -20"
           }
         ]
       },
       {
-        "matcher": "Write(src/**/*.ts)",
+        "matcher": "Write(*.tsx)",
         "hooks": [
           {
             "type": "command",
-            "command": "npx eslint --fix \"$file\" 2>/dev/null || true"
+            "command": "npm run type-check 2>&1 | head -20"
           }
         ]
-      }
-    ],
-    "Stop": [
+      },
       {
-        "matcher": "*",
+        "matcher": "Edit(*.ts)",
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/selfCheck.js"
+            "command": "npm run lint -- --fix --quiet || true"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit(*.tsx)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "npm run lint -- --fix --quiet || true"
           }
         ]
       }
     ]
   },
-  "statusline": {
-    "enabled": true,
-    "showTokens": true,
-    "showCost": true,
-    "showModel": true
+  "settings": {
+    "autoApprove": {
+      "tools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "Bash(git status)",
+        "Bash(git diff *)",
+        "Bash(git log *)",
+        "Bash(npm run *)",
+        "Bash(expo start *)"
+      ]
+    }
   }
 }
