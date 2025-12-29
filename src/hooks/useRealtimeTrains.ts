@@ -87,7 +87,7 @@ export const useRealtimeTrains = (
       
       staleTimerRef.current = setTimeout(() => {
         updateState({ isStale: true });
-      }, staleTime);
+      }, staleTime) as unknown as NodeJS.Timeout;
 
       if (onDataReceived) {
         onDataReceived(data);

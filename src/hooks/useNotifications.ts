@@ -9,6 +9,7 @@ import { notificationService, NotificationType } from '../services/notification/
 import { dataManager } from '../services/data/dataManager';
 import { useAuth } from '../services/auth/AuthContext';
 import { TrainDelay, ServiceDisruption, TrainStatus } from '../models/train';
+import { notificationStorageService } from '../services/notification/notificationStorageService';
 
 interface UseNotificationsState {
   hasPermission: boolean;
@@ -220,7 +221,7 @@ export const useNotifications = (options: UseNotificationsOptions = {}) => {
     await checkDelays();
 
     // Set up periodic monitoring
-    const timer = setInterval(checkDelays, 60000); // Check every minute
+    const timer = setInterval(checkDelays, 60000) as unknown as NodeJS.Timeout; // Check every minute
     monitoringRef.current.set(stationName, timer);
 
     console.log(`Started delay monitoring for ${stationName}`);
@@ -330,10 +331,33 @@ export const useNotifications = (options: UseNotificationsOptions = {}) => {
   /**
    * Handle incoming notifications
    */
-  const handleNotificationReceived = useCallback((notification: Notifications.Notification) => {
+  const handleNotificationReceived = useCallback(async (notification: Notifications.Notification) => {
     console.log('Notification received:', notification);
-    
+
     updateState({ lastNotification: notification });
+
+    // Save notification to storage
+    try {
+      const { title, body, data } = notification.request.content;
+
+      // Map notification type from data or default to SERVICE_UPDATE
+      const notificationType = (data?.type as NotificationType) || NotificationType.SERVICE_UPDATE;
+
+      // Map priority from data or default to 'normal'
+      const priority = (data?.priority as 'low' | 'normal' | 'high' | 'urgent') || 'normal';
+
+      await notificationStorageService.saveNotification({
+        type: notificationType,
+        title: title || '알림',
+        body: body || '',
+        priority,
+        data: data ? { ...data } : undefined,
+      });
+
+      console.log('✅ Notification saved to storage');
+    } catch (error) {
+      console.error('Error saving notification to storage:', error);
+    }
 
     if (onNotificationReceived) {
       onNotificationReceived(notification);

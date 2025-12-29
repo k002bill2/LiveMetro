@@ -12,6 +12,7 @@ import {
   signOut,
   onAuthStateChanged,
   updateProfile,
+  sendPasswordResetEmail,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 
@@ -27,6 +28,7 @@ interface AuthContextType {
   signUpWithEmail: (email: string, password: string, displayName?: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateUserProfile: (updates: Partial<User>) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -216,7 +218,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const userRef = doc(firestore, 'users', firebaseUser.uid);
       await setDoc(userRef, { ...updates, lastActiveAt: new Date() }, { merge: true });
-      
+
       // Update local user state
       setUser(prev => prev ? { ...prev, ...updates } : null);
 
@@ -230,6 +232,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const handleResetPassword = async (email: string): Promise<void> => {
+    try {
+      await sendPasswordResetEmail(auth, email);
+    } catch (error) {
+      console.error('Password reset error:', error);
+      throw new Error('비밀번호 재설정 이메일 전송에 실패했습니다.');
+    }
+  };
+
   const value: AuthContextType = {
     user,
     firebaseUser,
@@ -239,6 +250,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signUpWithEmail: handleSignUpWithEmail,
     signOut: handleSignOut,
     updateUserProfile: handleUpdateUserProfile,
+    resetPassword: handleResetPassword,
   };
 
   return (

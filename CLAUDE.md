@@ -2,239 +2,327 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-**Project**: LiveMetro - 실시간 서울 지하철 알림 앱
-**Architecture**: React Native (Expo) + TypeScript + Firebase + Seoul Open API
-**Development Status**: Active - Map visualization and real-time data integration
+## Project Overview
 
-<vooster-docs>
-- @vooster-docs/prd.md
-- @vooster-docs/architecture.md
-- @vooster-docs/guideline.md
-- @vooster-docs/step-by-step.md
-- @vooster-docs/clean-code.md
-</vooster-docs>
+LiveMetro is a React Native mobile application (Expo-based) for real-time Seoul metropolitan subway arrival notifications. The app integrates with Seoul's Open API for real-time train data and uses Firebase for user authentication and data persistence.
 
-## Essential Commands
+**Key Technologies:**
+- React Native 0.72 with Expo ~49
+- TypeScript 5.1+ with strict mode
+- Firebase (Auth, Firestore, Functions)
+- React Navigation 6.x (Stack + Bottom Tabs)
+- Seoul Open Data API integration
+
+## Development Commands
+
+### Running the App
+```bash
+npm start              # Start Expo dev server
+npm run android        # Run on Android
+npm run ios            # Run on iOS
+npm run web            # Run in web browser
+```
+
+### Code Quality
+```bash
+npm run lint           # Run ESLint with auto-fix
+npm run type-check     # TypeScript type checking (no emit)
+npm test               # Run Jest tests
+npm test:watch         # Run tests in watch mode
+npm test:coverage      # Generate coverage report
+```
+
+### Building & Deployment
+```bash
+# EAS Build (Expo Application Services)
+npm run build:development     # Development build (all platforms)
+npm run build:preview         # Preview build (all platforms)
+npm run build:production      # Production build (all platforms)
+npm run build:ios            # iOS production build
+npm run build:android        # Android production build
+
+# Submit to stores
+npm run submit:ios           # Submit to App Store
+npm run submit:android       # Submit to Play Store
+npm run submit:all           # Submit to both stores
+```
+
+**Important:** Both `prebuild` and `presubmit` hooks run linting and type-checking automatically. Builds will fail if these checks don't pass.
+
+## Architecture Overview
+
+### Multi-Tier Data Flow Strategy
+
+The app implements a sophisticated fallback system for real-time subway data:
+
+**Priority Order:** Seoul API → Firebase → Local Cache
+
+1. **Seoul API (Primary Source)**: Real-time arrival data from Seoul Open Data Portal
+2. **Firebase (Fallback)**: Secondary source with real-time subscriptions
+3. **AsyncStorage (Cache)**: Offline support with TTL-based expiration
+
+**Key Service Layer:**
+- `dataManager` (src/services/data/dataManager.ts): Orchestrates the multi-tier fallback with automatic retry logic
+- `seoulSubwayApi` (src/services/api/seoulSubwayApi.ts): Seoul API integration with timeout and error handling
+- `trainService` (src/services/train/trainService.ts): Firebase queries and real-time subscriptions
+
+### Navigation Architecture
+
+The app uses a conditional authentication-based navigation structure:
+
+**Root Structure:**
+```
+RootNavigator (Stack)
+├── If authenticated:
+│   └── Main (BottomTabs)
+│       ├── Home
+│       ├── Favorites
+│       ├── Alerts
+│       └── Settings
+└── If unauthenticated:
+    ├── Welcome
+    └── Auth
+```
+
+**Modal/Overlay Screens:**
+- `StationDetail`: Pushed onto stack from any tab (shows train arrivals)
+- `SubwayMap`: Full-screen Seoul Metro map with station navigation
+
+**Navigation Pattern:** Uses TypeScript-typed route params (see `src/navigation/types.ts`). All navigation props are strongly typed via `AppStackParamList` and `AppTabParamList`.
+
+### State Management Pattern
+
+**No Redux/MobX** - The app uses React hooks and Context API:
+
+1. **AuthContext** (src/services/auth/AuthContext.tsx): Global authentication state
+2. **Custom Hooks**: Domain-specific hooks for data fetching
+   - `useRealtimeTrains`: Real-time train data with auto-retry and stale detection
+   - `useLocation`: Location permissions and GPS tracking
+   - `useNearbyStations`: Geo-proximity station search
+   - `useNotifications`: Push notification management
+
+3. **Singleton Services**: Stateful service classes exported as singletons
+   - `dataManager`: Manages subscriptions and cache
+   - `trainService`: Firebase subscriptions
+   - `monitoringManager`: Production monitoring
+
+### Module Path Aliases
+
+The project uses Babel module resolver with TypeScript paths:
+
+```typescript
+@ → src/
+@components → src/components
+@screens → src/screens
+@services → src/services
+@models → src/models
+@utils → src/utils
+@hooks → src/hooks
+```
+
+**When creating imports:** Use path aliases consistently. Don't use relative imports like `../../services/`.
+
+## Environment Variables
+
+Required environment variables (use `.env` file):
 
 ```bash
-# Development
-npm start                    # Start Expo development server (press 'a' for Android, 'i' for iOS)
-npm run android              # Run on Android device/emulator
-npm run ios                  # Run on iOS device/simulator
-npm run web                  # Run web version
-
-# Testing
-npm test                     # Run all Jest tests
-npm run test:watch           # Watch mode for development
-npm run test:coverage        # Generate coverage report
-
-# Code Quality
-npm run lint                 # ESLint with auto-fix
-npm run type-check           # TypeScript compiler check (no emit)
-npm run prebuild             # Full quality check (lint + type-check)
-
-# Deployment
-npm run build:development    # EAS development build (all platforms)
-npm run build:ios            # Production iOS build
-npm run build:android        # Production Android build
-npm run submit:all           # Submit to app stores
-```
-
-## Core Architecture
-
-### Data Flow (3-Tier Fallback System)
-```
-Seoul Open API (primary)
-    ↓ (failure/offline)
-Firebase Firestore (cloud backup)
-    ↓ (failure/offline)
-AsyncStorage (local cache)
-```
-
-**Key Service Files**:
-- `src/services/data/dataManager.ts` - Orchestrates 3-tier data fallback
-- `src/services/api/seoulSubwayApi.ts` - Seoul Open API client
-- `src/services/notification/notificationService.ts` - Push notification system
-- `src/services/location/locationService.ts` - GPS and geofencing
-- `src/services/firebase/config.ts` - Firebase configuration
-
-### Map Visualization System
-Recent implementation of interactive Seoul subway map with 2024 design system:
-- `src/components/map/SubwayMapCanvas.tsx` - Gesture-based zoomable map with Reanimated
-- `src/utils/mapLayout.ts` - Map coordinate system and path generation
-- `src/utils/subwayMapData.ts` - Station data and line colors
-- Uses `react-native-svg` for rendering, `react-native-gesture-handler` for interactions
-
-## Project Structure
-
-```
-src/
-├── components/
-│   ├── auth/           # Authentication UI
-│   ├── common/         # Reusable components (buttons, cards, etc.)
-│   ├── map/            # Subway map visualization (SubwayMapCanvas.tsx)
-│   └── train/          # Train-specific components
-├── hooks/              # Custom React hooks (useRealtimeTrains, useLocation, etc.)
-├── models/             # TypeScript interfaces and types
-├── screens/            # Top-level navigation screens
-│   ├── home/           # Home screen (HomeScreen.tsx)
-│   ├── favorites/      # Favorites screen
-│   ├── alerts/         # Alerts screen
-│   └── settings/       # Settings screen
-├── services/
-│   ├── api/            # seoulSubwayApi.ts - External API client
-│   ├── data/           # dataManager.ts - 3-tier fallback orchestration
-│   ├── location/       # locationService.ts - GPS tracking singleton
-│   ├── notification/   # notificationService.ts - Push notifications
-│   ├── train/          # trainService.ts - Train data processing
-│   ├── monitoring/     # Performance, crash reporting, health checks
-│   └── firebase/       # Firebase config and initialization
-└── utils/
-    ├── mapLayout.ts    # Map coordinate system
-    ├── subwayMapData.ts # Station coordinates and line data
-    ├── colorUtils.ts   # LINE_COLORS mapping
-    └── formatUtils.ts  # Display formatting helpers
-```
-
-## Key Patterns and Conventions
-
-### TypeScript Path Aliases
-Configured in `tsconfig.json` and `jest.config.js`:
-```typescript
-import { Train } from '@models/train';
-import { dataManager } from '@services/data/dataManager';
-import { useRealtimeTrains } from '@hooks/useRealtimeTrains';
-```
-
-### Data Fetching Pattern
-```typescript
-// dataManager.ts handles 3-tier fallback automatically
-const trains = await dataManager.getRealtimeTrains(stationName);
-// Internally tries: Seoul API → Firebase → AsyncStorage → null
-```
-
-### Custom Hooks Usage
-```typescript
-// Hooks provide state management with error handling
-const { trains, loading, error, refetch } = useRealtimeTrains(stationName, {
-  refetchInterval: 30000,
-  retryAttempts: 3
-});
-```
-
-### Singleton Services
-Key services are singletons (not classes to instantiate):
-```typescript
-import { locationService } from '@services/location/locationService';
-import { notificationService } from '@services/notification/notificationService';
-
-await locationService.initialize();
-await notificationService.sendDelayAlert(stationName, lineName, delay, reason);
-```
-
-## TypeScript Configuration
-
-**Strict Mode Features**:
-- Full strict mode enabled (`strict: true`)
-- `noUnusedLocals`, `noUnusedParameters`, `noImplicitReturns` enforced
-- `noUncheckedIndexedAccess` for safer array/object access
-- Path aliases configured for cleaner imports
-
-**Important**: `exactOptionalPropertyTypes` is set to `false` to allow flexible optional property handling.
-
-## Testing
-
-**Test Setup** (`jest.config.js`):
-- Jest with React Native preset (jest-expo)
-- TypeScript support via Babel
-- Path aliases mirror `tsconfig.json`
-- Coverage thresholds: 75% lines, 70% functions, 60% branches
-
-**Running Tests**:
-```bash
-npm test                    # Run all tests
-npm run test:watch          # Watch mode
-npm run test:coverage       # Generate coverage report
-```
-
-**Test Location**:
-- Unit tests: `src/**/__tests__/**/*.test.ts(x)`
-- Service tests: `src/services/**/__tests__/*.test.ts`
-- Coverage excludes: `src/models/`, test files, `.d.ts` files
-
-## External APIs
-
-### Seoul Open API
-- **Base URL**: `http://swopenapi.seoul.go.kr/api/subway/`
-- **Endpoint**: `/realtimeStationArrival/{startIndex}/{endIndex}/{stationName}`
-- **Rate Limit**: 1000 requests/day on free tier
-- **Test Script**: `scripts/testRealtimeApi.ts` - Use `npx ts-node` to run
-
-### Firebase Configuration
-- Configured in `src/services/firebase/config.ts`
-- Services: Firestore (data backup), Auth (user management)
-- Environment variables required (see `.env.example`)
-
-## Working with the Subway Map
-
-**Current Implementation** (as of latest commit):
-- Interactive zoomable map using `react-native-gesture-handler` and `react-native-reanimated`
-- 2024 Seoul Metro design system with accurate line widths and station styling
-- File: `src/components/map/SubwayMapCanvas.tsx`
-
-**Design Constants**:
-```typescript
-LINE_WIDTH_MAIN = 13;          // Main lines (1-9호선)
-LINE_WIDTH_BRANCH = 10;        // Branch lines
-STATION_RADIUS_REGULAR = 6;    // Regular stations
-STATION_RADIUS_TRANSFER = 9;   // Transfer stations (traffic light style)
-```
-
-**Map Data Structure**:
-- Station coordinates: `src/utils/subwayMapData.ts`
-- Layout calculation: `src/utils/mapLayout.ts` (`createLinePaths()`)
-- Line colors: `LINE_COLORS` constant matches official Seoul Metro colors
-
-## Platform-Specific Configuration
-
-**iOS** (`app.json`):
-- Background location permission: `NSLocationAlwaysUsageDescription`
-- UI background modes: `['location', 'remote-notification']`
-- Non-exempt encryption: `false` (for App Store submission)
-
-**Android** (`app.json`):
-- Permissions: `ACCESS_FINE_LOCATION`, `ACCESS_BACKGROUND_LOCATION`
-- Blocked: `CAMERA`, `RECORD_AUDIO` (not used)
-- Adaptive icon configured with `#1976d2` background
-
-## Development Workflow
-
-1. **Start development**: `npm start` → Press 'a' (Android) or 'i' (iOS)
-2. **Before committing**: `npm run prebuild` (runs lint + type-check)
-3. **Write tests**: Follow existing patterns in `src/services/**/__tests__/`
-4. **Check coverage**: Aim for 75%+ line coverage on new code
-
-## Environment Setup
-
-Required in `.env`:
-```bash
-SEOUL_SUBWAY_API_KEY=your_key_here
+# Seoul Open Data API
+SEOUL_SUBWAY_API_KEY=your_api_key_here
 SEOUL_SUBWAY_API_BASE_URL=http://swopenapi.seoul.go.kr/api/subway
-# Firebase credentials
-FIREBASE_API_KEY=...
-FIREBASE_PROJECT_ID=...
+SEOUL_OPEN_API_BASE_URL=http://openAPI.seoul.go.kr:8088
+
+# Firebase Configuration (all prefixed with EXPO_PUBLIC_)
+EXPO_PUBLIC_FIREBASE_API_KEY=
+EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=
+EXPO_PUBLIC_FIREBASE_PROJECT_ID=
+EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=
+EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
+EXPO_PUBLIC_FIREBASE_APP_ID=
 ```
 
-Test API connectivity: `npx ts-node scripts/testRealtimeApi.ts`
+**Note:** Expo requires `EXPO_PUBLIC_` prefix for variables accessible in client code.
 
-## Reference Documentation
+## Testing Strategy
 
-Vooster-AI methodology guides (in `vooster-docs/`):
-- `prd.md` - Product requirements and feature specifications
-- `architecture.md` - Technical architecture decisions
-- `guideline.md` - Coding standards and conventions
-- `step-by-step.md` - Development methodology (Exploration → Planning → Execution)
-- `clean-code.md` - Code quality guidelines
+### Test Configuration
 
-## Task Master AI Integration
-Task Master workflow commands and guidelines: @./.taskmaster/CLAUDE.md
+- **Test Runner**: Jest with React Native preset
+- **Test Environment**: Node (not jsdom)
+- **Coverage Thresholds**: 75% statements/lines, 70% functions, 60% branches
+- **Setup File**: `src/__tests__/setup.ts` (loads before all tests)
+
+### Running Specific Tests
+
+```bash
+# Run single test file
+npm test -- src/components/train/__tests__/StationCard.test.tsx
+
+# Run tests matching pattern
+npm test -- --testPathPattern=train
+
+# Run tests in watch mode with coverage
+npm test:watch -- --coverage
+```
+
+### Test File Organization
+
+Tests are co-located with source files in `__tests__` directories:
+```
+src/components/train/
+├── StationCard.tsx
+└── __tests__/
+    └── StationCard.test.tsx
+```
+
+## TypeScript Guidelines
+
+### Strict Mode Configuration
+
+The project uses **strict TypeScript** with additional safety flags:
+- `strict: true`
+- `noUnusedLocals: true`
+- `noUnusedParameters: true`
+- `noImplicitReturns: true`
+- `noFallthroughCasesInSwitch: true`
+- `noUncheckedIndexedAccess: true`
+
+### Common Patterns
+
+**When writing new code:**
+1. Always define explicit return types for functions
+2. Use `interface` for object shapes, `type` for unions/intersections
+3. Avoid `any` - use `unknown` and type guards instead
+4. All async functions must handle errors with try-catch
+5. Use optional chaining (`?.`) and nullish coalescing (`??`) for nullable values
+
+**Model Definitions:**
+All data models are centralized in `src/models/`:
+- `train.ts`: Train, Station, SubwayLine, TrainDelay, CongestionData
+- `user.ts`: User, UserPreferences
+- `notification.ts`: Notification types
+
+## Seoul Metro API Integration
+
+### Real-Time Arrival API
+
+**Base URL:** `http://swopenapi.seoul.go.kr/api/subway/{API_KEY}/json/realtimeStationArrival/{START}/{END}/{STATION_NAME}`
+
+**Key Fields in Response:**
+- `arvlMsg2`, `arvlMsg3`: Arrival messages ("2분후[1번째전]", "곧 도착")
+- `btrainNo`: Train number
+- `updnLine`: Direction ("상행" = up, "하행" = down)
+- `trainLineNm`: Line name
+- `bstatnNm`: Destination station
+
+### Timetable API
+
+**Base URL:** `http://openAPI.seoul.go.kr:8088/{API_KEY}/json/SearchSTNTimeTableByIDService/{START}/{END}/{STATION_CODE}/{WEEK_TAG}/{INOUT_TAG}/`
+
+**Parameters:**
+- `WEEK_TAG`: '1' (Weekday), '2' (Saturday), '3' (Sunday/Holiday)
+- `INOUT_TAG`: '1' (Up/Inner), '2' (Down/Outer)
+
+**Service Disruption Detection:**
+The `dataManager.detectServiceDisruptions()` method scans arrival messages for keywords:
+- Suspension: "운행중단", "전면중단", "운행불가"
+- Incidents: "장애", "고장", "사고", "탈선", "화재"
+
+## Firebase Integration
+
+### Firestore Collections
+
+```
+subwayLines/          # Line metadata (color, name, sequence)
+stations/             # Station info with coordinates
+  ├─ lineId          # References subwayLines
+  ├─ coordinates     # {latitude, longitude}
+  └─ transfers[]     # Transfer station IDs
+
+trains/               # Real-time train positions
+  ├─ currentStationId
+  ├─ arrivalTime     # Timestamp
+  └─ status          # NORMAL | DELAYED | SUSPENDED | EMERGENCY
+
+trainDelays/          # Delay/disruption alerts
+  ├─ severity        # MINOR | MODERATE | MAJOR | SEVERE
+  └─ affectedStations[]
+
+congestionData/       # Train car congestion levels
+```
+
+### Firebase Subscription Pattern
+
+The app uses Firebase real-time listeners through `trainService.subscribeToTrainUpdates()`:
+
+```typescript
+const unsubscribe = trainService.subscribeToTrainUpdates(
+  stationId,
+  (trains) => {
+    // Handle real-time updates
+  }
+);
+
+// Clean up on unmount
+return () => unsubscribe();
+```
+
+**Important:** Always clean up Firebase subscriptions in useEffect return functions to prevent memory leaks.
+
+## Production Monitoring
+
+The app includes comprehensive monitoring via `monitoringManager` (src/services/monitoring/):
+
+- **Crash Reporting**: Automatic error capture and reporting
+- **Performance Monitoring**: App startup, API latency tracking
+- **Health Checks**: Service availability monitoring
+- **Breadcrumbs**: Navigation and user action tracking
+
+**Initialization:** Monitoring is initialized in `App.tsx` and disabled in `__DEV__` mode by default.
+
+## Subway Map Implementation
+
+The subway map (SubwayMapScreen) uses a custom SVG-based rendering system:
+
+**Data Files:**
+- `src/utils/subwayMapData.ts`: Station coordinates and metadata (100% accuracy achieved)
+- `src/utils/subwayLinePaths.ts`: SVG path definitions for all 9 lines
+- `src/utils/mapLayout.ts`: Layout calculations and zoom/pan logic
+
+**Design System:** Follows Seoul Metro 2024 official design standards with accurate line colors and typography.
+
+## Common Development Patterns
+
+### Adding a New Screen
+
+1. Create screen component in `src/screens/{category}/{ScreenName}.tsx`
+2. Add route params to `src/navigation/types.ts` (AppStackParamList or AppTabParamList)
+3. Register route in `AppNavigator.tsx` or `RootNavigator.tsx`
+4. Use TypeScript navigation prop typing:
+   ```typescript
+   import { NativeStackScreenProps } from '@react-navigation/native-stack';
+   import { AppStackParamList } from '@/navigation/types';
+
+   type Props = NativeStackScreenProps<AppStackParamList, 'ScreenName'>;
+   ```
+
+### Creating a Custom Hook
+
+1. Create in `src/hooks/use{FeatureName}.ts`
+2. Return object with loading, error, data, and action functions
+3. Include cleanup logic for subscriptions/timers
+4. Add unit tests in `src/hooks/__tests__/`
+
+### Adding API Integration
+
+1. Create service in `src/services/{domain}/{serviceName}.ts`
+2. Export singleton instance (lowercase): `export const serviceName = new ServiceClass()`
+3. Handle errors gracefully - return empty arrays/null instead of throwing
+4. Integrate with `dataManager` for caching and offline support
+
+## Known Issues & Workarounds
+
+1. **Firebase Firestore Offline Persistence**: Not enabled by default in React Native. The app relies on AsyncStorage cache layer instead.
+2. **Seoul API Rate Limiting**: No official rate limits documented, but the app implements 30-second polling intervals to be conservative.
+3. **Location Permissions on iOS**: Requires `NSLocationWhenInUseUsageDescription` in app.json. Always request permissions before accessing GPS.
+4. **TypeScript Path Aliases in Tests**: Configured in jest.config.js `moduleNameMapper`. If tests fail with module resolution errors, verify the mapping matches tsconfig.json paths.

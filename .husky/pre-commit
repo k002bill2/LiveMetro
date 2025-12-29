@@ -1,0 +1,21 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Check if .claude directory has changes
+if git diff --cached --name-only | grep -q "^\.claude/"; then
+  echo "📦 Detected changes in .claude/ directory"
+  echo "🔄 Creating automatic backup..."
+
+  npm run backup:claude
+
+  # Add backup to commit if it was created
+  if [ -d ".claude-backups" ]; then
+    # Get the latest backup directory
+    LATEST_BACKUP=$(ls -t .claude-backups | head -1)
+
+    if [ -n "$LATEST_BACKUP" ]; then
+      git add ".claude-backups/$LATEST_BACKUP"
+      echo "✅ Backup added to commit: $LATEST_BACKUP"
+    fi
+  fi
+fi

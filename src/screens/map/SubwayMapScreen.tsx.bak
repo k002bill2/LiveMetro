@@ -1,0 +1,464 @@
+import React, { useState } from 'react';
+import {
+  View,
+  StyleSheet,
+  TouchableOpacity,
+  Text,
+  SafeAreaView,
+  Linking,
+  Alert,
+} from 'react-native';
+import { NavigationProp, useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { Ionicons } from '@expo/vector-icons';
+import { GestureHandlerRootView, GestureDetector, Gesture } from 'react-native-gesture-handler';
+import Animated, { useSharedValue, useAnimatedStyle, withTiming } from 'react-native-reanimated';
+import Svg, { G, Circle, Text as SvgText, Line, Rect } from 'react-native-svg';
+
+import { AppStackParamList } from '../../navigation/types';
+
+// Seoul Metro Lines for quick access
+const SEOUL_METRO_LINES = [
+  { id: '1', name: '1호선', color: '#0052A4', stations: ['서울역', '시청', '종로3가', '종로5가', '동대문'] },
+  { id: '2', name: '2호선', color: '#00A84D', stations: ['강남', '역삼', '선릉', '삼성', '잠실', '건대입구', '왕십리', '성수', '신도림', '홍대입구'] },
+  { id: '3', name: '3호선', color: '#EF7C1C', stations: ['교대', '고속터미널', '신사', '압구정', '옥수'] },
+  { id: '4', name: '4호선', color: '#00A5DE', stations: ['명동', '서울역', '충무로', '동대문역사문화공원', '혜화'] },
+  { id: '5', name: '5호선', color: '#996CAC', stations: ['광화문', '종로3가', '을지로4가', '청구', '왕십리'] },
+  { id: '6', name: '6호선', color: '#CD7C2F', stations: ['이태원', '한강진', '삼각지', '공덕', '합정'] },
+  { id: '7', name: '7호선', color: '#747F00', stations: ['강남구청', '논현', '반포', '고속터미널', '건대입구', '상봉'] },
+  { id: '8', name: '8호선', color: '#E6186C', stations: ['잠실', '몽촌토성', '천호', '암사'] },
+  { id: '9', name: '9호선', color: '#BDB092', stations: ['여의도', '노량진', '동작', '고속터미널', '신논현', '봉은사'] },
+];
+
+// Simplified station positions for visual map
+const STATION_POSITIONS: Record<string, { x: number; y: number; lines: string[] }> = {
+  '서울역': { x: 200, y: 350, lines: ['1', '4'] },
+  '시청': { x: 220, y: 320, lines: ['1', '2'] },
+  '종로3가': { x: 280, y: 280, lines: ['1', '3', '5'] },
+  '교대': { x: 320, y: 500, lines: ['2', '3'] },
+  '강남': { x: 380, y: 520, lines: ['2'] },
+  '역삼': { x: 420, y: 520, lines: ['2'] },
+  '선릉': { x: 460, y: 520, lines: ['2', '분당'] },
+  '삼성': { x: 500, y: 500, lines: ['2'] },
+  '잠실': { x: 560, y: 460, lines: ['2', '8'] },
+  '건대입구': { x: 520, y: 380, lines: ['2', '7'] },
+  '왕십리': { x: 420, y: 320, lines: ['2', '5', '분당'] },
+  '성수': { x: 480, y: 350, lines: ['2'] },
+  '신도림': { x: 150, y: 520, lines: ['1', '2'] },
+  '홍대입구': { x: 160, y: 380, lines: ['2', '공항'] },
+  '고속터미널': { x: 280, y: 500, lines: ['3', '7', '9'] },
+  '신사': { x: 350, y: 480, lines: ['3'] },
+  '압구정': { x: 380, y: 460, lines: ['3'] },
+  '명동': { x: 250, y: 340, lines: ['4'] },
+  '충무로': { x: 270, y: 330, lines: ['3', '4'] },
+  '광화문': { x: 240, y: 290, lines: ['5'] },
+  '이태원': { x: 300, y: 400, lines: ['6'] },
+  '합정': { x: 150, y: 400, lines: ['2', '6'] },
+  '강남구청': { x: 400, y: 480, lines: ['7', '분당'] },
+  '논현': { x: 360, y: 500, lines: ['7'] },
+  '반포': { x: 300, y: 480, lines: ['7'] },
+  '여의도': { x: 180, y: 440, lines: ['5', '9'] },
+  '노량진': { x: 200, y: 480, lines: ['1', '9'] },
+  '동작': { x: 240, y: 480, lines: ['4', '9'] },
+  '신논현': { x: 360, y: 530, lines: ['9'] },
+};
+
+// Generate connections between stations on same line
+const generateConnections = () => {
+  const connections: { from: string; to: string; lineId: string; color: string }[] = [];
+  
+  SEOUL_METRO_LINES.forEach(line => {
+    for (let i = 0; i < line.stations.length - 1; i++) {
+      const from = line.stations[i];
+      const to = line.stations[i + 1];
+      if (from && to && STATION_POSITIONS[from] && STATION_POSITIONS[to]) {
+        connections.push({ from, to, lineId: line.id, color: line.color });
+      }
+    }
+  });
+  
+  return connections;
+};
+
+const MAP_WIDTH = 700;
+const MAP_HEIGHT = 700;
+
+export const SubwayMapScreen: React.FC = () => {
+  const navigation = useNavigation<NavigationProp<AppStackParamList>>();
+  const route = useRoute<RouteProp<AppStackParamList, 'SubwayMap'>>();
+  const [selectedLine, setSelectedLine] = useState<string | null>(null);
+
+  const initialStationName = route.params?.stationName;
+
+  // Gesture handling for pan and zoom
+  const scale = useSharedValue(1);
+  const savedScale = useSharedValue(1);
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+  const savedTranslateX = useSharedValue(0);
+  const savedTranslateY = useSharedValue(0);
+
+  const panGesture = Gesture.Pan()
+    .onUpdate((e) => {
+      translateX.value = savedTranslateX.value + e.translationX;
+      translateY.value = savedTranslateY.value + e.translationY;
+    })
+    .onEnd(() => {
+      savedTranslateX.value = translateX.value;
+      savedTranslateY.value = translateY.value;
+    });
+
+  const pinchGesture = Gesture.Pinch()
+    .onUpdate((e) => {
+      scale.value = Math.min(Math.max(savedScale.value * e.scale, 0.5), 3);
+    })
+    .onEnd(() => {
+      savedScale.value = scale.value;
+    });
+
+  const doubleTapGesture = Gesture.Tap()
+    .numberOfTaps(2)
+    .onEnd(() => {
+      scale.value = withTiming(1, { duration: 300 });
+      savedScale.value = 1;
+      translateX.value = withTiming(0, { duration: 300 });
+      translateY.value = withTiming(0, { duration: 300 });
+      savedTranslateX.value = 0;
+      savedTranslateY.value = 0;
+    });
+
+  const composedGesture = Gesture.Simultaneous(panGesture, pinchGesture, doubleTapGesture);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: translateX.value },
+      { translateY: translateY.value },
+      { scale: scale.value },
+    ],
+  }));
+
+  const connections = React.useMemo(() => generateConnections(), []);
+
+  const handleStationPress = (stationName: string) => {
+    const stationData = STATION_POSITIONS[stationName];
+    if (stationData) {
+      navigation.navigate('StationDetail', {
+        stationId: stationName.toLowerCase(),
+        stationName: stationName,
+        lineId: stationData.lines[0] || '2',
+      });
+    }
+  };
+
+  const handleLinePress = (lineId: string) => {
+    if (selectedLine === lineId) {
+      setSelectedLine(null);
+    } else {
+      setSelectedLine(lineId);
+    }
+  };
+
+  const openExternalMap = (type: 'kakao' | 'naver') => {
+    const urls = {
+      kakao: 'https://map.kakao.com/link/subwaymap',
+      naver: 'https://m.map.naver.com/subway/subwayLine.naver?region=1000',
+    };
+    Linking.openURL(urls[type]).catch(() => {
+      Alert.alert('오류', '지도를 열 수 없습니다.');
+    });
+  };
+
+  const resetView = () => {
+    scale.value = withTiming(1, { duration: 300 });
+    savedScale.value = 1;
+    translateX.value = withTiming(0, { duration: 300 });
+    translateY.value = withTiming(0, { duration: 300 });
+    savedTranslateX.value = 0;
+    savedTranslateY.value = 0;
+  };
+
+  return (
+    <SafeAreaView style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <View>
+          <Text style={styles.headerTitle}>🚇 서울 지하철 노선도</Text>
+          <Text style={styles.headerSubtitle}>
+            {initialStationName ? `${initialStationName} 역` : '역을 터치하여 상세 정보 확인'}
+          </Text>
+        </View>
+        <TouchableOpacity style={styles.resetButton} onPress={resetView}>
+          <Ionicons name="scan-outline" size={22} color="#6366f1" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Line Quick Access */}
+      <View style={styles.linesWrapper}>
+        {SEOUL_METRO_LINES.map((line) => (
+          <TouchableOpacity
+            key={line.id}
+            style={[
+              styles.lineChip,
+              { backgroundColor: line.color },
+              selectedLine === line.id && styles.lineChipSelected,
+            ]}
+            onPress={() => handleLinePress(line.id)}
+          >
+            <Text style={styles.lineChipText}>{line.id}</Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+
+      {/* Map Container */}
+      <GestureHandlerRootView style={styles.mapContainer}>
+        <GestureDetector gesture={composedGesture}>
+          <Animated.View style={[styles.mapWrapper, animatedStyle]}>
+            <Svg width={MAP_WIDTH} height={MAP_HEIGHT} viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}>
+              {/* Background */}
+              <Rect x="0" y="0" width={MAP_WIDTH} height={MAP_HEIGHT} fill="#f8fafc" />
+              
+              {/* Draw connections (lines between stations) */}
+              <G>
+                {connections.map((conn, index) => {
+                  const from = STATION_POSITIONS[conn.from];
+                  const to = STATION_POSITIONS[conn.to];
+                  if (!from || !to) return null;
+                  
+                  const isHighlighted = !selectedLine || selectedLine === conn.lineId;
+                  
+                  return (
+                    <Line
+                      key={`${conn.from}-${conn.to}-${index}`}
+                      x1={from.x}
+                      y1={from.y}
+                      x2={to.x}
+                      y2={to.y}
+                      stroke={conn.color}
+                      strokeWidth={isHighlighted ? 6 : 3}
+                      strokeLinecap="round"
+                      opacity={isHighlighted ? 1 : 0.2}
+                    />
+                  );
+                })}
+              </G>
+              
+              {/* Draw stations */}
+              <G>
+                {Object.entries(STATION_POSITIONS).map(([name, pos]) => {
+                  const isTransfer = pos.lines.length > 1;
+                  const isHighlighted = !selectedLine || pos.lines.includes(selectedLine);
+                  const isSelected = initialStationName === name;
+                  const stationColor = SEOUL_METRO_LINES.find(l => l.id === pos.lines[0])?.color || '#666';
+                  
+                  return (
+                    <G key={name} onPress={() => handleStationPress(name)}>
+                      {/* Station circle */}
+                      <Circle
+                        cx={pos.x}
+                        cy={pos.y}
+                        r={isTransfer ? 10 : 7}
+                        fill={isSelected ? '#fbbf24' : '#ffffff'}
+                        stroke={isSelected ? '#f59e0b' : stationColor}
+                        strokeWidth={isTransfer ? 3 : 2}
+                        opacity={isHighlighted ? 1 : 0.3}
+                      />
+                      
+                      {/* Station name */}
+                      <SvgText
+                        x={pos.x}
+                        y={pos.y + (isTransfer ? 22 : 18)}
+                        fontSize={isTransfer ? 11 : 9}
+                        fontWeight={isTransfer ? '700' : '500'}
+                        fill={isHighlighted ? '#1f2937' : '#9ca3af'}
+                        textAnchor="middle"
+                      >
+                        {name}
+                      </SvgText>
+                      
+                      {/* Transfer indicator */}
+                      {isTransfer && isHighlighted && (
+                        <Circle
+                          cx={pos.x}
+                          cy={pos.y}
+                          r={4}
+                          fill={stationColor}
+                        />
+                      )}
+                      
+                      {/* Enlarged hit area */}
+                      <Circle cx={pos.x} cy={pos.y} r={20} fill="transparent" />
+                    </G>
+                  );
+                })}
+              </G>
+            </Svg>
+          </Animated.View>
+        </GestureDetector>
+      </GestureHandlerRootView>
+
+      {/* Legend */}
+      <View style={styles.legend}>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDot, { backgroundColor: '#00A84D' }]} />
+          <Text style={styles.legendText}>일반역</Text>
+        </View>
+        <View style={styles.legendItem}>
+          <View style={[styles.legendDotTransfer]} />
+          <Text style={styles.legendText}>환승역</Text>
+        </View>
+      </View>
+
+      {/* Quick Action Buttons */}
+      <View style={styles.quickActions}>
+        <TouchableOpacity 
+          style={styles.quickActionButton}
+          onPress={() => openExternalMap('kakao')}
+        >
+          <Ionicons name="map-outline" size={20} color="#ffffff" />
+          <Text style={styles.quickActionText}>카카오맵 열기</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.quickActionButton, styles.quickActionButtonAlt]}
+          onPress={() => openExternalMap('naver')}
+        >
+          <Ionicons name="navigate-outline" size={20} color="#ffffff" />
+          <Text style={styles.quickActionText}>네이버 열기</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#f9fafb',
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: '#ffffff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#1f2937',
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    color: '#6b7280',
+    marginTop: 2,
+  },
+  resetButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#eef2ff',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  linesWrapper: {
+    flexDirection: 'row',
+    backgroundColor: '#ffffff',
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e5e7eb',
+    flexWrap: 'wrap',
+  },
+  lineChip: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  lineChipSelected: {
+    borderWidth: 3,
+    borderColor: '#1f2937',
+  },
+  lineChipText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+  mapContainer: {
+    flex: 1,
+    backgroundColor: '#f8fafc',
+    overflow: 'hidden',
+  },
+  mapWrapper: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  legend: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    backgroundColor: '#ffffff',
+    gap: 20,
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  legendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  legendDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    borderWidth: 2,
+    borderColor: '#00A84D',
+    backgroundColor: '#ffffff',
+  },
+  legendDotTransfer: {
+    width: 14,
+    height: 14,
+    borderRadius: 7,
+    borderWidth: 3,
+    borderColor: '#EF7C1C',
+    backgroundColor: '#ffffff',
+  },
+  legendText: {
+    fontSize: 12,
+    color: '#6b7280',
+  },
+  quickActions: {
+    flexDirection: 'row',
+    gap: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: '#ffffff',
+    borderTopWidth: 1,
+    borderTopColor: '#e5e7eb',
+  },
+  quickActionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#fbbf24',
+    paddingVertical: 14,
+    borderRadius: 12,
+    gap: 8,
+  },
+  quickActionButtonAlt: {
+    backgroundColor: '#10b981',
+  },
+  quickActionText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+});
+
+export default SubwayMapScreen;

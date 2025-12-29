@@ -66,7 +66,7 @@ class HealthCheckService {
         this.performHealthCheck().catch(error => {
           console.error('Health check failed:', error);
         });
-      }, this.intervalMs);
+      }, this.intervalMs) as unknown as NodeJS.Timeout;
 
       console.log('🏥 Health monitoring started');
     } catch (error) {

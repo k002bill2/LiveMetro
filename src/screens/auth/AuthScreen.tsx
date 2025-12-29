@@ -18,6 +18,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '../../services/auth/AuthContext';
+import { analyzeAuthError, printFirebaseDebugInfo } from '../../utils/firebaseDebug';
 
 export const AuthScreen: React.FC = () => {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -26,11 +27,38 @@ export const AuthScreen: React.FC = () => {
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const { signInWithEmail, signUpWithEmail, signInAnonymously } = useAuth();
+  const { signInWithEmail, signUpWithEmail, signInAnonymously, resetPassword } = useAuth();
+
+  // Email validation
+  const isValidEmail = (email: string): boolean => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  // Password validation
+  const isValidPassword = (password: string): boolean => {
+    return password.length >= 6;
+  };
 
   const handleSubmit = async (): Promise<void> => {
-    if (!email.trim() || !password.trim()) {
-      Alert.alert('오류', '이메일과 비밀번호를 입력해주세요.');
+    // Validation
+    if (!email.trim()) {
+      Alert.alert('오류', '이메일을 입력해주세요.');
+      return;
+    }
+
+    if (!isValidEmail(email.trim())) {
+      Alert.alert('오류', '올바른 이메일 형식을 입력해주세요.');
+      return;
+    }
+
+    if (!password.trim()) {
+      Alert.alert('오류', '비밀번호를 입력해주세요.');
+      return;
+    }
+
+    if (!isValidPassword(password)) {
+      Alert.alert('오류', '비밀번호는 최소 6자 이상이어야 합니다.');
       return;
     }
 
@@ -50,7 +78,58 @@ export const AuthScreen: React.FC = () => {
       }
     } catch (error) {
       console.error('Auth error:', error);
-      Alert.alert('오류', error instanceof Error ? error.message : '인증에 실패했습니다.');
+
+      // Analyze error and get recommendations
+      const debugInfo = analyzeAuthError(error);
+      printFirebaseDebugInfo(debugInfo);
+
+      // Get user-friendly error message
+      let errorTitle = isSignUp ? '계정 생성 실패' : '로그인 실패';
+      let errorMessage = '';
+
+      if (debugInfo.errorType === 'AUTH_DISABLED') {
+        errorTitle = 'Firebase 설정 필요';
+        errorMessage = 'Firebase 콘솔에서 이메일/비밀번호 인증을 활성화해야 합니다.\n\n자세한 내용은 콘솔 로그를 확인하세요.';
+      } else if (debugInfo.errorType === 'EMAIL_IN_USE') {
+        errorMessage = '이미 사용 중인 이메일입니다. 다른 이메일을 사용하거나 로그인하세요.';
+      } else if (debugInfo.errorType === 'FIRESTORE_PERMISSION') {
+        errorTitle = 'Firestore 권한 오류';
+        errorMessage = 'Firestore 보안 규칙을 확인해야 합니다.\n\n자세한 내용은 콘솔 로그를 확인하세요.';
+      } else if (debugInfo.missingEnvVars.length > 0) {
+        errorTitle = '설정 오류';
+        errorMessage = 'Firebase 환경 변수가 설정되지 않았습니다.\n\n.env 파일을 확인하고 앱을 재시작하세요.';
+      } else {
+        errorMessage = error instanceof Error ? error.message : '인증에 실패했습니다.';
+      }
+
+      Alert.alert(errorTitle, errorMessage);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleForgotPassword = async (): Promise<void> => {
+    if (!email.trim()) {
+      Alert.alert('알림', '이메일을 먼저 입력해주세요.');
+      return;
+    }
+
+    if (!isValidEmail(email.trim())) {
+      Alert.alert('오류', '올바른 이메일 형식을 입력해주세요.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      await resetPassword(email.trim());
+      Alert.alert(
+        '이메일 전송 완료',
+        `${email}로 비밀번호 재설정 이메일을 보냈습니다. 이메일을 확인해주세요.`,
+        [{ text: '확인' }]
+      );
+    } catch (error) {
+      console.error('Password reset error:', error);
+      Alert.alert('오류', '비밀번호 재설정 이메일 전송에 실패했습니다.');
     } finally {
       setLoading(false);
     }
@@ -134,8 +213,8 @@ export const AuthScreen: React.FC = () => {
               />
             </View>
 
-            <TouchableOpacity 
-              style={[styles.primaryButton, loading && styles.disabledButton]} 
+            <TouchableOpacity
+              style={[styles.primaryButton, loading && styles.disabledButton]}
               onPress={handleSubmit}
               disabled={loading}
             >
@@ -143,17 +222,30 @@ export const AuthScreen: React.FC = () => {
                 {loading ? '처리중...' : (isSignUp ? '계정 만들기' : '로그인')}
               </Text>
             </TouchableOpacity>
+
+            {/* Forgot Password */}
+            {!isSignUp && (
+              <TouchableOpacity
+                style={styles.forgotPasswordButton}
+                onPress={handleForgotPassword}
+                disabled={loading}
+              >
+                <Text style={styles.forgotPasswordText}>
+                  비밀번호를 잊으셨나요?
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
 
           {/* Alternative Actions */}
           <View style={styles.alternativeSection}>
-            <TouchableOpacity 
+            <TouchableOpacity
               style={styles.switchButton}
               onPress={() => setIsSignUp(!isSignUp)}
             >
               <Text style={styles.switchButtonText}>
-                {isSignUp 
-                  ? '이미 계정이 있으신가요? 로그인' 
+                {isSignUp
+                  ? '이미 계정이 있으신가요? 로그인'
                   : '계정이 없으신가요? 가입하기'
                 }
               </Text>
@@ -252,6 +344,16 @@ const styles = StyleSheet.create({
   },
   disabledButton: {
     opacity: 0.6,
+  },
+  forgotPasswordButton: {
+    paddingVertical: 12,
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  forgotPasswordText: {
+    fontSize: 14,
+    color: '#2563eb',
+    fontWeight: '600',
   },
   primaryButtonText: {
     fontSize: 16,

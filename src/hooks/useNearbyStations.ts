@@ -24,6 +24,7 @@ interface UseNearbyStationsOptions {
   minUpdateInterval?: number; // in milliseconds
   onStationsFound?: (stations: NearbyStation[]) => void;
   onClosestStationChanged?: (station: NearbyStation | null) => void;
+  mockLocation?: LocationCoordinates; // For testing: override GPS location
 }
 
 /**
@@ -36,7 +37,8 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
     autoUpdate = true,
     minUpdateInterval = 30000, // 30 seconds
     onStationsFound,
-    onClosestStationChanged
+    onClosestStationChanged,
+    mockLocation, // 🧪 Test mode: use fixed coordinates
   } = options;
 
   const [state, setState] = useState<UseNearbyStationsState>({
@@ -50,11 +52,15 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
   const [allStations, setAllStations] = useState<Station[]>([]);
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(0);
 
-  const { location, loading: locationLoading, error: locationError } = useLocation({
+  // Use mockLocation in test mode, otherwise use real GPS
+  const { location: gpsLocation, loading: locationLoading, error: locationError } = useLocation({
     enableHighAccuracy: false,
     distanceFilter: 50, // Update when user moves 50m
-    onLocationUpdate: autoUpdate ? handleLocationUpdate : undefined,
+    onLocationUpdate: autoUpdate && !mockLocation ? handleLocationUpdate : undefined,
   });
+
+  // Prefer mockLocation over GPS for testing
+  const location = mockLocation ?? gpsLocation;
 
   const updateState = useCallback((updates: Partial<UseNearbyStationsState>) => {
     setState(prevState => ({ ...prevState, ...updates }));

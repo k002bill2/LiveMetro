@@ -26,7 +26,8 @@ ios/
 .env.*.local
 
 # IDE
-.vscode/
+# .vscode/ is committed for team consistency
+# Individual settings can go in .vscode/settings.local.json (not tracked)
 .idea/
 *.swp
 *.swo
@@ -97,7 +98,11 @@ dev-debug.log
 
 # Task files
 # tasks.json
-# tasks/ 
+# tasks/
 !/.gemini/antigravity/mcp_config.json
 !/.gemini/
 !/.gemini/**
+
+# Claude Code backups (local)
+# Comment out this line if you want to commit backups to git
+.claude-backups/

@@ -29,9 +29,9 @@ const SUBWAY_MAP_SOURCES = [
 const StationDetailScreen: React.FC = () => {
   const route = useRoute<StationDetailRouteProp>();
   const {
-    // stationId = 'sangok', // TODO: 향후 역 ID로 조회 시 사용
-    stationName = '산곡',
-    lineId = '7',
+    // stationId = 'gangnam', // TODO: 향후 역 ID로 조회 시 사용
+    stationName = '강남',
+    lineId = '2',
   } = route.params || {};
 
   const [currentTime, setCurrentTime] = useState(new Date());

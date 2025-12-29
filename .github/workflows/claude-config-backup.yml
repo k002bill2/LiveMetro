@@ -1,0 +1,84 @@
+name: Claude Config Backup
+
+on:
+  # Run daily at 2 AM UTC
+  schedule:
+    - cron: '0 2 * * *'
+
+  # Allow manual trigger
+  workflow_dispatch:
+
+  # Run on push to main if .claude/ changes
+  push:
+    branches:
+      - main
+    paths:
+      - '.claude/**'
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for backup tracking
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Create Claude Config backup
+        run: npm run backup:claude
+
+      - name: Upload backup artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: claude-config-backup-${{ github.run_number }}
+          path: .claude-backups/
+          retention-days: 30  # Keep backups for 30 days
+
+      - name: Commit backup to repository (optional)
+        if: github.event_name == 'schedule'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+          # Only commit if there are changes
+          if [ -n "$(git status --porcelain .claude-backups/)" ]; then
+            git add .claude-backups/
+            git commit -m "chore: automated Claude Config backup [skip ci]"
+            git push
+          else
+            echo "No changes to backup"
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  backup-summary:
+    needs: backup
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Backup Status Summary
+        run: |
+          echo "## 📦 Claude Config Backup Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Trigger**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Run Number**: #${{ github.run_number }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: ${{ needs.backup.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Timestamp**: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ needs.backup.result }}" == "success" ]; then
+            echo "✅ Backup completed successfully!" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Backup failed. Please check the logs." >> $GITHUB_STEP_SUMMARY
+          fi

@@ -1,0 +1,90 @@
+name: Skills Guide Auto-Update
+
+# 30일마다 자동 실행 + 수동 실행 가능
+on:
+  schedule:
+    # 매월 1일과 15일 오전 9시 (KST 기준 18시)에 실행
+    - cron: '0 9 1,15 * *'
+
+  workflow_dispatch: # 수동 실행 허용
+    inputs:
+      force:
+        description: '강제 업데이트 (30일 대기 무시)'
+        required: false
+        default: 'false'
+
+jobs:
+  update-skills-guide:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write # 파일 수정 및 커밋 권한
+
+    steps:
+      - name: 📥 Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # 전체 히스토리 가져오기
+
+      - name: 🔧 Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
+
+      - name: 📦 Install dependencies
+        run: npm ci
+
+      - name: 🔍 Run Skills Guide Updater
+        run: |
+          if [ "${{ github.event.inputs.force }}" = "true" ]; then
+            npx ts-node scripts/skillsGuideUpdater.ts --force
+          else
+            npx ts-node scripts/skillsGuideUpdater.ts
+          fi
+
+      - name: 📊 Check for changes
+        id: git-check
+        run: |
+          git diff --exit-code || echo "changed=true" >> $GITHUB_OUTPUT
+
+      - name: 💾 Commit and push changes
+        if: steps.git-check.outputs.changed == 'true'
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+
+          git add "skills guide/"
+          git add scripts/
+
+          # 변경된 파일 수 계산
+          CHANGED_FILES=$(git diff --cached --name-only | wc -l)
+
+          git commit -m "docs: auto-update skills guide (${CHANGED_FILES} files)
+
+          🤖 Automated update performed by Skills Guide Updater
+
+          - Updated version information
+          - Checked for deprecated packages
+          - Generated update report
+
+          Next update: $(date -d '+30 days' '+%Y-%m-%d')"
+
+          git push
+
+      - name: 📝 Create Summary
+        if: always()
+        run: |
+          echo "## 📊 Skills Guide Update Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ -f "skills guide/LIVEMETRO_UPDATE_REPORT.md" ]; then
+            cat "skills guide/LIVEMETRO_UPDATE_REPORT.md" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "ℹ️ No updates were necessary at this time." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: 🚨 Notify on failure
+        if: failure()
+        run: |
+          echo "::error::Skills Guide update failed! Please check the logs."

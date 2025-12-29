@@ -260,4 +260,4 @@ try {
 
 ---
 
-*태그: #template #claude-code #project-setup #documentation*
+*태그: #template #claude-code #project-setup #documentation #antigravity*

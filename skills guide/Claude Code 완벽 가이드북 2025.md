@@ -1,13 +1,15 @@
 # Claude Code 완벽 가이드북 2025
-#claude-code #ai-coding #development #guide
+#claude-code #ai-coding #development #guide #antigravity
 
-> 작성일: 2025-01-03
-> 환경: Windows, Git, 단독 개발
-> Claude Code 경험: 초보자용
+> 작성일: 2025-12-28 (최신 업데이트) (최신 업데이트)
+> 환경: macOS (Antigravity AI IDE), Git, 단독 개발
+> Claude Code 경험: 초보자 ~ 중급자용
 
 ## 📌 개요
 
-Claude Code는 Anthropic이 개발한 터미널 기반 AI 코딩 도구로, 2025년 현재 가장 강력한 AI 개발 어시스턴트 중 하나입니다. 이 가이드는 Windows 환경에서 Claude Code를 처음 시작하는 개발자를 위한 완벽한 설정 및 활용 가이드입니다.
+Claude Code는 Anthropic이 개발한 AI 코딩 도구로, 2025년 12월 현재 가장 강력하고 혁신적인 AI 개발 어시스턴트입니다. 이 가이드는 **macOS 환경(Antigravity AI IDE 포함)**에서 Claude Code를 시작하는 개발자를 위한 완벽한 설정 및 활용 가이드입니다.
+
+**Antigravity**는 Google DeepMind의 Advanced Agentic Coding 팀에서 개발한 차세대 AI 코딩 IDE로, Claude Code와 완벽하게 통합됩니다.
 
 ## 🎯 2025년 핵심 기능
 
@@ -26,7 +28,6 @@ Claude Code는 Anthropic이 개발한 터미널 기반 AI 코딩 도구로, 2025
 
 ### 3. Personas & Frameworks 🎭
 - **주요 프레임워크**:
-  - SuperClaude: 메타 프로그래밍 설정 프레임워크
   - BMAD: 아키텍처 중심 개발 방법론
   - Claude Flow: 엔터프라이즈급 오케스트레이션
 - **활용**: 특화된 개발 방법론 적용
@@ -83,7 +84,6 @@ your-project/
 ```
 ├── .claude-plugin/              # 플러그인 설정
 ├── BMAD.md                      # BMAD 방법론
-├── SUPERCLAUDE.md              # SuperClaude 설정
 └── skill-rules.json            # Skills 자동 활성화 규칙 ⭐
 ```
 
@@ -99,38 +99,41 @@ your-project/
 
 ## 🚀 단계별 설정 가이드
 
-### Phase 1: 기본 환경 구성
+### Phase 1: 기본 환경 구성 (macOS)
 
 #### 1.1 필수 도구 설치
 ```bash
-# Node.js 설치 (필수)
-# https://nodejs.org 에서 LTS 버전 다운로드
+# Homebrew 설치 (macOS 패키지 매니저)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 
-# Git 설치
-# https://git-scm.com/download/win
+# Node.js 설치 (필수 - v18 이상)
+brew install node
+# 또는 https://nodejs.org 에서 LTS 버전 다운로드
 
-# VS Code 또는 Cursor 설치
+# Git 설치 (macOS는 기본 포함, 최신 버전 원할 경우)
+brew install git
+
+# VS Code 또는 Cursor/Antigravity 설치
 # VS Code: https://code.visualstudio.com/
 # Cursor: https://cursor.sh/
-
-# Windows Terminal 설치 (추천)
-# Microsoft Store에서 설치
+# Antigravity: 현재 사용 중인 AI 코딩 IDE
 ```
 
 #### 1.2 Claude Code CLI 설치
 ```bash
 # npm을 통한 설치
-npm install -g @anthropic/claude-code
+npm install -g @anthropic-ai/claude-code
 
-# 버전 확인 (최소 v2.0.28 이상 권장)
+# 버전 확인 (현재 최신: v2.0.67, 최소 v2.0.28 이상 권장)
 claude --version
 
 # 실행 및 로그인
 claude
 /login  # 브라우저 인증
 
-# 또는 API 키 설정
+# 또는 API 키 설정 (macOS)
 export ANTHROPIC_API_KEY="your-api-key"
+# 영구 설정: ~/.zshrc 또는 ~/.bash_profile에 추가
 ```
 
 #### 1.3 VS Code Extension 설치
@@ -307,8 +310,8 @@ const Component: React.FC<ComponentProps> = ({ ...props }) => {
       }
     ]
   },
-  "model": "claude-opus-4-1-20250805",
-  "maxTokens": 4000
+  "model": "claude-sonnet-4-5-20250929",
+  "maxTokens": 8000
 }
 ```
 
@@ -355,12 +358,15 @@ Ctrl+B npm test -- --watch
 ## 📦 프로젝트 타입별 Skills & Agents
 
 ### 웹 개발 프로젝트
-| Type | Name | Purpose |
-|------|------|---------|
-| **Skills** | | |
-| | component-generator | React/Vue 컴포넌트 생성 |
-| | api-integrator | API 연동 코드 생성 |
-| | style-system | CSS/Tailwind 스타일링 |
+| Type | 모델 | 용도 | 속도 | 비용 | 출시일 |
+|------|------|------|------|--------|
+| **Haiku 4.5** | Claude | 간단한 작업, 빠른 반복 | 🚀🚀🚀 | 💰 | - |
+| **Sonnet 4.5** | Claude | 일반 개발, 코딩, 에이전트 | 🚀🚀 | 💰💰 | 2025.09.29 |
+| **Opus 4.5** | Claude | 복잡한 추론, 엔터프라이즈 | 🚀 | 💰💰💰 | 2025.11.24 |
+| **Skills** | | | | | |
+| | component-generator | React/Vue 컴포넌트 생성 | | | |
+| | api-integrator | API 연동 코드 생성 | | | |
+| | style-system | CSS/Tailwind 스타일링 | | | |
 | **Agents** | | |
 | | ui-designer | 디자인 시스템 적용 |
 | | performance-optimizer | 번들 최적화 |
@@ -451,7 +457,6 @@ ls .claude/skills/
 ### 커뮤니티 리소스
 - [Awesome Claude Code](https://github.com/hesreallyhim/awesome-claude-code)
 - [ClaudeLog Community](https://claudelog.com/)
-- [SuperClaude Framework](https://github.com/SuperClaude-Org/SuperClaude_Framework)
 - [Claude Developers Discord](https://discord.gg/anthropic)
 
 ### 유용한 블로그 & 가이드
@@ -549,16 +554,21 @@ ls .claude/skills/
 
 ## 🔄 업데이트 내역
 
-### 2025년 주요 업데이트
+### 2025년 12월 26일 기준 주요 업데이트
+- **Claude Code CLI**: v2.0.70+ (최신)
+- **Antigravity IDE**: Google DeepMind 최신 릴리스와 완벽 통합
+- **Claude Sonnet 4.5**: 2025.09.29 출시 - 코딩, 에이전트, 컴퓨터 사용에 최적화
+- **Claude Opus 4.5**: 2025.11.24 출시 - 가장 지능적인 플래그십 모델
 - **Agent Skills**: 모듈형 기능 패키지 도입
 - **Sub-agents**: 자동 태스크 위임 시스템
-- **Background Tasks**: Ctrl+B로 백그라운드 실행
+- **Background Tasks**: Ctrl+B (macOS: Cmd+B)로 백그라운드 실행
 - **Hooks System**: 라이프사이클 자동화
 - **VS Code Extension**: GUI 인터페이스 제공
-- **Model Updates**: Claude Sonnet 4.5, Haiku 4.5
+- **Next.js 16.0.x**: 최신 프레임워크 지원
 
 ---
 
 *이 가이드는 지속적으로 업데이트됩니다. 최신 정보는 공식 문서를 참고하세요.*
+*마지막 업데이트: 2025-12-26 | 환경: macOS + Antigravity AI IDE*
 
-#claude-code #ai-development #2025-guide #windows-setup
+#claude-code #ai-development #2025-guide #macos-setup #antigravity

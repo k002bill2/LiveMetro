@@ -3,16 +3,13 @@
  * Displays real-time train arrival information for a station
  */
 
-import React, { useState, useEffect, useCallback, useMemo, memo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { StyleSheet, Text, View } from 'react-native';
+import { COLORS, RADIUS, SHADOWS, SPACING, TYPOGRAPHY } from '../../styles/modernTheme';
 
-import { trainService } from '../../services/train/trainService';
 import { Train, TrainStatus } from '../../models/train';
+import { trainService } from '../../services/train/trainService';
 import { performanceMonitor, throttle } from '../../utils/performanceUtils';
 
 interface TrainArrivalListProps {
@@ -27,17 +24,17 @@ const TrainArrivalItem: React.FC<TrainArrivalItemProps> = memo(({ train }) => {
   const getStatusColor = (status: TrainStatus): string => {
     switch (status) {
       case TrainStatus.NORMAL:
-        return '#059669';
+        return COLORS.semantic.success;
       case TrainStatus.DELAYED:
-        return '#dc2626';
+        return COLORS.semantic.error;
       case TrainStatus.SUSPENDED:
-        return '#7c2d12';
+        return COLORS.gray[800];
       case TrainStatus.MAINTENANCE:
-        return '#6b7280';
+        return COLORS.gray[500];
       case TrainStatus.EMERGENCY:
-        return '#991b1b';
+        return COLORS.semantic.error;
       default:
-        return '#6b7280';
+        return COLORS.gray[500];
     }
   };
 
@@ -108,45 +105,23 @@ const TrainArrivalItem: React.FC<TrainArrivalItemProps> = memo(({ train }) => {
     >
       <View style={styles.trainHeader}>
         <View style={styles.directionInfo}>
-          <Ionicons
-            name="train"
-            size={16}
-            color="#6b7280"
-          />
-          <Text style={styles.direction}>
-            {getDestinationName()} 방면
-          </Text>
+          <Ionicons name="train" size={16} color="#6b7280" />
+          <Text style={styles.direction}>{getDestinationName()} 방면</Text>
         </View>
-        
+
         <View style={[styles.statusBadge, { backgroundColor: getStatusColor(train.status) }]}>
-          <Ionicons 
-            name={getStatusIcon(train.status) as any} 
-            size={12} 
-            color="white" 
-          />
-          <Text style={styles.statusText}>
-            {getStatusText(train.status)}
-          </Text>
+          <Ionicons name={getStatusIcon(train.status) as any} size={12} color="white" />
+          <Text style={styles.statusText}>{getStatusText(train.status)}</Text>
         </View>
       </View>
 
       <View style={styles.trainDetails}>
         <View style={styles.arrivalInfo}>
-          <Text style={styles.arrivalTime}>
-            {formatArrivalTime()}
-          </Text>
-          {train.delayMinutes > 0 && (
-            <Text style={styles.delayText}>
-              ({train.delayMinutes}분 지연)
-            </Text>
-          )}
+          <Text style={styles.arrivalTime}>{formatArrivalTime()}</Text>
+          {train.delayMinutes > 0 && <Text style={styles.delayText}>({train.delayMinutes}분 지연)</Text>}
         </View>
 
-        {train.nextStationId && (
-          <Text style={styles.nextStation}>
-            다음역 정보 로딩중...
-          </Text>
-        )}
+        {train.nextStationId && <Text style={styles.nextStation}>다음역 정보 로딩중...</Text>}
       </View>
     </View>
   );
@@ -160,72 +135,72 @@ export const TrainArrivalList: React.FC<TrainArrivalListProps> = memo(({ station
   const [loading, setLoading] = useState(true);
 
   // Memoize the update handler to prevent unnecessary re-renders
-  const handleTrainUpdate = useCallback((updatedTrains: Train[]) => {
-    performanceMonitor.startMeasure(`train_update_${stationId}`);
-    setTrains(updatedTrains);
-    setLoading(false);
-    performanceMonitor.endMeasure(`train_update_${stationId}`);
-  }, [stationId]);
-
-  // Throttle subscription updates to improve performance
-  const throttledUpdate = useMemo(
-    () => throttle(handleTrainUpdate, 1000),
-    [handleTrainUpdate]
+  const handleTrainUpdate = useCallback(
+    (updatedTrains: Train[]) => {
+      performanceMonitor.startMeasure(`train_update_${stationId}`);
+      setTrains(updatedTrains);
+      setLoading(false);
+      performanceMonitor.endMeasure(`train_update_${stationId}`);
+    },
+    [stationId]
   );
 
+  // Throttle subscription updates to improve performance
+  const throttledUpdate = useMemo(() => throttle(handleTrainUpdate, 1000), [handleTrainUpdate]);
+
   useEffect(() => {
-    // Development: Mock data for Sangok station (산곡역)
-    if (__DEV__ && stationId === 'sangok') {
+    // Development: Mock data for Gangnam station (강남역) - Line 2
+    if (__DEV__ && stationId === 'gangnam') {
       let trainCounter = 5;
 
       const generateInitialTrains = (): Train[] => {
         const now = new Date();
         return [
           {
-            id: 'train-sangok-1',
-            lineId: '7',
+            id: 'train-gangnam-1',
+            lineId: '2',
             direction: 'down',
-            currentStationId: 'bupyeong-gu-office',
-            nextStationId: 'sangok',
-            finalDestination: '석남',
+            currentStationId: 'samseong',
+            nextStationId: 'gangnam',
+            finalDestination: '신도림',
             status: TrainStatus.NORMAL,
-            arrivalTime: new Date(now.getTime() + 5 * 60 * 1000 + 5 * 1000), // 5분 5초 후
+            arrivalTime: new Date(now.getTime() + 3 * 60 * 1000 + 30 * 1000), // 3분 30초 후
             delayMinutes: 0,
             lastUpdated: now,
           },
           {
-            id: 'train-sangok-2',
-            lineId: '7',
+            id: 'train-gangnam-2',
+            lineId: '2',
             direction: 'up',
-            currentStationId: 'bupyeong-gu-office',
-            nextStationId: 'sangok',
-            finalDestination: '도봉산',
+            currentStationId: 'yeoksam',
+            nextStationId: 'gangnam',
+            finalDestination: '성수',
             status: TrainStatus.NORMAL,
-            arrivalTime: new Date(now.getTime() + 8 * 60 * 1000 + 35 * 1000), // 8분 35초 후
+            arrivalTime: new Date(now.getTime() + 5 * 60 * 1000 + 10 * 1000), // 5분 10초 후
             delayMinutes: 0,
             lastUpdated: now,
           },
           {
-            id: 'train-sangok-3',
-            lineId: '7',
+            id: 'train-gangnam-3',
+            lineId: '2',
             direction: 'up',
-            currentStationId: 'gulpocheon',
-            nextStationId: 'sangok',
-            finalDestination: '대륭입구',
+            currentStationId: 'seolleung',
+            nextStationId: 'gangnam',
+            finalDestination: '건대입구',
             status: TrainStatus.NORMAL,
-            arrivalTime: new Date(now.getTime() + 18 * 60 * 1000), // 18분 후
+            arrivalTime: new Date(now.getTime() + 10 * 60 * 1000), // 10분 후
             delayMinutes: 0,
             lastUpdated: now,
           },
           {
-            id: 'train-sangok-4',
-            lineId: '7',
+            id: 'train-gangnam-4',
+            lineId: '2',
             direction: 'down',
-            currentStationId: 'seoknam',
-            nextStationId: 'sangok',
-            finalDestination: '석남',
+            currentStationId: 'jamsil',
+            nextStationId: 'gangnam',
+            finalDestination: '까치산',
             status: TrainStatus.NORMAL,
-            arrivalTime: new Date(now.getTime() + 18 * 60 * 1000), // 18분 후
+            arrivalTime: new Date(now.getTime() + 12 * 60 * 1000), // 12분 후
             delayMinutes: 0,
             lastUpdated: now,
           },
@@ -253,21 +228,22 @@ export const TrainArrivalList: React.FC<TrainArrivalListProps> = memo(({ station
           // Add new train if we have less than 4 trains
           if (updatedTrains.length < 4) {
             const newDirection = Math.random() > 0.5 ? 'up' : 'down';
-            const newArrivalMinutes = 6 + Math.random() * 4; // 6-10분 사이
-            const hasDelay = Math.random() > 0.8; // 20% 확률로 지연
+            const newArrivalMinutes = 4 + Math.random() * 6; // 4-10분 사이
+            const hasDelay = Math.random() > 0.85; // 15% 확률로 지연
 
-            // Random destination for up trains
-            const destinations: string[] = ['장암', '도봉산', '대륭입구'];
-            const randomDestination: string = destinations[Math.floor(Math.random() * destinations.length)] || '장암';
-            const finalDestination: string = newDirection === 'up' ? randomDestination : '석남';
+            // Random destination
+            const upDestinations: string[] = ['성수', '건대입구', '왕십리', '을지로입구'];
+            const downDestinations: string[] = ['신도림', '까치산', '문래', '당산'];
+            const destinations = newDirection === 'up' ? upDestinations : downDestinations;
+            const randomDestination: string = destinations[Math.floor(Math.random() * destinations.length)] || '성수';
 
             const newTrain: Train = {
-              id: `train-sangok-${trainCounter++}`,
-              lineId: '7',
+              id: `train-gangnam-${trainCounter++}`,
+              lineId: '2',
               direction: newDirection,
-              currentStationId: newDirection === 'up' ? 'gulpocheon' : 'seoknam',
-              nextStationId: 'sangok',
-              finalDestination,
+              currentStationId: newDirection === 'up' ? 'seolleung' : 'jamsil',
+              nextStationId: 'gangnam',
+              finalDestination: randomDestination,
               status: hasDelay ? TrainStatus.DELAYED : TrainStatus.NORMAL,
               arrivalTime: new Date(now.getTime() + newArrivalMinutes * 60 * 1000),
               delayMinutes: hasDelay ? Math.floor(Math.random() * 3) + 1 : 0,
@@ -301,10 +277,7 @@ export const TrainArrivalList: React.FC<TrainArrivalListProps> = memo(({ station
       setLoading(true);
       performanceMonitor.startMeasure(`subscription_${stationId}`);
 
-      unsubscribe = trainService.subscribeToTrainUpdates(
-        stationId,
-        throttledUpdate
-      );
+      unsubscribe = trainService.subscribeToTrainUpdates(stationId, throttledUpdate);
 
       performanceMonitor.endMeasure(`subscription_${stationId}`);
     };
@@ -319,47 +292,37 @@ export const TrainArrivalList: React.FC<TrainArrivalListProps> = memo(({ station
   }, [stationId, throttledUpdate]);
 
   const renderEmptyState = (): React.ReactElement => (
-    <View 
+    <View
       style={styles.emptyState}
       accessible={true}
       accessibilityRole="text"
       accessibilityLabel="현재 도착 예정인 열차가 없습니다. 잠시 후 다시 확인해보세요"
     >
       <Ionicons name="train-outline" size={48} color="#9ca3af" />
-      <Text style={styles.emptyText}>
-        현재 도착 예정인 열차가 없습니다
-      </Text>
-      <Text style={styles.emptySubtext}>
-        잠시 후 다시 확인해보세요
-      </Text>
+      <Text style={styles.emptyText}>현재 도착 예정인 열차가 없습니다</Text>
+      <Text style={styles.emptySubtext}>잠시 후 다시 확인해보세요</Text>
     </View>
   );
 
   if (loading && trains.length === 0) {
     return (
-      <View 
+      <View
         style={styles.loadingContainer}
         accessible={true}
         accessibilityRole="progressbar"
         accessibilityLabel="실시간 열차 정보를 불러오고 있습니다"
       >
         <Ionicons name="refresh" size={24} color="#2563eb" />
-        <Text style={styles.loadingText}>
-          실시간 열차 정보를 불러오고 있습니다...
-        </Text>
+        <Text style={styles.loadingText}>실시간 열차 정보를 불러오고 있습니다...</Text>
       </View>
     );
   }
 
   return (
     <View style={styles.container}>
-      {trains.length === 0 ? (
-        renderEmptyState()
-      ) : (
-        trains.map((train) => (
-          <TrainArrivalItem key={train.id} train={train} />
-        ))
-      )}
+      {trains.length === 0
+        ? renderEmptyState()
+        : trains.map(train => <TrainArrivalItem key={train.id} train={train} />)}
     </View>
   );
 });
@@ -372,49 +335,42 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   trainItem: {
-    backgroundColor: '#ffffff',
-    padding: 16,
-    marginHorizontal: 20,
-    marginBottom: 12,
-    borderRadius: 12,
+    backgroundColor: COLORS.white,
+    padding: SPACING.lg,
+    marginHorizontal: SPACING.lg,
+    marginBottom: SPACING.md,
+    borderRadius: RADIUS.md,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 1,
+    borderColor: COLORS.border.light,
+    ...SHADOWS.sm,
   },
   trainHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: SPACING.sm,
   },
   directionInfo: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   direction: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text.secondary,
     marginLeft: 4,
   },
   statusBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 8,
+    paddingHorizontal: SPACING.sm,
     paddingVertical: 4,
-    borderRadius: 12,
+    borderRadius: RADIUS.md,
   },
   statusText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#ffffff',
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.white,
     marginLeft: 4,
   },
   trainDetails: {
@@ -426,18 +382,18 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   arrivalTime: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: '#111827',
+    fontSize: TYPOGRAPHY.fontSize.xl,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.text.primary,
   },
   delayText: {
-    fontSize: 12,
-    color: '#dc2626',
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.semantic.error,
     marginTop: 2,
   },
   nextStation: {
-    fontSize: 12,
-    color: '#6b7280',
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.text.tertiary,
     fontStyle: 'italic',
   },
   loadingContainer: {
@@ -447,9 +403,9 @@ const styles = StyleSheet.create({
     paddingVertical: 40,
   },
   loadingText: {
-    marginTop: 8,
-    fontSize: 14,
-    color: '#6b7280',
+    marginTop: SPACING.sm,
+    fontSize: TYPOGRAPHY.fontSize.base,
+    color: COLORS.text.secondary,
     textAlign: 'center',
   },
   emptyContainer: {
@@ -460,19 +416,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 60,
-    paddingHorizontal: 20,
+    paddingHorizontal: SPACING.lg,
   },
   emptyText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#6b7280',
-    marginTop: 16,
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text.secondary,
+    marginTop: SPACING.lg,
     textAlign: 'center',
   },
   emptySubtext: {
-    fontSize: 14,
-    color: '#9ca3af',
-    marginTop: 8,
+    fontSize: TYPOGRAPHY.fontSize.base,
+    color: COLORS.text.tertiary,
+    marginTop: SPACING.sm,
     textAlign: 'center',
   },
 });

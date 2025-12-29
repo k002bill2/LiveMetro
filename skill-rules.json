@@ -3,71 +3,76 @@
     "type": "domain",
     "enforcement": "suggest",
     "priority": "high",
+    "description": "React Native component development with TypeScript, hooks, and navigation",
     "promptTriggers": {
-      "keywords": ["component", "screen", "react native", "UI", "layout", "navigation"],
+      "keywords": [
+        "react native",
+        "component",
+        "screen",
+        "navigation",
+        "hooks",
+        "useState",
+        "useEffect",
+        "expo",
+        "UI",
+        "layout"
+      ],
       "intentPatterns": [
-        "(create|add|build).*?(component|screen|page)",
-        "(update|fix).*?(UI|layout|style)",
-        "(implement|add).*?(navigation|routing)"
+        "(create|add|build|make).*?(component|screen|page)",
+        "(fix|update|modify).*?(UI|layout|style)",
+        "(implement|add).*?(navigation|routing)",
+        "use.*?(hook|context)"
       ]
     },
     "fileTriggers": {
-      "pathPatterns": ["src/components/**/*.tsx", "src/screens/**/*.tsx"],
-      "contentPatterns": ["import.*React", "export.*Component", "StyleSheet.create"]
+      "pathPatterns": [
+        "src/components/**/*.tsx",
+        "src/screens/**/*.tsx",
+        "src/hooks/**/*.ts"
+      ],
+      "contentPatterns": [
+        "import.*React",
+        "export.*Component",
+        "StyleSheet\\.create",
+        "useNavigation"
+      ]
     }
   },
 
   "firebase-integration": {
     "type": "domain",
-    "enforcement": "suggest",
+    "enforcement": "require",
     "priority": "high",
+    "description": "Firebase integration for auth, Firestore, and real-time data",
     "promptTriggers": {
-      "keywords": ["firebase", "firestore", "auth", "database", "cloud"],
+      "keywords": [
+        "firebase",
+        "firestore",
+        "authentication",
+        "auth",
+        "realtime",
+        "database",
+        "collection",
+        "document"
+      ],
       "intentPatterns": [
-        "(setup|configure|add).*?(firebase|firestore)",
-        "(create|update).*?(collection|document)",
-        "(implement|add).*?(auth|login|signup)"
+        "(add|create|setup).*?(firebase|firestore)",
+        "(query|fetch|get).*?(firestore|database)",
+        "(subscribe|listen).*?(realtime|updates)",
+        ".*?authentication.*?"
       ]
     },
     "fileTriggers": {
-      "pathPatterns": ["src/services/firebase/**/*.ts"],
-      "contentPatterns": ["firebase", "firestore", "collection", "doc"]
-    }
-  },
-
-  "location-services": {
-    "type": "domain",
-    "enforcement": "suggest",
-    "priority": "high",
-    "promptTriggers": {
-      "keywords": ["location", "GPS", "geolocation", "tracking", "nearby"],
-      "intentPatterns": [
-        "(implement|add).*?(location|GPS|tracking)",
-        "(find|get).*?(nearby|stations|location)",
-        "(setup|configure).*?(geofencing|location)"
+      "pathPatterns": [
+        "src/services/**/*.ts",
+        "src/config/firebase*.ts"
+      ],
+      "contentPatterns": [
+        "import.*firebase",
+        "firestore\\(\\)",
+        "collection\\(",
+        "onSnapshot"
       ]
-    },
-    "fileTriggers": {
-      "pathPatterns": ["src/services/location/**/*.ts"],
-      "contentPatterns": ["Location\\.", "getCurrentPositionAsync", "watchPositionAsync"]
-    }
-  },
-
-  "notification-system": {
-    "type": "domain",
-    "enforcement": "suggest",
-    "priority": "high",
-    "promptTriggers": {
-      "keywords": ["notification", "alert", "push", "message"],
-      "intentPatterns": [
-        "(send|create|schedule).*?(notification|alert|push)",
-        "(implement|add).*?(notification|alert)",
-        "(setup|configure).*?(push notification)"
-      ]
-    },
-    "fileTriggers": {
-      "pathPatterns": ["src/services/notification/**/*.ts"],
-      "contentPatterns": ["Notifications\\.", "scheduleNotificationAsync", "requestPermissionsAsync"]
     }
   },
 
@@ -75,60 +80,247 @@
     "type": "domain",
     "enforcement": "suggest",
     "priority": "high",
+    "description": "Seoul Open Data API integration for subway arrival data",
     "promptTriggers": {
-      "keywords": ["API", "endpoint", "fetch", "request", "seoul"],
+      "keywords": [
+        "API",
+        "seoul",
+        "subway",
+        "arrival",
+        "timetable",
+        "fetch",
+        "axios",
+        "endpoint"
+      ],
       "intentPatterns": [
-        "(call|fetch|request).*?(API|endpoint)",
-        "(implement|add).*?(API|integration)",
-        "(setup|configure).*?(API|client)"
+        "(call|fetch|get).*?API",
+        "(integrate|connect).*?(seoul|subway)",
+        ".*?(arrival|timetable).*?data"
       ]
     },
     "fileTriggers": {
-      "pathPatterns": ["src/services/api/**/*.ts"],
-      "contentPatterns": ["fetch", "axios", "API", "endpoint"]
+      "pathPatterns": [
+        "src/services/api/**/*.ts"
+      ],
+      "contentPatterns": [
+        "axios\\.",
+        "fetch\\(",
+        "seoulSubwayApi",
+        "API_KEY"
+      ]
     }
   },
 
-  "data-management": {
-    "type": "guardrail",
+  "location-services": {
+    "type": "domain",
     "enforcement": "require",
     "priority": "critical",
+    "description": "Location services, GPS, and geolocation features",
     "promptTriggers": {
-      "keywords": ["cache", "storage", "AsyncStorage", "data", "persist"],
+      "keywords": [
+        "location",
+        "GPS",
+        "geolocation",
+        "coordinate",
+        "latitude",
+        "longitude",
+        "nearby",
+        "distance"
+      ],
       "intentPatterns": [
-        "(save|store|cache).*?(data|state)",
-        "(implement|add).*?(cache|storage)",
-        "(update|modify).*?(storage|AsyncStorage)"
+        "(get|fetch|request).*?(location|position)",
+        "(find|search).*?nearby",
+        ".*?permission.*?location"
       ]
     },
     "fileTriggers": {
-      "pathPatterns": ["src/services/data/**/*.ts"],
-      "contentPatterns": ["AsyncStorage", "cache", "storage"]
+      "pathPatterns": [
+        "src/hooks/useLocation*.ts",
+        "src/services/**/*location*.ts"
+      ],
+      "contentPatterns": [
+        "expo-location",
+        "getCurrentPositionAsync",
+        "requestForegroundPermissionsAsync"
+      ]
     }
   },
 
-  "error-handling": {
-    "type": "guardrail",
+  "notification-system": {
+    "type": "domain",
     "enforcement": "require",
-    "priority": "critical",
+    "priority": "high",
+    "description": "Push notifications and alert system",
     "promptTriggers": {
-      "keywords": ["error", "exception", "try", "catch", "handle"],
+      "keywords": [
+        "notification",
+        "push",
+        "alert",
+        "reminder",
+        "notify"
+      ],
       "intentPatterns": [
-        "(add|implement).*?(error|exception).*?handling",
-        "(fix|resolve).*?(error|bug|issue)"
+        "(send|schedule|create).*?(notification|alert)",
+        "(setup|configure).*?push",
+        ".*?notification.*?permission"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": [
+        "src/hooks/useNotifications*.ts",
+        "src/services/**/*notification*.ts"
+      ],
+      "contentPatterns": [
+        "expo-notifications",
+        "scheduleNotificationAsync",
+        "registerForPushNotificationsAsync"
+      ]
+    }
+  },
+
+  "data-caching": {
+    "type": "domain",
+    "enforcement": "suggest",
+    "priority": "normal",
+    "description": "Data caching with AsyncStorage and offline support",
+    "promptTriggers": {
+      "keywords": [
+        "cache",
+        "storage",
+        "AsyncStorage",
+        "persist",
+        "offline"
+      ],
+      "intentPatterns": [
+        "(save|store|cache).*?data",
+        ".*?offline.*?support",
+        "(persist|save).*?state"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": [
+        "src/services/data/**/*.ts",
+        "src/utils/cache*.ts"
+      ],
+      "contentPatterns": [
+        "AsyncStorage",
+        "setItem",
+        "getItem"
       ]
     }
   },
 
   "performance-optimization": {
-    "type": "enhancement",
+    "type": "guardrail",
     "enforcement": "suggest",
-    "priority": "medium",
+    "priority": "normal",
+    "description": "Performance monitoring and optimization",
     "promptTriggers": {
-      "keywords": ["performance", "optimize", "slow", "lag", "cache"],
+      "keywords": [
+        "performance",
+        "optimize",
+        "memoize",
+        "useMemo",
+        "useCallback",
+        "lazy",
+        "suspense"
+      ],
       "intentPatterns": [
-        "(optimize|improve).*?(performance|speed)",
-        "(fix|resolve).*?(slow|lag|delay)"
+        "(optimize|improve).*?performance",
+        "(reduce|minimize).*?(re-?render|bundle)",
+        ".*?memoiz.*?"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": [
+        "src/utils/performance*.ts",
+        "src/services/monitoring/**/*.ts"
+      ],
+      "contentPatterns": [
+        "React\\.memo",
+        "useMemo",
+        "useCallback",
+        "monitoringManager"
+      ]
+    }
+  },
+
+  "security-check": {
+    "type": "guardrail",
+    "enforcement": "block",
+    "priority": "critical",
+    "description": "Security validation for sensitive operations",
+    "promptTriggers": {
+      "keywords": [
+        ".env",
+        "API_KEY",
+        "SECRET",
+        "password",
+        "token",
+        "credentials"
+      ],
+      "intentPatterns": [
+        ".*?(modify|change|update).*?(\\.env|secret|key)",
+        "(expose|share|commit).*?(credential|token)"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": [
+        ".env*",
+        "**/*secret*",
+        "**/*credential*"
+      ],
+      "contentPatterns": [
+        "API_KEY",
+        "SECRET",
+        "PASSWORD"
+      ]
+    }
+  },
+
+  "cc-feature-implementer-main": {
+    "type": "workflow",
+    "enforcement": "suggest",
+    "priority": "high",
+    "description": "Creates phase-based feature plans with quality gates and incremental delivery structure",
+    "promptTriggers": {
+      "keywords": [
+        "plan",
+        "planning",
+        "phases",
+        "breakdown",
+        "strategy",
+        "roadmap",
+        "organize",
+        "structure",
+        "outline",
+        "feature plan",
+        "implementation plan",
+        "TDD",
+        "test-driven"
+      ],
+      "intentPatterns": [
+        "(create|make|generate).*?(plan|roadmap|strategy)",
+        "(plan|organize|structure).*?(feature|implementation)",
+        "(break.*?down|split).*?(task|feature|work)",
+        ".*?phase.*?(breakdown|plan)",
+        "how.*?(implement|build|create).*?feature",
+        ".*?TDD.*?(plan|approach)",
+        "need.*?(plan|strategy).*?for"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": [
+        "docs/plans/**/*.md",
+        "docs/planning/**/*.md",
+        ".claude/skills/cc-feature-implementer-main/**/*"
+      ],
+      "contentPatterns": [
+        "## Implementation Plan",
+        "### Phase \\d+:",
+        "Quality Gate",
+        "Red-Green-Refactor",
+        "TDD Compliance"
       ]
     }
   }

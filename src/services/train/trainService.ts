@@ -3,29 +3,30 @@
  * Handles Seoul Metropolitan Subway API integration and real-time updates
  */
 
-import { 
-  collection, 
-  query, 
-  where, 
-  onSnapshot, 
-  doc, 
-  getDoc, 
+import {
+  collection,
+  query,
+  where,
+  onSnapshot,
+  doc,
+  getDoc,
   getDocs,
   orderBy,
   limit,
   Unsubscribe
 } from 'firebase/firestore';
 import { firestore } from '../firebase/config';
-import { 
-  Train, 
-  Station, 
-  SubwayLine, 
-  TrainDelay, 
+import {
+  Train,
+  Station,
+  SubwayLine,
+  TrainDelay,
   CongestionData,
   // TrainStatus, // Will be used in future updates
-  DelaySeverity 
+  DelaySeverity
 } from '../../models/train';
 import { seoulSubwayApi, SeoulTimetableRow } from '../api/seoulSubwayApi';
+import { getLocalStation, getLocalStationsByLine } from '../data/stationsDataService';
 
 class TrainService {
   private unsubscribeCallbacks: Map<string, Unsubscribe> = new Map();
@@ -48,9 +49,11 @@ class TrainService {
 
   /**
    * Get stations for a specific line
+   * Falls back to local data if not found in Firebase
    */
   async getStationsByLine(lineId: string): Promise<Station[]> {
     try {
+      // Try Firebase first
       const stationsQuery = query(
         collection(firestore, 'stations'),
         where('lineId', '==', lineId),
@@ -58,21 +61,40 @@ class TrainService {
       );
 
       const stationsSnapshot = await getDocs(stationsQuery);
-      return stationsSnapshot.docs.map(doc => ({
+      const firestoreStations = stationsSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       } as Station));
+
+      if (firestoreStations.length > 0) {
+        return firestoreStations;
+      }
+
+      // Fallback to local data if Firebase has no results
+      console.warn(`No stations found in Firebase for line ${lineId}, trying local data`);
+      const localStations = getLocalStationsByLine(lineId);
+
+      if (localStations.length > 0) {
+        console.log(`✅ Loaded ${localStations.length} stations for line ${lineId} from local data`);
+        return localStations;
+      }
+
+      console.error(`❌ No stations found for line ${lineId} in Firebase or local data`);
+      return [];
     } catch (error) {
-      console.error('Firebase error fetching stations:', error);
-      return []; // 에러 시 빈 배열 반환
+      // Firebase connection error - use local fallback
+      console.error('Firebase error fetching stations, falling back to local data:', error);
+      return getLocalStationsByLine(lineId);
     }
   }
 
   /**
    * Get station details by ID
+   * Falls back to local data if not found in Firebase
    */
   async getStation(stationId: string): Promise<Station | null> {
     try {
+      // Try Firebase first
       const stationDoc = await getDoc(doc(firestore, 'stations', stationId));
 
       if (stationDoc.exists()) {
@@ -82,13 +104,21 @@ class TrainService {
         } as Station;
       }
 
-      // 데이터가 없을 때 에러를 던지지 않고 null 반환
-      console.warn(`Station not found in Firebase: ${stationId}`);
+      // Fallback to local data
+      console.warn(`Station not found in Firebase: ${stationId}, trying local data`);
+      const localStation = getLocalStation(stationId);
+
+      if (localStation) {
+        console.log(`✅ Loaded station ${stationId} from local data`);
+        return localStation;
+      }
+
+      console.error(`❌ Station ${stationId} not found in Firebase or local data`);
       return null;
     } catch (error) {
-      // Firebase 연결 오류 시에만 에러 로깅하고 null 반환
-      console.error('Firebase error fetching station:', error);
-      return null;
+      // Firebase 연결 오류 시 로컬 데이터로 폴백
+      console.error('Firebase error fetching station, falling back to local data:', error);
+      return getLocalStation(stationId);
     }
   }
 

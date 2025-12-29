@@ -261,7 +261,7 @@ frontend-dev-guidelines/
 ```markdown
 ---
 name: frontend-dev-guidelines
-description: React 19, Next.js 14, TypeScript guidelines
+description: react 19.2.3, Next.js 14, TypeScript guidelines
 ---
 
 # Frontend Development Guidelines

@@ -1,59 +1,42 @@
 ---
 name: react-native-development
-description: React Native + TypeScript development guidelines for LiveMetro subway app. Use when creating/modifying UI components, screens, or navigation.
+description: React Native component development with TypeScript, Expo, and React Navigation. Use when creating UI components, screens, or implementing navigation flows.
 ---
 
 # React Native Development Guidelines
 
+## When to Use This Skill
+- Creating new React Native components
+- Building screens with navigation
+- Implementing custom hooks
+- Working with Expo SDK features
+- Styling with StyleSheet and responsive design
+
 ## Core Principles
 
-1. **TypeScript Strict Mode** - All components must be fully typed
-2. **Functional Components Only** - No class components
-3. **Expo SDK** - Use Expo's managed workflow
-4. **Custom Hooks** - Extract business logic into reusable hooks
-5. **Accessibility First** - All components must be accessible
-
-## Component Structure
-
-### Standard Component Template
-
+### 1. Component Structure
 ```tsx
 import React, { memo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 
 interface ComponentProps {
-  /** Prop description with JSDoc */
+  // Props with JSDoc comments
   title: string;
   onPress?: () => void;
-  disabled?: boolean;
 }
 
-/**
- * Component description
- * @example
- * <Component title="Example" onPress={() => {}} />
- */
 export const Component: React.FC<ComponentProps> = memo(({
   title,
-  onPress,
-  disabled = false
+  onPress
 }) => {
-  // 1. Custom hooks
+  // 1. Hooks (useState, useEffect, custom hooks)
   // 2. Derived state
   // 3. Event handlers
-  // 4. Effects (if needed)
+  // 4. Return JSX
 
   return (
     <View style={styles.container}>
-      <TouchableOpacity
-        onPress={onPress}
-        disabled={disabled}
-        accessible
-        accessibilityLabel={title}
-        accessibilityRole="button"
-      >
-        <Text style={styles.title}>{title}</Text>
-      </TouchableOpacity>
+      <Text style={styles.title}>{title}</Text>
     </View>
   );
 });
@@ -62,304 +45,178 @@ Component.displayName = 'Component';
 
 const styles = StyleSheet.create({
   container: {
-    padding: 16,
+    // Styles here
   },
   title: {
-    fontSize: 16,
-    fontWeight: '600',
+    // Styles here
   },
 });
 ```
 
-## Custom Hooks Pattern
-
-```tsx
-import { useState, useEffect, useCallback } from 'react';
-
-interface UseFeatureOptions {
-  refetchInterval?: number;
-  retryAttempts?: number;
-}
-
-interface UseFeatureReturn {
-  data: DataType | null;
-  loading: boolean;
-  error: Error | null;
-  refetch: () => Promise<void>;
-}
-
-/**
- * Custom hook description
- */
-export const useFeature = (
-  param: string,
-  options: UseFeatureOptions = {}
-): UseFeatureReturn => {
-  const [data, setData] = useState<DataType | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-
-  const fetchData = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const result = await apiCall(param);
-      setData(result);
-    } catch (err) {
-      setError(err as Error);
-    } finally {
-      setLoading(false);
-    }
-  }, [param]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  return { data, loading, error, refetch: fetchData };
-};
+### 2. File Organization
+```
+src/
+├── components/        # Reusable UI components
+│   └── train/        # Domain-specific components
+├── screens/          # Screen components
+│   └── home/         # Feature-based screens
+├── hooks/            # Custom React hooks
+├── navigation/       # Navigation configuration
+└── utils/            # Helper functions
 ```
 
-## Screen Structure
+### 3. TypeScript Standards
+- Always use TypeScript strict mode
+- Define interfaces for all component props
+- Use type inference where possible
+- Avoid `any` type - use `unknown` with type guards
 
+### 4. Performance Best Practices
 ```tsx
-import React from 'react';
-import { View, ScrollView, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-
-export const Screen: React.FC = () => {
-  // Hooks
-  const { data, loading, error } = useCustomHook();
-
-  // Handlers
-  const handleAction = useCallback(() => {
-    // Handle action
-  }, []);
-
-  // Render states
-  if (loading) return <LoadingState />;
-  if (error) return <ErrorState error={error} onRetry={refetch} />;
-  if (!data) return <EmptyState />;
-
-  return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.content}>
-        {/* Content */}
-      </ScrollView>
-    </SafeAreaView>
-  );
-};
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-  },
-  content: {
-    padding: 16,
-  },
-});
-```
-
-## Styling Guidelines
-
-### 1. Use StyleSheet.create()
-```tsx
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    padding: 16,
-  },
-});
-```
-
-### 2. Seoul Subway Line Colors (from colorUtils.ts)
-```tsx
-import { getSubwayLineColor } from '@utils/colorUtils';
-
-const lineColor = getSubwayLineColor('1호선'); // Returns official color
-```
-
-### 3. Responsive Design
-```tsx
-import { Dimensions } from 'react-native';
-
-const { width, height } = Dimensions.get('window');
-const isSmallDevice = width < 375;
-```
-
-## Navigation Pattern
-
-```tsx
-import { useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-
-type NavigationProp = NativeStackNavigationProp<RootStackParamList>;
-
-export const Component: React.FC = () => {
-  const navigation = useNavigation<NavigationProp>();
-
-  const handleNavigate = () => {
-    navigation.navigate('ScreenName', {
-      param1: 'value',
-    });
-  };
-
-  return <Button onPress={handleNavigate} />;
-};
-```
-
-## Performance Optimization
-
-### 1. Use React.memo for Expensive Components
-```tsx
+// Use memo for expensive components
 export const ExpensiveComponent = memo(({ data }) => {
-  return <View>{/* Render logic */}</View>;
+  // Component logic
 }, (prevProps, nextProps) => {
-  // Custom comparison
+  // Custom comparison if needed
   return prevProps.data === nextProps.data;
 });
-```
 
-### 2. useCallback for Event Handlers
-```tsx
+// Use useMemo for expensive calculations
+const processedData = useMemo(() => {
+  return heavyComputation(data);
+}, [data]);
+
+// Use useCallback for stable callback references
 const handlePress = useCallback(() => {
   // Handler logic
 }, [dependencies]);
 ```
 
-### 3. useMemo for Expensive Calculations
+### 5. Navigation Pattern
 ```tsx
-const processedData = useMemo(() => {
-  return expensiveCalculation(data);
-}, [data]);
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { AppStackParamList } from '@/navigation/types';
+
+type Props = NativeStackScreenProps<AppStackParamList, 'ScreenName'>;
+
+export const ScreenComponent: React.FC<Props> = ({ navigation, route }) => {
+  const handleNavigate = () => {
+    navigation.navigate('OtherScreen', {
+      param: 'value'
+    });
+  };
+
+  // Screen implementation
+};
 ```
 
-### 4. FlatList for Long Lists
+### 6. Error Handling
+```tsx
+const [error, setError] = useState<string | null>(null);
+
+try {
+  await someAsyncOperation();
+} catch (err) {
+  setError(err instanceof Error ? err.message : 'Unknown error');
+  console.error('Operation failed:', err);
+}
+
+// Display error to user
+{error && (
+  <Text style={styles.error}>{error}</Text>
+)}
+```
+
+## Styling Guidelines
+
+### 1. Responsive Design
+```tsx
+import { Dimensions, Platform } from 'react-native';
+
+const { width, height } = Dimensions.get('window');
+
+const styles = StyleSheet.create({
+  container: {
+    width: width * 0.9,
+    padding: width < 375 ? 12 : 16, // Smaller phones
+  },
+});
+```
+
+### 2. Platform-Specific Styles
+```tsx
+const styles = StyleSheet.create({
+  text: {
+    ...Platform.select({
+      ios: {
+        fontFamily: 'System',
+      },
+      android: {
+        fontFamily: 'Roboto',
+      },
+    }),
+  },
+});
+```
+
+## Common Patterns
+
+### 1. Loading States
+```tsx
+const [loading, setLoading] = useState(true);
+const [data, setData] = useState<DataType | null>(null);
+
+useEffect(() => {
+  fetchData()
+    .then(setData)
+    .finally(() => setLoading(false));
+}, []);
+
+if (loading) {
+  return <ActivityIndicator size="large" />;
+}
+```
+
+### 2. List Rendering
 ```tsx
 <FlatList
   data={items}
   keyExtractor={(item) => item.id}
   renderItem={({ item }) => <ItemComponent item={item} />}
-  getItemLayout={(data, index) => ({
-    length: ITEM_HEIGHT,
-    offset: ITEM_HEIGHT * index,
-    index,
-  })}
-  removeClippedSubviews
-  maxToRenderPerBatch={10}
-  windowSize={5}
+  ListEmptyComponent={<EmptyState />}
+  ListHeaderComponent={<Header />}
+  onEndReached={loadMore}
+  onEndReachedThreshold={0.5}
 />
 ```
 
-## Error Handling
-
+### 3. Form Input Handling
 ```tsx
-import { ErrorBoundary } from '@components/common/ErrorBoundary';
+const [value, setValue] = useState('');
 
-export const Screen: React.FC = () => {
-  return (
-    <ErrorBoundary fallback={<ErrorFallback />}>
-      {/* Screen content */}
-    </ErrorBoundary>
-  );
-};
+<TextInput
+  value={value}
+  onChangeText={setValue}
+  placeholder="Enter text"
+  autoCapitalize="none"
+  autoCorrect={false}
+/>
 ```
 
-## Accessibility Requirements
+## Testing Requirements
+- Write unit tests for all components
+- Test user interactions
+- Test error states
+- Mock API calls and navigation
 
-```tsx
-<TouchableOpacity
-  accessible
-  accessibilityLabel="지하철 1호선 선택"
-  accessibilityHint="터치하면 1호선 역 목록을 표시합니다"
-  accessibilityRole="button"
-  onPress={handlePress}
->
-  <Text>1호선</Text>
-</TouchableOpacity>
-```
+## Accessibility
+- Add `accessibilityLabel` to touchable elements
+- Use `accessibilityRole` appropriately
+- Ensure proper contrast ratios
+- Support screen readers
 
-## Testing Pattern
-
-```tsx
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
-
-describe('Component', () => {
-  it('should render correctly', () => {
-    const { getByText } = render(<Component title="Test" />);
-    expect(getByText('Test')).toBeTruthy();
-  });
-
-  it('should handle press events', async () => {
-    const onPress = jest.fn();
-    const { getByRole } = render(<Component onPress={onPress} />);
-
-    fireEvent.press(getByRole('button'));
-    await waitFor(() => {
-      expect(onPress).toHaveBeenCalled();
-    });
-  });
-});
-```
-
-## Import Order
-
-```tsx
-// 1. External libraries
-import React, { useState, useEffect } from 'react';
-import { View, Text } from 'react-native';
-
-// 2. Internal modules (use path aliases)
-import { useRealtimeTrains } from '@hooks/useRealtimeTrains';
-import { TrainCard } from '@components/train/TrainCard';
-
-// 3. Types
-import type { Train } from '@models/train';
-
-// 4. Styles
-import { styles } from './Component.styles';
-```
-
-## Common Patterns in LiveMetro
-
-### 1. Real-time Data Subscription
-```tsx
-const { trains, loading, error, refetch } = useRealtimeTrains(
-  stationName,
-  { refetchInterval: 30000 }
-);
-```
-
-### 2. Location-based Features
-```tsx
-const { location, error } = useLocation();
-const nearbyStations = useNearbyStations(location);
-```
-
-### 3. Notification Handling
-```tsx
-const { sendNotification } = useNotifications();
-
-await sendNotification({
-  title: '지연 알림',
-  body: `${stationName} ${lineName} 지연`,
-});
-```
-
-## Remember
-
-- ✅ Always use TypeScript strict mode
-- ✅ Extract business logic into custom hooks
-- ✅ Use Seoul subway line colors from colorUtils
-- ✅ Implement proper error boundaries
-- ✅ Add accessibility labels
-- ✅ Optimize FlatList with getItemLayout
-- ✅ Use React.memo for expensive components
-- ✅ Follow the 3-tier data architecture (API → Firebase → AsyncStorage)
-
-## Additional Resources
-
-- Project architecture: [vooster-docs/architecture.md](../../vooster-docs/architecture.md)
-- Clean code guidelines: [vooster-docs/clean-code.md](../../vooster-docs/clean-code.md)
-- Custom hooks: [src/hooks/](../../src/hooks/)
+## Important Notes
+- Always use path aliases (@/) instead of relative imports
+- Clean up subscriptions and timers in useEffect cleanup
+- Handle keyboard dismissal on iOS and Android
+- Test on both platforms before committing

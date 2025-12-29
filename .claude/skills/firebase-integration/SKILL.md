@@ -1,520 +1,277 @@
 ---
 name: firebase-integration
-description: Firebase Firestore, Auth, and Cloud Functions integration for LiveMetro. Use when working with backend services, authentication, or real-time data sync.
+description: Firebase integration for authentication, Firestore database, and real-time data synchronization. Use when working with Firebase services in the LiveMetro app.
 ---
 
 # Firebase Integration Guidelines
 
-## Architecture Overview
+## When to Use This Skill
+- Setting up Firebase authentication
+- Querying Firestore collections
+- Implementing real-time data subscriptions
+- Managing user data in Firebase
+- Handling Firebase errors
 
-LiveMetro uses Firebase as the cloud backend layer in the 3-tier architecture:
+## Core Services
 
+### 1. Firestore Database Structure
 ```
-Seoul Subway API → Firebase Firestore → Local AsyncStorage
-     (Tier 1)          (Tier 2)           (Tier 3)
+Collections:
+- subwayLines/          # Line metadata (color, name)
+- stations/             # Station info with coordinates
+- trains/               # Real-time train positions
+- trainDelays/          # Delay and disruption alerts
+- congestionData/       # Train car congestion levels
+- users/                # User preferences and favorites
 ```
 
-## Firebase Configuration
-
-### Initialization (src/services/firebase/config.ts)
-
+### 2. Authentication Pattern
 ```typescript
-import { initializeApp } from 'firebase/app';
-import { getFirestore } from 'firebase/firestore';
-import { getAuth } from 'firebase/auth';
-import { getFunctions } from 'firebase/functions';
+import { auth } from '@/config/firebase';
+import {
+  signInAnonymously,
+  onAuthStateChanged
+} from 'firebase/auth';
 
-const firebaseConfig = {
-  apiKey: process.env.FIREBASE_API_KEY,
-  projectId: process.env.FIREBASE_PROJECT_ID,
-  messagingSenderId: process.env.FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.FIREBASE_APP_ID,
+// Anonymous authentication for basic features
+const signIn = async () => {
+  try {
+    const result = await signInAnonymously(auth);
+    return result.user;
+  } catch (error) {
+    console.error('Auth error:', error);
+    throw error;
+  }
 };
 
-const app = initializeApp(firebaseConfig);
-
-export const db = getFirestore(app);
-export const auth = getAuth(app);
-export const functions = getFunctions(app);
+// Listen to auth state changes
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    // User is signed in
+  } else {
+    // User is signed out
+  }
+});
 ```
 
-## Firestore Data Patterns
-
-### 1. Collection Structure
-
-```
-/stations/{stationId}
-  - name: string
-  - lineNames: string[]
-  - location: GeoPoint
-  - createdAt: Timestamp
-
-/realtime-trains/{stationId}/arrivals/{trainId}
-  - trainNo: string
-  - lineNumber: string
-  - direction: string
-  - arrivalTime: number
-  - status: string
-  - updatedAt: Timestamp
-
-/users/{userId}
-  - email: string
-  - preferences: object
-  - favoriteStations: string[]
-  - createdAt: Timestamp
-
-/notifications/{notificationId}
-  - userId: string
-  - type: string
-  - title: string
-  - body: string
-  - read: boolean
-  - createdAt: Timestamp
-```
-
-### 2. Real-time Subscription Pattern
-
+### 3. Firestore Query Pattern
 ```typescript
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
-import { db } from '@services/firebase/config';
+import { firestore } from '@/config/firebase';
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  orderBy,
+  limit
+} from 'firebase/firestore';
 
-/**
- * Subscribe to real-time train arrivals for a station
- */
-export const subscribeToTrainArrivals = (
+// Basic query
+const getStations = async (lineId: string) => {
+  try {
+    const stationsRef = collection(firestore, 'stations');
+    const q = query(
+      stationsRef,
+      where('lineId', '==', lineId),
+      orderBy('sequence')
+    );
+
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    }));
+  } catch (error) {
+    console.error('Firestore query error:', error);
+    return [];
+  }
+};
+```
+
+### 4. Real-time Subscription Pattern
+```typescript
+import { onSnapshot } from 'firebase/firestore';
+
+// Subscribe to real-time updates
+const subscribeToTrains = (
   stationId: string,
   callback: (trains: Train[]) => void
 ): (() => void) => {
-  const arrivalsRef = collection(
-    db,
-    'realtime-trains',
-    stationId,
-    'arrivals'
-  );
-
+  const trainsRef = collection(firestore, 'trains');
   const q = query(
-    arrivalsRef,
-    where('arrivalTime', '>', Date.now())
+    trainsRef,
+    where('currentStationId', '==', stationId)
   );
 
   const unsubscribe = onSnapshot(
     q,
     (snapshot) => {
-      const trains = snapshot.docs.map((doc) => ({
+      const trains = snapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data(),
-      })) as Train[];
-
+        ...doc.data()
+      } as Train));
       callback(trains);
     },
     (error) => {
-      console.error('Firestore subscription error:', error);
-      // Fallback to local cache
+      console.error('Snapshot error:', error);
     }
   );
 
-  return unsubscribe;
+  return unsubscribe; // Return cleanup function
 };
+
+// Usage in component
+useEffect(() => {
+  const unsubscribe = subscribeToTrains(stationId, setTrains);
+  return () => unsubscribe(); // Cleanup on unmount
+}, [stationId]);
 ```
 
-### 3. CRUD Operations with Error Handling
-
-```typescript
-import {
-  doc,
-  getDoc,
-  setDoc,
-  updateDoc,
-  deleteDoc,
-  serverTimestamp,
-} from 'firebase/firestore';
-import { db } from '@services/firebase/config';
-
-/**
- * Create or update station data
- */
-export const saveStation = async (
-  stationId: string,
-  data: Partial<Station>
-): Promise<void> => {
-  try {
-    const stationRef = doc(db, 'stations', stationId);
-
-    await setDoc(
-      stationRef,
-      {
-        ...data,
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true }
-    );
-  } catch (error) {
-    console.error('Error saving station:', error);
-    throw new Error('Failed to save station data');
-  }
-};
-
-/**
- * Get station data with fallback
- */
-export const getStation = async (
-  stationId: string
-): Promise<Station | null> => {
-  try {
-    const stationRef = doc(db, 'stations', stationId);
-    const snapshot = await getDoc(stationRef);
-
-    if (!snapshot.exists()) {
-      return null;
-    }
-
-    return {
-      id: snapshot.id,
-      ...snapshot.data(),
-    } as Station;
-  } catch (error) {
-    console.error('Error getting station:', error);
-    // Fallback to local cache
-    return null;
-  }
-};
-```
-
-### 4. Batch Operations
-
-```typescript
-import { writeBatch, doc } from 'firebase/firestore';
-import { db } from '@services/firebase/config';
-
-/**
- * Update multiple stations in a single transaction
- */
-export const updateMultipleStations = async (
-  updates: Array<{ id: string; data: Partial<Station> }>
-): Promise<void> => {
-  const batch = writeBatch(db);
-
-  updates.forEach(({ id, data }) => {
-    const stationRef = doc(db, 'stations', id);
-    batch.update(stationRef, {
-      ...data,
-      updatedAt: serverTimestamp(),
-    });
-  });
-
-  try {
-    await batch.commit();
-  } catch (error) {
-    console.error('Batch update failed:', error);
-    throw error;
-  }
-};
-```
-
-## Authentication Patterns
-
-### 1. Email/Password Authentication
-
-```typescript
-import {
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut,
-  onAuthStateChanged,
-} from 'firebase/auth';
-import { auth } from '@services/firebase/config';
-
-/**
- * Sign in with email and password
- */
-export const signIn = async (
-  email: string,
-  password: string
-): Promise<void> => {
-  try {
-    await signInWithEmailAndPassword(auth, email, password);
-  } catch (error) {
-    console.error('Sign in error:', error);
-    throw new Error('인증에 실패했습니다');
-  }
-};
-
-/**
- * Sign up new user
- */
-export const signUp = async (
-  email: string,
-  password: string
-): Promise<void> => {
-  try {
-    const userCredential = await createUserWithEmailAndPassword(
-      auth,
-      email,
-      password
-    );
-
-    // Create user profile in Firestore
-    await setDoc(doc(db, 'users', userCredential.user.uid), {
-      email,
-      createdAt: serverTimestamp(),
-      favoriteStations: [],
-    });
-  } catch (error) {
-    console.error('Sign up error:', error);
-    throw new Error('회원가입에 실패했습니다');
-  }
-};
-
-/**
- * Sign out current user
- */
-export const logOut = async (): Promise<void> => {
-  try {
-    await signOut(auth);
-  } catch (error) {
-    console.error('Sign out error:', error);
-    throw error;
-  }
-};
-
-/**
- * Listen to auth state changes
- */
-export const onAuthChange = (
-  callback: (user: User | null) => void
-): (() => void) => {
-  return onAuthStateChanged(auth, callback);
-};
-```
-
-## Cloud Functions Integration
-
-### 1. Callable Functions
-
-```typescript
-import { httpsCallable } from 'firebase/functions';
-import { functions } from '@services/firebase/config';
-
-/**
- * Call cloud function to get train predictions
- */
-export const getTrainPredictions = async (
-  stationId: string,
-  lineNumber: string
-): Promise<TrainPrediction[]> => {
-  try {
-    const predictTrains = httpsCallable(functions, 'predictTrains');
-    const result = await predictTrains({ stationId, lineNumber });
-
-    return result.data as TrainPrediction[];
-  } catch (error) {
-    console.error('Cloud function error:', error);
-    throw new Error('예측 정보를 가져오는데 실패했습니다');
-  }
-};
-```
-
-### 2. Background Functions (Server-side)
-
-```typescript
-// functions/src/index.ts (Cloud Functions code)
-import * as functions from 'firebase-functions';
-import * as admin from 'firebase-admin';
-
-admin.initializeApp();
-
-/**
- * Update train arrival data every 30 seconds
- */
-export const updateTrainArrivals = functions.pubsub
-  .schedule('every 30 seconds')
-  .onRun(async (context) => {
-    const db = admin.firestore();
-
-    // Fetch from Seoul API
-    const trains = await fetchFromSeoulAPI();
-
-    // Update Firestore
-    const batch = db.batch();
-    trains.forEach((train) => {
-      const ref = db
-        .collection('realtime-trains')
-        .doc(train.stationId)
-        .collection('arrivals')
-        .doc(train.id);
-
-      batch.set(ref, {
-        ...train,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
-    });
-
-    await batch.commit();
-    console.log(`Updated ${trains.length} train arrivals`);
-  });
-```
-
-## Offline Persistence
-
-```typescript
-import { enableIndexedDbPersistence } from 'firebase/firestore';
-import { db } from '@services/firebase/config';
-
-/**
- * Enable offline persistence
- */
-export const enableOfflineSupport = async (): Promise<void> => {
-  try {
-    await enableIndexedDbPersistence(db);
-    console.log('Offline persistence enabled');
-  } catch (error) {
-    if (error.code === 'failed-precondition') {
-      // Multiple tabs open
-      console.warn('Persistence failed: Multiple tabs open');
-    } else if (error.code === 'unimplemented') {
-      // Browser doesn't support persistence
-      console.warn('Persistence not supported');
-    }
-  }
-};
-```
-
-## Security Rules
-
-```javascript
-// firestore.rules
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // Stations - public read, admin write
-    match /stations/{stationId} {
-      allow read: if true;
-      allow write: if request.auth.token.admin == true;
-    }
-
-    // Real-time trains - public read, system write
-    match /realtime-trains/{stationId}/arrivals/{trainId} {
-      allow read: if true;
-      allow write: if request.auth != null;
-    }
-
-    // Users - authenticated users can read/write their own data
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-
-    // Notifications - users can read their own notifications
-    match /notifications/{notificationId} {
-      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow create: if request.auth != null;
-    }
-  }
-}
-```
-
-## Error Handling Best Practices
-
+### 5. Error Handling
 ```typescript
 import { FirebaseError } from 'firebase/app';
 
-/**
- * Handle Firebase errors with user-friendly messages
- */
-export const handleFirebaseError = (error: unknown): string => {
-  if (!(error instanceof FirebaseError)) {
-    return '알 수 없는 오류가 발생했습니다';
+const handleFirebaseError = (error: unknown): string => {
+  if (error instanceof FirebaseError) {
+    switch (error.code) {
+      case 'permission-denied':
+        return 'You do not have permission to access this data';
+      case 'unavailable':
+        return 'Firebase service is temporarily unavailable';
+      case 'unauthenticated':
+        return 'Please sign in to continue';
+      default:
+        return error.message;
+    }
   }
-
-  switch (error.code) {
-    case 'auth/user-not-found':
-      return '사용자를 찾을 수 없습니다';
-    case 'auth/wrong-password':
-      return '비밀번호가 올바르지 않습니다';
-    case 'auth/email-already-in-use':
-      return '이미 사용 중인 이메일입니다';
-    case 'permission-denied':
-      return '접근 권한이 없습니다';
-    case 'unavailable':
-      return '네트워크 연결을 확인해주세요';
-    default:
-      console.error('Firebase error:', error.code, error.message);
-      return '작업을 완료할 수 없습니다';
-  }
+  return 'An unexpected error occurred';
 };
 ```
 
-## Performance Optimization
+## Service Layer Pattern
 
-### 1. Limit Query Results
+### trainService.ts Example
 ```typescript
-import { query, limit, orderBy } from 'firebase/firestore';
+class TrainService {
+  private static instance: TrainService;
 
-const q = query(
-  collection(db, 'realtime-trains'),
-  orderBy('arrivalTime'),
-  limit(20)
-);
-```
-
-### 2. Use Composite Indexes
-```javascript
-// firestore.indexes.json
-{
-  "indexes": [
-    {
-      "collectionGroup": "arrivals",
-      "queryScope": "COLLECTION",
-      "fields": [
-        { "fieldPath": "lineNumber", "order": "ASCENDING" },
-        { "fieldPath": "arrivalTime", "order": "ASCENDING" }
-      ]
+  static getInstance(): TrainService {
+    if (!TrainService.instance) {
+      TrainService.instance = new TrainService();
     }
-  ]
+    return TrainService.instance;
+  }
+
+  async getTrainsByStation(stationId: string): Promise<Train[]> {
+    // Implementation
+  }
+
+  subscribeToTrainUpdates(
+    stationId: string,
+    callback: (trains: Train[]) => void
+  ): () => void {
+    // Implementation with cleanup
+  }
 }
+
+export const trainService = TrainService.getInstance();
 ```
 
-### 3. Cache Strategy
+## Data Caching Strategy
+
+### Multi-tier fallback
 ```typescript
-import { getDocFromCache, getDocFromServer } from 'firebase/firestore';
+/**
+ * Priority: Seoul API → Firebase → Local Cache
+ */
+const getTrainData = async (stationId: string): Promise<Train[]> => {
+  try {
+    // 1. Try Seoul API (primary source)
+    const apiData = await seoulApi.getArrivals(stationId);
+    if (apiData.length > 0) {
+      await cacheData(stationId, apiData);
+      return apiData;
+    }
+  } catch (error) {
+    console.log('Seoul API failed, trying Firebase');
+  }
 
-const docRef = doc(db, 'stations', stationId);
+  try {
+    // 2. Fallback to Firebase
+    const fbData = await trainService.getTrainsByStation(stationId);
+    if (fbData.length > 0) {
+      return fbData;
+    }
+  } catch (error) {
+    console.log('Firebase failed, using cache');
+  }
 
-try {
-  // Try cache first
-  const snapshot = await getDocFromCache(docRef);
-  return snapshot.data();
-} catch {
-  // Fallback to server
-  const snapshot = await getDocFromServer(docRef);
-  return snapshot.data();
+  // 3. Last resort: Local cache
+  return await getCachedData(stationId);
+};
+```
+
+## Security Rules Considerations
+
+### Firestore Rules Pattern
+```
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Public read for subway data
+    match /stations/{stationId} {
+      allow read: if true;
+      allow write: if false; // Only through admin
+    }
+
+    // User-specific data
+    match /users/{userId} {
+      allow read, write: if request.auth.uid == userId;
+    }
+  }
 }
 ```
 
-## Testing with Firebase Emulators
+## Best Practices
 
+### 1. Subscription Cleanup
+Always clean up Firebase subscriptions to prevent memory leaks:
 ```typescript
-import { connectFirestoreEmulator } from 'firebase/firestore';
-import { connectAuthEmulator } from 'firebase/auth';
-
-if (__DEV__) {
-  connectFirestoreEmulator(db, 'localhost', 8080);
-  connectAuthEmulator(auth, 'http://localhost:9099');
-}
+useEffect(() => {
+  const unsubscribe = subscribeToData(callback);
+  return () => unsubscribe();
+}, [dependencies]);
 ```
 
-## Remember
+### 2. Batch Operations
+For multiple writes, use batch operations:
+```typescript
+import { writeBatch } from 'firebase/firestore';
 
-- ✅ Always use serverTimestamp() for timestamps
-- ✅ Implement proper error handling with user-friendly messages
-- ✅ Use batch operations for multiple writes
-- ✅ Enable offline persistence for better UX
-- ✅ Set up security rules properly
-- ✅ Use composite indexes for complex queries
-- ✅ Unsubscribe from real-time listeners when component unmounts
-- ✅ Test with Firebase Emulators in development
+const batch = writeBatch(firestore);
+batch.set(docRef1, data1);
+batch.update(docRef2, data2);
+await batch.commit();
+```
 
-## Additional Resources
+### 3. Offline Persistence
+Handle offline scenarios gracefully:
+```typescript
+import { enableNetwork, disableNetwork } from 'firebase/firestore';
 
-- [Firebase Documentation](https://firebase.google.com/docs)
-- [Firestore Data Modeling](https://firebase.google.com/docs/firestore/data-model)
-- [Security Rules Guide](https://firebase.google.com/docs/rules)
+// Firestore automatically caches data for offline use
+// Monitor connectivity and inform users
+```
+
+## Common Pitfalls to Avoid
+- ❌ Not cleaning up subscriptions (memory leaks)
+- ❌ Querying without indexes (slow performance)
+- ❌ Exposing Firebase config in client code (security)
+- ❌ Not handling permission errors
+- ❌ Over-fetching data (use limit and pagination)
+
+## Testing
+- Mock Firebase services in tests
+- Test offline scenarios
+- Verify subscription cleanup
+- Test error handling paths

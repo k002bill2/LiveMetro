@@ -1,524 +1,439 @@
 ---
 name: location-services
-description: GPS tracking, geofencing, and nearby station detection for LiveMetro. Use when implementing location-based features.
+description: Location services, GPS tracking, and geolocation features using Expo Location. Use when implementing location-based functionality like finding nearby stations.
 ---
 
 # Location Services Guidelines
 
-## Architecture
+## When to Use This Skill
+- Requesting location permissions
+- Getting user's current position
+- Finding nearby subway stations
+- Calculating distances between coordinates
+- Implementing location-based features
 
-LiveMetro uses Expo Location API with battery-optimized tracking:
+## Core Setup
 
+### 1. Installation
+```bash
+npx expo install expo-location
 ```
-GPS Hardware → Expo Location → LocationService → React Components
-                                     ↓
-                               Geofencing Logic
-                               Nearby Stations
-```
 
-## Core Service (src/services/location/locationService.ts)
-
-### 1. Service Initialization
-
-```typescript
-import * as Location from 'expo-location';
-
-class LocationService {
-  private static instance: LocationService;
-  private locationSubscription: Location.LocationSubscription | null = null;
-  private isTracking: boolean = false;
-
-  private constructor() {}
-
-  static getInstance(): LocationService {
-    if (!LocationService.instance) {
-      LocationService.instance = new LocationService();
+### 2. Configuration (app.json)
+```json
+{
+  "expo": {
+    "ios": {
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "LiveMetro needs your location to find nearby subway stations and provide arrival notifications."
+      }
+    },
+    "android": {
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION"
+      ]
     }
-    return LocationService.instance;
   }
+}
+```
 
-  /**
-   * Initialize location services and request permissions
-   */
-  async initialize(): Promise<boolean> {
+## Permission Handling
+
+### useLocation Hook Pattern
+```typescript
+import { useState, useEffect } from 'react';
+import * as Location from 'expo-location';
+import type { LocationObject } from 'expo-location';
+
+interface UseLocationReturn {
+  location: LocationObject | null;
+  loading: boolean;
+  error: string | null;
+  requestPermission: () => Promise<boolean>;
+  refreshLocation: () => Promise<void>;
+}
+
+export const useLocation = (): UseLocationReturn => {
+  const [location, setLocation] = useState<LocationObject | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const requestPermission = async (): Promise<boolean> => {
     try {
-      // Request foreground permissions
       const { status } = await Location.requestForegroundPermissionsAsync();
 
       if (status !== 'granted') {
-        console.warn('Location permission denied');
-        return false;
-      }
-
-      // Check if location services are enabled
-      const enabled = await Location.hasServicesEnabledAsync();
-      if (!enabled) {
-        console.warn('Location services disabled');
+        setError('Location permission denied');
         return false;
       }
 
       return true;
-    } catch (error) {
-      console.error('Location initialization error:', error);
+    } catch (err) {
+      setError('Failed to request location permission');
       return false;
     }
-  }
+  };
 
-  /**
-   * Get current position once
-   */
-  async getCurrentPosition(): Promise<Location.LocationObject | null> {
+  const getCurrentLocation = async (): Promise<void> => {
     try {
-      const location = await Location.getCurrentPositionAsync({
+      setLoading(true);
+      setError(null);
+
+      const hasPermission = await requestPermission();
+      if (!hasPermission) {
+        setLoading(false);
+        return;
+      }
+
+      const currentLocation = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.Balanced,
       });
 
-      return location;
-    } catch (error) {
-      console.error('Error getting current position:', error);
-      return null;
-    }
-  }
-}
-
-export const locationService = LocationService.getInstance();
-```
-
-### 2. Real-time Location Tracking
-
-```typescript
-/**
- * Start continuous location tracking
- * Battery-optimized with configurable accuracy
- */
-async startLocationTracking(
-  callback: (location: Location.LocationObject) => void,
-  options: {
-    accuracy?: Location.Accuracy;
-    distanceInterval?: number;
-    timeInterval?: number;
-  } = {}
-): Promise<boolean> {
-  if (this.isTracking) {
-    console.warn('Already tracking location');
-    return true;
-  }
-
-  try {
-    this.locationSubscription = await Location.watchPositionAsync(
-      {
-        accuracy: options.accuracy || Location.Accuracy.Balanced,
-        distanceInterval: options.distanceInterval || 100, // meters
-        timeInterval: options.timeInterval || 10000, // milliseconds
-      },
-      (location) => {
-        callback(location);
-      }
-    );
-
-    this.isTracking = true;
-    return true;
-  } catch (error) {
-    console.error('Error starting location tracking:', error);
-    return false;
-  }
-}
-
-/**
- * Stop location tracking to save battery
- */
-stopLocationTracking(): void {
-  if (this.locationSubscription) {
-    this.locationSubscription.remove();
-    this.locationSubscription = null;
-    this.isTracking = false;
-  }
-}
-
-/**
- * Check if currently tracking
- */
-isCurrentlyTracking(): boolean {
-  return this.isTracking;
-}
-```
-
-### 3. Geofencing for Station Proximity
-
-```typescript
-/**
- * Station geofence configuration
- */
-interface StationGeofence {
-  stationId: string;
-  latitude: number;
-  longitude: number;
-  radius: number; // meters
-}
-
-private activeGeofences: Map<string, StationGeofence> = new Map();
-
-/**
- * Add geofence for a station
- */
-addStationGeofence(geofence: StationGeofence): void {
-  this.activeGeofences.set(geofence.stationId, geofence);
-}
-
-/**
- * Remove geofence for a station
- */
-removeStationGeofence(stationId: string): void {
-  this.activeGeofences.delete(stationId);
-}
-
-/**
- * Check if location is within any geofence
- */
-checkGeofences(
-  location: Location.LocationObject,
-  onEnter: (stationId: string) => void,
-  onExit: (stationId: string) => void
-): void {
-  this.activeGeofences.forEach((geofence, stationId) => {
-    const distance = this.calculateDistance(
-      location.coords.latitude,
-      location.coords.longitude,
-      geofence.latitude,
-      geofence.longitude
-    );
-
-    if (distance <= geofence.radius) {
-      onEnter(stationId);
-    } else {
-      onExit(stationId);
-    }
-  });
-}
-
-/**
- * Calculate distance between two coordinates (Haversine formula)
- */
-private calculateDistance(
-  lat1: number,
-  lon1: number,
-  lat2: number,
-  lon2: number
-): number {
-  const R = 6371e3; // Earth radius in meters
-  const φ1 = (lat1 * Math.PI) / 180;
-  const φ2 = (lat2 * Math.PI) / 180;
-  const Δφ = ((lat2 - lat1) * Math.PI) / 180;
-  const Δλ = ((lon2 - lon1) * Math.PI) / 180;
-
-  const a =
-    Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-    Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-  return R * c; // Distance in meters
-}
-```
-
-## Custom Hook Pattern (src/hooks/useLocation.ts)
-
-```typescript
-import { useState, useEffect } from 'react';
-import * as Location from 'expo-location';
-import { locationService } from '@services/location/locationService';
-
-interface UseLocationReturn {
-  location: Location.LocationObject | null;
-  error: string | null;
-  loading: boolean;
-  refreshLocation: () => Promise<void>;
-}
-
-/**
- * Hook for accessing current location
- */
-export const useLocation = (): UseLocationReturn => {
-  const [location, setLocation] = useState<Location.LocationObject | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  const fetchLocation = async () => {
-    setLoading(true);
-    setError(null);
-
-    const initialized = await locationService.initialize();
-    if (!initialized) {
-      setError('위치 권한이 필요합니다');
-      setLoading(false);
-      return;
-    }
-
-    const currentLocation = await locationService.getCurrentPosition();
-    if (currentLocation) {
       setLocation(currentLocation);
-    } else {
-      setError('위치를 가져올 수 없습니다');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to get location');
+    } finally {
+      setLoading(false);
     }
-
-    setLoading(false);
   };
 
   useEffect(() => {
-    fetchLocation();
+    getCurrentLocation();
   }, []);
 
   return {
     location,
-    error,
     loading,
-    refreshLocation: fetchLocation,
+    error,
+    requestPermission,
+    refreshLocation: getCurrentLocation,
   };
 };
 ```
 
-## Nearby Stations Hook (src/hooks/useNearbyStations.ts)
+## Permission States
 
+### Handling All Permission States
 ```typescript
-import { useState, useEffect, useMemo } from 'react';
 import * as Location from 'expo-location';
-import { locationService } from '@services/location/locationService';
-import type { Station } from '@models/train';
 
-interface UseNearbyStationsOptions {
-  radius?: number; // Search radius in meters
-  maxResults?: number;
+const checkLocationPermission = async (): Promise<{
+  granted: boolean;
+  canAskAgain: boolean;
+}> => {
+  const { status, canAskAgain } = await Location.getForegroundPermissionsAsync();
+
+  switch (status) {
+    case 'granted':
+      return { granted: true, canAskAgain: true };
+
+    case 'denied':
+      // User denied but can ask again
+      return { granted: false, canAskAgain };
+
+    case 'undetermined':
+      // Never asked before
+      return { granted: false, canAskAgain: true };
+
+    default:
+      return { granted: false, canAskAgain: false };
+  }
+};
+
+// UI Component
+const LocationPermissionPrompt: React.FC = () => {
+  const [permissionStatus, setPermissionStatus] = useState<string>('');
+
+  const handleRequest = async () => {
+    const { granted, canAskAgain } = await checkLocationPermission();
+
+    if (granted) {
+      // Proceed with location features
+    } else if (!canAskAgain) {
+      // Show instructions to enable in settings
+      Alert.alert(
+        'Location Permission Required',
+        'Please enable location access in Settings to use this feature.',
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Open Settings', onPress: () => Linking.openSettings() }
+        ]
+      );
+    }
+  };
+
+  // Render permission prompt UI
+};
+```
+
+## Geolocation Features
+
+### 1. Finding Nearby Stations
+```typescript
+import { getDistance } from 'geolib';
+
+interface Station {
+  id: string;
+  name: string;
+  coordinates: {
+    latitude: number;
+    longitude: number;
+  };
 }
 
-/**
- * Hook for finding nearby subway stations
- */
-export const useNearbyStations = (
-  location: Location.LocationObject | null,
-  options: UseNearbyStationsOptions = {}
+const findNearbyStations = (
+  userLocation: { latitude: number; longitude: number },
+  stations: Station[],
+  maxDistance = 1000 // meters
 ): Station[] => {
-  const { radius = 1000, maxResults = 10 } = options;
-  const [allStations, setAllStations] = useState<Station[]>([]);
+  return stations
+    .map(station => ({
+      ...station,
+      distance: getDistance(
+        {
+          latitude: userLocation.latitude,
+          longitude: userLocation.longitude,
+        },
+        {
+          latitude: station.coordinates.latitude,
+          longitude: station.coordinates.longitude,
+        }
+      ),
+    }))
+    .filter(station => station.distance <= maxDistance)
+    .sort((a, b) => a.distance - b.distance);
+};
+```
+
+### 2. useNearbyStations Hook
+```typescript
+export const useNearbyStations = (maxDistance = 1000) => {
+  const { location } = useLocation();
+  const [nearbyStations, setNearbyStations] = useState<Station[]>([]);
 
   useEffect(() => {
-    // Load all stations from Firebase/AsyncStorage
-    loadStations().then(setAllStations);
-  }, []);
+    if (!location) return;
 
-  const nearbyStations = useMemo(() => {
-    if (!location || allStations.length === 0) {
-      return [];
-    }
+    const fetchNearbyStations = async () => {
+      // Fetch all stations (from Firebase or cache)
+      const allStations = await stationService.getAllStations();
 
-    const { latitude, longitude } = location.coords;
+      const nearby = findNearbyStations(
+        location.coords,
+        allStations,
+        maxDistance
+      );
 
-    // Calculate distance for each station
-    const stationsWithDistance = allStations.map((station) => ({
-      ...station,
-      distance: locationService.calculateDistance(
-        latitude,
-        longitude,
-        station.latitude,
-        station.longitude
-      ),
-    }));
+      setNearbyStations(nearby);
+    };
 
-    // Filter by radius and sort by distance
-    return stationsWithDistance
-      .filter((station) => station.distance <= radius)
-      .sort((a, b) => a.distance - b.distance)
-      .slice(0, maxResults);
-  }, [location, allStations, radius, maxResults]);
+    fetchNearbyStations();
+  }, [location, maxDistance]);
 
   return nearbyStations;
 };
 ```
 
-## Permission Handling
-
+### 3. Distance Formatting
 ```typescript
-/**
- * Request location permissions with user-friendly messaging
- */
-export const requestLocationPermissions = async (): Promise<{
-  granted: boolean;
-  message?: string;
-}> => {
-  try {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-
-    switch (status) {
-      case 'granted':
-        return { granted: true };
-
-      case 'denied':
-        return {
-          granted: false,
-          message: '위치 권한이 거부되었습니다. 설정에서 권한을 허용해주세요.',
-        };
-
-      default:
-        return {
-          granted: false,
-          message: '위치 권한을 확인할 수 없습니다.',
-        };
-    }
-  } catch (error) {
-    console.error('Permission request error:', error);
-    return {
-      granted: false,
-      message: '권한 요청 중 오류가 발생했습니다.',
-    };
+const formatDistance = (meters: number): string => {
+  if (meters < 1000) {
+    return `${Math.round(meters)}m`;
   }
-};
-
-/**
- * Request background location permissions (iOS only)
- */
-export const requestBackgroundPermissions = async (): Promise<boolean> => {
-  try {
-    const { status } = await Location.requestBackgroundPermissionsAsync();
-    return status === 'granted';
-  } catch (error) {
-    console.error('Background permission error:', error);
-    return false;
-  }
+  return `${(meters / 1000).toFixed(1)}km`;
 };
 ```
 
-## Battery Optimization
+## Background Location (Optional)
 
-### 1. Adaptive Accuracy
-
+### Background Tracking Setup
 ```typescript
-/**
- * Choose accuracy based on app state and battery level
- */
-const getOptimalAccuracy = (
-  appState: string,
-  batteryLevel: number
-): Location.Accuracy => {
-  // High precision when app is active and battery is good
-  if (appState === 'active' && batteryLevel > 0.5) {
-    return Location.Accuracy.High;
-  }
+import * as TaskManager from 'expo-task-manager';
 
-  // Balanced for normal use
-  if (batteryLevel > 0.2) {
-    return Location.Accuracy.Balanced;
-  }
+const LOCATION_TASK_NAME = 'background-location-task';
 
-  // Low power mode
-  return Location.Accuracy.Low;
-};
-```
-
-### 2. Intelligent Tracking Intervals
-
-```typescript
-/**
- * Adjust tracking intervals based on user activity
- */
-const getTrackingInterval = (
-  userMoving: boolean,
-  nearStation: boolean
-): number => {
-  // Frequent updates when near station and moving
-  if (nearStation && userMoving) {
-    return 5000; // 5 seconds
-  }
-
-  // Moderate updates when moving
-  if (userMoving) {
-    return 15000; // 15 seconds
-  }
-
-  // Infrequent updates when stationary
-  return 60000; // 1 minute
-};
-```
-
-## Location Component Pattern
-
-```tsx
-import React, { useEffect, useState } from 'react';
-import { View, Text, Button } from 'react-native';
-import { useLocation } from '@hooks/useLocation';
-import { useNearbyStations } from '@hooks/useNearbyStations';
-
-export const NearbyStationsScreen: React.FC = () => {
-  const { location, error, loading, refreshLocation } = useLocation();
-  const nearbyStations = useNearbyStations(location, { radius: 500 });
-
-  if (loading) {
-    return <Text>위치 정보를 가져오는 중...</Text>;
-  }
-
+// Define background task
+TaskManager.defineTask(LOCATION_TASK_NAME, ({ data, error }) => {
   if (error) {
-    return (
-      <View>
-        <Text>{error}</Text>
-        <Button title="다시 시도" onPress={refreshLocation} />
-      </View>
-    );
+    console.error('Background location error:', error);
+    return;
   }
 
-  return (
-    <View>
-      <Text>주변 역 {nearbyStations.length}개</Text>
-      {nearbyStations.map((station) => (
-        <Text key={station.id}>
-          {station.name} ({Math.round(station.distance)}m)
-        </Text>
-      ))}
-    </View>
-  );
+  if (data) {
+    const { locations } = data as any;
+    console.log('Background location update:', locations);
+    // Handle location update
+  }
+});
+
+// Start background location updates
+const startBackgroundLocation = async () => {
+  const { granted } = await Location.requestBackgroundPermissionsAsync();
+
+  if (!granted) {
+    console.log('Background location permission denied');
+    return;
+  }
+
+  await Location.startLocationUpdatesAsync(LOCATION_TASK_NAME, {
+    accuracy: Location.Accuracy.Balanced,
+    timeInterval: 60000, // 1 minute
+    distanceInterval: 100, // 100 meters
+  });
+};
+
+// Stop background updates
+const stopBackgroundLocation = async () => {
+  await Location.stopLocationUpdatesAsync(LOCATION_TASK_NAME);
 };
 ```
 
-## Testing Location Services
+## Error Handling
 
+### Common Location Errors
 ```typescript
-import { locationService } from '@services/location/locationService';
+const handleLocationError = (error: unknown): string => {
+  if (error instanceof Error) {
+    if (error.message.includes('permission')) {
+      return 'Location permission is required';
+    }
+    if (error.message.includes('timeout')) {
+      return 'Location request timed out. Please try again.';
+    }
+    if (error.message.includes('unavailable')) {
+      return 'Location services are unavailable';
+    }
+  }
+  return 'Failed to get location';
+};
+```
 
-// Mock location for testing
-jest.mock('expo-location', () => ({
-  requestForegroundPermissionsAsync: jest.fn(() =>
-    Promise.resolve({ status: 'granted' })
-  ),
-  getCurrentPositionAsync: jest.fn(() =>
-    Promise.resolve({
-      coords: {
-        latitude: 37.5665,
-        longitude: 126.9780,
-      },
-    })
-  ),
-}));
+## Performance Optimization
 
-describe('LocationService', () => {
-  it('should get current position', async () => {
-    const location = await locationService.getCurrentPosition();
-    expect(location).toBeTruthy();
-    expect(location?.coords.latitude).toBe(37.5665);
-  });
+### Accuracy Levels
+```typescript
+// Choose appropriate accuracy for use case
+const accuracyLevels = {
+  // Battery-friendly, ~3000m accuracy
+  lowest: Location.Accuracy.Lowest,
+
+  // Good for nearby stations, ~1000m accuracy
+  low: Location.Accuracy.Low,
+
+  // Balanced option, ~100m accuracy
+  balanced: Location.Accuracy.Balanced,
+
+  // High accuracy, ~10m
+  high: Location.Accuracy.High,
+
+  // Best accuracy, uses GPS
+  highest: Location.Accuracy.Highest,
+};
+
+// Example: Use balanced for nearby stations
+const location = await Location.getCurrentPositionAsync({
+  accuracy: Location.Accuracy.Balanced,
 });
 ```
 
-## Remember
+### Caching Location
+```typescript
+let cachedLocation: LocationObject | null = null;
+let lastFetchTime = 0;
+const CACHE_DURATION = 60000; // 1 minute
 
-- ✅ Always request permissions before accessing location
-- ✅ Use appropriate accuracy levels to save battery
-- ✅ Stop tracking when not needed
-- ✅ Handle permission denied gracefully
-- ✅ Implement geofencing for nearby station notifications
-- ✅ Use Haversine formula for distance calculations
-- ✅ Consider battery level when choosing accuracy
-- ✅ Test with mock locations
-- ✅ Provide clear user messaging for permission requests
+const getCachedLocation = async (): Promise<LocationObject> => {
+  const now = Date.now();
 
-## Additional Resources
+  if (cachedLocation && now - lastFetchTime < CACHE_DURATION) {
+    return cachedLocation;
+  }
 
-- [Expo Location Documentation](https://docs.expo.dev/versions/latest/sdk/location/)
-- [iOS Location Permissions](https://developer.apple.com/documentation/corelocation/requesting_authorization_to_use_location_services)
-- [Android Location Permissions](https://developer.android.com/training/location/permissions)
+  const location = await Location.getCurrentPositionAsync({
+    accuracy: Location.Accuracy.Balanced,
+  });
+
+  cachedLocation = location;
+  lastFetchTime = now;
+
+  return location;
+};
+```
+
+## Testing
+
+### Mock Location Data
+```typescript
+// __tests__/useLocation.test.ts
+const mockLocation: LocationObject = {
+  coords: {
+    latitude: 37.4979,
+    longitude: 127.0276,
+    altitude: null,
+    accuracy: 100,
+    altitudeAccuracy: null,
+    heading: null,
+    speed: null,
+  },
+  timestamp: Date.now(),
+};
+
+jest.mock('expo-location', () => ({
+  requestForegroundPermissionsAsync: jest.fn().mockResolvedValue({
+    status: 'granted',
+  }),
+  getCurrentPositionAsync: jest.fn().mockResolvedValue(mockLocation),
+}));
+```
+
+## Best Practices
+
+### 1. Request Permission at Right Time
+```tsx
+// ❌ Bad: Request on app launch
+useEffect(() => {
+  requestLocationPermission();
+}, []);
+
+// ✅ Good: Request when user needs feature
+const handleFindNearby = async () => {
+  const hasPermission = await requestLocationPermission();
+  if (hasPermission) {
+    // Proceed with location feature
+  }
+};
+```
+
+### 2. Provide Clear Messaging
+```tsx
+<View>
+  <Text>
+    We need your location to find nearby subway stations and provide
+    personalized arrival notifications.
+  </Text>
+  <Button title="Enable Location" onPress={requestPermission} />
+</View>
+```
+
+### 3. Handle Offline Gracefully
+```typescript
+const getLocationSafely = async (): Promise<LocationObject | null> => {
+  try {
+    return await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+    });
+  } catch (error) {
+    // Return last known location or null
+    return cachedLocation;
+  }
+};
+```
+
+## Important Notes
+- Always explain WHY you need location permission
+- Request permission when user needs the feature, not on app start
+- Handle permission denial gracefully
+- Use appropriate accuracy level to save battery
+- Cache location data when appropriate
+- Test on both iOS and Android (permission flows differ)
