@@ -17,11 +17,18 @@ This directory contains the complete Claude Code configuration for LiveMetro, in
 │   ├── location-services/              # GPS and geolocation
 │   ├── notification-system/            # Push notifications
 │   ├── test-automation/                # 🆕 Test generation and coverage
-│   └── subway-data-processor/          # 🆕 Seoul subway data parsing
+│   ├── subway-data-processor/          # 🆕 Seoul subway data parsing
+│   ├── hook-creator/                   # 🆕 Claude Code hook creation
+│   ├── slash-command-creator/          # 🆕 Custom command creation
+│   ├── skill-creator/                  # 🆕 Skill development guide
+│   ├── subagent-creator/               # 🆕 Sub-agent creation
+│   ├── youtube-collector/              # 🆕 YouTube content collection
+│   └── cc-feature-implementer-main/    # Feature planning system
 ├── agents/                             # Sub-agents
 │   ├── mobile-ui-specialist.md         # React Native UI/UX expert
 │   ├── backend-integration-specialist.md # Firebase/API integration
-│   └── performance-optimizer.md        # 🆕 Performance optimization
+│   ├── performance-optimizer.md        # 🆕 Performance optimization
+│   └── brand-logo-finder.md            # 🆕 Brand logo finder
 ├── commands/                           # Custom commands
 │   ├── test-coverage.md                # 🆕 Coverage analysis
 │   └── check-health.md                 # 🆕 Project health check
@@ -109,6 +116,68 @@ Claude Code is Anthropic's AI-powered development assistant that helps with codi
   - Service disruption detection
   - Multi-tier caching (Seoul API → Firebase → Cache)
 
+### Claude Code Development Tools (Meta-Skills)
+
+#### 8. **hook-creator** 🆕
+- **Purpose**: Create and configure Claude Code hooks for customizing agent behavior
+- **Use When**: Setting up automatic formatting, logging, notifications, or custom permissions
+- **Key Features**:
+  - PreToolUse/PostToolUse event hooks
+  - Shell command integration
+  - File protection patterns
+  - Auto-formatting on save
+  - Block edits to sensitive files
+
+#### 9. **slash-command-creator** 🆕
+- **Purpose**: Create custom slash commands for frequently-used prompts
+- **Use When**: Creating new commands, configuring frontmatter, or automating workflows
+- **Key Features**:
+  - Command initialization scripts
+  - Argument substitution ($ARGUMENTS, $1, $2)
+  - Bash execution support (!`command`)
+  - File reference inclusion (@file.js)
+  - Project vs personal scope
+
+#### 10. **skill-creator** 🆕
+- **Purpose**: Comprehensive guide for creating effective Claude Code skills
+- **Use When**: Building new skills or updating existing ones
+- **Key Features**:
+  - Skill design principles (progressive disclosure)
+  - Scripts, references, and assets organization
+  - SKILL.md frontmatter configuration
+  - Validation and packaging workflows
+  - Best practices and patterns
+
+#### 11. **subagent-creator** 🆕
+- **Purpose**: Create specialized AI sub-agents with custom prompts and tool access
+- **Use When**: Creating task-specific agents, custom assistants, or automated workflows
+- **Key Features**:
+  - Frontmatter configuration (tools, model, permissions)
+  - System prompt design guidelines
+  - Auto-delegation setup ("use proactively")
+  - Tool selection patterns
+  - Agent templates and examples
+
+#### 12. **youtube-collector** 🆕
+- **Purpose**: Register YouTube channels and collect/summarize new content
+- **Use When**: Managing YouTube channel subscriptions and generating transcript-based summaries
+- **Key Features**:
+  - Channel registration (handle, URL, or ID)
+  - Automated video collection
+  - Transcript extraction (youtube-transcript-api)
+  - AI-powered summarization
+  - YAML data storage (.reference/)
+- **Requirements**: YouTube Data API key, Python packages
+
+#### 13. **cc-feature-implementer-main** ✅
+- **Purpose**: Phase-based feature planning with quality gates
+- **Use When**: Planning complex features, breaking down tasks, or creating roadmaps
+- **Key Features**:
+  - Incremental delivery structure
+  - Quality gate checkpoints
+  - Phase-based organization
+  - Strategic planning guidance
+
 ---
 
 ## 🤖 Sub-agents
@@ -135,6 +204,17 @@ Claude Code is Anthropic's AI-powered development assistant that helps with codi
   - Optimizing FlatList performance
   - Bundle size reduction
   - 60 FPS optimization
+
+### 4. **brand-logo-finder** 🆕
+- **Model**: Haiku (fast & efficient)
+- **Tools**: WebFetch, WebSearch
+- **Expertise**: Finding brand logos and assets using Brandfetch
+- **Use For**:
+  - Retrieving brand logos for UI design
+  - Finding official brand assets
+  - Accessing brand color palettes
+  - Discovering logo formats (SVG, PNG)
+  - Brand identity information
 
 ---
 
@@ -467,8 +547,8 @@ Controls permissions and hooks:
 
 ## 📝 Current Configuration Summary
 
-**Total Skills**: 7 (5 core + 2 advanced)
-**Total Agents**: 3 (2 specialists + 1 optimizer)
+**Total Skills**: 13 (5 core + 2 advanced + 6 meta-skills)
+**Total Agents**: 4 (2 specialists + 1 optimizer + 1 logo finder)
 **Total Commands**: 2 (health + coverage)
 **MCP Servers**: 7 (6 enabled + 1 optional)
 
@@ -589,7 +669,7 @@ See: [docs/CLAUDE_BACKUP_GUIDE.md](../docs/CLAUDE_BACKUP_GUIDE.md)
 
 ---
 
-**Last Updated**: 2025-12-29
-**Configuration Version**: 2.1
+**Last Updated**: 2025-12-31
+**Configuration Version**: 2.2
 **Claude Code Version**: v2.0.80+
 **Backup System**: Enabled ✅
