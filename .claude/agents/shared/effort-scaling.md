@@ -1,3 +1,8 @@
+---
+name: effort-scaling
+description: Guide for determining appropriate agent resource allocation based on task complexity
+---
+
 # Effort Scaling Guide
 
 Determine appropriate resource allocation before spawning agents.

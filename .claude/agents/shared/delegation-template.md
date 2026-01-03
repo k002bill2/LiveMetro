@@ -1,3 +1,8 @@
+---
+name: delegation-template
+description: Structured template for delegating tasks to subagents with clear boundaries
+---
+
 # Task Delegation Template
 
 Structured format for delegating tasks to subagents to prevent duplicated work and gaps.

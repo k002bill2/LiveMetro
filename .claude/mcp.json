@@ -1,5 +1,9 @@
 {
   "mcpServers": {
+    "claude-in-chrome": {
+      "disabled": true,
+      "_note": "Disabled to save ~14K tokens. Enable when needed for Chrome automation."
+    },
     "codex-cli": {
       "command": "npx",
       "args": ["-y", "codex-mcp-server"],
@@ -16,7 +20,8 @@
       "env": {
         "TWENTYFIRST_API_KEY": "${TWENTYFIRST_API_KEY}"
       },
-      "disabled": false
+      "disabled": true,
+      "_note": "Disabled to save ~3.4K tokens. Enable when working with 21st.dev UI components."
     },
     "tavily": {
       "command": "npx",
@@ -29,7 +34,8 @@
     "playwright": {
       "command": "npx",
       "args": ["-y", "@playwright/mcp@latest"],
-      "disabled": false
+      "disabled": true,
+      "_note": "Disabled to save ~14K tokens. Enable when needed for browser automation."
     },
     "shadcn": {
       "command": "npx",

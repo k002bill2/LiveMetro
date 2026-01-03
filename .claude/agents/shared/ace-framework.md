@@ -1,3 +1,8 @@
+---
+name: ace-framework
+description: Shared parallel execution protocol for all specialist agents
+---
+
 # ACE Framework - Parallel Execution Mode
 
 This document defines the shared parallel execution protocol for all specialist agents in LiveMetro.
