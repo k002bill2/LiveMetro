@@ -38,7 +38,7 @@ interface StationCompareResult {
 }
 
 // Load environment variables
-const API_KEY = process.env.SEOUL_SUBWAY_API_KEY || '';
+const API_KEY = process.env.EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY || '';
 const BASE_URL = 'http://openAPI.seoul.go.kr:8088';
 
 /**
@@ -46,7 +46,7 @@ const BASE_URL = 'http://openAPI.seoul.go.kr:8088';
  */
 async function fetchStationsFromApi(): Promise<SeoulApiStationInfo[]> {
   if (!API_KEY) {
-    console.log('⚠️  SEOUL_SUBWAY_API_KEY not set. Using mock data for demonstration.');
+    console.log('⚠️  EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY not set. Using mock data for demonstration.');
     return [];
   }
 
@@ -136,8 +136,8 @@ async function main(): Promise<void> {
 
   if (apiStations.length === 0) {
     console.log('📋 Local station count:', Object.keys(localStations).length);
-    console.log('\nTo enable API comparison, set SEOUL_SUBWAY_API_KEY environment variable.');
-    console.log('Example: SEOUL_SUBWAY_API_KEY=your_key npx ts-node scripts/fetchStationData.ts');
+    console.log('\nTo enable API comparison, set EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY environment variable.');
+    console.log('Example: EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY=your_key npx ts-node scripts/fetchStationData.ts');
     return;
   }
 

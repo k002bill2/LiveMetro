@@ -1,0 +1,21 @@
+{
+  "validUser": {
+    "email": "test@livemetro.app",
+    "password": "TestPassword123!",
+    "displayName": "Test User"
+  },
+  "invalidUser": {
+    "email": "invalid@test.com",
+    "password": "wrongpassword"
+  },
+  "newUser": {
+    "email": "newuser@livemetro.app",
+    "password": "NewPassword123!",
+    "displayName": "New Test User"
+  },
+  "adminUser": {
+    "email": "admin@livemetro.app",
+    "password": "AdminPassword123!",
+    "displayName": "Admin User"
+  }
+}

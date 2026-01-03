@@ -1571,7 +1571,7 @@
     "name": "부천시청",
     "x": 1120,
     "y": 1847,
-    "lines": []
+    "lines": ["7"]
   },
   "s_eab888ec": {
     "id": "s_eab888ec",
@@ -1739,7 +1739,7 @@
     "name": "상동",
     "x": 1040,
     "y": 1867,
-    "lines": []
+    "lines": ["7"]
   },
   "s_eca491eb": {
     "id": "s_eca491eb",
@@ -1956,7 +1956,7 @@
     "name": "춘의",
     "x": 1297,
     "y": 1922,
-    "lines": []
+    "lines": ["7"]
   },
   "s_eab491ea": {
     "id": "s_eab491ea",
@@ -2278,7 +2278,7 @@
     "name": "천왕",
     "x": 1297,
     "y": 2289,
-    "lines": []
+    "lines": ["7"]
   },
   "s_ebb489eb": {
     "id": "s_ebb489eb",
@@ -2873,35 +2873,35 @@
     "name": "먹골",
     "x": 3683,
     "y": 1135,
-    "lines": []
+    "lines": ["7"]
   },
   "s_eca491ed": {
     "id": "s_eca491ed",
     "name": "중화",
     "x": 3683,
     "y": 1225,
-    "lines": []
+    "lines": ["7"]
   },
   "s_eba9b4eb": {
     "id": "s_eba9b4eb",
     "name": "면목",
     "x": 3640,
     "y": 1405,
-    "lines": []
+    "lines": ["7"]
   },
   "s_ec82acea": {
     "id": "s_ec82acea",
     "name": "사가정",
     "x": 3584,
     "y": 1462,
-    "lines": []
+    "lines": ["7"]
   },
   "s_eca491ea": {
     "id": "s_eca491ea",
     "name": "중곡",
     "x": 3470,
     "y": 1575,
-    "lines": []
+    "lines": ["7"]
   },
   "s_ec96b4eb": {
     "id": "s_ec96b4eb",
@@ -2922,14 +2922,14 @@
     "name": "반포",
     "x": 2792,
     "y": 2253,
-    "lines": []
+    "lines": ["7"]
   },
   "s_eb82b4eb": {
     "id": "s_eb82b4eb",
     "name": "내방",
     "x": 2565,
     "y": 2327,
-    "lines": []
+    "lines": ["7"]
   },
   "s_ec88adec": {
     "id": "s_ec88adec",
@@ -2957,28 +2957,28 @@
     "name": "남구로",
     "x": 1609,
     "y": 2327,
-    "lines": []
+    "lines": ["7"]
   },
   "s_eab98cec": {
     "id": "s_eab98cec",
     "name": "까치울",
     "x": 1297,
     "y": 2102,
-    "lines": []
+    "lines": ["7"]
   },
   "s_eab5b4ed": {
     "id": "s_eab5b4ed",
     "name": "굴포천",
     "x": 917,
     "y": 1990,
-    "lines": []
+    "lines": ["7"]
   },
   "s_ec82b0ea": {
     "id": "s_ec82b0ea",
     "name": "산곡",
     "x": 784,
     "y": 1947,
-    "lines": []
+    "lines": ["7"]
   },
   "s_eab5bdec": {
     "id": "s_eab5bdec",

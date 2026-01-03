@@ -127,7 +127,7 @@ class SkillsGuideUpdater {
    */
   private async performUpdates(): Promise<void> {
     const currentVersions = await this.getCurrentVersions();
-    const today = new Date().toISOString().split('T')[0];
+    const today = new Date().toISOString().split('T')[0]!; // Non-null assertion: ISO format always has 'T'
 
     // Update all markdown files with new date
     const files = [
@@ -235,7 +235,7 @@ class SkillsGuideUpdater {
     const content = fs.readFileSync(readmePath, 'utf-8');
     const skillMatches = content.matchAll(/├── ([a-z-]+)\//g);
 
-    return Array.from(skillMatches).map(m => m[1]);
+    return Array.from(skillMatches).map(m => m[1]).filter((s): s is string => s !== undefined);
   }
 
   /**
@@ -248,7 +248,7 @@ class SkillsGuideUpdater {
     const content = fs.readFileSync(readmePath, 'utf-8');
     const agentMatches = content.matchAll(/├── ([a-z-]+)\.md/g);
 
-    return Array.from(agentMatches).map(m => m[1]);
+    return Array.from(agentMatches).map(m => m[1]).filter((a): a is string => a !== undefined);
   }
 
   /**

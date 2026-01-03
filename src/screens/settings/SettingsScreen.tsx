@@ -15,11 +15,15 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useAuth } from '../../services/auth/AuthContext';
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '../../styles/modernTheme';
+import { SettingsStackParamList } from '@/navigation/types';
 
-export const SettingsScreen: React.FC = () => {
+type Props = NativeStackScreenProps<SettingsStackParamList, 'SettingsHome'>;
+
+export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   const { user, signOut } = useAuth();
 
   const handleSignOut = async (): Promise<void> => {
@@ -98,19 +102,19 @@ export const SettingsScreen: React.FC = () => {
               icon="notifications"
               title="지연 알림"
               subtitle="열차 지연 시 알림 받기"
-              onPress={() => {}}
+              onPress={() => navigation.navigate('DelayNotification')}
             />
             <SettingItem
               icon="time"
               title="알림 시간대"
               subtitle="출퇴근 시간 설정"
-              onPress={() => {}}
+              onPress={() => navigation.navigate('NotificationTime')}
             />
             <SettingItem
               icon="volume-high"
               title="소리 설정"
               subtitle="알림음 및 진동 설정"
-              onPress={() => {}}
+              onPress={() => navigation.navigate('SoundSettings')}
             />
           </View>
         </View>
@@ -123,19 +127,19 @@ export const SettingsScreen: React.FC = () => {
               icon="language"
               title="언어"
               subtitle="한국어"
-              onPress={() => {}}
+              onPress={() => navigation.navigate('LanguageSettings')}
             />
             <SettingItem
               icon="moon"
               title="테마"
               subtitle="시스템 설정 따름"
-              onPress={() => {}}
+              onPress={() => navigation.navigate('ThemeSettings')}
             />
             <SettingItem
               icon="location"
               title="위치 권한"
               subtitle="주변 역 검색을 위해 필요"
-              onPress={() => {}}
+              onPress={() => navigation.navigate('LocationPermission')}
             />
           </View>
         </View>
@@ -148,23 +152,25 @@ export const SettingsScreen: React.FC = () => {
               icon="help-circle"
               title="도움말"
               subtitle="앱 사용법 및 FAQ"
-              onPress={() => {}}
+              onPress={() => navigation.navigate('Help')}
             />
             <SettingItem
               icon="document-text"
               title="개인정보처리방침"
-              onPress={() => {}}
+              onPress={() => navigation.navigate('PrivacyPolicy')}
             />
             <SettingItem
               icon="shield-checkmark"
               title="서비스 이용약관"
               onPress={() => {}}
+              showChevron={false}
             />
             <SettingItem
               icon="information-circle"
               title="앱 정보"
               subtitle="버전 1.0.0"
               onPress={() => {}}
+              showChevron={false}
             />
           </View>
         </View>

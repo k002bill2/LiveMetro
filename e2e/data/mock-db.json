@@ -1,0 +1,212 @@
+{
+  "stations": [
+    {
+      "id": "gangnam",
+      "name": "강남",
+      "nameEn": "Gangnam",
+      "lineId": "2",
+      "lineName": "2호선",
+      "coordinates": {
+        "latitude": 37.4979,
+        "longitude": 127.0276
+      },
+      "transfers": []
+    },
+    {
+      "id": "hongdae",
+      "name": "홍대입구",
+      "nameEn": "Hongik Univ.",
+      "lineId": "2",
+      "lineName": "2호선",
+      "coordinates": {
+        "latitude": 37.5571,
+        "longitude": 126.9245
+      },
+      "transfers": ["공항철도", "경의중앙선"]
+    },
+    {
+      "id": "jamsil",
+      "name": "잠실",
+      "nameEn": "Jamsil",
+      "lineId": "2",
+      "lineName": "2호선",
+      "coordinates": {
+        "latitude": 37.5133,
+        "longitude": 127.1001
+      },
+      "transfers": ["8"]
+    },
+    {
+      "id": "seoul",
+      "name": "서울역",
+      "nameEn": "Seoul Station",
+      "lineId": "1",
+      "lineName": "1호선",
+      "coordinates": {
+        "latitude": 37.5547,
+        "longitude": 126.9707
+      },
+      "transfers": ["4", "공항철도", "경의중앙선"]
+    },
+    {
+      "id": "myeongdong",
+      "name": "명동",
+      "nameEn": "Myeong-dong",
+      "lineId": "4",
+      "lineName": "4호선",
+      "coordinates": {
+        "latitude": 37.5609,
+        "longitude": 126.9859
+      },
+      "transfers": []
+    },
+    {
+      "id": "sinchon",
+      "name": "신촌",
+      "nameEn": "Sinchon",
+      "lineId": "2",
+      "lineName": "2호선",
+      "coordinates": {
+        "latitude": 37.5551,
+        "longitude": 126.9367
+      },
+      "transfers": []
+    },
+    {
+      "id": "yeouido",
+      "name": "여의도",
+      "nameEn": "Yeouido",
+      "lineId": "5",
+      "lineName": "5호선",
+      "coordinates": {
+        "latitude": 37.5217,
+        "longitude": 126.9243
+      },
+      "transfers": ["9"]
+    },
+    {
+      "id": "dongdaemun",
+      "name": "동대문",
+      "nameEn": "Dongdaemun",
+      "lineId": "1",
+      "lineName": "1호선",
+      "coordinates": {
+        "latitude": 37.5713,
+        "longitude": 127.0094
+      },
+      "transfers": ["4"]
+    }
+  ],
+  "arrivals": [
+    {
+      "id": "arr-1",
+      "stationId": "gangnam",
+      "trainLineNm": "2호선",
+      "arvlMsg2": "2분 후 도착",
+      "arvlMsg3": "[2]번째 전역",
+      "bstatnNm": "신도림",
+      "updnLine": "상행",
+      "btrainNo": "2501",
+      "trainLineColor": "#00A651"
+    },
+    {
+      "id": "arr-2",
+      "stationId": "gangnam",
+      "trainLineNm": "2호선",
+      "arvlMsg2": "5분 후 도착",
+      "arvlMsg3": "[5]번째 전역",
+      "bstatnNm": "잠실",
+      "updnLine": "하행",
+      "btrainNo": "2502",
+      "trainLineColor": "#00A651"
+    },
+    {
+      "id": "arr-3",
+      "stationId": "gangnam",
+      "trainLineNm": "2호선",
+      "arvlMsg2": "곧 도착",
+      "arvlMsg3": "전역 출발",
+      "bstatnNm": "성수",
+      "updnLine": "상행",
+      "btrainNo": "2503",
+      "trainLineColor": "#00A651"
+    },
+    {
+      "id": "arr-4",
+      "stationId": "hongdae",
+      "trainLineNm": "2호선",
+      "arvlMsg2": "3분 후 도착",
+      "arvlMsg3": "[3]번째 전역",
+      "bstatnNm": "신도림",
+      "updnLine": "상행",
+      "btrainNo": "2504",
+      "trainLineColor": "#00A651"
+    },
+    {
+      "id": "arr-5",
+      "stationId": "jamsil",
+      "trainLineNm": "2호선",
+      "arvlMsg2": "1분 후 도착",
+      "arvlMsg3": "[1]번째 전역",
+      "bstatnNm": "강남",
+      "updnLine": "하행",
+      "btrainNo": "2505",
+      "trainLineColor": "#00A651"
+    }
+  ],
+  "lines": [
+    {
+      "id": "1",
+      "name": "1호선",
+      "color": "#263C96"
+    },
+    {
+      "id": "2",
+      "name": "2호선",
+      "color": "#00A651"
+    },
+    {
+      "id": "3",
+      "name": "3호선",
+      "color": "#EE6E0C"
+    },
+    {
+      "id": "4",
+      "name": "4호선",
+      "color": "#00A2E8"
+    },
+    {
+      "id": "5",
+      "name": "5호선",
+      "color": "#8B50A4"
+    },
+    {
+      "id": "6",
+      "name": "6호선",
+      "color": "#C55A11"
+    },
+    {
+      "id": "7",
+      "name": "7호선",
+      "color": "#747F00"
+    },
+    {
+      "id": "8",
+      "name": "8호선",
+      "color": "#E6186C"
+    },
+    {
+      "id": "9",
+      "name": "9호선",
+      "color": "#AA9872"
+    }
+  ],
+  "users": [
+    {
+      "id": "test-user-1",
+      "email": "test@livemetro.app",
+      "displayName": "Test User",
+      "favorites": ["gangnam", "hongdae"]
+    }
+  ]
+}

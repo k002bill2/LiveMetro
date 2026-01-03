@@ -6,7 +6,7 @@
 import * as dotenv from 'dotenv';
 dotenv.config();
 
-const API_KEY = process.env.SEOUL_SUBWAY_API_KEY || '6d486a6a6a3030323630556c4e554f';
+const API_KEY = process.env.EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY || '6d486a6a6a3030323630556c4e554f';
 const BASE_URL = process.env.SEOUL_SUBWAY_API_BASE_URL || 'http://swopenapi.seoul.go.kr/api/subway';
 
 async function testRealtimeArrival(stationName: string): Promise<void> {

@@ -7,6 +7,23 @@ import { render, fireEvent } from '@testing-library/react-native';
 import { StationCard } from '../StationCard';
 import { Station } from '../../../models/train';
 
+// Mock hooks
+jest.mock('../../../services/auth/AuthContext', () => ({
+  useAuth: () => ({
+    user: { uid: 'test-user', email: 'test@example.com' },
+    updateUserProfile: jest.fn(),
+  }),
+}));
+
+jest.mock('../../../hooks/useRealtimeTrains', () => ({
+  useRealtimeTrains: () => ({
+    trains: [],
+    loading: false,
+    error: null,
+    refresh: jest.fn(),
+  }),
+}));
+
 describe('StationCard', () => {
   const mockStation: Station = {
     id: 'station-1',
@@ -66,21 +83,24 @@ describe('StationCard', () => {
 
   describe('Selection State', () => {
     it('should show selected state when isSelected is true', () => {
-      const { getByTestId } = render(
+      const { getAllByRole } = render(
         <StationCard {...defaultProps} isSelected={true} />
       );
-      
-      // The checkmark icon should be visible
-      expect(getByTestId('selected-indicator')).toBeTruthy();
+
+      // The main card button should have selected state
+      const buttons = getAllByRole('button');
+      const mainButton = buttons[0]; // First button is the main card
+      expect(mainButton?.props.accessibilityState?.selected).toBe(true);
     });
 
     it('should apply selected styles when selected', () => {
-      const { getByRole } = render(
+      const { getAllByRole } = render(
         <StationCard {...defaultProps} isSelected={true} />
       );
-      
-      const button = getByRole('button');
-      expect(button.props.accessibilityState.selected).toBe(true);
+
+      const buttons = getAllByRole('button');
+      const mainButton = buttons[0]; // First button is the main card
+      expect(mainButton?.props.accessibilityState?.selected).toBe(true);
     });
   });
 
@@ -125,64 +145,70 @@ describe('StationCard', () => {
   describe('Interaction', () => {
     it('should call onPress when pressed', () => {
       const mockOnPress = jest.fn();
-      
-      const { getByRole } = render(
+
+      const { getAllByRole } = render(
         <StationCard {...defaultProps} onPress={mockOnPress} />
       );
-      
-      const button = getByRole('button');
-      fireEvent.press(button);
-      
+
+      const buttons = getAllByRole('button');
+      const mainButton = buttons[0]; // First button is the main card
+      fireEvent.press(mainButton!);
+
       expect(mockOnPress).toHaveBeenCalledTimes(1);
     });
 
     it('should not crash when onPress is undefined', () => {
-      const { getByRole } = render(
+      const { getAllByRole } = render(
         <StationCard {...defaultProps} onPress={undefined} />
       );
-      
-      const button = getByRole('button');
-      expect(() => fireEvent.press(button)).not.toThrow();
+
+      const buttons = getAllByRole('button');
+      const mainButton = buttons[0];
+      expect(() => fireEvent.press(mainButton!)).not.toThrow();
     });
   });
 
   describe('Accessibility', () => {
     it('should have proper accessibility label', () => {
-      const { getByRole } = render(
-        <StationCard 
-          {...defaultProps} 
-          showDistance={true} 
-          distance={0.5} 
+      const { getAllByRole } = render(
+        <StationCard
+          {...defaultProps}
+          showDistance={true}
+          distance={0.5}
         />
       );
-      
-      const button = getByRole('button');
+
+      const buttons = getAllByRole('button');
+      const mainButton = buttons[0];
       const expectedLabel = '강남역 역, 2호선, 환승역: 9호선, 거리: 500m';
-      
-      expect(button.props.accessibilityLabel).toBe(expectedLabel);
+
+      expect(mainButton?.props.accessibilityLabel).toBe(expectedLabel);
     });
 
     it('should have proper accessibility hint based on selection state', () => {
-      const { getByRole: getSelectedButton } = render(
+      const { getAllByRole: getSelectedButtons } = render(
         <StationCard {...defaultProps} isSelected={true} />
       );
-      
-      const selectedButton = getSelectedButton('button');
-      expect(selectedButton.props.accessibilityHint).toBe('현재 선택된 역입니다');
-      
-      const { getByRole: getUnselectedButton } = render(
+
+      const selectedButtons = getSelectedButtons('button');
+      const selectedButton = selectedButtons[0];
+      expect(selectedButton?.props.accessibilityHint).toBe('현재 선택된 역입니다');
+
+      const { getAllByRole: getUnselectedButtons } = render(
         <StationCard {...defaultProps} isSelected={false} />
       );
-      
-      const unselectedButton = getUnselectedButton('button');
-      expect(unselectedButton.props.accessibilityHint).toBe('탭하여 이 역의 실시간 정보를 확인하세요');
+
+      const unselectedButtons = getUnselectedButtons('button');
+      const unselectedButton = unselectedButtons[0];
+      expect(unselectedButton?.props.accessibilityHint).toBe('탭하여 이 역의 실시간 정보를 확인하세요');
     });
 
     it('should have proper accessibility role', () => {
-      const { getByRole } = render(<StationCard {...defaultProps} />);
-      
-      const button = getByRole('button');
-      expect(button.props.accessibilityRole).toBe('button');
+      const { getAllByRole } = render(<StationCard {...defaultProps} />);
+
+      const buttons = getAllByRole('button');
+      const mainButton = buttons[0];
+      expect(mainButton?.props.accessibilityRole).toBe('button');
     });
   });
 

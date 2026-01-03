@@ -32,12 +32,11 @@
     "production": {
       "ios": {
         "resourceClass": "m1-medium",
-        "autoIncrement": "buildNumber",
-        "bundleIdentifier": "com.livemetro.app"
+        "autoIncrement": "buildNumber"
       },
       "android": {
         "autoIncrement": "versionCode",
-        "buildType": "aab"
+        "buildType": "app-bundle"
       },
       "env": {
         "APP_ENV": "production",
@@ -49,17 +48,16 @@
       "ios": {
         "resourceClass": "m1-medium",
         "autoIncrement": "buildNumber",
-        "bundleIdentifier": "com.livemetro.app",
         "distribution": "store"
       }
     },
     "production-android": {
-      "extends": "production", 
+      "extends": "production",
       "android": {
         "autoIncrement": "versionCode",
-        "buildType": "aab",
-        "distribution": "store"
-      }
+        "buildType": "app-bundle"
+      },
+      "distribution": "store"
     }
   },
   "submit": {

@@ -182,6 +182,8 @@ export const AuthScreen: React.FC = () => {
                   placeholder="홍길동"
                   autoCapitalize="words"
                   textContentType="name"
+                  testID="displayname-input"
+                  accessibilityLabel="이름 입력"
                 />
               </View>
             )}
@@ -197,6 +199,8 @@ export const AuthScreen: React.FC = () => {
                 autoCapitalize="none"
                 textContentType="emailAddress"
                 autoComplete="email"
+                testID="email-input"
+                accessibilityLabel="이메일 입력"
               />
             </View>
 
@@ -210,6 +214,8 @@ export const AuthScreen: React.FC = () => {
                 secureTextEntry
                 textContentType="password"
                 autoComplete={isSignUp ? 'password-new' : 'password'}
+                testID="password-input"
+                accessibilityLabel="비밀번호 입력"
               />
             </View>
 
@@ -217,6 +223,8 @@ export const AuthScreen: React.FC = () => {
               style={[styles.primaryButton, loading && styles.disabledButton]}
               onPress={handleSubmit}
               disabled={loading}
+              testID="submit-button"
+              accessibilityLabel={isSignUp ? '계정 만들기' : '로그인'}
             >
               <Text style={styles.primaryButtonText}>
                 {loading ? '처리중...' : (isSignUp ? '계정 만들기' : '로그인')}
@@ -257,10 +265,12 @@ export const AuthScreen: React.FC = () => {
               <View style={styles.dividerLine} />
             </View>
 
-            <TouchableOpacity 
-              style={styles.secondaryButton} 
+            <TouchableOpacity
+              style={styles.secondaryButton}
               onPress={handleAnonymousSignIn}
               disabled={loading}
+              testID="anonymous-login-button"
+              accessibilityLabel="익명으로 계속하기"
             >
               <Ionicons name="person-outline" size={20} color="#6b7280" />
               <Text style={styles.secondaryButtonText}>

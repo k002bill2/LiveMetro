@@ -11,12 +11,14 @@ import {
   Animated,
   Easing,
 } from 'react-native';
-import { RouteProp, useRoute } from '@react-navigation/native';
+import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import { AppStackParamList } from '../../navigation/types';
 import { getSubwayLineColor } from '../../utils/colorUtils';
 import { useRealtimeTrains } from '../../hooks/useRealtimeTrains';
+import { useAdjacentStations } from '../../hooks/useAdjacentStations';
 
 type StationDetailRouteProp = RouteProp<AppStackParamList, 'StationDetail'>;
 const TAB_LABELS = ['출발', '도착', '시간표', '즐겨찾기'] as const;
@@ -28,11 +30,18 @@ const SUBWAY_MAP_SOURCES = [
 
 const StationDetailScreen: React.FC = () => {
   const route = useRoute<StationDetailRouteProp>();
+  const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
   const {
     // stationId = 'gangnam', // TODO: 향후 역 ID로 조회 시 사용
     stationName = '강남',
     lineId = '2',
   } = route.params || {};
+
+  // Get adjacent stations for navigation
+  const { prevStation, nextStation, hasPrev, hasNext } = useAdjacentStations(
+    stationName,
+    lineId
+  );
 
   const [currentTime, setCurrentTime] = useState(new Date());
   const [refreshing, setRefreshing] = useState(false);
@@ -204,17 +213,43 @@ const StationDetailScreen: React.FC = () => {
           <Text style={styles.lineBadgeText}>{lineId}</Text>
         </View>
         <View style={styles.stationSwitcher}>
-          <TouchableOpacity style={styles.switchButton}>
-            <Ionicons name="chevron-back" size={18} color="#4b5320" />
-            <Text style={styles.switchText}>부평구청</Text>
-          </TouchableOpacity>
+          {hasPrev && prevStation ? (
+            <TouchableOpacity
+              style={styles.prevStationButton}
+              onPress={() => {
+                navigation.push('StationDetail', {
+                  stationId: prevStation.id,
+                  stationName: prevStation.name,
+                  lineId: lineId,
+                });
+              }}
+            >
+              <Ionicons name="chevron-back" size={18} color="#4b5320" />
+              <Text style={styles.switchText}>{prevStation.name}</Text>
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.prevStationButton} />
+          )}
           <View style={styles.currentStation}>
             <Text style={styles.currentStationText}>{stationName}</Text>
           </View>
-          <TouchableOpacity style={styles.switchButton}>
-            <Text style={styles.switchText}>석남</Text>
-            <Ionicons name="chevron-forward" size={18} color="#4b5320" />
-          </TouchableOpacity>
+          {hasNext && nextStation ? (
+            <TouchableOpacity
+              style={styles.nextStationButton}
+              onPress={() => {
+                navigation.push('StationDetail', {
+                  stationId: nextStation.id,
+                  stationName: nextStation.name,
+                  lineId: lineId,
+                });
+              }}
+            >
+              <Text style={styles.switchText}>{nextStation.name}</Text>
+              <Ionicons name="chevron-forward" size={18} color="#4b5320" />
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.nextStationButton} />
+          )}
         </View>
       </View>
 
@@ -459,10 +494,17 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 12,
   },
-  switchButton: {
+  prevStationButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  nextStationButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   switchText: {
     color: '#4b5320',

@@ -6,10 +6,20 @@ import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { TrainArrivalList } from '../TrainArrivalList';
 import { trainService } from '../../../services/train/trainService';
+import { TrainStatus } from '../../../models/train';
 
 // Mock the train service
 jest.mock('../../../services/train/trainService');
 const mockTrainService = trainService as jest.Mocked<typeof trainService>;
+
+// Mock performance utils to avoid throttling in tests
+jest.mock('../../../utils/performanceUtils', () => ({
+  performanceMonitor: {
+    startMeasure: jest.fn(),
+    endMeasure: jest.fn(),
+  },
+  throttle: (fn: any) => fn, // Return function immediately without throttling
+}));
 
 describe('TrainArrivalList', () => {
   const mockTrains = [
@@ -19,17 +29,25 @@ describe('TrainArrivalList', () => {
       direction: 'up' as const,
       arrivalTime: new Date(Date.now() + 2 * 60 * 1000), // 2 minutes from now
       delayMinutes: 0,
-      status: 'NORMAL' as const,
+      status: TrainStatus.NORMAL,
       nextStationId: 'station-2',
+      finalDestination: '상행',
+      currentStationId: 'station-1',
+      lineId: '2',
+      lastUpdated: new Date(),
     },
     {
-      id: 'train-2', 
+      id: 'train-2',
       stationId: 'station-1',
       direction: 'down' as const,
       arrivalTime: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes from now
       delayMinutes: 2,
-      status: 'DELAYED' as const,
+      status: TrainStatus.DELAYED,
       nextStationId: 'station-3',
+      finalDestination: '하행',
+      currentStationId: 'station-1',
+      lineId: '2',
+      lastUpdated: new Date(),
     },
   ];
 
@@ -71,10 +89,10 @@ describe('TrainArrivalList', () => {
       const { getByText } = render(
         <TrainArrivalList stationId="station-1" />
       );
-      
+
       await waitFor(() => {
-        expect(getByText('상행')).toBeTruthy();
-        expect(getByText('하행')).toBeTruthy();
+        expect(getByText(/상행/)).toBeTruthy();
+        expect(getByText(/하행/)).toBeTruthy();
         expect(getByText('2분 후')).toBeTruthy();
         expect(getByText('5분 후')).toBeTruthy();
       });
@@ -146,23 +164,31 @@ describe('TrainArrivalList', () => {
   });
 
   describe('Refresh Functionality', () => {
-    it('should handle pull-to-refresh', async () => {
+    it('should re-subscribe when stationId changes', async () => {
       mockTrainService.subscribeToTrainUpdates.mockImplementation((stationId, callback) => {
         callback(mockTrains);
         return jest.fn();
       });
-      
-      const { getByTestId } = render(
+
+      const { rerender } = render(
         <TrainArrivalList stationId="station-1" />
       );
-      
+
       await waitFor(() => {
-        const flatList = getByTestId('train-arrival-flatlist');
-        
-        // Simulate pull-to-refresh
-        fireEvent(flatList, 'refresh');
-        
-        // Should not throw and should handle refresh gracefully
+        expect(mockTrainService.subscribeToTrainUpdates).toHaveBeenCalledWith(
+          'station-1',
+          expect.any(Function)
+        );
+      });
+
+      // Change station ID
+      rerender(<TrainArrivalList stationId="station-2" />);
+
+      await waitFor(() => {
+        expect(mockTrainService.subscribeToTrainUpdates).toHaveBeenCalledWith(
+          'station-2',
+          expect.any(Function)
+        );
       });
     });
   });
@@ -242,14 +268,14 @@ describe('TrainArrivalList', () => {
         callback(mockTrains);
         return jest.fn();
       });
-      
+
       const { getByLabelText } = render(
         <TrainArrivalList stationId="station-1" />
       );
-      
+
       await waitFor(() => {
-        expect(getByLabelText(/상행 열차, 정상 상태, 2분 후/)).toBeTruthy();
-        expect(getByLabelText(/하행 열차, 지연 상태, 5분 후, 2분 지연/)).toBeTruthy();
+        expect(getByLabelText(/상행 방면 열차, 정상 상태, 2분 후/)).toBeTruthy();
+        expect(getByLabelText(/하행 방면 열차, 지연 상태, 5분 후, 2분 지연/)).toBeTruthy();
       });
     });
   });

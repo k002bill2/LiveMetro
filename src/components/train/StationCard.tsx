@@ -235,6 +235,7 @@ export const StationCard: React.FC<StationCardProps> = memo(
           accessibilityLabel={`${station.name} 역, ${station.lineId}호선${station.transfers && station.transfers.length > 0 ? `, 환승역: ${station.transfers.join(', ')}호선` : ''}${formattedDistance ? `, 거리: ${formattedDistance}` : ''}${isFavorite ? ', 즐겨찾기됨' : ''}`}
           accessibilityHint={isSelected ? '현재 선택된 역입니다' : '탭하여 이 역의 실시간 정보를 확인하세요'}
           accessibilityState={{ selected: isSelected }}
+          testID={`station-card-${station.id}`}
         >
           {/* Accent bar */}
           <View style={[styles.accentBar, { backgroundColor: lineColor }]} />

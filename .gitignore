@@ -106,3 +106,15 @@ dev-debug.log
 # Claude Code backups (local)
 # Comment out this line if you want to commit backups to git
 .claude-backups/
+
+# Parallel Agents Temporary Workspaces
+.temp/
+
+# Auto Claude data directory
+.auto-claude/
+
+# E2E Testing
+e2e/reports/
+e2e/screenshots/
+e2e/logs/
+apps/

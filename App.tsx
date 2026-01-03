@@ -9,7 +9,7 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AuthProvider } from './src/services/auth/AuthContext';
-import AppNavigator from './src/navigation/AppNavigator';
+import { RootNavigator } from './src/navigation/RootNavigator';
 
 const App: React.FC = () => {
   return (
@@ -17,7 +17,7 @@ const App: React.FC = () => {
       <AuthProvider>
         <NavigationContainer>
           <StatusBar style="dark" />
-          <AppNavigator />
+          <RootNavigator />
         </NavigationContainer>
       </AuthProvider>
     </GestureHandlerRootView>

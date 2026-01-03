@@ -199,11 +199,11 @@ describe('TrainArrivalCard', () => {
       const onPress = jest.fn();
       const train = createMockTrain();
 
-      const { getByA11yRole } = render(
+      const { getByRole } = render(
         <TrainArrivalCard train={train} onPress={onPress} />
       );
 
-      const button = getByA11yRole('button');
+      const button = getByRole('button');
       fireEvent.press(button);
 
       expect(onPress).toHaveBeenCalledTimes(1);
@@ -212,10 +212,10 @@ describe('TrainArrivalCard', () => {
     it('should not crash when pressed without onPress handler', () => {
       const train = createMockTrain();
 
-      const { getByA11yRole } = render(<TrainArrivalCard train={train} />);
+      const { getByRole } = render(<TrainArrivalCard train={train} />);
 
       // Should render as summary, not button
-      expect(getByA11yRole('summary')).toBeTruthy();
+      expect(getByRole('summary')).toBeTruthy();
     });
   });
 
@@ -223,19 +223,19 @@ describe('TrainArrivalCard', () => {
     it('should have proper accessibility role when pressable', () => {
       const train = createMockTrain();
 
-      const { getByA11yRole } = render(
+      const { getByRole } = render(
         <TrainArrivalCard train={train} onPress={() => {}} />
       );
 
-      expect(getByA11yRole('button')).toBeTruthy();
+      expect(getByRole('button')).toBeTruthy();
     });
 
     it('should have proper accessibility role when not pressable', () => {
       const train = createMockTrain();
 
-      const { getByA11yRole } = render(<TrainArrivalCard train={train} />);
+      const { getByRole } = render(<TrainArrivalCard train={train} />);
 
-      expect(getByA11yRole('summary')).toBeTruthy();
+      expect(getByRole('summary')).toBeTruthy();
     });
 
     it('should have descriptive accessibility label', () => {
@@ -288,11 +288,11 @@ describe('TrainArrivalCard', () => {
       const train = createMockTrain();
       const customStyle = { marginBottom: 24 };
 
-      const { getByA11yRole } = render(
+      const { getByRole } = render(
         <TrainArrivalCard train={train} style={customStyle} />
       );
 
-      const element = getByA11yRole('summary');
+      const element = getByRole('summary');
       expect(element.props.style).toContainEqual(customStyle);
     });
   });
@@ -318,9 +318,8 @@ describe('TrainArrivalCard', () => {
     it('should handle null next station ID', () => {
       const train = createMockTrain({ nextStationId: null });
 
-      const { container } = render(<TrainArrivalCard train={train} />);
-
-      expect(container).toBeTruthy();
+      // Should not crash when nextStationId is null
+      expect(() => render(<TrainArrivalCard train={train} />)).not.toThrow();
     });
   });
 });

@@ -14,7 +14,7 @@ import { LoadingScreen } from '../components/common/LoadingScreen';
 import HomeScreen from '@screens/home/HomeScreen';
 import FavoritesScreen from '@screens/favorites/FavoritesScreen';
 import AlertsScreen from '@screens/alerts/AlertsScreen';
-import SettingsScreen from '@screens/settings/SettingsScreen';
+import SettingsNavigator from '@/navigation/SettingsNavigator';
 import StationDetailScreen from '@screens/station/StationDetailScreen';
 import StationNavigatorScreen from '@screens/station/StationNavigatorScreen';
 import { WelcomeScreen } from '../screens/auth/WelcomeScreen';
@@ -103,10 +103,10 @@ const MainTabs: React.FC = () => (
       />
       <Tab.Screen
         name="Settings"
-        component={SettingsScreen}
+        component={SettingsNavigator}
         options={{
           title: '설정',
-          headerTitle: '⚙️ 설정',
+          headerShown: false,
         }}
       />
     </Tab.Navigator>

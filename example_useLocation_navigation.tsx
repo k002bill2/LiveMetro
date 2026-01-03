@@ -20,7 +20,7 @@ export const WalkingNavigationScreen: React.FC<Props> = ({ destinationStation })
 
   // 🔥 실시간 위치 추적
   const {
-    location,
+    location: _location, // Location updates handled via onLocationUpdate callback
     loading,
     error,
     isTracking,

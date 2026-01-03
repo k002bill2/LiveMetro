@@ -38,11 +38,11 @@ export const WelcomeScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} testID="welcome-screen">
       <View style={styles.content}>
         {/* Logo Section */}
         <View style={styles.logoSection}>
-          <View style={styles.logoContainer}>
+          <View style={styles.logoContainer} testID="welcome-logo">
             <Ionicons name="train" size={64} color="#2563eb" />
           </View>
           <Text style={styles.appName}>LiveMetro</Text>
@@ -72,12 +72,22 @@ export const WelcomeScreen: React.FC = () => {
 
         {/* Action Buttons */}
         <View style={styles.buttonSection}>
-          <TouchableOpacity style={styles.primaryButton} onPress={handleGetStarted}>
+          <TouchableOpacity
+            style={styles.primaryButton}
+            onPress={handleGetStarted}
+            testID="get-started-button"
+            accessibilityLabel="시작하기"
+          >
             <Text style={styles.primaryButtonText}>시작하기</Text>
             <Ionicons name="arrow-forward" size={20} color="#ffffff" />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.secondaryButton} onPress={handleTryAnonymously}>
+          <TouchableOpacity
+            style={styles.secondaryButton}
+            onPress={handleTryAnonymously}
+            testID="try-anonymous-button"
+            accessibilityLabel="체험해보기"
+          >
             <Text style={styles.secondaryButtonText}>체험해보기</Text>
           </TouchableOpacity>
         </View>

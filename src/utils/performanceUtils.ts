@@ -17,6 +17,8 @@ interface PerformanceMetrics {
 class PerformanceMonitor {
   private metrics: Map<string, PerformanceMetrics> = new Map();
   private isProduction = __DEV__ === false;
+  // Allow tests to override time function
+  private timeFunction: () => number = Date.now.bind(Date);
 
   /**
    * Start measuring performance for a specific operation
@@ -25,7 +27,7 @@ class PerformanceMonitor {
     if (this.isProduction) return;
 
     this.metrics.set(key, {
-      startTime: Date.now(),
+      startTime: this.timeFunction(),
     });
   }
 
@@ -38,7 +40,7 @@ class PerformanceMonitor {
     const metric = this.metrics.get(key);
     if (!metric) return 0;
 
-    const endTime = Date.now();
+    const endTime = this.timeFunction();
     const duration = endTime - metric.startTime;
 
     this.metrics.set(key, {
@@ -53,6 +55,20 @@ class PerformanceMonitor {
     }
 
     return duration;
+  }
+
+  /**
+   * Set custom time function (for testing)
+   */
+  setTimeFunction(fn: () => number): void {
+    this.timeFunction = fn;
+  }
+
+  /**
+   * Reset time function to default
+   */
+  resetTimeFunction(): void {
+    this.timeFunction = Date.now.bind(Date);
   }
 
   /**

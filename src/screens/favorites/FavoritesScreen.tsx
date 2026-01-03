@@ -11,7 +11,7 @@
  * - Pull to refresh
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useState, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -30,7 +30,8 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useFavorites } from '../../hooks/useFavorites';
 import { useAuth } from '../../services/auth/AuthContext';
 import { AppStackParamList } from '../../navigation/types';
-import { StationCard } from '../../components/train/StationCard';
+import { FavoritesSearchBar } from '../../components/favorites/FavoritesSearchBar';
+import { DraggableFavoriteItem } from '../../components/favorites/DraggableFavoriteItem';
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '../../styles/modernTheme';
 
 type NavigationProp = NativeStackNavigationProp<AppStackParamList>;
@@ -43,8 +44,99 @@ export const FavoritesScreen: React.FC = () => {
     loading,
     error,
     removeFavorite,
+    updateFavorite,
     refresh,
   } = useFavorites();
+
+  // Search and filter state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeFilters, setActiveFilters] = useState<{
+    lineId?: string;
+    direction?: 'up' | 'down';
+    commuteOnly?: boolean;
+  }>({});
+
+  // Edit state
+  const [editingFavoriteId, setEditingFavoriteId] = useState<string | null>(null);
+
+  /**
+   * Filter favorites based on search query and active filters
+   */
+  const filteredFavorites = useMemo(() => {
+    return favoritesWithDetails.filter(fav => {
+      // Search filter (Korean + English name)
+      if (searchQuery) {
+        const query = searchQuery.toLowerCase().trim();
+        const matchesName = fav.station?.name.toLowerCase().includes(query);
+        const matchesNameEn = fav.station?.nameEn.toLowerCase().includes(query);
+        if (!matchesName && !matchesNameEn) {
+          return false;
+        }
+      }
+
+      // Line filter
+      if (activeFilters.lineId && fav.lineId !== activeFilters.lineId) {
+        return false;
+      }
+
+      // Direction filter
+      if (activeFilters.direction) {
+        if (fav.direction !== 'both' && fav.direction !== activeFilters.direction) {
+          return false;
+        }
+      }
+
+      // Commute filter
+      if (activeFilters.commuteOnly && !fav.isCommuteStation) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [favoritesWithDetails, searchQuery, activeFilters]);
+
+  /**
+   * Auto-close edit mode when search becomes active
+   */
+  useEffect(() => {
+    if (searchQuery.length > 0 || Object.keys(activeFilters).length > 0) {
+      setEditingFavoriteId(null);
+    }
+  }, [searchQuery, activeFilters]);
+
+  /**
+   * Handle edit toggle
+   */
+  const handleEditToggle = useCallback((favoriteId: string) => {
+    setEditingFavoriteId(prev => prev === favoriteId ? null : favoriteId);
+  }, []);
+
+  /**
+   * Handle save edit
+   */
+  const handleSaveEdit = useCallback(
+    async (
+      favoriteId: string,
+      updates: {
+        alias?: string | null;
+        direction?: 'up' | 'down' | 'both';
+        isCommuteStation?: boolean;
+      }
+    ) => {
+      try {
+        // Convert null to undefined for type compatibility
+        await updateFavorite(favoriteId, {
+          ...updates,
+          alias: updates.alias ?? undefined,
+        });
+        setEditingFavoriteId(null);
+      } catch (error) {
+        Alert.alert('오류', '즐겨찾기 수정에 실패했습니다.');
+        throw error;
+      }
+    },
+    [updateFavorite]
+  );
 
   /**
    * Handle favorite removal with confirmation
@@ -106,85 +198,34 @@ export const FavoritesScreen: React.FC = () => {
   );
 
   /**
+   * Render no results state (when filtered list is empty but favorites exist)
+   */
+  const renderNoResults = () => (
+    <View style={styles.emptyState}>
+      <Ionicons name="search-outline" size={64} color={COLORS.gray[300]} />
+      <Text style={styles.emptyTitle}>검색 결과가 없습니다</Text>
+      <Text style={styles.emptySubtitle}>
+        다른 검색어나 필터를 시도해보세요
+      </Text>
+    </View>
+  );
+
+  /**
    * Render favorite item
    */
   const renderFavoriteItem = (favorite: typeof favoritesWithDetails[0], index: number) => {
-    const { station } = favorite;
-
-    if (!station) {
-      return (
-        <View key={favorite.id} style={styles.errorCard}>
-          <View style={styles.errorContent}>
-            <Ionicons name="alert-circle-outline" size={24} color={COLORS.text.secondary} />
-            <View style={styles.errorTextContainer}>
-              <Text style={styles.errorText}>역 정보를 불러올 수 없습니다</Text>
-              <Text style={styles.errorSubtext}>
-                역 ID: {favorite.stationId}
-              </Text>
-            </View>
-          </View>
-          <TouchableOpacity
-            style={styles.deleteIconButton}
-            onPress={() => handleRemoveFavorite(favorite.id, '알 수 없는 역')}
-          >
-            <Ionicons name="trash-outline" size={20} color={COLORS.text.secondary} />
-          </TouchableOpacity>
-        </View>
-      );
-    }
-
     return (
-      <View key={favorite.id} style={styles.favoriteItemContainer}>
-        {/* Alias/Custom Name */}
-        {favorite.alias && (
-          <View style={styles.aliasContainer}>
-            <Ionicons name="pricetag" size={14} color={COLORS.text.secondary} />
-            <Text style={styles.aliasText}>{favorite.alias}</Text>
-          </View>
-        )}
-
-        {/* Station Card */}
-        <View style={styles.cardWrapper}>
-          <StationCard
-            station={station}
-            onPress={() => handleStationPress(favorite)}
-            showArrivals={true}
-            enableFavorite={false}
-            animationDelay={index * 50}
-          />
-
-          {/* Delete Button */}
-          <TouchableOpacity
-            style={styles.removeButton}
-            onPress={() => handleRemoveFavorite(favorite.id, station.name)}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <Ionicons name="close-circle" size={24} color={COLORS.text.secondary} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Direction & Commute Indicator */}
-        <View style={styles.metadataRow}>
-          {favorite.direction !== 'both' && (
-            <View style={styles.metadataItem}>
-              <Ionicons
-                name={favorite.direction === 'up' ? 'arrow-up' : 'arrow-down'}
-                size={14}
-                color={COLORS.text.secondary}
-              />
-              <Text style={styles.metadataText}>
-                {favorite.direction === 'up' ? '상행' : '하행'}
-              </Text>
-            </View>
-          )}
-          {favorite.isCommuteStation && (
-            <View style={[styles.metadataItem, styles.commuteIndicator]}>
-              <Ionicons name="briefcase" size={14} color={COLORS.black} />
-              <Text style={styles.commuteText}>출퇴근</Text>
-            </View>
-          )}
-        </View>
-      </View>
+      <DraggableFavoriteItem
+        key={favorite.id}
+        favorite={favorite}
+        index={index}
+        isEditing={editingFavoriteId === favorite.id}
+        onEditToggle={() => handleEditToggle(favorite.id)}
+        onRemove={() => handleRemoveFavorite(favorite.id, favorite.station?.name || '알 수 없는 역')}
+        onPress={() => handleStationPress(favorite)}
+        onSaveEdit={(updates) => handleSaveEdit(favorite.id, updates)}
+        isDragEnabled={false} // Will be enabled in Phase 3
+      />
     );
   };
 
@@ -230,6 +271,10 @@ export const FavoritesScreen: React.FC = () => {
     );
   }
 
+  // Determine which content to show
+  const hasNoFavorites = favoritesWithDetails.length === 0;
+  const hasNoResults = !hasNoFavorites && filteredFavorites.length === 0;
+
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
@@ -239,6 +284,17 @@ export const FavoritesScreen: React.FC = () => {
           {favoritesWithDetails.length}개의 역
         </Text>
       </View>
+
+      {/* Search Bar */}
+      {!hasNoFavorites && (
+        <FavoritesSearchBar
+          searchQuery={searchQuery}
+          onSearchChange={setSearchQuery}
+          activeFilters={activeFilters}
+          onFilterChange={setActiveFilters}
+          resultCount={filteredFavorites.length}
+        />
+      )}
 
       {/* Content */}
       <ScrollView
@@ -252,11 +308,13 @@ export const FavoritesScreen: React.FC = () => {
           />
         }
       >
-        {favoritesWithDetails.length === 0 ? (
+        {hasNoFavorites ? (
           renderEmptyState()
+        ) : hasNoResults ? (
+          renderNoResults()
         ) : (
           <View style={styles.listContainer}>
-            {favoritesWithDetails.map((favorite, index) =>
+            {filteredFavorites.map((favorite, index) =>
               renderFavoriteItem(favorite, index)
             )}
           </View>

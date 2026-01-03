@@ -214,6 +214,7 @@ export const HomeScreen: React.FC = () => {
       }
       accessible={false}
       contentInsetAdjustmentBehavior="automatic"
+      testID="home-screen"
     >
       {/* Welcome Section */}
       <View style={styles.welcomeSection}>
@@ -339,6 +340,7 @@ export const HomeScreen: React.FC = () => {
                 accessibilityLabel="실시간 정보 새로고침"
                 accessibilityHint="열차 도착 정보를 다시 불러옵니다"
                 disabled={refreshing}
+                testID="refresh-button"
               >
                 <Animated.View
                   style={{

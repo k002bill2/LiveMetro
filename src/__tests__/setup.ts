@@ -3,6 +3,9 @@
  * Global test environment setup and mocks
  */
 
+// Polyfill for Firebase (Firebase expects 'self' to be defined)
+(global as any).self = global;
+
 import 'react-native-gesture-handler/jestSetup';
 
 // Mock React Native modules
@@ -76,7 +79,7 @@ jest.mock('firebase/auth', () => ({
 // Mock Seoul API
 jest.mock('../services/api/seoulSubwayApi', () => ({
   seoulSubwayApi: {
-    getRealtimeArrivals: jest.fn(() => 
+    getRealtimeArrival: jest.fn(() =>
       Promise.resolve([
         {
           stationName: '강남역',
@@ -88,6 +91,21 @@ jest.mock('../services/api/seoulSubwayApi', () => ({
       ])
     ),
     getStationInfo: jest.fn(),
+    getAllStations: jest.fn(() => Promise.resolve([])),
+    getStationsByLine: jest.fn(() => Promise.resolve([])),
+    getStationTimetable: jest.fn(() => Promise.resolve([])),
+    checkServiceStatus: jest.fn(() => Promise.resolve(true)),
+    convertToAppTrain: jest.fn((seoulData) => ({
+      lineId: seoulData.trainLineNm || '2호선',
+      stationId: seoulData.statnId || 'station-1',
+      stationName: seoulData.statnNm || seoulData.stationName || '강남역',
+      direction: 'up',
+      arrivalMessage: seoulData.arvlMsg2 || '도착 예정',
+      arrivalTime: 120,
+      trainNumber: seoulData.btrainNo || 'train-1',
+      destinationStation: seoulData.bstatnNm || '종착역',
+      lastUpdated: new Date(),
+    })),
   },
 }));
 

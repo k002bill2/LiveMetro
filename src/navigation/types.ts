@@ -1,8 +1,63 @@
+import {
+  StationSelection,
+  TransferStation,
+  CommuteNotifications,
+  CommuteType,
+} from '@/models/commute';
+
 export type AppTabParamList = {
   Home: undefined;
   Favorites: undefined;
   Alerts: undefined;
   Settings: undefined;
+};
+
+export type SettingsStackParamList = {
+  SettingsHome: undefined;
+  DelayNotification: undefined;
+  NotificationTime: undefined;
+  SoundSettings: undefined;
+  LanguageSettings: undefined;
+  ThemeSettings: undefined;
+  LocationPermission: undefined;
+  Help: undefined;
+  PrivacyPolicy: undefined;
+};
+
+// Route data passed between onboarding screens
+export interface OnboardingRouteData {
+  departureTime: string;
+  departureStation: StationSelection;
+  arrivalStation: StationSelection;
+  transferStations: TransferStation[];
+  notifications?: CommuteNotifications;
+}
+
+export type OnboardingStackParamList = {
+  CommuteTime: {
+    commuteType: CommuteType;
+    initialTime?: string;
+    morningRoute?: OnboardingRouteData;
+    onTimeSet: (time: string) => void;
+    onSkip?: () => void;
+  };
+  CommuteRoute: {
+    commuteType: CommuteType;
+    departureTime: string;
+    morningRoute?: OnboardingRouteData;
+  };
+  CommuteNotification: {
+    commuteType: CommuteType;
+    departureTime: string;
+    departureStation: StationSelection;
+    arrivalStation: StationSelection;
+    transferStations: TransferStation[];
+    morningRoute?: OnboardingRouteData;
+  };
+  CommuteComplete: {
+    morningRoute: OnboardingRouteData;
+    eveningRoute: OnboardingRouteData;
+  };
 };
 
 export type AppStackParamList = {
@@ -21,4 +76,7 @@ export type AppStackParamList = {
   // Unauthenticated screens
   Welcome: undefined;
   Auth: undefined;
+
+  // Onboarding screens
+  Onboarding: undefined;
 };

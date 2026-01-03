@@ -93,10 +93,10 @@ class SeoulSubwayApiService {
 
   constructor() {
     this.baseUrl = process.env.SEOUL_SUBWAY_API_BASE_URL || 'http://swopenapi.seoul.go.kr/api/subway';
-    this.apiKey = process.env.SEOUL_SUBWAY_API_KEY || '';
+    this.apiKey = process.env.EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY || '';
     
     if (!this.apiKey) {
-      console.warn('Seoul Subway API key not found. Please set SEOUL_SUBWAY_API_KEY environment variable.');
+      console.warn('Seoul Subway API key not found. Please set EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY environment variable.');
     }
   }
 
