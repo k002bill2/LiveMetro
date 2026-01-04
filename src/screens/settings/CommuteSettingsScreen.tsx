@@ -3,7 +3,7 @@
  * Allows users to view and configure commute routes
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -12,15 +12,18 @@ import {
   SafeAreaView,
   ScrollView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect } from '@react-navigation/native';
 
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '@/styles/modernTheme';
 import { SettingsStackParamList } from '@/navigation/types';
 import { useAuth } from '@/services/auth/AuthContext';
 import { useOnboarding } from '@/contexts/OnboardingContext';
+import { loadCommuteRoutes } from '@/services/commute/commuteService';
+import { CommuteRoute } from '@/models/commute';
 
 type Props = NativeStackScreenProps<SettingsStackParamList, 'CommuteSettings'>;
 
@@ -43,34 +46,71 @@ interface CommuteRouteData {
   }>;
 }
 
-const COMMUTE_STORAGE_KEY = '@livemetro/commute_settings';
-
-export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
+export const CommuteSettingsScreen: React.FC<Props> = ({ navigation: _navigation }) => {
   const { user } = useAuth();
   const { resetOnboarding } = useOnboarding();
   const [morningRoute, setMorningRoute] = useState<CommuteRouteData | null>(null);
   const [eveningRoute, setEveningRoute] = useState<CommuteRouteData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    loadCommuteSettings();
-  }, []);
+  // Convert Firebase CommuteRoute to local CommuteRouteData format
+  const convertToRouteData = (route: CommuteRoute | null): CommuteRouteData | null => {
+    if (!route) return null;
+    return {
+      departureTime: route.departureTime,
+      departureStation: {
+        stationId: route.departureStationId,
+        stationName: route.departureStationName,
+        lineId: route.departureLineId,
+      },
+      arrivalStation: {
+        stationId: route.arrivalStationId,
+        stationName: route.arrivalStationName,
+        lineId: route.arrivalLineId,
+      },
+      transferStations: (route.transferStations || []).map(t => ({
+        stationId: t.stationId,
+        stationName: t.stationName,
+        lineId: t.lineId,
+      })),
+    };
+  };
 
-  const loadCommuteSettings = async (): Promise<void> => {
+  // Load commute settings from Firebase
+  const loadSettings = useCallback(async (): Promise<void> => {
+    const uid = user?.id;
+    if (!uid) {
+      console.log('No user ID available');
+      setLoading(false);
+      return;
+    }
+
     try {
-      const key = `${COMMUTE_STORAGE_KEY}_${user?.id}`;
-      const stored = await AsyncStorage.getItem(key);
-      if (stored) {
-        const data = JSON.parse(stored);
-        setMorningRoute(data.morningRoute || null);
-        setEveningRoute(data.eveningRoute || null);
+      setLoading(true);
+      const settings = await loadCommuteRoutes(uid);
+
+      if (settings) {
+        setMorningRoute(convertToRouteData(settings.morningRoute));
+        setEveningRoute(convertToRouteData(settings.eveningRoute));
+        console.log('Commute settings loaded from Firebase');
+      } else {
+        console.log('No commute settings found in Firebase');
+        setMorningRoute(null);
+        setEveningRoute(null);
       }
     } catch (error) {
       console.error('Error loading commute settings:', error);
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.id]);
+
+  // Load on mount and when screen focuses
+  useFocusEffect(
+    useCallback(() => {
+      loadSettings();
+    }, [loadSettings])
+  );
 
   const handleSetupCommute = (): void => {
     Alert.alert(
@@ -146,7 +186,8 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>불러오는 중...</Text>
+          <ActivityIndicator size="large" color={COLORS.black} />
+          <Text style={styles.loadingText}>출퇴근 설정을 불러오는 중...</Text>
         </View>
       </SafeAreaView>
     );

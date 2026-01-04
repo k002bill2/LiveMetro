@@ -4,7 +4,7 @@
  * Minimal grayscale design with black accent
  */
 
-import React from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -13,6 +13,7 @@ import {
   SafeAreaView,
   ScrollView,
   Alert,
+  Switch,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -20,11 +21,83 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useAuth } from '../../services/auth/AuthContext';
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '../../styles/modernTheme';
 import { SettingsStackParamList } from '@/navigation/types';
+import {
+  isBiometricAvailable,
+  isBiometricLoginEnabled,
+  getBiometricTypeName,
+  disableBiometricLogin,
+  hasStoredCredentials,
+} from '../../services/auth/biometricService';
 
 type Props = NativeStackScreenProps<SettingsStackParamList, 'SettingsHome'>;
 
 export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   const { user, signOut } = useAuth();
+
+  // Biometric state
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [biometricTypeName, setBiometricTypeName] = useState('생체인증');
+
+  // Check biometric status on mount
+  useEffect(() => {
+    const checkBiometric = async (): Promise<void> => {
+      try {
+        const available = await isBiometricAvailable();
+        setBiometricAvailable(available);
+
+        if (available) {
+          const enabled = await isBiometricLoginEnabled();
+          setBiometricEnabled(enabled);
+
+          const typeName = await getBiometricTypeName();
+          setBiometricTypeName(typeName);
+        }
+      } catch (error) {
+        console.error('Error checking biometric status:', error);
+      }
+    };
+
+    checkBiometric();
+  }, []);
+
+  // Handle biometric toggle
+  const handleBiometricToggle = useCallback(async (value: boolean): Promise<void> => {
+    if (value) {
+      // Check if credentials are stored
+      const hasCredentials = await hasStoredCredentials();
+      if (!hasCredentials) {
+        Alert.alert(
+          '설정 필요',
+          `${biometricTypeName} 로그인을 사용하려면 먼저 이메일/비밀번호로 로그인해주세요.`,
+          [{ text: '확인' }]
+        );
+        return;
+      }
+      setBiometricEnabled(true);
+    } else {
+      // Confirm disable
+      Alert.alert(
+        `${biometricTypeName} 비활성화`,
+        `${biometricTypeName} 로그인을 비활성화하시겠습니까?`,
+        [
+          { text: '취소', style: 'cancel' },
+          {
+            text: '비활성화',
+            style: 'destructive',
+            onPress: async () => {
+              const success = await disableBiometricLogin();
+              if (success) {
+                setBiometricEnabled(false);
+              } else {
+                Alert.alert('오류', '설정 변경에 실패했습니다.');
+              }
+            },
+          },
+        ]
+      );
+    }
+  }, [biometricTypeName]);
 
   const handleSignOut = async (): Promise<void> => {
     Alert.alert(
@@ -149,6 +222,36 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
             />
           </View>
         </View>
+
+        {/* Security Settings */}
+        {biometricAvailable && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>보안</Text>
+            <View style={styles.settingGroup}>
+              <View style={styles.settingItem}>
+                <View style={styles.settingItemLeft}>
+                  <View style={styles.iconContainer}>
+                    <Ionicons
+                      name={biometricTypeName === 'Face ID' ? 'scan-outline' : 'finger-print-outline'}
+                      size={20}
+                      color={COLORS.black}
+                    />
+                  </View>
+                  <View style={styles.textContainer}>
+                    <Text style={styles.settingTitle}>{biometricTypeName} 로그인</Text>
+                    <Text style={styles.settingSubtitle}>{biometricTypeName}로 빠르게 로그인</Text>
+                  </View>
+                </View>
+                <Switch
+                  value={biometricEnabled}
+                  onValueChange={handleBiometricToggle}
+                  trackColor={{ false: COLORS.gray[300], true: COLORS.black }}
+                  thumbColor={COLORS.white}
+                />
+              </View>
+            </View>
+          </View>
+        )}
 
         {/* About */}
         <View style={styles.section}>

@@ -11,6 +11,7 @@ import {
   Animated,
   Easing,
 } from 'react-native';
+import { WebView } from 'react-native-webview';
 import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
@@ -23,10 +24,6 @@ import { useAdjacentStations } from '../../hooks/useAdjacentStations';
 type StationDetailRouteProp = RouteProp<AppStackParamList, 'StationDetail'>;
 const TAB_LABELS = ['출발', '도착', '시간표', '즐겨찾기'] as const;
 type TabLabel = (typeof TAB_LABELS)[number];
-const SUBWAY_MAP_SOURCES = [
-  'https://t1.daumcdn.net/mapjsapi/images/subway/m_subway_map_seoul.png',
-  'https://t1.kakaocdn.net/kakaomap_web_kiss/subway/seoul.png',
-];
 
 const StationDetailScreen: React.FC = () => {
   const route = useRoute<StationDetailRouteProp>();
@@ -46,8 +43,6 @@ const StationDetailScreen: React.FC = () => {
   const [currentTime, setCurrentTime] = useState(new Date());
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<TabLabel>('출발');
-  const [mapSourceIndex, setMapSourceIndex] = useState(0);
-  const [mapLoading, setMapLoading] = useState(true);
   const [mapLoadError, setMapLoadError] = useState(false);
   const rotateAnim = useRef(new Animated.Value(0)).current;
 
@@ -151,21 +146,6 @@ const StationDetailScreen: React.FC = () => {
 
   const lineColor = getSubwayLineColor(lineId);
 
-  const handleMapLoad = () => {
-    setMapLoading(false);
-    setMapLoadError(false);
-  };
-
-  const handleMapError = () => {
-    if (mapSourceIndex < SUBWAY_MAP_SOURCES.length - 1) {
-      setMapSourceIndex((prev) => prev + 1);
-      setMapLoading(true);
-      setMapLoadError(false);
-      return;
-    }
-    setMapLoadError(true);
-    setMapLoading(false);
-  };
 
   const openKakaoSubway = () => {
     Linking.openURL('https://map.kakao.com/?subwayMap').catch(() => {
@@ -330,26 +310,26 @@ const StationDetailScreen: React.FC = () => {
         >
           <View style={styles.subwayMapHeader}>
             <Text style={styles.subwayMapTitle}>서울 지하철 노선도</Text>
-            <Text style={styles.subwayMapSubtitle}>카카오 지하철 (kakaoSubway)</Text>
+            <Text style={styles.subwayMapSubtitle}>다음 지하철 (Daum Subway)</Text>
           </View>
-          <View style={styles.subwayMapImageWrapper}>
-            <Image
-              key={SUBWAY_MAP_SOURCES[mapSourceIndex]}
-              source={{ uri: SUBWAY_MAP_SOURCES[mapSourceIndex] }}
-              style={styles.subwayMapImage}
-              resizeMode="contain"
-              accessibilityIgnoresInvertColors
-              onLoad={handleMapLoad}
-              onError={handleMapError}
+          <View style={styles.subwayMapWebViewWrapper}>
+            <WebView
+              source={{ uri: 'https://m.map.kakao.com/actions/subwayRouteView' }}
+              style={styles.subwayMapWebView}
+              startInLoadingState={true}
+              renderLoading={() => (
+                <View style={styles.subwayMapLoader}>
+                  <ActivityIndicator size="large" color="#f59e0b" />
+                  <Text style={styles.subwayMapLoaderText}>노선도 불러오는 중...</Text>
+                </View>
+              )}
+              onError={() => setMapLoadError(true)}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              scalesPageToFit={true}
             />
-            {mapLoading && (
-              <View style={styles.subwayMapLoader}>
-                <ActivityIndicator size="large" color="#f59e0b" />
-                <Text style={styles.subwayMapLoaderText}>노선도 불러오는 중...</Text>
-              </View>
-            )}
           </View>
-          {mapLoadError ? (
+          {mapLoadError && (
             <View style={styles.subwayMapError}>
               <Text style={styles.subwayMapErrorText}>
                 네트워크 연결을 확인한 뒤 다시 시도하거나 카카오맵에서 노선도를 확인하세요.
@@ -362,10 +342,6 @@ const StationDetailScreen: React.FC = () => {
                 <Text style={styles.subwayMapLinkText}>카카오맵 노선도 열기</Text>
               </TouchableOpacity>
             </View>
-          ) : (
-            <Text style={styles.subwayMapCaption}>
-              노선을 확대하여 환승 가능 여부와 구간별 운행 상태를 확인하세요.
-            </Text>
           )}
         </View>
       )}
@@ -617,6 +593,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#fefce8',
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  subwayMapWebViewWrapper: {
+    width: '100%',
+    height: 400,
+    borderRadius: 12,
+    overflow: 'hidden',
+    backgroundColor: '#ffffff',
+  },
+  subwayMapWebView: {
+    flex: 1,
+    backgroundColor: '#ffffff',
   },
   subwayMapLoader: {
     position: 'absolute',

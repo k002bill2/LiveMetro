@@ -72,7 +72,9 @@
     "react-native-svg": "13.9.0",
     "react-native-web": "~0.19.6",
     "react-native-webview": "^13.2.2",
-    "expo-dev-client": "~2.4.13"
+    "expo-dev-client": "~2.4.13",
+    "expo-local-authentication": "~13.4.1",
+    "expo-secure-store": "~12.3.1"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",

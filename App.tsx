@@ -1,6 +1,6 @@
 /**
  * LiveMetro App Entry Point
- * Real-time Seoul subway notification app
+* Real-time Seoul subway notification app
  */
 
 import React from 'react';

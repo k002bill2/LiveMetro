@@ -3,7 +3,7 @@
  * Handles user sign-in and sign-up
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -16,9 +16,21 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useAuth } from '../../services/auth/AuthContext';
 import { analyzeAuthError, printFirebaseDebugInfo } from '../../utils/firebaseDebug';
+import {
+  isBiometricAvailable,
+  isBiometricLoginEnabled,
+  getBiometricTypeName,
+  performBiometricLogin,
+  enableBiometricLogin,
+} from '../../services/auth/biometricService';
+
+// Storage keys for remember email
+const REMEMBER_EMAIL_KEY = '@livemetro_remember_email';
+const SAVED_EMAIL_KEY = '@livemetro_saved_email';
 
 export const AuthScreen: React.FC = () => {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -27,7 +39,109 @@ export const AuthScreen: React.FC = () => {
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Remember email state
+  const [rememberEmail, setRememberEmail] = useState(false);
+
+  // Biometric state
+  const [biometricAvailable, setBiometricAvailable] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [biometricTypeName, setBiometricTypeName] = useState('생체인증');
+
   const { signInWithEmail, signUpWithEmail, signInAnonymously, resetPassword } = useAuth();
+
+  // Load saved email and check biometric on mount
+  useEffect(() => {
+    const loadSavedData = async (): Promise<void> => {
+      try {
+        // Load saved email
+        const savedRemember = await AsyncStorage.getItem(REMEMBER_EMAIL_KEY);
+        if (savedRemember === 'true') {
+          setRememberEmail(true);
+          const savedEmail = await AsyncStorage.getItem(SAVED_EMAIL_KEY);
+          if (savedEmail) {
+            setEmail(savedEmail);
+          }
+        }
+
+        // Check biometric availability
+        const available = await isBiometricAvailable();
+        setBiometricAvailable(available);
+
+        if (available) {
+          const enabled = await isBiometricLoginEnabled();
+          setBiometricEnabled(enabled);
+
+          const typeName = await getBiometricTypeName();
+          setBiometricTypeName(typeName);
+        }
+      } catch (error) {
+        console.error('Error loading saved data:', error);
+      }
+    };
+
+    loadSavedData();
+  }, []);
+
+  // Handle biometric login
+  const handleBiometricLogin = useCallback(async (): Promise<void> => {
+    setLoading(true);
+    try {
+      const result = await performBiometricLogin();
+
+      if (result.success && result.credentials) {
+        // Perform actual login with stored credentials
+        await signInWithEmail(result.credentials.email, result.credentials.password);
+      } else if (result.error && result.error !== 'fallback') {
+        Alert.alert('인증 실패', result.error);
+      }
+    } catch (error) {
+      console.error('Biometric login error:', error);
+      Alert.alert('오류', '생체인증 로그인에 실패했습니다.');
+    } finally {
+      setLoading(false);
+    }
+  }, [signInWithEmail]);
+
+  // Save email preference
+  const saveEmailPreference = useCallback(async (emailToSave: string): Promise<void> => {
+    try {
+      if (rememberEmail) {
+        await AsyncStorage.setItem(REMEMBER_EMAIL_KEY, 'true');
+        await AsyncStorage.setItem(SAVED_EMAIL_KEY, emailToSave);
+      } else {
+        await AsyncStorage.setItem(REMEMBER_EMAIL_KEY, 'false');
+        await AsyncStorage.removeItem(SAVED_EMAIL_KEY);
+      }
+    } catch (error) {
+      console.error('Error saving email preference:', error);
+    }
+  }, [rememberEmail]);
+
+  // Prompt to enable biometric after successful login
+  const promptBiometricSetup = useCallback(async (
+    loginEmail: string,
+    loginPassword: string
+  ): Promise<void> => {
+    if (!biometricAvailable || biometricEnabled) return;
+
+    Alert.alert(
+      `${biometricTypeName} 설정`,
+      `다음에 ${biometricTypeName}로 빠르게 로그인하시겠습니까?`,
+      [
+        { text: '나중에', style: 'cancel' },
+        {
+          text: '설정하기',
+          onPress: async () => {
+            const success = await enableBiometricLogin(loginEmail, loginPassword);
+            if (success) {
+              setBiometricEnabled(true);
+              Alert.alert('완료', `${biometricTypeName} 로그인이 활성화되었습니다.`);
+            }
+          },
+        },
+      ]
+    );
+  }, [biometricAvailable, biometricEnabled, biometricTypeName]);
 
   // Email validation
   const isValidEmail = (email: string): boolean => {
@@ -69,12 +183,20 @@ export const AuthScreen: React.FC = () => {
 
     setLoading(true);
 
+    const trimmedEmail = email.trim();
+
     try {
       if (isSignUp) {
-        await signUpWithEmail(email.trim(), password, displayName.trim());
+        await signUpWithEmail(trimmedEmail, password, displayName.trim());
         Alert.alert('성공', '계정이 생성되었습니다!');
       } else {
-        await signInWithEmail(email.trim(), password);
+        await signInWithEmail(trimmedEmail, password);
+
+        // Save email preference after successful login
+        await saveEmailPreference(trimmedEmail);
+
+        // Prompt for biometric setup (only on login, not signup)
+        await promptBiometricSetup(trimmedEmail, password);
       }
     } catch (error) {
       console.error('Auth error:', error);
@@ -219,6 +341,27 @@ export const AuthScreen: React.FC = () => {
               />
             </View>
 
+            {/* Remember Email Checkbox (only for login) */}
+            {!isSignUp && (
+              <View style={styles.rememberContainer}>
+                <TouchableOpacity
+                  style={styles.rememberRow}
+                  onPress={() => setRememberEmail(!rememberEmail)}
+                  activeOpacity={0.7}
+                >
+                  <View style={[
+                    styles.checkbox,
+                    rememberEmail && styles.checkboxChecked
+                  ]}>
+                    {rememberEmail && (
+                      <Ionicons name="checkmark" size={14} color="#ffffff" />
+                    )}
+                  </View>
+                  <Text style={styles.rememberText}>이메일 기억하기</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+
             <TouchableOpacity
               style={[styles.primaryButton, loading && styles.disabledButton]}
               onPress={handleSubmit}
@@ -230,6 +373,26 @@ export const AuthScreen: React.FC = () => {
                 {loading ? '처리중...' : (isSignUp ? '계정 만들기' : '로그인')}
               </Text>
             </TouchableOpacity>
+
+            {/* Biometric Login Button */}
+            {!isSignUp && biometricAvailable && biometricEnabled && (
+              <TouchableOpacity
+                style={[styles.biometricButton, loading && styles.disabledButton]}
+                onPress={handleBiometricLogin}
+                disabled={loading}
+                testID="biometric-login-button"
+                accessibilityLabel={`${biometricTypeName}로 로그인`}
+              >
+                <Ionicons
+                  name={biometricTypeName === 'Face ID' ? 'scan-outline' : 'finger-print-outline'}
+                  size={24}
+                  color="#2563eb"
+                />
+                <Text style={styles.biometricButtonText}>
+                  {biometricTypeName}로 로그인
+                </Text>
+              </TouchableOpacity>
+            )}
 
             {/* Forgot Password */}
             {!isSignUp && (
@@ -414,6 +577,51 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: '#374151',
+    marginLeft: 8,
+  },
+  // Remember email styles
+  rememberContainer: {
+    marginBottom: 16,
+  },
+  rememberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#d1d5db',
+    backgroundColor: '#ffffff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  checkboxChecked: {
+    backgroundColor: '#2563eb',
+    borderColor: '#2563eb',
+  },
+  rememberText: {
+    fontSize: 14,
+    color: '#374151',
+  },
+  // Biometric button styles
+  biometricButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#eff6ff',
+    borderWidth: 1,
+    borderColor: '#2563eb',
+    paddingVertical: 14,
+    borderRadius: 8,
+    marginTop: 12,
+  },
+  biometricButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#2563eb',
     marginLeft: 8,
   },
 });

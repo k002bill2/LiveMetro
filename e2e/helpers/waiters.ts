@@ -209,7 +209,7 @@ export async function waitForLoadingComplete(
  * Note: This requires app instrumentation to expose network state
  * @param timeout - Maximum wait time in ms
  */
-export async function waitForNetworkIdle(timeout = 10000): Promise<void> {
+export async function waitForNetworkIdle(_timeout = 10000): Promise<void> {
   // This is a placeholder - actual implementation would depend on
   // how the app exposes network state
   await browser.pause(2000);

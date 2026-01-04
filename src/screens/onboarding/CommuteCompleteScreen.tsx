@@ -26,6 +26,8 @@ import {
   DEFAULT_COMMUTE_NOTIFICATIONS,
   DEFAULT_BUFFER_MINUTES,
 } from '@/models/commute';
+import { useAuth } from '@/services/auth/AuthContext';
+import { saveCommuteRoutes } from '@/services/commute/commuteService';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'CommuteComplete'>;
 
@@ -42,6 +44,7 @@ const formatTime = (time: string): string => {
 export const CommuteCompleteScreen: React.FC<Props> = ({ navigation, route }) => {
   const [saving, setSaving] = useState(false);
   const { onComplete } = useOnboardingCallbacks();
+  const { user } = useAuth();
 
   // 파라미터가 없으면 로딩 상태 표시 (Native Stack pre-render 대응)
   if (!route.params?.morningRoute || !route.params?.eveningRoute) {
@@ -94,8 +97,19 @@ export const CommuteCompleteScreen: React.FC<Props> = ({ navigation, route }) =>
   const handleComplete = async () => {
     setSaving(true);
     try {
-      // TODO: Save to Firebase/AsyncStorage
-      // await commuteService.saveCommuteRoutes(morningRouteData, eveningRouteData);
+      // Save to Firebase using user ID (works for both anonymous and authenticated users)
+      const uid = user?.id;
+      if (!uid) {
+        Alert.alert('오류', '사용자 정보를 찾을 수 없습니다. 다시 로그인해주세요.');
+        setSaving(false);
+        return;
+      }
+
+      const result = await saveCommuteRoutes(uid, morningRouteData, eveningRouteData);
+
+      if (!result.success) {
+        throw new Error(result.error || '저장에 실패했습니다');
+      }
 
       // Show success message
       Alert.alert(
