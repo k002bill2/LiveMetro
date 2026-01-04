@@ -5,7 +5,8 @@
 
 import React from 'react';
 import { View, Text, StyleSheet, ViewStyle } from 'react-native';
-import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
+import { SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
+import { useTheme } from '@/services/theme';
 
 interface SettingSectionProps {
   title?: string;
@@ -18,6 +19,9 @@ export const SettingSection: React.FC<SettingSectionProps> = ({
   children,
   style,
 }) => {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   return (
     <View style={[styles.section, style]}>
       {title && <Text style={styles.sectionTitle}>{title}</Text>}
@@ -26,27 +30,28 @@ export const SettingSection: React.FC<SettingSectionProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  section: {
-    marginBottom: SPACING.xl,
-  },
-  sectionTitle: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.secondary,
-    marginBottom: SPACING.md,
-    marginHorizontal: SPACING.lg,
-    letterSpacing: TYPOGRAPHY.letterSpacing.wide,
-    textTransform: 'uppercase',
-  },
-  sectionContent: {
-    backgroundColor: COLORS.white,
-    marginHorizontal: SPACING.lg,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: COLORS.border.light,
-    overflow: 'hidden',
-  },
-});
+const createStyles = (colors: any) =>
+  StyleSheet.create({
+    section: {
+      marginBottom: SPACING.xl,
+    },
+    sectionTitle: {
+      fontSize: TYPOGRAPHY.fontSize.sm,
+      fontWeight: TYPOGRAPHY.fontWeight.semibold,
+      color: colors.textSecondary,
+      marginBottom: SPACING.md,
+      marginHorizontal: SPACING.lg,
+      letterSpacing: TYPOGRAPHY.letterSpacing.wide,
+      textTransform: 'uppercase',
+    },
+    sectionContent: {
+      backgroundColor: colors.surface,
+      marginHorizontal: SPACING.lg,
+      borderRadius: RADIUS.lg,
+      borderWidth: 1,
+      borderColor: colors.borderLight,
+      overflow: 'hidden',
+    },
+  });
 
 export default SettingSection;

@@ -105,7 +105,7 @@ const TrainArrivalItem: React.FC<TrainArrivalItemProps> = memo(({ train }) => {
     >
       <View style={styles.trainHeader}>
         <View style={styles.directionInfo}>
-          <Ionicons name="train" size={16} color="#6b7280" />
+          <Ionicons name="train" size={16} color={COLORS.text.secondary} />
           <Text style={styles.direction}>{getDestinationName()} 방면</Text>
         </View>
 
@@ -298,7 +298,7 @@ export const TrainArrivalList: React.FC<TrainArrivalListProps> = memo(({ station
       accessibilityRole="text"
       accessibilityLabel="현재 도착 예정인 열차가 없습니다. 잠시 후 다시 확인해보세요"
     >
-      <Ionicons name="train-outline" size={48} color="#9ca3af" />
+      <Ionicons name="train-outline" size={48} color={COLORS.text.tertiary} />
       <Text style={styles.emptyText}>현재 도착 예정인 열차가 없습니다</Text>
       <Text style={styles.emptySubtext}>잠시 후 다시 확인해보세요</Text>
     </View>
@@ -312,7 +312,7 @@ export const TrainArrivalList: React.FC<TrainArrivalListProps> = memo(({ station
         accessibilityRole="progressbar"
         accessibilityLabel="실시간 열차 정보를 불러오고 있습니다"
       >
-        <Ionicons name="refresh" size={24} color="#2563eb" />
+        <Ionicons name="refresh" size={24} color={COLORS.primary.main} />
         <Text style={styles.loadingText}>실시간 열차 정보를 불러오고 있습니다...</Text>
       </View>
     );

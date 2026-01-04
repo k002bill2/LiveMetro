@@ -1,0 +1,267 @@
+"use strict";
+/**
+ * Email Service - SendGrid Integration
+ * Handles email sending for notifications
+ */
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || (function () {
+    var ownKeys = function(o) {
+        ownKeys = Object.getOwnPropertyNames || function (o) {
+            var ar = [];
+            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
+            return ar;
+        };
+        return ownKeys(o);
+    };
+    return function (mod) {
+        if (mod && mod.__esModule) return mod;
+        var result = {};
+        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
+        __setModuleDefault(result, mod);
+        return result;
+    };
+})();
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.emailService = void 0;
+const sgMail = __importStar(require("@sendgrid/mail"));
+const functions = __importStar(require("firebase-functions"));
+const types_1 = require("../types");
+class EmailService {
+    constructor() {
+        this.initialized = false;
+        this.senderEmail = '';
+    }
+    /**
+     * Initialize SendGrid with API key from Firebase config
+     */
+    initialize() {
+        var _a, _b;
+        if (this.initialized)
+            return true;
+        try {
+            const config = functions.config();
+            const apiKey = (_a = config.sendgrid) === null || _a === void 0 ? void 0 : _a.apikey;
+            this.senderEmail = ((_b = config.sendgrid) === null || _b === void 0 ? void 0 : _b.sender) || 'noreply@livemetro.app';
+            if (!apiKey) {
+                console.error('SendGrid API key not configured. Run: firebase functions:config:set sendgrid.apikey="YOUR_KEY"');
+                return false;
+            }
+            sgMail.setApiKey(apiKey);
+            this.initialized = true;
+            return true;
+        }
+        catch (error) {
+            console.error('Failed to initialize SendGrid:', error);
+            return false;
+        }
+    }
+    /**
+     * Send email notification
+     */
+    async sendNotification(toEmail, type, data) {
+        if (!this.initialize()) {
+            return { success: false, error: 'Email service not configured' };
+        }
+        try {
+            const content = this.buildEmailContent(type, data);
+            const msg = {
+                to: toEmail,
+                from: {
+                    email: this.senderEmail,
+                    name: 'LiveMetro',
+                },
+                subject: content.subject,
+                html: content.html,
+            };
+            const [response] = await sgMail.send(msg);
+            return {
+                success: true,
+                messageId: response.headers['x-message-id'],
+            };
+        }
+        catch (error) {
+            console.error('Email send error:', error);
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Failed to send email',
+            };
+        }
+    }
+    /**
+     * Build email content based on notification type
+     */
+    buildEmailContent(type, data) {
+        switch (type) {
+            case types_1.NotificationType.DELAY_ALERT:
+                return this.buildDelayAlertEmail(data);
+            case types_1.NotificationType.EMERGENCY_ALERT:
+                return this.buildEmergencyAlertEmail(data);
+            case types_1.NotificationType.SERVICE_UPDATE:
+                return this.buildServiceUpdateEmail(data);
+            default:
+                return this.buildServiceUpdateEmail(data);
+        }
+    }
+    /**
+     * Build delay alert email
+     */
+    buildDelayAlertEmail(data) {
+        const subject = `[LiveMetro] ${data.lineName || '지하철'} 지연 알림`;
+        const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+          .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+          .header { background: #2563eb; color: white; padding: 24px; text-align: center; }
+          .header h1 { margin: 0; font-size: 24px; }
+          .content { padding: 24px; }
+          .info-box { background: #f3f4f6; padding: 16px; border-radius: 8px; margin: 16px 0; }
+          .info-row { margin: 8px 0; }
+          .label { color: #6b7280; font-size: 14px; }
+          .value { color: #111827; font-size: 16px; font-weight: 600; }
+          .footer { padding: 16px 24px; background: #f9fafb; font-size: 12px; color: #6b7280; text-align: center; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🚇 열차 지연 알림</h1>
+          </div>
+          <div class="content">
+            <p>아래 노선에서 열차 지연이 발생했습니다.</p>
+            <div class="info-box">
+              <div class="info-row">
+                <span class="label">노선</span>
+                <p class="value">${data.lineName || '-'}</p>
+              </div>
+              <div class="info-row">
+                <span class="label">역</span>
+                <p class="value">${data.stationName || '-'}</p>
+              </div>
+              <div class="info-row">
+                <span class="label">지연 시간</span>
+                <p class="value">${data.delayMinutes || 0}분</p>
+              </div>
+              ${data.reason ? `
+              <div class="info-row">
+                <span class="label">지연 사유</span>
+                <p class="value">${data.reason}</p>
+              </div>
+              ` : ''}
+            </div>
+          </div>
+          <div class="footer">
+            이 알림은 LiveMetro 앱 설정에서 비활성화할 수 있습니다.
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+        return { to: '', subject, html };
+    }
+    /**
+     * Build emergency alert email
+     */
+    buildEmergencyAlertEmail(data) {
+        const subject = '[긴급] LiveMetro 서비스 알림';
+        const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+          .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+          .header { background: #dc2626; color: white; padding: 24px; text-align: center; }
+          .header h1 { margin: 0; font-size: 24px; }
+          .content { padding: 24px; }
+          .alert-box { background: #fef2f2; border-left: 4px solid #dc2626; padding: 16px; border-radius: 0 8px 8px 0; margin: 16px 0; }
+          .affected-lines { margin-top: 16px; padding: 12px; background: #f3f4f6; border-radius: 8px; }
+          .footer { padding: 16px 24px; background: #f9fafb; font-size: 12px; color: #6b7280; text-align: center; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>🚨 긴급 알림</h1>
+          </div>
+          <div class="content">
+            <div class="alert-box">
+              <p style="margin: 0; font-size: 16px; color: #991b1b;">${data.message || '서비스에 문제가 발생했습니다.'}</p>
+            </div>
+            ${data.affectedLines && data.affectedLines.length > 0 ? `
+            <div class="affected-lines">
+              <strong>영향 노선:</strong> ${data.affectedLines.join(', ')}
+            </div>
+            ` : ''}
+          </div>
+          <div class="footer">
+            발송 시각: ${new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' })}
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+        return { to: '', subject, html };
+    }
+    /**
+     * Build service update email
+     */
+    buildServiceUpdateEmail(data) {
+        const subject = '[LiveMetro] 서비스 안내';
+        const html = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: 'Apple SD Gothic Neo', 'Noto Sans KR', Arial, sans-serif; margin: 0; padding: 20px; background: #f5f5f5; }
+          .container { max-width: 600px; margin: 0 auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+          .header { background: #2563eb; color: white; padding: 24px; text-align: center; }
+          .header h1 { margin: 0; font-size: 24px; }
+          .content { padding: 24px; }
+          .message-box { background: #f0f9ff; padding: 16px; border-radius: 8px; margin: 16px 0; }
+          .footer { padding: 16px 24px; background: #f9fafb; font-size: 12px; color: #6b7280; text-align: center; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>📢 서비스 안내</h1>
+          </div>
+          <div class="content">
+            <div class="message-box">
+              <p style="margin: 0; font-size: 16px;">${data.message || 'LiveMetro에서 알려드립니다.'}</p>
+            </div>
+          </div>
+          <div class="footer">
+            이 알림은 LiveMetro 앱 설정에서 비활성화할 수 있습니다.
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+        return { to: '', subject, html };
+    }
+}
+// Export singleton instance
+exports.emailService = new EmailService();
+//# sourceMappingURL=emailService.js.map

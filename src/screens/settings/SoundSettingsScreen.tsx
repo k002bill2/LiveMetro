@@ -3,7 +3,7 @@
  * Configure notification sound and vibration preferences
  */
 
-import React, { useState } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -18,13 +18,79 @@ import { useAuth } from '@/services/auth/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
 import SettingSection from '@/components/settings/SettingSection';
 import SettingToggle from '@/components/settings/SettingToggle';
+import SettingSlider from '@/components/settings/SettingSlider';
+import SoundPicker from '@/components/settings/SoundPicker';
+import VibrationPicker from '@/components/settings/VibrationPicker';
+import {
+  soundService,
+  NOTIFICATION_SOUNDS,
+  VIBRATION_PATTERNS,
+} from '@/services/sound/soundService';
+import {
+  NotificationSoundId,
+  VibrationPatternId,
+  SoundPreferences,
+} from '@/models/user';
+import { emailNotificationService } from '@/services/email/emailService';
+
+// Default sound settings for fallback
+const DEFAULT_SOUND_SETTINGS: SoundPreferences = {
+  soundEnabled: true,
+  soundId: 'default',
+  volume: 80,
+  vibrationEnabled: true,
+  vibrationPattern: 'default',
+};
 
 export const SoundSettingsScreen: React.FC = () => {
   const { user, updateUserProfile } = useAuth();
   const { sendTestNotification } = useNotifications();
   const [saving, setSaving] = useState(false);
+  const [sendingTestEmail, setSendingTestEmail] = useState(false);
+
+  // Check if email notifications can be enabled for this user
+  const canEnableEmail = user && !user.isAnonymous && !!user.email;
 
   const notificationSettings = user?.preferences.notificationSettings;
+  const soundSettings = notificationSettings?.soundSettings || DEFAULT_SOUND_SETTINGS;
+
+  // Initialize sound service
+  useEffect(() => {
+    soundService.initialize();
+
+    return () => {
+      soundService.cleanup();
+    };
+  }, []);
+
+  // Helper to update sound settings
+  const updateSoundSettings = useCallback(
+    async (updates: Partial<SoundPreferences>): Promise<void> => {
+      if (!user) return;
+
+      try {
+        setSaving(true);
+        await updateUserProfile({
+          preferences: {
+            ...user.preferences,
+            notificationSettings: {
+              ...user.preferences.notificationSettings,
+              soundSettings: {
+                ...soundSettings,
+                ...updates,
+              },
+            },
+          },
+        });
+      } catch (error) {
+        console.error('Error updating sound settings:', error);
+        Alert.alert('오류', '설정 저장에 실패했습니다.');
+      } finally {
+        setSaving(false);
+      }
+    },
+    [user, soundSettings, updateUserProfile]
+  );
 
   const handleTogglePushNotifications = async (value: boolean): Promise<void> => {
     if (!user) return;
@@ -70,6 +136,31 @@ export const SoundSettingsScreen: React.FC = () => {
     }
   };
 
+  // Sound settings handlers
+  const handleSoundEnabledChange = (value: boolean): void => {
+    updateSoundSettings({ soundEnabled: value });
+  };
+
+  const handleSoundChange = (soundId: NotificationSoundId): void => {
+    updateSoundSettings({ soundId });
+  };
+
+  const handleVolumeChange = useCallback(
+    (volume: number): void => {
+      // Debounce volume changes to avoid too many API calls
+      updateSoundSettings({ volume });
+    },
+    [updateSoundSettings]
+  );
+
+  const handleVibrationEnabledChange = (value: boolean): void => {
+    updateSoundSettings({ vibrationEnabled: value });
+  };
+
+  const handleVibrationPatternChange = (patternId: VibrationPatternId): void => {
+    updateSoundSettings({ vibrationPattern: patternId });
+  };
+
   const handleTestNotification = async (): Promise<void> => {
     try {
       const success = await sendTestNotification();
@@ -81,6 +172,28 @@ export const SoundSettingsScreen: React.FC = () => {
     } catch (error) {
       console.error('Error sending test notification:', error);
       Alert.alert('오류', '테스트 알림 전송에 실패했습니다.');
+    }
+  };
+
+  const handleTestEmail = async (): Promise<void> => {
+    if (!canEnableEmail) {
+      Alert.alert('안내', '이메일 알림을 사용하려면 이메일로 로그인해야 합니다.');
+      return;
+    }
+
+    try {
+      setSendingTestEmail(true);
+      const success = await emailNotificationService.sendTestEmail();
+      if (success) {
+        Alert.alert('성공', `테스트 이메일이 ${user?.email}로 전송되었습니다.`);
+      } else {
+        Alert.alert('실패', '이메일 전송에 실패했습니다. 잠시 후 다시 시도해주세요.');
+      }
+    } catch (error) {
+      console.error('Error sending test email:', error);
+      Alert.alert('오류', '이메일 전송 중 오류가 발생했습니다.');
+    } finally {
+      setSendingTestEmail(false);
     }
   };
 
@@ -100,27 +213,80 @@ export const SoundSettingsScreen: React.FC = () => {
           <SettingToggle
             icon="mail"
             label="이메일 알림"
-            subtitle="중요 업데이트 이메일로 수신 (준비 중)"
+            subtitle={canEnableEmail ? "중요 업데이트 이메일로 수신" : "이메일 로그인 필요"}
             value={notificationSettings?.emailNotifications || false}
             onValueChange={handleToggleEmailNotifications}
-            disabled={true}
+            disabled={saving || !canEnableEmail}
           />
+          {notificationSettings?.emailNotifications && canEnableEmail && (
+            <TouchableOpacity
+              style={[styles.testEmailButton, sendingTestEmail && styles.testEmailButtonDisabled]}
+              onPress={handleTestEmail}
+              disabled={sendingTestEmail}
+            >
+              <Text style={styles.testEmailButtonText}>
+                {sendingTestEmail ? '전송 중...' : '테스트 이메일 보내기'}
+              </Text>
+            </TouchableOpacity>
+          )}
         </SettingSection>
 
-        {/* Future Features */}
+        {/* Sound Settings */}
         <SettingSection title="알림 효과">
-          <View style={styles.disabledItem}>
-            <Text style={styles.disabledLabel}>🔔 알림음</Text>
-            <Text style={styles.disabledSubtitle}>
-              알림 수신 시 소리 재생 (곧 추가될 예정)
-            </Text>
-          </View>
-          <View style={styles.disabledItem}>
-            <Text style={styles.disabledLabel}>📳 진동</Text>
-            <Text style={styles.disabledSubtitle}>
-              알림 수신 시 진동 (곧 추가될 예정)
-            </Text>
-          </View>
+          <SettingToggle
+            icon="volume-high"
+            label="알림음"
+            subtitle="알림 수신 시 소리 재생"
+            value={soundSettings.soundEnabled}
+            onValueChange={handleSoundEnabledChange}
+            disabled={saving}
+          />
+
+          {soundSettings.soundEnabled && (
+            <>
+              <SoundPicker
+                icon="musical-notes"
+                label="알림음 선택"
+                options={NOTIFICATION_SOUNDS}
+                value={soundSettings.soundId}
+                volume={soundSettings.volume}
+                onValueChange={handleSoundChange}
+                disabled={saving}
+              />
+
+              <SettingSlider
+                icon="volume-medium"
+                label="볼륨"
+                subtitle="알림음 볼륨 조절"
+                value={soundSettings.volume}
+                minValue={0}
+                maxValue={100}
+                step={10}
+                unit="%"
+                onValueChange={handleVolumeChange}
+              />
+            </>
+          )}
+
+          <SettingToggle
+            icon="phone-portrait"
+            label="진동"
+            subtitle="알림 수신 시 진동"
+            value={soundSettings.vibrationEnabled}
+            onValueChange={handleVibrationEnabledChange}
+            disabled={saving}
+          />
+
+          {soundSettings.vibrationEnabled && (
+            <VibrationPicker
+              icon="pulse"
+              label="진동 패턴"
+              options={VIBRATION_PATTERNS}
+              value={soundSettings.vibrationPattern}
+              onValueChange={handleVibrationPatternChange}
+              disabled={saving}
+            />
+          )}
         </SettingSection>
 
         {/* Test Notification */}
@@ -157,22 +323,6 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xl,
     paddingHorizontal: SPACING.lg,
   },
-  disabledItem: {
-    padding: SPACING.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.light,
-    opacity: 0.5,
-  },
-  disabledLabel: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
-  },
-  disabledSubtitle: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.tertiary,
-    marginTop: 2,
-  },
   testButton: {
     backgroundColor: COLORS.black,
     paddingVertical: SPACING.lg,
@@ -182,6 +332,23 @@ const styles = StyleSheet.create({
   testButtonText: {
     fontSize: TYPOGRAPHY.fontSize.base,
     fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.white,
+  },
+  testEmailButton: {
+    backgroundColor: COLORS.primary.main,
+    paddingVertical: SPACING.md,
+    paddingHorizontal: SPACING.lg,
+    borderRadius: RADIUS.md,
+    marginTop: SPACING.sm,
+    marginHorizontal: SPACING.lg,
+    alignItems: 'center',
+  },
+  testEmailButtonDisabled: {
+    opacity: 0.6,
+  },
+  testEmailButtonText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
     color: COLORS.white,
   },
   infoBox: {

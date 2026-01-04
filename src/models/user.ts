@@ -42,6 +42,32 @@ export interface NotificationSettings {
   readonly alertTypes: NotificationAlertTypes;
   readonly pushNotifications: boolean;
   readonly emailNotifications: boolean;
+  readonly soundSettings: SoundPreferences;
+}
+
+// Sound settings types
+export type NotificationSoundId =
+  | 'default'
+  | 'train_arrival'
+  | 'subway_chime'
+  | 'gentle_bell'
+  | 'urgent_alert'
+  | 'silent';
+
+export type VibrationPatternId =
+  | 'default'
+  | 'short'
+  | 'long'
+  | 'double'
+  | 'triple'
+  | 'none';
+
+export interface SoundPreferences {
+  readonly soundEnabled: boolean;
+  readonly soundId: NotificationSoundId;
+  readonly volume: number; // 0-100
+  readonly vibrationEnabled: boolean;
+  readonly vibrationPattern: VibrationPatternId;
 }
 
 export interface QuietHours {

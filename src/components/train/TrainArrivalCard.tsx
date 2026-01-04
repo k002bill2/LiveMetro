@@ -27,6 +27,7 @@ import {
   getDelayColor,
   addAlpha,
 } from '@utils/colorUtils';
+import { useTheme, ThemeColors } from '@services/theme';
 
 export interface TrainArrivalCardProps {
   /** Train data to display */
@@ -61,6 +62,8 @@ export const TrainArrivalCard: React.FC<TrainArrivalCardProps> = memo(({
   onPress,
   style,
 }) => {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   // Memoize line colors to prevent recalculation
   const lineColor = useMemo(() => {
     return getSubwayLineColor(train.lineId || lineName || '');
@@ -104,7 +107,7 @@ export const TrainArrivalCard: React.FC<TrainArrivalCardProps> = memo(({
       switch (status) {
         case TrainStatus.NORMAL:
           return {
-            color: '#059669',
+            color: colors.success,
             icon: 'checkmark-circle',
             text: '정상',
           };
@@ -116,25 +119,25 @@ export const TrainArrivalCard: React.FC<TrainArrivalCardProps> = memo(({
           };
         case TrainStatus.SUSPENDED:
           return {
-            color: '#7c2d12',
+            color: colors.error,
             icon: 'close-circle',
             text: '운행중단',
           };
         case TrainStatus.MAINTENANCE:
           return {
-            color: '#6b7280',
+            color: colors.textSecondary,
             icon: 'construct-outline',
             text: '점검중',
           };
         case TrainStatus.EMERGENCY:
           return {
-            color: '#991b1b',
+            color: colors.error,
             icon: 'warning',
             text: '긴급',
           };
         default:
           return {
-            color: '#6b7280',
+            color: colors.textSecondary,
             icon: 'help-circle',
             text: '알수없음',
           };
@@ -142,7 +145,7 @@ export const TrainArrivalCard: React.FC<TrainArrivalCardProps> = memo(({
     };
 
     return getStatusDetails(train.status);
-  }, [train.status, train.delayMinutes]);
+  }, [train.status, train.delayMinutes, colors]);
 
   // Direction display
   const directionInfo = useMemo(() => {
@@ -284,7 +287,7 @@ export const TrainArrivalCard: React.FC<TrainArrivalCardProps> = memo(({
           <Ionicons
             name="chevron-forward"
             size={20}
-            color="#9ca3af"
+            color={colors.textTertiary}
           />
         </View>
       )}
@@ -320,16 +323,16 @@ export const TrainArrivalCard: React.FC<TrainArrivalCardProps> = memo(({
 
 TrainArrivalCard.displayName = 'TrainArrivalCard';
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: colors.borderLight,
     padding: 16,
     marginBottom: 12,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: colors.black,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -388,7 +391,7 @@ const styles = StyleSheet.create({
   statusText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#ffffff',
+    color: colors.textInverse,
     marginLeft: 4,
   },
   arrivalContainer: {
@@ -397,11 +400,11 @@ const styles = StyleSheet.create({
   arrivalTime: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: '#111827',
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   arrivalTimeImmediate: {
-    color: '#dc2626',
+    color: colors.error,
   },
   delayBadge: {
     flexDirection: 'row',
@@ -415,7 +418,7 @@ const styles = StyleSheet.create({
   },
   stationName: {
     fontSize: 13,
-    color: '#6b7280',
+    color: colors.textSecondary,
     marginTop: 4,
   },
   chevronContainer: {

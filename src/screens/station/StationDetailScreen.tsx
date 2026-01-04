@@ -20,6 +20,7 @@ import { AppStackParamList } from '../../navigation/types';
 import { getSubwayLineColor } from '../../utils/colorUtils';
 import { useRealtimeTrains } from '../../hooks/useRealtimeTrains';
 import { useAdjacentStations } from '../../hooks/useAdjacentStations';
+import { useTheme, ThemeColors } from '../../services/theme';
 
 type StationDetailRouteProp = RouteProp<AppStackParamList, 'StationDetail'>;
 const TAB_LABELS = ['출발', '도착', '시간표', '즐겨찾기'] as const;
@@ -28,11 +29,13 @@ type TabLabel = (typeof TAB_LABELS)[number];
 const StationDetailScreen: React.FC = () => {
   const route = useRoute<StationDetailRouteProp>();
   const navigation = useNavigation<NativeStackNavigationProp<AppStackParamList>>();
+  const { colors } = useTheme();
   const {
     // stationId = 'gangnam', // TODO: 향후 역 ID로 조회 시 사용
     stationName = '강남',
     lineId = '2',
   } = route.params || {};
+  const styles = createStyles(colors);
 
   // Get adjacent stations for navigation
   const { prevStation, nextStation, hasPrev, hasNext } = useAdjacentStations(
@@ -180,12 +183,12 @@ const StationDetailScreen: React.FC = () => {
               <Ionicons
                 name="refresh"
                 size={18}
-                color={refreshing ? '#9ca3af' : '#2563eb'}
+                color={refreshing ? colors.textTertiary : colors.primary}
               />
             </Animated.View>
           </TouchableOpacity>
           <View style={styles.locationChip}>
-            <Ionicons name="navigate-outline" size={14} color="#2563eb" />
+            <Ionicons name="navigate-outline" size={14} color={colors.primary} />
             <Text style={styles.locationChipText}>GPS 동기화</Text>
           </View>
         </View>
@@ -240,14 +243,14 @@ const StationDetailScreen: React.FC = () => {
 
         {trainsLoading && (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color="#2563eb" />
+            <ActivityIndicator size="large" color={colors.primary} />
             <Text style={styles.loadingText}>열차 정보를 불러오는 중...</Text>
           </View>
         )}
 
         {!trainsLoading && trainsError && (
           <View style={styles.errorContainer}>
-            <Ionicons name="alert-circle-outline" size={48} color="#ef4444" />
+            <Ionicons name="alert-circle-outline" size={48} color={colors.error} />
             <Text style={styles.errorText}>{trainsError}</Text>
             <TouchableOpacity style={styles.retryButton} onPress={refetchTrains}>
               <Text style={styles.retryButtonText}>다시 시도</Text>
@@ -257,7 +260,7 @@ const StationDetailScreen: React.FC = () => {
 
         {!trainsLoading && !trainsError && arrivals.length === 0 && (
           <View style={styles.emptyContainer}>
-            <Ionicons name="moon-outline" size={48} color="#9ca3af" />
+            <Ionicons name="moon-outline" size={48} color={colors.textTertiary} />
             <Text style={styles.emptyText}>현재 운행 중인 열차가 없습니다</Text>
             <Text style={styles.emptySubtext}>운행 종료 시간대입니다</Text>
           </View>
@@ -400,16 +403,16 @@ const StationDetailScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: colors.backgroundSecondary,
   },
   header: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: colors.borderMedium,
   },
   statusRow: {
     flexDirection: 'row',
@@ -420,7 +423,7 @@ const styles = StyleSheet.create({
   timeText: {
     fontSize: 18,
     fontWeight: '600',
-    color: '#111827',
+    color: colors.textPrimary,
   },
   locationChip: {
     flexDirection: 'row',
@@ -429,10 +432,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 999,
-    backgroundColor: '#e0f2fe',
+    backgroundColor: colors.primaryLight,
   },
   locationChipText: {
-    color: '#0369a1',
+    color: colors.primary,
     fontWeight: '600',
     fontSize: 12,
   },
@@ -442,10 +445,10 @@ const styles = StyleSheet.create({
     height: 32,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#bfdbfe',
+    borderColor: colors.primaryLight,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#eff6ff',
+    backgroundColor: colors.primaryLight,
   },
   lineBadge: {
     width: 36,
@@ -457,13 +460,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   lineBadgeText: {
-    color: '#ffffff',
+    color: colors.textInverse,
     fontWeight: 'bold',
     fontSize: 16,
   },
   stationSwitcher: {
     flexDirection: 'row',
-    backgroundColor: '#eef1d7',
+    backgroundColor: colors.backgroundSecondary,
     borderRadius: 999,
     alignItems: 'center',
     justifyContent: 'space-between',
@@ -483,12 +486,12 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   switchText: {
-    color: '#4b5320',
+    color: colors.textSecondary,
     fontWeight: '600',
     fontSize: 14,
   },
   currentStation: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     paddingVertical: 8,
     paddingHorizontal: 24,
     borderRadius: 999,
@@ -497,16 +500,16 @@ const styles = StyleSheet.create({
   currentStationText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#2a2f1d',
+    color: colors.textPrimary,
   },
   arrivalContainer: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     marginTop: 8,
     padding: 20,
   },
   lastUpdatedText: {
     fontSize: 12,
-    color: '#6b7280',
+    color: colors.textSecondary,
     marginBottom: 12,
   },
   arrivalRow: {
@@ -516,22 +519,22 @@ const styles = StyleSheet.create({
   },
   arrivalDirection: {
     fontSize: 16,
-    color: '#374151',
+    color: colors.textPrimary,
   },
   arrivalTime: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#374151',
+    color: colors.textPrimary,
   },
   arrivalDelay: {
-    color: '#d97706',
+    color: colors.warning,
   },
   tabRow: {
     flexDirection: 'row',
     marginHorizontal: 16,
     marginTop: 16,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: colors.borderMedium,
     borderRadius: 12,
     overflow: 'hidden',
   },
@@ -539,28 +542,28 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: 12,
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
   },
   tabButtonActive: {
-    backgroundColor: '#fef3c7',
+    backgroundColor: colors.primaryLight,
   },
   tabButtonText: {
     fontSize: 14,
-    color: '#6b7280',
+    color: colors.textSecondary,
     fontWeight: '600',
   },
   tabButtonTextActive: {
-    color: '#ca8a04',
+    color: colors.primary,
   },
   subwayMapCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     marginHorizontal: 16,
     marginTop: 16,
     padding: 16,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#fde68a',
-    shadowColor: '#000000',
+    borderColor: colors.borderMedium,
+    shadowColor: colors.black,
     shadowOpacity: 0.05,
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
@@ -572,25 +575,25 @@ const styles = StyleSheet.create({
   subwayMapTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#1f2937',
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   subwayMapSubtitle: {
     fontSize: 13,
-    color: '#6b7280',
+    color: colors.textSecondary,
   },
   subwayMapImage: {
     width: '100%',
     height: 320,
     borderRadius: 12,
-    backgroundColor: '#fefce8',
+    backgroundColor: colors.backgroundSecondary,
   },
   subwayMapImageWrapper: {
     width: '100%',
     height: 320,
     borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: '#fefce8',
+    backgroundColor: colors.backgroundSecondary,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -599,11 +602,11 @@ const styles = StyleSheet.create({
     height: 400,
     borderRadius: 12,
     overflow: 'hidden',
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
   },
   subwayMapWebView: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
   },
   subwayMapLoader: {
     position: 'absolute',
@@ -618,12 +621,12 @@ const styles = StyleSheet.create({
   subwayMapLoaderText: {
     marginTop: 8,
     fontSize: 13,
-    color: '#8b5cf6',
+    color: colors.primary,
     fontWeight: '600',
   },
   subwayMapCaption: {
     fontSize: 12,
-    color: '#4b5563',
+    color: colors.textSecondary,
     marginTop: 12,
   },
   subwayMapError: {
@@ -636,7 +639,7 @@ const styles = StyleSheet.create({
   },
   subwayMapErrorText: {
     fontSize: 13,
-    color: '#b91c1c',
+    color: colors.error,
     marginBottom: 8,
     lineHeight: 18,
   },
@@ -645,29 +648,29 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: 999,
-    backgroundColor: '#fbbf24',
+    backgroundColor: colors.primary,
   },
   subwayMapLinkText: {
     fontSize: 13,
     fontWeight: '600',
-    color: '#78350f',
+    color: colors.textInverse,
   },
   kakaoCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     marginHorizontal: 16,
     marginTop: 16,
     padding: 16,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#fcd34d',
+    borderColor: '#fcd34d', // Kakao brand color
   },
   kakaoIconWrapper: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#fcd34d',
+    backgroundColor: '#fcd34d', // Kakao brand color
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
@@ -685,7 +688,7 @@ const styles = StyleSheet.create({
   kakaoTitle: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#374151',
+    color: colors.textPrimary,
   },
   section: {
     marginTop: 20,
@@ -694,23 +697,23 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#111827',
+    color: colors.textPrimary,
     marginBottom: 12,
   },
   mapImage: {
     width: '100%',
     height: 200,
     borderRadius: 12,
-    backgroundColor: '#d1d5db',
+    backgroundColor: colors.borderMedium,
     marginBottom: 16,
   },
   exitCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: colors.borderMedium,
   },
   exitHeader: {
     flexDirection: 'row',
@@ -719,23 +722,23 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   exitBadge: {
-    backgroundColor: '#fef3c7',
+    backgroundColor: colors.primaryLight,
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 999,
   },
   exitBadgeText: {
     fontWeight: 'bold',
-    color: '#92400e',
+    color: colors.primary,
   },
   exitDescription: {
     fontSize: 14,
-    color: '#374151',
+    color: colors.textPrimary,
     marginBottom: 8,
   },
   exitMeta: {
     fontSize: 13,
-    color: '#6b7280',
+    color: colors.textSecondary,
   },
   busButton: {
     marginHorizontal: 16,
@@ -743,31 +746,31 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#2563eb',
+    backgroundColor: colors.primary,
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: 16,
   },
   busButtonText: {
-    color: '#ffffff',
+    color: colors.textInverse,
     fontSize: 16,
     fontWeight: 'bold',
     marginRight: 8,
   },
   adCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: colors.surface,
     margin: 16,
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: colors.borderMedium,
   },
   adBadge: {
     width: 40,
     height: 40,
     borderRadius: 8,
-    backgroundColor: '#10b981',
+    backgroundColor: colors.success,
     marginRight: 12,
   },
   adContent: {
@@ -775,12 +778,12 @@ const styles = StyleSheet.create({
   },
   adTitle: {
     fontSize: 14,
-    color: '#374151',
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   adSubtitle: {
     fontSize: 12,
-    color: '#9ca3af',
+    color: colors.textTertiary,
   },
   loadingContainer: {
     padding: 40,
@@ -790,7 +793,7 @@ const styles = StyleSheet.create({
   loadingText: {
     marginTop: 16,
     fontSize: 14,
-    color: '#6b7280',
+    color: colors.textSecondary,
   },
   errorContainer: {
     padding: 40,
@@ -800,18 +803,18 @@ const styles = StyleSheet.create({
   errorText: {
     marginTop: 16,
     fontSize: 14,
-    color: '#ef4444',
+    color: colors.error,
     textAlign: 'center',
   },
   retryButton: {
     marginTop: 16,
     paddingHorizontal: 24,
     paddingVertical: 12,
-    backgroundColor: '#2563eb',
-    borderRadius: 8,
+    backgroundColor: colors.primary,
+    borderRadius: 16,
   },
   retryButtonText: {
-    color: '#ffffff',
+    color: colors.textInverse,
     fontSize: 14,
     fontWeight: 'bold',
   },
@@ -823,13 +826,13 @@ const styles = StyleSheet.create({
   emptyText: {
     marginTop: 16,
     fontSize: 16,
-    color: '#374151',
+    color: colors.textPrimary,
     fontWeight: '600',
   },
   emptySubtext: {
     marginTop: 8,
     fontSize: 14,
-    color: '#9ca3af',
+    color: colors.textTertiary,
   },
 });
 

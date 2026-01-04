@@ -9,6 +9,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '../services/auth/AuthContext';
+import { useTheme } from '../services/theme';
 import { LoadingScreen } from '../components/common/LoadingScreen';
 
 import HomeScreen from '@screens/home/HomeScreen';
@@ -24,8 +25,11 @@ import { AppTabParamList, AppStackParamList } from './types';
 const Tab = createBottomTabNavigator<AppTabParamList>();
 const Stack = createNativeStackNavigator<AppStackParamList>();
 
-const MainTabs: React.FC = () => (
-  <Tab.Navigator
+const MainTabs: React.FC = () => {
+  const { colors } = useTheme();
+
+  return (
+    <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
           let iconName: keyof typeof Ionicons.glyphMap;
@@ -49,11 +53,11 @@ const MainTabs: React.FC = () => (
 
           return <Ionicons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#0052A4', // Seoul Metro Blue (Line 1)
-        tabBarInactiveTintColor: '#9ca3af',
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textTertiary,
         tabBarStyle: {
-          backgroundColor: '#ffffff',
-          borderTopColor: '#e5e7eb',
+          backgroundColor: colors.surface,
+          borderTopColor: colors.borderMedium,
           borderTopWidth: 1,
           height: 60,
           paddingBottom: 8,
@@ -64,8 +68,8 @@ const MainTabs: React.FC = () => (
           fontWeight: '600',
         },
         headerStyle: {
-          backgroundColor: '#ffffff',
-          borderBottomColor: '#e5e7eb',
+          backgroundColor: colors.surface,
+          borderBottomColor: colors.borderMedium,
           borderBottomWidth: 1,
           elevation: 0,
           shadowOpacity: 0,
@@ -73,7 +77,7 @@ const MainTabs: React.FC = () => (
         headerTitleStyle: {
           fontSize: 18,
           fontWeight: 'bold',
-          color: '#111827',
+          color: colors.textPrimary,
         },
       })}
     >
@@ -110,10 +114,12 @@ const MainTabs: React.FC = () => (
         }}
       />
     </Tab.Navigator>
-);
+  );
+};
 
 const AppNavigator: React.FC = () => {
   const { user, loading } = useAuth();
+  const { colors } = useTheme();
 
   // Show loading screen while checking auth state
   if (loading) {
@@ -136,12 +142,12 @@ const AppNavigator: React.FC = () => {
               headerShown: true,
               title: `${route.params.stationName}역 정보`,
               headerStyle: {
-                backgroundColor: '#ffffff',
+                backgroundColor: colors.surface,
               },
               headerTitleStyle: {
                 fontSize: 18,
                 fontWeight: 'bold',
-                color: '#111827',
+                color: colors.textPrimary,
               },
             })}
           />
@@ -152,12 +158,12 @@ const AppNavigator: React.FC = () => {
               headerShown: false,
               title: '역 탐색',
               headerStyle: {
-                backgroundColor: '#ffffff',
+                backgroundColor: colors.surface,
               },
               headerTitleStyle: {
                 fontSize: 18,
                 fontWeight: 'bold',
-                color: '#111827',
+                color: colors.textPrimary,
               },
             }}
           />
@@ -176,7 +182,7 @@ const AppNavigator: React.FC = () => {
               headerShown: true,
               title: '',
               headerStyle: {
-                backgroundColor: '#f9fafb',
+                backgroundColor: colors.backgroundSecondary,
               },
               headerShadowVisible: false,
             }}

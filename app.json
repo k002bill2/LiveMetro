@@ -52,7 +52,11 @@
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE",
         "WAKE_LOCK",
-        "ACCESS_BACKGROUND_LOCATION"
+        "ACCESS_BACKGROUND_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.ACCESS_BACKGROUND_LOCATION"
       ],
       "blockedPermissions": [
         "CAMERA",
@@ -99,7 +103,7 @@
     },
     "extra": {
       "eas": {
-        "projectId": "livemetro-3q5d-project"
+        "projectId": "5a336447-64fc-48bd-a025-f2be8b0c7176"
       },
       "storybookEnabled": false,
       "privacyPolicyUrl": "https://livemetro.app/privacy-policy",
@@ -115,6 +119,7 @@
       "android",
       "web"
     ],
-    "githubUrl": "https://github.com/livemetro/livemetro-app"
+    "githubUrl": "https://github.com/livemetro/livemetro-app",
+    "owner": "younghwankang"
   }
 }

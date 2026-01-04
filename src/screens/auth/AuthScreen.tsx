@@ -20,6 +20,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import * as SecureStore from 'expo-secure-store';
 import { useAuth } from '../../services/auth/AuthContext';
+import { useTheme, ThemeColors } from '../../services/theme';
 import { analyzeAuthError, printFirebaseDebugInfo } from '../../utils/firebaseDebug';
 import {
   isBiometricAvailable,
@@ -35,6 +36,7 @@ const AUTO_LOGIN_EMAIL_KEY = 'livemetro_auto_login_email';
 const AUTO_LOGIN_PASSWORD_KEY = 'livemetro_auto_login_password';
 
 export const AuthScreen: React.FC = () => {
+  const { colors } = useTheme();
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -51,6 +53,7 @@ export const AuthScreen: React.FC = () => {
   const [biometricTypeName, setBiometricTypeName] = useState('생체인증');
 
   const { signInWithEmail, signUpWithEmail, signInAnonymously, resetPassword } = useAuth();
+  const styles = createStyles(colors);
 
   // Load saved data and attempt auto login on mount
   useEffect(() => {
@@ -300,7 +303,7 @@ export const AuthScreen: React.FC = () => {
       <SafeAreaView style={styles.container}>
         <View style={styles.autoLoginContainer}>
           <View style={styles.logoContainer}>
-            <Ionicons name="train" size={48} color="#2563eb" />
+            <Ionicons name="train" size={48} color={colors.primary} />
           </View>
           <Text style={styles.autoLoginText}>자동 로그인 중...</Text>
         </View>
@@ -318,7 +321,7 @@ export const AuthScreen: React.FC = () => {
           {/* Header */}
           <View style={styles.header}>
             <View style={styles.logoContainer}>
-              <Ionicons name="train" size={48} color="#2563eb" />
+              <Ionicons name="train" size={48} color={colors.primary} />
             </View>
             <Text style={styles.title}>
               {isSignUp ? '계정 만들기' : '로그인'}
@@ -393,7 +396,7 @@ export const AuthScreen: React.FC = () => {
                     autoLogin && styles.checkboxChecked
                   ]}>
                     {autoLogin && (
-                      <Ionicons name="checkmark" size={14} color="#ffffff" />
+                      <Ionicons name="checkmark" size={14} color={colors.textInverse} />
                     )}
                   </View>
                   <Text style={styles.rememberText}>자동로그인</Text>
@@ -425,7 +428,7 @@ export const AuthScreen: React.FC = () => {
                 <Ionicons
                   name={biometricTypeName === 'Face ID' ? 'scan-outline' : 'finger-print-outline'}
                   size={24}
-                  color="#2563eb"
+                  color={colors.primary}
                 />
                 <Text style={styles.biometricButtonText}>
                   {biometricTypeName}로 로그인
@@ -474,7 +477,7 @@ export const AuthScreen: React.FC = () => {
               testID="anonymous-login-button"
               accessibilityLabel="익명으로 계속하기"
             >
-              <Ionicons name="person-outline" size={20} color="#6b7280" />
+              <Ionicons name="person-outline" size={20} color={colors.textSecondary} />
               <Text style={styles.secondaryButtonText}>
                 익명으로 계속하기
               </Text>
@@ -486,191 +489,192 @@ export const AuthScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f9fafb',
-  },
-  autoLoginContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  autoLoginText: {
-    fontSize: 16,
-    color: '#6b7280',
-    marginTop: 16,
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-    paddingHorizontal: 32,
-    paddingVertical: 24,
-    justifyContent: 'center',
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 32,
-  },
-  logoContainer: {
-    width: 80,
-    height: 80,
-    backgroundColor: '#eff6ff',
-    borderRadius: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#111827',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#6b7280',
-    textAlign: 'center',
-    lineHeight: 22,
-  },
-  form: {
-    marginBottom: 24,
-  },
-  inputContainer: {
-    marginBottom: 16,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#374151',
-    marginBottom: 6,
-  },
-  input: {
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: '#111827',
-  },
-  primaryButton: {
-    backgroundColor: '#2563eb',
-    paddingVertical: 16,
-    borderRadius: 8,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  disabledButton: {
-    opacity: 0.6,
-  },
-  forgotPasswordButton: {
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  forgotPasswordText: {
-    fontSize: 14,
-    color: '#2563eb',
-    fontWeight: '600',
-  },
-  primaryButtonText: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#ffffff',
-  },
-  alternativeSection: {
-    alignItems: 'center',
-  },
-  switchButton: {
-    paddingVertical: 8,
-    marginBottom: 20,
-  },
-  switchButtonText: {
-    fontSize: 14,
-    color: '#2563eb',
-    fontWeight: '600',
-  },
-  divider: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '100%',
-    marginBottom: 20,
-  },
-  dividerLine: {
-    flex: 1,
-    height: 1,
-    backgroundColor: '#e5e7eb',
-  },
-  dividerText: {
-    paddingHorizontal: 16,
-    fontSize: 14,
-    color: '#9ca3af',
-  },
-  secondaryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#ffffff',
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 8,
-    width: '100%',
-    justifyContent: 'center',
-  },
-  secondaryButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#374151',
-    marginLeft: 8,
-  },
-  // Remember email styles
-  rememberContainer: {
-    marginBottom: 16,
-  },
-  rememberRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    borderWidth: 2,
-    borderColor: '#d1d5db',
-    backgroundColor: '#ffffff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: 8,
-  },
-  checkboxChecked: {
-    backgroundColor: '#2563eb',
-    borderColor: '#2563eb',
-  },
-  rememberText: {
-    fontSize: 14,
-    color: '#374151',
-  },
-  // Biometric button styles
-  biometricButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: '#eff6ff',
-    borderWidth: 1,
-    borderColor: '#2563eb',
-    paddingVertical: 14,
-    borderRadius: 8,
-    marginTop: 12,
-  },
-  biometricButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#2563eb',
-    marginLeft: 8,
-  },
-});
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.backgroundSecondary,
+    },
+    autoLoginContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    autoLoginText: {
+      fontSize: 16,
+      color: colors.textSecondary,
+      marginTop: 16,
+    },
+    keyboardView: {
+      flex: 1,
+    },
+    content: {
+      flex: 1,
+      paddingHorizontal: 32,
+      paddingVertical: 24,
+      justifyContent: 'center',
+    },
+    header: {
+      alignItems: 'center',
+      marginBottom: 32,
+    },
+    logoContainer: {
+      width: 80,
+      height: 80,
+      backgroundColor: colors.primaryLight,
+      borderRadius: 40,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 16,
+    },
+    title: {
+      fontSize: 28,
+      fontWeight: 'bold',
+      color: colors.textPrimary,
+      marginBottom: 8,
+    },
+    subtitle: {
+      fontSize: 16,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      lineHeight: 22,
+    },
+    form: {
+      marginBottom: 24,
+    },
+    inputContainer: {
+      marginBottom: 16,
+    },
+    label: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.textPrimary,
+      marginBottom: 6,
+    },
+    input: {
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.borderMedium,
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      fontSize: 16,
+      color: colors.textPrimary,
+    },
+    primaryButton: {
+      backgroundColor: colors.primary,
+      paddingVertical: 16,
+      borderRadius: 16,
+      alignItems: 'center',
+      marginTop: 8,
+    },
+    disabledButton: {
+      opacity: 0.6,
+    },
+    forgotPasswordButton: {
+      paddingVertical: 12,
+      alignItems: 'center',
+      marginTop: 8,
+    },
+    forgotPasswordText: {
+      fontSize: 14,
+      color: colors.primary,
+      fontWeight: '600',
+    },
+    primaryButtonText: {
+      fontSize: 16,
+      fontWeight: 'bold',
+      color: colors.textInverse,
+    },
+    alternativeSection: {
+      alignItems: 'center',
+    },
+    switchButton: {
+      paddingVertical: 8,
+      marginBottom: 20,
+    },
+    switchButtonText: {
+      fontSize: 14,
+      color: colors.primary,
+      fontWeight: '600',
+    },
+    divider: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      width: '100%',
+      marginBottom: 20,
+    },
+    dividerLine: {
+      flex: 1,
+      height: 1,
+      backgroundColor: colors.borderMedium,
+    },
+    dividerText: {
+      paddingHorizontal: 16,
+      fontSize: 14,
+      color: colors.textTertiary,
+    },
+    secondaryButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.borderMedium,
+      paddingVertical: 14,
+      paddingHorizontal: 20,
+      borderRadius: 16,
+      width: '100%',
+      justifyContent: 'center',
+    },
+    secondaryButtonText: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.textPrimary,
+      marginLeft: 8,
+    },
+    // Remember email styles
+    rememberContainer: {
+      marginBottom: 16,
+    },
+    rememberRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    checkbox: {
+      width: 20,
+      height: 20,
+      borderRadius: 4,
+      borderWidth: 2,
+      borderColor: colors.borderMedium,
+      backgroundColor: colors.surface,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: 8,
+    },
+    checkboxChecked: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    rememberText: {
+      fontSize: 14,
+      color: colors.textPrimary,
+    },
+    // Biometric button styles
+    biometricButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.primaryLight,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      paddingVertical: 14,
+      borderRadius: 16,
+      marginTop: 12,
+    },
+    biometricButtonText: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.primary,
+      marginLeft: 8,
+    },
+  });

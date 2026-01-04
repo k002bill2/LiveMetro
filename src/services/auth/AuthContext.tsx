@@ -13,6 +13,9 @@ import {
   onAuthStateChanged,
   updateProfile,
   sendPasswordResetEmail,
+  updatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 
@@ -29,6 +32,7 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   updateUserProfile: (updates: Partial<User>) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -71,6 +75,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       },
       pushNotifications: true,
       emailNotifications: false,
+      soundSettings: {
+        soundEnabled: true,
+        soundId: 'default',
+        volume: 80,
+        vibrationEnabled: true,
+        vibrationPattern: 'default',
+      },
     },
     commuteSchedule: {
       weekdays: {
@@ -241,6 +252,38 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const handleChangePassword = async (
+    currentPassword: string,
+    newPassword: string
+  ): Promise<void> => {
+    if (!firebaseUser || !firebaseUser.email) {
+      throw new Error('로그인된 사용자가 없습니다.');
+    }
+
+    try {
+      // Re-authenticate user with current password
+      const credential = EmailAuthProvider.credential(
+        firebaseUser.email,
+        currentPassword
+      );
+      await reauthenticateWithCredential(firebaseUser, credential);
+
+      // Update password
+      await updatePassword(firebaseUser, newPassword);
+    } catch (error: unknown) {
+      console.error('Password change error:', error);
+      const firebaseError = error as { code?: string };
+      if (firebaseError.code === 'auth/wrong-password') {
+        throw new Error('현재 비밀번호가 올바르지 않습니다.');
+      } else if (firebaseError.code === 'auth/weak-password') {
+        throw new Error('새 비밀번호가 너무 약합니다. 6자 이상 입력해주세요.');
+      } else if (firebaseError.code === 'auth/requires-recent-login') {
+        throw new Error('보안을 위해 다시 로그인 후 시도해주세요.');
+      }
+      throw new Error('비밀번호 변경에 실패했습니다.');
+    }
+  };
+
   const value: AuthContextType = {
     user,
     firebaseUser,
@@ -251,6 +294,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signOut: handleSignOut,
     updateUserProfile: handleUpdateUserProfile,
     resetPassword: handleResetPassword,
+    changePassword: handleChangePassword,
   };
 
   return (

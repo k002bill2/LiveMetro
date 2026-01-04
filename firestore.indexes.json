@@ -1,0 +1,38 @@
+{
+  "indexes": [
+    {
+      "collectionGroup": "trains",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "currentStationId", "order": "ASCENDING" },
+        { "fieldPath": "arrivalTime", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "stations",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "lineId", "order": "ASCENDING" },
+        { "fieldPath": "sequence", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "trainDelays",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "lineId", "order": "ASCENDING" },
+        { "fieldPath": "severity", "order": "ASCENDING" },
+        { "fieldPath": "reportedAt", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "congestionData",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "trainId", "order": "ASCENDING" },
+        { "fieldPath": "carNumber", "order": "ASCENDING" }
+      ]
+    }
+  ],
+  "fieldOverrides": []
+}

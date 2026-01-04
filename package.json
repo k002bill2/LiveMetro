@@ -55,9 +55,12 @@
     "@react-navigation/stack": "^6.3.20",
     "expo": "~49.0.15",
     "expo-datetimepicker": "^1.0.3",
+    "expo-dev-client": "~2.4.13",
     "expo-linear-gradient": "~12.3.0",
+    "expo-local-authentication": "~13.4.1",
     "expo-location": "~16.1.0",
     "expo-notifications": "~0.20.1",
+    "expo-secure-store": "~12.3.1",
     "expo-splash-screen": "~0.20.5",
     "expo-status-bar": "~1.6.0",
     "firebase": "^10.7.1",
@@ -71,10 +74,7 @@
     "react-native-screens": "~3.22.0",
     "react-native-svg": "13.9.0",
     "react-native-web": "~0.19.6",
-    "react-native-webview": "^13.2.2",
-    "expo-dev-client": "~2.4.13",
-    "expo-local-authentication": "~13.4.1",
-    "expo-secure-store": "~12.3.1"
+    "react-native-webview": "^13.2.2"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",

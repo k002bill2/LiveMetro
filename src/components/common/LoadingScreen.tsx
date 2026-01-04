@@ -10,38 +10,41 @@ import {
   ActivityIndicator,
   StyleSheet,
 } from 'react-native';
+import { useTheme, ThemeColors } from '../../services/theme';
 
 interface LoadingScreenProps {
   message?: string;
   size?: 'small' | 'large';
-  color?: string;
 }
 
 export const LoadingScreen: React.FC<LoadingScreenProps> = ({
   message = '로딩중...',
   size = 'large',
-  color = '#2563eb',
 }) => {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+
   return (
     <View style={styles.container}>
-      <ActivityIndicator size={size} color={color} />
+      <ActivityIndicator size={size} color={colors.primary} />
       {message && <Text style={styles.message}>{message}</Text>}
     </View>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#f9fafb',
-    padding: 20,
-  },
-  message: {
-    marginTop: 16,
-    fontSize: 16,
-    color: '#6b7280',
-    textAlign: 'center',
-  },
-});
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.backgroundSecondary,
+      padding: 20,
+    },
+    message: {
+      marginTop: 16,
+      fontSize: 16,
+      color: colors.textSecondary,
+      textAlign: 'center',
+    },
+  });

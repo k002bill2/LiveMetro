@@ -13,6 +13,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 
 import { SPACING, BORDER_RADIUS, SHADOWS, TYPOGRAPHY, Z_INDEX } from '../../utils/themeUtils';
+import { COLORS } from '../../styles/modernTheme';
 
 const { width } = Dimensions.get('window');
 
@@ -87,33 +88,33 @@ export const Toast: React.FC<ToastProps> = ({
     switch (toastType) {
       case 'success':
         return {
-          backgroundColor: '#10b981',
+          backgroundColor: COLORS.semantic.success,
           icon: 'checkmark-circle' as const,
-          iconColor: '#ffffff',
+          iconColor: COLORS.white,
         };
       case 'error':
         return {
-          backgroundColor: '#ef4444',
+          backgroundColor: COLORS.semantic.error,
           icon: 'close-circle' as const,
-          iconColor: '#ffffff',
+          iconColor: COLORS.white,
         };
       case 'warning':
         return {
-          backgroundColor: '#f59e0b',
+          backgroundColor: COLORS.semantic.warning,
           icon: 'warning' as const,
-          iconColor: '#ffffff',
+          iconColor: COLORS.white,
         };
       case 'info':
         return {
-          backgroundColor: '#3b82f6',
+          backgroundColor: COLORS.primary.main,
           icon: 'information-circle' as const,
-          iconColor: '#ffffff',
+          iconColor: COLORS.white,
         };
       default:
         return {
-          backgroundColor: '#6b7280',
+          backgroundColor: COLORS.text.secondary,
           icon: 'information-circle' as const,
-          iconColor: '#ffffff',
+          iconColor: COLORS.white,
         };
     }
   };
@@ -178,7 +179,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: TYPOGRAPHY.sizes.sm,
     fontWeight: TYPOGRAPHY.weights.medium,
-    color: '#ffffff',
+    color: COLORS.white,
     lineHeight: TYPOGRAPHY.lineHeights.normal * TYPOGRAPHY.sizes.sm,
   },
 });

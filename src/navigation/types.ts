@@ -14,6 +14,7 @@ export type AppTabParamList = {
 
 export type SettingsStackParamList = {
   SettingsHome: undefined;
+  EditProfile: undefined;
   CommuteSettings: undefined;
   DelayNotification: undefined;
   NotificationTime: undefined;

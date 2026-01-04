@@ -34,10 +34,11 @@ const app: FirebaseApp = initializeApp(firebaseConfig);
 // Initialize Firebase services
 export const auth: Auth = getAuth(app);
 export const firestore: Firestore = getFirestore(app);
-export const functions: Functions = getFunctions(app);
+export const functions: Functions = getFunctions(app, 'asia-northeast3'); // Seoul region
 
-// Set region for Cloud Functions (Seoul region)
-// connectFunctionsEmulator(functions, 'localhost', 5001); // Uncomment for local development
+// Uncomment for local development with emulator
+// import { connectFunctionsEmulator } from 'firebase/functions';
+// connectFunctionsEmulator(functions, 'localhost', 5001);
 
 export default app;
 

@@ -9,6 +9,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
 
 import { useAuth } from '../services/auth/AuthContext';
+import { useTheme } from '../services/theme';
 import { LoadingScreen } from '../components/common/LoadingScreen';
 import { OnboardingProvider, useOnboarding } from '../contexts/OnboardingContext';
 
@@ -55,6 +56,8 @@ const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 const MainTabNavigator: React.FC = () => {
+  const { colors } = useTheme();
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -80,20 +83,20 @@ const MainTabNavigator: React.FC = () => {
 
           return <Ionicons name={iconName} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#2563eb',
-        tabBarInactiveTintColor: '#6b7280',
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.textSecondary,
         tabBarStyle: {
-          backgroundColor: '#ffffff',
+          backgroundColor: colors.background,
           borderTopWidth: 1,
-          borderTopColor: '#e5e7eb',
+          borderTopColor: colors.borderMedium,
           height: 60,
           paddingBottom: 8,
           paddingTop: 8,
         },
         headerStyle: {
-          backgroundColor: '#2563eb',
+          backgroundColor: colors.primary,
         },
-        headerTintColor: '#ffffff',
+        headerTintColor: colors.textInverse,
         headerTitleStyle: {
           fontWeight: 'bold',
         },

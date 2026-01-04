@@ -2,8 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { SubwayLine } from '../../models/train';
 import { trainService } from '../../services/train/trainService';
+import { useTheme, ThemeColors } from '../../services/theme';
 
 export const SubwayLineList: React.FC = () => {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const [lines, setLines] = useState<SubwayLine[]>([]);
 
   useEffect(() => {
@@ -37,14 +40,14 @@ export const SubwayLineList: React.FC = () => {
   return (
     <View style={styles.wrapper}>
       <Text style={styles.title}>노선 정보</Text>
-      <ScrollView 
-        horizontal 
-        showsHorizontalScrollIndicator={false} 
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
         {lines.map((line) => (
-          <TouchableOpacity 
-            key={line.id} 
+          <TouchableOpacity
+            key={line.id}
             style={[styles.card, { borderLeftColor: line.color }]}
             accessible={true}
             accessibilityRole="button"
@@ -61,14 +64,14 @@ export const SubwayLineList: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   wrapper: {
     marginBottom: 24,
   },
   title: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#111827',
+    color: colors.textPrimary,
     marginBottom: 12,
     paddingHorizontal: 20,
   },
@@ -78,11 +81,11 @@ const styles = StyleSheet.create({
   card: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'white',
+    backgroundColor: colors.surface,
     padding: 12,
     borderRadius: 12,
     marginRight: 12,
-    shadowColor: '#000',
+    shadowColor: colors.black,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 4,
@@ -99,13 +102,13 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   iconText: {
-    color: 'white',
+    color: colors.textInverse,
     fontSize: 12,
     fontWeight: 'bold',
   },
   name: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#374151',
+    color: colors.textPrimary,
   },
 });

@@ -6,6 +6,7 @@
 import React, { Component, ReactNode } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { performanceMonitor } from '../../utils/performanceUtils';
+import { COLORS } from '../../styles/modernTheme';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -148,16 +149,16 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 const styles = StyleSheet.create({
   errorContainer: {
     flex: 1,
-    backgroundColor: '#f9f9f9',
+    backgroundColor: COLORS.surface.background,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
   },
   errorContent: {
-    backgroundColor: '#ffffff',
+    backgroundColor: COLORS.white,
     borderRadius: 12,
     padding: 24,
-    shadowColor: '#000',
+    shadowColor: COLORS.black,
     shadowOffset: {
       width: 0,
       height: 2,
@@ -171,46 +172,46 @@ const styles = StyleSheet.create({
   errorTitle: {
     fontSize: 20,
     fontWeight: '600',
-    color: '#1f2937',
+    color: COLORS.text.primary,
     textAlign: 'center',
     marginBottom: 12,
   },
   errorMessage: {
     fontSize: 16,
-    color: '#6b7280',
+    color: COLORS.text.secondary,
     textAlign: 'center',
     lineHeight: 24,
     marginBottom: 24,
   },
   retryButton: {
-    backgroundColor: '#3b82f6',
+    backgroundColor: COLORS.primary.main,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
   },
   retryButtonText: {
-    color: '#ffffff',
+    color: COLORS.white,
     fontSize: 16,
     fontWeight: '600',
   },
   debugInfo: {
-    backgroundColor: '#fef2f2',
+    backgroundColor: COLORS.secondary.redLight,
     borderRadius: 8,
     padding: 12,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: '#fecaca',
+    borderColor: COLORS.semantic.error,
   },
   debugTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#dc2626',
+    color: COLORS.semantic.error,
     marginBottom: 8,
   },
   debugText: {
     fontSize: 12,
-    color: '#7f1d1d',
+    color: COLORS.semantic.error,
     fontFamily: 'monospace',
   },
 });
