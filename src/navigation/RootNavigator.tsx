@@ -3,14 +3,14 @@
  * Main navigation structure for the app
  */
 
-import React, { useState, useCallback } from 'react';
+import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Ionicons } from '@expo/vector-icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { useAuth } from '../services/auth/AuthContext';
 import { LoadingScreen } from '../components/common/LoadingScreen';
+import { OnboardingProvider, useOnboarding } from '../contexts/OnboardingContext';
 
 // Import screens
 import { WelcomeScreen } from '../screens/auth/WelcomeScreen';
@@ -20,12 +20,11 @@ import { FavoritesScreen } from '../screens/favorites/FavoritesScreen';
 import { AlertsScreen } from '../screens/alerts/AlertsScreen';
 import { SettingsNavigator } from './SettingsNavigator';
 import { OnboardingNavigator } from './OnboardingNavigator';
-
-// Onboarding completion key
-const ONBOARDING_COMPLETE_KEY = '@livemetro/onboarding_complete';
+import StationNavigatorScreen from '../screens/station/StationNavigatorScreen';
+import StationDetailScreen from '../screens/station/StationDetailScreen';
 
 // DEBUG: Set to true to always show onboarding screen during development
-const DEBUG_FORCE_ONBOARDING = __DEV__ && true;
+const DEBUG_FORCE_ONBOARDING = __DEV__ && false;
 
 // Navigation types
 export type RootStackParamList = {
@@ -33,6 +32,15 @@ export type RootStackParamList = {
   Auth: undefined;
   Main: undefined;
   Onboarding: undefined;
+  StationNavigator: {
+    stationId: string;
+    lineId: string;
+  };
+  StationDetail: {
+    stationId: string;
+    stationName: string;
+    lineId: string;
+  };
 };
 
 export type MainTabParamList = {
@@ -127,69 +135,17 @@ const MainTabNavigator: React.FC = () => {
   );
 };
 
-// Custom hook to check onboarding completion status
-const useOnboardingStatus = (userId: string | undefined) => {
-  const [hasCompletedOnboarding, setHasCompletedOnboarding] = useState<boolean | null>(null);
-  const [checkingStatus, setCheckingStatus] = useState(true);
-
-  React.useEffect(() => {
-    const checkOnboardingStatus = async () => {
-      if (!userId) {
-        setHasCompletedOnboarding(null);
-        setCheckingStatus(false);
-        return;
-      }
-
-      try {
-        const key = `${ONBOARDING_COMPLETE_KEY}_${userId}`;
-        const value = await AsyncStorage.getItem(key);
-        setHasCompletedOnboarding(value === 'true');
-      } catch (error) {
-        console.error('Error checking onboarding status:', error);
-        setHasCompletedOnboarding(false);
-      } finally {
-        setCheckingStatus(false);
-      }
-    };
-
-    checkOnboardingStatus();
-  }, [userId]);
-
-  const completeOnboarding = useCallback(async () => {
-    if (!userId) return;
-    try {
-      const key = `${ONBOARDING_COMPLETE_KEY}_${userId}`;
-      await AsyncStorage.setItem(key, 'true');
-      setHasCompletedOnboarding(true);
-    } catch (error) {
-      console.error('Error saving onboarding status:', error);
-    }
-  }, [userId]);
-
-  const skipOnboarding = useCallback(async () => {
-    if (!userId) return;
-    try {
-      const key = `${ONBOARDING_COMPLETE_KEY}_${userId}`;
-      await AsyncStorage.setItem(key, 'true');
-      setHasCompletedOnboarding(true);
-    } catch (error) {
-      console.error('Error saving onboarding status:', error);
-    }
-  }, [userId]);
-
-  return { hasCompletedOnboarding, checkingStatus, completeOnboarding, skipOnboarding };
-};
-
-export const RootNavigator: React.FC = () => {
+// Inner navigator component that uses onboarding context
+const RootNavigatorContent: React.FC = () => {
   const { user, loading } = useAuth();
   const {
     hasCompletedOnboarding,
-    checkingStatus,
+    isCheckingStatus,
     completeOnboarding,
     skipOnboarding,
-  } = useOnboardingStatus(user?.id);
+  } = useOnboarding();
 
-  if (loading || (user && checkingStatus)) {
+  if (loading || (user && isCheckingStatus)) {
     return <LoadingScreen message="앱을 로딩중입니다..." />;
   }
 
@@ -223,6 +179,32 @@ export const RootNavigator: React.FC = () => {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Main" component={MainTabNavigator} />
+      <Stack.Screen
+        name="StationNavigator"
+        component={StationNavigatorScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="StationDetail"
+        component={StationDetailScreen}
+        options={{
+          headerShown: true,
+          title: '역 상세정보',
+        }}
+      />
     </Stack.Navigator>
+  );
+};
+
+// Root Navigator with OnboardingProvider
+export const RootNavigator: React.FC = () => {
+  const { user } = useAuth();
+
+  return (
+    <OnboardingProvider userId={user?.id}>
+      <RootNavigatorContent />
+    </OnboardingProvider>
   );
 };

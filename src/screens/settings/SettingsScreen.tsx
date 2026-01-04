@@ -99,6 +99,12 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
           <Text style={styles.sectionTitle}>알림 설정</Text>
           <View style={styles.settingGroup}>
             <SettingItem
+              icon="train-outline"
+              title="출퇴근 설정"
+              subtitle="출퇴근 경로 및 알림 설정"
+              onPress={() => navigation.navigate('CommuteSettings')}
+            />
+            <SettingItem
               icon="notifications"
               title="지연 알림"
               subtitle="열차 지연 시 알림 받기"

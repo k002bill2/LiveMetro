@@ -11,6 +11,7 @@ import { COLORS, TYPOGRAPHY } from '@/styles/modernTheme';
 
 // Import screens
 import SettingsScreen from '@/screens/settings/SettingsScreen';
+import CommuteSettingsScreen from '@/screens/settings/CommuteSettingsScreen';
 import DelayNotificationScreen from '@/screens/settings/DelayNotificationScreen';
 import NotificationTimeScreen from '@/screens/settings/NotificationTimeScreen';
 import SoundSettingsScreen from '@/screens/settings/SoundSettingsScreen';
@@ -43,6 +44,11 @@ export const SettingsNavigator: React.FC = () => {
         name="SettingsHome"
         component={SettingsScreen}
         options={{ headerShown: false }} // Hide header for main settings
+      />
+      <SettingsStack.Screen
+        name="CommuteSettings"
+        component={CommuteSettingsScreen}
+        options={{ title: '출퇴근 설정' }}
       />
       <SettingsStack.Screen
         name="DelayNotification"
