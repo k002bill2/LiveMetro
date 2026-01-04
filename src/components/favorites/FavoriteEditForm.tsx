@@ -53,12 +53,12 @@ export const FavoriteEditForm: React.FC<FavoriteEditFormProps> = ({
       Animated.timing(heightAnim, {
         toValue: isExpanded ? 1 : 0,
         duration: 300,
-        useNativeDriver: false,
+        useNativeDriver: false, // height/maxHeight requires non-native driver
       }),
       Animated.timing(opacityAnim, {
         toValue: isExpanded ? 1 : 0,
         duration: 300,
-        useNativeDriver: true,
+        useNativeDriver: false, // Must match heightAnim to avoid parentNode error
       }),
     ]).start();
   }, [isExpanded, heightAnim, opacityAnim]);
@@ -104,13 +104,9 @@ export const FavoriteEditForm: React.FC<FavoriteEditFormProps> = ({
     onCancel();
   };
 
-  if (!isExpanded) {
-    return null;
-  }
-
   const maxHeight = heightAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: [0, 300], // Approximate max height
+    outputRange: [0, 350], // Approximate max height
   });
 
   return (
@@ -122,6 +118,7 @@ export const FavoriteEditForm: React.FC<FavoriteEditFormProps> = ({
           opacity: opacityAnim,
         },
       ]}
+      pointerEvents={isExpanded ? 'auto' : 'none'}
     >
       <View style={styles.content}>
         {/* Alias Input */}

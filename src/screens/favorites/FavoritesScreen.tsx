@@ -32,6 +32,9 @@ import { useAuth } from '../../services/auth/AuthContext';
 import { AppStackParamList } from '../../navigation/types';
 import { FavoritesSearchBar } from '../../components/favorites/FavoritesSearchBar';
 import { DraggableFavoriteItem } from '../../components/favorites/DraggableFavoriteItem';
+import { StationSearchModal } from '../../components/commute/StationSearchModal';
+import { StationSelection } from '../../models/commute';
+import { Station } from '../../models/train';
 import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '../../styles/modernTheme';
 
 type NavigationProp = NativeStackNavigationProp<AppStackParamList>;
@@ -45,8 +48,12 @@ export const FavoritesScreen: React.FC = () => {
     error,
     removeFavorite,
     updateFavorite,
+    addFavorite,
     refresh,
   } = useFavorites();
+
+  // Station search modal state
+  const [isSearchModalVisible, setIsSearchModalVisible] = useState(false);
 
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -179,6 +186,42 @@ export const FavoritesScreen: React.FC = () => {
   }, [navigation]);
 
   /**
+   * Handle station selection from search modal
+   */
+  const handleStationSelect = useCallback(async (selection: StationSelection) => {
+    // Check if already in favorites first (before closing modal)
+    const alreadyExists = favoritesWithDetails.some(
+      fav => fav.stationId === selection.stationId && fav.lineId === selection.lineId
+    );
+
+    if (alreadyExists) {
+      setIsSearchModalVisible(false);
+      Alert.alert('알림', '이미 즐겨찾기에 추가된 역입니다.');
+      return;
+    }
+
+    try {
+      // Convert StationSelection to Station format
+      const station: Station = {
+        id: selection.stationId,
+        name: selection.stationName,
+        nameEn: '',
+        lineId: selection.lineId,
+        coordinates: { latitude: 0, longitude: 0 },
+        transfers: [],
+      };
+
+      // Add favorite first, then close modal to avoid animation conflicts
+      await addFavorite(station);
+      setIsSearchModalVisible(false);
+      Alert.alert('완료', `${selection.stationName}역이 즐겨찾기에 추가되었습니다.`);
+    } catch (error) {
+      setIsSearchModalVisible(false);
+      Alert.alert('오류', '즐겨찾기 추가에 실패했습니다.');
+    }
+  }, [addFavorite, favoritesWithDetails]);
+
+  /**
    * Render empty state
    */
   const renderEmptyState = () => (
@@ -190,7 +233,7 @@ export const FavoritesScreen: React.FC = () => {
       </Text>
       <TouchableOpacity
         style={styles.emptyButton}
-        onPress={() => navigation.navigate('MainTabs' as never)}
+        onPress={() => setIsSearchModalVisible(true)}
       >
         <Text style={styles.emptyButtonText}>역 찾아보기</Text>
       </TouchableOpacity>
@@ -279,10 +322,18 @@ export const FavoritesScreen: React.FC = () => {
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>즐겨찾기</Text>
-        <Text style={styles.headerSubtitle}>
-          {favoritesWithDetails.length}개의 역
-        </Text>
+        <View style={styles.headerLeft}>
+          <Text style={styles.headerTitle}>즐겨찾기</Text>
+          <Text style={styles.headerSubtitle}>
+            {favoritesWithDetails.length}개의 역
+          </Text>
+        </View>
+        <TouchableOpacity
+          style={styles.addButton}
+          onPress={() => setIsSearchModalVisible(true)}
+        >
+          <Ionicons name="add" size={24} color={COLORS.white} />
+        </TouchableOpacity>
       </View>
 
       {/* Search Bar */}
@@ -320,6 +371,15 @@ export const FavoritesScreen: React.FC = () => {
           </View>
         )}
       </ScrollView>
+
+      {/* Station Search Modal */}
+      <StationSearchModal
+        visible={isSearchModalVisible}
+        onClose={() => setIsSearchModalVisible(false)}
+        onSelect={handleStationSelect}
+        title="역 검색"
+        placeholder="즐겨찾기에 추가할 역을 검색하세요"
+      />
     </SafeAreaView>
   );
 };
@@ -330,11 +390,25 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
   },
   header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.lg,
     backgroundColor: COLORS.white,
     borderBottomWidth: 1,
     borderBottomColor: COLORS.border.light,
+  },
+  headerLeft: {
+    flex: 1,
+  },
+  addButton: {
+    width: 40,
+    height: 40,
+    borderRadius: RADIUS.full,
+    backgroundColor: COLORS.black,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerTitle: {
     fontSize: TYPOGRAPHY.fontSize['2xl'],

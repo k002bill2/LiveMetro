@@ -63,6 +63,27 @@ export const getLocalStation = (stationId: string): Station | null => {
 };
 
 /**
+ * Get station by name from local data (exact match)
+ */
+export const getLocalStationByName = (stationName: string): Station | null => {
+  try {
+    const localData = stationsData as Record<string, LocalStationData>;
+
+    for (const [stationId, stationData] of Object.entries(localData)) {
+      if (stationData.name === stationName) {
+        return convertLocalStationToModel(stationId, stationData);
+      }
+    }
+
+    console.warn(`Station with name "${stationName}" not found in local data`);
+    return null;
+  } catch (error) {
+    console.error('Error loading local station by name:', error);
+    return null;
+  }
+};
+
+/**
  * Search stations by name from local data
  */
 export const searchLocalStations = (query: string): Station[] => {

@@ -16,11 +16,13 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
 import { StationSelection } from '@/models/commute';
 import stationsData from '@/data/stations.json';
+import { useFavorites } from '@/hooks/useFavorites';
 
 interface StationSearchModalProps {
   visible: boolean;
@@ -76,6 +78,18 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
   const [stations, setStations] = useState<StationWithLine[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Get commute favorites
+  const { favoritesWithDetails } = useFavorites();
+
+  // Filter commute stations (isCommuteStation=true) and exclude already selected stations
+  const commuteStations = useMemo(() => {
+    return favoritesWithDetails.filter(fav =>
+      fav.isCommuteStation &&
+      fav.station &&
+      !excludeStationIds.includes(fav.stationId)
+    );
+  }, [favoritesWithDetails, excludeStationIds]);
 
   // Load all stations on mount
   useEffect(() => {
@@ -166,6 +180,69 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
     setSelectedLine(null);
     onClose();
   }, [onClose]);
+
+  // Handle selecting a commute favorite station
+  const handleSelectCommuteFavorite = useCallback(
+    (favorite: typeof favoritesWithDetails[0]) => {
+      if (!favorite.station) return;
+
+      onSelect({
+        stationId: favorite.stationId,
+        stationName: favorite.station.name,
+        lineId: favorite.lineId,
+        lineName: LINE_NAMES[favorite.lineId] || `${favorite.lineId}호선`,
+      });
+      setSearchQuery('');
+      setSelectedLine(null);
+      onClose();
+    },
+    [onSelect, onClose]
+  );
+
+  // Render commute favorites section
+  const renderCommuteFavorites = () => {
+    if (commuteStations.length === 0) return null;
+
+    return (
+      <View style={styles.favoritesSection}>
+        <View style={styles.favoritesSectionHeader}>
+          <Ionicons name="star" size={16} color={COLORS.black} />
+          <Text style={styles.favoritesSectionTitle}>출퇴근 즐겨찾기</Text>
+        </View>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.favoritesScrollContent}
+        >
+          {commuteStations.map((fav) => (
+            <TouchableOpacity
+              key={fav.id}
+              style={styles.favoriteCard}
+              onPress={() => handleSelectCommuteFavorite(fav)}
+            >
+              <View
+                style={[
+                  styles.favoriteLineIndicator,
+                  { backgroundColor: LINE_COLORS[fav.lineId] || COLORS.gray[400] },
+                ]}
+              />
+              <View style={styles.favoriteContent}>
+                {fav.alias && (
+                  <Text style={styles.favoriteAlias}>{fav.alias}</Text>
+                )}
+                <Text style={styles.favoriteStationName}>
+                  {fav.station?.name}역
+                </Text>
+                <Text style={styles.favoriteLineName}>
+                  {LINE_NAMES[fav.lineId] || `${fav.lineId}호선`}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
+    );
+  };
 
   const renderLineFilter = () => (
     <View style={styles.lineFilterContainer}>
@@ -267,6 +344,9 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
             <Text style={styles.title}>{title}</Text>
             <View style={styles.headerSpacer} />
           </View>
+
+          {/* Commute Favorites Section */}
+          {renderCommuteFavorites()}
 
           {/* Search Input */}
           <View style={styles.searchContainer}>
@@ -547,6 +627,65 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.base,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
     color: COLORS.white,
+  },
+  // Commute Favorites Styles
+  favoritesSection: {
+    paddingVertical: SPACING.md,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border.light,
+    backgroundColor: COLORS.surface.background,
+  },
+  favoritesSectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SPACING.lg,
+    marginBottom: SPACING.sm,
+    gap: SPACING.xs,
+  },
+  favoritesSectionTitle: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.text.primary,
+  },
+  favoritesScrollContent: {
+    paddingHorizontal: SPACING.lg,
+    gap: SPACING.sm,
+  },
+  favoriteCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+    borderRadius: RADIUS.md,
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    borderWidth: 1,
+    borderColor: COLORS.border.medium,
+    marginRight: SPACING.sm,
+    minWidth: 120,
+  },
+  favoriteLineIndicator: {
+    width: 4,
+    height: 36,
+    borderRadius: 2,
+    marginRight: SPACING.sm,
+  },
+  favoriteContent: {
+    flex: 1,
+  },
+  favoriteAlias: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    color: COLORS.black,
+    marginBottom: 2,
+  },
+  favoriteStationName: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
+    color: COLORS.text.primary,
+  },
+  favoriteLineName: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.text.tertiary,
   },
 });
 

@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { seoulSubwayApi, SeoulRealtimeArrival } from '../api/seoulSubwayApi';
 import { trainService } from '../train/trainService';
 import { Train, Station, TrainDelay, DelaySeverity, TrainStatus, ServiceDisruption } from '../../models/train';
+import { getLocalStationByName } from './stationsDataService';
 
 interface CachedData<T> {
   data: T;
@@ -80,26 +81,32 @@ class DataManager {
     }
 
     try {
-      // Fallback to Firebase
-      const firebaseStation = await trainService.getStation(stationName);
-      if (firebaseStation) {
-        return new Promise((resolve) => {
-          const unsubscribe = trainService.subscribeToTrainUpdates(
-            firebaseStation.id,
-            (trains) => {
-              unsubscribe(); // One-time fetch
-              const result: RealtimeTrainData = {
-                stationId: firebaseStation.id,
-                trains,
-                lastUpdated: new Date()
-              };
+      // First try to get station from local data by name
+      const localStation = getLocalStationByName(stationName);
+      const stationId = localStation?.id;
 
-              // Cache Firebase data
-              this.setCachedData(cacheKey, result, this.DEFAULT_CACHE_DURATION);
-              resolve(result);
-            }
-          );
-        });
+      if (stationId) {
+        // Try Firebase with the correct station ID
+        const firebaseStation = await trainService.getStation(stationId);
+        if (firebaseStation) {
+          return new Promise((resolve) => {
+            const unsubscribe = trainService.subscribeToTrainUpdates(
+              firebaseStation.id,
+              (trains) => {
+                unsubscribe(); // One-time fetch
+                const result: RealtimeTrainData = {
+                  stationId: firebaseStation.id,
+                  trains,
+                  lastUpdated: new Date()
+                };
+
+                // Cache Firebase data
+                this.setCachedData(cacheKey, result, this.DEFAULT_CACHE_DURATION);
+                resolve(result);
+              }
+            );
+          });
+        }
       }
     } catch (error) {
       console.warn('Firebase failed, trying cache:', error);
@@ -129,11 +136,26 @@ class DataManager {
     }
 
     try {
-      // Try Firebase
-      const firebaseStation = await trainService.getStation(stationName);
-      if (firebaseStation) {
-        await this.setCachedData(cacheKey, firebaseStation, 24 * 60 * 60 * 1000); // Cache for 24 hours
-        return firebaseStation;
+      // First try to get station from local data by name
+      const localStation = getLocalStationByName(stationName);
+
+      // Try Firebase with station ID if we have it (for more accurate data)
+      if (localStation?.id) {
+        try {
+          const firebaseStation = await trainService.getStation(localStation.id);
+          if (firebaseStation) {
+            await this.setCachedData(cacheKey, firebaseStation, 24 * 60 * 60 * 1000); // Cache for 24 hours
+            return firebaseStation;
+          }
+        } catch (firebaseError) {
+          console.warn('Firebase station lookup failed, using local data:', firebaseError);
+        }
+      }
+
+      // Use local station data if available
+      if (localStation) {
+        await this.setCachedData(cacheKey, localStation, 24 * 60 * 60 * 1000); // Cache for 24 hours
+        return localStation;
       }
 
       // Fallback to Seoul API for station coordinates
