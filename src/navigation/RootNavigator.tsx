@@ -35,6 +35,7 @@ export type RootStackParamList = {
   StationNavigator: {
     stationId: string;
     lineId: string;
+    mode?: 'departure' | 'arrival';
   };
   StationDetail: {
     stationId: string;

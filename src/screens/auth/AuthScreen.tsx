@@ -18,6 +18,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import * as SecureStore from 'expo-secure-store';
 import { useAuth } from '../../services/auth/AuthContext';
 import { analyzeAuthError, printFirebaseDebugInfo } from '../../utils/firebaseDebug';
 import {
@@ -28,9 +29,10 @@ import {
   enableBiometricLogin,
 } from '../../services/auth/biometricService';
 
-// Storage keys for remember email
-const REMEMBER_EMAIL_KEY = '@livemetro_remember_email';
-const SAVED_EMAIL_KEY = '@livemetro_saved_email';
+// Storage keys for auto login
+const AUTO_LOGIN_ENABLED_KEY = '@livemetro_auto_login_enabled';
+const AUTO_LOGIN_EMAIL_KEY = 'livemetro_auto_login_email';
+const AUTO_LOGIN_PASSWORD_KEY = 'livemetro_auto_login_password';
 
 export const AuthScreen: React.FC = () => {
   const [isSignUp, setIsSignUp] = useState(false);
@@ -39,8 +41,9 @@ export const AuthScreen: React.FC = () => {
   const [displayName, setDisplayName] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // Remember email state
-  const [rememberEmail, setRememberEmail] = useState(false);
+  // Auto login state
+  const [autoLogin, setAutoLogin] = useState(false);
+  const [isAutoLoggingIn, setIsAutoLoggingIn] = useState(true);
 
   // Biometric state
   const [biometricAvailable, setBiometricAvailable] = useState(false);
@@ -49,19 +52,14 @@ export const AuthScreen: React.FC = () => {
 
   const { signInWithEmail, signUpWithEmail, signInAnonymously, resetPassword } = useAuth();
 
-  // Load saved email and check biometric on mount
+  // Load saved data and attempt auto login on mount
   useEffect(() => {
     const loadSavedData = async (): Promise<void> => {
       try {
-        // Load saved email
-        const savedRemember = await AsyncStorage.getItem(REMEMBER_EMAIL_KEY);
-        if (savedRemember === 'true') {
-          setRememberEmail(true);
-          const savedEmail = await AsyncStorage.getItem(SAVED_EMAIL_KEY);
-          if (savedEmail) {
-            setEmail(savedEmail);
-          }
-        }
+        // Check auto login setting
+        const savedAutoLogin = await AsyncStorage.getItem(AUTO_LOGIN_ENABLED_KEY);
+        const isAutoLoginEnabled = savedAutoLogin === 'true';
+        setAutoLogin(isAutoLoginEnabled);
 
         // Check biometric availability
         const available = await isBiometricAvailable();
@@ -74,13 +72,35 @@ export const AuthScreen: React.FC = () => {
           const typeName = await getBiometricTypeName();
           setBiometricTypeName(typeName);
         }
+
+        // Attempt auto login if enabled
+        if (isAutoLoginEnabled) {
+          const savedEmail = await SecureStore.getItemAsync(AUTO_LOGIN_EMAIL_KEY);
+          const savedPassword = await SecureStore.getItemAsync(AUTO_LOGIN_PASSWORD_KEY);
+
+          if (savedEmail && savedPassword) {
+            setEmail(savedEmail);
+            setLoading(true);
+            try {
+              await signInWithEmail(savedEmail, savedPassword);
+              return; // Auto login successful
+            } catch (error) {
+              console.log('Auto login failed, showing login form');
+              // Auto login failed, show login form with saved email
+            } finally {
+              setLoading(false);
+            }
+          }
+        }
       } catch (error) {
         console.error('Error loading saved data:', error);
+      } finally {
+        setIsAutoLoggingIn(false);
       }
     };
 
     loadSavedData();
-  }, []);
+  }, [signInWithEmail]);
 
   // Handle biometric login
   const handleBiometricLogin = useCallback(async (): Promise<void> => {
@@ -102,20 +122,25 @@ export const AuthScreen: React.FC = () => {
     }
   }, [signInWithEmail]);
 
-  // Save email preference
-  const saveEmailPreference = useCallback(async (emailToSave: string): Promise<void> => {
+  // Save auto login credentials
+  const saveAutoLoginCredentials = useCallback(async (
+    emailToSave: string,
+    passwordToSave: string
+  ): Promise<void> => {
     try {
-      if (rememberEmail) {
-        await AsyncStorage.setItem(REMEMBER_EMAIL_KEY, 'true');
-        await AsyncStorage.setItem(SAVED_EMAIL_KEY, emailToSave);
+      if (autoLogin) {
+        await AsyncStorage.setItem(AUTO_LOGIN_ENABLED_KEY, 'true');
+        await SecureStore.setItemAsync(AUTO_LOGIN_EMAIL_KEY, emailToSave);
+        await SecureStore.setItemAsync(AUTO_LOGIN_PASSWORD_KEY, passwordToSave);
       } else {
-        await AsyncStorage.setItem(REMEMBER_EMAIL_KEY, 'false');
-        await AsyncStorage.removeItem(SAVED_EMAIL_KEY);
+        await AsyncStorage.setItem(AUTO_LOGIN_ENABLED_KEY, 'false');
+        await SecureStore.deleteItemAsync(AUTO_LOGIN_EMAIL_KEY);
+        await SecureStore.deleteItemAsync(AUTO_LOGIN_PASSWORD_KEY);
       }
     } catch (error) {
-      console.error('Error saving email preference:', error);
+      console.error('Error saving auto login credentials:', error);
     }
-  }, [rememberEmail]);
+  }, [autoLogin]);
 
   // Prompt to enable biometric after successful login
   const promptBiometricSetup = useCallback(async (
@@ -192,8 +217,8 @@ export const AuthScreen: React.FC = () => {
       } else {
         await signInWithEmail(trimmedEmail, password);
 
-        // Save email preference after successful login
-        await saveEmailPreference(trimmedEmail);
+        // Save auto login credentials after successful login
+        await saveAutoLoginCredentials(trimmedEmail, password);
 
         // Prompt for biometric setup (only on login, not signup)
         await promptBiometricSetup(trimmedEmail, password);
@@ -269,9 +294,23 @@ export const AuthScreen: React.FC = () => {
     }
   };
 
+  // Show loading while checking auto login
+  if (isAutoLoggingIn) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.autoLoginContainer}>
+          <View style={styles.logoContainer}>
+            <Ionicons name="train" size={48} color="#2563eb" />
+          </View>
+          <Text style={styles.autoLoginText}>자동 로그인 중...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardView}
       >
@@ -285,8 +324,8 @@ export const AuthScreen: React.FC = () => {
               {isSignUp ? '계정 만들기' : '로그인'}
             </Text>
             <Text style={styles.subtitle}>
-              {isSignUp 
-                ? 'LiveMetro에 오신 것을 환영합니다!' 
+              {isSignUp
+                ? 'LiveMetro에 오신 것을 환영합니다!'
                 : '계정에 로그인하여 개인화된 서비스를 이용하세요'
               }
             </Text>
@@ -341,23 +380,23 @@ export const AuthScreen: React.FC = () => {
               />
             </View>
 
-            {/* Remember Email Checkbox (only for login) */}
+            {/* Auto Login Checkbox (only for login) */}
             {!isSignUp && (
               <View style={styles.rememberContainer}>
                 <TouchableOpacity
                   style={styles.rememberRow}
-                  onPress={() => setRememberEmail(!rememberEmail)}
+                  onPress={() => setAutoLogin(!autoLogin)}
                   activeOpacity={0.7}
                 >
                   <View style={[
                     styles.checkbox,
-                    rememberEmail && styles.checkboxChecked
+                    autoLogin && styles.checkboxChecked
                   ]}>
-                    {rememberEmail && (
+                    {autoLogin && (
                       <Ionicons name="checkmark" size={14} color="#ffffff" />
                     )}
                   </View>
-                  <Text style={styles.rememberText}>이메일 기억하기</Text>
+                  <Text style={styles.rememberText}>자동로그인</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -451,6 +490,16 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f9fafb',
+  },
+  autoLoginContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  autoLoginText: {
+    fontSize: 16,
+    color: '#6b7280',
+    marginTop: 16,
   },
   keyboardView: {
     flex: 1,

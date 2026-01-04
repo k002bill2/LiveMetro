@@ -72,6 +72,7 @@ export type AppStackParamList = {
   StationNavigator: {
     stationId: string;
     lineId: string;
+    mode?: 'departure' | 'arrival';
   };
 
   // Unauthenticated screens

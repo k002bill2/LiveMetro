@@ -3,7 +3,7 @@
  * Minimal grayscale design with black accent
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -25,7 +25,10 @@ import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '../../styles/modernTheme';
 type Props = NativeStackScreenProps<AppStackParamList, 'StationNavigator'>;
 
 export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) => {
-  const { stationId, lineId } = route.params;
+  const { stationId, lineId, mode } = route.params;
+
+  // 방향 선택 상태 (출발 모드에서 사용)
+  const [selectedDirection, setSelectedDirection] = useState<'up' | 'down'>('down');
 
   const {
     currentStation,
@@ -37,8 +40,6 @@ export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) =
     error,
     goToPrevious,
     goToNext,
-    canGoPrevious,
-    canGoNext,
     refresh,
   } = useStationNavigation({
     initialStationId: stationId,
@@ -51,6 +52,30 @@ export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) =
   } = useRealtimeTrains(currentStation?.name || '', {
     enabled: !!currentStation,
   });
+
+  // 선택된 방향으로 앞으로 지나갈 역들 계산
+  const upcomingStations = useMemo(() => {
+    if (!allStations || allStations.length === 0 || currentIndex < 0) {
+      return [];
+    }
+
+    if (selectedDirection === 'up') {
+      // 상행: 현재역 이전 역들 (인덱스 감소 방향)
+      return allStations.slice(0, currentIndex).reverse();
+    } else {
+      // 하행: 현재역 이후 역들 (인덱스 증가 방향)
+      return allStations.slice(currentIndex + 1);
+    }
+  }, [allStations, currentIndex, selectedDirection]);
+
+  // 종착역 표시
+  const terminalStation = useMemo(() => {
+    if (selectedDirection === 'up') {
+      return allStations[0];
+    } else {
+      return allStations[allStations.length - 1];
+    }
+  }, [allStations, selectedDirection]);
 
   const handleRefresh = useCallback(async () => {
     await Promise.all([refresh(), refreshTrains()]);
@@ -87,14 +112,21 @@ export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) =
 
     const isCurrent = type === 'current';
 
+    const handlePress = isCurrent
+      ? handleStationDetail
+      : type === 'previous'
+      ? goToPrevious
+      : type === 'next'
+      ? goToNext
+      : undefined;
+
     return (
       <TouchableOpacity
         style={[
           styles.stationCard,
           isCurrent && styles.currentStationCard,
         ]}
-        onPress={isCurrent ? handleStationDetail : undefined}
-        disabled={!isCurrent}
+        onPress={handlePress}
         activeOpacity={0.6}
       >
         <View style={styles.stationCardContent}>
@@ -171,6 +203,54 @@ export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) =
         </TouchableOpacity>
       </View>
 
+      {/* 출발 모드: 방향 선택 UI */}
+      {mode === 'departure' && (
+        <View style={styles.directionSelector}>
+          <TouchableOpacity
+            style={[
+              styles.directionButton,
+              selectedDirection === 'up' && styles.directionButtonActive,
+            ]}
+            onPress={() => setSelectedDirection('up')}
+          >
+            <Ionicons
+              name="arrow-up"
+              size={16}
+              color={selectedDirection === 'up' ? COLORS.white : COLORS.black}
+            />
+            <Text
+              style={[
+                styles.directionButtonText,
+                selectedDirection === 'up' && styles.directionButtonTextActive,
+              ]}
+            >
+              상행 ({allStations[0]?.name || '종착'} 방면)
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.directionButton,
+              selectedDirection === 'down' && styles.directionButtonActive,
+            ]}
+            onPress={() => setSelectedDirection('down')}
+          >
+            <Ionicons
+              name="arrow-down"
+              size={16}
+              color={selectedDirection === 'down' ? COLORS.white : COLORS.black}
+            />
+            <Text
+              style={[
+                styles.directionButtonText,
+                selectedDirection === 'down' && styles.directionButtonTextActive,
+              ]}
+            >
+              하행 ({allStations[allStations.length - 1]?.name || '종착'} 방면)
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <ScrollView
         style={styles.content}
         contentContainerStyle={styles.contentContainer}
@@ -183,17 +263,48 @@ export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) =
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* Previous Station */}
-        {previousStation && (
+        {/* 출발 모드: 앞으로 지나갈 역 목록 */}
+        {mode === 'departure' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>
+              {selectedDirection === 'up' ? '상행' : '하행'} 방향 ({upcomingStations.length}개 역)
+            </Text>
+            {terminalStation && (
+              <View style={styles.terminalInfo}>
+                <Ionicons name="flag" size={14} color={COLORS.text.secondary} />
+                <Text style={styles.terminalText}>
+                  종착: {terminalStation.name}
+                </Text>
+              </View>
+            )}
+            <View style={styles.upcomingStationsList}>
+              {upcomingStations.length === 0 ? (
+                <Text style={styles.noStationsText}>
+                  {selectedDirection === 'up' ? '첫 번째 역입니다' : '마지막 역입니다'}
+                </Text>
+              ) : (
+                upcomingStations.map((station, index) => (
+                  <View key={station.id} style={styles.upcomingStationItem}>
+                    <View style={styles.stationDot} />
+                    {index < upcomingStations.length - 1 && <View style={styles.stationLine} />}
+                    <Text style={styles.upcomingStationName}>{station.name}</Text>
+                    {station.transfers && station.transfers.length > 0 && (
+                      <View style={styles.transferBadgeSmall}>
+                        <Text style={styles.transferTextSmall}>환승</Text>
+                      </View>
+                    )}
+                  </View>
+                ))
+              )}
+            </View>
+          </View>
+        )}
+
+        {/* 일반 모드: Previous Station */}
+        {mode !== 'departure' && previousStation && (
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>Previous</Text>
             {renderStationCard(previousStation, 'previous')}
-            {canGoPrevious && (
-              <TouchableOpacity style={styles.navButton} onPress={goToPrevious}>
-                <Ionicons name="chevron-up" size={16} color={COLORS.black} />
-                <Text style={styles.navButtonText}>이전 역</Text>
-              </TouchableOpacity>
-            )}
           </View>
         )}
 
@@ -212,17 +323,11 @@ export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) =
           </View>
         </View>
 
-        {/* Next Station */}
-        {nextStation && (
+        {/* 일반 모드: Next Station */}
+        {mode !== 'departure' && nextStation && (
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>Next</Text>
             {renderStationCard(nextStation, 'next')}
-            {canGoNext && (
-              <TouchableOpacity style={styles.navButton} onPress={goToNext}>
-                <Text style={styles.navButtonText}>다음 역</Text>
-                <Ionicons name="chevron-down" size={16} color={COLORS.black} />
-              </TouchableOpacity>
-            )}
           </View>
         )}
 
@@ -292,6 +397,99 @@ const styles = StyleSheet.create({
     color: COLORS.text.tertiary,
     marginTop: 2,
     letterSpacing: TYPOGRAPHY.letterSpacing.wide,
+  },
+  // 방향 선택 스타일
+  directionSelector: {
+    flexDirection: 'row',
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.md,
+    gap: SPACING.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border.light,
+  },
+  directionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SPACING.xs,
+    paddingVertical: SPACING.md,
+    backgroundColor: COLORS.surface.card,
+    borderRadius: RADIUS.base,
+    borderWidth: 1,
+    borderColor: COLORS.border.medium,
+  },
+  directionButtonActive: {
+    backgroundColor: COLORS.black,
+    borderColor: COLORS.black,
+  },
+  directionButtonText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.medium,
+    color: COLORS.text.primary,
+  },
+  directionButtonTextActive: {
+    color: COLORS.white,
+  },
+  // 앞으로 지나갈 역 목록 스타일
+  terminalInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.xs,
+    marginBottom: SPACING.md,
+  },
+  terminalText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.secondary,
+  },
+  upcomingStationsList: {
+    backgroundColor: COLORS.surface.card,
+    borderRadius: RADIUS.lg,
+    padding: SPACING.lg,
+    borderWidth: 1,
+    borderColor: COLORS.border.light,
+  },
+  upcomingStationItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: SPACING.sm,
+    position: 'relative',
+  },
+  stationDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: COLORS.black,
+    marginRight: SPACING.md,
+  },
+  stationLine: {
+    position: 'absolute',
+    left: 4,
+    top: 24,
+    width: 2,
+    height: 24,
+    backgroundColor: COLORS.gray[300],
+  },
+  upcomingStationName: {
+    fontSize: TYPOGRAPHY.fontSize.base,
+    color: COLORS.text.primary,
+    flex: 1,
+  },
+  transferBadgeSmall: {
+    backgroundColor: COLORS.gray[100],
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 2,
+    borderRadius: RADIUS.sm,
+  },
+  transferTextSmall: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    color: COLORS.text.secondary,
+  },
+  noStationsText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    color: COLORS.text.tertiary,
+    textAlign: 'center',
+    paddingVertical: SPACING.lg,
   },
   content: {
     flex: 1,
@@ -390,23 +588,6 @@ const styles = StyleSheet.create({
     fontSize: TYPOGRAPHY.fontSize.xs,
     fontWeight: TYPOGRAPHY.fontWeight.medium,
     color: COLORS.text.secondary,
-  },
-  navButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.xs,
-    marginTop: SPACING.md,
-    paddingVertical: SPACING.md,
-    backgroundColor: COLORS.surface.card,
-    borderRadius: RADIUS.base,
-    borderWidth: 1,
-    borderColor: COLORS.border.medium,
-  },
-  navButtonText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.medium,
-    color: COLORS.text.primary,
   },
   arrivalsContainer: {
     marginTop: SPACING.xl,

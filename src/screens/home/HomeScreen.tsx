@@ -161,6 +161,22 @@ export const HomeScreen: React.FC = () => {
     });
   };
 
+  // 출발 버튼 핸들러 - StationNavigator로 이동 (출발 모드)
+  const handleSetStart = (station: Station): void => {
+    setSelectedStation(station);
+    navigation.navigate('StationNavigator', {
+      stationId: station.id,
+      lineId: station.lineId,
+      mode: 'departure',
+    });
+  };
+
+  // 도착 버튼 핸들러 - 상태 초기화
+  const handleSetEnd = (): void => {
+    setSelectedStation(null);
+    showInfo('선택이 초기화되었습니다');
+  };
+
   const onRefresh = async (): Promise<void> => {
     setRefreshing(true);
 
@@ -302,6 +318,8 @@ export const HomeScreen: React.FC = () => {
                 station={station}
                 isSelected={selectedStation?.id === station.id}
                 onPress={() => onStationSelect(station)}
+                onSetStart={() => handleSetStart(station)}
+                onSetEnd={handleSetEnd}
               />
             ))}
           </ScrollView>
