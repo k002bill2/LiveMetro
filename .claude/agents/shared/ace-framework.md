@@ -53,9 +53,12 @@ Before accepting a task:
 
 ## Quality Gates (All Agents)
 
-1. TypeScript strict mode compliance (`npm run type-check`)
-2. ESLint with zero errors (`npm run lint`)
-3. No hardcoded sensitive data
+See [quality-gates.md](./quality-gates.md) for complete quality gate requirements.
+
+**Quick Reference**:
+- `npm run type-check` - TypeScript strict mode
+- `npm run lint` - ESLint zero errors
+- `npm test -- --coverage` - Coverage thresholds (75%/70%/60%)
 
 ## Task Completion
 

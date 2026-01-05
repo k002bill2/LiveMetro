@@ -270,3 +270,123 @@ jest.mock('expo-location', () => ({
   },
 }));
 ```
+
+---
+
+## Accuracy Selection Guide
+
+```typescript
+/**
+ * Location Accuracy Selection for Seoul Subway App
+ *
+ * | Accuracy | Battery | Use Case |
+ * |----------|---------|----------|
+ * | Lowest   | Best    | City-level (not recommended) |
+ * | Low      | Good    | District-level (~1km) |
+ * | Balanced | Medium  | Station finding (~100m) - RECOMMENDED |
+ * | High     | Poor    | Walking navigation (~10m) |
+ * | Highest  | Worst   | Precise tracking (~1m) |
+ */
+
+const getAccuracyForUseCase = (
+  useCase: 'nearby_stations' | 'walking_navigation' | 'background'
+): Location.Accuracy => {
+  switch (useCase) {
+    case 'nearby_stations':
+      return Location.Accuracy.Balanced; // ~100m is enough
+    case 'walking_navigation':
+      return Location.Accuracy.High; // Need precision
+    case 'background':
+      return Location.Accuracy.Low; // Save battery
+    default:
+      return Location.Accuracy.Balanced;
+  }
+};
+```
+
+---
+
+## Error Recovery Pattern
+
+```typescript
+const getLocationWithFallback = async (): Promise<{
+  location: LocationObject | null;
+  source: 'gps' | 'cached' | 'default';
+}> => {
+  // Try GPS first
+  try {
+    const location = await Location.getCurrentPositionAsync({
+      accuracy: Location.Accuracy.Balanced,
+      timeInterval: 5000,
+    });
+    return { location, source: 'gps' };
+  } catch (gpsError) {
+    console.log('GPS failed, trying cached location');
+  }
+
+  // Fallback to last known location
+  try {
+    const cached = await Location.getLastKnownPositionAsync();
+    if (cached) {
+      return { location: cached, source: 'cached' };
+    }
+  } catch (cacheError) {
+    console.log('Cache failed, using default');
+  }
+
+  // Ultimate fallback: Seoul Station coordinates
+  const defaultLocation: LocationObject = {
+    coords: {
+      latitude: 37.5546,
+      longitude: 126.9706,
+      altitude: null,
+      accuracy: null,
+      altitudeAccuracy: null,
+      heading: null,
+      speed: null,
+    },
+    timestamp: Date.now(),
+  };
+
+  return { location: defaultLocation, source: 'default' };
+};
+```
+
+---
+
+## Distance Calculation Utilities
+
+```typescript
+import { getDistance, isPointWithinRadius } from 'geolib';
+
+/**
+ * Calculate distance between two points in meters
+ */
+const calculateDistance = (
+  from: { latitude: number; longitude: number },
+  to: { latitude: number; longitude: number }
+): number => {
+  return getDistance(from, to);
+};
+
+/**
+ * Format distance for display
+ */
+const formatDistance = (meters: number): string => {
+  if (meters < 1000) {
+    return `${Math.round(meters)}m`;
+  }
+  return `${(meters / 1000).toFixed(1)}km`;
+};
+
+/**
+ * Check if station is within walking distance
+ */
+const isWalkable = (
+  userLocation: { latitude: number; longitude: number },
+  stationLocation: { latitude: number; longitude: number },
+  maxWalkingDistance = 500 // meters
+): boolean => {
+  return isPointWithinRadius(stationLocation, userLocation, maxWalkingDistance);
+};
+```

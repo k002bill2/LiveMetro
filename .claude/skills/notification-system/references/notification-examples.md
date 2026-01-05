@@ -305,3 +305,216 @@ const mockNotification: Notifications.Notification = {
   date: Date.now(),
 };
 ```
+
+---
+
+## Service Disruption Alerts
+
+```typescript
+interface ServiceDisruption {
+  lineId: string;
+  lineName: string;
+  type: 'delay' | 'suspension' | 'emergency';
+  message: string;
+  startTime: Date;
+  estimatedEndTime?: Date;
+}
+
+class DisruptionNotificationManager {
+  private sentDisruptions = new Set<string>();
+
+  async notifyDisruption(disruption: ServiceDisruption): Promise<void> {
+    const prefs = await getNotificationPreferences();
+
+    if (!prefs.enabled || !prefs.serviceDisruptions || isQuietHours(prefs)) {
+      return;
+    }
+
+    // Prevent duplicate notifications
+    const disruptionKey = `${disruption.lineId}-${disruption.type}-${disruption.startTime.getTime()}`;
+    if (this.sentDisruptions.has(disruptionKey)) {
+      return;
+    }
+
+    const severity = this.getSeverityEmoji(disruption.type);
+
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: `${severity} ${disruption.lineName} Service Alert`,
+        body: disruption.message,
+        data: {
+          type: 'disruption',
+          lineId: disruption.lineId,
+          disruptionType: disruption.type,
+        },
+        sound: true,
+        priority: Notifications.AndroidNotificationPriority.HIGH,
+      },
+      trigger: null, // Immediate
+    });
+
+    this.sentDisruptions.add(disruptionKey);
+
+    // Clean up old keys after 1 hour
+    setTimeout(() => {
+      this.sentDisruptions.delete(disruptionKey);
+    }, 3600000);
+  }
+
+  private getSeverityEmoji(type: ServiceDisruption['type']): string {
+    switch (type) {
+      case 'emergency': return '🚨';
+      case 'suspension': return '⚠️';
+      case 'delay': return '⏰';
+      default: return 'ℹ️';
+    }
+  }
+}
+
+export const disruptionNotificationManager = new DisruptionNotificationManager();
+```
+
+---
+
+## Commute Reminder System
+
+```typescript
+interface CommuteSchedule {
+  type: 'morning' | 'evening';
+  departureTime: string; // "08:30"
+  stationId: string;
+  stationName: string;
+  enabled: boolean;
+  daysOfWeek: number[]; // 0=Sunday, 1=Monday, ...
+}
+
+class CommuteReminderManager {
+  async scheduleCommuteReminders(schedules: CommuteSchedule[]): Promise<void> {
+    // Cancel all existing commute reminders first
+    await this.cancelAllCommuteReminders();
+
+    for (const schedule of schedules) {
+      if (!schedule.enabled) continue;
+
+      for (const dayOfWeek of schedule.daysOfWeek) {
+        await this.scheduleWeeklyReminder(schedule, dayOfWeek);
+      }
+    }
+  }
+
+  private async scheduleWeeklyReminder(
+    schedule: CommuteSchedule,
+    dayOfWeek: number
+  ): Promise<void> {
+    const [hours, minutes] = schedule.departureTime.split(':').map(Number);
+
+    // Schedule 10 minutes before departure
+    const reminderMinutes = minutes - 10;
+    const reminderHours = reminderMinutes < 0 ? hours - 1 : hours;
+    const adjustedMinutes = reminderMinutes < 0 ? reminderMinutes + 60 : reminderMinutes;
+
+    const identifier = `commute-${schedule.type}-${dayOfWeek}`;
+
+    await Notifications.scheduleNotificationAsync({
+      identifier,
+      content: {
+        title: schedule.type === 'morning' ? '🌅 Time to Leave!' : '🌆 Heading Home?',
+        body: `Check train times for ${schedule.stationName}`,
+        data: {
+          type: 'commute_reminder',
+          stationId: schedule.stationId,
+          commuteType: schedule.type,
+        },
+        sound: true,
+      },
+      trigger: {
+        weekday: dayOfWeek + 1, // Expo uses 1-7 (Sunday=1)
+        hour: reminderHours,
+        minute: adjustedMinutes,
+        repeats: true,
+      },
+    });
+  }
+
+  async cancelAllCommuteReminders(): Promise<void> {
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+
+    for (const notification of scheduled) {
+      if (notification.identifier.startsWith('commute-')) {
+        await Notifications.cancelScheduledNotificationAsync(notification.identifier);
+      }
+    }
+  }
+}
+
+export const commuteReminderManager = new CommuteReminderManager();
+```
+
+---
+
+## Notification Tap Handler
+
+```typescript
+const handleNotificationTap = (data: Record<string, unknown>): void => {
+  const type = data.type as string;
+
+  switch (type) {
+    case 'arrival_alert':
+      // Navigate to station detail
+      navigationRef.navigate('StationDetail', {
+        stationId: data.stationId as string,
+      });
+      break;
+
+    case 'disruption':
+      // Navigate to alerts screen with filter
+      navigationRef.navigate('Alerts', {
+        filterLine: data.lineId as string,
+      });
+      break;
+
+    case 'commute_reminder':
+      // Navigate to home with station pre-selected
+      navigationRef.navigate('Home', {
+        selectedStation: data.stationId as string,
+      });
+      break;
+
+    default:
+      // Default: go to home
+      navigationRef.navigate('Home');
+  }
+};
+```
+
+---
+
+## Jest Mocks
+
+```typescript
+// __tests__/setup.ts
+jest.mock('expo-notifications', () => ({
+  setNotificationHandler: jest.fn(),
+  getPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted' }),
+  requestPermissionsAsync: jest.fn().mockResolvedValue({ status: 'granted' }),
+  getExpoPushTokenAsync: jest.fn().mockResolvedValue({ data: 'ExponentPushToken[xxx]' }),
+  scheduleNotificationAsync: jest.fn().mockResolvedValue('notification-id'),
+  cancelScheduledNotificationAsync: jest.fn(),
+  getAllScheduledNotificationsAsync: jest.fn().mockResolvedValue([]),
+  setNotificationChannelAsync: jest.fn(),
+  addNotificationReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+  addNotificationResponseReceivedListener: jest.fn(() => ({ remove: jest.fn() })),
+  removeNotificationSubscription: jest.fn(),
+  setBadgeCountAsync: jest.fn(),
+  getBadgeCountAsync: jest.fn().mockResolvedValue(0),
+  AndroidImportance: {
+    DEFAULT: 3,
+    HIGH: 4,
+    MAX: 5,
+  },
+  AndroidNotificationPriority: {
+    DEFAULT: 0,
+    HIGH: 1,
+  },
+}));
+```

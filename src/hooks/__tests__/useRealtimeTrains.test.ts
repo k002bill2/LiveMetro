@@ -1,408 +1,420 @@
 /**
  * useRealtimeTrains Hook Tests
- *
- * NOTE: These tests are currently skipped because:
- * - The hook implementation uses dataManager (not trainService)
- * - Tests need to be rewritten to mock dataManager instead
- * - See src/services/data/dataManager.ts for actual implementation
+ * Tests for real-time train data subscription using dataManager
  */
 
-import { renderHook, act } from '@testing-library/react-native';
+import { renderHook, act, waitFor } from '@testing-library/react-native';
 import { useRealtimeTrains } from '../useRealtimeTrains';
-import { trainService } from '../../services/train/trainService';
+import { dataManager, RealtimeTrainData } from '../../services/data/dataManager';
 import { Train } from '../../models/train';
 
-// Mock trainService (legacy - hook now uses dataManager)
-jest.mock('../../services/train/trainService');
-const mockTrainService = trainService as jest.Mocked<typeof trainService>;
+// Mock dataManager
+jest.mock('../../services/data/dataManager', () => ({
+  dataManager: {
+    subscribeToRealtimeUpdates: jest.fn(),
+  },
+}));
 
-// Skip all tests until they are updated to use dataManager mocks
-describe.skip('useRealtimeTrains', () => {
-  const mockTrains: Train[] = [
-    {
-      id: 'train-1',
-      stationId: 'station-1',
-      direction: 'up',
-      arrivalTime: new Date(Date.now() + 2 * 60 * 1000),
-      delayMinutes: 0,
-      status: 'NORMAL',
-      nextStationId: 'station-2',
-    },
-    {
-      id: 'train-2',
-      stationId: 'station-1',
-      direction: 'down',
-      arrivalTime: new Date(Date.now() + 5 * 60 * 1000),
-      delayMinutes: 1,
-      status: 'DELAYED',
-      nextStationId: 'station-3',
-    },
-  ];
+const mockDataManager = dataManager as jest.Mocked<typeof dataManager>;
+
+const createMockTrains = (): Train[] => [
+  {
+    id: 'train-1',
+    stationId: 'station-1',
+    direction: 'up',
+    arrivalTime: new Date(Date.now() + 2 * 60 * 1000),
+    delayMinutes: 0,
+    status: 'NORMAL',
+    nextStationId: 'station-2',
+  },
+  {
+    id: 'train-2',
+    stationId: 'station-1',
+    direction: 'down',
+    arrivalTime: new Date(Date.now() + 5 * 60 * 1000),
+    delayMinutes: 1,
+    status: 'DELAYED',
+    nextStationId: 'station-3',
+  },
+];
+
+const createMockRealtimeData = (trains: Train[]): RealtimeTrainData => ({
+  trains,
+  stationName: '강남역',
+  lastUpdated: new Date(),
+  isStale: false,
+});
+
+describe('useRealtimeTrains', () => {
+  let unsubscribeMock: jest.Mock;
+  let dataCallback: ((data: RealtimeTrainData | null) => void) | null = null;
 
   beforeEach(() => {
     jest.clearAllMocks();
     jest.useFakeTimers();
+    unsubscribeMock = jest.fn();
+    dataCallback = null;
+
+    // Default mock implementation that captures callback
+    mockDataManager.subscribeToRealtimeUpdates.mockImplementation(
+      (_station, callback, _interval) => {
+        dataCallback = callback;
+        return unsubscribeMock;
+      }
+    );
   });
 
   afterEach(() => {
     jest.useRealTimers();
   });
 
-  describe('Basic Functionality', () => {
-    it('should initialize with loading state', () => {
-      mockTrainService.subscribeToTrainUpdates.mockImplementation(() => jest.fn());
-
-      const { result } = renderHook(() =>
-        useRealtimeTrains('강남역')
-      );
+  describe('Initialization', () => {
+    it('should initialize with loading true', () => {
+      const { result } = renderHook(() => useRealtimeTrains('강남역'));
 
       expect(result.current.loading).toBe(true);
-      expect(result.current.trains).toEqual([]);
-      expect(result.current.error).toBe(null);
     });
 
-    it('should fetch trains successfully', async () => {
-      mockTrainService.subscribeToTrainUpdates.mockImplementation((station, callback) => {
-        callback(mockTrains);
-        return jest.fn();
-      });
+    it('should not subscribe when stationName is empty', () => {
+      renderHook(() => useRealtimeTrains(''));
 
-      const { result } = renderHook(() =>
-        useRealtimeTrains('강남역')
-      );
-
-      await act(async () => {
-        jest.runAllTimers();
-      });
-
-      expect(result.current.loading).toBe(false);
-      expect(result.current.trains).toEqual(mockTrains);
-      expect(result.current.error).toBe(null);
+      expect(mockDataManager.subscribeToRealtimeUpdates).not.toHaveBeenCalled();
     });
 
-    it('should handle subscription errors', async () => {
-      const error = new Error('Subscription failed');
-      mockTrainService.subscribeToTrainUpdates.mockImplementation(() => {
-        throw error;
-      });
+    it('should not subscribe when enabled is false', () => {
+      renderHook(() => useRealtimeTrains('강남역', { enabled: false }));
 
-      const { result } = renderHook(() =>
-        useRealtimeTrains('강남역')
+      expect(mockDataManager.subscribeToRealtimeUpdates).not.toHaveBeenCalled();
+    });
+
+    it('should subscribe when stationName is provided', () => {
+      renderHook(() => useRealtimeTrains('강남역'));
+
+      expect(mockDataManager.subscribeToRealtimeUpdates).toHaveBeenCalledWith(
+        '강남역',
+        expect.any(Function),
+        30000 // default refetchInterval
       );
-
-      await act(async () => {
-        jest.runAllTimers();
-      });
-
-      expect(result.current.loading).toBe(false);
-      expect(result.current.trains).toEqual([]);
-      expect(result.current.error).toBe(error);
     });
   });
 
-  describe('Station Changes', () => {
-    it('should resubscribe when station changes', () => {
-      const unsubscribeMock = jest.fn();
-      mockTrainService.subscribeToTrainUpdates.mockReturnValue(unsubscribeMock);
-
-      const { rerender } = renderHook(
-        ({ station }) => useRealtimeTrains(station),
-        { initialProps: { station: '강남역' } }
+  describe('Subscription', () => {
+    it('should call dataManager.subscribeToRealtimeUpdates with correct params', () => {
+      renderHook(() =>
+        useRealtimeTrains('강남역', { refetchInterval: 60000 })
       );
 
-      expect(mockTrainService.subscribeToTrainUpdates).toHaveBeenCalledWith(
+      expect(mockDataManager.subscribeToRealtimeUpdates).toHaveBeenCalledWith(
         '강남역',
-        expect.any(Function)
-      );
-
-      // Change station
-      rerender({ station: '홍대입구역' });
-
-      expect(unsubscribeMock).toHaveBeenCalled();
-      expect(mockTrainService.subscribeToTrainUpdates).toHaveBeenCalledWith(
-        '홍대입구역',
-        expect.any(Function)
+        expect.any(Function),
+        60000
       );
     });
 
-    it('should reset state when station changes', async () => {
-      mockTrainService.subscribeToTrainUpdates.mockImplementation((station, callback) => {
-        if (station === '강남역') {
-          callback(mockTrains);
-        }
-        return jest.fn();
-      });
+    it('should update trains on successful data callback', async () => {
+      const mockTrains = createMockTrains();
+      const { result } = renderHook(() => useRealtimeTrains('강남역'));
 
-      const { result, rerender } = renderHook(
-        ({ station }) => useRealtimeTrains(station),
-        { initialProps: { station: '강남역' } }
-      );
-
+      // Simulate data received
       await act(async () => {
-        jest.runAllTimers();
+        dataCallback?.(createMockRealtimeData(mockTrains));
       });
 
       expect(result.current.trains).toEqual(mockTrains);
+      expect(result.current.loading).toBe(false);
+      expect(result.current.error).toBeNull();
+    });
 
-      // Change station - should reset to loading state
-      act(() => {
-        rerender({ station: '홍대입구역' });
+    it('should update lastUpdated on data received', async () => {
+      const mockTrains = createMockTrains();
+      const mockData = createMockRealtimeData(mockTrains);
+      const { result } = renderHook(() => useRealtimeTrains('강남역'));
+
+      await act(async () => {
+        dataCallback?.(mockData);
       });
 
-      expect(result.current.loading).toBe(true);
-      expect(result.current.trains).toEqual([]);
+      expect(result.current.lastUpdated).toEqual(mockData.lastUpdated);
+    });
+
+    it('should set isStale after staleTime elapses', async () => {
+      const mockTrains = createMockTrains();
+      const { result } = renderHook(() =>
+        useRealtimeTrains('강남역', { staleTime: 1000 })
+      );
+
+      await act(async () => {
+        dataCallback?.(createMockRealtimeData(mockTrains));
+      });
+
+      expect(result.current.isStale).toBe(false);
+
+      // Advance time past staleTime
+      await act(async () => {
+        jest.advanceTimersByTime(1100);
+      });
+
+      expect(result.current.isStale).toBe(true);
     });
   });
 
-  describe('Options Configuration', () => {
-    it('should use custom refetch interval', () => {
-      const options = {
-        refetchInterval: 60000, // 1 minute
-        retryAttempts: 5,
-      };
-
-      mockTrainService.subscribeToTrainUpdates.mockImplementation(() => jest.fn());
-
-      renderHook(() =>
-        useRealtimeTrains('강남역', options)
+  describe('Error Handling', () => {
+    it('should increment retry count on null data', async () => {
+      const { result } = renderHook(() =>
+        useRealtimeTrains('강남역', { retryAttempts: 3 })
       );
 
-      expect(mockTrainService.subscribeToTrainUpdates).toHaveBeenCalledWith(
-        '강남역',
-        expect.any(Function)
-      );
-      // The interval configuration would be handled internally
+      // Simulate null data (failure)
+      await act(async () => {
+        dataCallback?.(null);
+      });
+
+      expect(result.current.isRetrying).toBe(true);
     });
 
-    it('should handle disabled auto-refresh', () => {
-      const options = {
-        refetchInterval: 0, // Disable auto-refresh
-      };
-
-      mockTrainService.subscribeToTrainUpdates.mockImplementation(() => jest.fn());
-
-      renderHook(() =>
-        useRealtimeTrains('강남역', options)
+    it('should set error after max retry attempts', async () => {
+      const { result } = renderHook(() =>
+        useRealtimeTrains('강남역', { retryAttempts: 2 })
       );
 
-      // Should still create subscription but without auto-refresh
-      expect(mockTrainService.subscribeToTrainUpdates).toHaveBeenCalled();
+      // Simulate multiple null data (failures)
+      await act(async () => {
+        dataCallback?.(null);
+      });
+      await act(async () => {
+        dataCallback?.(null);
+      });
+
+      expect(result.current.error).toContain('최대 재시도 횟수');
+      expect(result.current.loading).toBe(false);
+    });
+
+    it('should reset retry count on successful data', async () => {
+      const mockTrains = createMockTrains();
+      const { result } = renderHook(() =>
+        useRealtimeTrains('강남역', { retryAttempts: 3 })
+      );
+
+      // Simulate failure
+      await act(async () => {
+        dataCallback?.(null);
+      });
+
+      expect(result.current.isRetrying).toBe(true);
+
+      // Simulate success
+      await act(async () => {
+        dataCallback?.(createMockRealtimeData(mockTrains));
+      });
+
+      expect(result.current.isRetrying).toBe(false);
+      expect(result.current.error).toBeNull();
+    });
+
+    it('should call onError callback when error occurs', async () => {
+      const onErrorMock = jest.fn();
+      renderHook(() =>
+        useRealtimeTrains('강남역', {
+          retryAttempts: 1,
+          onError: onErrorMock,
+        })
+      );
+
+      // Simulate failure to reach max retries
+      await act(async () => {
+        dataCallback?.(null);
+      });
+
+      expect(onErrorMock).toHaveBeenCalled();
     });
   });
 
-  describe('Lifecycle Management', () => {
+  describe('Lifecycle', () => {
     it('should unsubscribe on unmount', () => {
-      const unsubscribeMock = jest.fn();
-      mockTrainService.subscribeToTrainUpdates.mockReturnValue(unsubscribeMock);
-
-      const { unmount } = renderHook(() =>
-        useRealtimeTrains('강남역')
-      );
+      const { unmount } = renderHook(() => useRealtimeTrains('강남역'));
 
       unmount();
 
       expect(unsubscribeMock).toHaveBeenCalled();
     });
 
-    it('should handle multiple rapid station changes', () => {
-      const unsubscribeMocks = [jest.fn(), jest.fn(), jest.fn()];
-      let callCount = 0;
-
-      mockTrainService.subscribeToTrainUpdates.mockImplementation(() => {
-        return unsubscribeMocks[callCount++];
-      });
-
+    it('should resubscribe when stationName changes', () => {
       const { rerender } = renderHook(
         ({ station }) => useRealtimeTrains(station),
         { initialProps: { station: '강남역' } }
       );
 
-      rerender({ station: '홍대입구역' });
-      rerender({ station: '신촌역' });
-      rerender({ station: '이대역' });
+      expect(mockDataManager.subscribeToRealtimeUpdates).toHaveBeenCalledWith(
+        '강남역',
+        expect.any(Function),
+        30000
+      );
 
-      // Should unsubscribe from previous subscriptions
-      expect(unsubscribeMocks[0]).toHaveBeenCalled();
-      expect(unsubscribeMocks[1]).toHaveBeenCalled();
-      expect(unsubscribeMocks[2]).toHaveBeenCalled();
+      // Change station
+      rerender({ station: '역삼역' });
+
+      expect(unsubscribeMock).toHaveBeenCalled();
+      expect(mockDataManager.subscribeToRealtimeUpdates).toHaveBeenCalledWith(
+        '역삼역',
+        expect.any(Function),
+        30000
+      );
+    });
+
+    it('should clear stale timer on unsubscribe', async () => {
+      const mockTrains = createMockTrains();
+      const { result, unmount } = renderHook(() =>
+        useRealtimeTrains('강남역', { staleTime: 5000 })
+      );
+
+      await act(async () => {
+        dataCallback?.(createMockRealtimeData(mockTrains));
+      });
+
+      unmount();
+
+      // Advance time - stale timer should have been cleared
+      await act(async () => {
+        jest.advanceTimersByTime(6000);
+      });
+
+      // isStale should not change after unmount (timer cleared)
+      expect(result.current.isStale).toBe(false);
     });
   });
 
-  describe('Refetch Functionality', () => {
-    it('should provide manual refetch function', async () => {
-      mockTrainService.subscribeToTrainUpdates.mockImplementation((station, callback) => {
-        callback(mockTrains);
-        return jest.fn();
-      });
-      mockTrainService.getRealtimeTrains.mockResolvedValue(mockTrains);
-
+  describe('Refetch', () => {
+    it('refetch should reset retry count', async () => {
       const { result } = renderHook(() =>
-        useRealtimeTrains('강남역')
+        useRealtimeTrains('강남역', { retryAttempts: 3 })
       );
 
+      // Simulate failure
       await act(async () => {
-        await result.current.refetch();
+        dataCallback?.(null);
       });
 
-      expect(mockTrainService.getRealtimeTrains).toHaveBeenCalledWith('강남역');
-      expect(result.current.trains).toEqual(mockTrains);
-    });
+      expect(result.current.isRetrying).toBe(true);
 
-    it('should handle refetch errors gracefully', async () => {
-      const refetchError = new Error('Manual refetch failed');
-      mockTrainService.subscribeToTrainUpdates.mockImplementation(() => jest.fn());
-      mockTrainService.getRealtimeTrains.mockRejectedValue(refetchError);
-
-      const { result } = renderHook(() =>
-        useRealtimeTrains('강남역')
-      );
-
+      // Refetch
       await act(async () => {
-        await result.current.refetch();
-      });
-
-      expect(result.current.error).toBe(refetchError);
-      expect(result.current.loading).toBe(false);
-    });
-
-    it('should update loading state during refetch', async () => {
-      mockTrainService.subscribeToTrainUpdates.mockImplementation(() => jest.fn());
-      mockTrainService.getRealtimeTrains.mockImplementation(
-        () => new Promise(resolve => setTimeout(() => resolve(mockTrains), 100))
-      );
-
-      const { result } = renderHook(() =>
-        useRealtimeTrains('강남역')
-      );
-
-      act(() => {
         result.current.refetch();
       });
 
-      expect(result.current.loading).toBe(true);
+      // New subscription with reset retry count
+      expect(mockDataManager.subscribeToRealtimeUpdates).toHaveBeenCalledTimes(2);
+    });
+
+    it('refetch should trigger new subscription', async () => {
+      const { result } = renderHook(() => useRealtimeTrains('강남역'));
+
+      expect(mockDataManager.subscribeToRealtimeUpdates).toHaveBeenCalledTimes(1);
 
       await act(async () => {
-        jest.advanceTimersByTime(100);
-        await jest.runAllPromises();
+        result.current.refetch();
       });
 
-      expect(result.current.loading).toBe(false);
+      expect(mockDataManager.subscribeToRealtimeUpdates).toHaveBeenCalledTimes(2);
     });
   });
 
-  describe('Error Handling', () => {
-    it('should recover from temporary network errors', async () => {
-      let callCount = 0;
-      mockTrainService.subscribeToTrainUpdates.mockImplementation((station, callback) => {
-        if (callCount++ === 0) {
-          throw new Error('Network error');
-        } else {
-          callback(mockTrains);
-        }
-        return jest.fn();
-      });
-
-      const { result, rerender } = renderHook(() =>
-        useRealtimeTrains('강남역')
-      );
-
-      await act(async () => {
-        jest.runAllTimers();
-      });
-
-      expect(result.current.error).toBeInstanceOf(Error);
-
-      // Simulate retry by changing station and back
-      act(() => {
-        rerender();
-      });
-
-      await act(async () => {
-        jest.runAllTimers();
-      });
-
-      expect(result.current.trains).toEqual(mockTrains);
-      expect(result.current.error).toBe(null);
-    });
-
-    it('should clear previous error on successful refetch', async () => {
-      const initialError = new Error('Initial error');
-      mockTrainService.subscribeToTrainUpdates.mockImplementation(() => {
-        throw initialError;
-      });
-      mockTrainService.getRealtimeTrains.mockResolvedValue(mockTrains);
-
-      const { result } = renderHook(() =>
-        useRealtimeTrains('강남역')
-      );
-
-      await act(async () => {
-        jest.runAllTimers();
-      });
-
-      expect(result.current.error).toBe(initialError);
-
-      await act(async () => {
-        await result.current.refetch();
-      });
-
-      expect(result.current.error).toBe(null);
-      expect(result.current.trains).toEqual(mockTrains);
-    });
-  });
-
-  describe('Performance Optimization', () => {
-    it('should memoize subscription callback', () => {
-      const callbackSpy = jest.fn();
-      mockTrainService.subscribeToTrainUpdates.mockImplementation((station, callback) => {
-        callbackSpy(callback);
-        return jest.fn();
-      });
-
-      const { rerender } = renderHook(() =>
-        useRealtimeTrains('강남역')
-      );
-
-      const firstCallback = callbackSpy.mock.calls[0][0];
-
-      rerender();
-
-      const secondCallback = callbackSpy.mock.calls[1][0];
-
-      // Callback should be the same reference (memoized)
-      expect(firstCallback).toBe(secondCallback);
-    });
-
-    it('should not create new subscription if station is undefined', () => {
+  describe('Options', () => {
+    it('should use custom refetchInterval', () => {
       renderHook(() =>
-        useRealtimeTrains(undefined as any)
+        useRealtimeTrains('강남역', { refetchInterval: 45000 })
       );
 
-      expect(mockTrainService.subscribeToTrainUpdates).not.toHaveBeenCalled();
+      expect(mockDataManager.subscribeToRealtimeUpdates).toHaveBeenCalledWith(
+        '강남역',
+        expect.any(Function),
+        45000
+      );
     });
 
-    it('should debounce rapid station changes', async () => {
-      mockTrainService.subscribeToTrainUpdates.mockImplementation(() => jest.fn());
+    it('should use custom staleTime', async () => {
+      const mockTrains = createMockTrains();
+      const { result } = renderHook(() =>
+        useRealtimeTrains('강남역', { staleTime: 2000 })
+      );
 
+      await act(async () => {
+        dataCallback?.(createMockRealtimeData(mockTrains));
+      });
+
+      // Not stale yet
+      await act(async () => {
+        jest.advanceTimersByTime(1500);
+      });
+      expect(result.current.isStale).toBe(false);
+
+      // Now stale
+      await act(async () => {
+        jest.advanceTimersByTime(600);
+      });
+      expect(result.current.isStale).toBe(true);
+    });
+
+    it('should call onDataReceived callback', async () => {
+      const onDataReceivedMock = jest.fn();
+      const mockTrains = createMockTrains();
+      const mockData = createMockRealtimeData(mockTrains);
+
+      renderHook(() =>
+        useRealtimeTrains('강남역', { onDataReceived: onDataReceivedMock })
+      );
+
+      await act(async () => {
+        dataCallback?.(mockData);
+      });
+
+      expect(onDataReceivedMock).toHaveBeenCalledWith(mockData);
+    });
+
+    it('should call onError callback', async () => {
+      const onErrorMock = jest.fn();
+
+      renderHook(() =>
+        useRealtimeTrains('강남역', {
+          retryAttempts: 1,
+          onError: onErrorMock,
+        })
+      );
+
+      // Trigger max retries
+      await act(async () => {
+        dataCallback?.(null);
+      });
+
+      expect(onErrorMock).toHaveBeenCalled();
+    });
+  });
+
+  describe('Edge Cases', () => {
+    it('should handle whitespace-only stationName', () => {
+      renderHook(() => useRealtimeTrains('   '));
+
+      expect(mockDataManager.subscribeToRealtimeUpdates).not.toHaveBeenCalled();
+    });
+
+    it('should handle undefined options gracefully', () => {
+      const { result } = renderHook(() => useRealtimeTrains('강남역'));
+
+      expect(result.current.loading).toBe(true);
+      expect(result.current.trains).toEqual([]);
+    });
+
+    it('should handle multiple rapid rerenders', () => {
       const { rerender } = renderHook(
         ({ station }) => useRealtimeTrains(station),
         { initialProps: { station: '강남역' } }
       );
 
-      // Rapid station changes
-      rerender({ station: '홍대입구역' });
-      rerender({ station: '신촌역' });
-      rerender({ station: '이대역' });
+      rerender({ station: '역삼역' });
+      rerender({ station: '선릉역' });
+      rerender({ station: '삼성역' });
 
-      await act(async () => {
-        jest.advanceTimersByTime(300);
-      });
-
-      // Should only subscribe to the final station after debounce period
-      expect(mockTrainService.subscribeToTrainUpdates).toHaveBeenLastCalledWith(
-        '이대역',
-        expect.any(Function)
-      );
+      // Should have unsubscribed from previous subscriptions
+      expect(unsubscribeMock).toHaveBeenCalled();
     });
   });
 });

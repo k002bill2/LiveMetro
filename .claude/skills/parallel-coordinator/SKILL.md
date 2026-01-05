@@ -33,39 +33,19 @@ Coordinate parallel execution of specialist agents using the **ACE (Autonomous C
 
 **Critical Decision**: Determine appropriate resource allocation BEFORE spawning agents.
 
-### Complexity Assessment
+See [effort-scaling.md](../../agents/shared/effort-scaling.md) for complete guide including:
+- Complexity matrix (Trivial → Complex)
+- Decision flowchart
+- Token economics
+- Agent selection guide
 
-| Complexity | Agents | Tool Calls | When to Use |
-|------------|--------|------------|-------------|
-| **Trivial** | 0 | 1-3 | Typo fix, single line change, simple rename |
-| **Simple** | 1 | 3-10 | Single component, one function, config update |
-| **Moderate** | 2-3 | 10-30 | UI + API, feature with tests, multi-file refactor |
-| **Complex** | 5+ | 30+ | Full feature, system redesign, cross-cutting concern |
-
-### Assessment Checklist
-
-Before spawning agents, answer:
-1. [ ] How many files will be modified? (>3 = moderate+)
-2. [ ] Are there multiple independent subtasks? (yes = moderate+)
-3. [ ] Does it require UI + Backend + Tests? (yes = moderate)
-4. [ ] Is exploration needed first? (yes = add exploration phase)
-5. [ ] What's the estimated token cost? (15x multiplier for multi-agent)
-
-### Example Decisions
-
-```
-Task: "Fix typo in README"
-→ Trivial (0 agents, direct edit)
-
-Task: "Add loading spinner to StationCard"
-→ Simple (1 agent: mobile-ui-specialist)
-
-Task: "Add new station detail screen with API"
-→ Moderate (2-3 agents: backend + mobile-ui + test)
-
-Task: "Implement offline mode with sync"
-→ Complex (5+ agents: backend + mobile-ui + performance + test + quality)
-```
+**Quick Reference**:
+| Complexity | Agents | When to Use |
+|------------|--------|-------------|
+| Trivial | 0 | Typo, single line |
+| Simple | 1 | One component/function |
+| Moderate | 2-3 | UI + API + Tests |
+| Complex | 5+ | System-wide changes |
 
 ---
 

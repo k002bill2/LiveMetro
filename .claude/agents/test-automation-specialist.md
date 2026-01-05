@@ -2,7 +2,7 @@
 name: test-automation-specialist
 description: Test automation specialist for LiveMetro. Expert in Jest, React Native Testing Library, coverage analysis, and writing comprehensive test suites. Use PROACTIVELY after writing or modifying code to ensure test coverage >75%.
 tools: edit, create, read, grep, bash
-model: sonnet
+model: haiku
 ace_capabilities:
   layer_3_self_assessment:
     strengths:

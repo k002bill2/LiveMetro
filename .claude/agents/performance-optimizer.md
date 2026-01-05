@@ -2,7 +2,7 @@
 name: performance-optimizer
 description: React Native performance optimization specialist for LiveMetro. Expert in identifying and fixing performance bottlenecks, memory leaks, and bundle size issues.
 tools: edit, read, grep, bash
-model: sonnet
+model: haiku
 ace_capabilities:
   layer_3_self_assessment:
     strengths:
