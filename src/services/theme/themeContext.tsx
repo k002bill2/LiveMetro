@@ -44,9 +44,13 @@ const lightColors = {
 
   // Semantic
   success: '#27AE60',
+  successLight: '#D1FAE5',
   warning: '#F2C94C',
+  warningLight: '#FEF3C7',
   error: '#EB5757',
+  errorLight: '#FEE2E2',
   info: '#546FFF',
+  infoLight: '#E0E7FF',
 
   // Gray scale
   black: '#1A1A1A',
@@ -97,9 +101,13 @@ const darkColors = {
 
   // Semantic
   success: '#4ADE80',
+  successLight: '#1A3D2E',
   warning: '#FFD966',
+  warningLight: '#3D3520',
   error: '#FF6B6B',
+  errorLight: '#3D2020',
   info: '#7B8CFF',
+  infoLight: '#1E2A5E',
 
   // Gray scale (inverted for dark mode)
   black: '#FFFFFF',

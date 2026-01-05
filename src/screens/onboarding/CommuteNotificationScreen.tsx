@@ -13,7 +13,16 @@ import {
   ScrollView,
   Switch,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import {
+  Bell,
+  ArrowLeftRight,
+  Flag,
+  Clock,
+  AlertTriangle,
+  Info,
+  ArrowLeft,
+  ArrowRight
+} from 'lucide-react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS, SHADOWS } from '@/styles/modernTheme';
 import { OnboardingStackParamList } from '@/navigation/types';
@@ -97,8 +106,7 @@ export const CommuteNotificationScreen: React.FC<Props> = ({ navigation, route }
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.iconContainer}>
-            <Ionicons
-              name="notifications-outline"
+            <Bell
               size={48}
               color={COLORS.secondary.blue}
             />
@@ -119,8 +127,7 @@ export const CommuteNotificationScreen: React.FC<Props> = ({ navigation, route }
           {hasTransfers && (
             <View style={styles.settingItem}>
               <View style={styles.settingIcon}>
-                <Ionicons
-                  name="swap-horizontal"
+                <ArrowLeftRight
                   size={22}
                   color={COLORS.secondary.blue}
                 />
@@ -146,8 +153,7 @@ export const CommuteNotificationScreen: React.FC<Props> = ({ navigation, route }
           {/* Arrival Alert */}
           <View style={styles.settingItem}>
             <View style={styles.settingIcon}>
-              <Ionicons
-                name="flag"
+              <Flag
                 size={22}
                 color={COLORS.semantic.error}
               />
@@ -172,8 +178,7 @@ export const CommuteNotificationScreen: React.FC<Props> = ({ navigation, route }
           {/* Delay Alert */}
           <View style={styles.settingItem}>
             <View style={styles.settingIcon}>
-              <Ionicons
-                name="time"
+              <Clock
                 size={22}
                 color={COLORS.secondary.yellow}
               />
@@ -198,8 +203,7 @@ export const CommuteNotificationScreen: React.FC<Props> = ({ navigation, route }
           {/* Incident Alert */}
           <View style={styles.settingItem}>
             <View style={styles.settingIcon}>
-              <Ionicons
-                name="warning"
+              <AlertTriangle
                 size={22}
                 color={COLORS.semantic.error}
               />
@@ -255,8 +259,7 @@ export const CommuteNotificationScreen: React.FC<Props> = ({ navigation, route }
 
         {/* Info */}
         <View style={styles.infoContainer}>
-          <Ionicons
-            name="information-circle-outline"
+          <Info
             size={20}
             color={COLORS.text.tertiary}
           />
@@ -272,14 +275,14 @@ export const CommuteNotificationScreen: React.FC<Props> = ({ navigation, route }
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={20} color={COLORS.text.secondary} />
+          <ArrowLeft size={20} color={COLORS.text.secondary} />
           <Text style={styles.backButtonText}>이전</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
           <Text style={styles.nextButtonText}>
             {isMorning ? '퇴근 설정하기' : '완료'}
           </Text>
-          <Ionicons name="arrow-forward" size={20} color={COLORS.white} />
+          <ArrowRight size={20} color={COLORS.white} />
         </TouchableOpacity>
       </View>
     </SafeAreaView>

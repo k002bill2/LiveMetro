@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DarkTheme, DefaultTheme } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
@@ -18,7 +18,7 @@ const AppContent: React.FC = () => {
   const { isDark } = useTheme();
 
   return (
-    <NavigationContainer>
+    <NavigationContainer theme={isDark ? DarkTheme : DefaultTheme}>
       <StatusBar style={isDark ? 'light' : 'dark'} />
       <RootNavigator />
     </NavigationContainer>

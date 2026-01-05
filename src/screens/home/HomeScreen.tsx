@@ -4,7 +4,7 @@
  * Minimal grayscale design with black accent
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,13 @@ import {
   TouchableOpacity,
   Animated,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import {
+  CloudOff,
+  MapPin,
+  ChevronRight,
+  TrainFront,
+  RefreshCw,
+} from 'lucide-react-native';
 import * as Location from 'expo-location';
 import { NavigationProp, useNavigation } from '@react-navigation/native';
 
@@ -24,7 +30,8 @@ import { LoadingScreen } from '../../components/common/LoadingScreen';
 import { StationCard } from '../../components/train/StationCard';
 import { TrainArrivalList } from '../../components/train/TrainArrivalList';
 import { useToast } from '../../components/common/Toast';
-import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '../../styles/modernTheme';
+import { SPACING, RADIUS, TYPOGRAPHY } from '../../styles/modernTheme';
+import { useTheme, ThemeColors } from '../../services/theme';
 
 import { Station } from '../../models/train';
 import { AppStackParamList } from '../../navigation/types';
@@ -32,6 +39,8 @@ import { AppStackParamList } from '../../navigation/types';
 export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<AppStackParamList>>();
   const { user } = useAuth();
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const { showError, showSuccess, showInfo, ToastComponent } = useToast();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -41,18 +50,66 @@ export const HomeScreen: React.FC = () => {
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const rotateAnim = useRef(new Animated.Value(0)).current;
 
-  useEffect(() => {
-    initializeScreen();
-    setupNetworkListener();
-  }, []);
 
-  const setupNetworkListener = (): void => {
-    // Network state monitoring - simplified for MVP
-    // Future: Implement proper network state detection
-    setIsOnline(true);
-  };
 
-  const initializeScreen = async (): Promise<void> => {
+
+
+  const loadFavoriteStations = useCallback(async (): Promise<void> => {
+    if (!user?.preferences.favoriteStations.length) {
+      return;
+    }
+
+    try {
+      const favoriteStationIds = user.preferences.favoriteStations.map(fav => fav.stationId);
+      const stations: Station[] = [];
+
+      for (const stationId of favoriteStationIds.slice(0, 5)) {
+        const station = await trainService.getStation(stationId);
+        if (station) {
+          stations.push(station);
+        }
+      }
+
+      setNearbyStations(stations);
+      
+      if (stations.length > 0 && !selectedStation) {
+        setSelectedStation(stations[0] || null);
+      }
+    } catch {
+      // Error loading favorite stations
+    }
+  }, [user?.preferences.favoriteStations, selectedStation]);
+
+  const loadNearbyStations = useCallback(async (): Promise<void> => {
+    // Development: Skip in dev mode as we're using mock data
+    if (__DEV__) {
+      return;
+    }
+
+    try {
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      });
+
+      const stations = await trainService.getNearbyStations(
+        location.coords.latitude,
+        location.coords.longitude,
+        2 // 2km radius
+      );
+
+      setNearbyStations(stations);
+
+      // Auto-select the closest station
+      if (stations.length > 0 && !selectedStation) {
+        setSelectedStation(stations[0] || null);
+      }
+    } catch {
+      showError('주변 역 정보를 가져오는데 실패했습니다');
+      await loadFavoriteStations();
+    }
+  }, [loadFavoriteStations, selectedStation, showError]);
+
+  const initializeScreen = useCallback(async (): Promise<void> => {
     try {
       setLoading(true);
 
@@ -88,70 +145,12 @@ export const HomeScreen: React.FC = () => {
         // Load user's favorite stations if no location permission
         await loadFavoriteStations();
       }
-    } catch (error) {
-      console.error('Error initializing home screen:', error);
+    } catch {
       showError('데이터를 불러오는데 실패했습니다. 네트워크 연결을 확인해주세요.');
     } finally {
       setLoading(false);
     }
-  };
-
-  const loadNearbyStations = async (): Promise<void> => {
-    // Development: Skip in dev mode as we're using mock data
-    if (__DEV__) {
-      console.log('Development mode: Skipping loadNearbyStations');
-      return;
-    }
-
-    try {
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-
-      const stations = await trainService.getNearbyStations(
-        location.coords.latitude,
-        location.coords.longitude,
-        2 // 2km radius
-      );
-
-      setNearbyStations(stations);
-
-      // Auto-select the closest station
-      if (stations.length > 0 && !selectedStation) {
-        setSelectedStation(stations[0] || null);
-      }
-    } catch (error) {
-      console.error('Error loading nearby stations:', error);
-      showError('주변 역 정보를 가져오는데 실패했습니다');
-      await loadFavoriteStations();
-    }
-  };
-
-  const loadFavoriteStations = async (): Promise<void> => {
-    if (!user?.preferences.favoriteStations.length) {
-      return;
-    }
-
-    try {
-      const favoriteStationIds = user.preferences.favoriteStations.map(fav => fav.stationId);
-      const stations: Station[] = [];
-
-      for (const stationId of favoriteStationIds.slice(0, 5)) {
-        const station = await trainService.getStation(stationId);
-        if (station) {
-          stations.push(station);
-        }
-      }
-
-      setNearbyStations(stations);
-      
-      if (stations.length > 0 && !selectedStation) {
-        setSelectedStation(stations[0] || null);
-      }
-    } catch (error) {
-      console.error('Error loading favorite stations:', error);
-    }
-  };
+  }, [loadNearbyStations, loadFavoriteStations, showSuccess, showError]);
 
   const onStationSelect = (station: Station): void => {
     setSelectedStation(station);
@@ -195,8 +194,8 @@ export const HomeScreen: React.FC = () => {
       } else {
         await loadFavoriteStations();
       }
-    } catch (error) {
-      console.error('Error refreshing:', error);
+    } catch {
+      // Error refreshing
     } finally {
       setRefreshing(false);
       rotateAnim.setValue(0);
@@ -214,6 +213,12 @@ export const HomeScreen: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    initializeScreen();
+    // setupNetworkListener is safe to run once
+    setIsOnline(true);
+  }, [initializeScreen]);
+
   if (loading) {
     return <LoadingScreen message="주변 역 정보를 가져오고 있습니다..." />;
   }
@@ -225,7 +230,7 @@ export const HomeScreen: React.FC = () => {
         <RefreshControl
           refreshing={refreshing}
           onRefresh={onRefresh}
-          tintColor={COLORS.black}
+          tintColor={colors.textPrimary}
         />
       }
       accessible={false}
@@ -250,7 +255,7 @@ export const HomeScreen: React.FC = () => {
           accessibilityRole="text"
           accessibilityLabel="현재 오프라인 상태입니다. 캐시된 정보가 표시됩니다"
         >
-          <Ionicons name="cloud-offline-outline" size={20} color={COLORS.text.secondary} />
+          <CloudOff size={20} color={colors.textSecondary} />
           <Text style={styles.offlineText}>
             오프라인 상태 - 캐시된 정보가 표시됩니다
           </Text>
@@ -267,14 +272,14 @@ export const HomeScreen: React.FC = () => {
           accessibilityLabel="위치 권한 허용하기"
           accessibilityHint="주변 지하철역 정보를 받기 위해 위치 권한을 허용하세요"
         >
-          <Ionicons name="location-outline" size={24} color={COLORS.black} />
+          <MapPin size={24} color={colors.textPrimary} />
           <View style={styles.permissionText}>
             <Text style={styles.permissionTitle}>위치 권한 허용</Text>
             <Text style={styles.permissionSubtitle}>
               주변 역 정보를 보려면 위치 권한이 필요합니다
             </Text>
           </View>
-          <Ionicons name="chevron-forward" size={20} color={COLORS.gray[400]} />
+          <ChevronRight size={20} color={colors.textTertiary} />
         </TouchableOpacity>
       )}
 
@@ -296,7 +301,7 @@ export const HomeScreen: React.FC = () => {
               : '즐겨찾기에 추가된 역이 없습니다. 설정에서 자주 이용하는 역을 추가해보세요'
             }
           >
-            <Ionicons name="train-outline" size={48} color={COLORS.gray[300]} />
+            <TrainFront size={48} color={colors.textTertiary} />
             <Text style={styles.emptyText}>
               {locationPermission
                 ? '주변에 지하철역이 없습니다'
@@ -348,7 +353,7 @@ export const HomeScreen: React.FC = () => {
                 accessibilityLabel={`${selectedStation.name} 역 상세 정보 보기`}
               >
                 <Text style={styles.detailButtonText}>상세보기</Text>
-                <Ionicons name="chevron-forward" size={18} color={COLORS.black} />
+                <ChevronRight size={18} color={colors.textPrimary} />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={onRefresh}
@@ -372,10 +377,9 @@ export const HomeScreen: React.FC = () => {
                     ],
                   }}
                 >
-                  <Ionicons
-                    name="refresh"
+                  <RefreshCw
                     size={24}
-                    color={refreshing ? COLORS.gray[400] : COLORS.black}
+                    color={refreshing ? colors.textTertiary : colors.textPrimary}
                   />
                 </Animated.View>
               </TouchableOpacity>
@@ -390,31 +394,31 @@ export const HomeScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.background,
   },
   welcomeSection: {
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.surface,
     padding: SPACING.lg,
     marginBottom: SPACING.sm,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.light,
+    borderBottomColor: colors.borderLight,
   },
   welcomeText: {
     fontSize: TYPOGRAPHY.fontSize['2xl'],
     fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.text.primary,
+    color: colors.textPrimary,
     marginBottom: 4,
     letterSpacing: TYPOGRAPHY.letterSpacing.tight,
   },
   subtitle: {
     fontSize: TYPOGRAPHY.fontSize.base,
-    color: COLORS.text.secondary,
+    color: colors.textSecondary,
   },
   permissionBanner: {
-    backgroundColor: COLORS.surface.card,
+    backgroundColor: colors.backgroundSecondary,
     flexDirection: 'row',
     alignItems: 'center',
     padding: SPACING.lg,
@@ -422,7 +426,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.border.medium,
+    borderColor: colors.borderMedium,
   },
   permissionText: {
     flex: 1,
@@ -431,15 +435,15 @@ const styles = StyleSheet.create({
   permissionTitle: {
     fontSize: TYPOGRAPHY.fontSize.base,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
+    color: colors.textPrimary,
     marginBottom: 2,
   },
   permissionSubtitle: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.secondary,
+    color: colors.textSecondary,
   },
   offlineBanner: {
-    backgroundColor: COLORS.surface.card,
+    backgroundColor: colors.backgroundSecondary,
     flexDirection: 'row',
     alignItems: 'center',
     padding: SPACING.lg,
@@ -447,17 +451,17 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.border.medium,
+    borderColor: colors.borderMedium,
   },
   offlineText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.secondary,
+    color: colors.textSecondary,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
     marginLeft: SPACING.sm,
     flex: 1,
   },
   section: {
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.surface,
     marginBottom: SPACING.sm,
     paddingVertical: SPACING.lg,
   },
@@ -476,7 +480,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: TYPOGRAPHY.fontSize.lg,
     fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.text.primary,
+    color: colors.textPrimary,
     flex: 1,
     letterSpacing: TYPOGRAPHY.letterSpacing.tight,
   },
@@ -487,11 +491,11 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
     borderRadius: RADIUS.full,
     borderWidth: 1,
-    borderColor: COLORS.border.medium,
-    backgroundColor: COLORS.surface.card,
+    borderColor: colors.borderMedium,
+    backgroundColor: colors.backgroundSecondary,
   },
   detailButtonText: {
-    color: COLORS.black,
+    color: colors.textPrimary,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
     marginRight: 4,
     fontSize: TYPOGRAPHY.fontSize.sm,
@@ -499,7 +503,7 @@ const styles = StyleSheet.create({
   refreshButton: {
     padding: SPACING.sm,
     borderRadius: RADIUS.full,
-    backgroundColor: COLORS.surface.card,
+    backgroundColor: colors.backgroundSecondary,
     width: 40,
     height: 40,
     justifyContent: 'center',
@@ -516,13 +520,13 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: TYPOGRAPHY.fontSize.base,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.secondary,
+    color: colors.textSecondary,
     marginTop: SPACING.lg,
     textAlign: 'center',
   },
   emptySubtext: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.tertiary,
+    color: colors.textTertiary,
     marginTop: SPACING.sm,
     textAlign: 'center',
     lineHeight: TYPOGRAPHY.lineHeight.relaxed * TYPOGRAPHY.fontSize.sm,

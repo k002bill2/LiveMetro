@@ -6,7 +6,7 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { Ionicons } from '@expo/vector-icons';
+import { Home, Star, Bell, Settings, CircleHelp } from 'lucide-react-native';
 
 import { useAuth } from '../services/auth/AuthContext';
 import { useTheme } from '../services/theme';
@@ -32,26 +32,16 @@ const MainTabs: React.FC = () => {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
-          let iconName: keyof typeof Ionicons.glyphMap;
-
-          switch (route.name) {
-            case 'Home':
-              iconName = focused ? 'home' : 'home-outline';
-              break;
-            case 'Favorites':
-              iconName = focused ? 'star' : 'star-outline';
-              break;
-            case 'Alerts':
-              iconName = focused ? 'notifications' : 'notifications-outline';
-              break;
-            case 'Settings':
-              iconName = focused ? 'settings' : 'settings-outline';
-              break;
-            default:
-              iconName = 'help-circle-outline';
+          if (route.name === 'Home') {
+            return <Home size={size} color={color} fill={focused ? color : 'transparent'} />;
+          } else if (route.name === 'Favorites') {
+            return <Star size={size} color={color} fill={focused ? color : 'transparent'} />;
+          } else if (route.name === 'Alerts') {
+            return <Bell size={size} color={color} fill={focused ? color : 'transparent'} />;
+          } else if (route.name === 'Settings') {
+            return <Settings size={size} color={color} />;
           }
-
-          return <Ionicons name={iconName} size={size} color={color} />;
+          return <CircleHelp size={size} color={color} />;
         },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textTertiary,

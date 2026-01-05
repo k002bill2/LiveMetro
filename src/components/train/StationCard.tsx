@@ -10,14 +10,25 @@
  * - Modern grayscale design system
  */
 
-import { Ionicons } from '@expo/vector-icons';
+import {
+  Star,
+  Heart,
+  Shuffle,
+  TrainFront,
+  ArrowUp,
+  ArrowDown,
+  MapPin,
+  Navigation,
+  CheckCircle,
+} from 'lucide-react-native';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { useRealtimeTrains } from '../../hooks/useRealtimeTrains';
 import { Station } from '../../models/train';
 import { useAuth } from '../../services/auth/AuthContext';
-import { COLORS, RADIUS, SPACING, TRANSITIONS, TYPOGRAPHY } from '../../styles/modernTheme';
+import { RADIUS, SPACING, TRANSITIONS, TYPOGRAPHY } from '../../styles/modernTheme';
+import { useTheme, ThemeColors } from '../../services/theme';
 import { getSubwayLineColor } from '../../utils/colorUtils';
 
 interface StationCardProps {
@@ -50,6 +61,8 @@ export const StationCard: React.FC<StationCardProps> = memo(
     animationDelay = 0,
   }) => {
     // ============ HOOKS ============
+    const { colors } = useTheme();
+    const styles = createStyles(colors);
     const { user, updateUserProfile } = useAuth();
 
     // Animation values
@@ -99,7 +112,6 @@ export const StationCard: React.FC<StationCardProps> = memo(
         e.stopPropagation();
 
         if (!user) {
-          console.warn('User not logged in');
           return;
         }
 
@@ -148,8 +160,8 @@ export const StationCard: React.FC<StationCardProps> = memo(
               favoriteStations: updatedFavorites,
             },
           });
-        } catch (error) {
-          console.error('Error toggling favorite:', error);
+        } catch {
+          // Error toggling favorite
         } finally {
           setIsTogglingFavorite(false);
         }
@@ -247,7 +259,7 @@ export const StationCard: React.FC<StationCardProps> = memo(
                 <Text style={[styles.stationName, isSelected && styles.selectedText]}>{station.name}</Text>
                 {isFavorite && (
                   <View style={styles.favoriteBadge}>
-                    <Ionicons name="star" size={12} color={COLORS.black} />
+                    <Star size={12} fill={colors.textPrimary} color={colors.textPrimary} />
                   </View>
                 )}
               </View>
@@ -268,10 +280,10 @@ export const StationCard: React.FC<StationCardProps> = memo(
                     accessibilityRole="button"
                     accessibilityLabel={isFavorite ? '즐겨찾기 제거' : '즐겨찾기 추가'}
                   >
-                    <Ionicons
-                      name={isFavorite ? 'heart' : 'heart-outline'}
+                    <Heart
                       size={22}
-                      color={isFavorite ? COLORS.black : COLORS.gray[400]}
+                      color={isFavorite ? colors.textPrimary : colors.textTertiary}
+                      fill={isFavorite ? colors.textPrimary : 'transparent'}
                     />
                   </TouchableOpacity>
                 </Animated.View>
@@ -288,7 +300,7 @@ export const StationCard: React.FC<StationCardProps> = memo(
           {/* Transfer Info */}
           {station.transfers && station.transfers.length > 0 && (
             <View style={styles.transfersContainer}>
-              <Ionicons name="shuffle-outline" size={14} color={COLORS.text.secondary} />
+              <Shuffle size={14} color={colors.textSecondary} />
               <Text style={styles.transfersText}>
                 환승: {station.transfers.map(lineId => `${lineId}호선`).join(', ')}
               </Text>
@@ -299,17 +311,17 @@ export const StationCard: React.FC<StationCardProps> = memo(
           {showArrivals && upcomingArrivals.length > 0 && (
             <View style={styles.arrivalsContainer}>
               <View style={styles.arrivalsHeader}>
-                <Ionicons name="train" size={14} color={COLORS.text.secondary} />
+                <TrainFront size={14} color={colors.textSecondary} />
                 <Text style={styles.arrivalsHeaderText}>실시간 도착 정보</Text>
               </View>
               {upcomingArrivals.map((arrival: any, index: number) => (
                 <View key={index} style={styles.arrivalItem}>
                   <View style={styles.arrivalDirection}>
-                    <Ionicons
-                      name={arrival.direction === '상행' ? 'arrow-up' : 'arrow-down'}
-                      size={12}
-                      color={lineColor}
-                    />
+                    {arrival.direction === '상행' ? (
+                       <ArrowUp size={12} color={lineColor} />
+                    ) : (
+                       <ArrowDown size={12} color={lineColor} />
+                    )}
                     <Text style={[styles.arrivalDirectionText, { color: lineColor }]}>{arrival.direction}</Text>
                   </View>
                   <Text style={[styles.arrivalTime, arrival.isImmediate && styles.arrivalTimeImmediate]}>
@@ -336,7 +348,7 @@ export const StationCard: React.FC<StationCardProps> = memo(
                 onSetStart?.();
               }}
             >
-              <Ionicons name="location" size={14} color={COLORS.white} />
+              <MapPin size={14} color={colors.textInverse} />
               <Text style={styles.actionButtonText}>출발</Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -346,7 +358,7 @@ export const StationCard: React.FC<StationCardProps> = memo(
                 onSetEnd?.();
               }}
             >
-              <Ionicons name="navigate" size={14} color={COLORS.white} />
+              <Navigation size={14} color={colors.textInverse} />
               <Text style={styles.actionButtonText}>도착</Text>
             </TouchableOpacity>
           </View>
@@ -354,7 +366,7 @@ export const StationCard: React.FC<StationCardProps> = memo(
           {/* Selection Indicator */}
           {isSelected && (
             <View style={styles.selectedIndicator}>
-              <Ionicons name="checkmark-circle" size={20} color={COLORS.black} />
+              <CheckCircle size={20} color={colors.textPrimary} />
             </View>
           )}
         </TouchableOpacity>
@@ -366,23 +378,23 @@ export const StationCard: React.FC<StationCardProps> = memo(
 // Set display name for debugging
 StationCard.displayName = 'StationCard';
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.surface,
     borderRadius: RADIUS.lg,
     padding: SPACING.lg,
     marginRight: SPACING.md,
     minWidth: 240,
     minHeight: 120,
     borderWidth: 1,
-    borderColor: COLORS.border.light,
+    borderColor: colors.borderLight,
     overflow: 'hidden',
   },
   selectedContainer: {
-    borderColor: COLORS.primary.main,
-    backgroundColor: COLORS.surface.card,
+    borderColor: colors.primary,
+    backgroundColor: colors.surface,
     borderWidth: 2,
-    shadowColor: COLORS.primary.main,
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -413,26 +425,26 @@ const styles = StyleSheet.create({
   stationName: {
     fontSize: TYPOGRAPHY.fontSize.lg,
     fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.text.primary,
+    color: colors.textPrimary,
     letterSpacing: TYPOGRAPHY.letterSpacing.tight,
   },
   selectedText: {
-    color: COLORS.primary.main,
+    color: colors.primary,
   },
   favoriteBadge: {
     marginLeft: SPACING.xs,
-    backgroundColor: COLORS.surface.card,
+    backgroundColor: colors.surface,
     borderRadius: RADIUS.full,
     width: 20,
     height: 20,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: COLORS.border.medium,
+    borderColor: colors.borderMedium,
   },
   stationNameEn: {
     fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.text.tertiary,
+    color: colors.textTertiary,
     marginBottom: 4,
   },
   headerRight: {
@@ -442,7 +454,7 @@ const styles = StyleSheet.create({
   },
   distance: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.secondary,
+    color: colors.textSecondary,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
   },
   favoriteButton: {
@@ -461,7 +473,7 @@ const styles = StyleSheet.create({
   },
   lineText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.secondary,
+    color: colors.textSecondary,
     fontWeight: TYPOGRAPHY.fontWeight.medium,
   },
   transfersContainer: {
@@ -472,7 +484,7 @@ const styles = StyleSheet.create({
   },
   transfersText: {
     fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.text.secondary,
+    color: colors.textSecondary,
     marginLeft: 4,
   },
   // Arrivals Section
@@ -481,7 +493,7 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.sm,
     paddingTop: SPACING.sm,
     borderTopWidth: 1,
-    borderTopColor: COLORS.border.light,
+    borderTopColor: colors.borderLight,
   },
   arrivalsHeader: {
     flexDirection: 'row',
@@ -490,7 +502,7 @@ const styles = StyleSheet.create({
   },
   arrivalsHeaderText: {
     fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.text.secondary,
+    color: colors.textSecondary,
     marginLeft: 4,
     fontWeight: TYPOGRAPHY.fontWeight.medium,
   },
@@ -513,15 +525,15 @@ const styles = StyleSheet.create({
   arrivalTime: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.text.primary,
+    color: colors.textPrimary,
     minWidth: 60,
   },
   arrivalTimeImmediate: {
-    color: COLORS.semantic.error,
+    color: colors.error,
   },
   arrivalDestination: {
     fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.text.tertiary,
+    color: colors.textTertiary,
     flex: 1,
   },
   arrivalsLoading: {
@@ -530,7 +542,7 @@ const styles = StyleSheet.create({
   },
   arrivalsLoadingText: {
     fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.text.tertiary,
+    color: colors.textTertiary,
     fontStyle: 'italic',
   },
   // Action Buttons
@@ -549,13 +561,13 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   startButton: {
-    backgroundColor: COLORS.secondary.blue,
+    backgroundColor: colors.info,
   },
   endButton: {
-    backgroundColor: COLORS.primary.main,
+    backgroundColor: colors.primary,
   },
   actionButtonText: {
-    color: COLORS.white,
+    color: colors.textInverse,
     fontSize: TYPOGRAPHY.fontSize.xs,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
   },

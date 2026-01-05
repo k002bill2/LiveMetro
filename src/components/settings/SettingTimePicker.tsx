@@ -7,14 +7,14 @@ import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 // @ts-ignore - expo-datetimepicker wraps @react-native-community/datetimepicker
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { Ionicons } from '@expo/vector-icons';
+import { Clock } from 'lucide-react-native';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
 
 interface SettingTimePickerProps {
   label: string;
   value: string; // HH:mm format (e.g., "08:00")
   onValueChange: (time: string) => void;
-  icon?: keyof typeof Ionicons.glyphMap;
+  icon?: React.ElementType;
   minTime?: string;
   maxTime?: string;
 }
@@ -23,7 +23,7 @@ export const SettingTimePicker: React.FC<SettingTimePickerProps> = ({
   label,
   value,
   onValueChange,
-  icon,
+  icon: Icon,
 }) => {
   const [showPicker, setShowPicker] = useState(false);
 
@@ -77,9 +77,9 @@ export const SettingTimePicker: React.FC<SettingTimePickerProps> = ({
         onPress={() => setShowPicker(true)}
       >
         <View style={styles.leftContent}>
-          {icon && (
+          {Icon && (
             <View style={styles.iconContainer}>
-              <Ionicons name={icon} size={20} color={COLORS.black} />
+              <Icon size={20} color={COLORS.black} />
             </View>
           )}
           <View style={styles.textContainer}>
@@ -88,8 +88,7 @@ export const SettingTimePicker: React.FC<SettingTimePickerProps> = ({
         </View>
         <View style={styles.valueContainer}>
           <Text style={styles.value}>{formatTimeForDisplay(value)}</Text>
-          <Ionicons
-            name="time-outline"
+          <Clock
             size={20}
             color={COLORS.gray[400]}
             style={styles.icon}

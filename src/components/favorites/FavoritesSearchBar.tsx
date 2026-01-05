@@ -12,8 +12,9 @@ import {
   TouchableOpacity,
   Animated,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '../../styles/modernTheme';
+import { Search, XCircle, SlidersHorizontal, ArrowUp, ArrowDown, Briefcase } from 'lucide-react-native';
+import { SPACING, RADIUS, TYPOGRAPHY } from '../../styles/modernTheme';
+import { useTheme, ThemeColors } from '../../services/theme';
 
 interface FavoritesSearchBarProps {
   searchQuery: string;
@@ -34,6 +35,8 @@ export const FavoritesSearchBar: React.FC<FavoritesSearchBarProps> = ({
   onFilterChange,
   resultCount,
 }) => {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const [showFilters, setShowFilters] = useState(false);
   const filterAnimation = React.useRef(new Animated.Value(0)).current;
 
@@ -97,16 +100,15 @@ export const FavoritesSearchBar: React.FC<FavoritesSearchBarProps> = ({
     <View style={styles.container}>
       {/* Search Input */}
       <View style={styles.searchContainer}>
-        <Ionicons
-          name="search"
+        <Search
           size={20}
-          color={COLORS.text.tertiary}
+          color={colors.textTertiary}
           style={styles.searchIcon}
         />
         <TextInput
           style={styles.searchInput}
           placeholder="역 이름으로 검색"
-          placeholderTextColor={COLORS.text.tertiary}
+          placeholderTextColor={colors.textTertiary}
           value={searchQuery}
           onChangeText={onSearchChange}
           returnKeyType="search"
@@ -121,7 +123,7 @@ export const FavoritesSearchBar: React.FC<FavoritesSearchBarProps> = ({
             style={styles.clearButton}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name="close-circle" size={20} color={COLORS.text.tertiary} />
+            <XCircle size={20} color={colors.textTertiary} />
           </TouchableOpacity>
         )}
 
@@ -134,13 +136,12 @@ export const FavoritesSearchBar: React.FC<FavoritesSearchBarProps> = ({
           ]}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Ionicons
-            name="options"
+          <SlidersHorizontal
             size={20}
             color={
               activeFilters.direction || activeFilters.commuteOnly
-                ? COLORS.black
-                : COLORS.text.tertiary
+                ? colors.textPrimary
+                : colors.textTertiary
             }
           />
         </TouchableOpacity>
@@ -165,10 +166,9 @@ export const FavoritesSearchBar: React.FC<FavoritesSearchBarProps> = ({
                   activeFilters.direction === 'up' && styles.filterChipActive,
                 ]}
               >
-                <Ionicons
-                  name="arrow-up"
+                <ArrowUp
                   size={14}
-                  color={activeFilters.direction === 'up' ? COLORS.white : COLORS.text.secondary}
+                  color={activeFilters.direction === 'up' ? colors.textInverse : colors.textSecondary}
                 />
                 <Text
                   style={[
@@ -187,10 +187,9 @@ export const FavoritesSearchBar: React.FC<FavoritesSearchBarProps> = ({
                   activeFilters.direction === 'down' && styles.filterChipActive,
                 ]}
               >
-                <Ionicons
-                  name="arrow-down"
+                <ArrowDown
                   size={14}
-                  color={activeFilters.direction === 'down' ? COLORS.white : COLORS.text.secondary}
+                  color={activeFilters.direction === 'down' ? colors.textInverse : colors.textSecondary}
                 />
                 <Text
                   style={[
@@ -215,10 +214,9 @@ export const FavoritesSearchBar: React.FC<FavoritesSearchBarProps> = ({
                   activeFilters.commuteOnly && styles.filterChipActive,
                 ]}
               >
-                <Ionicons
-                  name="briefcase"
+                <Briefcase
                   size={14}
-                  color={activeFilters.commuteOnly ? COLORS.white : COLORS.text.secondary}
+                  color={activeFilters.commuteOnly ? colors.textInverse : colors.textSecondary}
                 />
                 <Text
                   style={[
@@ -249,24 +247,24 @@ export const FavoritesSearchBar: React.FC<FavoritesSearchBarProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.light,
+    borderBottomColor: colors.borderLight,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
-    backgroundColor: COLORS.surface.background,
+    backgroundColor: colors.backgroundSecondary,
     marginHorizontal: SPACING.lg,
     marginTop: SPACING.md,
     marginBottom: SPACING.sm,
     borderRadius: RADIUS.base,
     borderWidth: 1,
-    borderColor: COLORS.border.medium,
+    borderColor: colors.borderMedium,
   },
   searchIcon: {
     marginRight: SPACING.sm,
@@ -274,7 +272,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: TYPOGRAPHY.fontSize.base,
-    color: COLORS.text.primary,
+    color: colors.textPrimary,
     paddingVertical: SPACING.xs,
   },
   clearButton: {
@@ -287,7 +285,7 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.sm,
   },
   filterToggleActive: {
-    backgroundColor: COLORS.surface.card,
+    backgroundColor: colors.surface,
   },
   filtersContainer: {
     paddingHorizontal: SPACING.lg,
@@ -300,7 +298,7 @@ const styles = StyleSheet.create({
   filterLabel: {
     fontSize: TYPOGRAPHY.fontSize.xs,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.secondary,
+    color: colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -314,22 +312,22 @@ const styles = StyleSheet.create({
     gap: 4,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
-    backgroundColor: COLORS.surface.card,
+    backgroundColor: colors.surface,
     borderRadius: RADIUS.full,
     borderWidth: 1,
-    borderColor: COLORS.border.medium,
+    borderColor: colors.borderMedium,
   },
   filterChipActive: {
-    backgroundColor: COLORS.black,
-    borderColor: COLORS.black,
+    backgroundColor: colors.textPrimary,
+    borderColor: colors.textPrimary,
   },
   filterChipText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.secondary,
+    color: colors.textSecondary,
     fontWeight: TYPOGRAPHY.fontWeight.medium,
   },
   filterChipTextActive: {
-    color: COLORS.white,
+    color: colors.textInverse,
   },
   resultBar: {
     flexDirection: 'row',
@@ -337,11 +335,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.sm,
-    backgroundColor: COLORS.surface.background,
+    backgroundColor: colors.backgroundSecondary,
   },
   resultText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.secondary,
+    color: colors.textSecondary,
   },
   clearFiltersButton: {
     paddingHorizontal: SPACING.md,
@@ -349,7 +347,7 @@ const styles = StyleSheet.create({
   },
   clearFiltersText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.black,
+    color: colors.textPrimary,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
   },
 });

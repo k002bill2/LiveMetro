@@ -15,13 +15,24 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import {
+  Bell,
+  Plus,
+  CheckCheck,
+  Trash2,
+  AlertCircle,
+  X,
+  Circle,
+} from 'lucide-react-native';
 import { useAlerts } from '../../hooks/useAlerts';
 import { StoredNotification } from '../../services/notification/notificationStorageService';
-import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '../../styles/modernTheme';
+import { SPACING, RADIUS, TYPOGRAPHY } from '../../styles/modernTheme';
+import { useTheme, ThemeColors } from '../../services/theme';
 import { addTestNotifications, addRandomNotification } from '../../utils/notificationTestHelper';
 
 export const AlertsScreen: React.FC = () => {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const {
     notifications,
     unreadCount,
@@ -35,16 +46,16 @@ export const AlertsScreen: React.FC = () => {
     refresh,
   } = useAlerts();
 
-  const getNotificationIcon = (type: string): keyof typeof Ionicons.glyphMap => {
+  const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'ARRIVAL':
       case 'DELAY':
       case 'DISRUPTION':
       case 'SERVICE_CHANGE':
       case 'FAVORITE':
-        return 'ellipse';
+        return Circle;
       default:
-        return 'ellipse';
+        return Circle;
     }
   };
 
@@ -71,8 +82,7 @@ export const AlertsScreen: React.FC = () => {
     if (!notification.isRead) {
       try {
         await markAsRead(notification.id);
-      } catch (error) {
-        console.error('Error marking as read:', error);
+        // Error marking as read
       }
     }
   }, [markAsRead]);
@@ -144,15 +154,15 @@ export const AlertsScreen: React.FC = () => {
     try {
       await addRandomNotification();
       await refresh();
-    } catch (error) {
-      console.error('Error adding random notification:', error);
+    } catch {
+      // Error adding random notification
     }
   }, [refresh]);
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
       <View style={styles.emptyIcon}>
-        <Ionicons name="notifications-outline" size={48} color={COLORS.gray[300]} />
+        <Ionicons name="notifications-outline" size={48} color={colors.textTertiary} />
       </View>
       <Text style={styles.emptyTitle}>알림 없음</Text>
       <Text style={styles.emptySubtitle}>
@@ -169,8 +179,9 @@ export const AlertsScreen: React.FC = () => {
     </View>
   );
 
+
   const renderNotificationItem = (notification: StoredNotification) => {
-    const icon = getNotificationIcon(notification.type);
+    const IconComponent = getNotificationIcon(notification.type);
 
     return (
       <TouchableOpacity
@@ -184,10 +195,10 @@ export const AlertsScreen: React.FC = () => {
       >
         <View style={styles.notificationContent}>
           <View style={styles.iconContainer}>
-            <Ionicons
-              name={icon}
+            <IconComponent
               size={8}
-              color={notification.isRead ? COLORS.gray[300] : COLORS.black}
+              color={notification.isRead ? colors.textTertiary : colors.textPrimary}
+              fill={notification.isRead ? colors.textTertiary : colors.textPrimary}
             />
           </View>
 
@@ -210,7 +221,7 @@ export const AlertsScreen: React.FC = () => {
             onPress={() => handleDelete(notification.id)}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name="close" size={18} color={COLORS.gray[400]} />
+            <X size={18} color={colors.textTertiary} />
           </TouchableOpacity>
         </View>
       </TouchableOpacity>
@@ -221,7 +232,7 @@ export const AlertsScreen: React.FC = () => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.black} />
+          <ActivityIndicator size="large" color={colors.textPrimary} />
           <Text style={styles.loadingText}>알림 로딩중</Text>
         </View>
       </SafeAreaView>
@@ -232,7 +243,7 @@ export const AlertsScreen: React.FC = () => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
-          <Ionicons name="alert-circle-outline" size={48} color={COLORS.gray[400]} />
+          <AlertCircle size={48} color={colors.textTertiary} />
           <Text style={styles.errorTitle}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={refresh}>
             <Text style={styles.retryButtonText}>다시 시도</Text>
@@ -260,7 +271,7 @@ export const AlertsScreen: React.FC = () => {
               onPress={handleAddRandomNotification}
               onLongPress={handleAddTestNotifications}
             >
-              <Ionicons name="add" size={20} color={COLORS.black} />
+              <Plus size={20} color={colors.textPrimary} />
             </TouchableOpacity>
           )}
           {unreadCount > 0 && (
@@ -268,7 +279,7 @@ export const AlertsScreen: React.FC = () => {
               style={styles.headerButton}
               onPress={handleMarkAllAsRead}
             >
-              <Ionicons name="checkmark-done" size={20} color={COLORS.black} />
+              <CheckCheck size={20} color={colors.textPrimary} />
             </TouchableOpacity>
           )}
           {notifications.length > 0 && (
@@ -276,7 +287,7 @@ export const AlertsScreen: React.FC = () => {
               style={styles.headerButton}
               onPress={handleClearAll}
             >
-              <Ionicons name="trash-outline" size={20} color={COLORS.black} />
+              <Trash2 size={20} color={colors.textPrimary} />
             </TouchableOpacity>
           )}
         </View>
@@ -290,7 +301,7 @@ export const AlertsScreen: React.FC = () => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={refresh}
-            tintColor={COLORS.black}
+            tintColor={colors.textPrimary}
           />
         }
         showsVerticalScrollIndicator={false}
@@ -307,10 +318,10 @@ export const AlertsScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -319,17 +330,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.lg,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.light,
+    borderBottomColor: colors.borderLight,
   },
   headerTitle: {
     fontSize: TYPOGRAPHY.fontSize['2xl'],
     fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.text.primary,
+    color: colors.textPrimary,
     letterSpacing: TYPOGRAPHY.letterSpacing.tight,
   },
   headerSubtitle: {
     fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.text.tertiary,
+    color: colors.textTertiary,
     marginTop: 2,
   },
   headerActions: {
@@ -342,7 +353,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: RADIUS.base,
-    backgroundColor: COLORS.surface.card,
+    backgroundColor: colors.backgroundSecondary,
   },
   content: {
     flex: 1,
@@ -355,15 +366,15 @@ const styles = StyleSheet.create({
     gap: SPACING.sm,
   },
   notificationCard: {
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.surface,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.border.light,
+    borderColor: colors.borderLight,
     overflow: 'hidden',
   },
   unreadCard: {
-    borderColor: COLORS.black,
-    backgroundColor: COLORS.surface.card,
+    borderColor: colors.textPrimary,
+    backgroundColor: colors.backgroundSecondary,
   },
   notificationContent: {
     flexDirection: 'row',
@@ -390,17 +401,17 @@ const styles = StyleSheet.create({
   notificationTitle: {
     fontSize: TYPOGRAPHY.fontSize.base,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
+    color: colors.textPrimary,
     flex: 1,
     marginRight: SPACING.sm,
   },
   timestamp: {
     fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.text.tertiary,
+    color: colors.textTertiary,
   },
   notificationBody: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.secondary,
+    color: colors.textSecondary,
     lineHeight: TYPOGRAPHY.lineHeight.relaxed * TYPOGRAPHY.fontSize.sm,
   },
   deleteButton: {
@@ -414,7 +425,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.tertiary,
+    color: colors.textTertiary,
   },
   errorContainer: {
     flex: 1,
@@ -426,19 +437,19 @@ const styles = StyleSheet.create({
   errorTitle: {
     fontSize: TYPOGRAPHY.fontSize.base,
     fontWeight: TYPOGRAPHY.fontWeight.medium,
-    color: COLORS.text.secondary,
+    color: colors.textSecondary,
     textAlign: 'center',
   },
   retryButton: {
     paddingHorizontal: SPACING.xl,
     paddingVertical: SPACING.md,
-    backgroundColor: COLORS.black,
+    backgroundColor: colors.textPrimary,
     borderRadius: RADIUS.base,
   },
   retryButtonText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.white,
+    color: colors.textInverse,
   },
   emptyState: {
     flex: 1,
@@ -453,11 +464,11 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: TYPOGRAPHY.fontSize.xl,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
+    color: colors.textPrimary,
   },
   emptySubtitle: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.tertiary,
+    color: colors.textTertiary,
     textAlign: 'center',
     lineHeight: TYPOGRAPHY.lineHeight.relaxed * TYPOGRAPHY.fontSize.sm,
   },
@@ -465,13 +476,13 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xl,
     paddingHorizontal: SPACING.xl,
     paddingVertical: SPACING.md,
-    backgroundColor: COLORS.black,
+    backgroundColor: colors.textPrimary,
     borderRadius: RADIUS.base,
   },
   devButtonText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.white,
+    color: colors.textInverse,
   },
 });
 

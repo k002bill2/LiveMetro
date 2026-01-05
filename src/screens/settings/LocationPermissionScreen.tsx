@@ -16,10 +16,13 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
+import { SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
+import { useTheme, ThemeColors } from '@/services/theme';
 import SettingSection from '@/components/settings/SettingSection';
 
 export const LocationPermissionScreen: React.FC = () => {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const [permissionStatus, setPermissionStatus] = useState<string>('loading');
   const [requesting, setRequesting] = useState(false);
 
@@ -81,11 +84,11 @@ export const LocationPermissionScreen: React.FC = () => {
   const getStatusColor = (): string => {
     switch (permissionStatus) {
       case 'granted':
-        return COLORS.semantic.success;
+        return colors.success;
       case 'denied':
-        return COLORS.semantic.error;
+        return colors.error;
       default:
-        return COLORS.secondary.yellow;
+        return colors.warning;
     }
   };
 
@@ -136,7 +139,7 @@ export const LocationPermissionScreen: React.FC = () => {
         <SettingSection title="위치 정보 사용 목적">
           <View style={styles.featureItem}>
             <View style={styles.featureIcon}>
-              <Ionicons name="locate" size={24} color={COLORS.black} />
+              <Ionicons name="locate" size={24} color={colors.textPrimary} />
             </View>
             <View style={styles.featureContent}>
               <Text style={styles.featureTitle}>주변 역 찾기</Text>
@@ -148,7 +151,7 @@ export const LocationPermissionScreen: React.FC = () => {
 
           <View style={styles.featureItem}>
             <View style={styles.featureIcon}>
-              <Ionicons name="subway" size={24} color={COLORS.black} />
+              <Ionicons name="subway" size={24} color={colors.textPrimary} />
             </View>
             <View style={styles.featureContent}>
               <Text style={styles.featureTitle}>출퇴근 경로 설정</Text>
@@ -160,7 +163,7 @@ export const LocationPermissionScreen: React.FC = () => {
 
           <View style={styles.featureItem}>
             <View style={styles.featureIcon}>
-              <Ionicons name="notifications" size={24} color={COLORS.black} />
+              <Ionicons name="notifications" size={24} color={colors.textPrimary} />
             </View>
             <View style={styles.featureContent}>
               <Text style={styles.featureTitle}>맞춤 알림</Text>
@@ -179,7 +182,7 @@ export const LocationPermissionScreen: React.FC = () => {
               onPress={requestPermission}
               disabled={requesting}
             >
-              <Ionicons name="location" size={20} color={COLORS.white} />
+              <Ionicons name="location" size={20} color={colors.textInverse} />
               <Text style={styles.actionButtonText}>
                 {requesting ? '권한 요청 중...' : '위치 권한 요청'}
               </Text>
@@ -190,7 +193,7 @@ export const LocationPermissionScreen: React.FC = () => {
             style={[styles.actionButton, styles.secondaryButton]}
             onPress={openSettings}
           >
-            <Ionicons name="settings" size={20} color={COLORS.black} />
+            <Ionicons name="settings" size={20} color={colors.textPrimary} />
             <Text style={[styles.actionButtonText, styles.secondaryButtonText]}>
               앱 설정 열기
             </Text>
@@ -199,7 +202,7 @@ export const LocationPermissionScreen: React.FC = () => {
 
         {/* Privacy Notice */}
         <View style={styles.privacyBox}>
-          <Ionicons name="shield-checkmark" size={20} color={COLORS.text.secondary} />
+          <Ionicons name="shield-checkmark" size={20} color={colors.textSecondary} />
           <Text style={styles.privacyText}>
             위치 정보는 기기에만 저장되며 서버로 전송되지 않습니다. 개인정보는
             안전하게 보호됩니다.
@@ -210,23 +213,23 @@ export const LocationPermissionScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.background,
   },
   content: {
     flex: 1,
   },
   statusCard: {
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.surface,
     marginHorizontal: SPACING.lg,
     marginTop: SPACING.lg,
     marginBottom: SPACING.xl,
     paddingVertical: SPACING['2xl'],
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.border.light,
+    borderColor: colors.borderLight,
     alignItems: 'center',
   },
   statusIcon: {
@@ -249,12 +252,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.lg,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.light,
+    borderBottomColor: colors.borderLight,
   },
   featureIcon: {
     width: 40,
     height: 40,
-    backgroundColor: COLORS.surface.card,
+    backgroundColor: colors.backgroundSecondary,
     borderRadius: RADIUS.full,
     justifyContent: 'center',
     alignItems: 'center',
@@ -266,41 +269,41 @@ const styles = StyleSheet.create({
   featureTitle: {
     fontSize: TYPOGRAPHY.fontSize.base,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   featureDescription: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.tertiary,
+    color: colors.textTertiary,
     lineHeight: TYPOGRAPHY.lineHeight.normal * TYPOGRAPHY.fontSize.sm,
   },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: COLORS.black,
+    backgroundColor: colors.textPrimary,
     paddingVertical: SPACING.lg,
     marginHorizontal: SPACING.lg,
     marginBottom: SPACING.md,
     borderRadius: RADIUS.lg,
   },
   secondaryButton: {
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: COLORS.border.medium,
+    borderColor: colors.borderMedium,
   },
   actionButtonText: {
     fontSize: TYPOGRAPHY.fontSize.base,
     fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.white,
+    color: colors.textInverse,
     marginLeft: SPACING.sm,
   },
   secondaryButtonText: {
-    color: COLORS.black,
+    color: colors.textPrimary,
   },
   privacyBox: {
     flexDirection: 'row',
-    backgroundColor: COLORS.primary.light,
+    backgroundColor: colors.primaryLight,
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.lg,
     marginHorizontal: SPACING.lg,
@@ -308,12 +311,12 @@ const styles = StyleSheet.create({
     marginBottom: SPACING.xl,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.border.medium,
+    borderColor: colors.borderMedium,
   },
   privacyText: {
     flex: 1,
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.secondary,
+    color: colors.textSecondary,
     lineHeight: TYPOGRAPHY.lineHeight.relaxed * TYPOGRAPHY.fontSize.sm,
     marginLeft: SPACING.md,
   },

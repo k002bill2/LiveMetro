@@ -13,22 +13,38 @@ export interface FirebaseDebugInfo {
 }
 
 /**
+ * Check if a Firebase environment variable value is valid
+ */
+const isValidEnvValue = (value: string | undefined): boolean => {
+  return !!value && value !== '' && !value.startsWith('your_') && value !== 'development-key';
+};
+
+/**
  * Check if all required Firebase environment variables are set
+ * Note: Expo requires static access to process.env variables
  */
 export const checkFirebaseEnvVars = (): { valid: boolean; missing: string[] } => {
-  const requiredVars = [
-    'EXPO_PUBLIC_FIREBASE_API_KEY',
-    'EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN',
-    'EXPO_PUBLIC_FIREBASE_PROJECT_ID',
-    'EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET',
-    'EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID',
-    'EXPO_PUBLIC_FIREBASE_APP_ID',
-  ];
+  const missing: string[] = [];
 
-  const missing = requiredVars.filter(varName => {
-    const value = process.env[varName];
-    return !value || value === '' || value.startsWith('your_') || value === 'development-key';
-  });
+  // Static access to each environment variable (required by Expo)
+  if (!isValidEnvValue(process.env.EXPO_PUBLIC_FIREBASE_API_KEY)) {
+    missing.push('EXPO_PUBLIC_FIREBASE_API_KEY');
+  }
+  if (!isValidEnvValue(process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN)) {
+    missing.push('EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN');
+  }
+  if (!isValidEnvValue(process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID)) {
+    missing.push('EXPO_PUBLIC_FIREBASE_PROJECT_ID');
+  }
+  if (!isValidEnvValue(process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET)) {
+    missing.push('EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET');
+  }
+  if (!isValidEnvValue(process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID)) {
+    missing.push('EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID');
+  }
+  if (!isValidEnvValue(process.env.EXPO_PUBLIC_FIREBASE_APP_ID)) {
+    missing.push('EXPO_PUBLIC_FIREBASE_APP_ID');
+  }
 
   return {
     valid: missing.length === 0,

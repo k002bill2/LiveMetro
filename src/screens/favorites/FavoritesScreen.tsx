@@ -23,7 +23,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Heart, Search, AlertCircle, LogIn, Plus } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -35,13 +35,16 @@ import { DraggableFavoriteItem } from '../../components/favorites/DraggableFavor
 import { StationSearchModal } from '../../components/commute/StationSearchModal';
 import { StationSelection } from '../../models/commute';
 import { Station } from '../../models/train';
-import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '../../styles/modernTheme';
+import { SPACING, RADIUS, TYPOGRAPHY } from '../../styles/modernTheme';
+import { useTheme, ThemeColors } from '../../services/theme';
 
 type NavigationProp = NativeStackNavigationProp<AppStackParamList>;
 
 export const FavoritesScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const { user } = useAuth();
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const {
     favoritesWithDetails,
     loading,
@@ -163,7 +166,7 @@ export const FavoritesScreen: React.FC = () => {
           onPress: async () => {
             try {
               await removeFavorite(favoriteId);
-            } catch (error) {
+            } catch {
               Alert.alert('오류', '즐겨찾기 삭제에 실패했습니다.');
             }
           },
@@ -215,7 +218,7 @@ export const FavoritesScreen: React.FC = () => {
       await addFavorite(station);
       setIsSearchModalVisible(false);
       Alert.alert('완료', `${selection.stationName}역이 즐겨찾기에 추가되었습니다.`);
-    } catch (error) {
+    } catch {
       setIsSearchModalVisible(false);
       Alert.alert('오류', '즐겨찾기 추가에 실패했습니다.');
     }
@@ -226,7 +229,7 @@ export const FavoritesScreen: React.FC = () => {
    */
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
-      <Ionicons name="heart-outline" size={64} color={COLORS.gray[300]} />
+      <Heart size={64} color={colors.textTertiary} />
       <Text style={styles.emptyTitle}>즐겨찾기가 없습니다</Text>
       <Text style={styles.emptySubtitle}>
         자주 이용하는 역을 즐겨찾기에 추가해보세요
@@ -245,7 +248,7 @@ export const FavoritesScreen: React.FC = () => {
    */
   const renderNoResults = () => (
     <View style={styles.emptyState}>
-      <Ionicons name="search-outline" size={64} color={COLORS.gray[300]} />
+      <Search size={64} color={colors.textTertiary} />
       <Text style={styles.emptyTitle}>검색 결과가 없습니다</Text>
       <Text style={styles.emptySubtitle}>
         다른 검색어나 필터를 시도해보세요
@@ -277,7 +280,7 @@ export const FavoritesScreen: React.FC = () => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.black} />
+          <ActivityIndicator size="large" color={colors.textPrimary} />
           <Text style={styles.loadingText}>즐겨찾기를 불러오는 중...</Text>
         </View>
       </SafeAreaView>
@@ -289,7 +292,7 @@ export const FavoritesScreen: React.FC = () => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
-          <Ionicons name="alert-circle-outline" size={64} color={COLORS.gray[400]} />
+          <AlertCircle size={64} color={colors.textTertiary} />
           <Text style={styles.errorTitle}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={refresh}>
             <Text style={styles.retryButtonText}>다시 시도</Text>
@@ -304,7 +307,7 @@ export const FavoritesScreen: React.FC = () => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.emptyState}>
-          <Ionicons name="log-in-outline" size={64} color={COLORS.gray[300]} />
+          <LogIn size={64} color={colors.textTertiary} />
           <Text style={styles.emptyTitle}>로그인이 필요합니다</Text>
           <Text style={styles.emptySubtitle}>
             즐겨찾기를 사용하려면 로그인해주세요
@@ -332,7 +335,7 @@ export const FavoritesScreen: React.FC = () => {
           style={styles.addButton}
           onPress={() => setIsSearchModalVisible(true)}
         >
-          <Ionicons name="add" size={24} color={COLORS.white} />
+          <Plus size={24} color={colors.textInverse} />
         </TouchableOpacity>
       </View>
 
@@ -355,7 +358,7 @@ export const FavoritesScreen: React.FC = () => {
           <RefreshControl
             refreshing={loading}
             onRefresh={refresh}
-            tintColor={COLORS.black}
+            tintColor={colors.textPrimary}
           />
         }
       >
@@ -384,10 +387,10 @@ export const FavoritesScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -395,9 +398,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.lg,
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.light,
+    borderBottomColor: colors.borderLight,
   },
   headerLeft: {
     flex: 1,
@@ -406,19 +409,19 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: RADIUS.full,
-    backgroundColor: COLORS.black,
+    backgroundColor: colors.textPrimary,
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerTitle: {
     fontSize: TYPOGRAPHY.fontSize['2xl'],
     fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.text.primary,
+    color: colors.textPrimary,
     letterSpacing: TYPOGRAPHY.letterSpacing.tight,
   },
   headerSubtitle: {
     fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.text.tertiary,
+    color: colors.textTertiary,
     marginTop: 2,
   },
   content: {
@@ -442,7 +445,7 @@ const styles = StyleSheet.create({
   aliasText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.secondary,
+    color: colors.textSecondary,
     marginLeft: SPACING.xs,
   },
   cardWrapper: {
@@ -452,7 +455,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: SPACING.sm,
     right: SPACING.sm,
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.surface,
     borderRadius: RADIUS.full,
     padding: SPACING.xs,
   },
@@ -470,31 +473,31 @@ const styles = StyleSheet.create({
   },
   metadataText: {
     fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.text.secondary,
+    color: colors.textSecondary,
   },
   commuteIndicator: {
-    backgroundColor: COLORS.surface.card,
+    backgroundColor: colors.backgroundSecondary,
     paddingHorizontal: SPACING.sm,
     paddingVertical: 2,
     borderRadius: RADIUS.sm,
     borderWidth: 1,
-    borderColor: COLORS.border.medium,
+    borderColor: colors.borderMedium,
   },
   commuteText: {
     fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.black,
+    color: colors.textPrimary,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
   },
   errorCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: COLORS.surface.card,
+    backgroundColor: colors.backgroundSecondary,
     padding: SPACING.lg,
     borderRadius: RADIUS.lg,
     marginBottom: SPACING.md,
     borderWidth: 1,
-    borderColor: COLORS.border.medium,
+    borderColor: colors.borderMedium,
   },
   errorContent: {
     flexDirection: 'row',
@@ -508,12 +511,12 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.secondary,
+    color: colors.textSecondary,
     marginBottom: 2,
   },
   errorSubtext: {
     fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.text.tertiary,
+    color: colors.textTertiary,
   },
   deleteButton: {
     padding: SPACING.xs,
@@ -531,7 +534,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.tertiary,
+    color: colors.textTertiary,
   },
   errorContainer: {
     flex: 1,
@@ -543,19 +546,19 @@ const styles = StyleSheet.create({
   errorTitle: {
     fontSize: TYPOGRAPHY.fontSize.base,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.secondary,
+    color: colors.textSecondary,
     textAlign: 'center',
   },
   retryButton: {
     paddingHorizontal: SPACING.xl,
     paddingVertical: SPACING.md,
-    backgroundColor: COLORS.black,
+    backgroundColor: colors.textPrimary,
     borderRadius: RADIUS.base,
   },
   retryButtonText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.white,
+    color: colors.textInverse,
   },
   emptyState: {
     flex: 1,
@@ -567,11 +570,11 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: TYPOGRAPHY.fontSize.xl,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
+    color: colors.textPrimary,
   },
   emptySubtitle: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.tertiary,
+    color: colors.textTertiary,
     textAlign: 'center',
     lineHeight: TYPOGRAPHY.lineHeight.relaxed * TYPOGRAPHY.fontSize.sm,
   },
@@ -579,13 +582,13 @@ const styles = StyleSheet.create({
     marginTop: SPACING.lg,
     paddingHorizontal: SPACING.xl,
     paddingVertical: SPACING.md,
-    backgroundColor: COLORS.black,
+    backgroundColor: colors.textPrimary,
     borderRadius: RADIUS.base,
   },
   emptyButtonText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.white,
+    color: colors.textInverse,
   },
 });
 

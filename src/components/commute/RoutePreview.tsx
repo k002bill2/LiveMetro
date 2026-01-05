@@ -5,7 +5,13 @@
 
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import {
+  GitBranch,
+  Clock,
+  ArrowLeftRight,
+  MapPin,
+  Flag
+} from 'lucide-react-native';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
 import { routeToSteps, CommuteRoute } from '@/models/commute';
 
@@ -43,8 +49,7 @@ export const RoutePreview: React.FC<RoutePreviewProps> = ({
   if (!hasRoute) {
     return (
       <View style={[styles.container, styles.emptyContainer]}>
-        <Ionicons
-          name="git-branch-outline"
+        <GitBranch
           size={32}
           color={COLORS.gray[300]}
         />
@@ -57,8 +62,7 @@ export const RoutePreview: React.FC<RoutePreviewProps> = ({
     <View style={[styles.container, compact && styles.containerCompact]}>
       {showTime && route.departureTime && (
         <View style={styles.timeContainer}>
-          <Ionicons
-            name="time-outline"
+          <Clock
             size={16}
             color={COLORS.text.tertiary}
           />
@@ -85,8 +89,7 @@ export const RoutePreview: React.FC<RoutePreviewProps> = ({
                 />
                 {step.type === 'transfer' && (
                   <View style={styles.transferBadge}>
-                    <Ionicons
-                      name="swap-horizontal"
+                    <ArrowLeftRight
                       size={12}
                       color={COLORS.white}
                     />
@@ -107,10 +110,10 @@ export const RoutePreview: React.FC<RoutePreviewProps> = ({
                 ]}
               >
                 {step.type === 'departure' && (
-                  <Ionicons name="location" size={12} color={COLORS.primary.main} />
+                  <MapPin size={12} color={COLORS.primary.main} />
                 )}
                 {step.type === 'arrival' && (
-                  <Ionicons name="flag" size={12} color={COLORS.semantic.error} />
+                  <Flag size={12} color={COLORS.semantic.error} />
                 )}
                 {step.type === 'transfer' && (
                   <View

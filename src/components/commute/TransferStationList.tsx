@@ -10,7 +10,7 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { ArrowLeftRight, XCircle, PlusCircle, Info } from 'lucide-react-native';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
 import { TransferStation, MAX_TRANSFER_STATIONS } from '@/models/commute';
 
@@ -49,8 +49,7 @@ export const TransferStationList: React.FC<TransferStationListProps> = ({
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Ionicons
-          name="swap-horizontal"
+        <ArrowLeftRight
           size={18}
           color={COLORS.text.secondary}
         />
@@ -80,8 +79,7 @@ export const TransferStationList: React.FC<TransferStationListProps> = ({
             onPress={() => onRemoveTransfer(index)}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons
-              name="close-circle"
+            <XCircle
               size={22}
               color={COLORS.gray[400]}
             />
@@ -107,8 +105,7 @@ export const TransferStationList: React.FC<TransferStationListProps> = ({
           style={styles.addButton}
           onPress={onAddTransfer}
         >
-          <Ionicons
-            name="add-circle-outline"
+          <PlusCircle
             size={20}
             color={COLORS.secondary.blue}
           />
@@ -119,8 +116,7 @@ export const TransferStationList: React.FC<TransferStationListProps> = ({
       {/* Max Reached Notice */}
       {!canAddMore && (
         <View style={styles.maxNotice}>
-          <Ionicons
-            name="information-circle-outline"
+          <Info
             size={16}
             color={COLORS.text.tertiary}
           />

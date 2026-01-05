@@ -3,8 +3,6 @@
  */
 
 // Unmock to test actual implementation
-jest.unmock('../performanceUtils');
-
 import {
   performanceMonitor,
   debounce,
@@ -12,6 +10,8 @@ import {
   shallowEqual,
   batchProcess,
 } from '../performanceUtils';
+
+jest.unmock('../performanceUtils');
 
 describe('PerformanceMonitor', () => {
   beforeEach(() => {

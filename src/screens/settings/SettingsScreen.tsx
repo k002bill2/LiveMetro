@@ -15,7 +15,26 @@ import {
   Alert,
   Switch,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import {
+  ChevronRight,
+  User,
+  Pencil,
+  TrainFront,
+  Bell,
+  Clock,
+  Volume2,
+  Globe,
+  Moon,
+  MapPin,
+  LogIn,
+  ScanFace,
+  Fingerprint,
+  HelpCircle,
+  FileText,
+  ShieldCheck,
+  Info,
+  LogOut,
+} from 'lucide-react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useAuth } from '../../services/auth/AuthContext';
@@ -24,6 +43,7 @@ import { useTheme } from '../../services/theme';
 import { SPACING, RADIUS, TYPOGRAPHY } from '../../styles/modernTheme';
 import { SettingsStackParamList } from '@/navigation/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import {
   isBiometricAvailable,
   isBiometricLoginEnabled,
@@ -32,8 +52,11 @@ import {
   hasStoredCredentials,
 } from '../../services/auth/biometricService';
 
-// Storage key for biometric enabled state
+// Storage keys
 const BIOMETRIC_ENABLED_KEY = '@livemetro_biometric_enabled';
+const AUTO_LOGIN_ENABLED_KEY = '@livemetro_auto_login_enabled';
+const AUTO_LOGIN_EMAIL_KEY = 'livemetro_auto_login_email';
+const AUTO_LOGIN_PASSWORD_KEY = 'livemetro_auto_login_password';
 
 type Props = NativeStackScreenProps<SettingsStackParamList, 'SettingsHome'>;
 
@@ -51,15 +74,23 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
       ? t.settings.themeDark
       : t.settings.themeLight;
 
+  // Auto login state
+  const [autoLoginEnabled, setAutoLoginEnabled] = useState(false);
+
   // Biometric state
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [biometricTypeName, setBiometricTypeName] = useState('생체인증');
 
-  // Check biometric status on mount
+  // Check auto login and biometric status on mount
   useEffect(() => {
-    const checkBiometric = async (): Promise<void> => {
+    const checkSettings = async (): Promise<void> => {
       try {
+        // Check auto login status
+        const savedAutoLogin = await AsyncStorage.getItem(AUTO_LOGIN_ENABLED_KEY);
+        setAutoLoginEnabled(savedAutoLogin === 'true');
+
+        // Check biometric status
         const available = await isBiometricAvailable();
         setBiometricAvailable(available);
 
@@ -70,12 +101,47 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
           const typeName = await getBiometricTypeName();
           setBiometricTypeName(typeName);
         }
-      } catch (error) {
-        console.error('Error checking biometric status:', error);
+      } catch {
+        // Error checking settings status
       }
     };
 
-    checkBiometric();
+    checkSettings();
+  }, []);
+
+  // Handle auto login toggle
+  const handleAutoLoginToggle = useCallback(async (value: boolean): Promise<void> => {
+    if (!value) {
+      // Disable: show confirmation dialog
+      Alert.alert(
+        '자동로그인 해제',
+        '저장된 로그인 정보가 삭제됩니다. 계속하시겠습니까?',
+        [
+          { text: '취소', style: 'cancel' },
+          {
+            text: '해제',
+            style: 'destructive',
+            onPress: async () => {
+              try {
+                await AsyncStorage.setItem(AUTO_LOGIN_ENABLED_KEY, 'false');
+                await SecureStore.deleteItemAsync(AUTO_LOGIN_EMAIL_KEY);
+                await SecureStore.deleteItemAsync(AUTO_LOGIN_PASSWORD_KEY);
+                setAutoLoginEnabled(false);
+              } catch {
+                Alert.alert('오류', '설정 변경에 실패했습니다.');
+              }
+            },
+          },
+        ]
+      );
+    } else {
+      // Enable: show info that it can only be set during login
+      Alert.alert(
+        '자동로그인',
+        '자동로그인은 로그인 시 설정할 수 있습니다.',
+        [{ text: '확인' }]
+      );
+    }
   }, []);
 
   // Handle biometric toggle
@@ -96,8 +162,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
         await AsyncStorage.setItem(BIOMETRIC_ENABLED_KEY, 'true');
         setBiometricEnabled(true);
         Alert.alert('완료', `${biometricTypeName} 로그인이 활성화되었습니다.`);
-      } catch (error) {
-        console.error('Error enabling biometric:', error);
+      } catch {
         Alert.alert('오류', '설정 변경에 실패했습니다.');
       }
     } else {
@@ -139,8 +204,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
           onPress: async () => {
             try {
               await signOut();
-            } catch (error) {
-              console.error('Sign out error:', error);
+            } catch {
               Alert.alert(t.common.error, language === 'ko' ? '로그아웃에 실패했습니다.' : 'Failed to sign out.');
             }
           },
@@ -152,16 +216,16 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   const styles = createStyles(colors);
 
   const SettingItem: React.FC<{
-    icon: string;
+    Icon: React.ElementType;
     title: string;
     subtitle?: string;
     onPress?: () => void;
     showChevron?: boolean;
-  }> = ({ icon, title, subtitle, onPress, showChevron = true }) => (
+  }> = ({ Icon, title, subtitle, onPress, showChevron = true }) => (
     <TouchableOpacity style={styles.settingItem} onPress={onPress}>
       <View style={styles.settingItemLeft}>
         <View style={styles.iconContainer}>
-          <Ionicons name={icon as any} size={20} color={colors.textPrimary} />
+          <Icon size={20} color={colors.textPrimary} />
         </View>
         <View style={styles.textContainer}>
           <Text style={styles.settingTitle}>{title}</Text>
@@ -169,7 +233,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
         </View>
       </View>
       {showChevron && (
-        <Ionicons name="chevron-forward" size={20} color={colors.textTertiary} />
+        <ChevronRight size={20} color={colors.textTertiary} />
       )}
     </TouchableOpacity>
   );
@@ -185,7 +249,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
             activeOpacity={0.7}
           >
             <View style={styles.profileIcon}>
-              <Ionicons name="person" size={32} color={colors.textPrimary} />
+              <User size={32} color={colors.textPrimary} />
             </View>
             <View style={styles.profileInfo}>
               <Text style={styles.profileName}>
@@ -200,7 +264,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
               onPress={() => navigation.navigate('EditProfile')}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Ionicons name="create-outline" size={20} color={colors.textTertiary} />
+              <Pencil size={20} color={colors.textTertiary} />
             </TouchableOpacity>
           </TouchableOpacity>
         </View>
@@ -210,25 +274,25 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
           <Text style={styles.sectionTitle}>{t.settings.notificationSettings}</Text>
           <View style={styles.settingGroup}>
             <SettingItem
-              icon="train-outline"
+              Icon={TrainFront}
               title={t.settings.commuteSettings}
               subtitle={t.settings.commuteSettingsDesc}
               onPress={() => navigation.navigate('CommuteSettings')}
             />
             <SettingItem
-              icon="notifications"
+              Icon={Bell}
               title={t.settings.delayAlert}
               subtitle={t.settings.delayAlertDesc}
               onPress={() => navigation.navigate('DelayNotification')}
             />
             <SettingItem
-              icon="time"
+              Icon={Clock}
               title={t.settings.notificationTime}
               subtitle={t.settings.notificationTimeDesc}
               onPress={() => navigation.navigate('NotificationTime')}
             />
             <SettingItem
-              icon="volume-high"
+              Icon={Volume2}
               title={t.settings.soundSettings}
               subtitle={t.settings.soundSettingsDesc}
               onPress={() => navigation.navigate('SoundSettings')}
@@ -241,19 +305,19 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
           <Text style={styles.sectionTitle}>{t.settings.appSettings}</Text>
           <View style={styles.settingGroup}>
             <SettingItem
-              icon="language"
+              Icon={Globe}
               title={t.settings.language}
               subtitle={languageDisplayName}
               onPress={() => navigation.navigate('LanguageSettings')}
             />
             <SettingItem
-              icon="moon"
+              Icon={Moon}
               title={t.settings.theme}
               subtitle={themeDisplayName}
               onPress={() => navigation.navigate('ThemeSettings')}
             />
             <SettingItem
-              icon="location"
+              Icon={MapPin}
               title={t.settings.locationPermission}
               subtitle={t.settings.locationPermissionDesc}
               onPress={() => navigation.navigate('LocationPermission')}
@@ -265,14 +329,43 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t.settings.security}</Text>
           <View style={styles.settingGroup}>
+            {/* Auto Login Toggle */}
             <View style={styles.settingItem}>
               <View style={styles.settingItemLeft}>
                 <View style={styles.iconContainer}>
-                  <Ionicons
-                    name={biometricTypeName === 'Face ID' ? 'scan-outline' : 'finger-print-outline'}
-                    size={20}
-                    color={biometricAvailable ? colors.textPrimary : colors.textDisabled}
-                  />
+                  <LogIn size={20} color={colors.textPrimary} />
+                </View>
+                <View style={styles.textContainer}>
+                  <Text style={styles.settingTitle}>
+                    {language === 'ko' ? '자동로그인' : 'Auto Login'}
+                  </Text>
+                  <Text style={styles.settingSubtitle}>
+                    {language === 'ko' ? '앱 시작 시 자동으로 로그인합니다' : 'Automatically sign in when app starts'}
+                  </Text>
+                </View>
+              </View>
+              <Switch
+                value={autoLoginEnabled}
+                onValueChange={handleAutoLoginToggle}
+                trackColor={{ false: colors.borderMedium, true: colors.primary }}
+                thumbColor={colors.white}
+              />
+            </View>
+            {/* Biometric Login Toggle */}
+            <View style={styles.settingItem}>
+              <View style={styles.settingItemLeft}>
+                <View style={styles.iconContainer}>
+                  {biometricTypeName === 'Face ID' ? (
+                    <ScanFace
+                      size={20}
+                      color={biometricAvailable ? colors.textPrimary : colors.textDisabled}
+                    />
+                  ) : (
+                    <Fingerprint
+                      size={20}
+                      color={biometricAvailable ? colors.textPrimary : colors.textDisabled}
+                    />
+                  )}
                 </View>
                 <View style={styles.textContainer}>
                   <Text style={[
@@ -304,24 +397,24 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
           <Text style={styles.sectionTitle}>{t.settings.info}</Text>
           <View style={styles.settingGroup}>
             <SettingItem
-              icon="help-circle"
+              Icon={HelpCircle}
               title={t.settings.help}
               subtitle={t.settings.helpDesc}
               onPress={() => navigation.navigate('Help')}
             />
             <SettingItem
-              icon="document-text"
+              Icon={FileText}
               title={t.settings.privacyPolicy}
               onPress={() => navigation.navigate('PrivacyPolicy')}
             />
             <SettingItem
-              icon="shield-checkmark"
+              Icon={ShieldCheck}
               title={t.settings.termsOfService}
               onPress={() => {}}
               showChevron={false}
             />
             <SettingItem
-              icon="information-circle"
+              Icon={Info}
               title={t.settings.appInfo}
               subtitle={`${t.settings.version} 1.0.0`}
               onPress={() => {}}
@@ -333,7 +426,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
         {/* Sign Out */}
         <View style={styles.section}>
           <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-            <Ionicons name="log-out-outline" size={20} color={colors.textSecondary} />
+            <LogOut size={20} color={colors.textSecondary} />
             <Text style={styles.signOutText}>{t.settings.signOut}</Text>
           </TouchableOpacity>
         </View>

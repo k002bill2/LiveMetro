@@ -39,11 +39,11 @@ interface CommuteRouteData {
     stationName: string;
     lineId: string;
   };
-  transferStations: Array<{
+  transferStations: {
     stationId: string;
     stationName: string;
     lineId: string;
-  }>;
+  }[];
 }
 
 export const CommuteSettingsScreen: React.FC<Props> = ({ navigation: _navigation }) => {

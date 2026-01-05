@@ -14,8 +14,9 @@ import {
   Switch,
   ActivityIndicator,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '../../styles/modernTheme';
+import { ArrowUp, ArrowDown, ArrowUpDown, Briefcase, Check } from 'lucide-react-native';
+import { SPACING, RADIUS, TYPOGRAPHY } from '../../styles/modernTheme';
+import { useTheme, ThemeColors } from '../../services/theme';
 import { FavoriteWithDetails } from '../../hooks/useFavorites';
 
 interface FavoriteEditFormProps {
@@ -35,6 +36,8 @@ export const FavoriteEditForm: React.FC<FavoriteEditFormProps> = ({
   onSave,
   onCancel,
 }) => {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   // Form state
   const [alias, setAlias] = useState(favorite.alias || '');
   const [direction, setDirection] = useState<'up' | 'down' | 'both'>(favorite.direction);
@@ -86,8 +89,8 @@ export const FavoriteEditForm: React.FC<FavoriteEditFormProps> = ({
       };
 
       await onSave(updates);
-    } catch (error) {
-      console.error('Error saving favorite:', error);
+    } catch {
+      // Error saving favorite
     } finally {
       setSaving(false);
     }
@@ -127,7 +130,7 @@ export const FavoriteEditForm: React.FC<FavoriteEditFormProps> = ({
           <TextInput
             style={styles.input}
             placeholder="예: 집, 회사, 학교"
-            placeholderTextColor={COLORS.text.tertiary}
+            placeholderTextColor={colors.textTertiary}
             value={alias}
             onChangeText={setAlias}
             maxLength={20}
@@ -149,10 +152,9 @@ export const FavoriteEditForm: React.FC<FavoriteEditFormProps> = ({
               ]}
               onPress={() => setDirection('up')}
             >
-              <Ionicons
-                name="arrow-up"
+              <ArrowUp
                 size={16}
-                color={direction === 'up' ? COLORS.white : COLORS.text.secondary}
+                color={direction === 'up' ? colors.textInverse : colors.textSecondary}
               />
               <Text
                 style={[
@@ -172,10 +174,9 @@ export const FavoriteEditForm: React.FC<FavoriteEditFormProps> = ({
               ]}
               onPress={() => setDirection('both')}
             >
-              <Ionicons
-                name="swap-vertical"
+              <ArrowUpDown
                 size={16}
-                color={direction === 'both' ? COLORS.white : COLORS.text.secondary}
+                color={direction === 'both' ? colors.textInverse : colors.textSecondary}
               />
               <Text
                 style={[
@@ -195,10 +196,9 @@ export const FavoriteEditForm: React.FC<FavoriteEditFormProps> = ({
               ]}
               onPress={() => setDirection('down')}
             >
-              <Ionicons
-                name="arrow-down"
+              <ArrowDown
                 size={16}
-                color={direction === 'down' ? COLORS.white : COLORS.text.secondary}
+                color={direction === 'down' ? colors.textInverse : colors.textSecondary}
               />
               <Text
                 style={[
@@ -216,14 +216,14 @@ export const FavoriteEditForm: React.FC<FavoriteEditFormProps> = ({
         <View style={styles.formGroup}>
           <View style={styles.switchRow}>
             <View style={styles.switchLabel}>
-              <Ionicons name="briefcase" size={20} color={COLORS.text.primary} />
+              <Briefcase size={20} color={colors.textPrimary} />
               <Text style={styles.label}>출퇴근 역으로 설정</Text>
             </View>
             <Switch
               value={isCommute}
               onValueChange={setIsCommute}
-              trackColor={{ false: COLORS.gray[300], true: COLORS.black }}
-              thumbColor={COLORS.white}
+              trackColor={{ false: colors.borderLight, true: colors.textPrimary }}
+              thumbColor={colors.surface}
             />
           </View>
           <Text style={styles.helperText}>
@@ -247,10 +247,10 @@ export const FavoriteEditForm: React.FC<FavoriteEditFormProps> = ({
             disabled={saving}
           >
             {saving ? (
-              <ActivityIndicator size="small" color={COLORS.white} />
+              <ActivityIndicator size="small" color={colors.textInverse} />
             ) : (
               <>
-                <Ionicons name="checkmark" size={20} color={COLORS.white} />
+                <Check size={20} color={colors.textInverse} />
                 <Text style={styles.saveButtonText}>저장</Text>
               </>
             )}
@@ -261,16 +261,16 @@ export const FavoriteEditForm: React.FC<FavoriteEditFormProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     overflow: 'hidden',
     marginTop: SPACING.sm,
   },
   content: {
-    backgroundColor: COLORS.surface.card,
+    backgroundColor: colors.surface,
     borderRadius: RADIUS.lg,
     borderWidth: 1,
-    borderColor: COLORS.border.light,
+    borderColor: colors.borderLight,
     padding: SPACING.lg,
     gap: SPACING.lg,
   },
@@ -280,26 +280,26 @@ const styles = StyleSheet.create({
   label: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
+    color: colors.textPrimary,
   },
   input: {
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.backgroundSecondary,
     borderWidth: 1,
-    borderColor: COLORS.border.medium,
+    borderColor: colors.borderMedium,
     borderRadius: RADIUS.base,
     paddingHorizontal: SPACING.md,
     paddingVertical: SPACING.sm,
     fontSize: TYPOGRAPHY.fontSize.base,
-    color: COLORS.text.primary,
+    color: colors.textPrimary,
   },
   helperText: {
     fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.text.tertiary,
+    color: colors.textTertiary,
   },
   segmentedControl: {
     flexDirection: 'row',
     borderWidth: 1,
-    borderColor: COLORS.border.medium,
+    borderColor: colors.borderMedium,
     borderRadius: RADIUS.base,
     overflow: 'hidden',
   },
@@ -310,27 +310,27 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 4,
     paddingVertical: SPACING.sm,
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.backgroundSecondary,
   },
   segmentLeft: {
     borderRightWidth: 1,
-    borderRightColor: COLORS.border.medium,
+    borderRightColor: colors.borderMedium,
   },
   segmentMiddle: {
     borderRightWidth: 1,
-    borderRightColor: COLORS.border.medium,
+    borderRightColor: colors.borderMedium,
   },
   segmentRight: {},
   segmentActive: {
-    backgroundColor: COLORS.black,
+    backgroundColor: colors.textPrimary,
   },
   segmentText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontWeight: TYPOGRAPHY.fontWeight.medium,
-    color: COLORS.text.secondary,
+    color: colors.textSecondary,
   },
   segmentTextActive: {
-    color: COLORS.white,
+    color: colors.textInverse,
   },
   switchRow: {
     flexDirection: 'row',
@@ -351,7 +351,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingVertical: SPACING.md,
     borderWidth: 1,
-    borderColor: COLORS.border.dark,
+    borderColor: colors.borderMedium,
     borderRadius: RADIUS.base,
     alignItems: 'center',
     justifyContent: 'center',
@@ -359,7 +359,7 @@ const styles = StyleSheet.create({
   cancelButtonText: {
     fontSize: TYPOGRAPHY.fontSize.base,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.secondary,
+    color: colors.textSecondary,
   },
   saveButton: {
     flex: 1,
@@ -368,7 +368,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: SPACING.xs,
     paddingVertical: SPACING.md,
-    backgroundColor: COLORS.black,
+    backgroundColor: colors.textPrimary,
     borderRadius: RADIUS.base,
   },
   saveButtonDisabled: {
@@ -377,6 +377,6 @@ const styles = StyleSheet.create({
   saveButtonText: {
     fontSize: TYPOGRAPHY.fontSize.base,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.white,
+    color: colors.textInverse,
   },
 });

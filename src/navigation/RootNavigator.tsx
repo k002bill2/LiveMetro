@@ -6,7 +6,7 @@
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Ionicons } from '@expo/vector-icons';
+import { Home, Heart, Bell, Settings, CircleHelp } from 'lucide-react-native';
 
 import { useAuth } from '../services/auth/AuthContext';
 import { useTheme } from '../services/theme';
@@ -62,26 +62,18 @@ const MainTabNavigator: React.FC = () => {
     <Tab.Navigator
       screenOptions={({ route }) => ({
         tabBarIcon: ({ focused, color, size }) => {
-          let iconName: keyof typeof Ionicons.glyphMap;
-
           switch (route.name) {
             case 'Home':
-              iconName = focused ? 'home' : 'home-outline';
-              break;
+              return <Home size={size} color={color} fill={focused ? color : 'transparent'} />;
             case 'Favorites':
-              iconName = focused ? 'heart' : 'heart-outline';
-              break;
+              return <Heart size={size} color={color} fill={focused ? color : 'transparent'} />;
             case 'Alerts':
-              iconName = focused ? 'notifications' : 'notifications-outline';
-              break;
+              return <Bell size={size} color={color} fill={focused ? color : 'transparent'} />;
             case 'Settings':
-              iconName = focused ? 'settings' : 'settings-outline';
-              break;
+              return <Settings size={size} color={color} />;
             default:
-              iconName = 'help-outline';
+              return <CircleHelp size={size} color={color} />;
           }
-
-          return <Ionicons name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textSecondary,

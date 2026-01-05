@@ -3,10 +3,11 @@
  * Comprehensive test suite for the TrainArrivalCard component
  */
 
-import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
+import React, { ReactElement } from 'react';
+import { render, fireEvent, RenderOptions } from '@testing-library/react-native';
 import { TrainArrivalCard } from '../TrainArrivalCard';
 import { Train, TrainStatus } from '@models/train';
+import { ThemeProvider } from '@services/theme';
 
 // Mock utilities
 jest.mock('@utils/colorUtils', () => ({
@@ -19,6 +20,17 @@ jest.mock('@utils/colorUtils', () => ({
   }),
   addAlpha: jest.fn((color: string, alpha: number) => `rgba(0,168,77,${alpha})`),
 }));
+
+// Custom render function that wraps components with ThemeProvider
+const customRender = (
+  ui: ReactElement,
+  options?: Omit<RenderOptions, 'wrapper'>
+) => {
+  const Wrapper = ({ children }: { children: React.ReactNode }) => (
+    <ThemeProvider>{children}</ThemeProvider>
+  );
+  return render(ui, { wrapper: Wrapper, ...options });
+};
 
 describe('TrainArrivalCard', () => {
   const createMockTrain = (overrides?: Partial<Train>): Train => ({
@@ -36,27 +48,27 @@ describe('TrainArrivalCard', () => {
 
   describe('Rendering', () => {
     it('should render without crashing', () => {
-      const train = createMockTrain();
-      const { getByText } = render(
-        <TrainArrivalCard train={train} lineName="2호선" />
+      const train = createMockTrain({ lineId: '2' });
+      const { getByText } = customRender(
+        <TrainArrivalCard train={train} />
       );
 
       expect(getByText('2호선')).toBeTruthy();
     });
 
     it('should display line name when provided', () => {
-      const train = createMockTrain();
-      const { getByText } = render(
-        <TrainArrivalCard train={train} lineName="2호선" />
+      const train = createMockTrain({ lineId: '2' });
+      const { getByText } = customRender(
+        <TrainArrivalCard train={train} />
       );
 
       expect(getByText('2호선')).toBeTruthy();
     });
 
     it('should display station name when provided', () => {
-      const train = createMockTrain();
-      const { getByText } = render(
-        <TrainArrivalCard train={train} stationName="강남" />
+      const train = createMockTrain({ nextStationId: '강남' });
+      const { getByText } = customRender(
+        <TrainArrivalCard train={train} />
       );
 
       expect(getByText('강남역')).toBeTruthy();
@@ -64,14 +76,14 @@ describe('TrainArrivalCard', () => {
 
     it('should display direction correctly for upward train', () => {
       const train = createMockTrain({ direction: 'up' });
-      const { getByText } = render(<TrainArrivalCard train={train} />);
+      const { getByText } = customRender(<TrainArrivalCard train={train} />);
 
       expect(getByText('상행')).toBeTruthy();
     });
 
     it('should display direction correctly for downward train', () => {
       const train = createMockTrain({ direction: 'down' });
-      const { getByText } = render(<TrainArrivalCard train={train} />);
+      const { getByText } = customRender(<TrainArrivalCard train={train} />);
 
       expect(getByText('하행')).toBeTruthy();
     });
@@ -83,7 +95,7 @@ describe('TrainArrivalCard', () => {
         arrivalTime: new Date(Date.now() - 1000), // Already passed
       });
 
-      const { getByText } = render(<TrainArrivalCard train={train} />);
+      const { getByText } = customRender(<TrainArrivalCard train={train} />);
       expect(getByText('도착')).toBeTruthy();
     });
 
@@ -92,7 +104,7 @@ describe('TrainArrivalCard', () => {
         arrivalTime: new Date(Date.now() + 60 * 1000), // 1 minute
       });
 
-      const { getByText } = render(<TrainArrivalCard train={train} />);
+      const { getByText } = customRender(<TrainArrivalCard train={train} />);
       expect(getByText('1분 후')).toBeTruthy();
     });
 
@@ -101,7 +113,7 @@ describe('TrainArrivalCard', () => {
         arrivalTime: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes
       });
 
-      const { getByText } = render(<TrainArrivalCard train={train} />);
+      const { getByText } = customRender(<TrainArrivalCard train={train} />);
       expect(getByText('5분 후')).toBeTruthy();
     });
 
@@ -110,7 +122,7 @@ describe('TrainArrivalCard', () => {
         arrivalTime: null,
       });
 
-      const { getByText } = render(<TrainArrivalCard train={train} />);
+      const { getByText } = customRender(<TrainArrivalCard train={train} />);
       expect(getByText('정보 없음')).toBeTruthy();
     });
   });
@@ -118,35 +130,35 @@ describe('TrainArrivalCard', () => {
   describe('Train Status', () => {
     it('should display normal status correctly', () => {
       const train = createMockTrain({ status: TrainStatus.NORMAL });
-      const { getByText } = render(<TrainArrivalCard train={train} />);
+      const { getByText } = customRender(<TrainArrivalCard train={train} />);
 
       expect(getByText('정상')).toBeTruthy();
     });
 
     it('should display delayed status correctly', () => {
       const train = createMockTrain({ status: TrainStatus.DELAYED });
-      const { getByText } = render(<TrainArrivalCard train={train} />);
+      const { getByText } = customRender(<TrainArrivalCard train={train} />);
 
       expect(getByText('지연')).toBeTruthy();
     });
 
     it('should display suspended status correctly', () => {
       const train = createMockTrain({ status: TrainStatus.SUSPENDED });
-      const { getByText } = render(<TrainArrivalCard train={train} />);
+      const { getByText } = customRender(<TrainArrivalCard train={train} />);
 
       expect(getByText('운행중단')).toBeTruthy();
     });
 
     it('should display maintenance status correctly', () => {
       const train = createMockTrain({ status: TrainStatus.MAINTENANCE });
-      const { getByText } = render(<TrainArrivalCard train={train} />);
+      const { getByText } = customRender(<TrainArrivalCard train={train} />);
 
       expect(getByText('점검중')).toBeTruthy();
     });
 
     it('should display emergency status correctly', () => {
       const train = createMockTrain({ status: TrainStatus.EMERGENCY });
-      const { getByText } = render(<TrainArrivalCard train={train} />);
+      const { getByText } = customRender(<TrainArrivalCard train={train} />);
 
       expect(getByText('긴급')).toBeTruthy();
     });
@@ -159,7 +171,7 @@ describe('TrainArrivalCard', () => {
         delayMinutes: 5,
       });
 
-      const { getByText } = render(<TrainArrivalCard train={train} />);
+      const { getByText } = customRender(<TrainArrivalCard train={train} />);
       expect(getByText('5분 지연')).toBeTruthy();
     });
 
@@ -169,7 +181,7 @@ describe('TrainArrivalCard', () => {
         delayMinutes: 0,
       });
 
-      const { queryByText } = render(<TrainArrivalCard train={train} />);
+      const { queryByText } = customRender(<TrainArrivalCard train={train} />);
       expect(queryByText(/지연/)).toBeNull();
     });
 
@@ -179,7 +191,7 @@ describe('TrainArrivalCard', () => {
         delayMinutes: 3,
       });
 
-      const { getByText } = render(<TrainArrivalCard train={train} />);
+      const { getByText } = customRender(<TrainArrivalCard train={train} />);
       expect(getByText('3분 지연')).toBeTruthy();
     });
 
@@ -189,7 +201,7 @@ describe('TrainArrivalCard', () => {
         delayMinutes: 15,
       });
 
-      const { getByText } = render(<TrainArrivalCard train={train} />);
+      const { getByText } = customRender(<TrainArrivalCard train={train} />);
       expect(getByText('15분 지연')).toBeTruthy();
     });
   });
@@ -199,7 +211,7 @@ describe('TrainArrivalCard', () => {
       const onPress = jest.fn();
       const train = createMockTrain();
 
-      const { getByRole } = render(
+      const { getByRole } = customRender(
         <TrainArrivalCard train={train} onPress={onPress} />
       );
 
@@ -212,7 +224,7 @@ describe('TrainArrivalCard', () => {
     it('should not crash when pressed without onPress handler', () => {
       const train = createMockTrain();
 
-      const { getByRole } = render(<TrainArrivalCard train={train} />);
+      const { getByRole } = customRender(<TrainArrivalCard train={train} />);
 
       // Should render as summary, not button
       expect(getByRole('summary')).toBeTruthy();
@@ -223,7 +235,7 @@ describe('TrainArrivalCard', () => {
     it('should have proper accessibility role when pressable', () => {
       const train = createMockTrain();
 
-      const { getByRole } = render(
+      const { getByRole } = customRender(
         <TrainArrivalCard train={train} onPress={() => {}} />
       );
 
@@ -233,7 +245,7 @@ describe('TrainArrivalCard', () => {
     it('should have proper accessibility role when not pressable', () => {
       const train = createMockTrain();
 
-      const { getByRole } = render(<TrainArrivalCard train={train} />);
+      const { getByRole } = customRender(<TrainArrivalCard train={train} />);
 
       expect(getByRole('summary')).toBeTruthy();
     });
@@ -242,13 +254,12 @@ describe('TrainArrivalCard', () => {
       const train = createMockTrain({
         direction: 'up',
         delayMinutes: 0,
+        lineId: '2',
       });
 
-      const { getByLabelText } = render(
+      const { getByLabelText } = customRender(
         <TrainArrivalCard
           train={train}
-          lineName="2호선"
-          stationName="강남"
         />
       );
 
@@ -260,10 +271,11 @@ describe('TrainArrivalCard', () => {
       const train = createMockTrain({
         status: TrainStatus.DELAYED,
         delayMinutes: 5,
+        lineId: '2',
       });
 
-      const { getByLabelText } = render(
-        <TrainArrivalCard train={train} lineName="2호선" />
+      const { getByLabelText } = customRender(
+        <TrainArrivalCard train={train} />
       );
 
       const element = getByLabelText(/5분 지연/);
@@ -273,7 +285,7 @@ describe('TrainArrivalCard', () => {
     it('should have accessibility hint when pressable', () => {
       const train = createMockTrain();
 
-      const { getByA11yHint } = render(
+      const { getByA11yHint } = customRender(
         <TrainArrivalCard train={train} onPress={() => {}} />
       );
 
@@ -288,7 +300,7 @@ describe('TrainArrivalCard', () => {
       const train = createMockTrain();
       const customStyle = { marginBottom: 24 };
 
-      const { getByRole } = render(
+      const { getByRole } = customRender(
         <TrainArrivalCard train={train} style={customStyle} />
       );
 
@@ -299,18 +311,18 @@ describe('TrainArrivalCard', () => {
 
   describe('Edge Cases', () => {
     it('should handle missing line name gracefully', () => {
-      const train = createMockTrain();
+      const train = createMockTrain({ lineId: '' });
 
-      const { queryByText } = render(<TrainArrivalCard train={train} />);
+      const { queryByText } = customRender(<TrainArrivalCard train={train} />);
 
       // Should not crash, line badge should not render
       expect(queryByText(/호선/)).toBeNull();
     });
 
     it('should handle missing station name gracefully', () => {
-      const train = createMockTrain();
+      const train = createMockTrain({ nextStationId: '' });
 
-      const { queryByText } = render(<TrainArrivalCard train={train} />);
+      const { queryByText } = customRender(<TrainArrivalCard train={train} />);
 
       expect(queryByText(/역$/)).toBeNull();
     });
@@ -319,7 +331,7 @@ describe('TrainArrivalCard', () => {
       const train = createMockTrain({ nextStationId: null });
 
       // Should not crash when nextStationId is null
-      expect(() => render(<TrainArrivalCard train={train} />)).not.toThrow();
+      expect(() => customRender(<TrainArrivalCard train={train} />)).not.toThrow();
     });
   });
 });

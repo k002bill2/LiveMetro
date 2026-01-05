@@ -5,7 +5,6 @@
 
 import React from 'react';
 import { View, Text, Switch, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
 
 interface SettingToggleProps {
@@ -14,7 +13,7 @@ interface SettingToggleProps {
   value: boolean;
   onValueChange: (value: boolean) => void;
   disabled?: boolean;
-  icon?: keyof typeof Ionicons.glyphMap;
+  icon?: React.ElementType;
 }
 
 export const SettingToggle: React.FC<SettingToggleProps> = ({
@@ -23,14 +22,14 @@ export const SettingToggle: React.FC<SettingToggleProps> = ({
   value,
   onValueChange,
   disabled = false,
-  icon,
+  icon: Icon,
 }) => {
   return (
     <View style={[styles.container, disabled && styles.containerDisabled]}>
       <View style={styles.leftContent}>
-        {icon && (
+        {Icon && (
           <View style={styles.iconContainer}>
-            <Ionicons name={icon} size={20} color={COLORS.black} />
+            <Icon size={20} color={COLORS.black} />
           </View>
         )}
         <View style={styles.textContainer}>

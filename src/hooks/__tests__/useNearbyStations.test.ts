@@ -9,6 +9,9 @@ import { locationService, NearbyStation, LocationCoordinates } from '../../servi
 import { trainService } from '../../services/train/trainService';
 import { Station, SubwayLine } from '../../models/train';
 
+// Import useLocation mock
+import { useLocation } from '../useLocation';
+
 // Mock dependencies
 jest.mock('../../services/location/locationService');
 jest.mock('../../services/train/trainService');
@@ -16,9 +19,6 @@ jest.mock('../useLocation');
 
 const mockLocationService = locationService as jest.Mocked<typeof locationService>;
 const mockTrainService = trainService as jest.Mocked<typeof trainService>;
-
-// Import useLocation mock
-import { useLocation } from '../useLocation';
 const mockUseLocation = useLocation as jest.MockedFunction<typeof useLocation>;
 
 const createMockLocation = (): LocationCoordinates => ({

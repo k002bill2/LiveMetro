@@ -4,9 +4,9 @@
  */
 
 // Polyfill for Firebase (Firebase expects 'self' to be defined)
-(global as any).self = global;
-
 import 'react-native-gesture-handler/jestSetup';
+
+(global as any).self = global;
 
 // Mock React Native modules
 jest.mock('react-native-reanimated', () => {

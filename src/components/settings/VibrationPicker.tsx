@@ -13,7 +13,7 @@ import {
   SafeAreaView,
   ScrollView,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { ChevronRight, X, Check, Smartphone } from 'lucide-react-native';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
 import { VibrationPatternId } from '@/models/user';
 import { VibrationOption, soundService } from '@/services/sound/soundService';
@@ -23,7 +23,7 @@ interface VibrationPickerProps {
   options: readonly VibrationOption[];
   value: VibrationPatternId;
   onValueChange: (value: VibrationPatternId) => void;
-  icon?: keyof typeof Ionicons.glyphMap;
+  icon?: React.ElementType;
   disabled?: boolean;
 }
 
@@ -32,7 +32,7 @@ export const VibrationPicker: React.FC<VibrationPickerProps> = ({
   options,
   value,
   onValueChange,
-  icon,
+  icon: Icon,
   disabled = false,
 }) => {
   const [modalVisible, setModalVisible] = useState(false);
@@ -56,10 +56,9 @@ export const VibrationPicker: React.FC<VibrationPickerProps> = ({
         disabled={disabled}
       >
         <View style={styles.leftContent}>
-          {icon && (
+          {Icon && (
             <View style={styles.iconContainer}>
-              <Ionicons
-                name={icon}
+              <Icon
                 size={20}
                 color={disabled ? COLORS.gray[400] : COLORS.black}
               />
@@ -74,7 +73,7 @@ export const VibrationPicker: React.FC<VibrationPickerProps> = ({
             )}
           </View>
         </View>
-        <Ionicons name="chevron-forward" size={20} color={COLORS.gray[400]} />
+        <ChevronRight size={20} color={COLORS.gray[400]} />
       </TouchableOpacity>
 
       <Modal
@@ -92,7 +91,7 @@ export const VibrationPicker: React.FC<VibrationPickerProps> = ({
                   onPress={() => setModalVisible(false)}
                   style={styles.closeButton}
                 >
-                  <Ionicons name="close" size={24} color={COLORS.black} />
+                  <X size={24} color={COLORS.black} />
                 </TouchableOpacity>
               </View>
 
@@ -110,8 +109,7 @@ export const VibrationPicker: React.FC<VibrationPickerProps> = ({
                         </Text>
                       </View>
                       {value === option.id && (
-                        <Ionicons
-                          name="checkmark"
+                        <Check
                           size={24}
                           color={COLORS.black}
                         />
@@ -123,8 +121,7 @@ export const VibrationPicker: React.FC<VibrationPickerProps> = ({
                         style={styles.playButton}
                         onPress={() => handlePreview(option.id)}
                       >
-                        <Ionicons
-                          name="phone-portrait-outline"
+                        <Smartphone
                           size={28}
                           color={COLORS.black}
                         />

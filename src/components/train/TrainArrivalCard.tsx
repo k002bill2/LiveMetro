@@ -10,36 +10,44 @@
  * - Performance optimized with memo
  */
 
-import React, { memo, useMemo } from 'react';
+import React, { memo, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
   ViewStyle,
+  StyleProp,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-
-import { Train, TrainStatus } from '@models/train';
 import {
-  getSubwayLineColor,
+  CheckCircle,
+  Clock,
+  XCircle,
+  Wrench,
+  AlertTriangle,
+  CircleHelp,
+  ArrowUp,
+  ArrowDown,
+  AlertCircle,
+  ChevronRight
+} from 'lucide-react-native';
+
+import { Train, TrainStatus } from '@/models/train';
+import {
+  getSubwayLineColor as getLineColor,
   getLineTextColor,
-  getDelayColor,
-  addAlpha,
-} from '@utils/colorUtils';
-import { useTheme, ThemeColors } from '@services/theme';
+} from '@/utils/colorUtils';
+import { useTheme, ThemeColors } from '@/services/theme';
 
 export interface TrainArrivalCardProps {
   /** Train data to display */
   train: Train;
-  /** Station name for context */
-  stationName?: string;
-  /** Line name to display */
-  lineName?: string;
   /** Optional press handler */
   onPress?: () => void;
   /** Custom style */
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
+  /** Whether to show detailed information like station name and line badge */
+  showDetails?: boolean;
 }
 
 /**
@@ -57,25 +65,34 @@ export interface TrainArrivalCardProps {
  */
 export const TrainArrivalCard: React.FC<TrainArrivalCardProps> = memo(({
   train,
-  stationName,
-  lineName,
   onPress,
   style,
+  showDetails = true,
 }) => {
   const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   // Memoize line colors to prevent recalculation
   const lineColor = useMemo(() => {
-    return getSubwayLineColor(train.lineId || lineName || '');
-  }, [train.lineId, lineName]);
+    return getLineColor(train.lineId || '');
+  }, [train.lineId]);
 
   const lineTextColor = useMemo(() => {
-    return getLineTextColor(train.lineId || lineName || '');
-  }, [train.lineId, lineName]);
+    return getLineTextColor(train.lineId || '');
+  }, [train.lineId]);
 
+  const lineName = train.lineId ? `${train.lineId}호선` : '';
+  const stationName = train.nextStationId || '';
   const lineBackgroundColor = useMemo(() => {
-    return addAlpha(lineColor, 0.1);
+    return `${lineColor}20`; // 20% opacity
   }, [lineColor]);
+
+  // Get delay color based on minutes
+  const getDelayColor = useCallback((minutes: number) => {
+    if (minutes >= 10) return colors.error;
+    if (minutes >= 5) return colors.warning;
+    return colors.textSecondary;
+  }, [colors.error, colors.warning, colors.textSecondary]);
 
   // Calculate arrival time display
   const arrivalDisplay = useMemo((): {
@@ -108,49 +125,49 @@ export const TrainArrivalCard: React.FC<TrainArrivalCardProps> = memo(({
         case TrainStatus.NORMAL:
           return {
             color: colors.success,
-            icon: 'checkmark-circle',
+            icon: CheckCircle,
             text: '정상',
           };
         case TrainStatus.DELAYED:
           return {
             color: getDelayColor(train.delayMinutes),
-            icon: 'time-outline',
+            icon: Clock,
             text: '지연',
           };
         case TrainStatus.SUSPENDED:
           return {
             color: colors.error,
-            icon: 'close-circle',
+            icon: XCircle,
             text: '운행중단',
           };
         case TrainStatus.MAINTENANCE:
           return {
             color: colors.textSecondary,
-            icon: 'construct-outline',
+            icon: Wrench,
             text: '점검중',
           };
         case TrainStatus.EMERGENCY:
           return {
             color: colors.error,
-            icon: 'warning',
+            icon: AlertTriangle,
             text: '긴급',
           };
         default:
           return {
             color: colors.textSecondary,
-            icon: 'help-circle',
+            icon: CircleHelp,
             text: '알수없음',
           };
       }
     };
 
     return getStatusDetails(train.status);
-  }, [train.status, train.delayMinutes, colors]);
+  }, [train.status, train.delayMinutes, colors, getDelayColor]);
 
   // Direction display
   const directionInfo = useMemo(() => {
     return {
-      icon: train.direction === 'up' ? 'arrow-up' : 'arrow-down',
+      icon: train.direction === 'up' ? ArrowUp : ArrowDown,
       text: train.direction === 'up' ? '상행' : '하행',
     };
   }, [train.direction]);
@@ -176,10 +193,13 @@ export const TrainArrivalCard: React.FC<TrainArrivalCardProps> = memo(({
     return parts.join(', ');
   }, [lineName, directionInfo.text, arrivalDisplay.text, train.delayMinutes, statusInfo.text, stationName]);
 
+  const StatusIcon = statusInfo.icon;
+  const DirectionIcon = directionInfo.icon;
+
   const cardContent = (
     <>
       {/* Line Badge */}
-      {lineName && (
+      {showDetails && lineName && (
         <View
           style={[
             styles.lineBadge,
@@ -210,8 +230,7 @@ export const TrainArrivalCard: React.FC<TrainArrivalCardProps> = memo(({
                 { backgroundColor: lineBackgroundColor },
               ]}
             >
-              <Ionicons
-                name={directionInfo.icon as any}
+              <DirectionIcon
                 size={14}
                 color={lineColor}
               />
@@ -232,8 +251,7 @@ export const TrainArrivalCard: React.FC<TrainArrivalCardProps> = memo(({
               { backgroundColor: statusInfo.color },
             ]}
           >
-            <Ionicons
-              name={statusInfo.icon as any}
+            <StatusIcon
               size={12}
               color="white"
             />
@@ -256,8 +274,7 @@ export const TrainArrivalCard: React.FC<TrainArrivalCardProps> = memo(({
 
           {train.delayMinutes > 0 && (
             <View style={styles.delayBadge}>
-              <Ionicons
-                name="alert-circle"
+              <AlertCircle
                 size={14}
                 color={getDelayColor(train.delayMinutes)}
               />
@@ -274,7 +291,7 @@ export const TrainArrivalCard: React.FC<TrainArrivalCardProps> = memo(({
         </View>
 
         {/* Additional Info */}
-        {stationName && (
+        {showDetails && stationName && (
           <Text style={styles.stationName}>
             {stationName}역
           </Text>
@@ -284,8 +301,7 @@ export const TrainArrivalCard: React.FC<TrainArrivalCardProps> = memo(({
       {/* Chevron for pressable cards */}
       {onPress && (
         <View style={styles.chevronContainer}>
-          <Ionicons
-            name="chevron-forward"
+          <ChevronRight
             size={20}
             color={colors.textTertiary}
           />

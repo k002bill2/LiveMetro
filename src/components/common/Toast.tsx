@@ -3,14 +3,14 @@
  * Non-blocking feedback messages for user actions
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Text,
   StyleSheet,
   Animated,
   Dimensions,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { CheckCircle, XCircle, AlertTriangle, Info } from 'lucide-react-native';
 
 import { SPACING, BORDER_RADIUS, SHADOWS, TYPOGRAPHY, Z_INDEX } from '../../utils/themeUtils';
 import { COLORS } from '../../styles/modernTheme';
@@ -40,7 +40,25 @@ export const Toast: React.FC<ToastProps> = ({
   const [fadeAnim] = useState(new Animated.Value(0));
   const [slideAnim] = useState(new Animated.Value(position === 'bottom' ? 100 : -100));
 
+  const hideToast = useCallback((): void => {
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: position === 'bottom' ? 100 : -100,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      onDismiss();
+    });
+  }, [fadeAnim, slideAnim, position, onDismiss]);
+
   useEffect(() => {
+    let timer: NodeJS.Timeout;
     if (visible) {
       Animated.parallel([
         Animated.timing(fadeAnim, {
@@ -56,64 +74,48 @@ export const Toast: React.FC<ToastProps> = ({
         }),
       ]).start();
 
-      const timer = setTimeout(() => {
+      timer = setTimeout(() => {
         hideToast();
       }, duration);
-
-      return () => clearTimeout(timer);
     } else {
       hideToast();
-      return undefined;
     }
-  }, [visible, duration]);
-
-  const hideToast = (): void => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-      Animated.timing(slideAnim, {
-        toValue: position === 'bottom' ? 100 : -100,
-        duration: 200,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      onDismiss();
-    });
-  };
+    
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [visible, duration, fadeAnim, slideAnim, hideToast]);
 
   const getToastConfig = (toastType: ToastConfig['type']) => {
     switch (toastType) {
       case 'success':
         return {
           backgroundColor: COLORS.semantic.success,
-          icon: 'checkmark-circle' as const,
+          Icon: CheckCircle,
           iconColor: COLORS.white,
         };
       case 'error':
         return {
           backgroundColor: COLORS.semantic.error,
-          icon: 'close-circle' as const,
+          Icon: XCircle,
           iconColor: COLORS.white,
         };
       case 'warning':
         return {
           backgroundColor: COLORS.semantic.warning,
-          icon: 'warning' as const,
+          Icon: AlertTriangle,
           iconColor: COLORS.white,
         };
       case 'info':
         return {
           backgroundColor: COLORS.primary.main,
-          icon: 'information-circle' as const,
+          Icon: Info,
           iconColor: COLORS.white,
         };
       default:
         return {
           backgroundColor: COLORS.text.secondary,
-          icon: 'information-circle' as const,
+          Icon: Info,
           iconColor: COLORS.white,
         };
     }
@@ -122,6 +124,7 @@ export const Toast: React.FC<ToastProps> = ({
   if (!visible) return null;
 
   const config = getToastConfig(type);
+  const IconComponent = config.Icon;
 
   return (
     <Animated.View
@@ -139,11 +142,10 @@ export const Toast: React.FC<ToastProps> = ({
       accessibilityLabel={message}
       accessibilityLiveRegion="polite"
     >
-      <Ionicons
-        name={config.icon}
+      <IconComponent
         size={20}
         color={config.iconColor}
-        style={styles.icon}
+        style={styles.icon} // Lucide icons accept style prop? Usually they accept common svg props which include style but lucide-react-native icons return Svg which usually accepts style. Wait, lucide-react-native icons pass props to Svg. Svg accepts style? Yes.
       />
       <Text style={styles.message} numberOfLines={3}>
         {message}

@@ -12,7 +12,15 @@ import {
   SafeAreaView,
   ScrollView,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import {
+  GitBranch,
+  MapPin,
+  Flag,
+  ChevronRight,
+  Search,
+  ArrowLeft,
+  ArrowRight
+} from 'lucide-react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS, SHADOWS } from '@/styles/modernTheme';
 import { OnboardingStackParamList } from '@/navigation/types';
@@ -143,8 +151,7 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.iconContainer}>
-            <Ionicons
-              name="git-branch-outline"
+            <GitBranch
               size={48}
               color={COLORS.primary.main}
             />
@@ -174,8 +181,7 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
               {departureStation ? (
                 <View style={styles.selectedStation}>
                   <View style={styles.stationIconContainer}>
-                    <Ionicons
-                      name="location"
+                    <MapPin
                       size={20}
                       color={COLORS.primary.main}
                     />
@@ -188,16 +194,14 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
                       {departureStation.lineName}
                     </Text>
                   </View>
-                  <Ionicons
-                    name="chevron-forward"
+                  <ChevronRight
                     size={20}
                     color={COLORS.gray[400]}
                   />
                 </View>
               ) : (
                 <View style={styles.placeholderContent}>
-                  <Ionicons
-                    name="search"
+                  <Search
                     size={20}
                     color={COLORS.gray[400]}
                   />
@@ -235,8 +239,7 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
                       styles.arrivalIconContainer,
                     ]}
                   >
-                    <Ionicons
-                      name="flag"
+                    <Flag
                       size={20}
                       color={COLORS.semantic.error}
                     />
@@ -249,16 +252,14 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
                       {arrivalStation.lineName}
                     </Text>
                   </View>
-                  <Ionicons
-                    name="chevron-forward"
+                  <ChevronRight
                     size={20}
                     color={COLORS.gray[400]}
                   />
                 </View>
               ) : (
                 <View style={styles.placeholderContent}>
-                  <Ionicons
-                    name="search"
+                  <Search
                     size={20}
                     color={COLORS.gray[400]}
                   />
@@ -284,7 +285,7 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Ionicons name="arrow-back" size={20} color={COLORS.text.secondary} />
+          <ArrowLeft size={20} color={COLORS.text.secondary} />
           <Text style={styles.backButtonText}>이전</Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -300,8 +301,7 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
           >
             다음
           </Text>
-          <Ionicons
-            name="arrow-forward"
+          <ArrowRight
             size={20}
             color={isValid ? COLORS.white : COLORS.gray[400]}
           />

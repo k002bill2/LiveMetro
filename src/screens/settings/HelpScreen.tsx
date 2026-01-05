@@ -19,7 +19,8 @@ import {
   UIManager,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
+import { SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
+import { useTheme, ThemeColors } from '@/services/theme';
 import {
   FAQ_DATA,
   FAQ_CATEGORIES,
@@ -37,6 +38,8 @@ if (
 }
 
 export const HelpScreen: React.FC = () => {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
@@ -122,7 +125,7 @@ export const HelpScreen: React.FC = () => {
             <Ionicons
               name="help-circle-outline"
               size={20}
-              color={COLORS.black}
+              color={colors.textPrimary}
               style={styles.faqQuestionIcon}
             />
             <Text style={styles.faqQuestionText}>{item.question}</Text>
@@ -130,7 +133,7 @@ export const HelpScreen: React.FC = () => {
           <Ionicons
             name={isExpanded ? 'chevron-up' : 'chevron-down'}
             size={20}
-            color={COLORS.text.tertiary}
+            color={colors.textTertiary}
           />
         </TouchableOpacity>
 
@@ -172,13 +175,13 @@ export const HelpScreen: React.FC = () => {
           <Ionicons
             name="search"
             size={20}
-            color={COLORS.text.tertiary}
+            color={colors.textTertiary}
             style={styles.searchIcon}
           />
           <TextInput
             style={styles.searchInput}
             placeholder="질문 검색..."
-            placeholderTextColor={COLORS.text.tertiary}
+            placeholderTextColor={colors.textTertiary}
             value={searchQuery}
             onChangeText={setSearchQuery}
             returnKeyType="search"
@@ -188,7 +191,7 @@ export const HelpScreen: React.FC = () => {
               onPress={() => setSearchQuery('')}
               style={styles.clearButton}
             >
-              <Ionicons name="close-circle" size={20} color={COLORS.text.tertiary} />
+              <Ionicons name="close-circle" size={20} color={colors.textTertiary} />
             </TouchableOpacity>
           )}
         </View>
@@ -198,7 +201,7 @@ export const HelpScreen: React.FC = () => {
         {/* No Results Message */}
         {filteredFAQs.length === 0 && (
           <View style={styles.noResultsContainer}>
-            <Ionicons name="search-outline" size={64} color={COLORS.text.disabled} />
+            <Ionicons name="search-outline" size={64} color={colors.textDisabled} />
             <Text style={styles.noResultsTitle}>검색 결과가 없습니다</Text>
             <Text style={styles.noResultsSubtitle}>
               다른 키워드로 검색하거나{'\n'}고객 지원에 문의해주세요
@@ -219,7 +222,7 @@ export const HelpScreen: React.FC = () => {
                 <Ionicons
                   name="chatbubble-ellipses"
                   size={32}
-                  color={COLORS.black}
+                  color={colors.textPrimary}
                 />
               </View>
               <View style={styles.supportContent}>
@@ -234,17 +237,17 @@ export const HelpScreen: React.FC = () => {
               style={styles.contactButton}
               onPress={handleContactSupport}
             >
-              <Ionicons name="mail" size={20} color={COLORS.white} />
+              <Ionicons name="mail" size={20} color={colors.textInverse} />
               <Text style={styles.contactButtonText}>고객 지원 문의</Text>
             </TouchableOpacity>
 
             <View style={styles.contactInfo}>
               <View style={styles.contactInfoItem}>
-                <Ionicons name="mail-outline" size={16} color={COLORS.text.secondary} />
+                <Ionicons name="mail-outline" size={16} color={colors.textSecondary} />
                 <Text style={styles.contactInfoText}>{SUPPORT_EMAIL}</Text>
               </View>
               <View style={styles.contactInfoItem}>
-                <Ionicons name="call-outline" size={16} color={COLORS.text.secondary} />
+                <Ionicons name="call-outline" size={16} color={colors.textSecondary} />
                 <Text style={styles.contactInfoText}>{SUPPORT_PHONE}</Text>
               </View>
             </View>
@@ -255,26 +258,26 @@ export const HelpScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.background,
   },
   searchContainer: {
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.md,
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.light,
+    borderBottomColor: colors.borderLight,
   },
   searchInputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surface.card,
+    backgroundColor: colors.backgroundSecondary,
     borderRadius: RADIUS.lg,
     paddingHorizontal: SPACING.md,
     borderWidth: 1,
-    borderColor: COLORS.border.light,
+    borderColor: colors.borderLight,
   },
   searchIcon: {
     marginRight: SPACING.sm,
@@ -282,7 +285,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: TYPOGRAPHY.fontSize.base,
-    color: COLORS.text.primary,
+    color: colors.textPrimary,
     paddingVertical: SPACING.md,
   },
   clearButton: {
@@ -299,13 +302,13 @@ const styles = StyleSheet.create({
   noResultsTitle: {
     fontSize: TYPOGRAPHY.fontSize.lg,
     fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.text.primary,
+    color: colors.textPrimary,
     marginTop: SPACING.lg,
     marginBottom: SPACING.sm,
   },
   noResultsSubtitle: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.tertiary,
+    color: colors.textTertiary,
     textAlign: 'center',
     lineHeight: TYPOGRAPHY.lineHeight.relaxed * TYPOGRAPHY.fontSize.sm,
   },
@@ -321,12 +324,12 @@ const styles = StyleSheet.create({
   categoryTitle: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.text.secondary,
+    color: colors.textSecondary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   categoryBadge: {
-    backgroundColor: COLORS.surface.card,
+    backgroundColor: colors.backgroundSecondary,
     borderRadius: RADIUS.full,
     paddingHorizontal: SPACING.sm,
     paddingVertical: 2,
@@ -335,12 +338,12 @@ const styles = StyleSheet.create({
   categoryBadgeText: {
     fontSize: TYPOGRAPHY.fontSize.xs,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.tertiary,
+    color: colors.textTertiary,
   },
   faqItem: {
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.light,
+    borderBottomColor: colors.borderLight,
   },
   faqQuestion: {
     flexDirection: 'row',
@@ -361,7 +364,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: TYPOGRAPHY.fontSize.base,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
+    color: colors.textPrimary,
     lineHeight: TYPOGRAPHY.lineHeight.normal * TYPOGRAPHY.fontSize.base,
   },
   faqAnswer: {
@@ -372,7 +375,7 @@ const styles = StyleSheet.create({
   },
   faqAnswerText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.secondary,
+    color: colors.textSecondary,
     lineHeight: TYPOGRAPHY.lineHeight.relaxed * TYPOGRAPHY.fontSize.sm,
   },
   supportSection: {
@@ -382,17 +385,17 @@ const styles = StyleSheet.create({
   },
   supportCard: {
     flexDirection: 'row',
-    backgroundColor: COLORS.primary.light,
+    backgroundColor: colors.primaryLight,
     borderRadius: RADIUS.lg,
     padding: SPACING.lg,
     borderWidth: 1,
-    borderColor: COLORS.border.medium,
+    borderColor: colors.borderMedium,
     marginBottom: SPACING.lg,
   },
   supportIconContainer: {
     width: 56,
     height: 56,
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.surface,
     borderRadius: RADIUS.lg,
     justifyContent: 'center',
     alignItems: 'center',
@@ -404,19 +407,19 @@ const styles = StyleSheet.create({
   supportTitle: {
     fontSize: TYPOGRAPHY.fontSize.base,
     fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.text.primary,
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   supportDescription: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.tertiary,
+    color: colors.textTertiary,
     lineHeight: TYPOGRAPHY.lineHeight.normal * TYPOGRAPHY.fontSize.sm,
   },
   contactButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: COLORS.black,
+    backgroundColor: colors.textPrimary,
     paddingVertical: SPACING.lg,
     borderRadius: RADIUS.lg,
     marginBottom: SPACING.md,
@@ -424,7 +427,7 @@ const styles = StyleSheet.create({
   contactButtonText: {
     fontSize: TYPOGRAPHY.fontSize.base,
     fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.white,
+    color: colors.textInverse,
     marginLeft: SPACING.sm,
   },
   contactInfo: {
@@ -437,7 +440,7 @@ const styles = StyleSheet.create({
   },
   contactInfoText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.secondary,
+    color: colors.textSecondary,
     marginLeft: SPACING.sm,
   },
 });

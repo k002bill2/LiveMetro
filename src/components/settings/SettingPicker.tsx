@@ -13,7 +13,7 @@ import {
   SafeAreaView,
   ScrollView,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { ChevronRight, X, Check } from 'lucide-react-native';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
 
 export interface PickerOption {
@@ -27,7 +27,7 @@ interface SettingPickerProps {
   options: PickerOption[];
   value: string;
   onValueChange: (value: string) => void;
-  icon?: keyof typeof Ionicons.glyphMap;
+  icon?: React.ElementType;
 }
 
 export const SettingPicker: React.FC<SettingPickerProps> = ({
@@ -35,7 +35,7 @@ export const SettingPicker: React.FC<SettingPickerProps> = ({
   options,
   value,
   onValueChange,
-  icon,
+  icon: Icon,
 }) => {
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -53,9 +53,9 @@ export const SettingPicker: React.FC<SettingPickerProps> = ({
         onPress={() => setModalVisible(true)}
       >
         <View style={styles.leftContent}>
-          {icon && (
+          {Icon && (
             <View style={styles.iconContainer}>
-              <Ionicons name={icon} size={20} color={COLORS.black} />
+              <Icon size={20} color={COLORS.black} />
             </View>
           )}
           <View style={styles.textContainer}>
@@ -65,7 +65,7 @@ export const SettingPicker: React.FC<SettingPickerProps> = ({
             )}
           </View>
         </View>
-        <Ionicons name="chevron-forward" size={20} color={COLORS.gray[400]} />
+        <ChevronRight size={20} color={COLORS.gray[400]} />
       </TouchableOpacity>
 
       <Modal
@@ -83,7 +83,7 @@ export const SettingPicker: React.FC<SettingPickerProps> = ({
                   onPress={() => setModalVisible(false)}
                   style={styles.closeButton}
                 >
-                  <Ionicons name="close" size={24} color={COLORS.black} />
+                  <X size={24} color={COLORS.black} />
                 </TouchableOpacity>
               </View>
 
@@ -103,7 +103,7 @@ export const SettingPicker: React.FC<SettingPickerProps> = ({
                       )}
                     </View>
                     {value === option.value && (
-                      <Ionicons name="checkmark" size={24} color={COLORS.black} />
+                      <Check size={24} color={COLORS.black} />
                     )}
                   </TouchableOpacity>
                 ))}

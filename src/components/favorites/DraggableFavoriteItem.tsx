@@ -10,8 +10,9 @@ import {
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '../../styles/modernTheme';
+import { AlertCircle, Trash2, Tag, Pencil, XCircle, GripVertical, ArrowUp, ArrowDown, Briefcase } from 'lucide-react-native';
+import { SPACING, RADIUS, TYPOGRAPHY } from '../../styles/modernTheme';
+import { useTheme, ThemeColors } from '../../services/theme';
 import { FavoriteWithDetails } from '../../hooks/useFavorites';
 import { StationCard } from '../train/StationCard';
 import { FavoriteEditForm } from './FavoriteEditForm';
@@ -41,6 +42,8 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
   onSaveEdit,
   isDragEnabled = false,
 }) => {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const { station } = favorite;
 
   /**
@@ -50,7 +53,7 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
     return (
       <View style={styles.errorCard}>
         <View style={styles.errorContent}>
-          <Ionicons name="alert-circle-outline" size={24} color={COLORS.text.secondary} />
+          <AlertCircle size={24} color={colors.textSecondary} />
           <View style={styles.errorTextContainer}>
             <Text style={styles.errorText}>역 정보를 불러올 수 없습니다</Text>
             <Text style={styles.errorSubtext}>
@@ -62,7 +65,7 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
           style={styles.deleteIconButton}
           onPress={onRemove}
         >
-          <Ionicons name="trash-outline" size={20} color={COLORS.text.secondary} />
+          <Trash2 size={20} color={colors.textSecondary} />
         </TouchableOpacity>
       </View>
     );
@@ -73,7 +76,7 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
       {/* Alias/Custom Name */}
       {favorite.alias && (
         <View style={styles.aliasContainer}>
-          <Ionicons name="pricetag" size={14} color={COLORS.text.secondary} />
+          <Tag size={14} color={colors.textSecondary} />
           <Text style={styles.aliasText}>{favorite.alias}</Text>
         </View>
       )}
@@ -96,10 +99,9 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
             onPress={onEditToggle}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons
-              name={isEditing ? 'pencil' : 'pencil-outline'}
+            <Pencil
               size={20}
-              color={isEditing ? COLORS.black : COLORS.text.secondary}
+              color={isEditing ? colors.textPrimary : colors.textSecondary}
             />
           </TouchableOpacity>
 
@@ -109,14 +111,14 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
             onPress={onRemove}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Ionicons name="close-circle" size={24} color={COLORS.text.secondary} />
+            <XCircle size={24} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
 
         {/* Drag Handle (shown when drag is enabled - Phase 3) */}
         {isDragEnabled && (
           <View style={styles.dragHandle}>
-            <Ionicons name="reorder-three" size={24} color={COLORS.gray[400]} />
+            <GripVertical size={24} color={colors.textTertiary} />
           </View>
         )}
       </View>
@@ -134,19 +136,16 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
         <View style={styles.metadataRow}>
           {favorite.direction !== 'both' && (
             <View style={styles.metadataItem}>
-              <Ionicons
-                name={favorite.direction === 'up' ? 'arrow-up' : 'arrow-down'}
-                size={14}
-                color={COLORS.text.secondary}
-              />
-              <Text style={styles.metadataText}>
-                {favorite.direction === 'up' ? '상행' : '하행'}
-              </Text>
+              {favorite.direction === 'down' ? (
+                <ArrowDown size={14} color={colors.textSecondary} />
+              ) : (
+                <ArrowUp size={14} color={colors.textSecondary} />
+              )}
             </View>
           )}
           {favorite.isCommuteStation && (
             <View style={[styles.metadataItem, styles.commuteIndicator]}>
-              <Ionicons name="briefcase" size={14} color={COLORS.black} />
+              <Briefcase size={14} color={colors.textPrimary} />
               <Text style={styles.commuteText}>출퇴근</Text>
             </View>
           )}
@@ -156,7 +155,7 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
     marginBottom: SPACING.xl,
   },
@@ -169,7 +168,7 @@ const styles = StyleSheet.create({
   aliasText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.secondary,
+    color: colors.textSecondary,
     marginLeft: SPACING.xs,
   },
   cardWrapper: {
@@ -183,19 +182,19 @@ const styles = StyleSheet.create({
     gap: SPACING.xs,
   },
   actionButton: {
-    backgroundColor: COLORS.white,
+    backgroundColor: colors.surface,
     borderRadius: RADIUS.full,
     padding: SPACING.xs,
   },
   actionButtonActive: {
-    backgroundColor: COLORS.surface.background,
+    backgroundColor: colors.backgroundSecondary,
   },
   dragHandle: {
     position: 'absolute',
     left: SPACING.sm,
     top: '50%',
     transform: [{ translateY: -12 }],
-    backgroundColor: COLORS.gray[200],
+    backgroundColor: colors.borderLight,
     borderRadius: RADIUS.sm,
     padding: SPACING.xs,
   },
@@ -213,31 +212,31 @@ const styles = StyleSheet.create({
   },
   metadataText: {
     fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.text.secondary,
+    color: colors.textSecondary,
   },
   commuteIndicator: {
-    backgroundColor: COLORS.surface.card,
+    backgroundColor: colors.surface,
     paddingHorizontal: SPACING.sm,
     paddingVertical: 2,
     borderRadius: RADIUS.sm,
     borderWidth: 1,
-    borderColor: COLORS.border.medium,
+    borderColor: colors.borderMedium,
   },
   commuteText: {
     fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.black,
+    color: colors.textPrimary,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
   },
   errorCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: COLORS.surface.card,
+    backgroundColor: colors.surface,
     padding: SPACING.lg,
     borderRadius: RADIUS.lg,
     marginBottom: SPACING.md,
     borderWidth: 1,
-    borderColor: COLORS.border.medium,
+    borderColor: colors.borderMedium,
   },
   errorContent: {
     flexDirection: 'row',
@@ -251,12 +250,12 @@ const styles = StyleSheet.create({
   errorText: {
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.secondary,
+    color: colors.textSecondary,
     marginBottom: 2,
   },
   errorSubtext: {
     fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.text.tertiary,
+    color: colors.textTertiary,
   },
   deleteIconButton: {
     padding: SPACING.xs,

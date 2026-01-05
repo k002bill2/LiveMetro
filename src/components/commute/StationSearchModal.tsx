@@ -18,7 +18,14 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import {
+  Star,
+  ChevronRight,
+  Search,
+  X,
+  XCircle,
+  AlertCircle
+} from 'lucide-react-native';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
 import { StationSelection } from '@/models/commute';
 import stationsData from '@/data/stations.json';
@@ -124,8 +131,7 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
       });
 
       setStations(localStations);
-    } catch (err) {
-      console.error('Failed to load stations:', err);
+    } catch {
       setError('역 정보를 불러오는데 실패했습니다');
       // Use fallback static data if loading fails
       setStations(FALLBACK_STATIONS);
@@ -206,7 +212,7 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
     return (
       <View style={styles.favoritesSection}>
         <View style={styles.favoritesSectionHeader}>
-          <Ionicons name="star" size={16} color={COLORS.black} />
+          <Star size={16} color={COLORS.black} />
           <Text style={styles.favoritesSectionTitle}>출퇴근 즐겨찾기</Text>
         </View>
         <ScrollView
@@ -298,8 +304,7 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
         <Text style={styles.stationName}>{item.name}</Text>
         <Text style={styles.stationLine}>{item.lineName}</Text>
       </View>
-      <Ionicons
-        name="chevron-forward"
+      <ChevronRight
         size={20}
         color={COLORS.gray[400]}
       />
@@ -308,8 +313,7 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
-      <Ionicons
-        name="search-outline"
+      <Search
         size={48}
         color={COLORS.gray[300]}
       />
@@ -339,7 +343,7 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
               style={styles.closeButton}
               onPress={handleClose}
             >
-              <Ionicons name="close" size={24} color={COLORS.black} />
+              <X size={24} color={COLORS.black} />
             </TouchableOpacity>
             <Text style={styles.title}>{title}</Text>
             <View style={styles.headerSpacer} />
@@ -351,8 +355,7 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
           {/* Search Input */}
           <View style={styles.searchContainer}>
             <View style={styles.searchInputContainer}>
-              <Ionicons
-                name="search"
+              <Search
                 size={20}
                 color={COLORS.gray[400]}
                 style={styles.searchIcon}
@@ -372,8 +375,7 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
                   onPress={() => setSearchQuery('')}
                   style={styles.clearButton}
                 >
-                  <Ionicons
-                    name="close-circle"
+                  <XCircle
                     size={20}
                     color={COLORS.gray[400]}
                   />
@@ -402,8 +404,7 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
             </View>
           ) : error ? (
             <View style={styles.errorContainer}>
-              <Ionicons
-                name="alert-circle-outline"
+              <AlertCircle
                 size={48}
                 color={COLORS.semantic.error}
               />

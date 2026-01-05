@@ -3,7 +3,7 @@
  * Displays real-time train arrival information for a station
  */
 
-import { Ionicons } from '@expo/vector-icons';
+import { TrainFront, CheckCircle, Clock, XCircle, Wrench, AlertTriangle, CircleHelp, RefreshCw } from 'lucide-react-native';
 import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { COLORS, RADIUS, SHADOWS, SPACING, TYPOGRAPHY } from '../../styles/modernTheme';
@@ -60,20 +60,20 @@ const TrainArrivalItem: React.FC<TrainArrivalItemProps> = memo(({ train }) => {
     }
   };
 
-  const getStatusIcon = (status: TrainStatus): string => {
+  const getStatusIcon = (status: TrainStatus) => {
     switch (status) {
       case TrainStatus.NORMAL:
-        return 'checkmark-circle';
+        return CheckCircle;
       case TrainStatus.DELAYED:
-        return 'time-outline';
+        return Clock;
       case TrainStatus.SUSPENDED:
-        return 'close-circle';
+        return XCircle;
       case TrainStatus.MAINTENANCE:
-        return 'construct-outline';
+        return Wrench;
       case TrainStatus.EMERGENCY:
-        return 'warning';
+        return AlertTriangle;
       default:
-        return 'help-circle';
+        return CircleHelp;
     }
   };
 
@@ -96,6 +96,8 @@ const TrainArrivalItem: React.FC<TrainArrivalItemProps> = memo(({ train }) => {
     }
   };
 
+  const StatusIcon = getStatusIcon(train.status);
+
   return (
     <View
       style={styles.trainItem}
@@ -105,12 +107,12 @@ const TrainArrivalItem: React.FC<TrainArrivalItemProps> = memo(({ train }) => {
     >
       <View style={styles.trainHeader}>
         <View style={styles.directionInfo}>
-          <Ionicons name="train" size={16} color={COLORS.text.secondary} />
+          <TrainFront size={16} color={COLORS.text.secondary} />
           <Text style={styles.direction}>{getDestinationName()} 방면</Text>
         </View>
 
         <View style={[styles.statusBadge, { backgroundColor: getStatusColor(train.status) }]}>
-          <Ionicons name={getStatusIcon(train.status) as any} size={12} color="white" />
+          <StatusIcon size={12} color="white" />
           <Text style={styles.statusText}>{getStatusText(train.status)}</Text>
         </View>
       </View>
@@ -298,7 +300,7 @@ export const TrainArrivalList: React.FC<TrainArrivalListProps> = memo(({ station
       accessibilityRole="text"
       accessibilityLabel="현재 도착 예정인 열차가 없습니다. 잠시 후 다시 확인해보세요"
     >
-      <Ionicons name="train-outline" size={48} color={COLORS.text.tertiary} />
+      <TrainFront size={48} color={COLORS.text.tertiary} />
       <Text style={styles.emptyText}>현재 도착 예정인 열차가 없습니다</Text>
       <Text style={styles.emptySubtext}>잠시 후 다시 확인해보세요</Text>
     </View>
@@ -312,7 +314,7 @@ export const TrainArrivalList: React.FC<TrainArrivalListProps> = memo(({ station
         accessibilityRole="progressbar"
         accessibilityLabel="실시간 열차 정보를 불러오고 있습니다"
       >
-        <Ionicons name="refresh" size={24} color={COLORS.primary.main} />
+        <RefreshCw size={24} color={COLORS.primary.main} />
         <Text style={styles.loadingText}>실시간 열차 정보를 불러오고 있습니다...</Text>
       </View>
     );

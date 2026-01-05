@@ -14,7 +14,15 @@ import {
 import { WebView } from 'react-native-webview';
 import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Ionicons } from '@expo/vector-icons';
+import {
+  RefreshCw,
+  Navigation,
+  ChevronLeft,
+  ChevronRight,
+  AlertCircle,
+  Moon,
+  ChevronDown
+} from 'lucide-react-native';
 
 import { AppStackParamList } from '../../navigation/types';
 import { getSubwayLineColor } from '../../utils/colorUtils';
@@ -180,15 +188,14 @@ const StationDetailScreen: React.FC = () => {
                 ],
               }}
             >
-              <Ionicons
-                name="refresh"
+              <RefreshCw
                 size={18}
                 color={refreshing ? colors.textTertiary : colors.primary}
               />
             </Animated.View>
           </TouchableOpacity>
           <View style={styles.locationChip}>
-            <Ionicons name="navigate-outline" size={14} color={colors.primary} />
+            <Navigation size={14} color={colors.primary} />
             <Text style={styles.locationChipText}>GPS 동기화</Text>
           </View>
         </View>
@@ -207,7 +214,7 @@ const StationDetailScreen: React.FC = () => {
                 });
               }}
             >
-              <Ionicons name="chevron-back" size={18} color="#4b5320" />
+              <ChevronLeft size={18} color={colors.textSecondary} />
               <Text style={styles.switchText}>{prevStation.name}</Text>
             </TouchableOpacity>
           ) : (
@@ -228,7 +235,7 @@ const StationDetailScreen: React.FC = () => {
               }}
             >
               <Text style={styles.switchText}>{nextStation.name}</Text>
-              <Ionicons name="chevron-forward" size={18} color="#4b5320" />
+              <ChevronRight size={18} color={colors.textSecondary} />
             </TouchableOpacity>
           ) : (
             <View style={styles.nextStationButton} />
@@ -250,7 +257,7 @@ const StationDetailScreen: React.FC = () => {
 
         {!trainsLoading && trainsError && (
           <View style={styles.errorContainer}>
-            <Ionicons name="alert-circle-outline" size={48} color={colors.error} />
+            <AlertCircle size={48} color={colors.error} />
             <Text style={styles.errorText}>{trainsError}</Text>
             <TouchableOpacity style={styles.retryButton} onPress={refetchTrains}>
               <Text style={styles.retryButtonText}>다시 시도</Text>
@@ -260,7 +267,7 @@ const StationDetailScreen: React.FC = () => {
 
         {!trainsLoading && !trainsError && arrivals.length === 0 && (
           <View style={styles.emptyContainer}>
-            <Ionicons name="moon-outline" size={48} color={colors.textTertiary} />
+            <Moon size={48} color={colors.textTertiary} />
             <Text style={styles.emptyText}>현재 운행 중인 열차가 없습니다</Text>
             <Text style={styles.emptySubtext}>운행 종료 시간대입니다</Text>
           </View>
@@ -322,7 +329,7 @@ const StationDetailScreen: React.FC = () => {
               startInLoadingState={true}
               renderLoading={() => (
                 <View style={styles.subwayMapLoader}>
-                  <ActivityIndicator size="large" color="#f59e0b" />
+                  <ActivityIndicator size="large" color={colors.warning} />
                   <Text style={styles.subwayMapLoaderText}>노선도 불러오는 중...</Text>
                 </View>
               )}
@@ -357,7 +364,7 @@ const StationDetailScreen: React.FC = () => {
           <Text style={styles.kakaoTitle}>
             카카오버스에서 지하철 도착정보 확인
           </Text>
-          <Ionicons name="chevron-forward" size={18} color="#9ca3af" />
+          <ChevronRight size={18} color={colors.textTertiary} />
         </View>
       </TouchableOpacity>
 
@@ -376,7 +383,7 @@ const StationDetailScreen: React.FC = () => {
               <View style={styles.exitBadge}>
                 <Text style={styles.exitBadgeText}>{exit.id}</Text>
               </View>
-              <Ionicons name="chevron-down" size={18} color="#4b5563" />
+              <ChevronDown size={18} color={colors.textSecondary} />
             </View>
             <Text style={styles.exitDescription}>{exit.description}</Text>
             <Text style={styles.exitMeta}>{exit.transfers}</Text>
@@ -386,7 +393,7 @@ const StationDetailScreen: React.FC = () => {
 
       <TouchableOpacity style={styles.busButton}>
         <Text style={styles.busButtonText}>버스 도착 정보 보기</Text>
-        <Ionicons name="chevron-forward" size={18} color="#ffffff" />
+        <ChevronRight size={18} color="#ffffff" />
       </TouchableOpacity>
 
       <View style={styles.adCard}>
@@ -397,7 +404,7 @@ const StationDetailScreen: React.FC = () => {
           </Text>
           <Text style={styles.adSubtitle}>App Store</Text>
         </View>
-        <Ionicons name="chevron-forward" size={18} color="#9ca3af" />
+        <ChevronRight size={18} color={colors.textTertiary} />
       </View>
     </ScrollView>
   );
@@ -616,7 +623,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     right: 0,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(254, 252, 232, 0.85)',
+    backgroundColor: colors.backgroundSecondary,
   },
   subwayMapLoaderText: {
     marginTop: 8,
@@ -633,9 +640,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     marginTop: 12,
     padding: 12,
     borderRadius: 12,
-    backgroundColor: '#fef2f2',
+    backgroundColor: colors.errorLight,
     borderWidth: 1,
-    borderColor: '#fecaca',
+    borderColor: colors.error,
   },
   subwayMapErrorText: {
     fontSize: 13,

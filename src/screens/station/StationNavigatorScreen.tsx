@@ -14,7 +14,16 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import {
+  Minus,
+  ChevronRight,
+  AlertCircle,
+  ArrowLeft,
+  RefreshCw,
+  ArrowUp,
+  ArrowDown,
+  Flag,
+} from 'lucide-react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AppStackParamList } from '../../navigation/types';
 import { useStationNavigation } from '../../hooks/useStationNavigation';
@@ -98,8 +107,7 @@ export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) =
     if (!station) {
       return (
         <View style={[styles.stationCard, styles.emptyCard]}>
-          <Ionicons
-            name={type === 'previous' ? 'remove-outline' : 'remove-outline'}
+          <Minus
             size={20}
             color={COLORS.gray[300]}
           />
@@ -151,7 +159,7 @@ export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) =
             )}
           </View>
           {isCurrent && (
-            <Ionicons name="chevron-forward" size={20} color={COLORS.gray[400]} />
+            <ChevronRight size={20} color={COLORS.gray[400]} />
           )}
         </View>
       </TouchableOpacity>
@@ -174,7 +182,7 @@ export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) =
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
           <View style={styles.errorIcon}>
-            <Ionicons name="alert-circle-outline" size={48} color={COLORS.gray[400]} />
+            <AlertCircle size={48} color={COLORS.gray[400]} />
           </View>
           <Text style={styles.errorTitle}>{error || '역 정보를 찾을 수 없습니다'}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
@@ -190,7 +198,7 @@ export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) =
       {/* Modern Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.black} />
+          <ArrowLeft size={24} color={COLORS.black} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle}>Line {currentStation.lineId}</Text>
@@ -199,7 +207,7 @@ export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) =
           </Text>
         </View>
         <TouchableOpacity onPress={handleRefresh} style={styles.headerButton}>
-          <Ionicons name="refresh" size={24} color={COLORS.black} />
+          <RefreshCw size={24} color={COLORS.black} />
         </TouchableOpacity>
       </View>
 
@@ -213,8 +221,7 @@ export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) =
             ]}
             onPress={() => setSelectedDirection('up')}
           >
-            <Ionicons
-              name="arrow-up"
+            <ArrowUp
               size={16}
               color={selectedDirection === 'up' ? COLORS.white : COLORS.black}
             />
@@ -234,8 +241,7 @@ export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) =
             ]}
             onPress={() => setSelectedDirection('down')}
           >
-            <Ionicons
-              name="arrow-down"
+            <ArrowDown
               size={16}
               color={selectedDirection === 'down' ? COLORS.white : COLORS.black}
             />
@@ -271,7 +277,7 @@ export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) =
             </Text>
             {terminalStation && (
               <View style={styles.terminalInfo}>
-                <Ionicons name="flag" size={14} color={COLORS.text.secondary} />
+                <Flag size={14} color={COLORS.text.secondary} />
                 <Text style={styles.terminalText}>
                   종착: {terminalStation.name}
                 </Text>

@@ -14,7 +14,16 @@ import {
   ActivityIndicator,
   Alert,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import {
+  CheckCircle,
+  Sun,
+  Moon,
+  Pencil,
+  Bell,
+  Clock,
+  AlertCircle,
+  ArrowRight
+} from 'lucide-react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS, SHADOWS } from '@/styles/modernTheme';
 import { OnboardingStackParamList } from '@/navigation/types';
@@ -125,8 +134,7 @@ export const CommuteCompleteScreen: React.FC<Props> = ({ navigation, route }) =>
           },
         ]
       );
-    } catch (error) {
-      console.error('Failed to save commute routes:', error);
+    } catch {
       Alert.alert(
         '저장 실패',
         '출퇴근 설정을 저장하는데 실패했습니다. 다시 시도해주세요.',
@@ -178,8 +186,7 @@ export const CommuteCompleteScreen: React.FC<Props> = ({ navigation, route }) =>
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.iconContainer}>
-            <Ionicons
-              name="checkmark-circle"
+            <CheckCircle
               size={64}
               color={COLORS.semantic.success}
             />
@@ -196,7 +203,7 @@ export const CommuteCompleteScreen: React.FC<Props> = ({ navigation, route }) =>
           <View style={styles.routeHeader}>
             <View style={styles.routeHeaderLeft}>
               <View style={[styles.routeIcon, styles.morningIcon]}>
-                <Ionicons name="sunny" size={20} color={COLORS.secondary.yellow} />
+                <Sun size={20} color={COLORS.secondary.yellow} />
               </View>
               <View>
                 <Text style={styles.routeTitle}>출근</Text>
@@ -209,7 +216,7 @@ export const CommuteCompleteScreen: React.FC<Props> = ({ navigation, route }) =>
               style={styles.editButton}
               onPress={() => handleEdit('morning')}
             >
-              <Ionicons name="pencil" size={16} color={COLORS.text.tertiary} />
+              <Pencil size={16} color={COLORS.text.tertiary} />
               <Text style={styles.editButtonText}>수정</Text>
             </TouchableOpacity>
           </View>
@@ -217,8 +224,7 @@ export const CommuteCompleteScreen: React.FC<Props> = ({ navigation, route }) =>
           <RoutePreview route={morningRouteData} showTime={false} compact />
 
           <View style={styles.notificationSummary}>
-            <Ionicons
-              name="notifications-outline"
+            <Bell
               size={16}
               color={COLORS.text.tertiary}
             />
@@ -233,7 +239,7 @@ export const CommuteCompleteScreen: React.FC<Props> = ({ navigation, route }) =>
           <View style={styles.routeHeader}>
             <View style={styles.routeHeaderLeft}>
               <View style={[styles.routeIcon, styles.eveningIcon]}>
-                <Ionicons name="moon" size={20} color={COLORS.secondary.blue} />
+                <Moon size={20} color={COLORS.secondary.blue} />
               </View>
               <View>
                 <Text style={styles.routeTitle}>퇴근</Text>
@@ -246,7 +252,7 @@ export const CommuteCompleteScreen: React.FC<Props> = ({ navigation, route }) =>
               style={styles.editButton}
               onPress={() => handleEdit('evening')}
             >
-              <Ionicons name="pencil" size={16} color={COLORS.text.tertiary} />
+              <Pencil size={16} color={COLORS.text.tertiary} />
               <Text style={styles.editButtonText}>수정</Text>
             </TouchableOpacity>
           </View>
@@ -254,8 +260,7 @@ export const CommuteCompleteScreen: React.FC<Props> = ({ navigation, route }) =>
           <RoutePreview route={eveningRouteData} showTime={false} compact />
 
           <View style={styles.notificationSummary}>
-            <Ionicons
-              name="notifications-outline"
+            <Bell
               size={16}
               color={COLORS.text.tertiary}
             />
@@ -270,8 +275,7 @@ export const CommuteCompleteScreen: React.FC<Props> = ({ navigation, route }) =>
           <Text style={styles.featureTitle}>이런 기능을 이용할 수 있어요</Text>
           <View style={styles.featureList}>
             <View style={styles.featureItem}>
-              <Ionicons
-                name="time-outline"
+              <Clock
                 size={20}
                 color={COLORS.primary.main}
               />
@@ -280,8 +284,7 @@ export const CommuteCompleteScreen: React.FC<Props> = ({ navigation, route }) =>
               </Text>
             </View>
             <View style={styles.featureItem}>
-              <Ionicons
-                name="notifications-outline"
+              <Bell
                 size={20}
                 color={COLORS.secondary.blue}
               />
@@ -290,8 +293,7 @@ export const CommuteCompleteScreen: React.FC<Props> = ({ navigation, route }) =>
               </Text>
             </View>
             <View style={styles.featureItem}>
-              <Ionicons
-                name="alert-circle-outline"
+              <AlertCircle
                 size={20}
                 color={COLORS.semantic.error}
               />
@@ -315,7 +317,7 @@ export const CommuteCompleteScreen: React.FC<Props> = ({ navigation, route }) =>
           ) : (
             <>
               <Text style={styles.completeButtonText}>시작하기</Text>
-              <Ionicons name="arrow-forward" size={20} color={COLORS.white} />
+              <ArrowRight size={20} color={COLORS.white} />
             </>
           )}
         </TouchableOpacity>

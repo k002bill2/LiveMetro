@@ -12,7 +12,7 @@ import {
   SafeAreaView,
   ScrollView,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Sun, Moon, Info, ArrowRight } from 'lucide-react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS, SHADOWS } from '@/styles/modernTheme';
 import { SettingTimePicker } from '@/components/settings/SettingTimePicker';
@@ -50,11 +50,17 @@ export const CommuteTimeScreen: React.FC<Props> = ({ navigation, route }) => {
         {/* Header */}
         <View style={styles.header}>
           <View style={styles.iconContainer}>
-            <Ionicons
-              name={isMorning ? 'sunny' : 'moon'}
-              size={48}
-              color={isMorning ? COLORS.secondary.yellow : COLORS.secondary.blue}
-            />
+            {isMorning ? (
+              <Sun
+                size={48}
+                color={COLORS.secondary.yellow}
+              />
+            ) : (
+              <Moon
+                size={48}
+                color={COLORS.secondary.blue}
+              />
+            )}
           </View>
           <Text style={styles.title}>
             {isMorning ? '출근 시간 설정' : '퇴근 시간 설정'}
@@ -72,14 +78,13 @@ export const CommuteTimeScreen: React.FC<Props> = ({ navigation, route }) => {
             label={isMorning ? '출근 시간' : '퇴근 시간'}
             value={time}
             onValueChange={setTime}
-            icon={isMorning ? 'sunny-outline' : 'moon-outline'}
+            icon={isMorning ? Sun : Moon}
           />
         </View>
 
         {/* Info */}
         <View style={styles.infoContainer}>
-          <Ionicons
-            name="information-circle-outline"
+            <Info
             size={20}
             color={COLORS.text.tertiary}
           />
@@ -105,7 +110,7 @@ export const CommuteTimeScreen: React.FC<Props> = ({ navigation, route }) => {
           onPress={handleNext}
         >
           <Text style={styles.nextButtonText}>다음</Text>
-          <Ionicons name="arrow-forward" size={20} color={COLORS.white} />
+          <ArrowRight size={20} color={COLORS.white} />
         </TouchableOpacity>
       </View>
     </SafeAreaView>

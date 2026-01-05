@@ -24,6 +24,25 @@ jest.mock('../../../hooks/useRealtimeTrains', () => ({
   }),
 }));
 
+jest.mock('../../../services/theme', () => ({
+  useTheme: () => ({
+    colors: {
+      surface: '#FFFFFF',
+      borderLight: '#E0E0E0',
+      borderMedium: '#CCCCCC',
+      primary: '#00A84D',
+      textPrimary: '#000000',
+      textSecondary: '#666666',
+      textTertiary: '#999999',
+      textInverse: '#FFFFFF',
+      info: '#2196F3',
+      error: '#FF0000',
+      warning: '#FFA000',
+    },
+    isDark: false,
+  }),
+}));
+
 describe('StationCard', () => {
   const mockStation: Station = {
     id: 'station-1',

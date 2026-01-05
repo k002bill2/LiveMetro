@@ -6,6 +6,9 @@
 import { trainService } from '../trainService';
 import { Train, Station, SubwayLine, TrainDelay, TrainStatus, DelaySeverity } from '../../../models/train';
 
+import { seoulSubwayApi } from '../../api/seoulSubwayApi';
+import { getLocalStation, getLocalStationsByLine } from '../../data/stationsDataService';
+
 // Mock Firebase
 jest.mock('../../firebase/config', () => ({
   firestore: {},
@@ -46,9 +49,6 @@ jest.mock('../../data/stationsDataService', () => ({
   getLocalStation: jest.fn(),
   getLocalStationsByLine: jest.fn(),
 }));
-
-import { seoulSubwayApi } from '../../api/seoulSubwayApi';
-import { getLocalStation, getLocalStationsByLine } from '../../data/stationsDataService';
 
 const mockSeoulApi = seoulSubwayApi as jest.Mocked<typeof seoulSubwayApi>;
 const mockGetLocalStation = getLocalStation as jest.MockedFunction<typeof getLocalStation>;

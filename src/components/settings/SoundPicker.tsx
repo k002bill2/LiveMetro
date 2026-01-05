@@ -14,7 +14,7 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { ChevronRight, X, Check, PlayCircle } from 'lucide-react-native';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
 import { NotificationSoundId } from '@/models/user';
 import { SoundOption, soundService } from '@/services/sound/soundService';
@@ -25,7 +25,7 @@ interface SoundPickerProps {
   value: NotificationSoundId;
   volume: number;
   onValueChange: (value: NotificationSoundId) => void;
-  icon?: keyof typeof Ionicons.glyphMap;
+  icon?: React.ElementType;
   disabled?: boolean;
 }
 
@@ -35,7 +35,7 @@ export const SoundPicker: React.FC<SoundPickerProps> = ({
   value,
   volume,
   onValueChange,
-  icon,
+  icon: Icon,
   disabled = false,
 }) => {
   const [modalVisible, setModalVisible] = useState(false);
@@ -80,10 +80,9 @@ export const SoundPicker: React.FC<SoundPickerProps> = ({
         disabled={disabled}
       >
         <View style={styles.leftContent}>
-          {icon && (
+          {Icon && (
             <View style={styles.iconContainer}>
-              <Ionicons
-                name={icon}
+              <Icon
                 size={20}
                 color={disabled ? COLORS.gray[400] : COLORS.black}
               />
@@ -98,7 +97,7 @@ export const SoundPicker: React.FC<SoundPickerProps> = ({
             )}
           </View>
         </View>
-        <Ionicons name="chevron-forward" size={20} color={COLORS.gray[400]} />
+        <ChevronRight size={20} color={COLORS.gray[400]} />
       </TouchableOpacity>
 
       <Modal
@@ -116,7 +115,7 @@ export const SoundPicker: React.FC<SoundPickerProps> = ({
                   onPress={handleCloseModal}
                   style={styles.closeButton}
                 >
-                  <Ionicons name="close" size={24} color={COLORS.black} />
+                  <X size={24} color={COLORS.black} />
                 </TouchableOpacity>
               </View>
 
@@ -134,8 +133,7 @@ export const SoundPicker: React.FC<SoundPickerProps> = ({
                         </Text>
                       </View>
                       {value === option.id && (
-                        <Ionicons
-                          name="checkmark"
+                        <Check
                           size={24}
                           color={COLORS.black}
                         />
@@ -150,8 +148,7 @@ export const SoundPicker: React.FC<SoundPickerProps> = ({
                         {playingId === option.id ? (
                           <ActivityIndicator size="small" color={COLORS.black} />
                         ) : (
-                          <Ionicons
-                            name="play-circle"
+                          <PlayCircle
                             size={32}
                             color={COLORS.black}
                           />
