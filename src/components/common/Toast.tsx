@@ -196,32 +196,32 @@ export const useToast = () => {
     message: '',
   });
 
-  const showToast = (config: ToastConfig): void => {
+  const showToast = useCallback((config: ToastConfig): void => {
     setToastConfig({
       ...config,
       visible: true,
     });
-  };
+  }, []);
 
-  const hideToast = (): void => {
+  const hideToast = useCallback((): void => {
     setToastConfig(prev => ({ ...prev, visible: false }));
-  };
+  }, []);
 
-  const showSuccess = (message: string, duration?: number): void => {
+  const showSuccess = useCallback((message: string, duration?: number): void => {
     showToast({ type: 'success', message, ...(duration !== undefined && { duration }) });
-  };
+  }, [showToast]);
 
-  const showError = (message: string, duration?: number): void => {
+  const showError = useCallback((message: string, duration?: number): void => {
     showToast({ type: 'error', message, ...(duration !== undefined && { duration }) });
-  };
+  }, [showToast]);
 
-  const showWarning = (message: string, duration?: number): void => {
+  const showWarning = useCallback((message: string, duration?: number): void => {
     showToast({ type: 'warning', message, ...(duration !== undefined && { duration }) });
-  };
+  }, [showToast]);
 
-  const showInfo = (message: string, duration?: number): void => {
+  const showInfo = useCallback((message: string, duration?: number): void => {
     showToast({ type: 'info', message, ...(duration !== undefined && { duration }) });
-  };
+  }, [showToast]);
 
   const ToastComponent = () => (
     <Toast

@@ -14,6 +14,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { ChevronRight, X, Check, Smartphone } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
 import { VibrationPatternId } from '@/models/user';
 import { VibrationOption, soundService } from '@/services/sound/soundService';
@@ -23,7 +24,7 @@ interface VibrationPickerProps {
   options: readonly VibrationOption[];
   value: VibrationPatternId;
   onValueChange: (value: VibrationPatternId) => void;
-  icon?: React.ElementType;
+  icon?: string;
   disabled?: boolean;
 }
 
@@ -32,7 +33,7 @@ export const VibrationPicker: React.FC<VibrationPickerProps> = ({
   options,
   value,
   onValueChange,
-  icon: Icon,
+  icon,
   disabled = false,
 }) => {
   const [modalVisible, setModalVisible] = useState(false);
@@ -56,9 +57,10 @@ export const VibrationPicker: React.FC<VibrationPickerProps> = ({
         disabled={disabled}
       >
         <View style={styles.leftContent}>
-          {Icon && (
+          {icon && (
             <View style={styles.iconContainer}>
-              <Icon
+              <Ionicons
+                name={icon as keyof typeof Ionicons.glyphMap}
                 size={20}
                 color={disabled ? COLORS.gray[400] : COLORS.black}
               />

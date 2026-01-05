@@ -82,7 +82,8 @@ export const AlertsScreen: React.FC = () => {
     if (!notification.isRead) {
       try {
         await markAsRead(notification.id);
-        // Error marking as read
+      } catch (error) {
+        // 읽음 처리 실패 시 무시 (UX 영향 최소화)
       }
     }
   }, [markAsRead]);
@@ -162,7 +163,7 @@ export const AlertsScreen: React.FC = () => {
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
       <View style={styles.emptyIcon}>
-        <Ionicons name="notifications-outline" size={48} color={colors.textTertiary} />
+        <Bell size={48} color={colors.textTertiary} />
       </View>
       <Text style={styles.emptyTitle}>알림 없음</Text>
       <Text style={styles.emptySubtitle}>

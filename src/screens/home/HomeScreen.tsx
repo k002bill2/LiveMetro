@@ -71,14 +71,14 @@ export const HomeScreen: React.FC = () => {
       }
 
       setNearbyStations(stations);
-      
-      if (stations.length > 0 && !selectedStation) {
-        setSelectedStation(stations[0] || null);
+
+      if (stations.length > 0) {
+        setSelectedStation(prev => prev ?? stations[0] ?? null);
       }
     } catch {
       // Error loading favorite stations
     }
-  }, [user?.preferences.favoriteStations, selectedStation]);
+  }, [user?.preferences.favoriteStations]);
 
   const loadNearbyStations = useCallback(async (): Promise<void> => {
     // Development: Skip in dev mode as we're using mock data
@@ -100,14 +100,14 @@ export const HomeScreen: React.FC = () => {
       setNearbyStations(stations);
 
       // Auto-select the closest station
-      if (stations.length > 0 && !selectedStation) {
-        setSelectedStation(stations[0] || null);
+      if (stations.length > 0) {
+        setSelectedStation(prev => prev ?? stations[0] ?? null);
       }
     } catch {
       showError('주변 역 정보를 가져오는데 실패했습니다');
       await loadFavoriteStations();
     }
-  }, [loadFavoriteStations, selectedStation, showError]);
+  }, [loadFavoriteStations, showError]);
 
   const initializeScreen = useCallback(async (): Promise<void> => {
     try {
@@ -217,7 +217,8 @@ export const HomeScreen: React.FC = () => {
     initializeScreen();
     // setupNetworkListener is safe to run once
     setIsOnline(true);
-  }, [initializeScreen]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (loading) {
     return <LoadingScreen message="주변 역 정보를 가져오고 있습니다..." />;

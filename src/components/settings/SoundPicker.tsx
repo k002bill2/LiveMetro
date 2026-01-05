@@ -15,6 +15,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { ChevronRight, X, Check, PlayCircle } from 'lucide-react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
 import { NotificationSoundId } from '@/models/user';
 import { SoundOption, soundService } from '@/services/sound/soundService';
@@ -25,7 +26,7 @@ interface SoundPickerProps {
   value: NotificationSoundId;
   volume: number;
   onValueChange: (value: NotificationSoundId) => void;
-  icon?: React.ElementType;
+  icon?: string;
   disabled?: boolean;
 }
 
@@ -35,7 +36,7 @@ export const SoundPicker: React.FC<SoundPickerProps> = ({
   value,
   volume,
   onValueChange,
-  icon: Icon,
+  icon,
   disabled = false,
 }) => {
   const [modalVisible, setModalVisible] = useState(false);
@@ -80,9 +81,10 @@ export const SoundPicker: React.FC<SoundPickerProps> = ({
         disabled={disabled}
       >
         <View style={styles.leftContent}>
-          {Icon && (
+          {icon && (
             <View style={styles.iconContainer}>
-              <Icon
+              <Ionicons
+                name={icon as keyof typeof Ionicons.glyphMap}
                 size={20}
                 color={disabled ? COLORS.gray[400] : COLORS.black}
               />
