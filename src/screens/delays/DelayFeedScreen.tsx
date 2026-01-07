@@ -17,10 +17,8 @@ import {
 import {
   MessageSquare,
   ThumbsUp,
-  Filter,
   Plus,
   Clock,
-  MapPin,
   CheckCircle,
 } from 'lucide-react-native';
 
@@ -47,7 +45,7 @@ export const DelayFeedScreen: React.FC = () => {
   const styles = createStyles(colors);
 
   const [reports, setReports] = useState<DelayReport[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [_loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedLine, setSelectedLine] = useState('전체');
   const [showReportModal, setShowReportModal] = useState(false);

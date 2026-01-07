@@ -18,8 +18,6 @@ import {
 import {
   FileText,
   Clock,
-  MapPin,
-  Calendar,
   Share2,
   Trash2,
   AlertCircle,
@@ -44,7 +42,7 @@ export const DelayCertificateScreen: React.FC = () => {
 
   const [certificates, setCertificates] = useState<DelayCertificate[]>([]);
   const [history, setHistory] = useState<DelayHistoryEntry[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [_loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<'certificates' | 'history'>('certificates');
 

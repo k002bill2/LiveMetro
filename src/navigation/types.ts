@@ -76,6 +76,20 @@ export type AppStackParamList = {
     mode?: 'departure' | 'arrival';
   };
 
+  // Delay screens
+  DelayCertificate: undefined;
+  DelayFeed: {
+    lineId?: string;
+  } | undefined;
+
+  // Route screens
+  AlternativeRoutes: {
+    fromStationId: string;
+    toStationId: string;
+    fromStationName: string;
+    toStationName: string;
+  };
+
   // Unauthenticated screens
   Welcome: undefined;
   Auth: undefined;
@@ -83,3 +97,6 @@ export type AppStackParamList = {
   // Onboarding screens
   Onboarding: undefined;
 };
+
+// Type alias for consistency across codebase
+export type RootStackParamList = AppStackParamList;

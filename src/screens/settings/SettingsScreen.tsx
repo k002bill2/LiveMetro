@@ -34,10 +34,14 @@ import {
   ShieldCheck,
   Info,
   LogOut,
+  FileCheck,
+  MessageSquare,
 } from 'lucide-react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useNavigation, NavigationProp } from '@react-navigation/native';
 
 import { useAuth } from '../../services/auth/AuthContext';
+import { AppStackParamList } from '@/navigation/types';
 import { useI18n } from '../../services/i18n';
 import { useTheme } from '../../services/theme';
 import { SPACING, RADIUS, TYPOGRAPHY } from '../../styles/modernTheme';
@@ -64,6 +68,8 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   const { user, signOut } = useAuth();
   const { language, t } = useI18n();
   const { themeMode, colors } = useTheme();
+  // Root navigation for screens outside SettingsNavigator
+  const rootNavigation = useNavigation<NavigationProp<AppStackParamList>>();
 
   // Get display values for language and theme
   const languageDisplayName = language === 'ko' ? '한국어' : 'English';
@@ -296,6 +302,27 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
               title={t.settings.soundSettings}
               subtitle={t.settings.soundSettingsDesc}
               onPress={() => navigation.navigate('SoundSettings')}
+            />
+          </View>
+        </View>
+
+        {/* Delay Information */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>
+            {language === 'ko' ? '지연 정보' : 'DELAY INFO'}
+          </Text>
+          <View style={styles.settingGroup}>
+            <SettingItem
+              Icon={MessageSquare}
+              title={language === 'ko' ? '실시간 제보' : 'Live Reports'}
+              subtitle={language === 'ko' ? '승객들의 실시간 지연 제보' : 'Real-time delay reports from passengers'}
+              onPress={() => rootNavigation.navigate('DelayFeed')}
+            />
+            <SettingItem
+              Icon={FileCheck}
+              title={language === 'ko' ? '지연증명서' : 'Delay Certificate'}
+              subtitle={language === 'ko' ? '지연 이력 및 증명서 발급' : 'Delay history and certificate issuance'}
+              onPress={() => rootNavigation.navigate('DelayCertificate')}
             />
           </View>
         </View>

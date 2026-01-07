@@ -29,8 +29,9 @@ import { trainService } from '../../services/train/trainService';
 import { LoadingScreen } from '../../components/common/LoadingScreen';
 import { StationCard } from '../../components/train/StationCard';
 import { TrainArrivalList } from '../../components/train/TrainArrivalList';
-import { DelayAlertBanner, DelayInfo } from '../../components/delays';
+import { DelayAlertBanner } from '../../components/delays';
 import { useToast } from '../../components/common/Toast';
+import { useDelayDetection } from '../../hooks/useDelayDetection';
 import { SPACING, RADIUS, TYPOGRAPHY } from '../../styles/modernTheme';
 import { useTheme, ThemeColors } from '../../services/theme';
 
@@ -49,9 +50,14 @@ export const HomeScreen: React.FC = () => {
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
   const [locationPermission, setLocationPermission] = useState<boolean>(false);
   const [isOnline, setIsOnline] = useState<boolean>(true);
-  const [activeDelays, setActiveDelays] = useState<DelayInfo[]>([]);
   const [showDelayBanner, setShowDelayBanner] = useState<boolean>(true);
   const rotateAnim = useRef(new Animated.Value(0)).current;
+
+  // Seoul API 지연 감지 훅
+  const { delays: activeDelays } = useDelayDetection({
+    pollingInterval: 60000, // 1분마다 체크
+    autoPolling: true,
+  });
 
 
 
@@ -270,8 +276,19 @@ export const HomeScreen: React.FC = () => {
       {showDelayBanner && activeDelays.length > 0 && (
         <DelayAlertBanner
           delays={activeDelays}
-          onPress={() => navigation.navigate('Alerts' as never)}
+          onPress={() => navigation.navigate('DelayFeed' as never)}
           onDismiss={() => setShowDelayBanner(false)}
+          onAlternativeRoutePress={selectedStation ? () => {
+            // Navigate to alternative routes with selected station as start
+            // Default to Gangnam as destination for demo
+            navigation.navigate('AlternativeRoutes', {
+              fromStationId: selectedStation.id,
+              toStationId: 'gangnam',
+              fromStationName: selectedStation.name,
+              toStationName: '강남',
+            });
+          } : undefined}
+          showAlternativeRoute={!!selectedStation}
           dismissible
         />
       )}

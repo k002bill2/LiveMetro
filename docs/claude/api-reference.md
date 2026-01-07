@@ -53,11 +53,29 @@ trainDelays/          # Delay/disruption alerts
   └─ affectedStations[]
 
 congestionData/       # Train car congestion levels
+
+delayReports/         # User-submitted delay reports (Phase 3)
+  ├─ userId           # Report author's user ID
+  ├─ userDisplayName  # Author's display name
+  ├─ lineId           # Affected line (1-9)
+  ├─ stationId        # Station where delay observed
+  ├─ stationName      # Station name (display)
+  ├─ reportType       # DELAY | ACCIDENT | CROWDED | SIGNAL_ISSUE | DOOR_ISSUE | STOPPED | OTHER
+  ├─ severity         # LOW | MEDIUM | HIGH | CRITICAL
+  ├─ description      # Optional detailed description
+  ├─ estimatedDelayMinutes  # Optional delay estimate
+  ├─ timestamp        # Report submission time
+  ├─ expiresAt        # Auto-expire time (default: timestamp + 2 hours)
+  ├─ upvotes          # Upvote count
+  ├─ upvotedBy[]      # User IDs who upvoted
+  ├─ verified         # Official verification status
+  └─ status           # ACTIVE | RESOLVED | EXPIRED
 ```
 
 ### Firebase Subscription Pattern
 
 ```typescript
+// Train updates subscription
 const unsubscribe = trainService.subscribeToTrainUpdates(
   stationId,
   (trains) => {
@@ -67,6 +85,35 @@ const unsubscribe = trainService.subscribeToTrainUpdates(
 
 // Clean up on unmount
 return () => unsubscribe();
+```
+
+### Delay Reports Subscription
+
+```typescript
+import { delayReportService } from '@/services/delay/delayReportService';
+
+// Subscribe to real-time delay reports
+const unsubscribe = delayReportService.subscribeToActiveReports(
+  (reports) => {
+    // Handle new reports
+  }
+);
+
+// Submit a new report
+await delayReportService.submitReport({
+  userId: user.id,
+  userDisplayName: user.displayName || 'Anonymous',
+  lineId: '2',
+  stationId: 'gangnam',
+  stationName: '강남',
+  reportType: ReportType.DELAY,
+  severity: ReportSeverity.MEDIUM,
+  description: '열차가 10분째 멈춰있습니다',
+  estimatedDelayMinutes: 10,
+});
+
+// Upvote a report
+await delayReportService.upvoteReport(reportId, userId);
 ```
 
 **Important:** Always clean up Firebase subscriptions in useEffect return functions to prevent memory leaks.

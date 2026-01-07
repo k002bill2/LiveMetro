@@ -11,15 +11,17 @@ import {
   TouchableOpacity,
   Animated,
 } from 'react-native';
-import { AlertTriangle, ChevronRight, X } from 'lucide-react-native';
+import { AlertTriangle, ChevronRight, X, Route } from 'lucide-react-native';
 import { useTheme } from '@/services/theme';
 import { SPACING, RADIUS, TYPOGRAPHY } from '@/styles/modernTheme';
 import { getSubwayLineColor } from '@/utils/colorUtils';
 
 export interface DelayInfo {
   lineId: string;
+  lineName?: string;
   delayMinutes: number;
   reason?: string;
+  timestamp?: Date;
 }
 
 interface DelayAlertBannerProps {
@@ -29,15 +31,21 @@ interface DelayAlertBannerProps {
   onPress?: () => void;
   /** Called when dismiss button is pressed */
   onDismiss?: () => void;
+  /** Called when alternative route button is pressed */
+  onAlternativeRoutePress?: () => void;
   /** Show dismiss button */
   dismissible?: boolean;
+  /** Show alternative route button */
+  showAlternativeRoute?: boolean;
 }
 
 export const DelayAlertBanner: React.FC<DelayAlertBannerProps> = ({
   delays,
   onPress,
   onDismiss,
+  onAlternativeRoutePress,
   dismissible = true,
+  showAlternativeRoute = true,
 }) => {
   const { colors } = useTheme();
   const slideAnim = useRef(new Animated.Value(-100)).current;
@@ -116,6 +124,17 @@ export const DelayAlertBanner: React.FC<DelayAlertBannerProps> = ({
             {moreCount > 0 && ` 외 ${moreCount}개`}
           </Text>
         </View>
+
+        {showAlternativeRoute && onAlternativeRoutePress && (
+          <TouchableOpacity
+            style={styles.alternativeRouteButton}
+            onPress={onAlternativeRoutePress}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            <Route size={14} color="#FFFFFF" />
+            <Text style={styles.alternativeRouteText}>대체경로</Text>
+          </TouchableOpacity>
+        )}
 
         <View style={styles.actionContainer}>
           {onPress && (
@@ -198,6 +217,21 @@ const styles = StyleSheet.create({
   lineIndicator: {
     flex: 1,
     height: 3,
+  },
+  alternativeRouteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+    borderRadius: RADIUS.sm,
+    marginRight: SPACING.sm,
+    gap: 4,
+  },
+  alternativeRouteText: {
+    color: '#FFFFFF',
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    fontWeight: '600',
   },
 });
 

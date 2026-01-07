@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useEffect, useRef } from 'react';
+import React, { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import {
   ActivityIndicator,
   Linking,
@@ -21,7 +21,8 @@ import {
   ChevronRight,
   AlertCircle,
   Moon,
-  ChevronDown
+  ChevronDown,
+  Users,
 } from 'lucide-react-native';
 
 import { AppStackParamList } from '../../navigation/types';
@@ -29,6 +30,10 @@ import { getSubwayLineColor } from '../../utils/colorUtils';
 import { useRealtimeTrains } from '../../hooks/useRealtimeTrains';
 import { useAdjacentStations } from '../../hooks/useAdjacentStations';
 import { useTheme, ThemeColors } from '../../services/theme';
+import { useCongestion } from '@/hooks/useCongestion';
+import { TrainCongestionView } from '@/components/congestion/TrainCongestionView';
+import { CongestionReportModal } from '@/components/congestion/CongestionReportModal';
+import { CongestionReportInput } from '@/models/congestion';
 
 type StationDetailRouteProp = RouteProp<AppStackParamList, 'StationDetail'>;
 const TAB_LABELS = ['출발', '도착', '시간표', '즐겨찾기'] as const;
@@ -55,6 +60,8 @@ const StationDetailScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<TabLabel>('출발');
   const [mapLoadError, setMapLoadError] = useState(false);
+  const [showCongestionModal, setShowCongestionModal] = useState(false);
+  const [selectedCarNumber, setSelectedCarNumber] = useState<number | undefined>(undefined);
   const rotateAnim = useRef(new Animated.Value(0)).current;
 
   // 실시간 열차 데이터 가져오기
@@ -67,6 +74,29 @@ const StationDetailScreen: React.FC = () => {
     refetchInterval: 30000, // 30초마다 자동 갱신
     retryAttempts: 3,
   });
+
+  // 혼잡도 데이터 (첫 번째 열차 기준)
+  const firstTrain = realtimeTrains?.[0];
+  const {
+    trainCongestion,
+    submitReport,
+    submitting: congestionSubmitting,
+  } = useCongestion({
+    lineId: lineId,
+    trainId: firstTrain?.id,
+    direction: firstTrain?.direction,
+    autoSubscribe: !!firstTrain,
+  });
+
+  // 혼잡도 제보 핸들러
+  const handleCarPress = useCallback((carNumber: number) => {
+    setSelectedCarNumber(carNumber);
+    setShowCongestionModal(true);
+  }, []);
+
+  const handleCongestionReportSubmit = useCallback(async (input: CongestionReportInput) => {
+    await submitReport(input);
+  }, [submitReport]);
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60 * 1000);
@@ -288,6 +318,24 @@ const StationDetailScreen: React.FC = () => {
         ))}
       </View>
 
+      {/* 혼잡도 섹션 */}
+      {firstTrain && (
+        <View style={styles.congestionSection}>
+          <TrainCongestionView
+            congestion={trainCongestion}
+            onCarPress={handleCarPress}
+            showLegend={true}
+          />
+          <TouchableOpacity
+            style={styles.reportCongestionButton}
+            onPress={() => setShowCongestionModal(true)}
+          >
+            <Users size={16} color={colors.primary} />
+            <Text style={styles.reportCongestionText}>혼잡도 제보하기</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <View style={styles.tabRow}>
         {TAB_LABELS.map((label) => {
           const isActive = activeTab === label;
@@ -406,6 +454,27 @@ const StationDetailScreen: React.FC = () => {
         </View>
         <ChevronRight size={18} color={colors.textTertiary} />
       </View>
+
+      {/* 혼잡도 제보 모달 */}
+      {firstTrain && (
+        <CongestionReportModal
+          visible={showCongestionModal}
+          onClose={() => {
+            setShowCongestionModal(false);
+            setSelectedCarNumber(undefined);
+          }}
+          onSubmit={handleCongestionReportSubmit}
+          initialCarNumber={selectedCarNumber}
+          trainInfo={{
+            trainId: firstTrain.id,
+            lineId: lineId,
+            stationId: stationName, // Using stationName as ID for now
+            stationName: stationName,
+            direction: firstTrain.direction,
+          }}
+          submitting={congestionSubmitting}
+        />
+      )}
     </ScrollView>
   );
 };
@@ -840,6 +909,30 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     marginTop: 8,
     fontSize: 14,
     color: colors.textTertiary,
+  },
+  congestionSection: {
+    backgroundColor: colors.surface,
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.borderMedium,
+    gap: 12,
+  },
+  reportCongestionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: colors.primaryLight,
+  },
+  reportCongestionText: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

@@ -23,6 +23,9 @@ import { SettingsNavigator } from './SettingsNavigator';
 import { OnboardingNavigator } from './OnboardingNavigator';
 import StationNavigatorScreen from '../screens/station/StationNavigatorScreen';
 import StationDetailScreen from '../screens/station/StationDetailScreen';
+import { DelayCertificateScreen } from '../screens/delays/DelayCertificateScreen';
+import { DelayFeedScreen } from '../screens/delays/DelayFeedScreen';
+import { AlternativeRoutesScreen } from '../screens/route/AlternativeRoutesScreen';
 
 // DEBUG: Set to true to always show onboarding screen during development
 const DEBUG_FORCE_ONBOARDING = __DEV__ && false;
@@ -42,6 +45,16 @@ export type RootStackParamList = {
     stationId: string;
     stationName: string;
     lineId: string;
+  };
+  DelayCertificate: undefined;
+  DelayFeed: {
+    lineId?: string;
+  } | undefined;
+  AlternativeRoutes: {
+    fromStationId: string;
+    toStationId: string;
+    fromStationName: string;
+    toStationName: string;
   };
 };
 
@@ -188,6 +201,29 @@ const RootNavigatorContent: React.FC = () => {
         options={{
           headerShown: true,
           title: '역 상세정보',
+        }}
+      />
+      <Stack.Screen
+        name="DelayCertificate"
+        component={DelayCertificateScreen}
+        options={{
+          headerShown: true,
+          title: '지연증명서',
+        }}
+      />
+      <Stack.Screen
+        name="DelayFeed"
+        component={DelayFeedScreen}
+        options={{
+          headerShown: true,
+          title: '실시간 제보',
+        }}
+      />
+      <Stack.Screen
+        name="AlternativeRoutes"
+        component={AlternativeRoutesScreen}
+        options={{
+          headerShown: false,
         }}
       />
     </Stack.Navigator>

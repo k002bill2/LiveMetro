@@ -20,7 +20,7 @@ import {
   arrayRemove,
   increment,
 } from 'firebase/firestore';
-import { db } from '@/services/firebase/config';
+import { firestore as db } from '@/services/firebase/config';
 import {
   DelayReport,
   CreateReportInput,
