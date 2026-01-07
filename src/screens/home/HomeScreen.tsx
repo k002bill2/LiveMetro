@@ -29,6 +29,7 @@ import { trainService } from '../../services/train/trainService';
 import { LoadingScreen } from '../../components/common/LoadingScreen';
 import { StationCard } from '../../components/train/StationCard';
 import { TrainArrivalList } from '../../components/train/TrainArrivalList';
+import { DelayAlertBanner, DelayInfo } from '../../components/delays';
 import { useToast } from '../../components/common/Toast';
 import { SPACING, RADIUS, TYPOGRAPHY } from '../../styles/modernTheme';
 import { useTheme, ThemeColors } from '../../services/theme';
@@ -48,6 +49,8 @@ export const HomeScreen: React.FC = () => {
   const [selectedStation, setSelectedStation] = useState<Station | null>(null);
   const [locationPermission, setLocationPermission] = useState<boolean>(false);
   const [isOnline, setIsOnline] = useState<boolean>(true);
+  const [activeDelays, setActiveDelays] = useState<DelayInfo[]>([]);
+  const [showDelayBanner, setShowDelayBanner] = useState<boolean>(true);
   const rotateAnim = useRef(new Animated.Value(0)).current;
 
 
@@ -261,6 +264,16 @@ export const HomeScreen: React.FC = () => {
             오프라인 상태 - 캐시된 정보가 표시됩니다
           </Text>
         </View>
+      )}
+
+      {/* Delay Alert Banner */}
+      {showDelayBanner && activeDelays.length > 0 && (
+        <DelayAlertBanner
+          delays={activeDelays}
+          onPress={() => navigation.navigate('Alerts' as never)}
+          onDismiss={() => setShowDelayBanner(false)}
+          dismissible
+        />
       )}
 
       {/* Location Permission Banner */}
