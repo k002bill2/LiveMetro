@@ -24,6 +24,8 @@ interface DraggableFavoriteItemProps {
   onEditToggle: () => void;
   onRemove: () => void;
   onPress: () => void;
+  onSetStart?: () => void;
+  onSetEnd?: () => void;
   onSaveEdit: (updates: {
     alias?: string | null;
     direction?: 'up' | 'down' | 'both';
@@ -39,6 +41,8 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
   onEditToggle,
   onRemove,
   onPress,
+  onSetStart,
+  onSetEnd,
   onSaveEdit,
   isDragEnabled = false,
 }) => {
@@ -73,19 +77,13 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
 
   return (
     <View style={styles.container}>
-      {/* Alias/Custom Name */}
-      {favorite.alias && (
-        <View style={styles.aliasContainer}>
-          <Tag size={14} color={colors.textSecondary} />
-          <Text style={styles.aliasText}>{favorite.alias}</Text>
-        </View>
-      )}
-
       {/* Station Card with Action Buttons */}
       <View style={styles.cardWrapper}>
         <StationCard
           station={station}
           onPress={onPress}
+          onSetStart={onSetStart}
+          onSetEnd={onSetEnd}
           showArrivals={true}
           enableFavorite={false}
           animationDelay={index * 50}
@@ -131,9 +129,15 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
         onCancel={onEditToggle}
       />
 
-      {/* Direction & Commute Metadata (hidden when editing) */}
-      {!isEditing && (
+      {/* Alias, Direction & Commute Metadata (hidden when editing) */}
+      {!isEditing && (favorite.alias || favorite.direction !== 'both' || favorite.isCommuteStation) && (
         <View style={styles.metadataRow}>
+          {favorite.alias && (
+            <View style={[styles.metadataItem, styles.aliasIndicator]}>
+              <Tag size={14} color={colors.textSecondary} />
+              <Text style={styles.aliasText}>{favorite.alias}</Text>
+            </View>
+          )}
           {favorite.direction !== 'both' && (
             <View style={styles.metadataItem}>
               {favorite.direction === 'down' ? (
@@ -221,6 +225,12 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     borderRadius: RADIUS.sm,
     borderWidth: 1,
     borderColor: colors.borderMedium,
+  },
+  aliasIndicator: {
+    backgroundColor: colors.backgroundSecondary,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 2,
+    borderRadius: RADIUS.sm,
   },
   commuteText: {
     fontSize: TYPOGRAPHY.fontSize.xs,

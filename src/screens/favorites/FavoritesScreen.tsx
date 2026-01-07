@@ -189,6 +189,32 @@ export const FavoritesScreen: React.FC = () => {
   }, [navigation]);
 
   /**
+   * Navigate to StationNavigator with departure mode
+   */
+  const handleSetStart = useCallback((favorite: typeof favoritesWithDetails[0]) => {
+    if (!favorite.station) return;
+
+    navigation.navigate('StationNavigator', {
+      stationId: favorite.stationId,
+      lineId: favorite.lineId,
+      mode: 'departure',
+    });
+  }, [navigation]);
+
+  /**
+   * Navigate to StationNavigator with arrival mode
+   */
+  const handleSetEnd = useCallback((favorite: typeof favoritesWithDetails[0]) => {
+    if (!favorite.station) return;
+
+    navigation.navigate('StationNavigator', {
+      stationId: favorite.stationId,
+      lineId: favorite.lineId,
+      mode: 'arrival',
+    });
+  }, [navigation]);
+
+  /**
    * Handle station selection from search modal
    */
   const handleStationSelect = useCallback(async (selection: StationSelection) => {
@@ -269,6 +295,8 @@ export const FavoritesScreen: React.FC = () => {
         onEditToggle={() => handleEditToggle(favorite.id)}
         onRemove={() => handleRemoveFavorite(favorite.id, favorite.station?.name || '알 수 없는 역')}
         onPress={() => handleStationPress(favorite)}
+        onSetStart={() => handleSetStart(favorite)}
+        onSetEnd={() => handleSetEnd(favorite)}
         onSaveEdit={(updates) => handleSaveEdit(favorite.id, updates)}
         isDragEnabled={false} // Will be enabled in Phase 3
       />
