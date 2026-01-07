@@ -130,7 +130,7 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
       />
 
       {/* Alias, Direction & Commute Metadata (hidden when editing) */}
-      {!isEditing && (favorite.alias || favorite.direction !== 'both' || favorite.isCommuteStation) && (
+      {!isEditing && (
         <View style={styles.metadataRow}>
           {favorite.alias && (
             <View style={[styles.metadataItem, styles.aliasIndicator]}>
@@ -138,15 +138,18 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
               <Text style={styles.aliasText}>{favorite.alias}</Text>
             </View>
           )}
-          {favorite.direction !== 'both' && (
-            <View style={styles.metadataItem}>
-              {favorite.direction === 'down' ? (
-                <ArrowDown size={14} color={colors.textSecondary} />
-              ) : (
+          <View style={styles.metadataItem}>
+            {favorite.direction === 'both' ? (
+              <>
                 <ArrowUp size={14} color={colors.textSecondary} />
-              )}
-            </View>
-          )}
+                <ArrowDown size={14} color={colors.textSecondary} />
+              </>
+            ) : favorite.direction === 'down' ? (
+              <ArrowDown size={14} color={colors.textSecondary} />
+            ) : (
+              <ArrowUp size={14} color={colors.textSecondary} />
+            )}
+          </View>
           {favorite.isCommuteStation && (
             <View style={[styles.metadataItem, styles.commuteIndicator]}>
               <Briefcase size={14} color={colors.textPrimary} />
