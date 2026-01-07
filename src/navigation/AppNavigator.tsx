@@ -33,15 +33,15 @@ const MainTabs: React.FC = () => {
       screenOptions={({ route }) => ({
         tabBarIcon: ({ color, size }) => {
           if (route.name === 'Home') {
-            return <Home size={size} color={color} />;
+            return <Home size={size} color={color} fill="none" />;
           } else if (route.name === 'Favorites') {
-            return <Star size={size} color={color} />;
+            return <Star size={size} color={color} fill="none" />;
           } else if (route.name === 'Alerts') {
-            return <Bell size={size} color={color} />;
+            return <Bell size={size} color={color} fill="none" />;
           } else if (route.name === 'Settings') {
-            return <Settings size={size} color={color} />;
+            return <Settings size={size} color={color} fill="none" />;
           }
-          return <CircleHelp size={size} color={color} />;
+          return <CircleHelp size={size} color={color} fill="none" />;
         },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textTertiary,

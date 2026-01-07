@@ -61,18 +61,18 @@ const MainTabNavigator: React.FC = () => {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color, size }) => {
+        tabBarIcon: ({ color, size }) => {
           switch (route.name) {
             case 'Home':
-              return <Home size={size} color={color} fill={focused ? color : 'transparent'} />;
+              return <Home size={size} color={color} fill="none" />;
             case 'Favorites':
-              return <Heart size={size} color={color} fill={focused ? color : 'transparent'} />;
+              return <Heart size={size} color={color} fill="none" />;
             case 'Alerts':
-              return <Bell size={size} color={color} fill={focused ? color : 'transparent'} />;
+              return <Bell size={size} color={color} fill="none" />;
             case 'Settings':
-              return <Settings size={size} color={color} />;
+              return <Settings size={size} color={color} fill="none" />;
             default:
-              return <CircleHelp size={size} color={color} />;
+              return <CircleHelp size={size} color={color} fill="none" />;
           }
         },
         tabBarActiveTintColor: colors.primary,
