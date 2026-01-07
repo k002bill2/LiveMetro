@@ -31,13 +31,13 @@ const MainTabs: React.FC = () => {
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        tabBarIcon: ({ focused, color, size }) => {
+        tabBarIcon: ({ color, size }) => {
           if (route.name === 'Home') {
-            return <Home size={size} color={color} fill={focused ? color : 'transparent'} />;
+            return <Home size={size} color={color} />;
           } else if (route.name === 'Favorites') {
-            return <Star size={size} color={color} fill={focused ? color : 'transparent'} />;
+            return <Star size={size} color={color} />;
           } else if (route.name === 'Alerts') {
-            return <Bell size={size} color={color} fill={focused ? color : 'transparent'} />;
+            return <Bell size={size} color={color} />;
           } else if (route.name === 'Settings') {
             return <Settings size={size} color={color} />;
           }
