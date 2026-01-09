@@ -1,61 +1,114 @@
 /**
  * Stations Data Service
  * Provides local station data as fallback when Firebase is unavailable
+ * Uses Seoul Metro official station data
  */
 
-import stationsData from '../../data/stations.json';
-import linesData from '../../data/lines.json';
+import seoulStationsData from '../../data/seoulStations.json';
 import { Station } from '../../models/train';
 
-// Type for local station data structure
-interface LocalStationData {
-  id: string;
-  name: string;
-  nameEn?: string;
-  x: number;
-  y: number;
-  lines: string[];
+// Type for Seoul Metro station data structure
+interface SeoulStationData {
+  line_num: string;      // "01호선", "02호선", etc.
+  station_nm: string;    // Korean name
+  station_nm_eng: string; // English name
+  station_nm_chn: string; // Chinese name
+  station_nm_jpn: string; // Japanese name
+  station_cd: string;    // Station code
+  fr_code: string;       // External code
 }
 
-/**
- * Convert local station data to Station model
- */
-const convertLocalStationToModel = (
-  stationId: string,
-  localData: LocalStationData
-): Station => {
-  // Use first line as lineId, or empty string if no lines
-  const lineId = localData.lines?.[0] || '';
+interface SeoulStationsJson {
+  DESCRIPTION: Record<string, string>;
+  DATA: SeoulStationData[];
+}
 
+// Cache for faster lookups
+let stationsCache: Map<string, Station> | null = null;
+let stationsByLineCache: Map<string, Station[]> | null = null;
+
+/**
+ * Convert line_num to lineId format
+ */
+const convertLineNumToLineId = (lineNum: string): string => {
+  // "01호선" -> "1", "02호선" -> "2", etc.
+  const match = lineNum.match(/^0?(\d+)호선$/);
+  if (match) {
+    return match[1];
+  }
+  // Handle special lines like "경의중앙선", "분당선", etc.
+  return lineNum.replace('호선', '');
+};
+
+/**
+ * Convert Seoul Metro station data to Station model
+ */
+const convertSeoulStationToModel = (data: SeoulStationData): Station => {
   return {
-    id: stationId,
-    name: localData.name,
-    nameEn: localData.nameEn || '',
-    lineId,
+    id: data.station_cd,
+    name: data.station_nm,
+    nameEn: data.station_nm_eng,
+    lineId: convertLineNumToLineId(data.line_num),
     coordinates: {
-      // Convert SVG coordinates to approximate lat/lng
-      // This is a rough conversion - actual coordinates should come from Firebase
-      latitude: 37.5 + (localData.y / 10000),
-      longitude: 126.9 + (localData.x / 10000),
+      latitude: 37.5665, // Default Seoul coordinates
+      longitude: 126.9780,
     },
-    transfers: localData.lines.slice(1), // Other lines are transfers
+    transfers: [],
+    stationCode: data.fr_code,
   };
 };
 
 /**
- * Get station by ID from local data
+ * Normalize English name to ID format (lowercase, spaces to underscores)
  */
-export const getLocalStation = (stationId: string): Station | null => {
-  try {
-    const localData = stationsData as Record<string, LocalStationData>;
-    const stationData = localData[stationId];
+const normalizeNameToId = (name: string): string => {
+  return name.toLowerCase().replace(/[\s-]+/g, '_').replace(/[^a-z0-9_]/g, '');
+};
 
-    if (!stationData) {
-      console.warn(`Station ${stationId} not found in local data`);
+/**
+ * Initialize cache from Seoul Metro data
+ */
+const initializeCache = (): void => {
+  if (stationsCache && stationsByLineCache) return;
+
+  const jsonData = seoulStationsData as SeoulStationsJson;
+  stationsCache = new Map();
+  stationsByLineCache = new Map();
+
+  jsonData.DATA.forEach((stationData) => {
+    const station = convertSeoulStationToModel(stationData);
+
+    // Add to stations cache (by multiple keys for backward compatibility)
+    stationsCache!.set(station.id, station);                           // station_cd: "0222"
+    stationsCache!.set(station.name, station);                         // Korean: "강남"
+    stationsCache!.set(station.nameEn.toLowerCase(), station);         // English lowercase: "gangnam"
+    stationsCache!.set(normalizeNameToId(station.nameEn), station);    // Normalized: "gangnam_gu_office"
+
+    // Add to line cache
+    const lineId = station.lineId;
+    if (!stationsByLineCache!.has(lineId)) {
+      stationsByLineCache!.set(lineId, []);
+    }
+    stationsByLineCache!.get(lineId)!.push(station);
+  });
+
+  console.log(`✅ Loaded stations from Seoul Metro data (${stationsByLineCache.size} lines)`);
+};
+
+/**
+ * Get station by ID or name from local data
+ */
+export const getLocalStation = (stationIdOrName: string): Station | null => {
+  try {
+    initializeCache();
+
+    const station = stationsCache!.get(stationIdOrName);
+    if (!station) {
+      console.warn(`Station ${stationIdOrName} not found in local data`);
       return null;
     }
 
-    return convertLocalStationToModel(stationId, stationData);
+    return station;
   } catch (error) {
     console.error('Error loading local station data:', error);
     return null;
@@ -66,21 +119,7 @@ export const getLocalStation = (stationId: string): Station | null => {
  * Get station by name from local data (exact match)
  */
 export const getLocalStationByName = (stationName: string): Station | null => {
-  try {
-    const localData = stationsData as Record<string, LocalStationData>;
-
-    for (const [stationId, stationData] of Object.entries(localData)) {
-      if (stationData.name === stationName) {
-        return convertLocalStationToModel(stationId, stationData);
-      }
-    }
-
-    console.warn(`Station with name "${stationName}" not found in local data`);
-    return null;
-  } catch (error) {
-    console.error('Error loading local station by name:', error);
-    return null;
-  }
+  return getLocalStation(stationName);
 };
 
 /**
@@ -88,21 +127,24 @@ export const getLocalStationByName = (stationName: string): Station | null => {
  */
 export const searchLocalStations = (query: string): Station[] => {
   try {
-    const localData = stationsData as Record<string, LocalStationData>;
+    initializeCache();
     const searchQuery = query.toLowerCase().trim();
 
     if (!searchQuery) {
       return [];
     }
 
+    const jsonData = seoulStationsData as SeoulStationsJson;
     const matchingStations: Station[] = [];
+    const seenIds = new Set<string>();
 
-    Object.entries(localData).forEach(([stationId, stationData]) => {
-      const nameMatch = stationData.name.toLowerCase().includes(searchQuery);
-      const nameEnMatch = stationData.nameEn?.toLowerCase().includes(searchQuery);
+    jsonData.DATA.forEach((stationData) => {
+      const nameMatch = stationData.station_nm.toLowerCase().includes(searchQuery);
+      const nameEnMatch = stationData.station_nm_eng.toLowerCase().includes(searchQuery);
 
-      if (nameMatch || nameEnMatch) {
-        matchingStations.push(convertLocalStationToModel(stationId, stationData));
+      if ((nameMatch || nameEnMatch) && !seenIds.has(stationData.station_cd)) {
+        seenIds.add(stationData.station_cd);
+        matchingStations.push(convertSeoulStationToModel(stationData));
       }
     });
 
@@ -118,10 +160,11 @@ export const searchLocalStations = (query: string): Station[] => {
  */
 export const getAllLocalStations = (): Station[] => {
   try {
-    const localData = stationsData as Record<string, LocalStationData>;
+    initializeCache();
+    const jsonData = seoulStationsData as SeoulStationsJson;
 
-    return Object.entries(localData).map(([stationId, stationData]) =>
-      convertLocalStationToModel(stationId, stationData)
+    return jsonData.DATA.map((stationData) =>
+      convertSeoulStationToModel(stationData)
     );
   } catch (error) {
     console.error('Error loading all local stations:', error);
@@ -131,34 +174,18 @@ export const getAllLocalStations = (): Station[] => {
 
 /**
  * Get stations by line from local data
- * Uses lines.json to maintain correct station sequence
  */
 export const getLocalStationsByLine = (lineId: string): Station[] => {
   try {
-    const localStationsData = stationsData as Record<string, LocalStationData>;
-    const lines = linesData as { stations: Record<string, string[]> };
+    initializeCache();
 
-    // Get the ordered station IDs for this line
-    const stationIds = lines.stations[lineId];
-
-    if (!stationIds || stationIds.length === 0) {
-      console.warn(`No station sequence found for line ${lineId} in lines.json`);
+    const stations = stationsByLineCache!.get(lineId);
+    if (!stations || stations.length === 0) {
+      console.warn(`No stations found for line ${lineId} in local data`);
       return [];
     }
 
-    // Map station IDs to Station objects in the correct order
-    const stationsInLine: Station[] = [];
-
-    stationIds.forEach((stationId) => {
-      const stationData = localStationsData[stationId];
-      if (stationData) {
-        stationsInLine.push(convertLocalStationToModel(stationId, stationData));
-      } else {
-        console.warn(`Station ${stationId} not found in stations.json`);
-      }
-    });
-
-    return stationsInLine;
+    return stations;
   } catch (error) {
     console.error('Error loading stations by line:', error);
     return [];

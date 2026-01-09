@@ -1,70 +1,65 @@
 ---
-description: 현재 작업 컨텍스트를 저장하고 요약 (긴 세션용)
+description: Save context to Dev Docs and run /compact in one command
 ---
 
-# Save and Compact Context
+# Save & Compact
 
-현재 세션의 작업 컨텍스트를 저장하고 요약합니다. 긴 세션이나 복잡한 작업 중 컨텍스트를 보존해야 할 때 사용합니다.
+Dev Docs에 현재 세션의 컨텍스트를 저장합니다.
 
-## 실행 단계
+## Instructions
 
-### 1. 현재 작업 상태 수집
+다음 단계를 순서대로 실행하세요:
 
-다음 정보를 수집하세요:
-- 현재 진행 중인 작업
-- 수정된 파일 목록
-- 해결된 문제와 미해결 문제
-- 중요한 결정 사항
+### Step 1: 활성 프로젝트 확인
 
-### 2. 컨텍스트 파일 생성
+```bash
+ls dev/active/ 2>/dev/null || echo "No active projects"
+```
 
-`dev/context/session-{timestamp}.md` 파일에 다음 형식으로 저장:
+### Step 2: Dev Docs 업데이트
+
+활성 프로젝트가 있으면 해당 Context 문서(`*-context.md`)와 Tasks 문서(`*-tasks.md`)를 업데이트합니다:
+
+**Context 문서 업데이트:**
+- Last Updated 타임스탬프 갱신
+- 이번 세션 완료 작업 기록
+- 발견된 이슈/블로커 기록
+- 다음 세션 우선 작업 명시
+
+**Tasks 문서 업데이트:**
+- 완료 항목 `[x]` 표시
+- 새 작업 추가
+- 우선순위 조정
+
+### Step 3: 요약 출력
+
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+DEV DOCS SAVED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+Updated: [프로젝트명]
+- Context: [타임스탬프]
+- Tasks: [완료 N개 / 신규 N개]
+
+Next: /compact (컨텍스트 압축)
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
+
+### Step 4: Compact 안내
+
+사용자에게 `/compact` 명령어를 실행하라고 안내합니다.
+(내장 명령어는 스킬에서 직접 실행할 수 없음)
+
+## Session Summary Template
 
 ```markdown
-# Session Context - {날짜}
-
-## 작업 요약
-- 주요 작업: {설명}
-- 진행 상태: {완료/진행중/보류}
-
-## 수정된 파일
-- file1.tsx: {변경 내용}
-- file2.ts: {변경 내용}
-
-## 미해결 사항
-- [ ] 항목 1
-- [ ] 항목 2
-
-## 다음 단계
-1. {다음 작업 1}
-2. {다음 작업 2}
-
-## 중요 결정 사항
-- {결정 1}: {이유}
+### [날짜] [시간]
+- **완료**: [작업 목록]
+- **블로커**: [있으면 기록]
+- **다음**: [우선 작업]
 ```
 
-### 3. 체크포인트 생성
-
-coordination/checkpoint-manager.js를 사용하여 체크포인트 생성:
-- trigger: 'manual_save'
-- description: 세션 요약
-
-### 4. 사용자에게 요약 제공
-
-저장된 컨텍스트의 요약을 표시하고 다음 세션에서 복원 방법 안내.
-
-## 출력 형식
-
-```
-✅ Context Saved
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📁 File: dev/context/session-{timestamp}.md
-🔖 Checkpoint: {checkpoint_id}
-
-📋 Summary:
-- {작업 요약}
-
-📌 Next Session:
-- /restore-context {checkpoint_id} 로 복원 가능
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-```
+---
+**Version**: 2.0.0

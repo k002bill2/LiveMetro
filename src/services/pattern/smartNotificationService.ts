@@ -166,7 +166,7 @@ class SmartNotificationService {
    */
   async getWeekSchedule(
     userId: string
-  ): Promise<Array<{ date: string; dayOfWeek: DayOfWeek; alertTime: string | null }>> {
+  ): Promise<{ date: string; dayOfWeek: DayOfWeek; alertTime: string | null }[]> {
     const settings = await this.getSettings(userId);
     const predictions = await patternAnalysisService.getWeekPredictions(
       userId,

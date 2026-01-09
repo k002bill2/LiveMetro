@@ -4,7 +4,7 @@
  */
 
 // Services
-export { tensorFlowSetup, tf } from './tensorflowSetup';
+export { tensorFlowSetup, getTensorFlow } from './tensorflowSetup';
 export { featureExtractor } from './featureExtractor';
 export { modelService } from './modelService';
 export { trainingService } from './trainingService';

@@ -44,6 +44,7 @@ class DataManager {
   };
 
   private subscribers: Map<string, ((data: any) => void)[]> = new Map();
+  private activeIntervals: Map<string, NodeJS.Timeout> = new Map();
   private syncQueue: (() => Promise<void>)[] = [];
   private isProcessingQueue = false;
 
@@ -315,36 +316,72 @@ class DataManager {
     intervalMs: number = 30000 // 30 seconds
   ): () => void {
     const subscriptionKey = `realtime_${stationName}`;
-    
+
     if (!this.subscribers.has(subscriptionKey)) {
       this.subscribers.set(subscriptionKey, []);
     }
-    
+
     this.subscribers.get(subscriptionKey)!.push(callback);
+
+    // Clear existing interval for this station if any (prevent duplicates)
+    const existingInterval = this.activeIntervals.get(subscriptionKey);
+    if (existingInterval) {
+      clearInterval(existingInterval);
+    }
 
     // Set up periodic updates
     const intervalId = setInterval(async () => {
       const data = await this.getRealtimeTrains(stationName);
-      callback(data);
+      // Notify all subscribers for this station
+      const callbacks = this.subscribers.get(subscriptionKey);
+      callbacks?.forEach(cb => cb(data));
     }, intervalMs);
+
+    this.activeIntervals.set(subscriptionKey, intervalId);
 
     // Initial fetch
     this.getRealtimeTrains(stationName).then(callback);
 
     // Return unsubscribe function
     return () => {
-      clearInterval(intervalId);
       const callbacks = this.subscribers.get(subscriptionKey);
       if (callbacks) {
         const index = callbacks.indexOf(callback);
         if (index > -1) {
           callbacks.splice(index, 1);
         }
+        // Only clear interval when no more subscribers
         if (callbacks.length === 0) {
+          const intervalToClean = this.activeIntervals.get(subscriptionKey);
+          if (intervalToClean) {
+            clearInterval(intervalToClean);
+            this.activeIntervals.delete(subscriptionKey);
+          }
           this.subscribers.delete(subscriptionKey);
         }
       }
     };
+  }
+
+  /**
+   * Unsubscribe from all realtime updates
+   */
+  unsubscribeAll(): void {
+    // Clear all intervals
+    for (const intervalId of this.activeIntervals.values()) {
+      clearInterval(intervalId);
+    }
+    this.activeIntervals.clear();
+    this.subscribers.clear();
+  }
+
+  /**
+   * Clean up all resources - call when service is no longer needed
+   */
+  destroy(): void {
+    this.unsubscribeAll();
+    this.syncQueue = [];
+    this.isProcessingQueue = false;
   }
 
   /**

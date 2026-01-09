@@ -148,6 +148,20 @@ class TrainArrivalAlertService {
   }
 
   /**
+   * Clean up all resources - call when service is no longer needed
+   */
+  destroy(): void {
+    // Stop all sessions regardless of user
+    for (const [alertId, session] of this.activeSessions) {
+      if (session.intervalId) {
+        clearInterval(session.intervalId);
+      }
+    }
+    this.activeSessions.clear();
+    this.alertsSent.clear();
+  }
+
+  /**
    * Calculate optimal train based on commute pattern
    */
   async calculateOptimalTrain(

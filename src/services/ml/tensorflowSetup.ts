@@ -1,11 +1,10 @@
 /**
  * TensorFlow.js Setup Service
  * Initializes TensorFlow.js for React Native environment
+ * Gracefully handles missing native modules (expo-gl)
  */
 
-import * as tf from '@tensorflow/tfjs';
-import '@tensorflow/tfjs-react-native';
-import { InteractionManager } from 'react-native';
+import { InteractionManager, Platform } from 'react-native';
 
 // ============================================================================
 // Types
@@ -24,6 +23,8 @@ export interface TensorFlowStatus {
 
 let isInitialized = false;
 let initializationPromise: Promise<TensorFlowStatus> | null = null;
+let tf: typeof import('@tensorflow/tfjs') | null = null;
+let isTensorFlowAvailable = false;
 
 // ============================================================================
 // Service
@@ -37,7 +38,7 @@ class TensorFlowSetupService {
   private status: TensorFlowStatus = {
     isReady: false,
     backend: 'none',
-    version: tf.version.tfjs,
+    version: 'unknown',
   };
 
   /**
@@ -75,6 +76,13 @@ class TensorFlowSetupService {
   }
 
   /**
+   * Check if TensorFlow is available (native modules present)
+   */
+  isAvailable(): boolean {
+    return isTensorFlowAvailable;
+  }
+
+  /**
    * Get TensorFlow backend name
    */
   getBackend(): string {
@@ -85,31 +93,37 @@ class TensorFlowSetupService {
    * Dispose all tensors and clean up
    */
   dispose(): void {
-    tf.disposeVariables();
+    if (tf) {
+      tf.disposeVariables();
+    }
     isInitialized = false;
     initializationPromise = null;
     this.status = {
       isReady: false,
       backend: 'none',
-      version: tf.version.tfjs,
+      version: tf?.version?.tfjs || 'unknown',
     };
   }
 
   /**
    * Get memory info
    */
-  getMemoryInfo(): tf.MemoryInfo {
-    return tf.memory();
+  getMemoryInfo(): { numTensors: number; numBytes: number } | null {
+    if (tf) {
+      return tf.memory();
+    }
+    return null;
   }
 
   /**
    * Run a cleanup of unused tensors
    */
   async cleanup(): Promise<void> {
-    // Force garbage collection on tensors
-    tf.tidy(() => {
-      // Empty tidy block to trigger cleanup
-    });
+    if (tf) {
+      tf.tidy(() => {
+        // Empty tidy block to trigger cleanup
+      });
+    }
   }
 
   // ============================================================================
@@ -119,12 +133,36 @@ class TensorFlowSetupService {
   private async doInitialize(): Promise<TensorFlowStatus> {
     try {
       // Defer TensorFlow initialization until after interactions complete
-      // This prevents blocking the UI thread during app startup
       await new Promise<void>((resolve) => {
         InteractionManager.runAfterInteractions(() => {
           resolve();
         });
       });
+
+      // Dynamically import TensorFlow.js to catch native module errors
+      try {
+        tf = await import('@tensorflow/tfjs');
+
+        // Try to import React Native bindings (this may fail if expo-gl is not properly linked)
+        await import('@tensorflow/tfjs-react-native');
+
+        isTensorFlowAvailable = true;
+      } catch (importError) {
+        const errorMsg = importError instanceof Error ? importError.message : String(importError);
+        console.warn(`TensorFlow.js native modules not available: ${errorMsg}`);
+        console.warn('ML features will be disabled. App will continue without ML predictions.');
+
+        this.status = {
+          isReady: false,
+          backend: 'none',
+          version: 'unavailable',
+          error: `Native modules not available: ${errorMsg}`,
+        };
+
+        isInitialized = true;
+        isTensorFlowAvailable = false;
+        return this.status;
+      }
 
       // Wait for TensorFlow.js to be ready
       await tf.ready();
@@ -139,51 +177,65 @@ class TensorFlowSetupService {
       };
 
       isInitialized = true;
+      console.log(`✅ TensorFlow.js initialized with ${backend} backend`);
       return this.status;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.warn(`TensorFlow.js initialization failed: ${errorMessage}`);
 
       this.status = {
         isReady: false,
         backend: 'none',
-        version: tf.version.tfjs,
+        version: tf?.version?.tfjs || 'unknown',
         error: errorMessage,
       };
 
-      // Don't throw, return status with error
+      isInitialized = true;
+      isTensorFlowAvailable = false;
       return this.status;
     }
   }
 }
 
 // ============================================================================
-// Utility Functions
+// Utility Functions (safe wrappers)
 // ============================================================================
 
 /**
  * Create a tensor from array with proper cleanup handling
+ * Returns null if TensorFlow is not available
  */
-export function createTensor<R extends tf.Rank>(
-  values: tf.TensorLike,
-  shape?: tf.ShapeMap[R],
-  dtype?: tf.DataType
-): tf.Tensor<R> {
-  return tf.tensor(values, shape, dtype) as tf.Tensor<R>;
+export function createTensor<R extends number>(
+  values: number[] | number[][] | Float32Array,
+  shape?: number[],
+  dtype?: 'float32' | 'int32' | 'bool'
+): unknown | null {
+  if (!tf || !isTensorFlowAvailable) {
+    console.warn('TensorFlow not available, cannot create tensor');
+    return null;
+  }
+  return tf.tensor(values, shape, dtype);
 }
 
 /**
  * Safely dispose a tensor
  */
-export function disposeTensor(tensor: tf.Tensor | null | undefined): void {
-  if (tensor && !tensor.isDisposed) {
-    tensor.dispose();
+export function disposeTensor(tensor: unknown | null | undefined): void {
+  if (!tf || !tensor) return;
+  const t = tensor as { isDisposed?: boolean; dispose?: () => void };
+  if (t.dispose && !t.isDisposed) {
+    t.dispose();
   }
 }
 
 /**
  * Run operations within a tidy block for automatic memory management
  */
-export function tidyOperation<T extends tf.TensorContainer>(fn: () => T): T {
+export function tidyOperation<T>(fn: () => T): T | null {
+  if (!tf || !isTensorFlowAvailable) {
+    console.warn('TensorFlow not available, cannot run tidy operation');
+    return null;
+  }
   return tf.tidy(fn);
 }
 
@@ -210,12 +262,16 @@ export function denormalize(
   return normalizedValue * (max - min) + min;
 }
 
+/**
+ * Get TensorFlow instance (may be null if not available)
+ */
+export function getTensorFlow(): typeof import('@tensorflow/tfjs') | null {
+  return tf;
+}
+
 // ============================================================================
 // Export
 // ============================================================================
 
 export const tensorFlowSetup = new TensorFlowSetupService();
 export default tensorFlowSetup;
-
-// Re-export tf for convenience
-export { tf };

@@ -302,12 +302,12 @@ class CongestionService {
 
     const summaryData: Omit<CongestionSummaryDoc, 'lastUpdated' | 'cars'> & {
       lastUpdated: Timestamp;
-      cars: Array<{
+      cars: {
         carNumber: number;
         congestionLevel: CongestionLevel;
         reportCount: number;
         lastUpdated: Timestamp;
-      }>;
+      }[];
     } = {
       trainId: input.trainId,
       lineId: input.lineId,

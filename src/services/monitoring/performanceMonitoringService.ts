@@ -71,6 +71,7 @@ class PerformanceMonitoringService {
 
   private startTimes: Map<string, number> = new Map();
   private performanceData: Map<string, number[]> = new Map();
+  private metricsIntervalId: NodeJS.Timeout | null = null;
 
   constructor() {
     this.sessionId = this.generateSessionId();
@@ -240,6 +241,20 @@ class PerformanceMonitoringService {
     await this.processQueuedMetrics();
   }
 
+  /**
+   * Clean up all resources - call when service is no longer needed
+   */
+  destroy(): void {
+    if (this.metricsIntervalId) {
+      clearInterval(this.metricsIntervalId);
+      this.metricsIntervalId = null;
+    }
+    this.isEnabled = false;
+    this.performanceData.clear();
+    this.startTimes.clear();
+    this.metricsQueue = [];
+  }
+
   private recordMetric(name: string, value: number): void {
     if (!this.performanceData.has(name)) {
       this.performanceData.set(name, []);
@@ -316,12 +331,17 @@ class PerformanceMonitoringService {
   }
 
   private startPeriodicCollection(): void {
+    // Clear existing interval if any
+    if (this.metricsIntervalId) {
+      clearInterval(this.metricsIntervalId);
+    }
+
     // Collect metrics every 30 seconds
-    setInterval(async () => {
+    this.metricsIntervalId = setInterval(async () => {
       if (this.isEnabled) {
         try {
           this.recordMemoryUsage();
-          
+
           const metrics = await this.createMetricsSnapshot();
           await this.queueMetrics(metrics);
         } catch (error) {

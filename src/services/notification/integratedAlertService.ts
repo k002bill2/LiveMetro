@@ -194,6 +194,24 @@ class IntegratedAlertService {
   }
 
   /**
+   * Clean up all resources - call when service is no longer needed
+   */
+  destroy(): void {
+    // Stop all monitoring sessions
+    for (const monitoring of this.activeMonitoring.values()) {
+      if (monitoring.intervalId) {
+        clearInterval(monitoring.intervalId);
+      }
+    }
+    this.activeMonitoring.clear();
+    this.alertHistory = [];
+
+    // Also clean up dependent services
+    trainArrivalAlertService.destroy();
+    delayResponseAlertService.destroy();
+  }
+
+  /**
    * Get today's alerts for a user
    */
   async getTodayAlerts(_userId: string): Promise<IntegratedAlert[]> {

@@ -227,6 +227,18 @@ class DelayResponseAlertService {
   }
 
   /**
+   * Clean up all resources - call when service is no longer needed
+   */
+  destroy(): void {
+    for (const session of this.activeSessions.values()) {
+      if (session.intervalId) {
+        clearInterval(session.intervalId);
+      }
+    }
+    this.activeSessions.clear();
+  }
+
+  /**
    * Subscribe to route delays (one-time callback approach)
    */
   async subscribeToRouteDelays(

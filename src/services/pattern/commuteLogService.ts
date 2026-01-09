@@ -104,7 +104,7 @@ class CommuteLogService {
     const { maxResults = 50, dayOfWeek, fromDate, toDate } = options;
 
     const userLogsRef = collection(db, COLLECTION_NAME, userId, 'logs');
-    let q = query(userLogsRef, orderBy('createdAt', 'desc'), limit(maxResults));
+    const q = query(userLogsRef, orderBy('createdAt', 'desc'), limit(maxResults));
 
     // Note: Firestore composite queries require indexes
     // For simplicity, we filter in memory for additional criteria

@@ -13,6 +13,7 @@ export interface Station {
     readonly longitude: number;
   };
   readonly transfers: readonly string[];
+  readonly stationCode?: string; // External code (fr_code)
 }
 
 export interface SubwayLine {

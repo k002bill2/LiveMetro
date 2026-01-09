@@ -4,7 +4,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { tf, tensorFlowSetup, disposeTensor } from './tensorflowSetup';
+import { getTensorFlow, tensorFlowSetup, disposeTensor } from './tensorflowSetup';
 import { featureExtractor } from './featureExtractor';
 import { CommuteLog, DayOfWeek } from '@/models/pattern';
 import {
@@ -45,7 +45,7 @@ interface CachedPrediction {
 // ============================================================================
 
 class ModelService {
-  private model: tf.LayersModel | null = null;
+  private model: unknown | null = null;
   private metadata: ModelMetadata | null = null;
   private predictionCache: Map<string, CachedPrediction> = new Map();
   private isInitialized = false;
@@ -208,17 +208,18 @@ class ModelService {
   /**
    * Get the underlying model for training
    */
-  getModel(): tf.LayersModel | null {
+  getModel(): unknown | null {
     return this.model;
   }
 
   /**
    * Set a new model (after training)
    */
-  setModel(model: tf.LayersModel, metadata: ModelMetadata): void {
+  setModel(model: unknown, metadata: ModelMetadata): void {
     // Dispose old model
     if (this.model) {
-      this.model.dispose();
+      const m = this.model as { dispose?: () => void };
+      if (m.dispose) m.dispose();
     }
 
     this.model = model;
@@ -231,7 +232,8 @@ class ModelService {
    */
   dispose(): void {
     if (this.model) {
-      this.model.dispose();
+      const m = this.model as { dispose?: () => void };
+      if (m.dispose) m.dispose();
       this.model = null;
     }
     this.metadata = null;
@@ -247,6 +249,12 @@ class ModelService {
    * Load model from AsyncStorage
    */
   private async loadModel(): Promise<boolean> {
+    const tf = getTensorFlow();
+    if (!tf) {
+      console.warn('TensorFlow not available, cannot load model');
+      return false;
+    }
+
     try {
       // Load model
       this.model = await tf.loadLayersModel(
@@ -277,6 +285,12 @@ class ModelService {
    * Create a default LSTM model
    */
   private async createDefaultModel(): Promise<void> {
+    const tf = getTensorFlow();
+    if (!tf) {
+      console.warn('TensorFlow not available, cannot create model');
+      return;
+    }
+
     // Note: Not using tidyOperation here since LayersModel is not a Tensor
     const model = tf.sequential();
 
@@ -335,18 +349,24 @@ class ModelService {
       throw new Error('Model not loaded');
     }
 
-    let inputTensor: tf.Tensor2D | null = null;
-    let outputTensor: tf.Tensor | null = null;
+    let inputTensor: unknown | null = null;
+    let outputTensor: unknown | null = null;
 
     try {
       // Create input tensor
       inputTensor = featureExtractor.createInputTensor(featureVector);
 
+      if (!inputTensor) {
+        throw new Error('Failed to create input tensor');
+      }
+
       // Run prediction
-      outputTensor = this.model.predict(inputTensor) as tf.Tensor;
+      const model = this.model as { predict: (input: unknown) => unknown };
+      outputTensor = model.predict(inputTensor);
 
       // Get output values
-      const outputData = await outputTensor.data();
+      const tensor = outputTensor as { data: () => Promise<Float32Array> };
+      const outputData = await tensor.data();
       const departureNorm = outputData[0] ?? 0;
       const arrivalNorm = outputData[1] ?? 0;
       const delayProb = outputData[2] ?? 0;

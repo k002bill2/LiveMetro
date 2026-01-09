@@ -3,7 +3,7 @@
  * Converts commute logs to ML-ready feature vectors
  */
 
-import { tf, tidyOperation, normalize } from './tensorflowSetup';
+import { getTensorFlow, tidyOperation, normalize, tensorFlowSetup } from './tensorflowSetup';
 import { CommuteLog, FrequentRoute, DayOfWeek, parseTimeToMinutes } from '@/models/pattern';
 import {
   MLFeatureVector,
@@ -16,14 +16,15 @@ import {
 // Types
 // ============================================================================
 
+// Using unknown for tensor types to avoid direct TensorFlow dependency
 export interface FeatureExtractionResult {
-  readonly features: tf.Tensor2D;
-  readonly labels: tf.Tensor2D;
+  readonly features: unknown | null;
+  readonly labels: unknown | null;
   readonly featureVectors: readonly MLFeatureVector[];
 }
 
 export interface ExtractedFeatures {
-  readonly inputTensor: tf.Tensor2D;
+  readonly inputTensor: unknown | null;
   readonly featureVector: MLFeatureVector;
 }
 
@@ -123,14 +124,20 @@ class FeatureExtractorService {
       outputData.push(this.createOutputVector(log));
     }
 
-    // Create tensors
-    const features = tidyOperation(() =>
-      tf.tensor2d(inputData, [inputData.length, MODEL_INPUT_FEATURES])
-    );
+    // Create tensors (only if TensorFlow is available)
+    const tf = getTensorFlow();
+    let features: unknown | null = null;
+    let labels: unknown | null = null;
 
-    const labels = tidyOperation(() =>
-      tf.tensor2d(outputData, [outputData.length, 3])
-    );
+    if (tf && tensorFlowSetup.isReady()) {
+      features = tidyOperation(() =>
+        tf.tensor2d(inputData, [inputData.length, MODEL_INPUT_FEATURES])
+      );
+
+      labels = tidyOperation(() =>
+        tf.tensor2d(outputData, [outputData.length, 3])
+      );
+    }
 
     return {
       features,
@@ -141,8 +148,14 @@ class FeatureExtractorService {
 
   /**
    * Create input tensor for single prediction
+   * Returns null if TensorFlow is not available
    */
-  createInputTensor(featureVector: MLFeatureVector): tf.Tensor2D {
+  createInputTensor(featureVector: MLFeatureVector): unknown | null {
+    const tf = getTensorFlow();
+    if (!tf || !tensorFlowSetup.isReady()) {
+      return null;
+    }
+
     const inputArray = this.featureVectorToArray(featureVector);
     return tidyOperation(() =>
       tf.tensor2d([inputArray], [1, MODEL_INPUT_FEATURES])

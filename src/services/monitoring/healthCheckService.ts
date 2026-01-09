@@ -90,6 +90,15 @@ class HealthCheckService {
   }
 
   /**
+   * Clean up all resources - call when service is no longer needed
+   */
+  destroy(): void {
+    this.stopMonitoring();
+    this.lastHealthCheck = undefined;
+    this.healthHistory = [];
+  }
+
+  /**
    * Perform immediate health check
    */
   async performHealthCheck(): Promise<HealthCheckResult> {

@@ -49,6 +49,10 @@
           {
             "type": "command",
             "command": "node .claude/hooks/stopEvent.js 2>/dev/null || true"
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/contextMonitor.js 2>/dev/null || true"
           }
         ]
       }

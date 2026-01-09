@@ -72,7 +72,7 @@ interface UseSmartNotificationsReturn {
   /** Today's notification */
   todayNotification: SmartNotification | null;
   /** Week schedule */
-  weekSchedule: Array<{ date: string; dayOfWeek: DayOfWeek; alertTime: string | null }>;
+  weekSchedule: { date: string; dayOfWeek: DayOfWeek; alertTime: string | null }[];
   /** Is enabled */
   isEnabled: boolean;
   /** Loading state */
@@ -177,7 +177,7 @@ export function useSmartNotifications(): UseSmartNotificationsReturn {
   const [settings, setSettings] = useState<SmartNotificationSettings | null>(null);
   const [todayNotification, setTodayNotification] = useState<SmartNotification | null>(null);
   const [weekSchedule, setWeekSchedule] = useState<
-    Array<{ date: string; dayOfWeek: DayOfWeek; alertTime: string | null }>
+    { date: string; dayOfWeek: DayOfWeek; alertTime: string | null }[]
   >([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
