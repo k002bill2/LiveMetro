@@ -63,6 +63,8 @@ const StationDetailScreen: React.FC = () => {
   const [showCongestionModal, setShowCongestionModal] = useState(false);
   const [selectedCarNumber, setSelectedCarNumber] = useState<number | undefined>(undefined);
   const rotateAnim = useRef(new Animated.Value(0)).current;
+  const spinAnimRef = useRef<Animated.CompositeAnimation | null>(null);
+  const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // 실시간 열차 데이터 가져오기
   const {
@@ -100,14 +102,34 @@ const StationDetailScreen: React.FC = () => {
 
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 60 * 1000);
-    return () => clearInterval(timer);
+    return () => {
+      clearInterval(timer);
+      // Cleanup animation and timeout on unmount
+      if (spinAnimRef.current) {
+        spinAnimRef.current.stop();
+        spinAnimRef.current = null;
+      }
+      if (refreshTimeoutRef.current) {
+        clearTimeout(refreshTimeoutRef.current);
+        refreshTimeoutRef.current = null;
+      }
+    };
   }, []);
 
   const handleManualRefresh = () => {
     if (refreshing) return;
     setRefreshing(true);
+
+    // Stop any existing animation/timeout first
+    if (spinAnimRef.current) {
+      spinAnimRef.current.stop();
+    }
+    if (refreshTimeoutRef.current) {
+      clearTimeout(refreshTimeoutRef.current);
+    }
+
     rotateAnim.setValue(0);
-    const spin = Animated.loop(
+    spinAnimRef.current = Animated.loop(
       Animated.timing(rotateAnim, {
         toValue: 1,
         duration: 1000,
@@ -115,16 +137,20 @@ const StationDetailScreen: React.FC = () => {
         useNativeDriver: true,
       })
     );
-    spin.start();
+    spinAnimRef.current.start();
 
     // 실제 API 데이터 다시 가져오기
     refetchTrains();
 
-    setTimeout(() => {
+    refreshTimeoutRef.current = setTimeout(() => {
       setCurrentTime(new Date());
       setRefreshing(false);
-      spin.stop();
+      if (spinAnimRef.current) {
+        spinAnimRef.current.stop();
+        spinAnimRef.current = null;
+      }
       rotateAnim.setValue(0);
+      refreshTimeoutRef.current = null;
     }, 2000);
   };
 
@@ -936,4 +962,5 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
 });
 
-export default StationDetailScreen;
+// Memoize to prevent unnecessary re-renders
+export default React.memo(StationDetailScreen);

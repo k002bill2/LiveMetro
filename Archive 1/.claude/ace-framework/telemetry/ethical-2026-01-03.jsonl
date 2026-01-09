@@ -1,0 +1,6 @@
+{"timestamp":"2026-01-03T19:37:39.973Z","layer":"Layer 1 (Aspirational)","tool":"Bash","allowed":false,"warningCount":0,"blockedCount":1,"blockedReasons":[{"category":"database","severity":"CRITICAL","message":"데이터베이스 구조 변경 또는 대량 삭제는 차단됩니다.","pattern":"/DROP\\s+(TABLE|DATABASE|INDEX)/i"}]}
+{"timestamp":"2026-01-03T19:37:39.974Z","layer":"Layer 1 (Aspirational)","tool":"Bash","allowed":true,"warningCount":0,"blockedCount":0}
+{"timestamp":"2026-01-03T19:39:15.926Z","layer":"Layer 1 (Aspirational)","tool":"Bash","allowed":false,"warningCount":0,"blockedCount":1,"blockedReasons":[{"category":"database","severity":"CRITICAL","message":"데이터베이스 구조 변경 또는 대량 삭제는 차단됩니다.","pattern":"/DROP\\s+(TABLE|DATABASE|INDEX)/i"}]}
+{"timestamp":"2026-01-03T19:39:15.928Z","layer":"Layer 1 (Aspirational)","tool":"Bash","allowed":true,"warningCount":0,"blockedCount":0}
+{"timestamp":"2026-01-03T19:39:37.904Z","layer":"Layer 1 (Aspirational)","tool":"Bash","allowed":false,"warningCount":0,"blockedCount":1,"blockedReasons":[{"category":"database","severity":"CRITICAL","message":"데이터베이스 구조 변경 또는 대량 삭제는 차단됩니다.","pattern":"/DROP\\s+(TABLE|DATABASE|INDEX)/i"}]}
+{"timestamp":"2026-01-03T19:39:37.905Z","layer":"Layer 1 (Aspirational)","tool":"Bash","allowed":true,"warningCount":0,"blockedCount":0}

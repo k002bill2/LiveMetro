@@ -11,7 +11,7 @@
  * - Pull to refresh
  */
 
-import React, { useCallback, useState, useMemo, useEffect } from 'react';
+import React, { useCallback, useState, useMemo, useEffect, memo } from 'react';
 import {
   View,
   Text,
@@ -620,4 +620,5 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
 });
 
-export default FavoritesScreen;
+// Memoize to prevent unnecessary re-renders
+export default memo(FavoritesScreen);

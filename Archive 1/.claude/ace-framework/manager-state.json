@@ -1,0 +1,94 @@
+{
+  "activeManagers": {
+    "build-manager": {
+      "managerId": "build-manager",
+      "startedAt": 1767585780145,
+      "assignedWorkers": [
+        "primary-coordinator",
+        "secondary_a",
+        "secondary_b",
+        "secondary_c"
+      ],
+      "subtaskCount": 5
+    }
+  },
+  "workerAssignments": {
+    "primary-coordinator": [
+      {
+        "managerId": "build-manager",
+        "taskId": "t_1767585780143_0",
+        "taskName": "Build Common Modules",
+        "assignedAt": 1767585780145
+      },
+      {
+        "managerId": "build-manager",
+        "taskId": "t_1767585780143_4",
+        "taskName": "Integration Verification",
+        "assignedAt": 1767585780145
+      }
+    ],
+    "secondary_a": [
+      {
+        "managerId": "build-manager",
+        "taskId": "t_1767585780143_1",
+        "taskName": "Build KiiPS-FD",
+        "assignedAt": 1767585780145
+      }
+    ],
+    "secondary_b": [
+      {
+        "managerId": "build-manager",
+        "taskId": "t_1767585780143_2",
+        "taskName": "Build KiiPS-IL",
+        "assignedAt": 1767585780145
+      }
+    ],
+    "secondary_c": [
+      {
+        "managerId": "build-manager",
+        "taskId": "t_1767585780143_3",
+        "taskName": "Build KiiPS-PG",
+        "assignedAt": 1767585780145
+      }
+    ]
+  },
+  "escalationHistory": [
+    {
+      "escalationId": "esc_1767585695045_3b6sbsycs",
+      "managerId": "deployment-manager",
+      "reason": "health_check_failure",
+      "context": {
+        "serviceName": "KiiPS-FD",
+        "error": "Service unresponsive after 3 attempts",
+        "attemptCount": 3
+      },
+      "timestamp": 1767585695045,
+      "status": "escalated"
+    },
+    {
+      "escalationId": "esc_1767585737485_n3fz9hgjk",
+      "managerId": "deployment-manager",
+      "reason": "health_check_failure",
+      "context": {
+        "serviceName": "KiiPS-FD",
+        "error": "Service unresponsive after 3 attempts",
+        "attemptCount": 3
+      },
+      "timestamp": 1767585737485,
+      "status": "escalated"
+    },
+    {
+      "escalationId": "esc_1767585780146_9mrlvckck",
+      "managerId": "build-manager",
+      "reason": "dependency_resolution_failure",
+      "context": {
+        "service": "KiiPS-FD",
+        "error": "COMMON module not built",
+        "recommendation": "Build COMMON module first (Primary-only)"
+      },
+      "timestamp": 1767585780146,
+      "status": "escalated"
+    }
+  ],
+  "lastUpdated": "2026-01-05T04:03:00.146Z"
+}

@@ -30,8 +30,10 @@ import { LoadingScreen } from '../../components/common/LoadingScreen';
 import { StationCard } from '../../components/train/StationCard';
 import { TrainArrivalList } from '../../components/train/TrainArrivalList';
 import { DelayAlertBanner } from '../../components/delays';
+import { CommutePredictionCard } from '../../components/prediction';
 import { useToast } from '../../components/common/Toast';
 import { useDelayDetection } from '../../hooks/useDelayDetection';
+import { useIntegratedAlerts } from '../../hooks/useIntegratedAlerts';
 import { SPACING, RADIUS, TYPOGRAPHY } from '../../styles/modernTheme';
 import { useTheme, ThemeColors } from '../../services/theme';
 
@@ -57,6 +59,13 @@ export const HomeScreen: React.FC = () => {
   const { delays: activeDelays } = useDelayDetection({
     pollingInterval: 60000, // 1분마다 체크
     autoPolling: true,
+  });
+
+  // 통합 알림 훅 - ML 기반 출퇴근 예측
+  const { scheduleDepartureAlert } = useIntegratedAlerts({
+    autoStartMonitoring: false,
+    enableDeparture: true,
+    enableDelay: true,
   });
 
 
@@ -122,28 +131,6 @@ export const HomeScreen: React.FC = () => {
     try {
       setLoading(true);
 
-      // Development: Use 강남역 (Gangnam) for testing - Seoul API reliably returns data for this station
-      if (__DEV__) {
-        const mockGangnamStation: Station = {
-          id: 'gangnam',
-          name: '강남',
-          nameEn: 'Gangnam',
-          lineId: '2',
-          coordinates: {
-            latitude: 37.4979,
-            longitude: 127.0276,
-          },
-          transfers: [],
-        };
-
-        setNearbyStations([mockGangnamStation]);
-        setSelectedStation(mockGangnamStation);
-        setLocationPermission(true);
-        setLoading(false);
-        showSuccess('개발 모드: 강남역으로 설정되었습니다');
-        return;
-      }
-      
       // Request location permission
       const { status } = await Location.requestForegroundPermissionsAsync();
       setLocationPermission(status === 'granted');
@@ -185,17 +172,39 @@ export const HomeScreen: React.FC = () => {
     showInfo('선택이 초기화되었습니다');
   };
 
+  // 출발 알림 예약 핸들러
+  const handleScheduleAlert = async (): Promise<void> => {
+    const alert = await scheduleDepartureAlert(15);
+    if (alert) {
+      showSuccess(`${alert.alertTime}에 출발 알림이 예약되었습니다`);
+    }
+  };
+
+  // 주간 예측 보기 핸들러
+  const handleViewPredictions = (): void => {
+    navigation.navigate('WeeklyPrediction' as never);
+  };
+
+  // Animation reference for proper cleanup
+  const rotateAnimRef = useRef<Animated.CompositeAnimation | null>(null);
+
   const onRefresh = async (): Promise<void> => {
     setRefreshing(true);
 
-    // Rotate animation
-    Animated.loop(
+    // Stop any existing animation first
+    if (rotateAnimRef.current) {
+      rotateAnimRef.current.stop();
+    }
+
+    // Rotate animation with ref for cleanup
+    rotateAnimRef.current = Animated.loop(
       Animated.timing(rotateAnim, {
         toValue: 1,
         duration: 1000,
         useNativeDriver: true,
       })
-    ).start();
+    );
+    rotateAnimRef.current.start();
 
     try {
       if (locationPermission) {
@@ -206,8 +215,13 @@ export const HomeScreen: React.FC = () => {
     } catch {
       // Error refreshing
     } finally {
-      setRefreshing(false);
+      // Stop animation and reset
+      if (rotateAnimRef.current) {
+        rotateAnimRef.current.stop();
+        rotateAnimRef.current = null;
+      }
       rotateAnim.setValue(0);
+      setRefreshing(false);
     }
   };
 
@@ -226,6 +240,14 @@ export const HomeScreen: React.FC = () => {
     initializeScreen();
     // setupNetworkListener is safe to run once
     setIsOnline(true);
+
+    // Cleanup on unmount
+    return () => {
+      if (rotateAnimRef.current) {
+        rotateAnimRef.current.stop();
+        rotateAnimRef.current = null;
+      }
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -256,6 +278,12 @@ export const HomeScreen: React.FC = () => {
           실시간 지하철 정보를 확인하세요
         </Text>
       </View>
+
+      {/* ML-based Commute Prediction Card */}
+      <CommutePredictionCard
+        onScheduleAlert={handleScheduleAlert}
+        onViewDetails={handleViewPredictions}
+      />
 
       {/* Offline Banner */}
       {!isOnline && (
@@ -563,4 +591,6 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     lineHeight: TYPOGRAPHY.lineHeight.relaxed * TYPOGRAPHY.fontSize.sm,
   },
 });
-export default HomeScreen;
+
+// Memoize to prevent unnecessary re-renders
+export default React.memo(HomeScreen);

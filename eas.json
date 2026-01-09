@@ -19,14 +19,20 @@
     "preview": {
       "distribution": "internal",
       "ios": {
-        "resourceClass": "m1-medium",
-        "simulator": true
+        "resourceClass": "m1-medium"
       },
       "android": {
         "buildType": "apk"
       },
       "env": {
-        "APP_ENV": "preview"
+        "APP_ENV": "preview",
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyArkmevCGo4T4fUqU4uN7vZUZBYg5culXU",
+        "EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN": "livemetro-cc092.firebaseapp.com",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "livemetro-cc092",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "livemetro-cc092.appspot.com",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "450020925480",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:450020925480:web:7edf434219fde3a2d9951d",
+        "EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY": "6d486a6a6a3030323630556c4e554f"
       }
     },
     "production": {

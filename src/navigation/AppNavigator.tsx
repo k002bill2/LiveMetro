@@ -18,6 +18,7 @@ import AlertsScreen from '@screens/alerts/AlertsScreen';
 import SettingsNavigator from '@/navigation/SettingsNavigator';
 import StationDetailScreen from '@screens/station/StationDetailScreen';
 import StationNavigatorScreen from '@screens/station/StationNavigatorScreen';
+import { WeeklyPredictionScreen } from '@screens/prediction';
 import { WelcomeScreen } from '../screens/auth/WelcomeScreen';
 import { AuthScreen } from '../screens/auth/AuthScreen';
 import { AppTabParamList, AppStackParamList } from './types';
@@ -155,6 +156,14 @@ const AppNavigator: React.FC = () => {
                 fontWeight: 'bold',
                 color: colors.textPrimary,
               },
+            }}
+          />
+          <Stack.Screen
+            name="WeeklyPrediction"
+            component={WeeklyPredictionScreen}
+            options={{
+              headerShown: false,
+              title: '주간 예측',
             }}
           />
         </>

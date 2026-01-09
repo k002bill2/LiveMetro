@@ -40,6 +40,7 @@
     },
     "android": {
       "package": "com.livemetro.app",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#1976d2"

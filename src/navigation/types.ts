@@ -90,6 +90,10 @@ export type AppStackParamList = {
     toStationName: string;
   };
 
+  // ML Prediction screens
+  WeeklyPrediction: undefined;
+  AlertSettings: undefined;
+
   // Unauthenticated screens
   Welcome: undefined;
   Auth: undefined;

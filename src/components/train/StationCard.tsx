@@ -22,7 +22,7 @@ import {
   CheckCircle,
 } from 'lucide-react-native';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, StyleSheet, Text, TouchableOpacity, View, Pressable, GestureResponderEvent } from 'react-native';
 
 import { useRealtimeTrains } from '../../hooks/useRealtimeTrains';
 import { Station } from '../../models/train';
@@ -108,7 +108,8 @@ export const StationCard: React.FC<StationCardProps> = memo(
     }, [user?.preferences?.favoriteStations, station.id, station.lineId]);
 
     const toggleFavorite = useCallback(
-      async (e: any): Promise<void> => {
+      async (e: GestureResponderEvent): Promise<void> => {
+        // Prevent event bubbling to parent TouchableOpacity
         e.stopPropagation();
 
         if (!user) {
@@ -272,10 +273,11 @@ export const StationCard: React.FC<StationCardProps> = memo(
               {/* Favorite Toggle Button */}
               {enableFavorite && user && (
                 <Animated.View style={{ transform: [{ scale: favoriteScaleAnim }] }}>
-                  <TouchableOpacity
+                  <Pressable
                     style={styles.favoriteButton}
                     onPress={toggleFavorite}
                     disabled={isTogglingFavorite}
+                    hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                     accessible
                     accessibilityRole="button"
                     accessibilityLabel={isFavorite ? '즐겨찾기 제거' : '즐겨찾기 추가'}
@@ -285,7 +287,7 @@ export const StationCard: React.FC<StationCardProps> = memo(
                       color={isFavorite ? colors.textPrimary : colors.textTertiary}
                       fill={isFavorite ? colors.textPrimary : 'transparent'}
                     />
-                  </TouchableOpacity>
+                  </Pressable>
                 </Animated.View>
               )}
             </View>
@@ -341,26 +343,28 @@ export const StationCard: React.FC<StationCardProps> = memo(
 
           {/* Route Search Buttons */}
           <View style={styles.actionButtons}>
-            <TouchableOpacity
+            <Pressable
               style={[styles.actionButton, styles.startButton]}
               onPress={e => {
                 e.stopPropagation();
                 onSetStart?.();
               }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <MapPin size={14} color={colors.textInverse} />
               <Text style={styles.actionButtonText}>출발</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
+            </Pressable>
+            <Pressable
               style={[styles.actionButton, styles.endButton]}
               onPress={e => {
                 e.stopPropagation();
                 onSetEnd?.();
               }}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               <Navigation size={14} color={colors.textInverse} />
               <Text style={styles.actionButtonText}>도착</Text>
-            </TouchableOpacity>
+            </Pressable>
           </View>
 
           {/* Selection Indicator */}

@@ -1,0 +1,237 @@
+{
+  "permissionRules": [
+    {
+      "type": "allow",
+      "tool": "Bash",
+      "pattern": "mvn:*",
+      "description": "Allow Maven commands for building KiiPS modules"
+    },
+    {
+      "type": "allow",
+      "tool": "Bash",
+      "pattern": "java:*",
+      "description": "Allow Java commands for running services"
+    },
+    {
+      "type": "allow",
+      "tool": "Bash",
+      "pattern": "svn:*",
+      "description": "Allow SVN commands (KiiPS uses SVN for version control)"
+    },
+    {
+      "type": "allow",
+      "tool": "Bash",
+      "pattern": "git:*",
+      "description": "Allow Git commands"
+    },
+    {
+      "type": "allow",
+      "tool": "Bash",
+      "pattern": "./start.sh:*",
+      "description": "Allow starting KiiPS services"
+    },
+    {
+      "type": "allow",
+      "tool": "Bash",
+      "pattern": "./stop.sh:*",
+      "description": "Allow stopping KiiPS services"
+    },
+    {
+      "type": "allow",
+      "tool": "Bash",
+      "pattern": "tail:*",
+      "description": "Allow viewing log files"
+    },
+    {
+      "type": "allow",
+      "tool": "Bash",
+      "pattern": "cat:*",
+      "description": "Allow reading file contents"
+    },
+    {
+      "type": "allow",
+      "tool": "Bash",
+      "pattern": "grep:*",
+      "description": "Allow searching in files"
+    },
+    {
+      "type": "allow",
+      "tool": "Bash",
+      "pattern": "find:*",
+      "description": "Allow finding files"
+    },
+    {
+      "type": "allow",
+      "tool": "Bash",
+      "pattern": "ls:*",
+      "description": "Allow listing directories"
+    },
+    {
+      "type": "allow",
+      "tool": "Bash",
+      "pattern": "mkdir:*",
+      "description": "Allow creating directories"
+    },
+    {
+      "type": "allow",
+      "tool": "Read",
+      "pattern": "**/*.java",
+      "description": "Allow reading Java source files"
+    },
+    {
+      "type": "allow",
+      "tool": "Read",
+      "pattern": "**/*.xml",
+      "description": "Allow reading XML configuration files (pom.xml, etc.)"
+    },
+    {
+      "type": "allow",
+      "tool": "Read",
+      "pattern": "**/*.properties",
+      "description": "Allow reading properties files"
+    },
+    {
+      "type": "allow",
+      "tool": "Read",
+      "pattern": "**/*.jsp",
+      "description": "Allow reading JSP files"
+    },
+    {
+      "type": "allow",
+      "tool": "Read",
+      "pattern": "**/*.js",
+      "description": "Allow reading JavaScript files"
+    },
+    {
+      "type": "allow",
+      "tool": "Read",
+      "pattern": "**/*.css",
+      "description": "Allow reading CSS files"
+    },
+    {
+      "type": "allow",
+      "tool": "Read",
+      "pattern": "**/*.scss",
+      "description": "Allow reading SCSS files"
+    },
+    {
+      "type": "allow",
+      "tool": "Read",
+      "pattern": "**/*.sh",
+      "description": "Allow reading shell scripts"
+    },
+    {
+      "type": "allow",
+      "tool": "Read",
+      "pattern": "**/*.md",
+      "description": "Allow reading markdown files"
+    },
+    {
+      "type": "allow",
+      "tool": "Read",
+      "pattern": "**/*.json",
+      "description": "Allow reading JSON files"
+    },
+    {
+      "type": "deny",
+      "tool": "Bash",
+      "pattern": "rm -rf:*",
+      "description": "Prevent recursive file deletion"
+    },
+    {
+      "type": "deny",
+      "tool": "Bash",
+      "pattern": "rm:*",
+      "description": "Prevent file deletion without approval"
+    },
+    {
+      "type": "deny",
+      "tool": "Bash",
+      "pattern": "DROP:*",
+      "description": "Prevent database DROP commands"
+    },
+    {
+      "type": "deny",
+      "tool": "Bash",
+      "pattern": "TRUNCATE:*",
+      "description": "Prevent database TRUNCATE commands"
+    },
+    {
+      "type": "deny",
+      "tool": "Bash",
+      "pattern": "DELETE FROM:*",
+      "description": "Prevent database DELETE commands"
+    },
+    {
+      "type": "deny",
+      "tool": "Bash",
+      "pattern": "sudo:*",
+      "description": "Prevent sudo commands"
+    },
+    {
+      "type": "deny",
+      "tool": "Read",
+      "pattern": "**/.env*",
+      "description": "Prevent reading environment secrets"
+    },
+    {
+      "type": "deny",
+      "tool": "Read",
+      "pattern": "**/password*",
+      "description": "Prevent reading password files"
+    }
+  ],
+  "mcpContextUris": [],
+  "thinking": {
+    "enabled": true,
+    "mode": "auto"
+  },
+  "autoAcceptEdits": false,
+  "contextWindowWarningThreshold": 0.8,
+  "maxTokens": 8000,
+  "enabledPlugins": {
+    "claude-mem@thedotmack": true
+  },
+  "lsp": {
+    "java": {
+      "command": "/opt/homebrew/bin/jdtls",
+      "args": [
+        "-data",
+        "${workspaceFolder}/.jdt"
+      ],
+      "initializationOptions": {
+        "workspace": "${workspaceFolder}",
+        "settings": {
+          "java": {
+            "home": "/opt/homebrew/opt/openjdk/libexec/openjdk.jdk/Contents/Home",
+            "configuration": {
+              "runtimes": [
+                {
+                  "name": "JavaSE-1.8",
+                  "path": "/Library/Java/JavaVirtualMachines/jdk-1.8.jdk/Contents/Home",
+                  "default": true
+                }
+              ]
+            },
+            "project": {
+              "referencedLibraries": [
+                "**/*.jar"
+              ]
+            },
+            "maven": {
+              "downloadSources": true,
+              "downloadJavadoc": false
+            }
+          }
+        }
+      },
+      "rootPatterns": [
+        "pom.xml",
+        ".git"
+      ],
+      "filetypes": [
+        "java"
+      ]
+    }
+  }
+}

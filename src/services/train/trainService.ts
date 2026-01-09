@@ -16,6 +16,7 @@ import {
   Unsubscribe
 } from 'firebase/firestore';
 import { firestore } from '../firebase/config';
+import { throttle } from '../../utils/performanceUtils';
 import {
   Train,
   Station,
@@ -124,9 +125,10 @@ class TrainService {
 
   /**
    * Subscribe to real-time train updates for a station
+   * Callback is throttled to prevent excessive UI updates
    */
   subscribeToTrainUpdates(
-    stationId: string, 
+    stationId: string,
     callback: (trains: Train[]) => void
   ): () => void {
     const trainsQuery = query(
@@ -134,6 +136,9 @@ class TrainService {
       where('currentStationId', '==', stationId),
       orderBy('arrivalTime')
     );
+
+    // Throttle callback to prevent UI blocking from rapid updates
+    const throttledCallback = throttle(callback, 1000);
 
     const unsubscribe = onSnapshot(
       trainsQuery,
@@ -145,7 +150,7 @@ class TrainService {
           lastUpdated: doc.data().lastUpdated.toDate()
         } as Train));
 
-        callback(trains);
+        throttledCallback(trains);
       },
       (error) => {
         console.error('Error in train updates subscription:', error);

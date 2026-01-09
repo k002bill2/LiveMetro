@@ -1,0 +1,714 @@
+{
+  "ace-coordinator": {
+    "type": "framework",
+    "enforcement": "require",
+    "priority": "critical",
+    "description": "ACE Framework coordination for parallel agents and ethical validation",
+    "aceLayer": "Layer 4 (Executive Function)",
+    "promptTriggers": {
+      "keywords": ["병렬", "parallel", "에이전트", "agent", "조정", "coordination", "ACE"],
+      "intentPatterns": [
+        "(병렬|parallel).*?(작업|task|agent)",
+        "(multi|여러).*?(agent|에이전트)",
+        "(coordinate|조정).*?(task|작업)"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": [".claude/ace-framework/**", ".claude/coordination/**"],
+      "contentPatterns": ["aceFramework", "Layer 1", "Layer 4", "parallelCoordinator"]
+    }
+  },
+
+  "ace-ethical-validator": {
+    "type": "guardrail",
+    "enforcement": "block",
+    "priority": "critical",
+    "description": "ACE Layer 1 ethical validation - automatically enforced",
+    "aceLayer": "Layer 1 (Aspirational)",
+    "promptTriggers": {
+      "keywords": ["윤리", "ethical", "위험", "dangerous", "프로덕션", "production", "삭제", "delete"],
+      "intentPatterns": [
+        "(production|프로덕션).*?(database|DB|데이터베이스)",
+        "(delete|drop|truncate).*?(all|모든|전체)",
+        "(force|강제).*?(push|배포)"
+      ]
+    }
+  },
+
+  "kiips-backend-guidelines": {
+    "type": "guideline",
+    "enforcement": "suggest",
+    "priority": "high",
+    "promptTriggers": {
+      "keywords": ["controller", "service", "dao", "API", "endpoint", "REST", "백엔드", "컨트롤러"],
+      "intentPatterns": [
+        "(create|add|make).*?(controller|service|endpoint)",
+        "(fix|debug).*?(API|service)",
+        "(how to|best practice).*?(backend|controller)"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": ["**/controll/**/*.java", "**/service/**/*.java", "**/dao/**/*.java"],
+      "contentPatterns": ["@RestController", "@Service", "extends DAO"]
+    }
+  },
+
+  "kiips-frontend-guidelines": {
+    "type": "guideline",
+    "enforcement": "suggest",
+    "priority": "high",
+    "promptTriggers": {
+      "keywords": ["JSP", "JavaScript", "UI", "프론트엔드", "화면", "페이지", "jQuery"],
+      "intentPatterns": [
+        "(create|update|modify).*?(page|screen|UI|화면)",
+        "(fix|style).*?(JSP|JavaScript)"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": ["**/jsp/**/*.jsp", "**/static/**/*.js", "**/static/**/*.css"],
+      "contentPatterns": ["<%@", "$(document)", "function "]
+    }
+  },
+
+  "kiips-security-check": {
+    "type": "guardrail",
+    "enforcement": "require",
+    "priority": "critical",
+    "promptTriggers": {
+      "keywords": ["인증", "로그인", "JWT", "토큰", "비밀번호", "암호화", "보안"],
+      "intentPatterns": [
+        ".*?(auth|login|token).*?",
+        ".*?(password|secret|encrypt).*?"
+      ]
+    }
+  },
+
+  "kiips-database-verification": {
+    "type": "guardrail",
+    "enforcement": "block",
+    "priority": "critical",
+    "promptTriggers": {
+      "keywords": ["database", "DB", "테이블", "스키마", "마이그레이션", "MyBatis"],
+      "intentPatterns": [
+        ".*?(alter|modify|change).*?table",
+        ".*?(drop|delete|truncate).*?",
+        ".*?(schema|migration).*?"
+      ]
+    }
+  },
+
+  "kiips-common-patterns": {
+    "type": "guideline",
+    "enforcement": "suggest",
+    "priority": "normal",
+    "promptTriggers": {
+      "keywords": ["COMMON", "UTILS", "GlobalExceptionHandler", "ErrorNotificationService", "공통"],
+      "intentPatterns": [
+        "(use|implement).*?(common|shared|util)"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": ["**/KiiPS-COMMON/**/*.java", "**/KiiPS-UTILS/**/*.java"]
+    }
+  },
+
+  "kiips-build-deploy": {
+    "type": "guideline",
+    "enforcement": "suggest",
+    "priority": "high",
+    "promptTriggers": {
+      "keywords": ["빌드", "배포", "build", "deploy", "maven", "mvn", "start.sh", "stop.sh"],
+      "intentPatterns": [
+        "(build|deploy|run).*?(service|module)",
+        "(how to).*?(build|deploy)"
+      ]
+    }
+  },
+
+  "kiips-maven-builder": {
+    "type": "domain",
+    "enforcement": "require",
+    "priority": "critical",
+    "managerAgent": "build-manager",
+    "orchestrationSkill": "build-orchestration",
+    "autoActivationLevel": "manager",
+    "delegationRules": {
+      "managerHandles": "빌드 조정, 의존성 해결, 병렬 그룹 식별, 워커 할당",
+      "workerHandles": "Maven 명령 실행, 로그 모니터링, 아티팩트 검증"
+    },
+    "promptTriggers": {
+      "keywords": ["빌드", "build", "maven", "mvn", "compile", "package", "KiiPS-HUB"],
+      "intentPatterns": [
+        "(build|compile|package).*?(service|module|project)",
+        ".*?KiiPS-(FD|IL|PG|COMMON|UTILS).*?(build|빌드)",
+        "(how to|need to).*?build"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": ["**/pom.xml"],
+      "contentPatterns": ["<artifactId>KiiPS-", "<packaging>"]
+    }
+  },
+
+  "kiips-service-deployer": {
+    "type": "domain",
+    "enforcement": "require",
+    "priority": "high",
+    "managerAgent": "deployment-manager",
+    "orchestrationSkill": "deployment-pipeline-orchestration",
+    "autoActivationLevel": "manager",
+    "delegationRules": {
+      "managerHandles": "배포 파이프라인 조정, 헬스체크 검증, 로그 분석 감독, 롤백 관리",
+      "workerHandles": "API 테스트 실행, 로그 파일 분석",
+      "primaryHandles": "서비스 start/stop 직접 실행 (Primary 전용 권한)"
+    },
+    "promptTriggers": {
+      "keywords": ["배포", "deploy", "start", "stop", "restart", "서비스 시작", "서비스 중지"],
+      "intentPatterns": [
+        "(start|stop|restart|deploy).*?service",
+        ".*?(배포|시작|중지|재시작).*?서비스",
+        "check.*?(health|status)"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": ["**/start.sh", "**/stop.sh"]
+    }
+  },
+
+  "kiips-api-tester": {
+    "type": "domain",
+    "enforcement": "suggest",
+    "priority": "high",
+    "managerAgent": "deployment-manager",
+    "orchestrationSkill": "deployment-pipeline-orchestration",
+    "autoActivationLevel": "worker",
+    "delegationRules": {
+      "managerHandles": "헬스체크 검증 조정, API 테스트 시나리오 계획, 결과 집계",
+      "workerHandles": "실제 API 호출, curl 명령 실행, JWT 토큰 검증, 엔드포인트 테스트"
+    },
+    "promptTriggers": {
+      "keywords": ["API", "테스트", "test", "curl", "gateway", "endpoint", "JWT"],
+      "intentPatterns": [
+        "test.*?(API|endpoint|gateway)",
+        "(verify|check).*?(routing|authentication)",
+        ".*?(테스트|검증).*?(API|게이트웨이)"
+      ]
+    }
+  },
+
+  "kiips-log-analyzer": {
+    "type": "domain",
+    "enforcement": "suggest",
+    "priority": "high",
+    "managerAgent": "deployment-manager",
+    "orchestrationSkill": "deployment-pipeline-orchestration",
+    "autoActivationLevel": "worker",
+    "delegationRules": {
+      "managerHandles": "로그 분석 감독, 에러 패턴 심각도 분류, 롤백 결정",
+      "workerHandles": "로그 파일 읽기, grep/tail 실행, ERROR/WARN 패턴 검색, 스택 트레이스 분석"
+    },
+    "promptTriggers": {
+      "keywords": ["로그", "log", "error", "에러", "exception", "분석", "analyze", "grep"],
+      "intentPatterns": [
+        "(check|analyze|find).*?(log|error)",
+        ".*?(로그|에러).*?(확인|분석|검색)",
+        "(troubleshoot|debug).*?issue"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": ["**/logs/*.log"]
+    }
+  },
+
+  "kiips-feature-planner": {
+    "type": "domain",
+    "enforcement": "require",
+    "priority": "high",
+    "managerAgent": "feature-manager",
+    "orchestrationSkill": "feature-lifecycle-orchestration",
+    "autoActivationLevel": "manager",
+    "delegationRules": {
+      "managerHandles": "기능 개발 라이프사이클 조정, 단계별 handoff (architect→developer→QA), 품질 체크포인트 강제, dev docs 관리",
+      "workerHandles": "아키텍처 설계 (kiips-architect), 코드 구현 (kiips-developer), UI 개발 (kiips-ui-designer), 검증 (checklist-generator)"
+    },
+    "promptTriggers": {
+      "keywords": ["기능", "feature", "개발", "계획", "plan", "구현", "implement"],
+      "intentPatterns": [
+        "(새로운|new).*?(기능|feature)",
+        "(개발|develop).*?(계획|plan)",
+        "(구현|implement).*?(기능|feature)",
+        "feature.*?(추가|add|create)"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": ["dev/active/**/*-plan.md"],
+      "contentPatterns": ["## Implementation Plan", "## Phase"]
+    }
+  },
+
+  "kiips-detail-page-planner": {
+    "type": "domain",
+    "enforcement": "require",
+    "priority": "high",
+    "description": "모듈 상세페이지 개발 계획서 자동 생성 (2-4시간 규모의 UI 중심 개발)",
+    "managerAgent": "ui-manager",
+    "orchestrationSkill": "ui-workflow-orchestration",
+    "autoActivationLevel": "manager",
+    "delegationRules": {
+      "managerHandles": "상세페이지 개발 계획 수립, Phase별 진행 관리, Quality Gate 검증 조정",
+      "workerHandles": "JSP 생성 (kiips-ui-component-builder), 반응형 검증 (kiips-responsive-validator), 접근성 검증 (kiips-a11y-checker)"
+    },
+    "promptTriggers": {
+      "keywords": [
+        "상세페이지",
+        "detail page",
+        "상세화면",
+        "투자기업상세",
+        "펀드상세",
+        "기업상세",
+        "detail view"
+      ],
+      "intentPatterns": [
+        "(생성|create|만들|개발).*?(상세|detail).*?(페이지|page|화면)",
+        "(new|새|신규).*?(detail|상세).*?(screen|화면|page)",
+        ".*?[A-Z]{2}0[0-9]0[0-9].*?(상세|detail|생성|만들)",
+        "(상세|detail).*?(JSP|jsp).*?(생성|만들|create)"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": ["**/jsp/kiips/**/*0[0-9]0[0-9].jsp"],
+      "contentPatterns": ["cd-container", "cd-header", "cd-card", "cd-grid"]
+    },
+    "relatedSkills": [
+      "kiips-ui-component-builder",
+      "kiips-responsive-validator",
+      "kiips-a11y-checker",
+      "kiips-realgrid-builder"
+    ]
+  },
+
+  "kiips-ui-component-builder": {
+    "type": "domain",
+    "enforcement": "require",
+    "priority": "high",
+    "description": "JSP 컴포넌트 템플릿 기반 생성 (RealGrid, ApexCharts, Bootstrap 폼)",
+    "managerAgent": "ui-manager",
+    "orchestrationSkill": "ui-workflow-orchestration",
+    "autoActivationLevel": "worker",
+    "delegationRules": {
+      "managerHandles": "UI 컴포넌트 구현 계획, 템플릿 선택 조정, 검증 파이프라인 조정 (반응형→접근성→크로스브라우저)",
+      "workerHandles": "JSP 파일 생성, RealGrid 초기화 코드, ApexCharts 설정, Bootstrap 레이아웃, SCSS 스타일 작성"
+    },
+    "promptTriggers": {
+      "keywords": [
+        "UI 컴포넌트",
+        "JSP 생성",
+        "그리드 생성",
+        "차트 추가",
+        "페이지 생성",
+        "화면 개발",
+        "컴포넌트 템플릿",
+        "펀드 목록",
+        "투자 대시보드",
+        "검색 폼",
+        "모달 팝업",
+        "탭 레이아웃"
+      ],
+      "intentPatterns": [
+        "(create|생성|만들).*?(UI|component|컴포넌트|page|페이지|screen|화면)",
+        "(add|추가).*?(grid|그리드|chart|차트|form|폼|modal|모달)",
+        "(build|develop).*?(JSP|화면|페이지)",
+        "(new|새).*?(page|화면|component|컴포넌트)"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": ["**/*.jsp", "**/webapp/**/*.html"],
+      "contentPatterns": ["RealGridJS", "ApexCharts", "Bootstrap"]
+    }
+  },
+
+  "kiips-realgrid-builder": {
+    "type": "domain",
+    "enforcement": "require",
+    "priority": "critical",
+    "description": "RealGrid 2.8.8 전문 설정 및 최적화",
+    "managerAgent": "ui-manager",
+    "orchestrationSkill": "ui-workflow-orchestration",
+    "autoActivationLevel": "worker",
+    "delegationRules": {
+      "managerHandles": "RealGrid 설정 감독, 성능 최적화 권장사항, Excel export/import 전략 검토",
+      "workerHandles": "GridView/DataProvider 초기화, 컬럼 정의, 셀 에디터 설정, 필터/정렬/그룹핑 구현, Excel 다운로드 로직"
+    },
+    "promptTriggers": {
+      "keywords": [
+        "RealGrid",
+        "그리드 설정",
+        "그리드 편집",
+        "셀 에디터",
+        "엑셀 내보내기",
+        "엑셀 가져오기",
+        "그리드 필터",
+        "그리드 정렬",
+        "데이터 그리드",
+        "그룹핑",
+        "집계"
+      ],
+      "intentPatterns": [
+        "RealGrid.*?(설정|config|setup|configure)",
+        "(grid|그리드).*?(edit|편집|export|내보내기|import|가져오기)",
+        "(Excel|엑셀).*?(export|import|다운로드|업로드)",
+        "(cell|셀).*?(editor|에디터|edit|편집)"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": ["**/*grid*.js", "**/*Grid*.js"],
+      "contentPatterns": ["RealGridJS", "GridView", "DataProvider", "setFields", "setColumns"]
+    }
+  },
+
+  "kiips-responsive-validator": {
+    "type": "validation",
+    "enforcement": "require",
+    "priority": "high",
+    "description": "반응형 디자인 자동 검증 및 테스트",
+    "managerAgent": "ui-manager",
+    "orchestrationSkill": "ui-workflow-orchestration",
+    "autoActivationLevel": "worker",
+    "delegationRules": {
+      "managerHandles": "검증 파이프라인 조정, 브레이크포인트별 테스트 순서 관리, 실패 시 개발자 피드백 조정",
+      "workerHandles": "Bootstrap 브레이크포인트 검증 (xs/sm/md/lg/xl), 터치 타겟 크기 측정 (≥44px), 미디어 쿼리 정합성 검사"
+    },
+    "promptTriggers": {
+      "keywords": [
+        "반응형 테스트",
+        "모바일 확인",
+        "브레이크포인트",
+        "반응형 검증",
+        "모바일 레이아웃",
+        "터치 타겟",
+        "responsive"
+      ],
+      "intentPatterns": [
+        "(responsive|반응형).*?(test|테스트|check|확인|validate|검증)",
+        "(mobile|모바일).*?(layout|레이아웃|view|화면)",
+        "(breakpoint|브레이크포인트).*?",
+        "(touch|터치).*?(target|타겟)"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": ["**/*.jsp", "**/*.scss", "**/*.css"],
+      "contentPatterns": ["@media", "col-md-", "col-lg-", "img-fluid"]
+    }
+  },
+
+  "kiips-a11y-checker": {
+    "type": "validation",
+    "enforcement": "require",
+    "priority": "high",
+    "description": "웹 접근성 (WCAG 2.1 AA) 검증 및 자동 수정",
+    "managerAgent": "ui-manager",
+    "orchestrationSkill": "ui-workflow-orchestration",
+    "autoActivationLevel": "worker",
+    "delegationRules": {
+      "managerHandles": "WCAG 2.1 AA 준수 강제, 접근성 검증 파이프라인 조정, 자동 수정 vs 경고 판단",
+      "workerHandles": "ARIA 속성 검증, 색상 대비 측정 (≥4.5:1), 키보드 네비게이션 테스트, 스크린 리더 호환성 검사, alt/label 누락 탐지"
+    },
+    "promptTriggers": {
+      "keywords": [
+        "접근성",
+        "WCAG",
+        "ARIA",
+        "스크린 리더",
+        "키보드 네비게이션",
+        "색상 대비",
+        "웹 표준",
+        "accessibility",
+        "a11y"
+      ],
+      "intentPatterns": [
+        "(accessibility|접근성|a11y).*?(check|검증|validate|test)",
+        "WCAG.*?(verify|check|validate)",
+        "ARIA.*?(label|role|attribute)",
+        "(screen reader|스크린 리더).*?",
+        "(keyboard|키보드).*?(navigation|네비게이션|nav)"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": ["**/*.jsp", "**/*.html"],
+      "contentPatterns": ["aria-", "role=", "alt=", "label"]
+    }
+  },
+
+  "kiips-scss-theme-manager": {
+    "type": "domain",
+    "enforcement": "suggest",
+    "priority": "normal",
+    "description": "SCSS 테마 시스템 및 디자인 토큰 관리",
+    "managerAgent": "ui-manager",
+    "orchestrationSkill": "ui-workflow-orchestration",
+    "autoActivationLevel": "worker",
+    "delegationRules": {
+      "managerHandles": "테마 일관성 관리, 디자인 토큰 변경 영향 범위 검토, 스타일 가이드 준수 감독",
+      "workerHandles": "SCSS 변수 정의, 믹스인 작성, 테마 파일 생성, CSS 변수 변환, 스타일 컴파일 검증"
+    },
+    "promptTriggers": {
+      "keywords": [
+        "SCSS",
+        "스타일",
+        "테마",
+        "디자인 토큰",
+        "CSS 변수",
+        "믹스인",
+        "mixin",
+        "스타일 가이드",
+        "theme"
+      ],
+      "intentPatterns": [
+        "SCSS.*?(setup|설정|create|생성)",
+        "(theme|테마).*?(manage|관리|change|변경)",
+        "(design token|디자인 토큰).*?",
+        "(mixin|믹스인).*?(create|생성|add|추가)",
+        "(style|스타일).*?(guide|가이드|system|시스템)"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": ["**/*.scss", "**/_*.scss"],
+      "contentPatterns": ["@import", "@mixin", "$primary", "$theme"]
+    }
+  },
+
+  "hook-creator": {
+    "type": "tool",
+    "enforcement": "suggest",
+    "priority": "normal",
+    "promptTriggers": {
+      "keywords": ["hook", "훅", "자동화", "automation", "이벤트"],
+      "intentPatterns": [
+        "(hook|훅).*?(만들|생성|create)",
+        "(자동화|automation).*?(설정|configure)",
+        "(PreToolUse|PostToolUse|Stop).*?hook"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": [".claude/hooks/**", ".claudecode.json"],
+      "contentPatterns": ["\"hooks\":", "PreToolUse", "PostToolUse"]
+    }
+  },
+
+  "skill-creator": {
+    "type": "tool",
+    "enforcement": "suggest",
+    "priority": "normal",
+    "promptTriggers": {
+      "keywords": ["skill", "스킬", "생성"],
+      "intentPatterns": [
+        "(skill|스킬).*?(만들|생성|create)",
+        "(새로운|new).*?(skill|스킬)",
+        "skill.*?(추가|add)"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": [".claude/skills/**/SKILL.md"],
+      "contentPatterns": ["---", "name:", "description:"]
+    }
+  },
+
+  "slash-command-creator": {
+    "type": "tool",
+    "enforcement": "suggest",
+    "priority": "normal",
+    "promptTriggers": {
+      "keywords": ["command", "명령어", "slash"],
+      "intentPatterns": [
+        "(slash|/).*?(command|명령어)",
+        "(command|명령어).*?(만들|생성|create)",
+        "커스텀.*?(명령어|command)"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": [".claude/commands/**/*.md"],
+      "contentPatterns": ["---", "command:", "description:"]
+    }
+  },
+
+  "subagent-creator": {
+    "type": "tool",
+    "enforcement": "suggest",
+    "priority": "normal",
+    "promptTriggers": {
+      "keywords": ["agent", "에이전트", "subagent"],
+      "intentPatterns": [
+        "(agent|에이전트).*?(만들|생성|create)",
+        "(sub-agent|서브에이전트).*?(추가|add)",
+        "전문.*?(agent|에이전트)"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": [".claude/agents/**/*.md"],
+      "contentPatterns": ["---", "name:", "description:", "tools:"]
+    }
+  },
+
+  "checklist-generator": {
+    "type": "tool",
+    "enforcement": "suggest",
+    "priority": "normal",
+    "managerAgent": "shared",
+    "orchestrationSkill": "shared",
+    "autoActivationLevel": "worker",
+    "delegationRules": {
+      "managerHandles": "체크리스트 요청 조정, 체크포인트 타이밍 결정, 검증 결과 평가",
+      "workerHandles": "도메인별 체크리스트 생성 (빌드, 배포, 코드 리뷰, UI 검증, 테스트)",
+      "sharedBy": ["build-manager", "feature-manager", "ui-manager", "deployment-manager"]
+    },
+    "promptTriggers": {
+      "keywords": [
+        "checklist",
+        "체크리스트",
+        "TODO",
+        "todo",
+        "task list",
+        "verification",
+        "검증",
+        "확인사항",
+        "점검"
+      ],
+      "intentPatterns": [
+        "(create|generate|make|생성|작성).*?(checklist|체크리스트|TODO|task list)",
+        "(code review|deployment|testing).*?(checklist|체크리스트)",
+        "(verify|check|validate).*?(list|items|체크)",
+        "what.*?(should|need).*?(check|verify|confirm)"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": [
+        "**/*-checklist.md",
+        "**/checklists/**",
+        "**/TODO.md"
+      ]
+    }
+  },
+
+  "youtube-collector": {
+    "type": "utility",
+    "enforcement": "suggest",
+    "priority": "low",
+    "promptTriggers": {
+      "keywords": ["youtube", "유튜브", "영상", "자막"],
+      "intentPatterns": [
+        "(youtube|유튜브).*?(수집|collect)",
+        "(영상|video).*?(요약|summary)",
+        "(자막|subtitle).*?(분석|analyze)"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": [".reference/**/*.yaml"],
+      "contentPatterns": ["youtube_channels:", "video_id:"]
+    }
+  },
+
+  "kiips-test-runner": {
+    "type": "validation",
+    "enforcement": "require",
+    "priority": "critical",
+    "description": "Automated test execution (Boris Cherny's feedback loop principle)",
+    "autoActivationLevel": "hook",
+    "triggeredBy": "stopEvent Hook",
+    "promptTriggers": {
+      "keywords": [
+        "테스트",
+        "test",
+        "junit",
+        "검증",
+        "validation",
+        "테스트 실행",
+        "run test",
+        "자동 테스트",
+        "auto test",
+        "test coverage",
+        "커버리지"
+      ],
+      "intentPatterns": [
+        "(run|실행|execute).*?(test|테스트)",
+        "(test|테스트).*?(자동|auto|automatic)",
+        "(verify|검증|validate).*?(code|코드)",
+        "(junit|karma|jest).*?(test|테스트)",
+        "(coverage|커버리지).*?(check|확인|measure)"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": [
+        "**/*Test.java",
+        "**/*Tests.java",
+        "**/test/**/*.java",
+        "**/*.test.js",
+        "**/*.spec.js",
+        "**/test/**/*.js"
+      ],
+      "contentPatterns": [
+        "@Test",
+        "@RunWith",
+        "describe\\(",
+        "it\\(",
+        "test\\("
+      ]
+    },
+    "activationConditions": {
+      "automatic": "Triggered by stopEvent Hook when .java files are modified",
+      "manual": "Can be invoked explicitly for test execution",
+      "preventDuplicates": true
+    }
+  },
+
+  "code-simplifier": {
+    "type": "agent",
+    "enforcement": "suggest",
+    "priority": "normal",
+    "description": "Post-implementation code refactoring and simplification (Boris Cherny principle)",
+    "agentFile": ".claude/agents/code-simplifier.md",
+    "model": "haiku",
+    "autoActivationLevel": "manual",
+    "promptTriggers": {
+      "keywords": [
+        "simplify",
+        "단순화",
+        "refactor",
+        "리팩토링",
+        "개선",
+        "improve",
+        "cleanup",
+        "정리",
+        "복잡",
+        "complex",
+        "complicated"
+      ],
+      "intentPatterns": [
+        "(simplify|단순화).*?(code|코드)",
+        "(refactor|리팩토링).*?(this|이|code|코드)",
+        "(code|코드).*?(too|너무).*?(complex|복잡)",
+        "(improve|개선).*?(code|코드|quality|품질)",
+        "(cleanup|정리).*?(code|코드)",
+        "(reduce|줄이|감소).*?(complexity|복잡도)"
+      ]
+    },
+    "triggeredAfter": [
+      "기능 구현 완료",
+      "feature implementation complete",
+      "/review shows high complexity"
+    ],
+    "capabilities": {
+      "detectComplexity": true,
+      "extractMethod": true,
+      "guardClauses": true,
+      "extractConditional": true,
+      "eliminateDuplication": true,
+      "preserveBehavior": true
+    },
+    "thresholds": {
+      "cyclomaticComplexity": 10,
+      "nestingDepth": 3,
+      "methodLength": 50,
+      "duplicationMinLines": 5
+    }
+  }
+}
