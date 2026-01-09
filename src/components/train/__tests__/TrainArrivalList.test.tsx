@@ -3,7 +3,7 @@
  */
 
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, waitFor } from '@testing-library/react-native';
 import { TrainArrivalList } from '../TrainArrivalList';
 import { trainService } from '../../../services/train/trainService';
 import { TrainStatus } from '../../../models/train';
@@ -81,7 +81,7 @@ describe('TrainArrivalList', () => {
   describe('Data Display', () => {
     it('should display train arrival data when loaded', async () => {
       // Mock successful subscription
-      mockTrainService.subscribeToTrainUpdates.mockImplementation((stationId, callback) => {
+      mockTrainService.subscribeToTrainUpdates.mockImplementation((_stationId, callback) => {
         callback(mockTrains);
         return jest.fn(); // Return unsubscribe function
       });
@@ -99,7 +99,7 @@ describe('TrainArrivalList', () => {
     });
 
     it('should display delay information', async () => {
-      mockTrainService.subscribeToTrainUpdates.mockImplementation((stationId, callback) => {
+      mockTrainService.subscribeToTrainUpdates.mockImplementation((_stationId, callback) => {
         callback(mockTrains);
         return jest.fn();
       });
@@ -114,7 +114,7 @@ describe('TrainArrivalList', () => {
     });
 
     it('should display different status badges', async () => {
-      mockTrainService.subscribeToTrainUpdates.mockImplementation((stationId, callback) => {
+      mockTrainService.subscribeToTrainUpdates.mockImplementation((_stationId, callback) => {
         callback(mockTrains);
         return jest.fn();
       });
@@ -132,7 +132,7 @@ describe('TrainArrivalList', () => {
 
   describe('Empty State', () => {
     it('should show empty state when no trains available', async () => {
-      mockTrainService.subscribeToTrainUpdates.mockImplementation((stationId, callback) => {
+      mockTrainService.subscribeToTrainUpdates.mockImplementation((_stationId, callback) => {
         callback([]);
         return jest.fn();
       });
@@ -148,7 +148,7 @@ describe('TrainArrivalList', () => {
     });
 
     it('should have proper accessibility for empty state', async () => {
-      mockTrainService.subscribeToTrainUpdates.mockImplementation((stationId, callback) => {
+      mockTrainService.subscribeToTrainUpdates.mockImplementation((_stationId, callback) => {
         callback([]);
         return jest.fn();
       });
@@ -165,7 +165,7 @@ describe('TrainArrivalList', () => {
 
   describe('Refresh Functionality', () => {
     it('should re-subscribe when stationId changes', async () => {
-      mockTrainService.subscribeToTrainUpdates.mockImplementation((stationId, callback) => {
+      mockTrainService.subscribeToTrainUpdates.mockImplementation((_stationId, callback) => {
         callback(mockTrains);
         return jest.fn();
       });
@@ -200,9 +200,7 @@ describe('TrainArrivalList', () => {
     });
 
     it('should throttle updates', async () => {
-      const mockCallback = jest.fn();
-      
-      mockTrainService.subscribeToTrainUpdates.mockImplementation((stationId, callback) => {
+      mockTrainService.subscribeToTrainUpdates.mockImplementation((_stationId, callback) => {
         // Store the callback to call it multiple times rapidly
         for (let i = 0; i < 5; i++) {
           setTimeout(() => callback(mockTrains), i * 100);
@@ -264,7 +262,7 @@ describe('TrainArrivalList', () => {
 
   describe('Accessibility', () => {
     it('should provide proper accessibility labels for train items', async () => {
-      mockTrainService.subscribeToTrainUpdates.mockImplementation((stationId, callback) => {
+      mockTrainService.subscribeToTrainUpdates.mockImplementation((_stationId, callback) => {
         callback(mockTrains);
         return jest.fn();
       });

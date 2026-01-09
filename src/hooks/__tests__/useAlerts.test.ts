@@ -32,18 +32,20 @@ const createMockNotifications = (): StoredNotification[] => [
     title: '열차 지연',
     body: '2호선 강남역 5분 지연',
     type: 'delay',
+    priority: 'high',
     data: { stationName: '강남역', lineId: '2' },
-    timestamp: new Date('2024-01-01T10:00:00'),
-    read: false,
+    createdAt: '2024-01-01T10:00:00.000Z',
+    isRead: false,
   },
   {
     id: 'notif-2',
     title: '도착 알림',
     body: '역삼역 도착 예정',
     type: 'arrival',
+    priority: 'normal',
     data: { stationName: '역삼역', lineId: '2' },
-    timestamp: new Date('2024-01-01T09:30:00'),
-    read: true,
+    createdAt: '2024-01-01T09:30:00.000Z',
+    isRead: true,
   },
 ];
 
@@ -298,9 +300,7 @@ describe('useAlerts', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      let refreshingDuringCall = false;
       mockService.getAllNotifications.mockImplementation(async () => {
-        refreshingDuringCall = result.current.refreshing;
         return createMockNotifications();
       });
 
@@ -308,8 +308,7 @@ describe('useAlerts', () => {
         await result.current.refresh();
       });
 
-      // Note: refreshing state may have already been reset by the time we check
-      // So we verify it was set at some point during the call
+      // Verify refresh was called
       expect(mockService.getAllNotifications).toHaveBeenCalled();
     });
 

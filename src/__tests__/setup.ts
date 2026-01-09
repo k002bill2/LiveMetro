@@ -3,10 +3,33 @@
  * Global test environment setup and mocks
  */
 
+// Extend global type for test utilities
+declare global {
+  // eslint-disable-next-line no-var
+  var mockTrain: {
+    id: string;
+    stationId: string;
+    direction: string;
+    arrivalTime: Date;
+    delayMinutes: number;
+    status: string;
+    nextStationId: string;
+  };
+  // eslint-disable-next-line no-var
+  var mockStation: {
+    id: string;
+    name: string;
+    nameEn: string;
+    lineId: string;
+    coordinates: { latitude: number; longitude: number };
+    transfers: string[];
+  };
+}
+
 // Polyfill for Firebase (Firebase expects 'self' to be defined)
 import 'react-native-gesture-handler/jestSetup';
 
-(global as any).self = global;
+(global as typeof globalThis & { self: typeof globalThis }).self = global;
 
 // Mock React Native modules
 jest.mock('react-native-reanimated', () => {

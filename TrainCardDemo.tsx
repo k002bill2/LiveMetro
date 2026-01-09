@@ -115,24 +115,18 @@ const TrainCardDemo: React.FC = () => {
 
           <TrainArrivalCard
             train={normalTrain}
-            lineName="2호선"
-            stationName="강남"
             onPress={() => console.log('2호선 pressed')}
             style={styles.card}
           />
 
           <TrainArrivalCard
             train={immediateTrain}
-            lineName="3호선"
-            stationName="압구정"
             onPress={() => console.log('3호선 pressed')}
             style={styles.card}
           />
 
           <TrainArrivalCard
             train={bundangTrain}
-            lineName="분당선"
-            stationName="선릉"
             onPress={() => console.log('분당선 pressed')}
             style={styles.card}
           />
@@ -144,15 +138,11 @@ const TrainCardDemo: React.FC = () => {
 
           <TrainArrivalCard
             train={delayedTrain}
-            lineName="1호선"
-            stationName="서울역"
             style={styles.card}
           />
 
           <TrainArrivalCard
             train={shinbundangTrain}
-            lineName="신분당선"
-            stationName="강남"
             style={styles.card}
           />
         </View>
@@ -163,8 +153,6 @@ const TrainCardDemo: React.FC = () => {
 
           <TrainArrivalCard
             train={suspendedTrain}
-            lineName="4호선"
-            stationName="사당"
             style={styles.card}
           />
         </View>
@@ -191,7 +179,6 @@ const TrainCardDemo: React.FC = () => {
               <TrainArrivalCard
                 key={lineId}
                 train={demoTrain}
-                lineName={`${lineId}호선`}
                 style={styles.card}
               />
             );

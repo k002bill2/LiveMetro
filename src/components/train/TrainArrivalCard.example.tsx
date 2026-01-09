@@ -28,8 +28,6 @@ export const NormalTrainExample: React.FC = () => {
   return (
     <TrainArrivalCard
       train={train}
-      stationName="강남"
-      lineName="2호선"
       onPress={() => console.log('Train pressed:', train.id)}
     />
   );
@@ -52,13 +50,7 @@ export const DelayedTrainExample: React.FC = () => {
     lastUpdated: new Date(),
   };
 
-  return (
-    <TrainArrivalCard
-      train={train}
-      stationName="서울역"
-      lineName="1호선"
-    />
-  );
+  return <TrainArrivalCard train={train} />;
 };
 
 /**
@@ -78,13 +70,7 @@ export const ImmediateArrivalExample: React.FC = () => {
     lastUpdated: new Date(),
   };
 
-  return (
-    <TrainArrivalCard
-      train={train}
-      stationName="압구정"
-      lineName="3호선"
-    />
-  );
+  return <TrainArrivalCard train={train} />;
 };
 
 /**
@@ -104,94 +90,70 @@ export const SuspendedTrainExample: React.FC = () => {
     lastUpdated: new Date(),
   };
 
-  return (
-    <TrainArrivalCard
-      train={train}
-      stationName="사당"
-      lineName="4호선"
-    />
-  );
+  return <TrainArrivalCard train={train} />;
 };
 
 /**
  * Example: Multiple lines showcase
  */
 export const MultiLineShowcase: React.FC = () => {
-  const trains: { train: Train; lineName: string; stationName: string }[] = [
+  const trains: Train[] = [
     {
-      train: {
-        id: 'train-line1',
-        lineId: '1',
-        direction: 'up',
-        currentStationId: 'station1',
-        nextStationId: 'station2',
-        finalDestination: '의정부',
-        status: TrainStatus.NORMAL,
-        arrivalTime: new Date(Date.now() + 2 * 60 * 1000),
-        delayMinutes: 0,
-        lastUpdated: new Date(),
-      },
-      lineName: '1호선',
-      stationName: '서울역',
+      id: 'train-line1',
+      lineId: '1',
+      direction: 'up',
+      currentStationId: 'station1',
+      nextStationId: 'station2',
+      finalDestination: '의정부',
+      status: TrainStatus.NORMAL,
+      arrivalTime: new Date(Date.now() + 2 * 60 * 1000),
+      delayMinutes: 0,
+      lastUpdated: new Date(),
     },
     {
-      train: {
-        id: 'train-line2',
-        lineId: '2',
-        direction: 'down',
-        currentStationId: 'station3',
-        nextStationId: 'station4',
-        finalDestination: '잠실',
-        status: TrainStatus.NORMAL,
-        arrivalTime: new Date(Date.now() + 4 * 60 * 1000),
-        delayMinutes: 0,
-        lastUpdated: new Date(),
-      },
-      lineName: '2호선',
-      stationName: '강남',
+      id: 'train-line2',
+      lineId: '2',
+      direction: 'down',
+      currentStationId: 'station3',
+      nextStationId: 'station4',
+      finalDestination: '잠실',
+      status: TrainStatus.NORMAL,
+      arrivalTime: new Date(Date.now() + 4 * 60 * 1000),
+      delayMinutes: 0,
+      lastUpdated: new Date(),
     },
     {
-      train: {
-        id: 'train-line3',
-        lineId: '3',
-        direction: 'up',
-        currentStationId: 'station5',
-        nextStationId: 'station6',
-        finalDestination: '대화',
-        status: TrainStatus.DELAYED,
-        arrivalTime: new Date(Date.now() + 7 * 60 * 1000),
-        delayMinutes: 3,
-        lastUpdated: new Date(),
-      },
-      lineName: '3호선',
-      stationName: '신사',
+      id: 'train-line3',
+      lineId: '3',
+      direction: 'up',
+      currentStationId: 'station5',
+      nextStationId: 'station6',
+      finalDestination: '대화',
+      status: TrainStatus.DELAYED,
+      arrivalTime: new Date(Date.now() + 7 * 60 * 1000),
+      delayMinutes: 3,
+      lastUpdated: new Date(),
     },
     {
-      train: {
-        id: 'train-bundang',
-        lineId: 'bundang',
-        direction: 'down',
-        currentStationId: 'station7',
-        nextStationId: 'station8',
-        finalDestination: '왕십리',
-        status: TrainStatus.NORMAL,
-        arrivalTime: new Date(Date.now() + 5 * 60 * 1000),
-        delayMinutes: 0,
-        lastUpdated: new Date(),
-      },
-      lineName: '분당선',
-      stationName: '선릉',
+      id: 'train-bundang',
+      lineId: 'bundang',
+      direction: 'down',
+      currentStationId: 'station7',
+      nextStationId: 'station8',
+      finalDestination: '왕십리',
+      status: TrainStatus.NORMAL,
+      arrivalTime: new Date(Date.now() + 5 * 60 * 1000),
+      delayMinutes: 0,
+      lastUpdated: new Date(),
     },
   ];
 
   return (
     <ScrollView style={styles.showcase}>
-      {trains.map(({ train, lineName, stationName }) => (
+      {trains.map((train) => (
         <TrainArrivalCard
           key={train.id}
           train={train}
-          lineName={lineName}
-          stationName={stationName}
           style={styles.showcaseCard}
         />
       ))}

@@ -11,14 +11,14 @@ import { ThemeProvider } from '@services/theme';
 
 // Mock utilities
 jest.mock('@utils/colorUtils', () => ({
-  getSubwayLineColor: jest.fn((lineId: string) => '#00a84d'), // Line 2 green
+  getSubwayLineColor: jest.fn((_lineId: string) => '#00a84d'), // Line 2 green
   getLineTextColor: jest.fn(() => 'white'),
   getDelayColor: jest.fn((minutes: number) => {
     if (minutes < 5) return '#10b981';
     if (minutes < 10) return '#f59e0b';
     return '#ef4444';
   }),
-  addAlpha: jest.fn((color: string, alpha: number) => `rgba(0,168,77,${alpha})`),
+  addAlpha: jest.fn((_color: string, alpha: number) => `rgba(0,168,77,${alpha})`),
 }));
 
 // Custom render function that wraps components with ThemeProvider
@@ -39,6 +39,7 @@ describe('TrainArrivalCard', () => {
     direction: 'up',
     currentStationId: 'gangnam',
     nextStationId: 'yeoksam',
+    finalDestination: '신도림',
     status: TrainStatus.NORMAL,
     arrivalTime: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes from now
     delayMinutes: 0,
