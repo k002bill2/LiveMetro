@@ -33,7 +33,7 @@ let stationsByLineCache: Map<string, Station[]> | null = null;
 const convertLineNumToLineId = (lineNum: string): string => {
   // "01호선" -> "1", "02호선" -> "2", etc.
   const match = lineNum.match(/^0?(\d+)호선$/);
-  if (match) {
+  if (match?.[1]) {
     return match[1];
   }
   // Handle special lines like "경의중앙선", "분당선", etc.

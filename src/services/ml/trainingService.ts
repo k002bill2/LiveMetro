@@ -186,10 +186,18 @@ class TrainingService {
     features: FeatureExtractionResult,
     options: TrainingOptions
   ): Promise<Omit<TrainingResult, 'durationMs'>> {
-    const model = modelService.getModel();
-    if (!model) {
+    const rawModel = modelService.getModel();
+    if (!rawModel) {
       throw new Error('Model not initialized');
     }
+    // Type assertion for TensorFlow model with fit and stopTraining methods
+    const model = rawModel as {
+      fit: (x: unknown, y: unknown, config: unknown) => Promise<{
+        history: { loss?: number[]; val_loss?: number[] };
+        epoch: number[];
+      }>;
+      stopTraining: boolean;
+    };
 
     // Ensure TensorFlow is ready
     const tfStatus = await tensorFlowSetup.initialize();

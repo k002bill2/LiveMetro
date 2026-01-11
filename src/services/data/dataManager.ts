@@ -323,23 +323,20 @@ class DataManager {
 
     this.subscribers.get(subscriptionKey)!.push(callback);
 
-    // Clear existing interval for this station if any (prevent duplicates)
-    const existingInterval = this.activeIntervals.get(subscriptionKey);
-    if (existingInterval) {
-      clearInterval(existingInterval);
+    // Only create interval if one doesn't exist for this station
+    // This prevents interval duplication when multiple subscribers join
+    if (!this.activeIntervals.has(subscriptionKey)) {
+      const intervalId = setInterval(async () => {
+        const data = await this.getRealtimeTrains(stationName);
+        // Notify all subscribers for this station
+        const callbacks = this.subscribers.get(subscriptionKey);
+        callbacks?.forEach(cb => cb(data));
+      }, intervalMs);
+
+      this.activeIntervals.set(subscriptionKey, intervalId);
     }
 
-    // Set up periodic updates
-    const intervalId = setInterval(async () => {
-      const data = await this.getRealtimeTrains(stationName);
-      // Notify all subscribers for this station
-      const callbacks = this.subscribers.get(subscriptionKey);
-      callbacks?.forEach(cb => cb(data));
-    }, intervalMs);
-
-    this.activeIntervals.set(subscriptionKey, intervalId);
-
-    // Initial fetch
+    // Initial fetch for new subscriber only
     this.getRealtimeTrains(stationName).then(callback);
 
     // Return unsubscribe function

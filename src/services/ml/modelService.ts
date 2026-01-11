@@ -186,7 +186,8 @@ class ModelService {
 
     try {
       // Save model using TensorFlow.js IO handler
-      await this.model.save(`asyncstorage://${STORAGE_KEYS.MODEL_WEIGHTS}`);
+      const model = this.model as { save: (path: string) => Promise<void> };
+      await model.save(`asyncstorage://${STORAGE_KEYS.MODEL_WEIGHTS}`);
 
       // Save metadata
       if (this.metadata) {

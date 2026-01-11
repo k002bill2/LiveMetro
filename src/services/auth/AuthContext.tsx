@@ -3,7 +3,7 @@
  * Provides user authentication state and methods throughout the app
  */
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import {
   User as FirebaseUser,
   signInAnonymously,
@@ -177,32 +177,32 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     return unsubscribe;
   }, []);
 
-  const handleSignInAnonymously = async (): Promise<void> => {
+  const handleSignInAnonymously = useCallback(async (): Promise<void> => {
     try {
       await signInAnonymously(auth);
     } catch (error) {
       console.error('Anonymous sign in error:', error);
       throw new Error('익명 로그인에 실패했습니다.');
     }
-  };
+  }, []);
 
-  const handleSignInWithEmail = async (email: string, password: string): Promise<void> => {
+  const handleSignInWithEmail = useCallback(async (email: string, password: string): Promise<void> => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
     } catch (error) {
       console.error('Email sign in error:', error);
       throw new Error('이메일 로그인에 실패했습니다.');
     }
-  };
+  }, []);
 
-  const handleSignUpWithEmail = async (
-    email: string, 
-    password: string, 
+  const handleSignUpWithEmail = useCallback(async (
+    email: string,
+    password: string,
     displayName?: string
   ): Promise<void> => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      
+
       if (displayName && userCredential.user) {
         await updateProfile(userCredential.user, { displayName });
       }
@@ -210,18 +210,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.error('Email sign up error:', error);
       throw new Error('계정 생성에 실패했습니다.');
     }
-  };
+  }, []);
 
-  const handleSignOut = async (): Promise<void> => {
+  const handleSignOut = useCallback(async (): Promise<void> => {
     try {
       await signOut(auth);
     } catch (error) {
       console.error('Sign out error:', error);
       throw new Error('로그아웃에 실패했습니다.');
     }
-  };
+  }, []);
 
-  const handleUpdateUserProfile = async (updates: Partial<User>): Promise<void> => {
+  const handleUpdateUserProfile = useCallback(async (updates: Partial<User>): Promise<void> => {
     if (!firebaseUser || !user) {
       throw new Error('사용자가 로그인되어 있지 않습니다.');
     }
@@ -241,18 +241,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.error('Error updating user profile:', error);
       throw new Error('프로필 업데이트에 실패했습니다.');
     }
-  };
+  }, [firebaseUser, user]);
 
-  const handleResetPassword = async (email: string): Promise<void> => {
+  const handleResetPassword = useCallback(async (email: string): Promise<void> => {
     try {
       await sendPasswordResetEmail(auth, email);
     } catch (error) {
       console.error('Password reset error:', error);
       throw new Error('비밀번호 재설정 이메일 전송에 실패했습니다.');
     }
-  };
+  }, []);
 
-  const handleChangePassword = async (
+  const handleChangePassword = useCallback(async (
     currentPassword: string,
     newPassword: string
   ): Promise<void> => {
@@ -282,9 +282,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
       throw new Error('비밀번호 변경에 실패했습니다.');
     }
-  };
+  }, [firebaseUser]);
 
-  const value: AuthContextType = {
+  const value = useMemo<AuthContextType>(() => ({
     user,
     firebaseUser,
     loading,
@@ -295,7 +295,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     updateUserProfile: handleUpdateUserProfile,
     resetPassword: handleResetPassword,
     changePassword: handleChangePassword,
-  };
+  }), [
+    user,
+    firebaseUser,
+    loading,
+    handleSignInAnonymously,
+    handleSignInWithEmail,
+    handleSignUpWithEmail,
+    handleSignOut,
+    handleUpdateUserProfile,
+    handleResetPassword,
+    handleChangePassword,
+  ]);
 
   return (
     <AuthContext.Provider value={value}>

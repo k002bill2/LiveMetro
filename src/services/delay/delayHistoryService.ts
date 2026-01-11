@@ -101,6 +101,7 @@ class DelayHistoryService {
     if (entryIndex === -1) return null;
 
     const entry = history[entryIndex];
+    if (!entry) return null;
 
     // Create certificate
     const certificate: DelayCertificate = {
@@ -128,7 +129,7 @@ class DelayHistoryService {
       ...entry,
       certificateGenerated: true,
       certificateId: certificate.id,
-    };
+    } as DelayHistoryEntry;
 
     await AsyncStorage.setItem(
       STORAGE_KEYS.DELAY_HISTORY,

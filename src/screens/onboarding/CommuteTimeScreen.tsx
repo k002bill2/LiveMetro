@@ -78,7 +78,7 @@ export const CommuteTimeScreen: React.FC<Props> = ({ navigation, route }) => {
             label={isMorning ? '출근 시간' : '퇴근 시간'}
             value={time}
             onValueChange={setTime}
-            icon={isMorning ? Sun : Moon}
+            icon={isMorning ? 'sunny' : 'moon'}
           />
         </View>
 

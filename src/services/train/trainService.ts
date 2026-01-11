@@ -164,6 +164,7 @@ class TrainService {
 
     // Return cleanup function
     return () => {
+      throttledCallback.cancel(); // Clean up throttle timer
       unsubscribe();
       this.unsubscribeCallbacks.delete(subscriptionKey);
     };

@@ -3,7 +3,7 @@
  * Supports: light, dark, system (auto)
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, ReactNode } from 'react';
 import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -188,14 +188,14 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     }
   }, []);
 
-  const value: ThemeContextType = {
+  const value = useMemo<ThemeContextType>(() => ({
     themeMode,
     resolvedTheme,
     colors,
     isDark,
     setThemeMode,
     isLoading,
-  };
+  }), [themeMode, resolvedTheme, colors, isDark, setThemeMode, isLoading]);
 
   return (
     <ThemeContext.Provider value={value}>

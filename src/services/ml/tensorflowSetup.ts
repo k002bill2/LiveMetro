@@ -4,7 +4,7 @@
  * Gracefully handles missing native modules (expo-gl)
  */
 
-import { InteractionManager, Platform } from 'react-native';
+import { InteractionManager } from 'react-native';
 
 // ============================================================================
 // Types
@@ -141,9 +141,11 @@ class TensorFlowSetupService {
 
       // Dynamically import TensorFlow.js to catch native module errors
       try {
+        // @ts-expect-error Dynamic imports work at runtime in Expo
         tf = await import('@tensorflow/tfjs');
 
         // Try to import React Native bindings (this may fail if expo-gl is not properly linked)
+        // @ts-expect-error Dynamic imports work at runtime in Expo
         await import('@tensorflow/tfjs-react-native');
 
         isTensorFlowAvailable = true;
@@ -205,7 +207,7 @@ class TensorFlowSetupService {
  * Create a tensor from array with proper cleanup handling
  * Returns null if TensorFlow is not available
  */
-export function createTensor<R extends number>(
+export function createTensor(
   values: number[] | number[][] | Float32Array,
   shape?: number[],
   dtype?: 'float32' | 'int32' | 'bool'
@@ -236,7 +238,7 @@ export function tidyOperation<T>(fn: () => T): T | null {
     console.warn('TensorFlow not available, cannot run tidy operation');
     return null;
   }
-  return tf.tidy(fn);
+  return tf.tidy(fn as never) as T;
 }
 
 /**

@@ -116,21 +116,45 @@ export const debounce = <T extends (...args: any[]) => void>(
 };
 
 /**
- * Throttle function for limiting frequent updates
+ * Throttled function with cancel method for cleanup
  */
+export interface ThrottledFunction<T extends (...args: never[]) => void> {
+  (...args: Parameters<T>): void;
+  cancel: () => void;
+}
+
+/**
+ * Throttle function for limiting frequent updates
+ * Includes cancel method for proper cleanup on unmount
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const throttle = <T extends (...args: any[]) => void>(
   func: T,
   limit: number
-): ((...args: Parameters<T>) => void) => {
-  let inThrottle: boolean;
-  
-  return (...args: Parameters<T>) => {
+): ThrottledFunction<T> => {
+  let inThrottle = false;
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  const throttledFn = (...args: Parameters<T>): void => {
     if (!inThrottle) {
       func(...args);
       inThrottle = true;
-      setTimeout(() => inThrottle = false, limit);
+      timeoutId = setTimeout(() => {
+        inThrottle = false;
+        timeoutId = null;
+      }, limit);
     }
   };
+
+  throttledFn.cancel = (): void => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+    inThrottle = false;
+  };
+
+  return throttledFn;
 };
 
 /**

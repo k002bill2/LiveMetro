@@ -152,7 +152,7 @@ class TrainArrivalAlertService {
    */
   destroy(): void {
     // Stop all sessions regardless of user
-    for (const [alertId, session] of this.activeSessions) {
+    for (const [, session] of this.activeSessions) {
       if (session.intervalId) {
         clearInterval(session.intervalId);
       }

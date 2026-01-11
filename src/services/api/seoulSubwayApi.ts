@@ -3,6 +3,114 @@
  * Real-time subway data from Seoul Open API
  */
 
+/**
+ * Rate Limiter for Seoul API (30-second minimum interval per endpoint)
+ * Required by CLAUDE.md: "Seoul API - 30s minimum polling interval"
+ */
+class RateLimiter {
+  private lastRequestTime: Map<string, number> = new Map();
+  private readonly minInterval: number;
+
+  constructor(minIntervalMs: number = 30000) {
+    this.minInterval = minIntervalMs;
+  }
+
+  /**
+   * Throttle requests to ensure minimum interval between calls
+   * @param key Unique key for the endpoint (e.g., 'realtime:강남')
+   * @returns Time waited in ms (0 if no wait needed)
+   */
+  async throttle(key: string): Promise<number> {
+    const lastTime = this.lastRequestTime.get(key) || 0;
+    const elapsed = Date.now() - lastTime;
+
+    if (elapsed < this.minInterval) {
+      const waitTime = this.minInterval - elapsed;
+      await new Promise(resolve => setTimeout(resolve, waitTime));
+      this.lastRequestTime.set(key, Date.now());
+      return waitTime;
+    }
+
+    this.lastRequestTime.set(key, Date.now());
+    return 0;
+  }
+
+  /**
+   * Check if a request can be made without waiting
+   */
+  canRequest(key: string): boolean {
+    const lastTime = this.lastRequestTime.get(key) || 0;
+    return Date.now() - lastTime >= this.minInterval;
+  }
+
+  /**
+   * Get remaining cooldown time in ms
+   */
+  getRemainingCooldown(key: string): number {
+    const lastTime = this.lastRequestTime.get(key) || 0;
+    const remaining = this.minInterval - (Date.now() - lastTime);
+    return Math.max(0, remaining);
+  }
+
+  /**
+   * Clear rate limit for a specific key (for testing)
+   */
+  clear(key?: string): void {
+    if (key) {
+      this.lastRequestTime.delete(key);
+    } else {
+      this.lastRequestTime.clear();
+    }
+  }
+}
+
+/**
+ * Retry with exponential backoff
+ */
+async function withRetry<T>(
+  fn: () => Promise<T>,
+  options: {
+    maxAttempts?: number;
+    initialDelayMs?: number;
+    maxDelayMs?: number;
+    backoffMultiplier?: number;
+  } = {}
+): Promise<T> {
+  const {
+    maxAttempts = 3,
+    initialDelayMs = 1000,
+    maxDelayMs = 10000,
+    backoffMultiplier = 2,
+  } = options;
+
+  let lastError: Error | undefined;
+  let delay = initialDelayMs;
+
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      // Don't retry on certain errors
+      if (lastError.message.includes('API 요청 시간이 초과')) {
+        // Timeout - retry with backoff
+      } else if (lastError.message.includes('Seoul API Error')) {
+        // API error - don't retry
+        throw lastError;
+      }
+
+      if (attempt < maxAttempts) {
+        console.warn(`API call failed (attempt ${attempt}/${maxAttempts}), retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        delay = Math.min(delay * backoffMultiplier, maxDelayMs);
+      }
+    }
+  }
+
+  throw lastError || new Error('All retry attempts failed');
+}
+
 interface SeoulApiResponse<T> {
   errorMessage?: {
     status: number;
@@ -90,62 +198,90 @@ class SeoulSubwayApiService {
   private readonly baseUrl: string;
   private readonly apiKey: string;
   private readonly timeout: number = 10000;
+  private readonly rateLimiter: RateLimiter;
 
   constructor() {
     this.baseUrl = process.env.SEOUL_SUBWAY_API_BASE_URL || 'http://swopenapi.seoul.go.kr/api/subway';
     this.apiKey = process.env.EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY || '';
-    
+    this.rateLimiter = new RateLimiter(30000); // 30-second minimum interval
+
     if (!this.apiKey) {
       console.warn('Seoul Subway API key not found. Please set EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY environment variable.');
     }
   }
 
   /**
+   * Get the rate limiter instance (for testing or status checks)
+   */
+  getRateLimiter(): RateLimiter {
+    return this.rateLimiter;
+  }
+
+  /**
    * Get real-time arrival information for a station
+   * Rate limited to 30-second minimum interval per station
    */
   async getRealtimeArrival(stationName: string): Promise<SeoulRealtimeArrival[]> {
-    try {
-      const url = `${this.baseUrl}/${this.apiKey}/json/realtimeStationArrival/0/10/${encodeURIComponent(stationName)}`;
-      
-      const response = await this.fetchWithTimeout(url);
-      const data: SeoulApiResponse<SeoulRealtimeArrival> = await response.json();
+    const rateLimitKey = `realtime:${stationName}`;
 
-      // Check for API errors
-      if (data.errorMessage) {
-        throw new Error(`Seoul API Error: ${data.errorMessage.message} (Code: ${data.errorMessage.code})`);
-      }
-
-      return data.realtimeArrivalList || [];
-    } catch (error) {
-      console.error('Error fetching realtime arrival:', error);
-      throw new Error(`실시간 도착정보를 가져오는데 실패했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+    // Apply rate limiting (30-second minimum interval)
+    const waitedMs = await this.rateLimiter.throttle(rateLimitKey);
+    if (waitedMs > 0) {
+      console.debug(`Rate limited: waited ${waitedMs}ms before fetching ${stationName}`);
     }
+
+    return withRetry(async () => {
+      try {
+        const url = `${this.baseUrl}/${this.apiKey}/json/realtimeStationArrival/0/10/${encodeURIComponent(stationName)}`;
+
+        const response = await this.fetchWithTimeout(url);
+        const data: SeoulApiResponse<SeoulRealtimeArrival> = await response.json();
+
+        // Check for API errors
+        if (data.errorMessage) {
+          throw new Error(`Seoul API Error: ${data.errorMessage.message} (Code: ${data.errorMessage.code})`);
+        }
+
+        return data.realtimeArrivalList || [];
+      } catch (error) {
+        console.error('Error fetching realtime arrival:', error);
+        throw new Error(`실시간 도착정보를 가져오는데 실패했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+      }
+    });
   }
 
   /**
    * Get station information by subway line
+   * Rate limited to 30-second minimum interval per line
    */
   async getStationsByLine(lineNumber: string): Promise<SeoulStationInfo[]> {
-    try {
-      const url = `${this.baseUrl}/${this.apiKey}/json/SearchInfoBySubwayNameService/1/1000/${encodeURIComponent(lineNumber)}호선`;
-      
-      const response = await this.fetchWithTimeout(url);
-      const data: SeoulApiResponse<SeoulStationInfo> = await response.json();
+    const rateLimitKey = `stations:line:${lineNumber}`;
 
-      // Check for API errors
-      if (data.errorMessage) {
-        throw new Error(`Seoul API Error: ${data.errorMessage.message} (Code: ${data.errorMessage.code})`);
+    // Apply rate limiting
+    await this.rateLimiter.throttle(rateLimitKey);
+
+    return withRetry(async () => {
+      try {
+        const url = `${this.baseUrl}/${this.apiKey}/json/SearchInfoBySubwayNameService/1/1000/${encodeURIComponent(lineNumber)}호선`;
+
+        const response = await this.fetchWithTimeout(url);
+        const data: SeoulApiResponse<SeoulStationInfo> = await response.json();
+
+        // Check for API errors
+        if (data.errorMessage) {
+          throw new Error(`Seoul API Error: ${data.errorMessage.message} (Code: ${data.errorMessage.code})`);
+        }
+
+        if (data.SearchInfoBySubwayNameService?.RESULT.CODE !== 'INFO-000') {
+          throw new Error(`API Error: ${data.SearchInfoBySubwayNameService?.RESULT.MESSAGE}`);
+        }
+
+        return data.SearchInfoBySubwayNameService?.row || [];
+      } catch (error) {
+        console.error('Error fetching stations by line:', error);
+        throw new Error(`역 정보를 가져오는데 실패했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
       }
-
-      if (data.SearchInfoBySubwayNameService?.RESULT.CODE !== 'INFO-000') {
-        throw new Error(`API Error: ${data.SearchInfoBySubwayNameService?.RESULT.MESSAGE}`);
-      }
-
-      return data.SearchInfoBySubwayNameService?.row || [];
-    } catch (error) {
-      console.error('Error fetching stations by line:', error);
-      throw new Error(`역 정보를 가져오는데 실패했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
-    }
+    });
   }
 
   /**
@@ -195,37 +331,45 @@ class SeoulSubwayApiService {
 
   /**
    * Get station timetable (schedule)
+   * Rate limited to 30-second minimum interval per station/weekTag/inoutTag combo
    * @param stationCode Station code (e.g., '0222' for Gangnam)
    * @param weekTag '1': Weekday, '2': Saturday, '3': Holiday/Sunday
    * @param inoutTag '1': Up/Inner, '2': Down/Outer
    */
   async getStationTimetable(
-    stationCode: string, 
-    weekTag: '1' | '2' | '3' = '1', 
+    stationCode: string,
+    weekTag: '1' | '2' | '3' = '1',
     inoutTag: '1' | '2' = '1'
   ): Promise<SeoulTimetableRow[]> {
-    try {
-      // Note: Timetable API uses a different base URL usually (openAPI.seoul.go.kr)
-      // But we'll try to use the configured base URL or fallback to the standard openAPI URL
-      const generalBaseUrl = process.env.SEOUL_OPEN_API_BASE_URL || 'http://openAPI.seoul.go.kr:8088';
-      const url = `${generalBaseUrl}/${this.apiKey}/json/SearchSTNTimeTableByIDService/1/500/${stationCode}/${weekTag}/${inoutTag}/`;
-      
-      const response = await this.fetchWithTimeout(url);
-      const data: SeoulTimetableResponse = await response.json();
+    const rateLimitKey = `timetable:${stationCode}:${weekTag}:${inoutTag}`;
 
-      if (data.SearchSTNTimeTableByIDService?.RESULT.CODE !== 'INFO-000') {
-        // INFO-200 means no data found, which is valid for empty schedules
-        if (data.SearchSTNTimeTableByIDService?.RESULT.CODE === 'INFO-200') {
-          return [];
+    // Apply rate limiting
+    await this.rateLimiter.throttle(rateLimitKey);
+
+    return withRetry(async () => {
+      try {
+        // Note: Timetable API uses a different base URL usually (openAPI.seoul.go.kr)
+        // But we'll try to use the configured base URL or fallback to the standard openAPI URL
+        const generalBaseUrl = process.env.SEOUL_OPEN_API_BASE_URL || 'http://openAPI.seoul.go.kr:8088';
+        const url = `${generalBaseUrl}/${this.apiKey}/json/SearchSTNTimeTableByIDService/1/500/${stationCode}/${weekTag}/${inoutTag}/`;
+
+        const response = await this.fetchWithTimeout(url);
+        const data: SeoulTimetableResponse = await response.json();
+
+        if (data.SearchSTNTimeTableByIDService?.RESULT.CODE !== 'INFO-000') {
+          // INFO-200 means no data found, which is valid for empty schedules
+          if (data.SearchSTNTimeTableByIDService?.RESULT.CODE === 'INFO-200') {
+            return [];
+          }
+          throw new Error(`API Error: ${data.SearchSTNTimeTableByIDService?.RESULT.MESSAGE}`);
         }
-        throw new Error(`API Error: ${data.SearchSTNTimeTableByIDService?.RESULT.MESSAGE}`);
-      }
 
-      return data.SearchSTNTimeTableByIDService?.row || [];
-    } catch (error) {
-      console.error('Error fetching station timetable:', error);
-      throw new Error(`시간표 정보를 가져오는데 실패했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
-    }
+        return data.SearchSTNTimeTableByIDService?.row || [];
+      } catch (error) {
+        console.error('Error fetching station timetable:', error);
+        throw new Error(`시간표 정보를 가져오는데 실패했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+      }
+    });
   }
 
   /**
@@ -301,4 +445,7 @@ class SeoulSubwayApiService {
 
 // Export singleton instance
 export const seoulSubwayApi = new SeoulSubwayApiService();
+
+// Export utilities for external use
+export { RateLimiter, withRetry };
 export type { SeoulRealtimeArrival, SeoulStationInfo, SeoulTimetableRow, SeoulTimetableResponse };

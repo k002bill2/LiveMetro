@@ -8,6 +8,7 @@ import { useLocation } from './useLocation';
 import { locationService, NearbyStation, LocationCoordinates } from '../services/location/locationService';
 import { trainService } from '../services/train/trainService';
 import { Station } from '../models/train';
+import { USE_TEST_STATIONS, TEST_STATIONS } from '../data/testStations';
 
 interface UseNearbyStationsState {
   nearbyStations: NearbyStation[];
@@ -68,22 +69,30 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
 
   /**
    * Load all stations from the service
+   * In test mode (USE_TEST_STATIONS), uses hardcoded test data instead of API
    */
   const loadAllStations = useCallback(async () => {
+    // Test mode: use hardcoded stations (no API calls)
+    if (USE_TEST_STATIONS) {
+      console.log('[useNearbyStations] Using test stations (no API call)');
+      setAllStations(TEST_STATIONS);
+      return TEST_STATIONS;
+    }
+
+    // Production mode: load from Firebase/API
     try {
-      // Try to get stations from Firebase first
       const lines = await trainService.getSubwayLines();
       const stationsPromises = lines.map(line => trainService.getStationsByLine(line.id));
       const stationArrays = await Promise.all(stationsPromises);
-      
+
       const stations = stationArrays.flat();
       setAllStations(stations);
       return stations;
     } catch (error) {
       console.error('Error loading stations:', error);
-      updateState({ 
+      updateState({
         error: '역 정보를 불러올 수 없습니다.',
-        loading: false 
+        loading: false
       });
       return [];
     }
