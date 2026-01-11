@@ -404,8 +404,11 @@ describe('useDragReorder', () => {
   describe('Item Changes', () => {
     it('should handle items prop changes', () => {
       const initialItems = createTestItems();
-      const { result, rerender } = renderHook(
-        ({ items }) => useDragReorder({ items, onReorder: mockOnReorder }),
+      const { result, rerender } = renderHook<
+        ReturnType<typeof useDragReorder>,
+        { items: TestItem[] }
+      >(
+        ({ items }: { items: TestItem[] }) => useDragReorder({ items, onReorder: mockOnReorder }),
         { initialProps: { items: initialItems } }
       );
 

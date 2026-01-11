@@ -39,7 +39,7 @@ export class BasePage {
    * Get element by text content (cross-platform)
    * @param text - The exact text to search for
    */
-  protected async getByText(text: string): Promise<WebdriverIO.Element> {
+  async getByText(text: string): Promise<WebdriverIO.Element> {
     if (this.isAndroid) {
       return $wdio(`android=new UiSelector().text("${text}")`);
     }

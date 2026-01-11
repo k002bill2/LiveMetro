@@ -27,23 +27,18 @@ const createMockStation = (id: string, name: string): Station => ({
   name,
   nameEn: `${name} Station`,
   lineId: '2',
-  lineName: '2호선',
-  lineColor: '#00A86B',
   coordinates: { latitude: 37.5, longitude: 127.0 },
   transfers: [],
-  address: `${name} 주소`,
-  facilities: [],
 });
 
-const createMockFavorite = (id: string, stationId: string, stationName: string): FavoriteStation => ({
+const createMockFavorite = (id: string, stationId: string): FavoriteStation => ({
   id,
   stationId,
-  stationName,
   lineId: '2',
-  lineName: '2호선',
-  order: 0,
+  alias: null,
+  direction: 'both',
   isCommuteStation: false,
-  createdAt: new Date(),
+  addedAt: new Date(),
 });
 
 describe('useFavorites', () => {
@@ -94,7 +89,7 @@ describe('useFavorites', () => {
 
   describe('Load Favorites', () => {
     it('should load favorites on mount', async () => {
-      const mockFavorites = [createMockFavorite('fav-1', 'station-1', '강남역')];
+      const mockFavorites = [createMockFavorite('fav-1', 'station-1')];
       mockFavoritesService.getFavorites.mockResolvedValue(mockFavorites);
 
       const { result } = renderHook(() => useFavorites());
@@ -109,8 +104,8 @@ describe('useFavorites', () => {
 
     it('should load station details for each favorite', async () => {
       const mockFavorites = [
-        createMockFavorite('fav-1', 'station-1', '강남역'),
-        createMockFavorite('fav-2', 'station-2', '역삼역'),
+        createMockFavorite('fav-1', 'station-1'),
+        createMockFavorite('fav-2', 'station-2'),
       ];
       mockFavoritesService.getFavorites.mockResolvedValue(mockFavorites);
 
@@ -124,7 +119,7 @@ describe('useFavorites', () => {
     });
 
     it('should handle station load errors gracefully', async () => {
-      const mockFavorites = [createMockFavorite('fav-1', 'station-1', '강남역')];
+      const mockFavorites = [createMockFavorite('fav-1', 'station-1')];
       mockFavoritesService.getFavorites.mockResolvedValue(mockFavorites);
       mockTrainService.getStation.mockRejectedValue(new Error('Station not found'));
 
@@ -228,7 +223,7 @@ describe('useFavorites', () => {
     });
 
     it('removeFavoriteByStationId should find and remove', async () => {
-      const mockFavorite = createMockFavorite('fav-1', 'station-1', '강남역');
+      const mockFavorite = createMockFavorite('fav-1', 'station-1');
       mockFavoritesService.getFavoriteByStationId.mockResolvedValue(mockFavorite);
 
       const { result } = renderHook(() => useFavorites());
@@ -284,7 +279,7 @@ describe('useFavorites', () => {
 
   describe('Toggle and Check', () => {
     it('isFavorite should return true for favorited stations', async () => {
-      const mockFavorites = [createMockFavorite('fav-1', 'station-1', '강남역')];
+      const mockFavorites = [createMockFavorite('fav-1', 'station-1')];
       mockFavoritesService.getFavorites.mockResolvedValue(mockFavorites);
 
       const { result } = renderHook(() => useFavorites());
@@ -326,9 +321,9 @@ describe('useFavorites', () => {
     });
 
     it('toggleFavorite should remove when favorited', async () => {
-      const mockFavorites = [createMockFavorite('fav-1', 'station-1', '강남역')];
+      const mockFavorites = [createMockFavorite('fav-1', 'station-1')];
       mockFavoritesService.getFavorites.mockResolvedValue(mockFavorites);
-      mockFavoritesService.getFavoriteByStationId.mockResolvedValue(mockFavorites[0]);
+      mockFavoritesService.getFavoriteByStationId.mockResolvedValue(mockFavorites[0] ?? null);
       const station = createMockStation('station-1', '강남역');
 
       const { result } = renderHook(() => useFavorites());
@@ -348,8 +343,8 @@ describe('useFavorites', () => {
   describe('Reorder', () => {
     it('reorderFavorites should call service', async () => {
       const reordered = [
-        createMockFavorite('fav-2', 'station-2', '역삼역'),
-        createMockFavorite('fav-1', 'station-1', '강남역'),
+        createMockFavorite('fav-2', 'station-2'),
+        createMockFavorite('fav-1', 'station-1'),
       ];
 
       const { result } = renderHook(() => useFavorites());
@@ -385,8 +380,8 @@ describe('useFavorites', () => {
   describe('Commute Stations', () => {
     it('getCommuteStations should filter by isCommuteStation', async () => {
       const mockFavorites = [
-        { ...createMockFavorite('fav-1', 'station-1', '강남역'), isCommuteStation: true },
-        { ...createMockFavorite('fav-2', 'station-2', '역삼역'), isCommuteStation: false },
+        { ...createMockFavorite('fav-1', 'station-1'), isCommuteStation: true },
+        { ...createMockFavorite('fav-2', 'station-2'), isCommuteStation: false },
       ];
       mockFavoritesService.getFavorites.mockResolvedValue(mockFavorites);
 
@@ -398,7 +393,7 @@ describe('useFavorites', () => {
 
       const commuteStations = result.current.getCommuteStations();
       expect(commuteStations).toHaveLength(1);
-      expect(commuteStations[0]?.stationName).toBe('강남역');
+      expect(commuteStations[0]?.station?.name).toBe('강남역');
     });
   });
 });

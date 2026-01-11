@@ -10,7 +10,7 @@ import { notificationService, NotificationType } from '../../services/notificati
 import { dataManager } from '../../services/data/dataManager';
 import { useAuth } from '../../services/auth/AuthContext';
 import { notificationStorageService } from '../../services/notification/notificationStorageService';
-import { TrainDelay, ServiceDisruption, TrainStatus } from '../../models/train';
+import { TrainDelay, ServiceDisruption, TrainStatus, DelaySeverity } from '../../models/train';
 
 // Mock dependencies
 jest.mock('../../services/notification/notificationService');
@@ -43,11 +43,12 @@ const mockUser = {
 const createMockDelay = (overrides?: Partial<TrainDelay>): TrainDelay => ({
   trainId: 'train-1',
   lineId: '2',
-  stationName: '강남역',
   delayMinutes: 10,
   reason: '열차 고장',
-  detectedAt: new Date(),
-  status: TrainStatus.DELAYED,
+  affectedStations: ['강남역', '역삼역'],
+  estimatedResolutionTime: null,
+  severity: DelaySeverity.MODERATE,
+  reportedAt: new Date(),
   ...overrides,
 });
 
@@ -58,7 +59,9 @@ const createMockDisruption = (overrides?: Partial<ServiceDisruption>): ServiceDi
   stationName: '강남역',
   status: TrainStatus.SUSPENDED,
   message: '운행 중단',
-  startTime: new Date(),
+  severity: DelaySeverity.MAJOR,
+  reportedAt: new Date(),
+  affectedDirections: ['up', 'down'],
   ...overrides,
 });
 
@@ -563,6 +566,7 @@ describe('useNotifications', () => {
       });
 
       const mockNotification = {
+        date: Date.now(),
         request: {
           content: {
             title: '테스트',
@@ -570,7 +574,7 @@ describe('useNotifications', () => {
             data: { type: NotificationType.DELAY_ALERT },
           },
         },
-      } as Notifications.Notification;
+      } as unknown as Notifications.Notification;
 
       await act(async () => {
         capturedHandler?.(mockNotification);
@@ -594,6 +598,7 @@ describe('useNotifications', () => {
       });
 
       const mockNotification = {
+        date: Date.now(),
         request: {
           content: {
             title: '지연 알림',
@@ -601,7 +606,7 @@ describe('useNotifications', () => {
             data: { type: NotificationType.DELAY_ALERT },
           },
         },
-      } as Notifications.Notification;
+      } as unknown as Notifications.Notification;
 
       await act(async () => {
         capturedHandler?.(mockNotification);

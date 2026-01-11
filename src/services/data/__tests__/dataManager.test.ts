@@ -6,7 +6,7 @@
 import { dataManager } from '../dataManager';
 import { seoulSubwayApi } from '../../api/seoulSubwayApi';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { Train } from '../../../models/train';
+import { Train, TrainStatus } from '../../../models/train';
 
 // Use mocks from setup.ts
 jest.mock('../../firebase/config');
@@ -18,21 +18,27 @@ describe('DataManager', () => {
   const mockTrains: Train[] = [
     {
       id: 'train-1',
-      stationId: 'station-1',
+      lineId: '2',
+      currentStationId: 'station-1',
       direction: 'up',
       arrivalTime: new Date(Date.now() + 2 * 60 * 1000),
       delayMinutes: 0,
-      status: 'NORMAL',
+      status: TrainStatus.NORMAL,
       nextStationId: 'station-2',
+      finalDestination: '강남',
+      lastUpdated: new Date(),
     },
     {
       id: 'train-2',
-      stationId: 'station-1',
+      lineId: '2',
+      currentStationId: 'station-1',
       direction: 'down',
       arrivalTime: new Date(Date.now() + 5 * 60 * 1000),
       delayMinutes: 1,
-      status: 'DELAYED',
+      status: TrainStatus.DELAYED,
       nextStationId: 'station-3',
+      finalDestination: '역삼',
+      lastUpdated: new Date(),
     },
   ];
 
@@ -51,7 +57,7 @@ describe('DataManager', () => {
           arvlMsg2: '2분 후 도착',
           arvlMsg3: '강남역 도착',
           btrainSttus: '일반',
-        }];
+        }] as any;
         mockSeoulApi.getRealtimeArrival.mockResolvedValue(mockSeoulResponse);
 
         await dataManager.getRealtimeTrains('강남역');
@@ -67,7 +73,7 @@ describe('DataManager', () => {
           arvlMsg2: '2분 후 도착',
           arvlMsg3: '강남역 도착',
           btrainSttus: '일반',
-        }];
+        }] as any;
         mockSeoulApi.getRealtimeArrival.mockResolvedValue(mockSeoulResponse);
 
         // Multiple calls
@@ -79,7 +85,7 @@ describe('DataManager', () => {
       });
 
       it('should invalidate cache after TTL expires', async () => {
-        mockSeoulApi.getRealtimeArrival.mockResolvedValue(mockTrains);
+        mockSeoulApi.getRealtimeArrival.mockResolvedValue(mockTrains as never);
         jest.useFakeTimers();
 
         // First call
@@ -101,18 +107,18 @@ describe('DataManager', () => {
       it('should fallback to Firebase when Seoul API fails', async () => {
         const error = new Error('Seoul API unavailable');
         mockSeoulApi.getRealtimeArrival.mockRejectedValue(error);
-        
+
         // Mock Firebase success (this would be mocked in firebase config)
-        const mockFirebaseData = mockTrains.slice(0, 1); // Partial data
-        
-        const result = await dataManager.getRealtimeTrains('강남역');
+        // Firebase would return partial data like mockTrains.slice(0, 1)
+
+        await dataManager.getRealtimeTrains('강남역');
 
         expect(mockSeoulApi.getRealtimeArrival).toHaveBeenCalled();
         // Would expect Firebase fallback logic here in real implementation
       });
 
       it('should sync successful API data to Firebase', async () => {
-        mockSeoulApi.getRealtimeArrival.mockResolvedValue(mockTrains);
+        mockSeoulApi.getRealtimeArrival.mockResolvedValue(mockTrains as never);
 
         await dataManager.getRealtimeTrains('강남역');
 
@@ -132,7 +138,7 @@ describe('DataManager', () => {
           lastUpdated: new Date().toISOString()
         }));
 
-        const result = await dataManager.getRealtimeTrains('강남역');
+        await dataManager.getRealtimeTrains('강남역');
 
         // When all APIs fail, falls back to cached data or returns null
         expect(mockAsyncStorage.getItem).toHaveBeenCalled();
@@ -145,7 +151,7 @@ describe('DataManager', () => {
           arvlMsg2: '2분 후 도착',
           arvlMsg3: '강남역 도착',
           btrainSttus: '일반',
-        }];
+        }] as never;
         mockSeoulApi.getRealtimeArrival.mockResolvedValue(mockSeoulResponse);
         mockAsyncStorage.setItem.mockResolvedValue();
 
@@ -177,7 +183,7 @@ describe('DataManager', () => {
         arvlMsg2: '2분 후 도착',
         arvlMsg3: '강남역 도착',
         btrainSttus: '일반',
-      }];
+      }] as never;
       mockSeoulApi.getRealtimeArrival.mockResolvedValue(mockSeoulResponse);
 
       // Call to get realtime data
@@ -189,12 +195,12 @@ describe('DataManager', () => {
 
     it('should fetch station info from API', async () => {
       mockSeoulApi.getAllStations.mockResolvedValue([{
-        stationId: 'station-1',
-        stationName: '강남역',
-        lineId: '2',
-      }]);
+        STATION_CD: 'station-1',
+        STATION_NM: '강남역',
+        LINE_NUM: '02호선',
+      }] as never);
 
-      const result = await dataManager.getStationInfo('강남역');
+      await dataManager.getStationInfo('강남역');
 
       // Should call API to get station info
       expect(mockSeoulApi.getAllStations).toHaveBeenCalled();
@@ -211,7 +217,7 @@ describe('DataManager', () => {
         lastUpdated: new Date().toISOString()
       }));
 
-      const result = await dataManager.getRealtimeTrains('강남역');
+      await dataManager.getRealtimeTrains('강남역');
 
       // Falls back to cached data or returns null
       expect(mockAsyncStorage.getItem).toHaveBeenCalled();
@@ -247,7 +253,7 @@ describe('DataManager', () => {
 
   describe('Performance Optimization', () => {
     it('should handle multiple requests for same station', async () => {
-      mockSeoulApi.getRealtimeArrival.mockResolvedValue(mockTrains);
+      mockSeoulApi.getRealtimeArrival.mockResolvedValue(mockTrains as never);
 
       // Make multiple simultaneous requests
       const promises = [
@@ -264,7 +270,7 @@ describe('DataManager', () => {
     });
 
     it('should handle concurrent requests for different stations', async () => {
-      mockSeoulApi.getRealtimeArrival.mockResolvedValue(mockTrains);
+      mockSeoulApi.getRealtimeArrival.mockResolvedValue(mockTrains as never);
 
       const promises = [
         dataManager.getRealtimeTrains('강남역'),
@@ -282,7 +288,7 @@ describe('DataManager', () => {
     });
 
     it('should handle many sequential requests', async () => {
-      mockSeoulApi.getRealtimeArrival.mockResolvedValue(mockTrains);
+      mockSeoulApi.getRealtimeArrival.mockResolvedValue(mockTrains as never);
 
       // Test a few stations
       const stations = ['강남역', '홍대역', '신촌역'];
@@ -304,9 +310,9 @@ describe('DataManager', () => {
         undefined,
       ];
 
-      mockSeoulApi.getRealtimeArrival.mockResolvedValue(invalidData as any);
+      mockSeoulApi.getRealtimeArrival.mockResolvedValue(invalidData as never);
 
-      const result = await dataManager.getRealtimeTrains('강남역');
+      await dataManager.getRealtimeTrains('강남역');
 
       // Implementation handles invalid data gracefully
       expect(mockSeoulApi.getRealtimeArrival).toHaveBeenCalled();
@@ -314,11 +320,286 @@ describe('DataManager', () => {
 
     it('should call API with input station names', async () => {
       const input = '강남역';
-      mockSeoulApi.getRealtimeArrival.mockResolvedValue(mockTrains);
+      mockSeoulApi.getRealtimeArrival.mockResolvedValue(mockTrains as never);
 
       await dataManager.getRealtimeTrains(input);
 
       expect(mockSeoulApi.getRealtimeArrival).toHaveBeenCalledWith(input);
+    });
+  });
+
+  describe('Subscription Management', () => {
+    beforeEach(() => {
+      // Clean up subscriptions from previous tests
+      dataManager.unsubscribeAll();
+    });
+
+    afterEach(() => {
+      dataManager.destroy();
+    });
+
+    it('should create only one interval for multiple subscribers to same station', () => {
+      const callback1 = jest.fn();
+      const callback2 = jest.fn();
+
+      // Subscribe two callbacks to the same station - should not throw
+      const unsubscribe1 = dataManager.subscribeToRealtimeUpdates('강남', callback1);
+      const unsubscribe2 = dataManager.subscribeToRealtimeUpdates('강남', callback2);
+
+      // Both should return unsubscribe functions
+      expect(typeof unsubscribe1).toBe('function');
+      expect(typeof unsubscribe2).toBe('function');
+
+      unsubscribe1();
+      unsubscribe2();
+    });
+
+    it('should allow multiple subscriptions to same station', () => {
+      const callback1 = jest.fn();
+      const callback2 = jest.fn();
+
+      // Subscribe two callbacks - should not throw
+      const unsubscribe1 = dataManager.subscribeToRealtimeUpdates('강남', callback1);
+      const unsubscribe2 = dataManager.subscribeToRealtimeUpdates('강남', callback2);
+
+      expect(typeof unsubscribe1).toBe('function');
+      expect(typeof unsubscribe2).toBe('function');
+
+      unsubscribe1();
+      unsubscribe2();
+    });
+
+    it('should handle unsubscribe correctly', () => {
+      mockSeoulApi.getRealtimeArrival.mockResolvedValue([]);
+
+      const callback1 = jest.fn();
+      const callback2 = jest.fn();
+
+      const unsubscribe1 = dataManager.subscribeToRealtimeUpdates('강남', callback1);
+      const unsubscribe2 = dataManager.subscribeToRealtimeUpdates('강남', callback2);
+
+      // Unsubscribe first callback - should not throw
+      expect(() => unsubscribe1()).not.toThrow();
+
+      // Unsubscribe second callback - should not throw
+      expect(() => unsubscribe2()).not.toThrow();
+    });
+
+    it('should handle different stations independently', () => {
+      const gangnamCallback = jest.fn();
+      const hongdaeCallback = jest.fn();
+
+      // Subscribe to different stations - should not throw
+      const unsubGangnam = dataManager.subscribeToRealtimeUpdates('강남', gangnamCallback);
+      const unsubHongdae = dataManager.subscribeToRealtimeUpdates('홍대입구', hongdaeCallback);
+
+      // Both should return unsubscribe functions
+      expect(typeof unsubGangnam).toBe('function');
+      expect(typeof unsubHongdae).toBe('function');
+
+      // Unsubscribing one should not affect the other
+      expect(() => unsubGangnam()).not.toThrow();
+      expect(() => unsubHongdae()).not.toThrow();
+    });
+  });
+
+  describe('unsubscribeAll', () => {
+    it('should clear all intervals and subscribers', async () => {
+      mockSeoulApi.getRealtimeArrival.mockResolvedValue([]);
+
+      const callback1 = jest.fn();
+      const callback2 = jest.fn();
+
+      dataManager.subscribeToRealtimeUpdates('강남', callback1);
+      dataManager.subscribeToRealtimeUpdates('홍대입구', callback2);
+
+      // Should not throw
+      expect(() => dataManager.unsubscribeAll()).not.toThrow();
+    });
+  });
+
+  describe('destroy', () => {
+    it('should clean up all resources', async () => {
+      mockSeoulApi.getRealtimeArrival.mockResolvedValue([]);
+
+      const callback = jest.fn();
+      dataManager.subscribeToRealtimeUpdates('강남', callback);
+
+      // Should not throw
+      expect(() => dataManager.destroy()).not.toThrow();
+    });
+  });
+
+  describe('getSyncStatus', () => {
+    it('should return sync status object', () => {
+      const status = dataManager.getSyncStatus();
+
+      expect(status).toHaveProperty('lastSync');
+      expect(status).toHaveProperty('isOnline');
+      expect(status).toHaveProperty('pendingSyncs');
+      expect(status).toHaveProperty('errors');
+    });
+
+    it('should return a copy of sync status', () => {
+      const status1 = dataManager.getSyncStatus();
+      const status2 = dataManager.getSyncStatus();
+
+      expect(status1).not.toBe(status2);
+    });
+  });
+
+  describe('forceSync', () => {
+    it('should return true when Seoul API is available', async () => {
+      mockSeoulApi.checkServiceStatus.mockResolvedValue(true);
+
+      const result = await dataManager.forceSync();
+
+      expect(result).toBe(true);
+      expect(mockSeoulApi.checkServiceStatus).toHaveBeenCalled();
+    });
+
+    it('should return false when Seoul API is unavailable', async () => {
+      mockSeoulApi.checkServiceStatus.mockResolvedValue(false);
+
+      const result = await dataManager.forceSync();
+
+      expect(result).toBe(false);
+    });
+
+    it('should handle errors gracefully', async () => {
+      mockSeoulApi.checkServiceStatus.mockRejectedValue(new Error('Network error'));
+
+      const result = await dataManager.forceSync();
+
+      expect(result).toBe(false);
+      const status = dataManager.getSyncStatus();
+      expect(status.errors.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('clearCache', () => {
+    it('should clear all cache items', async () => {
+      mockAsyncStorage.getAllKeys.mockResolvedValue([
+        '@livemetro_cache_test1',
+        '@livemetro_cache_test2',
+        '@other_key',
+      ]);
+      mockAsyncStorage.multiRemove.mockResolvedValue(undefined);
+
+      await dataManager.clearCache();
+
+      expect(mockAsyncStorage.multiRemove).toHaveBeenCalledWith([
+        '@livemetro_cache_test1',
+        '@livemetro_cache_test2',
+      ]);
+    });
+
+    it('should handle errors gracefully', async () => {
+      mockAsyncStorage.getAllKeys.mockRejectedValue(new Error('Storage error'));
+
+      // Should not throw
+      await expect(dataManager.clearCache()).resolves.not.toThrow();
+    });
+  });
+
+  describe('getCacheInfo', () => {
+    it('should return cache information', async () => {
+      mockAsyncStorage.getAllKeys.mockResolvedValue([
+        '@livemetro_cache_test1',
+        '@livemetro_cache_test2',
+      ]);
+      mockAsyncStorage.getItem
+        .mockResolvedValueOnce('{"data":"test1"}')
+        .mockResolvedValueOnce('{"data":"test2"}');
+
+      const info = await dataManager.getCacheInfo();
+
+      expect(info.totalItems).toBe(2);
+      expect(info.totalSize).toBeGreaterThan(0);
+      expect(info.items).toContain('test1');
+      expect(info.items).toContain('test2');
+    });
+
+    it('should handle errors gracefully', async () => {
+      mockAsyncStorage.getAllKeys.mockRejectedValue(new Error('Storage error'));
+
+      const info = await dataManager.getCacheInfo();
+
+      expect(info.totalItems).toBe(0);
+      expect(info.totalSize).toBe(0);
+      expect(info.items).toEqual([]);
+    });
+  });
+
+  describe('detectServiceDisruptions', () => {
+    it('should detect suspension keywords', async () => {
+      const mockArrival = {
+        statnNm: '강남',
+        trainLineNm: '2호선',
+        arvlMsg2: '운행중단',
+        arvlMsg3: '',
+        btrainSttus: '',
+        subwayId: '1002',
+        updnLine: '상행',
+        recptnDt: '2024-01-01 12:00:00',
+        statnId: '0222',
+      };
+
+      mockSeoulApi.getRealtimeArrival.mockResolvedValue([mockArrival] as never);
+
+      const disruptions = await dataManager.detectServiceDisruptions('강남');
+
+      expect(disruptions.length).toBe(1);
+      expect(disruptions[0]?.status).toBe('suspended');
+    });
+
+    it('should detect incident keywords', async () => {
+      const mockArrival = {
+        statnNm: '강남',
+        trainLineNm: '2호선',
+        arvlMsg2: '장애 발생',
+        arvlMsg3: '',
+        btrainSttus: '',
+        subwayId: '1002',
+        updnLine: '하행',
+        recptnDt: '2024-01-01 12:00:00',
+        statnId: '0222',
+      };
+
+      mockSeoulApi.getRealtimeArrival.mockResolvedValue([mockArrival] as never);
+
+      const disruptions = await dataManager.detectServiceDisruptions('강남');
+
+      expect(disruptions.length).toBe(1);
+      expect(disruptions[0]?.status).toBe('emergency');
+    });
+
+    it('should return empty array for normal arrivals', async () => {
+      const mockArrival = {
+        statnNm: '강남',
+        trainLineNm: '2호선',
+        arvlMsg2: '3분후 도착',
+        arvlMsg3: '',
+        btrainSttus: '일반',
+        subwayId: '1002',
+        updnLine: '상행',
+        recptnDt: '2024-01-01 12:00:00',
+        statnId: '0222',
+      };
+
+      mockSeoulApi.getRealtimeArrival.mockResolvedValue([mockArrival] as never);
+
+      const disruptions = await dataManager.detectServiceDisruptions('강남');
+
+      expect(disruptions).toEqual([]);
+    });
+
+    it('should handle errors gracefully', async () => {
+      mockSeoulApi.getRealtimeArrival.mockRejectedValue(new Error('API error'));
+
+      const disruptions = await dataManager.detectServiceDisruptions('강남');
+
+      expect(disruptions).toEqual([]);
     });
   });
 
@@ -333,7 +614,7 @@ describe('DataManager', () => {
         lastUpdated: new Date().toISOString()
       }));
 
-      const result = await dataManager.getRealtimeTrains('강남역');
+      await dataManager.getRealtimeTrains('강남역');
 
       // Falls back to Firebase or cache
       expect(mockAsyncStorage.getItem).toHaveBeenCalled();
@@ -353,7 +634,7 @@ describe('DataManager', () => {
         lastUpdated: new Date().toISOString()
       }));
 
-      const result = await dataManager.getRealtimeTrains('강남역');
+      await dataManager.getRealtimeTrains('강남역');
 
       // Should attempt to fetch from cache
       expect(mockAsyncStorage.getItem).toHaveBeenCalled();

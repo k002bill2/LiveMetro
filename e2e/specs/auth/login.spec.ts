@@ -11,8 +11,10 @@ import { testUsers, generateTestEmail, generateTestName } from '../../helpers/te
 describe('Authentication Flow', () => {
   beforeEach(async () => {
     // Reset app state before each test
-    await (browser as WebdriverIO.Browser).terminateApp('com.livemetro.app');
-    await (browser as WebdriverIO.Browser).activateApp('com.livemetro.app');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (browser as any).terminateApp('com.livemetro.app');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (browser as any).activateApp('com.livemetro.app');
     await welcomePage.waitForScreen();
   });
 

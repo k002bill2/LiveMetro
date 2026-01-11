@@ -323,8 +323,8 @@ describe('useCommuteSetup', () => {
       });
 
       expect(result.current.currentRoute.transferStations).toHaveLength(1);
-      expect(result.current.currentRoute.transferStations![0].stationId).toBe('transfer-1');
-      expect(result.current.currentRoute.transferStations![0].order).toBe(0);
+      expect(result.current.currentRoute.transferStations?.[0]?.stationId).toBe('transfer-1');
+      expect(result.current.currentRoute.transferStations?.[0]?.order).toBe(0);
     });
 
     it('addTransferStation should respect MAX_TRANSFER_STATIONS limit', () => {
@@ -393,10 +393,10 @@ describe('useCommuteSetup', () => {
       });
 
       expect(result.current.currentRoute.transferStations).toHaveLength(2);
-      expect(result.current.currentRoute.transferStations![0].stationId).toBe('transfer-0');
-      expect(result.current.currentRoute.transferStations![0].order).toBe(0);
-      expect(result.current.currentRoute.transferStations![1].stationId).toBe('transfer-2');
-      expect(result.current.currentRoute.transferStations![1].order).toBe(1);
+      expect(result.current.currentRoute.transferStations?.[0]?.stationId).toBe('transfer-0');
+      expect(result.current.currentRoute.transferStations?.[0]?.order).toBe(0);
+      expect(result.current.currentRoute.transferStations?.[1]?.stationId).toBe('transfer-2');
+      expect(result.current.currentRoute.transferStations?.[1]?.order).toBe(1);
     });
   });
 

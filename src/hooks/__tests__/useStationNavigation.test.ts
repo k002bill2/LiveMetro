@@ -18,12 +18,8 @@ const createMockStation = (id: string, name: string, lineId: string): Station =>
   name,
   nameEn: `${name} Station`,
   lineId,
-  lineName: `${lineId}호선`,
-  lineColor: '#00A86B',
   coordinates: { latitude: 37.5, longitude: 127.0 },
   transfers: [],
-  address: `${name} 주소`,
-  facilities: [],
 });
 
 const createMockStations = (): Station[] => [

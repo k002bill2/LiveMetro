@@ -4,6 +4,9 @@
  */
 
 // Extend global type for test utilities
+// Polyfill for Firebase (Firebase expects 'self' to be defined)
+import 'react-native-gesture-handler/jestSetup';
+
 declare global {
   // eslint-disable-next-line no-var
   var mockTrain: {
@@ -26,10 +29,8 @@ declare global {
   };
 }
 
-// Polyfill for Firebase (Firebase expects 'self' to be defined)
-import 'react-native-gesture-handler/jestSetup';
-
-(global as typeof globalThis & { self: typeof globalThis }).self = global;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+(global as any).self = global;
 
 // Mock React Native modules
 jest.mock('react-native-reanimated', () => {
@@ -141,7 +142,11 @@ jest.mock('../utils/performanceUtils', () => ({
     clearMetrics: jest.fn(),
   },
   debounce: jest.fn((fn) => fn),
-  throttle: jest.fn((fn) => fn),
+  throttle: jest.fn((fn) => {
+    const throttledFn = fn;
+    throttledFn.cancel = jest.fn();
+    return throttledFn;
+  }),
   scheduleAfterInteractions: jest.fn((callback) => callback()),
 }));
 

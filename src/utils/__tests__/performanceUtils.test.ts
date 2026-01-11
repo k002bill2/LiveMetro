@@ -150,8 +150,8 @@ describe.skip('shallowEqual', () => {
   });
 
   it('should return false for objects with different keys', () => {
-    const obj1 = { a: 1, b: 2 };
-    const obj2 = { a: 1, c: 2 };
+    const obj1: Record<string, number> = { a: 1, b: 2 };
+    const obj2: Record<string, number> = { a: 1, c: 2 };
 
     expect(shallowEqual(obj1, obj2)).toBe(false);
   });

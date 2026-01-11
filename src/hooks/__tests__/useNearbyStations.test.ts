@@ -17,6 +17,12 @@ jest.mock('../../services/location/locationService');
 jest.mock('../../services/train/trainService');
 jest.mock('../useLocation');
 
+// Disable test stations mode for unit tests
+jest.mock('../../data/testStations', () => ({
+  USE_TEST_STATIONS: false,
+  TEST_STATIONS: [],
+}));
+
 const mockLocationService = locationService as jest.Mocked<typeof locationService>;
 const mockTrainService = trainService as jest.Mocked<typeof trainService>;
 const mockUseLocation = useLocation as jest.MockedFunction<typeof useLocation>;
@@ -32,12 +38,8 @@ const createMockStation = (id: string, name: string, lineId: string): Station =>
   name,
   nameEn: `${name} Station`,
   lineId,
-  lineName: `${lineId}호선`,
-  lineColor: '#00A86B',
   coordinates: { latitude: 37.5 + Math.random() * 0.1, longitude: 127.0 + Math.random() * 0.1 },
   transfers: [],
-  address: `${name} 주소`,
-  facilities: [],
 });
 
 const createMockNearbyStation = (id: string, name: string, distance: number): NearbyStation => ({

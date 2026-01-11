@@ -10,8 +10,10 @@ import stationDetailPage from '../../page-objects/station/station-detail.page';
 describe('Station Detail Screen', () => {
   before(async () => {
     // Login and navigate to home
-    await (browser as WebdriverIO.Browser).terminateApp('com.livemetro.app');
-    await (browser as WebdriverIO.Browser).activateApp('com.livemetro.app');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (browser as any).terminateApp('com.livemetro.app');
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (browser as any).activateApp('com.livemetro.app');
     await welcomePage.waitForScreen();
     await welcomePage.tapTryAnonymously();
     await homePage.waitForScreen();

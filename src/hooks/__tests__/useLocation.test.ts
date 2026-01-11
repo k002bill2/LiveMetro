@@ -4,7 +4,7 @@
  */
 
 import { renderHook, act, waitFor } from '@testing-library/react-native';
-import { AppState, AppStateStatus } from 'react-native';
+import { AppState } from 'react-native';
 import { useLocation, useCurrentLocation } from '../useLocation';
 import { locationService, LocationCoordinates } from '../../services/location/locationService';
 
@@ -20,11 +20,10 @@ jest.mock('expo-location', () => ({
 const mockLocationService = locationService as jest.Mocked<typeof locationService>;
 
 // Mock AppState
-let appStateCallback: ((state: AppStateStatus) => void) | null = null;
 const mockRemove = jest.fn();
 
-jest.spyOn(AppState, 'addEventListener').mockImplementation((_, callback) => {
-  appStateCallback = callback as (state: AppStateStatus) => void;
+jest.spyOn(AppState, 'addEventListener').mockImplementation((_, _callback) => {
+  // Callback stored for potential test usage
   return { remove: mockRemove };
 });
 
@@ -38,7 +37,6 @@ const createMockLocation = (overrides?: Partial<LocationCoordinates>): LocationC
 describe('useLocation', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    appStateCallback = null;
     mockLocationService.initialize.mockResolvedValue(true);
     mockLocationService.getCurrentLocation.mockResolvedValue(createMockLocation());
     mockLocationService.startLocationTracking.mockResolvedValue(true);

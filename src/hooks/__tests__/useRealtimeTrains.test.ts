@@ -3,10 +3,10 @@
  * Tests for real-time train data subscription using dataManager
  */
 
-import { renderHook, act, waitFor } from '@testing-library/react-native';
+import { renderHook, act } from '@testing-library/react-native';
 import { useRealtimeTrains } from '../useRealtimeTrains';
 import { dataManager, RealtimeTrainData } from '../../services/data/dataManager';
-import { Train } from '../../models/train';
+import { Train, TrainStatus } from '../../models/train';
 
 // Mock dataManager
 jest.mock('../../services/data/dataManager', () => ({
@@ -20,30 +20,37 @@ const mockDataManager = dataManager as jest.Mocked<typeof dataManager>;
 const createMockTrains = (): Train[] => [
   {
     id: 'train-1',
-    stationId: 'station-1',
+    lineId: '2',
     direction: 'up',
+    currentStationId: 'station-1',
+    nextStationId: 'station-2',
+    finalDestination: '강남',
+    status: TrainStatus.NORMAL,
     arrivalTime: new Date(Date.now() + 2 * 60 * 1000),
     delayMinutes: 0,
-    status: 'NORMAL',
-    nextStationId: 'station-2',
+    lastUpdated: new Date(),
   },
   {
     id: 'train-2',
-    stationId: 'station-1',
+    lineId: '2',
     direction: 'down',
+    currentStationId: 'station-1',
+    nextStationId: 'station-3',
+    finalDestination: '역삼',
+    status: TrainStatus.DELAYED,
     arrivalTime: new Date(Date.now() + 5 * 60 * 1000),
     delayMinutes: 1,
-    status: 'DELAYED',
-    nextStationId: 'station-3',
+    lastUpdated: new Date(),
   },
 ];
 
 const createMockRealtimeData = (trains: Train[]): RealtimeTrainData => ({
-  trains,
+  stationId: 'station-1',
   stationName: '강남역',
+  trains,
   lastUpdated: new Date(),
   isStale: false,
-});
+} as RealtimeTrainData);
 
 describe('useRealtimeTrains', () => {
   let unsubscribeMock: jest.Mock;
@@ -239,8 +246,11 @@ describe('useRealtimeTrains', () => {
     });
 
     it('should resubscribe when stationName changes', () => {
-      const { rerender } = renderHook(
-        ({ station }) => useRealtimeTrains(station),
+      const { rerender } = renderHook<
+        ReturnType<typeof useRealtimeTrains>,
+        { station: string }
+      >(
+        ({ station }: { station: string }) => useRealtimeTrains(station),
         { initialProps: { station: '강남역' } }
       );
 
@@ -404,8 +414,11 @@ describe('useRealtimeTrains', () => {
     });
 
     it('should handle multiple rapid rerenders', () => {
-      const { rerender } = renderHook(
-        ({ station }) => useRealtimeTrains(station),
+      const { rerender } = renderHook<
+        ReturnType<typeof useRealtimeTrains>,
+        { station: string }
+      >(
+        ({ station }: { station: string }) => useRealtimeTrains(station),
         { initialProps: { station: '강남역' } }
       );
 

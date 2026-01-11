@@ -86,8 +86,8 @@ describe('TrainService', () => {
     {
       id: '2',
       name: '2호선',
-      nameEn: 'Line 2',
       color: '#00a84d',
+      stations: [],
     },
   ];
 
@@ -106,7 +106,7 @@ describe('TrainService', () => {
       mockGetDocs.mockResolvedValue({
         docs: mockSubwayLines.map(line => ({
           id: line.id,
-          data: () => ({ name: line.name, nameEn: line.nameEn, color: line.color }),
+          data: () => ({ name: line.name, color: line.color }),
         })),
       });
 
@@ -146,7 +146,7 @@ describe('TrainService', () => {
       const result = await trainService.getStationsByLine('2');
 
       expect(result).toHaveLength(2);
-      expect(result[0].name).toBe('강남역');
+      expect(result[0]?.name).toBe('강남역');
     });
 
     it('should fallback to local data when Firebase returns empty', async () => {
@@ -241,7 +241,7 @@ describe('TrainService', () => {
         },
       ];
 
-      mockOnSnapshot.mockImplementation((query, onNext) => {
+      mockOnSnapshot.mockImplementation((_query, onNext) => {
         onNext({
           docs: mockTrains.map(train => ({
             id: train.id,
@@ -281,7 +281,7 @@ describe('TrainService', () => {
       const mockCallback = jest.fn();
       const mockUnsubscribe = jest.fn();
 
-      mockOnSnapshot.mockImplementation((query, onNext, onError) => {
+      mockOnSnapshot.mockImplementation((_query, _onNext, onError) => {
         onError(new Error('Subscription error'));
         return mockUnsubscribe;
       });
@@ -299,23 +299,27 @@ describe('TrainService', () => {
 
       const mockDelays: TrainDelay[] = [
         {
+          trainId: 'train-1',
           lineId: '2',
+          delayMinutes: 10,
           severity: DelaySeverity.MODERATE,
           affectedStations: ['gangnam', 'seolleung'],
-          message: '운행 지연',
+          reason: '운행 지연',
           reportedAt: new Date(),
           estimatedResolutionTime: null,
         },
       ];
 
-      mockOnSnapshot.mockImplementation((query, onNext) => {
+      mockOnSnapshot.mockImplementation((_query, onNext) => {
         onNext({
           docs: mockDelays.map(delay => ({
             data: () => ({
+              trainId: delay.trainId,
               lineId: delay.lineId,
+              delayMinutes: delay.delayMinutes,
               severity: delay.severity,
               affectedStations: delay.affectedStations,
-              message: delay.message,
+              reason: delay.reason,
               reportedAt: { toDate: () => delay.reportedAt },
               estimatedResolutionTime: null,
             }),
@@ -358,7 +362,7 @@ describe('TrainService', () => {
       const result = await trainService.getTrainCongestion('train-1');
 
       expect(result).toHaveLength(1);
-      expect(result[0].trainId).toBe('train-1');
+      expect(result[0]?.trainId).toBe('train-1');
     });
 
     it('should return empty array on error', async () => {
@@ -388,7 +392,7 @@ describe('TrainService', () => {
       const result = await trainService.searchStations('강남');
 
       expect(result.length).toBeGreaterThan(0);
-      expect(result[0].name).toContain('강남');
+      expect(result[0]?.name).toContain('강남');
     });
 
     it('should return empty array on error', async () => {
@@ -436,7 +440,15 @@ describe('TrainService', () => {
         {
           STATION_CD: '0222',
           STATION_NM: '강남',
+          TRAIN_NO: '2001',
           ARRIVETIME: '05:30:00',
+          LEFTTIME: '05:25:00',
+          ORIGIN_STATION_NM: '시청',
+          DEST_STATION_NM: '강남',
+          SUBWAYSNAME: '2호선',
+          WEEK_TAG: '1',
+          INOUT_TAG: '1',
+          FLAG: '0',
         },
       ];
 

@@ -1,6 +1,5 @@
 
 import { generateMapLayout } from '../mapLayout';
-import { STATIONS, LINE_STATIONS } from '../subwayMapData';
 
 describe('generateMapLayout', () => {
   it('should generate map data with nodes and edges using default data', () => {

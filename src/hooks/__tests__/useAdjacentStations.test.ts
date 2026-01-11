@@ -8,6 +8,12 @@ import { useAdjacentStations } from '../useAdjacentStations';
 import { getLocalStationsByLine } from '@/services/data/stationsDataService';
 import { Station } from '@/models/train';
 
+// Type for renderHook props
+interface HookProps {
+  stationName: string;
+  lineId: string;
+}
+
 // Mock the stationsDataService
 jest.mock('@/services/data/stationsDataService', () => ({
   getLocalStationsByLine: jest.fn(),
@@ -23,12 +29,8 @@ const createMockStation = (id: string, name: string, lineId: string): Station =>
   name,
   nameEn: `${name} Station`,
   lineId,
-  lineName: `${lineId}호선`,
-  lineColor: '#00A86B',
   coordinates: { latitude: 37.5, longitude: 127.0 },
   transfers: [],
-  address: `${name} 주소`,
-  facilities: [],
 });
 
 describe('useAdjacentStations', () => {
@@ -265,8 +267,8 @@ describe('useAdjacentStations', () => {
       ];
       mockGetLocalStationsByLine.mockReturnValue(mockStations);
 
-      const { result, rerender } = renderHook(
-        ({ stationName, lineId }) => useAdjacentStations(stationName, lineId),
+      const { result, rerender } = renderHook<ReturnType<typeof useAdjacentStations>, HookProps>(
+        ({ stationName, lineId }: HookProps) => useAdjacentStations(stationName, lineId),
         { initialProps: { stationName: '시청', lineId: '2' } }
       );
 
@@ -286,8 +288,8 @@ describe('useAdjacentStations', () => {
       ];
       mockGetLocalStationsByLine.mockReturnValue(mockStations);
 
-      const { result, rerender } = renderHook(
-        ({ stationName, lineId }) => useAdjacentStations(stationName, lineId),
+      const { result, rerender } = renderHook<ReturnType<typeof useAdjacentStations>, HookProps>(
+        ({ stationName, lineId }: HookProps) => useAdjacentStations(stationName, lineId),
         { initialProps: { stationName: '시청', lineId: '2' } }
       );
 
@@ -315,8 +317,8 @@ describe('useAdjacentStations', () => {
         return [];
       });
 
-      const { result, rerender } = renderHook(
-        ({ stationName, lineId }) => useAdjacentStations(stationName, lineId),
+      const { result, rerender } = renderHook<ReturnType<typeof useAdjacentStations>, HookProps>(
+        ({ stationName, lineId }: HookProps) => useAdjacentStations(stationName, lineId),
         { initialProps: { stationName: '시청', lineId: '2' } }
       );
 
