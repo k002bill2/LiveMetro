@@ -1,0 +1,265 @@
+# Eval Task Schema v2.0
+# Claude Code Agent Evaluation Task Definition
+# Based on: https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents
+
+$schema: "https://json-schema.org/draft/2020-12/schema"
+title: EvalTask
+description: AI agent evaluation task definition for Claude Code workflows
+
+required:
+  - id
+  - name
+  - category
+  - input
+  - success_criteria
+  - graders
+
+properties:
+  id:
+    type: string
+    pattern: "^task_[a-z]+_[0-9]{3}$"
+    description: "Unique task identifier (e.g., task_ui_001)"
+
+  name:
+    type: string
+    maxLength: 100
+    description: "Human-readable task name"
+
+  category:
+    type: string
+    enum:
+      - ui_component
+      - service
+      - refactor
+      - bug_fix
+      - feature
+      - test
+      - documentation
+      - negative        # NEW: 실패해야 하는 케이스
+      - research        # NEW: 연구/조사 태스크
+      - conversation    # NEW: 대화형 태스크
+    description: "Task category for grouping and filtering"
+
+  input:
+    type: object
+    required:
+      - description
+      - requirements
+    properties:
+      description:
+        type: string
+        description: "Task description for the agent"
+      requirements:
+        type: array
+        items:
+          type: string
+        minItems: 1
+        description: "List of requirements to fulfill"
+      reference_files:
+        type: array
+        items:
+          type: string
+        description: "Files to reference for implementation"
+      context:
+        type: string
+        description: "Additional context or constraints"
+      project_vars:
+        type: object
+        description: "Project-specific variables (for portability)"
+        additionalProperties:
+          type: string
+
+  success_criteria:
+    type: object
+    properties:
+      required:
+        type: object
+        description: "Must-pass criteria (양방향 테스트의 '성공해야 하는' 부분)"
+        additionalProperties:
+          oneOf:
+            - type: boolean
+            - type: number
+            - type: string
+      optional:
+        type: object
+        description: "Nice-to-have criteria (bonus points)"
+        additionalProperties:
+          oneOf:
+            - type: boolean
+            - type: number
+            - type: string
+      # NEW: 양방향 테스트 지원 (Anthropic 블로그 권장)
+      must_fail:
+        type: object
+        description: "Conditions that MUST fail (네거티브 테스트)"
+        additionalProperties:
+          oneOf:
+            - type: boolean
+            - type: number
+            - type: string
+      forbidden_patterns:
+        type: array
+        items:
+          type: string
+        description: "Regex patterns that should NOT appear in output"
+
+  # NEW: 실행 제약 조건
+  constraints:
+    type: object
+    description: "Execution constraints for the task"
+    properties:
+      max_turns:
+        type: integer
+        description: "Maximum conversation turns allowed"
+      max_tool_calls:
+        type: integer
+        description: "Maximum tool invocations allowed"
+      max_tokens:
+        type: integer
+        description: "Maximum tokens in response"
+      disallowed_tools:
+        type: array
+        items:
+          type: string
+        description: "Tools that are forbidden for this task"
+      required_tools:
+        type: array
+        items:
+          type: string
+        description: "Tools that must be used"
+      timeout_seconds:
+        type: integer
+        description: "Hard timeout in seconds"
+
+  graders:
+    type: array
+    minItems: 1
+    items:
+      type: object
+      required:
+        - type
+      properties:
+        type:
+          type: string
+          enum:
+            - code              # 코드 기반 결정론적 검사
+            - llm               # LLM 루브릭 기반 평가
+            - human             # 인간 검토
+            - state_check       # NEW: 백엔드/DB 상태 검증
+            - transcript        # NEW: 트랜스크립트 분석 (턴 수, 도구 사용)
+            - static_analysis   # NEW: 정적 분석 도구 (ruff, mypy, bandit)
+        checks:
+          type: array
+          items:
+            type: string
+          description: "Code-based checks (for type: code)"
+        rubric:
+          type: string
+          description: "Rubric name to use (for type: llm)"
+        weight:
+          type: number
+          minimum: 0
+          maximum: 1
+          description: "Weight in final score calculation"
+        criteria:
+          type: array
+          items:
+            type: string
+          description: "Specific criteria for LLM/human grading"
+        # NEW: state_check 그레이더용
+        expect:
+          type: object
+          description: "Expected state after task completion (for state_check)"
+          properties:
+            files:
+              type: object
+              description: "Expected file states"
+            firebase:
+              type: object
+              description: "Expected Firestore document states"
+            logs:
+              type: object
+              description: "Expected log entries"
+        # NEW: transcript 그레이더용
+        max_turns:
+          type: integer
+          minimum: 1
+          description: "Maximum allowed conversation turns"
+        max_tool_calls:
+          type: integer
+          minimum: 1
+          description: "Maximum allowed tool invocations"
+        disallowed_tools:
+          type: array
+          items:
+            type: string
+          description: "Tools that should NOT be used"
+        required_tools:
+          type: array
+          items:
+            type: string
+          description: "Tools that MUST be used"
+        # NEW: static_analysis 그레이더용
+        commands:
+          type: array
+          items:
+            type: string
+          description: "Static analysis commands to run (ruff, mypy, bandit)"
+
+  max_attempts:
+    type: integer
+    default: 3
+    minimum: 1
+    maximum: 10
+    description: "Maximum retry attempts for pass@k calculation"
+
+  timeout_minutes:
+    type: integer
+    default: 15
+    minimum: 1
+    maximum: 60
+    description: "Task timeout in minutes"
+
+  tags:
+    type: array
+    items:
+      type: string
+    description: "Tags for filtering and organization"
+
+  difficulty:
+    type: string
+    enum:
+      - trivial
+      - simple
+      - moderate
+      - complex
+    default: simple
+    description: "Expected task difficulty"
+
+  expected_agent:
+    type: string
+    description: "Recommended agent type for this task"
+
+# Example usage:
+# id: task_ui_001
+# name: "Create StationCard component"
+# category: ui_component
+# input:
+#   description: "Create a card component for displaying station info"
+#   requirements:
+#     - Display station name and line color
+#     - Navigate to detail screen on tap
+#     - Include accessibility labels
+# success_criteria:
+#   required:
+#     typescript_no_errors: true
+#     test_coverage: 75
+#   optional:
+#     memo_usage: true
+# graders:
+#   - type: code
+#     checks:
+#       - "file_exists: src/components/station/StationCard.tsx"
+#   - type: llm
+#     rubric: code-quality
+#     weight: 0.6

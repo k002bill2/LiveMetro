@@ -1,0 +1,69 @@
+# Service Implementation Evaluation Task
+# LiveMetro: Real-time Arrival Service
+
+id: task_svc_001
+name: "실시간 도착 정보 서비스 구현"
+category: service
+difficulty: moderate
+
+input:
+  description: |
+    서울 열린데이터 API를 활용하여 실시간 지하철 도착 정보를
+    가져오는 서비스 모듈을 구현합니다.
+  requirements:
+    - "서울 열린데이터 API 연동"
+    - "에러 처리 및 재시도 로직"
+    - "응답 데이터 파싱 및 타입 변환"
+    - "캐싱 전략 구현 (30초 최소 간격)"
+    - "TypeScript 타입 정의"
+  reference_files:
+    - "src/services/train/trainService.ts"
+    - "src/services/api/seoulMetroApi.ts"
+  context: |
+    서울 열린데이터 API는 30초 이상의 폴링 간격을 요구합니다.
+    Rate limiting을 반드시 구현하세요.
+  project_vars:
+    PROJECT_SERVICES: "src/services"
+    PROJECT_MODELS: "src/models"
+
+success_criteria:
+  required:
+    typescript_no_errors: true
+    test_coverage: 80
+    error_handling: true
+    no_any_types: true
+    rate_limiting: true
+  optional:
+    caching_implemented: true
+    retry_logic: true
+    timeout_handling: true
+
+graders:
+  - type: code
+    weight: 0.4
+    checks:
+      - "file_exists: src/services/arrival/arrivalService.ts"
+      - "test_exists: src/services/arrival/__tests__/arrivalService.test.ts"
+      - "no_any_types"
+      - "has_try_catch"
+      - "returns_typed_promise"
+      - "has_rate_limiting"
+  - type: llm
+    weight: 0.6
+    rubric: code-quality
+    criteria:
+      - "단일 책임 원칙을 따르는가"
+      - "에러 처리가 포괄적인가"
+      - "함수 시그니처가 명확하고 타입이 지정되었는가"
+      - "부수 효과가 적절히 관리되는가"
+      - "비동기 작업이 올바르게 처리되는가"
+      - "API 응답 데이터 검증이 있는가"
+
+max_attempts: 3
+timeout_minutes: 20
+tags:
+  - service
+  - api
+  - real-time
+  - seoul-metro
+expected_agent: backend-integration-specialist

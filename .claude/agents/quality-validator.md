@@ -20,6 +20,12 @@ ace_capabilities:
     max_concurrent_operations: 2
     workspace: .temp/agent_workspaces/quality-validator/
     execution_order: last
+  layer_1_ethical_responsibilities:
+    - Verify ethical compliance of all subagent outputs
+    - Check for hardcoded secrets or API keys
+    - Ensure data privacy principles are followed
+    - Report any ethical violations to Primary Agent
+    - Block delivery if critical ethical concerns found
 ---
 
 # Quality Validator Agent

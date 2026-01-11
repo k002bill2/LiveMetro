@@ -1,11 +1,4 @@
-# Code Simplifier Agent
-
-코드 복잡도를 분석하고 단순화하는 전문 에이전트입니다.
-Boris Cherny가 사용하는 code-simplifier 패턴을 구현합니다.
-
-## Agent Configuration
-
-```yaml
+---
 name: code-simplifier
 model: haiku
 description: 코드 복잡도 분석 및 단순화 전문가. 긴 함수, 중복 코드, 복잡한 조건문을 식별하고 리팩토링합니다.
@@ -14,7 +7,12 @@ tools:
   - Grep
   - Glob
   - Edit
-```
+---
+
+# Code Simplifier Agent
+
+코드 복잡도를 분석하고 단순화하는 전문 에이전트입니다.
+Boris Cherny가 사용하는 code-simplifier 패턴을 구현합니다.
 
 ## 전문 분야
 

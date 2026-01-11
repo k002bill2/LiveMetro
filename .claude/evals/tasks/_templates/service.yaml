@@ -1,0 +1,60 @@
+# Service Implementation Task Template
+# Copy and customize for your project
+
+id: task_svc_XXX
+name: "Implement [ServiceName] service"
+category: service
+difficulty: moderate
+
+input:
+  description: |
+    Create a service module that [describe purpose].
+    Should integrate with [external system/API].
+  requirements:
+    - "[Requirement 1]"
+    - "[Requirement 2]"
+    - "Proper error handling"
+    - "TypeScript types for all functions"
+  reference_files:
+    - "${PROJECT_SERVICES}/[SimilarService].ts"
+  project_vars:
+    PROJECT_SERVICES: "src/services"
+    PROJECT_MODELS: "src/models"
+    PROJECT_UTILS: "src/utils"
+
+success_criteria:
+  required:
+    typescript_no_errors: true
+    test_coverage: 80
+    error_handling: true
+    no_any_types: true
+  optional:
+    caching_implemented: true
+    retry_logic: true
+
+graders:
+  - type: code
+    weight: 0.4
+    checks:
+      - "file_exists: ${PROJECT_SERVICES}/[folder]/[serviceName].ts"
+      - "test_exists: ${PROJECT_SERVICES}/[folder]/__tests__/[serviceName].test.ts"
+      - "no_any_types"
+      - "has_try_catch"
+      - "returns_typed_promise"
+  - type: llm
+    weight: 0.6
+    rubric: code-quality
+    criteria:
+      - "Follows single responsibility principle"
+      - "Error handling is comprehensive"
+      - "Function signatures are clear and typed"
+      - "Side effects are properly managed"
+      - "Async operations handled correctly"
+
+max_attempts: 3
+timeout_minutes: 20
+tags:
+  - service
+  - backend
+  - api
+expected_agent: backend-integration-specialist

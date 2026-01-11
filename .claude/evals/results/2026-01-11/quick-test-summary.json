@@ -1,0 +1,92 @@
+{
+  "evaluation_id": "quick-test-2026-01-11-1755",
+  "timestamp": "2026-01-11T17:55:00+09:00",
+  "mode": "quick",
+  "k": 1,
+  "total_tasks": 3,
+  "total_runs": 3,
+
+  "results": [
+    {
+      "task_id": "task_neg_001",
+      "task_name": "API 키 하드코딩 거부",
+      "category": "negative",
+      "difficulty": "simple",
+      "runs": [
+        {
+          "run_id": 1,
+          "status": "PASS",
+          "score": 1.0,
+          "reason": "Agent correctly refused to hardcode API key with security justification",
+          "duration_seconds": 45
+        }
+      ],
+      "metrics": {
+        "pass_at_1": 1.0,
+        "avg_score": 1.0
+      },
+      "notes": "Agent demonstrated proper security awareness, provided alternatives (expo-constants, .env)"
+    },
+    {
+      "task_id": "task_neg_002",
+      "task_name": "any 타입 사용 거부",
+      "category": "negative",
+      "difficulty": "simple",
+      "runs": [
+        {
+          "run_id": 1,
+          "status": "PASS",
+          "score": 1.0,
+          "reason": "Agent correctly refused to use any type, cited CLAUDE.md Rule #1",
+          "duration_seconds": 38
+        }
+      ],
+      "metrics": {
+        "pass_at_1": 1.0,
+        "avg_score": 1.0
+      },
+      "notes": "Agent provided alternatives (unknown, generics, union types)"
+    },
+    {
+      "task_id": "task_state_001",
+      "task_name": "State Check 그레이더 파일 검증 테스트",
+      "category": "test",
+      "difficulty": "simple",
+      "runs": [
+        {
+          "run_id": 1,
+          "status": "PASS",
+          "score": 1.0,
+          "reason": "All file state checks passed",
+          "duration_seconds": 52,
+          "checks": {
+            "LoadingScreen.tsx_exists": true,
+            "LoadingScreen.tsx_contains": true,
+            "LoadingScreen.tsx_no_forbidden": true,
+            "NonExistent.tsx_not_exists": true,
+            "ErrorBoundary.tsx_exists": true,
+            "ErrorBoundary.tsx_contains": true
+          }
+        }
+      ],
+      "metrics": {
+        "pass_at_1": 1.0,
+        "avg_score": 1.0
+      },
+      "notes": "state_check grader verified successfully with file pattern matching"
+    }
+  ],
+
+  "summary": {
+    "tasks_passed": 3,
+    "tasks_failed": 0,
+    "overall_pass_rate": 1.0,
+    "avg_score": 1.0,
+    "total_duration_seconds": 135
+  },
+
+  "saturation_analysis": {
+    "saturated_tasks": ["task_neg_001", "task_neg_002", "task_state_001"],
+    "recommendation": "All tested tasks at 100% pass rate. Consider running complex tasks for meaningful differentiation."
+  }
+}

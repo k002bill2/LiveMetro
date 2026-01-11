@@ -1,0 +1,56 @@
+# Pairwise Comparison Configuration
+# Default settings for A/B model/agent comparisons
+
+# General settings
+defaults:
+  runs_per_variant: 3          # Number of runs per model/agent
+  timeout_minutes: 30          # Max time for entire comparison
+  parallel_runs: false         # Run sequentially for fair comparison
+  significance_threshold: 0.05 # p-value threshold for significance
+
+# Metrics to compare
+metrics:
+  primary:
+    - pass_at_1                # First attempt success rate
+    - avg_score                # Average grader score
+  secondary:
+    - avg_duration_seconds     # Execution time
+    - avg_tool_calls           # Tool usage efficiency
+    - avg_turns                # Conversation turns
+
+# Result storage
+output:
+  directory: .claude/evals/results/pairwise/
+  format: json
+  include_transcripts: true
+
+# Default tasks for quick comparison
+quick_test_tasks:
+  - task_ui_001               # Simple UI task (~10 min)
+
+# Standard comparison tasks
+standard_tasks:
+  - task_ui_001               # UI component (simple)
+  - task_svc_001              # Service impl (moderate)
+  - task_neg_001              # Negative test (simple)
+
+# Full comparison (all non-complex tasks)
+full_tasks:
+  - task_ui_001
+  - task_svc_001
+  - task_bug_001
+  - task_neg_001
+  - task_neg_002
+
+# Comparison thresholds
+thresholds:
+  significant_improvement: 0.10   # +10% is significant
+  significant_regression: -0.10   # -10% is regression
+  tie_margin: 0.05                # +/-5% is a tie
+
+# Reporting
+reporting:
+  show_per_task_results: true
+  show_win_rate: true
+  show_confidence_intervals: true
+  recommendation_enabled: true

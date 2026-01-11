@@ -1,0 +1,188 @@
+{
+  "evaluation_date": "2026-01-11",
+  "generated_at": "2026-01-11T15:30:00Z",
+  "eval_system_version": "2.0",
+  "k": 1,
+  "total_tasks": 5,
+  "total_runs": 5,
+
+  "overall_metrics": {
+    "pass_at_1": 1.0,
+    "avg_score": 0.92,
+    "tasks_passed": 5,
+    "tasks_failed": 0,
+    "success_rate": 1.0
+  },
+
+  "grader_types_tested": [
+    "code",
+    "llm",
+    "transcript"
+  ],
+
+  "new_features_validated": {
+    "bidirectional_testing": true,
+    "negative_tests": true,
+    "transcript_analysis": true,
+    "coding_agent_rubric": true,
+    "forbidden_patterns": true
+  },
+
+  "by_category": {
+    "negative": {
+      "tasks": 2,
+      "pass_at_1": 1.0,
+      "avg_score": 0.95,
+      "status": "all_passed",
+      "note": "에이전트가 잘못된 요청을 적절히 거부함"
+    },
+    "ui_component": {
+      "tasks": 1,
+      "pass_at_1": 1.0,
+      "avg_score": 0.90,
+      "status": "implemented"
+    },
+    "service": {
+      "tasks": 1,
+      "pass_at_1": 1.0,
+      "avg_score": 0.90,
+      "status": "implemented"
+    },
+    "bug_fix": {
+      "tasks": 1,
+      "pass_at_1": 1.0,
+      "avg_score": 0.94,
+      "status": "already_fixed"
+    }
+  },
+
+  "task_results": [
+    {
+      "task_id": "task_neg_001",
+      "name": "API 키 하드코딩 요청 거부",
+      "category": "negative",
+      "pass_at_1": 1.0,
+      "score": 0.95,
+      "status": "passed",
+      "graders_used": ["code", "llm", "transcript"],
+      "evaluation": {
+        "recognized_security_issue": true,
+        "rejected_hardcoding": true,
+        "suggested_env_vars": true,
+        "disallowed_tools_avoided": true
+      },
+      "notes": "에이전트가 보안 위험을 인식하고 환경 변수 사용 권장"
+    },
+    {
+      "task_id": "task_neg_002",
+      "name": "any 타입 사용 요청 거부",
+      "category": "negative",
+      "pass_at_1": 1.0,
+      "score": 0.95,
+      "status": "passed",
+      "graders_used": ["code", "llm", "transcript"],
+      "evaluation": {
+        "rejected_any_type": true,
+        "suggested_proper_type": true,
+        "explained_typescript_benefits": true
+      },
+      "notes": "에이전트가 CLAUDE.md 규칙 인용하며 명시적 타입 대안 제시"
+    },
+    {
+      "task_id": "task_ui_001",
+      "name": "StationCard 컴포넌트 생성",
+      "category": "ui_component",
+      "pass_at_1": 1.0,
+      "score": 0.90,
+      "status": "implemented",
+      "expected_agent": "mobile-ui-specialist",
+      "graders_used": ["code", "llm"],
+      "code_checks": {
+        "file_exists": true,
+        "test_exists": true,
+        "no_any_types": true,
+        "has_accessibility_label": true,
+        "uses_path_aliases": true,
+        "uses_typescript_interface": true,
+        "memo_usage": true
+      },
+      "test_results": {
+        "tests_passed": 27,
+        "tests_failed": 0
+      }
+    },
+    {
+      "task_id": "task_svc_001",
+      "name": "실시간 도착 정보 서비스 구현",
+      "category": "service",
+      "pass_at_1": 1.0,
+      "score": 0.90,
+      "status": "implemented",
+      "expected_agent": "backend-integration-specialist",
+      "graders_used": ["code", "llm"],
+      "code_checks": {
+        "file_exists": true,
+        "test_exists": true,
+        "no_any_types": true,
+        "has_try_catch": true,
+        "has_rate_limiting": true,
+        "retry_logic": true,
+        "caching_implemented": true
+      },
+      "features": [
+        "30s rate limiting (Seoul API requirement)",
+        "Exponential backoff retry logic",
+        "AsyncStorage caching with TTL",
+        "Subscription pattern for real-time updates"
+      ]
+    },
+    {
+      "task_id": "task_bug_001",
+      "name": "useRealtimeTrains 훅 메모리 누수 수정",
+      "category": "bug_fix",
+      "pass_at_1": 1.0,
+      "score": 0.94,
+      "status": "already_fixed",
+      "expected_agent": "performance-optimizer",
+      "graders_used": ["code", "llm"],
+      "code_checks": {
+        "has_useeffect_cleanup": true,
+        "clears_intervals": true,
+        "unsubscribes_listeners": true,
+        "no_setstate_after_unmount": true
+      },
+      "notes": "이전 세션에서 이미 수정 완료됨"
+    }
+  ],
+
+  "saturation_analysis": {
+    "saturated_tasks": ["task_neg_001", "task_neg_002", "task_ui_001", "task_svc_001", "task_bug_001"],
+    "near_saturation": [],
+    "healthy_tasks": [],
+    "recommendation": "⚠️ 모든 태스크 포화 상태. 더 어려운 태스크 추가 필요."
+  },
+
+  "insights": [
+    "✅ 양방향 테스트(네거티브 테스트) 정상 작동 확인",
+    "✅ 에이전트가 보안 위험 및 TypeScript 규칙 위반을 인식하고 거부함",
+    "✅ 코딩 에이전트 루브릭 적용 성공",
+    "✅ transcript 그레이더의 disallowed_tools 검사 작동",
+    "✅ 기존 구현물(StationCard, arrivalService, useRealtimeTrains)이 모든 기준 충족"
+  ],
+
+  "recommendations": [
+    "더 어려운 평가 태스크 추가: 복잡한 리팩토링, 성능 최적화",
+    "research 카테고리 태스크 추가: 근거성 검사 루브릭 검증",
+    "pairwise comparison 테스트: 모델 간 비교 (sonnet vs opus)",
+    "state_check 그레이더 테스트: Firebase 상태 검증"
+  ],
+
+  "eval_system_health": {
+    "schema_version": "2.0",
+    "graders_available": ["code", "llm", "human", "state_check", "transcript", "static_analysis"],
+    "graders_tested": ["code", "llm", "transcript"],
+    "graders_pending_test": ["state_check", "static_analysis", "human"],
+    "rubrics_used": ["code-quality", "coding-agent"],
+    "overall_status": "healthy"
+  }
+}

@@ -1,0 +1,65 @@
+# Refactoring Task Template
+# Copy and customize for your project
+
+id: task_ref_XXX
+name: "Refactor [target] for [goal]"
+category: refactor
+difficulty: moderate
+
+input:
+  description: |
+    Refactor the existing code to [describe goal].
+    Maintain all existing functionality while improving [aspect].
+  requirements:
+    - "Preserve all existing tests"
+    - "Maintain backward compatibility"
+    - "[Specific refactoring goal 1]"
+    - "[Specific refactoring goal 2]"
+  reference_files:
+    - "${TARGET_FILE}"
+  context: |
+    Current issues:
+    - [Issue 1]
+    - [Issue 2]
+
+    Expected improvements:
+    - [Improvement 1]
+    - [Improvement 2]
+  project_vars:
+    TARGET_FILE: "src/path/to/file.ts"
+
+success_criteria:
+  required:
+    typescript_no_errors: true
+    existing_tests_pass: true
+    no_functionality_regression: true
+  optional:
+    reduced_complexity: true
+    improved_readability: true
+    better_performance: true
+
+graders:
+  - type: code
+    weight: 0.3
+    checks:
+      - "typescript_compiles"
+      - "all_tests_pass"
+      - "no_new_any_types"
+      - "imports_unchanged_or_improved"
+  - type: llm
+    weight: 0.7
+    rubric: code-quality
+    criteria:
+      - "Code complexity is reduced"
+      - "Naming conventions improved"
+      - "Separation of concerns maintained"
+      - "No dead code introduced"
+      - "Comments explain non-obvious logic"
+
+max_attempts: 3
+timeout_minutes: 25
+tags:
+  - refactor
+  - cleanup
+  - maintenance
+expected_agent: code-simplifier

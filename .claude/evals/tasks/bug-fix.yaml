@@ -1,0 +1,65 @@
+# Bug Fix Evaluation Task
+# LiveMetro: Memory Leak in useRealtimeTrains Hook
+
+id: task_bug_001
+name: "useRealtimeTrains 훅 메모리 누수 수정"
+category: bug_fix
+difficulty: moderate
+
+input:
+  description: |
+    useRealtimeTrains 훅에서 발생하는 메모리 누수 버그를 수정합니다.
+    컴포넌트 언마운트 시 구독이 정리되지 않는 문제입니다.
+  requirements:
+    - "useEffect cleanup 함수 추가"
+    - "모든 타이머/인터벌 정리"
+    - "구독 취소 로직 구현"
+    - "기존 테스트 통과 유지"
+  reference_files:
+    - "src/hooks/useRealtimeTrains.ts"
+    - "src/hooks/__tests__/useRealtimeTrains.test.ts"
+  context: |
+    현재 문제:
+    - setInterval이 cleanup되지 않음
+    - Firebase 구독이 해제되지 않음
+    - 컴포넌트 언마운트 후에도 setState 호출됨
+  project_vars:
+    TARGET_FILE: "src/hooks/useRealtimeTrains.ts"
+
+success_criteria:
+  required:
+    typescript_no_errors: true
+    existing_tests_pass: true
+    cleanup_implemented: true
+    no_memory_leak: true
+  optional:
+    improved_test_coverage: true
+    added_cleanup_tests: true
+
+graders:
+  - type: code
+    weight: 0.4
+    checks:
+      - "has_useeffect_cleanup"
+      - "clears_intervals"
+      - "unsubscribes_listeners"
+      - "no_setstate_after_unmount"
+      - "all_tests_pass"
+  - type: llm
+    weight: 0.6
+    rubric: code-quality
+    criteria:
+      - "모든 리소스가 적절히 정리되는가"
+      - "cleanup 로직이 누락된 곳이 없는가"
+      - "unmount 상태 체크가 구현되었는가"
+      - "수정이 기존 기능에 영향을 주지 않는가"
+      - "테스트가 cleanup 동작을 검증하는가"
+
+max_attempts: 3
+timeout_minutes: 15
+tags:
+  - bug-fix
+  - memory-leak
+  - hooks
+  - cleanup
+expected_agent: performance-optimizer

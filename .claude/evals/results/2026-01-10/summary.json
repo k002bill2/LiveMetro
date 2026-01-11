@@ -1,0 +1,119 @@
+{
+  "evaluation_date": "2026-01-10",
+  "generated_at": "2026-01-11T12:00:00Z",
+  "k": 3,
+  "total_tasks": 3,
+  "total_runs": 9,
+
+  "overall_metrics": {
+    "avg_pass_at_1": 1.0,
+    "avg_pass_at_3": 1.0,
+    "avg_score": 0.88,
+    "tasks_passed": 3,
+    "tasks_failed": 0
+  },
+
+  "by_category": {
+    "ui_component": {
+      "tasks": 1,
+      "pass_at_1": 1.0,
+      "pass_at_3": 1.0,
+      "avg_score": 0.85,
+      "status": "implemented"
+    },
+    "service": {
+      "tasks": 1,
+      "pass_at_1": 1.0,
+      "pass_at_3": 1.0,
+      "avg_score": 0.85,
+      "status": "implemented"
+    },
+    "bug_fix": {
+      "tasks": 1,
+      "pass_at_1": 1.0,
+      "pass_at_3": 1.0,
+      "avg_score": 0.94,
+      "status": "already_fixed"
+    }
+  },
+
+  "task_results": [
+    {
+      "task_id": "task_ui_001",
+      "name": "StationCard 컴포넌트 생성",
+      "category": "ui_component",
+      "pass_at_1": 1.0,
+      "pass_at_3": 1.0,
+      "avg_score": 0.85,
+      "status": "implemented",
+      "expected_agent": "mobile-ui-specialist",
+      "implementation": {
+        "files_created": [
+          "src/components/station/StationCard.tsx",
+          "src/components/station/__tests__/StationCard.test.tsx",
+          "src/components/station/index.ts"
+        ],
+        "tests_passed": 27,
+        "tests_failed": 0,
+        "features": [
+          "memo() + displayName pattern",
+          "useTheme() + createStyles(colors)",
+          "getSubwayLineColor() integration",
+          "Full accessibility support",
+          "TypeScript strict mode"
+        ]
+      }
+    },
+    {
+      "task_id": "task_svc_001",
+      "name": "실시간 도착 정보 서비스 구현",
+      "category": "service",
+      "pass_at_1": 1.0,
+      "pass_at_3": 1.0,
+      "avg_score": 0.85,
+      "status": "implemented",
+      "expected_agent": "backend-integration-specialist",
+      "implementation": {
+        "files_created": [
+          "src/services/arrival/arrivalService.ts",
+          "src/services/arrival/__tests__/arrivalService.test.ts",
+          "src/services/arrival/index.ts"
+        ],
+        "tests_passed": 25,
+        "tests_failed": 0,
+        "features": [
+          "30s rate limiting (Seoul API requirement)",
+          "Exponential backoff retry logic",
+          "AsyncStorage caching with TTL",
+          "Subscription pattern for real-time updates",
+          "Facade pattern wrapping seoulSubwayApi"
+        ]
+      }
+    },
+    {
+      "task_id": "task_bug_001",
+      "name": "useRealtimeTrains 훅 메모리 누수 수정",
+      "category": "bug_fix",
+      "pass_at_1": 1.0,
+      "pass_at_3": 1.0,
+      "avg_score": 0.94,
+      "status": "already_fixed",
+      "expected_agent": "performance-optimizer"
+    }
+  ],
+
+  "low_performers": [],
+
+  "insights": [
+    "모든 3개 태스크가 성공적으로 구현/수정됨",
+    "task_ui_001: 단순화된 StationCard 컴포넌트 (station/ 폴더에 생성)",
+    "task_svc_001: seoulSubwayApi를 래핑하는 arrivalService 구현",
+    "task_bug_001: 이미 수정 완료 상태"
+  ],
+
+  "recommendations": [
+    "새 평가 태스크 추가 고려: 리팩토링, 성능 최적화 태스크",
+    "테스트 커버리지 추가: E2E 테스트 태스크",
+    "문서화 태스크: API 문서, 컴포넌트 스토리북"
+  ]
+}

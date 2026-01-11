@@ -1,17 +1,20 @@
 /**
  * Stop Event Hook for LiveMetro
- * React Native/Expo 코드 변경 후 자동 검증
+ * React Native/Expo 코드 변경 후 자동 검증 + 세션 메트릭 집계
  *
  * Claude의 응답이 완료된 후 실행되어:
  * 1. 코드 변경사항 분석
  * 2. React Native 패턴 검증
  * 3. 자동 테스트 실행 (선택적)
+ * 4. 세션 메트릭 집계 (Feedback Loops)
  *
- * @version 1.0.0-LiveMetro
+ * @version 2.0.0-LiveMetro
  */
 
 const fs = require('fs');
 const path = require('path');
+
+const TRACE_DIR = '.temp/traces/sessions';
 
 /**
  * Hook entry point
@@ -21,14 +24,17 @@ async function onStopEvent(context) {
   try {
     const editedFiles = context.editedFiles || [];
 
+    // 1. 세션 메트릭 집계 (항상 실행)
+    await aggregateSessionMetrics();
+
     if (editedFiles.length === 0) {
       return;
     }
 
-    // 1. 코드 변경사항 분석
+    // 2. 코드 변경사항 분석
     await analyzeCodeChanges(editedFiles);
 
-    // 2. 테스트 커버리지 알림 (TS/TSX 파일 변경 시)
+    // 3. 테스트 커버리지 알림 (TS/TSX 파일 변경 시)
     const tsFiles = editedFiles.filter(f =>
       f.endsWith('.ts') || f.endsWith('.tsx')
     );
@@ -39,6 +45,96 @@ async function onStopEvent(context) {
 
   } catch (error) {
     console.error('[StopEvent] Error:', error.message);
+  }
+}
+
+/**
+ * 세션 메트릭 집계 (Feedback Loops)
+ * 현재 세션의 에이전트 호출 통계를 집계합니다.
+ */
+async function aggregateSessionMetrics() {
+  try {
+    if (!fs.existsSync(TRACE_DIR)) {
+      return;
+    }
+
+    const sessions = fs.readdirSync(TRACE_DIR).filter(d =>
+      fs.statSync(path.join(TRACE_DIR, d)).isDirectory()
+    );
+
+    if (sessions.length === 0) {
+      return;
+    }
+
+    // 가장 최근 세션 찾기
+    const latestSession = sessions.sort().pop();
+    const sessionDir = path.join(TRACE_DIR, latestSession);
+    const eventsFile = path.join(sessionDir, 'events.jsonl');
+    const metricsFile = path.join(sessionDir, 'metrics.json');
+
+    if (!fs.existsSync(eventsFile)) {
+      return;
+    }
+
+    // 이벤트 파싱
+    const events = fs.readFileSync(eventsFile, 'utf8')
+      .split('\n')
+      .filter(line => line.trim())
+      .map(line => {
+        try {
+          return JSON.parse(line);
+        } catch (e) {
+          return null;
+        }
+      })
+      .filter(Boolean);
+
+    if (events.length === 0) {
+      return;
+    }
+
+    // 메트릭 집계
+    const agentCounts = {};
+    const modelCounts = {};
+
+    events.forEach(event => {
+      if (event.event === 'agent_spawned' && event.data) {
+        const agentType = event.data.agent_type || 'unknown';
+        const model = event.data.model || 'default';
+
+        agentCounts[agentType] = (agentCounts[agentType] || 0) + 1;
+        modelCounts[model] = (modelCounts[model] || 0) + 1;
+      }
+    });
+
+    const metrics = {
+      session_id: latestSession,
+      aggregated_at: new Date().toISOString(),
+      total_events: events.length,
+      total_agents_spawned: Object.values(agentCounts).reduce((a, b) => a + b, 0),
+      agents_by_type: agentCounts,
+      models_used: modelCounts,
+      first_event: events[0]?.timestamp || null,
+      last_event: events[events.length - 1]?.timestamp || null
+    };
+
+    // 메트릭 저장
+    fs.writeFileSync(metricsFile, JSON.stringify(metrics, null, 2));
+
+    // 간략 요약 출력 (에이전트가 사용된 경우에만)
+    if (metrics.total_agents_spawned > 0) {
+      console.log('\n━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('📊 SESSION AGENT METRICS');
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log(`Agents spawned: ${metrics.total_agents_spawned}`);
+      Object.entries(agentCounts).forEach(([type, count]) => {
+        console.log(`  • ${type}: ${count}`);
+      });
+      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
+    }
+
+  } catch (error) {
+    // 메트릭 집계 실패는 무시 (다른 작업 방해 안함)
   }
 }
 

@@ -1,0 +1,97 @@
+{
+  "task_id": "task_ui_001",
+  "task_name": "StationCard 컴포넌트 생성",
+  "evaluated_at": "2026-01-10T10:10:00Z",
+  "k": 3,
+  "status": "simulated",
+  "note": "실제 에이전트 실행 대신 시뮬레이션 평가. StationCard 컴포넌트가 아직 존재하지 않음.",
+
+  "runs": [
+    {
+      "run_id": "run_sim_001",
+      "timestamp": "2026-01-10T10:10:00Z",
+      "agent": "mobile-ui-specialist",
+      "duration_seconds": 0,
+      "outcome": {
+        "files_created": [],
+        "typescript_errors": "N/A",
+        "test_results": {"passed": 0, "failed": 0},
+        "test_coverage": 0
+      },
+      "grades": {
+        "code_checks": {
+          "passed": 0,
+          "failed": 6,
+          "score": 0.0,
+          "details": [
+            {"check": "file_exists", "passed": false, "evidence": "src/components/station/StationCard.tsx not found"},
+            {"check": "test_exists", "passed": false, "evidence": "Test file not found"},
+            {"check": "no_any_types", "passed": false, "evidence": "File does not exist"},
+            {"check": "imports_use_aliases", "passed": false, "evidence": "File does not exist"},
+            {"check": "has_accessibility_label", "passed": false, "evidence": "File does not exist"},
+            {"check": "uses_typescript_interface", "passed": false, "evidence": "File does not exist"}
+          ]
+        },
+        "llm_evaluation": {
+          "score": 0.0,
+          "rubric": "code-quality",
+          "feedback": "컴포넌트가 존재하지 않아 평가 불가"
+        },
+        "final_score": 0.0,
+        "grade": "F"
+      },
+      "passed": false,
+      "reason": "Target component does not exist - this is a creation task awaiting implementation"
+    },
+    {
+      "run_id": "run_sim_002",
+      "timestamp": "2026-01-10T10:10:00Z",
+      "agent": "mobile-ui-specialist",
+      "duration_seconds": 0,
+      "outcome": {
+        "files_created": [],
+        "typescript_errors": "N/A",
+        "test_results": {"passed": 0, "failed": 0},
+        "test_coverage": 0
+      },
+      "grades": {
+        "code_checks": {"passed": 0, "failed": 6, "score": 0.0},
+        "llm_evaluation": {"score": 0.0},
+        "final_score": 0.0,
+        "grade": "F"
+      },
+      "passed": false
+    },
+    {
+      "run_id": "run_sim_003",
+      "timestamp": "2026-01-10T10:10:00Z",
+      "agent": "mobile-ui-specialist",
+      "duration_seconds": 0,
+      "outcome": {
+        "files_created": [],
+        "typescript_errors": "N/A",
+        "test_results": {"passed": 0, "failed": 0},
+        "test_coverage": 0
+      },
+      "grades": {
+        "code_checks": {"passed": 0, "failed": 6, "score": 0.0},
+        "llm_evaluation": {"score": 0.0},
+        "final_score": 0.0,
+        "grade": "F"
+      },
+      "passed": false
+    }
+  ],
+
+  "metrics": {
+    "pass_at_1": 0.0,
+    "pass_at_3": 0.0,
+    "pass_power_3": 0.0,
+    "avg_score": 0.0,
+    "avg_duration_seconds": 0,
+    "success_rate": 0.0
+  },
+
+  "summary": "StationCard 컴포넌트가 아직 구현되지 않음. 이 태스크는 새 컴포넌트 생성을 위한 평가 태스크입니다.",
+  "recommendation": "mobile-ui-specialist 에이전트를 실행하여 StationCard 컴포넌트를 생성하세요."
+}

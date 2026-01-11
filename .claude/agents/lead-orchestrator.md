@@ -45,6 +45,13 @@ ace_capabilities:
     memory_location: .temp/memory/
     checkpoint_location: .temp/memory/checkpoints/
     token_threshold: 150000
+  layer_1_ethical_responsibilities:
+    - Enforce Heuristic Imperatives across all subagents
+    - Invoke Ethical Veto if any subagent violates constraints
+    - Ensure user data privacy in all delegated tasks
+    - Verify rollback capability before risky operations
+    - Escalate uncertain ethical decisions to user
+    - Document all ethical decisions in incident logs
 ---
 
 # Lead Orchestrator Agent

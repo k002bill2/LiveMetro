@@ -1,0 +1,91 @@
+{
+  "evaluation_id": "moderate-test-2026-01-11-1805",
+  "timestamp": "2026-01-11T18:05:00+09:00",
+  "mode": "moderate",
+  "k": 1,
+  "total_tasks": 2,
+  "total_runs": 2,
+
+  "results": [
+    {
+      "task_id": "service-implementation",
+      "task_name": "실시간 도착 정보 서비스 구현",
+      "category": "service",
+      "difficulty": "moderate",
+      "runs": [
+        {
+          "run_id": 1,
+          "status": "FAIL",
+          "score": 0.72,
+          "reason": "Missing critical 30-second rate limiting requirement",
+          "duration_seconds": 180,
+          "breakdown": {
+            "api_integration": 0.90,
+            "error_handling": 0.80,
+            "rate_limiting": 0.50,
+            "typescript": 1.00,
+            "tests": 0.70
+          }
+        }
+      ],
+      "metrics": {
+        "pass_at_1": 0.0,
+        "avg_score": 0.72
+      },
+      "notes": "Rate limiting is critical requirement (30s min interval). Current implementation relies on cache only, not proactive rate limiting.",
+      "recommendations": [
+        "Add explicit RateLimiter class",
+        "Implement exponential backoff retry",
+        "Add rate limiting tests"
+      ]
+    },
+    {
+      "task_id": "task_res_001",
+      "task_name": "Seoul Metro API 문서 조사",
+      "category": "research",
+      "difficulty": "moderate",
+      "runs": [
+        {
+          "run_id": 1,
+          "status": "READY",
+          "score": 0.85,
+          "reason": "Task design validated, research rubric properly aligned",
+          "duration_seconds": 120,
+          "design_quality": {
+            "research_scope": true,
+            "citation_requirements": true,
+            "tool_requirements": true,
+            "grading_rubric": true,
+            "groundedness_testable": true,
+            "completeness_testable": true,
+            "source_quality_testable": true
+          }
+        }
+      ],
+      "metrics": {
+        "design_score": 0.85
+      },
+      "notes": "Task well-designed for research agent evaluation. Minor improvements recommended.",
+      "recommendations": [
+        "Add timeout_minutes: 15",
+        "Add max_attempts: 3",
+        "Add constraints.max_tool_calls: 20"
+      ]
+    }
+  ],
+
+  "summary": {
+    "tasks_passed": 0,
+    "tasks_failed": 1,
+    "tasks_ready": 1,
+    "overall_pass_rate": 0.0,
+    "avg_score": 0.785,
+    "total_duration_seconds": 300
+  },
+
+  "insights": {
+    "critical_issue": "service-implementation lacks rate limiting (CLAUDE.md requires 30s minimum polling)",
+    "positive": "task_res_001 research task properly designed with groundedness checks",
+    "saturation": "Moderate tasks showing differentiation (not 100% pass rate)"
+  }
+}

@@ -1,0 +1,132 @@
+# Complex Performance Task: useNotifications Hook Optimization
+# LiveMetro: Eliminate unnecessary re-renders and optimize memo usage
+
+id: task_perf_001
+name: "useNotifications 훅 성능 최적화"
+category: refactor
+difficulty: complex
+
+input:
+  description: |
+    473줄의 useNotifications 훅에서 불필요한 리렌더링을 제거하고
+    메모이제이션을 최적화합니다.
+
+    현재 문제점:
+    1. 모든 상태 변경 시 전체 리렌더링 발생
+    2. 의존성 배열에 객체/함수 직접 전달
+    3. 불필요한 context 구독
+    4. 비동기 작업의 경쟁 상태(race condition) 가능성
+
+    성능 목표:
+    - 불필요한 리렌더링 70% 감소
+    - 번들 사이즈 영향 최소화
+    - 기능 동작 100% 유지
+  requirements:
+    - "useMemo/useCallback 적절한 적용"
+    - "상태 분리 (관련 상태끼리 그룹화)"
+    - "의존성 배열 최적화"
+    - "useRef 활용하여 불필요한 리렌더링 방지"
+    - "AbortController로 비동기 경쟁 상태 해결"
+    - "기존 테스트 모두 통과"
+    - "성능 측정 결과 문서화"
+  reference_files:
+    - "src/hooks/useNotifications.ts"
+    - "src/hooks/__tests__/useNotifications.test.ts"
+  context: |
+    최적화 포인트:
+    1. 상태 분리:
+       - UI 상태 (loading, error)
+       - 데이터 상태 (notifications, unreadCount)
+       - 설정 상태 (preferences)
+
+    2. 메모이제이션:
+       - 콜백 함수: useCallback
+       - 계산 값: useMemo
+       - 외부 참조: useRef
+
+    3. Context 최적화:
+       - 필요한 값만 구독
+       - 또는 별도 selector 패턴 적용
+
+    성능 측정 방법:
+    - React DevTools Profiler
+    - 또는 console.count로 렌더 횟수 측정
+    - 결과를 주석으로 문서화
+  project_vars:
+    TARGET_FILE: "src/hooks/useNotifications.ts"
+
+success_criteria:
+  required:
+    typescript_no_errors: true
+    existing_tests_pass: true
+    no_any_types: true
+    no_functionality_regression: true
+    uses_memo_or_callback: true
+    abort_controller_used: true
+  optional:
+    render_count_documented: true
+    state_properly_split: true
+    bundle_size_unchanged: true
+  must_fail:
+    introduces_memory_leak: false
+    breaks_existing_behavior: false
+  forbidden_patterns:
+    - "eslint-disable.*exhaustive-deps"  # 의존성 무시 금지
+    - "as any"
+    - "// @ts-ignore"
+
+constraints:
+  max_turns: 20
+  max_tool_calls: 40
+  timeout_seconds: 1800
+  required_tools:
+    - Read
+    - Edit
+    - Bash  # 테스트 실행
+
+graders:
+  - type: code
+    weight: 0.3
+    checks:
+      - "uses_pattern: useCallback"
+      - "uses_pattern: useMemo"
+      - "uses_pattern: useRef"
+      - "uses_pattern: AbortController"
+      - "no_eslint_disable_exhaustive"
+      - "all_tests_pass"
+      - "no_any_types"
+
+  - type: static_analysis
+    weight: 0.2
+    commands:
+      - "npm run type-check"
+      - "npm run lint -- src/hooks/useNotifications.ts"
+
+  - type: llm
+    weight: 0.4
+    rubric: coding-agent
+    criteria:
+      - "메모이제이션이 적절한 곳에만 적용되었는가 (과도하지 않음)"
+      - "의존성 배열이 정확하게 지정되었는가"
+      - "상태 분리가 논리적인가"
+      - "비동기 작업의 cleanup이 적절한가"
+      - "코드 가독성이 유지/개선되었는가"
+      - "성능 개선이 문서화되었는가"
+
+  - type: transcript
+    weight: 0.1
+    max_turns: 20
+    max_tool_calls: 40
+    required_tools:
+      - Read
+      - Edit
+
+max_attempts: 3
+timeout_minutes: 30
+tags:
+  - performance
+  - optimization
+  - complex
+  - react-hooks
+  - memoization
+expected_agent: performance-optimizer

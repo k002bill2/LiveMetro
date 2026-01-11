@@ -1,0 +1,90 @@
+{
+  "version": "1.0.0",
+  "created_at": "2025-01-10T00:00:00Z",
+  "description": "Initial baseline for AI agent evaluation metrics",
+
+  "targets": {
+    "pass_at_1": {
+      "minimum": 0.80,
+      "target": 0.90,
+      "excellent": 0.95,
+      "description": "First attempt success rate"
+    },
+    "pass_at_3": {
+      "minimum": 0.85,
+      "target": 0.95,
+      "excellent": 0.98,
+      "description": "Success rate within 3 attempts"
+    },
+    "avg_score": {
+      "minimum": 0.70,
+      "target": 0.80,
+      "excellent": 0.90,
+      "description": "Average grader score (code + LLM)"
+    },
+    "avg_time_seconds": {
+      "maximum": 900,
+      "target": 600,
+      "excellent": 300,
+      "description": "Average task completion time"
+    }
+  },
+
+  "category_targets": {
+    "ui_component": {
+      "pass_at_1": 0.85,
+      "pass_at_3": 0.95,
+      "avg_score": 0.80,
+      "expected_agent": "mobile-ui-specialist"
+    },
+    "service": {
+      "pass_at_1": 0.80,
+      "pass_at_3": 0.92,
+      "avg_score": 0.78,
+      "expected_agent": "backend-integration-specialist"
+    },
+    "bug_fix": {
+      "pass_at_1": 0.75,
+      "pass_at_3": 0.90,
+      "avg_score": 0.75,
+      "expected_agent": "performance-optimizer"
+    },
+    "refactor": {
+      "pass_at_1": 0.70,
+      "pass_at_3": 0.88,
+      "avg_score": 0.75,
+      "expected_agent": "code-simplifier"
+    }
+  },
+
+  "grading_weights": {
+    "code_checks": 0.4,
+    "llm_evaluation": 0.6,
+    "description": "Weighted scoring: 40% automated code checks, 60% LLM deep analysis"
+  },
+
+  "llm_rubric_weights": {
+    "readability": 0.20,
+    "architecture": 0.25,
+    "maintainability": 0.25,
+    "performance": 0.15,
+    "security": 0.15
+  },
+
+  "pass_threshold": 0.70,
+  "low_performer_threshold": 0.80,
+
+  "improvement_triggers": {
+    "pass_at_k_below": 0.80,
+    "avg_score_below": 0.75,
+    "consecutive_failures": 2,
+    "frequency_threshold": 5
+  },
+
+  "notes": [
+    "Baseline established for LiveMetro project",
+    "Targets based on initial agent capabilities",
+    "Update after significant agent improvements",
+    "Review quarterly for target adjustments"
+  ]
+}

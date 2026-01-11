@@ -1,0 +1,60 @@
+# UI Component Creation Task Template
+# Copy and customize for your project
+
+id: task_ui_XXX
+name: "Create [ComponentName] component"
+category: ui_component
+difficulty: simple
+
+input:
+  description: |
+    Create a React Native component that [describe purpose].
+    Follow existing patterns in the codebase.
+  requirements:
+    - "[Requirement 1]"
+    - "[Requirement 2]"
+    - "Include accessibility labels"
+    - "Add TypeScript types"
+  reference_files:
+    - "${PROJECT_COMPONENTS}/[SimilarComponent].tsx"
+  project_vars:
+    PROJECT_COMPONENTS: "src/components"
+    PROJECT_SCREENS: "src/screens"
+    PROJECT_STYLES: "src/styles"
+
+success_criteria:
+  required:
+    typescript_no_errors: true
+    test_coverage: 75
+    accessibility_labels: true
+    no_any_types: true
+  optional:
+    memo_usage: true
+    proper_imports: true
+
+graders:
+  - type: code
+    weight: 0.4
+    checks:
+      - "file_exists: ${PROJECT_COMPONENTS}/[folder]/[ComponentName].tsx"
+      - "test_exists: ${PROJECT_COMPONENTS}/[folder]/__tests__/[ComponentName].test.tsx"
+      - "no_any_types"
+      - "imports_use_aliases"
+      - "has_accessibility_label"
+  - type: llm
+    weight: 0.6
+    rubric: code-quality
+    criteria:
+      - "Component follows React Native best practices"
+      - "Props are properly typed with interfaces"
+      - "Accessibility is properly implemented"
+      - "Code is readable and maintainable"
+      - "Performance considerations (memo, useCallback)"
+
+max_attempts: 3
+timeout_minutes: 15
+tags:
+  - ui
+  - component
+  - react-native
+expected_agent: mobile-ui-specialist

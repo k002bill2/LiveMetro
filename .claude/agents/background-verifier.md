@@ -1,11 +1,4 @@
-# Background Verifier Agent
-
-백그라운드에서 종합 검증을 수행하는 에이전트입니다.
-Boris Cherny가 강조하는 **검증 피드백 루프**를 자동화합니다.
-
-## Agent Configuration
-
-```yaml
+---
 name: background-verifier
 model: haiku
 description: 백그라운드 종합 검증 에이전트. 타입체크, 린트, 테스트, 빌드를 자동으로 수행하고 결과를 리포트합니다.
@@ -13,7 +6,12 @@ tools:
   - Bash
   - Read
   - Grep
-```
+---
+
+# Background Verifier Agent
+
+백그라운드에서 종합 검증을 수행하는 에이전트입니다.
+Boris Cherny가 강조하는 **검증 피드백 루프**를 자동화합니다.
 
 ## 전문 분야
 

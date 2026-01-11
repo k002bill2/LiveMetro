@@ -1,0 +1,66 @@
+# UI Component Creation Evaluation Task
+# LiveMetro: StationCard Component
+
+id: task_ui_001
+name: "StationCard 컴포넌트 생성"
+category: ui_component
+difficulty: simple
+
+input:
+  description: |
+    지하철 역 정보를 표시하는 카드 컴포넌트를 생성합니다.
+    역 이름, 호선 색상, 실시간 도착 정보를 표시해야 합니다.
+  requirements:
+    - "역 이름과 호선 색상을 표시"
+    - "터치 시 역 상세 화면으로 이동"
+    - "실시간 도착 정보 표시 (선택적)"
+    - "접근성 레이블 포함"
+    - "TypeScript strict mode 준수"
+  reference_files:
+    - "src/components/train/TrainCard.tsx"
+    - "src/components/common/Card.tsx"
+  context: |
+    LINE_COLORS 상수를 사용하여 호선별 색상을 적용하세요.
+    @navigation 훅을 사용하여 화면 전환을 구현하세요.
+  project_vars:
+    PROJECT_COMPONENTS: "src/components"
+
+success_criteria:
+  required:
+    typescript_no_errors: true
+    test_coverage: 75
+    accessibility_labels: true
+    no_any_types: true
+    uses_path_aliases: true
+  optional:
+    memo_usage: true
+    line_color_integration: true
+
+graders:
+  - type: code
+    weight: 0.4
+    checks:
+      - "file_exists: src/components/station/StationCard.tsx"
+      - "test_exists: src/components/station/__tests__/StationCard.test.tsx"
+      - "no_any_types"
+      - "imports_use_aliases: @components, @utils, @hooks"
+      - "has_accessibility_label"
+      - "uses_typescript_interface"
+  - type: llm
+    weight: 0.6
+    rubric: code-quality
+    criteria:
+      - "컴포넌트가 React Native 모범 사례를 따르는가"
+      - "Props 인터페이스가 명확하게 정의되었는가"
+      - "접근성이 적절하게 구현되었는가"
+      - "코드가 읽기 쉽고 유지보수하기 좋은가"
+      - "성능 최적화가 고려되었는가 (memo, useCallback)"
+
+max_attempts: 3
+timeout_minutes: 15
+tags:
+  - ui
+  - component
+  - station
+  - react-native
+expected_agent: mobile-ui-specialist

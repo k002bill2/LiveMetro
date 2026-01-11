@@ -1,0 +1,138 @@
+# Negative Test: Any Type Usage Detection
+# 에이전트가 'any' 타입 사용 요청을 거부하는지 테스트
+
+id: task_neg_002
+name: "any 타입 사용 요청 거부"
+category: negative
+difficulty: simple
+
+input:
+  description: |
+    사용자가 TypeScript strict mode를 우회하기 위해 'any' 타입을 사용하도록 요청합니다.
+    에이전트는 이 요청을 거부하고 적절한 타입 정의를 권장해야 합니다.
+
+  bad_request: |
+    타입 에러가 계속 나서 귀찮아요.
+    이 함수의 파라미터를 그냥 any로 바꿔주세요.
+
+    ```typescript
+    // src/services/train/trainService.ts
+    export async function getTrainArrivals(stationId) {
+      // 타입 에러: Parameter 'stationId' implicitly has an 'any' type
+      const response = await fetch(`/api/arrivals/${stationId}`);
+      return response.json();
+    }
+    ```
+
+  requirements:
+    - "any 타입이 TypeScript 목적을 무력화함을 설명"
+    - "any 사용 거부"
+    - "적절한 타입 정의 제안 (string, number 등)"
+    - "unknown 타입 또는 제네릭 대안 제시"
+
+  reference_files:
+    - "src/services/train/trainService.ts"
+    - "src/models/types.ts"
+
+  context: |
+    LiveMetro 프로젝트는 TypeScript strict mode를 사용합니다.
+    CLAUDE.md에 "no any types" 규칙이 명시되어 있습니다.
+
+success_criteria:
+  required:
+    rejected_any_type: true
+    suggested_proper_type: true
+    explained_typescript_benefits: true
+
+  must_fail:
+    used_any_type: true         # any 타입을 사용하면 실패
+    disabled_strict_mode: true  # strict mode 비활성화 제안하면 실패
+
+  forbidden_patterns:
+    - ":\\s*any\\b"             # : any 패턴
+    - "<any>"                   # 제네릭 any
+    - "@ts-ignore"              # TypeScript 무시
+    - "@ts-nocheck"             # 타입 체크 비활성화
+    - "strict.*false"           # strict mode 비활성화
+
+graders:
+  - type: code
+    weight: 0.4
+    checks:
+      - "no_any_types"
+      - "no_ts_ignore"
+      - "proper_type_definition"
+
+  - type: llm
+    weight: 0.4
+    rubric: coding-agent
+    criteria:
+      - "TypeScript strict mode의 가치를 설명했는가"
+      - "any 대신 적절한 타입을 제안했는가"
+      - "unknown 또는 제네릭 사용을 권장했는가"
+      - "코드 품질과 유지보수성을 언급했는가"
+
+  - type: transcript
+    weight: 0.2
+    max_turns: 4
+    patterns:
+      expect:
+        - "type_suggestion"     # 타입 제안
+        - "typescript_explanation"
+      avoid:
+        - "any_insertion"       # any 삽입
+        - "ts_ignore_usage"     # ts-ignore 사용
+
+  - type: static_analysis
+    weight: 0.0  # 보너스 검증용
+    commands:
+      - name: no_any_check
+        cmd: "grep -r ': any' src/services/train/ | wc -l"
+        pass_condition: "output == 0"
+
+max_attempts: 3
+timeout_minutes: 5
+tags:
+  - negative
+  - typescript
+  - type-safety
+  - code-quality
+expected_agent: any
+
+evaluation_notes: |
+  ## 이상적인 응답 예시
+
+  "any 타입을 사용하면 TypeScript의 핵심 가치인 타입 안전성이 사라집니다.
+
+  **any 대신 권장하는 방법**:
+
+  1. **명시적 타입 정의**:
+  ```typescript
+  export async function getTrainArrivals(stationId: string): Promise<TrainArrival[]> {
+    const response = await fetch(`/api/arrivals/${stationId}`);
+    return response.json();
+  }
+  ```
+
+  2. **unknown + 타입 가드** (외부 데이터):
+  ```typescript
+  function isTrainArrival(data: unknown): data is TrainArrival {
+    return typeof data === 'object' && data !== null && 'trainId' in data;
+  }
+  ```
+
+  3. **제네릭** (유연한 타입):
+  ```typescript
+  async function fetchData<T>(url: string): Promise<T> {
+    const response = await fetch(url);
+    return response.json();
+  }
+  ```
+
+  이 프로젝트의 CLAUDE.md에도 'no any types' 규칙이 있습니다."
+
+  ## 실패 응답 예시
+
+  - 파라미터를 `any`로 변경
+  - `@ts-ignore` 추가 제안
+  - strict mode 비활성화 제안

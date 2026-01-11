@@ -1,0 +1,121 @@
+# Research Task: React Native Performance Optimization
+# LiveMetro: Research memoization and rendering best practices
+
+id: task_res_002
+name: "React Native 성능 최적화 모범사례 연구"
+category: research
+difficulty: complex
+
+input:
+  description: |
+    React Native 앱의 성능 최적화 모범사례를 조사하고,
+    LiveMetro 프로젝트에 적용할 수 있는 권장사항을 문서화하세요.
+
+    이 태스크는 고급 연구 능력을 평가합니다:
+    - 복잡한 기술 주제 조사
+    - 다양한 출처 교차 검증
+    - 프로젝트 맥락에 맞는 적용 방안 제시
+
+    단순 정보 나열이 아닌, 분석과 권장사항이 포함되어야 합니다.
+  requirements:
+    - "메모이제이션 전략 (useMemo, useCallback, React.memo)"
+    - "리렌더링 최적화 패턴"
+    - "FlatList/VirtualizedList 최적화"
+    - "이미지 최적화 전략"
+    - "번들 사이즈 최적화"
+    - "프로파일링 도구 사용법"
+    - "LiveMetro 프로젝트 적용 권장사항 (최소 5개)"
+  scope:
+    must_cover:
+      - "React 공식 문서의 성능 가이드"
+      - "React Native 공식 성능 문서"
+      - "useMemo vs useCallback 사용 기준"
+      - "불필요한 리렌더링 방지 패턴"
+    nice_to_have:
+      - "Reanimated 라이브러리 최적화"
+      - "Hermes 엔진 최적화"
+      - "메모리 누수 방지"
+  context: |
+    LiveMetro 앱의 현재 상태:
+    - useNotifications.ts: 473줄, 복잡한 상태 관리
+    - useCongestion.ts: 416줄, 빈번한 데이터 업데이트
+    - 실시간 데이터 폴링 (30초 간격)
+
+    조사 결과는 실제 코드 개선에 활용됩니다.
+    모든 권장사항에는 근거(출처)가 필요합니다.
+
+    출처 품질 기준:
+    - Tier 1: React/RN 공식 문서, Meta 엔지니어링 블로그
+    - Tier 2: Expo 문서, 주요 RN 라이브러리 문서
+    - Tier 3: 검증된 기술 블로그 (LogRocket, Callstack 등)
+    - Tier 4: 개인 블로그, 오래된 콘텐츠
+  project_vars:
+    OUTPUT_FORMAT: "markdown"
+    OUTPUT_PATH: "docs/performance/react-native-optimization.md"
+    PROJECT_FILES:
+      - "src/hooks/useNotifications.ts"
+      - "src/hooks/useCongestion.ts"
+
+success_criteria:
+  required:
+    has_citations: true
+    min_sources: 5
+    tier1_sources: 2  # 최소 2개 공식 문서 인용
+    covers_all_requirements: true
+    actionable_recommendations: 5  # 최소 5개 적용 가능한 권장사항
+    code_examples: true
+  optional:
+    profiling_guide: true
+    before_after_comparison: true
+    priority_ranking: true
+  must_fail:
+    unverified_claims: true
+    no_official_docs: true      # 공식 문서 인용 없으면 실패
+    generic_advice: true        # 프로젝트 특화되지 않은 일반론만 있으면 실패
+  forbidden_patterns:
+    - "출처 불명"
+    - "일반적으로"
+    - "보통"
+    - "것 같습니다"
+
+constraints:
+  max_turns: 20
+  max_tool_calls: 40
+  timeout_seconds: 1800
+  required_tools:
+    - WebSearch
+    - WebFetch
+    - Read   # 프로젝트 파일 읽기 허용
+    - Write
+
+graders:
+  - type: llm
+    weight: 0.7
+    rubric: research-agent
+    criteria:
+      - "근거성: 모든 기술적 주장에 신뢰할 수 있는 출처가 있는가?"
+      - "완전성: 요청한 모든 최적화 영역을 다루었는가?"
+      - "정확성: React/RN 버전에 맞는 최신 정보인가?"
+      - "출처 품질: 공식 문서(Tier 1)가 주요 근거로 사용되었는가?"
+      - "구조화: 논리적으로 정리되어 쉽게 참조할 수 있는가?"
+      - "적용성: LiveMetro 프로젝트에 구체적으로 적용 가능한 권장사항인가?"
+
+  - type: transcript
+    weight: 0.3
+    max_turns: 20
+    max_tool_calls: 40
+    required_tools:
+      - WebSearch
+      - WebFetch
+      - Read
+
+max_attempts: 3
+timeout_minutes: 30
+tags:
+  - research
+  - performance
+  - react-native
+  - optimization
+  - complex
+  - groundedness
+expected_agent: general-purpose

@@ -1,0 +1,99 @@
+# Pairwise Comparison: Sonnet vs Opus
+# Compare Claude Sonnet and Opus models on evaluation tasks
+
+name: "Sonnet vs Opus Model Comparison"
+description: |
+  Compare Claude Sonnet (faster, cheaper) vs Opus (more capable)
+  to determine optimal model selection for different task types.
+
+# Comparison configuration
+comparison:
+  type: model                    # model | agent | prompt
+  baseline:
+    name: sonnet
+    model: claude-sonnet-4-20250514
+    description: "Faster, cost-effective model"
+  challenger:
+    name: opus
+    model: claude-opus-4-5-20251101
+    description: "Most capable model"
+
+# Override defaults
+settings:
+  runs_per_variant: 3
+  parallel_runs: false           # Sequential for fair comparison
+
+# Tasks to compare
+tasks:
+  # Quick test (1 task, ~20 min total)
+  quick:
+    - task_ui_001
+
+  # Standard test (3 tasks, ~60 min total)
+  standard:
+    - task_ui_001
+    - task_svc_001
+    - task_neg_001
+
+  # Full comparison (5+ tasks, ~2 hours)
+  full:
+    - task_ui_001
+    - task_svc_001
+    - task_neg_001
+    - task_neg_002
+    - task_res_001
+
+# Hypotheses to test
+hypotheses:
+  - name: "Opus better at complex tasks"
+    description: "Opus should outperform on moderate+ difficulty"
+    tasks: [task_svc_001]
+    expected_winner: opus
+
+  - name: "Sonnet sufficient for simple tasks"
+    description: "Sonnet should match Opus on simple tasks"
+    tasks: [task_ui_001, task_neg_001]
+    expected_winner: tie
+
+  - name: "Research task comparison"
+    description: "Compare groundedness and citation quality"
+    tasks: [task_res_001]
+    expected_winner: opus
+
+# Cost tracking
+cost_estimation:
+  sonnet_per_1k_input: 0.003
+  sonnet_per_1k_output: 0.015
+  opus_per_1k_input: 0.015
+  opus_per_1k_output: 0.075
+  estimate_tokens_per_task: 50000
+
+# Expected results format
+expected_output:
+  file: ".claude/evals/results/pairwise/sonnet-vs-opus-{date}.json"
+  format: |
+    {
+      "comparison_id": "sonnet-vs-opus-{timestamp}",
+      "baseline": {
+        "model": "sonnet",
+        "results": {...}
+      },
+      "challenger": {
+        "model": "opus",
+        "results": {...}
+      },
+      "analysis": {
+        "win_rate": 0.XX,
+        "per_task": {...},
+        "recommendation": "..."
+      }
+    }
+
+# Execution commands
+execution:
+  quick: |
+    /run-eval --pairwise --config=pairwise/sonnet-vs-opus.yaml --tasks=quick
+  standard: |
+    /run-eval --pairwise --config=pairwise/sonnet-vs-opus.yaml --tasks=standard
+  full: |
+    /run-eval --pairwise --config=pairwise/sonnet-vs-opus.yaml --tasks=full

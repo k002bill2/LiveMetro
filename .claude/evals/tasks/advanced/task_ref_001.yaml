@@ -1,0 +1,130 @@
+# Complex Refactoring Task: DataManager Modularization
+# LiveMetro: Split monolithic data manager into focused modules
+
+id: task_ref_001
+name: "DataManager 모듈화 리팩토링"
+category: refactor
+difficulty: complex
+
+input:
+  description: |
+    563줄의 monolithic dataManager.ts 파일을 3개의 독립 모듈로 분리합니다.
+
+    현재 파일이 담당하는 책임:
+    1. 캐시 관리 (AsyncStorage)
+    2. 데이터 동기화 (Firebase ↔ Local)
+    3. 데이터 변환 및 정규화
+
+    각 책임을 독립 모듈로 분리하여 단일 책임 원칙(SRP)을 준수하세요.
+  requirements:
+    - "cacheManager.ts 생성 - AsyncStorage 캐시 로직 분리"
+    - "syncManager.ts 생성 - Firebase 동기화 로직 분리"
+    - "dataTransformer.ts 생성 - 데이터 변환/정규화 로직 분리"
+    - "dataManager.ts는 facade 패턴으로 모듈 통합만 담당"
+    - "기존 외부 API(export) 시그니처 유지 - 하위 호환성 필수"
+    - "기존 테스트 모두 통과"
+    - "순환 참조(circular dependency) 방지"
+    - "각 모듈에 대한 단위 테스트 추가"
+  reference_files:
+    - "src/services/data/dataManager.ts"
+    - "src/services/data/__tests__/dataManager.test.ts"
+  context: |
+    현재 dataManager.ts 구조:
+    - initializeData(): 앱 시작 시 데이터 초기화
+    - syncWithFirebase(): Firebase 실시간 동기화
+    - getCachedData(): AsyncStorage 캐시 조회
+    - transformApiResponse(): API 응답 정규화
+
+    리팩토링 후 예상 구조:
+    ```
+    src/services/data/
+    ├── dataManager.ts      (facade - 50줄 이하)
+    ├── cacheManager.ts     (캐시 전담 - 150줄 예상)
+    ├── syncManager.ts      (동기화 전담 - 200줄 예상)
+    ├── dataTransformer.ts  (변환 전담 - 150줄 예상)
+    └── __tests__/
+        ├── dataManager.test.ts (기존)
+        ├── cacheManager.test.ts (신규)
+        ├── syncManager.test.ts (신규)
+        └── dataTransformer.test.ts (신규)
+    ```
+  project_vars:
+    TARGET_DIR: "src/services/data"
+    ORIGINAL_FILE: "src/services/data/dataManager.ts"
+
+success_criteria:
+  required:
+    typescript_no_errors: true
+    existing_tests_pass: true
+    no_circular_deps: true
+    no_any_types: true
+    facade_under_100_lines: true
+    external_api_unchanged: true
+  optional:
+    new_module_tests: true
+    improved_readability: true
+    reduced_coupling: true
+  must_fail:
+    circular_import_exists: false
+    external_signature_changed: false
+  forbidden_patterns:
+    - "require\\("  # CommonJS 사용 금지
+    - "as any"      # 타입 우회 금지
+    - "\\.\\.\\/\\.\\.\\/\\.\\.\\/\\.\\.\\"  # 과도한 상대 경로 금지
+
+constraints:
+  max_turns: 20
+  max_tool_calls: 50
+  timeout_seconds: 1800
+  required_tools:
+    - Read
+    - Edit
+    - Write
+    - Bash  # 테스트 실행용
+
+graders:
+  - type: code
+    weight: 0.3
+    checks:
+      - "file_exists: src/services/data/cacheManager.ts"
+      - "file_exists: src/services/data/syncManager.ts"
+      - "file_exists: src/services/data/dataTransformer.ts"
+      - "file_under_lines: src/services/data/dataManager.ts:100"
+      - "no_circular_deps: src/services/data/"
+      - "all_tests_pass"
+      - "exports_match_original: src/services/data/dataManager.ts"
+
+  - type: static_analysis
+    weight: 0.2
+    commands:
+      - "npm run type-check"
+      - "npm run lint -- src/services/data/"
+
+  - type: llm
+    weight: 0.4
+    rubric: coding-agent
+    criteria:
+      - "단일 책임 원칙이 잘 적용되었는가"
+      - "모듈 간 의존성이 명확하고 단방향인가"
+      - "Facade 패턴이 적절하게 구현되었는가"
+      - "각 모듈의 인터페이스가 명확한가"
+      - "에러 처리가 일관성 있게 유지되는가"
+      - "코드 가독성이 개선되었는가"
+
+  - type: transcript
+    weight: 0.1
+    max_turns: 20
+    max_tool_calls: 50
+    required_tools:
+      - Read
+      - Edit
+
+max_attempts: 3
+timeout_minutes: 30
+tags:
+  - refactor
+  - modularization
+  - complex
+  - srp
+  - facade-pattern
+expected_agent: code-simplifier

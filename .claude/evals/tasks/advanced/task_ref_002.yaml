@@ -1,0 +1,129 @@
+# Complex Refactoring Task: Notification Service Integration
+# LiveMetro: Extract common logic from 4 notification services
+
+id: task_ref_002
+name: "알림 서비스 중복 로직 통합"
+category: refactor
+difficulty: complex
+
+input:
+  description: |
+    4개의 알림 서비스에 중복된 로직을 추출하여 공통 모듈로 통합합니다.
+
+    현재 알림 서비스:
+    1. notificationService.ts (435줄) - 기본 알림
+    2. trainArrivalAlertService.ts (452줄) - 열차 도착 알림
+    3. delayResponseAlertService.ts (464줄) - 지연 대응 알림
+    4. integratedAlertService.ts (511줄) - 통합 알림 관리
+
+    중복 패턴:
+    - 알림 권한 체크
+    - 알림 스케줄링/취소
+    - 알림 히스토리 관리
+    - 에러 처리 및 재시도
+
+    공통 로직을 BaseNotificationService 클래스로 추출하세요.
+  requirements:
+    - "BaseNotificationService 추상 클래스 생성"
+    - "공통 인터페이스 정의 (NotificationPayload, NotificationConfig)"
+    - "각 서비스가 BaseNotificationService 상속"
+    - "중복 코드 50% 이상 제거"
+    - "기존 public API 유지"
+    - "모든 기존 테스트 통과"
+    - "새로운 통합 테스트 추가"
+  reference_files:
+    - "src/services/notification/notificationService.ts"
+    - "src/services/notification/trainArrivalAlertService.ts"
+    - "src/services/notification/delayResponseAlertService.ts"
+    - "src/services/notification/integratedAlertService.ts"
+  context: |
+    공통 추출 대상 메서드:
+    - checkPermission(): 권한 확인
+    - scheduleNotification(): 알림 예약
+    - cancelNotification(): 알림 취소
+    - getNotificationHistory(): 히스토리 조회
+    - handleError(): 에러 처리
+
+    예상 결과 구조:
+    ```
+    src/services/notification/
+    ├── base/
+    │   ├── BaseNotificationService.ts
+    │   └── types.ts (공통 타입)
+    ├── notificationService.ts (상속)
+    ├── trainArrivalAlertService.ts (상속)
+    ├── delayResponseAlertService.ts (상속)
+    └── integratedAlertService.ts (상속)
+    ```
+  project_vars:
+    TARGET_DIR: "src/services/notification"
+
+success_criteria:
+  required:
+    typescript_no_errors: true
+    existing_tests_pass: true
+    no_any_types: true
+    duplication_reduced: 50  # 50% 이상 중복 제거
+    public_api_unchanged: true
+  optional:
+    new_integration_tests: true
+    improved_type_safety: true
+    reduced_total_lines: true
+  must_fail:
+    breaking_change_introduced: false
+  forbidden_patterns:
+    - "as any"
+    - "// @ts-ignore"
+    - "// @ts-nocheck"
+
+constraints:
+  max_turns: 25
+  max_tool_calls: 60
+  timeout_seconds: 2400
+  required_tools:
+    - Read
+    - Edit
+    - Write
+    - Grep  # 중복 패턴 찾기용
+
+graders:
+  - type: code
+    weight: 0.35
+    checks:
+      - "file_exists: src/services/notification/base/BaseNotificationService.ts"
+      - "file_exists: src/services/notification/base/types.ts"
+      - "class_extends: trainArrivalAlertService.ts:BaseNotificationService"
+      - "class_extends: delayResponseAlertService.ts:BaseNotificationService"
+      - "all_tests_pass"
+      - "no_any_types"
+      - "line_reduction: src/services/notification/:300"  # 최소 300줄 감소
+
+  - type: llm
+    weight: 0.5
+    rubric: coding-agent
+    criteria:
+      - "추상화 수준이 적절한가 (과도/부족하지 않음)"
+      - "상속 구조가 논리적인가"
+      - "공통 인터페이스가 명확하게 정의되었는가"
+      - "각 서비스의 특수 로직이 적절히 분리되었는가"
+      - "SOLID 원칙을 준수하는가"
+      - "테스트 용이성이 개선되었는가"
+
+  - type: transcript
+    weight: 0.15
+    max_turns: 25
+    max_tool_calls: 60
+    required_tools:
+      - Read
+      - Grep
+
+max_attempts: 3
+timeout_minutes: 40
+tags:
+  - refactor
+  - integration
+  - complex
+  - oop
+  - inheritance
+  - dry-principle
+expected_agent: code-simplifier
