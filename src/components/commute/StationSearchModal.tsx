@@ -28,7 +28,10 @@ import {
 } from 'lucide-react-native';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
 import { StationSelection } from '@/models/commute';
-import stationsData from '@/data/stations.json';
+import {
+  getStationsWithLineInfo,
+  StationWithLineInfo,
+} from '@/services/data/stationsDataService';
 import { useFavorites } from '@/hooks/useFavorites';
 
 interface StationSearchModalProps {
@@ -65,12 +68,9 @@ const LINE_NAMES: Record<string, string> = {
   '9': '9호선',
 };
 
-interface StationWithLine {
-  id: string;
-  name: string;
-  lineId: string;
-  lineName: string;
-}
+// Use StationWithLineInfo from stationsDataService
+// which provides station_cd (seoulStations.json) for consistent ID format
+type StationWithLine = StationWithLineInfo;
 
 export const StationSearchModal: React.FC<StationSearchModalProps> = ({
   visible,
@@ -109,27 +109,10 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
     setLoading(true);
     setError(null);
     try {
-      // Use local station data from stations.json
-      // Filter stations that have line information and create entries for each line
-      const localStations: StationWithLine[] = [];
-
-      Object.values(stationsData as Record<string, { id: string; name: string; lines: string[] }>).forEach((station) => {
-        // Only include stations with line information
-        if (station.lines && station.lines.length > 0) {
-          station.lines.forEach((line) => {
-            // Only include lines 1-9
-            if (['1', '2', '3', '4', '5', '6', '7', '8', '9'].includes(line)) {
-              localStations.push({
-                id: station.id,
-                name: station.name,
-                lineId: line,
-                lineName: LINE_NAMES[line] || `${line}호선`,
-              });
-            }
-          });
-        }
-      });
-
+      // Use seoulStations.json via stationsDataService
+      // This provides station_cd (unique per line) instead of stations.json ID
+      // Transfer stations have different station_cd per line for correct matching
+      const localStations = getStationsWithLineInfo();
       setStations(localStations);
     } catch {
       setError('역 정보를 불러오는데 실패했습니다');
@@ -433,22 +416,22 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
   );
 };
 
-// Fallback station data in case API fails
+// Fallback station data in case API fails (using station_cd from seoulStations.json)
 const FALLBACK_STATIONS: StationWithLine[] = [
-  { id: '0150', name: '서울역', lineId: '1', lineName: '1호선' },
-  { id: '0151', name: '시청', lineId: '1', lineName: '1호선' },
-  { id: '0152', name: '종각', lineId: '1', lineName: '1호선' },
-  { id: '0153', name: '종로3가', lineId: '1', lineName: '1호선' },
-  { id: '0222', name: '강남', lineId: '2', lineName: '2호선' },
-  { id: '0223', name: '역삼', lineId: '2', lineName: '2호선' },
-  { id: '0224', name: '선릉', lineId: '2', lineName: '2호선' },
-  { id: '0225', name: '삼성', lineId: '2', lineName: '2호선' },
-  { id: '0239', name: '홍대입구', lineId: '2', lineName: '2호선' },
-  { id: '0240', name: '신촌', lineId: '2', lineName: '2호선' },
-  { id: '0309', name: '교대', lineId: '3', lineName: '3호선' },
-  { id: '0415', name: '명동', lineId: '4', lineName: '4호선' },
-  { id: '0537', name: '여의도', lineId: '5', lineName: '5호선' },
-  { id: '0756', name: '건대입구', lineId: '7', lineName: '7호선' },
+  { id: '0150', name: '서울역', nameEn: 'Seoul Station', lineId: '1', lineName: '1호선' },
+  { id: '0151', name: '시청', nameEn: 'City Hall', lineId: '1', lineName: '1호선' },
+  { id: '0152', name: '종각', nameEn: 'Jonggak', lineId: '1', lineName: '1호선' },
+  { id: '0153', name: '종로3가', nameEn: 'Jongno 3(sam)-ga', lineId: '1', lineName: '1호선' },
+  { id: '0222', name: '강남', nameEn: 'Gangnam', lineId: '2', lineName: '2호선' },
+  { id: '0223', name: '역삼', nameEn: 'Yeoksam', lineId: '2', lineName: '2호선' },
+  { id: '0224', name: '선릉', nameEn: 'Seolleung', lineId: '2', lineName: '2호선' },
+  { id: '0225', name: '삼성', nameEn: 'Samsung', lineId: '2', lineName: '2호선' },
+  { id: '0239', name: '홍대입구', nameEn: 'Hongik Univ.', lineId: '2', lineName: '2호선' },
+  { id: '0240', name: '신촌', nameEn: 'Sinchon', lineId: '2', lineName: '2호선' },
+  { id: '0309', name: '교대', nameEn: 'Seoul Nat\'l Univ. of Education', lineId: '3', lineName: '3호선' },
+  { id: '0415', name: '명동', nameEn: 'Myeong-dong', lineId: '4', lineName: '4호선' },
+  { id: '0537', name: '여의도', nameEn: 'Yeouido', lineId: '5', lineName: '5호선' },
+  { id: '0756', name: '건대입구', nameEn: 'Konkuk Univ.', lineId: '7', lineName: '7호선' },
 ];
 
 const styles = StyleSheet.create({

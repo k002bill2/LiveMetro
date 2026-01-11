@@ -7,7 +7,7 @@
       "distribution": "internal",
       "developmentClient": true,
       "ios": {
-        "resourceClass": "m1-medium"
+        "resourceClass": "m-medium"
       },
       "android": {
         "buildType": "apk"

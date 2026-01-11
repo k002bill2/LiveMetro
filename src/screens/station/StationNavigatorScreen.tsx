@@ -62,18 +62,32 @@ export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) =
     enabled: !!currentStation,
   });
 
-  // 선택된 방향으로 앞으로 지나갈 역들 계산
+  // 선택된 방향으로 앞으로 지나갈 역들 계산 (최대 4정거장)
+  const MAX_UPCOMING_STATIONS = 4;
+
   const upcomingStations = useMemo(() => {
     if (!allStations || allStations.length === 0 || currentIndex < 0) {
       return [];
     }
 
     if (selectedDirection === 'up') {
-      // 상행: 현재역 이전 역들 (인덱스 감소 방향)
-      return allStations.slice(0, currentIndex).reverse();
+      // 상행: 현재역 이전 역들 (인덱스 감소 방향), 최대 4개
+      return allStations.slice(0, currentIndex).reverse().slice(0, MAX_UPCOMING_STATIONS);
     } else {
-      // 하행: 현재역 이후 역들 (인덱스 증가 방향)
-      return allStations.slice(currentIndex + 1);
+      // 하행: 현재역 이후 역들 (인덱스 증가 방향), 최대 4개
+      return allStations.slice(currentIndex + 1, currentIndex + 1 + MAX_UPCOMING_STATIONS);
+    }
+  }, [allStations, currentIndex, selectedDirection]);
+
+  // 전체 남은 역 수 계산
+  const totalRemainingStations = useMemo(() => {
+    if (!allStations || allStations.length === 0 || currentIndex < 0) {
+      return 0;
+    }
+    if (selectedDirection === 'up') {
+      return currentIndex;
+    } else {
+      return allStations.length - currentIndex - 1;
     }
   }, [allStations, currentIndex, selectedDirection]);
 
@@ -269,11 +283,15 @@ export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) =
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* 출발 모드: 앞으로 지나갈 역 목록 */}
-        {mode === 'departure' && (
+        {/* 출발 모드 상행: 현재역 위에 표시 */}
+        {mode === 'departure' && selectedDirection === 'up' && (
           <View style={styles.section}>
             <Text style={styles.sectionLabel}>
-              {selectedDirection === 'up' ? '상행' : '하행'} 방향 ({upcomingStations.length}개 역)
+              상행 방향 (
+              {totalRemainingStations > MAX_UPCOMING_STATIONS
+                ? `${upcomingStations.length}/${totalRemainingStations}개 역`
+                : `${upcomingStations.length}개 역`}
+              )
             </Text>
             {terminalStation && (
               <View style={styles.terminalInfo}>
@@ -285,9 +303,7 @@ export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) =
             )}
             <View style={styles.upcomingStationsList}>
               {upcomingStations.length === 0 ? (
-                <Text style={styles.noStationsText}>
-                  {selectedDirection === 'up' ? '첫 번째 역입니다' : '마지막 역입니다'}
-                </Text>
+                <Text style={styles.noStationsText}>첫 번째 역입니다</Text>
               ) : (
                 upcomingStations.map((station, index) => (
                   <View key={station.id} style={styles.upcomingStationItem}>
@@ -328,6 +344,45 @@ export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) =
             <TrainArrivalList stationId={currentStation.id} />
           </View>
         </View>
+
+        {/* 출발 모드 하행: 현재역 아래에 표시 */}
+        {mode === 'departure' && selectedDirection === 'down' && (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>
+              하행 방향 (
+              {totalRemainingStations > MAX_UPCOMING_STATIONS
+                ? `${upcomingStations.length}/${totalRemainingStations}개 역`
+                : `${upcomingStations.length}개 역`}
+              )
+            </Text>
+            {terminalStation && (
+              <View style={styles.terminalInfo}>
+                <Flag size={14} color={COLORS.text.secondary} />
+                <Text style={styles.terminalText}>
+                  종착: {terminalStation.name}
+                </Text>
+              </View>
+            )}
+            <View style={styles.upcomingStationsList}>
+              {upcomingStations.length === 0 ? (
+                <Text style={styles.noStationsText}>마지막 역입니다</Text>
+              ) : (
+                upcomingStations.map((station, index) => (
+                  <View key={station.id} style={styles.upcomingStationItem}>
+                    <View style={styles.stationDot} />
+                    {index < upcomingStations.length - 1 && <View style={styles.stationLine} />}
+                    <Text style={styles.upcomingStationName}>{station.name}</Text>
+                    {station.transfers && station.transfers.length > 0 && (
+                      <View style={styles.transferBadgeSmall}>
+                        <Text style={styles.transferTextSmall}>환승</Text>
+                      </View>
+                    )}
+                  </View>
+                ))
+              )}
+            </View>
+          </View>
+        )}
 
         {/* 일반 모드: Next Station */}
         {mode !== 'departure' && nextStation && (

@@ -1,19 +1,14 @@
 /**
  * ML Model Service
- * Manages model loading, inference, and storage
+ * TensorFlow is disabled - uses statistics-based fallback predictions
  */
 
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { getTensorFlow, tensorFlowSetup, disposeTensor } from './tensorflowSetup';
 import { featureExtractor } from './featureExtractor';
 import { CommuteLog, DayOfWeek } from '@/models/pattern';
 import {
   MLPrediction,
   ModelMetadata,
-  MLFeatureVector,
   WeatherCondition,
-  MODEL_INPUT_FEATURES,
-  MODEL_OUTPUT_COUNT,
   createDefaultPrediction,
 } from '@/models/ml';
 
@@ -21,13 +16,6 @@ import {
 // Constants
 // ============================================================================
 
-const STORAGE_KEYS = {
-  MODEL_WEIGHTS: '@livemetro:ml_model_weights',
-  MODEL_METADATA: '@livemetro:ml_model_metadata',
-  PREDICTION_CACHE: '@livemetro:ml_prediction_cache',
-};
-
-const MODEL_VERSION = '1.0.0';
 const CACHE_DURATION_MS = 5 * 60 * 1000; // 5 minutes
 
 // ============================================================================
@@ -45,41 +33,38 @@ interface CachedPrediction {
 // ============================================================================
 
 class ModelService {
-  private model: unknown | null = null;
-  private metadata: ModelMetadata | null = null;
   private predictionCache: Map<string, CachedPrediction> = new Map();
   private isInitialized = false;
+  private metadata: ModelMetadata | null = null;
 
   /**
    * Initialize the model service
+   * TensorFlow is disabled - always uses fallback predictions
    */
   async initialize(): Promise<boolean> {
     if (this.isInitialized) {
       return true;
     }
 
-    try {
-      // Ensure TensorFlow is ready
-      const tfStatus = await tensorFlowSetup.initialize();
-      if (!tfStatus.isReady) {
-        return false;
-      }
+    // TensorFlow is disabled, use fallback mode
+    console.log('ℹ️ ML Model Service initialized in fallback mode (statistics-based predictions)');
 
-      // Try to load saved model, or create new one
-      const loaded = await this.loadModel();
-      if (!loaded) {
-        await this.createDefaultModel();
-      }
+    this.metadata = {
+      version: 'fallback',
+      lastTrainedAt: new Date(),
+      trainingDataCount: 0,
+      accuracy: 0,
+      loss: 1,
+      isFineTuned: false,
+    };
 
-      this.isInitialized = true;
-      return true;
-    } catch {
-      return false;
-    }
+    this.isInitialized = true;
+    return true;
   }
 
   /**
    * Make a prediction for a given date
+   * Uses statistics-based fallback since TensorFlow is disabled
    */
   async predict(
     logs: readonly CommuteLog[],
@@ -103,56 +88,20 @@ class ModelService {
       }
     }
 
-    // Ensure model is ready
-    if (!this.model || !this.isInitialized) {
-      const initialized = await this.initialize();
-      if (!initialized || !this.model) {
-        return this.fallbackPrediction(logs, targetDayOfWeek);
-      }
+    // Ensure service is initialized
+    if (!this.isInitialized) {
+      await this.initialize();
     }
 
-    // Filter logs for target day
-    const relevantLogs = logs.filter((log) => log.dayOfWeek === targetDayOfWeek);
+    // Use fallback prediction (statistics-based)
+    const prediction = this.fallbackPrediction(logs, targetDayOfWeek);
 
-    if (relevantLogs.length === 0) {
-      return this.fallbackPrediction(logs, targetDayOfWeek);
+    // Cache the prediction
+    if (useCache) {
+      this.cachePrediction(cacheKey, prediction);
     }
 
-    try {
-      // Get the most recent log as basis for features
-      const latestLog = relevantLogs[relevantLogs.length - 1];
-      if (!latestLog) {
-        return this.fallbackPrediction(logs, targetDayOfWeek);
-      }
-
-      // Calculate historical delay rate
-      const delayRate = featureExtractor.calculateDelayRate(relevantLogs);
-
-      // Check if previous log had delay
-      const prevLogIndex = logs.indexOf(latestLog) - 1;
-      const recentDelay = prevLogIndex >= 0 ? (logs[prevLogIndex]?.wasDelayed ?? false) : false;
-
-      // Extract features
-      const featureVector = featureExtractor.extractSingleFeature(
-        latestLog,
-        delayRate,
-        recentDelay,
-        weather,
-        isHoliday
-      );
-
-      // Run inference
-      const prediction = await this.runInference(featureVector);
-
-      // Cache the prediction
-      if (useCache) {
-        this.cachePrediction(cacheKey, prediction);
-      }
-
-      return prediction;
-    } catch {
-      return this.fallbackPrediction(logs, targetDayOfWeek);
-    }
+    return prediction;
   }
 
   /**
@@ -163,10 +112,11 @@ class ModelService {
   }
 
   /**
-   * Check if model is loaded and ready
+   * Check if model is ready
+   * Always returns true in fallback mode
    */
   isReady(): boolean {
-    return this.isInitialized && this.model !== null;
+    return this.isInitialized;
   }
 
   /**
@@ -177,222 +127,39 @@ class ModelService {
   }
 
   /**
-   * Save current model to AsyncStorage
+   * Save model - no-op when TensorFlow is disabled
    */
   async saveModel(): Promise<boolean> {
-    if (!this.model) {
-      return false;
-    }
-
-    try {
-      // Save model using TensorFlow.js IO handler
-      const model = this.model as { save: (path: string) => Promise<void> };
-      await model.save(`asyncstorage://${STORAGE_KEYS.MODEL_WEIGHTS}`);
-
-      // Save metadata
-      if (this.metadata) {
-        await AsyncStorage.setItem(
-          STORAGE_KEYS.MODEL_METADATA,
-          JSON.stringify({
-            ...this.metadata,
-            lastTrainedAt: this.metadata.lastTrainedAt.toISOString(),
-          })
-        );
-      }
-
-      return true;
-    } catch {
-      return false;
-    }
+    // No-op in fallback mode
+    return false;
   }
 
   /**
-   * Get the underlying model for training
+   * Get the underlying model - always returns null when TensorFlow is disabled
    */
   getModel(): unknown | null {
-    return this.model;
+    return null;
   }
 
   /**
-   * Set a new model (after training)
+   * Set a new model - no-op when TensorFlow is disabled
    */
-  setModel(model: unknown, metadata: ModelMetadata): void {
-    // Dispose old model
-    if (this.model) {
-      const m = this.model as { dispose?: () => void };
-      if (m.dispose) m.dispose();
-    }
-
-    this.model = model;
-    this.metadata = metadata;
-    this.clearCache();
+  setModel(_model: unknown, _metadata: ModelMetadata): void {
+    // No-op in fallback mode
   }
 
   /**
    * Dispose model and cleanup
    */
   dispose(): void {
-    if (this.model) {
-      const m = this.model as { dispose?: () => void };
-      if (m.dispose) m.dispose();
-      this.model = null;
-    }
-    this.metadata = null;
     this.predictionCache.clear();
     this.isInitialized = false;
+    this.metadata = null;
   }
 
   // ============================================================================
   // Private Methods
   // ============================================================================
-
-  /**
-   * Load model from AsyncStorage
-   */
-  private async loadModel(): Promise<boolean> {
-    const tf = getTensorFlow();
-    if (!tf) {
-      console.warn('TensorFlow not available, cannot load model');
-      return false;
-    }
-
-    try {
-      // Load model
-      this.model = await tf.loadLayersModel(
-        `asyncstorage://${STORAGE_KEYS.MODEL_WEIGHTS}`
-      );
-
-      // Load metadata
-      const metadataStr = await AsyncStorage.getItem(STORAGE_KEYS.MODEL_METADATA);
-      if (metadataStr) {
-        const parsed = JSON.parse(metadataStr) as Record<string, unknown>;
-        this.metadata = {
-          version: String(parsed.version || MODEL_VERSION),
-          lastTrainedAt: new Date(String(parsed.lastTrainedAt)),
-          trainingDataCount: Number(parsed.trainingDataCount || 0),
-          accuracy: Number(parsed.accuracy || 0),
-          loss: Number(parsed.loss || 1),
-          isFineTuned: Boolean(parsed.isFineTuned),
-        };
-      }
-
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  /**
-   * Create a default LSTM model
-   */
-  private async createDefaultModel(): Promise<void> {
-    const tf = getTensorFlow();
-    if (!tf) {
-      console.warn('TensorFlow not available, cannot create model');
-      return;
-    }
-
-    // Note: Not using tidyOperation here since LayersModel is not a Tensor
-    const model = tf.sequential();
-
-    // Input layer + First dense layer
-    model.add(
-      tf.layers.dense({
-        inputShape: [MODEL_INPUT_FEATURES],
-        units: 32,
-        activation: 'relu',
-        name: 'dense_1',
-      })
-    );
-
-    // Second dense layer
-    model.add(
-      tf.layers.dense({
-        units: 16,
-        activation: 'relu',
-        name: 'dense_2',
-      })
-    );
-
-    // Output layer
-    model.add(
-      tf.layers.dense({
-        units: MODEL_OUTPUT_COUNT,
-        activation: 'sigmoid',
-        name: 'output',
-      })
-    );
-
-    // Compile model
-    model.compile({
-      optimizer: tf.train.adam(0.001),
-      loss: 'meanSquaredError',
-      metrics: ['mse'],
-    });
-
-    this.model = model;
-
-    this.metadata = {
-      version: MODEL_VERSION,
-      lastTrainedAt: new Date(),
-      trainingDataCount: 0,
-      accuracy: 0,
-      loss: 1,
-      isFineTuned: false,
-    };
-  }
-
-  /**
-   * Run inference on feature vector
-   */
-  private async runInference(featureVector: MLFeatureVector): Promise<MLPrediction> {
-    if (!this.model) {
-      throw new Error('Model not loaded');
-    }
-
-    let inputTensor: unknown | null = null;
-    let outputTensor: unknown | null = null;
-
-    try {
-      // Create input tensor
-      inputTensor = featureExtractor.createInputTensor(featureVector);
-
-      if (!inputTensor) {
-        throw new Error('Failed to create input tensor');
-      }
-
-      // Run prediction
-      const model = this.model as { predict: (input: unknown) => unknown };
-      outputTensor = model.predict(inputTensor);
-
-      // Get output values
-      const tensor = outputTensor as { data: () => Promise<Float32Array> };
-      const outputData = await tensor.data();
-      const departureNorm = outputData[0] ?? 0;
-      const arrivalNorm = outputData[1] ?? 0;
-      const delayProb = outputData[2] ?? 0;
-
-      // Convert back to time strings
-      const predictedDepartureTime = featureExtractor.denormalizeTime(departureNorm);
-      const predictedArrivalTime = featureExtractor.denormalizeTime(arrivalNorm);
-
-      // Calculate confidence based on model metadata
-      const confidence = this.calculateConfidence();
-
-      return {
-        predictedDepartureTime,
-        predictedArrivalTime,
-        delayProbability: Math.min(1, Math.max(0, delayProb)),
-        confidence,
-        modelVersion: this.metadata?.version || MODEL_VERSION,
-        predictedAt: new Date(),
-      };
-    } finally {
-      // Cleanup tensors
-      disposeTensor(inputTensor);
-      disposeTensor(outputTensor);
-    }
-  }
 
   /**
    * Fallback prediction using simple statistics
@@ -436,22 +203,6 @@ class ModelService {
       modelVersion: 'fallback',
       predictedAt: new Date(),
     };
-  }
-
-  /**
-   * Calculate confidence score
-   */
-  private calculateConfidence(): number {
-    if (!this.metadata) {
-      return 0.3;
-    }
-
-    // Base confidence on training data and accuracy
-    const dataFactor = Math.min(1, this.metadata.trainingDataCount / 50);
-    const accuracyFactor = this.metadata.accuracy;
-    const fineTunedBonus = this.metadata.isFineTuned ? 0.1 : 0;
-
-    return Math.min(0.95, dataFactor * 0.5 + accuracyFactor * 0.4 + fineTunedBonus);
   }
 
   /**

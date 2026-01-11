@@ -3,6 +3,8 @@
  * Real-time subway data from Seoul Open API
  */
 
+import { createSeoulApiKeyManager, ApiKeyManager } from './apiKeyManager';
+
 /**
  * Rate Limiter for Seoul API (30-second minimum interval per endpoint)
  * Required by CLAUDE.md: "Seoul API - 30s minimum polling interval"
@@ -196,18 +198,30 @@ interface SeoulTimetableResponse {
 
 class SeoulSubwayApiService {
   private readonly baseUrl: string;
-  private readonly apiKey: string;
   private readonly timeout: number = 10000;
   private readonly rateLimiter: RateLimiter;
+  private readonly keyManager: ApiKeyManager;
 
   constructor() {
     this.baseUrl = process.env.SEOUL_SUBWAY_API_BASE_URL || 'http://swopenapi.seoul.go.kr/api/subway';
-    this.apiKey = process.env.EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY || '';
     this.rateLimiter = new RateLimiter(30000); // 30-second minimum interval
+    this.keyManager = createSeoulApiKeyManager({
+      disableDurationMs: 60000, // 1분간 비활성화
+      errorThreshold: 3, // 연속 3회 에러 시 비활성화
+    });
 
-    if (!this.apiKey) {
+    if (this.keyManager.keyCount === 0) {
       console.warn('Seoul Subway API key not found. Please set EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY environment variable.');
+    } else {
+      console.info(`Seoul Subway API: ${this.keyManager.keyCount} key(s) loaded`);
     }
+  }
+
+  /**
+   * API 키 상태 조회 (디버깅/모니터링용)
+   */
+  getKeyStats(): ReturnType<ApiKeyManager['getKeyStats']> {
+    return this.keyManager.getKeyStats();
   }
 
   /**
@@ -220,6 +234,7 @@ class SeoulSubwayApiService {
   /**
    * Get real-time arrival information for a station
    * Rate limited to 30-second minimum interval per station
+   * Uses ApiKeyManager for automatic key rotation and failover
    */
   async getRealtimeArrival(stationName: string): Promise<SeoulRealtimeArrival[]> {
     const rateLimitKey = `realtime:${stationName}`;
@@ -231,17 +246,36 @@ class SeoulSubwayApiService {
     }
 
     return withRetry(async () => {
+      const apiKey = this.keyManager.getNextKey();
+      if (!apiKey) {
+        throw new Error('사용 가능한 API 키가 없습니다. 잠시 후 다시 시도해주세요.');
+      }
+
       try {
-        const url = `${this.baseUrl}/${this.apiKey}/json/realtimeStationArrival/0/10/${encodeURIComponent(stationName)}`;
+        const url = `${this.baseUrl}/${apiKey}/json/realtimeStationArrival/0/10/${encodeURIComponent(stationName)}`;
 
         const response = await this.fetchWithTimeout(url);
         const data: SeoulApiResponse<SeoulRealtimeArrival> = await response.json();
 
         // Check for API errors
         if (data.errorMessage) {
-          throw new Error(`Seoul API Error: ${data.errorMessage.message} (Code: ${data.errorMessage.code})`);
+          const errorCode = data.errorMessage.code;
+
+          // Rate limit error - immediately switch to another key
+          if (errorCode === 'ERROR-500' || errorCode === 'ERROR-501') {
+            const fallbackKey = this.keyManager.reportRateLimit(apiKey);
+            if (fallbackKey) {
+              console.warn(`Rate limit hit, switching to backup key`);
+            }
+          } else {
+            this.keyManager.reportError(apiKey);
+          }
+
+          throw new Error(`Seoul API Error: ${data.errorMessage.message} (Code: ${errorCode})`);
         }
 
+        // Success - report to key manager
+        this.keyManager.reportSuccess(apiKey);
         return data.realtimeArrivalList || [];
       } catch (error) {
         console.error('Error fetching realtime arrival:', error);
@@ -261,14 +295,20 @@ class SeoulSubwayApiService {
     await this.rateLimiter.throttle(rateLimitKey);
 
     return withRetry(async () => {
+      const apiKey = this.keyManager.getNextKey();
+      if (!apiKey) {
+        throw new Error('사용 가능한 API 키가 없습니다.');
+      }
+
       try {
-        const url = `${this.baseUrl}/${this.apiKey}/json/SearchInfoBySubwayNameService/1/1000/${encodeURIComponent(lineNumber)}호선`;
+        const url = `${this.baseUrl}/${apiKey}/json/SearchInfoBySubwayNameService/1/1000/${encodeURIComponent(lineNumber)}호선`;
 
         const response = await this.fetchWithTimeout(url);
         const data: SeoulApiResponse<SeoulStationInfo> = await response.json();
 
         // Check for API errors
         if (data.errorMessage) {
+          this.keyManager.reportError(apiKey);
           throw new Error(`Seoul API Error: ${data.errorMessage.message} (Code: ${data.errorMessage.code})`);
         }
 
@@ -276,6 +316,7 @@ class SeoulSubwayApiService {
           throw new Error(`API Error: ${data.SearchInfoBySubwayNameService?.RESULT.MESSAGE}`);
         }
 
+        this.keyManager.reportSuccess(apiKey);
         return data.SearchInfoBySubwayNameService?.row || [];
       } catch (error) {
         console.error('Error fetching stations by line:', error);
@@ -332,6 +373,7 @@ class SeoulSubwayApiService {
   /**
    * Get station timetable (schedule)
    * Rate limited to 30-second minimum interval per station/weekTag/inoutTag combo
+   * NOTE: Uses HTTP API (openapi.seoul.go.kr) - may not work on web due to mixed content
    * @param stationCode Station code (e.g., '0222' for Gangnam)
    * @param weekTag '1': Weekday, '2': Saturday, '3': Holiday/Sunday
    * @param inoutTag '1': Up/Inner, '2': Down/Outer
@@ -341,30 +383,53 @@ class SeoulSubwayApiService {
     weekTag: '1' | '2' | '3' = '1',
     inoutTag: '1' | '2' = '1'
   ): Promise<SeoulTimetableRow[]> {
+    // Skip API call on web platform (HTTP API doesn't work with HTTPS pages)
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
+      console.debug('[SeoulSubwayApi] Skipping timetable API on web (HTTP only API)');
+      return [];
+    }
+
     const rateLimitKey = `timetable:${stationCode}:${weekTag}:${inoutTag}`;
 
     // Apply rate limiting
     await this.rateLimiter.throttle(rateLimitKey);
 
     return withRetry(async () => {
+      const apiKey = this.keyManager.getNextKey();
+      if (!apiKey) {
+        throw new Error('사용 가능한 API 키가 없습니다.');
+      }
+
       try {
-        // Note: Timetable API uses a different base URL usually (openAPI.seoul.go.kr)
-        // But we'll try to use the configured base URL or fallback to the standard openAPI URL
-        const generalBaseUrl = process.env.SEOUL_OPEN_API_BASE_URL || 'http://openAPI.seoul.go.kr:8088';
-        const url = `${generalBaseUrl}/${this.apiKey}/json/SearchSTNTimeTableByIDService/1/500/${stationCode}/${weekTag}/${inoutTag}/`;
+        // Note: Timetable API uses HTTP (not HTTPS) - only works on native platforms
+        const generalBaseUrl = process.env.SEOUL_OPEN_API_BASE_URL || 'http://openapi.seoul.go.kr:8088';
+        const url = `${generalBaseUrl}/${apiKey}/json/SearchSTNTimeTableByIDService/1/500/${stationCode}/${weekTag}/${inoutTag}/`;
 
         const response = await this.fetchWithTimeout(url);
         const data: SeoulTimetableResponse = await response.json();
 
-        if (data.SearchSTNTimeTableByIDService?.RESULT.CODE !== 'INFO-000') {
-          // INFO-200 means no data found, which is valid for empty schedules
-          if (data.SearchSTNTimeTableByIDService?.RESULT.CODE === 'INFO-200') {
-            return [];
-          }
-          throw new Error(`API Error: ${data.SearchSTNTimeTableByIDService?.RESULT.MESSAGE}`);
+        // Handle empty or invalid response structure
+        if (!data || !data.SearchSTNTimeTableByIDService) {
+          console.warn('[SeoulSubwayApi] Empty or invalid timetable response');
+          this.keyManager.reportSuccess(apiKey);
+          return [];
         }
 
-        return data.SearchSTNTimeTableByIDService?.row || [];
+        const resultCode = data.SearchSTNTimeTableByIDService.RESULT?.CODE;
+        const resultMessage = data.SearchSTNTimeTableByIDService.RESULT?.MESSAGE || 'Unknown error';
+
+        if (resultCode !== 'INFO-000') {
+          // INFO-200 means no data found, which is valid for empty schedules
+          if (resultCode === 'INFO-200') {
+            this.keyManager.reportSuccess(apiKey);
+            return [];
+          }
+          this.keyManager.reportError(apiKey);
+          throw new Error(`API Error: ${resultMessage}`);
+        }
+
+        this.keyManager.reportSuccess(apiKey);
+        return data.SearchSTNTimeTableByIDService.row || [];
       } catch (error) {
         console.error('Error fetching station timetable:', error);
         throw new Error(`시간표 정보를 가져오는데 실패했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);

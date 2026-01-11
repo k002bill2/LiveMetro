@@ -1,11 +1,12 @@
 /**
  * useMLPrediction Hook
- * Provides ML-based commute predictions with training support
+ * Provides statistics-based commute predictions
+ * TensorFlow is disabled - uses fallback predictions
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/services/auth/AuthContext';
-import { modelService, trainingService, tensorFlowSetup } from '@/services/ml';
+import { modelService, trainingService } from '@/services/ml';
 import { commuteLogService } from '@/services/pattern/commuteLogService';
 import {
   MLPrediction,
@@ -32,7 +33,7 @@ export interface UseMLPredictionState {
   modelMetadata: ModelMetadata | null;
   /** Whether model is ready */
   isModelReady: boolean;
-  /** Whether TensorFlow is initialized */
+  /** Whether TensorFlow is initialized (always false - disabled) */
   isTensorFlowReady: boolean;
   /** Training progress (0-1) */
   trainingProgress: number;
@@ -76,7 +77,6 @@ export function useMLPrediction(): UseMLPredictionReturn {
   const [error, setError] = useState<string | null>(null);
   const [modelMetadata, setModelMetadata] = useState<ModelMetadata | null>(null);
   const [isModelReady, setIsModelReady] = useState(false);
-  const [isTensorFlowReady, setIsTensorFlowReady] = useState(false);
   const [trainingProgress, setTrainingProgress] = useState(0);
   const [isTraining, setIsTraining] = useState(false);
   const [logCount, setLogCount] = useState(0);
@@ -84,27 +84,14 @@ export function useMLPrediction(): UseMLPredictionReturn {
 
   const unsubscribeRef = useRef<(() => void) | null>(null);
 
-  // Initialize TensorFlow and model on mount
+  // Initialize model on mount (fallback mode)
   useEffect(() => {
     const initialize = async (): Promise<void> => {
       try {
-        // Initialize TensorFlow
-        const tfStatus = await tensorFlowSetup.initialize();
-        setIsTensorFlowReady(tfStatus.isReady);
-
-        if (!tfStatus.isReady) {
-          setError('TensorFlow 초기화 실패');
-          return;
-        }
-
-        // Initialize model
+        // Initialize model (fallback mode since TensorFlow is disabled)
         const modelReady = await modelService.initialize();
         setIsModelReady(modelReady);
         setModelMetadata(modelService.getMetadata());
-
-        if (!modelReady) {
-          setError('ML 모델 로드 실패');
-        }
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';
         setError(errorMessage);
@@ -113,7 +100,7 @@ export function useMLPrediction(): UseMLPredictionReturn {
 
     initialize();
 
-    // Subscribe to training progress
+    // Subscribe to training progress (will always be idle since TensorFlow is disabled)
     unsubscribeRef.current = trainingService.onProgress((state) => {
       setIsTraining(state.isTraining);
       setTrainingProgress(state.progress);
@@ -178,7 +165,7 @@ export function useMLPrediction(): UseMLPredictionReturn {
     [user?.id, isModelReady, logs]
   );
 
-  // Train model
+  // Train model (disabled - returns error)
   const trainModel = useCallback(async (): Promise<TrainingResult> => {
     if (!user?.id) {
       return {
@@ -202,39 +189,16 @@ export function useMLPrediction(): UseMLPredictionReturn {
       };
     }
 
-    setIsTraining(true);
-    setError(null);
-
-    try {
-      const result = await trainingService.train(logs);
-
-      if (result.success) {
-        // Update metadata after training
-        setModelMetadata(modelService.getMetadata());
-
-        // Refresh prediction with new model
-        await refreshPrediction();
-      } else {
-        setError(result.error || '학습 실패');
-      }
-
-      return result;
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setError(errorMessage);
-      return {
-        success: false,
-        epochsCompleted: 0,
-        finalLoss: 1,
-        validationAccuracy: 0,
-        durationMs: 0,
-        error: errorMessage,
-      };
-    } finally {
-      setIsTraining(false);
-      setTrainingProgress(0);
-    }
-  }, [user?.id, logs, refreshPrediction]);
+    // TensorFlow is disabled - training not available
+    return {
+      success: false,
+      epochsCompleted: 0,
+      finalLoss: 1,
+      validationAccuracy: 0,
+      durationMs: 0,
+      error: 'ML 학습이 비활성화되어 있습니다. 통계 기반 예측을 사용합니다.',
+    };
+  }, [user?.id, logs]);
 
   // Get predictions for the entire week
   const getWeekPredictions = useCallback(async (): Promise<(MLPrediction | null)[]> => {
@@ -286,7 +250,7 @@ export function useMLPrediction(): UseMLPredictionReturn {
     error,
     modelMetadata,
     isModelReady,
-    isTensorFlowReady,
+    isTensorFlowReady: false, // Always false - TensorFlow is disabled
     trainingProgress,
     isTraining,
     logCount,

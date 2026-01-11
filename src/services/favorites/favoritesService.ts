@@ -7,6 +7,11 @@ import { doc, getDoc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firest
 import { firestore } from '../firebase/config';
 import { FavoriteStation } from '../../models/user';
 import { Station } from '../../models/train';
+import {
+  getLocalStation,
+  findStationCdByNameAndLine,
+  getLocalStationsByLine,
+} from '../data/stationsDataService';
 
 export interface AddFavoriteParams {
   userId: string;
@@ -187,6 +192,99 @@ class FavoritesService {
     }
   }
 }
+
+/**
+ * Check if a stationId is in the legacy format (stations.json)
+ * Legacy IDs are like "city_hall_1", "gangnam", "jongno3ga_5"
+ * New IDs (station_cd) are like "0151", "0222", "0340"
+ */
+const isLegacyStationId = (stationId: string): boolean => {
+  // station_cd is typically 4 digits starting with 0
+  const isStationCd = /^0\d{3}$/.test(stationId);
+  if (isStationCd) return false;
+
+  // Also check if it matches any station in our data
+  const station = getLocalStation(stationId);
+  return station === null;
+};
+
+/**
+ * Migrate a legacy stationId to station_cd format
+ * @param stationId Legacy ID (e.g., "city_hall_1", "gangnam") or Korean name
+ * @param lineId Line ID to find the correct station_cd for transfer stations
+ * @returns station_cd or original ID if migration not possible
+ */
+const migrateStationId = (stationId: string, lineId: string): string => {
+  // Already in station_cd format
+  if (!isLegacyStationId(stationId)) {
+    return stationId;
+  }
+
+  // Try to find station_cd by name match
+  const stations = getLocalStationsByLine(lineId);
+  if (stations.length === 0) {
+    return stationId;
+  }
+
+  // Normalize for comparison
+  const normalizedId = stationId.toLowerCase().replace(/[\s\-_().]/g, '');
+  const cleanedId = stationId.replace(/_\d+$/, ''); // Remove "_1", "_5" suffix
+  const normalizedCleanedId = cleanedId.toLowerCase().replace(/[\s\-_().]/g, '');
+
+  // Find matching station
+  const matchedStation = stations.find(s => {
+    const normalizedName = s.name.toLowerCase().replace(/[\s\-_().]/g, '');
+    const normalizedNameEn = (s.nameEn || '').toLowerCase().replace(/[\s\-_().]/g, '');
+
+    return normalizedName === normalizedId ||
+           normalizedNameEn === normalizedId ||
+           normalizedName === normalizedCleanedId ||
+           normalizedNameEn === normalizedCleanedId ||
+           normalizedNameEn.includes(normalizedCleanedId) ||
+           normalizedCleanedId.includes(normalizedNameEn);
+  });
+
+  if (matchedStation) {
+    console.log(`✅ Migrated stationId: ${stationId} → ${matchedStation.id} (${matchedStation.name})`);
+    return matchedStation.id;
+  }
+
+  // Fallback: try findStationCdByNameAndLine with the original ID as name
+  const stationCd = findStationCdByNameAndLine(stationId, lineId);
+  if (stationCd) {
+    console.log(`✅ Migrated stationId by name: ${stationId} → ${stationCd}`);
+    return stationCd;
+  }
+
+  console.warn(`⚠️ Could not migrate stationId: ${stationId} for line ${lineId}`);
+  return stationId;
+};
+
+/**
+ * Migrate favorites array to use station_cd format
+ * Returns migrated array and whether any changes were made
+ */
+export const migrateFavoritesToNewFormat = (
+  favorites: FavoriteStation[]
+): { migrated: FavoriteStation[]; hasChanges: boolean } => {
+  let hasChanges = false;
+
+  const migrated = favorites.map(fav => {
+    const newStationId = migrateStationId(fav.stationId, fav.lineId);
+
+    if (newStationId !== fav.stationId) {
+      hasChanges = true;
+      return {
+        ...fav,
+        stationId: newStationId,
+      };
+    }
+
+    return fav;
+  });
+
+  return { migrated, hasChanges };
+};
 
 // Export singleton instance
 export const favoritesService = new FavoritesService();

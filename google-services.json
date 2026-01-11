@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "450020925480",
+    "project_id": "livemetro-cc092",
+    "storage_bucket": "livemetro-cc092.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:450020925480:android:a1cf8f09e918bfb8d9951d",
+        "android_client_info": {
+          "package_name": "com.livemetro.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBuw5VUViSjN3LgKf96UeTFYAy9-ITlQDA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

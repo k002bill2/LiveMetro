@@ -1,7 +1,6 @@
 {
   "expo": {
     "name": "LiveMetro",
-    "entryPoint": "./index.js",
     "slug": "livemetro-subway-app",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -35,8 +34,6 @@
         "NSMicrophoneUsageDescription": "This app does not use the microphone.",
         "ITSAppUsesNonExemptEncryption": false
       },
-      "appStoreUrl": "https://apps.apple.com/app/livemetro/id-placeholder",
-      "category": "navigation"
     },
     "android": {
       "package": "com.livemetro.app",
@@ -113,7 +110,6 @@
       "websiteUrl": "https://livemetro.app"
     },
     "privacy": "public",
-    "isDetached": false,
     "scheme": "livemetro",
     "platforms": [
       "ios",

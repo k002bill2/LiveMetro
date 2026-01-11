@@ -1,30 +1,29 @@
 /**
  * Feature Extractor Service
  * Converts commute logs to ML-ready feature vectors
+ * Pure math implementation (no TensorFlow dependency)
  */
 
-import { getTensorFlow, tidyOperation, normalize, tensorFlowSetup } from './tensorflowSetup';
+import { normalize } from './tensorflowSetup';
 import { CommuteLog, FrequentRoute, DayOfWeek, parseTimeToMinutes } from '@/models/pattern';
 import {
   MLFeatureVector,
   WeatherCondition,
   WEATHER_FEATURE_MAP,
-  MODEL_INPUT_FEATURES,
 } from '@/models/ml';
 
 // ============================================================================
 // Types
 // ============================================================================
 
-// Using unknown for tensor types to avoid direct TensorFlow dependency
 export interface FeatureExtractionResult {
-  readonly features: unknown | null;
-  readonly labels: unknown | null;
+  readonly features: null;
+  readonly labels: null;
   readonly featureVectors: readonly MLFeatureVector[];
 }
 
 export interface ExtractedFeatures {
-  readonly inputTensor: unknown | null;
+  readonly inputTensor: null;
   readonly featureVector: MLFeatureVector;
 }
 
@@ -80,7 +79,7 @@ class FeatureExtractorService {
 
   /**
    * Extract features from multiple commute logs
-   * Returns tensors ready for training/inference
+   * Returns feature vectors (no tensors since TensorFlow is disabled)
    */
   extractFeatures(
     logs: readonly CommuteLog[],
@@ -101,8 +100,6 @@ class FeatureExtractorService {
 
     // Extract feature vectors
     const featureVectors: MLFeatureVector[] = [];
-    const inputData: number[][] = [];
-    const outputData: number[][] = [];
 
     for (let i = 0; i < logs.length; i++) {
       const log = logs[i];
@@ -120,46 +117,22 @@ class FeatureExtractorService {
       );
 
       featureVectors.push(featureVector);
-      inputData.push(this.featureVectorToArray(featureVector));
-      outputData.push(this.createOutputVector(log));
     }
 
-    // Create tensors (only if TensorFlow is available)
-    const tf = getTensorFlow();
-    let features: unknown | null = null;
-    let labels: unknown | null = null;
-
-    if (tf && tensorFlowSetup.isReady()) {
-      features = tidyOperation(() =>
-        tf.tensor2d(inputData, [inputData.length, MODEL_INPUT_FEATURES])
-      );
-
-      labels = tidyOperation(() =>
-        tf.tensor2d(outputData, [outputData.length, 3])
-      );
-    }
-
+    // TensorFlow is disabled - return null for tensors
     return {
-      features,
-      labels,
+      features: null,
+      labels: null,
       featureVectors,
     };
   }
 
   /**
    * Create input tensor for single prediction
-   * Returns null if TensorFlow is not available
+   * Always returns null since TensorFlow is disabled
    */
-  createInputTensor(featureVector: MLFeatureVector): unknown | null {
-    const tf = getTensorFlow();
-    if (!tf || !tensorFlowSetup.isReady()) {
-      return null;
-    }
-
-    const inputArray = this.featureVectorToArray(featureVector);
-    return tidyOperation(() =>
-      tf.tensor2d([inputArray], [1, MODEL_INPUT_FEATURES])
-    );
+  createInputTensor(_featureVector: MLFeatureVector): null {
+    return null;
   }
 
   /**
@@ -224,34 +197,6 @@ class FeatureExtractorService {
   // ============================================================================
   // Private Methods
   // ============================================================================
-
-  /**
-   * Convert feature vector to flat array for tensor
-   */
-  private featureVectorToArray(vector: MLFeatureVector): number[] {
-    return [
-      vector.dayOfWeekCyclic[0], // sin
-      vector.dayOfWeekCyclic[1], // cos
-      vector.departureTimeNormalized,
-      vector.historicalDelayRate,
-      vector.recentDelayIndicator,
-      vector.weatherFeature / 4, // Normalize to 0-1
-      vector.holidayFlag,
-    ];
-  }
-
-  /**
-   * Create output vector for training (departure time, arrival time, delay probability)
-   */
-  private createOutputVector(log: CommuteLog): number[] {
-    const departureNorm = this.normalizeTime(log.departureTime);
-    const arrivalNorm = log.arrivalTime
-      ? this.normalizeTime(log.arrivalTime)
-      : departureNorm + 0.05;
-    const delayProb = log.wasDelayed ? Math.min(1, (log.delayMinutes || 5) / 30) : 0;
-
-    return [departureNorm, arrivalNorm, delayProb];
-  }
 
   /**
    * Simple string hash function

@@ -29,6 +29,69 @@ interface UseStationNavigationOptions {
 }
 
 /**
+ * Normalize string for comparison (remove spaces, special chars, lowercase)
+ */
+const normalizeForComparison = (str: string): string => {
+  return str.toLowerCase().replace(/[\s\-_().]/g, '');
+};
+
+/**
+ * Find station index with multiple matching strategies
+ * Handles ID format inconsistencies between data sources:
+ * - seoulStations.json uses station_cd (e.g., "0151", "0222")
+ * - stations.json uses custom IDs (e.g., "city_hall_1", "gangnam")
+ * - Legacy favorites may use station names
+ */
+const findStationIndex = (stations: Station[], stationId: string): number => {
+  if (!stationId) return -1;
+
+  // 1. Exact ID match (station_cd from seoulStations.json)
+  let index = stations.findIndex(s => s.id === stationId);
+  if (index >= 0) return index;
+
+  // 2. stationCode (fr_code) match
+  index = stations.findIndex(s => s.stationCode === stationId);
+  if (index >= 0) return index;
+
+  // 3. Exact name match (stationId might be a Korean station name)
+  index = stations.findIndex(s => s.name === stationId);
+  if (index >= 0) return index;
+
+  // 4. English name match (case-insensitive)
+  const lowerStationId = stationId.toLowerCase();
+  index = stations.findIndex(s => s.nameEn?.toLowerCase() === lowerStationId);
+  if (index >= 0) return index;
+
+  // 5. Normalized name match for legacy stations.json IDs
+  // e.g., "city_hall_1" should match "City Hall", "gangnam" should match "Gangnam"
+  const normalizedStationId = normalizeForComparison(stationId);
+  index = stations.findIndex(s => {
+    const normalizedName = normalizeForComparison(s.name);
+    const normalizedNameEn = normalizeForComparison(s.nameEn || '');
+    return normalizedName === normalizedStationId ||
+           normalizedNameEn === normalizedStationId ||
+           normalizedNameEn.includes(normalizedStationId) ||
+           normalizedStationId.includes(normalizedNameEn);
+  });
+  if (index >= 0) return index;
+
+  // 6. Partial name match as last resort
+  // For IDs like "jongno3ga_5" → extract "jongno3ga" and match "종로3가"
+  const cleanedId = stationId.replace(/_\d+$/, ''); // Remove trailing "_N" suffix
+  if (cleanedId !== stationId) {
+    const normalizedCleanedId = normalizeForComparison(cleanedId);
+    index = stations.findIndex(s => {
+      const normalizedNameEn = normalizeForComparison(s.nameEn || '');
+      return normalizedNameEn.includes(normalizedCleanedId) ||
+             normalizedCleanedId.includes(normalizedNameEn);
+    });
+    if (index >= 0) return index;
+  }
+
+  return -1;
+};
+
+/**
  * Hook for navigating between stations in a line
  */
 export const useStationNavigation = (
@@ -58,9 +121,12 @@ export const useStationNavigation = (
 
       setAllStations(stations);
 
-      // Set initial station index
+      // Set initial station index using multi-match strategy
       if (initialStationId) {
-        const index = stations.findIndex(s => s.id === initialStationId);
+        const index = findStationIndex(stations, initialStationId);
+        if (index < 0) {
+          console.warn(`Station not found: ${initialStationId}, defaulting to first station`);
+        }
         setCurrentIndex(index >= 0 ? index : 0);
       } else {
         setCurrentIndex(0);
@@ -92,10 +158,10 @@ export const useStationNavigation = (
   }, [currentIndex, allStations.length]);
 
   /**
-   * Navigate to specific station
+   * Navigate to specific station using multi-match strategy
    */
   const goToStation = useCallback((stationId: string) => {
-    const index = allStations.findIndex(s => s.id === stationId);
+    const index = findStationIndex(allStations, stationId);
     if (index >= 0) {
       setCurrentIndex(index);
     }

@@ -27,7 +27,7 @@ import {
   DelaySeverity
 } from '../../models/train';
 import { seoulSubwayApi, SeoulTimetableRow } from '../api/seoulSubwayApi';
-import { getLocalStation, getLocalStationsByLine } from '../data/stationsDataService';
+import { getLocalStation, getLocalStationsByLine, searchLocalStations } from '../data/stationsDataService';
 
 class TrainService {
   private unsubscribeCallbacks: Map<string, Unsubscribe> = new Map();
@@ -235,6 +235,7 @@ class TrainService {
 
   /**
    * Search stations by name
+   * Falls back to local data if Firebase fails or has no data
    */
   async searchStations(searchTerm: string): Promise<Station[]> {
     try {
@@ -247,16 +248,22 @@ class TrainService {
         ...doc.data()
       } as Station));
 
-      // Filter stations that match the search term (case-insensitive)
-      const filteredStations = allStations.filter(station =>
-        station.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        station.nameEn.toLowerCase().includes(searchTerm.toLowerCase())
-      );
+      // If Firebase has data, filter and return
+      if (allStations.length > 0) {
+        const filteredStations = allStations.filter(station =>
+          station.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          station.nameEn.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        return filteredStations.slice(0, 20);
+      }
 
-      return filteredStations.slice(0, 20); // Limit results
+      // Firebase has no data - fall back to local
+      console.warn('No stations in Firebase, using local data for search');
+      return searchLocalStations(searchTerm);
     } catch (error) {
-      console.error('Firebase error searching stations:', error);
-      return []; // 에러 시 빈 배열 반환
+      // Firebase error - fall back to local data
+      console.error('Firebase error searching stations, falling back to local:', error);
+      return searchLocalStations(searchTerm);
     }
   }
 

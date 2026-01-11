@@ -3,8 +3,12 @@
  * Custom hook for managing user's favorite stations
  */
 
-import { useState, useEffect, useCallback } from 'react';
-import { favoritesService, AddFavoriteParams } from '../services/favorites/favoritesService';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import {
+  favoritesService,
+  AddFavoriteParams,
+  migrateFavoritesToNewFormat,
+} from '../services/favorites/favoritesService';
 import { FavoriteStation } from '../models/user';
 import { Station } from '../models/train';
 import { trainService } from '../services/train/trainService';
@@ -33,6 +37,9 @@ export const useFavorites = () => {
     favoritesWithDetails: [],
   });
 
+  // Track if migration has been performed to avoid duplicate updates
+  const migrationPerformedRef = useRef<string | null>(null);
+
   /**
    * Load favorites from Firestore
    */
@@ -50,7 +57,21 @@ export const useFavorites = () => {
     try {
       setState(prev => ({ ...prev, loading: true, error: null }));
 
-      const favorites = await favoritesService.getFavorites(user.id);
+      let favorites = await favoritesService.getFavorites(user.id);
+
+      // Migrate legacy stationIds to station_cd format (one-time per session)
+      if (favorites.length > 0 && migrationPerformedRef.current !== user.id) {
+        const { migrated, hasChanges } = migrateFavoritesToNewFormat(favorites);
+
+        if (hasChanges) {
+          console.log('📦 Migrating favorites to new station_cd format...');
+          // Update Firebase with migrated data
+          await favoritesService.reorderFavorites(user.id, migrated);
+          favorites = migrated;
+        }
+
+        migrationPerformedRef.current = user.id;
+      }
 
       // Load station details for each favorite
       const favoritesWithDetails = await Promise.all(

@@ -7,7 +7,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Image,
   Animated,
   Easing,
 } from 'react-native';
@@ -21,7 +20,6 @@ import {
   ChevronRight,
   AlertCircle,
   Moon,
-  ChevronDown,
   Users,
 } from 'lucide-react-native';
 
@@ -31,9 +29,15 @@ import { useRealtimeTrains } from '../../hooks/useRealtimeTrains';
 import { useAdjacentStations } from '../../hooks/useAdjacentStations';
 import { useTheme, ThemeColors } from '../../services/theme';
 import { useCongestion } from '@/hooks/useCongestion';
+import { usePublicDataForStation } from '@/hooks/usePublicData';
 import { TrainCongestionView } from '@/components/congestion/TrainCongestionView';
 import { CongestionReportModal } from '@/components/congestion/CongestionReportModal';
+import { AccessibilitySection } from '@/components/station/AccessibilitySection';
+import { ExitInfoSection } from '@/components/station/ExitInfoSection';
+import { AlertBanner } from '@/components/common/AlertBanner';
 import { CongestionReportInput } from '@/models/congestion';
+import { useTrainSchedule } from '@/hooks/useTrainSchedule';
+import { Clock, ArrowUp, ArrowDown } from 'lucide-react-native';
 
 type StationDetailRouteProp = RouteProp<AppStackParamList, 'StationDetail'>;
 const TAB_LABELS = ['출발', '도착', '시간표', '즐겨찾기'] as const;
@@ -88,6 +92,30 @@ const StationDetailScreen: React.FC = () => {
     trainId: firstTrain?.id,
     direction: firstTrain?.direction,
     autoSubscribe: !!firstTrain,
+  });
+
+  // 공공데이터포털 API 데이터 (교통약자, 출구정보, 알림)
+  const {
+    accessibility,
+    exitInfo,
+    alerts,
+    loading: publicDataLoading,
+  } = usePublicDataForStation(stationName, {
+    lineName: `${lineId}호선`,
+  });
+
+  // 열차시간표 데이터
+  const [scheduleDirection, setScheduleDirection] = useState<'1' | '2'>('1');
+  const {
+    upcomingTrains: scheduleTrains,
+    loading: scheduleLoading,
+    error: scheduleError,
+    refresh: refreshSchedule,
+  } = useTrainSchedule({
+    stationName: stationName,
+    lineNumber: lineId,
+    direction: scheduleDirection,
+    enabled: activeTab === '시간표',
   });
 
   // 혼잡도 제보 핸들러
@@ -194,23 +222,6 @@ const StationDetailScreen: React.FC = () => {
     });
   }, [realtimeTrains]);
 
-  const exits = useMemo(
-    () => [
-      {
-        id: '1',
-        description:
-          '부평우체국, 인천마장초등학교, 산곡2동행정복지센터',
-        transfers: '부평구청 방면 3-3, 6-1 / 석남 방면 3-4, 6-2',
-      },
-      {
-        id: '2',
-        description: '부평구청, 상동호수공원',
-        transfers: '50m 앞 버스 정류장',
-      },
-    ],
-    []
-  );
-
   const lineColor = getSubwayLineColor(lineId);
 
 
@@ -299,6 +310,9 @@ const StationDetailScreen: React.FC = () => {
         </View>
       </View>
 
+      {/* 운행 알림 배너 */}
+      <AlertBanner alerts={alerts} />
+
       <View style={styles.arrivalContainer}>
         <Text style={styles.lastUpdatedText}>
           현재 {formattedTime} 기준 실시간 열차
@@ -361,6 +375,12 @@ const StationDetailScreen: React.FC = () => {
           </TouchableOpacity>
         </View>
       )}
+
+      {/* 교통약자 편의시설 */}
+      <AccessibilitySection
+        info={accessibility}
+        loading={publicDataLoading}
+      />
 
       <View style={styles.tabRow}>
         {TAB_LABELS.map((label) => {
@@ -430,6 +450,121 @@ const StationDetailScreen: React.FC = () => {
         </View>
       )}
 
+      {activeTab === '시간표' && (
+        <View style={styles.scheduleContainer}>
+          <View style={styles.scheduleHeader}>
+            <Text style={styles.scheduleTitle}>열차 시간표</Text>
+            <TouchableOpacity
+              style={styles.scheduleRefreshButton}
+              onPress={refreshSchedule}
+            >
+              <RefreshCw size={16} color={colors.primary} />
+            </TouchableOpacity>
+          </View>
+
+          {/* 방향 선택 */}
+          <View style={styles.directionSelector}>
+            <TouchableOpacity
+              style={[
+                styles.directionButton,
+                scheduleDirection === '1' && styles.directionButtonActive,
+              ]}
+              onPress={() => setScheduleDirection('1')}
+            >
+              <ArrowUp
+                size={16}
+                color={scheduleDirection === '1' ? colors.textInverse : colors.textSecondary}
+              />
+              <Text
+                style={[
+                  styles.directionButtonText,
+                  scheduleDirection === '1' && styles.directionButtonTextActive,
+                ]}
+              >
+                상행
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.directionButton,
+                scheduleDirection === '2' && styles.directionButtonActive,
+              ]}
+              onPress={() => setScheduleDirection('2')}
+            >
+              <ArrowDown
+                size={16}
+                color={scheduleDirection === '2' ? colors.textInverse : colors.textSecondary}
+              />
+              <Text
+                style={[
+                  styles.directionButtonText,
+                  scheduleDirection === '2' && styles.directionButtonTextActive,
+                ]}
+              >
+                하행
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {scheduleLoading && (
+            <View style={styles.scheduleLoadingContainer}>
+              <ActivityIndicator size="large" color={colors.primary} />
+              <Text style={styles.scheduleLoadingText}>시간표를 불러오는 중...</Text>
+            </View>
+          )}
+
+          {!scheduleLoading && scheduleError && (
+            <View style={styles.scheduleErrorContainer}>
+              <AlertCircle size={40} color={colors.error} />
+              <Text style={styles.scheduleErrorText}>{scheduleError}</Text>
+              <TouchableOpacity
+                style={styles.scheduleRetryButton}
+                onPress={refreshSchedule}
+              >
+                <Text style={styles.scheduleRetryButtonText}>다시 시도</Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {!scheduleLoading && !scheduleError && scheduleTrains.length === 0 && (
+            <View style={styles.scheduleEmptyContainer}>
+              <Clock size={40} color={colors.textTertiary} />
+              <Text style={styles.scheduleEmptyText}>
+                운행 시간표가 없습니다
+              </Text>
+            </View>
+          )}
+
+          {!scheduleLoading && !scheduleError && scheduleTrains.length > 0 && (
+            <View style={styles.scheduleList}>
+              {scheduleTrains.slice(0, 10).map((train, index) => (
+                <View key={`${train.trainNumber}-${index}`} style={styles.scheduleItem}>
+                  <View style={styles.scheduleTimeContainer}>
+                    <Clock size={14} color={colors.primary} />
+                    <Text style={styles.scheduleTime}>
+                      {train.departureTime.substring(0, 5)}
+                    </Text>
+                  </View>
+                  <View style={styles.scheduleInfoContainer}>
+                    <Text style={styles.scheduleDestination}>
+                      {train.destinationName}행
+                    </Text>
+                    <Text style={styles.scheduleTrainNumber}>
+                      열차 {train.trainNumber}
+                    </Text>
+                  </View>
+                </View>
+              ))}
+              {scheduleTrains.length > 10 && (
+                <Text style={styles.scheduleMoreText}>
+                  외 {scheduleTrains.length - 10}개 열차
+                </Text>
+              )}
+            </View>
+          )}
+        </View>
+      )}
+
       <TouchableOpacity style={styles.kakaoCard}>
         <View style={styles.kakaoIconWrapper}>
           <Text style={styles.kakaoIconText}>B</Text>
@@ -442,28 +577,11 @@ const StationDetailScreen: React.FC = () => {
         </View>
       </TouchableOpacity>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>출구정보</Text>
-        <Image
-          source={{
-            uri: 'https://maps.googleapis.com/maps/api/staticmap?center=37.4988,126.7189&zoom=16&size=600x300&maptype=roadmap&key=AIzaSyD-Placeholder',
-          }}
-          style={styles.mapImage}
-          resizeMode="cover"
-        />
-        {exits.map((exit) => (
-          <View key={exit.id} style={styles.exitCard}>
-            <View style={styles.exitHeader}>
-              <View style={styles.exitBadge}>
-                <Text style={styles.exitBadgeText}>{exit.id}</Text>
-              </View>
-              <ChevronDown size={18} color={colors.textSecondary} />
-            </View>
-            <Text style={styles.exitDescription}>{exit.description}</Text>
-            <Text style={styles.exitMeta}>{exit.transfers}</Text>
-          </View>
-        ))}
-      </View>
+      {/* 출구 정보 */}
+      <ExitInfoSection
+        exitInfo={exitInfo}
+        loading={publicDataLoading}
+      />
 
       <TouchableOpacity style={styles.busButton}>
         <Text style={styles.busButtonText}>버스 도착 정보 보기</Text>
@@ -959,6 +1077,150 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     color: colors.primary,
     fontSize: 14,
     fontWeight: '600',
+  },
+  // 시간표 스타일
+  scheduleContainer: {
+    backgroundColor: colors.surface,
+    marginHorizontal: 16,
+    marginTop: 16,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.borderMedium,
+  },
+  scheduleHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  scheduleTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  scheduleRefreshButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  directionSelector: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  directionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
+    borderRadius: 12,
+    backgroundColor: colors.backgroundSecondary,
+    borderWidth: 1,
+    borderColor: colors.borderMedium,
+  },
+  directionButtonActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  directionButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  directionButtonTextActive: {
+    color: colors.textInverse,
+  },
+  scheduleLoadingContainer: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scheduleLoadingText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  scheduleErrorContainer: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scheduleErrorText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: colors.error,
+    textAlign: 'center',
+  },
+  scheduleRetryButton: {
+    marginTop: 16,
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    backgroundColor: colors.primary,
+    borderRadius: 12,
+  },
+  scheduleRetryButtonText: {
+    color: colors.textInverse,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  scheduleEmptyContainer: {
+    padding: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scheduleEmptyText: {
+    marginTop: 12,
+    fontSize: 14,
+    color: colors.textTertiary,
+    textAlign: 'center',
+  },
+  scheduleList: {
+    gap: 8,
+  },
+  scheduleItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 12,
+    backgroundColor: colors.backgroundSecondary,
+    borderRadius: 12,
+  },
+  scheduleTimeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    minWidth: 70,
+  },
+  scheduleTime: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  scheduleInfoContainer: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  scheduleDestination: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  scheduleTrainNumber: {
+    fontSize: 12,
+    color: colors.textTertiary,
+    marginTop: 2,
+  },
+  scheduleMoreText: {
+    textAlign: 'center',
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginTop: 8,
   },
 });
 

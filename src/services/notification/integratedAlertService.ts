@@ -7,6 +7,7 @@ import { notificationService, NotificationType } from './notificationService';
 import { departureAlertService } from './departureAlertService';
 import { trainArrivalAlertService } from './trainArrivalAlertService';
 import { delayResponseAlertService } from './delayResponseAlertService';
+import { publicDataApi } from '@/services/api';
 import { modelService } from '@/services/ml';
 import { commuteLogService } from '@/services/pattern/commuteLogService';
 import { patternAnalysisService } from '@/services/pattern/patternAnalysisService';
@@ -279,15 +280,29 @@ class IntegratedAlertService {
 
   /**
    * Check delay status for a route
+   * Combines real-time delay data with public data portal alerts
    */
   private async checkDelayStatus(
     userId: string,
     route: FrequentRoute
   ): Promise<DelayStatus | null> {
     try {
-      const routeStatus = await delayResponseAlertService.checkRouteDelays(userId, route);
+      // Check real-time delays and public data alerts in parallel
+      const [routeStatus, serviceAlerts] = await Promise.all([
+        delayResponseAlertService.checkRouteDelays(userId, route),
+        this.getServiceAlertsForRoute(route),
+      ]);
 
-      if (!routeStatus.hasDelays) {
+      // Check if there are service alerts for the route
+      const hasServiceAlert = serviceAlerts.some(
+        (alert) => alert.isActive && ['delay', 'accident'].includes(alert.alertType)
+      );
+      const alertReason = serviceAlerts.find(
+        (alert) => alert.isActive && ['delay', 'accident'].includes(alert.alertType)
+      )?.content;
+
+      // No delays from either source
+      if (!routeStatus.hasDelays && !hasServiceAlert) {
         return null;
       }
 
@@ -295,11 +310,28 @@ class IntegratedAlertService {
         hasDelay: true,
         affectedLines: routeStatus.affectedLines,
         maxDelayMinutes: routeStatus.maxDelayMinutes,
-        reason: routeStatus.delayDetails[0]?.reason,
+        reason: alertReason || routeStatus.delayDetails[0]?.reason,
         adjustedDepartureTime: routeStatus.adjustedDepartureTime,
       };
     } catch {
       return null;
+    }
+  }
+
+  /**
+   * Get service alerts for a route from public data portal
+   */
+  private async getServiceAlertsForRoute(route: FrequentRoute): Promise<import('@/models/publicData').SubwayAlert[]> {
+    try {
+      // Get alerts for all lines in the route
+      const lineAlerts = await Promise.all(
+        route.lineIds.map((lineId: string) =>
+          publicDataApi.getAlertsByLine(`${lineId}호선`).catch(() => [])
+        )
+      );
+      return lineAlerts.flat();
+    } catch {
+      return [];
     }
   }
 

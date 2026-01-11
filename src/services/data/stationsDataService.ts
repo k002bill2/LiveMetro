@@ -5,6 +5,7 @@
  */
 
 import seoulStationsData from '../../data/seoulStations.json';
+import stationsJsonData from '../../data/stations.json';
 import { Station } from '../../models/train';
 
 // Type for Seoul Metro station data structure
@@ -66,6 +67,26 @@ const normalizeNameToId = (name: string): string => {
 };
 
 /**
+ * Parse fr_code (외부코드) for sorting
+ * Examples: "130" → 130, "P164" → 164, "P157-1" → 157.1, "211-2" → 211.2
+ */
+const parseFrCode = (frCode: string): number => {
+  if (!frCode) return 0;
+
+  // Remove prefix letters (P, etc.)
+  const cleaned = frCode.replace(/^[A-Z]+/, '');
+
+  // Split by hyphen for sub-numbers (e.g., "157-1")
+  const parts = cleaned.split('-');
+  const mainStr = parts[0] ?? '0';
+  const subStr = parts[1];
+  const main = parseInt(mainStr, 10) || 0;
+  const sub = subStr ? parseInt(subStr, 10) / 10 : 0;
+
+  return main + sub;
+};
+
+/**
  * Initialize cache from Seoul Metro data
  */
 const initializeCache = (): void => {
@@ -92,7 +113,50 @@ const initializeCache = (): void => {
     stationsByLineCache!.get(lineId)!.push(station);
   });
 
-  console.log(`✅ Loaded stations from Seoul Metro data (${stationsByLineCache.size} lines)`);
+  // Sort stations by fr_code for each line
+  stationsByLineCache.forEach((stations) => {
+    stations.sort((a, b) => {
+      const codeA = a.stationCode ?? '';
+      const codeB = b.stationCode ?? '';
+      return parseFrCode(codeA) - parseFrCode(codeB);
+    });
+  });
+
+  // Also cache stations.json data for fallback (different ID format)
+  // stations.json uses IDs like "s_ec82b0ea", "seoul", "city_hall_1"
+  const stationsJson = stationsJsonData as Record<string, {
+    id: string;
+    name: string;
+    lines?: string[];
+    x?: number;
+    y?: number;
+  }>;
+
+  let stationsJsonCount = 0;
+  Object.values(stationsJson).forEach((stationData) => {
+    // Skip if already cached (seoulStations.json takes priority)
+    if (stationsCache!.has(stationData.id)) {
+      return;
+    }
+
+    // Convert stations.json data to Station model
+    const station: Station = {
+      id: stationData.id,
+      name: stationData.name,
+      nameEn: stationData.name, // No English name, use Korean
+      lineId: stationData.lines?.[0] || '',
+      coordinates: {
+        latitude: 37.5665, // Default Seoul coordinates
+        longitude: 126.9780,
+      },
+      transfers: [],
+    };
+
+    stationsCache!.set(station.id, station);
+    stationsJsonCount++;
+  });
+
+  console.log(`✅ Loaded stations from Seoul Metro data (${stationsByLineCache.size} lines, +${stationsJsonCount} from stations.json)`);
 };
 
 /**
@@ -189,5 +253,114 @@ export const getLocalStationsByLine = (lineId: string): Station[] => {
   } catch (error) {
     console.error('Error loading stations by line:', error);
     return [];
+  }
+};
+
+/**
+ * Line names for display
+ */
+const LINE_NAMES: Record<string, string> = {
+  '1': '1호선',
+  '2': '2호선',
+  '3': '3호선',
+  '4': '4호선',
+  '5': '5호선',
+  '6': '6호선',
+  '7': '7호선',
+  '8': '8호선',
+  '9': '9호선',
+};
+
+/**
+ * Station with line info for search modal
+ */
+export interface StationWithLineInfo {
+  readonly id: string;       // station_cd (seoulStations.json)
+  readonly name: string;     // Korean name
+  readonly nameEn: string;   // English name
+  readonly lineId: string;   // Line ID (1-9)
+  readonly lineName: string; // Line name (1호선, 2호선, etc.)
+}
+
+/**
+ * Get all stations with line info for search modal
+ * Uses seoulStations.json (station_cd) for consistent ID format
+ * Transfer stations appear once per line with unique station_cd
+ */
+export const getStationsWithLineInfo = (): StationWithLineInfo[] => {
+  try {
+    initializeCache();
+    const jsonData = seoulStationsData as SeoulStationsJson;
+    const result: StationWithLineInfo[] = [];
+
+    // Only include lines 1-9
+    const validLines = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+
+    jsonData.DATA.forEach((stationData) => {
+      const lineId = convertLineNumToLineId(stationData.line_num);
+
+      // Skip non-numeric lines (경의중앙선, 분당선, etc.)
+      if (!validLines.includes(lineId)) {
+        return;
+      }
+
+      result.push({
+        id: stationData.station_cd,           // station_cd for unique identification
+        name: stationData.station_nm,
+        nameEn: stationData.station_nm_eng,
+        lineId,
+        lineName: LINE_NAMES[lineId] || `${lineId}호선`,
+      });
+    });
+
+    return result;
+  } catch (error) {
+    console.error('Error getting stations with line info:', error);
+    return [];
+  }
+};
+
+/**
+ * Search stations with line info by name
+ * Returns stations matching the query with their line info
+ */
+export const searchStationsWithLineInfo = (query: string): StationWithLineInfo[] => {
+  if (!query.trim()) {
+    return [];
+  }
+
+  const allStations = getStationsWithLineInfo();
+  const searchQuery = query.toLowerCase().trim();
+
+  return allStations.filter((station) =>
+    station.name.toLowerCase().includes(searchQuery) ||
+    station.nameEn.toLowerCase().includes(searchQuery)
+  );
+};
+
+/**
+ * Find station_cd by station name and lineId
+ * Useful for migrating old IDs (station name) to new IDs (station_cd)
+ */
+export const findStationCdByNameAndLine = (
+  stationName: string,
+  lineId: string
+): string | null => {
+  try {
+    initializeCache();
+    const stations = stationsByLineCache!.get(lineId);
+
+    if (!stations) {
+      return null;
+    }
+
+    const station = stations.find(
+      (s) => s.name === stationName || s.nameEn.toLowerCase() === stationName.toLowerCase()
+    );
+
+    return station?.id ?? null;
+  } catch (error) {
+    console.error('Error finding station_cd:', error);
+    return null;
   }
 };
