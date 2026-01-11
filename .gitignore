@@ -119,3 +119,6 @@ e2e/screenshots/
 e2e/logs/
 apps/
 google-services.json
+
+# Claude Code backups
+.claude/backups/
