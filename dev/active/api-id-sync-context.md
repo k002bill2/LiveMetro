@@ -5,8 +5,8 @@
 
 ## Status: In Progress
 - **Started**: 2025-01-11
-- **Last Updated**: 2026-01-12 22:45 KST
-- **Progress**: 90%
+- **Last Updated**: 2026-01-13 09:45 KST
+- **Progress**: 95%
 
 ## Background
 1. 사용자가 많을 때 API rate limit 대응 필요
@@ -70,6 +70,32 @@
 
 **다음 세션:**
 - 네이티브 환경에서 시간표 API 실제 테스트
+- 기존 즐겨찾기 마이그레이션 검토
+
+### 2026-01-13 Session 3
+**완료:**
+1. **테스트 코드 수정**
+   - `seoulSubwayApi.test.ts`: API 키 환경변수 설정으로 모킹 문제 해결
+   - `useFavorites.test.ts`: `migrateFavoritesToNewFormat` 함수 모킹 추가
+   - `trainService.test.ts`: `searchLocalStations` 함수 모킹 추가
+
+2. **EAS Preview 빌드 제출**
+   - Android: https://expo.dev/accounts/younghwankang/projects/livemetro-subway-app/builds/cfe43c2d-fce1-45d9-9a07-432f6fa3bc85
+   - iOS: https://expo.dev/accounts/younghwankang/projects/livemetro-subway-app/builds/3e9e28ce-951f-4051-84e4-a36eb1467536
+
+3. **테스트 결과**
+   - Test Suites: 27 passed
+   - Tests: 617 passed, 9 skipped
+   - Coverage: 24.43% (임계값 통과)
+
+**이슈 해결:**
+- Jest 테스트에서 `seoulSubwayApi` 싱글톤의 API 키 문제
+- `useFavorites` 훅의 마이그레이션 함수 모킹 누락
+- `trainService`의 로컬 검색 함수 모킹 누락
+
+**다음 세션:**
+- EAS 빌드 결과 확인
+- 네이티브 환경에서 시간표 API 테스트
 - 기존 즐겨찾기 마이그레이션 검토
 
 ## Key Files

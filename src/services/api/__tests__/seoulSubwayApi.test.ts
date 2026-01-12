@@ -2,17 +2,54 @@
  * Seoul Subway API Service Tests
  *
  * Note: This tests the actual implementation, not the mock from setup.ts
+ * We need to reset modules and set env vars before importing the real module.
  */
 
-// Unmock to test actual implementation
-// Now import the actual module
-import { seoulSubwayApi, SeoulRealtimeArrival, RateLimiter } from '../seoulSubwayApi';
+// Set environment variable for API key BEFORE module import
+process.env.EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY = 'test-api-key-1';
+process.env.EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY_2 = 'test-api-key-2';
 
+// Reset module registry BEFORE any imports
+jest.resetModules();
+
+// Unmock the seoulSubwayApi module to test actual implementation
 jest.unmock('../seoulSubwayApi');
 
-// Mock fetch before importing
+// Mock fetch globally
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
+
+// Now require the actual module (after reset and unmock)
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { seoulSubwayApi, RateLimiter } = jest.requireActual('../seoulSubwayApi');
+
+// Type for test use
+interface SeoulRealtimeArrival {
+  rowNum: string;
+  selectedCount: string;
+  totalCount: string;
+  subwayId: string;
+  updnLine: string;
+  trainLineNm: string;
+  subwayHeading: string;
+  statnFid: string;
+  statnTid: string;
+  statnId: string;
+  statnNm: string;
+  trainCo: string;
+  ordkey: string;
+  subwayList: string;
+  statnList: string;
+  btrainSttus: string;
+  barvlDt: string;
+  btrainNo: string;
+  bstatnId: string;
+  bstatnNm: string;
+  recptnDt: string;
+  arvlMsg2: string;
+  arvlMsg3: string;
+  arvlCd: string;
+}
 
 describe('SeoulSubwayApiService', () => {
   beforeEach(() => {

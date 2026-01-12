@@ -5,20 +5,31 @@
 
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import { useFavorites } from '../useFavorites';
-import { favoritesService } from '../../services/favorites/favoritesService';
+import { favoritesService, migrateFavoritesToNewFormat } from '../../services/favorites/favoritesService';
 import { trainService } from '../../services/train/trainService';
 import { useAuth } from '../../services/auth/AuthContext';
 import { FavoriteStation } from '../../models/user';
 import { Station } from '../../models/train';
 
 // Mock dependencies
-jest.mock('../../services/favorites/favoritesService');
+jest.mock('../../services/favorites/favoritesService', () => ({
+  favoritesService: {
+    getFavorites: jest.fn(),
+    addFavorite: jest.fn(),
+    removeFavorite: jest.fn(),
+    updateFavorite: jest.fn(),
+    reorderFavorites: jest.fn(),
+    getFavoriteByStationId: jest.fn(),
+  },
+  migrateFavoritesToNewFormat: jest.fn(() => ({ migrated: [], hasChanges: false })),
+}));
 jest.mock('../../services/train/trainService');
 jest.mock('../../services/auth/AuthContext');
 
 const mockFavoritesService = favoritesService as jest.Mocked<typeof favoritesService>;
 const mockTrainService = trainService as jest.Mocked<typeof trainService>;
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
+const mockMigrateFavoritesToNewFormat = migrateFavoritesToNewFormat as jest.MockedFunction<typeof migrateFavoritesToNewFormat>;
 
 const mockUser = { id: 'user-123', email: 'test@test.com' };
 
@@ -55,6 +66,11 @@ describe('useFavorites', () => {
     } as any);
     mockFavoritesService.getFavorites.mockResolvedValue([]);
     mockTrainService.getStation.mockResolvedValue(createMockStation('station-1', '강남역'));
+    // Mock migration function to return unchanged data
+    mockMigrateFavoritesToNewFormat.mockImplementation((favorites) => ({
+      migrated: favorites,
+      hasChanges: false,
+    }));
   });
 
   describe('Without User', () => {
@@ -108,11 +124,15 @@ describe('useFavorites', () => {
         createMockFavorite('fav-2', 'station-2'),
       ];
       mockFavoritesService.getFavorites.mockResolvedValue(mockFavorites);
+      mockTrainService.getStation
+        .mockResolvedValueOnce(createMockStation('station-1', '강남역'))
+        .mockResolvedValueOnce(createMockStation('station-2', '역삼역'));
 
       const { result } = renderHook(() => useFavorites());
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
+        expect(result.current.favorites).toHaveLength(2);
       });
 
       expect(mockTrainService.getStation).toHaveBeenCalledTimes(2);
@@ -127,6 +147,7 @@ describe('useFavorites', () => {
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
+        expect(result.current.favorites).toHaveLength(1);
       });
 
       // Should still have the favorite, just with null station
@@ -281,11 +302,13 @@ describe('useFavorites', () => {
     it('isFavorite should return true for favorited stations', async () => {
       const mockFavorites = [createMockFavorite('fav-1', 'station-1')];
       mockFavoritesService.getFavorites.mockResolvedValue(mockFavorites);
+      mockTrainService.getStation.mockResolvedValue(createMockStation('station-1', '강남역'));
 
       const { result } = renderHook(() => useFavorites());
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
+        expect(result.current.favorites).toHaveLength(1);
       });
 
       expect(result.current.isFavorite('station-1')).toBe(true);
@@ -324,12 +347,14 @@ describe('useFavorites', () => {
       const mockFavorites = [createMockFavorite('fav-1', 'station-1')];
       mockFavoritesService.getFavorites.mockResolvedValue(mockFavorites);
       mockFavoritesService.getFavoriteByStationId.mockResolvedValue(mockFavorites[0] ?? null);
+      mockTrainService.getStation.mockResolvedValue(createMockStation('station-1', '강남역'));
       const station = createMockStation('station-1', '강남역');
 
       const { result } = renderHook(() => useFavorites());
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
+        expect(result.current.favorites).toHaveLength(1);
       });
 
       await act(async () => {
@@ -384,11 +409,15 @@ describe('useFavorites', () => {
         { ...createMockFavorite('fav-2', 'station-2'), isCommuteStation: false },
       ];
       mockFavoritesService.getFavorites.mockResolvedValue(mockFavorites);
+      mockTrainService.getStation
+        .mockResolvedValueOnce(createMockStation('station-1', '강남역'))
+        .mockResolvedValueOnce(createMockStation('station-2', '역삼역'));
 
       const { result } = renderHook(() => useFavorites());
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
+        expect(result.current.favorites).toHaveLength(2);
       });
 
       const commuteStations = result.current.getCommuteStations();

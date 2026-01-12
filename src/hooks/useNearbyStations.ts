@@ -82,10 +82,18 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
     // Production mode: load from Firebase/API
     try {
       const lines = await trainService.getSubwayLines();
+      if (__DEV__) {
+        console.log(`[useNearbyStations] Loaded ${lines.length} subway lines`);
+      }
+
       const stationsPromises = lines.map(line => trainService.getStationsByLine(line.id));
       const stationArrays = await Promise.all(stationsPromises);
 
       const stations = stationArrays.flat();
+      if (__DEV__) {
+        console.log(`[useNearbyStations] Loaded ${stations.length} total stations`);
+      }
+
       setAllStations(stations);
       return stations;
     } catch (error) {
@@ -125,6 +133,11 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
         stations,
         radius
       ).slice(0, maxStations);
+
+      if (__DEV__) {
+        console.log(`[useNearbyStations] Location: ${currentLocation.latitude.toFixed(6)}, ${currentLocation.longitude.toFixed(6)}`);
+        console.log(`[useNearbyStations] Found ${nearbyStations.length} stations within ${radius}m`);
+      }
 
       const closestStation: NearbyStation | null = nearbyStations.at(0) ?? null;
 

@@ -7,7 +7,7 @@ import { trainService } from '../trainService';
 import { Train, Station, SubwayLine, TrainDelay, TrainStatus, DelaySeverity } from '../../../models/train';
 
 import { seoulSubwayApi } from '../../api/seoulSubwayApi';
-import { getLocalStation, getLocalStationsByLine } from '../../data/stationsDataService';
+import { getLocalStation, getLocalStationsByLine, searchLocalStations } from '../../data/stationsDataService';
 
 // Mock Firebase
 jest.mock('../../firebase/config', () => ({
@@ -48,11 +48,13 @@ jest.mock('../../api/seoulSubwayApi', () => ({
 jest.mock('../../data/stationsDataService', () => ({
   getLocalStation: jest.fn(),
   getLocalStationsByLine: jest.fn(),
+  searchLocalStations: jest.fn(),
 }));
 
 const mockSeoulApi = seoulSubwayApi as jest.Mocked<typeof seoulSubwayApi>;
 const mockGetLocalStation = getLocalStation as jest.MockedFunction<typeof getLocalStation>;
 const mockGetLocalStationsByLine = getLocalStationsByLine as jest.MockedFunction<typeof getLocalStationsByLine>;
+const mockSearchLocalStations = searchLocalStations as jest.MockedFunction<typeof searchLocalStations>;
 
 describe('TrainService', () => {
   const mockStation: Station = {
@@ -397,6 +399,7 @@ describe('TrainService', () => {
 
     it('should return empty array on error', async () => {
       mockGetDocs.mockRejectedValue(new Error('Firebase error'));
+      mockSearchLocalStations.mockReturnValue([]);
 
       const result = await trainService.searchStations('강남');
 

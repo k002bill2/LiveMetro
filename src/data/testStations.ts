@@ -16,7 +16,10 @@ import { Station } from '@models/train';
  * true: 아래 TEST_STATIONS만 사용 (API 호출 없음)
  * false: 실제 API/Firebase에서 데이터 로드
  */
-export const USE_TEST_STATIONS = __DEV__;
+// 실제 역 데이터를 사용하려면 false로 설정
+// true: 테스트용 3개 역만 사용 (강남, 홍대입구, 서울역)
+// false: Firebase/API에서 전체 역 데이터 로드
+export const USE_TEST_STATIONS = false;
 
 /**
  * 테스트용 고정 역 데이터 (3개역)
