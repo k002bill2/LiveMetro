@@ -59,7 +59,6 @@
     "expo-camera": "~13.4.4",
     "expo-datetimepicker": "^1.0.3",
     "expo-dev-client": "~2.4.13",
-    "expo-gl": "~13.0.1",
     "expo-linear-gradient": "~12.3.0",
     "expo-local-authentication": "~13.4.1",
     "expo-location": "~16.1.0",
