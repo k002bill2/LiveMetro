@@ -12,6 +12,13 @@ import { TrainStatus } from '../../../models/train';
 jest.mock('../../../services/train/trainService');
 const mockTrainService = trainService as jest.Mocked<typeof trainService>;
 
+// Mock Seoul Subway API
+jest.mock('../../../services/api/seoulSubwayApi', () => ({
+  seoulSubwayApi: {
+    getRealtimeArrival: jest.fn().mockResolvedValue([]),
+  },
+}));
+
 // Mock performance utils to avoid throttling in tests
 jest.mock('../../../utils/performanceUtils', () => ({
   performanceMonitor: {
@@ -53,6 +60,15 @@ describe('TrainArrivalList', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // Default mock for getStation - needed for API calls
+    mockTrainService.getStation.mockResolvedValue({
+      id: 'station-1',
+      name: '테스트역',
+      nameEn: 'Test Station',
+      lineId: '2',
+      coordinates: { latitude: 37.5, longitude: 127.0 },
+      transfers: [],
+    });
   });
 
   describe('Loading State', () => {
