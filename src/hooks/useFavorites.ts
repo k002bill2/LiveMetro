@@ -80,7 +80,11 @@ export const useFavorites = () => {
             const station = await trainService.getStation(favorite.stationId);
             return {
               ...favorite,
-              station,
+              // 저장된 lineId를 사용하여 환승역에서 올바른 호선 표시
+              station: station ? {
+                ...station,
+                lineId: favorite.lineId,
+              } : null,
             };
           } catch (error) {
             console.error(`Error loading station ${favorite.stationId}:`, error);
