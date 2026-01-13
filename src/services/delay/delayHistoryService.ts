@@ -234,6 +234,69 @@ class DelayHistoryService {
   }
 
   /**
+   * Add sample data for testing (개발/테스트용)
+   */
+  async addSampleData(userId: string): Promise<void> {
+    const now = new Date();
+
+    // 샘플 지연 이력 추가
+    const sampleEntries = [
+      {
+        userId,
+        lineId: '2',
+        stationId: '0222',
+        stationName: '강남',
+        delayMinutes: 15,
+        timestamp: new Date(now.getTime() - 2 * 60 * 60 * 1000), // 2시간 전
+        reason: DelayReason.SIGNAL_FAILURE,
+        rawMessage: '신호 장애로 인한 지연',
+      },
+      {
+        userId,
+        lineId: '3',
+        stationId: '0309',
+        stationName: '교대',
+        delayMinutes: 8,
+        timestamp: new Date(now.getTime() - 24 * 60 * 60 * 1000), // 1일 전
+        reason: DelayReason.CONGESTION,
+        rawMessage: '혼잡으로 인한 지연',
+      },
+      {
+        userId,
+        lineId: '7',
+        stationId: '0729',
+        stationName: '고속터미널',
+        delayMinutes: 12,
+        timestamp: new Date(now.getTime() - 3 * 24 * 60 * 60 * 1000), // 3일 전
+        reason: DelayReason.MECHANICAL_FAILURE,
+        rawMessage: '차량 고장으로 인한 지연',
+      },
+    ];
+
+    for (const entry of sampleEntries) {
+      await this.addHistoryEntry(entry);
+    }
+
+    // 샘플 증명서 1개 발급
+    const history = await this.getHistory();
+    if (history.length > 0 && history[0]) {
+      const firstEntry = history[0];
+      const scheduledTime = new Date(firstEntry.timestamp).toLocaleTimeString('ko-KR', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+      const actualTime = new Date(
+        firstEntry.timestamp.getTime() + firstEntry.delayMinutes * 60000
+      ).toLocaleTimeString('ko-KR', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+
+      await this.generateCertificate(firstEntry.id, scheduledTime, actualTime);
+    }
+  }
+
+  /**
    * Trim history to keep only recent entries within limits
    */
   private trimHistory(history: DelayHistoryEntry[]): DelayHistoryEntry[] {

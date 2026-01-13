@@ -84,6 +84,7 @@ export const DelayCertificateScreen: React.FC = () => {
       });
     } catch (error) {
       console.error('Share failed:', error);
+      Alert.alert('오류', '공유에 실패했습니다.');
     }
   };
 
@@ -274,6 +275,19 @@ export const DelayCertificateScreen: React.FC = () => {
     );
   };
 
+  const handleAddSampleData = async () => {
+    if (!user) return;
+
+    try {
+      await delayHistoryService.addSampleData(user.id);
+      Alert.alert('완료', '샘플 데이터가 추가되었습니다.');
+      await loadData();
+    } catch (error) {
+      console.error('Failed to add sample data:', error);
+      Alert.alert('오류', '샘플 데이터 추가에 실패했습니다.');
+    }
+  };
+
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
       <FileText size={64} color={colors.textTertiary} />
@@ -287,6 +301,14 @@ export const DelayCertificateScreen: React.FC = () => {
           ? '지연 발생 시 자동으로 기록되며,\n이력에서 증명서를 발급할 수 있습니다.'
           : '지연이 감지되면 자동으로 기록됩니다.'}
       </Text>
+      {__DEV__ && (
+        <TouchableOpacity
+          style={styles.sampleButton}
+          onPress={handleAddSampleData}
+        >
+          <Text style={styles.sampleButtonText}>샘플 데이터 추가 (개발용)</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 
@@ -578,6 +600,18 @@ const createStyles = (colors: ThemeColors) =>
       textAlign: 'center',
       marginTop: SPACING.sm,
       lineHeight: 20,
+    },
+    sampleButton: {
+      marginTop: SPACING.lg,
+      paddingHorizontal: SPACING.lg,
+      paddingVertical: SPACING.sm,
+      backgroundColor: colors.primary,
+      borderRadius: RADIUS.md,
+    },
+    sampleButtonText: {
+      color: '#FFFFFF',
+      fontSize: TYPOGRAPHY.fontSize.sm,
+      fontWeight: '600',
     },
     infoBox: {
       flexDirection: 'row',
