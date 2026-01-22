@@ -87,7 +87,7 @@ class ArrivalService {
   private readonly options: Required<ArrivalServiceOptions>;
   private lastFetchTime: Map<string, number> = new Map();
   private activeSubscriptions: Map<string, Set<ArrivalCallback>> = new Map();
-  private pollingIntervals: Map<string, NodeJS.Timeout> = new Map();
+  private pollingIntervals: Map<string, ReturnType<typeof setInterval>> = new Map();
 
   constructor(options?: ArrivalServiceOptions) {
     this.options = { ...DEFAULT_OPTIONS, ...options };

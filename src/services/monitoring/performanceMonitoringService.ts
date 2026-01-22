@@ -71,7 +71,7 @@ class PerformanceMonitoringService {
 
   private startTimes: Map<string, number> = new Map();
   private performanceData: Map<string, number[]> = new Map();
-  private metricsIntervalId: NodeJS.Timeout | null = null;
+  private metricsIntervalId: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
     this.sessionId = this.generateSessionId();

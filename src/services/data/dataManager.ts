@@ -44,7 +44,7 @@ class DataManager {
   };
 
   private subscribers: Map<string, ((data: any) => void)[]> = new Map();
-  private activeIntervals: Map<string, NodeJS.Timeout> = new Map();
+  private activeIntervals: Map<string, ReturnType<typeof setInterval>> = new Map();
   private syncQueue: (() => Promise<void>)[] = [];
   private isProcessingQueue = false;
 

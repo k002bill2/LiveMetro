@@ -58,7 +58,7 @@ export const Toast: React.FC<ToastProps> = ({
   }, [fadeAnim, slideAnim, position, onDismiss]);
 
   useEffect(() => {
-    let timer: NodeJS.Timeout;
+    let timer: ReturnType<typeof setTimeout>;
     if (visible) {
       Animated.parallel([
         Animated.timing(fadeAnim, {
