@@ -4,25 +4,33 @@
  */
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { AppState, AppStateStatus } from 'react-native';
+import { AppState, AppStateStatus, Alert, Platform } from 'react-native';
 import * as Location from 'expo-location';
-import { locationService, LocationCoordinates } from '../services/location/locationService';
+import {
+  locationService,
+  LocationCoordinates,
+  LocationTrackingMode,
+} from '../services/location/locationService';
 
 interface UseLocationState {
   location: LocationCoordinates | null;
   loading: boolean;
   error: string | null;
   hasPermission: boolean;
+  hasBackgroundPermission: boolean;
   isTracking: boolean;
+  trackingMode: LocationTrackingMode;
   accuracy: number | null;
 }
 
 interface UseLocationOptions {
   enableHighAccuracy?: boolean;
+  trackingMode?: LocationTrackingMode;
   timeout?: number;
   maximumAge?: number;
   distanceFilter?: number;
   enableBackgroundLocation?: boolean;
+  showPermissionExplanation?: boolean;
   onLocationUpdate?: ((location: LocationCoordinates) => void) | undefined;
   onError?: ((error: string) => void) | undefined;
 }
@@ -33,7 +41,9 @@ interface UseLocationOptions {
 export const useLocation = (options: UseLocationOptions = {}) => {
   const {
     enableHighAccuracy = false,
-    distanceFilter = 10,
+    trackingMode = 'normal',
+    distanceFilter = 50, // 증가: 10 → 50 (도시 환경에서 충분)
+    showPermissionExplanation = true,
     onLocationUpdate,
     onError
   } = options;
@@ -43,7 +53,9 @@ export const useLocation = (options: UseLocationOptions = {}) => {
     loading: false,
     error: null,
     hasPermission: false,
+    hasBackgroundPermission: false,
     isTracking: false,
+    trackingMode: 'normal',
     accuracy: null,
   });
 
@@ -82,17 +94,72 @@ export const useLocation = (options: UseLocationOptions = {}) => {
   }, [updateState, onError]);
 
   /**
+   * Show permission explanation before requesting
+   */
+  const showPermissionExplanationAlert = useCallback((): Promise<boolean> => {
+    return new Promise((resolve) => {
+      Alert.alert(
+        '위치 권한이 필요합니다',
+        '주변 역 찾기와 도착 알림을 위해 위치 정보가 필요합니다.\n\n• 현재 위치 기반 가까운 역 표시\n• 역 도착 시 자동 알림\n• 출퇴근 경로 추천',
+        [
+          { text: '허용 안함', onPress: () => resolve(false), style: 'cancel' },
+          { text: '계속', onPress: () => resolve(true) },
+        ]
+      );
+    });
+  }, []);
+
+  /**
+   * Show Android 11+ background permission guide
+   */
+  const showBackgroundPermissionGuide = useCallback((): Promise<void> => {
+    return new Promise((resolve) => {
+      if (Platform.OS === 'android' && Platform.Version >= 30) {
+        Alert.alert(
+          '항상 허용 설정 필요',
+          '백그라운드 알림을 받으려면:\n\n1. "권한" 메뉴 선택\n2. "위치" 선택\n3. "항상 허용" 선택',
+          [{ text: '설정으로 이동', onPress: () => resolve() }]
+        );
+      } else {
+        resolve();
+      }
+    });
+  }, []);
+
+  /**
    * Initialize location service and request permissions
    */
   const initializeLocation = useCallback(async () => {
     try {
       updateState({ loading: true, error: null });
-      
+
+      // Check if already have permission
+      const { status: currentStatus } = await Location.getForegroundPermissionsAsync();
+
+      if (currentStatus === 'granted') {
+        const hasBackgroundPermission = locationService.hasBackgroundLocationPermission();
+        updateState({
+          hasPermission: true,
+          hasBackgroundPermission,
+          loading: false
+        });
+        return true;
+      }
+
+      // Show explanation before requesting permission
+      if (showPermissionExplanation) {
+        const proceed = await showPermissionExplanationAlert();
+        if (!proceed) {
+          updateState({ loading: false });
+          return false;
+        }
+      }
+
       const hasPermission = await locationService.initialize();
-      
-      updateState({ 
+
+      updateState({
         hasPermission,
-        loading: false 
+        loading: false
       });
 
       if (!hasPermission) {
@@ -105,7 +172,37 @@ export const useLocation = (options: UseLocationOptions = {}) => {
       handleError(error instanceof Error ? error.message : '위치 서비스 초기화에 실패했습니다.');
       return false;
     }
-  }, [updateState, handleError]);
+  }, [updateState, handleError, showPermissionExplanation, showPermissionExplanationAlert]);
+
+  /**
+   * Request background location permission with proper UI guidance
+   */
+  const requestBackgroundPermission = useCallback(async (): Promise<boolean> => {
+    try {
+      if (!state.hasPermission) {
+        const initialized = await initializeLocation();
+        if (!initialized) return false;
+      }
+
+      // Show guide for Android 11+
+      await showBackgroundPermissionGuide();
+
+      const hasBackgroundPermission = await locationService.requestBackgroundPermission();
+
+      updateState({ hasBackgroundPermission });
+
+      if (!hasBackgroundPermission) {
+        if (__DEV__) {
+          console.warn('Background permission not granted');
+        }
+      }
+
+      return hasBackgroundPermission;
+    } catch (error) {
+      handleError(error instanceof Error ? error.message : '백그라운드 권한 요청에 실패했습니다.');
+      return false;
+    }
+  }, [state.hasPermission, initializeLocation, showBackgroundPermissionGuide, updateState, handleError]);
 
   /**
    * Get current location once
@@ -135,9 +232,9 @@ export const useLocation = (options: UseLocationOptions = {}) => {
   }, [state.hasPermission, initializeLocation, enableHighAccuracy, updateState, handleLocationUpdate, handleError]);
 
   /**
-   * Start continuous location tracking
+   * Start continuous location tracking with optional mode
    */
-  const startTracking = useCallback(async () => {
+  const startTracking = useCallback(async (mode?: LocationTrackingMode) => {
     if (trackingRef.current) {
       if (__DEV__) {
         console.warn('Location tracking already active');
@@ -151,21 +248,23 @@ export const useLocation = (options: UseLocationOptions = {}) => {
     }
 
     try {
+      const effectiveMode = mode || trackingMode;
       const success = await locationService.startLocationTracking(
         handleLocationUpdate,
         {
-          accuracy: enableHighAccuracy ? 
-            Location.Accuracy.BestForNavigation : 
-            Location.Accuracy.Balanced,
+          mode: effectiveMode,
+          accuracy: enableHighAccuracy ?
+            Location.Accuracy.BestForNavigation :
+            undefined, // Let mode config handle it
           distanceInterval: distanceFilter,
         }
       );
 
       if (success) {
         trackingRef.current = true;
-        updateState({ isTracking: true });
+        updateState({ isTracking: true, trackingMode: effectiveMode });
         if (__DEV__) {
-          console.log('Location tracking started');
+          console.log(`Location tracking started (mode: ${effectiveMode})`);
         }
         return true;
       } else {
@@ -176,7 +275,21 @@ export const useLocation = (options: UseLocationOptions = {}) => {
       handleError(error instanceof Error ? error.message : '위치 추적 시작에 실패했습니다.');
       return false;
     }
-  }, [state.hasPermission, initializeLocation, handleLocationUpdate, enableHighAccuracy, distanceFilter, updateState, handleError]);
+  }, [state.hasPermission, initializeLocation, handleLocationUpdate, enableHighAccuracy, trackingMode, distanceFilter, updateState, handleError]);
+
+  /**
+   * Start battery-efficient tracking mode
+   */
+  const startBatteryEfficientTracking = useCallback(async () => {
+    return startTracking('batteryEfficient');
+  }, [startTracking]);
+
+  /**
+   * Start high-accuracy tracking mode (for station arrival detection)
+   */
+  const startHighAccuracyTracking = useCallback(async () => {
+    return startTracking('highAccuracy');
+  }, [startTracking]);
 
   /**
    * Stop location tracking
@@ -266,9 +379,12 @@ export const useLocation = (options: UseLocationOptions = {}) => {
     ...state,
     getCurrentLocation,
     startTracking,
+    startBatteryEfficientTracking,
+    startHighAccuracyTracking,
     stopTracking,
     checkLocationServices,
     initializeLocation,
+    requestBackgroundPermission,
   };
 };
 

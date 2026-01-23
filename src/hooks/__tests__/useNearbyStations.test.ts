@@ -64,13 +64,18 @@ describe('useNearbyStations', () => {
       loading: false,
       error: null,
       hasPermission: true,
+      hasBackgroundPermission: false,
       isTracking: false,
+      trackingMode: 'normal',
       accuracy: 10,
       getCurrentLocation: jest.fn(),
       startTracking: jest.fn(),
+      startBatteryEfficientTracking: jest.fn(),
+      startHighAccuracyTracking: jest.fn(),
       stopTracking: jest.fn(),
       checkLocationServices: jest.fn(),
       initializeLocation: jest.fn(),
+      requestBackgroundPermission: jest.fn(),
     });
 
     // Default mock for trainService
@@ -353,13 +358,18 @@ describe('useNearbyStations', () => {
         loading: false,
         error: '위치 권한 없음',
         hasPermission: false,
+        hasBackgroundPermission: false,
         isTracking: false,
+        trackingMode: 'normal',
         accuracy: null,
         getCurrentLocation: jest.fn(),
         startTracking: jest.fn(),
+        startBatteryEfficientTracking: jest.fn(),
+        startHighAccuracyTracking: jest.fn(),
         stopTracking: jest.fn(),
         checkLocationServices: jest.fn(),
         initializeLocation: jest.fn(),
+        requestBackgroundPermission: jest.fn(),
       });
 
       const { result } = renderHook(() => useNearbyStations());
@@ -389,13 +399,18 @@ describe('useNearbyStations', () => {
         loading: false,
         error: null,
         hasPermission: true,
+        hasBackgroundPermission: false,
         isTracking: false,
+        trackingMode: 'normal',
         accuracy: null,
         getCurrentLocation: jest.fn(),
         startTracking: jest.fn(),
+        startBatteryEfficientTracking: jest.fn(),
+        startHighAccuracyTracking: jest.fn(),
         stopTracking: jest.fn(),
         checkLocationServices: jest.fn(),
         initializeLocation: jest.fn(),
+        requestBackgroundPermission: jest.fn(),
       });
 
       const { result } = renderHook(() => useNearbyStations());
@@ -420,13 +435,18 @@ describe('useStationDistance', () => {
       loading: false,
       error: null,
       hasPermission: true,
+      hasBackgroundPermission: false,
       isTracking: false,
+      trackingMode: 'normal',
       accuracy: 10,
       getCurrentLocation: jest.fn(),
       startTracking: jest.fn(),
+      startBatteryEfficientTracking: jest.fn(),
+      startHighAccuracyTracking: jest.fn(),
       stopTracking: jest.fn(),
       checkLocationServices: jest.fn(),
       initializeLocation: jest.fn(),
+      requestBackgroundPermission: jest.fn(),
     });
 
     mockTrainService.searchStations.mockResolvedValue([
@@ -532,13 +552,18 @@ describe('useStationDistance', () => {
         loading: false,
         error: null,
         hasPermission: true,
+        hasBackgroundPermission: false,
         isTracking: false,
+        trackingMode: 'normal',
         accuracy: null,
         getCurrentLocation: jest.fn(),
         startTracking: jest.fn(),
+        startBatteryEfficientTracking: jest.fn(),
+        startHighAccuracyTracking: jest.fn(),
         stopTracking: jest.fn(),
         checkLocationServices: jest.fn(),
         initializeLocation: jest.fn(),
+        requestBackgroundPermission: jest.fn(),
       });
 
       const { result } = renderHook(() => useStationDistance('강남역'));

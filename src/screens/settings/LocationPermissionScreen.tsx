@@ -13,18 +13,41 @@ import {
   TouchableOpacity,
   Linking,
   Alert,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
 import { useTheme, ThemeColors } from '@/services/theme';
 import SettingSection from '@/components/settings/SettingSection';
+import { locationService } from '@/services/location/locationService';
+
+interface PermissionState {
+  foreground: Location.PermissionStatus;
+  background: Location.PermissionStatus;
+}
+
+type PermissionStatusString = 'granted' | 'denied' | 'undetermined' | 'loading';
 
 export const LocationPermissionScreen: React.FC = () => {
   const { colors } = useTheme();
   const styles = createStyles(colors);
-  const [permissionStatus, setPermissionStatus] = useState<string>('loading');
+  const [permissionState, setPermissionState] = useState<PermissionState>({
+    foreground: Location.PermissionStatus.UNDETERMINED,
+    background: Location.PermissionStatus.UNDETERMINED,
+  });
+  const [isLoading, setIsLoading] = useState(true);
   const [requesting, setRequesting] = useState(false);
+  const [requestingBackground, setRequestingBackground] = useState(false);
+
+  // For backward compatibility with UI rendering
+  const permissionStatus: PermissionStatusString = isLoading
+    ? 'loading'
+    : permissionState.foreground === Location.PermissionStatus.GRANTED
+    ? 'granted'
+    : permissionState.foreground === Location.PermissionStatus.DENIED
+    ? 'denied'
+    : 'undetermined';
 
   useEffect(() => {
     checkPermission();
@@ -32,19 +55,46 @@ export const LocationPermissionScreen: React.FC = () => {
 
   const checkPermission = async (): Promise<void> => {
     try {
-      const { status } = await Location.getForegroundPermissionsAsync();
-      setPermissionStatus(status);
+      setIsLoading(true);
+      const { status: foreground } = await Location.getForegroundPermissionsAsync();
+      const { status: background } = await Location.getBackgroundPermissionsAsync();
+      setPermissionState({ foreground, background });
     } catch (error) {
       console.error('Error checking location permission:', error);
-      setPermissionStatus('undetermined');
+      setPermissionState({
+        foreground: Location.PermissionStatus.UNDETERMINED,
+        background: Location.PermissionStatus.UNDETERMINED,
+      });
+    } finally {
+      setIsLoading(false);
     }
+  };
+
+  /**
+   * Show permission explanation before requesting
+   */
+  const showPermissionExplanation = (): Promise<boolean> => {
+    return new Promise((resolve) => {
+      Alert.alert(
+        '위치 권한이 필요합니다',
+        '주변 역 찾기와 도착 알림을 위해 위치 정보가 필요합니다.\n\n• 현재 위치 기반 가까운 역 표시\n• 역 도착 시 자동 알림\n• 출퇴근 경로 추천',
+        [
+          { text: '허용 안함', onPress: () => resolve(false), style: 'cancel' },
+          { text: '계속', onPress: () => resolve(true) },
+        ]
+      );
+    });
   };
 
   const requestPermission = async (): Promise<void> => {
     try {
+      // Show explanation first
+      const proceed = await showPermissionExplanation();
+      if (!proceed) return;
+
       setRequesting(true);
       const { status } = await Location.requestForegroundPermissionsAsync();
-      setPermissionStatus(status);
+      setPermissionState(prev => ({ ...prev, foreground: status }));
 
       if (status === 'granted') {
         Alert.alert('권한 허용됨', '위치 권한이 성공적으로 허용되었습니다.');
@@ -59,6 +109,53 @@ export const LocationPermissionScreen: React.FC = () => {
       Alert.alert('오류', '권한 요청에 실패했습니다.');
     } finally {
       setRequesting(false);
+    }
+  };
+
+  /**
+   * Request background permission with Android 11+ guide
+   */
+  const requestBackgroundPermission = async (): Promise<void> => {
+    try {
+      // Ensure foreground permission first
+      if (permissionState.foreground !== 'granted') {
+        Alert.alert(
+          '전경 권한 필요',
+          '먼저 위치 권한을 허용해주세요.'
+        );
+        return;
+      }
+
+      // Show Android 11+ guide
+      if (Platform.OS === 'android' && Platform.Version >= 30) {
+        await new Promise<void>((resolve) => {
+          Alert.alert(
+            '항상 허용 설정 필요',
+            '백그라운드에서 알림을 받으려면:\n\n1. "권한" 메뉴 선택\n2. "위치" 선택\n3. "항상 허용" 선택',
+            [{ text: '설정으로 이동', onPress: () => resolve() }]
+          );
+        });
+      }
+
+      setRequestingBackground(true);
+      const granted = await locationService.requestBackgroundPermission();
+
+      // Refresh permission state
+      await checkPermission();
+
+      if (granted) {
+        Alert.alert('권한 허용됨', '백그라운드 위치 권한이 허용되었습니다.');
+      } else {
+        Alert.alert(
+          '권한 거부됨',
+          '백그라운드 위치 권한이 거부되었습니다. 설정에서 "항상 허용"을 선택해주세요.'
+        );
+      }
+    } catch (error) {
+      console.error('Error requesting background permission:', error);
+      Alert.alert('오류', '백그라운드 권한 요청에 실패했습니다.');
+    } finally {
+      setRequestingBackground(false);
     }
   };
 
@@ -187,6 +284,28 @@ export const LocationPermissionScreen: React.FC = () => {
                 {requesting ? '권한 요청 중...' : '위치 권한 요청'}
               </Text>
             </TouchableOpacity>
+          )}
+
+          {permissionStatus === 'granted' && permissionState.background !== 'granted' && (
+            <TouchableOpacity
+              style={styles.actionButton}
+              onPress={requestBackgroundPermission}
+              disabled={requestingBackground}
+            >
+              <Ionicons name="navigate" size={20} color={colors.textInverse} />
+              <Text style={styles.actionButtonText}>
+                {requestingBackground ? '권한 요청 중...' : '백그라운드 권한 요청'}
+              </Text>
+            </TouchableOpacity>
+          )}
+
+          {permissionState.background === 'granted' && (
+            <View style={styles.permissionGrantedBadge}>
+              <Ionicons name="checkmark-circle" size={20} color={colors.success} />
+              <Text style={[styles.badgeText, { color: colors.success }]}>
+                백그라운드 위치 허용됨
+              </Text>
+            </View>
           )}
 
           <TouchableOpacity
@@ -319,6 +438,19 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     color: colors.textSecondary,
     lineHeight: TYPOGRAPHY.lineHeight.relaxed * TYPOGRAPHY.fontSize.sm,
     marginLeft: SPACING.md,
+  },
+  permissionGrantedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.md,
+    marginHorizontal: SPACING.lg,
+    marginBottom: SPACING.md,
+  },
+  badgeText: {
+    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    marginLeft: SPACING.sm,
   },
 });
 

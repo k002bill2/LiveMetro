@@ -12,12 +12,18 @@ import * as Location from 'expo-location';
 jest.mock('expo-location', () => ({
   requestForegroundPermissionsAsync: jest.fn(),
   requestBackgroundPermissionsAsync: jest.fn(),
+  getForegroundPermissionsAsync: jest.fn(),
+  getBackgroundPermissionsAsync: jest.fn(),
   getCurrentPositionAsync: jest.fn(),
   watchPositionAsync: jest.fn(),
   reverseGeocodeAsync: jest.fn(),
   hasServicesEnabledAsync: jest.fn(),
   Accuracy: {
+    Lowest: 1,
+    Low: 2,
     Balanced: 3,
+    High: 4,
+    Highest: 5,
     BestForNavigation: 6,
   },
 }));
@@ -375,15 +381,16 @@ describe('LocationService', () => {
 
   describe('initialize', () => {
     it('should initialize with permissions granted', async () => {
-      mockLocation.requestForegroundPermissionsAsync.mockResolvedValue({
+      // Mock getForegroundPermissionsAsync to return granted (already have permission)
+      mockLocation.getForegroundPermissionsAsync.mockResolvedValue({
         status: 'granted',
         granted: true,
         canAskAgain: true,
         expires: 'never',
       } as Location.PermissionResponse);
-      mockLocation.requestBackgroundPermissionsAsync.mockResolvedValue({
-        status: 'granted',
-        granted: true,
+      mockLocation.getBackgroundPermissionsAsync.mockResolvedValue({
+        status: 'undetermined',
+        granted: false,
         canAskAgain: true,
         expires: 'never',
       } as Location.PermissionResponse);
@@ -394,7 +401,34 @@ describe('LocationService', () => {
       expect(locationService.hasLocationPermission()).toBe(true);
     });
 
+    it('should request permission if not already granted', async () => {
+      // Mock getForegroundPermissionsAsync to return undetermined (need to request)
+      mockLocation.getForegroundPermissionsAsync.mockResolvedValue({
+        status: 'undetermined',
+        granted: false,
+        canAskAgain: true,
+        expires: 'never',
+      } as Location.PermissionResponse);
+      mockLocation.requestForegroundPermissionsAsync.mockResolvedValue({
+        status: 'granted',
+        granted: true,
+        canAskAgain: true,
+        expires: 'never',
+      } as Location.PermissionResponse);
+
+      const result = await locationService.initialize();
+
+      expect(result).toBe(true);
+      expect(mockLocation.requestForegroundPermissionsAsync).toHaveBeenCalled();
+    });
+
     it('should return false when foreground permission is denied', async () => {
+      mockLocation.getForegroundPermissionsAsync.mockResolvedValue({
+        status: 'undetermined',
+        granted: false,
+        canAskAgain: true,
+        expires: 'never',
+      } as Location.PermissionResponse);
       mockLocation.requestForegroundPermissionsAsync.mockResolvedValue({
         status: 'denied',
         granted: false,
@@ -410,15 +444,15 @@ describe('LocationService', () => {
 
   describe('getCurrentLocation', () => {
     beforeEach(async () => {
-      mockLocation.requestForegroundPermissionsAsync.mockResolvedValue({
+      mockLocation.getForegroundPermissionsAsync.mockResolvedValue({
         status: 'granted',
         granted: true,
         canAskAgain: true,
         expires: 'never',
       } as Location.PermissionResponse);
-      mockLocation.requestBackgroundPermissionsAsync.mockResolvedValue({
-        status: 'granted',
-        granted: true,
+      mockLocation.getBackgroundPermissionsAsync.mockResolvedValue({
+        status: 'undetermined',
+        granted: false,
         canAskAgain: true,
         expires: 'never',
       } as Location.PermissionResponse);
@@ -458,15 +492,15 @@ describe('LocationService', () => {
 
   describe('location tracking', () => {
     beforeEach(async () => {
-      mockLocation.requestForegroundPermissionsAsync.mockResolvedValue({
+      mockLocation.getForegroundPermissionsAsync.mockResolvedValue({
         status: 'granted',
         granted: true,
         canAskAgain: true,
         expires: 'never',
       } as Location.PermissionResponse);
-      mockLocation.requestBackgroundPermissionsAsync.mockResolvedValue({
-        status: 'granted',
-        granted: true,
+      mockLocation.getBackgroundPermissionsAsync.mockResolvedValue({
+        status: 'undetermined',
+        granted: false,
         canAskAgain: true,
         expires: 'never',
       } as Location.PermissionResponse);
@@ -502,15 +536,15 @@ describe('LocationService', () => {
 
   describe('reverse geocoding', () => {
     beforeEach(async () => {
-      mockLocation.requestForegroundPermissionsAsync.mockResolvedValue({
+      mockLocation.getForegroundPermissionsAsync.mockResolvedValue({
         status: 'granted',
         granted: true,
         canAskAgain: true,
         expires: 'never',
       } as Location.PermissionResponse);
-      mockLocation.requestBackgroundPermissionsAsync.mockResolvedValue({
-        status: 'granted',
-        granted: true,
+      mockLocation.getBackgroundPermissionsAsync.mockResolvedValue({
+        status: 'undetermined',
+        granted: false,
         canAskAgain: true,
         expires: 'never',
       } as Location.PermissionResponse);

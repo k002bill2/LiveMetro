@@ -6,7 +6,11 @@
 
 import seoulStationsData from '../../data/seoulStations.json';
 import stationsJsonData from '../../data/stations.json';
+import stationCoordinates from '../../data/stationCoordinates.json';
 import { Station } from '../../models/train';
+
+// Type for station coordinates data
+type CoordinateData = Record<string, { latitude: number; longitude: number }>;
 
 // Type for Seoul Metro station data structure
 interface SeoulStationData {
@@ -42,18 +46,26 @@ const convertLineNumToLineId = (lineNum: string): string => {
 };
 
 /**
+ * Default Seoul City Hall coordinates (fallback)
+ */
+const DEFAULT_COORDINATES = {
+  latitude: 37.5665,
+  longitude: 126.9780,
+};
+
+/**
  * Convert Seoul Metro station data to Station model
  */
 const convertSeoulStationToModel = (data: SeoulStationData): Station => {
+  // Look up coordinates from stationCoordinates.json, fallback to default
+  const coords = (stationCoordinates as CoordinateData)[data.station_cd] ?? DEFAULT_COORDINATES;
+
   return {
     id: data.station_cd,
     name: data.station_nm,
     nameEn: data.station_nm_eng,
     lineId: convertLineNumToLineId(data.line_num),
-    coordinates: {
-      latitude: 37.5665, // Default Seoul coordinates
-      longitude: 126.9780,
-    },
+    coordinates: coords,
     transfers: [],
     stationCode: data.fr_code,
   };
@@ -139,16 +151,16 @@ const initializeCache = (): void => {
       return;
     }
 
+    // Try to get coordinates from stationCoordinates.json using ID
+    const coords = (stationCoordinates as CoordinateData)[stationData.id] ?? DEFAULT_COORDINATES;
+
     // Convert stations.json data to Station model
     const station: Station = {
       id: stationData.id,
       name: stationData.name,
       nameEn: stationData.name, // No English name, use Korean
       lineId: stationData.lines?.[0] || '',
-      coordinates: {
-        latitude: 37.5665, // Default Seoul coordinates
-        longitude: 126.9780,
-      },
+      coordinates: coords,
       transfers: [],
     };
 

@@ -26,42 +26,119 @@ export interface GeofenceRegion {
   notifyOnExit: boolean;
 }
 
+/**
+ * Location tracking mode configuration
+ */
+export type LocationTrackingMode = 'normal' | 'batteryEfficient' | 'highAccuracy';
+
+export interface LocationTrackingConfig {
+  mode: LocationTrackingMode;
+  accuracy: Location.Accuracy;
+  distanceInterval: number;
+  timeInterval: number;
+}
+
+const TRACKING_CONFIGS: Record<LocationTrackingMode, Omit<LocationTrackingConfig, 'mode'>> = {
+  normal: {
+    accuracy: Location.Accuracy.Balanced,
+    distanceInterval: 50, // 50m - 도시 환경에서 적절
+    timeInterval: 10000,  // 10초
+  },
+  batteryEfficient: {
+    accuracy: Location.Accuracy.Low,
+    distanceInterval: 500, // 500m - 배터리 효율 최적화
+    timeInterval: 60000,   // 1분
+  },
+  highAccuracy: {
+    accuracy: Location.Accuracy.High,
+    distanceInterval: 10,  // 10m - 정밀 추적
+    timeInterval: 5000,    // 5초
+  },
+};
+
 class LocationService {
   private currentLocation: LocationCoordinates | null = null;
   private locationSubscription: Location.LocationSubscription | null = null;
   private backgroundLocationSubscription: Location.LocationSubscription | null = null;
   private hasPermission: boolean = false;
+  private hasBackgroundPermission: boolean = false;
   private isTracking: boolean = false;
+  private currentTrackingMode: LocationTrackingMode = 'normal';
   private geofences: Map<string, GeofenceRegion> = new Map();
-  private readonly MIN_DISTANCE_CHANGE = 10; // meters
-  private readonly MIN_TIME_INTERVAL = 5000; // 5 seconds
 
   /**
-   * Initialize location service and request permissions
+   * Initialize location service and request foreground permissions only
+   * Background permission should be requested separately with proper UI explanation
    */
   async initialize(): Promise<boolean> {
     try {
+      // Check current permission status first
+      const { status: currentStatus } = await Location.getForegroundPermissionsAsync();
+
+      if (currentStatus === 'granted') {
+        this.hasPermission = true;
+
+        // Check background permission status
+        const { status: bgStatus } = await Location.getBackgroundPermissionsAsync();
+        this.hasBackgroundPermission = bgStatus === 'granted';
+
+        return true;
+      }
+
       // Request foreground location permission
       const { status: foregroundStatus } = await Location.requestForegroundPermissionsAsync();
-      
+
       if (foregroundStatus !== 'granted') {
         console.warn('Foreground location permission not granted');
         return false;
       }
 
-      // Request background location permission for better user experience
-      const { status: backgroundStatus } = await Location.requestBackgroundPermissionsAsync();
-      if (backgroundStatus !== 'granted') {
-        console.warn('Background location permission not granted, but continuing with foreground only');
-      }
-
       this.hasPermission = true;
-      console.log('Location service initialized successfully');
+      console.log('Location service initialized successfully (foreground only)');
       return true;
     } catch (error) {
       console.error('Failed to initialize location service:', error);
       return false;
     }
+  }
+
+  /**
+   * Request background location permission with proper status check
+   * Should be called after showing explanation UI to the user
+   */
+  async requestBackgroundPermission(): Promise<boolean> {
+    try {
+      if (!this.hasPermission) {
+        const initialized = await this.initialize();
+        if (!initialized) return false;
+      }
+
+      const { status: currentStatus } = await Location.getBackgroundPermissionsAsync();
+
+      if (currentStatus === 'granted') {
+        this.hasBackgroundPermission = true;
+        return true;
+      }
+
+      const { status } = await Location.requestBackgroundPermissionsAsync();
+      this.hasBackgroundPermission = status === 'granted';
+
+      if (!this.hasBackgroundPermission) {
+        console.warn('Background location permission not granted');
+      }
+
+      return this.hasBackgroundPermission;
+    } catch (error) {
+      console.error('Failed to request background permission:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Check if background permission is granted
+   */
+  hasBackgroundLocationPermission(): boolean {
+    return this.hasBackgroundPermission;
   }
 
   /**
@@ -100,6 +177,7 @@ class LocationService {
       accuracy?: Location.Accuracy;
       distanceInterval?: number;
       timeInterval?: number;
+      mode?: LocationTrackingMode;
     }
   ): Promise<boolean> {
     try {
@@ -112,11 +190,17 @@ class LocationService {
         return true;
       }
 
+      // Use mode-based config if provided, otherwise use individual options
+      const mode = options?.mode || 'normal';
+      const modeConfig = TRACKING_CONFIGS[mode];
+
+      this.currentTrackingMode = mode;
+
       this.locationSubscription = await Location.watchPositionAsync(
         {
-          accuracy: options?.accuracy || Location.Accuracy.Balanced,
-          distanceInterval: options?.distanceInterval || this.MIN_DISTANCE_CHANGE,
-          timeInterval: options?.timeInterval || this.MIN_TIME_INTERVAL,
+          accuracy: options?.accuracy ?? modeConfig.accuracy,
+          distanceInterval: options?.distanceInterval ?? modeConfig.distanceInterval,
+          timeInterval: options?.timeInterval ?? modeConfig.timeInterval,
         },
         (location) => {
           const coordinates: LocationCoordinates = {
@@ -131,12 +215,46 @@ class LocationService {
       );
 
       this.isTracking = true;
-      console.log('Location tracking started');
+      console.log(`Location tracking started (mode: ${mode})`);
       return true;
     } catch (error) {
       console.error('Error starting location tracking:', error);
       return false;
     }
+  }
+
+  /**
+   * Start battery-efficient location tracking
+   * Uses lower accuracy and longer intervals to conserve battery
+   */
+  async startBatteryEfficientTracking(
+    callback: (location: LocationCoordinates) => void
+  ): Promise<boolean> {
+    return this.startLocationTracking(callback, { mode: 'batteryEfficient' });
+  }
+
+  /**
+   * Start high-accuracy location tracking
+   * Uses highest accuracy for precise location (e.g., station arrival detection)
+   */
+  async startHighAccuracyTracking(
+    callback: (location: LocationCoordinates) => void
+  ): Promise<boolean> {
+    return this.startLocationTracking(callback, { mode: 'highAccuracy' });
+  }
+
+  /**
+   * Get current tracking mode
+   */
+  getCurrentTrackingMode(): LocationTrackingMode {
+    return this.currentTrackingMode;
+  }
+
+  /**
+   * Get tracking configuration for a specific mode
+   */
+  getTrackingConfig(mode: LocationTrackingMode): LocationTrackingConfig {
+    return { mode, ...TRACKING_CONFIGS[mode] };
   }
 
   /**
