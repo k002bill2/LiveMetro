@@ -1,18 +1,18 @@
 ---
 name: parallel-agents-protocol
-description: Parallel Agents Safety Protocol with ACE Framework for AOS Dashboard multi-agent execution
+description: Parallel Agents Safety Protocol with ACE Framework for LiveMetro multi-agent execution
 ---
 
-# Parallel Agents Safety Protocol v3.1.0
-## ACE Framework Integration - AOS Dashboard Project
+# Parallel Agents Safety Protocol v3.2.0
+## ACE Framework Integration - LiveMetro Project
 
 ## Document Information
-- **Version**: 3.1.0
-- **Last Updated**: 2025-01-26
-- **Status**: Active - ACE Framework Integrated for AOS Dashboard
-- **Scope**: Multi-agent parallel execution for AOS React Web + Python Backend
+- **Version**: 3.2.0
+- **Last Updated**: 2026-02-01
+- **Status**: Active - ACE Framework Integrated for LiveMetro
+- **Scope**: Multi-agent parallel execution for LiveMetro React Native + Firebase
 - **Framework**: Based on Autonomous Cognitive Entity (ACE) Framework
-- **Project**: AOS Dashboard - Agent Orchestration Service
+- **Project**: LiveMetro - Seoul Metro Real-time Arrival App
 
 ---
 
@@ -66,68 +66,74 @@ description: Parallel Agents Safety Protocol with ACE Framework for AOS Dashboar
 
 ---
 
-## 2. Core Principles - AOS Dashboard
+## 2. Core Principles - LiveMetro
 
 ### 2.1 Aspirational Layer: Ethical Principles
 
 #### 2.1.1 Core Mission (Heuristic Imperatives)
 
 **1. Reduce Suffering**
-- 세션 데이터 무결성 보장 (PostgreSQL/Redis)
-- API Rate Limit 존중 (Firebase, LLM Provider)
+- 앱 안정성 보장 (크래시 최소화)
+- Seoul Open Data API Rate Limit 존중 (30초 최소 폴링)
+- Firebase 비용 최적화 (불필요한 읽기/쓰기 방지)
 - 사용자 승인 없는 위험 작업 방지 (HITL)
 
 **2. Increase Prosperity**
 - 병렬 처리로 개발 효율 극대화
-- LangGraph 오케스트레이션으로 자동화
 - 테스트 커버리지 75%+ 유지
+- 접근성 레이블 필수 (모든 사용자 지원)
+- 오프라인 캐싱으로 사용자 경험 개선
 
 **3. Increase Understanding**
-- 타입 안전성 (TypeScript strict, Python type hints)
+- TypeScript strict mode (any 타입 금지)
 - 명확한 문서화 (CLAUDE.md, Dev Docs)
 - 투명한 에러 메시지
+- @경로 별칭 사용 (가독성)
 
 #### 2.1.2 Universal Ethical Constraints
 
-| Constraint | Description | AOS Context |
-|------------|-------------|-------------|
-| **Data Integrity** | 세션/태스크 데이터 손실 방지 | DB 트랜잭션 필수 |
-| **Transparency** | 에러/충돌 숨기지 않음 | 로깅 철저히 |
-| **Harm Prevention** | 시스템 손상 작업 금지 | HITL 승인 시스템 |
-| **Respect Boundaries** | 권한 범위 초과 금지 | 에이전트별 권한 분리 |
+| Constraint | Description | LiveMetro Context |
+|------------|-------------|-------------------|
+| **Data Integrity** | 사용자 데이터 손실 방지 | AsyncStorage, Firebase 백업 |
+| **Transparency** | 에러/충돌 숨기지 않음 | 에러 바운더리 필수 |
+| **Harm Prevention** | 시스템 손상 작업 금지 | 30초 API 폴링 준수 |
+| **Respect Boundaries** | 권한 범위 초과 금지 | 에이전트별 워크스페이스 격리 |
+| **Privacy** | 사용자 위치 정보 보호 | 위치 권한 최소 요청 |
 
 ---
 
-## 3. Agent Roles - AOS Dashboard
+## 3. Agent Roles - LiveMetro
 
 ### 3.1 Primary Agent (Lead Orchestrator)
 
+**Model**: Opus
+
 **Core Responsibilities:**
 - 태스크 분해 및 서브에이전트 할당
-- LangGraph 그래프 조정
+- 복잡도 평가 (Effort Scaling)
 - 충돌 해결 및 통합
 - 사용자 커뮤니케이션
 
 **Exclusive Permissions:**
-- 공유 파일 수정 (orchestrator/, models/)
+- 공유 파일 수정 (src/models/, src/types/)
 - 충돌하는 변경사항 병합
 - HITL 승인 최종 결정
 - 최종 결과물 프레젠테이션
 
 ### 3.2 Secondary Agents (Specialists)
 
-| Agent | Domain | Workspace | Tools |
-|-------|--------|-----------|-------|
-| `web-ui-specialist` | React Web UI | `src/dashboard/` | Edit, Read, Write |
-| `backend-integration-specialist` | FastAPI/LangGraph | `src/backend/` | Edit, Read, Bash |
-| `test-automation-specialist` | Vitest/Pytest | `tests/` | Edit, Read, Bash |
-| `performance-optimizer` | 성능 최적화 | All | Read, Grep, Bash |
-| `code-simplifier` | 리팩토링 | All | Read, Grep, Edit |
+| Agent | Model | Domain | Workspace | Tools |
+|-------|-------|--------|-----------|-------|
+| `mobile-ui-specialist` | sonnet | React Native UI | `.temp/agent_workspaces/mobile-ui/` | Edit, Read, Write |
+| `backend-integration-specialist` | sonnet | Firebase, Seoul API | `.temp/agent_workspaces/backend-integration/` | Edit, Read, Bash |
+| `test-automation-specialist` | haiku | Jest, RTL | `.temp/agent_workspaces/test-automation/` | Edit, Read, Bash |
+| `performance-optimizer` | haiku | 메모리, 렌더링 | `.temp/agent_workspaces/performance-optimizer/` | Read, Grep, Bash |
+| `quality-validator` | haiku | 최종 검증 | `.temp/agent_workspaces/quality-validator/` | Read, Grep, Bash |
 
 **Restrictions:**
 - 다른 에이전트가 락한 파일 수정 불가
 - 전략적 결정 불가 (Layer 2 제한)
-- 범위 변경 시 승인 필요
+- 범위 변경 시 Primary 승인 필요
 
 ---
 
@@ -136,28 +142,33 @@ description: Parallel Agents Safety Protocol with ACE Framework for AOS Dashboar
 ### 4.1 Working Directory Isolation
 
 ```
-/Users/younghwankang/Work/Agent-System/
+/Users/younghwankang/Work/LiveMetro/
 ├── src/
-│   ├── backend/          # Secondary Agent B (Backend Specialist)
-│   │   ├── api/          # FastAPI 라우터
-│   │   ├── orchestrator/ # LangGraph (Primary 조정)
-│   │   ├── services/     # 서비스 레이어
-│   │   └── models/       # 데이터 모델
-│   └── dashboard/        # Secondary Agent A (UI Specialist)
-│       └── src/
-│           ├── components/
-│           ├── pages/
-│           ├── stores/   # Zustand
-│           └── hooks/
-├── tests/
-│   ├── backend/          # Secondary Agent C (Test Specialist)
-│   └── dashboard/
+│   ├── components/      # mobile-ui-specialist
+│   │   ├── train/       # 열차 관련 컴포넌트
+│   │   ├── station/     # 역 관련 컴포넌트
+│   │   └── common/      # 공통 컴포넌트
+│   ├── screens/         # mobile-ui-specialist
+│   ├── services/        # backend-integration-specialist
+│   │   ├── firebase/    # Firebase 서비스
+│   │   ├── api/         # Seoul API 연동
+│   │   └── cache/       # 캐시 서비스
+│   ├── hooks/           # backend-integration-specialist
+│   ├── models/          # Primary (공유)
+│   ├── types/           # Primary (공유)
+│   └── navigation/      # mobile-ui-specialist
+├── __tests__/           # test-automation-specialist
 ├── .temp/
-│   ├── agent_a/          # UI 에이전트 작업 공간
-│   ├── agent_b/          # Backend 에이전트 작업 공간
-│   └── integration/      # Primary 통합 공간
+│   ├── agent_workspaces/
+│   │   ├── mobile-ui/
+│   │   ├── backend-integration/
+│   │   ├── test-automation/
+│   │   ├── performance-optimizer/
+│   │   └── quality-validator/
+│   ├── memory/          # 체크포인트, 컨텍스트
+│   └── coordination/    # 파일 락
 └── dev/
-    └── active/           # Dev Docs 작업 디렉토리
+    └── active/          # Dev Docs 작업 디렉토리
 ```
 
 ### 4.2 Tool Access Matrix
@@ -176,13 +187,15 @@ description: Parallel Agents Safety Protocol with ACE Framework for AOS Dashboar
 ```json
 {
   "operation": "file_lock_request",
-  "agent": "web-ui-specialist",
-  "file": "src/dashboard/src/stores/orchestration.ts",
+  "agent": "mobile-ui-specialist",
+  "file": "src/components/train/StationCard.tsx",
   "operation_type": "write",
   "estimated_duration": "30s",
-  "timestamp": "2025-01-26T14:30:00Z"
+  "timestamp": "2026-02-01T14:30:00Z"
 }
 ```
+
+**Lock Directory**: `.temp/coordination/locks/`
 
 **Lock States:**
 - `Available`: 리소스 사용 가능
@@ -194,31 +207,36 @@ description: Parallel Agents Safety Protocol with ACE Framework for AOS Dashboar
 
 ## 5. Skill Auto-Invocation Protocol
 
-### 5.1 AOS Dashboard Skill Mapping
+### 5.1 LiveMetro Skill Mapping
 
 | File Operation | Required Skill | Timing |
 |----------------|---------------|--------|
-| React Web UI | `react-web-development` | 컴포넌트 생성 전 |
-| Zustand Store | `react-web-development` | 스토어 수정 전 |
-| FastAPI Endpoint | `backend-development` | API 추가 전 |
-| LangGraph Node | `langgraph-patterns` | 노드 생성 전 |
-| Vitest Test | `test-automation` | 테스트 작성 전 |
-| Pytest Test | `test-automation` | 테스트 작성 전 |
+| React Native Component | `react-native-development` | 컴포넌트 생성 전 |
+| Navigation Screen | `react-native-development` | 스크린 추가 전 |
+| Firebase Service | `firebase-integration` | 서비스 수정 전 |
+| Seoul API Call | `api-integration` | API 연동 전 |
+| Location Feature | `location-services` | 위치 기능 추가 전 |
+| Push Notification | `notification-system` | 알림 구현 전 |
+| Subway Data Parse | `subway-data-processor` | 데이터 처리 전 |
+| Jest Test | `test-automation` | 테스트 작성 전 |
 
 ### 5.2 Skill Selection Logic
 
-```python
-def select_skill(task_type: str) -> str:
-    skill_map = {
-        'ui_component': 'react-web-development',
-        'page': 'react-web-development',
-        'store': 'react-web-development',
-        'api_endpoint': 'backend-development',
-        'langgraph_node': 'langgraph-patterns',
-        'test': 'test-automation',
-        'performance': 'performance-optimization',
-    }
-    return skill_map.get(task_type, 'general')
+```typescript
+function selectSkill(taskType: string): string {
+  const skillMap: Record<string, string> = {
+    'ui_component': 'react-native-development',
+    'screen': 'react-native-development',
+    'navigation': 'react-native-development',
+    'firebase': 'firebase-integration',
+    'api': 'api-integration',
+    'location': 'location-services',
+    'notification': 'notification-system',
+    'subway_data': 'subway-data-processor',
+    'test': 'test-automation'
+  };
+  return skillMap[taskType] ?? 'general';
+}
 ```
 
 ---
@@ -231,9 +249,9 @@ def select_skill(task_type: str) -> str:
 Primary (Lead Orchestrator)
   ↓ [Fan-Out: 독립 서브태스크 분배]
 ┌─────────────────────────────────────┐
-│ web-ui-specialist (UI 작업)          │
+│ mobile-ui-specialist (UI 작업)       │
 │ backend-integration-specialist (API) │
-│ test-automation-specialist (테스트)  │
+│ test-automation-specialist (테스트)   │
 └─────────────────────────────────────┘
   ↓ [Fan-In: 결과 수집 및 통합]
 Primary (통합 및 검증)
@@ -243,34 +261,70 @@ Primary (통합 및 검증)
 
 ### 6.2 Example: 새 기능 구현
 
-**User Request:** "Claude Sessions 페이지에 필터 기능 추가"
+**User Request:** "즐겨찾기 역 기능 추가"
 
 **Layer 4 (Executive Function) - Task Decomposition:**
 
 ```json
 {
-  "primary_task": "Claude Sessions 필터 기능 구현",
+  "primary_task": "즐겨찾기 역 기능 구현",
+  "complexity": "moderate",
   "subtasks": [
     {
       "agent": "backend-integration-specialist",
-      "task": "API에 status/sort_by 쿼리 파라미터 추가",
-      "skill": "backend-development",
-      "output": "src/backend/api/claude_sessions.py"
+      "task": "Firebase favorites 서비스 구현",
+      "skill": "firebase-integration",
+      "output": "src/services/favorites/favoritesService.ts",
+      "dependencies": []
     },
     {
-      "agent": "web-ui-specialist",
-      "task": "SessionList에 필터 UI 컴포넌트 추가",
-      "skill": "react-web-development",
-      "output": "src/dashboard/src/components/claude-sessions/SessionFilter.tsx"
+      "agent": "mobile-ui-specialist",
+      "task": "StationCard에 즐겨찾기 버튼 추가",
+      "skill": "react-native-development",
+      "output": "src/components/station/StationCard.tsx",
+      "dependencies": ["favorites_service"]
+    },
+    {
+      "agent": "mobile-ui-specialist",
+      "task": "FavoritesScreen 생성",
+      "skill": "react-native-development",
+      "output": "src/screens/FavoritesScreen.tsx",
+      "dependencies": ["favorites_service"]
     },
     {
       "agent": "test-automation-specialist",
-      "task": "필터 기능 테스트 작성",
+      "task": "즐겨찾기 기능 테스트",
       "skill": "test-automation",
-      "output": "tests/dashboard/SessionFilter.test.tsx"
+      "output": "__tests__/services/favorites.test.ts",
+      "dependencies": ["favorites_service", "station_card", "favorites_screen"]
     }
   ]
 }
+```
+
+### 6.3 Execution Timeline
+
+```
+T0:00  Primary: backend-integration-specialist 호출
+       └─ Firebase favoritesService.ts 구현
+
+T0:15  backend: 완료, 타입 내보내기
+       └─ .temp/agent_workspaces/backend-integration/proposals/
+
+T0:16  Primary: mobile-ui-specialist (2개 태스크 병렬)
+       ├─ StationCard 즐겨찾기 버튼
+       └─ FavoritesScreen
+
+T0:26  mobile-ui: 두 태스크 완료
+
+T0:27  Primary: test-automation-specialist 호출
+       └─ 전체 기능 테스트
+
+T0:37  test: 완료
+
+순차 실행: ~60분
+병렬 실행: ~37분
+속도 향상: 1.6x
 ```
 
 ---
@@ -283,22 +337,23 @@ Primary (통합 및 검증)
 |------------|---------|----------|
 | LOW | Read, Grep, Glob | 자동 |
 | MEDIUM | Write, Edit (assigned workspace) | 자동 |
-| HIGH | Bash (system), Delete, DB 수정 | 승인 필요 |
+| HIGH | Bash (system), Delete, Firebase 규칙 수정 | 승인 필요 |
 | CRITICAL | Deploy, 프로덕션 변경 | 반드시 승인 |
 
 ### 7.2 Approval Flow
 
-```python
-if tool_risk_level == "HIGH":
-    approval_request = {
-        "approval_id": str(uuid4()),
-        "agent": current_agent,
-        "action": tool_name,
-        "parameters": tool_params,
-        "justification": "이유 설명",
-        "timestamp": datetime.now()
-    }
-    await wait_for_approval(approval_request)
+```typescript
+if (toolRiskLevel === "HIGH") {
+  const approvalRequest = {
+    approval_id: crypto.randomUUID(),
+    agent: currentAgent,
+    action: toolName,
+    parameters: toolParams,
+    justification: "이유 설명",
+    timestamp: new Date().toISOString()
+  };
+  await waitForApproval(approvalRequest);
+}
 ```
 
 ---
@@ -311,22 +366,24 @@ if tool_risk_level == "HIGH":
 {
   "checkpoints": [
     {
-      "id": "cp_001",
+      "id": "cp_phase_session_2026-02-01T14-30-00",
       "timestamp": "T0:00",
       "state": "Initial state",
       "files_snapshot": [],
       "validation": "passed"
     },
     {
-      "id": "cp_002",
-      "timestamp": "T5:00",
-      "state": "Backend API complete",
-      "files_snapshot": ["src/backend/api/claude_sessions.py"],
-      "validation": "pytest passed"
+      "id": "cp_phase_backend_2026-02-01T14-45-00",
+      "timestamp": "T15:00",
+      "state": "Backend service complete",
+      "files_snapshot": ["src/services/favorites/favoritesService.ts"],
+      "validation": "type-check passed"
     }
   ]
 }
 ```
+
+**Checkpoint Location**: `.temp/memory/checkpoints/`
 
 ### 8.2 Rollback Procedure
 
@@ -343,21 +400,56 @@ if tool_risk_level == "HIGH":
 
 - [ ] 태스크 분해 검토 완료
 - [ ] 파일 충돌 없음 확인
-- [ ] 모든 에이전트 자기 평가 완료
+- [ ] 모든 에이전트 자기 평가 완료 (>0.70)
 - [ ] 롤백 체크포인트 정의됨
 - [ ] 윤리적 검토 통과
 
 ### 9.2 Post-Execution Validation
 
 - [ ] 모든 서브태스크 완료
-- [ ] 타입 체크 통과 (`npm run type-check`, `mypy`)
-- [ ] 린트 통과 (`npm run lint`, `ruff`)
-- [ ] 테스트 통과 (`npm test`, `pytest`)
-- [ ] 커버리지 목표 달성 (75%+)
+- [ ] TypeScript 타입 체크 통과 (`npm run type-check`)
+- [ ] ESLint 통과 (`npm run lint`, 에러 0개)
+- [ ] Jest 테스트 통과 (`npm test -- --coverage`)
+- [ ] 커버리지 목표 달성:
+  - Statements: 75%+
+  - Functions: 70%+
+  - Branches: 60%+
+- [ ] 접근성 레이블 확인
+- [ ] useEffect cleanup 함수 확인
 
 ---
 
-## 10. Quick Reference
+## 10. Ethical Veto Protocol
+
+### 10.1 Veto Triggers
+
+| Trigger | Severity | Action |
+|---------|----------|--------|
+| API Rate Limit 위반 시도 | CRITICAL | 즉시 중단 |
+| Firebase 키 하드코딩 | CRITICAL | 즉시 중단 |
+| 접근성 레이블 누락 | HIGH | 경고 후 수정 요청 |
+| useEffect cleanup 누락 | HIGH | 경고 후 수정 요청 |
+| any 타입 사용 | MEDIUM | 수정 요청 |
+| 상대 경로 import | LOW | 권고 |
+
+### 10.2 Veto Message Format
+
+```json
+{
+  "type": "ethical_veto",
+  "invoked_by": "mobile-ui-specialist",
+  "target_action": "API 호출 간격 10초 설정",
+  "concern": "Seoul API 30초 최소 폴링 규칙 위반",
+  "principle_violated": "harm_prevention",
+  "severity": "critical",
+  "status": "operation_halted",
+  "suggested_alternative": "폴링 간격을 30초 이상으로 설정"
+}
+```
+
+---
+
+## 11. Quick Reference
 
 ### Agent Decision Matrix
 
@@ -372,20 +464,30 @@ if tool_risk_level == "HIGH":
 
 ```bash
 # Skill invocation
-Skill react-web-development    # UI 작업
-Skill backend-development      # Backend 작업
-Skill test-automation          # 테스트 작성
+Skill react-native-development    # UI 작업
+Skill firebase-integration        # Firebase 작업
+Skill api-integration             # Seoul API 작업
+Skill test-automation             # 테스트 작성
 
 # Task agent invocation (parallel)
 Task
   description: "Implement feature X"
-  subagent_type: "web-ui-specialist"
-  prompt: "Create SessionFilter component with Tailwind CSS"
+  subagent_type: "mobile-ui-specialist"
+  prompt: "Create StationCard component with accessibility"
 
 # Verification
-/verify-app                    # 전체 검증
-/check-health                  # 헬스 체크
+/verify-app                       # 전체 검증
+/check-health                     # 헬스 체크
 ```
+
+### Effort Scaling Quick Reference
+
+| Complexity | Agents | Token Cost | Example |
+|------------|--------|------------|---------|
+| Trivial | 0 | ~1K | 타이포 수정 |
+| Simple | 1 | ~5K | 단일 컴포넌트 |
+| Moderate | 2-3 | ~50K | UI + API + Tests |
+| Complex | 5+ | ~150K | 시스템 전체 변경 |
 
 ---
 
@@ -396,10 +498,11 @@ Task
 | Version | Date | Changes |
 |---------|------|---------|
 | 3.0 | 2025-01-03 | ACE Framework Integration |
-| 3.0.1 | 2025-01-03 | LiveMetro Adaptation |
-| 3.1.0 | 2025-01-26 | **AOS Dashboard Adaptation**: React Web + Python Backend, LangGraph, HITL Integration |
+| 3.0.1 | 2025-01-03 | Initial adaptation |
+| 3.1.0 | 2025-01-26 | Intermediate version |
+| 3.2.0 | 2026-02-01 | **LiveMetro Complete Adaptation**: React Native + Firebase, Seoul API 30초 폴링, 한국어 문서화, 에이전트 역할 정의 |
 
 **Distribution:**
-- AOS Dashboard Development Team
-- Claude Code agents working on AOS
+- LiveMetro Development Team
+- Claude Code agents working on LiveMetro
 - Multi-agent orchestration projects
