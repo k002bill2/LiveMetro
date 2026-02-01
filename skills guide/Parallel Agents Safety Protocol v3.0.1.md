@@ -1652,8 +1652,8 @@ If Low → Document and proceed with monitoring
 - **Trust**: Ethical handling of commuter data, location privacy
 
 ### Key Technologies Integrated:
-- React Native 0.72 + Expo ~49
-- TypeScript 5.1+ (strict mode)
+- React Native 0.72.10 + expo 54.0.32
+- TypeScript ^5.1.3+ (strict mode)
 - Firebase (Auth, Firestore, Functions)
 - Seoul Open Data API (rate-limited polling)
 - AsyncStorage (offline cache with TTL)

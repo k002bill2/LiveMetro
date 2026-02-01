@@ -1,7 +1,7 @@
 # Claude Code 완벽 가이드북 2025
 #claude-code #ai-coding #development #guide #antigravity
 
-> 작성일: 2025-12-28 (최신 업데이트) (최신 업데이트)
+> 작성일: 2026-02-01 (최신 업데이트) (최신 업데이트) (최신 업데이트)
 > 환경: macOS (Antigravity AI IDE), Git, 단독 개발
 > Claude Code 경험: 초보자 ~ 중급자용
 
