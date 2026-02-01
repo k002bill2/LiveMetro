@@ -1,0 +1,88 @@
+# Bug Fix - EXPERT
+# LiveMetro: Deadlock in Multi-threaded Data Pipeline
+
+id: task_bug_expert_001
+name: "멀티스레드 데이터 파이프라인 Deadlock 해결"
+category: bug_fix
+difficulty: expert
+
+input:
+  description: |
+    React Native의 JS-Native bridge에서 발생하는 데드락 버그를 해결합니다.
+    여러 비동기 작업이 서로를 기다리며 무한 대기 상태에 빠지는 문제입니다.
+
+    현재 문제:
+    1. JS→Native→JS 순환 호출에서 데드락 발생
+    2. Promise chain에서 상호 대기 (circular dependency)
+    3. Reanimated worklet과 JS thread 간 lock contention
+    4. 여러 컴포넌트가 동시에 같은 리소스 접근
+    5. 메모리 부족 시 GC와 비동기 작업 충돌
+
+  requirements:
+    - "데드락 탐지 알고리즘 구현 (cycle detection)"
+    - "Lock ordering으로 데드락 방지"
+    - "Promise.race timeout으로 무한 대기 방지"
+    - "Resource acquisition hierarchy 정의"
+    - "Worklet과 JS thread 간 통신 최적화"
+    - "Memory pressure 감지 및 graceful degradation"
+    - "Lock-free data structures 사용"
+    - "Deadlock 재현 테스트 작성"
+
+  context: |
+    React Native bridge는 비동기이지만, 특정 패턴에서 동기적 대기가 발생할 수 있습니다.
+    Reanimated의 worklet은 UI thread에서 실행되어 JS thread와 경쟁 상태가 발생합니다.
+
+    버그 재현 시나리오:
+    1. ComponentA가 NativeModuleX 호출
+    2. NativeModuleX가 완료 전 ComponentB 업데이트 요청
+    3. ComponentB가 NativeModuleX 결과 대기
+    4. NativeModuleX가 ComponentA 업데이트 대기
+    → Circular wait → Deadlock
+
+success_criteria:
+  required:
+    typescript_no_errors: true
+    existing_tests_pass: true
+    deadlock_detection: true
+    lock_ordering: true
+    timeout_mechanism: true
+    lock_free_structures: true
+    stress_test_pass: true
+  optional:
+    memory_pressure_handling: true
+    performance_monitoring: true
+    auto_recovery: true
+
+graders:
+  - type: code
+    weight: 0.4
+    checks:
+      - "has_cycle_detection"
+      - "has_lock_ordering"
+      - "uses_Promise_race_timeout"
+      - "has_resource_hierarchy"
+      - "uses_lock_free_structures"
+      - "has_memory_pressure_handler"
+      - "has_deadlock_test"
+      - "stress_test_passes"
+  - type: llm
+    weight: 0.6
+    rubric: code-quality-concurrency
+    criteria:
+      - "데드락 탐지가 모든 순환을 감지하는가"
+      - "Lock ordering이 일관되게 적용되는가"
+      - "Timeout이 적절하게 설정되었는가"
+      - "Lock-free 구조가 올바르게 구현되었는가"
+      - "스트레스 테스트가 실제 시나리오를 커버하는가"
+      - "수정이 기존 기능에 영향을 주지 않는가"
+
+max_attempts: 3
+timeout_minutes: 35
+tags:
+  - bug-fix
+  - deadlock
+  - concurrency
+  - multi-thread
+  - expert
+expected_agent: performance-optimizer
+pass_threshold: 0.75

@@ -1,0 +1,90 @@
+# Service Implementation - HARD
+# LiveMetro: Offline-First Sync Engine
+
+id: task_svc_hard_001
+name: "오프라인 우선 동기화 엔진"
+category: service
+difficulty: hard
+
+input:
+  description: |
+    오프라인 환경에서도 동작하고, 온라인 복귀 시 자동 동기화하는
+    데이터 동기화 엔진을 구현합니다.
+
+    핵심 요구사항:
+    1. 오프라인 시 로컬 캐시 우선 사용
+    2. 온라인 복귀 시 백그라운드 동기화
+    3. 충돌 해결 전략 (Last-Write-Wins + 사용자 선택)
+    4. 지수 백오프 재시도 로직
+    5. Circuit Breaker 패턴으로 장애 격리
+    6. 네트워크 상태 감지 및 큐잉
+
+  requirements:
+    - "@react-native-community/netinfo로 네트워크 상태 감지"
+    - "AsyncStorage 기반 로컬 캐시"
+    - "Firebase Firestore 오프라인 지속성 활용"
+    - "지수 백오프 (1s, 2s, 4s, 8s, max 30s)"
+    - "Circuit Breaker (5회 실패 시 30초 차단)"
+    - "동기화 큐 관리 (FIFO, 우선순위 지원)"
+    - "충돌 감지 및 해결 콜백"
+    - "TypeScript 제네릭으로 타입 안전성"
+
+  reference_files:
+    - "src/services/SeoulMetroService.ts"
+    - "src/services/firebase/firestoreService.ts"
+
+  context: |
+    NetInfo의 addEventListener로 연결 상태 변화 감지.
+    오프라인 작업은 큐에 저장 후 온라인 복귀 시 순차 처리.
+    Circuit Breaker는 연속 실패 횟수 기반으로 상태 전환.
+
+success_criteria:
+  required:
+    typescript_no_errors: true
+    test_coverage: 85
+    offline_detection: true
+    exponential_backoff: true
+    circuit_breaker: true
+    sync_queue: true
+    conflict_resolution: true
+    no_any_types: true
+  optional:
+    priority_queue: true
+    partial_sync: true
+    compression: true
+
+graders:
+  - type: code
+    weight: 0.4
+    checks:
+      - "file_exists: src/services/sync/SyncEngine.ts"
+      - "file_exists: src/services/sync/CircuitBreaker.ts"
+      - "file_exists: src/services/sync/SyncQueue.ts"
+      - "test_exists: src/services/sync/__tests__/SyncEngine.test.ts"
+      - "imports: @react-native-community/netinfo"
+      - "has_exponential_backoff_logic"
+      - "has_circuit_breaker_states"
+      - "uses_typescript_generics"
+      - "no_any_types"
+  - type: llm
+    weight: 0.6
+    rubric: code-quality-hard
+    criteria:
+      - "오프라인/온라인 전환이 매끄럽게 처리되는가"
+      - "지수 백오프가 올바르게 구현되었는가"
+      - "Circuit Breaker 상태 전환이 정확한가"
+      - "동기화 큐가 FIFO를 보장하는가"
+      - "충돌 해결 전략이 일관성을 유지하는가"
+      - "메모리 누수 없이 리스너가 정리되는가"
+      - "제네릭 타입이 재사용성을 높이는가"
+      - "에러 복구가 견고한가"
+
+max_attempts: 3
+timeout_minutes: 30
+tags:
+  - service
+  - offline
+  - sync
+  - circuit-breaker
+  - hard
+expected_agent: backend-integration-specialist

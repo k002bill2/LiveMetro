@@ -1,7 +1,6 @@
 /**
  * TensorFlow.js Setup Service
- * TensorFlow is disabled due to Expo Managed Workflow compatibility
- * This module provides stub implementations for type safety
+ * Provides TensorFlow.js integration with fallback for environments where it's unavailable
  */
 
 // ============================================================================
@@ -13,6 +12,48 @@ export interface TensorFlowStatus {
   readonly backend: string;
   readonly version: string;
   readonly error?: string;
+  readonly mode: 'tensorflow' | 'fallback';
+}
+
+export interface TensorLike {
+  readonly shape: readonly number[];
+  readonly dtype: string;
+  data(): Promise<Float32Array | Int32Array | Uint8Array>;
+  dispose(): void;
+}
+
+// ============================================================================
+// TensorFlow.js Dynamic Import
+// ============================================================================
+
+let tf: typeof import('@tensorflow/tfjs') | null = null;
+let tfInitialized = false;
+
+/**
+ * Try to load TensorFlow.js dynamically
+ */
+async function loadTensorFlow(): Promise<typeof import('@tensorflow/tfjs') | null> {
+  if (tf) return tf;
+
+  try {
+    // Dynamic import to avoid bundling issues
+    const tfModule = await import('@tensorflow/tfjs');
+
+    // Try to load React Native backend if available
+    try {
+      await import('@tensorflow/tfjs-react-native');
+      await tfModule.ready();
+    } catch {
+      // React Native backend not available, use default
+      await tfModule.ready();
+    }
+
+    tf = tfModule;
+    return tf;
+  } catch (error) {
+    console.log('ℹ️ TensorFlow.js not available, using fallback mode');
+    return null;
+  }
 }
 
 // ============================================================================
@@ -21,22 +62,56 @@ export interface TensorFlowStatus {
 
 /**
  * TensorFlow.js Setup Service
- * Currently disabled - always returns unavailable status
+ * Attempts to initialize TensorFlow.js, falls back to statistics-based predictions
  */
 class TensorFlowSetupService {
   private status: TensorFlowStatus = {
     isReady: false,
     backend: 'none',
-    version: 'unavailable',
-    error: 'TensorFlow disabled for Expo Managed Workflow compatibility',
+    version: 'unknown',
+    mode: 'fallback',
   };
 
   /**
    * Initialize TensorFlow.js
-   * Always returns unavailable status
    */
   async initialize(): Promise<TensorFlowStatus> {
-    console.log('ℹ️ TensorFlow is disabled. Using statistics-based fallback predictions.');
+    if (tfInitialized) {
+      return this.status;
+    }
+
+    try {
+      const tfModule = await loadTensorFlow();
+
+      if (tfModule) {
+        this.status = {
+          isReady: true,
+          backend: tfModule.getBackend() || 'cpu',
+          version: tfModule.version.tfjs || 'unknown',
+          mode: 'tensorflow',
+        };
+        console.log(`✅ TensorFlow.js initialized (backend: ${this.status.backend})`);
+      } else {
+        this.status = {
+          isReady: true,
+          backend: 'statistics',
+          version: 'fallback',
+          mode: 'fallback',
+        };
+        console.log('ℹ️ Using statistics-based fallback predictions');
+      }
+    } catch (error) {
+      this.status = {
+        isReady: true,
+        backend: 'statistics',
+        version: 'fallback',
+        mode: 'fallback',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+      console.log('ℹ️ TensorFlow.js initialization failed, using fallback');
+    }
+
+    tfInitialized = true;
     return this.status;
   }
 
@@ -48,75 +123,153 @@ class TensorFlowSetupService {
   }
 
   /**
-   * Check if TensorFlow is ready
+   * Check if TensorFlow is ready (either mode)
    */
   isReady(): boolean {
-    return false;
+    return this.status.isReady;
   }
 
   /**
-   * Check if TensorFlow is available
+   * Check if TensorFlow.js is available (not fallback)
    */
   isAvailable(): boolean {
-    return false;
+    return this.status.mode === 'tensorflow' && tf !== null;
+  }
+
+  /**
+   * Check if using fallback mode
+   */
+  isFallbackMode(): boolean {
+    return this.status.mode === 'fallback';
   }
 
   /**
    * Get TensorFlow backend name
    */
   getBackend(): string {
-    return 'none';
+    return this.status.backend;
   }
 
   /**
-   * Dispose - no-op when TensorFlow is disabled
+   * Get TensorFlow.js instance (null if fallback mode)
+   */
+  getTf(): typeof import('@tensorflow/tfjs') | null {
+    return tf;
+  }
+
+  /**
+   * Dispose all tensors - cleanup
    */
   dispose(): void {
-    // No-op
+    if (tf) {
+      tf.disposeVariables();
+    }
   }
 
   /**
-   * Get memory info - always returns null when disabled
+   * Get memory info
    */
   getMemoryInfo(): { numTensors: number; numBytes: number } | null {
-    return null;
+    if (!tf) return null;
+    const memory = tf.memory();
+    return {
+      numTensors: memory.numTensors,
+      numBytes: memory.numBytes,
+    };
   }
 
   /**
-   * Cleanup - no-op when TensorFlow is disabled
+   * Cleanup and reset
    */
   async cleanup(): Promise<void> {
-    // No-op
+    if (tf) {
+      tf.disposeVariables();
+    }
   }
 }
 
 // ============================================================================
-// Utility Functions (safe stubs)
+// Utility Functions
 // ============================================================================
 
 /**
- * Create a tensor - always returns null when TensorFlow is disabled
+ * Create a tensor
  */
 export function createTensor(
-  _values: number[] | number[][] | Float32Array,
-  _shape?: number[],
-  _dtype?: 'float32' | 'int32' | 'bool'
-): unknown | null {
-  return null;
+  values: number[] | number[][] | Float32Array,
+  shape?: number[],
+  dtype?: 'float32' | 'int32' | 'bool'
+): TensorLike | null {
+  if (!tf) return null;
+
+  try {
+    if (shape) {
+      return tf.tensor(values as number[], shape, dtype) as unknown as TensorLike;
+    }
+    return tf.tensor(values as number[], undefined, dtype) as unknown as TensorLike;
+  } catch {
+    return null;
+  }
 }
 
 /**
- * Safely dispose a tensor - no-op when TensorFlow is disabled
+ * Create a 2D tensor
  */
-export function disposeTensor(_tensor: unknown | null | undefined): void {
-  // No-op
+export function createTensor2d(
+  values: number[][],
+  shape?: [number, number]
+): TensorLike | null {
+  if (!tf) return null;
+
+  try {
+    return tf.tensor2d(values, shape) as unknown as TensorLike;
+  } catch {
+    return null;
+  }
 }
 
 /**
- * Run operations within a tidy block - always returns null when TensorFlow is disabled
+ * Create a 3D tensor (for sequences)
  */
-export function tidyOperation<T>(_fn: () => T): T | null {
-  return null;
+export function createTensor3d(
+  values: number[][][],
+  shape?: [number, number, number]
+): TensorLike | null {
+  if (!tf) return null;
+
+  try {
+    return tf.tensor3d(values, shape) as unknown as TensorLike;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Safely dispose a tensor
+ */
+export function disposeTensor(tensor: TensorLike | null | undefined): void {
+  if (tensor && typeof tensor.dispose === 'function') {
+    tensor.dispose();
+  }
+}
+
+/**
+ * Run operations within a tidy block (auto-cleanup)
+ */
+export function tidyOperation<T>(fn: () => T): T | null {
+  if (!tf) {
+    try {
+      return fn();
+    } catch {
+      return null;
+    }
+  }
+
+  try {
+    return tf.tidy(fn);
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -145,10 +298,17 @@ export function denormalize(
 }
 
 /**
- * Get TensorFlow instance - always returns null when disabled
+ * Get TensorFlow instance
  */
-export function getTensorFlow(): null {
-  return null;
+export function getTensorFlow(): typeof import('@tensorflow/tfjs') | null {
+  return tf;
+}
+
+/**
+ * Check if TensorFlow is available
+ */
+export function isTensorFlowAvailable(): boolean {
+  return tf !== null;
 }
 
 // ============================================================================

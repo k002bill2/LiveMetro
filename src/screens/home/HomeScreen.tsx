@@ -31,6 +31,7 @@ import { StationCard } from '../../components/train/StationCard';
 import { TrainArrivalList } from '../../components/train/TrainArrivalList';
 import { DelayAlertBanner } from '../../components/delays';
 import { CommutePredictionCard } from '../../components/prediction';
+import { LocationDebugPanel } from '../../components/debug';
 import { useToast } from '../../components/common/Toast';
 import { useDelayDetection } from '../../hooks/useDelayDetection';
 import { useIntegratedAlerts } from '../../hooks/useIntegratedAlerts';
@@ -449,6 +450,9 @@ export const HomeScreen: React.FC = () => {
       )}
       
       <ToastComponent />
+
+      {/* Location Debug Panel - Development only */}
+      {__DEV__ && <LocationDebugPanel />}
     </ScrollView>
   );
 };

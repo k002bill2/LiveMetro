@@ -1,0 +1,94 @@
+# Bug Fix - HARD
+# LiveMetro: Race Condition in Concurrent API Calls
+
+id: task_bug_hard_001
+name: "동시 API 호출 Race Condition 수정"
+category: bug_fix
+difficulty: hard
+
+input:
+  description: |
+    여러 역의 도착 정보를 동시에 요청할 때 발생하는 Race Condition을 수정합니다.
+
+    현재 문제:
+    1. 빠른 역 전환 시 이전 요청 응답이 현재 역 데이터를 덮어씀
+    2. 동시 요청 시 응답 순서가 보장되지 않음
+    3. AbortController 미사용으로 불필요한 네트워크 요청 지속
+    4. 상태 업데이트가 올바른 컨텍스트에서 발생하지 않음
+    5. Promise.all 실패 시 부분 성공 데이터 유실
+
+  requirements:
+    - "AbortController로 이전 요청 취소"
+    - "요청 ID 기반 응답 검증"
+    - "Promise.allSettled로 부분 성공 처리"
+    - "useRef로 최신 요청 추적"
+    - "상태 업데이트 전 유효성 검증"
+    - "동시성 제어 (최대 3개 병렬 요청)"
+    - "기존 테스트 통과 유지"
+
+  reference_files:
+    - "src/hooks/useMultiStationArrivals.ts"
+    - "src/services/SeoulMetroService.ts"
+
+  context: |
+    문제 시나리오:
+    1. 사용자가 A역 선택 → API 요청 시작
+    2. 1초 후 B역으로 전환 → 새 API 요청 시작
+    3. B역 응답 먼저 도착 → 상태 업데이트
+    4. A역 응답 나중에 도착 → B역 데이터를 A역 데이터로 덮어씀 (버그!)
+
+    해결 방향:
+    - 각 요청에 고유 ID 부여
+    - 응답 처리 전 현재 요청 ID와 비교
+    - 불일치 시 응답 무시
+    - AbortController로 이전 요청 취소
+
+success_criteria:
+  required:
+    typescript_no_errors: true
+    existing_tests_pass: true
+    uses_abort_controller: true
+    has_request_id_validation: true
+    uses_promise_allsettled: true
+    concurrent_request_limit: true
+    no_race_condition: true
+    no_any_types: true
+  optional:
+    has_race_condition_tests: true
+    request_deduplication: true
+    request_batching: true
+
+graders:
+  - type: code
+    weight: 0.4
+    checks:
+      - "uses_AbortController"
+      - "has_request_id_ref"
+      - "uses_Promise_allSettled"
+      - "validates_response_id"
+      - "limits_concurrent_requests"
+      - "all_existing_tests_pass"
+      - "has_race_condition_test"
+      - "no_any_types"
+  - type: llm
+    weight: 0.6
+    rubric: code-quality-hard
+    criteria:
+      - "Race condition이 완전히 해결되었는가"
+      - "AbortController가 모든 경로에서 올바르게 사용되는가"
+      - "요청 ID 검증이 모든 상태 업데이트 전에 수행되는가"
+      - "Promise.allSettled 결과가 올바르게 처리되는가"
+      - "동시성 제한이 효과적으로 동작하는가"
+      - "메모리 누수 없이 cleanup이 수행되는가"
+      - "테스트가 race condition 시나리오를 커버하는가"
+      - "코드가 읽기 쉽고 의도가 명확한가"
+
+max_attempts: 3
+timeout_minutes: 25
+tags:
+  - bug-fix
+  - race-condition
+  - concurrency
+  - abort-controller
+  - hard
+expected_agent: performance-optimizer

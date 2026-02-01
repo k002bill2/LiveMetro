@@ -1,9 +1,22 @@
 /**
  * Delay History Service
- * Manages delay history and certificate storage
+ * Manages delay history and certificate storage with Firestore sync
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  collection,
+  doc,
+  setDoc,
+  getDoc,
+  getDocs,
+  query,
+  where,
+  orderBy,
+  limit,
+  Timestamp,
+} from 'firebase/firestore';
+import { firestore as db } from '@/services/firebase/config';
 import {
   DelayCertificate,
   DelayHistoryEntry,
@@ -14,6 +27,12 @@ import {
 const STORAGE_KEYS = {
   DELAY_HISTORY: '@livemetro:delay_history',
   DELAY_CERTIFICATES: '@livemetro:delay_certificates',
+  SYNC_TIMESTAMP: '@livemetro:delay_sync_timestamp',
+};
+
+const FIRESTORE_COLLECTIONS = {
+  CERTIFICATES: 'delayCertificates',
+  HISTORY: 'delayHistory',
 };
 
 const MAX_HISTORY_ENTRIES = 100;
@@ -343,6 +362,189 @@ class DelayHistoryService {
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     `.trim();
+  }
+
+  // ============================================================================
+  // Firestore Sync Methods
+  // ============================================================================
+
+  /**
+   * Sync certificate to Firestore
+   */
+  async syncCertificateToFirestore(certificate: DelayCertificate): Promise<boolean> {
+    try {
+      const docRef = doc(db, FIRESTORE_COLLECTIONS.CERTIFICATES, certificate.id);
+
+      await setDoc(docRef, {
+        certificateNumber: certificate.certificateNumber,
+        userId: certificate.userId,
+        date: Timestamp.fromDate(certificate.date),
+        lineId: certificate.lineId,
+        stationId: certificate.stationId,
+        stationName: certificate.stationName,
+        scheduledTime: certificate.scheduledTime,
+        actualTime: certificate.actualTime,
+        delayMinutes: certificate.delayMinutes,
+        reason: certificate.reason,
+        verified: certificate.verified,
+        createdAt: Timestamp.fromDate(certificate.createdAt),
+        updatedAt: Timestamp.fromDate(new Date()),
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Failed to sync certificate to Firestore:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Fetch certificate from Firestore
+   */
+  async fetchCertificateFromFirestore(certificateId: string): Promise<DelayCertificate | null> {
+    try {
+      const docRef = doc(db, FIRESTORE_COLLECTIONS.CERTIFICATES, certificateId);
+      const docSnap = await getDoc(docRef);
+
+      if (!docSnap.exists()) {
+        return null;
+      }
+
+      const data = docSnap.data();
+      return {
+        id: docSnap.id,
+        certificateNumber: data.certificateNumber,
+        userId: data.userId,
+        date: data.date.toDate(),
+        lineId: data.lineId,
+        stationId: data.stationId,
+        stationName: data.stationName,
+        scheduledTime: data.scheduledTime,
+        actualTime: data.actualTime,
+        delayMinutes: data.delayMinutes,
+        reason: data.reason,
+        verified: data.verified,
+        createdAt: data.createdAt.toDate(),
+        updatedAt: data.updatedAt.toDate(),
+      };
+    } catch (error) {
+      console.error('Failed to fetch certificate from Firestore:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Sync all certificates for a user
+   */
+  async syncUserCertificates(userId: string): Promise<number> {
+    try {
+      const q = query(
+        collection(db, FIRESTORE_COLLECTIONS.CERTIFICATES),
+        where('userId', '==', userId),
+        orderBy('createdAt', 'desc'),
+        limit(50)
+      );
+
+      const snapshot = await getDocs(q);
+      const certificates: DelayCertificate[] = [];
+
+      for (const docSnap of snapshot.docs) {
+        const data = docSnap.data();
+        certificates.push({
+          id: docSnap.id,
+          certificateNumber: data.certificateNumber,
+          userId: data.userId,
+          date: data.date.toDate(),
+          lineId: data.lineId,
+          stationId: data.stationId,
+          stationName: data.stationName,
+          scheduledTime: data.scheduledTime,
+          actualTime: data.actualTime,
+          delayMinutes: data.delayMinutes,
+          reason: data.reason,
+          verified: data.verified,
+          createdAt: data.createdAt.toDate(),
+          updatedAt: data.updatedAt.toDate(),
+        });
+      }
+
+      // Merge with local certificates
+      const localCerts = await this.getCertificates();
+      const mergedCerts = this.mergeCertificates(localCerts, certificates);
+
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.DELAY_CERTIFICATES,
+        JSON.stringify(mergedCerts)
+      );
+
+      await AsyncStorage.setItem(
+        STORAGE_KEYS.SYNC_TIMESTAMP,
+        Date.now().toString()
+      );
+
+      return certificates.length;
+    } catch (error) {
+      console.error('Failed to sync user certificates:', error);
+      return 0;
+    }
+  }
+
+  /**
+   * Verify certificate exists in Firestore
+   */
+  async verifyCertificateExists(certificateNumber: string): Promise<boolean> {
+    try {
+      const q = query(
+        collection(db, FIRESTORE_COLLECTIONS.CERTIFICATES),
+        where('certificateNumber', '==', certificateNumber),
+        limit(1)
+      );
+
+      const snapshot = await getDocs(q);
+      return !snapshot.empty;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Get last sync timestamp
+   */
+  async getLastSyncTimestamp(): Promise<number | null> {
+    try {
+      const timestamp = await AsyncStorage.getItem(STORAGE_KEYS.SYNC_TIMESTAMP);
+      return timestamp ? parseInt(timestamp, 10) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Merge local and remote certificates
+   */
+  private mergeCertificates(
+    local: DelayCertificate[],
+    remote: DelayCertificate[]
+  ): DelayCertificate[] {
+    const merged = new Map<string, DelayCertificate>();
+
+    // Add local certificates
+    for (const cert of local) {
+      merged.set(cert.id, cert);
+    }
+
+    // Merge remote certificates (prefer newer)
+    for (const cert of remote) {
+      const existing = merged.get(cert.id);
+      if (!existing || cert.updatedAt > existing.updatedAt) {
+        merged.set(cert.id, cert);
+      }
+    }
+
+    // Sort by date descending
+    return Array.from(merged.values()).sort(
+      (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+    );
   }
 }
 

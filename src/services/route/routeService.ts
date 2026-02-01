@@ -1,6 +1,6 @@
 /**
  * Route Service
- * Calculates optimal and alternative routes using Dijkstra's algorithm
+ * Calculates optimal and alternative routes using A* algorithm with heuristics
  */
 
 import { STATIONS, LINE_STATIONS, LINE_COLORS } from '@utils/subwayMapData';
@@ -18,6 +18,8 @@ import {
   createAlternativeRoute,
   getLineName,
 } from '@models/route';
+import { PriorityQueue } from '@/utils/priorityQueue';
+import { fareService, type FareResult } from './fareService';
 
 // ============================================================================
 // Types
@@ -40,10 +42,29 @@ interface Graph {
   edges: Map<string, GraphEdge[]>;
 }
 
-interface DijkstraResult {
+interface AStarResult {
   distance: number;
   previous: Map<string, string>;
   path: string[];
+  nodesExplored: number;
+}
+
+/**
+ * Route with additional metadata
+ */
+export interface EnhancedRoute extends Route {
+  readonly fare: FareResult;
+  readonly stationCount: number;
+  readonly estimatedArrivalTime?: string;
+}
+
+/**
+ * Real-time delay info for route calculation
+ */
+export interface DelayInfo {
+  lineId: string;
+  delayMinutes: number;
+  reason?: string;
 }
 
 // ============================================================================
@@ -176,84 +197,165 @@ const buildGraph = (excludeLineIds: readonly string[] = []): Graph => {
 };
 
 // ============================================================================
-// Dijkstra's Algorithm
+// A* Algorithm (Optimized)
 // ============================================================================
 
 /**
- * Find shortest path using Dijkstra's algorithm
+ * Heuristic function for A* algorithm
+ * Estimates minimum time to reach destination
+ */
+const heuristic = (
+  currentKey: string,
+  endKeys: string[],
+  stationPositions: Map<string, number>
+): number => {
+  const currentStationId = currentKey.split('_')[0];
+  if (!currentStationId) return 0;
+
+  const currentPos = stationPositions.get(currentStationId) ?? 0;
+
+  // Find closest end station
+  let minDistance = Infinity;
+  for (const endKey of endKeys) {
+    const endStationId = endKey.split('_')[0];
+    if (!endStationId) continue;
+    const endPos = stationPositions.get(endStationId) ?? 0;
+    const distance = Math.abs(endPos - currentPos);
+    if (distance < minDistance) {
+      minDistance = distance;
+    }
+  }
+
+  // Estimate time based on station distance (approximately 2.5 min per station)
+  return minDistance * AVG_STATION_TRAVEL_TIME * 0.8; // Underestimate for admissibility
+};
+
+/**
+ * Build station position map for heuristic
+ */
+const buildStationPositions = (): Map<string, number> => {
+  const positions = new Map<string, number>();
+  let counter = 0;
+
+  Object.entries(LINE_STATIONS).forEach(([_lineId, stationIds]) => {
+    stationIds.forEach(stationId => {
+      if (!positions.has(stationId)) {
+        positions.set(stationId, counter);
+        counter++;
+      }
+    });
+  });
+
+  return positions;
+};
+
+/**
+ * Find shortest path using A* algorithm with priority queue
+ */
+const astar = (
+  graph: Graph,
+  startKeys: string[],
+  endKeys: string[],
+  lineDelays?: Map<string, number>
+): AStarResult | null => {
+  const gScores = new Map<string, number>();
+  const fScores = new Map<string, number>();
+  const previous = new Map<string, string>();
+  const visited = new Set<string>();
+
+  const queue = new PriorityQueue<string>();
+  const stationPositions = buildStationPositions();
+  let nodesExplored = 0;
+
+  // Initialize
+  graph.nodes.forEach((_, key) => {
+    gScores.set(key, Infinity);
+    fScores.set(key, Infinity);
+  });
+
+  // Add start nodes
+  for (const startKey of startKeys) {
+    if (graph.nodes.has(startKey)) {
+      gScores.set(startKey, 0);
+      const h = heuristic(startKey, endKeys, stationPositions);
+      fScores.set(startKey, h);
+      queue.enqueue(startKey, h);
+    }
+  }
+
+  while (!queue.isEmpty()) {
+    const current = queue.dequeue();
+    if (!current) break;
+
+    nodesExplored++;
+
+    if (visited.has(current)) continue;
+    visited.add(current);
+
+    // Check if reached destination
+    if (endKeys.includes(current)) {
+      const path: string[] = [];
+      let node: string | undefined = current;
+      while (node) {
+        path.unshift(node);
+        node = previous.get(node);
+      }
+
+      return {
+        distance: gScores.get(current) ?? 0,
+        previous,
+        path,
+        nodesExplored,
+      };
+    }
+
+    const currentG = gScores.get(current) ?? Infinity;
+    const edges = graph.edges.get(current) ?? [];
+
+    for (const edge of edges) {
+      if (visited.has(edge.to.key)) continue;
+
+      // Apply delay penalty if line has delays
+      let weight = edge.weight;
+      if (lineDelays && !edge.isTransfer) {
+        const lineId = edge.to.lineId;
+        const delay = lineDelays.get(lineId) ?? 0;
+        weight += delay;
+      }
+
+      const tentativeG = currentG + weight;
+      const existingG = gScores.get(edge.to.key) ?? Infinity;
+
+      if (tentativeG < existingG) {
+        previous.set(edge.to.key, current);
+        gScores.set(edge.to.key, tentativeG);
+        const h = heuristic(edge.to.key, endKeys, stationPositions);
+        const f = tentativeG + h;
+        fScores.set(edge.to.key, f);
+        queue.enqueue(edge.to.key, f);
+      }
+    }
+  }
+
+  return null;
+};
+
+/**
+ * Find shortest path using Dijkstra's algorithm (fallback)
  */
 const dijkstra = (
   graph: Graph,
   startKeys: string[],
   endKeys: string[]
 ): DijkstraResult | null => {
-  const distances = new Map<string, number>();
-  const previous = new Map<string, string>();
-  const visited = new Set<string>();
+  const result = astar(graph, startKeys, endKeys);
+  if (!result) return null;
 
-  // Priority queue (simple array-based for clarity)
-  const queue: { key: string; distance: number }[] = [];
-
-  // Initialize distances
-  graph.nodes.forEach((_, key) => {
-    distances.set(key, Infinity);
-  });
-
-  // Set start nodes distance to 0
-  startKeys.forEach(key => {
-    if (graph.nodes.has(key)) {
-      distances.set(key, 0);
-      queue.push({ key, distance: 0 });
-    }
-  });
-
-  // Process queue
-  while (queue.length > 0) {
-    // Sort by distance and get minimum
-    queue.sort((a, b) => a.distance - b.distance);
-    const current = queue.shift();
-    if (!current) break;
-
-    const { key: currentKey, distance: currentDistance } = current;
-
-    // Skip if already visited
-    if (visited.has(currentKey)) continue;
-    visited.add(currentKey);
-
-    // Check if we reached any end node
-    if (endKeys.includes(currentKey)) {
-      // Reconstruct path
-      const path: string[] = [];
-      let curr: string | undefined = currentKey;
-      while (curr) {
-        path.unshift(curr);
-        curr = previous.get(curr);
-      }
-
-      return {
-        distance: currentDistance,
-        previous,
-        path,
-      };
-    }
-
-    // Process neighbors
-    const neighbors = graph.edges.get(currentKey) || [];
-    for (const edge of neighbors) {
-      if (visited.has(edge.to.key)) continue;
-
-      const newDistance = currentDistance + edge.weight;
-      const existingDistance = distances.get(edge.to.key) ?? Infinity;
-
-      if (newDistance < existingDistance) {
-        distances.set(edge.to.key, newDistance);
-        previous.set(edge.to.key, currentKey);
-        queue.push({ key: edge.to.key, distance: newDistance });
-      }
-    }
-  }
-
-  return null; // No path found
+  return {
+    distance: result.distance,
+    previous: result.previous,
+    path: result.path,
+  };
 };
 
 // ============================================================================
@@ -440,12 +542,169 @@ export const getLineColor = (lineId: string): string => {
 };
 
 // ============================================================================
+// Enhanced Route Calculation
+// ============================================================================
+
+/**
+ * Calculate route with fare and additional metadata
+ */
+export const calculateEnhancedRoute = (
+  fromStationId: string,
+  toStationId: string,
+  excludeLineIds: readonly string[] = [],
+  delays?: DelayInfo[]
+): EnhancedRoute | null => {
+  const graph = buildGraph(excludeLineIds);
+  const startKeys = getStationKeys(fromStationId, excludeLineIds);
+  const endKeys = getStationKeys(toStationId, excludeLineIds);
+
+  if (startKeys.length === 0 || endKeys.length === 0) {
+    return null;
+  }
+
+  // Build delay map
+  const lineDelays = delays
+    ? new Map(delays.map(d => [d.lineId, d.delayMinutes]))
+    : undefined;
+
+  // Find path using A*
+  const result = astar(graph, startKeys, endKeys, lineDelays);
+  if (!result) return null;
+
+  const segments = pathToSegments(result.path);
+  if (segments.length === 0) return null;
+
+  const route = createRoute(segments);
+
+  // Count stations
+  const stationCount = segments.filter(s => !s.isTransfer).length + 1;
+
+  // Calculate fare
+  const fare = fareService.calculateFare(stationCount);
+
+  return {
+    ...route,
+    fare,
+    stationCount,
+  };
+};
+
+/**
+ * Calculate route with real-time delay consideration
+ */
+export const calculateRouteWithDelays = (
+  fromStationId: string,
+  toStationId: string,
+  delays: DelayInfo[]
+): Route | null => {
+  const enhanced = calculateEnhancedRoute(fromStationId, toStationId, [], delays);
+  return enhanced ? {
+    segments: enhanced.segments,
+    totalMinutes: enhanced.totalMinutes,
+    transferCount: enhanced.transferCount,
+    lineIds: enhanced.lineIds,
+  } : null;
+};
+
+/**
+ * Find multiple alternative routes
+ */
+export const findMultipleAlternatives = (
+  fromStationId: string,
+  toStationId: string,
+  affectedLineIds: readonly string[],
+  reason: AlternativeReason,
+  maxAlternatives: number = 3
+): AlternativeRoute[] => {
+  const alternatives: AlternativeRoute[] = [];
+
+  // Original route
+  const originalRoute = calculateRoute(fromStationId, toStationId);
+  if (!originalRoute) return [];
+
+  // Try excluding each affected line individually
+  for (const lineId of affectedLineIds) {
+    const altRoute = calculateRoute(fromStationId, toStationId, [lineId]);
+    if (altRoute) {
+      const timeDiff = altRoute.totalMinutes - originalRoute.totalMinutes;
+      const confidence = Math.max(0, 100 - Math.abs(timeDiff) * 5 - altRoute.transferCount * 10);
+
+      alternatives.push(
+        createAlternativeRoute(originalRoute, altRoute, reason, lineId, confidence)
+      );
+    }
+  }
+
+  // Try excluding all affected lines
+  if (affectedLineIds.length > 1) {
+    const altRoute = calculateRoute(fromStationId, toStationId, affectedLineIds);
+    if (altRoute) {
+      const timeDiff = altRoute.totalMinutes - originalRoute.totalMinutes;
+      const confidence = Math.max(0, 100 - Math.abs(timeDiff) * 5 - altRoute.transferCount * 10);
+
+      alternatives.push(
+        createAlternativeRoute(originalRoute, altRoute, reason, affectedLineIds[0] || '', confidence)
+      );
+    }
+  }
+
+  // Sort by time difference and return top alternatives
+  alternatives.sort((a, b) => a.timeDifference - b.timeDifference);
+  return alternatives.slice(0, maxAlternatives);
+};
+
+/**
+ * Compare routes by different criteria
+ */
+export const compareRoutes = (
+  route1: Route,
+  route2: Route
+): {
+  fasterRoute: 1 | 2 | 'equal';
+  timeDifference: number;
+  transferDifference: number;
+  recommendation: string;
+} => {
+  const timeDiff = route1.totalMinutes - route2.totalMinutes;
+  const transferDiff = route1.transferCount - route2.transferCount;
+
+  let fasterRoute: 1 | 2 | 'equal';
+  if (timeDiff < 0) fasterRoute = 1;
+  else if (timeDiff > 0) fasterRoute = 2;
+  else fasterRoute = 'equal';
+
+  let recommendation: string;
+  if (timeDiff < -5) {
+    recommendation = '경로 1이 훨씬 빠릅니다';
+  } else if (timeDiff > 5) {
+    recommendation = '경로 2가 훨씬 빠릅니다';
+  } else if (transferDiff < 0) {
+    recommendation = '경로 1이 환승이 적습니다';
+  } else if (transferDiff > 0) {
+    recommendation = '경로 2가 환승이 적습니다';
+  } else {
+    recommendation = '두 경로가 비슷합니다';
+  }
+
+  return {
+    fasterRoute,
+    timeDifference: Math.abs(timeDiff),
+    transferDifference: Math.abs(transferDiff),
+    recommendation,
+  };
+};
+
+// ============================================================================
 // Singleton Export
 // ============================================================================
 
 export const routeService = {
   calculateRoute,
+  calculateEnhancedRoute,
+  calculateRouteWithDelays,
   findAlternativeRoutes,
+  findMultipleAlternatives,
+  compareRoutes,
   getRouteSummary,
   routeUsesLine,
   getStationInfo,

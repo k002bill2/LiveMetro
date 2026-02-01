@@ -1,0 +1,87 @@
+# UI Component Creation - HARD
+# LiveMetro: Animated Route Map with Gestures
+
+id: task_ui_hard_001
+name: "실시간 노선도 컴포넌트 (애니메이션 + 제스처)"
+category: ui_component
+difficulty: hard
+
+input:
+  description: |
+    실시간 열차 위치를 표시하는 인터랙티브 노선도 컴포넌트를 생성합니다.
+
+    핵심 요구사항:
+    1. 핀치 줌/팬 제스처로 노선도 확대/축소/이동
+    2. 열차 아이콘이 실시간으로 이동하는 애니메이션
+    3. 역 탭 시 상세 정보 바텀시트 표시
+    4. 호선 선택 시 해당 노선 하이라이트 애니메이션
+    5. 성능 최적화 (60fps 유지)
+
+  requirements:
+    - "react-native-gesture-handler로 핀치/팬 제스처 구현"
+    - "react-native-reanimated로 60fps 애니메이션"
+    - "useSharedValue, useAnimatedStyle 활용"
+    - "worklet 함수로 UI 스레드 최적화"
+    - "메모이제이션으로 불필요한 리렌더 방지"
+    - "바텀시트 컴포넌트 통합"
+    - "접근성 지원 (VoiceOver/TalkBack)"
+    - "TypeScript strict mode 준수"
+
+  reference_files:
+    - "src/components/map/SubwayMap.tsx"
+    - "src/components/common/BottomSheet.tsx"
+
+  context: |
+    Reanimated worklet을 사용하여 JS 스레드 차단 없이 애니메이션 처리.
+    제스처 핸들러는 simultaneousHandlers로 핀치+팬 동시 지원.
+    열차 위치 업데이트는 30초마다 발생하며, 부드러운 이동 애니메이션 필요.
+
+success_criteria:
+  required:
+    typescript_no_errors: true
+    test_coverage: 80
+    uses_reanimated: true
+    uses_gesture_handler: true
+    has_worklet_functions: true
+    animation_60fps: true
+    accessibility_labels: true
+    no_any_types: true
+  optional:
+    uses_shared_value: true
+    has_memoization: true
+    bottom_sheet_integration: true
+
+graders:
+  - type: code
+    weight: 0.4
+    checks:
+      - "file_exists: src/components/map/InteractiveRouteMap.tsx"
+      - "test_exists: src/components/map/__tests__/InteractiveRouteMap.test.tsx"
+      - "imports: react-native-reanimated"
+      - "imports: react-native-gesture-handler"
+      - "has_worklet_directive"
+      - "uses_useSharedValue"
+      - "uses_useAnimatedStyle"
+      - "no_any_types"
+      - "has_accessibility_label"
+  - type: llm
+    weight: 0.6
+    rubric: code-quality-hard
+    criteria:
+      - "제스처 핸들링이 자연스럽고 반응성이 좋은가"
+      - "애니메이션이 부드럽고 60fps를 유지하는가"
+      - "worklet 분리가 적절하여 JS 스레드 블로킹이 없는가"
+      - "메모이제이션이 효과적으로 적용되었는가"
+      - "컴포넌트 구조가 확장 가능하고 유지보수하기 좋은가"
+      - "에러 바운더리와 폴백 UI가 있는가"
+      - "접근성이 완벽하게 구현되었는가"
+
+max_attempts: 3
+timeout_minutes: 25
+tags:
+  - ui
+  - animation
+  - gesture
+  - reanimated
+  - hard
+expected_agent: mobile-ui-specialist
