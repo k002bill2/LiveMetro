@@ -1,0 +1,87 @@
+# UI Component - EXPERT+ (AR Integration)
+# LiveMetro: AR-Enhanced 3D Subway Map
+
+id: task_ui_expert_002
+name: "AR 증강현실 노선도 with 실시간 열차 추적"
+category: ui_component
+difficulty: expert_plus
+
+input:
+  description: |
+    ARKit/ARCore를 활용하여 실제 환경에 지하철 노선도를 오버레이하고,
+    실시간 열차 위치를 AR로 표시하는 컴포넌트를 구현합니다.
+
+    핵심 요구사항:
+    1. expo-camera + ViroReact/react-native-arkit으로 AR 렌더링
+    2. 평면 감지 후 노선도 배치
+    3. 실시간 열차 위치 AR 마커
+    4. 손가락으로 AR 객체 조작 (확대/축소/회전)
+    5. 역 탭 시 AR 정보 팝업
+    6. 디바이스 방향에 따른 노선도 회전
+    7. 저조도 환경 대응
+    8. 60fps 유지 (AR + 3D 렌더링)
+
+  requirements:
+    - "ViroReact 또는 react-native-arkit으로 AR 씬 구성"
+    - "ARPlaneAnchor로 평면 감지 및 노선도 배치"
+    - "ARImageAnchor로 역 표지판 인식 (옵션)"
+    - "실시간 열차 위치를 AR 마커로 표시"
+    - "PinchGesture + RotateGesture로 AR 조작"
+    - "DeviceMotion으로 디바이스 방향 추적"
+    - "AR 세션 상태 관리 (초기화, 추적 중단, 복구)"
+    - "저조도 감지 및 사용자 알림"
+    - "배터리 최적화 (AR 세션 일시정지)"
+
+  context: |
+    AR 세션은 배터리 소모가 크므로 적극적인 최적화 필요.
+    평면 감지 후 노선도 앵커링, 이후 추적 모드로 전환.
+    열차 위치는 30초마다 업데이트, AR 마커는 부드럽게 이동.
+
+success_criteria:
+  required:
+    typescript_no_errors: true
+    test_coverage: 80
+    ar_plane_detection: true
+    ar_object_manipulation: true
+    realtime_train_markers: true
+    device_orientation_tracking: true
+    session_state_management: true
+    fps_60_maintained: true
+  optional:
+    image_anchor_recognition: true
+    low_light_handling: true
+    battery_optimization: true
+
+graders:
+  - type: code
+    weight: 0.4
+    checks:
+      - "imports: ViroReact or react-native-arkit"
+      - "has_ar_plane_detection"
+      - "has_ar_anchor_management"
+      - "has_gesture_handlers_ar"
+      - "has_device_motion_integration"
+      - "has_session_state_machine"
+      - "has_realtime_marker_updates"
+      - "performance_optimized"
+  - type: llm
+    weight: 0.6
+    rubric: code-quality-ar
+    criteria:
+      - "AR 세션이 안정적으로 관리되는가"
+      - "평면 감지 및 앵커링이 정확한가"
+      - "AR 객체 조작이 자연스러운가"
+      - "실시간 마커가 부드럽게 업데이트되는가"
+      - "배터리 최적화가 적절한가"
+      - "에러 복구가 견고한가"
+
+max_attempts: 3
+timeout_minutes: 45
+tags:
+  - ui
+  - ar
+  - 3d
+  - realtime
+  - expert-plus
+expected_agent: mobile-ui-specialist
+pass_threshold: 0.75
