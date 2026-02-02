@@ -55,7 +55,7 @@ export interface DelayAlert {
 // ============================================================================
 
 // Seoul Metro API endpoints (would be actual API in production)
-const API_BASE_URL = 'http://swopenapi.seoul.go.kr/api/subway';
+export const API_BASE_URL = 'http://swopenapi.seoul.go.kr/api/subway';
 const CACHE_DURATION_MS = 60 * 1000; // 1 minute
 
 const LINE_NAMES: Record<string, string> = {

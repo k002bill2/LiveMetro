@@ -3,10 +3,48 @@
  * Generates and shares PDF certificates using expo-print
  */
 
-import * as Print from 'expo-print';
-import * as Sharing from 'expo-sharing';
-import * as FileSystem from 'expo-file-system';
 import { DelayCertificate, DelayReason } from '@/models/delayCertificate';
+
+// 동적 import를 위한 타입 정의
+interface PrintModule {
+  printToFileAsync(options: { html: string }): Promise<{ uri: string }>;
+  printAsync(options: { html: string }): Promise<void>;
+}
+
+interface SharingModule {
+  isAvailableAsync(): Promise<boolean>;
+  shareAsync(url: string, options?: { mimeType?: string; dialogTitle?: string; UTI?: string }): Promise<void>;
+}
+
+interface FileSystemModule {
+  documentDirectory: string | null;
+  moveAsync(options: { from: string; to: string }): Promise<void>;
+}
+
+// Lazy load modules
+let Print: PrintModule | null = null;
+let Sharing: SharingModule | null = null;
+let FileSystem: FileSystemModule | null = null;
+
+async function loadModules(): Promise<boolean> {
+  try {
+    if (!Print) {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      Print = require('expo-print') as PrintModule;
+    }
+    if (!Sharing) {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      Sharing = require('expo-sharing') as SharingModule;
+    }
+    if (!FileSystem) {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      FileSystem = require('expo-file-system') as FileSystemModule;
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 // ============================================================================
 // Types
@@ -56,9 +94,12 @@ const REASON_LABELS_KO: Record<DelayReason, string> = {
   [DelayReason.SIGNAL_FAILURE]: '신호 장애',
   [DelayReason.MECHANICAL_FAILURE]: '차량 고장',
   [DelayReason.PASSENGER_INCIDENT]: '승객 관련 사고',
-  [DelayReason.DOOR_ISSUE]: '출입문 장애',
+  [DelayReason.DOOR_FAILURE]: '출입문 장애',
+  [DelayReason.MEDICAL_EMERGENCY]: '응급 환자 발생',
+  [DelayReason.SECURITY_INCIDENT]: '안전 사고',
   [DelayReason.CONGESTION]: '혼잡',
   [DelayReason.WEATHER]: '기상 악화',
+  [DelayReason.MAINTENANCE]: '시설 점검',
   [DelayReason.OTHER]: '기타',
 };
 
@@ -76,13 +117,21 @@ class PdfService {
   ): Promise<PdfGenerationResult> {
     const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
 
+    const modulesLoaded = await loadModules();
+    if (!modulesLoaded || !Print || !FileSystem) {
+      return {
+        success: false,
+        error: 'PDF 모듈을 로드할 수 없습니다.',
+      };
+    }
+
     try {
       const html = this.generateHtml(certificate, mergedOptions);
       const { uri } = await Print.printToFileAsync({ html });
 
       // Rename file with meaningful name
       const fileName = `delay_certificate_${certificate.certificateNumber}.pdf`;
-      const newPath = `${FileSystem.documentDirectory}${fileName}`;
+      const newPath = `${FileSystem.documentDirectory ?? ''}${fileName}`;
 
       await FileSystem.moveAsync({
         from: uri,
@@ -114,6 +163,11 @@ class PdfService {
       return false;
     }
 
+    const modulesLoaded = await loadModules();
+    if (!modulesLoaded || !Sharing) {
+      return false;
+    }
+
     try {
       const isAvailable = await Sharing.isAvailableAsync();
       if (!isAvailable) {
@@ -142,6 +196,11 @@ class PdfService {
   ): Promise<boolean> {
     const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
 
+    const modulesLoaded = await loadModules();
+    if (!modulesLoaded || !Print) {
+      return false;
+    }
+
     try {
       const html = this.generateHtml(certificate, mergedOptions);
       await Print.printAsync({ html });
@@ -155,6 +214,10 @@ class PdfService {
    * Check if sharing is available
    */
   async isSharingAvailable(): Promise<boolean> {
+    const modulesLoaded = await loadModules();
+    if (!modulesLoaded || !Sharing) {
+      return false;
+    }
     return Sharing.isAvailableAsync();
   }
 

@@ -4,7 +4,8 @@
  */
 
 import { CongestionLevel } from '@/models/congestion';
-import { congestionPredictionService, HourlyCongestionPattern } from './congestionPredictionService';
+import { congestionPredictionService } from './congestionPredictionService';
+import type { HourlyCongestionPattern as _HourlyCongestionPattern } from './congestionPredictionService';
 
 // ============================================================================
 // Types

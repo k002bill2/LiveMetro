@@ -64,9 +64,9 @@ export interface ReporterReliability {
 }
 
 /**
- * Report with context for validation
+ * Report with context for validation - exported for future use
  */
-interface ReportWithContext {
+export interface ReportWithContext {
   report: CongestionReport;
   nearbyReports: CongestionReport[];
   recentReports: CongestionReport[];
@@ -457,7 +457,8 @@ class DataQualityService {
   }
 
   private calculateQualityScore(
-    reports: readonly CongestionReport[],
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _reports: readonly CongestionReport[],
     issues: readonly DataQualityIssue[]
   ): number {
     let score = 100;

@@ -49,6 +49,13 @@ interface AStarResult {
   nodesExplored: number;
 }
 
+// Dijkstra result type (same structure without nodesExplored)
+interface DijkstraResult {
+  distance: number;
+  previous: Map<string, string>;
+  path: string[];
+}
+
 /**
  * Route with additional metadata
  */
