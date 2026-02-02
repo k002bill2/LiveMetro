@@ -77,8 +77,8 @@ export interface DataQualityReport {
 /** Threshold for outlier detection (standard deviations) */
 const OUTLIER_THRESHOLD = 3;
 
-/** Minimum samples for reliable validation */
-const MIN_VALIDATION_SAMPLES = 5;
+/** Minimum samples for reliable validation - exported for configuration */
+export const MIN_VALIDATION_SAMPLES = 5;
 
 /** Threshold for delay classification */
 const DELAY_PROBABILITY_THRESHOLD = 0.5;
@@ -260,7 +260,10 @@ class ValidationService {
         missingArrivalTime++;
       }
 
-      dayDistribution[log.dayOfWeek]++;
+      const dayKey = log.dayOfWeek as number;
+      if (Object.prototype.hasOwnProperty.call(dayDistribution, dayKey)) {
+        dayDistribution[dayKey] = (dayDistribution[dayKey] ?? 0) + 1;
+      }
       departureTimes.push(parseTimeToMinutes(log.departureTime));
       validLogs++;
     }

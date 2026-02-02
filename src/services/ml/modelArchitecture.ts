@@ -264,7 +264,6 @@ export function lstmCellForward(
     outputGate: { weights: readonly number[][]; biases: readonly number[] };
   }
 ): { hiddenState: number[]; cellState: number[] } {
-  const inputSize = input.length;
   const hiddenSize = hiddenState.length;
   const combinedInput = [...input, ...hiddenState];
 

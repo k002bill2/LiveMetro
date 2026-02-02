@@ -10,11 +10,10 @@ import {
   MIN_LOGS_FOR_ML_TRAINING,
 } from '@/models/ml';
 import { CommuteLog } from '@/models/pattern';
-import { tensorFlowSetup, getTensorFlow, isTensorFlowAvailable } from './tensorflowSetup';
+import { tensorFlowSetup, getTensorFlow } from './tensorflowSetup';
 import { featureExtractor } from './featureExtractor';
 import {
   DEFAULT_MODEL_CONFIG,
-  flattenFeatureVector,
   createSequence,
 } from './modelArchitecture';
 
@@ -123,14 +122,15 @@ class TrainingService {
       const labelTensor = tf.tensor2d(trainingData.labels);
 
       // Train the model
-      const model = this.model as ReturnType<typeof tf.sequential>;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const model = this.model as any;
       const history = await model.fit(inputTensor, labelTensor, {
         epochs: options.epochs,
         batchSize: options.batchSize,
         validationSplit: options.validationSplit,
         shuffle: true,
         callbacks: {
-          onEpochEnd: (epoch, epochLogs) => {
+          onEpochEnd: (epoch: number, epochLogs: { loss?: number; acc?: number }) => {
             this.updateState({
               isTraining: true,
               progress: (epoch + 1) / options.epochs,
@@ -193,7 +193,8 @@ class TrainingService {
   /**
    * Create TensorFlow.js model
    */
-  private createModel(tf: typeof import('@tensorflow/tfjs')): unknown {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private createModel(tf: any): unknown {
     const config = DEFAULT_MODEL_CONFIG;
 
     const model = tf.sequential();

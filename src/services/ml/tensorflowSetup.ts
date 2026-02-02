@@ -22,26 +22,41 @@ export interface TensorLike {
   dispose(): void;
 }
 
+// TensorFlow.js 타입 정의 (모듈이 없을 때를 위한 인터페이스)
+interface TensorFlowModule {
+  ready(): Promise<void>;
+  getBackend(): string | null;
+  version: { tfjs?: string };
+  memory(): { numTensors: number; numBytes: number };
+  disposeVariables(): void;
+  tensor(values: number[], shape?: number[], dtype?: string): TensorLike;
+  tensor2d(values: number[][], shape?: [number, number]): TensorLike;
+  tensor3d(values: number[][][], shape?: [number, number, number]): TensorLike;
+  tidy<T>(fn: () => T): T;
+}
+
 // ============================================================================
 // TensorFlow.js Dynamic Import
 // ============================================================================
 
-let tf: typeof import('@tensorflow/tfjs') | null = null;
+let tf: TensorFlowModule | null = null;
 let tfInitialized = false;
 
 /**
  * Try to load TensorFlow.js dynamically
  */
-async function loadTensorFlow(): Promise<typeof import('@tensorflow/tfjs') | null> {
+async function loadTensorFlow(): Promise<TensorFlowModule | null> {
   if (tf) return tf;
 
   try {
     // Dynamic import to avoid bundling issues
-    const tfModule = await import('@tensorflow/tfjs');
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const tfModule = require('@tensorflow/tfjs') as TensorFlowModule;
 
     // Try to load React Native backend if available
     try {
-      await import('@tensorflow/tfjs-react-native');
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      require('@tensorflow/tfjs-react-native');
       await tfModule.ready();
     } catch {
       // React Native backend not available, use default
@@ -50,7 +65,7 @@ async function loadTensorFlow(): Promise<typeof import('@tensorflow/tfjs') | nul
 
     tf = tfModule;
     return tf;
-  } catch (error) {
+  } catch {
     console.log('ℹ️ TensorFlow.js not available, using fallback mode');
     return null;
   }
@@ -153,7 +168,7 @@ class TensorFlowSetupService {
   /**
    * Get TensorFlow.js instance (null if fallback mode)
    */
-  getTf(): typeof import('@tensorflow/tfjs') | null {
+  getTf(): TensorFlowModule | null {
     return tf;
   }
 
@@ -300,7 +315,7 @@ export function denormalize(
 /**
  * Get TensorFlow instance
  */
-export function getTensorFlow(): typeof import('@tensorflow/tfjs') | null {
+export function getTensorFlow(): TensorFlowModule | null {
   return tf;
 }
 
