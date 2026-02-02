@@ -106,7 +106,8 @@ class NotificationOptimizerService {
   async getOptimalNotificationTime(
     userId: string,
     scheduledDeparture: string,
-    dayOfWeek: DayOfWeek
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _dayOfWeek: DayOfWeek
   ): Promise<NotificationTiming> {
     const prefs = this.preferences.get(userId);
 
