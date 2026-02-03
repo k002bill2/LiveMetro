@@ -4,4 +4,3 @@
  */
 
 export * from './mapCacheService';
-export { default as mapCacheService } from './mapCacheService';

@@ -7,22 +7,24 @@ import {
   MIN_VALIDATION_SAMPLES,
 } from '../validationService';
 import { CommuteLog, DayOfWeek } from '@/models/pattern';
-import { MLPrediction } from '@/models/ml';
+import { MLPrediction, TrainingResult } from '@/models/ml';
 
 describe('ValidationService', () => {
   const createMockLog = (overrides: Partial<CommuteLog> = {}): CommuteLog => ({
     id: `log_${Math.random()}`,
     userId: 'user1',
-    date: new Date(),
+    date: '2024-01-15',
     dayOfWeek: 1 as DayOfWeek,
     departureTime: '08:30',
     arrivalTime: '09:00',
     departureStationId: 'station1',
+    departureStationName: '강남역',
     arrivalStationId: 'station2',
+    arrivalStationName: '서울역',
     lineIds: ['line1'],
-    transferCount: 0,
-    duration: 30,
     wasDelayed: false,
+    isManual: false,
+    createdAt: new Date(),
     ...overrides,
   });
 
@@ -31,9 +33,8 @@ describe('ValidationService', () => {
     predictedArrivalTime: '09:00',
     confidence: 0.85,
     delayProbability: 0.1,
-    factors: [],
     modelVersion: '1.0',
-    generatedAt: new Date(),
+    predictedAt: new Date(),
     ...overrides,
   });
 
@@ -179,7 +180,7 @@ describe('ValidationService', () => {
         })
       );
 
-      const predictor = (trainData: readonly CommuteLog[], testLog: CommuteLog) =>
+      const predictor = (_trainData: readonly CommuteLog[], testLog: CommuteLog) =>
         createMockPrediction({
           predictedDepartureTime: testLog.departureTime,
         });
@@ -251,14 +252,12 @@ describe('ValidationService', () => {
 
   describe('validateTrainingResult', () => {
     it('should accept good training result', () => {
-      const result = {
+      const result: TrainingResult = {
         success: true,
-        modelVersion: '1.0',
         epochsCompleted: 10,
         finalLoss: 0.1,
         validationAccuracy: 0.85,
-        trainingTime: 5000,
-        samplesUsed: 100,
+        durationMs: 5000,
       };
 
       const validation = validationService.validateTrainingResult(result);
@@ -268,14 +267,12 @@ describe('ValidationService', () => {
     });
 
     it('should reject failed training', () => {
-      const result = {
+      const result: TrainingResult = {
         success: false,
-        modelVersion: '1.0',
         epochsCompleted: 0,
         finalLoss: 1,
         validationAccuracy: 0,
-        trainingTime: 100,
-        samplesUsed: 10,
+        durationMs: 100,
         error: 'Training failed',
       };
 
@@ -286,14 +283,12 @@ describe('ValidationService', () => {
     });
 
     it('should flag high loss', () => {
-      const result = {
+      const result: TrainingResult = {
         success: true,
-        modelVersion: '1.0',
         epochsCompleted: 10,
         finalLoss: 0.8, // High loss
         validationAccuracy: 0.7,
-        trainingTime: 5000,
-        samplesUsed: 100,
+        durationMs: 5000,
       };
 
       const validation = validationService.validateTrainingResult(result);
@@ -302,14 +297,12 @@ describe('ValidationService', () => {
     });
 
     it('should flag low accuracy', () => {
-      const result = {
+      const result: TrainingResult = {
         success: true,
-        modelVersion: '1.0',
         epochsCompleted: 10,
         finalLoss: 0.2,
         validationAccuracy: 0.4, // Low accuracy
-        trainingTime: 5000,
-        samplesUsed: 100,
+        durationMs: 5000,
       };
 
       const validation = validationService.validateTrainingResult(result);

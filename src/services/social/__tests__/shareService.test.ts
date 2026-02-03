@@ -3,7 +3,6 @@
  */
 
 import { shareService } from '../shareService';
-import { Platform } from 'react-native';
 
 // Mock react-native Share
 jest.mock('react-native', () => ({

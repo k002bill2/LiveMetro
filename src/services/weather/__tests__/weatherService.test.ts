@@ -2,7 +2,8 @@
  * Weather Service Tests
  */
 
-import { weatherService, WeatherCondition, WeatherData } from '../weatherService';
+import { weatherService, WeatherData } from '../weatherService';
+import type { WeatherCondition } from '@/models/ml';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Mock AsyncStorage
@@ -49,7 +50,7 @@ describe('WeatherService', () => {
       const condition = await weatherService.getWeatherCondition();
 
       expect(typeof condition).toBe('string');
-      const validConditions: WeatherCondition[] = ['clear', 'cloudy', 'rain', 'snow', 'storm', 'fog', 'other'];
+      const validConditions: WeatherCondition[] = ['clear', 'rain', 'snow', 'fog', 'other'];
       expect(validConditions).toContain(condition);
     });
   });
@@ -97,8 +98,8 @@ describe('WeatherService', () => {
 
   describe('type exports', () => {
     it('should export WeatherCondition type', () => {
-      const conditions: WeatherCondition[] = ['clear', 'cloudy', 'rain', 'snow', 'storm', 'fog', 'other'];
-      expect(conditions.length).toBe(7);
+      const conditions: WeatherCondition[] = ['clear', 'rain', 'snow', 'fog', 'other'];
+      expect(conditions.length).toBe(5);
     });
 
     it('should export WeatherData interface', () => {

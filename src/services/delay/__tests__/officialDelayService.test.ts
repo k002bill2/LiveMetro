@@ -5,7 +5,6 @@
 import {
   officialDelayService,
   API_BASE_URL,
-  DelayStatus,
 } from '../officialDelayService';
 
 describe('OfficialDelayService', () => {

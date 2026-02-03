@@ -2,7 +2,7 @@
  * TTS Service Tests
  */
 
-import { ttsService, TTSSettings, VoiceOption } from '../ttsService';
+import { ttsService, TTSSettings } from '../ttsService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Mock AsyncStorage

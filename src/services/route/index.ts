@@ -5,7 +5,6 @@
 
 // Main route service
 export * from './routeService';
-export { routeService } from './routeService';
 
 // Fare calculation
 export {

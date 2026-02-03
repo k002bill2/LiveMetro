@@ -21,12 +21,14 @@ describe('StatisticsService', () => {
     departureTime: '08:30',
     arrivalTime: '09:00',
     departureStationId: 'station1',
+    departureStationName: '강남역',
     arrivalStationId: 'station2',
+    arrivalStationName: '서울역',
     lineIds: ['2'],
-    transferCount: 0,
-    duration: 30,
     wasDelayed: false,
     delayMinutes: 0,
+    isManual: false,
+    createdAt: new Date(),
     ...overrides,
   });
 

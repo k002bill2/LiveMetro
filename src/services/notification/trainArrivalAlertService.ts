@@ -135,16 +135,21 @@ class TrainArrivalAlertService {
    * Stop all monitoring sessions for a user
    */
   stopAllMonitoring(userId: string): number {
-    let stoppedCount = 0;
+    // Collect alert IDs first to avoid modifying Map during iteration
+    const alertIdsToStop: string[] = [];
 
     for (const [alertId, session] of this.activeSessions) {
       if (session.config.userId === userId) {
-        this.stopMonitoring(alertId);
-        stoppedCount++;
+        alertIdsToStop.push(alertId);
       }
     }
 
-    return stoppedCount;
+    // Then stop each session
+    for (const alertId of alertIdsToStop) {
+      this.stopMonitoring(alertId);
+    }
+
+    return alertIdsToStop.length;
   }
 
   /**

@@ -2,7 +2,7 @@
  * User Trust Service Tests
  */
 
-import { userTrustService, TrustLevel, TRUST_THRESHOLDS } from '../userTrustService';
+import { userTrustService, TRUST_THRESHOLDS } from '../userTrustService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // Mock AsyncStorage

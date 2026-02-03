@@ -14,10 +14,12 @@ describe('DataQualityService', () => {
     trainId: 'train123',
     lineId: '2',
     stationId: 'station1',
+    direction: 'up',
     carNumber: 3,
     congestionLevel: CongestionLevel.MODERATE,
     reporterId: 'user1',
     timestamp: new Date(),
+    expiresAt: new Date(Date.now() + 10 * 60 * 1000),
     ...overrides,
   });
 
