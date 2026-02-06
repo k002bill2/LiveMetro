@@ -137,6 +137,8 @@ export const useLocation = (options: UseLocationOptions = {}) => {
       const { status: currentStatus } = await Location.getForegroundPermissionsAsync();
 
       if (currentStatus === 'granted') {
+        // locationService 내부 상태도 동기화 (hasPermission 플래그 설정)
+        await locationService.initialize();
         const hasBackgroundPermission = locationService.hasBackgroundLocationPermission();
         updateState({
           hasPermission: true,

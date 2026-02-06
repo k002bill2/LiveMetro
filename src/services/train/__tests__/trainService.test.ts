@@ -8,6 +8,16 @@ import { Train, Station, SubwayLine, TrainDelay, TrainStatus, DelaySeverity } fr
 
 import { seoulSubwayApi } from '../../api/seoulSubwayApi';
 import { getLocalStation, getLocalStationsByLine, searchLocalStations } from '../../data/stationsDataService';
+import { locationService } from '../../location/locationService';
+
+// Mock locationService
+jest.mock('../../location/locationService', () => ({
+  locationService: {
+    findNearbyStations: jest.fn(),
+  },
+}));
+
+const mockFindNearbyStations = locationService.findNearbyStations as jest.MockedFunction<typeof locationService.findNearbyStations>;
 
 // Mock Firebase
 jest.mock('../../firebase/config', () => ({
@@ -408,7 +418,7 @@ describe('TrainService', () => {
   });
 
   describe('getNearbyStations', () => {
-    it('should return nearby stations within radius', async () => {
+    it('should delegate to locationService.findNearbyStations with meters', async () => {
       mockGetDocs.mockResolvedValue({
         docs: mockStations.map(station => ({
           id: station.id,
@@ -422,8 +432,17 @@ describe('TrainService', () => {
         })),
       });
 
+      mockFindNearbyStations.mockReturnValue([
+        { ...mockStations[0], distance: 500, bearing: 90 },
+      ]);
+
       const result = await trainService.getNearbyStations(37.5665, 126.978, 2);
 
+      expect(mockFindNearbyStations).toHaveBeenCalledWith(
+        { latitude: 37.5665, longitude: 126.978 },
+        expect.any(Array),
+        2000 // 2km → 2000m conversion
+      );
       expect(Array.isArray(result)).toBe(true);
       expect(result.length).toBeLessThanOrEqual(10);
     });

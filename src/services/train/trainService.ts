@@ -28,6 +28,7 @@ import {
 } from '../../models/train';
 import { seoulSubwayApi, SeoulTimetableRow } from '../api/seoulSubwayApi';
 import { getLocalStation, getLocalStationsByLine, searchLocalStations } from '../data/stationsDataService';
+import { locationService } from '../location/locationService';
 
 class TrainService {
   private unsubscribeCallbacks: Map<string, Unsubscribe> = new Map();
@@ -269,6 +270,7 @@ class TrainService {
 
   /**
    * Get nearby stations based on user location
+   * Delegates to locationService for distance calculation (meters unit)
    */
   async getNearbyStations(
     latitude: number,
@@ -276,8 +278,6 @@ class TrainService {
     radiusKm: number = 2
   ): Promise<Station[]> {
     try {
-      // Simple distance calculation (not precise for production)
-      // In production, use Geohash or Firebase Geofirestore for spatial queries
       const stationsSnapshot = await getDocs(collection(firestore, 'stations'));
 
       const allStations: Station[] = stationsSnapshot.docs.map(doc => ({
@@ -285,49 +285,18 @@ class TrainService {
         ...doc.data()
       } as Station));
 
-      const nearbyStations = allStations.filter(station => {
-        const distance = this.calculateDistance(
-          latitude,
-          longitude,
-          station.coordinates.latitude,
-          station.coordinates.longitude
-        );
-        return distance <= radiusKm;
-      });
+      const radiusMeters = radiusKm * 1000;
+      const nearbyStations = locationService.findNearbyStations(
+        { latitude, longitude },
+        allStations,
+        radiusMeters
+      );
 
-      // Sort by distance
-      nearbyStations.sort((a, b) => {
-        const distA = this.calculateDistance(latitude, longitude, a.coordinates.latitude, a.coordinates.longitude);
-        const distB = this.calculateDistance(latitude, longitude, b.coordinates.latitude, b.coordinates.longitude);
-        return distA - distB;
-      });
-
-      return nearbyStations.slice(0, 10); // Return closest 10 stations
+      return nearbyStations.slice(0, 10);
     } catch (error) {
       console.error('Firebase error fetching nearby stations:', error);
-      return []; // 에러 시 빈 배열 반환
+      return [];
     }
-  }
-
-  /**
-   * Calculate distance between two coordinates (Haversine formula)
-   */
-  private calculateDistance(lat1: number, lon1: number, lat2: number, lon2: number): number {
-    const R = 6371; // Earth's radius in kilometers
-    const dLat = this.toRadians(lat2 - lat1);
-    const dLon = this.toRadians(lon2 - lon1);
-    
-    const a = 
-      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-      Math.cos(this.toRadians(lat1)) * Math.cos(this.toRadians(lat2)) *
-      Math.sin(dLon / 2) * Math.sin(dLon / 2);
-    
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-    return R * c;
-  }
-
-  private toRadians(degrees: number): number {
-    return degrees * (Math.PI / 180);
   }
 
   /**

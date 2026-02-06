@@ -3,5 +3,11 @@
  * Centralized exports for user-related services
  */
 
-export * from './userTrustService';
-export { default as userTrustService } from './userTrustService';
+export { userTrustService } from './userTrustService';
+export type {
+  UserTrustProfile,
+  TrustLevel,
+  TrustBadge,
+  ReportVerificationResult,
+  TrustScoreChange,
+} from './userTrustService';

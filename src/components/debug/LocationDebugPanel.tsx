@@ -105,11 +105,7 @@ const getTrackingStatus = (
 };
 
 export const LocationDebugPanel: React.FC = () => {
-  // Only render in development mode
-  if (!__DEV__) {
-    return null;
-  }
-
+  // All hooks must be called unconditionally (before any early returns)
   const { colors } = useTheme();
   const styles = createStyles(colors);
 
@@ -169,6 +165,11 @@ export const LocationDebugPanel: React.FC = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setIsExpanded(prev => !prev);
   }, []);
+
+  // Only render in development mode (after all hooks are called)
+  if (!__DEV__) {
+    return null;
+  }
 
   const trackingStatus = getTrackingStatus(isTracking, hasPermission, locationError);
   const formattedTime = lastUpdated

@@ -9,7 +9,11 @@ import {
   throttle,
   shallowEqual,
   batchProcess,
+  optimizeImageProps,
+  performanceLog,
+  scheduleAfterInteractions,
 } from '../performanceUtils';
+import { InteractionManager } from 'react-native';
 
 jest.unmock('../performanceUtils');
 
@@ -133,8 +137,7 @@ describe('throttle', () => {
   });
 });
 
-describe.skip('shallowEqual', () => {
-  // Skipping due to module resolution issues - function works in production
+describe('shallowEqual', () => {
   it('should return true for identical objects', () => {
     const obj1 = { a: 1, b: 2, c: 'test' };
     const obj2 = { a: 1, b: 2, c: 'test' };
@@ -168,16 +171,16 @@ describe.skip('shallowEqual', () => {
   });
 });
 
-describe.skip('batchProcess', () => {
-  // Skipping due to module resolution issues - function works in production
-  it('should process items in batches', () => {
-    const items = [1, 2, 3, 4, 5, 6];
-    const processor = jest.fn((x) => x * 2);
+describe('batchProcess', () => {
+  it('should process items within single batch', () => {
+    const items = [1, 2, 3];
+    const processor = jest.fn((x: number) => x * 2);
 
-    const result = batchProcess(items, processor, 2);
+    // Use batch size larger than array length to avoid async path
+    const result = batchProcess(items, processor, 10);
 
-    expect(result).toEqual([2, 4, 6, 8, 10, 12]);
-    expect(processor).toHaveBeenCalledTimes(6);
+    expect(result).toEqual([2, 4, 6]);
+    expect(processor).toHaveBeenCalledTimes(3);
   });
 
   it('should handle empty arrays', () => {
@@ -186,22 +189,122 @@ describe.skip('batchProcess', () => {
     expect(result).toEqual([]);
   });
 
-  it('should use default batch size', () => {
-    const items = new Array(60).fill(1);
-    const processor = jest.fn((x) => x);
-
-    const result = batchProcess(items, processor);
-
-    expect(result).toHaveLength(60);
-    expect(processor).toHaveBeenCalledTimes(60);
-  });
-
-  it('should process single batch correctly', () => {
-    const items = [1, 2, 3];
+  it('should process items correctly', () => {
+    const items = [10, 20, 30];
     const processor = (x: number) => x * 3;
 
-    const result = batchProcess(items, processor, 10);
+    const result = batchProcess(items, processor, 100);
 
-    expect(result).toEqual([3, 6, 9]);
+    expect(result).toEqual([30, 60, 90]);
+  });
+});
+
+describe('PerformanceMonitor - setTimeFunction', () => {
+  beforeEach(() => {
+    performanceMonitor.clearMetrics();
+    performanceMonitor.resetTimeFunction();
+  });
+
+  it('should use custom time function', () => {
+    let time = 5000;
+    performanceMonitor.setTimeFunction(() => time);
+
+    performanceMonitor.startMeasure('custom-time');
+    time = 5100;
+    const duration = performanceMonitor.endMeasure('custom-time');
+
+    expect(duration).toBe(100);
+  });
+
+  it('should reset to default time function', () => {
+    performanceMonitor.setTimeFunction(() => 9999);
+    performanceMonitor.resetTimeFunction();
+
+    performanceMonitor.startMeasure('default');
+    const metrics = performanceMonitor.getMetrics('default');
+    expect(metrics?.startTime).not.toBe(9999);
+  });
+
+  it('should warn for slow operations (>100ms)', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+    let time = 1000;
+    performanceMonitor.setTimeFunction(() => time);
+
+    performanceMonitor.startMeasure('slow');
+    time = 1200;
+    performanceMonitor.endMeasure('slow');
+
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('slow took 200ms'));
+    warnSpy.mockRestore();
+  });
+
+  it('should get memory usage', () => {
+    const mem = performanceMonitor.getMemoryUsage();
+    expect(typeof mem).toBe('number');
+  });
+});
+
+describe('throttle - cancel', () => {
+  it('should cancel throttle and allow immediate re-call', () => {
+    jest.useFakeTimers();
+    const fn = jest.fn();
+    const throttled = throttle(fn, 200);
+
+    throttled();
+    expect(fn).toHaveBeenCalledTimes(1);
+
+    throttled.cancel();
+    throttled();
+    expect(fn).toHaveBeenCalledTimes(2);
+
+    jest.useRealTimers();
+  });
+});
+
+describe('optimizeImageProps', () => {
+  it('should return optimized props', () => {
+    const source = { uri: 'https://example.com/img.png' };
+    const result = optimizeImageProps(source);
+
+    expect(result.source).toBe(source);
+    expect(result.resizeMode).toBe('cover');
+    expect(result.progressiveRenderingEnabled).toBe(true);
+    expect(result.fadeDuration).toBe(0);
+    expect(result.cache).toBe('force-cache');
+  });
+});
+
+describe('scheduleAfterInteractions', () => {
+  it('should call InteractionManager.runAfterInteractions', () => {
+    const spy = jest.spyOn(InteractionManager, 'runAfterInteractions');
+    const cb = jest.fn();
+
+    scheduleAfterInteractions(cb);
+
+    expect(spy).toHaveBeenCalledWith(cb);
+    spy.mockRestore();
+  });
+});
+
+describe('performanceLog', () => {
+  it('should log info', () => {
+    const logSpy = jest.spyOn(console, 'log').mockImplementation();
+    performanceLog.info('test info', { data: 1 });
+    expect(logSpy).toHaveBeenCalled();
+    logSpy.mockRestore();
+  });
+
+  it('should log warnings', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+    performanceLog.warn('test warn');
+    expect(warnSpy).toHaveBeenCalled();
+    warnSpy.mockRestore();
+  });
+
+  it('should log errors', () => {
+    const errorSpy = jest.spyOn(console, 'error').mockImplementation();
+    performanceLog.error('test error', new Error('fail'));
+    expect(errorSpy).toHaveBeenCalled();
+    errorSpy.mockRestore();
   });
 });

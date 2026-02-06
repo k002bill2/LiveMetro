@@ -364,7 +364,7 @@ class LocationService {
     currentLocation: LocationCoordinates,
     allStations: Station[]
   ): NearbyStation | null {
-    const nearbyStations = this.findNearbyStations(currentLocation, allStations, 5000); // 5km radius
+    const nearbyStations = this.findNearbyStations(currentLocation, allStations, 2000); // 2km radius
     return nearbyStations.at(0) ?? null;
   }
 

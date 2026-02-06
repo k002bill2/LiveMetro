@@ -3,7 +3,7 @@
  * Tests for real-time train arrival monitoring and notification
  */
 
-import { trainArrivalAlertService, TrainArrivalStatus } from '../trainArrivalAlertService';
+import { trainArrivalAlertService } from '../trainArrivalAlertService';
 import { TrainArrivalConfig } from '@/models/ml';
 
 // Mock dependencies
@@ -64,7 +64,6 @@ describe('TrainArrivalAlertService', () => {
       stationId: '강남',
       lineId: '2',
       direction: 'up',
-      targetTime: '08:30',
       alertMinutesBefore: 3,
       pollingIntervalSeconds: 30,
     };
@@ -123,7 +122,6 @@ describe('TrainArrivalAlertService', () => {
         stationId: '강남',
         lineId: '2',
         direction: 'up',
-        targetTime: '08:30',
         alertMinutesBefore: 3,
         pollingIntervalSeconds: 30,
       });
@@ -153,7 +151,6 @@ describe('TrainArrivalAlertService', () => {
         stationId: '강남',
         lineId: '2',
         direction: 'up',
-        targetTime: '08:30',
         alertMinutesBefore: 3,
         pollingIntervalSeconds: 30,
       });
@@ -163,7 +160,6 @@ describe('TrainArrivalAlertService', () => {
         stationId: '잠실',
         lineId: '2',
         direction: 'down',
-        targetTime: '09:00',
         alertMinutesBefore: 5,
         pollingIntervalSeconds: 30,
       });
@@ -184,7 +180,6 @@ describe('TrainArrivalAlertService', () => {
         stationId: '강남',
         lineId: '2',
         direction: 'up',
-        targetTime: '08:30',
         alertMinutesBefore: 3,
         pollingIntervalSeconds: 30,
       });
@@ -194,7 +189,6 @@ describe('TrainArrivalAlertService', () => {
         stationId: '잠실',
         lineId: '2',
         direction: 'down',
-        targetTime: '09:00',
         alertMinutesBefore: 5,
         pollingIntervalSeconds: 30,
       });
@@ -215,7 +209,6 @@ describe('TrainArrivalAlertService', () => {
         stationId: '강남',
         lineId: '2',
         direction: 'up',
-        targetTime: '08:30',
         alertMinutesBefore: 3,
         pollingIntervalSeconds: 30,
       });
@@ -225,7 +218,6 @@ describe('TrainArrivalAlertService', () => {
         stationId: '잠실',
         lineId: '2',
         direction: 'down',
-        targetTime: '09:00',
         alertMinutesBefore: 5,
         pollingIntervalSeconds: 30,
       });
@@ -389,7 +381,6 @@ describe('TrainArrivalAlertService', () => {
         stationId: '강남',
         lineId: '2',
         direction: 'up',
-        targetTime: '08:30',
         alertMinutesBefore: 3,
         pollingIntervalSeconds: 30,
       });
@@ -420,7 +411,6 @@ describe('TrainArrivalAlertService', () => {
         stationId: '강남',
         lineId: '2',
         direction: 'up',
-        targetTime: '08:30',
         alertMinutesBefore: 3, // Alert when 3 min or less, train is 2 min away
         pollingIntervalSeconds: 30,
       });
@@ -450,7 +440,6 @@ describe('TrainArrivalAlertService', () => {
         stationId: '강남',
         lineId: '2',
         direction: 'up',
-        targetTime: '08:30',
         alertMinutesBefore: 3,
         pollingIntervalSeconds: 30,
       });

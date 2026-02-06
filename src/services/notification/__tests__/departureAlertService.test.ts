@@ -3,7 +3,7 @@
  * Tests for ML-based departure prediction and notification scheduling
  */
 
-import { departureAlertService, DepartureAlertResult } from '../departureAlertService';
+import { departureAlertService } from '../departureAlertService';
 import { DepartureAlertConfig } from '@/models/ml';
 
 // Mock dependencies

@@ -3,26 +3,21 @@
  * Centralized exports for notification-related services
  */
 
-export * from './notificationService';
+export { notificationService, NotificationType } from './notificationService';
 
-export * from './notificationStorageService';
+export { notificationStorageService } from './notificationStorageService';
 
-export * from './departureAlertService';
-export { default as departureAlertService } from './departureAlertService';
+export { departureAlertService } from './departureAlertService';
 
-export * from './delayResponseAlertService';
-export { default as delayResponseAlertService } from './delayResponseAlertService';
+export { delayResponseAlertService } from './delayResponseAlertService';
 
-export * from './trainArrivalAlertService';
-export { default as trainArrivalAlertService } from './trainArrivalAlertService';
+export { trainArrivalAlertService } from './trainArrivalAlertService';
+export type { TrainArrivalStatus, MonitoringSession } from './trainArrivalAlertService';
 
-export * from './integratedAlertService';
-export { default as integratedAlertService } from './integratedAlertService';
+export { integratedAlertService } from './integratedAlertService';
 
-export * from './currentStationAlertService';
+export { currentStationAlertService } from './currentStationAlertService';
 
-export * from './notificationOptimizer';
-export { default as notificationOptimizer } from './notificationOptimizer';
+export { notificationOptimizer } from './notificationOptimizer';
 
-export * from './topicSubscriptionService';
-export { default as topicSubscriptionService } from './topicSubscriptionService';
+export { topicSubscriptionService } from './topicSubscriptionService';
