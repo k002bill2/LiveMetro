@@ -1,8 +1,11 @@
 /**
- * Auto Formatter Hook for LiveMetro
+ * Auto Formatter Hook for AOS Dashboard
  * PostToolUse에서 자동 코드 포매팅 및 린팅
  *
- * @version 1.0.0-LiveMetro
+ * @version 1.0.0-AOS Dashboard
+ *
+ * @hook-config
+ * {"event": "PostToolUse", "matcher": "Edit|Write", "command": "node .claude/hooks/autoFormatter.js 2>/dev/null || true"}
  */
 
 const fs = require('fs');

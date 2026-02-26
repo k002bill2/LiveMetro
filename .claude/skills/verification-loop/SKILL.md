@@ -1,3 +1,20 @@
+---
+name: verification-loop
+description: Boris Cherny style verification feedback loop automation. Run type check, lint, test, and build verification.
+type: workflow
+priority: high
+triggers:
+  keywords:
+    - verify
+    - verification
+    - feedback loop
+    - check
+    - validate
+  patterns:
+    - "(verify|validate).*?(code|app)"
+    - "(feedback|verification).*?loop"
+---
+
 # Verification Loop Skill
 
 Boris Cherny가 강조하는 **검증 피드백 루프**를 자동화하는 스킬입니다.
@@ -104,30 +121,6 @@ Task(subagent_type="background-verifier", run_in_background=true)
 2. **테스트 실패**: 코드 또는 테스트 수정
 3. **린트 에러**: `npm run lint -- --fix` 시도
 4. **커버리지 미달**: 테스트 추가
-
-### 디버깅 재시도 제한 (2-Strike Rule)
-
-**동일한 에러에 대해 최대 2번까지만 수정을 시도합니다.**
-
-| 시도 | 행동 |
-|------|------|
-| 1차 | 에러 분석 + 수정 시도 |
-| 2차 | 다른 접근 방식으로 수정 |
-| 3차~ | **중단** - 근본 원인 재분석 후 접근 전환 |
-
-3차 시도 대신 수행할 작업:
-1. 지금까지 시도한 수정 방법 목록 정리
-2. 에러의 근본 원인 재분석 (증상이 아닌 원인)
-3. 완전히 다른 접근 방식 탐색 (예: 코드 구조 변경, 의존성 업데이트)
-4. 필요 시 사용자에게 상황 공유 및 판단 요청
-
-### 자동 에스컬레이션 트리거
-
-다음 상황에서는 즉시 사용자에게 보고합니다:
-- 동일 파일에서 3회 이상 타입 에러 수정 반복
-- 테스트 수정이 다른 테스트를 깨뜨리는 연쇄 실패
-- 빌드 에러가 의존성 문제로 판단될 때
-- 에러 메시지가 환경 설정(ENV, 경로) 관련일 때
 
 ### 수정 후 재검증
 ```bash

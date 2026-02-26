@@ -117,11 +117,11 @@ Enable long-running multi-agent tasks to persist context beyond token limits, su
   "state": {
     "completed_subtasks": ["task_1", "task_2"],
     "pending_subtasks": ["task_3", "task_4"],
-    "active_agents": ["mobile-ui-specialist"],
+    "active_agents": ["web-ui-specialist"],
     "blocked_agents": [],
     "findings_count": 3
   },
-  "context_summary": "Implementing station detail feature. UI components done, backend integration in progress.",
+  "context_summary": "Implementing agent detail feature. UI components done, backend integration in progress.",
   "next_action": "Wait for backend-integration-specialist to complete API service",
   "recovery_instructions": "Resume by checking workspace metadata for pending agents"
 }
@@ -266,14 +266,14 @@ Rough estimates for planning:
 ### Starting a Complex Task
 ```markdown
 1. Create research plan
-   └── .temp/memory/research_plans/station_feature.md
+   └── .temp/memory/research_plans/agent_feature.md
 
 2. After exploration phase
    └── .temp/memory/checkpoints/cp_exploration_*.json
    └── .temp/memory/findings/exploration_*.md
 
 3. After spawning UI + Backend agents
-   └── .temp/memory/findings/mobile-ui_*.md
+   └── .temp/memory/findings/web-ui_*.md
    └── .temp/memory/findings/backend-integration_*.md
 
 4. Merge and checkpoint

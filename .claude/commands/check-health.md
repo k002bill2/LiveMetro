@@ -5,7 +5,7 @@ description: Comprehensive project health check including tests, types, linting,
 
 # Project Health Check
 
-Perform a comprehensive health check of the LiveMetro project, running all quality gates and reporting any issues with actionable fixes.
+Perform a comprehensive health check of the AOS Dashboard project, running all quality gates and reporting any issues with actionable fixes.
 
 ## Steps
 
@@ -62,15 +62,15 @@ npm run build:development
 ```
 
 **What it checks**:
-- App bundles correctly for iOS/Android
+- App bundles correctly
 - No build-time errors
 - Asset loading works
 - Environment variables are accessible
 
 **Common Issues & Fixes**:
 - `Module not found` → Check imports and dependencies
-- `EXPO_PUBLIC_ prefix required` → Rename env variables
-- `Asset 'x' not found` → Check asset paths in app.json
+- `VITE_ prefix required` → Rename env variables for client-side access
+- `Asset 'x' not found` → Check asset paths in vite.config.ts
 
 ### 5. Dependency Audit
 ```bash
@@ -95,7 +95,7 @@ npm audit
 ## Output Format
 
 ```markdown
-# LiveMetro Project Health Check
+# AOS Dashboard Project Health Check
 *Run at: 2025-12-28 09:30:00*
 
 ## ✅ Passed Checks (4/6)
@@ -219,7 +219,7 @@ jobs:
 
 ### Build Verification
 - Ensures app can be built for deployment
-- Validates Expo configuration (app.json)
+- Validates Vite configuration (vite.config.ts)
 - Checks environment variable setup
 - Verifies asset bundling
 

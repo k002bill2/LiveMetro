@@ -2,7 +2,7 @@
 name: eval-grader
 description: AI agent evaluation grader. Performs code-based checks and LLM-powered deep analysis using rubrics.
 tools: read, grep, glob, bash
-model: sonnet
+model: inherit
 role: grader
 ace_capabilities:
   layer_3_self_assessment:
@@ -91,12 +91,12 @@ For each check in the task definition:
 
 ```markdown
 ## Code Check: file_exists
-- Target: src/components/station/StationCard.tsx
+- Target: src/components/agents/AgentCard.tsx
 - Result: PASS/FAIL
 - Evidence: [file path or error message]
 
 ## Code Check: no_any_types
-- Target: src/components/station/StationCard.tsx
+- Target: src/components/agents/AgentCard.tsx
 - Result: PASS/FAIL
 - Count: 0 instances found
 ```
@@ -296,11 +296,11 @@ Receive grading request:
 
 **Task ID**: task_ui_001
 **Run ID**: run_abc123
-**Agent**: mobile-ui-specialist
+**Agent**: web-ui-specialist
 
 **Files Created**:
-- src/components/station/StationCard.tsx
-- src/components/station/__tests__/StationCard.test.tsx
+- src/components/agents/AgentCard.tsx
+- src/components/agents/__tests__/AgentCard.test.tsx
 
 **Transcript Path**: .temp/traces/sessions/sess_xyz/
 
@@ -322,12 +322,12 @@ graders:
     weight: 0.2
     expect:
       files:
-        "src/components/station/StationCard.tsx":
+        "src/components/agents/AgentCard.tsx":
           exists: true
           contains: ["React.memo"]
           not_contains: [": any"]
       firebase:
-        "stations/{id}":
+        "agents/{id}":
           status: "active"
 ```
 
@@ -347,7 +347,7 @@ grep -c ": any" "$FILE_PATH"
 
 2. **Firebase 상태 검증** (가능한 경우):
 ```typescript
-const doc = await db.collection('stations').doc(id).get();
+const doc = await db.collection('agents').doc(id).get();
 const passed = doc.exists && doc.data()?.status === 'active';
 ```
 
@@ -427,7 +427,7 @@ grep -r ": any" src/ | wc -l
 
 | Agent Type | Rubric | Focus |
 |------------|--------|-------|
-| mobile-ui-specialist | coding-agent | 기능, 성능, 테스트 |
+| web-ui-specialist | coding-agent | 기능, 성능, 테스트 |
 | backend-integration-specialist | coding-agent | 아키텍처, 에러 처리 |
 | Explore (research) | research-agent | 근거성, 출처 품질 |
 
@@ -436,7 +436,7 @@ grep -r ": any" src/ | wc -l
 ```typescript
 function selectRubric(agentType: string, category: string): string {
   if (category === 'research') return 'research-agent';
-  if (['mobile-ui-specialist', 'backend-integration-specialist',
+  if (['web-ui-specialist', 'backend-integration-specialist',
        'performance-optimizer'].includes(agentType)) {
     return 'coding-agent';
   }

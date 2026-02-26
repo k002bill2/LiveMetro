@@ -29,6 +29,15 @@
             "command": "node .claude/hooks/ethicalValidator.js 2>/dev/null || true"
           }
         ]
+      },
+      {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/parallelCoordinator.js pre 2>/dev/null || true"
+          }
+        ]
       }
     ],
     "PostToolUse": [
@@ -47,6 +56,24 @@
           {
             "type": "command",
             "command": "jq -r '.tool_input.file_path' | { read f; [[ \"$f\" == *.ts || \"$f\" == *.tsx ]] && npx prettier --write \"$f\" 2>/dev/null; exit 0; }"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/autoFormatter.js 2>/dev/null || true"
+          }
+        ]
+      },
+      {
+        "matcher": "Task",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/parallelCoordinator.js post 2>/dev/null || true"
           }
         ]
       }

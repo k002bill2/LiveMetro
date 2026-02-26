@@ -2,7 +2,7 @@
 name: eval-task-runner
 description: Evaluation task orchestrator. Loads task definitions, executes evaluation runs, records transcripts, and calculates pass@k metrics.
 tools: read, grep, glob, bash, task
-model: sonnet
+model: inherit
 role: evaluator
 ace_capabilities:
   layer_2_global_strategy:
@@ -47,7 +47,7 @@ Parse YAML task files from `.claude/evals/tasks/`:
 ```yaml
 # Task structure
 id: task_ui_001
-name: "StationCard component creation"
+name: "AgentCard component creation"
 category: ui_component
 input:
   description: "..."
@@ -60,7 +60,7 @@ graders:
   - type: llm
 max_attempts: 3
 timeout_minutes: 15
-expected_agent: mobile-ui-specialist
+expected_agent: web-ui-specialist
 ```
 
 ### 2. Execute Evaluation Runs
@@ -89,7 +89,7 @@ Integrate with agent-observability:
   "session_id": "eval_sess_{task_id}_{run_id}",
   "events": [
     {"event": "eval_started", "task_id": "task_ui_001", "run": 1},
-    {"event": "agent_spawned", "agent": "mobile-ui-specialist"},
+    {"event": "agent_spawned", "agent": "web-ui-specialist"},
     {"event": "tool_called", "tool": "read", "duration_ms": 45},
     // ... more events
     {"event": "eval_completed", "outcome": {...}}
@@ -127,7 +127,7 @@ where:
 
 ### Run 1/3
 1. Load task definition
-2. Spawn mobile-ui-specialist with:
+2. Spawn web-ui-specialist with:
    - Input description
    - Requirements
    - Reference files
@@ -175,10 +175,10 @@ where:
 **Task ID**: task_ui_001
 **Run ID**: run_20250110_abc123
 
-**Objective**: Create StationCard component
+**Objective**: Create AgentCard component
 
 **Requirements**:
-1. Display station name and line color
+1. Display agent name and status badge
 2. Navigate to detail screen on tap
 3. Include accessibility labels
 4. TypeScript strict mode compliance
@@ -194,8 +194,8 @@ where:
 - No `any` types
 
 **Output Expected**:
-- Component file: src/components/station/StationCard.tsx
-- Test file: src/components/station/__tests__/StationCard.test.tsx
+- Component file: src/components/agents/AgentCard.tsx
+- Test file: src/components/agents/__tests__/AgentCard.test.tsx
 
 **IMPORTANT**: This is an evaluation run. Complete the task to the best of your ability. Your output will be graded.
 ```
@@ -208,8 +208,8 @@ where:
 **Duration**: 8m 32s
 
 **Files Created**:
-- src/components/station/StationCard.tsx
-- src/components/station/__tests__/StationCard.test.tsx
+- src/components/agents/AgentCard.tsx
+- src/components/agents/__tests__/AgentCard.test.tsx
 
 **Self-Assessment**:
 - TypeScript: Passed
@@ -235,7 +235,7 @@ where:
 ```json
 {
   "task_id": "task_ui_001",
-  "task_name": "StationCard component creation",
+  "task_name": "AgentCard component creation",
   "evaluated_at": "2025-01-10T12:00:00Z",
   "k": 3,
 
@@ -243,13 +243,13 @@ where:
     {
       "run_id": "run_001",
       "timestamp": "2025-01-10T12:00:00Z",
-      "agent": "mobile-ui-specialist",
+      "agent": "web-ui-specialist",
       "duration_seconds": 512,
       "transcript_path": ".temp/traces/sessions/eval_sess_001/",
       "outcome": {
         "files_created": [
-          "src/components/station/StationCard.tsx",
-          "src/components/station/__tests__/StationCard.test.tsx"
+          "src/components/agents/AgentCard.tsx",
+          "src/components/agents/__tests__/AgentCard.test.tsx"
         ],
         "typescript_errors": 0,
         "test_results": {"passed": 8, "failed": 0},
@@ -433,7 +433,7 @@ function checkSaturation(results: TaskResult[]): SaturationCheck[] {
 ### 실행 방법
 
 ```bash
-/run-eval --pairwise --agents="mobile-ui-specialist,mobile-ui-specialist-v2"
+/run-eval --pairwise --agents="web-ui-specialist,web-ui-specialist-v2"
 /run-eval --pairwise --models="sonnet,opus" --task=task_ui_001
 ```
 
@@ -443,13 +443,13 @@ function checkSaturation(results: TaskResult[]): SaturationCheck[] {
 {
   "comparison": {
     "baseline": {
-      "agent": "mobile-ui-specialist",
+      "agent": "web-ui-specialist",
       "model": "sonnet",
       "pass_at_1": 0.80,
       "avg_score": 0.82
     },
     "challenger": {
-      "agent": "mobile-ui-specialist-v2",
+      "agent": "web-ui-specialist-v2",
       "model": "sonnet",
       "pass_at_1": 0.90,
       "avg_score": 0.88

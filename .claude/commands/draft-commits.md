@@ -37,20 +37,18 @@ git log --oneline -5
 | `.claude/commands/` | Claude Commands | docs(commands) |
 | `.claude/agents/` | Claude Agents | docs(agents) |
 | `.claude/*.json` | Claude Config | chore(config) |
-| `src/screens/` | Screens | feat(screens) |
-| `src/components/` | Components | feat(components) |
-| `src/hooks/` | Hooks | feat(hooks) |
-| `src/services/` | Services | feat(services) |
-| `src/stores/` | Stores | feat(stores) |
-| `src/utils/` | Utilities | feat(utils) |
-| `src/types/` | Types | feat(types) |
-| `src/navigation/` | Navigation | feat(navigation) |
-| `functions/` | Firebase Functions | feat(functions) |
-| `e2e/` | E2E Tests | test(e2e) |
-| `android/` | Android | chore(android) |
-| `ios/` | iOS | chore(ios) |
+| `src/backend/api/` | Backend API | feat(api) |
+| `src/backend/services/` | Backend Services | feat(services) |
+| `src/backend/agents/` | Backend Agents | feat(agents) |
+| `src/backend/models/` | Backend Models | feat(models) |
+| `src/backend/db/` | Backend Database | feat(db) |
+| `src/dashboard/src/pages/` | Dashboard Pages | feat(pages) |
+| `src/dashboard/src/components/` | Dashboard Components | feat(components) |
+| `src/dashboard/src/stores/` | Dashboard Stores | feat(stores) |
+| `src/dashboard/src/hooks/` | Dashboard Hooks | feat(hooks) |
+| `tests/` | Tests | test |
 | `docs/` | Documentation | docs |
-| `scripts/` | Scripts | chore(scripts) |
+| `infra/` | Infrastructure | chore(infra) |
 
 ### 3. Commit Type 결정
 
@@ -116,15 +114,15 @@ Legend: [M] Modified  [A] Added  [D] Deleted  [R] Renamed
    - 명령형 사용 (add, fix, update)
 
 2. **Scope 선택**
-   - 영향받는 영역 (screens, components, hooks, navigation 등)
+   - 영향받는 영역 (api, ui, hooks, config 등)
    - 생략 가능하나 권장
 
 3. **예시**
    ```
-   feat(screens): add real-time subway arrival screen
-   fix(hooks): resolve infinite loop in useLocation
+   feat(api): add organization invitation endpoint
+   fix(hooks): resolve infinite loop in useAuth
    docs(commands): add draft-commits slash command
-   chore(android): update gradle dependencies
+   chore(config): update eslint rules
    ```
 
 ## 연계 명령어

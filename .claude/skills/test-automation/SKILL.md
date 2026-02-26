@@ -1,12 +1,30 @@
 ---
 name: test-automation
-description: Generate comprehensive Jest tests for React Native components, hooks, and services. Use when writing tests, improving coverage, or test-driven development.
+description: Generate comprehensive Vitest tests for React Web components, hooks, and stores. Use when writing tests, improving coverage, or test-driven development.
+type: skill
+enforcement: suggest
+priority: high
+triggers:
+  keywords:
+    - test
+    - vitest
+    - coverage
+    - tdd
+    - testing library
+  patterns:
+    - "(write|add|create).*?test"
+    - "(run|check).*?coverage"
+    - "test.*?(component|hook|store)"
+  files:
+    - "**/__tests__/**"
+    - "**/*.test.ts"
+    - "**/*.test.tsx"
 ---
 
 # Test Automation Skill
 
 ## Purpose
-Create comprehensive unit and integration tests for LiveMetro components, hooks, and services using Jest and React Native Testing Library.
+Create comprehensive unit and integration tests for AOS Dashboard components, hooks, and stores using Vitest and React Testing Library.
 
 ## When to Use
 - Writing tests for new components or features
@@ -25,7 +43,7 @@ Create comprehensive unit and integration tests for LiveMetro components, hooks,
 
 ### Test Location
 - Co-located with source files in `__tests__/` directories
-- Example: `src/components/train/__tests__/StationCard.test.tsx`
+- Example: `src/components/agents/__tests__/AgentCard.test.tsx`
 
 ### Naming Conventions
 - Test files: `*.test.ts` or `*.test.tsx`
@@ -37,7 +55,7 @@ Create comprehensive unit and integration tests for LiveMetro components, hooks,
 ### 1. Analyze the Code
 - Read the component/hook/service implementation
 - Identify all functions, props, and edge cases
-- Note external dependencies (Firebase, API, Expo modules)
+- Note external dependencies (Firebase, API)
 
 ### 2. Identify Test Scenarios
 **Happy Path**:
@@ -57,7 +75,8 @@ Create comprehensive unit and integration tests for LiveMetro components, hooks,
 
 ### 3. Create Test File
 ```typescript
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { vi, describe, it, expect } from 'vitest';
 import { ComponentName } from '../ComponentName';
 
 describe('ComponentName', () => {
@@ -67,62 +86,68 @@ describe('ComponentName', () => {
 
 ### 4. Mock External Dependencies
 
-**Firebase**:
+**API Services**:
 ```typescript
-jest.mock('@/services/train/trainService', () => ({
-  trainService: {
-    subscribeToTrainUpdates: jest.fn(),
-    getTrainArrivals: jest.fn()
+vi.mock('@/lib/api', () => ({
+  api: {
+    getSessions: vi.fn(),
+    getAgents: vi.fn()
   }
 }));
 ```
 
-**Seoul API**:
+**Zustand Stores**:
 ```typescript
-jest.mock('@/services/api/seoulSubwayApi', () => ({
-  getRealtimeArrival: jest.fn(),
-  getStationTimetable: jest.fn()
+vi.mock('@/stores/orchestration', () => ({
+  useOrchestration: vi.fn(() => ({
+    sessions: [],
+    loading: false,
+    fetchSessions: vi.fn(),
+  })),
 }));
 ```
 
-**Expo Modules**:
+**React Router**:
 ```typescript
-jest.mock('expo-location', () => ({
-  requestForegroundPermissionsAsync: jest.fn(),
-  getCurrentPositionAsync: jest.fn()
-}));
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom');
+  return {
+    ...actual,
+    useNavigate: () => vi.fn(),
+  };
+});
 ```
 
 ### 5. Write Tests
 
 **Component Tests**:
 ```typescript
-describe('StationCard', () => {
-  const mockStation = {
-    id: 'station1',
-    name: '강남역',
-    lineId: 'line2',
-    coordinates: { latitude: 37.498, longitude: 127.028 }
+describe('AgentCard', () => {
+  const mockAgent = {
+    id: 'agent1',
+    name: 'web-ui-specialist',
+    status: 'available',
+    tools: ['read', 'edit', 'bash']
   };
 
-  it('renders station name correctly', () => {
-    const { getByText } = render(<StationCard station={mockStation} />);
-    expect(getByText('강남역')).toBeTruthy();
+  it('renders agent name correctly', () => {
+    const { getByText } = render(<AgentCard agent={mockAgent} />);
+    expect(getByText('web-ui-specialist')).toBeTruthy();
   });
 
   it('handles press event', () => {
     const onPress = jest.fn();
     const { getByTestId } = render(
-      <StationCard station={mockStation} onPress={onPress} />
+      <AgentCard agent={mockAgent} onPress={onPress} />
     );
 
-    fireEvent.press(getByTestId('station-card'));
-    expect(onPress).toHaveBeenCalledWith(mockStation);
+    fireEvent.press(getByTestId('agent-card'));
+    expect(onPress).toHaveBeenCalledWith(mockAgent);
   });
 
   it('shows loading state', () => {
     const { getByTestId } = render(
-      <StationCard station={mockStation} loading={true} />
+      <AgentCard agent={mockAgent} loading={true} />
     );
     expect(getByTestId('loading-indicator')).toBeTruthy();
   });
@@ -132,12 +157,12 @@ describe('StationCard', () => {
 **Hook Tests**:
 ```typescript
 import { renderHook, act } from '@testing-library/react-hooks';
-import { useRealtimeTrains } from '../useRealtimeTrains';
+import { useRealtimeAgents } from '../useRealtimeAgents';
 
-describe('useRealtimeTrains', () => {
+describe('useRealtimeAgents', () => {
   it('fetches train data on mount', async () => {
     const { result, waitForNextUpdate } = renderHook(() =>
-      useRealtimeTrains('station1')
+      useRealtimeAgents('agent1')
     );
 
     expect(result.current.loading).toBe(true);
@@ -153,7 +178,7 @@ describe('useRealtimeTrains', () => {
     jest.spyOn(console, 'error').mockImplementation(() => {});
 
     const { result, waitForNextUpdate } = renderHook(() =>
-      useRealtimeTrains('invalid-station')
+      useRealtimeAgents('invalid-agent')
     );
 
     await waitForNextUpdate();
@@ -174,19 +199,19 @@ describe('dataManager', () => {
   });
 
   it('fetches from Seoul API first', async () => {
-    const data = await dataManager.getTrainArrivals('station1');
+    const data = await dataManager.getAgentTasks('agent1');
 
-    expect(seoulSubwayApi.getRealtimeArrival).toHaveBeenCalledWith('station1');
+    expect(agentRegistryApi.getAgentStatus).toHaveBeenCalledWith('agent1');
     expect(data).toBeDefined();
   });
 
   it('falls back to Firebase on API failure', async () => {
     // Mock Seoul API failure
-    seoulSubwayApi.getRealtimeArrival.mockRejectedValue(new Error('API Error'));
+    agentRegistryApi.getAgentStatus.mockRejectedValue(new Error('API Error'));
 
-    const data = await dataManager.getTrainArrivals('station1');
+    const data = await dataManager.getAgentTasks('agent1');
 
-    expect(trainService.getTrainArrivals).toHaveBeenCalledWith('station1');
+    expect(trainService.getAgentTasks).toHaveBeenCalledWith('agent1');
   });
 
   it('uses cache when available and fresh', async () => {
@@ -196,10 +221,10 @@ describe('dataManager', () => {
       timestamp: Date.now()
     }));
 
-    const data = await dataManager.getTrainArrivals('station1');
+    const data = await dataManager.getAgentTasks('agent1');
 
     // Should not call APIs
-    expect(seoulSubwayApi.getRealtimeArrival).not.toHaveBeenCalled();
+    expect(agentRegistryApi.getAgentStatus).not.toHaveBeenCalled();
     expect(data).toEqual(mockData);
   });
 });
@@ -217,40 +242,43 @@ Check coverage report and add tests for uncovered lines.
 ### Testing Async Operations
 ```typescript
 it('fetches data asynchronously', async () => {
-  const { getByText } = render(<Component />);
+  render(<Component />);
 
   await waitFor(() => {
-    expect(getByText('Loaded Data')).toBeTruthy();
+    expect(screen.getByText('Loaded Data')).toBeInTheDocument();
   });
 });
 ```
 
 ### Testing Navigation
 ```typescript
-import { useNavigation } from '@react-navigation/native';
+import { useNavigate } from 'react-router-dom';
 
-jest.mock('@react-navigation/native');
+vi.mock('react-router-dom', async () => {
+  const actual = await vi.importActual('react-router-dom');
+  return { ...actual, useNavigate: () => vi.fn() };
+});
 
-it('navigates to detail screen', () => {
-  const navigate = jest.fn();
-  (useNavigation as jest.Mock).mockReturnValue({ navigate });
+it('navigates to detail page', () => {
+  const navigate = vi.fn();
+  vi.mocked(useNavigate).mockReturnValue(navigate);
 
-  const { getByTestId } = render(<Component />);
-  fireEvent.press(getByTestId('detail-button'));
+  render(<Component />);
+  fireEvent.click(screen.getByTestId('detail-button'));
 
-  expect(navigate).toHaveBeenCalledWith('StationDetail', { stationId: '1' });
+  expect(navigate).toHaveBeenCalledWith('/sessions/1');
 });
 ```
 
-### Testing Firebase Subscriptions
+### Testing API Subscriptions
 ```typescript
-it('subscribes to Firebase updates', () => {
-  const unsubscribe = jest.fn();
-  trainService.subscribeToTrainUpdates.mockReturnValue(unsubscribe);
+it('subscribes to API updates and cleans up', () => {
+  const unsubscribe = vi.fn();
+  vi.mocked(api.subscribe).mockReturnValue(unsubscribe);
 
-  const { unmount } = render(<Component stationId="1" />);
+  const { unmount } = render(<Component sessionId="1" />);
 
-  expect(trainService.subscribeToTrainUpdates).toHaveBeenCalled();
+  expect(api.subscribe).toHaveBeenCalled();
 
   unmount();
   expect(unsubscribe).toHaveBeenCalled(); // Verify cleanup
@@ -260,19 +288,19 @@ it('subscribes to Firebase updates', () => {
 ### Testing Error Boundaries
 ```typescript
 it('handles errors with error boundary', () => {
-  const spy = jest.spyOn(console, 'error').mockImplementation(() => {});
+  const spy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
   const ThrowError = () => {
     throw new Error('Test error');
   };
 
-  const { getByText } = render(
+  render(
     <ErrorBoundary>
       <ThrowError />
     </ErrorBoundary>
   );
 
-  expect(getByText('Something went wrong')).toBeTruthy();
+  expect(screen.getByText('Something went wrong')).toBeInTheDocument();
   spy.mockRestore();
 });
 ```
@@ -289,104 +317,95 @@ it('handles errors with error boundary', () => {
 
 ## Test Configuration
 
-LiveMetro uses Jest with React Native preset:
+AOS Dashboard uses Vitest with React Testing Library:
 
-```javascript
-// jest.config.js
-module.exports = {
-  preset: 'react-native',
-  setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
-  testEnvironment: 'node',
-  coverageThreshold: {
-    global: {
-      statements: 75,
-      branches: 60,
-      functions: 70,
-      lines: 75
+```typescript
+// vitest.config.ts
+import { defineConfig } from 'vitest/config';
+
+export default defineConfig({
+  test: {
+    globals: true,
+    environment: 'jsdom',
+    setupFiles: ['./src/test/setup.ts'],
+    coverage: {
+      reporter: ['text', 'json', 'html'],
+      thresholds: {
+        statements: 75,
+        branches: 60,
+        functions: 70,
+        lines: 75
+      }
     }
   }
-};
+});
 ```
 
 ## Resources
-- [React Native Testing Library](https://callstack.github.io/react-native-testing-library/)
-- [Jest Documentation](https://jestjs.io/docs/getting-started)
-- [Testing Hooks](https://react-hooks-testing-library.com/)
-- Project setup: `src/__tests__/setup.ts`
+- [React Testing Library](https://testing-library.com/docs/react-testing-library/intro/)
+- [Vitest Documentation](https://vitest.dev/guide/)
+- [Testing Hooks](https://testing-library.com/docs/react-testing-library/api#renderhook)
+- Project setup: `src/dashboard/src/test/setup.ts`
 
 ## Example: Complete Test Suite
 
 ```typescript
-// src/components/train/__tests__/TrainArrivalCard.test.tsx
-import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
-import { TrainArrivalCard } from '../TrainArrivalCard';
-import type { TrainArrival } from '@/models/train';
+// src/dashboard/src/components/__tests__/SessionCard.test.tsx
+import { render, screen, fireEvent } from '@testing-library/react';
+import { vi, describe, it, expect } from 'vitest';
+import { SessionCard } from '../claude-sessions/SessionCard';
+import type { ClaudeSession } from '@/types/session';
 
-describe('TrainArrivalCard', () => {
-  const mockTrain: TrainArrival = {
-    trainNo: 'T1001',
-    stationName: '강남역',
-    direction: 'up',
-    arrivalTime: 120, // seconds
-    destinationName: '신도림',
-    lineId: 'line2',
-    status: 'NORMAL',
-    updatedAt: new Date()
+describe('SessionCard', () => {
+  const mockSession: ClaudeSession = {
+    id: 'session-1',
+    projectName: 'Test Project',
+    status: 'active',
+    messageCount: 42,
+    estimatedCost: 0.15,
+    createdAt: new Date().toISOString(),
+    lastActivity: new Date().toISOString()
   };
 
-  it('renders train information correctly', () => {
-    const { getByText } = render(<TrainArrivalCard train={mockTrain} />);
+  it('renders session information correctly', () => {
+    render(<SessionCard session={mockSession} />);
 
-    expect(getByText('강남역')).toBeTruthy();
-    expect(getByText('신도림 방면')).toBeTruthy();
-    expect(getByText('2분 후')).toBeTruthy();
+    expect(screen.getByText('Test Project')).toBeInTheDocument();
+    expect(screen.getByText('active')).toBeInTheDocument();
+    expect(screen.getByText('42 messages')).toBeInTheDocument();
   });
 
-  it('shows delayed status with warning color', () => {
-    const delayedTrain = { ...mockTrain, status: 'DELAYED' };
-    const { getByTestId } = render(<TrainArrivalCard train={delayedTrain} />);
+  it('shows cost with correct formatting', () => {
+    render(<SessionCard session={mockSession} />);
 
-    const statusBadge = getByTestId('status-badge');
-    expect(statusBadge.props.style).toContainEqual(
-      expect.objectContaining({ backgroundColor: '#FFA500' })
-    );
+    expect(screen.getByText('$0.15')).toBeInTheDocument();
   });
 
-  it('handles press event', () => {
-    const onPress = jest.fn();
-    const { getByTestId } = render(
-      <TrainArrivalCard train={mockTrain} onPress={onPress} />
-    );
+  it('handles click event', () => {
+    const onClick = vi.fn();
+    render(<SessionCard session={mockSession} onClick={onClick} />);
 
-    fireEvent.press(getByTestId('train-card'));
-    expect(onPress).toHaveBeenCalledWith(mockTrain);
+    fireEvent.click(screen.getByTestId('session-card'));
+    expect(onClick).toHaveBeenCalledWith(mockSession);
   });
 
-  it('formats arrival time correctly', () => {
-    const testCases = [
-      { seconds: 30, expected: '곧 도착' },
-      { seconds: 60, expected: '1분 후' },
-      { seconds: 120, expected: '2분 후' },
-      { seconds: 300, expected: '5분 후' }
-    ];
+  it('applies correct status color', () => {
+    render(<SessionCard session={mockSession} />);
 
-    testCases.forEach(({ seconds, expected }) => {
-      const train = { ...mockTrain, arrivalTime: seconds };
-      const { getByText } = render(<TrainArrivalCard train={train} />);
-      expect(getByText(expected)).toBeTruthy();
-    });
+    const statusBadge = screen.getByTestId('status-badge');
+    expect(statusBadge).toHaveClass('bg-green-100');
   });
 
-  it('shows error state when train data is invalid', () => {
-    const invalidTrain = { ...mockTrain, trainNo: '' };
-    const { getByText } = render(<TrainArrivalCard train={invalidTrain} />);
+  it('shows idle status correctly', () => {
+    const idleSession = { ...mockSession, status: 'idle' as const };
+    render(<SessionCard session={idleSession} />);
 
-    expect(getByText('열차 정보 없음')).toBeTruthy();
+    expect(screen.getByText('idle')).toBeInTheDocument();
+    expect(screen.getByTestId('status-badge')).toHaveClass('bg-yellow-100');
   });
 });
 ```
 
 ---
 
-*Use this skill to maintain high test coverage and ensure code quality in LiveMetro.*
+*Use this skill to maintain high test coverage and ensure code quality in AOS Dashboard.*
