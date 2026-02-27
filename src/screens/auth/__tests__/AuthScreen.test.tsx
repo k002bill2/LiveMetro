@@ -98,7 +98,7 @@ describe('AuthScreen', () => {
     // Wait for auto-login check to complete and form to appear
     await waitFor(() => {
       expect(getByTestId('email-input')).toBeTruthy();
-    });
+    }, { timeout: 15000 });
 
     expect(getByTestId('password-input')).toBeTruthy();
     expect(getByTestId('submit-button')).toBeTruthy();

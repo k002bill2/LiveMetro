@@ -50,6 +50,8 @@ module.exports = {
     '!src/models/**', // Type definitions only
   ],
 
+  coverageReporters: ['text', 'lcov', 'json-summary', 'clover'],
+
   coverageThreshold: {
     global: {
       branches: 15,
