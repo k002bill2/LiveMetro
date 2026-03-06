@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp@latest"],
+      "description": "실시간 라이브러리 문서 조회 - React Native, Expo, Firebase 등의 최신 문서를 가져옵니다"
+    },
+    "memory": {
+      "command": "npx",
+      "args": ["-y", "@anthropic/memory-mcp@latest"],
+      "description": "영구 지식 그래프 - 프로젝트 인사이트, 패턴, 결정 사항을 세션 간 보존합니다"
+    }
+  }
+}

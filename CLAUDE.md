@@ -56,6 +56,7 @@ State: AuthContext + Custom Hooks (no Redux)
 3. **Seoul API** - 30s minimum polling interval
 4. **Coverage thresholds**: 75% statements, 70% functions, 60% branches
 5. **Error handling** - return empty arrays/null instead of throwing
+6. **Surgical Changes** - 요청한 것만 변경. 관련 없는 파일을 리팩토링하거나, 요청하지 않은 "개선"을 하지 않음. 부수 변경이 필요하면 명시적으로 사용자에게 확인
 
 ## Claude Code System Architecture
 
@@ -84,6 +85,7 @@ State: AuthContext + Custom Hooks (no Redux)
 | `aceMatrixSync.js` | PostToolUse/Edit\|Write | ACE enforcement matrix 동기화 검사 |
 | `agentTracer.js` | PostToolUse/Task | 에이전트 활동 추적 (JSONL 이벤트 로그) |
 | `userPromptSubmit.js` | UserPromptSubmit | 스킬/에이전트 자동 활성화, Gemini 리뷰 결과 주입 |
+| `outputSecretFilter.sh` | PostToolUse/Bash | Bash 출력에서 API키/토큰/시크릿 자동 마스킹 |
 | TypeScript 체크 | PostToolUse/Edit\|Write | .ts/.tsx 편집 시 자동 `npx tsc --noEmit` |
 
 **설정**: `.claude/settings.json`, `.claude/settings.local.json`
@@ -98,6 +100,24 @@ Claude Code와 Gemini CLI가 자동 연동됩니다:
 - **제약**: 읽기 전용, 일일 900회 제한
 
 **커맨드**: `/gemini-review`, `/gemini-scan`
+
+### MCP Server Integration
+
+외부 MCP 서버를 통한 기능 확장 (`.mcp.json`):
+
+| 서버 | 용도 |
+|------|------|
+| `context7` | React Native, Expo, Firebase 등 실시간 라이브러리 문서 조회 |
+| `memory` | 영구 지식 그래프 - 프로젝트 인사이트/결정사항 세션 간 보존 |
+
+### Agent Self-Evolution (자기 진화)
+
+에이전트가 태스크 수행 중 학습한 패턴/실패/성공을 `.claude/agents/agent-memory/`에 JSONL로 기록합니다.
+
+- **기록 시점**: 태스크 완료 후 `agentMemory.recordLearning()` 호출
+- **조회 시점**: 태스크 시작 전 `agentMemory.queryLearnings()` → 프롬프트에 포함
+- **정리**: confidence 0.3 이하 + 30일 이상 항목 자동 제거
+- **공유**: confidence 0.8 이상은 `shared-learnings.jsonl`에도 기록
 
 ### Quality Gates (품질 게이트)
 
@@ -231,6 +251,7 @@ npm test -- --coverage # 3. 테스트 통과 + 커버리지 충족
 | 기능 계획/페이즈 설계 | `cc-feature-implementer-main` |
 | 장기 작업 컨텍스트 보존 | `external-memory` |
 | 에이전트 성능 추적 | `agent-observability` |
+| 세션 정리/종료 | `session-wrap` |
 
 ## Coding Guidelines
 
