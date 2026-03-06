@@ -1,15 +1,21 @@
 /**
  * Gemini Auto Trigger - PostToolUse hook for Edit|Write
  *
- * Debounce 방식으로 연속 편집 시 마지막 편집 후 일정 시간 뒤에
- * 백그라운드로 gemini-bridge.js review를 실행합니다.
+ * @description Debounce 방식으로 연속 편집 시 마지막 편집 후 일정 시간 뒤에
+ *   백그라운드로 gemini-bridge.js review를 실행합니다.
+ * @event PostToolUse (Edit|Write)
+ * @param {object} toolInput - Edit/Write 도구 입력 (file_path, content 등)
+ * @param {string} toolInput.file_path - 편집된 파일 경로
+ *
+ * @hook-config
+ * {"event": "PostToolUse", "matcher": "Edit|Write", "command": "node .claude/hooks/geminiAutoTrigger.js 2>/dev/null || true"}
  *
  * 동작 방식:
  * 1. Edit/Write가 발생할 때마다 타임스탬프 파일에 기록
  * 2. 이전 예약된 리뷰가 있으면 취소 (debounce)
  * 3. 30초 후 변경이 없으면 백그라운드로 리뷰 실행
  *
- * @version 1.0.0
+ * @version 1.1.0
  */
 
 const fs = require('fs');

@@ -19,6 +19,68 @@ const PARALLEL_STATE_PATH = path.join(__dirname, '../coordination/parallel-state
 const STALE_MS = 10 * 60 * 1000; // 10분
 const MAX_COMPLETED = 20;
 
+/**
+ * HITL (Human-In-The-Loop) 분류 체계
+ * ACE Framework Layer 4 (Executive Function)에서 사용
+ *
+ * 각 레벨은 작업의 위험도에 따라 사용자 승인 필요 여부를 결정합니다.
+ */
+const HITL_LEVELS = {
+  LOW: {
+    level: 'LOW',
+    approvalRequired: false,
+    description: '자동 실행 — 읽기 전용, 테스트, 린트',
+    examples: ['코드 분석', '테스트 실행', '린트 검사', '타입 체크']
+  },
+  MEDIUM: {
+    level: 'MEDIUM',
+    approvalRequired: false,
+    description: '자동 실행 (로깅) — 워크스페이스 내 파일 생성/수정',
+    examples: ['컴포넌트 생성', '테스트 작성', '워크스페이스 파일 수정']
+  },
+  HIGH: {
+    level: 'HIGH',
+    approvalRequired: true,
+    description: '사용자 승인 필요 — src/ 직접 수정, 설정 변경',
+    examples: ['src/ 파일 직접 수정', '패키지 설치', '설정 파일 변경']
+  },
+  CRITICAL: {
+    level: 'CRITICAL',
+    approvalRequired: true,
+    description: '필수 승인 — 삭제, 배포, 데이터 마이그레이션',
+    examples: ['파일 삭제', '데이터베이스 변경', '배포 실행', 'git push']
+  }
+};
+
+/**
+ * 작업 내용 기반 HITL 레벨 분류
+ * @param {object} taskInput - Task tool_input
+ * @returns {object} HITL 레벨 정보
+ */
+function classifyHITL(taskInput) {
+  const prompt = (taskInput.prompt || '').toLowerCase();
+  const desc = (taskInput.description || '').toLowerCase();
+  const combined = `${prompt} ${desc}`;
+
+  // CRITICAL: 삭제, 배포, 마이그레이션
+  const criticalPatterns = /\b(delete|remove|drop|deploy|push|migration|rm\s+-rf|force)\b/;
+  if (criticalPatterns.test(combined)) return HITL_LEVELS.CRITICAL;
+
+  // HIGH: src/ 직접 수정, 설정 변경, 패키지 변경
+  const highPatterns = /\b(modify src|edit src|install|uninstall|config change|settings)\b/;
+  const srcWritePattern = /(?:write|edit|modify).*?src\//;
+  if (highPatterns.test(combined) || srcWritePattern.test(combined)) return HITL_LEVELS.HIGH;
+
+  // LOW: 읽기 전용, 분석, 검증
+  const lowPatterns = /\b(read|analyze|review|check|lint|test|type.?check|scan|search|grep)\b/;
+  if (lowPatterns.test(combined) && !/\b(write|create|modify|edit|update)\b/.test(combined)) {
+    return HITL_LEVELS.LOW;
+  }
+
+  // 기본: MEDIUM
+  return HITL_LEVELS.MEDIUM;
+}
+
 // file-lock-manager 로드 (실패 시 no-op)
 let fileLockManager;
 try {
@@ -110,16 +172,28 @@ function extractTargetFiles(prompt) {
  * Task 실행 전 조정
  */
 async function onTaskPreExecute(event) {
-  const { tool_input } = event;
+  const tool_input = event.tool_input || {};
+  if (!tool_input.description && !tool_input.prompt) {
+    return { decision: 'allow' };
+  }
   const state = loadParallelState();
 
   // Stale 에이전트 정리
   cleanupStaleAgents(state);
 
+  // HITL 분류
+  const hitlLevel = classifyHITL(tool_input);
+
+  // CRITICAL/HIGH 레벨은 승인 필요 로그 출력
+  if (hitlLevel.approvalRequired) {
+    console.log(`[ParallelCoordinator] HITL ${hitlLevel.level}: "${tool_input.description}" — ${hitlLevel.description}`);
+  }
+
   const taskInfo = {
     taskId: `task_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
     subagentType: tool_input.subagent_type,
     description: tool_input.description,
+    hitlLevel: hitlLevel.level,
     startTime: Date.now(),
     status: 'running'
   };
@@ -222,7 +296,7 @@ async function onTaskPostExecute(event) {
 
 function injectCoordinationContext(prompt, taskInfo) {
   const lines = [
-    `[PARALLEL TASK: ${taskInfo.taskId}]`,
+    `[PARALLEL TASK: ${taskInfo.taskId}] [HITL: ${taskInfo.hitlLevel}]`,
     '',
     '다른 에이전트와 같은 파일 수정 시 충돌에 주의하세요.',
     '',
@@ -253,7 +327,9 @@ module.exports = {
   onTaskPostExecute,
   getParallelStatus,
   clearAllTasks,
-  injectCoordinationContext
+  injectCoordinationContext,
+  classifyHITL,
+  HITL_LEVELS
 };
 
 // CLI entry point for hook system

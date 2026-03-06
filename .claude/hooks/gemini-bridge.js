@@ -1,6 +1,13 @@
 /**
  * Gemini Bridge - Claude Code <-> Gemini CLI Integration
  *
+ * @description Claude Code와 Gemini CLI 간 크로스 검증 브릿지.
+ *   코드 변경 리뷰, 대규모 분석, 독립 태스크 위임을 지원합니다.
+ * @event PostToolUse (Edit|Write) - geminiAutoTrigger.js에서 호출
+ * @event UserPromptSubmit - userPromptSubmit.js에서 결과 주입
+ * @param {string} mode - 실행 모드: review | scan | parallel | status
+ * @param {string[]} [files] - 대상 파일 목록 (review/scan 모드)
+ *
  * Modes:
  *   review  - Cross-verify code changes via Gemini
  *   scan    - Large-context codebase analysis
@@ -10,7 +17,7 @@
  * All results saved to .claude/gemini-bridge/
  * Gemini is READ-ONLY: never edits src/ files.
  *
- * @version 1.0.0
+ * @version 1.1.0
  */
 
 const fs = require('fs');
