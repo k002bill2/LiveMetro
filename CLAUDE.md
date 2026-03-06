@@ -30,7 +30,7 @@ This file provides guidance to Claude Code when working with this repository.
 Data Flow: Seoul API → Firebase → AsyncStorage (Cache)
 
 Navigation:
-RootNavigator → Main (BottomTabs) → Home | Favorites | Alerts | Settings
+RootNavigator → Main (BottomTabs) → Home | Map | Favorites | Alerts | Settings
 
 State: AuthContext + Custom Hooks (no Redux)
 ```
@@ -57,6 +57,64 @@ State: AuthContext + Custom Hooks (no Redux)
 4. **Coverage thresholds**: 75% statements, 70% functions, 60% branches
 5. **Error handling** - return empty arrays/null instead of throwing
 
+## Claude Code System Architecture
+
+### ACE Framework (Autonomous Cognitive Entity)
+
+프로젝트 전체에 ACE 6-Layer 아키텍처가 적용됩니다:
+
+| Layer | 역할 | 구현 |
+|-------|------|------|
+| 1. Aspirational | 윤리적 기반 (Heuristic Imperatives) | `ethicalValidator.js` 훅 |
+| 2. Global Strategy | Primary Agent 전략 결정 | `effort-scaling.md` |
+| 3. Agent Model | 에이전트 자기 평가 | 에이전트 `.md` 파일 |
+| 4. Executive Function | 태스크 분해 및 위임 | `delegation-template.md` |
+| 5. Cognitive Control | 충돌 방지, 파일 락 | `parallelCoordinator.js` |
+| 6. Task Prosecution | 실행 및 결과 수집 | 개별 에이전트 실행 |
+
+**상세**: `.claude/agents/shared/ace-framework.md`
+
+### Hook System (자동화 파이프라인)
+
+| 훅 | 이벤트 | 기능 |
+|----|--------|------|
+| `ethicalValidator.js` | PreToolUse/Bash | 위험 명령 차단 (rm -rf, force push, 하드코딩 키) |
+| `parallelCoordinator.js` | Pre/PostToolUse/Task | 파일 락, 병렬 에이전트 조정, stale 정리 |
+| `geminiAutoTrigger.js` | PostToolUse/Edit\|Write | 30초 debounce 후 Gemini 크로스 리뷰 큐잉 |
+| `aceMatrixSync.js` | PostToolUse/Edit\|Write | ACE enforcement matrix 동기화 검사 |
+| `agentTracer.js` | PostToolUse/Task | 에이전트 활동 추적 (JSONL 이벤트 로그) |
+| `userPromptSubmit.js` | UserPromptSubmit | 스킬/에이전트 자동 활성화, Gemini 리뷰 결과 주입 |
+| TypeScript 체크 | PostToolUse/Edit\|Write | .ts/.tsx 편집 시 자동 `npx tsc --noEmit` |
+
+**설정**: `.claude/settings.json`, `.claude/settings.local.json`
+
+### Gemini CLI Integration (크로스 검증)
+
+Claude Code와 Gemini CLI가 자동 연동됩니다:
+
+- **자동 리뷰**: 코드 변경 시 30초 debounce 후 Gemini 크로스 리뷰
+- **UserPromptSubmit**: 매 프롬프트에 Gemini 리뷰 결과 자동 주입
+- **모드**: review (변경 검증), scan (대규모 분석), parallel (독립 태스크)
+- **제약**: 읽기 전용, 일일 900회 제한
+
+**커맨드**: `/gemini-review`, `/gemini-scan`
+
+### Quality Gates (품질 게이트)
+
+모든 에이전트가 준수하는 품질 기준 (`quality-gates.md`):
+
+**Ethical Gate** (Layer 1):
+- API 키 하드코딩 금지 → Ethical Veto
+- Seoul API 30초 미만 폴링 → Ethical Veto
+- 백업 없이 사용자 데이터 수정 → Ethical Veto
+- 무한 루프 가능성 → Ethical Veto
+
+**Technical Gates**:
+- TypeScript strict (no `any`) + ESLint 0 에러
+- 커버리지 75%/70%/60%
+- Firebase 구독 cleanup 필수
+- React Native: StyleSheet, memo, accessibility labels
+
 ## Boris Cherny 워크플로우
 
 ### 피드백 루프 규칙 (필수)
@@ -72,13 +130,11 @@ State: AuthContext + Custom Hooks (no Redux)
 
 | 모델 | 용도 | 예시 |
 |------|------|------|
-| **Opus 4.5** | 복잡한 설계, 오케스트레이션, 아키텍처 결정 | 새 기능 설계, 대규모 리팩토링 |
+| **Opus** | 복잡한 설계, 오케스트레이션, 아키텍처 결정 | 새 기능 설계, 대규모 리팩토링 |
 | **Sonnet** | UI/백엔드 구현, 일반 개발 작업 | 컴포넌트 구현, 서비스 작성 |
 | **Haiku** | 빠른 검증, 단순 작업, 코드 분석 | 테스트 작성, 린트 수정, 버그 수정 |
 
 ### 잘못된 행동 기록 (팀 공유)
-
-Claude가 잘못된 행동을 할 때마다 여기에 기록하여 같은 실수를 방지합니다.
 
 | 날짜 | 문제 | 해결 방법 |
 |------|------|----------|
@@ -120,18 +176,42 @@ npm test -- --coverage # 3. 테스트 통과 + 커버리지 충족
 
 ## Multi-Agent Orchestration
 
-메인 에이전트(Opus)가 직접 서브에이전트를 스폰합니다.
+메인 에이전트(Opus)가 ACE Framework 기반으로 서브에이전트를 스폰합니다.
 
-| 복잡도 | 에이전트 수 | 기준 |
-|--------|-----------|------|
-| Trivial | 0 | 단일 파일, 명확한 수정 |
-| Simple | 1 | 2-3 파일, 한 영역 |
-| Moderate | 2-3 | UI+서비스 또는 크로스 영역 |
-| Complex | 3+ | 풀스택, 아키텍처 변경 |
+### Effort Scaling (복잡도별 에이전트 할당)
 
-**에이전트**: mobile-ui-specialist(sonnet), test-automation-specialist(haiku), quality-validator(haiku)
-**평가**: eval-task-runner(inherit), eval-grader(inherit)
-**품질 기준**: `.claude/agents/shared/quality-reference.md`
+| 복잡도 | 에이전트 수 | 기준 | 예상 토큰 |
+|--------|-----------|------|----------|
+| Trivial | 0 | 단일 파일, 명확한 수정 | ~1K |
+| Simple | 1 | 2-3 파일, 한 영역 | ~5K |
+| Moderate | 2-3 | UI+서비스 또는 크로스 영역 | ~50K |
+| Complex | 3+ | 풀스택, 아키텍처 변경 | ~150K |
+
+**상세**: `.claude/agents/shared/effort-scaling.md`
+
+### 에이전트 구성
+
+| 에이전트 | 모델 | 역할 |
+|----------|------|------|
+| mobile-ui-specialist | Sonnet | React Native UI/UX, Firebase, Seoul API |
+| test-automation-specialist | Haiku | Jest, RNTL, 커버리지 분석 |
+| quality-validator | Haiku | 최종 품질 검증 (TypeScript, ESLint, 커버리지) |
+| eval-task-runner | Inherit | 평가 태스크 오케스트레이션, pass@k 계산 |
+| eval-grader | Inherit | 코드/LLM 기반 평가 채점 |
+
+### Parallel Execution Safety
+
+병렬 에이전트 실행 시 안전 프로토콜 적용:
+- **파일 락**: `parallelCoordinator.js`가 파일 레벨 충돌 방지
+- **워크스페이스 격리**: Agent tool의 `isolation: "worktree"` 활용
+- **HITL 분류**: LOW(자동) → MEDIUM(자동) → HIGH(승인) → CRITICAL(필수 승인)
+- **Fan-Out/Fan-In**: Primary가 분배 → 병렬 실행 → 결과 통합
+
+**상세**: `.claude/agents/shared/parallel-agents-protocol.md`
+
+### 품질 기준
+
+`.claude/agents/shared/quality-gates.md`
 
 ## Skill Routing (필수)
 
@@ -141,9 +221,16 @@ npm test -- --coverage # 3. 테스트 통과 + 커버리지 충족
 |-----------|------|
 | React Native/UI/컴포넌트/화면 | `react-native-development` |
 | Firebase/Auth/Firestore | `firebase-integration` |
-| 테스트/커버리지 | `test-automation` |
+| 테스트/커버리지/TDD | `test-automation` |
+| 서울 지하철 API 통합 | `api-integration` |
+| 지하철 데이터 정규화/파싱 | `subway-data-processor` |
+| 위치 권한/주변역 검색 | `location-services` |
+| 푸시 알림/도착 알림 | `notification-system` |
 | 병렬 에이전트 (3+ 작업) | `parallel-coordinator` |
 | 구현 완료 검증 | `verification-loop` |
+| 기능 계획/페이즈 설계 | `cc-feature-implementer-main` |
+| 장기 작업 컨텍스트 보존 | `external-memory` |
+| 에이전트 성능 추적 | `agent-observability` |
 
 ## Coding Guidelines
 
