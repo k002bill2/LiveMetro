@@ -1,8 +1,8 @@
 /**
- * Parallel Coordinator Hook for AOS Dashboard
+ * Parallel Coordinator Hook for LiveMetro
  * 병렬 에이전트 작업 조정 — 파일 락, stale 정리, completedAgents 이력
  *
- * @version 3.0.0-AOS Dashboard
+ * @version 3.0.0-LiveMetro
  *
  * @hook-config
  * {"event": "PreToolUse", "matcher": "Task", "command": "node .claude/hooks/parallelCoordinator.js pre 2>/dev/null || true"}

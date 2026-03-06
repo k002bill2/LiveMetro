@@ -19,9 +19,10 @@
     "priority": "high",
     "description": "Jest + React Native Testing Library 테스트 생성",
     "agentFile": ".claude/agents/test-automation-specialist.md",
+    "skillFile": ".claude/skills/test-automation/SKILL.md",
     "promptTriggers": {
-      "keywords": ["test", "jest", "coverage", "tdd", "testing library"],
-      "intentPatterns": ["(write|add|create).*?test"]
+      "keywords": ["test", "jest", "coverage", "tdd", "testing library", "테스트", "커버리지"],
+      "intentPatterns": ["(write|add|create).*?test", "(run|check).*?coverage"]
     },
     "fileTriggers": {
       "pathPatterns": ["**/__tests__/**", "**/*.test.ts", "**/*.test.tsx"]
@@ -33,40 +34,86 @@
     "priority": "high",
     "description": "React Native + Expo 컴포넌트 개발",
     "agentFile": ".claude/agents/mobile-ui-specialist.md",
+    "skillFile": ".claude/skills/react-native-development/SKILL.md",
     "promptTriggers": {
-      "keywords": ["react native", "component", "screen", "expo", "컴포넌트", "화면"],
+      "keywords": ["react native", "component", "screen", "expo", "컴포넌트", "화면", "ui"],
       "intentPatterns": ["(create|add|make).*?(component|screen)", "(react native|RN).*?(개발|구현)"]
     },
     "fileTriggers": {
-      "pathPatterns": ["src/**/*.tsx", "src/**/*.ts"]
+      "pathPatterns": ["src/components/**/*.tsx", "src/screens/**/*.tsx"]
     }
   },
   "firebase-integration": {
-    "type": "domain",
+    "type": "skill",
     "enforcement": "require",
     "priority": "high",
     "description": "Firebase Auth + Firestore 통합",
+    "agentFile": ".claude/agents/mobile-ui-specialist.md",
+    "skillFile": ".claude/skills/firebase-integration/SKILL.md",
     "promptTriggers": {
-      "keywords": ["firebase", "firestore", "auth", "collection", "document"],
+      "keywords": ["firebase", "firestore", "auth", "collection", "document", "인증", "로그인"],
       "intentPatterns": ["(firebase|firestore).*?(auth|query|collection)"]
     },
     "fileTriggers": {
-      "pathPatterns": ["src/services/firebase*.ts", "src/config/firebase*.ts"]
+      "pathPatterns": ["src/services/firebase*.ts", "src/config/firebase*.ts", "src/services/auth/**"]
     }
   },
   "seoul-api-patterns": {
-    "type": "domain",
+    "type": "skill",
     "enforcement": "require",
     "priority": "high",
     "description": "Seoul Open Data API 통합 (30초 폴링 제한)",
+    "skillFile": ".claude/skills/api-integration/SKILL.md",
     "promptTriggers": {
-      "keywords": ["seoul", "metro", "subway", "api", "실시간", "지하철"],
-      "intentPatterns": ["(seoul|metro|subway).*?(api|data)"]
+      "keywords": ["seoul", "metro", "subway", "api", "실시간", "지하철", "도착"],
+      "intentPatterns": ["(seoul|metro|subway).*?(api|data)", "실시간.*?도착"]
     },
     "fileTriggers": {
       "pathPatterns": ["src/services/train*.ts", "src/services/seoul*.ts"]
     },
     "reminder": "30초 최소 폴링 간격 준수"
+  },
+  "subway-data-processor": {
+    "type": "skill",
+    "enforcement": "suggest",
+    "priority": "normal",
+    "description": "지하철 데이터 정규화 및 파싱",
+    "skillFile": ".claude/skills/subway-data-processor/SKILL.md",
+    "promptTriggers": {
+      "keywords": ["파싱", "정규화", "데이터 변환", "역명", "노선"],
+      "intentPatterns": ["(parse|normalize|transform).*?(data|arrival)"]
+    },
+    "fileTriggers": {
+      "pathPatterns": ["src/utils/subway*.ts", "src/models/**"]
+    }
+  },
+  "location-services": {
+    "type": "skill",
+    "enforcement": "suggest",
+    "priority": "normal",
+    "description": "위치 기반 기능 (Expo Location, 주변역 검색)",
+    "skillFile": ".claude/skills/location-services/SKILL.md",
+    "promptTriggers": {
+      "keywords": ["location", "gps", "위치", "주변역", "nearby"],
+      "intentPatterns": ["(location|gps|위치).*?(서비스|기능)"]
+    },
+    "fileTriggers": {
+      "pathPatterns": ["src/services/location*.ts", "src/hooks/useLocation*.ts"]
+    }
+  },
+  "notification-system": {
+    "type": "skill",
+    "enforcement": "suggest",
+    "priority": "normal",
+    "description": "푸시 알림 (Expo Notifications, 도착 알림)",
+    "skillFile": ".claude/skills/notification-system/SKILL.md",
+    "promptTriggers": {
+      "keywords": ["notification", "push", "알림", "푸시"],
+      "intentPatterns": ["(notification|push|알림).*?(설정|구현)"]
+    },
+    "fileTriggers": {
+      "pathPatterns": ["src/services/notification*.ts"]
+    }
   },
   "navigation-patterns": {
     "type": "guideline",
@@ -81,44 +128,59 @@
       "pathPatterns": ["src/navigation/**"]
     }
   },
+  "quality-validation": {
+    "type": "workflow",
+    "enforcement": "require",
+    "priority": "critical",
+    "description": "최종 품질 검증 (구현 완료 후 자동 호출)",
+    "agentFile": ".claude/agents/quality-validator.md",
+    "promptTriggers": {
+      "keywords": ["검증", "validate", "quality", "review", "완료", "done", "finish"],
+      "intentPatterns": ["(검증|validate|review).*?(code|코드)", "(완료|done|finish).*?(구현|implement)"]
+    }
+  },
   "parallel-coordinator": {
     "type": "workflow",
     "enforcement": "suggest",
     "priority": "high",
-    "description": "Coordinate parallel agent execution.",
+    "description": "병렬 에이전트 조정 (ACE Framework 기반)",
+    "skillFile": ".claude/skills/parallel-coordinator/SKILL.md",
     "promptTriggers": {
-      "keywords": ["parallel", "concurrent", "multi-agent"],
-      "intentPatterns": ["(parallel|concurrent).*?(agent|task)"]
+      "keywords": ["parallel", "concurrent", "multi-agent", "병렬"],
+      "intentPatterns": ["(parallel|concurrent|병렬).*?(agent|task|작업)"]
     }
   },
   "verification-loop": {
     "type": "workflow",
     "enforcement": "suggest",
     "priority": "high",
-    "description": "Boris Cherny style verification feedback loop.",
+    "description": "Boris Cherny 검증 피드백 루프",
+    "skillFile": ".claude/skills/verification-loop/SKILL.md",
     "promptTriggers": {
-      "keywords": ["verify", "verification", "check", "validate"],
-      "intentPatterns": ["(verify|validate).*?(code|app)"]
-    }
-  },
-  "dev-docs-workflow": {
-    "type": "workflow",
-    "enforcement": "suggest",
-    "priority": "high",
-    "description": "Dev Docs 3-파일 시스템 워크플로우",
-    "promptTriggers": {
-      "keywords": ["dev docs", "plan", "대규모 작업"],
-      "intentPatterns": ["(create|make).*?(dev docs|plan)"]
+      "keywords": ["verify", "verification", "check", "validate", "검증"],
+      "intentPatterns": ["(verify|validate|검증).*?(code|app|앱)"]
     }
   },
   "cc-feature-implementer-main": {
     "type": "workflow",
     "enforcement": "suggest",
     "priority": "high",
-    "description": "Phase-based feature plans with quality gates.",
+    "description": "Phase 기반 기능 계획 및 품질 게이트",
+    "skillFile": ".claude/skills/cc-feature-implementer-main/SKILL.md",
     "promptTriggers": {
-      "keywords": ["plan", "planning", "phases", "roadmap"],
-      "intentPatterns": ["(create|make).*?plan"]
+      "keywords": ["plan", "planning", "phases", "roadmap", "계획", "설계"],
+      "intentPatterns": ["(create|make|작성).*?(plan|계획)"]
+    }
+  },
+  "external-memory": {
+    "type": "workflow",
+    "enforcement": "suggest",
+    "priority": "normal",
+    "description": "장기 작업 컨텍스트 보존 (토큰 한계 대비)",
+    "skillFile": ".claude/skills/external-memory/SKILL.md",
+    "promptTriggers": {
+      "keywords": ["context", "memory", "checkpoint", "컨텍스트", "저장"],
+      "intentPatterns": ["(save|store|preserve).*?(context|memory)"]
     }
   }
 }

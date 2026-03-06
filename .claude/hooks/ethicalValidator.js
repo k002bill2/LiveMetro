@@ -1,8 +1,8 @@
 /**
- * Ethical Validator Hook for AOS Dashboard
+ * Ethical Validator Hook for LiveMetro
  * 위험 작업 사전 차단 (PreToolUse)
  *
- * @version 1.0.0-AOS Dashboard
+ * @version 1.0.0-LiveMetro
  *
  * @hook-config
  * {"event": "PreToolUse", "matcher": "Bash", "command": "node .claude/hooks/ethicalValidator.js 2>/dev/null || true"}

@@ -7,7 +7,7 @@
  * - Increase Understanding: 모든 에이전트 활동 투명하게 기록
  * - Transparency: 감사 추적 가능한 로그 생성
  *
- * @version 2.0.0-AOS Dashboard
+ * @version 2.0.0-LiveMetro
  *
  * @hook-config
  * {"event": "PostToolUse", "matcher": "Task", "command": "node .claude/hooks/agentTracer.js 2>/dev/null || true"}
