@@ -15,7 +15,6 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 
 import { getSubwayLineColor, getLineTextColor } from '@utils/colorUtils';
-import { Station } from '@models/train';
 
 // Simplified subway line data for MVP
 interface SubwayLineData {
