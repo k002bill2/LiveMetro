@@ -1,592 +1,122 @@
 {
-  "react-native-patterns": {
+  "error-handling": {
     "type": "guideline",
     "enforcement": "require",
-    "priority": "critical",
-    "description": "React Native/Expo 핵심 패턴 가이드",
+    "priority": "high",
+    "description": "에러 처리 패턴 (React Native: ErrorBoundary, Firebase: try/catch)",
     "promptTriggers": {
-      "keywords": [
-        "useEffect",
-        "component",
-        "screen",
-        "hook",
-        "navigation",
-        "컴포넌트",
-        "화면"
-      ],
-      "intentPatterns": [
-        "(create|add|make).*?(component|screen|hook)",
-        "(fix|debug).*?(useEffect|hook)",
-        "(생성|만들|추가).*?(컴포넌트|화면|훅)"
-      ]
+      "keywords": ["error", "catch", "try", "에러", "오류"],
+      "intentPatterns": ["(handle|catch).*?(error|exception)"]
     },
     "fileTriggers": {
-      "pathPatterns": [
-        "**/components/**/*.tsx",
-        "**/screens/**/*.tsx",
-        "**/hooks/**/*.ts"
-      ],
-      "contentPatterns": [
-        "useEffect",
-        "useState",
-        "React.FC"
-      ]
+      "pathPatterns": ["**/services/**", "**/hooks/**"]
+    },
+    "reminder": "에러는 빈 배열/null 반환, throw 지양"
+  },
+  "test-automation": {
+    "type": "skill",
+    "enforcement": "require",
+    "priority": "high",
+    "description": "Jest + React Native Testing Library 테스트 생성",
+    "promptTriggers": {
+      "keywords": ["test", "jest", "coverage", "tdd", "testing library"],
+      "intentPatterns": ["(write|add|create).*?test"]
+    },
+    "fileTriggers": {
+      "pathPatterns": ["**/__tests__/**", "**/*.test.ts", "**/*.test.tsx"]
     }
   },
-  "useeffect-cleanup": {
-    "type": "guardrail",
+  "react-native-development": {
+    "type": "skill",
     "enforcement": "require",
-    "priority": "critical",
-    "description": "useEffect cleanup 함수 필수 확인",
+    "priority": "high",
+    "description": "React Native + Expo 컴포넌트 개발",
     "promptTriggers": {
-      "keywords": [
-        "useEffect",
-        "subscription",
-        "interval",
-        "listener",
-        "구독",
-        "타이머"
-      ],
-      "intentPatterns": [
-        "useEffect.*?(subscribe|interval|timer|listener)",
-        "(add|remove).*?(subscription|listener)"
-      ]
+      "keywords": ["react native", "component", "screen", "expo", "컴포넌트", "화면"],
+      "intentPatterns": ["(create|add|make).*?(component|screen)", "(react native|RN).*?(개발|구현)"]
     },
-    "reminder": "useEffect에서 구독/타이머는 반드시 cleanup 함수에서 정리하세요"
+    "fileTriggers": {
+      "pathPatterns": ["src/**/*.tsx", "src/**/*.ts"]
+    }
   },
   "firebase-integration": {
     "type": "domain",
     "enforcement": "require",
     "priority": "high",
-    "description": "Firebase 통합 패턴 (Auth, Firestore)",
+    "description": "Firebase Auth + Firestore 통합",
     "promptTriggers": {
-      "keywords": [
-        "firebase",
-        "firestore",
-        "auth",
-        "인증",
-        "데이터베이스"
-      ],
-      "intentPatterns": [
-        "(firebase|firestore).*?(setup|config|integration)",
-        "(auth|인증).*?(login|signup|logout)"
-      ]
+      "keywords": ["firebase", "firestore", "auth", "collection", "document"],
+      "intentPatterns": ["(firebase|firestore).*?(auth|query|collection)"]
     },
     "fileTriggers": {
-      "pathPatterns": [
-        "**/services/firebase/**",
-        "**/services/auth/**"
-      ],
-      "contentPatterns": [
-        "firebase",
-        "firestore",
-        "auth"
-      ]
+      "pathPatterns": ["src/services/firebase*.ts", "src/config/firebase*.ts"]
     }
   },
-  "seoul-api-integration": {
+  "seoul-api-patterns": {
     "type": "domain",
     "enforcement": "require",
-    "priority": "critical",
-    "description": "Seoul Open Data API 통합 패턴",
-    "promptTriggers": {
-      "keywords": [
-        "seoul api",
-        "서울 api",
-        "실시간 도착",
-        "arrival",
-        "subway",
-        "지하철"
-      ],
-      "intentPatterns": [
-        "(seoul|서울).*?(api|데이터)",
-        "(실시간|realtime).*?(arrival|도착)",
-        "(fetch|get).*?(train|subway)"
-      ]
-    },
-    "fileTriggers": {
-      "pathPatterns": [
-        "**/services/api/**",
-        "**/seoulSubwayApi.ts"
-      ],
-      "contentPatterns": [
-        "seoulSubwayApi",
-        "ARRIVAL_INFO",
-        "STATION"
-      ]
-    },
-    "reminder": "API 폴링 간격은 최소 30초를 유지하세요"
-  },
-  "expo-notifications": {
-    "type": "domain",
-    "enforcement": "suggest",
     "priority": "high",
-    "description": "Expo Push Notifications 패턴",
+    "description": "Seoul Open Data API 통합 (30초 폴링 제한)",
     "promptTriggers": {
-      "keywords": [
-        "notification",
-        "push",
-        "알림",
-        "푸시"
-      ],
-      "intentPatterns": [
-        "(notification|알림).*?(send|schedule|push)",
-        "expo.*?notification"
-      ]
+      "keywords": ["seoul", "metro", "subway", "api", "실시간", "지하철"],
+      "intentPatterns": ["(seoul|metro|subway).*?(api|data)"]
     },
     "fileTriggers": {
-      "pathPatterns": [
-        "**/services/notification/**"
-      ],
-      "contentPatterns": [
-        "Notifications",
-        "scheduleNotification",
-        "ExpoPushToken"
-      ]
-    }
+      "pathPatterns": ["src/services/train*.ts", "src/services/seoul*.ts"]
+    },
+    "reminder": "30초 최소 폴링 간격 준수"
   },
   "navigation-patterns": {
     "type": "guideline",
-    "enforcement": "suggest",
+    "enforcement": "require",
     "priority": "high",
     "description": "React Navigation 6.x 패턴",
     "promptTriggers": {
-      "keywords": [
-        "navigation",
-        "navigate",
-        "screen",
-        "stack",
-        "tab",
-        "네비게이션"
-      ],
-      "intentPatterns": [
-        "(navigation|navigate).*?(screen|page)",
-        "(add|create).*?(screen|route)"
-      ]
+      "keywords": ["navigation", "screen", "route", "navigate", "네비게이션"],
+      "intentPatterns": ["(navigate|screen|route).*?(add|create)"]
     },
     "fileTriggers": {
-      "pathPatterns": [
-        "**/navigation/**"
-      ],
-      "contentPatterns": [
-        "createStackNavigator",
-        "createBottomTabNavigator",
-        "useNavigation"
-      ]
-    }
-  },
-  "typescript-strict": {
-    "type": "guardrail",
-    "enforcement": "block",
-    "priority": "critical",
-    "description": "TypeScript strict mode 준수",
-    "promptTriggers": {
-      "keywords": [
-        "any",
-        "타입",
-        "type",
-        "interface"
-      ],
-      "intentPatterns": [
-        ".*?:\\s*any\\b",
-        "(add|define).*?(type|interface)"
-      ]
-    },
-    "blockedPatterns": [
-      ": any",
-      "as any"
-    ],
-    "reminder": "any 타입 대신 구체적인 타입이나 unknown을 사용하세요"
-  },
-  "error-handling": {
-    "type": "guideline",
-    "enforcement": "require",
-    "priority": "high",
-    "description": "에러 처리 및 Sentry 통합",
-    "promptTriggers": {
-      "keywords": [
-        "error",
-        "catch",
-        "try",
-        "에러",
-        "오류",
-        "예외"
-      ],
-      "intentPatterns": [
-        "(handle|catch).*?(error|exception)",
-        "try.*?catch"
-      ]
-    },
-    "fileTriggers": {
-      "pathPatterns": [
-        "**/services/**",
-        "**/hooks/**"
-      ],
-      "contentPatterns": [
-        "try",
-        "catch",
-        "throw",
-        "Error"
-      ]
-    },
-    "reminder": "에러는 빈 배열/null 반환으로 처리하고, Sentry로 전송하세요"
-  },
-  "async-storage": {
-    "type": "domain",
-    "enforcement": "suggest",
-    "priority": "normal",
-    "description": "AsyncStorage 캐싱 패턴",
-    "promptTriggers": {
-      "keywords": [
-        "storage",
-        "cache",
-        "persist",
-        "캐시",
-        "저장"
-      ],
-      "intentPatterns": [
-        "(async)?storage.*?(save|get|set)",
-        "(cache|persist).*?(data|state)"
-      ]
-    },
-    "fileTriggers": {
-      "pathPatterns": [
-        "**/utils/storageUtils.ts",
-        "**/services/data/**"
-      ],
-      "contentPatterns": [
-        "AsyncStorage",
-        "setItem",
-        "getItem"
-      ]
-    }
-  },
-  "test-coverage": {
-    "type": "validation",
-    "enforcement": "require",
-    "priority": "high",
-    "description": "Jest 테스트 커버리지 (75% statements)",
-    "promptTriggers": {
-      "keywords": [
-        "test",
-        "jest",
-        "coverage",
-        "테스트",
-        "커버리지"
-      ],
-      "intentPatterns": [
-        "(write|add).*?test",
-        "(run|check).*?coverage"
-      ]
-    },
-    "fileTriggers": {
-      "pathPatterns": [
-        "**/__tests__/**",
-        "**/*.test.ts",
-        "**/*.test.tsx"
-      ],
-      "contentPatterns": [
-        "describe",
-        "it",
-        "expect",
-        "jest"
-      ]
-    },
-    "thresholds": {
-      "statements": 75,
-      "functions": 70,
-      "branches": 60
-    }
-  },
-  "performance-optimization": {
-    "type": "guideline",
-    "enforcement": "suggest",
-    "priority": "normal",
-    "description": "React Native 성능 최적화",
-    "promptTriggers": {
-      "keywords": [
-        "performance",
-        "optimize",
-        "memo",
-        "callback",
-        "성능",
-        "최적화"
-      ],
-      "intentPatterns": [
-        "(optimize|improve).*?(performance|speed)",
-        "(use)?memo.*?(component|function)"
-      ]
-    },
-    "fileTriggers": {
-      "pathPatterns": [
-        "**/components/**"
-      ],
-      "contentPatterns": [
-        "React.memo",
-        "useMemo",
-        "useCallback"
-      ]
-    }
-  },
-  "checklist-generator": {
-    "type": "tool",
-    "enforcement": "suggest",
-    "priority": "normal",
-    "description": "자동 체크리스트 생성",
-    "promptTriggers": {
-      "keywords": [
-        "checklist",
-        "체크리스트",
-        "TODO",
-        "확인사항"
-      ],
-      "intentPatterns": [
-        "(create|generate).*?(checklist|todo)",
-        "(verify|check).*?list"
-      ]
-    }
-  },
-  "code-simplifier": {
-    "type": "agent",
-    "enforcement": "suggest",
-    "priority": "normal",
-    "description": "코드 단순화 및 리팩토링",
-    "agentFile": ".claude/agents/code-simplifier.md",
-    "model": "haiku",
-    "promptTriggers": {
-      "keywords": [
-        "simplify",
-        "refactor",
-        "단순화",
-        "리팩토링",
-        "개선"
-      ],
-      "intentPatterns": [
-        "(simplify|refactor).*?(code|function)",
-        "(reduce|줄이).*?(complexity|복잡도)"
-      ]
+      "pathPatterns": ["src/navigation/**"]
     }
   },
   "parallel-coordinator": {
     "type": "workflow",
     "enforcement": "suggest",
     "priority": "high",
-    "description": "Coordinate parallel agent execution using ACE Framework for AOS Dashboard development. Use when implementing features with 3+ independent subtasks (UI + API + Firebase + Tests).",
+    "description": "Coordinate parallel agent execution.",
     "promptTriggers": {
-      "keywords": [
-        "parallel",
-        "concurrent",
-        "multi-agent",
-        "coordinate",
-        "ACE"
-      ],
-      "intentPatterns": [
-        "(parallel|concurrent).*?(agent|task|execution)",
-        "(coordinate|orchestrate).*?(agent|worker)",
-        "multi.?agent"
-      ]
-    }
-  },
-  "agent-improvement": {
-    "type": "meta",
-    "enforcement": "suggest",
-    "priority": "low",
-    "description": "Self-improvement loop for multi-agent workflows. Diagnose failures, improve tool descriptions, and learn from success/failure patterns.",
-    "promptTriggers": {
-      "keywords": [
-        "improvement",
-        "failure",
-        "diagnose",
-        "optimize",
-        "benchmark"
-      ],
-      "intentPatterns": [
-        "(improve|optimize).*?(agent|workflow)",
-        "(diagnose|analyze).*?(failure|error)"
-      ]
-    }
-  },
-  "agent-observability": {
-    "type": "infrastructure",
-    "enforcement": "suggest",
-    "priority": "medium",
-    "description": "Production tracing and metrics for multi-agent workflows. Track agent decisions, tool calls, and performance without monitoring conversation content.",
-    "promptTriggers": {
-      "keywords": [
-        "trace",
-        "metrics",
-        "observability",
-        "monitoring",
-        "performance"
-      ],
-      "intentPatterns": [
-        "(trace|track).*?(agent|workflow)",
-        "(monitor|observe).*?(performance|decision)"
-      ]
-    }
-  },
-  "cc-feature-implementer-main": {
-    "type": "workflow",
-    "enforcement": "suggest",
-    "priority": "high",
-    "description": "Creates phase-based feature plans with quality gates and incremental delivery structure. Use when planning features, organizing work, breaking down tasks, creating roadmaps, or structuring development strategy. Keywords: plan, planning, phases, breakdown, strategy, roadmap, organize, structure, outline.",
-    "promptTriggers": {
-      "keywords": [
-        "plan",
-        "planning",
-        "phases",
-        "roadmap",
-        "breakdown"
-      ],
-      "intentPatterns": [
-        "(create|make).*?plan",
-        "(break.*?down|structure).*?(task|feature)"
-      ]
-    }
-  },
-  "external-memory": {
-    "type": "workflow",
-    "enforcement": "suggest",
-    "priority": "high",
-    "description": "Context persistence system for long-running multi-agent tasks. Saves research plans, findings, and checkpoints to prevent context loss at token limits.",
-    "promptTriggers": {}
-  },
-  "hook-creator": {
-    "type": "meta",
-    "enforcement": "suggest",
-    "priority": "normal",
-    "description": "Create and configure Claude Code hooks for customizing agent behavior. Use when the user wants to (1) create a new hook, (2) configure automatic formatting, logging, or notifications, (3) add file protection or custom permissions, (4) set up pre/post tool execution actions, or (5) asks about hook events like PreToolUse, PostToolUse, Notification, etc.",
-    "promptTriggers": {
-      "keywords": [
-        "hook",
-        "hooks",
-        "PreToolUse",
-        "PostToolUse",
-        "UserPromptSubmit"
-      ],
-      "intentPatterns": [
-        "(create|make|add).*?hook",
-        "(configure|setup).*?hook"
-      ]
-    },
-    "fileTriggers": {
-      "pathPatterns": [
-        ".claude/hooks/**"
-      ]
-    }
-  },
-  "skill-creator": {
-    "type": "meta",
-    "enforcement": "suggest",
-    "priority": "normal",
-    "description": "Guide for creating effective skills. This skill should be used when users want to create a new skill (or update an existing skill) that extends Claude's capabilities with specialized knowledge, workflows, or tool integrations.",
-    "promptTriggers": {
-      "keywords": [
-        "skill",
-        "create skill",
-        "new skill",
-        "SKILL.md"
-      ],
-      "intentPatterns": [
-        "(create|make|add).*?skill",
-        "(update|modify).*?skill"
-      ]
-    },
-    "fileTriggers": {
-      "pathPatterns": [
-        ".claude/skills/**"
-      ]
-    }
-  },
-  "slash-command-creator": {
-    "type": "meta",
-    "enforcement": "suggest",
-    "priority": "normal",
-    "description": "Guide for creating Claude Code slash commands. Use when the user wants to create a new slash command, update an existing slash command, or asks about slash command syntax, frontmatter options, or best practices.",
-    "promptTriggers": {
-      "keywords": [
-        "command",
-        "slash command",
-        "/command"
-      ],
-      "intentPatterns": [
-        "(create|make|add).*?command",
-        "(new|custom).*?slash"
-      ]
-    },
-    "fileTriggers": {
-      "pathPatterns": [
-        ".claude/commands/**"
-      ]
-    }
-  },
-  "subagent-creator": {
-    "type": "meta",
-    "enforcement": "suggest",
-    "priority": "normal",
-    "description": "Create specialized Claude Code sub-agents with custom system prompts and tool configurations. Use when users ask to create a new sub-agent, custom agent, specialized assistant, or want to configure task-specific AI workflows for Claude Code.",
-    "promptTriggers": {
-      "keywords": [
-        "agent",
-        "subagent",
-        "sub-agent",
-        "specialist"
-      ],
-      "intentPatterns": [
-        "(create|make|add).*?(agent|subagent)",
-        "(new|custom).*?agent"
-      ]
-    },
-    "fileTriggers": {
-      "pathPatterns": [
-        ".claude/agents/**"
-      ]
-    }
-  },
-  "test-automation": {
-    "type": "skill",
-    "enforcement": "suggest",
-    "priority": "high",
-    "description": "Generate comprehensive Vitest tests for React Web components, hooks, and stores. Use when writing tests, improving coverage, or test-driven development.",
-    "promptTriggers": {
-      "keywords": [
-        "test",
-        "vitest",
-        "coverage",
-        "tdd",
-        "testing library"
-      ],
-      "intentPatterns": [
-        "(write|add|create).*?test",
-        "(run|check).*?coverage",
-        "test.*?(component|hook|store)"
-      ]
-    },
-    "fileTriggers": {
-      "pathPatterns": [
-        "**/__tests__/**",
-        "**/*.test.ts",
-        "**/*.test.tsx"
-      ]
+      "keywords": ["parallel", "concurrent", "multi-agent"],
+      "intentPatterns": ["(parallel|concurrent).*?(agent|task)"]
     }
   },
   "verification-loop": {
     "type": "workflow",
     "enforcement": "suggest",
     "priority": "high",
-    "description": "Boris Cherny style verification feedback loop automation. Run type check, lint, test, and build verification.",
+    "description": "Boris Cherny style verification feedback loop.",
     "promptTriggers": {
-      "keywords": [
-        "verify",
-        "verification",
-        "feedback loop",
-        "check",
-        "validate"
-      ],
-      "intentPatterns": [
-        "(verify|validate).*?(code|app)",
-        "(feedback|verification).*?loop"
-      ]
+      "keywords": ["verify", "verification", "check", "validate"],
+      "intentPatterns": ["(verify|validate).*?(code|app)"]
+    }
+  },
+  "dev-docs-workflow": {
+    "type": "workflow",
+    "enforcement": "suggest",
+    "priority": "high",
+    "description": "Dev Docs 3-파일 시스템 워크플로우",
+    "promptTriggers": {
+      "keywords": ["dev docs", "plan", "대규모 작업"],
+      "intentPatterns": ["(create|make).*?(dev docs|plan)"]
+    }
+  },
+  "cc-feature-implementer-main": {
+    "type": "workflow",
+    "enforcement": "suggest",
+    "priority": "high",
+    "description": "Phase-based feature plans with quality gates.",
+    "promptTriggers": {
+      "keywords": ["plan", "planning", "phases", "roadmap"],
+      "intentPatterns": ["(create|make).*?plan"]
     }
   }
 }

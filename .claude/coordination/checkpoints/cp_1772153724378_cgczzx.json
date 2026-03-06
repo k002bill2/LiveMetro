@@ -1,0 +1,69 @@
+{
+  "checkpointId": "cp_1772153724378_cgczzx",
+  "agentId": "session",
+  "trigger": "stop_event",
+  "description": "2 files edited",
+  "context": {
+    "editedFiles": [
+      ".aos-project.json",
+      ".claude/hooks/.context-state.json"
+    ],
+    "activeAgents": [],
+    "completedAgents": [
+      {
+        "subagentType": "test-automation-specialist",
+        "duration_ms": 44
+      },
+      {
+        "subagentType": "test-automation-specialist",
+        "duration_ms": 43
+      },
+      {
+        "subagentType": "test-automation-specialist",
+        "duration_ms": 43
+      },
+      {
+        "subagentType": "test-automation-specialist",
+        "duration_ms": 44
+      },
+      {
+        "subagentType": "test-automation-specialist",
+        "duration_ms": 45
+      },
+      {
+        "subagentType": "test-automation-specialist",
+        "duration_ms": 48
+      },
+      {
+        "subagentType": "general-purpose",
+        "duration_ms": 86
+      },
+      {
+        "subagentType": "general-purpose",
+        "duration_ms": 123
+      },
+      {
+        "subagentType": "general-purpose",
+        "duration_ms": 89
+      },
+      {
+        "subagentType": "general-purpose",
+        "duration_ms": 269
+      },
+      {
+        "subagentType": "general-purpose",
+        "duration_ms": 171
+      },
+      {
+        "subagentType": "general-purpose",
+        "duration_ms": 202229
+      },
+      {
+        "subagentType": "general-purpose",
+        "duration_ms": 310476
+      }
+    ]
+  },
+  "timestamp": "2026-02-27T00:55:24.378Z",
+  "createdAt": 1772153724379
+}

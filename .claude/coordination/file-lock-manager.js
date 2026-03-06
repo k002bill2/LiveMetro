@@ -162,7 +162,7 @@ function loadLocks() {
 }
 
 /**
- * 락 파일 저장 (atomic write: .tmp → rename)
+ * 락 파일 저장 (atomic write: .tmp -> rename)
  */
 function saveLocks(locks) {
   try {

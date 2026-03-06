@@ -18,7 +18,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { spawn, execSync } = require('child_process');
 
-// ─── Constants ──────────────────────────────────────────────
+// --- Constants ---
 const PROJECT_ROOT = path.resolve(__dirname, '../..');
 const BRIDGE_DIR = path.join(PROJECT_ROOT, '.claude', 'gemini-bridge');
 const REVIEWS_DIR = path.join(BRIDGE_DIR, 'reviews');
@@ -27,18 +27,17 @@ const ERRORS_LOG = path.join(BRIDGE_DIR, 'errors.log');
 const GEMINI_BIN = '/opt/homebrew/bin/gemini';
 const GEMINI_MD = path.join(PROJECT_ROOT, 'GEMINI.md');
 
-const TIMEOUT_REVIEW = 120_000;  // 120s
-const TIMEOUT_SCAN = 180_000;    // 180s
+const TIMEOUT_REVIEW = 180_000;
+const TIMEOUT_SCAN = 300_000;
 const DAILY_LIMIT = 900;
 
-// ─── State Management ───────────────────────────────────────
+// --- State Management ---
 
 function loadState() {
   try {
     if (fs.existsSync(STATE_FILE)) {
       const raw = fs.readFileSync(STATE_FILE, 'utf8');
       const state = JSON.parse(raw);
-      // Reset daily counter if date changed
       const today = new Date().toISOString().slice(0, 10);
       if (state.date !== today) {
         state.date = today;
@@ -78,7 +77,7 @@ function incrementCallCount(state) {
   saveState(state);
 }
 
-// ─── Error Logging ──────────────────────────────────────────
+// --- Error Logging ---
 
 function logError(context, error) {
   try {
@@ -86,27 +85,14 @@ function logError(context, error) {
     const timestamp = new Date().toISOString();
     const entry = `[${timestamp}] [${context}] ${error.message || error}\n`;
     fs.appendFileSync(ERRORS_LOG, entry);
-  } catch (_) {
-    // Silent fail - cannot even log errors
-  }
+  } catch (_) {}
 }
 
-// ─── Gemini Invocation ──────────────────────────────────────
+// --- Gemini Invocation ---
 
-/**
- * Call Gemini CLI with a prompt string.
- * Small prompts (<200K) use -p flag directly.
- * Large prompts write to a temp file and use stdin pipe with -p instruction prefix,
- * plus --approval-mode plan to prevent Gemini from launching tool calls.
- * PID-based timeout (macOS has no `timeout` command).
- *
- * @param {string} prompt - The prompt text
- * @param {object} options - { timeoutMs, outputFormat }
- * @returns {Promise<{success: boolean, output: string, error?: string}>}
- */
 function callGemini(prompt, options = {}) {
   const { timeoutMs = TIMEOUT_REVIEW, outputFormat = 'text' } = options;
-  const TMPFILE_THRESHOLD = 200_000; // Use temp file above this size
+  const TMPFILE_THRESHOLD = 200_000;
 
   return new Promise((resolve) => {
     if (!fs.existsSync(GEMINI_BIN)) {
@@ -121,7 +107,6 @@ function callGemini(prompt, options = {}) {
     const useTmpFile = prompt.length > TMPFILE_THRESHOLD;
     let tmpFile = null;
 
-    // For large prompts, write to temp file and reference it in -p
     if (useTmpFile) {
       tmpFile = path.join(BRIDGE_DIR, `.prompt-${Date.now()}.tmp`);
       try {
@@ -133,8 +118,6 @@ function callGemini(prompt, options = {}) {
     }
 
     const args = [];
-
-    // READ-ONLY 제한: 프롬프트에 수정 금지 명시 + sandbox로 파일시스템 보호
     const readOnlyPrefix = 'CRITICAL CONSTRAINT: You are a READ-ONLY reviewer. You MUST NOT use any tools that write, edit, or delete files (WriteFile, EditFile, ReplaceInFile, etc). Only analyze and respond with text. ';
 
     if (useTmpFile) {
@@ -144,8 +127,8 @@ function callGemini(prompt, options = {}) {
     }
 
     args.push('--output-format', outputFormat);
-    args.push('--sandbox');          // Sandbox: 파일 수정 시도해도 실제 파일시스템에 반영 안됨
-    args.push('-e', 'none');         // 확장 비활성화: 파일 도구 로드 차단
+    args.push('--sandbox');
+    args.push('-e', 'none');
     args.push('--yolo');
 
     let stdout = '';
@@ -154,20 +137,22 @@ function callGemini(prompt, options = {}) {
 
     const child = spawn(GEMINI_BIN, args, {
       cwd: PROJECT_ROOT,
-      env: { ...process.env, TERM: 'dumb' },
+      env: {
+        ...process.env,
+        TERM: 'dumb',
+        NODE_OPTIONS: '--max-old-space-size=2048'
+      },
       stdio: [useTmpFile ? 'pipe' : 'ignore', 'pipe', 'pipe']
     });
 
-    // Feed prompt via stdin for large prompts
     if (useTmpFile) {
       const content = fs.readFileSync(tmpFile, 'utf8');
-      child.stdin.on('error', () => {}); // Suppress EPIPE if Gemini closes early
+      child.stdin.on('error', () => {});
       child.stdin.write(content, () => {
         try { child.stdin.end(); } catch (_) {}
       });
     }
 
-    // PID-based timeout
     const timer = setTimeout(() => {
       killed = true;
       try { process.kill(child.pid, 'SIGTERM'); } catch (_) {}
@@ -181,7 +166,6 @@ function callGemini(prompt, options = {}) {
 
     child.on('close', (code) => {
       clearTimeout(timer);
-      // Cleanup temp file
       if (tmpFile) {
         try { if (fs.existsSync(tmpFile)) fs.unlinkSync(tmpFile); } catch (_) {}
       }
@@ -205,19 +189,11 @@ function callGemini(prompt, options = {}) {
   });
 }
 
-// ─── Review Mode ────────────────────────────────────────────
+// --- Review Mode ---
 
-/**
- * Review code changes using Gemini as second opinion.
- * Gets git diff, sends to Gemini with review prompt.
- *
- * @param {string[]} files - Optional list of specific files to review
- * @returns {Promise<object>} Review result
- */
 async function runReview(files = []) {
   const state = loadState();
 
-  // 4c. Clean up stale activeJobs (older than TIMEOUT_REVIEW + 30s)
   const staleThreshold = Date.now() - (TIMEOUT_REVIEW + 30_000);
   const staleCount = state.activeJobs.length;
   state.activeJobs = state.activeJobs.filter(j => {
@@ -233,7 +209,6 @@ async function runReview(files = []) {
     return { skipped: true, reason: 'daily_limit' };
   }
 
-  // Get diff
   let diff;
   try {
     if (files.length > 0) {
@@ -246,7 +221,6 @@ async function runReview(files = []) {
       });
     }
   } catch (e) {
-    // Try staged + unstaged
     try {
       diff = execSync('git diff', {
         cwd: PROJECT_ROOT, encoding: 'utf8', maxBuffer: 1024 * 1024
@@ -261,7 +235,6 @@ async function runReview(files = []) {
     return { skipped: true, reason: 'no_changes' };
   }
 
-  // 4a. Diff hash deduplication — skip if same diff reviewed within 10 minutes
   const diffHash = crypto.createHash('md5').update(diff).digest('hex').slice(0, 12);
   const tenMinAgo = Date.now() - 10 * 60 * 1000;
   const recentDuplicate = (state.pendingReviews || []).find(r => {
@@ -271,14 +244,11 @@ async function runReview(files = []) {
     return { skipped: true, reason: 'duplicate_diff', existingReview: recentDuplicate.id };
   }
 
-  // Smart diff handling for large diffs
-  const maxDiffLen = 80_000;
+  const maxDiffLen = 50_000;
   if (diff.length > maxDiffLen) {
-    // Extract only key changes: file headers + first N lines per file
     diff = truncateDiffSmart(diff, maxDiffLen);
   }
 
-  // Get recent commit messages for intent context
   let recentCommits = '';
   try {
     recentCommits = execSync('git log --oneline -5 2>/dev/null', {
@@ -286,7 +256,6 @@ async function runReview(files = []) {
     }).trim();
   } catch (_) {}
 
-  // Load GEMINI.md context if available
   let geminiContext = '';
   try {
     if (fs.existsSync(GEMINI_MD)) {
@@ -296,18 +265,15 @@ async function runReview(files = []) {
 
   const prompt = buildReviewPrompt(diff, geminiContext, recentCommits);
 
-  // Register active job
   const jobId = `review-${Date.now()}`;
   state.activeJobs.push({ id: jobId, mode: 'review', startedAt: new Date().toISOString() });
   incrementCallCount(state);
 
   const result = await callGemini(prompt, { timeoutMs: TIMEOUT_REVIEW, outputFormat: 'text' });
 
-  // Remove from active jobs
   const updatedState = loadState();
   updatedState.activeJobs = updatedState.activeJobs.filter(j => j.id !== jobId);
 
-  // Post-validate review to filter false positives
   let validatedReview = result.success ? result.output : null;
   let validationMeta = null;
   if (result.success && validatedReview) {
@@ -318,7 +284,6 @@ async function runReview(files = []) {
     }
   }
 
-  // Save review result
   const reviewResult = {
     id: jobId,
     timestamp: new Date().toISOString(),
@@ -347,15 +312,6 @@ async function runReview(files = []) {
   return reviewResult;
 }
 
-/**
- * Smart diff truncation: preserve file headers and key hunks.
- * Instead of naive slice, keeps the beginning of each file's diff
- * to maximize context coverage across all changed files.
- *
- * @param {string} diff - Full git diff
- * @param {number} maxLen - Maximum output length
- * @returns {string} Truncated diff with all file headers preserved
- */
 function truncateDiffSmart(diff, maxLen) {
   const fileSections = diff.split(/(?=^diff --git )/m);
   const maxPerFile = Math.floor(maxLen / Math.max(fileSections.length, 1));
@@ -368,7 +324,6 @@ function truncateDiffSmart(diff, maxLen) {
     } else {
       const remaining = maxLen - result.length;
       if (remaining > 200) {
-        // Keep at least the header and first hunk
         const truncated = section.slice(0, Math.min(remaining, maxPerFile));
         result += truncated + '\n... [FILE TRUNCATED]\n';
         truncatedCount++;
@@ -390,7 +345,6 @@ function buildReviewPrompt(diff, geminiContext, recentCommits = '') {
     ? `\n\nPROJECT CONTEXT:\n${geminiContext}\n`
     : '';
 
-  // Auto-detect which skills to activate based on diff content
   const activeSkills = detectSkillsFromDiff(diff);
   const skillBlock = activeSkills.length > 0
     ? `\nACTIVATED SKILLS: ${activeSkills.join(', ')}\nApply the review criteria from these skills to the diff below.\n`
@@ -400,8 +354,7 @@ function buildReviewPrompt(diff, geminiContext, recentCommits = '') {
     ? `\nRECENT COMMITS (for intent context):\n${recentCommits}\n`
     : '';
 
-  return `You are a verification partner reviewing Claude Code's changes for an AOS project
-(LangGraph + FastAPI backend, React + Zustand + Tailwind frontend).
+  return `You are a verification partner reviewing Claude Code's changes for a LiveMetro project (React Native + Expo + Firebase mobile app for Seoul subway real-time arrivals).
 ${contextBlock}${skillBlock}${commitsBlock}
 CRITICAL INSTRUCTION FOR READING THE DIFF:
 The content below is a UNIFIED DIFF produced by \`git diff\`.
@@ -437,22 +390,13 @@ DIFF:
 ${diff}`;
 }
 
-// ─── Skill Detection ────────────────────────────────────────
+// --- Skill Detection ---
 
-/**
- * Detect which Gemini skills to activate based on diff content.
- * Maps file patterns to skill names for automatic skill activation.
- *
- * @param {string} diff - Git diff content
- * @returns {string[]} List of skill names to activate
- */
 function detectSkillsFromDiff(diff) {
   const skills = new Set();
 
-  // Always activate code-review for any diff
   skills.add('code-review');
 
-  // Security-related changes (tightened patterns to reduce false positives)
   const securityFilePatterns = [
     /auth[._/]/i, /\.env/i, /secret/i, /credential/i, /oauth/i
   ];
@@ -461,9 +405,7 @@ function detectSkillsFromDiff(diff) {
     /cors/i, /oauth/i, /credential/i,
     /sanitize/i, /validate.*input/i
   ];
-  // Activate if security-related file path OR 2+ content pattern matches
   const hasSecurityFile = securityFilePatterns.some(p => {
-    // Check only diff file headers (lines starting with "diff --git" or "---" or "+++")
     return diff.split('\n').some(line =>
       (/^diff --git|^---|^\+\+\+/.test(line)) && p.test(line)
     );
@@ -473,19 +415,16 @@ function detectSkillsFromDiff(diff) {
     skills.add('security-audit');
   }
 
-  // Type boundary changes (both frontend and backend files changed)
-  const hasFrontend = /src\/dashboard\/src\/(types|stores|components)/.test(diff);
-  const hasBackend = /src\/backend\/(models|api|services)/.test(diff);
+  const hasFrontend = /src\/(types|hooks|components|screens)/.test(diff);
+  const hasBackend = /src\/services/.test(diff);
   if (hasFrontend && hasBackend) {
     skills.add('type-safety');
   }
 
-  // Type definition changes
   if (/\.(types|models)\.(ts|py)/.test(diff) || /interface\s+\w+|class\s+\w+.*BaseModel/.test(diff)) {
     skills.add('type-safety');
   }
 
-  // Architecture-level changes (new files, imports, config)
   const archPatterns = [
     /^diff --git.*new file/m,
     /from\s+\.\.|import.*from\s+['"]@\//,
@@ -499,23 +438,14 @@ function detectSkillsFromDiff(diff) {
   return [...skills];
 }
 
-// ─── Post-Validation Filter ─────────────────────────────────
+// --- Post-Validation Filter ---
 
-/**
- * Validate and filter Gemini review issues to remove false positives.
- * Runs locally after Gemini returns, before saving the result.
- *
- * @param {string} reviewText - Raw review text from Gemini
- * @param {string} diff - The original git diff that was reviewed
- * @returns {{ filteredText: string, removedCount: number, modified: boolean }}
- */
 function validateReviewIssues(reviewText, diff) {
   const lines = reviewText.split('\n');
   let removedCount = 0;
   let modified = false;
   const filteredLines = [];
 
-  // Parse diff to know which files and line ranges are present
   const diffFiles = new Set();
   const diffSections = {};
   const fileHeaderRegex = /^diff --git a\/(.+?) b\/(.+)$/;
@@ -538,7 +468,6 @@ function validateReviewIssues(reviewText, diff) {
     }
   }
 
-  // Escaped operator pattern: detects hallucinated backslash-escaped operators
   const escapedOperatorPattern = /\\!==|\\===|\\!=|\\>=|\\<=|\\&&|\\\|\|/;
 
   let inIssuesBlock = false;
@@ -567,19 +496,16 @@ function validateReviewIssues(reviewText, diff) {
     const line = lines[i];
     const trimmed = line.trim();
 
-    // Detect start of ISSUES block
     if (/^ISSUES:/i.test(trimmed)) {
       inIssuesBlock = true;
       filteredLines.push(line);
       continue;
     }
 
-    // Detect end of ISSUES block
     if (inIssuesBlock && /^(VERDICT|SUMMARY):/i.test(trimmed)) {
       flushIssue();
       inIssuesBlock = false;
 
-      // If all critical/warning issues were removed, override VERDICT
       if (/^VERDICT:/i.test(trimmed) && criticalOrWarningCount === 0 && removedCount > 0) {
         filteredLines.push('VERDICT: approve');
         modified = true;
@@ -595,36 +521,29 @@ function validateReviewIssues(reviewText, diff) {
       continue;
     }
 
-    // Inside ISSUES block — parse issue lines
     if (/^\s*-\s*\[severity:/.test(line)) {
-      // New issue starts — flush previous
       flushIssue();
       currentIssueLines = [line];
 
-      // Check 1: Escaped operator hallucination
       if (escapedOperatorPattern.test(line)) {
         issueRemoved = true;
         continue;
       }
 
-      // Check 2: Referenced file not in diff
       const fileRef = line.match(/\]\s+([^\s:]+):(\d+)/);
       if (fileRef) {
         const refFile = fileRef[1];
         const refLine = parseInt(fileRef[2], 10);
 
-        // Normalize: try both with and without leading paths
         const fileInDiff = diffFiles.has(refFile) ||
           [...diffFiles].some(f => f.endsWith('/' + refFile) || f === refFile);
 
         if (!fileInDiff) {
-          // File not in diff: downgrade to info
           currentIssueLines = [line.replace(/\[severity:(critical|warning)\]/, '[severity:info][phantom-file]')];
           if (/\[severity:(critical|warning)\]/.test(line)) modified = true;
           continue;
         }
 
-        // Check 3: Referenced line outside diff hunk ranges
         const matchingDiffFile = [...diffFiles].find(f => f.endsWith('/' + refFile) || f === refFile);
         if (matchingDiffFile && diffSections[matchingDiffFile]) {
           const ranges = diffSections[matchingDiffFile];
@@ -636,15 +555,12 @@ function validateReviewIssues(reviewText, diff) {
         }
       }
     } else {
-      // Continuation line of current issue
       currentIssueLines.push(line);
     }
   }
 
-  // Flush last issue
   flushIssue();
 
-  // If no issues remain, ensure "ISSUES: none" if all were removed
   const result = filteredLines.join('\n');
   if (removedCount > 0 && !/\[severity:/.test(result) && /^ISSUES:\s*$/m.test(result)) {
     return {
@@ -657,14 +573,8 @@ function validateReviewIssues(reviewText, diff) {
   return { filteredText: result, removedCount, modified };
 }
 
-// ─── Scan Mode ──────────────────────────────────────────────
+// --- Scan Mode ---
 
-/**
- * Scan entire codebase or subsection using Gemini's large context.
- *
- * @param {object} options - { scope, analysisType }
- * @returns {Promise<object>} Scan result
- */
 async function runScan(options = {}) {
   const { scope = 'full', analysisType = 'architecture' } = options;
 
@@ -674,7 +584,6 @@ async function runScan(options = {}) {
     return { skipped: true, reason: 'daily_limit' };
   }
 
-  // Collect source files based on scope
   let sourceContent = '';
   try {
     sourceContent = collectSource(scope);
@@ -687,16 +596,13 @@ async function runScan(options = {}) {
     return { skipped: true, reason: 'no_source_files' };
   }
 
-  // Truncate to ~200K chars to stay within Gemini CLI memory limits
-  // (Gemini CLI OOMs on large stdin; 200K provides good coverage for most scopes)
-  const maxLen = 200_000;
+  const maxLen = 120_000;
   if (sourceContent.length > maxLen) {
     sourceContent = sourceContent.slice(0, maxLen) + '\n\n... [TRUNCATED - ' +
       Math.round(sourceContent.length / 1024) + 'KB total, showing first ' +
       Math.round(maxLen / 1024) + 'KB] ...';
   }
 
-  // Load GEMINI.md context
   let geminiContext = '';
   try {
     if (fs.existsSync(GEMINI_MD)) {
@@ -736,18 +642,15 @@ async function runScan(options = {}) {
 function collectSource(scope) {
   const files = [];
   const extensions = {
-    backend: ['.py'],
+    backend: ['.ts'],
     frontend: ['.ts', '.tsx'],
-    full: ['.py', '.ts', '.tsx']
+    full: ['.ts', '.tsx']
   };
 
   const dirs = {
-    backend: [path.join(PROJECT_ROOT, 'src', 'backend')],
-    frontend: [path.join(PROJECT_ROOT, 'src', 'dashboard', 'src')],
-    full: [
-      path.join(PROJECT_ROOT, 'src', 'backend'),
-      path.join(PROJECT_ROOT, 'src', 'dashboard', 'src')
-    ]
+    backend: [path.join(PROJECT_ROOT, 'src', 'services')],
+    frontend: [path.join(PROJECT_ROOT, 'src')],
+    full: [path.join(PROJECT_ROOT, 'src')]
   };
 
   const targetDirs = dirs[scope] || dirs.full;
@@ -757,7 +660,6 @@ function collectSource(scope) {
     collectFilesRecursive(dir, targetExts, files);
   }
 
-  // Build concatenated source
   let result = '';
   for (const filePath of files) {
     try {
@@ -800,8 +702,8 @@ function buildScanPrompt(source, analysisType, scope, geminiContext) {
   const analysisInstructions = {
     architecture: `Analyze the overall architecture:
 1. Component dependency graph - are there circular dependencies?
-2. Layer separation - does the code respect backend/frontend boundaries?
-3. API contract consistency - do frontend types match backend schemas?
+2. Layer separation - does the code respect service/screen boundaries?
+3. API contract consistency - do types match Firebase schemas?
 4. Missing abstractions or over-engineering?`,
 
     deps: `Analyze the import/dependency graph:
@@ -820,14 +722,13 @@ function buildScanPrompt(source, analysisType, scope, geminiContext) {
 1. Authentication/authorization gaps
 2. Input validation missing
 3. Secrets or credentials in code
-4. SQL injection, XSS, or CSRF vulnerabilities
+4. Firebase rules vulnerabilities
 5. Insecure defaults`
   };
 
   const instructions = analysisInstructions[analysisType] || analysisInstructions.architecture;
   const contextBlock = geminiContext ? `\nPROJECT CONTEXT:\n${geminiContext}\n` : '';
 
-  // Map analysis types to skills
   const skillMap = {
     architecture: 'architecture-check',
     security: 'security-audit',
@@ -836,7 +737,7 @@ function buildScanPrompt(source, analysisType, scope, geminiContext) {
   };
   const skill = skillMap[analysisType] || 'architecture-check';
 
-  return `You are analyzing the ${scope} scope of an AOS project.
+  return `You are analyzing the ${scope} scope of a LiveMetro project (React Native + Expo + Firebase).
 ${contextBlock}
 ACTIVATED SKILL: ${skill}
 ANALYSIS TYPE: ${analysisType}
@@ -856,15 +757,8 @@ SOURCE CODE:
 ${source}`;
 }
 
-// ─── Parallel Mode ──────────────────────────────────────────
+// --- Parallel Mode ---
 
-/**
- * Run a custom prompt on Gemini in parallel with Claude's work.
- *
- * @param {string} task - Description of the task
- * @param {string} prompt - Full prompt to send
- * @returns {Promise<object>}
- */
 async function runParallel(task, prompt) {
   const state = loadState();
   if (!canCallGemini(state)) {
@@ -905,7 +799,7 @@ async function runParallel(task, prompt) {
   return parallelResult;
 }
 
-// ─── Status Mode ────────────────────────────────────────────
+// --- Status Mode ---
 
 function showStatus() {
   const state = loadState();
@@ -940,7 +834,7 @@ function showStatus() {
   return state;
 }
 
-// ─── Review Storage ─────────────────────────────────────────
+// --- Review Storage ---
 
 function saveReview(result) {
   try {
@@ -964,13 +858,6 @@ function loadReview(reviewId) {
   return null;
 }
 
-/**
- * Cleanup old review files and stale pendingReviews entries.
- * Keeps only the last `maxReviews` files (default: 50).
- * Also prunes pendingReviews in state to match existing files.
- *
- * @param {number} maxReviews - Maximum number of review files to keep
- */
 function cleanupReviews(maxReviews = 50) {
   try {
     if (!fs.existsSync(REVIEWS_DIR)) return { removed: 0 };
@@ -982,7 +869,7 @@ function cleanupReviews(maxReviews = 50) {
         path: path.join(REVIEWS_DIR, f),
         mtime: fs.statSync(path.join(REVIEWS_DIR, f)).mtimeMs
       }))
-      .sort((a, b) => b.mtime - a.mtime); // newest first
+      .sort((a, b) => b.mtime - a.mtime);
 
     let removed = 0;
     if (files.length > maxReviews) {
@@ -992,7 +879,6 @@ function cleanupReviews(maxReviews = 50) {
       }
     }
 
-    // Prune pendingReviews in state to only keep existing review IDs
     const state = loadState();
     const existingIds = new Set(
       fs.readdirSync(REVIEWS_DIR)
@@ -1009,7 +895,7 @@ function cleanupReviews(maxReviews = 50) {
   }
 }
 
-// ─── Exports ────────────────────────────────────────────────
+// --- Exports ---
 
 module.exports = {
   runReview,
@@ -1029,7 +915,7 @@ module.exports = {
   STATE_FILE
 };
 
-// ─── CLI Entry Point ────────────────────────────────────────
+// --- CLI Entry Point ---
 
 if (require.main === module) {
   const args = process.argv.slice(2);
@@ -1071,7 +957,6 @@ if (require.main === module) {
 
         case 'parallel': {
           const task = args[1] || 'custom-task';
-          // Read prompt from stdin
           let prompt = '';
           process.stdin.setEncoding('utf8');
           process.stdin.on('data', (chunk) => { prompt += chunk; });
@@ -1089,7 +974,7 @@ if (require.main === module) {
             }
             process.exit(0);
           });
-          return; // Don't exit yet - waiting for stdin
+          return;
         }
 
         case 'status':
@@ -1106,11 +991,6 @@ if (require.main === module) {
 
         default:
           console.log('Usage: gemini-bridge.js <review|scan|parallel|status|cleanup> [args...]');
-          console.log('  review [file1 file2 ...]  - Review git diff');
-          console.log('  scan [scope] [type]       - Scan codebase (scope: backend|frontend|full, type: architecture|deps|dead-code|security)');
-          console.log('  parallel <task>            - Run custom prompt (stdin)');
-          console.log('  status                     - Show bridge status');
-          console.log('  cleanup [max]              - Remove old reviews (default: keep last 50)');
       }
     } catch (e) {
       logError('cli', e);
