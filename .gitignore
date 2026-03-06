@@ -103,8 +103,8 @@ dev-debug.log
 !/.gemini/
 !/.gemini/**
 
-# Gemini review/scan result files
-.claude/gemini-bridge/reviews/
+# Gemini bridge
+.claude/gemini-bridge/
 
 # Claude Code backups (local)
 # Comment out this line if you want to commit backups to git
