@@ -1,3 +1,8 @@
+import React from 'react';
+import { render, fireEvent } from '@testing-library/react-native';
+import { CommuteInsightCard, PatternSummaryCard } from '../CommuteInsightCard';
+import { PredictedCommute, CommutePattern } from '@/models/pattern';
+
 jest.mock('lucide-react-native', () => new Proxy({}, { get: (_, name) => name }));
 
 jest.mock('@/services/theme', () => ({
@@ -49,11 +54,6 @@ jest.mock('@/models/pattern', () => ({
     6: '토',
   },
 }));
-
-import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
-import { CommuteInsightCard, PatternSummaryCard } from '../CommuteInsightCard';
-import { PredictedCommute, CommutePattern } from '@/models/pattern';
 
 const baseRoute = {
   departureStationId: 'S1',

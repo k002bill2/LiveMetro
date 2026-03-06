@@ -1,4 +1,10 @@
 // Jest mock calls MUST come before imports (Jest hoisting requirement)
+import React from 'react';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { ThemeSettingsScreen } from '../ThemeSettingsScreen';
+import { useTheme } from '@/services/theme';
+import { useI18n } from '@/services/i18n';
+
 jest.mock('@expo/vector-icons', () => ({
   Ionicons: 'Ionicons',
 }));
@@ -77,12 +83,6 @@ jest.mock('@/components/settings/SettingSection', () => {
       ),
   };
 });
-
-import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
-import { ThemeSettingsScreen } from '../ThemeSettingsScreen';
-import { useTheme } from '@/services/theme';
-import { useI18n } from '@/services/i18n';
 
 const mockNavigation = {
   goBack: mockGoBack,

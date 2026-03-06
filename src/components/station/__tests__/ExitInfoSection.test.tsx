@@ -2,6 +2,11 @@
  * ExitInfoSection Component Tests
  */
 
+import React from 'react';
+import { render } from '@testing-library/react-native';
+import { ExitInfoSection } from '../ExitInfoSection';
+import type { ExitInfo } from '@/models/publicData';
+
 jest.mock('@/services/theme/themeContext', () => ({
   useTheme: () => ({
     colors: {
@@ -14,11 +19,6 @@ jest.mock('@/services/theme/themeContext', () => ({
     },
   }),
 }));
-
-import React from 'react';
-import { render } from '@testing-library/react-native';
-import { ExitInfoSection } from '../ExitInfoSection';
-import type { ExitInfo } from '@/models/publicData';
 
 describe('ExitInfoSection', () => {
   it('renders loading state', () => {

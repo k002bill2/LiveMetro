@@ -1,3 +1,8 @@
+import React from 'react';
+import { render } from '@testing-library/react-native';
+import { Text } from 'react-native';
+import { SettingSection } from '../SettingSection';
+
 jest.mock('@/services/theme', () => ({
   useTheme: () => ({
     colors: {
@@ -7,11 +12,6 @@ jest.mock('@/services/theme', () => ({
     },
   }),
 }));
-
-import React from 'react';
-import { render } from '@testing-library/react-native';
-import { Text } from 'react-native';
-import { SettingSection } from '../SettingSection';
 
 describe('SettingSection', () => {
   it('renders children', () => {

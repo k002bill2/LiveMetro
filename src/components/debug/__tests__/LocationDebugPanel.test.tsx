@@ -1,3 +1,8 @@
+import React from 'react';
+import { render, fireEvent, act } from '@testing-library/react-native';
+import { LayoutAnimation } from 'react-native';
+import { LocationDebugPanel } from '../LocationDebugPanel';
+
 jest.mock('lucide-react-native', () => ({
   ChevronUp: 'ChevronUp',
   ChevronDown: 'ChevronDown',
@@ -48,11 +53,6 @@ jest.mock('@/hooks/useNearbyStations', () => ({
     loading: false,
   })),
 }));
-
-import React from 'react';
-import { render, fireEvent, act } from '@testing-library/react-native';
-import { LayoutAnimation } from 'react-native';
-import { LocationDebugPanel } from '../LocationDebugPanel';
 
 // Mock LayoutAnimation to prevent animation-related re-render loops
 jest.spyOn(LayoutAnimation, 'configureNext').mockImplementation(() => {});

@@ -1,3 +1,8 @@
+import React from 'react';
+import { render, fireEvent } from '@testing-library/react-native';
+import { AlertBanner } from '../AlertBanner';
+import type { SubwayAlert } from '@/models/publicData';
+
 jest.mock('@/services/theme/themeContext', () => ({
   useTheme: () => ({
     colors: {
@@ -9,11 +14,6 @@ jest.mock('@/services/theme/themeContext', () => ({
     },
   }),
 }));
-
-import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
-import { AlertBanner } from '../AlertBanner';
-import type { SubwayAlert } from '@/models/publicData';
 
 const makeAlert = (overrides: Partial<SubwayAlert> = {}): SubwayAlert => ({
   alertId: 'alert-1',

@@ -1,3 +1,8 @@
+import React from 'react';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { Alert, Switch } from 'react-native';
+import { DelayNotificationScreen } from '../DelayNotificationScreen';
+
 jest.mock('@expo/vector-icons', () => ({
   Ionicons: 'Ionicons',
 }));
@@ -94,11 +99,6 @@ jest.mock('@/components/settings/SettingSlider', () => {
       ),
   };
 });
-
-import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
-import { Alert, Switch } from 'react-native';
-import { DelayNotificationScreen } from '../DelayNotificationScreen';
 
 jest.spyOn(Alert, 'alert');
 

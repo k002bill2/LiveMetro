@@ -2,14 +2,14 @@
  * RoutePreview Component Tests
  */
 
-jest.mock('lucide-react-native', () =>
-  new Proxy({}, { get: (_, name) => name })
-);
-
 import React from 'react';
 import { render } from '@testing-library/react-native';
 import { RoutePreview } from '../RoutePreview';
 import type { CommuteRoute } from '@/models/commute';
+
+jest.mock('lucide-react-native', () =>
+  new Proxy({}, { get: (_, name) => name })
+);
 
 describe('RoutePreview', () => {
   it('renders empty state when no route data', () => {

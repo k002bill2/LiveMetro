@@ -1,3 +1,8 @@
+import React from 'react';
+import { render, fireEvent } from '@testing-library/react-native';
+import { AlternativeRouteCard } from '../AlternativeRouteCard';
+import { AlternativeRoute } from '@/models/route';
+
 jest.mock('lucide-react-native', () => new Proxy({}, { get: (_, name) => name }));
 
 jest.mock('@/services/theme', () => ({
@@ -47,11 +52,6 @@ jest.mock('@/models/route', () => ({
     return 'much_slower';
   },
 }));
-
-import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
-import { AlternativeRouteCard } from '../AlternativeRouteCard';
-import { AlternativeRoute } from '@/models/route';
 
 const makeRoute = (overrides = {}) => ({
   segments: [

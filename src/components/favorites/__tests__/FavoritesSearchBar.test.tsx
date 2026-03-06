@@ -1,3 +1,7 @@
+import React from 'react';
+import { render, fireEvent } from '@testing-library/react-native';
+import { FavoritesSearchBar } from '../FavoritesSearchBar';
+
 jest.mock('lucide-react-native', () => ({
   Search: 'Search',
   XCircle: 'XCircle',
@@ -21,10 +25,6 @@ jest.mock('../../../services/theme', () => ({
     },
   }),
 }));
-
-import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
-import { FavoritesSearchBar } from '../FavoritesSearchBar';
 
 describe('FavoritesSearchBar', () => {
   const defaultProps = {

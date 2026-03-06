@@ -1,3 +1,8 @@
+import React from 'react';
+import { render } from '@testing-library/react-native';
+import { RouteComparisonView } from '../RouteComparisonView';
+import { Route } from '@/models/route';
+
 jest.mock('lucide-react-native', () => new Proxy({}, { get: (_, name) => name }));
 
 jest.mock('@/services/theme', () => ({
@@ -37,11 +42,6 @@ jest.mock('@/utils/colorUtils', () => ({
 jest.mock('@/models/route', () => ({
   getLineName: (lineId: string) => `${lineId}호선`,
 }));
-
-import React from 'react';
-import { render } from '@testing-library/react-native';
-import { RouteComparisonView } from '../RouteComparisonView';
-import { Route } from '@/models/route';
 
 const makeSegment = (overrides = {}) => ({
   fromStationId: 'S1',

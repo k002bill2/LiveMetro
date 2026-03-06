@@ -1,3 +1,7 @@
+import React from 'react';
+import { render, fireEvent } from '@testing-library/react-native';
+import { DelayAlertBanner, DelayInfo } from '../DelayAlertBanner';
+
 jest.mock('lucide-react-native', () => ({
   AlertTriangle: 'AlertTriangle',
   ChevronRight: 'ChevronRight',
@@ -28,10 +32,6 @@ jest.mock('@/utils/colorUtils', () => ({
     return colors[lineId] || '#888888';
   }),
 }));
-
-import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
-import { DelayAlertBanner, DelayInfo } from '../DelayAlertBanner';
 
 const singleDelay: DelayInfo[] = [
   { lineId: '2', lineName: '2호선', delayMinutes: 10, reason: '신호 장애' },

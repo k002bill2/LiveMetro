@@ -4,6 +4,10 @@
  */
 
 // Mock modules BEFORE imports (Jest hoisting)
+import React from 'react';
+import { render, fireEvent } from '@testing-library/react-native';
+import { CommuteRouteScreen } from '../CommuteRouteScreen';
+
 jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
 jest.mock('lucide-react-native', () => ({
   GitBranch: 'GitBranch',
@@ -34,10 +38,6 @@ jest.mock('@/components/commute/RoutePreview', () => ({
 jest.mock('@/models/commute', () => ({
   MAX_TRANSFER_STATIONS: 3,
 }));
-
-import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
-import { CommuteRouteScreen } from '../CommuteRouteScreen';
 
 const mockGoBack = jest.fn();
 const mockNavigate = jest.fn();

@@ -1,4 +1,11 @@
 // Jest mock calls MUST come before imports (hoisting)
+import React from 'react';
+import { render, fireEvent } from '@testing-library/react-native';
+import { VibrationPicker } from '../VibrationPicker';
+import { VibrationPatternId } from '@/models/user';
+import { VibrationOption } from '@/services/sound/soundService';
+import { soundService } from '@/services/sound/soundService';
+
 jest.mock('lucide-react-native', () => new Proxy({}, { get: (_, name) => name }));
 
 jest.mock('@expo/vector-icons', () => ({
@@ -27,13 +34,6 @@ jest.mock('@/services/sound/soundService', () => ({
     previewVibration: jest.fn().mockResolvedValue(undefined),
   },
 }));
-
-import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
-import { VibrationPicker } from '../VibrationPicker';
-import { VibrationPatternId } from '@/models/user';
-import { VibrationOption } from '@/services/sound/soundService';
-import { soundService } from '@/services/sound/soundService';
 
 const testOptions: VibrationOption[] = [
   { id: 'default' as VibrationPatternId, label: '기본', description: '표준 진동', pattern: [0, 250, 250, 250] },

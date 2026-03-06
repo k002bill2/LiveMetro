@@ -2,6 +2,11 @@
  * AccessibilitySection Component Tests
  */
 
+import React from 'react';
+import { render } from '@testing-library/react-native';
+import { AccessibilitySection } from '../AccessibilitySection';
+import type { AccessibilityInfo } from '@/models/publicData';
+
 jest.mock('@/services/theme/themeContext', () => ({
   useTheme: () => ({
     colors: {
@@ -17,11 +22,6 @@ jest.mock('@/services/theme/themeContext', () => ({
     },
   }),
 }));
-
-import React from 'react';
-import { render } from '@testing-library/react-native';
-import { AccessibilitySection } from '../AccessibilitySection';
-import type { AccessibilityInfo } from '@/models/publicData';
 
 const mockInfo: AccessibilityInfo = {
   stationCode: 'ST001',

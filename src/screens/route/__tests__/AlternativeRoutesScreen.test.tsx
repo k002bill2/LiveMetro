@@ -4,6 +4,11 @@
  */
 
 // Mock modules BEFORE imports (Jest hoisting)
+import React from 'react';
+import { render, fireEvent } from '@testing-library/react-native';
+import { AlternativeRoutesScreen } from '../AlternativeRoutesScreen';
+import { useAlternativeRoutes } from '@/hooks/useAlternativeRoutes';
+
 jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
 jest.mock('lucide-react-native', () => ({
   ArrowLeft: 'ArrowLeft',
@@ -75,11 +80,6 @@ jest.mock('@/components/route/RouteComparisonView', () => ({
 jest.mock('@/utils/colorUtils', () => ({
   getSubwayLineColor: jest.fn(() => '#00A84D'),
 }));
-
-import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
-import { AlternativeRoutesScreen } from '../AlternativeRoutesScreen';
-import { useAlternativeRoutes } from '@/hooks/useAlternativeRoutes';
 
 describe('AlternativeRoutesScreen', () => {
   beforeEach(() => {

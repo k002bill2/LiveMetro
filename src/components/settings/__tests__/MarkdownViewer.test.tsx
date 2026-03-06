@@ -2,6 +2,11 @@
  * MarkdownViewer Component Tests
  */
 
+import React from 'react';
+import { render, fireEvent } from '@testing-library/react-native';
+import { Alert } from 'react-native';
+import { MarkdownViewer } from '../MarkdownViewer';
+
 jest.mock('react-native-markdown-display', () => {
   const React = require('react');
   const { Text } = require('react-native');
@@ -15,11 +20,6 @@ jest.mock('react-native-markdown-display', () => {
       ),
   };
 });
-
-import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
-import { Alert } from 'react-native';
-import { MarkdownViewer } from '../MarkdownViewer';
 
 describe('MarkdownViewer', () => {
   it('renders markdown content', () => {

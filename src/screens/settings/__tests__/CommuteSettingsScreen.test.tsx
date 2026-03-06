@@ -2,6 +2,12 @@
  * CommuteSettingsScreen Tests
  */
 
+import React from 'react';
+import { render, waitFor } from '@testing-library/react-native';
+import { CommuteSettingsScreen } from '../CommuteSettingsScreen';
+import { useAuth } from '@/services/auth/AuthContext';
+import { loadCommuteRoutes } from '@/services/commute/commuteService';
+
 jest.mock('@expo/vector-icons', () => ({
   Ionicons: 'Ionicons',
 }));
@@ -28,12 +34,6 @@ jest.mock('@/contexts/OnboardingContext', () => ({
 jest.mock('@/services/commute/commuteService', () => ({
   loadCommuteRoutes: jest.fn(),
 }));
-
-import React from 'react';
-import { render, waitFor } from '@testing-library/react-native';
-import { CommuteSettingsScreen } from '../CommuteSettingsScreen';
-import { useAuth } from '@/services/auth/AuthContext';
-import { loadCommuteRoutes } from '@/services/commute/commuteService';
 
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const mockLoadCommuteRoutes = loadCommuteRoutes as jest.MockedFunction<typeof loadCommuteRoutes>;

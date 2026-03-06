@@ -4,6 +4,11 @@
  */
 
 // Mock modules BEFORE imports (Jest hoisting)
+import React from 'react';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import AccessibilitySettingsScreen from '../AccessibilitySettingsScreen';
+import { useAccessibility } from '@/contexts/AccessibilityContext';
+
 jest.mock('react-native-safe-area-context', () => {
   const React = require('react');
   const { View } = require('react-native');
@@ -52,11 +57,6 @@ jest.mock('@/contexts/AccessibilityContext', () => ({
     shouldUseHaptics: true,
   })),
 }));
-
-import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
-import AccessibilitySettingsScreen from '../AccessibilitySettingsScreen';
-import { useAccessibility } from '@/contexts/AccessibilityContext';
 
 describe('AccessibilitySettingsScreen', () => {
   beforeEach(() => {

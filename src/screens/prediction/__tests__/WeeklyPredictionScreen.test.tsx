@@ -4,6 +4,11 @@
  */
 
 // Mock modules BEFORE imports (Jest hoisting)
+import React from 'react';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { WeeklyPredictionScreen } from '../WeeklyPredictionScreen';
+import { useMLPrediction } from '@/hooks/useMLPrediction';
+
 jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
 jest.mock('lucide-react-native', () => ({
   ChevronLeft: 'ChevronLeft',
@@ -54,11 +59,6 @@ jest.mock('@/hooks/useMLPrediction', () => ({
     hasEnoughData: false,
   })),
 }));
-
-import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
-import { WeeklyPredictionScreen } from '../WeeklyPredictionScreen';
-import { useMLPrediction } from '@/hooks/useMLPrediction';
 
 describe('WeeklyPredictionScreen', () => {
   beforeEach(() => {

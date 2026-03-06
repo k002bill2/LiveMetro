@@ -4,6 +4,11 @@
  */
 
 // Mock modules BEFORE imports (Jest hoisting)
+import React from 'react';
+import { render, fireEvent } from '@testing-library/react-native';
+import { Alert, Linking } from 'react-native';
+import { HelpScreen } from '../HelpScreen';
+
 jest.mock('@expo/vector-icons', () => ({
   Ionicons: 'Ionicons',
 }));
@@ -61,11 +66,6 @@ jest.mock('@/utils/helpContent', () => ({
   SUPPORT_EMAIL: 'support@livemetro.app',
   SUPPORT_PHONE: '1234-5678',
 }));
-
-import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
-import { Alert, Linking } from 'react-native';
-import { HelpScreen } from '../HelpScreen';
 
 describe('HelpScreen', () => {
   beforeEach(() => {

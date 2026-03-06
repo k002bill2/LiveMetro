@@ -4,6 +4,13 @@
  */
 
 // Mock modules BEFORE imports (Jest hoisting)
+import React from 'react';
+import { render, waitFor } from '@testing-library/react-native';
+import StatisticsDashboardScreen from '../StatisticsDashboardScreen';
+import { useAuth } from '@/services/auth/AuthContext';
+import { commuteLogService } from '@/services/pattern';
+import { statisticsService } from '@/services/statistics/statisticsService';
+
 jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
 jest.mock('react-native-safe-area-context', () => {
   const React = require('react');
@@ -60,13 +67,6 @@ jest.mock('@/components/statistics/LineUsagePieChart', () => {
   const { Text } = require('react-native');
   return () => <Text>LineUsagePieChart</Text>;
 });
-
-import React from 'react';
-import { render, waitFor } from '@testing-library/react-native';
-import StatisticsDashboardScreen from '../StatisticsDashboardScreen';
-import { useAuth } from '@/services/auth/AuthContext';
-import { commuteLogService } from '@/services/pattern';
-import { statisticsService } from '@/services/statistics/statisticsService';
 
 describe('StatisticsDashboardScreen', () => {
   const mockGetCommuteLogs = commuteLogService.getCommuteLogs as jest.Mock;

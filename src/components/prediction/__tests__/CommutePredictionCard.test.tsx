@@ -1,3 +1,7 @@
+import React from 'react';
+import { render, fireEvent } from '@testing-library/react-native';
+import { CommutePredictionCard } from '../CommutePredictionCard';
+
 jest.mock('lucide-react-native', () => new Proxy({}, { get: (_, name) => name }));
 
 jest.mock('@/services/theme', () => ({
@@ -40,10 +44,6 @@ const mockUseMLPrediction = jest.fn();
 jest.mock('@/hooks/useMLPrediction', () => ({
   useMLPrediction: () => mockUseMLPrediction(),
 }));
-
-import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
-import { CommutePredictionCard } from '../CommutePredictionCard';
 
 const basePrediction = {
   predictedDepartureTime: '08:30',

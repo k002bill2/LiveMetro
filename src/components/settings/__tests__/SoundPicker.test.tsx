@@ -1,3 +1,9 @@
+import React from 'react';
+import { render, fireEvent } from '@testing-library/react-native';
+import { SoundPicker } from '../SoundPicker';
+import { NotificationSoundId } from '@/models/user';
+import { SoundOption } from '@/services/sound/soundService';
+
 jest.mock('lucide-react-native', () => new Proxy({}, { get: (_, name) => name }));
 
 jest.mock('@expo/vector-icons', () => ({
@@ -27,12 +33,6 @@ jest.mock('@/services/sound/soundService', () => ({
     previewSound: jest.fn().mockResolvedValue(undefined),
   },
 }));
-
-import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
-import { SoundPicker } from '../SoundPicker';
-import { NotificationSoundId } from '@/models/user';
-import { SoundOption } from '@/services/sound/soundService';
 
 const testOptions: SoundOption[] = [
   { id: 'default' as NotificationSoundId, label: '기본', description: '기본 알림음' },

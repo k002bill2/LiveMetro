@@ -2,13 +2,13 @@
  * CommuteNotificationScreen Tests
  */
 
-jest.mock('lucide-react-native', () =>
-  new Proxy({}, { get: (_, name) => name })
-);
-
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 import { CommuteNotificationScreen } from '../CommuteNotificationScreen';
+
+jest.mock('lucide-react-native', () =>
+  new Proxy({}, { get: (_, name) => name })
+);
 
 const baseParams = {
   commuteType: 'morning' as const,

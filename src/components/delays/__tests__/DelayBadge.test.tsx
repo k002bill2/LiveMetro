@@ -1,3 +1,7 @@
+import React from 'react';
+import { render } from '@testing-library/react-native';
+import { DelayBadge } from '../DelayBadge';
+
 jest.mock('lucide-react-native', () => ({
   Clock: 'Clock',
 }));
@@ -7,10 +11,6 @@ jest.mock('@/services/theme', () => ({
     colors: { error: '#FF3B30' },
   }),
 }));
-
-import React from 'react';
-import { render } from '@testing-library/react-native';
-import { DelayBadge } from '../DelayBadge';
 
 describe('DelayBadge', () => {
   it('renders nothing when delayMinutes is 0', () => {

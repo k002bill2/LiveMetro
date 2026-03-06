@@ -4,6 +4,13 @@
  */
 
 // Mock modules BEFORE imports (Jest hoisting)
+import React from 'react';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { Alert } from 'react-native';
+import { DelayCertificateScreen } from '../DelayCertificateScreen';
+import { delayHistoryService } from '@/services/delay/delayHistoryService';
+import { useAuth } from '@/services/auth/AuthContext';
+
 jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
 jest.mock('lucide-react-native', () => ({
   FileText: 'FileText',
@@ -59,13 +66,6 @@ jest.mock('@/services/delay/delayHistoryService', () => ({
 jest.mock('@/utils/colorUtils', () => ({
   getSubwayLineColor: jest.fn(() => '#00A84D'),
 }));
-
-import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
-import { Alert } from 'react-native';
-import { DelayCertificateScreen } from '../DelayCertificateScreen';
-import { delayHistoryService } from '@/services/delay/delayHistoryService';
-import { useAuth } from '@/services/auth/AuthContext';
 
 describe('DelayCertificateScreen', () => {
   beforeEach(() => {

@@ -4,6 +4,13 @@
  */
 
 // Mock modules BEFORE imports (Jest hoisting)
+import React from 'react';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { Alert } from 'react-native';
+import { SoundSettingsScreen } from '../SoundSettingsScreen';
+import { useAuth } from '@/services/auth/AuthContext';
+import { soundService } from '@/services/sound/soundService';
+
 jest.mock('@expo/vector-icons', () => ({
   Ionicons: 'Ionicons',
 }));
@@ -159,13 +166,6 @@ jest.mock('@/components/settings/VibrationPicker', () => {
       ),
   };
 });
-
-import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
-import { Alert } from 'react-native';
-import { SoundSettingsScreen } from '../SoundSettingsScreen';
-import { useAuth } from '@/services/auth/AuthContext';
-import { soundService } from '@/services/sound/soundService';
 
 describe('SoundSettingsScreen', () => {
   beforeEach(() => {

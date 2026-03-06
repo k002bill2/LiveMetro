@@ -1,3 +1,8 @@
+import React from 'react';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { FavoriteEditForm } from '../FavoriteEditForm';
+import { FavoriteWithDetails } from '@/hooks/useFavorites';
+
 jest.mock('lucide-react-native', () => new Proxy({}, { get: (_, name) => name }));
 
 jest.mock('@/services/theme', () => ({
@@ -30,11 +35,6 @@ jest.mock('@/styles/modernTheme', () => ({
     fontWeight: { medium: '500', semibold: '600', bold: '700' },
   },
 }));
-
-import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
-import { FavoriteEditForm } from '../FavoriteEditForm';
-import { FavoriteWithDetails } from '@/hooks/useFavorites';
 
 const baseFavorite: FavoriteWithDetails = {
   id: 'fav-1',

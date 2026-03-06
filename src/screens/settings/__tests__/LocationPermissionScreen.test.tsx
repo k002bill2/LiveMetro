@@ -4,6 +4,12 @@
  */
 
 // Mock modules BEFORE imports (Jest hoisting)
+import React from 'react';
+import { render, waitFor, fireEvent } from '@testing-library/react-native';
+import { Alert, Linking } from 'react-native';
+import * as Location from 'expo-location';
+import { LocationPermissionScreen } from '../LocationPermissionScreen';
+
 jest.mock('@expo/vector-icons', () => ({
   Ionicons: 'Ionicons',
 }));
@@ -73,12 +79,6 @@ jest.mock('@/services/location/locationService', () => ({
     requestBackgroundPermission: jest.fn(() => Promise.resolve(true)),
   },
 }));
-
-import React from 'react';
-import { render, waitFor, fireEvent } from '@testing-library/react-native';
-import { Alert, Linking } from 'react-native';
-import * as Location from 'expo-location';
-import { LocationPermissionScreen } from '../LocationPermissionScreen';
 
 describe('LocationPermissionScreen', () => {
   beforeEach(() => {

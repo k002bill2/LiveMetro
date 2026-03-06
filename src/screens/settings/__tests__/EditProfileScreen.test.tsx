@@ -4,6 +4,12 @@
  */
 
 // Mock modules BEFORE imports (Jest hoisting)
+import React from 'react';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { Alert } from 'react-native';
+import { EditProfileScreen } from '../EditProfileScreen';
+import { useAuth } from '@/services/auth/AuthContext';
+
 jest.mock('@expo/vector-icons', () => ({
   Ionicons: 'Ionicons',
 }));
@@ -31,12 +37,6 @@ jest.mock('@/services/auth/AuthContext', () => ({
     changePassword: jest.fn(() => Promise.resolve()),
   })),
 }));
-
-import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
-import { Alert } from 'react-native';
-import { EditProfileScreen } from '../EditProfileScreen';
-import { useAuth } from '@/services/auth/AuthContext';
 
 const mockGoBack = jest.fn();
 const defaultProps = {

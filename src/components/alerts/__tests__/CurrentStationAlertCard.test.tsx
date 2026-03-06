@@ -2,6 +2,10 @@
  * CurrentStationAlertCard Component Tests
  */
 
+import React from 'react';
+import { render, fireEvent } from '@testing-library/react-native';
+import { CurrentStationAlertCard } from '../CurrentStationAlertCard';
+
 jest.mock('@react-native-community/slider', () => {
   const React = require('react');
   const { View } = require('react-native');
@@ -15,10 +19,6 @@ jest.mock('@react-native-community/slider', () => {
 jest.mock('@utils/colorUtils', () => ({
   getSubwayLineColor: jest.fn(() => '#00A84D'),
 }));
-
-import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
-import { CurrentStationAlertCard } from '../CurrentStationAlertCard';
 
 const defaultProps = {
   enabled: true,

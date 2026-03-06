@@ -1,3 +1,9 @@
+import React from 'react';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { Alert } from 'react-native';
+import { DelayReportForm } from '../DelayReportForm';
+import { ReportTypeLabels } from '@/models/delayReport';
+
 jest.mock('lucide-react-native', () => ({
   Clock: 'Clock',
   AlertTriangle: 'AlertTriangle',
@@ -56,12 +62,6 @@ jest.mock('@/utils/colorUtils', () => ({
     return colors[lineId] || '#888888';
   }),
 }));
-
-import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
-import { Alert } from 'react-native';
-import { DelayReportForm } from '../DelayReportForm';
-import { ReportTypeLabels } from '@/models/delayReport';
 
 jest.spyOn(Alert, 'alert');
 

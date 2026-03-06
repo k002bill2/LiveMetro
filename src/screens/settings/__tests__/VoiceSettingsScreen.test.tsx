@@ -1,3 +1,8 @@
+import React from 'react';
+import { render, waitFor } from '@testing-library/react-native';
+import { ttsService } from '@/services/speech/ttsService';
+import VoiceSettingsScreen from '../VoiceSettingsScreen';
+
 jest.mock('react-native-safe-area-context', () => ({
   SafeAreaView: ({ children, ...props }: Record<string, unknown>) => {
     const React = require('react');
@@ -41,11 +46,6 @@ jest.mock('@/services/speech/ttsService', () => ({
     announceArrival: jest.fn(() => Promise.resolve()),
   },
 }));
-
-import React from 'react';
-import { render, waitFor } from '@testing-library/react-native';
-import { ttsService } from '@/services/speech/ttsService';
-import VoiceSettingsScreen from '../VoiceSettingsScreen';
 
 const mockTtsService = ttsService as {
   initialize: jest.Mock;

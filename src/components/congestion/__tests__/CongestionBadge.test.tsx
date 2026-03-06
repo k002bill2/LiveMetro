@@ -1,3 +1,8 @@
+import React from 'react';
+import { render, fireEvent } from '@testing-library/react-native';
+import { CongestionBadge, CongestionDot, CongestionInline } from '../CongestionBadge';
+import { CongestionLevel } from '@/models/congestion';
+
 jest.mock('lucide-react-native', () => ({
   Users: 'Users',
   AlertTriangle: 'AlertTriangle',
@@ -26,11 +31,6 @@ jest.mock('@/models/congestion', () => ({
     return colors[level] || '#8E8E93';
   },
 }));
-
-import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
-import { CongestionBadge, CongestionDot, CongestionInline } from '../CongestionBadge';
-import { CongestionLevel } from '@/models/congestion';
 
 describe('CongestionBadge', () => {
   it('renders congestion level name', () => {

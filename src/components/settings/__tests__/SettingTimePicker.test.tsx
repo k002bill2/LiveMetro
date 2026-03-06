@@ -1,3 +1,8 @@
+import React from 'react';
+import { Platform } from 'react-native';
+import { render, fireEvent } from '@testing-library/react-native';
+import { SettingTimePicker } from '../SettingTimePicker';
+
 jest.mock('lucide-react-native', () => new Proxy({}, { get: (_, name) => name }));
 
 jest.mock('@expo/vector-icons', () => ({
@@ -22,11 +27,6 @@ jest.mock('@/styles/modernTheme', () => ({
     fontWeight: { medium: '500', semibold: '600', bold: '700' },
   },
 }));
-
-import React from 'react';
-import { Platform } from 'react-native';
-import { render, fireEvent } from '@testing-library/react-native';
-import { SettingTimePicker } from '../SettingTimePicker';
 
 describe('SettingTimePicker', () => {
   const defaultProps = {

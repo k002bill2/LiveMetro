@@ -1,4 +1,9 @@
 // Jest mock calls MUST come before imports (Jest hoisting requirement)
+import React from 'react';
+import { render, waitFor } from '@testing-library/react-native';
+import { SubwayLineList } from '../SubwayLineList';
+import { trainService } from '@/services/train/trainService';
+
 jest.mock('@/services/train/trainService', () => ({
   trainService: {
     getSubwayLines: jest.fn(),
@@ -24,11 +29,6 @@ jest.mock('@/services/theme', () => ({
   })),
   ThemeColors: {},
 }));
-
-import React from 'react';
-import { render, waitFor } from '@testing-library/react-native';
-import { SubwayLineList } from '../SubwayLineList';
-import { trainService } from '@/services/train/trainService';
 
 const mockTrainService = trainService as jest.Mocked<typeof trainService>;
 

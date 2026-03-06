@@ -1,12 +1,12 @@
 // Jest mock calls MUST come before imports (Jest hoisting requirement)
-jest.mock('@/services/statistics/statisticsService', () => ({
-  statisticsService: {},
-}));
-
 import React from 'react';
 import { render } from '@testing-library/react-native';
 import LineUsagePieChart from '../LineUsagePieChart';
 import { LineUsageData } from '@/services/statistics/statisticsService';
+
+jest.mock('@/services/statistics/statisticsService', () => ({
+  statisticsService: {},
+}));
 
 const mockData: LineUsageData[] = [
   { lineId: '2', lineName: '2호선', tripCount: 40, percentage: 40, color: '#00A84D' },

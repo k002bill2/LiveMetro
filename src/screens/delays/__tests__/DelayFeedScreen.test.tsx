@@ -4,6 +4,11 @@
  */
 
 // Mock modules BEFORE imports (Jest hoisting)
+import React from 'react';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { DelayFeedScreen } from '../DelayFeedScreen';
+import { delayReportService } from '@/services/delay/delayReportService';
+
 jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
 jest.mock('lucide-react-native', () => ({
   MessageSquare: 'MessageSquare',
@@ -62,11 +67,6 @@ jest.mock('@/utils/colorUtils', () => ({
 jest.mock('@/components/delays/DelayReportForm', () => ({
   DelayReportForm: () => 'DelayReportForm',
 }));
-
-import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
-import { DelayFeedScreen } from '../DelayFeedScreen';
-import { delayReportService } from '@/services/delay/delayReportService';
 
 describe('DelayFeedScreen', () => {
   beforeEach(() => {

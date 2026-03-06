@@ -2,6 +2,11 @@
  * SettingPicker Component Tests
  */
 
+import React from 'react';
+import { render, fireEvent } from '@testing-library/react-native';
+import { SettingPicker } from '../SettingPicker';
+import type { PickerOption } from '../SettingPicker';
+
 jest.mock('lucide-react-native', () =>
   new Proxy({}, { get: (_, name) => name })
 );
@@ -9,11 +14,6 @@ jest.mock('lucide-react-native', () =>
 jest.mock('@expo/vector-icons', () => ({
   Ionicons: 'Ionicons',
 }));
-
-import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
-import { SettingPicker } from '../SettingPicker';
-import type { PickerOption } from '../SettingPicker';
 
 const options: PickerOption[] = [
   { label: '한국어', value: 'ko', description: 'Korean' },

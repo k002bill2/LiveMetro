@@ -4,6 +4,12 @@
  */
 
 // Mock modules BEFORE imports (Jest hoisting)
+import React from 'react';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { Alert } from 'react-native';
+import { NotificationTimeScreen } from '../NotificationTimeScreen';
+import { useAuth } from '@/services/auth/AuthContext';
+
 jest.mock('@expo/vector-icons', () => ({
   Ionicons: 'Ionicons',
 }));
@@ -121,12 +127,6 @@ jest.mock('@/components/settings/SettingTimePicker', () => {
       ),
   };
 });
-
-import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
-import { Alert } from 'react-native';
-import { NotificationTimeScreen } from '../NotificationTimeScreen';
-import { useAuth } from '@/services/auth/AuthContext';
 
 describe('NotificationTimeScreen', () => {
   beforeEach(() => {

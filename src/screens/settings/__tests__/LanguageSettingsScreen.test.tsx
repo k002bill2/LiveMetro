@@ -4,6 +4,11 @@
  */
 
 // Mock modules BEFORE imports (Jest hoisting)
+import React from 'react';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { LanguageSettingsScreen } from '../LanguageSettingsScreen';
+import { useI18n } from '@/services/i18n';
+
 jest.mock('@expo/vector-icons', () => ({
   Ionicons: 'Ionicons',
 }));
@@ -70,11 +75,6 @@ jest.mock('@/styles/modernTheme', () => ({
 jest.mock('@react-navigation/native-stack', () => ({
   createNativeStackNavigator: jest.fn(),
 }));
-
-import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
-import { LanguageSettingsScreen } from '../LanguageSettingsScreen';
-import { useI18n } from '@/services/i18n';
 
 const mockGoBack = jest.fn();
 const mockNavigation = {

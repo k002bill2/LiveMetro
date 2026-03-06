@@ -1,3 +1,7 @@
+import React from 'react';
+import { render, fireEvent } from '@testing-library/react-native';
+import SubwayMapView from '../SubwayMapView';
+
 jest.mock('react-native-svg', () => {
   const React = require('react');
   const { View, Text: RNText } = require('react-native');
@@ -18,10 +22,6 @@ jest.mock('react-native-svg', () => {
       React.createElement(RNText, props, props.children),
   };
 });
-
-import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
-import SubwayMapView from '../SubwayMapView';
 
 const mockStations = [
   { id: 'st1', name: '강남', x: 100, y: 200, lineIds: ['2'], isTransfer: false },

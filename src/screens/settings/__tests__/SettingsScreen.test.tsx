@@ -4,6 +4,12 @@
  */
 
 // Mock modules BEFORE imports (Jest hoisting)
+import React from 'react';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { Alert } from 'react-native';
+import { SettingsScreen } from '../SettingsScreen';
+import { useAuth } from '@/services/auth/AuthContext';
+
 jest.mock('lucide-react-native', () => ({
   ChevronRight: 'ChevronRight',
   User: 'User',
@@ -141,12 +147,6 @@ jest.mock('@/services/auth/biometricService', () => ({
   disableBiometricLogin: jest.fn(() => Promise.resolve(true)),
   hasStoredCredentials: jest.fn(() => Promise.resolve(false)),
 }));
-
-import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
-import { Alert } from 'react-native';
-import { SettingsScreen } from '../SettingsScreen';
-import { useAuth } from '@/services/auth/AuthContext';
 
 const mockNavigate = jest.fn();
 const mockGoBack = jest.fn();

@@ -1,3 +1,7 @@
+import React from 'react';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { CongestionReportModal } from '../CongestionReportModal';
+
 jest.mock('lucide-react-native', () => new Proxy({}, { get: (_, name) => name }));
 
 jest.mock('@/services/theme', () => ({
@@ -57,10 +61,6 @@ jest.mock('@/models/congestion', () => ({
   },
   TRAIN_CAR_COUNT: 10,
 }));
-
-import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
-import { CongestionReportModal } from '../CongestionReportModal';
 
 const defaultTrainInfo = {
   trainId: 'T001',

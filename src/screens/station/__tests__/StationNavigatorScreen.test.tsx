@@ -4,6 +4,11 @@
  */
 
 // Mock modules BEFORE imports (Jest hoisting)
+import React from 'react';
+import { render } from '@testing-library/react-native';
+import { StationNavigatorScreen } from '../StationNavigatorScreen';
+import { useStationNavigation } from '@/hooks/useStationNavigation';
+
 jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
 jest.mock('lucide-react-native', () => ({
   Minus: 'Minus',
@@ -81,11 +86,6 @@ jest.mock('@/hooks/useRealtimeTrains', () => ({
 jest.mock('@/components/train/TrainArrivalList', () => ({
   TrainArrivalList: () => 'TrainArrivalList',
 }));
-
-import React from 'react';
-import { render } from '@testing-library/react-native';
-import { StationNavigatorScreen } from '../StationNavigatorScreen';
-import { useStationNavigation } from '@/hooks/useStationNavigation';
 
 const mockGoBack = jest.fn();
 const mockNavigate = jest.fn();

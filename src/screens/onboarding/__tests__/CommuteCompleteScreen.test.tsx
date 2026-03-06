@@ -4,6 +4,12 @@
  */
 
 // Mock modules BEFORE imports (Jest hoisting)
+import React from 'react';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { Alert } from 'react-native';
+import { CommuteCompleteScreen } from '../CommuteCompleteScreen';
+import { saveCommuteRoutes } from '@/services/commute/commuteService';
+
 jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
 jest.mock('lucide-react-native', () => ({
   CheckCircle: 'CheckCircle',
@@ -52,12 +58,6 @@ jest.mock('@/models/commute', () => ({
   },
   DEFAULT_BUFFER_MINUTES: 5,
 }));
-
-import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
-import { Alert } from 'react-native';
-import { CommuteCompleteScreen } from '../CommuteCompleteScreen';
-import { saveCommuteRoutes } from '@/services/commute/commuteService';
 
 const mockNavigate = jest.fn();
 

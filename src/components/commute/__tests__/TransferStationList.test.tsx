@@ -4,6 +4,11 @@
  */
 
 // Mock modules BEFORE imports (Jest hoisting)
+import React from 'react';
+import { render, fireEvent } from '@testing-library/react-native';
+import { TransferStationList } from '../TransferStationList';
+import { TransferStation } from '@/models/commute';
+
 jest.mock('lucide-react-native', () => ({
   ArrowLeftRight: 'ArrowLeftRight',
   XCircle: 'XCircle',
@@ -32,11 +37,6 @@ jest.mock('@/styles/modernTheme', () => ({
   },
   RADIUS: { base: 8, lg: 12 },
 }));
-
-import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
-import { TransferStationList } from '../TransferStationList';
-import { TransferStation } from '@/models/commute';
 
 const mockTransfer1: TransferStation = {
   stationId: 'stn-001',

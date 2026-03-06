@@ -1,14 +1,14 @@
+import React from 'react';
+import { render, fireEvent } from '@testing-library/react-native';
+import { Text } from 'react-native';
+import { ErrorBoundary, withErrorBoundary } from '../ErrorBoundary';
+
 jest.mock('../../../utils/performanceUtils', () => ({
   performanceMonitor: {
     startMeasure: jest.fn(),
     endMeasure: jest.fn(),
   },
 }));
-
-import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
-import { Text } from 'react-native';
-import { ErrorBoundary, withErrorBoundary } from '../ErrorBoundary';
 
 // Component that throws on demand
 const ThrowingComponent: React.FC<{ shouldThrow: boolean }> = ({ shouldThrow }) => {

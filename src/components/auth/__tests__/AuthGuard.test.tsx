@@ -1,3 +1,9 @@
+import React from 'react';
+import { render } from '@testing-library/react-native';
+import { Text } from 'react-native';
+import { AuthGuard } from '../AuthGuard';
+import { useAuth } from '../../../services/auth/AuthContext';
+
 jest.mock('../../../services/auth/AuthContext', () => ({
   useAuth: jest.fn(),
 }));
@@ -9,12 +15,6 @@ jest.mock('../../common/LoadingScreen', () => ({
     return React.createElement(Text, { testID: 'loading-screen' }, message);
   },
 }));
-
-import React from 'react';
-import { render } from '@testing-library/react-native';
-import { Text } from 'react-native';
-import { AuthGuard } from '../AuthGuard';
-import { useAuth } from '../../../services/auth/AuthContext';
 
 const mockUseAuth = useAuth as jest.Mock;
 

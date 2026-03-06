@@ -4,6 +4,11 @@
  */
 
 // Mock modules BEFORE imports (Jest hoisting)
+import React from 'react';
+import { render, fireEvent } from '@testing-library/react-native';
+import { CommuteTimeScreen } from '../CommuteTimeScreen';
+import { useOnboardingCallbacks } from '@/navigation/OnboardingNavigator';
+
 jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
 
 jest.mock('lucide-react-native', () => ({
@@ -56,11 +61,6 @@ jest.mock('@/styles/modernTheme', () => ({
   RADIUS: { base: 8, lg: 12 },
   SHADOWS: { sm: { shadowColor: '#000', shadowOpacity: 0.1 } },
 }));
-
-import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
-import { CommuteTimeScreen } from '../CommuteTimeScreen';
-import { useOnboardingCallbacks } from '@/navigation/OnboardingNavigator';
 
 const mockGoBack = jest.fn();
 const mockNavigate = jest.fn();

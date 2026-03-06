@@ -1,3 +1,7 @@
+import React from 'react';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { StationSearchModal } from '../StationSearchModal';
+
 jest.mock('lucide-react-native', () => ({
   Star: 'Star',
   ChevronRight: 'ChevronRight',
@@ -23,10 +27,6 @@ jest.mock('@/hooks/useFavorites', () => ({
     error: null,
   })),
 }));
-
-import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
-import { StationSearchModal } from '../StationSearchModal';
 
 describe('StationSearchModal', () => {
   const mockOnClose = jest.fn();

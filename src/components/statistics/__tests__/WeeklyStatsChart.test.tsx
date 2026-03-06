@@ -1,13 +1,13 @@
+import React from 'react';
+import { render } from '@testing-library/react-native';
+import WeeklyStatsChart from '../WeeklyStatsChart';
+import { ChartDataPoint } from '@/services/statistics/statisticsService';
+
 jest.mock('react-native', () => {
   const RN = jest.requireActual('react-native');
   RN.Dimensions.get = () => ({ width: 400, height: 800 });
   return RN;
 });
-
-import React from 'react';
-import { render } from '@testing-library/react-native';
-import WeeklyStatsChart from '../WeeklyStatsChart';
-import { ChartDataPoint } from '@/services/statistics/statisticsService';
 
 describe('WeeklyStatsChart', () => {
   it('renders empty state when data is empty', () => {
