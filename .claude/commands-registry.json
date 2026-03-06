@@ -1,5 +1,5 @@
 {
-  "_generated": "2026-02-26T14:34:07.741Z",
+  "_generated": "2026-03-06T00:00:00.000Z",
   "_description": "Auto-generated commands registry. Do not edit manually.",
   "commands": {
     "check-health": {
@@ -77,16 +77,6 @@
       "description": "코드 복잡도 분석 및 단순화 제안 (Boris Cherny code-simplifier 스타일)",
       "allowedTools": null
     },
-    "start-all": {
-      "file": ".claude/commands/start-all.md",
-      "description": "AOS 전체 서비스 시작 (인프라 + Backend + Dashboard)",
-      "allowedTools": null
-    },
-    "stop-all": {
-      "file": ".claude/commands/stop-all.md",
-      "description": "AOS 전체 서비스 중지",
-      "allowedTools": null
-    },
     "sync-registry": {
       "file": ".claude/commands/sync-registry.md",
       "description": "스킬, 에이전트, 훅, 커맨드 레지스트리 자동 동기화",
@@ -105,11 +95,6 @@
     "verify-app": {
       "file": ".claude/commands/verify-app.md",
       "description": "앱 종합 검증 - 타입체크, 린트, 테스트, 빌드를 한번에 실행 (Boris Cherny 피드백 루프)",
-      "allowedTools": null
-    },
-    "view-logs": {
-      "file": ".claude/commands/view-logs.md",
-      "description": "Vite 개발 서버 또는 테스트 로그 분석",
       "allowedTools": null
     }
   }

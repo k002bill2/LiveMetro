@@ -129,8 +129,7 @@ npm test -- --coverage # 3. 테스트 통과 + 커버리지 충족
 | Moderate | 2-3 | UI+서비스 또는 크로스 영역 |
 | Complex | 3+ | 풀스택, 아키텍처 변경 |
 
-**에이전트**: mobile-ui-specialist(inherit), backend-integration-specialist(inherit),
-test-automation-specialist(haiku), performance-optimizer(haiku), quality-validator(haiku)
+**에이전트**: mobile-ui-specialist(sonnet), test-automation-specialist(haiku), quality-validator(haiku)
 **평가**: eval-task-runner(inherit), eval-grader(inherit)
 **품질 기준**: `.claude/agents/shared/quality-reference.md`
 
