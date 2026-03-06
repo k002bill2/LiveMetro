@@ -118,56 +118,39 @@ npm test -- --coverage # 3. 테스트 통과 + 커버리지 충족
 
 **Production 빌드는 반드시 `/deploy-with-tests` 커맨드를 사용합니다.**
 
-## Debugging Guidelines
+## Multi-Agent Orchestration
 
-### 재시도 제한 규칙
+메인 에이전트(Opus)가 직접 서브에이전트를 스폰합니다.
 
-| 시도 | 행동 |
-|------|------|
-| 1차 | 에러 분석 후 수정 시도 |
-| 2차 | 다른 접근 방식으로 수정 시도 |
-| 3차 이후 | **중단 → 근본 원인 분석 → 접근 전환** |
+| 복잡도 | 에이전트 수 | 기준 |
+|--------|-----------|------|
+| Trivial | 0 | 단일 파일, 명확한 수정 |
+| Simple | 1 | 2-3 파일, 한 영역 |
+| Moderate | 2-3 | UI+서비스 또는 크로스 영역 |
+| Complex | 3+ | 풀스택, 아키텍처 변경 |
 
-**동일한 수정을 3번 이상 반복하지 않습니다.** 2회 실패 시:
-1. 현재까지 시도한 방법 정리
-2. 에러의 근본 원인 재분석
-3. 완전히 다른 접근 방식 탐색
-4. 필요 시 사용자에게 컨텍스트 공유
+**에이전트**: mobile-ui-specialist(inherit), backend-integration-specialist(inherit),
+test-automation-specialist(haiku), performance-optimizer(haiku), quality-validator(haiku)
+**평가**: eval-task-runner(inherit), eval-grader(inherit)
+**품질 기준**: `.claude/agents/shared/quality-reference.md`
 
-### 디버깅 원칙
-- **증상이 아닌 원인을 수정** - 에러 메시지를 억제하는 것이 아닌 근본 원인 해결
-- **변경 범위 최소화** - 한 번에 하나의 변경만 적용하고 검증
-- **가설 기반 디버깅** - 추측이 아닌 로그/증거 기반 접근
+## Skill Routing (필수)
 
-## Communication Style
+구현 전 반드시 해당 스킬을 Skill 도구로 호출할 것:
 
-### 응답 원칙
-- **분석 > 요약**: 단순 나열이 아닌 원인/영향/해결책 분석 제공
-- **구체적 예시**: 추상적 설명보다 코드 예시와 파일 위치 명시
-- **왜(Why) 설명**: 무엇(What)을 했는지보다 왜(Why) 그렇게 했는지 설명
-- **트레이드오프 명시**: 선택지가 있을 때 각각의 장단점 제시
+| 작업 유형 | 스킬 |
+|-----------|------|
+| React Native/UI/컴포넌트/화면 | `react-native-development` |
+| Firebase/Auth/Firestore | `firebase-integration` |
+| 테스트/커버리지 | `test-automation` |
+| 병렬 에이전트 (3+ 작업) | `parallel-coordinator` |
+| 구현 완료 검증 | `verification-loop` |
 
-### 에러 보고 형식
-```
-[문제] 무엇이 잘못되었는지
-[원인] 왜 발생했는지
-[시도] 어떤 해결을 시도했는지
-[결과] 현재 상태
-[다음] 권장 조치
-```
+## Coding Guidelines
 
-## Tech Stack
-
-| 영역 | 기술 | 비고 |
-|------|------|------|
-| Primary Language | TypeScript (strict) | `any` 금지 |
-| Secondary | Python 3.x | 스크립트/도구용 |
-| Framework | React Native + Expo | SDK ~49 |
-| State | Context API + Custom Hooks | Redux 미사용 |
-| Backend | Firebase (Auth + Firestore) | |
-| API | Seoul Open Data API | 30s 폴링 제한 |
-| Testing | Jest + RNTL | 커버리지 75%+ |
-| CI/CD | EAS Build | expo-cli |
+- 배포 전 검증: `npx tsc --noEmit` + `npm test` 실행 후 에러 0 확인
+- 타입 안전성: TypeScript 타입 힌트 일관 사용
+- 디버깅 규칙: 같은 수정을 2회 시도 후 실패하면 멈추고 근본 원인 분석
 
 ## Reference Documentation
 
