@@ -17,6 +17,7 @@ import { OnboardingProvider, useOnboarding } from '../contexts/OnboardingContext
 import { WelcomeScreen } from '../screens/auth/WelcomeScreen';
 import { AuthScreen } from '../screens/auth/AuthScreen';
 import { HomeScreen } from '../screens/home/HomeScreen';
+import { SubwayMapScreen } from '../screens/map/SubwayMapScreen';
 import { FavoritesScreen } from '../screens/favorites/FavoritesScreen';
 import { AlertsScreen } from '../screens/alerts/AlertsScreen';
 import { SettingsNavigator } from './SettingsNavigator';
@@ -60,6 +61,7 @@ export type RootStackParamList = {
 
 export type MainTabParamList = {
   Home: undefined;
+  Map: undefined;
   Favorites: undefined;
   Alerts: undefined;
   Settings: undefined;
@@ -107,16 +109,24 @@ const MainTabNavigator: React.FC = () => {
         },
       })}
     >
-      <Tab.Screen 
-        name="Home" 
+      <Tab.Screen
+        name="Home"
         component={HomeScreen}
         options={{
           title: '홈',
           tabBarLabel: '홈',
         }}
       />
-      <Tab.Screen 
-        name="Favorites" 
+      <Tab.Screen
+        name="Map"
+        component={SubwayMapScreen}
+        options={{
+          title: '노선도',
+          tabBarLabel: '노선도',
+        }}
+      />
+      <Tab.Screen
+        name="Favorites"
         component={FavoritesScreen}
         options={{
           title: '즐겨찾기',
