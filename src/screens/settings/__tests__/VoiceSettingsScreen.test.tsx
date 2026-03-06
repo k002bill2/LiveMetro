@@ -47,7 +47,7 @@ jest.mock('@/services/speech/ttsService', () => ({
   },
 }));
 
-const mockTtsService = ttsService as {
+const mockTtsService = ttsService as unknown as {
   initialize: jest.Mock;
   getSettings: jest.Mock;
   loadAvailableVoices: jest.Mock;

@@ -5,7 +5,7 @@
 
 // Mock modules BEFORE imports (Jest hoisting)
 import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
+import { render } from '@testing-library/react-native';
 import { AlternativeRoutesScreen } from '../AlternativeRoutesScreen';
 import { useAlternativeRoutes } from '@/hooks/useAlternativeRoutes';
 

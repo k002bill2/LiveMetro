@@ -14,7 +14,7 @@ jest.mock('@/models/pattern', () => ({
   DayOfWeek: { MON: 1, TUE: 2, WED: 3, THU: 4, FRI: 5, SAT: 6, SUN: 0 },
   parseTimeToMinutes: jest.fn((time: string) => {
     const [h, m] = time.split(':').map(Number);
-    return h * 60 + m;
+    return (h ?? 0) * 60 + (m ?? 0);
   }),
   formatMinutesToTime: jest.fn((mins: number) => {
     const h = Math.floor(mins / 60);

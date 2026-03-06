@@ -144,7 +144,7 @@ describe('useTrainCongestion', () => {
     mockCongestionService.subscribeToTrainCongestion.mockReturnValue(mockUnsubscribe);
 
     const { rerender } = renderHook(
-      ({ lineId, direction, trainId }) =>
+      ({ lineId, direction, trainId }: { lineId: string; direction: 'up' | 'down'; trainId: string }) =>
         useTrainCongestion(lineId, direction, trainId),
       {
         initialProps: { lineId: '2', direction: 'up' as const, trainId: 'train-123' },
@@ -720,7 +720,7 @@ describe('useCongestion (combined hook)', () => {
     mockCongestionService.subscribeToLineCongestion.mockReturnValue(mockUnsubscribe);
 
     const { rerender } = renderHook(
-      ({ lineId }) => useCongestion({ lineId, autoSubscribe: true }),
+      ({ lineId }: { lineId: string }) => useCongestion({ lineId, autoSubscribe: true }),
       { initialProps: { lineId: '2' } }
     );
 

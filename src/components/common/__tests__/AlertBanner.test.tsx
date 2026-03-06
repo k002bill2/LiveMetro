@@ -20,10 +20,11 @@ const makeAlert = (overrides: Partial<SubwayAlert> = {}): SubwayAlert => ({
   title: '2호선 지연',
   content: '신호 장애로 인한 지연',
   alertType: 'delay',
-  lineId: '2',
   lineName: '2호선',
   isActive: true,
   startTime: new Date(),
+  endTime: null,
+  affectedStations: [],
   ...overrides,
 });
 

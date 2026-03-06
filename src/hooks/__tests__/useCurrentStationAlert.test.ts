@@ -2,7 +2,7 @@
  * useCurrentStationAlert Hook Tests
  */
 
-import { renderHook, act, waitFor } from '@testing-library/react-native';
+import { renderHook, act } from '@testing-library/react-native';
 import { currentStationAlertService } from '@services/notification/currentStationAlertService';
 import { useCurrentStationAlert, useCurrentStationAlerts } from '../useCurrentStationAlert';
 

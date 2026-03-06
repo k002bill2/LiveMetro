@@ -4,7 +4,6 @@
  */
 
 // Mock modules BEFORE imports (Jest hoisting)
-import React from 'react';
 import { render, waitFor } from '@testing-library/react-native';
 import StatisticsDashboardScreen from '../StatisticsDashboardScreen';
 import { useAuth } from '@/services/auth/AuthContext';
@@ -13,10 +12,9 @@ import { statisticsService } from '@/services/statistics/statisticsService';
 
 jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
 jest.mock('react-native-safe-area-context', () => {
-  const React = require('react');
   return {
-    SafeAreaView: ({ children }: { children: React.ReactNode }) => children,
-    SafeAreaProvider: ({ children }: { children: React.ReactNode }) => children,
+    SafeAreaView: ({ children }: { children: unknown }) => children,
+    SafeAreaProvider: ({ children }: { children: unknown }) => children,
     useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
   };
 });

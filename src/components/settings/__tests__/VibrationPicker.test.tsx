@@ -4,7 +4,6 @@ import { render, fireEvent } from '@testing-library/react-native';
 import { VibrationPicker } from '../VibrationPicker';
 import { VibrationPatternId } from '@/models/user';
 import { VibrationOption } from '@/services/sound/soundService';
-import { soundService } from '@/services/sound/soundService';
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: (_, name) => name }));
 

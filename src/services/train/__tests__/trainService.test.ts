@@ -433,7 +433,7 @@ describe('TrainService', () => {
       });
 
       mockFindNearbyStations.mockReturnValue([
-        { ...mockStations[0], distance: 500, bearing: 90 },
+        { ...mockStations[0]!, distance: 500, bearing: 90 },
       ]);
 
       const result = await trainService.getNearbyStations(37.5665, 126.978, 2);

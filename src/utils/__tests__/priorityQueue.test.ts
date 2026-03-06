@@ -138,7 +138,7 @@ describe('PriorityQueue', () => {
   describe('heap property', () => {
     it('should maintain min-heap after many insertions', () => {
       const values = [10, 5, 3, 8, 1, 7, 2, 9, 4, 6];
-      values.forEach((v, i) => pq.enqueue(`item${v}`, v));
+      values.forEach((v) => pq.enqueue(`item${v}`, v));
 
       const result: string[] = [];
       while (!pq.isEmpty()) {

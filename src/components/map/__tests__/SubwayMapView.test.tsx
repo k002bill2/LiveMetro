@@ -27,7 +27,7 @@ const mockStations = [
   { id: 'st1', name: '강남', x: 100, y: 200, lineIds: ['2'], isTransfer: false },
   { id: 'st2', name: '역삼', x: 150, y: 200, lineIds: ['2'], isTransfer: false },
   { id: 'st3', name: '교대', x: 100, y: 250, lineIds: ['2', '3'], isTransfer: true },
-] as const;
+] as const as readonly any[];
 
 const mockLines = [
   { lineId: '2', fromStation: 'st1', toStation: 'st2', color: '#00A84D' },

@@ -42,7 +42,7 @@ describe('NotificationStorageService', () => {
 
       const result = await notificationStorageService.getAllNotifications();
       expect(result).toHaveLength(1);
-      expect(result[0].title).toBe('Test Alert');
+      expect(result[0]?.title).toBe('Test Alert');
     });
 
     it('should handle storage error', async () => {
@@ -70,11 +70,11 @@ describe('NotificationStorageService', () => {
       );
 
       const savedData = JSON.parse(
-        (AsyncStorage.setItem as jest.Mock).mock.calls[0][1]
+        (AsyncStorage.setItem as jest.Mock).mock.calls[0]?.[1] ?? '[]'
       );
-      expect(savedData[0].title).toBe('New Alert');
-      expect(savedData[0].isRead).toBe(false);
-      expect(savedData[0].id).toBeDefined();
+      expect(savedData[0]?.title).toBe('New Alert');
+      expect(savedData[0]?.isRead).toBe(false);
+      expect(savedData[0]?.id).toBeDefined();
     });
 
     it('should prepend to existing notifications', async () => {
@@ -89,10 +89,10 @@ describe('NotificationStorageService', () => {
       });
 
       const savedData = JSON.parse(
-        (AsyncStorage.setItem as jest.Mock).mock.calls[0][1]
+        (AsyncStorage.setItem as jest.Mock).mock.calls[0]?.[1] ?? '[]'
       );
-      expect(savedData[0].title).toBe('New');
-      expect(savedData[1].title).toBe('Old');
+      expect(savedData[0]?.title).toBe('New');
+      expect(savedData[1]?.title).toBe('Old');
     });
 
     it('should handle save error', async () => {
@@ -121,7 +121,7 @@ describe('NotificationStorageService', () => {
 
       const result = await notificationStorageService.getUnreadNotifications();
       expect(result).toHaveLength(1);
-      expect(result[0].title).toBe('Unread');
+      expect(result[0]?.title).toBe('Unread');
     });
 
     it('should return empty array on error', async () => {
@@ -145,10 +145,10 @@ describe('NotificationStorageService', () => {
       await notificationStorageService.markAsRead('notif_1');
 
       const savedData = JSON.parse(
-        (AsyncStorage.setItem as jest.Mock).mock.calls[0][1]
+        (AsyncStorage.setItem as jest.Mock).mock.calls[0]?.[1] ?? '[]'
       );
-      expect(savedData[0].isRead).toBe(true);
-      expect(savedData[1].isRead).toBe(false);
+      expect(savedData[0]?.isRead).toBe(true);
+      expect(savedData[1]?.isRead).toBe(false);
     });
 
     it('should handle error', async () => {
@@ -198,10 +198,10 @@ describe('NotificationStorageService', () => {
       await notificationStorageService.deleteNotification('delete');
 
       const savedData = JSON.parse(
-        (AsyncStorage.setItem as jest.Mock).mock.calls[0][1]
+        (AsyncStorage.setItem as jest.Mock).mock.calls[0]?.[1] ?? '[]'
       );
       expect(savedData).toHaveLength(1);
-      expect(savedData[0].id).toBe('keep');
+      expect(savedData[0]?.id).toBe('keep');
     });
 
     it('should handle error', async () => {

@@ -26,7 +26,7 @@ jest.mock('@/models/pattern', () => ({
   isWeekday: jest.fn().mockReturnValue(true),
   parseTimeToMinutes: jest.fn((time: string) => {
     const [h, m] = time.split(':').map(Number);
-    return h * 60 + m;
+    return (h ?? 0) * 60 + (m ?? 0);
   }),
   getCurrentTimeString: jest.fn().mockReturnValue('08:00'),
   createDefaultSmartNotificationSettings: jest.fn().mockReturnValue({
@@ -88,7 +88,13 @@ describe('SmartNotificationService', () => {
   describe('updateSettings', () => {
     it('should save settings', async () => {
       const { setDoc } = require('firebase/firestore');
-      await smartNotificationService.updateSettings('user-1', { enabled: true });
+      await smartNotificationService.updateSettings('user-1', {
+        enabled: true,
+        alertMinutesBefore: 15,
+        checkDelaysFor: [],
+        includeWeekends: false,
+        customAlertTimes: [],
+      });
       expect(setDoc).toHaveBeenCalled();
     });
   });
@@ -121,7 +127,7 @@ describe('SmartNotificationService', () => {
 
   describe('shouldShowNotification', () => {
     it('should return false when disabled', async () => {
-      const result = await smartNotificationService.shouldShowNotification('user-1', 1);
+      const result = await smartNotificationService.shouldShowNotification('user-1', '08:00');
       expect(result).toBe(false);
     });
   });

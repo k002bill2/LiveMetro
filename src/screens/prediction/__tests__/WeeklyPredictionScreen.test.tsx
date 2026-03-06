@@ -46,7 +46,7 @@ jest.mock('@/services/theme', () => ({
   ThemeColors: {},
 }));
 
-const mockGetWeekPredictions = jest.fn(() => Promise.resolve([]));
+const mockGetWeekPredictions = jest.fn(() => Promise.resolve([] as any[]));
 const mockTrainModel = jest.fn(() => Promise.resolve());
 
 jest.mock('@/hooks/useMLPrediction', () => ({

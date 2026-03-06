@@ -1,173 +1,676 @@
 /**
  * HomeScreen Test Suite
- * Tests home screen rendering and core functionality
+ * Comprehensive tests covering all code paths
  */
 
-// Mock modules BEFORE imports (Jest hoisting)
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
-import { HomeScreen } from '../HomeScreen';
+import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
+import * as Location from 'expo-location';
+
+// ============================================================================
+// Mocks - All jest.mock() calls hoisted before imports
+// ============================================================================
 
 jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
+
+const mockNavigate = jest.fn();
 jest.mock('@react-navigation/native', () => ({
-  useNavigation: jest.fn(() => ({
-    navigate: jest.fn(),
-    goBack: jest.fn(),
-  })),
+  useNavigation: jest.fn(() => ({ navigate: mockNavigate, goBack: jest.fn() })),
   useRoute: jest.fn(() => ({ params: {} })),
-  useFocusEffect: jest.fn((cb) => cb()),
+  useFocusEffect: jest.fn((cb: () => void) => cb()),
 }));
+
+const mockUser = {
+  id: 'uid-1',
+  uid: 'uid-1',
+  displayName: 'Test User',
+  email: 'test@test.com',
+  isAnonymous: false,
+  profilePicture: null,
+  preferences: {
+    favoriteStations: [
+      { stationId: 'fav-1', lineId: 'line-2' },
+      { stationId: 'fav-2', lineId: 'line-3' },
+    ],
+    notificationSettings: {
+      enabled: true, delayThresholdMinutes: 5,
+      quietHours: { enabled: false, startTime: '22:00', endTime: '07:00' },
+      weekdaysOnly: false,
+      alertTypes: { delays: true, suspensions: true, congestion: false, alternativeRoutes: true, serviceUpdates: true },
+      pushNotifications: true, emailNotifications: false,
+      soundSettings: { soundEnabled: true, soundId: 'default', volume: 80, vibrationEnabled: true, vibrationPattern: 'default' },
+    },
+    commuteSchedule: { weekdays: { morningCommute: null, eveningCommute: null }, weekends: null, autoDetect: false },
+    language: 'ko', theme: 'system', units: 'metric',
+  },
+  subscription: 'free',
+  createdAt: new Date(),
+  lastLoginAt: new Date(),
+};
+
 jest.mock('@/services/auth/AuthContext', () => ({
   useAuth: jest.fn(() => ({
-    user: {
-      uid: 'test-uid',
-      displayName: 'Test User',
-      email: 'test@example.com',
-      preferences: { favoriteStations: [] },
-    },
-    isAuthenticated: true,
+    user: mockUser,
+    firebaseUser: null,
+    loading: false,
+    signInAnonymously: jest.fn(),
+    signInWithEmail: jest.fn(),
+    signUpWithEmail: jest.fn(),
+    signOut: jest.fn(),
+    updateUserProfile: jest.fn(),
+    resetPassword: jest.fn(),
+    changePassword: jest.fn(),
   })),
 }));
+
 jest.mock('@/services/theme', () => ({
   useTheme: jest.fn(() => ({
     colors: {
-      primary: '#000000',
-      primaryLight: '#E5E5E5',
-      surface: '#FFFFFF',
-      background: '#F5F5F5',
-      backgroundSecondary: '#FAFAFA',
-      textPrimary: '#1A1A1A',
-      textSecondary: '#666666',
-      textTertiary: '#999999',
-      textInverse: '#FFFFFF',
-      borderLight: '#E5E5E5',
-      borderMedium: '#CCCCCC',
+      primary: '#000', primaryLight: '#E5E5E5', surface: '#FFF',
+      background: '#F5F5F5', backgroundSecondary: '#FAFAFA',
+      textPrimary: '#1A1A1A', textSecondary: '#666', textTertiary: '#999', textInverse: '#FFF',
+      borderLight: '#E5E5E5', borderMedium: '#CCC',
     },
   })),
   ThemeColors: {},
 }));
+
+const mockGetNearbyStations = jest.fn();
+const mockGetStation = jest.fn();
+
 jest.mock('@/services/train/trainService', () => ({
   trainService: {
-    getNearbyStations: jest.fn(() => Promise.resolve([])),
-    getStation: jest.fn(() => Promise.resolve(null)),
+    getNearbyStations: mockGetNearbyStations,
+    getStation: mockGetStation,
   },
 }));
+
+const mockScheduleDepartureAlert = jest.fn();
 jest.mock('@/hooks/useDelayDetection', () => ({
-  useDelayDetection: jest.fn(() => ({
-    delays: [],
-    loading: false,
-    error: null,
-  })),
+  useDelayDetection: jest.fn(() => ({ delays: [], loading: false, error: null })),
 }));
 jest.mock('@/hooks/useIntegratedAlerts', () => ({
   useIntegratedAlerts: jest.fn(() => ({
-    scheduleDepartureAlert: jest.fn(),
+    scheduleDepartureAlert: mockScheduleDepartureAlert,
     alerts: [],
   })),
 }));
-jest.mock('@/components/common/LoadingScreen', () => ({
-  LoadingScreen: () => null,
+
+// Mock lucide icons
+jest.mock('lucide-react-native', () => ({
+  CloudOff: () => null,
+  MapPin: () => null,
+  ChevronRight: () => null,
+  TrainFront: () => null,
+  RefreshCw: () => null,
 }));
-jest.mock('@/components/train/StationCard', () => ({
-  StationCard: () => null,
-}));
-jest.mock('@/components/train/TrainArrivalList', () => ({
-  TrainArrivalList: () => null,
-}));
-jest.mock('@/components/delays', () => ({
-  DelayAlertBanner: () => null,
-}));
-jest.mock('@/components/prediction', () => ({
-  CommutePredictionCard: () => null,
-}));
-jest.mock('@/components/debug', () => ({
-  LocationDebugPanel: () => null,
-}));
-jest.mock('@/components/common/Toast', () => ({
-  useToast: jest.fn(() => ({
-    showError: jest.fn(),
-    showSuccess: jest.fn(),
-    showInfo: jest.fn(),
-    ToastComponent: () => null,
-  })),
-}));
+
+// Mock components with require() to avoid scope issues
+jest.mock('@/components/common/LoadingScreen', () => {
+  const { View: V, Text: T } = require('react-native');
+  return { LoadingScreen: ({ message }: { message?: string }) => <V testID="loading-screen"><T>{message}</T></V> };
+});
+
+jest.mock('@/components/train/StationCard', () => {
+  const { TouchableOpacity: TO, Text: T } = require('react-native');
+  return {
+    StationCard: ({ station, onPress, onSetStart, onSetEnd }: {
+      station: { id: string; name: string }; isSelected?: boolean;
+      onPress: () => void; onSetStart: () => void; onSetEnd: () => void;
+    }) => (
+      <TO testID={`station-card-${station.id}`} onPress={onPress}>
+        <T>{station.name}</T>
+        <TO testID={`set-start-${station.id}`} onPress={onSetStart}><T>Start</T></TO>
+        <TO testID={`set-end-${station.id}`} onPress={onSetEnd}><T>End</T></TO>
+      </TO>
+    ),
+  };
+});
+
+jest.mock('@/components/train/TrainArrivalList', () => {
+  const { View: V, Text: T } = require('react-native');
+  return {
+    TrainArrivalList: ({ stationId }: { stationId: string }) => (
+      <V testID={`train-arrival-list-${stationId}`}><T>Arrivals</T></V>
+    ),
+  };
+});
+
+jest.mock('@/components/delays', () => {
+  const { View: V, Text: T, TouchableOpacity: TO } = require('react-native');
+  return {
+    DelayAlertBanner: ({ onPress, onDismiss, onAlternativeRoutePress }: {
+      onPress: () => void; onDismiss: () => void;
+      onAlternativeRoutePress?: () => void; delays?: unknown[];
+      showAlternativeRoute?: boolean; dismissible?: boolean;
+    }) => (
+      <V testID="delay-banner">
+        <TO testID="delay-press" onPress={onPress}><T>Delays</T></TO>
+        <TO testID="delay-dismiss" onPress={onDismiss}><T>Dismiss</T></TO>
+        {onAlternativeRoutePress && (
+          <TO testID="alt-route-press" onPress={onAlternativeRoutePress}><T>AltRoute</T></TO>
+        )}
+      </V>
+    ),
+  };
+});
+
+jest.mock('@/components/prediction', () => {
+  const { View: V, Text: T, TouchableOpacity: TO } = require('react-native');
+  return {
+    CommutePredictionCard: ({ onScheduleAlert, onViewDetails }: {
+      onScheduleAlert: () => void; onViewDetails: () => void;
+    }) => (
+      <V testID="prediction-card">
+        <TO testID="schedule-alert-btn" onPress={onScheduleAlert}><T>Schedule</T></TO>
+        <TO testID="view-details-btn" onPress={onViewDetails}><T>Details</T></TO>
+      </V>
+    ),
+  };
+});
+
+jest.mock('@/components/debug', () => {
+  const { View: V } = require('react-native');
+  return { LocationDebugPanel: () => <V testID="debug-panel" /> };
+});
+
+const mockShowError = jest.fn();
+const mockShowSuccess = jest.fn();
+const mockShowInfo = jest.fn();
+jest.mock('@/components/common/Toast', () => {
+  const { View: V } = require('react-native');
+  return {
+    useToast: jest.fn(() => ({
+      showError: mockShowError,
+      showSuccess: mockShowSuccess,
+      showInfo: mockShowInfo,
+      ToastComponent: () => <V testID="toast" />,
+    })),
+  };
+});
+
 jest.mock('expo-location', () => ({
-  requestForegroundPermissionsAsync: jest.fn(() =>
-    Promise.resolve({ status: 'granted' })
-  ),
-  getCurrentPositionAsync: jest.fn(() =>
-    Promise.resolve({
-      coords: { latitude: 37.5665, longitude: 126.9780 },
-    })
-  ),
+  requestForegroundPermissionsAsync: jest.fn(),
+  getCurrentPositionAsync: jest.fn(),
   Accuracy: { Balanced: 1 },
 }));
+
+// Mock styles module
+jest.mock('@/styles/modernTheme', () => ({
+  SPACING: { sm: 4, md: 8, lg: 16, xl: 24, '2xl': 32 },
+  RADIUS: { sm: 4, md: 8, lg: 12, full: 999 },
+  TYPOGRAPHY: {
+    fontSize: { sm: 12, base: 14, lg: 16, xl: 18, '2xl': 24 },
+    fontWeight: { normal: '400', semibold: '600', bold: '700' },
+    letterSpacing: { tight: -0.5 },
+    lineHeight: { relaxed: 1.5 },
+  },
+}));
+
+// ============================================================================
+// Imports after mocks
+// ============================================================================
+
+import { HomeScreen } from '../HomeScreen';
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+const mockLocationRequest = Location.requestForegroundPermissionsAsync as jest.Mock;
+const mockGetCurrentPosition = Location.getCurrentPositionAsync as jest.Mock;
+
+const originalDEV = (globalThis as Record<string, unknown>).__DEV__;
+
+const mockStation = (id: string, name: string) => ({
+  id, name, nameEn: name, lineId: 'line-2',
+  coordinates: { latitude: 37.5665, longitude: 126.978 },
+  transfers: [],
+});
+
+const setupGrantedLocation = (): void => {
+  mockLocationRequest.mockResolvedValue({ status: 'granted' });
+  mockGetCurrentPosition.mockResolvedValue({
+    coords: { latitude: 37.5665, longitude: 126.978 },
+  });
+};
+
+const setupDeniedLocation = (): void => {
+  mockLocationRequest.mockResolvedValue({ status: 'denied' });
+};
+
+// ============================================================================
+// Tests
+// ============================================================================
 
 describe('HomeScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    (globalThis as Record<string, unknown>).__DEV__ = false;
+    setupGrantedLocation();
+    mockGetNearbyStations.mockResolvedValue([]);
+    mockGetStation.mockResolvedValue(null);
   });
 
-  it('renders without crashing', async () => {
-    const { getByTestId } = render(<HomeScreen />);
+  afterAll(() => {
+    (globalThis as Record<string, unknown>).__DEV__ = originalDEV;
+  });
 
-    await waitFor(() => {
-      expect(getByTestId('home-screen')).toBeTruthy();
+  // ---------- Rendering ----------
+
+  describe('Rendering', () => {
+    it('renders home-screen after loading', async () => {
+      const { getByTestId } = render(<HomeScreen />);
+      await waitFor(() => expect(getByTestId('home-screen')).toBeTruthy());
+    });
+
+    it('shows welcome message with user name', async () => {
+      const { getByText } = render(<HomeScreen />);
+      await waitFor(() => expect(getByText(/Test User/)).toBeTruthy());
+    });
+
+    it('shows subtitle', async () => {
+      const { getByText } = render(<HomeScreen />);
+      await waitFor(() => expect(getByText('실시간 지하철 정보를 확인하세요')).toBeTruthy());
+    });
+
+    it('shows CommutePredictionCard and Toast', async () => {
+      const { getByTestId } = render(<HomeScreen />);
+      await waitFor(() => {
+        expect(getByTestId('prediction-card')).toBeTruthy();
+        expect(getByTestId('toast')).toBeTruthy();
+      });
+    });
+
+    it('shows "주변 역" when permission granted', async () => {
+      const { getByText } = render(<HomeScreen />);
+      await waitFor(() => expect(getByText('주변 역')).toBeTruthy());
+    });
+
+    it('shows "즐겨찾기" when permission denied', async () => {
+      setupDeniedLocation();
+      const { getByText } = render(<HomeScreen />);
+      await waitFor(() => expect(getByText('즐겨찾기')).toBeTruthy());
+    });
+
+    it('shows empty state when no nearby stations', async () => {
+      const { getByText } = render(<HomeScreen />);
+      await waitFor(() => expect(getByText('주변에 지하철역이 없습니다')).toBeTruthy());
+    });
+
+    it('shows favorite empty state when denied and no favorites', async () => {
+      setupDeniedLocation();
+      // User has favorites but getStation returns null
+      const { getByText } = render(<HomeScreen />);
+      await waitFor(() => expect(getByText('즐겨찾기에 추가된 역이 없습니다')).toBeTruthy());
     });
   });
 
-  it('displays welcome message with user name', async () => {
-    const { getByText } = render(<HomeScreen />);
+  // ---------- Location Permission ----------
 
-    await waitFor(() => {
-      expect(getByText(/안녕하세요, Test User님!/)).toBeTruthy();
+  describe('Location Permission', () => {
+    it('requests location permission on mount', async () => {
+      render(<HomeScreen />);
+      await waitFor(() => expect(mockLocationRequest).toHaveBeenCalled());
+    });
+
+    it('calls getNearbyStations when permission granted', async () => {
+      mockGetNearbyStations.mockResolvedValue([mockStation('s1', 'Station 1')]);
+      render(<HomeScreen />);
+      await waitFor(() => expect(mockGetNearbyStations).toHaveBeenCalled());
+    });
+
+    it('shows permission banner when denied', async () => {
+      setupDeniedLocation();
+      const { getByText } = render(<HomeScreen />);
+      await waitFor(() => expect(getByText('위치 권한 허용')).toBeTruthy());
+    });
+
+    it('handles permission request from banner - granted', async () => {
+      setupDeniedLocation();
+      const { getByText } = render(<HomeScreen />);
+      await waitFor(() => expect(getByText('위치 권한 허용')).toBeTruthy());
+
+      // Second call grants permission
+      mockLocationRequest.mockResolvedValueOnce({ status: 'granted' });
+      mockGetCurrentPosition.mockResolvedValue({ coords: { latitude: 37.5, longitude: 127 } });
+      mockGetNearbyStations.mockResolvedValue([]);
+
+      fireEvent.press(getByText('위치 권한 허용'));
+      await waitFor(() => expect(mockShowSuccess).toHaveBeenCalledWith('위치 권한이 허용되었습니다'));
+    });
+
+    it('handles permission request from banner - still denied', async () => {
+      setupDeniedLocation();
+      const { getByText } = render(<HomeScreen />);
+      await waitFor(() => expect(getByText('위치 권한 허용')).toBeTruthy());
+
+      mockLocationRequest.mockResolvedValueOnce({ status: 'denied' });
+      fireEvent.press(getByText('위치 권한 허용'));
+      await waitFor(() =>
+        expect(mockShowInfo).toHaveBeenCalledWith('위치 권한이 필요합니다. 설정에서 수동으로 허용해주세요.')
+      );
     });
   });
 
-  it('displays subtitle', async () => {
-    const { getByText } = render(<HomeScreen />);
+  // ---------- Nearby Stations ----------
 
-    await waitFor(() => {
-      expect(getByText('실시간 지하철 정보를 확인하세요')).toBeTruthy();
+  describe('Nearby Stations', () => {
+    it('renders station cards when stations available', async () => {
+      mockGetNearbyStations.mockResolvedValue([
+        mockStation('s1', 'Station A'),
+        mockStation('s2', 'Station B'),
+      ]);
+
+      const { getByTestId } = render(<HomeScreen />);
+      await waitFor(() => {
+        expect(getByTestId('station-card-s1')).toBeTruthy();
+        expect(getByTestId('station-card-s2')).toBeTruthy();
+      });
+    });
+
+    it('auto-selects first station and shows TrainArrivalList', async () => {
+      mockGetNearbyStations.mockResolvedValue([mockStation('s1', 'Station A')]);
+
+      const { getByTestId } = render(<HomeScreen />);
+      await waitFor(() => {
+        expect(getByTestId('train-arrival-list-s1')).toBeTruthy();
+      });
+    });
+
+    it('shows detail button and refresh button for selected station', async () => {
+      mockGetNearbyStations.mockResolvedValue([mockStation('s1', 'Station A')]);
+
+      const { getByText, getByTestId } = render(<HomeScreen />);
+      await waitFor(() => {
+        expect(getByText('상세보기')).toBeTruthy();
+        expect(getByTestId('refresh-button')).toBeTruthy();
+      });
+    });
+
+    it('shows station name in real-time info header', async () => {
+      mockGetNearbyStations.mockResolvedValue([mockStation('s1', 'My Station')]);
+
+      const { getByText } = render(<HomeScreen />);
+      await waitFor(() => expect(getByText('My Station 실시간 정보')).toBeTruthy());
     });
   });
 
-  it('has pull-to-refresh via ScrollView', async () => {
-    const { getByTestId } = render(<HomeScreen />);
+  // ---------- Station Selection & Navigation (lines 152-167) ----------
 
-    await waitFor(() => {
-      const scrollView = getByTestId('home-screen');
-      expect(scrollView).toBeTruthy();
+  describe('Station Interactions', () => {
+    it('onStationSelect navigates to StationNavigator', async () => {
+      mockGetNearbyStations.mockResolvedValue([mockStation('s1', 'Station A')]);
+
+      const { getByTestId } = render(<HomeScreen />);
+      await waitFor(() => expect(getByTestId('station-card-s1')).toBeTruthy());
+
+      fireEvent.press(getByTestId('station-card-s1'));
+      expect(mockNavigate).toHaveBeenCalledWith('StationNavigator', {
+        stationId: 's1', lineId: 'line-2',
+      });
+    });
+
+    it('handleSetStart navigates with departure mode', async () => {
+      mockGetNearbyStations.mockResolvedValue([mockStation('s1', 'Station A')]);
+
+      const { getByTestId } = render(<HomeScreen />);
+      await waitFor(() => expect(getByTestId('set-start-s1')).toBeTruthy());
+
+      fireEvent.press(getByTestId('set-start-s1'));
+      expect(mockNavigate).toHaveBeenCalledWith('StationNavigator', {
+        stationId: 's1', lineId: 'line-2', mode: 'departure',
+      });
+    });
+
+    it('handleSetEnd resets selection and shows info toast', async () => {
+      mockGetNearbyStations.mockResolvedValue([mockStation('s1', 'Station A')]);
+
+      const { getByTestId } = render(<HomeScreen />);
+      await waitFor(() => expect(getByTestId('set-end-s1')).toBeTruthy());
+
+      fireEvent.press(getByTestId('set-end-s1'));
+      expect(mockShowInfo).toHaveBeenCalledWith('선택이 초기화되었습니다');
+    });
+
+    it('detail button navigates to StationDetail', async () => {
+      mockGetNearbyStations.mockResolvedValue([mockStation('s1', 'Station A')]);
+
+      const { getByText } = render(<HomeScreen />);
+      await waitFor(() => expect(getByText('상세보기')).toBeTruthy());
+
+      fireEvent.press(getByText('상세보기'));
+      expect(mockNavigate).toHaveBeenCalledWith('StationDetail', {
+        stationId: 's1', stationName: 'Station A', lineId: 'line-2',
+      });
     });
   });
 
-  it('handles pull-to-refresh action', async () => {
-    const { getByTestId } = render(<HomeScreen />);
+  // ---------- Refresh (lines 192-227) ----------
 
-    await waitFor(() => {
-      expect(getByTestId('home-screen')).toBeTruthy();
+  describe('Refresh', () => {
+    it('refresh button triggers onRefresh', async () => {
+      mockGetNearbyStations.mockResolvedValue([mockStation('s1', 'Station A')]);
+
+      const { getByTestId } = render(<HomeScreen />);
+      await waitFor(() => expect(getByTestId('refresh-button')).toBeTruthy());
+
+      await act(async () => {
+        fireEvent.press(getByTestId('refresh-button'));
+      });
+
+      // onRefresh calls loadNearbyStations again
+      // Initial call + refresh call
+      expect(mockGetNearbyStations).toHaveBeenCalledTimes(2);
     });
-
-    // ScrollView에 RCTRefreshControl이 포함되어 있음
-    const scrollView = getByTestId('home-screen');
-    expect(scrollView).toBeTruthy();
   });
 
-  it('displays section titles', async () => {
-    const { getByText } = render(<HomeScreen />);
+  // ---------- Commute Prediction (lines 177-187) ----------
 
-    await waitFor(() => {
-      expect(getByText(/주변 역|즐겨찾기/)).toBeTruthy();
+  describe('Commute Prediction', () => {
+    it('schedule alert calls scheduleDepartureAlert(15)', async () => {
+      mockScheduleDepartureAlert.mockResolvedValue({ alertTime: '08:00' });
+
+      const { getByTestId } = render(<HomeScreen />);
+      await waitFor(() => expect(getByTestId('schedule-alert-btn')).toBeTruthy());
+
+      fireEvent.press(getByTestId('schedule-alert-btn'));
+      await waitFor(() => expect(mockScheduleDepartureAlert).toHaveBeenCalledWith(15));
+    });
+
+    it('shows success toast when alert scheduled', async () => {
+      mockScheduleDepartureAlert.mockResolvedValue({ alertTime: '08:00' });
+
+      const { getByTestId } = render(<HomeScreen />);
+      await waitFor(() => expect(getByTestId('schedule-alert-btn')).toBeTruthy());
+
+      fireEvent.press(getByTestId('schedule-alert-btn'));
+      await waitFor(() =>
+        expect(mockShowSuccess).toHaveBeenCalledWith('08:00에 출발 알림이 예약되었습니다')
+      );
+    });
+
+    it('does not show toast when alert returns null', async () => {
+      mockScheduleDepartureAlert.mockResolvedValue(null);
+
+      const { getByTestId } = render(<HomeScreen />);
+      await waitFor(() => expect(getByTestId('schedule-alert-btn')).toBeTruthy());
+
+      fireEvent.press(getByTestId('schedule-alert-btn'));
+      await waitFor(() => expect(mockScheduleDepartureAlert).toHaveBeenCalled());
+      expect(mockShowSuccess).not.toHaveBeenCalled();
+    });
+
+    it('view details navigates to WeeklyPrediction', async () => {
+      const { getByTestId } = render(<HomeScreen />);
+      await waitFor(() => expect(getByTestId('view-details-btn')).toBeTruthy());
+
+      fireEvent.press(getByTestId('view-details-btn'));
+      expect(mockNavigate).toHaveBeenCalledWith('WeeklyPrediction');
     });
   });
 
-  it('shows empty state when no stations available', async () => {
-    const { getByText } = render(<HomeScreen />);
+  // ---------- Delay Alert Banner (lines 305-323) ----------
 
-    await waitFor(() => {
-      expect(
-        getByText(/주변에 지하철역이 없습니다|즐겨찾기에 추가된 역이 없습니다/)
-      ).toBeTruthy();
+  describe('Delay Alert Banner', () => {
+    beforeEach(() => {
+      // Inject delays to show banner
+      const { useDelayDetection } = require('@/hooks/useDelayDetection');
+      useDelayDetection.mockReturnValue({
+        delays: [{ id: 'd1', line: '2호선', message: 'Delay' }],
+        loading: false,
+        error: null,
+      });
+    });
+
+    it('shows delay banner when delays exist', async () => {
+      const { getByTestId } = render(<HomeScreen />);
+      await waitFor(() => expect(getByTestId('delay-banner')).toBeTruthy());
+    });
+
+    it('delay press navigates to DelayFeed', async () => {
+      const { getByTestId } = render(<HomeScreen />);
+      await waitFor(() => expect(getByTestId('delay-press')).toBeTruthy());
+
+      fireEvent.press(getByTestId('delay-press'));
+      expect(mockNavigate).toHaveBeenCalledWith('DelayFeed');
+    });
+
+    it('dismiss hides the banner', async () => {
+      const { getByTestId, queryByTestId } = render(<HomeScreen />);
+      await waitFor(() => expect(getByTestId('delay-dismiss')).toBeTruthy());
+
+      fireEvent.press(getByTestId('delay-dismiss'));
+      await waitFor(() => expect(queryByTestId('delay-banner')).toBeNull());
+    });
+
+    it('alt route button navigates to AlternativeRoutes with selected station', async () => {
+      mockGetNearbyStations.mockResolvedValue([mockStation('s1', 'Station A')]);
+
+      const { getByTestId } = render(<HomeScreen />);
+      await waitFor(() => expect(getByTestId('alt-route-press')).toBeTruthy());
+
+      fireEvent.press(getByTestId('alt-route-press'));
+      expect(mockNavigate).toHaveBeenCalledWith('AlternativeRoutes', {
+        fromStationId: 's1',
+        toStationId: 'gangnam',
+        fromStationName: 'Station A',
+        toStationName: '강남',
+      });
+    });
+  });
+
+  // ---------- Favorite Stations (lines 76-100) ----------
+
+  describe('Favorite Stations', () => {
+    it('loads favorite stations when permission denied', async () => {
+      setupDeniedLocation();
+      mockGetStation
+        .mockResolvedValueOnce(mockStation('fav-1', 'Fav Station 1'))
+        .mockResolvedValueOnce(mockStation('fav-2', 'Fav Station 2'));
+
+      const { getByTestId } = render(<HomeScreen />);
+      await waitFor(() => {
+        expect(getByTestId('station-card-fav-1')).toBeTruthy();
+        expect(getByTestId('station-card-fav-2')).toBeTruthy();
+      });
+    });
+
+    it('auto-selects first favorite station', async () => {
+      setupDeniedLocation();
+      mockGetStation.mockResolvedValueOnce(mockStation('fav-1', 'Fav A')).mockResolvedValueOnce(null);
+
+      const { getByTestId } = render(<HomeScreen />);
+      await waitFor(() => expect(getByTestId('train-arrival-list-fav-1')).toBeTruthy());
+    });
+
+    it('falls back to favorites on nearby stations error', async () => {
+      mockGetCurrentPosition.mockRejectedValue(new Error('Location unavailable'));
+      mockGetStation.mockResolvedValueOnce(mockStation('fav-1', 'Fav')).mockResolvedValueOnce(null);
+
+      // getNearbyStations won't be called because getCurrentPositionAsync fails first
+      const { getByText } = render(<HomeScreen />);
+      await waitFor(() => expect(mockShowError).toHaveBeenCalled());
+    });
+  });
+
+  // ---------- Error Handling (lines 125-127, 145-146) ----------
+
+  describe('Error Handling', () => {
+    it('shows error toast when loadNearbyStations fails', async () => {
+      mockGetCurrentPosition.mockRejectedValue(new Error('GPS error'));
+
+      render(<HomeScreen />);
+      await waitFor(() =>
+        expect(mockShowError).toHaveBeenCalledWith('주변 역 정보를 가져오는데 실패했습니다')
+      );
+    });
+
+    it('shows error toast when initializeScreen fails completely', async () => {
+      mockLocationRequest.mockRejectedValue(new Error('Permission API crash'));
+
+      render(<HomeScreen />);
+      await waitFor(() =>
+        expect(mockShowError).toHaveBeenCalledWith(
+          '데이터를 불러오는데 실패했습니다. 네트워크 연결을 확인해주세요.'
+        )
+      );
+    });
+  });
+
+  // ---------- Cleanup (lines 246-251) ----------
+
+  describe('Cleanup', () => {
+    it('unmounts without errors', async () => {
+      const { unmount, getByTestId } = render(<HomeScreen />);
+      await waitFor(() => expect(getByTestId('home-screen')).toBeTruthy());
+      unmount();
+      // No error thrown = success
+    });
+  });
+
+  // ---------- Dev Mode (lines 104-106) ----------
+
+  describe('Development Mode', () => {
+    it('skips getCurrentPositionAsync in dev mode', async () => {
+      (globalThis as Record<string, unknown>).__DEV__ = true;
+      render(<HomeScreen />);
+      await waitFor(() => expect(mockGetCurrentPosition).not.toHaveBeenCalled());
+    });
+  });
+
+  // ---------- Display Name Fallback (line 276) ----------
+
+  describe('Display Name', () => {
+    it('shows user display name', async () => {
+      const { getByText } = render(<HomeScreen />);
+      await waitFor(() => expect(getByText(/Test User/)).toBeTruthy());
+    });
+
+    it('shows default "사용자" when displayName is null', async () => {
+      const { useAuth } = require('@/services/auth/AuthContext');
+      useAuth.mockReturnValueOnce({
+        user: { ...mockUser, displayName: null },
+        firebaseUser: null, loading: false,
+        signInAnonymously: jest.fn(), signInWithEmail: jest.fn(),
+        signUpWithEmail: jest.fn(), signOut: jest.fn(),
+        updateUserProfile: jest.fn(), resetPassword: jest.fn(), changePassword: jest.fn(),
+      });
+
+      const { getByText } = render(<HomeScreen />);
+      await waitFor(() => expect(getByText(/사용자님/)).toBeTruthy());
+    });
+  });
+
+  // ---------- Loading State (line 255-257) ----------
+
+  describe('Loading State', () => {
+    it('shows loading screen initially', () => {
+      // Make permission request hang to keep loading state
+      mockLocationRequest.mockReturnValue(new Promise(() => {}));
+
+      const { getByTestId } = render(<HomeScreen />);
+      expect(getByTestId('loading-screen')).toBeTruthy();
     });
   });
 });

@@ -2,7 +2,7 @@
  * useAlternativeRoutes Hook Tests
  */
 
-import { renderHook, act, waitFor } from '@testing-library/react-native';
+import { renderHook, act } from '@testing-library/react-native';
 import { routeService } from '@services/route';
 import {
   useAlternativeRoutes,

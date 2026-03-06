@@ -31,7 +31,7 @@ jest.mock('@/models/pattern', () => ({
   getDayOfWeek: jest.fn().mockReturnValue(1),
   parseTimeToMinutes: jest.fn((time: string) => {
     const [h, m] = time.split(':').map(Number);
-    return h * 60 + m;
+    return (h ?? 0) * 60 + (m ?? 0);
   }),
   formatMinutesToTime: jest.fn((mins: number) => {
     const h = Math.floor(mins / 60);
@@ -69,11 +69,12 @@ describe('DelayResponseAlertService', () => {
 
   describe('checkRouteDelays', () => {
     it('should check for delays', async () => {
-      const result = await delayResponseAlertService.checkRouteDelays({
-        userId: 'user-1',
-        stationName: '강남역',
-        lineId: '2',
-        direction: 'up',
+      const result = await delayResponseAlertService.checkRouteDelays('user-1', {
+        departureStationId: 'gangnam',
+        departureStationName: '강남역',
+        arrivalStationId: 'jamsil',
+        arrivalStationName: '잠실',
+        lineIds: ['2'],
       });
       expect(result).toBeDefined();
     });
@@ -100,11 +101,15 @@ describe('DelayResponseAlertService', () => {
     it('should return session ID', () => {
       const sessionId = delayResponseAlertService.startDelayMonitoring({
         userId: 'user-1',
-        stationName: '강남역',
-        lineId: '2',
-        direction: 'up',
-        intervalMs: 30000,
-        onDelayDetected: jest.fn(),
+        route: {
+          departureStationId: 'gangnam',
+          departureStationName: '강남역',
+          arrivalStationId: 'jamsil',
+          arrivalStationName: '잠실',
+          lineIds: ['2'],
+        },
+        pollingIntervalSeconds: 30,
+        bufferMinutes: 10,
       });
       expect(typeof sessionId).toBe('string');
       expect(sessionId.length).toBeGreaterThan(0);
@@ -115,11 +120,15 @@ describe('DelayResponseAlertService', () => {
     it('should stop existing session', () => {
       const sessionId = delayResponseAlertService.startDelayMonitoring({
         userId: 'user-1',
-        stationName: '강남역',
-        lineId: '2',
-        direction: 'up',
-        intervalMs: 30000,
-        onDelayDetected: jest.fn(),
+        route: {
+          departureStationId: 'gangnam',
+          departureStationName: '강남역',
+          arrivalStationId: 'jamsil',
+          arrivalStationName: '잠실',
+          lineIds: ['2'],
+        },
+        pollingIntervalSeconds: 30,
+        bufferMinutes: 10,
       });
       const result = delayResponseAlertService.stopDelayMonitoring(sessionId);
       expect(result).toBe(true);
@@ -135,11 +144,15 @@ describe('DelayResponseAlertService', () => {
     it('should stop all sessions for user', () => {
       delayResponseAlertService.startDelayMonitoring({
         userId: 'user-1',
-        stationName: '강남역',
-        lineId: '2',
-        direction: 'up',
-        intervalMs: 30000,
-        onDelayDetected: jest.fn(),
+        route: {
+          departureStationId: 'gangnam',
+          departureStationName: '강남역',
+          arrivalStationId: 'jamsil',
+          arrivalStationName: '잠실',
+          lineIds: ['2'],
+        },
+        pollingIntervalSeconds: 30,
+        bufferMinutes: 10,
       });
       const count = delayResponseAlertService.stopAllMonitoring('user-1');
       expect(count).toBeGreaterThanOrEqual(1);
@@ -155,11 +168,15 @@ describe('DelayResponseAlertService', () => {
     it('should cleanup all resources', () => {
       delayResponseAlertService.startDelayMonitoring({
         userId: 'user-1',
-        stationName: '강남역',
-        lineId: '2',
-        direction: 'up',
-        intervalMs: 30000,
-        onDelayDetected: jest.fn(),
+        route: {
+          departureStationId: 'gangnam',
+          departureStationName: '강남역',
+          arrivalStationId: 'jamsil',
+          arrivalStationName: '잠실',
+          lineIds: ['2'],
+        },
+        pollingIntervalSeconds: 30,
+        bufferMinutes: 10,
       });
       expect(() => delayResponseAlertService.destroy()).not.toThrow();
     });
@@ -169,11 +186,15 @@ describe('DelayResponseAlertService', () => {
     it('should return active sessions', () => {
       delayResponseAlertService.startDelayMonitoring({
         userId: 'user-1',
-        stationName: '강남역',
-        lineId: '2',
-        direction: 'up',
-        intervalMs: 30000,
-        onDelayDetected: jest.fn(),
+        route: {
+          departureStationId: 'gangnam',
+          departureStationName: '강남역',
+          arrivalStationId: 'jamsil',
+          arrivalStationName: '잠실',
+          lineIds: ['2'],
+        },
+        pollingIntervalSeconds: 30,
+        bufferMinutes: 10,
       });
       const sessions = delayResponseAlertService.getActiveSessions();
       expect(sessions.length).toBeGreaterThanOrEqual(1);

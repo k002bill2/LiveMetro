@@ -5,7 +5,7 @@
 
 // Mock modules BEFORE imports (Jest hoisting)
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, fireEvent } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import { SettingsScreen } from '../SettingsScreen';
 import { useAuth } from '@/services/auth/AuthContext';

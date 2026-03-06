@@ -62,7 +62,7 @@ describe('SoundPicker', () => {
   });
 
   it('opens modal and shows options when pressed', () => {
-    const { getByText, queryByText } = render(
+    const { getByText } = render(
       <SoundPicker {...defaultProps} />,
     );
     // Modal not visible initially (options inside modal)

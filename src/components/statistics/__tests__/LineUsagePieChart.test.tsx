@@ -61,7 +61,7 @@ describe('LineUsagePieChart', () => {
       { lineId: '5', lineName: '5호선', tripCount: 5, percentage: 5, color: '#996CAC' },
       { lineId: '6', lineName: '6호선', tripCount: 3, percentage: 3, color: '#CD7C2F' },
     ];
-    const { queryByText, getByText } = render(<LineUsagePieChart data={sixLineData} />);
+    const { getByText } = render(<LineUsagePieChart data={sixLineData} />);
     // First 5 should appear in bar chart
     expect(getByText('2호선')).toBeTruthy();
     // Legend shows all items

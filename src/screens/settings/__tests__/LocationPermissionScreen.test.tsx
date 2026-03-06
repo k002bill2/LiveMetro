@@ -6,7 +6,7 @@
 // Mock modules BEFORE imports (Jest hoisting)
 import React from 'react';
 import { render, waitFor, fireEvent } from '@testing-library/react-native';
-import { Alert, Linking } from 'react-native';
+import { Alert } from 'react-native';
 import * as Location from 'expo-location';
 import { LocationPermissionScreen } from '../LocationPermissionScreen';
 

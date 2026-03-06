@@ -23,14 +23,14 @@ const mockReduceMotionListeners: ((enabled: boolean) => void)[] = [];
 jest.spyOn(AccessibilityInfo, 'isScreenReaderEnabled').mockResolvedValue(false);
 jest.spyOn(AccessibilityInfo, 'isReduceMotionEnabled').mockResolvedValue(false);
 jest.spyOn(AccessibilityInfo, 'addEventListener').mockImplementation(
-  (eventName: string, handler: (enabled: boolean) => void) => {
+  ((eventName: string, handler: (enabled: boolean) => void) => {
     if (eventName === 'screenReaderChanged') {
       mockScreenReaderListeners.push(handler);
     } else if (eventName === 'reduceMotionChanged') {
       mockReduceMotionListeners.push(handler);
     }
-    return { remove: jest.fn() };
-  }
+    return { remove: jest.fn() } as any;
+  }) as any
 );
 
 const wrapper = ({ children }: { children: React.ReactNode }) => (

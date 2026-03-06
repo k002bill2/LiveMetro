@@ -6,7 +6,7 @@
 // Mock modules BEFORE imports (Jest hoisting)
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
-import { Alert, Linking } from 'react-native';
+import { Alert } from 'react-native';
 import { HelpScreen } from '../HelpScreen';
 
 jest.mock('@expo/vector-icons', () => ({

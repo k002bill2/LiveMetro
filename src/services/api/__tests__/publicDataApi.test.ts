@@ -112,7 +112,7 @@ describe('PublicDataApiService', () => {
         }),
       });
 
-      const result = await publicDataApi.getCurrentCongestion('강남', 'up');
+      await publicDataApi.getCurrentCongestion('강남', 'up');
       // Result depends on current time/day matching
     }, 15000);
 

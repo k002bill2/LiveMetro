@@ -102,11 +102,11 @@ describe('useCommuteLogs', () => {
     let logged: unknown;
     await act(async () => {
       logged = await result.current.logCommute({
-        startStationId: 's1',
-        endStationId: 's2',
-        lineId: '2',
-        startTime: new Date(),
-        endTime: new Date(),
+        departureStationId: 's1',
+        departureStationName: 'Station A',
+        arrivalStationId: 's2',
+        arrivalStationName: 'Station B',
+        lineIds: ['2'],
       });
     });
 
@@ -124,11 +124,11 @@ describe('useCommuteLogs', () => {
     let logged: unknown;
     await act(async () => {
       logged = await result.current.logCommute({
-        startStationId: 's1',
-        endStationId: 's2',
-        lineId: '2',
-        startTime: new Date(),
-        endTime: new Date(),
+        departureStationId: 's1',
+        departureStationName: 'Station A',
+        arrivalStationId: 's2',
+        arrivalStationName: 'Station B',
+        lineIds: ['2'],
       });
     });
 
@@ -146,11 +146,11 @@ describe('useCommuteLogs', () => {
 
     await act(async () => {
       await result.current.logCommute({
-        startStationId: 's1',
-        endStationId: 's2',
-        lineId: '2',
-        startTime: new Date(),
-        endTime: new Date(),
+        departureStationId: 's1',
+        departureStationName: 'Station A',
+        arrivalStationId: 's2',
+        arrivalStationName: 'Station B',
+        lineIds: ['2'],
       });
     });
 
@@ -361,11 +361,11 @@ describe('useCommutePattern', () => {
 
     await act(async () => {
       await result.current.logCommute({
-        startStationId: 's1',
-        endStationId: 's2',
-        lineId: '2',
-        startTime: new Date(),
-        endTime: new Date(),
+        departureStationId: 's1',
+        departureStationName: 'Station A',
+        arrivalStationId: 's2',
+        arrivalStationName: 'Station B',
+        lineIds: ['2'],
       });
     });
 

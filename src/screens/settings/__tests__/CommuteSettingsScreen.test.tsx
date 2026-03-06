@@ -96,6 +96,8 @@ describe('CommuteSettingsScreen', () => {
         bufferMinutes: 10,
       },
       eveningRoute: null,
+      createdAt: null,
+      updatedAt: null,
     });
 
     const { getByText, getAllByText } = render(<CommuteSettingsScreen {...createProps()} />);
@@ -158,6 +160,8 @@ describe('CommuteSettingsScreen', () => {
         bufferMinutes: 10,
       },
       eveningRoute: null,
+      createdAt: null,
+      updatedAt: null,
     });
 
     const { getByText } = render(<CommuteSettingsScreen {...createProps()} />);

@@ -39,24 +39,19 @@ describe('CongestionPredictionService', () => {
 
   describe('recordObservation', () => {
     it('should record congestion observation', async () => {
-      await congestionPredictionService.recordObservation({
-        stationId: '222',
-        lineId: '2',
-        direction: 'up' as const,
-        congestionLevel: 2,
-      });
+      await congestionPredictionService.recordObservation(
+        '222',
+        '2',
+        'up',
+        2 as any
+      );
       // Service should process observation
     });
 
     it('should handle storage errors', async () => {
       (AsyncStorage.setItem as jest.Mock).mockRejectedValue(new Error('Storage error'));
       await expect(
-        congestionPredictionService.recordObservation({
-          stationId: '222',
-          lineId: '2',
-          direction: 'up' as const,
-          congestionLevel: 3,
-        })
+        congestionPredictionService.recordObservation('222', '2', 'up', 3 as any)
       ).resolves.not.toThrow();
     });
   });

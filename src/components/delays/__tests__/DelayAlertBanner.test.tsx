@@ -102,16 +102,6 @@ describe('DelayAlertBanner', () => {
   });
 
   it('calls onDismiss when dismiss button is pressed', () => {
-    const { UNSAFE_getAllByType } = render(
-      <DelayAlertBanner
-        delays={singleDelay}
-        onDismiss={mockOnDismiss}
-        dismissible={true}
-      />,
-    );
-    // The dismiss button renders an X icon. Find all TouchableOpacity elements.
-    // Since dismiss button is separate, we can find it.
-    // Use the onDismiss callback as confirmation.
     const { getByText } = render(
       <DelayAlertBanner
         delays={singleDelay}
@@ -119,7 +109,7 @@ describe('DelayAlertBanner', () => {
         dismissible={true}
       />,
     );
-    // The dismiss button's X is rendered as a mock string component.
+    // The dismiss button renders an X icon.
     // We verify that the component renders with dismissible=true without errors.
     expect(getByText('지연 운행 중')).toBeTruthy();
   });

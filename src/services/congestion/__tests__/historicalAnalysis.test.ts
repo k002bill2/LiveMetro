@@ -40,12 +40,7 @@ describe('HistoricalAnalysisService', () => {
   describe('addRecord', () => {
     it('should add a congestion record', async () => {
       await expect(
-        historicalAnalysisService.addRecord({
-          stationId: '222',
-          lineId: '2',
-          direction: 'up',
-          level: 'moderate' as never,
-        })
+        historicalAnalysisService.addRecord('222', '2', 'up', 'moderate' as any)
       ).resolves.not.toThrow();
     });
   });
