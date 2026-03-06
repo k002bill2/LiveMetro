@@ -6,9 +6,20 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -c \"import json,sys; p=json.load(sys.stdin).get('tool_input',{}).get('file_path',''); blocked=['.env','secrets','.git/','/prod/','google-services.json']; sys.exit(2 if any(b in p for b in blocked) else 0)\"",
+            "command": "python3 -c \"import json,sys; p=json.load(sys.stdin).get('tool_input',{}).get('file_path',''); blocked=['.env','secrets','.git/','google-services.json','eas.json','firestore.rules']; sys.exit(2 if any(b in p for b in blocked) else 0)\"",
             "timeout": 5,
             "statusMessage": "Path protection..."
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/ethicalValidator.js 2>/dev/null || true",
+            "timeout": 5,
+            "statusMessage": "Ethical validation..."
           }
         ]
       },

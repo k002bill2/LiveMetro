@@ -124,11 +124,9 @@ description: Parallel Agents Safety Protocol with ACE Framework for LiveMetro mu
 
 | Agent | Model | Domain | Workspace | Tools |
 |-------|-------|--------|-----------|-------|
-| `mobile-ui-specialist` | sonnet | React Native UI | `.temp/agent_workspaces/mobile-ui/` | Edit, Read, Write |
-| `backend-integration-specialist` | sonnet | Firebase, Seoul API | `.temp/agent_workspaces/backend-integration/` | Edit, Read, Bash |
-| `test-automation-specialist` | haiku | Jest, RTL | `.temp/agent_workspaces/test-automation/` | Edit, Read, Bash |
-| `performance-optimizer` | haiku | 메모리, 렌더링 | `.temp/agent_workspaces/performance-optimizer/` | Read, Grep, Bash |
-| `quality-validator` | haiku | 최종 검증 | `.temp/agent_workspaces/quality-validator/` | Read, Grep, Bash |
+| `mobile-ui-specialist` | sonnet | React Native UI, Firebase, Seoul API | `.temp/agent_workspaces/mobile-ui/` | Edit, Write, Read, Grep, Glob, Bash |
+| `test-automation-specialist` | haiku | Jest, RNTL | `.temp/agent_workspaces/test-automation/` | Edit, Write, Read, Grep, Glob, Bash |
+| `quality-validator` | haiku | 최종 검증 | `.temp/agent_workspaces/quality-validator/` | Edit, Write, Read, Grep, Glob, Bash |
 
 **Restrictions:**
 - 다른 에이전트가 락한 파일 수정 불가
@@ -149,11 +147,11 @@ description: Parallel Agents Safety Protocol with ACE Framework for LiveMetro mu
 │   │   ├── station/     # 역 관련 컴포넌트
 │   │   └── common/      # 공통 컴포넌트
 │   ├── screens/         # mobile-ui-specialist
-│   ├── services/        # backend-integration-specialist
+│   ├── services/        # mobile-ui-specialist
 │   │   ├── firebase/    # Firebase 서비스
 │   │   ├── api/         # Seoul API 연동
 │   │   └── cache/       # 캐시 서비스
-│   ├── hooks/           # backend-integration-specialist
+│   ├── hooks/           # mobile-ui-specialist
 │   ├── models/          # Primary (공유)
 │   ├── types/           # Primary (공유)
 │   └── navigation/      # mobile-ui-specialist
@@ -161,9 +159,7 @@ description: Parallel Agents Safety Protocol with ACE Framework for LiveMetro mu
 ├── .temp/
 │   ├── agent_workspaces/
 │   │   ├── mobile-ui/
-│   │   ├── backend-integration/
 │   │   ├── test-automation/
-│   │   ├── performance-optimizer/
 │   │   └── quality-validator/
 │   ├── memory/          # 체크포인트, 컨텍스트
 │   └── coordination/    # 파일 락
@@ -249,8 +245,7 @@ function selectSkill(taskType: string): string {
 Primary (Lead Orchestrator)
   ↓ [Fan-Out: 독립 서브태스크 분배]
 ┌─────────────────────────────────────┐
-│ mobile-ui-specialist (UI 작업)       │
-│ backend-integration-specialist (API) │
+│ mobile-ui-specialist (UI + 서비스)   │
 │ test-automation-specialist (테스트)   │
 └─────────────────────────────────────┘
   ↓ [Fan-In: 결과 수집 및 통합]
@@ -271,32 +266,18 @@ Primary (통합 및 검증)
   "complexity": "moderate",
   "subtasks": [
     {
-      "agent": "backend-integration-specialist",
-      "task": "Firebase favorites 서비스 구현",
-      "skill": "firebase-integration",
-      "output": "src/services/favorites/favoritesService.ts",
+      "agent": "mobile-ui-specialist",
+      "task": "Firebase favorites 서비스 + StationCard 즐겨찾기 버튼 + FavoritesScreen",
+      "skill": "react-native-development",
+      "output": ["src/services/favorites/favoritesService.ts", "src/components/station/StationCard.tsx", "src/screens/FavoritesScreen.tsx"],
       "dependencies": []
-    },
-    {
-      "agent": "mobile-ui-specialist",
-      "task": "StationCard에 즐겨찾기 버튼 추가",
-      "skill": "react-native-development",
-      "output": "src/components/station/StationCard.tsx",
-      "dependencies": ["favorites_service"]
-    },
-    {
-      "agent": "mobile-ui-specialist",
-      "task": "FavoritesScreen 생성",
-      "skill": "react-native-development",
-      "output": "src/screens/FavoritesScreen.tsx",
-      "dependencies": ["favorites_service"]
     },
     {
       "agent": "test-automation-specialist",
       "task": "즐겨찾기 기능 테스트",
       "skill": "test-automation",
       "output": "__tests__/services/favorites.test.ts",
-      "dependencies": ["favorites_service", "station_card", "favorites_screen"]
+      "dependencies": ["mobile_ui_complete"]
     }
   ]
 }
@@ -305,26 +286,22 @@ Primary (통합 및 검증)
 ### 6.3 Execution Timeline
 
 ```
-T0:00  Primary: backend-integration-specialist 호출
-       └─ Firebase favoritesService.ts 구현
-
-T0:15  backend: 완료, 타입 내보내기
-       └─ .temp/agent_workspaces/backend-integration/proposals/
-
-T0:16  Primary: mobile-ui-specialist (2개 태스크 병렬)
+T0:00  Primary: mobile-ui-specialist 호출
+       ├─ Firebase favoritesService.ts 구현
        ├─ StationCard 즐겨찾기 버튼
        └─ FavoritesScreen
 
-T0:26  mobile-ui: 두 태스크 완료
+T0:20  mobile-ui: 완료
+       └─ .temp/agent_workspaces/mobile-ui/proposals/
 
-T0:27  Primary: test-automation-specialist 호출
+T0:21  Primary: test-automation-specialist 호출
        └─ 전체 기능 테스트
 
-T0:37  test: 완료
+T0:31  test: 완료
 
-순차 실행: ~60분
-병렬 실행: ~37분
-속도 향상: 1.6x
+순차 실행: ~45분
+병렬 실행: ~31분
+속도 향상: 1.5x
 ```
 
 ---

@@ -1,16 +1,16 @@
-# AOS Dashboard Quick Reference
-> Agent Orchestration Service - React Web + Python Backend
+# LiveMetro Quick Reference
+> Seoul Metro Real-time Arrival App - React Native + Firebase
 
 ## Tech Stack 요약
 
 | Layer | Tech | Version |
 |-------|------|---------|
-| **Frontend** | React + Vite + Tailwind | 18.3.1 / 6.0+ / 3.4.16 |
-| **State** | Zustand | 5.0.0 |
-| **Backend** | FastAPI + LangGraph | 0.115+ / 0.2.0+ |
-| **Database** | PostgreSQL + Redis | 15+ / 7+ |
-| **Vector DB** | ChromaDB | 0.4+ |
-| **LLM** | Gemini / Claude / Ollama | 다중 프로바이더 |
+| **Framework** | React Native + Expo | 0.76+ / SDK 52 |
+| **Language** | TypeScript | 5.6+ |
+| **State** | Zustand | 5.0+ |
+| **Backend** | Firebase (Auth + Firestore) | 11.x |
+| **API** | Seoul Open Data API | 30초 폴링 |
+| **Navigation** | React Navigation | 6.x |
 
 ---
 
@@ -18,17 +18,17 @@
 
 ```
 src/
-├── backend/              # Python Backend
-│   ├── api/              # FastAPI 라우터
-│   ├── orchestrator/     # LangGraph (nodes.py, graph.py)
-│   ├── services/         # 비즈니스 로직
-│   └── models/           # Pydantic 모델
-└── dashboard/            # React Web
-    └── src/
-        ├── components/   # UI 컴포넌트
-        ├── pages/        # 페이지
-        ├── stores/       # Zustand 스토어 (12개)
-        └── hooks/        # 커스텀 훅
+├── components/       # UI 컴포넌트
+│   ├── train/        # 열차 관련
+│   ├── station/      # 역 관련
+│   └── common/       # 공통
+├── screens/          # 스크린
+├── services/         # 서비스 (Firebase, Seoul API, Cache)
+├── hooks/            # 커스텀 훅
+├── models/           # 데이터 모델
+├── types/            # TypeScript 타입
+├── navigation/       # React Navigation 설정
+└── config/           # Firebase 등 설정
 ```
 
 ---
@@ -40,7 +40,6 @@ src/
 /check-health      # 타입체크 + 린트 + 테스트 + 빌드
 /verify-app        # Boris Cherny 스타일 검증 루프
 /test-coverage     # 테스트 커버리지 분석
-/simplify-code     # 코드 복잡도 분석
 /review            # 변경 파일 코드 리뷰
 ```
 
@@ -54,13 +53,7 @@ src/
 
 ### Git 워크플로우
 ```bash
-/commit-push-pr    # 커밋 → 푸시 → PR 자동화
-```
-
-### 인프라
-```bash
-/start-all         # 전체 서비스 시작
-/stop-all          # 전체 서비스 중지
+/commit-push-pr    # 커밋 -> 푸시 -> PR 자동화
 ```
 
 ---
@@ -69,27 +62,34 @@ src/
 
 | Agent | Domain | Model |
 |-------|--------|-------|
-| `web-ui-specialist` | React Web UI | Sonnet |
-| `backend-integration-specialist` | FastAPI/Firebase | Sonnet |
-| `test-automation-specialist` | Vitest/Pytest | Sonnet |
-| `lead-orchestrator` | 멀티 에이전트 조정 | Sonnet |
-| `performance-optimizer` | 성능 최적화 | Sonnet |
-| `code-simplifier` | 코드 복잡도 분석 | Haiku |
-| `quality-validator` | 품질 검증 | Sonnet |
+| `mobile-ui-specialist` | React Native UI + Services | Sonnet |
+| `test-automation-specialist` | Jest + RNTL | Haiku |
+| `quality-validator` | 품질 검증 | Haiku |
+| `eval-grader` | 에이전트 평가 채점 | Inherit |
+| `eval-task-runner` | 평가 태스크 실행 | Inherit |
 
 ---
 
 ## 코드 패턴
 
-### React Component (Tailwind)
+### React Native Component
 ```tsx
-import { cn } from '@/lib/utils';
+import { StyleSheet, View, Text, Pressable } from 'react-native';
 
-export const MyComponent = ({ className, ...props }) => (
-  <div className={cn('p-4 rounded-lg', className)} {...props}>
-    {/* content */}
-  </div>
-);
+export const StationCard = memo(({ station, onPress }: StationCardProps) => (
+  <Pressable
+    style={styles.container}
+    onPress={() => onPress(station.id)}
+    accessibilityLabel={`${station.name} 역`}
+  >
+    <Text style={styles.title}>{station.name}</Text>
+  </Pressable>
+));
+
+const styles = StyleSheet.create({
+  container: { padding: 16, borderRadius: 8 },
+  title: { fontSize: 16, fontWeight: '600' },
+});
 ```
 
 ### Zustand Store
@@ -97,96 +97,37 @@ export const MyComponent = ({ className, ...props }) => (
 export const useStore = create<State>((set, get) => ({
   data: null,
   fetchData: async () => {
-    const response = await api.get('/data');
-    set({ data: response.data });
+    const result = await trainService.getArrivals();
+    set({ data: result });
   },
 }));
 ```
 
-### FastAPI Endpoint
-```python
-@router.get("/items/{id}", response_model=ItemResponse)
-async def get_item(id: str, db: AsyncSession = Depends(get_db)):
-    item = await db.get(Item, id)
-    if not item:
-        raise HTTPException(status_code=404)
-    return item
+### Firebase Service
+```typescript
+export const getFavorites = async (userId: string): Promise<Station[]> => {
+  try {
+    const snapshot = await getDocs(collection(db, 'users', userId, 'favorites'));
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Station));
+  } catch (error) {
+    console.error('getFavorites error:', error);
+    return []; // throw 지양, 빈 배열 반환
+  }
+};
 ```
-
-### LangGraph Node
-```python
-class MyNode(BaseNode):
-    async def run(self, state: AgentState) -> dict:
-        # 노드 로직
-        return {"next_action": "continue"}
-```
-
----
-
-## API Endpoints 요약
-
-### 세션/태스크
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/sessions` | 세션 생성 |
-| GET | `/api/sessions/{id}` | 세션 조회 |
-| POST | `/api/sessions/{id}/tasks` | 태스크 제출 |
-| WS | `/ws/{session_id}` | 실시간 스트리밍 |
-
-### Claude Sessions (외부 모니터링)
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/claude-sessions` | 세션 목록 |
-| GET | `/api/claude-sessions/{id}` | 세션 상세 |
-| GET | `/api/claude-sessions/{id}/stream` | SSE 스트림 |
-
-### HITL 승인
-| Method | Path | Description |
-|--------|------|-------------|
-| GET | `/api/sessions/{id}/approvals` | 대기 승인 목록 |
-| POST | `/api/sessions/{id}/approve/{aid}` | 승인 |
-| POST | `/api/sessions/{id}/deny/{aid}` | 거부 |
-
-### RAG (Vector DB)
-| Method | Path | Description |
-|--------|------|-------------|
-| POST | `/api/rag/projects/{id}/index` | 인덱싱 |
-| POST | `/api/rag/projects/{id}/query` | 검색 |
 
 ---
 
 ## 환경 변수
 
 ```bash
-# LLM Provider
-LLM_PROVIDER=google              # google | anthropic | ollama
-GOOGLE_API_KEY=xxx
-ANTHROPIC_API_KEY=xxx
+# Firebase (firebase.config.ts에서 관리)
+EXPO_PUBLIC_FIREBASE_API_KEY=xxx
+EXPO_PUBLIC_FIREBASE_PROJECT_ID=xxx
 
-# Database
-DATABASE_URL=postgresql+asyncpg://...
-USE_DATABASE=true                # DB 영구 저장
-
-# Redis
-REDIS_URL=redis://localhost:6379/0
-
-# OAuth
-GOOGLE_CLIENT_ID=xxx
-GITHUB_CLIENT_ID=xxx
-JWT_ALGORITHM=HS256
+# Seoul API
+EXPO_PUBLIC_SEOUL_API_KEY=xxx
 ```
-
----
-
-## 서비스 URL
-
-| Service | URL |
-|---------|-----|
-| Dashboard | http://localhost:5173 |
-| Backend API | http://localhost:8000 |
-| API Docs | http://localhost:8000/docs |
-| PostgreSQL | localhost:5432 |
-| Redis | localhost:6379 |
 
 ---
 
@@ -203,18 +144,10 @@ JWT_ALGORITHM=HS256
 ## 자주 쓰는 검증 명령
 
 ```bash
-# Frontend
-cd src/dashboard
 npm run type-check    # TypeScript
 npm run lint          # ESLint
-npm test              # Vitest
-npm run build         # 빌드
-
-# Backend
-cd src/backend
-mypy .                # 타입 체크
-ruff check .          # 린트
-pytest tests/backend  # 테스트
+npm test              # Jest
+npm test -- --coverage  # 커버리지
 ```
 
 ---
@@ -226,18 +159,9 @@ pytest tests/backend  # 테스트
 | Skill 미작동 | skill-rules.json + Hook 확인 |
 | 타입 에러 | `npm run type-check` 실행 |
 | 테스트 실패 | 커버리지 확인, 의존성 체크 |
-| API 에러 | Backend 로그 확인, DB 연결 체크 |
-| Context 부족 | `/update-dev-docs` → `/compact` |
+| Seoul API 오류 | 30초 폴링 간격 확인, API 키 체크 |
+| Context 부족 | `/update-dev-docs` -> `/compact` |
 
 ---
 
-## Dev Docs 워크플로우
-
-1. **계획 승인** → `/dev-docs` 실행
-2. **구현 진행** → 주기적으로 tasks.md 업데이트
-3. **Context 20% 이하** → `/update-dev-docs` 실행
-4. **세션 재개** → `/resume` 또는 dev/active/ 읽기
-
----
-
-*Last Updated: 2025-01-26*
+*Last Updated: 2026-03-06*

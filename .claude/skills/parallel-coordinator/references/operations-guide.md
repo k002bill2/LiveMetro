@@ -10,7 +10,7 @@
 git status --porcelain | grep '^[MARC]' && echo "ABORT: Uncommitted changes" && exit 1
 
 # 2. Verify .temp/ directory structure exists
-[ -d ".temp/agent_workspaces" ] || mkdir -p .temp/agent_workspaces/{web-ui,backend-integration,performance-optimizer,test-automation}/{drafts,proposals}
+[ -d ".temp/agent_workspaces" ] || mkdir -p .temp/agent_workspaces/{mobile-ui,mobile-ui,quality-validator,test-automation}/{drafts,proposals}
 
 # 3. Verify no active file locks from previous execution
 rm -f .temp/coordination/locks/*.lock
@@ -149,8 +149,8 @@ def emergency_abort(reason, severity):
 find .temp/agent_workspaces/*/proposals/ -type f -name "*.ts" -o -name "*.tsx"
 
 # Output:
-# .temp/agent_workspaces/backend-integration/proposals/seoulSubwayApi.ts
-# .temp/agent_workspaces/web-ui/proposals/AgentDetailScreen.tsx
+# .temp/agent_workspaces/mobile-ui/proposals/seoulSubwayApi.ts
+# .temp/agent_workspaces/mobile-ui/proposals/AgentDetailScreen.tsx
 # .temp/agent_workspaces/test-automation/proposals/seoulSubwayApi.test.ts
 ```
 
@@ -198,8 +198,8 @@ echo "Checkpoint created: $(date +%Y%m%d_%H%M%S)" >> .temp/integration/checkpoin
 
 ### View Agent Status
 ```bash
-cat .temp/agent_workspaces/web-ui/metadata.json | jq '.status, .progress'
-cat .temp/agent_workspaces/backend-integration/metadata.json | jq '.status, .workload'
+cat .temp/agent_workspaces/mobile-ui/metadata.json | jq '.status, .progress'
+cat .temp/agent_workspaces/mobile-ui/metadata.json | jq '.status, .workload'
 ```
 
 ### View Active Locks
@@ -232,7 +232,7 @@ diff .temp/integration/conflicts/file_agent-a.ts \
   "subtasks": [
     {
       "id": "favorites_service",
-      "agent": "backend-integration-specialist",
+      "agent": "mobile-ui-specialist",
       "task": "Firebase favorites service with offline support",
       "skill": "firebase-integration",
       "output": "src/services/favorites/favoritesService.ts",
@@ -240,7 +240,7 @@ diff .temp/integration/conflicts/file_agent-a.ts \
     },
     {
       "id": "star_icon",
-      "agent": "web-ui-specialist",
+      "agent": "mobile-ui-specialist",
       "task": "Add star icon to AgentCard component",
       "skill": "react-web-development",
       "output": "src/components/agents/AgentCard.tsx",
@@ -248,7 +248,7 @@ diff .temp/integration/conflicts/file_agent-a.ts \
     },
     {
       "id": "favorites_screen",
-      "agent": "web-ui-specialist",
+      "agent": "mobile-ui-specialist",
       "task": "Create FavoritesScreen",
       "skill": "react-web-development",
       "output": "src/screens/FavoritesScreen.tsx",
@@ -268,26 +268,26 @@ diff .temp/integration/conflicts/file_agent-a.ts \
 
 ### Execution Timeline
 ```
-T0:00 - Primary: Invokes backend-integration-specialist
-T0:15 - backend-integration: Completes favoritesService.ts
-        → Writes to .temp/agent_workspaces/backend-integration/proposals/
+T0:00 - Primary: Invokes mobile-ui-specialist
+T0:15 - mobile-ui: Completes favoritesService.ts
+        → Writes to .temp/agent_workspaces/mobile-ui/proposals/
 
-T0:16 - Primary: Invokes web-ui-specialist + test-automation-specialist
+T0:16 - Primary: Invokes mobile-ui-specialist + test-automation-specialist
         → Both can proceed (backend types available)
 
-T0:26 - web-ui: Completes AgentCard.tsx
+T0:26 - mobile-ui: Completes AgentCard.tsx
 T0:31 - test-automation: Completes favoritesService.test.ts
-T0:32 - Primary: Invokes web-ui-specialist (favorites_screen)
-T0:47 - web-ui: Completes FavoritesScreen.tsx
+T0:32 - Primary: Invokes mobile-ui-specialist (favorites_screen)
+T0:47 - mobile-ui: Completes FavoritesScreen.tsx
 
 Feature completed in 47 minutes vs ~75 minutes sequential = 1.6x speedup
 ```
 
 ### Integration
 ```bash
-cp .temp/agent_workspaces/backend-integration/proposals/favoritesService.ts src/services/favorites/
-cp .temp/agent_workspaces/web-ui/proposals/AgentCard.tsx src/components/agents/
-cp .temp/agent_workspaces/web-ui/proposals/FavoritesScreen.tsx src/screens/
+cp .temp/agent_workspaces/mobile-ui/proposals/favoritesService.ts src/services/favorites/
+cp .temp/agent_workspaces/mobile-ui/proposals/AgentCard.tsx src/components/agents/
+cp .temp/agent_workspaces/mobile-ui/proposals/FavoritesScreen.tsx src/screens/
 cp .temp/agent_workspaces/test-automation/proposals/favoritesService.test.ts src/services/favorites/__tests__/
 ```
 

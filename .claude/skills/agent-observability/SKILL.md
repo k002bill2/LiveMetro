@@ -51,7 +51,7 @@ Enable systematic diagnosis of multi-agent workflow failures by tracking:
   "session_id": "sess_abc123",
   "task_id": "task_xyz",
   "data": {
-    "agent_type": "web-ui-specialist",
+    "agent_type": "mobile-ui-specialist",
     "model": "sonnet",
     "task_summary": "Create AgentCard component",
     "complexity": "simple",
@@ -98,8 +98,8 @@ Enable systematic diagnosis of multi-agent workflow failures by tracking:
     "succeeded": 3,
     "failed": 1,
     "by_type": {
-      "web-ui-specialist": 1,
-      "backend-integration-specialist": 1,
+      "mobile-ui-specialist": 1,
+      "test-automation-specialist": 1,
       "test-automation-specialist": 1,
       "quality-validator": 1
     }

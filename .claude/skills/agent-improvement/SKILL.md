@@ -66,7 +66,7 @@ Store in `.temp/improvement/patterns/`:
   "frequency": 5,
   "context": {
     "task_type": "ui_component_creation",
-    "agent": "web-ui-specialist",
+    "agent": "mobile-ui-specialist",
     "phase": "implementation"
   },
   "description": "Agent often misses accessibility labels",
@@ -235,7 +235,7 @@ STOP if you need to modify excluded files.
 ```markdown
 ## Improvement Validation
 
-### Change: Added accessibility reminder to web-ui-specialist
+### Change: Added accessibility reminder to mobile-ui-specialist
 
 ### Test Results
 | Metric | Before | After | Change |
@@ -398,11 +398,11 @@ pass@k < 0.8인 태스크를 분석합니다:
 - Run 3: TypeScript 에러 (grader: typescript_compiles FAIL)
 
 **근본 원인**:
-- web-ui-specialist 프롬프트에 접근성 명시 부족
+- mobile-ui-specialist 프롬프트에 접근성 명시 부족
 - 참조 파일에 접근성 예시 없음
 
 **개선 제안**:
-1. web-ui-specialist 프롬프트에 접근성 체크리스트 추가
+1. mobile-ui-specialist 프롬프트에 접근성 체크리스트 추가
 2. 참조 파일 목록에 접근성 구현 예시 추가
 3. code-quality 루브릭에 접근성 가중치 상향
 ```
@@ -419,7 +419,7 @@ LLM grader 피드백에서 반복 패턴을 추출합니다:
   "frequency": 5,
   "feedback_pattern": "Performance could be improved with memo()",
   "proposed_fix": {
-    "target": "web-ui-specialist",
+    "target": "mobile-ui-specialist",
     "change": "Add memo() reminder to CRITICAL REMINDERS section"
   }
 }

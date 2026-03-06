@@ -178,9 +178,7 @@ When task is complete:
 | Agent | Workspace | Dependencies |
 |-------|-----------|--------------|
 | lead-orchestrator | N/A (coordinates) | None |
-| web-ui-specialist | `.temp/agent_workspaces/web-ui/` | Depends on backend types |
-| backend-integration-specialist | `.temp/agent_workspaces/backend-integration/` | Provides types first |
-| performance-optimizer | `.temp/agent_workspaces/performance-optimizer/` | Optimizes all code |
+| mobile-ui-specialist | `.temp/agent_workspaces/mobile-ui/` | Depends on service types |
 | test-automation-specialist | `.temp/agent_workspaces/test-automation/` | Tests all proposals |
 | quality-validator | `.temp/agent_workspaces/quality-validator/` | Validates final output |
 

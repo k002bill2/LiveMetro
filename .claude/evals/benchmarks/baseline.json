@@ -41,13 +41,13 @@
       "pass_at_1": 0.80,
       "pass_at_3": 0.92,
       "avg_score": 0.78,
-      "expected_agent": "backend-integration-specialist"
+      "expected_agent": "mobile-ui-specialist"
     },
     "bug_fix": {
       "pass_at_1": 0.75,
       "pass_at_3": 0.90,
       "avg_score": 0.75,
-      "expected_agent": "performance-optimizer"
+      "expected_agent": "quality-validator"
     },
     "refactor": {
       "pass_at_1": 0.70,

@@ -58,8 +58,6 @@ npm run lint && npm run type-check && npm test -- --coverage
 
 | Agent | Additional Requirements |
 |-------|------------------------|
-| mobile-ui-specialist | Accessibility labels, responsive layout |
-| backend-integration-specialist | 30s polling, Firebase cleanup functions |
-| performance-optimizer | FlatList metrics, no memory leaks |
+| mobile-ui-specialist | Accessibility labels, responsive layout, iOS+Android |
 | test-automation-specialist | Coverage meets thresholds, no flaky tests |
 | quality-validator | All gates verified, integration checked |
