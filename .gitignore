@@ -103,8 +103,9 @@ dev-debug.log
 !/.gemini/
 !/.gemini/**
 
-# Gemini bridge
+# Gemini bridge & coordination
 .claude/gemini-bridge/
+.claude/coordination/
 
 # Claude Code backups (local)
 # Comment out this line if you want to commit backups to git
