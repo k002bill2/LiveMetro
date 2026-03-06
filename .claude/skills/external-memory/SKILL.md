@@ -117,12 +117,12 @@ Enable long-running multi-agent tasks to persist context beyond token limits, su
   "state": {
     "completed_subtasks": ["task_1", "task_2"],
     "pending_subtasks": ["task_3", "task_4"],
-    "active_agents": ["web-ui-specialist"],
+    "active_agents": ["mobile-ui-specialist"],
     "blocked_agents": [],
     "findings_count": 3
   },
   "context_summary": "Implementing agent detail feature. UI components done, backend integration in progress.",
-  "next_action": "Wait for backend-integration-specialist to complete API service",
+  "next_action": "Wait for mobile-ui-specialist to complete service implementation",
   "recovery_instructions": "Resume by checking workspace metadata for pending agents"
 }
 ```

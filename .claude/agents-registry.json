@@ -5,35 +5,35 @@
     "eval-grader": {
       "file": ".claude/agents/eval-grader.md",
       "description": "AI agent evaluation grader. Performs code-based checks and LLM-powered deep analysis using rubrics.",
-      "tools": "read, grep, glob, bash",
+      "tools": "Edit, Write, Read, Grep, Glob, Bash",
       "model": "inherit",
       "triggers": null
     },
     "eval-task-runner": {
       "file": ".claude/agents/eval-task-runner.md",
       "description": "Evaluation task orchestrator. Loads task definitions, executes evaluation runs, records transcripts, and calculates pass@k metrics.",
-      "tools": "read, grep, glob, bash, task",
+      "tools": "Edit, Write, Read, Grep, Glob, Bash, Task",
       "model": "inherit",
       "triggers": null
     },
     "mobile-ui-specialist": {
       "file": ".claude/agents/mobile-ui-specialist.md",
       "description": "React Native UI/UX specialist for LiveMetro. Expert in mobile component design, responsive layouts, and user experience optimization.",
-      "tools": "edit, create, read, grep",
+      "tools": "Edit, Write, Read, Grep, Glob, Bash",
       "model": "sonnet",
       "triggers": null
     },
     "quality-validator": {
       "file": ".claude/agents/quality-validator.md",
       "description": "Final validation agent for multi-agent workflows. Reviews code quality, verifies citations/references, ensures compliance with project standards.",
-      "tools": "read, grep, glob, bash",
+      "tools": "Edit, Write, Read, Grep, Glob, Bash",
       "model": "haiku",
       "triggers": null
     },
     "test-automation-specialist": {
       "file": ".claude/agents/test-automation-specialist.md",
       "description": "Test automation specialist for LiveMetro. Expert in Jest, React Native Testing Library, coverage analysis, and writing comprehensive test suites.",
-      "tools": "edit, create, read, grep, bash",
+      "tools": "Edit, Write, Read, Grep, Glob, Bash",
       "model": "haiku",
       "triggers": null
     }

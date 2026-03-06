@@ -91,7 +91,7 @@ See [effort-scaling.md](../../agents/shared/effort-scaling.md) for complete guid
 - DO NOT modify files in: `src/services/`
 - DO NOT implement: API calls (backend agent handles)
 - DO NOT test: (test agent handles)
-- WAIT FOR: `backend-integration-specialist` types before starting
+- WAIT FOR: service types before starting
 ```
 
 ### Real Example
@@ -106,7 +106,7 @@ Create a reusable card component displaying agent information including:
 - Tap handler for navigation
 
 ### Output Format
-- File: `.temp/agent_workspaces/web-ui/proposals/AgentInfoCard.tsx`
+- File: `.temp/agent_workspaces/mobile-ui/proposals/StationCard.tsx`
 - Props interface exported
 - memo() wrapper for performance
 - Accessibility labels included
@@ -227,10 +227,9 @@ Define strategic context:
 
 | Agent | Strengths (>0.80) | Weaknesses (<0.50) |
 |-------|-------------------|---------------------|
-| **web-ui** | React (0.95), TypeScript (0.90), Tailwind CSS (0.90) | Backend (0.40), Complex animations (0.50) |
-| **backend-integration** | Firebase (0.95), Seoul API (0.90), Data sync (0.90) | UI design (0.40), Animations (0.30) |
-| **performance-optimizer** | React optimization (0.90), Memory leaks (0.85) | New features (0.50), UI (0.45) |
-| **test-automation** | Jest (0.95), RTL (0.90), Coverage (0.90) | Feature impl (0.40), UI design (0.35) |
+| **mobile-ui** | React Native (0.95), TypeScript (0.90), Firebase (0.85), Seoul API (0.85) | Complex animations (0.50), Low-level native (0.40) |
+| **test-automation** | Jest (0.95), RNTL (0.90), Coverage (0.90) | Feature impl (0.40), UI design (0.35) |
+| **quality-validator** | Code review (0.90), Standards (0.90) | Implementation (0.30), Feature design (0.30) |
 
 **Matching Rule**: If agent confidence < 0.70 → Agent should DECLINE
 
@@ -242,21 +241,12 @@ Define strategic context:
   "subtasks": [
     {
       "id": "task_1",
-      "agent": "backend-integration-specialist",
-      "task": "API/Firebase integration",
-      "output": "src/services/[feature]/[service].ts",
-      "workspace": ".temp/agent_workspaces/backend-integration/",
+      "agent": "mobile-ui-specialist",
+      "task": "Service + UI components and screens",
+      "output": ["src/services/[feature]/[service].ts", "src/screens/[Screen].tsx"],
+      "workspace": ".temp/agent_workspaces/mobile-ui/",
       "dependencies": [],
-      "skill": "api-integration OR firebase-integration"
-    },
-    {
-      "id": "task_2",
-      "agent": "web-ui-specialist",
-      "task": "UI components and screens",
-      "output": "src/screens/[Screen].tsx",
-      "workspace": ".temp/agent_workspaces/web-ui/",
-      "dependencies": ["task_1"],
-      "skill": "react-web-development"
+      "skill": "react-native-development"
     },
     {
       "id": "task_3",
@@ -292,10 +282,9 @@ Define strategic context:
 | Agent | Read Access | Write Access |
 |-------|-------------|--------------|
 | **Primary** | All files | src/**, .temp/** |
-| **web-ui** | All files | .temp/agent_workspaces/web-ui/** ONLY |
-| **backend-integration** | All files | .temp/agent_workspaces/backend-integration/** ONLY |
-| **performance-optimizer** | All files | .temp/agent_workspaces/performance-optimizer/** ONLY |
+| **mobile-ui** | All files | .temp/agent_workspaces/mobile-ui/** ONLY |
 | **test-automation** | All files | .temp/agent_workspaces/test-automation/** ONLY |
+| **quality-validator** | All files | .temp/agent_workspaces/quality-validator/** ONLY |
 
 **Lock File Location**: `.temp/coordination/locks/`
 
@@ -308,7 +297,7 @@ Define strategic context:
 
 | Task Type | Required Skill |
 |-----------|---------------|
-| React Web UI | `react-web-development` |
+| React Native UI | `react-native-development` |
 | Push notifications | `notification-system` |
 | Seoul API | `api-integration` |
 | Firebase | `firebase-integration` |
@@ -317,7 +306,7 @@ Define strategic context:
 **Tool Usage**:
 ```typescript
 // GOOD: Agent writes to own workspace
-Write(.temp/agent_workspaces/web-ui/proposals/AgentCard.tsx)
+Write(.temp/agent_workspaces/mobile-ui/proposals/StationCard.tsx)
 
 // BAD: Agent writes to src/ directly (DENIED)
 Write(src/components/agents/AgentCard.tsx)
@@ -358,13 +347,12 @@ Read(src/components/train/ExistingComponent.tsx)
 ```
 .temp/
 ├── agent_workspaces/
-│   ├── web-ui/
+│   ├── mobile-ui/
 │   │   ├── drafts/
 │   │   ├── proposals/
 │   │   └── metadata.json
-│   ├── backend-integration/
-│   ├── performance-optimizer/
-│   └── test-automation/
+│   ├── test-automation/
+│   └── quality-validator/
 ├── coordination/
 │   ├── locks/
 │   ├── tasks/
@@ -377,7 +365,7 @@ Read(src/components/train/ExistingComponent.tsx)
 ### Agent Metadata Format
 ```json
 {
-  "agent_id": "web-ui-specialist",
+  "agent_id": "mobile-ui",
   "status": "working|blocked|completed|failed",
   "progress": 0-100,
   "current_task": "description",
@@ -420,10 +408,8 @@ This skill enables:
 | Agent | Role | Model |
 |-------|------|-------|
 | `lead-orchestrator` | Coordination, effort scaling | opus |
-| `web-ui-specialist` | UI components, pages | sonnet |
-| `backend-integration-specialist` | Firebase, Seoul API | sonnet |
-| `performance-optimizer` | Memory, render optimization | sonnet |
-| `test-automation-specialist` | Jest tests, coverage | sonnet |
+| `mobile-ui-specialist` | React Native UI, Firebase, Seoul API | sonnet |
+| `test-automation-specialist` | Jest tests, RNTL, coverage | haiku |
 | `quality-validator` | Final review, validation | haiku |
 
 ## Related Skills

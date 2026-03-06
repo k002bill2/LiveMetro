@@ -71,7 +71,7 @@ find .claude/evals/results -name "*.json" -mtime -7 -type f 2>/dev/null | head -
 | Agent | Tasks | Avg Score | Pass Rate |
 |-------|-------|-----------|-----------|
 | mobile-ui-specialist | N | N.NN | N% |
-| backend-integration-specialist | N | N.NN | N% |
+| test-automation-specialist | N | N.NN | N% |
 | test-automation-specialist | N | N.NN | N% |
 
 ## 🔄 Trend Analysis

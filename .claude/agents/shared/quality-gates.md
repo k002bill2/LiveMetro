@@ -81,11 +81,14 @@ Score = (통과한 윤리 체크 / 전체 윤리 체크) × 100
 - [ ] Sensitive data uses environment variables
 - [ ] No console.log with sensitive information
 
-### 5. React Web Specific
+### 5. React Native Specific
 - [ ] `React.memo()` on expensive components
 - [ ] `useCallback`/`useMemo` for stable references
-- [ ] `aria-label` on interactive elements
+- [ ] `accessibilityLabel` on interactive elements
 - [ ] Proper cleanup in useEffect return functions
+- [ ] `FlatList` for long lists (not ScrollView with map)
+- [ ] `Platform.select()` for platform-specific logic
+- [ ] `StyleSheet.create()` for styles (no inline objects)
 
 ### 6. Subscription Cleanup
 ```typescript
@@ -110,9 +113,7 @@ npm run lint && npm run type-check && npm test -- --coverage
 
 | Agent | Additional Requirements |
 |-------|------------------------|
-| web-ui-specialist | ARIA attributes, responsive Tailwind design |
-| backend-integration-specialist | API rate limits respected, cleanup functions |
-| performance-optimizer | Core Web Vitals metrics, no memory leaks |
+| mobile-ui-specialist | Accessibility labels, responsive layout, iOS+Android |
 | test-automation-specialist | Coverage meets thresholds, no flaky tests |
 | quality-validator | All gates verified, integration checked |
 

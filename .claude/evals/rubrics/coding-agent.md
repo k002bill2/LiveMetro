@@ -1,6 +1,6 @@
 # Coding Agent Rubric
 
-코딩 에이전트(mobile-ui-specialist, backend-integration-specialist, performance-optimizer 등) 전용 평가 루브릭.
+코딩 에이전트(mobile-ui-specialist, test-automation-specialist, quality-validator 등) 전용 평가 루브릭.
 
 ## 개요
 

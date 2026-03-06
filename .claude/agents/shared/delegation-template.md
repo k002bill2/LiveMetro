@@ -111,7 +111,7 @@ Success Criteria:
 - [ ] Has accessibility labels
 
 ### Output Format
-**Location**: `.temp/agent_workspaces/web-ui/proposals/`
+**Location**: `.temp/agent_workspaces/mobile-ui/proposals/`
 
 **Files to create:**
 - `AgentInfoCard.tsx` - Main component with styles
@@ -123,7 +123,7 @@ Success Criteria:
 - Follow patterns in `src/components/agents/AgentCard.tsx`
 
 ### Tools & Sources
-**Invoke skill**: `react-web-development`
+**Invoke skill**: `react-native-development`
 
 **Reference files:**
 - `src/components/agents/AgentCard.tsx` - Existing pattern
@@ -144,47 +144,45 @@ Success Criteria:
 - You need Agent type changes
 ```
 
-### Example 2: Backend Service
+### Example 2: Firebase Service
 
 ```markdown
-## Task: Implement AgentService
+## Task: Implement FavoritesService
 
 ### Objective
-Create service for fetching agent data from API.
+Create Firebase Firestore service for managing favorite stations.
 
 Success Criteria:
-- [ ] Fetches agent list from API
-- [ ] Fetches real-time arrival data
-- [ ] Implements caching with 30s TTL
-- [ ] Handles API errors gracefully
+- [ ] CRUD operations for favorite stations
+- [ ] Real-time sync via onSnapshot
+- [ ] Proper cleanup (unsubscribe)
+- [ ] Handles errors gracefully (return empty arrays, no throws)
 
 ### Output Format
-**Location**: `.temp/agent_workspaces/backend-integration/proposals/`
+**Location**: `.temp/agent_workspaces/mobile-ui/proposals/`
 
 **Files to create:**
-- `agentService.ts` - Service with all methods
-- `agentService.types.ts` - Request/response types
+- `favoritesService.ts` - Service with all methods
+- `favoritesService.types.ts` - Request/response types
 
 **Code Requirements:**
 - TypeScript strict mode
 - Export types for UI consumption
 - Return empty arrays on error (don't throw)
+- 30s minimum polling for Seoul API calls
 
 ### Tools & Sources
-**Invoke skill**: `api-integration`
+**Invoke skill**: `react-native-development`
 
 **Reference files:**
-- `src/services/api/seoulSubwayApi.ts` - Existing API patterns
-- `src/services/train/trainService.ts` - Service pattern
-
-**APIs/Services:**
-- Agent Registry API - Agent endpoints
+- `src/services/firebase/` - Existing Firebase patterns
+- `src/services/trainService.ts` - Service pattern
 
 ### Task Boundaries
 
 **DO NOT:**
-- Modify files in: `src/components/`, `src/screens/`
-- Implement: UI components (web-ui agent handles)
+- Modify files in: `src/navigation/`
+- Implement: UI screens (separate task)
 - Write: tests (test-automation agent handles)
 
 **WAIT FOR:**
@@ -231,7 +229,7 @@ Success Criteria:
 - Create: snapshot tests (prefer assertions)
 
 **WAIT FOR:**
-- `web-ui-specialist` to complete: AgentInfoCard.tsx
+- `mobile-ui-specialist` to complete: StationCard.tsx
 ```
 
 ---
@@ -288,7 +286,7 @@ Check the types somewhere in the codebase
 - `src/utils/lineColors.ts` - LINE_COLORS constant
 
 **WAIT FOR:**
-- `backend-integration-specialist` types in proposals/
+- `mobile-ui-specialist` types in proposals/
 ```
 
 ---
@@ -308,10 +306,9 @@ Check the types somewhere in the codebase
 
 | Agent | Typical DO NOT |
 |-------|---------------|
-| web-ui | services, models, tests |
-| backend-integration | components, screens, tests |
+| mobile-ui | services, models, tests |
 | test-automation | implementation, services |
-| performance-optimizer | new features, tests |
+| quality-validator | implementation, new features |
 
 ---
 

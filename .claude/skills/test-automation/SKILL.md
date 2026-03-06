@@ -125,14 +125,14 @@ vi.mock('react-router-dom', async () => {
 describe('AgentCard', () => {
   const mockAgent = {
     id: 'agent1',
-    name: 'web-ui-specialist',
+    name: 'mobile-ui-specialist',
     status: 'available',
     tools: ['read', 'edit', 'bash']
   };
 
   it('renders agent name correctly', () => {
     const { getByText } = render(<AgentCard agent={mockAgent} />);
-    expect(getByText('web-ui-specialist')).toBeTruthy();
+    expect(getByText('mobile-ui-specialist')).toBeTruthy();
   });
 
   it('handles press event', () => {

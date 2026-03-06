@@ -18,6 +18,7 @@
     "enforcement": "require",
     "priority": "high",
     "description": "Jest + React Native Testing Library 테스트 생성",
+    "agentFile": ".claude/agents/test-automation-specialist.md",
     "promptTriggers": {
       "keywords": ["test", "jest", "coverage", "tdd", "testing library"],
       "intentPatterns": ["(write|add|create).*?test"]
@@ -31,6 +32,7 @@
     "enforcement": "require",
     "priority": "high",
     "description": "React Native + Expo 컴포넌트 개발",
+    "agentFile": ".claude/agents/mobile-ui-specialist.md",
     "promptTriggers": {
       "keywords": ["react native", "component", "screen", "expo", "컴포넌트", "화면"],
       "intentPatterns": ["(create|add|make).*?(component|screen)", "(react native|RN).*?(개발|구현)"]

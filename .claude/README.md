@@ -40,11 +40,11 @@ Claude Code configuration for LiveMetro React Native subway app.
 
 | Agent | Model | Expertise |
 |-------|-------|-----------|
-| `mobile-ui-specialist` | Sonnet | React Native UI/UX |
-| `backend-integration-specialist` | Sonnet | Firebase, API design |
-| `performance-optimizer` | Sonnet | Memory leaks, optimization |
-| `test-automation-specialist` | Sonnet | Jest, coverage |
-| `brand-logo-finder` | Haiku | Brand asset discovery |
+| `mobile-ui-specialist` | Sonnet | React Native UI/UX + Firebase + Seoul API |
+| `test-automation-specialist` | Haiku | Jest, RNTL, coverage |
+| `quality-validator` | Haiku | 최종 품질 검증 |
+| `eval-grader` | Inherit | 에이전트 평가 채점 |
+| `eval-task-runner` | Inherit | 평가 태스크 실행 |
 
 ## Commands
 
@@ -78,8 +78,8 @@ See [docs/claude/mcp-setup.md](../docs/claude/mcp-setup.md) for detailed setup.
 ### Using Agents
 ```bash
 @mobile-ui-specialist "Design the station detail screen"
-@performance-optimizer "Analyze re-render issues"
-@backend-integration-specialist "Implement data fallback"
+@test-automation-specialist "Write tests for StationCard"
+@quality-validator "Validate final implementation"
 ```
 
 ## Adding New Skills
@@ -101,4 +101,4 @@ Backups stored in `.claude-backups/` with 30-day retention.
 
 ---
 
-**Skills**: 13 | **Agents**: 5 | **Commands**: 2 | **MCP Servers**: 5 enabled
+**Skills**: 13 | **Agents**: 5 (mobile-ui, test-automation, quality-validator, eval-grader, eval-task-runner) | **Commands**: 2 | **MCP Servers**: 5 enabled
