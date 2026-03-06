@@ -2,8 +2,8 @@
 ## ACE Framework Integration Edition - LiveMetro Project
 
 ## Document Information
-- **Version**: 3.0.1
-- **Last Updated**: 2025-01-03
+- **Version**: 3.0.2
+- **Last Updated**: 2026-03-06
 - **Status**: Active - ACE Framework Integrated for LiveMetro
 - **Scope**: Multi-agent parallel execution for LiveMetro React Native development
 - **Framework**: Based on Autonomous Cognitive Entity (ACE) Framework
@@ -1610,6 +1610,7 @@ If Low → Document and proceed with monitoring
 | 2.0 | 2025-01-01 | Skill/MCP Integration | Enhanced |
 | 3.0 | 2025-01-01 | **ACE Framework Integration**: 6-layer architecture, Aspirational principles, Agent Model, Dynamic reallocation, Feedback Loops | ACE Edition |
 | 3.0.1 | 2025-01-03 | **LiveMetro Adaptation**: Customized for React Native/Expo development, Seoul Open Data API integration, Firebase services, TypeScript strict mode, mobile-specific examples and workflows | LiveMetro Team |
+| 3.0.2 | 2026-03-06 | **Claude 4.6 Update**: Claude Code v2.1.x, Claude 4.6 모델 패밀리, 새 Hook 이벤트 (TeammateIdle, TaskCompleted, WorktreeCreate, Notification), Agent Teams 실험적 지원, HTTP hooks | LiveMetro Team |
 
 **Distribution:**
 - LiveMetro Development Team

@@ -1,8 +1,15 @@
 # Agent Skills 예시 모음
-#claude-code #skills #examples
+#claude-code #skills #examples #2026-03-update
 
-## 📌 개요
+> 최신 업데이트: 2026-03-06 | Claude Code v2.1.x | Claude 4.6 모델 패밀리
+>
+> Skills/Commands 통합 (v2.1.3): `user-invocable` 필드로 슬래시 명령어 호출 가능
+> Agent frontmatter 확장: `memory`, `hooks`, `skills` 필드 추가
+
+## 개요
 Claude Code Agent Skills의 실제 예시들입니다. 각 Skill은 특정 작업에 특화되어 있으며, 필요에 따라 자동으로 로드됩니다.
+
+LiveMetro(React Native/Expo) 프로젝트 기준으로 TypeScript 예시를 중심으로 구성했습니다.
 
 ---
 
@@ -67,23 +74,30 @@ Perform thorough code reviews focusing on:
 
 ## Review Process
 
-\`\`\`python
-def perform_code_review(changes):
-    issues = {
-        'critical': [],
-        'warning': [],
-        'suggestion': []
-    }
-    
-    # Step 1: Analyze changes
-    for file in changes:
-        check_security(file, issues)
-        check_performance(file, issues)
-        check_style(file, issues)
-        check_tests(file, issues)
-    
-    # Step 2: Generate report
-    return format_review_report(issues)
+\`\`\`typescript
+interface ReviewIssues {
+  critical: string[];
+  warning: string[];
+  suggestion: string[];
+}
+
+function performCodeReview(changes: string[]): ReviewIssues {
+  const issues: ReviewIssues = {
+    critical: [],
+    warning: [],
+    suggestion: [],
+  };
+
+  // Step 1: Analyze changes
+  for (const file of changes) {
+    checkSecurity(file, issues);
+    checkPerformance(file, issues);
+    checkStyle(file, issues);
+    checkTests(file, issues);
+  }
+
+  return issues;
+}
 \`\`\`
 
 ## Output Format
@@ -128,201 +142,145 @@ claude -p "Review staged changes using code-reviewer skill"
 
 ---
 
-## 📊 Excel Processor Skill
+## Subway Data Processor Skill (LiveMetro)
 
 ### 파일 위치
-`.claude/skills/excel-processor/SKILL.md`
+`.claude/skills/subway-data-processor/SKILL.md`
 
 ### 전체 코드
 ```markdown
 ---
-name: excel-processor
-description: Process Excel files with formulas, pivot tables, and charts. Use for spreadsheet analysis, data transformation, or report generation.
+name: subway-data-processor
+description: Process and transform Seoul subway data including station info, real-time arrivals, and timetables. Use when working with Seoul Open Data API responses or subway data normalization.
+user-invocable: true
 ---
 
-# Excel Processing Skill
+# Subway Data Processor Skill
 
 ## Capabilities
-- Read/write Excel files preserving formulas
-- Create pivot tables and charts
-- Data validation and cleaning
-- Multi-sheet operations
-- Conditional formatting
-- VLOOKUP/HLOOKUP operations
+- Seoul Open Data API 응답 파싱
+- 실시간 도착 정보 정규화
+- 역 정보 캐싱 (AsyncStorage)
+- 노선별 데이터 필터링
+- 도착 시간 계산 및 포맷팅
 
-## Dependencies
-\`\`\`python
-import pandas as pd
-import openpyxl
-from openpyxl.chart import BarChart, LineChart, Reference
-from openpyxl.styles import PatternFill, Font, Alignment
-from openpyxl.utils.dataframe import dataframe_to_rows
-import numpy as np
+## Core Types
+\`\`\`typescript
+interface ArrivalInfo {
+  stationId: string;
+  stationName: string;
+  lineNum: string;
+  trainLineNm: string;
+  destination: string;
+  arrivalMessage: string;
+  arrivalSec: number;
+  updatedAt: Date;
+}
+
+interface StationInfo {
+  id: string;
+  name: string;
+  line: string;
+  lat: number;
+  lng: number;
+  transferLines?: string[];
+}
 \`\`\`
 
 ## Core Functions
 
-### 1. Read Excel with Formulas
-\`\`\`python
-def read_excel_with_formulas(filepath):
-    """
-    Read Excel file preserving formulas and formatting
-    """
-    workbook = openpyxl.load_workbook(filepath, data_only=False)
-    sheets_data = {}
-    
-    for sheet_name in workbook.sheetnames:
-        sheet = workbook[sheet_name]
-        data = []
-        for row in sheet.iter_rows():
-            row_data = []
-            for cell in row:
-                if cell.value:
-                    row_data.append({
-                        'value': cell.value,
-                        'formula': cell.formula if hasattr(cell, 'formula') else None,
-                        'format': cell.number_format
-                    })
-                else:
-                    row_data.append(None)
-            data.append(row_data)
-        sheets_data[sheet_name] = data
-    
-    return sheets_data, workbook
+### 1. API 응답 파싱
+\`\`\`typescript
+function parseArrivalResponse(raw: unknown): ArrivalInfo[] {
+  if (!raw || typeof raw !== 'object') return [];
+
+  const data = raw as Record<string, unknown>;
+  const realtimeList = data.realtimeArrivalList;
+  if (!Array.isArray(realtimeList)) return [];
+
+  return realtimeList.map((item): ArrivalInfo => ({
+    stationId: String(item.statnId ?? ''),
+    stationName: String(item.statnNm ?? ''),
+    lineNum: String(item.subwayId ?? ''),
+    trainLineNm: String(item.trainLineNm ?? ''),
+    destination: String(item.bstatnNm ?? ''),
+    arrivalMessage: String(item.arvlMsg2 ?? ''),
+    arrivalSec: Number(item.barvlDt ?? 0),
+    updatedAt: new Date(),
+  }));
+}
 \`\`\`
 
-### 2. Create Pivot Table
-\`\`\`python
-def create_pivot_table(df, index, columns, values, aggfunc='sum'):
-    """
-    Create pivot table from dataframe
-    """
-    pivot = pd.pivot_table(
-        df,
-        index=index,
-        columns=columns,
-        values=values,
-        aggfunc=aggfunc,
-        fill_value=0
-    )
-    return pivot
+### 2. 도착 시간 포맷팅
+\`\`\`typescript
+function formatArrivalTime(seconds: number): string {
+  if (seconds <= 0) return '곧 도착';
+  if (seconds < 60) return seconds + '초';
+  const minutes = Math.floor(seconds / 60);
+  const remainSec = seconds % 60;
+  return remainSec > 0
+    ? minutes + '분 ' + remainSec + '초'
+    : minutes + '분';
+}
 \`\`\`
 
-### 3. Generate Charts
-\`\`\`python
-def add_chart_to_sheet(worksheet, data_range, chart_type='bar'):
-    """
-    Add chart to Excel worksheet
-    """
-    if chart_type == 'bar':
-        chart = BarChart()
-    elif chart_type == 'line':
-        chart = LineChart()
-    else:
-        raise ValueError(f"Unsupported chart type: {chart_type}")
-    
-    chart.title = "Data Analysis"
-    chart.x_axis.title = "Category"
-    chart.y_axis.title = "Values"
-    
-    data = Reference(worksheet, min_col=2, min_row=1, 
-                    max_col=data_range[1], max_row=data_range[0])
-    categories = Reference(worksheet, min_col=1, min_row=2, 
-                          max_row=data_range[0])
-    
-    chart.add_data(data, titles_from_data=True)
-    chart.set_categories(categories)
-    
-    worksheet.add_chart(chart, "E5")
-    return worksheet
-\`\`\`
+### 3. AsyncStorage 캐싱
+\`\`\`typescript
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-### 4. Data Validation
-\`\`\`python
-def validate_and_clean_data(df):
-    """
-    Validate and clean dataframe
-    """
-    # Remove duplicates
-    df = df.drop_duplicates()
-    
-    # Handle missing values
-    numeric_columns = df.select_dtypes(include=[np.number]).columns
-    df[numeric_columns] = df[numeric_columns].fillna(0)
-    
-    # Remove outliers (3 sigma rule)
-    for col in numeric_columns:
-        mean = df[col].mean()
-        std = df[col].std()
-        df = df[(df[col] > mean - 3*std) & (df[col] < mean + 3*std)]
-    
-    return df
+const CACHE_KEY = '@livemetro/arrivals';
+const CACHE_TTL = 30 * 1000; // 30초
+
+async function getCachedArrivals(
+  stationId: string
+): Promise<ArrivalInfo[] | null> {
+  const cached = await AsyncStorage.getItem(CACHE_KEY + '/' + stationId);
+  if (!cached) return null;
+
+  const parsed = JSON.parse(cached);
+  if (Date.now() - parsed.timestamp > CACHE_TTL) return null;
+
+  return parsed.data as ArrivalInfo[];
+}
+
+async function setCachedArrivals(
+  stationId: string,
+  data: ArrivalInfo[]
+): Promise<void> {
+  await AsyncStorage.setItem(
+    CACHE_KEY + '/' + stationId,
+    JSON.stringify({ data, timestamp: Date.now() })
+  );
+}
 \`\`\`
 
 ## Usage Examples
 
-### Example 1: Monthly Sales Report
-\`\`\`python
-# Load sales data
-df = pd.read_excel('sales_data.xlsx')
+### Example 1: 실시간 도착 정보 조회
+\`\`\`typescript
+async function fetchArrivals(stationName: string): Promise<ArrivalInfo[]> {
+  const cached = await getCachedArrivals(stationName);
+  if (cached) return cached;
 
-# Create pivot by region and product
-pivot = create_pivot_table(
-    df,
-    index='Region',
-    columns='Product',
-    values='Sales',
-    aggfunc='sum'
-)
+  const response = await fetch(
+    'http://swopenAPI.seoul.go.kr/api/subway/' +
+    API_KEY + '/json/realtimeStationArrival/0/10/' +
+    encodeURIComponent(stationName)
+  );
+  const raw = await response.json();
+  const arrivals = parseArrivalResponse(raw);
 
-# Generate report with chart
-workbook = openpyxl.Workbook()
-worksheet = workbook.active
-worksheet.title = "Sales Report"
-
-# Write pivot table
-for r in dataframe_to_rows(pivot, index=True, header=True):
-    worksheet.append(r)
-
-# Add chart
-add_chart_to_sheet(worksheet, (len(pivot)+1, len(pivot.columns)+1))
-
-# Save
-workbook.save('sales_report.xlsx')
+  await setCachedArrivals(stationName, arrivals);
+  return arrivals;
+}
 \`\`\`
 
-### Example 2: Data Cleaning Pipeline
-\`\`\`python
-# Read multiple sheets
-excel_file = pd.ExcelFile('raw_data.xlsx')
-cleaned_data = {}
-
-for sheet_name in excel_file.sheet_names:
-    df = pd.read_excel(excel_file, sheet_name)
-    cleaned_df = validate_and_clean_data(df)
-    cleaned_data[sheet_name] = cleaned_df
-
-# Save cleaned data
-with pd.ExcelWriter('cleaned_data.xlsx', engine='openpyxl') as writer:
-    for sheet_name, df in cleaned_data.items():
-        df.to_excel(writer, sheet_name=sheet_name, index=False)
+### Example 2: 노선별 필터링
+\`\`\`typescript
+function filterByLine(arrivals: ArrivalInfo[], lineNum: string): ArrivalInfo[] {
+  return arrivals.filter((a) => a.lineNum === lineNum);
+}
 \`\`\`
-
-## Output Templates
-
-### Financial Report Template
-- Summary sheet with KPIs
-- Detailed transactions
-- Pivot tables by category
-- Trend charts
-- Conditional formatting for variances
-
-### Data Analysis Template
-- Raw data sheet
-- Cleaned data sheet
-- Statistical summary
-- Correlation matrix
-- Visualization dashboard
 ```
 
 ---
@@ -908,4 +866,48 @@ widdershins openapi.yaml -o API.md --language_tabs javascript python
 
 ---
 
-*태그: #claude-code #skills #examples #automation*
+## Notification System Skill (LiveMetro)
+
+### 파일 위치
+`.claude/skills/notification-system/SKILL.md`
+
+### 요약
+```markdown
+---
+name: notification-system
+description: Push notification system using Expo Notifications for train arrival alerts and service disruption notifications. Use when implementing notification features.
+user-invocable: true
+hooks:
+  PostToolUse:
+    - matcher: "Write(src/services/notification*)"
+      hooks:
+        - type: command
+          command: "npx tsc --noEmit src/services/notification*.ts 2>&1 | head -10"
+---
+
+# Notification System Skill
+
+## Core Functions
+- Expo Push Notifications 설정
+- 도착 알림 스케줄링
+- 서비스 장애 알림
+- 알림 권한 요청 및 관리
+- 백그라운드 알림 처리
+
+## Key Types
+\`\`\`typescript
+interface NotificationConfig {
+  stationId: string;
+  lineNum: string;
+  direction: string;
+  minutesBefore: number;
+  enabled: boolean;
+}
+\`\`\`
+```
+
+---
+
+*마지막 업데이트: 2026-03-06 | Claude Code v2.1.x | 환경: macOS + VS Code/Cursor*
+
+*태그: #claude-code #skills #examples #automation #livemetro*

@@ -1,9 +1,16 @@
 # PM2와 백엔드 디버깅 시스템
-#claude-code #pm2 #debugging #backend
+#claude-code #pm2 #debugging #backend #2026-03-update
 
-> 💡 **문제**: 7개 마이크로서비스 동시 실행, Claude가 로그 못 봄
-> 
-> ✅ **해결**: PM2로 프로세스 관리 + 실시간 로그 접근
+> 최신 업데이트: 2026-03-06
+>
+> 적용 범위 안내: LiveMetro는 React Native Expo 모바일 앱으로,
+> PM2는 직접적으로 사용하지 않습니다. 이 가이드는 백엔드 서비스(API 서버,
+> Firebase Functions 등)를 로컬에서 운영하거나, 별도 백엔드 프로젝트가 있는 경우
+> 참고 자료로 활용하세요. LiveMetro의 백엔드는 Firebase 서비스를 사용합니다.
+
+> 문제: 여러 마이크로서비스 동시 실행 시 Claude가 로그를 확인할 수 없음
+>
+> 해결: PM2로 프로세스 관리 + 실시간 로그 접근
 
 ## 🎯 왜 PM2인가?
 
@@ -470,5 +477,7 @@ Remember: All services auto-restart on crash.
 ---
 
 *"Make debugging bearable with PM2"*
+
+*마지막 업데이트: 2026-03-06*
 
 #pm2 #microservices #debugging #backend

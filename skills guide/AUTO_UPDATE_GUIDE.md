@@ -1,8 +1,9 @@
 # Skills Guide 자동 업데이트 시스템 사용 가이드
 
-> **버전**: 1.0.0
-> **최종 업데이트**: 2025-12-28
+> **버전**: 1.1.0
+> **최종 업데이트**: 2026-03-06
 > **작성자**: LiveMetro Team
+> **환경**: Claude Code v2.1.x, Claude 4.6 모델 패밀리
 
 ---
 
@@ -367,7 +368,7 @@ touch "skills guide/LIVEMETRO_UPDATE_REPORT.md"
 ```json
 {
   "priorityFiles": [
-    "Claude Code 완벽 가이드북 2025.md",
+    "Claude Code 완벽 가이드북 2026.md",
     "Quick Reference.md",
     "README.md"
   ]
@@ -497,9 +498,10 @@ function compareVersions(current: string, latest: string): boolean {
 
 ---
 
-**Happy Automating! 🤖✨**
+**Happy Automating!**
 
-*최종 업데이트: 2025-12-28*
-*버전: 1.0.0*
+*최종 업데이트: 2026-03-06*
+*버전: 1.1.0*
+*Claude Code: v2.1.x | 모델: Claude 4.6 패밀리*
 
 #automation #skills-guide #version-management #best-practices

@@ -1,8 +1,12 @@
 # CLAUDE.md 템플릿
-#template #claude-code #project-setup
+#template #claude-code #project-setup #2026-03-update
+
+> 최신 업데이트: 2026-03-06 | Claude Code v2.1.x
 
 ## 개요
 이 문서는 Claude Code가 프로젝트를 이해하고 효과적으로 작업할 수 있도록 돕는 핵심 문서입니다. 프로젝트 루트에 `CLAUDE.md` 파일로 저장하세요.
+
+참고: LiveMetro 프로젝트의 실제 CLAUDE.md는 React Native/Expo, Firebase, AsyncStorage 패턴을 포함합니다.
 
 ---
 
@@ -12,11 +16,12 @@
 ## 🎯 Project Overview
 - **Name**: [프로젝트 이름]
 - **Purpose**: [프로젝트의 주요 목적과 목표]
-- **Tech Stack**: 
-  - Frontend: [React, Vue, Next.js 등]
-  - Backend: [Node.js, Python, Go 등]
-  - Database: [PostgreSQL, MongoDB 등]
-  - Infrastructure: [AWS, Docker, Kubernetes 등]
+- **Tech Stack**:
+  - Framework: [React Native/Expo, Next.js, Express 등]
+  - Language: [TypeScript, Python 등]
+  - Database: [Firebase Firestore, PostgreSQL, AsyncStorage 등]
+  - Auth: [Firebase Auth, NextAuth 등]
+  - Navigation: [React Navigation, expo-router 등]
 - **Current Phase**: [개발/테스트/배포 단계]
 - **Team Size**: [혼자/팀 규모]
 
@@ -260,4 +265,6 @@ try {
 
 ---
 
-*태그: #template #claude-code #project-setup #documentation #antigravity*
+*마지막 업데이트: 2026-03-06 | Claude Code v2.1.x | 환경: macOS + VS Code/Cursor*
+
+*태그: #template #claude-code #project-setup #documentation #livemetro*

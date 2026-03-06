@@ -1,8 +1,16 @@
 # Dev Docs 시스템 구축 가이드
-#claude-code #dev-docs #context-management
+#claude-code #dev-docs #context-management #2026-03-update
 
-> 💡 **Claude = 극도로 자신감 넘치는 주니어 개발자 with 심각한 건망증**
-> 
+> 최신 업데이트: 2026-03-06 | Claude Code v2.1.x
+>
+> 참고: Claude Code 2.1에서 자동 메모리 기능(`~/.claude/projects/.../memory/`)이 추가되었지만,
+> 대규모 작업에서는 여전히 Dev Docs 3-파일 시스템이 더 체계적입니다.
+> 자동 메모리는 세션 간 패턴/규칙 기억에, Dev Docs는 작업별 진행 관리에 적합합니다.
+>
+> Context auto-compaction 시 이미지가 자동 보존됩니다 (2.1 개선사항).
+>
+> Claude = 극도로 자신감 넘치는 주니어 개발자 with 심각한 건망증
+>
 > 이 시스템으로 Claude가 길을 잃지 않게 관리!
 
 ## 🎯 왜 필요한가?
@@ -332,4 +340,18 @@ ls dev/completed/
 
 *"Documentation is Claude's memory, and memory is everything"*
 
-#dev-docs #context-management #planning
+### 자동 메모리와의 관계 (Claude Code 2.1+)
+
+| 기능 | 자동 메모리 | Dev Docs |
+|------|-----------|----------|
+| 위치 | `~/.claude/projects/.../memory/` | `dev/active/[task]/` |
+| 용도 | 세션 간 패턴, 규칙 기억 | 작업별 계획/진행/결정 관리 |
+| 자동화 | Claude가 자동 저장 | 수동 생성 필요 |
+| 범위 | 프로젝트 전반 | 특정 작업/기능 |
+| 추천 | 항상 활성화 | 대규모 작업 시 |
+
+두 시스템을 함께 사용하면 가장 효과적입니다.
+
+*마지막 업데이트: 2026-03-06 | Claude Code v2.1.x*
+
+#dev-docs #context-management #planning #livemetro
