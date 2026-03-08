@@ -7,6 +7,12 @@ import { CommuteLog, DayOfWeek } from '@/models/pattern';
 import { MIN_LOGS_FOR_ML_TRAINING } from '@/models/ml';
 
 // ============================================================================
+// Import after mocks
+// ============================================================================
+
+import { trainingService, DEFAULT_TRAINING_OPTIONS } from '../trainingService';
+
+// ============================================================================
 // Mocks
 // ============================================================================
 
@@ -145,12 +151,6 @@ function setupFallbackMocks(): void {
   tensorFlowSetup.isAvailable.mockReturnValue(false);
   featureExtractor.extractFeatures.mockReturnValue(createMockFeatureVectors());
 }
-
-// ============================================================================
-// Import after mocks
-// ============================================================================
-
-import { trainingService, DEFAULT_TRAINING_OPTIONS } from '../trainingService';
 
 // ============================================================================
 // Tests: Insufficient Data

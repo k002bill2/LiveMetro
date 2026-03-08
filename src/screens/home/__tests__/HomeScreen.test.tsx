@@ -12,6 +12,12 @@ import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import * as Location from 'expo-location';
 
 // ============================================================================
+// Imports
+// ============================================================================
+
+import { HomeScreen } from '../HomeScreen';
+
+// ============================================================================
 // Mocks
 // ============================================================================
 
@@ -221,12 +227,6 @@ jest.mock('@/styles/modernTheme', () => ({
     lineHeight: { relaxed: 1.5 },
   },
 }));
-
-// ============================================================================
-// Imports
-// ============================================================================
-
-import { HomeScreen } from '../HomeScreen';
 
 const mockLocationRequest = Location.requestForegroundPermissionsAsync as jest.Mock;
 
