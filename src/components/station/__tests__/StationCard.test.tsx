@@ -279,5 +279,275 @@ describe('StationCard', () => {
         : card.props.style;
       expect(flatStyle.marginTop).toBe(20);
     });
+
+    it('should handle station with null nameEn', () => {
+      const stationNullEn: Station = {
+        ...mockStation,
+        nameEn: null as any,
+      };
+
+      const { queryByText } = render(
+        <StationCard {...defaultProps} station={stationNullEn} />
+      );
+
+      // Should handle null gracefully
+      expect(queryByText('강남')).toBeTruthy();
+    });
+
+    it('should handle station with null transfers', () => {
+      const stationNullTransfers: Station = {
+        ...mockStation,
+        transfers: null as any,
+      };
+
+      const { queryByText } = render(
+        <StationCard {...defaultProps} station={stationNullTransfers} />
+      );
+
+      expect(queryByText(/환승:/)).toBeNull();
+    });
+
+    it('should handle station with single transfer', () => {
+      const stationSingleTransfer: Station = {
+        ...mockStation,
+        transfers: ['5'],
+      };
+
+      const { getByText } = render(
+        <StationCard {...defaultProps} station={stationSingleTransfer} />
+      );
+
+      expect(getByText('환승: 5호선')).toBeTruthy();
+    });
+
+    it('should handle station with multiple transfers', () => {
+      const stationMultiTransfers: Station = {
+        ...mockStation,
+        transfers: ['1', '3', '7', '신분당'],
+      };
+
+      const { getByText } = render(
+        <StationCard {...defaultProps} station={stationMultiTransfers} />
+      );
+
+      expect(
+        getByText('환승: 1호선, 3호선, 7호선, 신분당호선')
+      ).toBeTruthy();
+    });
+
+    it('should handle undefined testID prop', () => {
+      const { getByTestId } = render(
+        <StationCard {...defaultProps} testID={undefined} />
+      );
+
+      // Should use default testID based on station.id
+      expect(getByTestId('station-card-station-gangnam')).toBeTruthy();
+    });
+
+    it('should handle station with various lineIds', () => {
+      const stationLine9: Station = {
+        ...mockStation,
+        lineId: '9',
+      };
+
+      const { getByText } = render(
+        <StationCard {...defaultProps} station={stationLine9} />
+      );
+
+      expect(getByText('9호선')).toBeTruthy();
+    });
+  });
+
+  describe('Memoization and Callbacks', () => {
+    it('should maintain callback reference stability', () => {
+      const onPress = jest.fn();
+      const { getByTestId, rerender } = render(
+        <StationCard {...defaultProps} onPress={onPress} />
+      );
+
+      const card1 = getByTestId('station-card-station-gangnam');
+      fireEvent.press(card1);
+      expect(onPress).toHaveBeenCalledTimes(1);
+
+      // Re-render with same callback
+      rerender(<StationCard {...defaultProps} onPress={onPress} />);
+      const card2 = getByTestId('station-card-station-gangnam');
+      fireEvent.press(card2);
+      expect(onPress).toHaveBeenCalledTimes(2);
+    });
+
+    it('should handle changing station prop', () => {
+      const { getByText, rerender } = render(
+        <StationCard {...defaultProps} />
+      );
+
+      expect(getByText('강남')).toBeTruthy();
+
+      const newStation: Station = {
+        ...mockStation,
+        name: '역삼',
+        id: 'station-yeoksam',
+      };
+
+      rerender(<StationCard {...defaultProps} station={newStation} />);
+
+      expect(getByText('역삼')).toBeTruthy();
+    });
+
+    it('should update accessibility label when station changes', () => {
+      const { getByRole, rerender } = render(
+        <StationCard {...defaultProps} />
+      );
+
+      let button = getByRole('button');
+      expect(button.props.accessibilityLabel).toContain('강남 역');
+
+      const newStation: Station = {
+        ...mockStation,
+        name: '건대입구',
+        id: 'station-konkuk',
+      };
+
+      rerender(<StationCard {...defaultProps} station={newStation} />);
+
+      button = getByRole('button');
+      expect(button.props.accessibilityLabel).toContain('건대입구 역');
+    });
+
+    it('should compute lineColor based on lineId', () => {
+      const { getSubwayLineColor } = require('@/utils/colorUtils');
+
+      render(<StationCard {...defaultProps} station={mockStation} />);
+
+      expect(getSubwayLineColor).toHaveBeenCalledWith('2');
+    });
+
+    it('should update lineColor when lineId changes', () => {
+      const { getSubwayLineColor } = require('@/utils/colorUtils');
+      const { rerender } = render(
+        <StationCard {...defaultProps} />
+      );
+
+      getSubwayLineColor.mockClear();
+
+      const newStation: Station = {
+        ...mockStation,
+        lineId: '3',
+      };
+
+      rerender(<StationCard {...defaultProps} station={newStation} />);
+
+      expect(getSubwayLineColor).toHaveBeenCalledWith('3');
+    });
+  });
+
+  describe('Prop Combinations', () => {
+    it('should render correctly with all props provided', () => {
+      const { getByTestId, getByRole } = render(
+        <StationCard
+          station={mockStation}
+          onPress={mockOnPress}
+          isSelected={true}
+          testID="custom-id"
+          style={{ padding: 10 }}
+        />
+      );
+
+      expect(getByTestId('custom-id')).toBeTruthy();
+      const button = getByRole('button');
+      expect(button.props.accessibilityState.selected).toBe(true);
+    });
+
+    it('should render correctly with minimal props', () => {
+      const { getByTestId } = render(
+        <StationCard
+          station={mockStation}
+          onPress={mockOnPress}
+        />
+      );
+
+      expect(getByTestId('station-card-station-gangnam')).toBeTruthy();
+    });
+
+    it('should toggle selection state independently', () => {
+      const { rerender, getByRole } = render(
+        <StationCard {...defaultProps} isSelected={false} />
+      );
+
+      let button = getByRole('button');
+      expect(button.props.accessibilityState.selected).toBe(false);
+
+      rerender(<StationCard {...defaultProps} isSelected={true} />);
+
+      button = getByRole('button');
+      expect(button.props.accessibilityState.selected).toBe(true);
+    });
+  });
+
+  describe('Theme Integration', () => {
+    it('should render with correct theme context', () => {
+      const { getByText } = render(<StationCard {...defaultProps} />);
+
+      // Verify that component renders using theme colors
+      const stationNameElement = getByText('강남');
+      expect(stationNameElement).toBeTruthy();
+    });
+
+    it('should render with correct text colors from theme', () => {
+      const { getByText } = render(<StationCard {...defaultProps} />);
+
+      const stationNameElement = getByText('강남');
+      const lineInfoElement = getByText('2호선');
+
+      expect(stationNameElement).toBeTruthy();
+      expect(lineInfoElement).toBeTruthy();
+    });
+  });
+
+  describe('Transfers Display Formatting', () => {
+    it('should format multiple transfers with 호선 suffix', () => {
+      const stationMultiTransfers: Station = {
+        ...mockStation,
+        transfers: ['1', '3', '신분당'],
+      };
+
+      const { getByText } = render(
+        <StationCard {...defaultProps} station={stationMultiTransfers} />
+      );
+
+      expect(getByText('환승: 1호선, 3호선, 신분당호선')).toBeTruthy();
+    });
+
+    it('should handle transfer display in accessibility label', () => {
+      const stationWithTransfers: Station = {
+        ...mockStation,
+        transfers: ['3', '7'],
+      };
+
+      const { getByRole } = render(
+        <StationCard {...defaultProps} station={stationWithTransfers} />
+      );
+
+      const button = getByRole('button');
+      // The accessibility label includes all parts: name, line, transfers
+      expect(button.props.accessibilityLabel).toContain('환승:');
+      expect(button.props.accessibilityLabel).toContain('3');
+      expect(button.props.accessibilityLabel).toContain('7');
+    });
+  });
+
+  describe('Display Name and Component Identity', () => {
+    it('should have correct displayName for debugging tools', () => {
+      expect(StationCard.displayName).toBe('StationCard');
+    });
+
+    it('should maintain consistent component identity', () => {
+      const { getByTestId: getById1 } = render(
+        <StationCard {...defaultProps} />
+      );
+
+      const card1 = getById1('station-card-station-gangnam');
+      expect(card1.props.accessibilityRole).toBe('button');
+    });
   });
 });
