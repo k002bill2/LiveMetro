@@ -132,9 +132,10 @@ export const LocationDebugPanel: React.FC = () => {
     lastUpdated,
     loading: stationsLoading,
   } = useNearbyStations({
-    radius: 2000, // 2km
+    radius: 1000, // 1km
     maxStations: 1,
     autoUpdate: true,
+    externalLocation: location, // Pass already-tracking location to avoid duplicate tracking
   });
 
   // Calculate delta when location changes

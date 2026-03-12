@@ -4,17 +4,19 @@
  */
 
 import { TrainFront, CheckCircle, Clock, XCircle, Wrench, AlertTriangle, CircleHelp, RefreshCw } from 'lucide-react-native';
-import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { COLORS, RADIUS, SHADOWS, SPACING, TYPOGRAPHY } from '../../styles/modernTheme';
 
 import { Train, TrainStatus } from '../../models/train';
 import { trainService } from '../../services/train/trainService';
 import { seoulSubwayApi } from '../../services/api/seoulSubwayApi';
+import { getLocalStation } from '../../services/data/stationsDataService';
 import { performanceMonitor, throttle } from '../../utils/performanceUtils';
 
 interface TrainArrivalListProps {
   stationId: string;
+  stationName?: string;
 }
 
 interface TrainArrivalItemProps {
@@ -133,9 +135,12 @@ const TrainArrivalItem: React.FC<TrainArrivalItemProps> = memo(({ train }) => {
 // Set display name for debugging
 TrainArrivalItem.displayName = 'TrainArrivalItem';
 
-export const TrainArrivalList: React.FC<TrainArrivalListProps> = memo(({ stationId }) => {
+export const TrainArrivalList: React.FC<TrainArrivalListProps> = memo(({ stationId, stationName: stationNameProp }) => {
   const [trains, setTrains] = useState<Train[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const retryRef = useRef<(() => void) | null>(null);
+  const resolvedStationNameRef = useRef<string | null>(null);
 
   // Memoize the update handler to prevent unnecessary re-renders
   const handleTrainUpdate = useCallback(
@@ -329,13 +334,21 @@ export const TrainArrivalList: React.FC<TrainArrivalListProps> = memo(({ station
       try {
         performanceMonitor.startMeasure(`api_fetch_${stationId}`);
 
-        // Get station name from stationId (may need to look up)
-        const station = await trainService.getStation(stationId);
-        const stationName = station?.name || stationId;
+        // Use cached resolved name to avoid redundant DB reads on every poll cycle
+        // Fallback chain: stationNameProp → cached → Firebase → LocalData → stationId
+        let stationName = stationNameProp || resolvedStationNameRef.current;
+        if (!stationName) {
+          const station = await trainService.getStation(stationId);
+          const localStation = getLocalStation(stationId);
+          stationName = station?.name || localStation?.name || stationId;
+          resolvedStationNameRef.current = stationName;
+        }
 
         const arrivals = await seoulSubwayApi.getRealtimeArrival(stationName);
 
         if (!isMounted) return;
+
+        setError(null);
 
         if (arrivals.length > 0) {
           const convertedTrains = arrivals
@@ -353,13 +366,17 @@ export const TrainArrivalList: React.FC<TrainArrivalListProps> = memo(({ station
         }
 
         performanceMonitor.endMeasure(`api_fetch_${stationId}`);
-      } catch (error) {
-        console.error('Failed to fetch realtime arrivals:', error);
+      } catch (err) {
+        console.error('Failed to fetch realtime arrivals:', err);
         if (isMounted) {
+          setError(err instanceof Error ? err.message : '도착정보를 불러올 수 없습니다');
           setLoading(false);
         }
       }
     };
+
+    // Expose for retry button
+    retryRef.current = () => { fetchRealtimeArrivals(); };
 
     // Try Firebase subscription first, then fallback to Seoul API polling
     const subscribeToUpdates = (): void => {
@@ -387,6 +404,7 @@ export const TrainArrivalList: React.FC<TrainArrivalListProps> = memo(({ station
 
     return () => {
       isMounted = false;
+      resolvedStationNameRef.current = null;
       if (unsubscribe) {
         unsubscribe();
       }
@@ -395,6 +413,34 @@ export const TrainArrivalList: React.FC<TrainArrivalListProps> = memo(({ station
       }
     };
   }, [stationId, throttledUpdate]);
+
+  const handleRetry = useCallback((): void => {
+    setError(null);
+    setLoading(true);
+    retryRef.current?.();
+  }, []);
+
+  const renderErrorState = (): React.ReactElement => (
+    <View
+      style={styles.emptyState}
+      accessible={true}
+      accessibilityRole="alert"
+      accessibilityLabel={`오류: ${error}. 재시도 버튼을 눌러 다시 시도하세요`}
+    >
+      <AlertTriangle size={48} color={COLORS.semantic.error} />
+      <Text style={styles.errorText}>도착정보를 불러올 수 없습니다</Text>
+      <Text style={styles.emptySubtext}>{error}</Text>
+      <Pressable
+        style={styles.retryButton}
+        onPress={handleRetry}
+        accessibilityRole="button"
+        accessibilityLabel="재시도"
+      >
+        <RefreshCw size={16} color={COLORS.white} />
+        <Text style={styles.retryButtonText}>재시도</Text>
+      </Pressable>
+    </View>
+  );
 
   const renderEmptyState = (): React.ReactElement => (
     <View
@@ -419,6 +465,14 @@ export const TrainArrivalList: React.FC<TrainArrivalListProps> = memo(({ station
       >
         <RefreshCw size={24} color={COLORS.primary.main} />
         <Text style={styles.loadingText}>실시간 열차 정보를 불러오고 있습니다...</Text>
+      </View>
+    );
+  }
+
+  if (error && trains.length === 0) {
+    return (
+      <View style={styles.container}>
+        {renderErrorState()}
       </View>
     );
   }
@@ -535,5 +589,27 @@ const styles = StyleSheet.create({
     color: COLORS.text.tertiary,
     marginTop: SPACING.sm,
     textAlign: 'center',
+  },
+  errorText: {
+    fontSize: TYPOGRAPHY.fontSize.lg,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.semantic.error,
+    marginTop: SPACING.lg,
+    textAlign: 'center',
+  },
+  retryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: COLORS.primary.main,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    borderRadius: RADIUS.md,
+    marginTop: SPACING.lg,
+  },
+  retryButtonText: {
+    fontSize: TYPOGRAPHY.fontSize.base,
+    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: COLORS.white,
+    marginLeft: SPACING.xs,
   },
 });

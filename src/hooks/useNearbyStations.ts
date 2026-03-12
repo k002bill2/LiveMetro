@@ -5,10 +5,9 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useLocation } from './useLocation';
-import { locationService, NearbyStation, LocationCoordinates } from '../services/location/locationService';
+import { locationService, NearbyStation, LocationCoordinates, AdaptiveRadiusResult } from '../services/location/locationService';
 import { trainService } from '../services/train/trainService';
 import { Station } from '../models/train';
-import { USE_TEST_STATIONS, TEST_STATIONS } from '../data/testStations';
 
 interface UseNearbyStationsState {
   nearbyStations: NearbyStation[];
@@ -16,16 +15,20 @@ interface UseNearbyStationsState {
   error: string | null;
   lastUpdated: Date | null;
   closestStation: NearbyStation | null;
+  effectiveRadius: number | null;
+  radiusExpanded: boolean;
 }
 
 interface UseNearbyStationsOptions {
   radius?: number; // in meters
   maxStations?: number;
+  minStations?: number; // Minimum stations for adaptive radius (default: 3)
   autoUpdate?: boolean;
   minUpdateInterval?: number; // in milliseconds
   onStationsFound?: (stations: NearbyStation[]) => void;
   onClosestStationChanged?: (station: NearbyStation | null) => void;
   mockLocation?: LocationCoordinates; // For testing: override GPS location
+  externalLocation?: LocationCoordinates | null; // Use location from parent hook instead of creating new tracking
 }
 
 /**
@@ -35,11 +38,13 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
   const {
     radius = 1000, // 1km default
     maxStations = 10,
+    minStations = 3, // Adaptive radius: expand until this many found
     autoUpdate = true,
     minUpdateInterval = 30000, // 30 seconds
     onStationsFound,
     onClosestStationChanged,
     mockLocation, // 🧪 Test mode: use fixed coordinates
+    externalLocation, // 🔗 Use location from parent hook
   } = options;
 
   const [state, setState] = useState<UseNearbyStationsState>({
@@ -48,38 +53,32 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
     error: null,
     lastUpdated: null,
     closestStation: null,
+    effectiveRadius: null,
+    radiusExpanded: false,
   });
 
   const [allStations, setAllStations] = useState<Station[]>([]);
   const [lastUpdateTime, setLastUpdateTime] = useState<number>(0);
 
   // Use mockLocation in test mode, otherwise use real GPS
-  const { location: gpsLocation, loading: locationLoading, error: locationError } = useLocation({
+  // Skip onLocationUpdate when external location is provided (parent handles tracking)
+  const { location: gpsLocation, loading: locationLoading, error: locationError, getCurrentLocation } = useLocation({
     enableHighAccuracy: false,
     distanceFilter: 50, // Update when user moves 50m
-    onLocationUpdate: autoUpdate && !mockLocation ? handleLocationUpdate : undefined,
+    onLocationUpdate: autoUpdate && !mockLocation && !externalLocation ? handleLocationUpdate : undefined,
   });
 
-  // Prefer mockLocation over GPS for testing
-  const location = mockLocation ?? gpsLocation;
+  // Priority: mockLocation > externalLocation > GPS
+  const location = mockLocation ?? externalLocation ?? gpsLocation;
 
   const updateState = useCallback((updates: Partial<UseNearbyStationsState>) => {
     setState(prevState => ({ ...prevState, ...updates }));
   }, []);
 
   /**
-   * Load all stations from the service
-   * In test mode (USE_TEST_STATIONS), uses hardcoded test data instead of API
+   * Load all stations from the service (Firebase/API)
    */
   const loadAllStations = useCallback(async () => {
-    // Test mode: use hardcoded stations (no API calls)
-    if (USE_TEST_STATIONS) {
-      console.log('[useNearbyStations] Using test stations (no API call)');
-      setAllStations(TEST_STATIONS);
-      return TEST_STATIONS;
-    }
-
-    // Production mode: load from Firebase/API
     try {
       const lines = await trainService.getSubwayLines();
       if (__DEV__) {
@@ -128,15 +127,17 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
         stations = await loadAllStations();
       }
 
-      const nearbyStations = locationService.findNearbyStations(
+      const adaptiveResult: AdaptiveRadiusResult = locationService.findNearbyStationsAdaptive(
         currentLocation,
         stations,
-        radius
-      ).slice(0, maxStations);
+        radius,
+        minStations
+      );
+      const nearbyStations = adaptiveResult.stations.slice(0, maxStations);
 
       if (__DEV__) {
         console.log(`[useNearbyStations] Location: ${currentLocation.latitude.toFixed(6)}, ${currentLocation.longitude.toFixed(6)}`);
-        console.log(`[useNearbyStations] Found ${nearbyStations.length} stations within ${radius}m`);
+        console.log(`[useNearbyStations] Found ${nearbyStations.length} stations within ${adaptiveResult.effectiveRadius}m${adaptiveResult.expanded ? ' (expanded)' : ''}`);
       }
 
       const closestStation: NearbyStation | null = nearbyStations.at(0) ?? null;
@@ -151,6 +152,8 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
         closestStation,
         loading: false,
         lastUpdated: new Date(),
+        effectiveRadius: adaptiveResult.effectiveRadius,
+        radiusExpanded: adaptiveResult.expanded,
       });
 
       setLastUpdateTime(now);
@@ -173,6 +176,7 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
     updateState,
     radius,
     maxStations,
+    minStations,
     lastUpdateTime,
     minUpdateInterval,
     state.closestStation,
@@ -237,6 +241,13 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
     loadAllStations();
   }, [loadAllStations]);
 
+  // Fallback: if no external/mock location and GPS hasn't provided one, try one-shot
+  useEffect(() => {
+    if (!mockLocation && !externalLocation && !gpsLocation && !locationLoading) {
+      getCurrentLocation();
+    }
+  }, [mockLocation, externalLocation, gpsLocation, locationLoading, getCurrentLocation]);
+
   // Find nearby stations when location is available
   useEffect(() => {
     if (location && !locationLoading) {
@@ -254,15 +265,19 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
     }
   }, [locationError, updateState]);
 
+  // When external or mock location is provided, ignore internal locationLoading
+  const effectiveLocationLoading = (externalLocation != null || mockLocation != null) ? false : locationLoading;
+
   return {
     ...state,
-    loading: state.loading || locationLoading,
+    loading: state.loading || effectiveLocationLoading,
     refresh,
     getStationsByCategory,
     isAtStation,
     getFormattedStations,
     hasLocation: !!location,
-    searchRadius: radius,
+    searchRadius: state.effectiveRadius ?? radius,
+    radiusExpanded: state.radiusExpanded,
   };
 };
 

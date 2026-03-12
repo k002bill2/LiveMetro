@@ -3,7 +3,7 @@
  * Seoul Open Data API에서 실시간 지연 정보를 감지합니다
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { seoulSubwayApi, SeoulRealtimeArrival } from '@/services/api/seoulSubwayApi';
 import type { DelayInfo } from '@/components/delays/DelayAlertBanner';
 
@@ -106,9 +106,17 @@ export function useDelayDetection(
 ): UseDelayDetectionResult {
   const {
     pollingInterval = 60000, // 1분
-    lineIds = Object.keys(LINE_REPRESENTATIVE_STATIONS),
+    lineIds: lineIdsProp,
     autoPolling = true,
   } = options;
+
+  const defaultLineIds = useMemo(() => Object.keys(LINE_REPRESENTATIVE_STATIONS), []);
+  // Stabilize lineIds reference to prevent infinite re-renders
+  const lineIds = useMemo(
+    () => lineIdsProp ?? defaultLineIds,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [lineIdsProp?.join(','), defaultLineIds]
+  );
 
   const [delays, setDelays] = useState<DelayInfo[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
@@ -116,14 +124,16 @@ export function useDelayDetection(
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   const isMountedRef = useRef<boolean>(true);
+  const loadingRef = useRef<boolean>(false);
   const pollingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   /**
    * 지정된 노선들의 지연 정보를 조회합니다
    */
   const fetchDelays = useCallback(async (): Promise<void> => {
-    if (loading) return;
+    if (loadingRef.current) return;
 
+    loadingRef.current = true;
     setLoading(true);
     setError(null);
 
@@ -183,11 +193,12 @@ export function useDelayDetection(
         setError('지연 정보를 가져오는데 실패했습니다');
       }
     } finally {
+      loadingRef.current = false;
       if (isMountedRef.current) {
         setLoading(false);
       }
     }
-  }, [lineIds, loading]);
+  }, [lineIds]);
 
   /**
    * 수동 새로고침

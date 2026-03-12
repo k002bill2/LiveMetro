@@ -6,8 +6,46 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { seoulSubwayApi, SeoulTimetableRow } from '@/services/api/seoulSubwayApi';
 import { findStationCdByNameAndLine } from '@/services/data/stationsDataService';
+
+/** 시간표 캐시 TTL: 24시간 (시간표는 일 단위 변경) */
+const TIMETABLE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+interface TimetableCacheEntry {
+  data: SeoulTimetableRow[];
+  timestamp: number;
+}
+
+const getTimetableCacheKey = (stationCode: string, weekTag: string, direction: string): string =>
+  `timetable:${stationCode}:${weekTag}:${direction}`;
+
+const getCachedTimetable = async (cacheKey: string): Promise<SeoulTimetableRow[] | null> => {
+  try {
+    const raw = await AsyncStorage.getItem(cacheKey);
+    if (!raw) return null;
+
+    const entry: TimetableCacheEntry = JSON.parse(raw);
+    if (Date.now() - entry.timestamp > TIMETABLE_CACHE_TTL_MS) {
+      await AsyncStorage.removeItem(cacheKey);
+      return null;
+    }
+
+    return entry.data;
+  } catch {
+    return null;
+  }
+};
+
+const setCachedTimetable = async (cacheKey: string, data: SeoulTimetableRow[]): Promise<void> => {
+  try {
+    const entry: TimetableCacheEntry = { data, timestamp: Date.now() };
+    await AsyncStorage.setItem(cacheKey, JSON.stringify(entry));
+  } catch (err) {
+    console.warn('Failed to cache timetable:', err);
+  }
+};
 
 /** 상하행 방향 코드 */
 type DirectionCode = '1' | '2';
@@ -124,13 +162,26 @@ export const useTrainSchedule = (
         return;
       }
 
-      // 현재 요일 기준 시간표 조회
+      // 현재 요일 기준 시간표 조회 (캐시 우선)
       const weekTag = getCurrentWeekTag();
-      const data = await seoulSubwayApi.getStationTimetable(
-        stationCode,
-        weekTag,
-        direction
-      );
+      const cacheKey = getTimetableCacheKey(stationCode, weekTag, direction);
+
+      const cached = await getCachedTimetable(cacheKey);
+      let data: SeoulTimetableRow[];
+
+      if (cached) {
+        data = cached;
+      } else {
+        data = await seoulSubwayApi.getStationTimetable(
+          stationCode,
+          weekTag,
+          direction
+        );
+        // 성공 시 캐시 저장
+        if (data.length > 0) {
+          await setCachedTimetable(cacheKey, data);
+        }
+      }
 
       // 데이터 변환
       const convertedData = data.map((row) =>

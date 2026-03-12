@@ -46,26 +46,22 @@ const convertLineNumToLineId = (lineNum: string): string => {
 };
 
 /**
- * Default Seoul City Hall coordinates (fallback)
- */
-const DEFAULT_COORDINATES = {
-  latitude: 37.5665,
-  longitude: 126.9780,
-};
-
-/**
  * Convert Seoul Metro station data to Station model
+ * Coordinates are looked up from stationCoordinates.json
  */
 const convertSeoulStationToModel = (data: SeoulStationData): Station => {
-  // Look up coordinates from stationCoordinates.json, fallback to default
-  const coords = (stationCoordinates as CoordinateData)[data.station_cd] ?? DEFAULT_COORDINATES;
+  const coords = (stationCoordinates as CoordinateData)[data.station_cd];
+
+  if (!coords) {
+    console.warn(`[stationsDataService] No coordinates for station ${data.station_cd} (${data.station_nm})`);
+  }
 
   return {
     id: data.station_cd,
     name: data.station_nm,
     nameEn: data.station_nm_eng,
     lineId: convertLineNumToLineId(data.line_num),
-    coordinates: coords,
+    coordinates: coords ?? { latitude: 0, longitude: 0 },
     transfers: [],
     stationCode: data.fr_code,
   };
@@ -152,7 +148,7 @@ const initializeCache = (): void => {
     }
 
     // Try to get coordinates from stationCoordinates.json using ID
-    const coords = (stationCoordinates as CoordinateData)[stationData.id] ?? DEFAULT_COORDINATES;
+    const coords = (stationCoordinates as CoordinateData)[stationData.id] ?? { latitude: 0, longitude: 0 };
 
     // Convert stations.json data to Station model
     const station: Station = {

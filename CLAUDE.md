@@ -251,6 +251,14 @@ npm test -- --coverage # 3. 테스트 통과 + 커버리지 충족
 | 기능 계획/페이즈 설계 | `cc-feature-implementer-main` |
 | 장기 작업 컨텍스트 보존 | `external-memory` |
 | 에이전트 성능 추적 | `agent-observability` |
+| 역정보 조회/역 검색/주변역 | `station-info` |
+| 혼잡도/크라우드소싱/히트맵 | `crowdsourced-congestion` |
+| 경로 탐색/요금 계산/환승 | `route-fare-calculation` |
+| 통계/분석/차트/대시보드 | `statistics-analytics` |
+| 테마/다크모드/다국어/i18n | `theme-i18n-system` |
+| TTS/사운드/진동/접근성 | `audio-accessibility` |
+| 신뢰도/평판/뱃지/사기탐지 | `user-trust-reputation` |
+| 성능 모니터링/헬스체크/크래시 | `monitoring-observability` |
 | 세션 정리/종료 | `session-wrap` |
 
 ## Coding Guidelines

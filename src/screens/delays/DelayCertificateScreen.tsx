@@ -325,6 +325,7 @@ export const DelayCertificateScreen: React.FC = () => {
       {/* Tabs */}
       <View style={styles.tabContainer}>
         <TouchableOpacity
+          testID="certificates-tab"
           style={[
             styles.tab,
             activeTab === 'certificates' && styles.tabActive,
@@ -346,6 +347,7 @@ export const DelayCertificateScreen: React.FC = () => {
         </TouchableOpacity>
 
         <TouchableOpacity
+          testID="history-tab"
           style={[
             styles.tab,
             activeTab === 'history' && styles.tabActive,

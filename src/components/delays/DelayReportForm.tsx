@@ -166,7 +166,11 @@ export const DelayReportForm: React.FC<DelayReportFormProps> = ({
       <View style={styles.header}>
         <Text style={styles.title}>지연 제보하기</Text>
         {onCancel && (
-          <TouchableOpacity onPress={onCancel} style={styles.closeButton}>
+          <TouchableOpacity
+            testID="close-button"
+            onPress={onCancel}
+            style={styles.closeButton}
+          >
             <X size={24} color={colors.textSecondary} />
           </TouchableOpacity>
         )}

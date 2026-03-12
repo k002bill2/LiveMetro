@@ -3,7 +3,7 @@
  * Real-time subway data from Seoul Open API
  */
 
-import { createSeoulApiKeyManager, ApiKeyManager } from './apiKeyManager';
+import { createSeoulApiKeyManager, createPublicDataApiKeyManager, ApiKeyManager } from './apiKeyManager';
 
 /**
  * Rate Limiter for Seoul API (30-second minimum interval per endpoint)
@@ -201,6 +201,7 @@ class SeoulSubwayApiService {
   private readonly timeout: number = 10000;
   private readonly rateLimiter: RateLimiter;
   private readonly keyManager: ApiKeyManager;
+  private readonly timetableKeyManager: ApiKeyManager;
 
   constructor() {
     this.baseUrl = process.env.SEOUL_SUBWAY_API_BASE_URL || 'http://swopenapi.seoul.go.kr/api/subway';
@@ -209,19 +210,32 @@ class SeoulSubwayApiService {
       disableDurationMs: 60000, // 1분간 비활성화
       errorThreshold: 3, // 연속 3회 에러 시 비활성화
     });
+    this.timetableKeyManager = createPublicDataApiKeyManager({
+      disableDurationMs: 60000,
+      errorThreshold: 3,
+    });
 
     if (this.keyManager.keyCount === 0) {
       console.warn('Seoul Subway API key not found. Please set EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY environment variable.');
     } else {
       console.info(`Seoul Subway API: ${this.keyManager.keyCount} key(s) loaded`);
     }
+
+    if (this.timetableKeyManager.keyCount === 0) {
+      console.warn('Data Portal API key not found. Please set EXPO_PUBLIC_DATA_PORTAL_API_KEY environment variable.');
+    } else {
+      console.info(`Timetable API: ${this.timetableKeyManager.keyCount} key(s) loaded`);
+    }
   }
 
   /**
    * API 키 상태 조회 (디버깅/모니터링용)
    */
-  getKeyStats(): ReturnType<ApiKeyManager['getKeyStats']> {
-    return this.keyManager.getKeyStats();
+  getKeyStats(): { realtime: ReturnType<ApiKeyManager['getKeyStats']>; timetable: ReturnType<ApiKeyManager['getKeyStats']> } {
+    return {
+      realtime: this.keyManager.getKeyStats(),
+      timetable: this.timetableKeyManager.getKeyStats(),
+    };
   }
 
   /**
@@ -260,6 +274,12 @@ class SeoulSubwayApiService {
         // Check for API errors
         if (data.errorMessage) {
           const errorCode = data.errorMessage.code;
+
+          // INFO-000 means "success but no data" - return empty array
+          if (errorCode === 'INFO-000') {
+            this.keyManager.reportSuccess(apiKey);
+            return [];
+          }
 
           // Rate limit error - immediately switch to another key
           if (errorCode === 'ERROR-500' || errorCode === 'ERROR-501') {
@@ -395,9 +415,9 @@ class SeoulSubwayApiService {
     await this.rateLimiter.throttle(rateLimitKey);
 
     return withRetry(async () => {
-      const apiKey = this.keyManager.getNextKey();
+      const apiKey = this.timetableKeyManager.getNextKey();
       if (!apiKey) {
-        throw new Error('사용 가능한 API 키가 없습니다.');
+        throw new Error('사용 가능한 Data Portal API 키가 없습니다. EXPO_PUBLIC_DATA_PORTAL_API_KEY를 설정해주세요.');
       }
 
       try {
@@ -411,7 +431,7 @@ class SeoulSubwayApiService {
         // Handle empty or invalid response structure
         if (!data || !data.SearchSTNTimeTableByIDService) {
           console.warn('[SeoulSubwayApi] Empty or invalid timetable response');
-          this.keyManager.reportSuccess(apiKey);
+          this.timetableKeyManager.reportSuccess(apiKey);
           return [];
         }
 
@@ -421,14 +441,14 @@ class SeoulSubwayApiService {
         if (resultCode !== 'INFO-000') {
           // INFO-200 means no data found, which is valid for empty schedules
           if (resultCode === 'INFO-200') {
-            this.keyManager.reportSuccess(apiKey);
+            this.timetableKeyManager.reportSuccess(apiKey);
             return [];
           }
-          this.keyManager.reportError(apiKey);
+          this.timetableKeyManager.reportError(apiKey);
           throw new Error(`API Error: ${resultMessage}`);
         }
 
-        this.keyManager.reportSuccess(apiKey);
+        this.timetableKeyManager.reportSuccess(apiKey);
         return data.SearchSTNTimeTableByIDService.row || [];
       } catch (error) {
         console.error('Error fetching station timetable:', error);

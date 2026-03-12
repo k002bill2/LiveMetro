@@ -51,10 +51,6 @@ export interface WeatherImpact {
 const STORAGE_KEY = '@livemetro:weather_cache';
 const CACHE_DURATION_MS = 30 * 60 * 1000; // 30 minutes
 
-// Seoul center coordinates
-const SEOUL_LAT = 37.5665;
-const SEOUL_LNG = 126.9780;
-
 // Weather code to condition mapping (based on common weather API codes)
 const WEATHER_CODE_MAP: Record<number, WeatherCondition> = {
   0: 'clear',    // Clear sky
@@ -119,15 +115,16 @@ class WeatherService {
 
   /**
    * Get current weather
+   * @param location - User's current coordinates (optional)
    */
-  async getCurrentWeather(): Promise<WeatherData | null> {
+  async getCurrentWeather(location?: { latitude: number; longitude: number }): Promise<WeatherData | null> {
     // Check cache
     if (this.isCacheValid()) {
       return this.cache.data;
     }
 
     try {
-      const weather = await this.fetchWeather();
+      const weather = await this.fetchWeather(location);
       if (weather) {
         this.cache = {
           data: weather,
@@ -169,10 +166,19 @@ class WeatherService {
 
   /**
    * Get weather forecast for next days
+   * @param days - Number of forecast days
+   * @param location - User's current coordinates (optional)
    */
-  async getForecast(days: number = 3): Promise<WeatherForecast[]> {
+  async getForecast(
+    days: number = 3,
+    location?: { latitude: number; longitude: number }
+  ): Promise<WeatherForecast[]> {
+    if (!location) {
+      return [];
+    }
+
     try {
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${SEOUL_LAT}&longitude=${SEOUL_LNG}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=Asia/Seoul&forecast_days=${days}`;
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${location.latitude}&longitude=${location.longitude}&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum&timezone=Asia/Seoul&forecast_days=${days}`;
 
       const response = await fetch(url);
       if (!response.ok) throw new Error('Forecast fetch failed');
@@ -258,12 +264,16 @@ class WeatherService {
   // ============================================================================
 
   /**
-   * Fetch weather from API
+   * Fetch weather from API using provided coordinates
    */
-  private async fetchWeather(): Promise<WeatherData | null> {
+  private async fetchWeather(location?: { latitude: number; longitude: number }): Promise<WeatherData | null> {
+    if (!location) {
+      return null;
+    }
+
     try {
       // Using Open-Meteo API (free, no API key required)
-      const url = `https://api.open-meteo.com/v1/forecast?latitude=${SEOUL_LAT}&longitude=${SEOUL_LNG}&current=temperature_2m,relative_humidity_2m,weather_code,precipitation&timezone=Asia/Seoul`;
+      const url = `https://api.open-meteo.com/v1/forecast?latitude=${location.latitude}&longitude=${location.longitude}&current=temperature_2m,relative_humidity_2m,weather_code,precipitation&timezone=Asia/Seoul`;
 
       const response = await fetch(url);
       if (!response.ok) throw new Error('Weather fetch failed');

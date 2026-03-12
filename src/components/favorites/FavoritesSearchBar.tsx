@@ -122,6 +122,7 @@ export const FavoritesSearchBar: React.FC<FavoritesSearchBarProps> = ({
             onPress={() => onSearchChange('')}
             style={styles.clearButton}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            testID="clear-search-button"
           >
             <XCircle size={20} color={colors.textTertiary} />
           </TouchableOpacity>
@@ -135,6 +136,7 @@ export const FavoritesSearchBar: React.FC<FavoritesSearchBarProps> = ({
             (activeFilters.direction || activeFilters.commuteOnly) && styles.filterToggleActive,
           ]}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          testID="filter-toggle-button"
         >
           <SlidersHorizontal
             size={20}
@@ -165,6 +167,7 @@ export const FavoritesSearchBar: React.FC<FavoritesSearchBarProps> = ({
                   styles.filterChip,
                   activeFilters.direction === 'up' && styles.filterChipActive,
                 ]}
+                testID="direction-filter-up"
               >
                 <ArrowUp
                   size={14}
@@ -186,6 +189,7 @@ export const FavoritesSearchBar: React.FC<FavoritesSearchBarProps> = ({
                   styles.filterChip,
                   activeFilters.direction === 'down' && styles.filterChipActive,
                 ]}
+                testID="direction-filter-down"
               >
                 <ArrowDown
                   size={14}
@@ -213,6 +217,7 @@ export const FavoritesSearchBar: React.FC<FavoritesSearchBarProps> = ({
                   styles.filterChip,
                   activeFilters.commuteOnly && styles.filterChipActive,
                 ]}
+                testID="commute-filter-button"
               >
                 <Briefcase
                   size={14}
@@ -238,7 +243,7 @@ export const FavoritesSearchBar: React.FC<FavoritesSearchBarProps> = ({
           <Text style={styles.resultText}>
             {resultCount}개의 결과
           </Text>
-          <TouchableOpacity onPress={clearFilters} style={styles.clearFiltersButton}>
+          <TouchableOpacity onPress={clearFilters} style={styles.clearFiltersButton} testID="clear-filters-button">
             <Text style={styles.clearFiltersText}>필터 초기화</Text>
           </TouchableOpacity>
         </View>

@@ -75,4 +75,7 @@ module.exports = {
 
   // Timeout
   testTimeout: 10000,
+
+  // Watchman: use --no-watchman flag locally if permission issues occur
+  // watchman: false,
 };

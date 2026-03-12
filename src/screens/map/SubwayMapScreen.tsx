@@ -3,7 +3,7 @@
  * Interactive Seoul subway line map with station selection
  */
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -15,101 +15,117 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 
 import { getSubwayLineColor, getLineTextColor } from '@utils/colorUtils';
+import { getLocalStationsByLine } from '@services/data/stationsDataService';
 
-// Simplified subway line data for MVP
-interface SubwayLineData {
-  id: string;
-  name: string;
-  stations: {
-    id: string;
-    name: string;
-    nameEn: string;
-    isTransfer: boolean;
-    transferLines?: string[];
-  }[];
+interface StationDisplay {
+  readonly id: string;
+  readonly name: string;
+  readonly nameEn: string;
+  readonly isTransfer: boolean;
+  readonly transferLines: readonly string[];
 }
 
-const SUBWAY_LINES: SubwayLineData[] = [
-  {
-    id: '1',
-    name: '1호선',
-    stations: [
-      { id: '1001', name: '서울역', nameEn: 'Seoul Station', isTransfer: true, transferLines: ['4'] },
-      { id: '1002', name: '시청', nameEn: 'City Hall', isTransfer: true, transferLines: ['2'] },
-      { id: '1003', name: '종각', nameEn: 'Jonggak', isTransfer: false },
-      { id: '1004', name: '종로3가', nameEn: 'Jongno 3-ga', isTransfer: true, transferLines: ['3', '5'] },
-      { id: '1005', name: '종로5가', nameEn: 'Jongno 5-ga', isTransfer: false },
-      { id: '1006', name: '동대문', nameEn: 'Dongdaemun', isTransfer: true, transferLines: ['4'] },
-    ],
-  },
-  {
-    id: '2',
-    name: '2호선',
-    stations: [
-      { id: '2001', name: '시청', nameEn: 'City Hall', isTransfer: true, transferLines: ['1'] },
-      { id: '2002', name: '을지로입구', nameEn: 'Euljiro 1-ga', isTransfer: false },
-      { id: '2003', name: '을지로3가', nameEn: 'Euljiro 3-ga', isTransfer: true, transferLines: ['3'] },
-      { id: '2004', name: '을지로4가', nameEn: 'Euljiro 4-ga', isTransfer: true, transferLines: ['5'] },
-      { id: '2005', name: '동대문역사문화공원', nameEn: 'DDP', isTransfer: true, transferLines: ['4', '5'] },
-      { id: '2006', name: '신당', nameEn: 'Sindang', isTransfer: true, transferLines: ['6'] },
-      { id: '2007', name: '강남', nameEn: 'Gangnam', isTransfer: true, transferLines: ['신분당'] },
-      { id: '2008', name: '역삼', nameEn: 'Yeoksam', isTransfer: false },
-      { id: '2009', name: '선릉', nameEn: 'Seolleung', isTransfer: true, transferLines: ['분당'] },
-    ],
-  },
-  {
-    id: '3',
-    name: '3호선',
-    stations: [
-      { id: '3001', name: '종로3가', nameEn: 'Jongno 3-ga', isTransfer: true, transferLines: ['1', '5'] },
-      { id: '3002', name: '을지로3가', nameEn: 'Euljiro 3-ga', isTransfer: true, transferLines: ['2'] },
-      { id: '3003', name: '충무로', nameEn: 'Chungmuro', isTransfer: true, transferLines: ['4'] },
-      { id: '3004', name: '동대입구', nameEn: 'Dongguk Univ.', isTransfer: false },
-      { id: '3005', name: '약수', nameEn: 'Yaksu', isTransfer: true, transferLines: ['6'] },
-      { id: '3006', name: '금호', nameEn: 'Geumho', isTransfer: false },
-      { id: '3007', name: '옥수', nameEn: 'Oksu', isTransfer: false },
-    ],
-  },
-  {
-    id: '4',
-    name: '4호선',
-    stations: [
-      { id: '4001', name: '서울역', nameEn: 'Seoul Station', isTransfer: true, transferLines: ['1'] },
-      { id: '4002', name: '회현', nameEn: 'Hoehyeon', isTransfer: false },
-      { id: '4003', name: '명동', nameEn: 'Myeongdong', isTransfer: false },
-      { id: '4004', name: '충무로', nameEn: 'Chungmuro', isTransfer: true, transferLines: ['3'] },
-      { id: '4005', name: '동대문역사문화공원', nameEn: 'DDP', isTransfer: true, transferLines: ['2', '5'] },
-      { id: '4006', name: '동대문', nameEn: 'Dongdaemun', isTransfer: true, transferLines: ['1'] },
-    ],
-  },
-  {
-    id: '5',
-    name: '5호선',
-    stations: [
-      { id: '5001', name: '종로3가', nameEn: 'Jongno 3-ga', isTransfer: true, transferLines: ['1', '3'] },
-      { id: '5002', name: '을지로4가', nameEn: 'Euljiro 4-ga', isTransfer: true, transferLines: ['2'] },
-      { id: '5003', name: '동대문역사문화공원', nameEn: 'DDP', isTransfer: true, transferLines: ['2', '4'] },
-      { id: '5004', name: '청구', nameEn: 'Cheonggu', isTransfer: false },
-      { id: '5005', name: '왕십리', nameEn: 'Wangsimni', isTransfer: true, transferLines: ['2', '경의중앙'] },
-    ],
-  },
-];
+interface SubwayLineData {
+  readonly id: string;
+  readonly name: string;
+  readonly stations: readonly StationDisplay[];
+}
+
+/** All supported subway line IDs (mapped from seoulStations.json line_num) */
+const LINE_IDS = [
+  '1', '2', '3', '4', '5', '6', '7', '8', '9',
+  '공항철도', '경의선', '경춘선', '수인분당선', '신분당선',
+  '경강선', '서해선', '인천선', '인천2', '용인경전철',
+  '의정부경전철', '우이신설경전철', '김포도시철도', '신림선', 'GTX-A',
+] as const;
+
+const LINE_NAMES: Record<string, string> = {
+  '1': '1호선', '2': '2호선', '3': '3호선',
+  '4': '4호선', '5': '5호선', '6': '6호선',
+  '7': '7호선', '8': '8호선', '9': '9호선',
+  '공항철도': '공항',
+  '경의선': '경의중앙',
+  '경춘선': '경춘',
+  '수인분당선': '수인분당',
+  '신분당선': '신분당',
+  '경강선': '경강',
+  '서해선': '서해',
+  '인천선': '인천1',
+  '인천2': '인천2',
+  '용인경전철': '에버라인',
+  '의정부경전철': '의정부',
+  '우이신설경전철': '우이신설',
+  '김포도시철도': '김포골드',
+  '신림선': '신림',
+  'GTX-A': 'GTX-A',
+};
+
+/**
+ * Build transfer map: station name → set of lineIds it appears on
+ */
+const buildTransferMap = (): Map<string, Set<string>> => {
+  const transferMap = new Map<string, Set<string>>();
+
+  for (const lineId of LINE_IDS) {
+    const stations = getLocalStationsByLine(lineId);
+    for (const station of stations) {
+      if (!transferMap.has(station.name)) {
+        transferMap.set(station.name, new Set());
+      }
+      transferMap.get(station.name)!.add(lineId);
+    }
+  }
+
+  return transferMap;
+};
+
+/**
+ * Build all subway line data from stationsDataService
+ */
+const buildSubwayLines = (): SubwayLineData[] => {
+  const transferMap = buildTransferMap();
+
+  return LINE_IDS.map((lineId) => {
+    const stations = getLocalStationsByLine(lineId);
+    const displayStations: StationDisplay[] = stations.map((station) => {
+      const lineSet = transferMap.get(station.name);
+      const otherLines = lineSet
+        ? [...lineSet].filter((l) => l !== lineId)
+        : [];
+
+      return {
+        id: station.id,
+        name: station.name,
+        nameEn: station.nameEn,
+        isTransfer: otherLines.length > 0,
+        transferLines: otherLines,
+      };
+    });
+
+    return {
+      id: lineId,
+      name: LINE_NAMES[lineId] ?? `${lineId}호선`,
+      stations: displayStations,
+    };
+  });
+};
 
 export const SubwayMapScreen: React.FC = () => {
-  const [selectedLine, setSelectedLine] = useState<string | null>('2'); // Default to Line 2
-  const [selectedStation, setSelectedStation] = useState<SubwayLineData['stations'][0] | null>(null);
+  const subwayLines = useMemo(() => buildSubwayLines(), []);
+  const [selectedLine, setSelectedLine] = useState<string | null>('2');
+  const [selectedStation, setSelectedStation] = useState<StationDisplay | null>(null);
   const [showStationModal, setShowStationModal] = useState(false);
 
   const handleLineSelect = (lineId: string) => {
     setSelectedLine(lineId);
   };
 
-  const handleStationPress = (station: SubwayLineData['stations'][0]) => {
+  const handleStationPress = (station: StationDisplay) => {
     setSelectedStation(station);
     setShowStationModal(true);
   };
 
-  const selectedLineData = SUBWAY_LINES.find(line => line.id === selectedLine);
+  const selectedLineData = subwayLines.find(line => line.id === selectedLine);
 
   return (
     <View style={styles.container}>
@@ -120,7 +136,7 @@ export const SubwayMapScreen: React.FC = () => {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.lineSelectorContent}
         >
-          {SUBWAY_LINES.map((line) => {
+          {subwayLines.map((line) => {
             const lineColor = getSubwayLineColor(line.id);
             const lineTextColor = getLineTextColor(line.id);
             const isSelected = selectedLine === line.id;
@@ -292,7 +308,7 @@ export const SubwayMapScreen: React.FC = () => {
                         if (!line) return null;
                         const lineColor = getSubwayLineColor(line);
                         const lineTextColor = getLineTextColor(line);
-                        const lineName = SUBWAY_LINES.find(l => l.id === line)?.name || line;
+                        const lineName = subwayLines.find(l => l.id === line)?.name || line;
 
                         return (
                           <View

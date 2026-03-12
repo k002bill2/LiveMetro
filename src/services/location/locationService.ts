@@ -17,6 +17,16 @@ export interface NearbyStation extends Station {
   bearing?: number; // Bearing in degrees
 }
 
+export interface AdaptiveRadiusResult {
+  stations: NearbyStation[];
+  effectiveRadius: number; // Actually used radius in meters
+  expanded: boolean; // Whether radius was expanded from initial
+}
+
+/** Adaptive radius configuration */
+const ADAPTIVE_RADIUS_STEPS: readonly number[] = [1000, 1500, 2000] as const;
+const ADAPTIVE_MIN_STATIONS = 3;
+
 export interface GeofenceRegion {
   identifier: string;
   latitude: number;
@@ -354,7 +364,53 @@ class LocationService {
     }
 
     // Sort by distance
-    return nearbyStations.sort((a, b) => a.distance - b.distance);
+    nearbyStations.sort((a, b) => a.distance - b.distance);
+
+    // Dedup transfer stations: keep closest entry per station name
+    const seen = new Map<string, NearbyStation>();
+    for (const station of nearbyStations) {
+      if (!seen.has(station.name)) {
+        seen.set(station.name, station);
+      }
+    }
+
+    return Array.from(seen.values());
+  }
+
+  /**
+   * Find nearby stations with adaptive radius expansion.
+   * Starts at initialRadius and expands through ADAPTIVE_RADIUS_STEPS
+   * until minStations are found or max radius is reached.
+   */
+  findNearbyStationsAdaptive(
+    currentLocation: LocationCoordinates,
+    allStations: Station[],
+    initialRadius: number = ADAPTIVE_RADIUS_STEPS[0],
+    minStations: number = ADAPTIVE_MIN_STATIONS
+  ): AdaptiveRadiusResult {
+    // Build step list: ensure initialRadius is included, then add larger steps
+    const steps = [
+      initialRadius,
+      ...ADAPTIVE_RADIUS_STEPS.filter(r => r > initialRadius),
+    ];
+
+    for (const radius of steps) {
+      const stations = this.findNearbyStations(currentLocation, allStations, radius);
+      if (stations.length >= minStations || radius === steps[steps.length - 1]) {
+        return {
+          stations,
+          effectiveRadius: radius,
+          expanded: radius > initialRadius,
+        };
+      }
+    }
+
+    // Fallback (should not reach here due to loop logic)
+    return {
+      stations: this.findNearbyStations(currentLocation, allStations, steps[steps.length - 1]),
+      effectiveRadius: steps[steps.length - 1],
+      expanded: true,
+    };
   }
 
   /**

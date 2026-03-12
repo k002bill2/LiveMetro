@@ -6,28 +6,27 @@
  * 2. 배터리 최적화 (30초 throttle + 50m 거리 필터)
  * 3. 에러 핸들링 자동화
  * 4. 코드 90% 감소
- *
- * 테스트용: 현재 위치를 산곡역으로 고정
  */
 
 import React from 'react';
 import { View, Text, ScrollView, RefreshControl, StyleSheet } from 'react-native';
 import { useNearbyStations } from '@/hooks/useNearbyStations';
+import { useLocation } from '@/hooks/useLocation';
 import { StationCard } from '@/components/train/StationCard';
 import { TrainArrivalList } from '@/components/train/TrainArrivalList';
 import { useToast } from '@/components/common/Toast';
-
-// 🧪 테스트용 고정 좌표 - 산곡역 (서울 7호선)
-const TEST_LOCATION = {
-  latitude: 37.6661,
-  longitude: 126.8850,
-};
 
 export const ImprovedHomeScreen: React.FC = () => {
   const { showSuccess, showError } = useToast();
   const [selectedStationId, setSelectedStationId] = React.useState<string | null>(null);
 
-  // 🎯 이것만으로 모든 위치 기능 완성!
+  // 현재 위치 추적
+  const { location: currentLocation } = useLocation({
+    enableHighAccuracy: false,
+    distanceFilter: 50,
+  });
+
+  // 실제 GPS 기반 주변역 검색
   const {
     closestStation,
     loading,
@@ -39,9 +38,8 @@ export const ImprovedHomeScreen: React.FC = () => {
   } = useNearbyStations({
     radius: 1000,            // 1km 반경
     maxStations: 10,
-    autoUpdate: false,       // 🧪 테스트 모드에서는 자동 업데이트 비활성화
+    autoUpdate: true,        // GPS 이동 시 자동 업데이트
     minUpdateInterval: 30000, // 30초 throttle로 배터리 보호
-    mockLocation: TEST_LOCATION, // 🧪 산곡역 고정 좌표 사용
 
     // 가장 가까운 역이 바뀔 때 알림
     onClosestStationChanged: (station) => {
@@ -80,6 +78,16 @@ export const ImprovedHomeScreen: React.FC = () => {
       style={styles.container}
       refreshControl={<RefreshControl refreshing={loading} onRefresh={refresh} />}
     >
+      {/* 현재 위치 표시 */}
+      {currentLocation && (
+        <View style={styles.locationBanner}>
+          <Text style={styles.locationLabel}>현재 위치</Text>
+          <Text style={styles.locationCoords}>
+            {currentLocation.latitude.toFixed(6)}, {currentLocation.longitude.toFixed(6)}
+          </Text>
+        </View>
+      )}
+
       {/* 위치 권한 없을 때 자동으로 감지 */}
       {!hasLocation && (
         <View style={styles.banner}>
@@ -130,6 +138,25 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f9fafb',
+  },
+  locationBanner: {
+    backgroundColor: '#f0fdf4',
+    padding: 16,
+    margin: 16,
+    borderRadius: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  locationLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#166534',
+  },
+  locationCoords: {
+    fontSize: 13,
+    fontFamily: 'monospace',
+    color: '#15803d',
   },
   banner: {
     backgroundColor: '#dbeafe',

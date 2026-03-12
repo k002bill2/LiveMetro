@@ -341,7 +341,7 @@ export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) =
               <Text style={styles.arrivalsTitle}>실시간 도착</Text>
               <View style={styles.liveDot} />
             </View>
-            <TrainArrivalList stationId={currentStation.id} />
+            <TrainArrivalList stationId={currentStation.id} stationName={currentStation.name} />
           </View>
         </View>
 
