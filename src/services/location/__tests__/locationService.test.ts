@@ -200,6 +200,47 @@ describe('LocationService', () => {
       expect(nearbyStations).toEqual([]);
     });
 
+    it('should dedup transfer stations keeping closest entry', () => {
+      // 도봉산: 1호선과 7호선에 각각 등록, 거의 같은 위치
+      const transferStations: Station[] = [
+        {
+          id: 'dobongsan-1',
+          name: '도봉산',
+          nameEn: 'Dobongsan',
+          lineId: '1',
+          coordinates: { latitude: 37.6896, longitude: 127.0447 },
+          transfers: ['7'],
+        },
+        {
+          id: 'dobongsan-7',
+          name: '도봉산',
+          nameEn: 'Dobongsan',
+          lineId: '7',
+          coordinates: { latitude: 37.6894, longitude: 127.0450 }, // 26m away
+          transfers: ['1'],
+        },
+        {
+          id: 'suraksan',
+          name: '수락산',
+          nameEn: 'Suraksan',
+          lineId: '7',
+          coordinates: { latitude: 37.6920, longitude: 127.0560 },
+          transfers: [],
+        },
+      ];
+
+      const location: LocationCoordinates = { latitude: 37.6895, longitude: 127.0448 };
+      const result = locationService.findNearbyStations(location, transferStations, 2000);
+
+      // 도봉산 should appear only once (closest of the two)
+      const dobongEntries = result.filter(s => s.name === '도봉산');
+      expect(dobongEntries).toHaveLength(1);
+
+      // 수락산 should still appear
+      const surakEntries = result.filter(s => s.name === '수락산');
+      expect(surakEntries).toHaveLength(1);
+    });
+
     it('should use default radius of 1000 meters', () => {
       // This station is very close (0 distance)
       const exactLocation: LocationCoordinates = {

@@ -115,6 +115,24 @@ jest.mock('@/services/train/trainService', () => ({
 let mockGetStation: jest.Mock;
 let mockGetNearbyStations: jest.Mock;
 
+const mockRefreshNearby = jest.fn();
+const mockUseNearbyStations = jest.fn(() => ({
+  nearbyStations: [] as unknown[],
+  loading: false,
+  error: null as string | null,
+  closestStation: null as unknown,
+  lastUpdated: null as Date | null,
+  refresh: mockRefreshNearby,
+  getStationsByCategory: { 'very-close': [], 'close': [], 'nearby': [], 'far': [] },
+  isAtStation: false,
+  getFormattedStations: [],
+  hasLocation: false,
+  searchRadius: 2000,
+}));
+jest.mock('@/hooks/useNearbyStations', () => ({
+  useNearbyStations: () => mockUseNearbyStations(),
+}));
+
 const mockScheduleDepartureAlert = jest.fn();
 jest.mock('@/hooks/useDelayDetection', () => ({
   useDelayDetection: jest.fn(() => ({ delays: [], loading: false, error: null })),
@@ -248,10 +266,23 @@ describe('HomeScreen', () => {
     mockGetStation = trainService.getStation;
     mockGetNearbyStations = trainService.getNearbyStations;
     // Default: permission denied -> triggers loadFavoriteStations path
-    // This is the testable path since __DEV__=true in Jest makes loadNearbyStations early-return
     mockLocationRequest.mockResolvedValue({ status: 'denied' });
     mockGetNearbyStations.mockResolvedValue([]);
     mockGetStation.mockResolvedValue(null);
+    // Reset useNearbyStations mock to default (no stations)
+    mockUseNearbyStations.mockReturnValue({
+      nearbyStations: [],
+      loading: false,
+      error: null,
+      closestStation: null,
+      lastUpdated: null,
+      refresh: mockRefreshNearby,
+      getStationsByCategory: { 'very-close': [], 'close': [], 'nearby': [], 'far': [] },
+      isAtStation: false,
+      getFormattedStations: [],
+      hasLocation: false,
+      searchRadius: 2000,
+    });
   });
 
   // ---------- Rendering ----------
@@ -297,10 +328,36 @@ describe('HomeScreen', () => {
       await waitFor(() => expect(getByText('즐겨찾기에 추가된 역이 없습니다')).toBeTruthy());
     });
 
-    it('shows empty state with permission granted (DEV mode skips nearby)', async () => {
+    it('shows empty state with permission granted but no nearby stations', async () => {
       mockLocationRequest.mockResolvedValue({ status: 'granted' });
       const { getByText } = render(<HomeScreen />);
       await waitFor(() => expect(getByText('주변에 지하철역이 없습니다')).toBeTruthy());
+    });
+
+    it('shows nearby stations from hook when permission granted', async () => {
+      mockLocationRequest.mockResolvedValue({ status: 'granted' });
+      mockUseNearbyStations.mockReturnValue({
+        nearbyStations: [
+          { ...mockStation('nearby-1', '서울역'), distance: 150, bearing: 90 },
+          { ...mockStation('nearby-2', '시청역'), distance: 500, bearing: 180 },
+        ],
+        loading: false,
+        error: null,
+        closestStation: { ...mockStation('nearby-1', '서울역'), distance: 150, bearing: 90 },
+        lastUpdated: new Date(),
+        refresh: mockRefreshNearby,
+        getStationsByCategory: { 'very-close': [], 'close': [], 'nearby': [], 'far': [] },
+        isAtStation: false,
+        getFormattedStations: [],
+        hasLocation: true,
+        searchRadius: 2000,
+      });
+
+      const { getByTestId } = render(<HomeScreen />);
+      await waitFor(() => {
+        expect(getByTestId('station-card-nearby-1')).toBeTruthy();
+        expect(getByTestId('station-card-nearby-2')).toBeTruthy();
+      });
     });
   });
 

@@ -119,11 +119,25 @@ describe('DelayReportForm', () => {
   });
 
   it('renders close button when onCancel is provided', () => {
-    const { toJSON } = render(
+    const { getByTestId } = render(
       <DelayReportForm onCancel={mockOnCancel} />,
     );
-    // The component renders an X icon when onCancel is provided
-    expect(toJSON()).toBeTruthy();
+    const closeButton = getByTestId('close-button');
+    expect(closeButton).toBeTruthy();
+  });
+
+  it('calls onCancel when close button is pressed', () => {
+    const { getByTestId } = render(
+      <DelayReportForm onCancel={mockOnCancel} />,
+    );
+    const closeButton = getByTestId('close-button');
+    fireEvent.press(closeButton);
+    expect(mockOnCancel).toHaveBeenCalled();
+  });
+
+  it('does not render close button when onCancel is not provided', () => {
+    const { queryByTestId } = render(<DelayReportForm />);
+    expect(queryByTestId('close-button')).toBeFalsy();
   });
 
   it('pre-fills station name when provided', () => {

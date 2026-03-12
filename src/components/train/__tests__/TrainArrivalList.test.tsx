@@ -8,7 +8,7 @@ import { TrainArrivalList } from '../TrainArrivalList';
 import { trainService } from '../../../services/train/trainService';
 import { seoulSubwayApi } from '../../../services/api/seoulSubwayApi';
 import { performanceMonitor } from '../../../utils/performanceUtils';
-import { TrainStatus } from '../../../models/train';
+import { TrainStatus, Train } from '../../../models/train';
 
 // Mock the train service
 jest.mock('../../../services/train/trainService', () => ({
@@ -38,10 +38,9 @@ const mockTrainService = trainService as jest.Mocked<typeof trainService>;
 const mockSeoulSubwayApi = seoulSubwayApi as jest.Mocked<typeof seoulSubwayApi>;
 
 describe('TrainArrivalList', () => {
-  const mockTrains = [
+  const mockTrains: Train[] = [
     {
       id: 'train-1',
-      stationId: 'station-1',
       direction: 'up' as const,
       arrivalTime: new Date(Date.now() + 2 * 60 * 1000), // 2 minutes from now
       delayMinutes: 0,
@@ -54,7 +53,6 @@ describe('TrainArrivalList', () => {
     },
     {
       id: 'train-2',
-      stationId: 'station-1',
       direction: 'down' as const,
       arrivalTime: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes from now
       delayMinutes: 2,
@@ -79,7 +77,7 @@ describe('TrainArrivalList', () => {
       transfers: [],
     });
     // Default for subscribeToTrainUpdates - returns unsubscribe function
-    mockTrainService.subscribeToTrainUpdates.mockImplementation(() => jest.fn());
+    mockTrainService.subscribeToTrainUpdates.mockReturnValue(jest.fn());
   });
 
   describe('Loading State', () => {
@@ -322,7 +320,7 @@ describe('TrainArrivalList', () => {
   describe('Status Badges - All Status Types', () => {
     it('should display NORMAL status badge', async () => {
       mockTrainService.subscribeToTrainUpdates.mockImplementation((_stationId, callback) => {
-        callback([mockTrains[0]]); // NORMAL status
+        callback([mockTrains[0]!]); // NORMAL status
         return jest.fn();
       });
 
@@ -337,7 +335,7 @@ describe('TrainArrivalList', () => {
 
     it('should display DELAYED status badge', async () => {
       mockTrainService.subscribeToTrainUpdates.mockImplementation((_stationId, callback) => {
-        callback([mockTrains[1]]); // DELAYED status
+        callback([mockTrains[1]!]); // DELAYED status
         return jest.fn();
       });
 
@@ -352,7 +350,7 @@ describe('TrainArrivalList', () => {
 
     it('should display SUSPENDED status badge', async () => {
       const suspendedTrain = {
-        ...mockTrains[0],
+        ...mockTrains[0]!,
         status: TrainStatus.SUSPENDED,
       };
 
@@ -374,7 +372,7 @@ describe('TrainArrivalList', () => {
 
     it('should display MAINTENANCE status badge', async () => {
       const maintenanceTrain = {
-        ...mockTrains[0],
+        ...mockTrains[0]!,
         status: TrainStatus.MAINTENANCE,
       };
 
@@ -394,7 +392,7 @@ describe('TrainArrivalList', () => {
 
     it('should display EMERGENCY status badge', async () => {
       const emergencyTrain = {
-        ...mockTrains[0],
+        ...mockTrains[0]!,
         status: TrainStatus.EMERGENCY,
       };
 
@@ -414,7 +412,7 @@ describe('TrainArrivalList', () => {
 
     it('should handle unknown status gracefully', async () => {
       const unknownStatusTrain = {
-        ...mockTrains[0],
+        ...mockTrains[0]!,
         status: 'unknown' as TrainStatus,
       };
 
@@ -436,7 +434,7 @@ describe('TrainArrivalList', () => {
   describe('Arrival Time Formatting', () => {
     it('should show "도착" when arrival time has passed', async () => {
       const arrivedTrain = {
-        ...mockTrains[0],
+        ...mockTrains[0]!,
         arrivalTime: new Date(Date.now() - 1000), // 1 second in the past
       };
 
@@ -456,7 +454,7 @@ describe('TrainArrivalList', () => {
 
     it('should show "1분 후" for 1 minute arrival', async () => {
       const oneMinuteTrain = {
-        ...mockTrains[0],
+        ...mockTrains[0]!,
         arrivalTime: new Date(Date.now() + 60 * 1000), // 1 minute
       };
 
@@ -476,7 +474,7 @@ describe('TrainArrivalList', () => {
 
     it('should show "정보없음" when arrivalTime is null', async () => {
       const noTimeTrain = {
-        ...mockTrains[0],
+        ...mockTrains[0]!,
         arrivalTime: null,
       };
 
@@ -496,7 +494,7 @@ describe('TrainArrivalList', () => {
 
     it('should round up arrival minutes correctly', async () => {
       const train = {
-        ...mockTrains[0],
+        ...mockTrains[0]!,
         arrivalTime: new Date(Date.now() + 3 * 60 * 1000 + 45 * 1000), // 3:45
       };
 
@@ -519,19 +517,19 @@ describe('TrainArrivalList', () => {
     it('should sort trains by arrival time', async () => {
       const trainsToSort = [
         {
-          ...mockTrains[0],
+          ...mockTrains[0]!,
           id: 'train-10',
           arrivalTime: new Date(Date.now() + 10 * 60 * 1000),
           finalDestination: '역10',
         },
         {
-          ...mockTrains[0],
+          ...mockTrains[0]!,
           id: 'train-5',
           arrivalTime: new Date(Date.now() + 5 * 60 * 1000),
           finalDestination: '역5',
         },
         {
-          ...mockTrains[0],
+          ...mockTrains[0]!,
           id: 'train-15',
           arrivalTime: new Date(Date.now() + 15 * 60 * 1000),
           finalDestination: '역15',
@@ -561,7 +559,7 @@ describe('TrainArrivalList', () => {
   describe('Delay Display', () => {
     it('should not display delay text when delayMinutes is 0', async () => {
       const noDelayTrain = {
-        ...mockTrains[0],
+        ...mockTrains[0]!,
         delayMinutes: 0,
       };
 
@@ -581,7 +579,7 @@ describe('TrainArrivalList', () => {
 
     it('should display delay text when delayMinutes > 0', async () => {
       const delayedTrain = {
-        ...mockTrains[1], // This has delayMinutes: 2
+        ...mockTrains[1]!, // This has delayMinutes: 2
         delayMinutes: 3,
       };
 
@@ -698,7 +696,7 @@ describe('TrainArrivalList', () => {
       jest.useRealTimers();
     });
 
-    it('should set up polling interval when subscribing', () => {
+    it('should set up polling interval when subscribing', async () => {
       mockTrainService.subscribeToTrainUpdates.mockImplementation(() => jest.fn());
       mockTrainService.getStation.mockResolvedValue({
         id: 'station-1',
@@ -712,8 +710,10 @@ describe('TrainArrivalList', () => {
 
       render(<TrainArrivalList stationId="station-1" />);
 
-      // Polling should be set up
-      expect(mockSeoulSubwayApi.getRealtimeArrival).toHaveBeenCalled();
+      // Polling should be set up (async call)
+      await waitFor(() => {
+        expect(mockSeoulSubwayApi.getRealtimeArrival).toHaveBeenCalled();
+      });
     });
   });
 
@@ -814,7 +814,7 @@ describe('TrainArrivalList', () => {
       });
       mockSeoulSubwayApi.getRealtimeArrival.mockResolvedValue(apiResponse as any);
 
-      const { getByText } = render(
+      render(
         <TrainArrivalList stationId="station-1" />
       );
 
@@ -850,7 +850,7 @@ describe('TrainArrivalList', () => {
       });
       mockSeoulSubwayApi.getRealtimeArrival.mockResolvedValue(apiResponse as any);
 
-      const { getByText } = render(
+      render(
         <TrainArrivalList stationId="station-1" />
       );
 
@@ -987,7 +987,7 @@ describe('TrainArrivalList', () => {
 
     it('should display nextStationId loading message when present', async () => {
       const trainWithNextStation = {
-        ...mockTrains[0],
+        ...mockTrains[0]!,
         nextStationId: 'station-2',
       };
 
@@ -1066,7 +1066,7 @@ describe('TrainArrivalList', () => {
 
     it('should handle very large delay values', async () => {
       const delayedTrain = {
-        ...mockTrains[0],
+        ...mockTrains[0]!,
         delayMinutes: 999,
       };
 

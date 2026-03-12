@@ -7,6 +7,13 @@ import { useTrainSchedule } from '../useTrainSchedule';
 import { seoulSubwayApi } from '@/services/api/seoulSubwayApi';
 import { findStationCdByNameAndLine } from '@/services/data/stationsDataService';
 
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  getItem: jest.fn().mockResolvedValue(null),
+  setItem: jest.fn().mockResolvedValue(undefined),
+  removeItem: jest.fn().mockResolvedValue(undefined),
+  clear: jest.fn().mockResolvedValue(undefined),
+}));
+
 jest.mock('@/services/api/seoulSubwayApi', () => ({
   seoulSubwayApi: {
     getStationTimetable: jest.fn().mockResolvedValue([]),

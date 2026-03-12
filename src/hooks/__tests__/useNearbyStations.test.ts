@@ -17,12 +17,6 @@ jest.mock('../../services/location/locationService');
 jest.mock('../../services/train/trainService');
 jest.mock('../useLocation');
 
-// Disable test stations mode for unit tests
-jest.mock('../../data/testStations', () => ({
-  USE_TEST_STATIONS: false,
-  TEST_STATIONS: [],
-}));
-
 const mockLocationService = locationService as jest.Mocked<typeof locationService>;
 const mockTrainService = trainService as jest.Mocked<typeof trainService>;
 const mockUseLocation = useLocation as jest.MockedFunction<typeof useLocation>;
@@ -86,12 +80,16 @@ describe('useNearbyStations', () => {
       createMockStation('station-3', '선릉역', '2'),
     ]);
 
-    // Default mock for locationService
-    mockLocationService.findNearbyStations.mockReturnValue([
-      createMockNearbyStation('station-1', '강남역', 100),
-      createMockNearbyStation('station-2', '역삼역', 300),
-      createMockNearbyStation('station-3', '선릉역', 800),
-    ]);
+    // Default mock for locationService (adaptive radius)
+    mockLocationService.findNearbyStationsAdaptive.mockReturnValue({
+      stations: [
+        createMockNearbyStation('station-1', '강남역', 100),
+        createMockNearbyStation('station-2', '역삼역', 300),
+        createMockNearbyStation('station-3', '선릉역', 800),
+      ],
+      effectiveRadius: 1000,
+      expanded: false,
+    });
     mockLocationService.getDistanceCategory.mockReturnValue('close');
     mockLocationService.formatDistance.mockReturnValue('100m');
   });
@@ -151,9 +149,10 @@ describe('useNearbyStations', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      expect(mockLocationService.findNearbyStations).toHaveBeenCalledWith(
+      expect(mockLocationService.findNearbyStationsAdaptive).toHaveBeenCalledWith(
         mockLocation,
         expect.any(Array),
+        expect.any(Number),
         expect.any(Number)
       );
     });
@@ -164,22 +163,27 @@ describe('useNearbyStations', () => {
       renderHook(() => useNearbyStations({ radius: 500 }));
 
       await waitFor(() => {
-        expect(mockLocationService.findNearbyStations).toHaveBeenCalledWith(
+        expect(mockLocationService.findNearbyStationsAdaptive).toHaveBeenCalledWith(
           expect.any(Object),
           expect.any(Array),
-          500
+          500,
+          expect.any(Number)
         );
       });
     });
 
     it('should limit results to maxStations', async () => {
-      mockLocationService.findNearbyStations.mockReturnValue([
-        createMockNearbyStation('1', '역1', 100),
-        createMockNearbyStation('2', '역2', 200),
-        createMockNearbyStation('3', '역3', 300),
-        createMockNearbyStation('4', '역4', 400),
-        createMockNearbyStation('5', '역5', 500),
-      ]);
+      mockLocationService.findNearbyStationsAdaptive.mockReturnValue({
+        stations: [
+          createMockNearbyStation('1', '역1', 100),
+          createMockNearbyStation('2', '역2', 200),
+          createMockNearbyStation('3', '역3', 300),
+          createMockNearbyStation('4', '역4', 400),
+          createMockNearbyStation('5', '역5', 500),
+        ],
+        effectiveRadius: 1000,
+        expanded: false,
+      });
 
       const { result } = renderHook(() =>
         useNearbyStations({ maxStations: 3 })
@@ -229,13 +233,13 @@ describe('useNearbyStations', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      mockLocationService.findNearbyStations.mockClear();
+      mockLocationService.findNearbyStationsAdaptive.mockClear();
 
       await act(async () => {
         result.current.refresh();
       });
 
-      expect(mockLocationService.findNearbyStations).toHaveBeenCalled();
+      expect(mockLocationService.findNearbyStationsAdaptive).toHaveBeenCalled();
     });
   });
 
@@ -249,7 +253,7 @@ describe('useNearbyStations', () => {
         expect(result.current.loading).toBe(false);
       });
 
-      const initialCallCount = mockLocationService.findNearbyStations.mock.calls.length;
+      const initialCallCount = mockLocationService.findNearbyStationsAdaptive.mock.calls.length;
 
       // Try to update within throttle window
       await act(async () => {
@@ -257,7 +261,7 @@ describe('useNearbyStations', () => {
       });
 
       // Should not have called again (within throttle window)
-      expect(mockLocationService.findNearbyStations.mock.calls.length).toBe(initialCallCount);
+      expect(mockLocationService.findNearbyStationsAdaptive.mock.calls.length).toBe(initialCallCount);
     });
   });
 
@@ -281,9 +285,13 @@ describe('useNearbyStations', () => {
     });
 
     it('isAtStation should be true when within 100m', async () => {
-      mockLocationService.findNearbyStations.mockReturnValue([
-        createMockNearbyStation('station-1', '강남역', 50), // Within 100m
-      ]);
+      mockLocationService.findNearbyStationsAdaptive.mockReturnValue({
+        stations: [
+          createMockNearbyStation('station-1', '강남역', 50), // Within 100m
+        ],
+        effectiveRadius: 1000,
+        expanded: false,
+      });
 
       const { result } = renderHook(() => useNearbyStations());
 
@@ -295,10 +303,14 @@ describe('useNearbyStations', () => {
     });
 
     it('isAtStation should be false when all stations > 100m', async () => {
-      mockLocationService.findNearbyStations.mockReturnValue([
-        createMockNearbyStation('station-1', '강남역', 150),
-        createMockNearbyStation('station-2', '역삼역', 300),
-      ]);
+      mockLocationService.findNearbyStationsAdaptive.mockReturnValue({
+        stations: [
+          createMockNearbyStation('station-1', '강남역', 150),
+          createMockNearbyStation('station-2', '역삼역', 300),
+        ],
+        effectiveRadius: 1000,
+        expanded: false,
+      });
 
       const { result } = renderHook(() => useNearbyStations());
 
@@ -334,10 +346,21 @@ describe('useNearbyStations', () => {
       expect(result.current.hasLocation).toBe(true);
     });
 
-    it('searchRadius should reflect radius option', () => {
-      const { result } = renderHook(() => useNearbyStations({ radius: 2000 }));
+    it('searchRadius should reflect effective radius after search', async () => {
+      mockLocationService.findNearbyStationsAdaptive.mockReturnValue({
+        stations: [createMockNearbyStation('station-1', '강남역', 100)],
+        effectiveRadius: 1500,
+        expanded: true,
+      });
 
-      expect(result.current.searchRadius).toBe(2000);
+      const { result } = renderHook(() => useNearbyStations({ radius: 1000 }));
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      expect(result.current.searchRadius).toBe(1500);
+      expect(result.current.radiusExpanded).toBe(true);
     });
   });
 
@@ -379,8 +402,8 @@ describe('useNearbyStations', () => {
       });
     });
 
-    it('should handle findNearbyStations error', async () => {
-      mockLocationService.findNearbyStations.mockImplementation(() => {
+    it('should handle findNearbyStationsAdaptive error', async () => {
+      mockLocationService.findNearbyStationsAdaptive.mockImplementation(() => {
         throw new Error('Find error');
       });
 
@@ -388,6 +411,109 @@ describe('useNearbyStations', () => {
 
       await waitFor(() => {
         expect(result.current.error).toContain('주변 역');
+      });
+    });
+  });
+
+  describe('External Location', () => {
+    it('should use externalLocation for nearby station search', async () => {
+      const externalLocation = { latitude: 37.554700, longitude: 126.970600 };
+
+      // Set internal GPS to null to confirm externalLocation is used
+      mockUseLocation.mockReturnValue({
+        location: null,
+        loading: false,
+        error: null,
+        hasPermission: true,
+        hasBackgroundPermission: false,
+        isTracking: false,
+        trackingMode: 'normal',
+        accuracy: null,
+        getCurrentLocation: jest.fn(),
+        startTracking: jest.fn(),
+        startBatteryEfficientTracking: jest.fn(),
+        startHighAccuracyTracking: jest.fn(),
+        stopTracking: jest.fn(),
+        checkLocationServices: jest.fn(),
+        initializeLocation: jest.fn(),
+        requestBackgroundPermission: jest.fn(),
+      });
+
+      const { result } = renderHook(() =>
+        useNearbyStations({ externalLocation })
+      );
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      expect(mockLocationService.findNearbyStationsAdaptive).toHaveBeenCalledWith(
+        externalLocation,
+        expect.any(Array),
+        expect.any(Number),
+        expect.any(Number)
+      );
+      expect(result.current.hasLocation).toBe(true);
+    });
+
+    it('should not show locationLoading when externalLocation is provided', () => {
+      const externalLocation = { latitude: 37.554700, longitude: 126.970600 };
+
+      // Internal useLocation reports loading=true, but externalLocation overrides
+      mockUseLocation.mockReturnValue({
+        location: null,
+        loading: true,
+        error: null,
+        hasPermission: true,
+        hasBackgroundPermission: false,
+        isTracking: false,
+        trackingMode: 'normal',
+        accuracy: null,
+        getCurrentLocation: jest.fn(),
+        startTracking: jest.fn(),
+        startBatteryEfficientTracking: jest.fn(),
+        startHighAccuracyTracking: jest.fn(),
+        stopTracking: jest.fn(),
+        checkLocationServices: jest.fn(),
+        initializeLocation: jest.fn(),
+        requestBackgroundPermission: jest.fn(),
+      });
+
+      const { result } = renderHook(() =>
+        useNearbyStations({ externalLocation })
+      );
+
+      // loading should reflect state.loading, NOT locationLoading
+      // state.loading starts true, but should NOT be compounded by locationLoading
+      expect(result.current.loading).toBe(true); // state.loading is initially true
+    });
+
+    it('should call getCurrentLocation as fallback when no location sources available', async () => {
+      const mockGetCurrentLocation = jest.fn();
+
+      mockUseLocation.mockReturnValue({
+        location: null,
+        loading: false,
+        error: null,
+        hasPermission: true,
+        hasBackgroundPermission: false,
+        isTracking: false,
+        trackingMode: 'normal',
+        accuracy: null,
+        getCurrentLocation: mockGetCurrentLocation,
+        startTracking: jest.fn(),
+        startBatteryEfficientTracking: jest.fn(),
+        startHighAccuracyTracking: jest.fn(),
+        stopTracking: jest.fn(),
+        checkLocationServices: jest.fn(),
+        initializeLocation: jest.fn(),
+        requestBackgroundPermission: jest.fn(),
+      });
+
+      renderHook(() => useNearbyStations());
+
+      await waitFor(() => {
+        expect(mockGetCurrentLocation).toHaveBeenCalled();
       });
     });
   });
@@ -420,8 +546,8 @@ describe('useNearbyStations', () => {
         expect(result.current.hasLocation).toBe(false);
       });
 
-      // Should not have called findNearbyStations with location
-      expect(mockLocationService.findNearbyStations).not.toHaveBeenCalled();
+      // Should not have called findNearbyStationsAdaptive with location
+      expect(mockLocationService.findNearbyStationsAdaptive).not.toHaveBeenCalled();
     });
   });
 });

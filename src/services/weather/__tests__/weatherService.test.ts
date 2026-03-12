@@ -20,10 +20,10 @@ const service = weatherService as unknown as {
   isCacheValid: () => boolean;
   calculateImpact: (weather: unknown) => unknown;
   initialize: () => Promise<void>;
-  getCurrentWeather: () => Promise<unknown>;
+  getCurrentWeather: (location?: { latitude: number; longitude: number }) => Promise<unknown>;
   getWeatherCondition: () => Promise<string>;
   getWeatherImpact: () => Promise<unknown>;
-  getForecast: (days?: number) => Promise<unknown[]>;
+  getForecast: (days?: number, location?: { latitude: number; longitude: number }) => Promise<unknown[]>;
   shouldAlertForWeather: () => Promise<{ shouldAlert: boolean; message?: string }>;
   getWeatherIcon: (condition: string) => string;
   getWeatherDescription: (condition: string) => string;
@@ -108,7 +108,7 @@ describe('weatherService', () => {
         }),
       });
 
-      const result = await service.getCurrentWeather();
+      const result = await service.getCurrentWeather({ latitude: 37.5, longitude: 127.0 });
       expect(result).toBeDefined();
       expect(global.fetch).toHaveBeenCalled();
     });
@@ -266,7 +266,7 @@ describe('weatherService', () => {
         }),
       });
 
-      const forecast = await service.getForecast(2);
+      const forecast = await service.getForecast(2, { latitude: 37.5, longitude: 127.0 });
       expect(forecast).toHaveLength(2);
     });
 
