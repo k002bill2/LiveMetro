@@ -125,3 +125,6 @@ apps/
 
 # Claude Code backups
 .claude/backups/
+
+# Serena MCP
+.serena/
