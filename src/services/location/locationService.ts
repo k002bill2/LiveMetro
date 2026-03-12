@@ -385,7 +385,7 @@ class LocationService {
   findNearbyStationsAdaptive(
     currentLocation: LocationCoordinates,
     allStations: Station[],
-    initialRadius: number = ADAPTIVE_RADIUS_STEPS[0],
+    initialRadius: number = ADAPTIVE_RADIUS_STEPS[0] ?? 1000,
     minStations: number = ADAPTIVE_MIN_STATIONS
   ): AdaptiveRadiusResult {
     // Build step list: ensure initialRadius is included, then add larger steps
@@ -408,7 +408,7 @@ class LocationService {
     // Fallback (should not reach here due to loop logic)
     return {
       stations: this.findNearbyStations(currentLocation, allStations, steps[steps.length - 1]),
-      effectiveRadius: steps[steps.length - 1],
+      effectiveRadius: steps[steps.length - 1] ?? initialRadius,
       expanded: true,
     };
   }

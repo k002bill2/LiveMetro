@@ -8,6 +8,7 @@
 // Set environment variable for API key BEFORE module import
 process.env.EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY = 'test-api-key-1';
 process.env.EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY_2 = 'test-api-key-2';
+process.env.EXPO_PUBLIC_DATA_PORTAL_API_KEY = 'test-data-portal-key';
 
 // Reset module registry BEFORE any imports
 jest.resetModules();
