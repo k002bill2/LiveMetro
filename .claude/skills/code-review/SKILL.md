@@ -1,19 +1,7 @@
 ---
 name: code-review
 description: Systematic code review with security, performance, and type safety checklists. Use when reviewing code changes, PRs, or before committing.
-type: workflow
-priority: high
-version: 1.0
-triggers:
-  keywords:
-    - review
-    - code review
-    - 리뷰
-    - 코드 리뷰
-    - PR review
-  patterns:
-    - "(review|check|inspect).*?(code|changes|PR)"
-    - "(코드|변경).*?리뷰"
+allowed-tools: Read, Grep, Glob, Bash(git diff*), Bash(git log*)
 ---
 
 # Code Review Skill

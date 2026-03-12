@@ -1,24 +1,6 @@
 ---
 name: test-automation
 description: Generate comprehensive Jest tests for LiveMetro React Native components, hooks, and services. Use when writing tests, improving coverage, or test-driven development.
-type: skill
-enforcement: suggest
-priority: high
-triggers:
-  keywords:
-    - test
-    - jest
-    - coverage
-    - tdd
-    - testing library
-  patterns:
-    - "(write|add|create).*?test"
-    - "(run|check).*?coverage"
-    - "test.*?(component|hook|service)"
-  files:
-    - "**/__tests__/**"
-    - "**/*.test.ts"
-    - "**/*.test.tsx"
 ---
 
 # Test Automation Skill (LiveMetro)

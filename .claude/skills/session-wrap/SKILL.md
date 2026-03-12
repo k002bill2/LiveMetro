@@ -1,7 +1,7 @@
 ---
 name: session-wrap
 description: 세션 종료 시 4개 병렬 에이전트로 문서/패턴/학습/후속작업을 자동 정리하는 스킬
-tags: [session, wrap, cleanup, documentation, learning]
+disable-model-invocation: true
 ---
 
 # Session Wrap Skill
