@@ -275,10 +275,10 @@ class SeoulSubwayApiService {
         if (data.errorMessage) {
           const errorCode = data.errorMessage.code;
 
-          // INFO-000 means "success but no data" - return empty array
+          // INFO-000 means success - return data if available
           if (errorCode === 'INFO-000') {
             this.keyManager.reportSuccess(apiKey);
-            return [];
+            return data.realtimeArrivalList || [];
           }
 
           // Rate limit error - immediately switch to another key

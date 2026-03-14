@@ -3,7 +3,7 @@
  * Interactive Seoul subway line map with station selection
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -11,11 +11,17 @@ import {
   TouchableOpacity,
   StyleSheet,
   Modal,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { getSubwayLineColor, getLineTextColor } from '@utils/colorUtils';
 import { getLocalStationsByLine } from '@services/data/stationsDataService';
+import { useFavorites } from '@hooks/useFavorites';
+import type { Station } from '@models/train';
+import type { AppStackParamList } from '@navigation/types';
 
 interface StationDisplay {
   readonly id: string;
@@ -23,6 +29,7 @@ interface StationDisplay {
   readonly nameEn: string;
   readonly isTransfer: boolean;
   readonly transferLines: readonly string[];
+  readonly originalStation: Station;
 }
 
 interface SubwayLineData {
@@ -99,6 +106,7 @@ const buildSubwayLines = (): SubwayLineData[] => {
         nameEn: station.nameEn,
         isTransfer: otherLines.length > 0,
         transferLines: otherLines,
+        originalStation: station,
       };
     });
 
@@ -110,21 +118,49 @@ const buildSubwayLines = (): SubwayLineData[] => {
   });
 };
 
+type NavigationProp = NativeStackNavigationProp<AppStackParamList>;
+
 export const SubwayMapScreen: React.FC = () => {
+  const navigation = useNavigation<NavigationProp>();
+  const { toggleFavorite, isFavorite } = useFavorites();
   const subwayLines = useMemo(() => buildSubwayLines(), []);
   const [selectedLine, setSelectedLine] = useState<string | null>('2');
   const [selectedStation, setSelectedStation] = useState<StationDisplay | null>(null);
   const [showStationModal, setShowStationModal] = useState(false);
 
-  const handleLineSelect = (lineId: string) => {
+  const handleLineSelect = (lineId: string): void => {
     setSelectedLine(lineId);
   };
 
-  const handleStationPress = (station: StationDisplay) => {
+  const handleStationPress = (station: StationDisplay): void => {
     setSelectedStation(station);
     setShowStationModal(true);
   };
 
+  const handleViewArrival = useCallback((): void => {
+    if (!selectedStation || !selectedLine) return;
+    setShowStationModal(false);
+    navigation.navigate('StationDetail', {
+      stationId: selectedStation.id,
+      stationName: selectedStation.name,
+      lineId: selectedLine,
+    });
+  }, [selectedStation, selectedLine, navigation]);
+
+  const handleToggleFavorite = useCallback(async (): Promise<void> => {
+    if (!selectedStation) return;
+    try {
+      await toggleFavorite(selectedStation.originalStation);
+      setShowStationModal(false);
+    } catch (error) {
+      Alert.alert(
+        '알림',
+        error instanceof Error ? error.message : '즐겨찾기 처리에 실패했습니다.'
+      );
+    }
+  }, [selectedStation, toggleFavorite]);
+
+  const isStationFavorite = selectedStation ? isFavorite(selectedStation.id) : false;
   const selectedLineData = subwayLines.find(line => line.id === selectedLine);
 
   return (
@@ -337,11 +373,10 @@ export const SubwayMapScreen: React.FC = () => {
                   <Text style={styles.modalSectionTitle}>실시간 정보</Text>
                   <TouchableOpacity
                     style={styles.viewArrivalButton}
-                    onPress={() => {
-                      // Navigate to arrival info
-                      setShowStationModal(false);
-                      // TODO: Navigate to HomeScreen with selected station
-                    }}
+                    onPress={handleViewArrival}
+                    accessible
+                    accessibilityRole="button"
+                    accessibilityLabel="도착 정보 보기"
                   >
                     <Ionicons name="train" size={20} color="#2563eb" />
                     <Text style={styles.viewArrivalButtonText}>
@@ -352,15 +387,22 @@ export const SubwayMapScreen: React.FC = () => {
                 </View>
 
                 <TouchableOpacity
-                  style={styles.addFavoriteButton}
-                  onPress={() => {
-                    // TODO: Add to favorites
-                    setShowStationModal(false);
-                  }}
+                  style={[
+                    styles.addFavoriteButton,
+                    isStationFavorite && styles.removeFavoriteButton,
+                  ]}
+                  onPress={handleToggleFavorite}
+                  accessible
+                  accessibilityRole="button"
+                  accessibilityLabel={isStationFavorite ? '즐겨찾기 제거' : '즐겨찾기 추가'}
                 >
-                  <Ionicons name="heart-outline" size={20} color="#ffffff" />
+                  <Ionicons
+                    name={isStationFavorite ? 'heart' : 'heart-outline'}
+                    size={20}
+                    color="#ffffff"
+                  />
                   <Text style={styles.addFavoriteButtonText}>
-                    즐겨찾기 추가
+                    {isStationFavorite ? '즐겨찾기 제거' : '즐겨찾기 추가'}
                   </Text>
                 </TouchableOpacity>
               </>
@@ -561,5 +603,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: '#ffffff',
+  },
+  removeFavoriteButton: {
+    backgroundColor: '#ef4444',
   },
 });
