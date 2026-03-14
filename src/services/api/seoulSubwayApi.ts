@@ -79,9 +79,9 @@ async function withRetry<T>(
   } = {}
 ): Promise<T> {
   const {
-    maxAttempts = 3,
-    initialDelayMs = 1000,
-    maxDelayMs = 10000,
+    maxAttempts = 2,
+    initialDelayMs = 500,
+    maxDelayMs = 3000,
     backoffMultiplier = 2,
   } = options;
 
@@ -198,7 +198,7 @@ interface SeoulTimetableResponse {
 
 class SeoulSubwayApiService {
   private readonly baseUrl: string;
-  private readonly timeout: number = 10000;
+  private readonly timeout: number = 5000;
   private readonly rateLimiter: RateLimiter;
   private readonly keyManager: ApiKeyManager;
   private readonly timetableKeyManager: ApiKeyManager;

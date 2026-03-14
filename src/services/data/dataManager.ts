@@ -87,26 +87,33 @@ class DataManager {
       const stationId = localStation?.id;
 
       if (stationId) {
-        // Try Firebase with the correct station ID
+        // Try Firebase with the correct station ID (5-second timeout)
         const firebaseStation = await trainService.getStation(stationId);
         if (firebaseStation) {
-          return new Promise((resolve) => {
-            const unsubscribe = trainService.subscribeToTrainUpdates(
-              firebaseStation.id,
-              (trains) => {
-                unsubscribe(); // One-time fetch
-                const result: RealtimeTrainData = {
-                  stationId: firebaseStation.id,
-                  trains,
-                  lastUpdated: new Date()
-                };
-
-                // Cache Firebase data
-                this.setCachedData(cacheKey, result, this.DEFAULT_CACHE_DURATION);
-                resolve(result);
-              }
-            );
-          });
+          const FIREBASE_TIMEOUT_MS = 5000;
+          const result = await Promise.race([
+            new Promise<RealtimeTrainData>((resolve) => {
+              const unsubscribe = trainService.subscribeToTrainUpdates(
+                firebaseStation.id,
+                (trains) => {
+                  unsubscribe();
+                  const data: RealtimeTrainData = {
+                    stationId: firebaseStation.id,
+                    trains,
+                    lastUpdated: new Date()
+                  };
+                  this.setCachedData(cacheKey, data, this.DEFAULT_CACHE_DURATION);
+                  resolve(data);
+                }
+              );
+              // Cleanup on timeout
+              setTimeout(() => unsubscribe(), FIREBASE_TIMEOUT_MS);
+            }),
+            new Promise<null>((resolve) =>
+              setTimeout(() => resolve(null), FIREBASE_TIMEOUT_MS)
+            ),
+          ]);
+          if (result) return result;
         }
       }
     } catch (error) {

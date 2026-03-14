@@ -291,6 +291,11 @@ export function createPublicDataApiKeyManager(
   const keys = [
     process.env.EXPO_PUBLIC_DATA_PORTAL_API_KEY,
     process.env.EXPO_PUBLIC_DATA_PORTAL_API_KEY_2,
+    // Fallback: Seoul subway API keys work with openapi.seoul.go.kr too
+    ...(!process.env.EXPO_PUBLIC_DATA_PORTAL_API_KEY ? [
+      process.env.EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY,
+      process.env.EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY_2,
+    ] : []),
   ].filter((key): key is string => !!key);
 
   return new ApiKeyManager(keys, options);
