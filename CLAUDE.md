@@ -49,14 +49,21 @@ State: AuthContext + Custom Hooks (no Redux)
 
 **Use path aliases, not relative imports.**
 
-## Critical Rules
+## Project Rules (`.claude/rules/`)
 
-1. **TypeScript strict mode** - no `any`, explicit return types
-2. **Cleanup subscriptions** in useEffect return functions
-3. **Seoul API** - 30s minimum polling interval
-4. **Coverage thresholds**: 75% statements, 70% functions, 60% branches
-5. **Error handling** - return empty arrays/null instead of throwing
-6. **Surgical Changes** - 요청한 것만 변경. 관련 없는 파일을 리팩토링하거나, 요청하지 않은 "개선"을 하지 않음. 부수 변경이 필요하면 명시적으로 사용자에게 확인
+프로젝트 전용 규칙 7개가 항상 로드됩니다:
+
+| 규칙 파일 | 내용 |
+|-----------|------|
+| `typescript-strict.md` | `any` 금지, 명시적 반환 타입, strict mode |
+| `path-aliases.md` | `@/` alias 필수, 상대 경로 금지 |
+| `subscription-cleanup.md` | useEffect cleanup, onSnapshot 해제, 타이머 정리 |
+| `seoul-api-limits.md` | 30초 최소 폴링, 타임아웃 10초, 캐시 폴백 |
+| `error-handling.md` | 빈 배열/null 반환, throw 지양, ErrorBoundary |
+| `react-native-patterns.md` | StyleSheet.create, memo, FlatList, 접근성 |
+| `coverage-thresholds.md` | Stmt 75%, Fn 70%, Branch 60% |
+
+> 글로벌 규칙(`~/.claude/rules/`)도 함께 적용: surgical changes, DRY/KISS/YAGNI, 보안, 검증
 
 ## Claude Code System Architecture
 
@@ -71,7 +78,7 @@ State: AuthContext + Custom Hooks (no Redux)
 | 3. Agent Model | 에이전트 학습/진화 | `agentMemory.js` + 에이전트 `.md` | **자동 기록** — agentTracer가 완료 시 agent-memory에 기록 |
 | 4. Executive Function | 태스크 분해, HITL 차단 | `task-allocator.js` + `parallelCoordinator.js` | **Hook 강제** — CRITICAL/HIGH 작업 차단, 에이전트 추천 |
 | 5. Cognitive Control | 충돌 방지, 파일 락 (뮤텍스) | `parallelCoordinator.js` + `file-lock-manager.js` | **Hook 강제** — 파일 락, stale 정리, 체크포인트 |
-| 6. Task Prosecution | 42개 스킬 실행 + 피드백 루프 | 개별 에이전트 → feedback-loop → agent-memory | **양방향** — L6→L4(메트릭), L6→L3(학습), L1→L3(Veto) |
+| 6. Task Prosecution | 21개 스킬 + 21개 커맨드 + 피드백 루프 | 개별 에이전트 → feedback-loop → agent-memory | **양방향** — L6→L4(메트릭), L6→L3(학습), L1→L3(Veto) |
 
 **상세**: `.claude/agents/shared/ace-framework.md`
 
@@ -235,7 +242,35 @@ npm test -- --coverage # 3. 테스트 통과 + 커버리지 충족
 
 `.claude/agents/shared/quality-gates.md`
 
-## Skill Routing (필수)
+## Skills 2.0 Three-Tier Architecture
+
+### Commands (`.claude/commands/`) — 21개, 사용자 `/` 호출
+
+| 커맨드 | 용도 |
+|--------|------|
+| `/verify-app` | 타입체크 + 린트 + 테스트 + 빌드 검증 |
+| `/check-health` | 프로젝트 전체 상태 점검 |
+| `/commit-push-pr` | 커밋 → 푸시 → PR 자동화 |
+| `/deploy-with-tests` | 검증 후 배포 |
+| `/review` | 코드 리뷰 (보안/성능/타입 체크리스트) |
+| `/test-coverage` | 커버리지 분석 |
+| `/simplify-code` | 복잡도 분석 및 단순화 |
+| `/draft-commits` | Conventional Commits 초안 |
+| `/start-dev` | Expo dev 서버 시작 |
+| `/gemini-review` | Gemini 크로스 리뷰 |
+| `/gemini-scan` | Gemini 대규모 분석 |
+| `/run-eval` | 평가 태스크 실행 |
+| `/eval-dashboard` | 평가 결과 대시보드 |
+| `/config-backup` | 설정 백업/복원 |
+| `/save-and-compact` | 컨텍스트 저장 + compact |
+| `/session-wrap` | 세션 종료 정리 |
+| `/resume` | 이전 세션 재개 |
+| `/dev-docs` | Dev Docs 시스템 생성 |
+| `/update-dev-docs` | Dev Docs 업데이트 |
+| `/sync-registry` | 레지스트리 동기화 |
+| `/run-workflow` | 워크플로우 실행 |
+
+### Skills (`.claude/skills/`) — 21개, 컨텍스트 기반 on-demand 로드
 
 구현 전 반드시 해당 스킬을 Skill 도구로 호출할 것:
 
@@ -261,7 +296,11 @@ npm test -- --coverage # 3. 테스트 통과 + 커버리지 충족
 | TTS/사운드/진동/접근성 | `audio-accessibility` |
 | 신뢰도/평판/뱃지/사기탐지 | `user-trust-reputation` |
 | 성능 모니터링/헬스체크/크래시 | `monitoring-observability` |
-| 세션 정리/종료 | `session-wrap` |
+| ACE 프레임워크 | `ace-framework` |
+
+### Rules (`.claude/rules/`) — 7개, 항상 로드
+
+위 "Project Rules" 섹션 참조.
 
 ## Coding Guidelines
 
