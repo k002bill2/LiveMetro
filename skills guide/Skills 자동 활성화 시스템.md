@@ -379,7 +379,7 @@ Claude Code 2.1에서는 `.claude/settings.json` 파일에 hooks를 설정합니
       {
         "hooks": [{
           "type": "command",
-          "command": "ts-node .claude/hooks/userPromptSubmit.ts"
+          "command": "ts-node 10.9.2claude/hooks/userPromptSubmit.ts"
         }]
       }
     ],
@@ -387,13 +387,13 @@ Claude Code 2.1에서는 `.claude/settings.json` 파일에 hooks를 설정합니
       {
         "hooks": [{
           "type": "command",
-          "command": "ts-node .claude/hooks/stopEvent.ts"
+          "command": "ts-node 10.9.2claude/hooks/stopEvent.ts"
         }]
       },
       {
         "hooks": [{
           "type": "command",
-          "command": "ts-node .claude/hooks/buildChecker.ts"
+          "command": "ts-node 10.9.2claude/hooks/buildChecker.ts"
         }]
       }
     ],

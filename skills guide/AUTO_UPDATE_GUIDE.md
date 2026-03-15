@@ -348,7 +348,7 @@ touch "skills guide/LIVEMETRO_UPDATE_REPORT.md"
     {
       "name": "React Native",
       "minVersion": "0.70.0",
-      "reason": "expo 54.0.32 호환성"
+      "reason": "expo 55.0.6 호환성"
     },
     {
       "name": "TypeScript",

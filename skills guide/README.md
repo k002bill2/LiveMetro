@@ -87,7 +87,7 @@
 ### LiveMetro 프로젝트
 
 - Seoul Metro 실시간 도착정보 React Native Expo 앱
-- 기술 스택: React Native 0.72, Expo SDK ~49, TypeScript 5.1+, Firebase (Auth/Firestore)
+- 기술 스택: React Native 0.72.10, Expo SDK ~49, TypeScript ^5.1.3+, Firebase (Auth/Firestore)
 - 네비게이션: React Navigation 6.x (BottomTabs)
 - 상태 관리: AuthContext + Custom Hooks (Redux 미사용)
 - 데이터 흐름: Seoul API -> Firebase -> AsyncStorage (Cache)

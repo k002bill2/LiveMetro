@@ -1,7 +1,7 @@
 # Claude Code 완벽 가이드북 2026
 #claude-code #ai-coding #development #guide #livemetro
 
-> 작성일: 2026-03-06 (최신 업데이트)
+> 작성일: 2026-03-15 (최신 업데이트) (최신 업데이트)
 > 환경: macOS (VS Code/Cursor), Git, 단독 개발
 > Claude Code 경험: 초보자 ~ 중급자용
 
@@ -305,7 +305,7 @@ hooks: PostToolUse
 
 ## 기술 스택
 
-- React Native 0.72 + Expo SDK ~49
+- React Native 0.72.10 + Expo SDK ~49
 - TypeScript strict 모드
 - React Navigation 6.x
 - Firebase Auth / Firestore
