@@ -74,7 +74,7 @@ interface AutoVerificationConfig {
 // ============================================================================
 
 const COLLECTIONS = {
-  REPORTS: 'delay_reports',
+  REPORTS: 'delayReports',
   USERS: 'users',
   TRUST_PROFILES: 'user_trust_profiles',
   VERIFICATION_LOG: 'verification_log',
@@ -244,7 +244,7 @@ export const autoVerifyReports = functions
  */
 export const onDelayReportCreated = functions
   .region('asia-northeast3')
-  .firestore.document('delay_reports/{reportId}')
+  .firestore.document('delayReports/{reportId}')
   .onCreate(async (snap, context) => {
     const report = snap.data() as DelayReport;
     const reportId = context.params.reportId;

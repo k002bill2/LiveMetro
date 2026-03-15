@@ -67,7 +67,7 @@ interface CommuteSchedule {
  */
 export const onDelayReportVerified = functions
   .region('asia-northeast3')
-  .firestore.document('delay_reports/{reportId}')
+  .firestore.document('delayReports/{reportId}')
   .onUpdate(async (change, context) => {
     const before = change.before.data() as DelayReport;
     const after = change.after.data() as DelayReport;

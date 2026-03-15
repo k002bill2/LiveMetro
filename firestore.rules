@@ -2,9 +2,25 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users collection - authenticated users can read/write their own data
+
+    // Helper: check if only allowed fields are being modified
+    function onlyUpdates(allowedFields) {
+      return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowedFields);
+    }
+
+    // Users collection - prevent privilege escalation
+    // Users can read/update their own profile, but cannot set role/admin fields
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null && request.auth.uid == userId;
+      allow create: if request.auth != null
+        && request.auth.uid == userId
+        && !('role' in request.resource.data)
+        && !('isAdmin' in request.resource.data);
+      allow update: if request.auth != null
+        && request.auth.uid == userId
+        && !('role' in request.resource.data.diff(resource.data).affectedKeys())
+        && !('isAdmin' in request.resource.data.diff(resource.data).affectedKeys());
+      allow delete: if false;
     }
 
     // Stations - public read, admin write
@@ -39,16 +55,36 @@ service cloud.firestore {
 
     // Favorites - authenticated users only for their own data
     match /favorites/{favoriteId} {
-      allow read, write: if request.auth != null && resource.data.userId == request.auth.uid;
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+      allow read: if request.auth != null && resource.data.userId == request.auth.uid;
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid;
+      allow update: if request.auth != null
+        && resource.data.userId == request.auth.uid
+        && request.resource.data.userId == request.auth.uid;
+      allow delete: if request.auth != null
+        && resource.data.userId == request.auth.uid;
     }
 
-    // Delay Reports - public read, authenticated write
+    // Delay Reports - granular update rules
     match /delayReports/{reportId} {
       allow read: if true;
-      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
-      allow update: if request.auth != null;
-      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+
+      // Only authenticated users can create, must set own userId
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid;
+
+      // Upvote: any authenticated user can update only vote-related fields
+      allow update: if request.auth != null
+        && onlyUpdates(['upvotes', 'upvotedBy', 'updatedAt']);
+
+      // Owner can resolve or update their own report
+      allow update: if request.auth != null
+        && resource.data.userId == request.auth.uid
+        && onlyUpdates(['active', 'resolvedAt', 'updatedAt', 'description', 'severity', 'estimatedDelayMinutes']);
+
+      // Only owner can delete
+      allow delete: if request.auth != null
+        && resource.data.userId == request.auth.uid;
     }
   }
 }
