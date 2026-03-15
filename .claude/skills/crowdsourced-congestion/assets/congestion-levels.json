@@ -1,0 +1,23 @@
+{
+  "_description": "혼잡도 레벨 정의 및 표시 기준. UI 컴포넌트와 히트맵에서 사용.",
+  "levels": [
+    { "value": 1, "label": "여유", "labelEn": "Spacious", "color": "#4CAF50", "emoji": "🟢", "description": "좌석 여유 있음" },
+    { "value": 2, "label": "보통", "labelEn": "Normal", "color": "#8BC34A", "emoji": "🟡", "description": "좌석 일부 사용" },
+    { "value": 3, "label": "약간혼잡", "labelEn": "Slightly Crowded", "color": "#FFC107", "emoji": "🟠", "description": "좌석 대부분 사용, 서있는 승객 있음" },
+    { "value": 4, "label": "혼잡", "labelEn": "Crowded", "color": "#FF9800", "emoji": "🔴", "description": "서있는 승객 많음, 이동 불편" },
+    { "value": 5, "label": "매우혼잡", "labelEn": "Very Crowded", "color": "#F44336", "emoji": "⛔", "description": "승차 어려움, 다음 열차 권장" }
+  ],
+  "heatmapGradient": {
+    "0.0": "#4CAF50",
+    "0.25": "#8BC34A",
+    "0.5": "#FFC107",
+    "0.75": "#FF9800",
+    "1.0": "#F44336"
+  },
+  "reportAggregation": {
+    "windowMinutes": 15,
+    "minReportsForDisplay": 3,
+    "weightByTrustScore": true,
+    "decayHalfLifeMinutes": 10
+  }
+}

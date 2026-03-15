@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/ethicalValidator.js 2>/dev/null || true",
+            "command": "node .claude/hooks/ethicalValidator.js",
             "timeout": 5,
             "statusMessage": "Ethical validation..."
           }

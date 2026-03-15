@@ -10,6 +10,12 @@ allowed-tools: Read, Grep, Glob, Bash(git diff*), Bash(git log*)
 
 Git diff 기반 체계적 코드 리뷰. 보안, 성능, 타입 안전성, LiveMetro 프로젝트 규칙 준수 여부를 검증합니다.
 
+## Checklists
+
+리뷰 시 다음 체크리스트를 참조하세요:
+- `.claude/checklists/code-review.md` - TypeScript, 에러 처리, 성능, 접근성
+- `.claude/checklists/rn-specific.md` - React Native 전용 (useEffect, 네비게이션, 리스트 최적화)
+
 ## When to Use
 
 - 커밋 전 변경사항 검토

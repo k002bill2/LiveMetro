@@ -5,6 +5,11 @@ description: React Native component development with TypeScript, Expo, and React
 
 # React Native Development Guidelines
 
+## Checklists
+
+개발 시 다음 체크리스트를 참조하세요:
+- `.claude/checklists/rn-specific.md` - useEffect, 상태관리, 네비게이션, 리스트/이미지 최적화, Expo 특화
+
 ## When to Use This Skill
 - Creating new React Native components
 - Building screens with navigation

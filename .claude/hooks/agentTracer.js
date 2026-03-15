@@ -18,10 +18,26 @@ const path = require('path');
 
 const TRACE_DIR = '.temp/traces/sessions';
 
-// feedback-loop 제거됨 — 메트릭은 events.jsonl로 직접 기록
-const feedbackLoop = {
-  recordExecutionMetrics: () => ({ success: true })
-};
+// feedback-loop 연동 — 메트릭을 events.jsonl + coordination/feedback에 이중 기록
+let feedbackLoop;
+try {
+  feedbackLoop = require('../coordination/feedback-loop');
+} catch {
+  feedbackLoop = {
+    recordExecutionMetrics: () => ({ success: true })
+  };
+}
+
+// agent-memory 연동 — L6→L3 피드백 루프 (Self-Evolution)
+let agentMemory;
+try {
+  agentMemory = require('../agents/agent-memory/agentMemory');
+} catch {
+  agentMemory = {
+    recordLearning: () => ({}),
+    queryLearnings: () => []
+  };
+}
 
 /**
  * parallel-state.json에서 에이전트 startTime 조회하여 duration 계산
@@ -113,6 +129,22 @@ process.stdin.on('end', () => {
             tools_used: 0,
             success: event.data.success
           }
+        });
+      } catch {}
+
+      // L6→L3 피드백: agent-memory에 학습 기록 (Self-Evolution)
+      try {
+        const agentId = input.tool_input?.subagent_type || 'unknown';
+        agentMemory.recordLearning({
+          agentId,
+          eventType: event.data.success ? 'success' : 'failure',
+          taskContext: description,
+          learning: event.data.success
+            ? `${detectTaskType(description)} 태스크 완료 (${duration}ms)`
+            : `${detectTaskType(description)} 태스크 실패 — 원인 분석 필요`,
+          confidence: event.data.success ? 0.7 : 0.8,
+          tags: [detectTaskType(description), event.data.success ? 'success' : 'failure'],
+          relatedFiles: []
         });
       } catch {}
 

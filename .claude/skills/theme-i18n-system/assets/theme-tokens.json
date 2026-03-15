@@ -1,0 +1,73 @@
+{
+  "_description": "테마 디자인 토큰. ThemeContext 및 StyleSheet에서 사용. 고대비 모드 포함.",
+  "light": {
+    "colors": {
+      "primary": "#1976D2",
+      "primaryDark": "#1565C0",
+      "primaryLight": "#42A5F5",
+      "secondary": "#FF6F00",
+      "background": "#FFFFFF",
+      "surface": "#F5F5F5",
+      "surfaceVariant": "#E0E0E0",
+      "text": "#212121",
+      "textSecondary": "#757575",
+      "textDisabled": "#BDBDBD",
+      "error": "#D32F2F",
+      "warning": "#F57F17",
+      "success": "#388E3C",
+      "info": "#1976D2",
+      "border": "#E0E0E0",
+      "divider": "#EEEEEE",
+      "overlay": "rgba(0,0,0,0.5)"
+    },
+    "lineColors": {
+      "1호선": "#0052A4", "2호선": "#00A84D", "3호선": "#EF7C1C",
+      "4호선": "#00A5DE", "5호선": "#996CAC", "6호선": "#CD7C2F",
+      "7호선": "#747F00", "8호선": "#E6186C", "9호선": "#BDB092",
+      "경의중앙선": "#77C4A3", "분당선": "#F5A200", "신분당선": "#D4003B",
+      "공항철도": "#0090D2", "경춘선": "#0C8E72"
+    }
+  },
+  "dark": {
+    "colors": {
+      "primary": "#64B5F6",
+      "primaryDark": "#42A5F5",
+      "primaryLight": "#90CAF9",
+      "secondary": "#FFB74D",
+      "background": "#121212",
+      "surface": "#1E1E1E",
+      "surfaceVariant": "#2C2C2C",
+      "text": "#E0E0E0",
+      "textSecondary": "#9E9E9E",
+      "textDisabled": "#616161",
+      "error": "#EF5350",
+      "warning": "#FFB300",
+      "success": "#66BB6A",
+      "info": "#64B5F6",
+      "border": "#424242",
+      "divider": "#2C2C2C",
+      "overlay": "rgba(0,0,0,0.7)"
+    }
+  },
+  "highContrast": {
+    "colors": {
+      "primary": "#FFFFFF",
+      "background": "#000000",
+      "surface": "#1A1A1A",
+      "text": "#FFFFFF",
+      "textSecondary": "#CCCCCC",
+      "error": "#FF4444",
+      "border": "#FFFFFF"
+    },
+    "note": "WCAG AAA 기준 7:1 대비 비율 충족"
+  },
+  "typography": {
+    "fontFamily": { "default": "System", "monospace": "Courier" },
+    "fontSize": {
+      "xs": 10, "sm": 12, "md": 14, "lg": 16, "xl": 20, "xxl": 24, "title": 28
+    },
+    "fontWeight": { "regular": "400", "medium": "500", "semibold": "600", "bold": "700" }
+  },
+  "spacing": { "xs": 4, "sm": 8, "md": 12, "lg": 16, "xl": 24, "xxl": 32 },
+  "borderRadius": { "sm": 4, "md": 8, "lg": 12, "xl": 16, "full": 9999 }
+}

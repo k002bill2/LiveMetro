@@ -64,14 +64,14 @@ State: AuthContext + Custom Hooks (no Redux)
 
 프로젝트 전체에 ACE 6-Layer 아키텍처가 적용됩니다:
 
-| Layer | 역할 | 구현 |
-|-------|------|------|
-| 1. Aspirational | 윤리적 기반 (Heuristic Imperatives) | `ethicalValidator.js` 훅 |
-| 2. Global Strategy | Primary Agent 전략 결정 | `effort-scaling.md` |
-| 3. Agent Model | 에이전트 자기 평가 | 에이전트 `.md` 파일 |
-| 4. Executive Function | 태스크 분해 및 위임 | `delegation-template.md` |
-| 5. Cognitive Control | 충돌 방지, 파일 락 | `parallelCoordinator.js` |
-| 6. Task Prosecution | 실행 및 결과 수집 | 개별 에이전트 실행 |
+| Layer | 역할 | 구현 | 강제 수준 |
+|-------|------|------|-----------|
+| 1. Aspirational | 보안/윤리 필터 + Veto Protocol | `ethicalValidator.js` (fail-closed) | **Hook 강제** — 위험 명령 차단, 30s 폴링 검증, Veto 기록 |
+| 2. Global Strategy | 전략 가이드라인 | `effort-scaling.md` (문서) | **프롬프트 의존** — LLM이 문서 참조하여 판단 |
+| 3. Agent Model | 에이전트 학습/진화 | `agentMemory.js` + 에이전트 `.md` | **자동 기록** — agentTracer가 완료 시 agent-memory에 기록 |
+| 4. Executive Function | 태스크 분해, HITL 차단 | `task-allocator.js` + `parallelCoordinator.js` | **Hook 강제** — CRITICAL/HIGH 작업 차단, 에이전트 추천 |
+| 5. Cognitive Control | 충돌 방지, 파일 락 (뮤텍스) | `parallelCoordinator.js` + `file-lock-manager.js` | **Hook 강제** — 파일 락, stale 정리, 체크포인트 |
+| 6. Task Prosecution | 42개 스킬 실행 + 피드백 루프 | 개별 에이전트 → feedback-loop → agent-memory | **양방향** — L6→L4(메트릭), L6→L3(학습), L1→L3(Veto) |
 
 **상세**: `.claude/agents/shared/ace-framework.md`
 
@@ -114,10 +114,12 @@ Claude Code와 Gemini CLI가 자동 연동됩니다:
 
 에이전트가 태스크 수행 중 학습한 패턴/실패/성공을 `.claude/agents/agent-memory/`에 JSONL로 기록합니다.
 
-- **기록 시점**: 태스크 완료 후 `agentMemory.recordLearning()` 호출
-- **조회 시점**: 태스크 시작 전 `agentMemory.queryLearnings()` → 프롬프트에 포함
-- **정리**: confidence 0.3 이하 + 30일 이상 항목 자동 제거
+- **자동 기록**: `agentTracer.js` PostToolUse:Task 훅이 에이전트 완료 시 `agentMemory.recordLearning()` 자동 호출
+- **Veto 기록**: `ethicalValidator.js`가 차단 시 agent-memory에 failure 학습 기록
+- **조회**: `agentMemory.queryLearnings({ agentId, tags, minConfidence })` → 프롬프트에 포함 가능
+- **정리**: `agentMemory.pruneOldEntries()` — confidence 0.3 이하 + 30일 이상 항목 제거
 - **공유**: confidence 0.8 이상은 `shared-learnings.jsonl`에도 기록
+- **피드백 경로**: L6(스킬 실행) → agentTracer → agent-memory(L3) + feedback-loop(L4)
 
 ### Quality Gates (품질 게이트)
 

@@ -5,6 +5,11 @@ description: "혼잡도 크라우드소싱 시스템. Firebase 기반 혼잡도 
 
 # Crowdsourced Congestion System
 
+## Resources
+
+- `scripts/validate-congestion-data.py` - 혼잡도 리포트 데이터 검증
+- `assets/congestion-levels.json` - 혼잡도 레벨 정의, 색상, 히트맵 그래디언트
+
 ## Architecture Overview
 
 ```

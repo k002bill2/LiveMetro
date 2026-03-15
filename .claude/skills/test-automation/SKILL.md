@@ -8,6 +8,11 @@ description: Generate comprehensive Jest tests for LiveMetro React Native compon
 ## Purpose
 Create comprehensive unit and integration tests for LiveMetro React Native components, hooks, and services using **Jest** and **React Native Testing Library**.
 
+## Checklists
+
+테스트 작성 시 다음 체크리스트를 참조하세요:
+- `.claude/checklists/testing.md` - 단위/통합 테스트, 커버리지, 모킹, 엣지 케이스
+
 ## When to Use
 - Writing tests for new components or features
 - Improving test coverage (target: 75% statements, 70% functions)

@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LiveMetro Claude Code System Architecture</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: -apple-system, 'Segoe UI', sans-serif; background: #0d1117; color: #c9d1d9; padding: 32px; }
+  h1 { text-align: center; font-size: 24px; color: #58a6ff; margin-bottom: 8px; }
+  .subtitle { text-align: center; font-size: 13px; color: #8b949e; margin-bottom: 32px; }
+
+  .diagram { max-width: 1200px; margin: 0 auto; }
+
+  /* ACE Layers */
+  .ace-layer { border: 1px solid #30363d; border-radius: 12px; margin-bottom: 16px; overflow: hidden; }
+  .ace-header { padding: 10px 16px; font-weight: 600; font-size: 13px; display: flex; align-items: center; gap: 8px; }
+  .ace-body { padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 10px; }
+
+  .l1 .ace-header { background: #1a0a2e; color: #d2a8ff; border-bottom: 1px solid #30363d; }
+  .l2 .ace-header { background: #0a1929; color: #58a6ff; border-bottom: 1px solid #30363d; }
+  .l3 .ace-header { background: #071a0e; color: #3fb950; border-bottom: 1px solid #30363d; }
+  .l4 .ace-header { background: #1a1400; color: #d29922; border-bottom: 1px solid #30363d; }
+
+  /* Nodes */
+  .node { background: #161b22; border: 1px solid #30363d; border-radius: 8px; padding: 8px 12px; font-size: 12px; display: flex; align-items: center; gap: 6px; transition: all 0.2s; cursor: default; }
+  .node:hover { border-color: #58a6ff; transform: translateY(-1px); }
+  .node .icon { font-size: 14px; flex-shrink: 0; }
+  .node .label { white-space: nowrap; }
+  .node .detail { color: #8b949e; font-size: 10px; }
+
+  .node.hook { border-left: 3px solid #f85149; }
+  .node.agent { border-left: 3px solid #58a6ff; }
+  .node.skill { border-left: 3px solid #3fb950; }
+  .node.coordination { border-left: 3px solid #d29922; }
+  .node.config { border-left: 3px solid #8b949e; }
+  .node.mcp { border-left: 3px solid #d2a8ff; }
+  .node.data { border-left: 3px solid #388bfd; }
+
+  /* Section titles */
+  .section { margin-bottom: 24px; }
+  .section-title { font-size: 14px; font-weight: 600; color: #8b949e; margin-bottom: 10px; display: flex; align-items: center; gap: 8px; }
+  .section-title::after { content: ''; flex: 1; height: 1px; background: #21262d; }
+
+  /* Flow arrows */
+  .flow-container { display: flex; flex-direction: column; gap: 4px; margin: 16px 0; }
+  .flow-row { display: flex; align-items: center; gap: 8px; font-size: 12px; padding: 6px 12px; }
+  .flow-arrow { color: #58a6ff; font-weight: bold; flex-shrink: 0; }
+  .flow-label { color: #8b949e; }
+  .flow-target { color: #c9d1d9; font-weight: 500; }
+
+  /* Grid layouts */
+  .grid-3 { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+  /* Legend */
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 24px; padding: 12px 16px; background: #161b22; border-radius: 8px; border: 1px solid #21262d; }
+  .legend-item { display: flex; align-items: center; gap: 6px; font-size: 11px; }
+  .legend-color { width: 12px; height: 12px; border-radius: 3px; border: 1px solid #30363d; }
+
+  /* Connector lines */
+  .connectors { margin: 12px 0; padding: 12px; background: #0d1117; border: 1px dashed #21262d; border-radius: 8px; }
+  .conn-title { font-size: 12px; font-weight: 600; color: #58a6ff; margin-bottom: 8px; }
+  .conn-line { font-size: 11px; color: #8b949e; padding: 2px 0; font-family: 'SF Mono', 'Fira Code', monospace; }
+  .conn-line .src { color: #f85149; }
+  .conn-line .tgt { color: #3fb950; }
+  .conn-line .arrow { color: #d29922; }
+
+  @media (max-width: 768px) {
+    .grid-2 { grid-template-columns: 1fr; }
+    .grid-3 { grid-template-columns: 1fr 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<h1>LiveMetro Claude Code System Architecture</h1>
+<p class="subtitle">ACE Framework 6-Layer | 7 Hooks | 5 Agents | 42 Skills | 4 Coordination Modules | 2 MCP Servers</p>
+
+<div class="diagram">
+
+<!-- ============================================================ -->
+<!-- ACE Layer 1: Aspirational (Ethics) -->
+<!-- ============================================================ -->
+<div class="ace-layer l1">
+  <div class="ace-header">
+    <span>L1 Aspirational</span>
+    <span style="font-weight:400; font-size:11px; opacity:0.7;">Heuristic Imperatives &mdash; 윤리적 기반</span>
+  </div>
+  <div class="ace-body">
+    <div class="node hook"><span class="icon">🛡</span><div><div class="label">ethicalValidator.js</div><div class="detail">PreToolUse:Bash &mdash; rm -rf, force push, 하드코딩 키 차단</div></div></div>
+    <div class="node hook"><span class="icon">🔒</span><div><div class="label">Path Protection (inline)</div><div class="detail">PreToolUse:Edit|Write &mdash; .env, secrets, google-services.json 보호</div></div></div>
+    <div class="node hook"><span class="icon">🔑</span><div><div class="label">outputSecretFilter.sh</div><div class="detail">PostToolUse:Bash &mdash; API키/토큰 자동 마스킹</div></div></div>
+    <div class="node config"><span class="icon">📋</span><div><div class="label">CLAUDE.md</div><div class="detail">Golden Rules: strict TS, 30s polling, cleanup, no any</div></div></div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- ACE Layer 2: Global Strategy -->
+<!-- ============================================================ -->
+<div class="ace-layer l2">
+  <div class="ace-header">
+    <span>L2 Global Strategy</span>
+    <span style="font-weight:400; font-size:11px; opacity:0.7;">Primary Agent 전략 결정</span>
+  </div>
+  <div class="ace-body">
+    <div class="node config"><span class="icon">📊</span><div><div class="label">effort-scaling.md</div><div class="detail">복잡도별 에이전트 할당: Trivial(0) ~ Complex(3+)</div></div></div>
+    <div class="node skill"><span class="icon">🎯</span><div><div class="label">CLAUDE.md Skill Routing</div><div class="detail">작업 유형 → 스킬 자동 매핑 (21개 도메인)</div></div></div>
+    <div class="node hook"><span class="icon">🚀</span><div><div class="label">userPromptSubmit.js</div><div class="detail">UserPromptSubmit &mdash; 스킬/에이전트 자동 활성화, Gemini 결과 주입</div></div></div>
+    <div class="node config"><span class="icon">📁</span><div><div class="label">commands-registry.json</div><div class="detail">21개 스킬 라우팅 레지스트리</div></div></div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- ACE Layer 3-4: Agent Model + Executive Function -->
+<!-- ============================================================ -->
+<div class="ace-layer l3">
+  <div class="ace-header">
+    <span>L3-4 Agent Model + Executive Function</span>
+    <span style="font-weight:400; font-size:11px; opacity:0.7;">에이전트 자기 평가 + 태스크 분해/위임</span>
+  </div>
+  <div class="ace-body" style="flex-direction: column;">
+    <div class="section-title">Agents (agents-registry.json)</div>
+    <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+      <div class="node agent"><span class="icon">📱</span><div><div class="label">mobile-ui-specialist</div><div class="detail">Sonnet &mdash; RN UI/UX, Firebase, Seoul API</div></div></div>
+      <div class="node agent"><span class="icon">🧪</span><div><div class="label">test-automation-specialist</div><div class="detail">Haiku &mdash; Jest, RNTL, 커버리지</div></div></div>
+      <div class="node agent"><span class="icon">✅</span><div><div class="label">quality-validator</div><div class="detail">Haiku &mdash; TypeScript, ESLint, 최종 검증</div></div></div>
+      <div class="node agent"><span class="icon">📊</span><div><div class="label">eval-task-runner</div><div class="detail">Inherit &mdash; 평가 오케스트레이션, pass@k</div></div></div>
+      <div class="node agent"><span class="icon">📝</span><div><div class="label">eval-grader</div><div class="detail">Inherit &mdash; 코드/LLM 기반 채점</div></div></div>
+    </div>
+
+    <div class="section-title" style="margin-top: 14px;">Shared Agent Knowledge</div>
+    <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+      <div class="node config"><span class="icon">🏗</span><div><div class="label">ace-framework.md</div><div class="detail">ACE 6-Layer 아키텍처 가이드</div></div></div>
+      <div class="node config"><span class="icon">📋</span><div><div class="label">delegation-template.md</div><div class="detail">태스크 위임 구조 템플릿</div></div></div>
+      <div class="node config"><span class="icon">⚖️</span><div><div class="label">quality-gates.md</div><div class="detail">Ethical + Technical 품질 게이트</div></div></div>
+      <div class="node config"><span class="icon">🔀</span><div><div class="label">parallel-agents-protocol.md</div><div class="detail">병렬 실행 안전 프로토콜</div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- ACE Layer 5: Cognitive Control (Coordination) -->
+<!-- ============================================================ -->
+<div class="ace-layer l4">
+  <div class="ace-header">
+    <span>L5 Cognitive Control</span>
+    <span style="font-weight:400; font-size:11px; opacity:0.7;">충돌 방지, 파일 락, 상태 관리 &mdash; coordination/index.js</span>
+  </div>
+  <div class="ace-body" style="flex-direction: column;">
+    <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+      <div class="node coordination"><span class="icon">🔐</span><div><div class="label">file-lock-manager.js</div><div class="detail">파일 레벨 락 획득/해제, 타임아웃 정리</div></div></div>
+      <div class="node coordination"><span class="icon">💾</span><div><div class="label">checkpoint-manager.js</div><div class="detail">작업 상태 체크포인트 저장/복원</div></div></div>
+      <div class="node coordination"><span class="icon">🎯</span><div><div class="label">task-allocator.js</div><div class="detail">작업 분류, 에이전트 추천, 성능 보정</div></div></div>
+      <div class="node coordination"><span class="icon">📈</span><div><div class="label">feedback-loop.js</div><div class="detail">실행 메트릭 기록, 성능 분석</div></div></div>
+    </div>
+
+    <div class="section-title" style="margin-top: 14px;">Orchestration Hooks</div>
+    <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+      <div class="node hook"><span class="icon">🔄</span><div><div class="label">parallelCoordinator.js</div><div class="detail">PreToolUse:Task + PostToolUse:Task &mdash; HITL 분류, 파일 락, 체크포인트</div></div></div>
+      <div class="node hook"><span class="icon">📍</span><div><div class="label">agentTracer.js</div><div class="detail">PostToolUse:Task &mdash; 에이전트 트레이싱 → feedback-loop 연동</div></div></div>
+      <div class="node hook"><span class="icon">🔗</span><div><div class="label">aceMatrixSync.js</div><div class="detail">PostToolUse:Edit|Write &mdash; enforcement-matrix drift 감지</div></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- Connection Diagram -->
+<!-- ============================================================ -->
+<div class="connectors">
+  <div class="conn-title">Module Dependencies (require 관계)</div>
+  <div class="conn-line"><span class="src">parallelCoordinator.js</span> <span class="arrow">──require──▶</span> <span class="tgt">file-lock-manager.js</span></div>
+  <div class="conn-line"><span class="src">parallelCoordinator.js</span> <span class="arrow">──require──▶</span> <span class="tgt">checkpoint-manager.js</span></div>
+  <div class="conn-line"><span class="src">parallelCoordinator.js</span> <span class="arrow">──require──▶</span> <span class="tgt">task-allocator.js</span></div>
+  <div class="conn-line"><span class="src">agentTracer.js</span> <span class="arrow">──require──▶</span> <span class="tgt">feedback-loop.js</span></div>
+  <div class="conn-line"><span class="src">task-allocator.js</span> <span class="arrow">──require──▶</span> <span class="tgt">feedback-loop.js</span> <span style="color:#8b949e;">(성능 데이터 → 추천 보정)</span></div>
+  <div class="conn-line"><span class="src">geminiAutoTrigger.js</span> <span class="arrow">──spawn───▶</span> <span class="tgt">scripts/gemini-bridge.js</span></div>
+  <div class="conn-line"><span class="src">aceMatrixSync.js</span> <span class="arrow">──read────▶</span> <span class="tgt">ace-framework/references/enforcement-matrix.md</span></div>
+  <div class="conn-line"><span class="src">coordination/index.js</span> <span class="arrow">──export──▶</span> <span class="tgt">{fileLock, feedback, checkpoint, taskAllocator}</span></div>
+</div>
+
+<!-- ============================================================ -->
+<!-- ACE Layer 6: Task Prosecution (Skills) -->
+<!-- ============================================================ -->
+<div class="section" style="margin-top: 24px;">
+  <div class="section-title">L6 Task Prosecution &mdash; 42 Skills (실행 및 결과 수집)</div>
+
+  <div class="grid-2">
+    <div>
+      <div style="font-size: 12px; font-weight: 600; color: #3fb950; margin-bottom: 8px;">Domain Skills (21)</div>
+      <div class="grid-3" style="grid-template-columns: 1fr 1fr;">
+        <div class="node skill"><span class="icon">📱</span><div class="label">react-native-dev</div></div>
+        <div class="node skill"><span class="icon">🔥</span><div class="label">firebase-integration</div></div>
+        <div class="node skill"><span class="icon">🌐</span><div class="label">api-integration</div></div>
+        <div class="node skill"><span class="icon">🚇</span><div class="label">subway-data-processor</div></div>
+        <div class="node skill"><span class="icon">📍</span><div class="label">location-services</div></div>
+        <div class="node skill"><span class="icon">🔔</span><div class="label">notification-system</div></div>
+        <div class="node skill"><span class="icon">🚉</span><div class="label">station-info</div></div>
+        <div class="node skill"><span class="icon">📊</span><div class="label">statistics-analytics</div></div>
+        <div class="node skill"><span class="icon">🗺</span><div class="label">route-fare-calculation</div></div>
+        <div class="node skill"><span class="icon">👥</span><div class="label">crowdsourced-congestion</div></div>
+        <div class="node skill"><span class="icon">🎨</span><div class="label">theme-i18n-system</div></div>
+        <div class="node skill"><span class="icon">🔊</span><div class="label">audio-accessibility</div></div>
+        <div class="node skill"><span class="icon">⭐</span><div class="label">user-trust-reputation</div></div>
+        <div class="node skill"><span class="icon">📈</span><div class="label">monitoring-observability</div></div>
+        <div class="node skill"><span class="icon">🧪</span><div class="label">test-automation</div></div>
+        <div class="node skill"><span class="icon">🔍</span><div class="label">code-review</div></div>
+        <div class="node skill"><span class="icon">🏗</span><div class="label">cc-feature-implementer</div></div>
+        <div class="node skill"><span class="icon">🔄</span><div class="label">parallel-coordinator</div></div>
+        <div class="node skill"><span class="icon">💾</span><div class="label">external-memory</div></div>
+        <div class="node skill"><span class="icon">👁</span><div class="label">agent-observability</div></div>
+        <div class="node skill"><span class="icon">🏛</span><div class="label">ace-framework</div></div>
+      </div>
+    </div>
+    <div>
+      <div style="font-size: 12px; font-weight: 600; color: #d29922; margin-bottom: 8px;">Workflow Skills (21)</div>
+      <div class="grid-3" style="grid-template-columns: 1fr 1fr;">
+        <div class="node skill"><span class="icon">✓</span><div class="label">verify-app</div></div>
+        <div class="node skill"><span class="icon">🏥</span><div class="label">check-health</div></div>
+        <div class="node skill"><span class="icon">📦</span><div class="label">commit-push-pr</div></div>
+        <div class="node skill"><span class="icon">🚀</span><div class="label">deploy-with-tests</div></div>
+        <div class="node skill"><span class="icon">📝</span><div class="label">draft-commits</div></div>
+        <div class="node skill"><span class="icon">🔍</span><div class="label">review</div></div>
+        <div class="node skill"><span class="icon">♻️</span><div class="label">simplify-code</div></div>
+        <div class="node skill"><span class="icon">🧪</span><div class="label">test-coverage</div></div>
+        <div class="node skill"><span class="icon">✓</span><div class="label">verification-loop</div></div>
+        <div class="node skill"><span class="icon">🔄</span><div class="label">sync-registry</div></div>
+        <div class="node skill"><span class="icon">💾</span><div class="label">save-and-compact</div></div>
+        <div class="node skill"><span class="icon">📄</span><div class="label">dev-docs</div></div>
+        <div class="node skill"><span class="icon">📄</span><div class="label">update-dev-docs</div></div>
+        <div class="node skill"><span class="icon">▶</span><div class="label">start-dev</div></div>
+        <div class="node skill"><span class="icon">⏹</span><div class="label">session-wrap</div></div>
+        <div class="node skill"><span class="icon">🔁</span><div class="label">resume</div></div>
+        <div class="node skill"><span class="icon">💿</span><div class="label">config-backup</div></div>
+        <div class="node skill"><span class="icon">⚡</span><div class="label">gemini-review</div></div>
+        <div class="node skill"><span class="icon">🔬</span><div class="label">gemini-scan</div></div>
+        <div class="node skill"><span class="icon">🏃</span><div class="label">run-eval</div></div>
+        <div class="node skill"><span class="icon">📊</span><div class="label">eval-dashboard</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- External Systems -->
+<!-- ============================================================ -->
+<div class="section" style="margin-top: 24px;">
+  <div class="section-title">External Integrations</div>
+  <div style="display: flex; flex-wrap: wrap; gap: 10px;">
+    <div class="node mcp"><span class="icon">📚</span><div><div class="label">MCP: context7</div><div class="detail">React Native, Expo, Firebase 실시간 문서 조회</div></div></div>
+    <div class="node mcp"><span class="icon">🧠</span><div><div class="label">MCP: serena</div><div class="detail">시맨틱 코딩 도구 (심볼 탐색, 리팩토링)</div></div></div>
+    <div class="node data"><span class="icon">🤖</span><div><div class="label">Gemini CLI Bridge</div><div class="detail">scripts/gemini-bridge.js &mdash; 크로스 리뷰, 대규모 분석</div></div></div>
+    <div class="node data"><span class="icon">📋</span><div><div class="label">Checklists (4)</div><div class="detail">code-review, testing, rn-specific, deployment</div></div></div>
+    <div class="node data"><span class="icon">🗂</span><div><div class="label">Memory (2)</div><div class="detail">quick-reference, common-patterns</div></div></div>
+    <div class="node data"><span class="icon">📊</span><div><div class="label">Evals System</div><div class="detail">rubrics, tasks, benchmarks, results</div></div></div>
+  </div>
+</div>
+
+<!-- ============================================================ -->
+<!-- Data Flow -->
+<!-- ============================================================ -->
+<div class="section" style="margin-top: 24px;">
+  <div class="section-title">Event Flow (시간순)</div>
+  <div class="flow-container" style="background: #161b22; border-radius: 8px; padding: 16px; border: 1px solid #21262d;">
+    <div class="flow-row">
+      <span class="flow-arrow">1.</span>
+      <span class="flow-label">User Prompt</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-target">userPromptSubmit.js</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-label">스킬 자동 감지 + Gemini 리뷰 결과 주입</span>
+    </div>
+    <div class="flow-row">
+      <span class="flow-arrow">2.</span>
+      <span class="flow-label">Bash 실행</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-target">ethicalValidator.js</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-label">위험 명령 차단 (rm -rf, force push 등)</span>
+    </div>
+    <div class="flow-row">
+      <span class="flow-arrow">3.</span>
+      <span class="flow-label">Edit/Write</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-target">Path Protection</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-label">.env, secrets 보호 → TypeScript 자동 체크</span>
+    </div>
+    <div class="flow-row">
+      <span class="flow-arrow">4.</span>
+      <span class="flow-label">Edit/Write 후</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-target">geminiAutoTrigger.js</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-label">30초 debounce → gemini-bridge.js review 실행</span>
+    </div>
+    <div class="flow-row">
+      <span class="flow-arrow">5.</span>
+      <span class="flow-label">Agent 스폰</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-target">parallelCoordinator.js (pre)</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-label">HITL 분류 + 파일 락 + 체크포인트 + 에이전트 추천</span>
+    </div>
+    <div class="flow-row">
+      <span class="flow-arrow">6.</span>
+      <span class="flow-label">Agent 완료</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-target">agentTracer.js + parallelCoordinator.js (post)</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-label">트레이싱 → feedback-loop → 락 해제</span>
+    </div>
+    <div class="flow-row">
+      <span class="flow-arrow">7.</span>
+      <span class="flow-label">세션 종료</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-target">SessionEnd hook</span>
+      <span class="flow-arrow">→</span>
+      <span class="flow-label">active-locks.json + parallel-state.json 초기화</span>
+    </div>
+  </div>
+</div>
+
+<!-- Legend -->
+<div class="legend">
+  <div class="legend-item"><div class="legend-color" style="background:#f85149;"></div> Hook (7)</div>
+  <div class="legend-item"><div class="legend-color" style="background:#58a6ff;"></div> Agent (5)</div>
+  <div class="legend-item"><div class="legend-color" style="background:#3fb950;"></div> Skill (42)</div>
+  <div class="legend-item"><div class="legend-color" style="background:#d29922;"></div> Coordination (4)</div>
+  <div class="legend-item"><div class="legend-color" style="background:#d2a8ff;"></div> MCP Server (2)</div>
+  <div class="legend-item"><div class="legend-color" style="background:#388bfd;"></div> Data/External</div>
+  <div class="legend-item"><div class="legend-color" style="background:#8b949e;"></div> Config</div>
+</div>
+
+<p style="text-align: center; margin-top: 16px; font-size: 11px; color: #484f58;">
+  Generated 2026-03-15 | LiveMetro Claude Code System v3.0
+</p>
+
+</div>
+</body>
+</html>

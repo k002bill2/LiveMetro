@@ -1,0 +1,26 @@
+{
+  "_description": "2024년 서울 지하철 요금 체계. fare-calculator.py 및 src/services/fare/ 에서 참조.",
+  "fareTypes": {
+    "adult": { "label": "일반", "baseFare": 1400, "ageRange": "19-64" },
+    "youth": { "label": "청소년", "baseFare": 720, "ageRange": "13-18" },
+    "child": { "label": "어린이", "baseFare": 450, "ageRange": "6-12" },
+    "senior": { "label": "경로/장애인", "baseFare": 0, "ageRange": "65+" }
+  },
+  "distanceBands": [
+    { "from_km": 0, "to_km": 10, "increment_km": null, "increment_fare": 0, "note": "기본 요금 구간" },
+    { "from_km": 10, "to_km": 50, "increment_km": 5, "increment_fare": 100, "note": "5km마다 100원 추가" },
+    { "from_km": 50, "to_km": null, "increment_km": 8, "increment_fare": 100, "note": "8km마다 100원 추가" }
+  ],
+  "transferRules": {
+    "maxTransfers": 4,
+    "maxTransferTimeMinutes": 30,
+    "nightBusExtraFare": 0,
+    "integratedFare": true,
+    "validModes": ["subway", "bus", "마을버스"]
+  },
+  "specialFares": {
+    "airportExpress": { "일반": 4150, "직통": 9500 },
+    "shinbundang": { "baseFare": 1500, "extraPer5km": 200 },
+    "gtxA": { "baseFare": 2000, "extraPer5km": 150 }
+  }
+}

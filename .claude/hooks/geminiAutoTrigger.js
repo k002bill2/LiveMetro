@@ -85,7 +85,7 @@ function main() {
           fs.unlinkSync(TRIGGER_FILE);
 
           const review = spawn('node', [
-            path.join(PROJECT_ROOT, '.claude', 'hooks', 'gemini-bridge.js'),
+            path.join(PROJECT_ROOT, '.claude', 'scripts', 'gemini-bridge.js'),
             'review'
           ], {
             cwd: PROJECT_ROOT,

@@ -10,6 +10,11 @@ allowed-tools: Bash(npm *), Bash(npx *), Bash(eas *)
 Backend(Python)과 Frontend(TypeScript) 모두 검증 후 배포합니다.
 **단계를 절대 건너뛰지 마세요. 어떤 단계든 실패하면 계속하기 전에 멈추고 수정하세요.**
 
+## Checklists
+
+배포 전 다음 체크리스트를 참조하세요:
+- `.claude/checklists/deployment.md` - 사전 검증, 환경 설정, 빌드, 배포 후 확인, 롤백 계획
+
 ## 실행 단계
 
 ### 1. Backend 사전 검증

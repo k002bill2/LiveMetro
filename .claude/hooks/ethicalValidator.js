@@ -72,6 +72,14 @@ const BLOCKED_OPERATIONS = {
     ],
     message: '위험한 시스템 명령이 감지되었습니다.',
     severity: 'HIGH'
+  },
+  polling_interval: {
+    patterns: [
+      /setInterval\s*\(\s*\w+\s*,\s*([1-9]\d{0,3}|[12]\d{4})\s*\)/,  // setInterval < 30000ms
+      /polling.*interval.*=\s*([1-9]\d{0,3}|[12]\d{4})\b/i,           // pollingInterval < 30000
+    ],
+    message: 'Seoul API 폴링 간격은 최소 30초(30000ms)여야 합니다. (ACE L1: Reduce Suffering)',
+    severity: 'HIGH'
   }
 };
 
@@ -263,21 +271,50 @@ if (require.main === module) {
         };
         process.stdout.write(JSON.stringify(blockResponse));
 
-        // 차단 이벤트를 학습 데이터로 기록
+        // ACE L1: Ethical Veto Protocol — incidents 기록 + feedback-loop + agent-memory
         try {
+          const vetoRecord = {
+            id: `veto_${Date.now()}`,
+            timestamp: new Date().toISOString(),
+            layer: 'L1_Aspirational',
+            tool_name: event.tool_name,
+            blocked_categories: result.blockedReasons.map(r => r.category),
+            severities: result.blockedReasons.map(r => r.severity),
+            reasons: result.blockedReasons.map(r => r.message),
+            command_preview: (event.tool_input?.command || '').substring(0, 100)
+          };
+
+          // incidents 디렉토리에 Veto 기록
+          const incidentsDir = path.join(__dirname, '../../.temp/incidents');
+          if (!fs.existsSync(incidentsDir)) fs.mkdirSync(incidentsDir, { recursive: true });
+          fs.appendFileSync(
+            path.join(incidentsDir, 'ethical-vetoes.jsonl'),
+            JSON.stringify(vetoRecord) + '\n'
+          );
+
+          // coordination feedback-loop에 학습 이벤트 기록
           const feedbackLoop = require('../coordination/feedback-loop');
           feedbackLoop.recordLearningEvent({
             agentId: 'ethicalValidator',
             eventType: 'ethical_block',
-            context: {
-              tool_name: event.tool_name,
-              blocked_categories: result.blockedReasons.map(r => r.category),
-              command_preview: (event.tool_input?.command || '').substring(0, 100)
-            },
+            context: vetoRecord,
             suggestion: result.blockedReasons[0]?.message || '',
             severity: result.blockedReasons[0]?.severity === 'CRITICAL' ? 'critical' : 'warning'
           });
-        } catch {}
+
+          // agent-memory에 학습 기록 (L3 Self-Evolution 피드백)
+          const agentMemory = require('../agents/agent-memory/agentMemory');
+          agentMemory.recordLearning({
+            agentId: 'ethicalValidator',
+            eventType: 'failure',
+            taskContext: `Blocked ${event.tool_name}: ${vetoRecord.command_preview}`,
+            learning: `${vetoRecord.blocked_categories.join(', ')} 패턴 차단됨: ${vetoRecord.reasons.join('; ')}`,
+            confidence: 0.9,
+            tags: ['ethical_veto', ...vetoRecord.blocked_categories]
+          });
+        } catch (e) {
+          console.error('[EthicalValidator] Veto recording failed:', e.message);
+        }
       } else {
         const message = formatValidationResult(result);
         if (message) {

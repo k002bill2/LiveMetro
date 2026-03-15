@@ -5,6 +5,11 @@ description: "음성 합성(TTS), 알림음, 진동, 접근성 서비스 통합.
 
 # Audio & Accessibility Skill
 
+## Resources
+
+- `scripts/tts-test-runner.py` - TTS 안내 문구 생성/검증
+- `assets/accessibility-config.json` - 접근성 설정 (TTS, 진동, 화면 읽기)
+
 ## Overview
 
 LiveMetro의 음성 안내(TTS), 알림음/진동 재생, 접근성(VoiceOver/TalkBack) 기능을 다루는 스킬. 세 서비스(`ttsService`, `soundService`, `accessibilityService`)가 싱글톤 패턴으로 동작하며, 각각 AsyncStorage에 설정을 영속화한다.

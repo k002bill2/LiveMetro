@@ -1,0 +1,24 @@
+{
+  "_description": "뱃지 정의. UI 표시 및 신뢰도 시스템에서 참조.",
+  "badges": [
+    { "id": "first_report", "label": "첫 리포트", "labelEn": "First Report", "icon": "star-outline", "color": "#9E9E9E", "condition": "리포트 1개 이상", "tier": "bronze" },
+    { "id": "active_10", "label": "활동가", "labelEn": "Active", "icon": "trending-up", "color": "#8BC34A", "condition": "리포트 10개 이상", "tier": "bronze" },
+    { "id": "active_50", "label": "베테랑", "labelEn": "Veteran", "icon": "shield-checkmark", "color": "#2196F3", "condition": "리포트 50개 이상", "tier": "silver" },
+    { "id": "active_100", "label": "마스터", "labelEn": "Master", "icon": "trophy", "color": "#FF9800", "condition": "리포트 100개 이상", "tier": "gold" },
+    { "id": "accurate_90", "label": "정확도 90%+", "labelEn": "Sharp Eye", "icon": "eye", "color": "#4CAF50", "condition": "검증 정확도 90% 이상 (최소 10건)", "tier": "silver" },
+    { "id": "streak_7", "label": "7일 연속", "labelEn": "7-Day Streak", "icon": "flame", "color": "#F44336", "condition": "7일 연속 리포트", "tier": "silver" },
+    { "id": "early_adopter", "label": "얼리어답터", "labelEn": "Early Adopter", "icon": "rocket", "color": "#9C27B0", "condition": "가입 1년 이상", "tier": "gold" }
+  ],
+  "tiers": {
+    "bronze": { "label": "브론즈", "minBadges": 0, "borderColor": "#CD7F32" },
+    "silver": { "label": "실버", "minBadges": 3, "borderColor": "#C0C0C0" },
+    "gold": { "label": "골드", "minBadges": 5, "borderColor": "#FFD700" }
+  },
+  "trustLevels": [
+    { "range": [0.0, 0.2], "level": "flagged", "label": "신고됨", "color": "#F44336" },
+    { "range": [0.2, 0.4], "level": "new", "label": "신규", "color": "#9E9E9E" },
+    { "range": [0.4, 0.6], "level": "basic", "label": "기본", "color": "#2196F3" },
+    { "range": [0.6, 0.8], "level": "trusted", "label": "신뢰", "color": "#4CAF50" },
+    { "range": [0.8, 1.0], "level": "expert", "label": "전문가", "color": "#FF9800" }
+  ]
+}

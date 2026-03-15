@@ -1,101 +1,91 @@
 {
-  "_generated": "2026-03-06T00:00:00.000Z",
-  "_description": "Auto-generated commands registry. Do not edit manually.",
-  "commands": {
+  "_generated": "2026-03-14T00:00:00.000Z",
+  "_description": "Skills 2.0 마이그레이션 후 스킬 기반 라우팅 레지스트리. commands/ → skills/ 전환 완료.",
+  "_migration": "commands/*.md → skills/*/SKILL.md (2026-02-06)",
+  "skills": {
     "check-health": {
-      "file": ".claude/commands/check-health.md",
-      "description": "Comprehensive project health check including tests, types, linting, and build verification",
-      "allowedTools": null
+      "file": ".claude/skills/check-health/SKILL.md",
+      "description": "Comprehensive project health check including tests, types, linting, and build verification"
     },
     "commit-push-pr": {
-      "file": ".claude/commands/commit-push-pr.md",
-      "description": "커밋, 푸시, PR 생성 자동화 워크플로우 (Boris Cherny 스타일)",
-      "allowedTools": null
+      "file": ".claude/skills/commit-push-pr/SKILL.md",
+      "description": "커밋, 푸시, PR 생성 자동화 워크플로우 (Boris Cherny 스타일)"
     },
     "config-backup": {
-      "file": ".claude/commands/config-backup.md",
-      "description": "Claude Code 설정 백업/복원 시스템 - backup, restore, verify, diff, list 지원",
-      "allowedTools": null
+      "file": ".claude/skills/config-backup/SKILL.md",
+      "description": "Claude Code 설정 백업/복원 시스템"
     },
     "deploy-with-tests": {
-      "file": ".claude/commands/deploy-with-tests.md",
-      "description": "테스트 검증 후 빌드/배포 실행",
-      "allowedTools": null
+      "file": ".claude/skills/deploy-with-tests/SKILL.md",
+      "description": "테스트 검증 후 빌드/배포 실행"
     },
     "dev-docs": {
-      "file": ".claude/commands/dev-docs.md",
-      "description": "대규모 작업을 위한 Dev Docs 3-파일 시스템 생성",
-      "allowedTools": null
+      "file": ".claude/skills/dev-docs/SKILL.md",
+      "description": "대규모 작업을 위한 Dev Docs 3-파일 시스템 생성"
     },
     "draft-commits": {
-      "file": ".claude/commands/draft-commits.md",
-      "description": "Git 변경사항 분석 및 Conventional Commits 형식 커밋 초안 생성",
-      "allowedTools": "Bash(git status:*), Bash(git diff:*), Bash(git log:*)"
+      "file": ".claude/skills/draft-commits/SKILL.md",
+      "description": "Git 변경사항 분석 및 Conventional Commits 형식 커밋 초안 생성"
     },
     "eval-dashboard": {
-      "file": ".claude/commands/eval-dashboard.md",
-      "description": "AI 에이전트 평가 결과 대시보드 - 추세 분석 및 저성능 태스크 식별",
-      "allowedTools": "Bash(node:*), Read, Grep, Glob"
+      "file": ".claude/skills/eval-dashboard/SKILL.md",
+      "description": "AI 에이전트 평가 결과 대시보드"
     },
     "gemini-review": {
-      "file": ".claude/commands/gemini-review.md",
-      "description": "Gemini CLI로 현재 코드 변경사항 크로스 리뷰 실행",
-      "allowedTools": null
+      "file": ".claude/skills/gemini-review/SKILL.md",
+      "description": "Gemini CLI로 현재 코드 변경사항 크로스 리뷰 실행"
     },
     "gemini-scan": {
-      "file": ".claude/commands/gemini-scan.md",
-      "description": "Gemini CLI로 대규모 코드베이스 분석 실행",
-      "allowedTools": null
+      "file": ".claude/skills/gemini-scan/SKILL.md",
+      "description": "Gemini CLI로 대규모 코드베이스 분석 실행"
     },
     "resume": {
-      "file": ".claude/commands/resume.md",
-      "description": "dev/active에서 저장된 컨텍스트를 불러와 작업 재개",
-      "allowedTools": null
+      "file": ".claude/skills/resume/SKILL.md",
+      "description": "dev/active에서 저장된 컨텍스트를 불러와 작업 재개"
     },
     "review": {
-      "file": ".claude/commands/review.md",
-      "description": "코드 리뷰 자동화 - 변경된 파일 분석",
-      "allowedTools": null
+      "file": ".claude/skills/review/SKILL.md",
+      "description": "코드 리뷰 자동화 - 변경된 파일 분석"
     },
     "run-eval": {
-      "file": ".claude/commands/run-eval.md",
-      "description": "AI 에이전트 평가 태스크 실행 및 pass@k 지표 계산",
-      "allowedTools": "read, grep, glob, bash, task"
+      "file": ".claude/skills/run-eval/SKILL.md",
+      "description": "AI 에이전트 평가 태스크 실행 및 pass@k 지표 계산"
     },
     "run-workflow": {
-      "file": ".claude/commands/run-workflow.md",
-      "description": "/run-workflow",
-      "allowedTools": null
+      "file": ".claude/skills/run-workflow/SKILL.md",
+      "description": "워크플로우 실행"
     },
     "save-and-compact": {
-      "file": ".claude/commands/save-and-compact.md",
-      "description": "Save context to Dev Docs and run /compact in one command",
-      "allowedTools": null
+      "file": ".claude/skills/save-and-compact/SKILL.md",
+      "description": "Save context to Dev Docs and run /compact"
     },
     "simplify-code": {
-      "file": ".claude/commands/simplify-code.md",
-      "description": "코드 복잡도 분석 및 단순화 제안 (Boris Cherny code-simplifier 스타일)",
-      "allowedTools": null
+      "file": ".claude/skills/simplify-code/SKILL.md",
+      "description": "코드 복잡도 분석 및 단순화 제안"
     },
     "sync-registry": {
-      "file": ".claude/commands/sync-registry.md",
-      "description": "스킬, 에이전트, 훅, 커맨드 레지스트리 자동 동기화",
-      "allowedTools": null
+      "file": ".claude/skills/sync-registry/SKILL.md",
+      "description": "스킬, 에이전트, 훅, 커맨드 레지스트리 자동 동기화"
     },
     "test-coverage": {
-      "file": ".claude/commands/test-coverage.md",
-      "description": "Run tests with coverage report and identify areas needing more tests",
-      "allowedTools": null
+      "file": ".claude/skills/test-coverage/SKILL.md",
+      "description": "Run tests with coverage report and identify areas needing more tests"
     },
     "update-dev-docs": {
-      "file": ".claude/commands/update-dev-docs.md",
-      "description": "Context Compaction 전 Dev Docs 업데이트",
-      "allowedTools": null
+      "file": ".claude/skills/update-dev-docs/SKILL.md",
+      "description": "Context Compaction 전 Dev Docs 업데이트"
     },
     "verify-app": {
-      "file": ".claude/commands/verify-app.md",
-      "description": "앱 종합 검증 - 타입체크, 린트, 테스트, 빌드를 한번에 실행 (Boris Cherny 피드백 루프)",
-      "allowedTools": null
+      "file": ".claude/skills/verify-app/SKILL.md",
+      "description": "앱 종합 검증 - 타입체크, 린트, 테스트, 빌드를 한번에 실행"
+    },
+    "start-dev": {
+      "file": ".claude/skills/start-dev/SKILL.md",
+      "description": "개발 서버 시작"
+    },
+    "session-wrap": {
+      "file": ".claude/skills/session-wrap/SKILL.md",
+      "description": "세션 정리/종료"
     }
   }
 }

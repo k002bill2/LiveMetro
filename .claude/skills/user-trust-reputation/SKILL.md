@@ -5,6 +5,11 @@ description: "사용자 신뢰도 및 평판 시스템. 신뢰도 점수 관리,
 
 # User Trust & Reputation System
 
+## Resources
+
+- `scripts/trust-score-calculator.py` - 신뢰도 점수 산출, 부정행위 탐지
+- `assets/badge-definitions.json` - 뱃지 정의, 신뢰도 레벨, 색상
+
 ## Overview
 
 사용자의 지연 제보 정확도를 기반으로 신뢰도 점수(0-100)를 관리하고, 뱃지를 수여하며, 부정행위를 탐지하는 시스템. 클라이언트(AsyncStorage) + 서버(Firestore) 이중 저장 구조.

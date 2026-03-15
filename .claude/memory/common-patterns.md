@@ -1,309 +1,87 @@
-# Common Patterns - AOS Dashboard
+# Common Patterns - LiveMetro
 
-자주 사용되는 React Web/Vite/Tailwind 패턴 모음
+React Native + Expo + Firebase 패턴 모음.
 
 ## 1. 컴포넌트 패턴
 
-### 기본 함수형 컴포넌트
-```typescript
-import { memo } from 'react';
-import { cn } from '@/lib/utils';
+```tsx
+import React, { memo } from 'react';
+import { View, Text, StyleSheet } from 'react-native';
 
 interface Props {
   title: string;
   subtitle?: string;
-  className?: string;
 }
 
-export const MyComponent: React.FC<Props> = memo(({ title, subtitle, className }) => {
-  return (
-    <div className={cn('p-4', className)}>
-      <h2 className="text-lg font-bold text-gray-900 dark:text-gray-100">{title}</h2>
-      {subtitle && <p className="text-sm text-gray-600 dark:text-gray-400">{subtitle}</p>}
-    </div>
-  );
-});
+export const StationCard: React.FC<Props> = memo(({ title, subtitle }) => (
+  <View style={styles.container} accessibilityLabel={`${title} 역`}>
+    <Text style={styles.title}>{title}</Text>
+    {subtitle && <Text style={styles.subtitle}>{subtitle}</Text>}
+  </View>
+));
 
-MyComponent.displayName = 'MyComponent';
-```
-
-### 메모이제이션된 컴포넌트
-```typescript
-export const OptimizedComponent = memo<Props>(({ data }) => {
-  // 렌더링 로직
-}, (prevProps, nextProps) => {
-  return prevProps.data === nextProps.data;
+const styles = StyleSheet.create({
+  container: { padding: 16, borderRadius: 8, backgroundColor: '#fff' },
+  title: { fontSize: 16, fontWeight: '600' },
+  subtitle: { fontSize: 12, color: '#757575', marginTop: 4 },
 });
 ```
 
 ## 2. 훅 패턴
 
-### 데이터 페칭 훅
-```typescript
-import { useState, useEffect, useCallback } from 'react';
-
-interface UseDataResult<T> {
-  data: T | null;
-  loading: boolean;
-  error: Error | null;
-  refetch: () => void;
-}
-
-export function useData<T>(fetchFn: () => Promise<T>): UseDataResult<T> {
-  const [data, setData] = useState<T | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
-
-  const fetchData = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const result = await fetchFn();
-      setData(result);
-    } catch (err) {
-      setError(err instanceof Error ? err : new Error('Unknown error'));
-    } finally {
-      setLoading(false);
-    }
-  }, [fetchFn]);
-
-  useEffect(() => {
-    fetchData();
-  }, [fetchData]);
-
-  return { data, loading, error, refetch: fetchData };
-}
-```
-
-### 구독 훅 (Cleanup 포함)
-```typescript
-export function useSubscription<T>(
-  subscribe: (callback: (data: T) => void) => () => void
-): T | null {
-  const [data, setData] = useState<T | null>(null);
-
-  useEffect(() => {
-    const unsubscribe = subscribe(setData);
-    return () => unsubscribe(); // Cleanup 필수!
-  }, [subscribe]);
-
-  return data;
-}
-```
-
-### 폴링 훅
-```typescript
-export function usePolling<T>(
-  fetchFn: () => Promise<T>,
-  intervalMs: number = 30000
-): T | null {
-  const [data, setData] = useState<T | null>(null);
+### 데이터 페칭 + Cleanup
+```tsx
+export function useRealtimeArrivals(stationId: string): ArrivalInfo[] {
+  const [arrivals, setArrivals] = useState<ArrivalInfo[]>([]);
 
   useEffect(() => {
     let mounted = true;
-
-    const poll = async () => {
-      try {
-        const result = await fetchFn();
-        if (mounted) setData(result);
-      } catch (error) {
-        console.error('Polling error:', error);
-      }
+    const fetchData = async (): Promise<void> => {
+      const data = await seoulSubwayApi.getRealtimeArrivals(stationId);
+      if (mounted) setArrivals(data);
     };
+    fetchData();
+    const interval = setInterval(fetchData, 30000); // 30초 폴링
+    return () => { mounted = false; clearInterval(interval); };
+  }, [stationId]);
 
-    poll(); // 즉시 실행
-    const interval = setInterval(poll, intervalMs);
-
-    return () => {
-      mounted = false;
-      clearInterval(interval);
-    };
-  }, [fetchFn, intervalMs]);
-
-  return data;
+  return arrivals;
 }
 ```
 
 ## 3. 서비스 패턴
 
-### API 서비스
-```typescript
-class ApiService {
-  private baseUrl: string;
-
-  constructor(baseUrl: string) {
-    this.baseUrl = baseUrl;
-  }
-
-  async get<T>(endpoint: string): Promise<T> {
+```tsx
+class StationService {
+  async getStation(stationId: string): Promise<Station | null> {
     try {
-      const response = await fetch(`${this.baseUrl}${endpoint}`);
-
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
-
-      return response.json();
-    } catch (error) {
-      console.error(`API Error [${endpoint}]:`, error);
-      throw error;
-    }
-  }
-}
-```
-
-### Firebase 서비스
-```typescript
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
-import { db } from '@/services/firebase/config';
-
-export const userService = {
-  async getUser(userId: string): Promise<User | null> {
-    try {
-      const docRef = doc(db, 'users', userId);
-      const docSnap = await getDoc(docRef);
-      return docSnap.exists() ? (docSnap.data() as User) : null;
-    } catch (error) {
-      console.error('getUser error:', error);
+      const cached = await AsyncStorage.getItem(`station_${stationId}`);
+      if (cached) return JSON.parse(cached);
+      const doc = await getDoc(doc(db, 'stations', stationId));
+      return doc.exists() ? (doc.data() as Station) : null;
+    } catch {
       return null;
     }
-  },
-
-  subscribeToUser(userId: string, callback: (user: User | null) => void) {
-    const docRef = doc(db, 'users', userId);
-    return onSnapshot(docRef, (doc) => {
-      callback(doc.exists() ? (doc.data() as User) : null);
-    });
   }
-};
-```
-
-## 4. 라우팅 패턴
-
-### 타입 정의
-```typescript
-// React Router 타입
-export type AppRoutes = {
-  '/': undefined;
-  '/sessions/:id': { id: string };
-  '/settings': { section?: string };
-};
-```
-
-### 타입 안전 네비게이션
-```typescript
-import { useNavigate, useParams } from 'react-router-dom';
-
-const MyPage: React.FC = () => {
-  const navigate = useNavigate();
-  const { id } = useParams<{ id: string }>();
-
-  const goToSession = (sessionId: string) => {
-    navigate(`/sessions/${sessionId}`);
-  };
-};
-```
-
-## 5. 에러 처리 패턴
-
-### ErrorBoundary
-```typescript
-interface State {
-  hasError: boolean;
-  error: Error | null;
 }
+export const stationService = new StationService();
+```
 
-class ErrorBoundary extends React.Component<Props, State> {
-  state: State = { hasError: false, error: null };
+## 4. 에러 처리
 
-  static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('Error caught:', error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return <ErrorFallback error={this.state.error} />;
-    }
-    return this.props.children;
-  }
+```tsx
+try {
+  const data = await fetchData();
+  return data;
+} catch (error) {
+  // 빈 배열/null 반환 (throw 금지)
+  return [];
 }
 ```
 
-## 6. 스타일 패턴
+## 5. 네비게이션
 
-### cn() 유틸리티와 조건부 클래스
-```typescript
-import { cn } from '@/lib/utils';
-
-const MyComponent: React.FC<{ variant?: 'primary' | 'secondary' }> = ({ variant = 'primary' }) => {
-  return (
-    <div className={cn(
-      'p-4 rounded-lg transition-colors',
-      variant === 'primary' && 'bg-blue-600 text-white hover:bg-blue-700',
-      variant === 'secondary' && 'bg-gray-100 text-gray-900 hover:bg-gray-200'
-    )}>
-      Content
-    </div>
-  );
-};
-```
-
-### 반응형 스타일
-```typescript
-// 모바일 우선 반응형 디자인
-<div className="
-  w-full px-4
-  md:max-w-2xl md:px-6
-  lg:max-w-4xl lg:px-8
-">
-  <h1 className="text-xl md:text-2xl lg:text-3xl font-bold">
-    Responsive Title
-  </h1>
-</div>
-```
-
-### 다크 모드 지원
-```typescript
-<div className="
-  bg-white text-gray-900
-  dark:bg-gray-800 dark:text-gray-100
-">
-  Dark mode aware content
-</div>
-```
-
-## 7. Zustand 스토어 패턴
-
-```typescript
-import { create } from 'zustand';
-
-interface StoreState {
-  data: DataType[];
-  loading: boolean;
-  fetchData: () => Promise<void>;
-  addItem: (item: DataType) => void;
-}
-
-export const useStore = create<StoreState>((set, get) => ({
-  data: [],
-  loading: false,
-
-  fetchData: async () => {
-    set({ loading: true });
-    try {
-      const response = await api.get('/data');
-      set({ data: response.data });
-    } finally {
-      set({ loading: false });
-    }
-  },
-
-  addItem: (item) => {
-    set((state) => ({ data: [...state.data, item] }));
-  },
-}));
+```tsx
+// 타입 안전 네비게이션
+navigation.navigate('StationDetail', { stationId: '0150' });
 ```

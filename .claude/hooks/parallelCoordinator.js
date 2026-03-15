@@ -81,7 +81,7 @@ function classifyHITL(taskInput) {
   return HITL_LEVELS.MEDIUM;
 }
 
-// file-lock-manager 로드 (실패 시 no-op)
+// coordination 모듈 로드 (실패 시 no-op)
 let fileLockManager;
 try {
   fileLockManager = require('../coordination/file-lock-manager');
@@ -89,6 +89,26 @@ try {
   fileLockManager = {
     acquireLock: () => ({ success: true, lockId: null }),
     releaseByAgent: () => ({ success: true, released: 0 })
+  };
+}
+
+let checkpointManager;
+try {
+  checkpointManager = require('../coordination/checkpoint-manager');
+} catch {
+  checkpointManager = {
+    createCheckpoint: () => ({ success: true, checkpointId: null }),
+    listCheckpoints: () => []
+  };
+}
+
+let taskAllocator;
+try {
+  taskAllocator = require('../coordination/task-allocator');
+} catch {
+  taskAllocator = {
+    recommendAgent: () => ({ recommended: 'mobile-ui-specialist', confidence: 'low' }),
+    checkAgentAvailability: () => ({ available: true, currentTasks: 0 })
   };
 }
 
@@ -184,18 +204,32 @@ async function onTaskPreExecute(event) {
   // HITL 분류
   const hitlLevel = classifyHITL(tool_input);
 
-  // CRITICAL/HIGH 레벨은 승인 필요 로그 출력
+  // CRITICAL/HIGH 레벨은 차단 (ACE L4: Executive Function)
   if (hitlLevel.approvalRequired) {
-    console.log(`[ParallelCoordinator] HITL ${hitlLevel.level}: "${tool_input.description}" — ${hitlLevel.description}`);
+    const msg = `[ParallelCoordinator] HITL ${hitlLevel.level}: "${tool_input.description}" — ${hitlLevel.description}`;
+    console.log(msg);
+    return {
+      decision: 'block',
+      reason: `HITL ${hitlLevel.level} 승인 필요: ${hitlLevel.description}\n작업: ${tool_input.description || 'unknown'}`
+    };
+  }
+
+  // task-allocator로 에이전트 추천 (subagent_type 미지정 시)
+  let recommendedAgent = null;
+  if (!tool_input.subagent_type && tool_input.description) {
+    try {
+      recommendedAgent = taskAllocator.recommendAgent(tool_input.description);
+    } catch {}
   }
 
   const taskInfo = {
     taskId: `task_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
-    subagentType: tool_input.subagent_type,
+    subagentType: tool_input.subagent_type || (recommendedAgent?.recommended),
     description: tool_input.description,
     hitlLevel: hitlLevel.level,
     startTime: Date.now(),
-    status: 'running'
+    status: 'running',
+    recommendation: recommendedAgent
   };
 
   // 대상 파일 추출 + 파일 락 획득
@@ -238,6 +272,16 @@ async function onTaskPreExecute(event) {
   });
 
   saveParallelState(state);
+
+  // checkpoint 생성 (병렬 작업 시작 시 상태 보존)
+  try {
+    checkpointManager.createCheckpoint({
+      agentId: taskInfo.taskId,
+      trigger: 'task_start',
+      description: `Task started: ${tool_input.description || 'unknown'}`,
+      context: { activeAgents: state.activeAgents.length, hitlLevel: hitlLevel.level }
+    });
+  } catch {}
 
   const modifiedInput = {
     ...tool_input,

@@ -1,0 +1,53 @@
+{
+  "_description": "접근성 설정 참조 데이터. VoiceOver/TalkBack, 진동 패턴, 사운드 설정.",
+  "tts": {
+    "defaultLang": "ko-KR",
+    "supportedLangs": ["ko-KR", "en-US"],
+    "rate": { "default": 0.5, "min": 0.1, "max": 1.0, "step": 0.1 },
+    "pitch": { "default": 1.0, "min": 0.5, "max": 2.0 },
+    "maxLength": 200,
+    "queueMode": "flush",
+    "expoSpeechApi": "expo-speech"
+  },
+  "vibration": {
+    "patterns": {
+      "arrival": [0, 200, 100, 200],
+      "transfer": [0, 100, 50, 100, 50, 100],
+      "delay": [0, 500],
+      "alert": [0, 300, 100, 300, 100, 300],
+      "tap": [0, 50]
+    },
+    "respectReduceMotion": true,
+    "expoHapticsApi": "expo-haptics"
+  },
+  "sounds": {
+    "arrival": { "file": "arrival-chime.mp3", "volume": 0.7, "duration_ms": 1200 },
+    "notification": { "file": "notification.mp3", "volume": 0.5, "duration_ms": 800 },
+    "error": { "file": "error-beep.mp3", "volume": 0.6, "duration_ms": 500 }
+  },
+  "screenReader": {
+    "accessibilityLabels": {
+      "congestionLevel": "{level} 혼잡도, 5단계 중 {value}",
+      "arrivalTime": "{station}역 {direction} 방면 {time} 도착 예정",
+      "transferInfo": "{line}으로 환승, 약 {minutes}분 소요",
+      "favoriteToggle": "{station}역 즐겨찾기 {state}"
+    },
+    "accessibilityRoles": {
+      "stationCard": "button",
+      "arrivalInfo": "text",
+      "congestionBar": "progressbar",
+      "mapPin": "image"
+    },
+    "accessibilityHints": {
+      "stationCard": "탭하여 역 상세정보를 확인하세요",
+      "favoriteButton": "탭하여 즐겨찾기에 추가하거나 제거합니다",
+      "refreshButton": "탭하여 도착정보를 새로고침합니다"
+    }
+  },
+  "reduceMotion": {
+    "disableAnimations": true,
+    "disableParallax": true,
+    "reduceTransparency": true,
+    "useSystemSetting": true
+  }
+}
