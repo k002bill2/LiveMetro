@@ -79,9 +79,9 @@ async function withRetry<T>(
   } = {}
 ): Promise<T> {
   const {
-    maxAttempts = 2,
-    initialDelayMs = 500,
-    maxDelayMs = 3000,
+    maxAttempts = 3,
+    initialDelayMs = 1000,
+    maxDelayMs = 5000,
     backoffMultiplier = 2,
   } = options;
 
@@ -198,10 +198,19 @@ interface SeoulTimetableResponse {
 
 class SeoulSubwayApiService {
   private readonly baseUrl: string;
-  private readonly timeout: number = 5000;
+  private readonly timeout: number = 10000;
   private readonly rateLimiter: RateLimiter;
   private readonly keyManager: ApiKeyManager;
   private readonly timetableKeyManager: ApiKeyManager;
+  /** In-flight request cache for deduplication */
+  private readonly inflightRequests: Map<string, Promise<SeoulRealtimeArrival[]>> = new Map();
+
+  /**
+   * Clear in-flight request cache (for testing)
+   */
+  clearInflightRequests(): void {
+    this.inflightRequests.clear();
+  }
 
   constructor() {
     this.baseUrl = process.env.SEOUL_SUBWAY_API_BASE_URL || 'http://swopenapi.seoul.go.kr/api/subway';
@@ -251,6 +260,29 @@ class SeoulSubwayApiService {
    * Uses ApiKeyManager for automatic key rotation and failover
    */
   async getRealtimeArrival(stationName: string): Promise<SeoulRealtimeArrival[]> {
+    // Request deduplication: reuse in-flight request for same station
+    const dedupKey = `arrival:${stationName}`;
+    const inflight = this.inflightRequests.get(dedupKey);
+    if (inflight) {
+      return inflight;
+    }
+
+    const promise = this.fetchRealtimeArrival(stationName);
+
+    this.inflightRequests.set(dedupKey, promise);
+    // Use .then with both handlers to avoid unhandled rejection from .finally()
+    promise.then(
+      () => { this.inflightRequests.delete(dedupKey); },
+      () => { this.inflightRequests.delete(dedupKey); }
+    );
+
+    return promise;
+  }
+
+  /**
+   * Internal: actual fetch logic for realtime arrival (separated for dedup)
+   */
+  private async fetchRealtimeArrival(stationName: string): Promise<SeoulRealtimeArrival[]> {
     const rateLimitKey = `realtime:${stationName}`;
 
     // Apply rate limiting (30-second minimum interval)
@@ -298,7 +330,6 @@ class SeoulSubwayApiService {
         this.keyManager.reportSuccess(apiKey);
         return data.realtimeArrivalList || [];
       } catch (error) {
-        console.error('Error fetching realtime arrival:', error);
         throw new Error(`실시간 도착정보를 가져오는데 실패했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
       }
     });
@@ -423,7 +454,7 @@ class SeoulSubwayApiService {
       try {
         // Note: Timetable API uses HTTP (not HTTPS) - only works on native platforms
         const generalBaseUrl = process.env.SEOUL_OPEN_API_BASE_URL || 'http://openapi.seoul.go.kr:8088';
-        const url = `${generalBaseUrl}/${apiKey}/json/SearchSTNTimeTableByIDService/1/500/${stationCode}/${weekTag}/${inoutTag}/`;
+        const url = `${generalBaseUrl}/${apiKey}/json/SearchSTNTimeTableByIDService/1/30/${stationCode}/${weekTag}/${inoutTag}/`;
 
         const response = await this.fetchWithTimeout(url);
         const data: SeoulTimetableResponse = await response.json();

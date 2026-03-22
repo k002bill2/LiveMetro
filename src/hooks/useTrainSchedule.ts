@@ -18,8 +18,8 @@ interface TimetableCacheEntry {
   timestamp: number;
 }
 
-const getTimetableCacheKey = (stationCode: string, weekTag: string, direction: string): string =>
-  `timetable:${stationCode}:${weekTag}:${direction}`;
+const getTimetableCacheKey = (stationCode: string, lineNumber: string, weekTag: string, direction: string): string =>
+  `timetable:${stationCode}:${lineNumber}:${weekTag}:${direction}`;
 
 const getCachedTimetable = async (cacheKey: string): Promise<SeoulTimetableRow[] | null> => {
   try {
@@ -164,7 +164,7 @@ export const useTrainSchedule = (
 
       // 현재 요일 기준 시간표 조회 (캐시 우선)
       const weekTag = getCurrentWeekTag();
-      const cacheKey = getTimetableCacheKey(stationCode, weekTag, direction);
+      const cacheKey = getTimetableCacheKey(stationCode, lineNumber, weekTag, direction);
 
       const cached = await getCachedTimetable(cacheKey);
       let data: SeoulTimetableRow[];
@@ -189,8 +189,13 @@ export const useTrainSchedule = (
       );
       setSchedules(convertedData);
 
-      // 전체 시간표를 upcomingTrains에도 할당 (필터링 제거)
-      setUpcomingTrains(convertedData);
+      // 현재 시각 이후 열차만 필터링
+      const now = new Date();
+      const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
+      const upcoming = convertedData.filter(
+        (item) => item.arrivalTime >= currentTimeStr
+      );
+      setUpcomingTrains(upcoming);
     } catch (err) {
       console.error('Error fetching train schedule:', err);
       setError('시간표를 불러오는데 실패했습니다.');

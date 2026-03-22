@@ -103,26 +103,28 @@ describe('DataManager', () => {
       });
     });
 
-    describe('Tier 2: Firebase Firestore (Backup)', () => {
-      it('should fallback to Firebase when Seoul API fails', async () => {
-        const error = new Error('Seoul API unavailable');
-        mockSeoulApi.getRealtimeArrival.mockRejectedValue(error);
-
-        // Mock Firebase success (this would be mocked in firebase config)
-        // Firebase would return partial data like mockTrains.slice(0, 1)
-
+    describe('Stale-While-Revalidate Pattern', () => {
+      it('should return cached data immediately when available', async () => {
+        // Prime the cache with first call
+        mockSeoulApi.getRealtimeArrival.mockResolvedValue(mockTrains as never);
         await dataManager.getRealtimeTrains('강남역');
 
-        expect(mockSeoulApi.getRealtimeArrival).toHaveBeenCalled();
-        // Would expect Firebase fallback logic here in real implementation
+        // Reset mock to track second call
+        mockSeoulApi.getRealtimeArrival.mockClear();
+
+        // Second call should return cached data (SWR: immediate response)
+        const result = await dataManager.getRealtimeTrains('강남역');
+
+        expect(result).not.toBeNull();
+        expect(result?.trains).toBeDefined();
       });
 
-      it('should sync successful API data to Firebase', async () => {
-        mockSeoulApi.getRealtimeArrival.mockResolvedValue(mockTrains as never);
+      it('should return null when Seoul API fails and no cache', async () => {
+        mockSeoulApi.getRealtimeArrival.mockRejectedValue(new Error('API error'));
 
-        await dataManager.getRealtimeTrains('강남역');
+        const result = await dataManager.getRealtimeTrains('강남역');
 
-        // In real implementation, would verify Firebase write operations
+        expect(result).toBeNull();
         expect(mockSeoulApi.getRealtimeArrival).toHaveBeenCalled();
       });
     });

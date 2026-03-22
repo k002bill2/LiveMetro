@@ -45,20 +45,36 @@ class DataManager {
 
   private subscribers: Map<string, ((data: any) => void)[]> = new Map();
   private activeIntervals: Map<string, ReturnType<typeof setInterval>> = new Map();
-  private syncQueue: (() => Promise<void>)[] = [];
-  private isProcessingQueue = false;
 
   /**
-   * Get realtime train data with multi-tier fallback
-   * Priority: Seoul API -> Firebase -> Local Cache
+   * Get realtime train data with Stale-While-Revalidate pattern
+   * 1. Cache hit → return immediately (even if stale)
+   * 2. Background: fetch from Seoul API → update cache
+   * 3. Cache miss → await Seoul API directly
    */
   async getRealtimeTrains(stationName: string): Promise<RealtimeTrainData | null> {
     const cacheKey = `realtime_trains_${stationName}`;
-    
+
+    // Check cache first (Stale-While-Revalidate)
+    const cachedData = await this.getCachedData<RealtimeTrainData>(cacheKey);
+
+    if (cachedData) {
+      // Return cached data immediately, refresh in background
+      this.refreshInBackground(stationName, cacheKey);
+      return cachedData;
+    }
+
+    // No cache → must await Seoul API
+    return this.fetchFromSeoulApi(stationName, cacheKey);
+  }
+
+  /**
+   * Fetch fresh data from Seoul API and update cache
+   */
+  private async fetchFromSeoulApi(stationName: string, cacheKey: string): Promise<RealtimeTrainData | null> {
     try {
-      // Try Seoul API first (most up-to-date data)
       const seoulData = await seoulSubwayApi.getRealtimeArrival(stationName);
-      
+
       if (seoulData.length > 0) {
         const trains: Train[] = seoulData.map(arrival => this.convertSeoulToTrain(arrival));
         const result: RealtimeTrainData = {
@@ -67,68 +83,44 @@ class DataManager {
           lastUpdated: new Date()
         };
 
-        // Cache the fresh data
         await this.setCachedData(cacheKey, result, this.DEFAULT_CACHE_DURATION);
-        
-        // Also update Firebase for other users
-        this.queueFirebaseSync(stationName, trains);
-        
         this.updateSyncStatus(true);
         return result;
       }
+
+      // API returned empty data
+      this.updateSyncStatus(true);
+      return { stationId: stationName, trains: [], lastUpdated: new Date() };
     } catch (error) {
-      console.warn('Seoul API failed, trying Firebase:', error);
+      console.warn('Seoul API failed:', error);
       this.updateSyncStatus(false, error instanceof Error ? error.message : 'Seoul API error');
+      return null;
     }
+  }
 
-    try {
-      // First try to get station from local data by name
-      const localStation = getLocalStationByName(stationName);
-      const stationId = localStation?.id;
-
-      if (stationId) {
-        // Try Firebase with the correct station ID (5-second timeout)
-        const firebaseStation = await trainService.getStation(stationId);
-        if (firebaseStation) {
-          const FIREBASE_TIMEOUT_MS = 5000;
-          const result = await Promise.race([
-            new Promise<RealtimeTrainData>((resolve) => {
-              const unsubscribe = trainService.subscribeToTrainUpdates(
-                firebaseStation.id,
-                (trains) => {
-                  unsubscribe();
-                  const data: RealtimeTrainData = {
-                    stationId: firebaseStation.id,
-                    trains,
-                    lastUpdated: new Date()
-                  };
-                  this.setCachedData(cacheKey, data, this.DEFAULT_CACHE_DURATION);
-                  resolve(data);
-                }
-              );
-              // Cleanup on timeout
-              setTimeout(() => unsubscribe(), FIREBASE_TIMEOUT_MS);
-            }),
-            new Promise<null>((resolve) =>
-              setTimeout(() => resolve(null), FIREBASE_TIMEOUT_MS)
-            ),
-          ]);
-          if (result) return result;
+  /**
+   * Refresh data in background without blocking the caller.
+   * Notifies subscribers when fresh data arrives.
+   */
+  private refreshInBackground(stationName: string, cacheKey: string): void {
+    this.fetchFromSeoulApi(stationName, cacheKey)
+      .then((result) => {
+        if (result) {
+          this.notifySubscribers(stationName, result);
         }
-      }
-    } catch (error) {
-      console.warn('Firebase failed, trying cache:', error);
-    }
+      })
+      .catch(() => {
+        // Background refresh failure is non-critical, already returned cached data
+      });
+  }
 
-    // Final fallback to local cache
-    const cachedData = await this.getCachedData<RealtimeTrainData>(cacheKey);
-    if (cachedData) {
-      console.log('Using cached data for', stationName);
-      return cachedData;
-    }
-
-    console.error('No data available for station:', stationName);
-    return null;
+  /**
+   * Notify all subscribers for a station with fresh data
+   */
+  private notifySubscribers(stationName: string, data: RealtimeTrainData): void {
+    const subscriptionKey = `realtime_${stationName}`;
+    const callbacks = this.subscribers.get(subscriptionKey);
+    callbacks?.forEach(cb => cb(data));
   }
 
   /**
@@ -384,8 +376,6 @@ class DataManager {
    */
   destroy(): void {
     this.unsubscribeAll();
-    this.syncQueue = [];
-    this.isProcessingQueue = false;
   }
 
   /**
@@ -517,38 +507,6 @@ class DataManager {
       delayMinutes: converted.arrivalTime && converted.arrivalTime > 300 ? 
         Math.floor(converted.arrivalTime / 60) : 0
     };
-  }
-
-  private queueFirebaseSync(stationId: string, trains: Train[]): void {
-    this.syncQueue.push(async () => {
-      try {
-        // In a real implementation, you would sync this data to Firebase
-        console.log(`Queued Firebase sync for station ${stationId} with ${trains.length} trains`);
-      } catch (error) {
-        console.error('Firebase sync failed:', error);
-      }
-    });
-
-    this.processQueue();
-  }
-
-  private async processQueue(): Promise<void> {
-    if (this.isProcessingQueue || this.syncQueue.length === 0) return;
-
-    this.isProcessingQueue = true;
-    
-    while (this.syncQueue.length > 0) {
-      const syncOperation = this.syncQueue.shift();
-      if (syncOperation) {
-        try {
-          await syncOperation();
-        } catch (error) {
-          console.error('Sync operation failed:', error);
-        }
-      }
-    }
-
-    this.isProcessingQueue = false;
   }
 
   private updateSyncStatus(isOnline: boolean, error?: string): void {
