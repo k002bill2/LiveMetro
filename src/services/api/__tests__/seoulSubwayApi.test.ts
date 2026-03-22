@@ -16,7 +16,7 @@ jest.resetModules();
 // Unmock the seoulSubwayApi module to test actual implementation
 jest.unmock('../seoulSubwayApi');
 
-// Mock fetch globally
+// Mock fetch globally - must be const since module captures reference at load time
 const mockFetch = jest.fn();
 global.fetch = mockFetch;
 
@@ -52,11 +52,16 @@ interface SeoulRealtimeArrival {
   arvlCd: string;
 }
 
+// Increase timeout for retry delay tests (3 retries × 3s backoff = ~9s)
+jest.setTimeout(30000);
+
 describe('SeoulSubwayApiService', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
-    // Clear rate limiter to avoid throttling between tests
+    // mockReset clears calls + once-implementations (specificMockImpls)
+    mockFetch.mockReset();
+    // Clear rate limiter and in-flight requests to avoid cross-test contamination
     seoulSubwayApi.getRateLimiter().clear();
+    seoulSubwayApi.clearInflightRequests();
   });
 
   describe('getRealtimeArrival', () => {
@@ -445,6 +450,75 @@ describe('SeoulSubwayApiService', () => {
       await expect(seoulSubwayApi.getStationTimetable('0222', '1', '1')).rejects.toThrow(
         '시간표 정보를 가져오는데 실패했습니다'
       );
+    });
+  });
+
+  describe('request deduplication', () => {
+    it('should deduplicate concurrent requests for same station', async () => {
+      const mockData = {
+        realtimeArrivalList: [
+          {
+            rowNum: '1', selectedCount: '1', totalCount: '1',
+            subwayId: '1002', updnLine: '상행', trainLineNm: '2호선',
+            subwayHeading: '시청', statnFid: '0221', statnTid: '0223',
+            statnId: '0222', statnNm: '강남', trainCo: '', ordkey: '01',
+            subwayList: '', statnList: '', btrainSttus: '일반', barvlDt: '',
+            btrainNo: '2145', bstatnId: '0250', bstatnNm: '시청',
+            recptnDt: '2024-01-01 12:00:00', arvlMsg2: '2분후', arvlMsg3: '', arvlCd: '2',
+          },
+        ],
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockData),
+      });
+
+      // Fire two concurrent requests for the same station
+      const [result1, result2] = await Promise.all([
+        seoulSubwayApi.getRealtimeArrival('강남'),
+        seoulSubwayApi.getRealtimeArrival('강남'),
+      ]);
+
+      // Both should return same data
+      expect(result1).toEqual(result2);
+      // fetch should only be called once (deduplication)
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('should make new request after previous one completes', async () => {
+      const mockData = {
+        realtimeArrivalList: [],
+      };
+
+      mockFetch
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockData) })
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockData) });
+
+      // First request
+      await seoulSubwayApi.getRealtimeArrival('역삼');
+      // Clear rate limiter between sequential calls to same station
+      seoulSubwayApi.getRateLimiter().clear();
+      // Second request (after first completes)
+      await seoulSubwayApi.getRealtimeArrival('역삼');
+
+      // Two separate fetches
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('should not deduplicate requests for different stations', async () => {
+      const mockData = { realtimeArrivalList: [] };
+
+      mockFetch
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockData) })
+        .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(mockData) });
+
+      await Promise.all([
+        seoulSubwayApi.getRealtimeArrival('강남'),
+        seoulSubwayApi.getRealtimeArrival('역삼'),
+      ]);
+
+      expect(mockFetch).toHaveBeenCalledTimes(2);
     });
   });
 

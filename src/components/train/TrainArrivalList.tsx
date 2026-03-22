@@ -10,9 +10,9 @@ import { COLORS, RADIUS, SHADOWS, SPACING, TYPOGRAPHY } from '../../styles/moder
 
 import { Train, TrainStatus } from '../../models/train';
 import { trainService } from '../../services/train/trainService';
-import { seoulSubwayApi } from '../../services/api/seoulSubwayApi';
 import { getLocalStation } from '../../services/data/stationsDataService';
-import { performanceMonitor, throttle } from '../../utils/performanceUtils';
+import { dataManager, RealtimeTrainData } from '../../services/data/dataManager';
+import { throttle } from '../../utils/performanceUtils';
 
 interface TrainArrivalListProps {
   stationId: string;
@@ -145,12 +145,10 @@ export const TrainArrivalList: React.FC<TrainArrivalListProps> = memo(({ station
   // Memoize the update handler to prevent unnecessary re-renders
   const handleTrainUpdate = useCallback(
     (updatedTrains: Train[]) => {
-      performanceMonitor.startMeasure(`train_update_${stationId}`);
       setTrains(updatedTrains);
       setLoading(false);
-      performanceMonitor.endMeasure(`train_update_${stationId}`);
     },
-    [stationId]
+    []
   );
 
   // Throttle subscription updates to improve performance
@@ -279,140 +277,63 @@ export const TrainArrivalList: React.FC<TrainArrivalListProps> = memo(({ station
       return () => clearInterval(interval);
     }
 
-    let unsubscribe: (() => void) | undefined;
-    let pollingInterval: ReturnType<typeof setInterval> | undefined;
-    let isMounted = true;
-
-    /**
-     * Convert Seoul API response to app Train model
-     */
-    const convertToTrain = (
-      arrival: Awaited<ReturnType<typeof seoulSubwayApi.getRealtimeArrival>>[number],
-      index: number
-    ): Train => {
-      const now = new Date();
-      let arrivalTime: Date | null = null;
-
-      // Parse arrival time from barvlDt (seconds) or arvlMsg2
-      if (arrival.barvlDt) {
-        const seconds = parseInt(arrival.barvlDt, 10);
-        if (!isNaN(seconds)) {
-          arrivalTime = new Date(now.getTime() + seconds * 1000);
-        }
+    // Resolve station name for DataManager (needs Korean name, not ID)
+    const resolveAndSubscribe = async (): Promise<void> => {
+      let stationName = stationNameProp || resolvedStationNameRef.current;
+      if (!stationName) {
+        const station = await trainService.getStation(stationId);
+        const localStation = getLocalStation(stationId);
+        stationName = station?.name || localStation?.name || stationId;
+        resolvedStationNameRef.current = stationName;
       }
 
-      // Fallback: parse from arrival message (e.g., "3분 후", "곧 도착")
-      if (!arrivalTime && arrival.arvlMsg2) {
-        const minuteMatch = arrival.arvlMsg2.match(/(\d+)분/);
-        if (minuteMatch?.[1]) {
-          arrivalTime = new Date(now.getTime() + parseInt(minuteMatch[1], 10) * 60 * 1000);
-        } else if (arrival.arvlMsg2.includes('곧 도착') || arrival.arvlMsg2.includes('진입')) {
-          arrivalTime = new Date(now.getTime() + 30 * 1000);
-        }
-      }
-
-      return {
-        id: `seoul-${arrival.statnId}-${arrival.btrainNo || index}`,
-        lineId: arrival.subwayId || '',
-        direction: arrival.updnLine === '상행' || arrival.updnLine === '내선' ? 'up' : 'down',
-        currentStationId: arrival.statnId || stationId,
-        nextStationId: arrival.statnTid || null,
-        finalDestination: arrival.bstatnNm || arrival.trainLineNm || '행선지 미정',
-        status: TrainStatus.NORMAL,
-        arrivalTime,
-        delayMinutes: 0,
-        lastUpdated: now,
-      };
-    };
-
-    /**
-     * Fetch real-time arrivals from Seoul Open API
-     */
-    const fetchRealtimeArrivals = async (): Promise<void> => {
-      if (!isMounted) return;
-
-      try {
-        performanceMonitor.startMeasure(`api_fetch_${stationId}`);
-
-        // Use cached resolved name to avoid redundant DB reads on every poll cycle
-        // Fallback chain: stationNameProp → cached → Firebase → LocalData → stationId
-        let stationName = stationNameProp || resolvedStationNameRef.current;
-        if (!stationName) {
-          const station = await trainService.getStation(stationId);
-          const localStation = getLocalStation(stationId);
-          stationName = station?.name || localStation?.name || stationId;
-          resolvedStationNameRef.current = stationName;
-        }
-
-        const arrivals = await seoulSubwayApi.getRealtimeArrival(stationName);
-
-        if (!isMounted) return;
-
-        setError(null);
-
-        if (arrivals.length > 0) {
-          const convertedTrains = arrivals
-            .map((arrival, idx) => convertToTrain(arrival, idx))
-            .filter(train => train.arrivalTime !== null)
-            .sort((a, b) => {
+      // Subscribe via DataManager (handles polling, caching, SWR, dedup)
+      unsubscribe = dataManager.subscribeToRealtimeUpdates(
+        stationName,
+        (data: RealtimeTrainData | null) => {
+          if (data) {
+            setError(null);
+            const sorted = [...data.trains].sort((a, b) => {
               const aTime = a.arrivalTime?.getTime() || 0;
               const bTime = b.arrivalTime?.getTime() || 0;
               return aTime - bTime;
             });
-
-          throttledUpdate(convertedTrains);
-        } else {
-          throttledUpdate([]);
-        }
-
-        performanceMonitor.endMeasure(`api_fetch_${stationId}`);
-      } catch (err) {
-        console.error('Failed to fetch realtime arrivals:', err);
-        if (isMounted) {
-          setError(err instanceof Error ? err.message : '도착정보를 불러올 수 없습니다');
-          setLoading(false);
-        }
-      }
+            throttledUpdate(sorted);
+          } else {
+            throttledUpdate([]);
+          }
+        },
+        35000 // 30s rate limit + 5s buffer
+      );
     };
+
+    let unsubscribe: (() => void) | undefined;
 
     // Expose for retry button
-    retryRef.current = () => { fetchRealtimeArrivals(); };
-
-    // Try Firebase subscription first, then fallback to Seoul API polling
-    const subscribeToUpdates = (): void => {
+    retryRef.current = () => {
       setLoading(true);
-      performanceMonitor.startMeasure(`subscription_${stationId}`);
-
-      // Subscribe to Firebase (for when backend sync is available)
-      unsubscribe = trainService.subscribeToTrainUpdates(stationId, (firebaseTrains) => {
-        // If Firebase has data, use it
-        if (firebaseTrains.length > 0) {
-          throttledUpdate(firebaseTrains);
-        }
+      setError(null);
+      // Force re-subscribe
+      if (unsubscribe) unsubscribe();
+      resolveAndSubscribe().catch((err) => {
+        setError(err instanceof Error ? err.message : '도착정보를 불러올 수 없습니다');
+        setLoading(false);
       });
-
-      // Also fetch directly from Seoul API (primary data source)
-      fetchRealtimeArrivals();
-
-      // Poll every 35 seconds (30s rate limit + 5s buffer)
-      pollingInterval = setInterval(fetchRealtimeArrivals, 35000);
-
-      performanceMonitor.endMeasure(`subscription_${stationId}`);
     };
 
-    subscribeToUpdates();
+    setLoading(true);
+    resolveAndSubscribe().catch((err) => {
+      setError(err instanceof Error ? err.message : '도착정보를 불러올 수 없습니다');
+      setLoading(false);
+    });
 
     return () => {
-      isMounted = false;
       resolvedStationNameRef.current = null;
       if (unsubscribe) {
         unsubscribe();
       }
-      if (pollingInterval) {
-        clearInterval(pollingInterval);
-      }
     };
-  }, [stationId, throttledUpdate]);
+  }, [stationId, stationNameProp, throttledUpdate]);
 
   const handleRetry = useCallback((): void => {
     setError(null);

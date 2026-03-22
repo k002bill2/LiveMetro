@@ -21,7 +21,7 @@ import { getSubwayLineColor, getLineTextColor } from '@utils/colorUtils';
 import { getLocalStationsByLine } from '@services/data/stationsDataService';
 import { useFavorites } from '@hooks/useFavorites';
 import type { Station } from '@models/train';
-import type { AppStackParamList } from '@navigation/types';
+import type { AppStackParamList } from '@/navigation/types';
 
 interface StationDisplay {
   readonly id: string;
