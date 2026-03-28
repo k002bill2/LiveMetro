@@ -54,7 +54,9 @@ interface SeoulRealtimeArrival {
 
 describe('SeoulSubwayApiService', () => {
   beforeEach(() => {
-    jest.clearAllMocks();
+    // mockReset clears both call history AND unconsumed mockResolvedValueOnce/mockRejectedValueOnce queues
+    // jest.clearAllMocks only clears call history, leaving queued values to leak between tests
+    mockFetch.mockReset();
     // Clear rate limiter to avoid throttling between tests
     seoulSubwayApi.getRateLimiter().clear();
   });
@@ -135,9 +137,8 @@ describe('SeoulSubwayApiService', () => {
     });
 
     it('should throw error on network failure after retries', async () => {
-      // With retry logic, need to mock multiple failures (3 retries)
+      // withRetry maxAttempts = 2, so mock exactly 2 failures
       mockFetch
-        .mockRejectedValueOnce(new Error('Network error'))
         .mockRejectedValueOnce(new Error('Network error'))
         .mockRejectedValueOnce(new Error('Network error'));
 
@@ -147,13 +148,8 @@ describe('SeoulSubwayApiService', () => {
     });
 
     it('should throw error on HTTP error status after retries', async () => {
-      // Mock multiple HTTP errors for retry
+      // withRetry maxAttempts = 2, so mock exactly 2 failures
       mockFetch
-        .mockResolvedValueOnce({
-          ok: false,
-          status: 503,
-          statusText: 'Service Unavailable',
-        })
         .mockResolvedValueOnce({
           ok: false,
           status: 503,
@@ -221,20 +217,12 @@ describe('SeoulSubwayApiService', () => {
         },
       };
 
-      // Mock 3 failures for retry exhaustion
-      mockFetch
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockError),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockError),
-        })
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockError),
-        });
+      // Inner catch wraps error as '역 정보를 가져오는데 실패했습니다: Seoul API Error: ...'
+      // withRetry sees 'Seoul API Error' in message → throws immediately (no retry)
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockError),
+      });
 
       await expect(seoulSubwayApi.getStationsByLine('99')).rejects.toThrow(
         '역 정보를 가져오는데 실패했습니다'
@@ -253,12 +241,8 @@ describe('SeoulSubwayApiService', () => {
         },
       };
 
-      // Mock 3 failures for retry exhaustion
+      // withRetry maxAttempts = 2
       mockFetch
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockData),
-        })
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockData),
@@ -315,14 +299,13 @@ describe('SeoulSubwayApiService', () => {
         },
       };
 
-      // With retry logic, failures will be retried 3 times
-      // For lines 0, 3, 6 (i % 3 === 0), mock 3 failures each
+      // withRetry maxAttempts = 2
+      // For lines 0, 3, 6 (i % 3 === 0), mock 2 failures each
       // For other lines, mock success
       for (let i = 0; i < 9; i++) {
         if (i % 3 === 0) {
-          // Mock 3 failures for retry exhaustion
+          // Mock 2 failures for retry exhaustion (maxAttempts = 2)
           mockFetch
-            .mockRejectedValueOnce(new Error('Network error'))
             .mockRejectedValueOnce(new Error('Network error'))
             .mockRejectedValueOnce(new Error('Network error'));
         } else {
@@ -352,9 +335,8 @@ describe('SeoulSubwayApiService', () => {
     });
 
     it('should return false when API is unavailable', async () => {
-      // Mock 3 failures for retry exhaustion
+      // withRetry maxAttempts = 2
       mockFetch
-        .mockRejectedValueOnce(new Error('Network error'))
         .mockRejectedValueOnce(new Error('Network error'))
         .mockRejectedValueOnce(new Error('Network error'));
 
@@ -427,12 +409,8 @@ describe('SeoulSubwayApiService', () => {
         },
       };
 
-      // Mock 3 failures for retry exhaustion
+      // withRetry maxAttempts = 2
       mockFetch
-        .mockResolvedValueOnce({
-          ok: true,
-          json: () => Promise.resolve(mockData),
-        })
         .mockResolvedValueOnce({
           ok: true,
           json: () => Promise.resolve(mockData),
@@ -592,11 +570,11 @@ describe('SeoulSubwayApiService', () => {
 
   describe('fetchWithTimeout', () => {
     it('should handle AbortError correctly after retries', async () => {
-      // Simulate abort error (timeout) - needs 3 failures for retry exhaustion
+      // fetchWithTimeout converts AbortError to 'API 요청 시간이 초과되었습니다.'
+      // withRetry sees this and retries (maxAttempts = 2)
       const abortError = new Error('Aborted');
       abortError.name = 'AbortError';
       mockFetch
-        .mockRejectedValueOnce(abortError)
         .mockRejectedValueOnce(abortError)
         .mockRejectedValueOnce(abortError);
 
