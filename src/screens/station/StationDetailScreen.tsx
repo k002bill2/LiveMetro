@@ -194,24 +194,30 @@ const StationDetailScreen: React.FC = () => {
       return [];
     }
 
+    const now = Date.now();
+
     return realtimeTrains.map((train) => {
-      // 도착 시간 계산
-      const timeUntilArrival = train.arrivalTime
-        ? Math.max(0, Math.floor((train.arrivalTime.getTime() - Date.now()) / 1000))
-        : 0;
+      let timeString: string;
 
-      const minutes = Math.floor(timeUntilArrival / 60);
-      const seconds = timeUntilArrival % 60;
-
-      let timeString = '';
-      if (minutes > 0 && seconds > 0) {
-        timeString = `${minutes}분 ${seconds}초`;
-      } else if (minutes > 0) {
-        timeString = `${minutes}분`;
-      } else if (seconds > 0) {
-        timeString = `${seconds}초`;
+      if (!train.arrivalTime) {
+        timeString = '정보 확인 중';
       } else {
-        timeString = '곧 도착';
+        const timeUntilArrival = Math.max(
+          0,
+          Math.floor((train.arrivalTime.getTime() - now) / 1000)
+        );
+        const minutes = Math.floor(timeUntilArrival / 60);
+        const seconds = timeUntilArrival % 60;
+
+        if (timeUntilArrival === 0) {
+          timeString = '곧 도착';
+        } else if (minutes > 0 && seconds > 0) {
+          timeString = `${minutes}분 ${seconds}초`;
+        } else if (minutes > 0) {
+          timeString = `${minutes}분`;
+        } else {
+          timeString = `${seconds}초`;
+        }
       }
 
       return {

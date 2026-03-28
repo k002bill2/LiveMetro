@@ -533,24 +533,73 @@ class SeoulSubwayApiService {
     destinationStation: string;
     lastUpdated: Date;
   } {
-    // Parse arrival time from message
+    // Primary: use barvlDt (exact remaining seconds from Seoul API)
     let arrivalTime: number | null = null;
-    const arrivalMsg = seoulData.arvlMsg2 || seoulData.arvlMsg3 || '';
-    
-    // Extract minutes from messages like "2분후[1번째전]", "곧 도착[0번째전]"
-    const minuteMatch = arrivalMsg.match(/(\d+)분후/);
-    if (minuteMatch && minuteMatch[1]) {
-      arrivalTime = parseInt(minuteMatch[1], 10) * 60; // Convert to seconds
-    } else if (arrivalMsg.includes('곧 도착') || arrivalMsg.includes('진입')) {
-      arrivalTime = 30; // 30 seconds for "arriving soon"
+
+    if (seoulData.barvlDt) {
+      const seconds = parseInt(seoulData.barvlDt, 10);
+      if (!isNaN(seconds) && seconds >= 0) {
+        arrivalTime = seconds;
+      }
     }
+
+    // Fallback: parse arrival message text when barvlDt is unavailable
+    if (arrivalTime === null) {
+      const arrivalMsg = seoulData.arvlMsg2 || seoulData.arvlMsg3 || '';
+
+      // "X분 Y초후" pattern (e.g., "3분 20초후")
+      const minSecMatch = arrivalMsg.match(/(\d+)분\s*(\d+)초/);
+      if (minSecMatch?.[1] && minSecMatch[2]) {
+        arrivalTime = parseInt(minSecMatch[1], 10) * 60 + parseInt(minSecMatch[2], 10);
+      }
+
+      // "X분후" pattern (e.g., "2분후[1번째전]")
+      if (arrivalTime === null) {
+        const minuteMatch = arrivalMsg.match(/(\d+)분후/);
+        if (minuteMatch?.[1]) {
+          arrivalTime = parseInt(minuteMatch[1], 10) * 60;
+        }
+      }
+
+      // Station proximity patterns
+      if (arrivalTime === null) {
+        if (arrivalMsg.includes('곧 도착') || arrivalMsg.includes('진입')) {
+          arrivalTime = 30;
+        } else if (arrivalMsg.includes('도착') || arrivalMsg.includes('출발')) {
+          arrivalTime = 0;
+        }
+      }
+    }
+
+    // arvlCd fallback: 0=진입, 1=도착, 2=출발, 3=전역출발, 4=전역진입, 5=전역도착
+    // 전역(前驛) = 이전 역. 순서: 전역진입→전역도착→전역출발→당역진입→당역도착→당역출발
+    if (arrivalTime === null && seoulData.arvlCd) {
+      const code = seoulData.arvlCd;
+      if (code === '0') {
+        arrivalTime = 30;  // 당역 진입 → 곧 도착
+      } else if (code === '1') {
+        arrivalTime = 0;   // 당역 도착
+      } else if (code === '2') {
+        arrivalTime = null; // 당역 출발 → 이미 지남, 표시 제외
+      } else if (code === '3') {
+        arrivalTime = 120; // 전역 출발 → 약 2분 (이동 중)
+      } else if (code === '4') {
+        arrivalTime = 180; // 전역 진입 → 약 3분 (가장 먼 상태)
+      } else if (code === '5') {
+        arrivalTime = 150; // 전역 도착 → 약 2.5분 (정차 중)
+      }
+    }
+
+    // Direction: handle Line 2 circular (내선/외선)
+    const updnLine = seoulData.updnLine;
+    const direction = (updnLine === '상행' || updnLine === '내선') ? 'up' : 'down';
 
     return {
       lineId: seoulData.subwayId || seoulData.trainLineNm,
       stationId: seoulData.statnId,
       stationName: seoulData.statnNm,
-      direction: seoulData.updnLine === '상행' ? 'up' : 'down',
-      arrivalMessage: arrivalMsg,
+      direction,
+      arrivalMessage: seoulData.arvlMsg2 || seoulData.arvlMsg3 || '',
       arrivalTime,
       trainNumber: seoulData.btrainNo || '',
       destinationStation: seoulData.bstatnNm || seoulData.subwayHeading || '',

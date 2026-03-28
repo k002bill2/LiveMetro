@@ -99,8 +99,9 @@ export const useRealtimeTrains = (
       if (retryCountRef.current >= retryAttempts) {
         handleError(`최대 재시도 횟수(${retryAttempts})에 도달했습니다.`);
       } else {
-        updateState({ 
-          error: `데이터 로드 실패, 재시도 중... (${retryCountRef.current}/${retryAttempts})` 
+        updateState({
+          loading: false,
+          error: `데이터 로드 실패, 재시도 중... (${retryCountRef.current}/${retryAttempts})`
         });
       }
     }

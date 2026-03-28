@@ -501,11 +501,12 @@ class DataManager {
       nextStationId: null,
       finalDestination: converted.destinationStation || '종착역 미확인',
       direction: converted.direction === 'up' ? 'up' : 'down',
-      arrivalTime: converted.arrivalTime ? new Date(Date.now() + converted.arrivalTime * 1000) : null,
+      arrivalTime: converted.arrivalTime !== null
+        ? new Date(Date.now() + converted.arrivalTime * 1000)
+        : null,
       status: TrainStatus.NORMAL,
       lastUpdated: converted.lastUpdated,
-      delayMinutes: converted.arrivalTime && converted.arrivalTime > 300 ? 
-        Math.floor(converted.arrivalTime / 60) : 0
+      delayMinutes: 0, // Seoul API doesn't provide schedule deviation; use detectDelays() separately
     };
   }
 
