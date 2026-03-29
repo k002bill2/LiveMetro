@@ -306,6 +306,47 @@ module.exports = {
 };
 ```
 
+## BANNED Patterns (Hard Failures)
+
+테스트 코드에서 아래 패턴은 즉시 수정 대상입니다.
+
+### Mock Patterns
+| BANNED | USE INSTEAD | WHY |
+|--------|-------------|-----|
+| `jest.fn()` 외부 선언 → `jest.mock()` 내부 참조 | `jest.mock()` factory 내부에 inline 정의 | jest.mock 호이스팅으로 undefined 됨 |
+| `as any`로 mock 타입 우회 | 올바른 mock 타입 또는 `as jest.Mock` | 타입 안전성 무력화 |
+| `getByText('로그인')` (중복 텍스트) | `getByTestId('login-button')` | "Found multiple elements" 에러 |
+| `expect(component).toBeTruthy()` (존재만 확인) | 구체적 assertion (`toHaveTextContent`, `toBeVisible`) | 의미 없는 테스트 |
+| 실제 API 호출 (`fetch` unmocked) | `jest.mock` 또는 MSW | 테스트 불안정 + API 부하 |
+| `act()` 없이 상태 업데이트 | `await act(async () => {...})` | "act() warning" 발생 |
+
+### Structure Patterns
+| BANNED | USE INSTEAD |
+|--------|-------------|
+| 한 `it` 블록에 5+ assertion | 시나리오별 분리 |
+| `beforeAll`에서 mutable 상태 공유 | `beforeEach`에서 초기화 |
+| 구현 세부사항 테스트 (내부 state 직접 검사) | 사용자 행동 기반 테스트 |
+| snapshot만으로 충분하다고 판단 | snapshot + 행동 테스트 병행 |
+| cleanup 없는 타이머 mock | `jest.useFakeTimers()` + `jest.useRealTimers()` in afterEach |
+
+### Output Patterns (LLM Laziness 방지)
+| BANNED | REQUIRED |
+|--------|----------|
+| `// ... similar tests for other cases` | 모든 케이스를 명시적으로 작성 |
+| `// Add more tests as needed` | 필요한 테스트를 모두 작성 |
+| Happy path만 테스트 | Happy + Error + Edge 전부 |
+
+## Pre-Output Checklist
+
+테스트 코드 출력 전 반드시 확인:
+- [ ] 모든 외부 의존성이 mock되었는가?
+- [ ] `beforeEach`에서 `jest.clearAllMocks()` 호출하는가?
+- [ ] Error 케이스 테스트가 포함되었는가?
+- [ ] Edge 케이스 (null, undefined, 빈 배열) 테스트가 포함되었는가?
+- [ ] 비동기 테스트에 `waitFor` 또는 `act`가 사용되었는가?
+- [ ] Firebase/타이머 구독의 cleanup 테스트가 있는가?
+- [ ] mock 변수가 `jest.mock()` factory 내부에 inline 정의되었는가?
+
 ## Running Tests
 
 ```bash
@@ -320,7 +361,3 @@ npm test -- -t "renders correctly"                # Specific test name
 - [React Native Testing Library](https://callstack.github.io/react-native-testing-library/)
 - [Jest Documentation](https://jestjs.io/docs/getting-started)
 - [Testing Hooks](https://callstack.github.io/react-native-testing-library/docs/api#renderhook)
-
----
-
-*Use this skill to maintain high test coverage and ensure code quality in LiveMetro.*
