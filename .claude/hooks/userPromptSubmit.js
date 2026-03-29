@@ -253,7 +253,7 @@ function shouldActivateSkill(prompt, rule) {
 // --- Gemini 크로스 리뷰 결과 확인 ---
 function checkPendingGeminiReviews() {
   try {
-    const stateFile = path.join(PROJECT_ROOT, '.claude', 'coordination', 'gemini-state.json');
+    const stateFile = path.join(PROJECT_ROOT, '.claude', 'gemini-bridge', 'gemini-state.json');
     if (!fs.existsSync(stateFile)) return null;
 
     const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
@@ -369,19 +369,7 @@ function recommendAgents(prompt) {
   const lowerPrompt = prompt.toLowerCase();
   const recommended = [];
 
-  if (/^\/resume\b/i.test(prompt.trim())) {
-    try {
-      const cpMgr = require('../coordination/checkpoint-manager');
-      const checkpoints = cpMgr.listCheckpoints(3);
-      if (checkpoints.length > 0) {
-        let cpMsg = '[CHECKPOINT CONTEXT]';
-        for (const cp of checkpoints) {
-          cpMsg += `\n  ${cp.timestamp} | ${cp.trigger} | ${cp.description}`;
-        }
-        console.log(cpMsg);
-      }
-    } catch {}
-  }
+  // /resume handled via dev-docs system
 
   if (fs.existsSync(RULES_PATH)) {
     try {

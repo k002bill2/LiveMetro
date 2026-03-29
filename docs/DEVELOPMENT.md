@@ -3,11 +3,10 @@
 ## Table of Contents
 1. [Architecture Overview](#architecture-overview)
 2. [Development Workflows](#development-workflows)
-3. [ACE Framework Integration](#ace-framework-integration)
-4. [Validation Gates](#validation-gates)
-5. [Common Patterns](#common-patterns)
-6. [Testing Requirements](#testing-requirements)
-7. [Troubleshooting](#troubleshooting)
+3. [Validation Gates](#validation-gates)
+4. [Common Patterns](#common-patterns)
+5. [Testing Requirements](#testing-requirements)
+6. [Troubleshooting](#troubleshooting)
 
 ---
 
@@ -116,7 +115,7 @@ git commit -m "feat: add station card component"
 # 1. Primary Agent invokes parallel-coordinator skill
 Skill parallel-coordinator
 
-# 2. Primary Agent decomposes task using ACE Layer 4
+# 2. Primary Agent decomposes task
 # Example: "Implement real-time train arrival feature"
 
 Subtasks:
@@ -148,205 +147,20 @@ git commit -m "feat: implement real-time train arrivals"
 
 ---
 
-## ACE Framework Integration
-
-LiveMetro uses the **ACE (Autonomous Cognitive Entity) Framework** with 6 layers for coordinated parallel development.
-
-### Layer 1: Aspirational (Ethical Principles)
-
-**Core Mission - Reduce Suffering**:
-- Prevent data loss (user preferences, favorite stations are critical)
-- Avoid user frustration (accurate arrival times, clear error messages)
-- Minimize errors (pre-flight checks, cross-validation)
-- Abort operations that risk app instability (users depend on real-time info)
-
-**Core Mission - Increase Prosperity**:
-- Maximize efficiency (faster API responses, better UX)
-- Optimize resources (respect Seoul API rate limits: 30s polling minimum)
-- Minimize costs (optimize Firebase reads)
-- Enable user success (reliable subway information)
-
-**Core Mission - Increase Understanding**:
-- Transparency in all decisions
-- Clear documentation (TypeScript types, code comments)
-- Share learnings (React Native best practices)
-
-**Ethical Constraints (Never Violate)**:
-- **Data Integrity**: Never corrupt, lose, or expose user data
-- **Privacy**: Respect user location data, no indefinite storage
-- **API Respect**: Never exceed Seoul API rate limits
-- **App Stability**: Never commit code that crashes the app
-
-**Example - Ethical Veto**:
-```
-User Request: "Store detailed user location history"
-Agent Response: ⚠️ ETHICAL CONCERN
-  - Violates privacy principle (Layer 1)
-  - Recommend: Local-only predictions (no server storage)
-  - Alternative: Aggregate station patterns only (no GPS)
-```
-
-### Layer 2: Global Strategy (Mission Context)
-
-**Primary Agent maintains**:
-```json
-{
-  "user_goal": "Implement real-time train arrival feature",
-  "success_criteria": [
-    "Seoul API integration with proper error handling",
-    "Firebase fallback operational",
-    "AsyncStorage offline cache with TTL",
-    "TypeScript strict mode compliance",
-    "Test coverage >75%",
-    "Works on iOS and Android"
-  ],
-  "constraints": [
-    "Must respect Seoul API rate limits (30s polling)",
-    "Optimize Firebase reads (cost consideration)",
-    "No breaking changes to existing navigation"
-  ],
-  "long_term_context": "Part of LiveMetro v2.0 major release"
-}
-```
-
-### Layer 3: Agent Model (Self-Assessment)
-
-Each agent knows its capabilities:
-
-| Agent | Strengths | Weaknesses |
-|-------|-----------|------------|
-| mobile-ui-specialist | React Native (0.95), TypeScript (0.90), Mobile UX (0.85) | Native modules (0.30), Animations (0.50) |
-| backend-integration-specialist | Firebase (0.95), Seoul API (0.90), Data sync (0.90) | UI design (0.40), UX patterns (0.35) |
-| performance-optimizer | React optimization (0.90), Profiling (0.80) | New features (0.50), API design (0.50) |
-| test-automation-specialist | Jest (0.95), RTL (0.90), Coverage (0.90) | Implementation (0.40), UI design (0.35) |
-
-**Agent Self-Assessment Example**:
-```
-Task: "Implement native module for GPS tracking"
-mobile-ui-specialist:
-  ❌ DECLINE (Native module capability: 0.30)
-  ✅ SUGGEST: Reassign to specialist or use Expo Location API
-```
-
-### Layer 4: Executive Function (Task Decomposition)
-
-**Primary Agent's Role**:
-- Decompose user request into subtasks
-- Match subtasks to agent capabilities (Layer 3)
-- Assign workspaces and file outputs
-- Define dependencies
-- Monitor progress and reallocate if needed
-
-**Example Task Decomposition**:
-```json
-{
-  "primary_task": "Add push notification for train delays",
-  "subtasks": [
-    {
-      "agent": "backend-integration-specialist",
-      "task": "Setup Firebase Cloud Messaging",
-      "output": "src/services/notification/fcmService.ts",
-      "workspace": ".temp/agent_workspaces/backend-integration/",
-      "estimated_time": "15 min"
-    },
-    {
-      "agent": "mobile-ui-specialist",
-      "task": "Notification settings screen",
-      "output": "src/screens/NotificationSettingsScreen.tsx",
-      "dependencies": ["backend-integration-specialist"],
-      "workspace": ".temp/agent_workspaces/mobile-ui/",
-      "estimated_time": "20 min"
-    },
-    {
-      "agent": "test-automation-specialist",
-      "task": "Notification tests",
-      "output": "src/services/notification/__tests__/",
-      "dependencies": ["backend-integration-specialist"],
-      "workspace": ".temp/agent_workspaces/test-automation/",
-      "estimated_time": "15 min"
-    }
-  ]
-}
-```
-
-**Dynamic Reallocation**:
-If an agent is blocked or task takes 2x expected time:
-1. Primary assesses other agents' workload
-2. Splits blocked task if possible
-3. Reassigns to idle agent with capability match
-
-### Layer 5: Cognitive Control (File Locks & Conflict Prevention)
-
-**File Lock Mechanism**:
-```
-Before writing to any file:
-1. Check .temp/coordination/locks/ for existing lock
-2. If locked → Queue operation or notify Primary
-3. If available → Acquire lock, write to workspace
-4. After completion → Release lock
-```
-
-**Workspace Isolation**:
-- Secondary agents write ONLY to `.temp/agent_workspaces/{agent-name}/`
-- Primary Agent has exclusive write access to `src/`
-- Proposals in `.temp/agent_workspaces/*/proposals/` await Primary review
-
-**Conflict Detection**:
-```
-Scenario: Both agents try to modify dataManager.ts
-Resolution:
-1. First agent acquires lock → proceeds
-2. Second agent detects conflict → waits
-3. Primary Agent coordinates:
-   - Option A: Sequential execution
-   - Option B: Split file into separate concerns
-```
-
-### Layer 6: Task Prosecution (Skill Invocation & Execution)
-
-**Skill Auto-Invocation Before Operations**:
-
-| Operation | Required Skill | Timing |
-|-----------|---------------|--------|
-| React Native UI | `react-native-development` | Before creating screens/components |
-| Push notifications | `notification-system` | Before implementing alerts |
-| Seoul API | `api-integration` | Before API calls |
-| Firebase | `firebase-integration` | Before Firestore/Auth work |
-| Tests | `test-automation` | Before writing tests |
-
-**Example Execution**:
-```
-T0:00 - Primary: Task decomposition (Layer 4)
-T0:05 - Primary: Ethical check passed (Layer 1)
-T0:10 - Secondary-API: Skill api-integration invoked
-T0:15 - Secondary-UI: Skill react-native-development invoked
-T2:30 - Secondary-API: Completes → Notifies Primary
-T3:00 - Secondary-UI: Blocked (waiting for API types)
-T3:05 - Primary: Exports types from API file
-T3:10 - Secondary-UI: Resumes
-T5:00 - Primary: Integrates all proposals
-T6:00 - Primary: Runs validation gates
-```
-
----
-
 ## Validation Gates
 
 ### Pre-Execution Gates
 Before starting parallel execution:
-- [ ] Task decomposition reviewed (Layer 4)
-- [ ] Agent capabilities match tasks (Layer 3)
-- [ ] No overlapping file assignments (Layer 5)
+- [ ] Task decomposition reviewed
+- [ ] Agent capabilities match tasks
+- [ ] No overlapping file assignments
 - [ ] Rollback checkpoints defined
-- [ ] Ethical clearance obtained (Layer 1)
 
 ### Mid-Execution Gates
-During parallel execution (every 30s):
+During parallel execution:
 - [ ] Progress updates received from all agents
-- [ ] No deadlocks detected (Layer 5)
-- [ ] File locks properly acquired/released
-- [ ] No ethical concerns raised (Layer 1)
-- [ ] Agent self-monitoring active (Layer 3)
+- [ ] No deadlocks detected
+- [ ] Workspace isolation maintained
 
 ### Post-Execution Gates
 After parallel execution completes:
@@ -356,7 +170,6 @@ After parallel execution completes:
 - [ ] ESLint passed (`npm run lint`)
 - [ ] All tests passed (`npm test`)
 - [ ] Test coverage >75% (`npm test -- --coverage`)
-- [ ] No orphaned lock files remain
 - [ ] User-facing output ready
 
 **Example Validation Flow**:
@@ -625,9 +438,7 @@ npm run type-check
 ## Additional Resources
 
 - **CLAUDE.md**: Project architecture and guidelines
-- **PARALLEL_AGENTS_GUIDE.md**: Quick reference for parallel execution
 - **CONTRIBUTING.md**: Contribution guidelines
-- **Parallel Agents Safety Protocol v3.0.1**: Full ACE Framework documentation
 
 ---
 
@@ -658,4 +469,4 @@ npm run submit:all           # Submit to stores
 ---
 
 **Last Updated**: 2025-01-03
-**Version**: 1.0 (ACE Framework Integration)
+**Version**: 2.0

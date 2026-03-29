@@ -67,33 +67,16 @@ State: AuthContext + Custom Hooks (no Redux)
 
 ## Claude Code System Architecture
 
-### ACE Framework (Autonomous Cognitive Entity)
-
-프로젝트 전체에 ACE 6-Layer 아키텍처가 적용됩니다:
-
-| Layer | 역할 | 구현 | 강제 수준 |
-|-------|------|------|-----------|
-| 1. Aspirational | 보안/윤리 필터 + Veto Protocol | `ethicalValidator.js` (fail-closed) | **Hook 강제** — 위험 명령 차단, 30s 폴링 검증, Veto 기록 |
-| 2. Global Strategy | 전략 가이드라인 | `effort-scaling.md` (문서) | **프롬프트 의존** — LLM이 문서 참조하여 판단 |
-| 3. Agent Model | 에이전트 학습/진화 | `agentMemory.js` + 에이전트 `.md` | **자동 기록** — agentTracer가 완료 시 agent-memory에 기록 |
-| 4. Executive Function | 태스크 분해, HITL 차단 | `task-allocator.js` + `parallelCoordinator.js` | **Hook 강제** — CRITICAL/HIGH 작업 차단, 에이전트 추천 |
-| 5. Cognitive Control | 충돌 방지, 파일 락 (뮤텍스) | `parallelCoordinator.js` + `file-lock-manager.js` | **Hook 강제** — 파일 락, stale 정리, 체크포인트 |
-| 6. Task Prosecution | 21개 스킬 + 21개 커맨드 + 피드백 루프 | 개별 에이전트 → feedback-loop → agent-memory | **양방향** — L6→L4(메트릭), L6→L3(학습), L1→L3(Veto) |
-
-**상세**: `.claude/agents/shared/ace-framework.md`
-
 ### Hook System (자동화 파이프라인)
 
 | 훅 | 이벤트 | 기능 |
 |----|--------|------|
-| `ethicalValidator.js` | PreToolUse/Bash | 위험 명령 차단 (rm -rf, force push, 하드코딩 키) |
-| `parallelCoordinator.js` | Pre/PostToolUse/Task | 파일 락, 병렬 에이전트 조정, stale 정리 |
+| Path Protection | PreToolUse/Edit\|Write | 민감 파일 (.env, secrets 등) 수정 차단 |
 | `geminiAutoTrigger.js` | PostToolUse/Edit\|Write | 30초 debounce 후 Gemini 크로스 리뷰 큐잉 |
-| `aceMatrixSync.js` | PostToolUse/Edit\|Write | ACE enforcement matrix 동기화 검사 |
-| `agentTracer.js` | PostToolUse/Task | 에이전트 활동 추적 (JSONL 이벤트 로그) |
-| `userPromptSubmit.js` | UserPromptSubmit | 스킬/에이전트 자동 활성화, Gemini 리뷰 결과 주입 |
 | `outputSecretFilter.sh` | PostToolUse/Bash | Bash 출력에서 API키/토큰/시크릿 자동 마스킹 |
-| TypeScript 체크 | PostToolUse/Edit\|Write | .ts/.tsx 편집 시 자동 `npx tsc --noEmit` |
+| `userPromptSubmit.js` | UserPromptSubmit | 스킬/에이전트 자동 활성화, Gemini 리뷰 결과 주입 |
+| `postCompact.js` | PostCompact | /compact 후 스킬/dev docs/미커밋 변경 리마인더 재주입 |
+| `stopValidator.js` | Stop | 응답 후 console.log/any 타입 등 위험 패턴 자가검증 |
 
 **설정**: `.claude/settings.json`, `.claude/settings.local.json`
 
@@ -117,28 +100,10 @@ Claude Code와 Gemini CLI가 자동 연동됩니다:
 | `context7` | React Native, Expo, Firebase 등 실시간 라이브러리 문서 조회 |
 | `memory` | 영구 지식 그래프 - 프로젝트 인사이트/결정사항 세션 간 보존 |
 
-### Agent Self-Evolution (자기 진화)
-
-에이전트가 태스크 수행 중 학습한 패턴/실패/성공을 `.claude/agents/agent-memory/`에 JSONL로 기록합니다.
-
-- **자동 기록**: `agentTracer.js` PostToolUse:Task 훅이 에이전트 완료 시 `agentMemory.recordLearning()` 자동 호출
-- **Veto 기록**: `ethicalValidator.js`가 차단 시 agent-memory에 failure 학습 기록
-- **조회**: `agentMemory.queryLearnings({ agentId, tags, minConfidence })` → 프롬프트에 포함 가능
-- **정리**: `agentMemory.pruneOldEntries()` — confidence 0.3 이하 + 30일 이상 항목 제거
-- **공유**: confidence 0.8 이상은 `shared-learnings.jsonl`에도 기록
-- **피드백 경로**: L6(스킬 실행) → agentTracer → agent-memory(L3) + feedback-loop(L4)
-
 ### Quality Gates (품질 게이트)
 
 모든 에이전트가 준수하는 품질 기준 (`quality-gates.md`):
 
-**Ethical Gate** (Layer 1):
-- API 키 하드코딩 금지 → Ethical Veto
-- Seoul API 30초 미만 폴링 → Ethical Veto
-- 백업 없이 사용자 데이터 수정 → Ethical Veto
-- 무한 루프 가능성 → Ethical Veto
-
-**Technical Gates**:
 - TypeScript strict (no `any`) + ESLint 0 에러
 - 커버리지 75%/70%/60%
 - Firebase 구독 cleanup 필수
@@ -205,7 +170,7 @@ npm test -- --coverage # 3. 테스트 통과 + 커버리지 충족
 
 ## Multi-Agent Orchestration
 
-메인 에이전트(Opus)가 ACE Framework 기반으로 서브에이전트를 스폰합니다.
+메인 에이전트(Opus)가 복잡도에 따라 서브에이전트를 스폰합니다.
 
 ### Effort Scaling (복잡도별 에이전트 할당)
 
@@ -230,17 +195,7 @@ npm test -- --coverage # 3. 테스트 통과 + 커버리지 충족
 
 ### Parallel Execution Safety
 
-병렬 에이전트 실행 시 안전 프로토콜 적용:
-- **파일 락**: `parallelCoordinator.js`가 파일 레벨 충돌 방지
-- **워크스페이스 격리**: Agent tool의 `isolation: "worktree"` 활용
-- **HITL 분류**: LOW(자동) → MEDIUM(자동) → HIGH(승인) → CRITICAL(필수 승인)
-- **Fan-Out/Fan-In**: Primary가 분배 → 병렬 실행 → 결과 통합
-
-**상세**: `.claude/agents/shared/parallel-agents-protocol.md`
-
-### 품질 기준
-
-`.claude/agents/shared/quality-gates.md`
+병렬 에이전트 실행 시 워크스페이스 격리 (`isolation: "worktree"`) 활용.
 
 ## Skills 2.0 Three-Tier Architecture
 
@@ -270,7 +225,7 @@ npm test -- --coverage # 3. 테스트 통과 + 커버리지 충족
 | `/sync-registry` | 레지스트리 동기화 |
 | `/run-workflow` | 워크플로우 실행 |
 
-### Skills (`.claude/skills/`) — 21개, 컨텍스트 기반 on-demand 로드
+### Skills (`.claude/skills/`) — 19개, 컨텍스트 기반 on-demand 로드
 
 구현 전 반드시 해당 스킬을 Skill 도구로 호출할 것:
 
@@ -283,7 +238,6 @@ npm test -- --coverage # 3. 테스트 통과 + 커버리지 충족
 | 지하철 데이터 정규화/파싱 | `subway-data-processor` |
 | 위치 권한/주변역 검색 | `location-services` |
 | 푸시 알림/도착 알림 | `notification-system` |
-| 병렬 에이전트 (3+ 작업) | `parallel-coordinator` |
 | 구현 완료 검증 | `verification-loop` |
 | 기능 계획/페이즈 설계 | `cc-feature-implementer-main` |
 | 장기 작업 컨텍스트 보존 | `external-memory` |
@@ -296,7 +250,6 @@ npm test -- --coverage # 3. 테스트 통과 + 커버리지 충족
 | TTS/사운드/진동/접근성 | `audio-accessibility` |
 | 신뢰도/평판/뱃지/사기탐지 | `user-trust-reputation` |
 | 성능 모니터링/헬스체크/크래시 | `monitoring-observability` |
-| ACE 프레임워크 | `ace-framework` |
 
 ### Rules (`.claude/rules/`) — 7개, 항상 로드
 

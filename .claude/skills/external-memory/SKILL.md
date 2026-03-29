@@ -13,32 +13,14 @@ description: Context persistence system for long-running multi-agent tasks. Save
 - 컨텍스트 윈도우 제한에 도달하기 전 상태 보존
 - `/save-and-compact` 실행 전 핵심 컨텍스트 저장
 
-## Resources
-
-- `.claude/coordination/checkpoint-manager.js` - 체크포인트 생성/복원/관리
-- `.claude/coordination/feedback-loop.js` - 실행 메트릭 및 학습 이벤트 기록
-
 ## How to Use
 
-### 체크포인트 저장
-```javascript
-const { checkpoint } = require('./.claude/coordination');
-checkpoint.createCheckpoint({
-  agentId: 'primary',
-  trigger: 'context_limit',
-  description: '리팩토링 Phase 2 완료 상태',
-  context: { completedFiles: [...], remainingFiles: [...] }
-});
+Dev Docs 시스템 (`/dev-docs`, `/save-and-compact`)을 통해 세션 간 컨텍스트를 전달합니다.
+
+### 컨텍스트 저장 패턴
 ```
-
-### 체크포인트 복원
-```javascript
-const checkpoints = checkpoint.listCheckpoints(5);
-const latest = checkpoint.restoreCheckpoint(checkpoints[0].checkpointId);
+1. /dev-docs 로 3-파일 시스템 생성 (context, plan, tasks)
+2. 작업 중 주요 결정/발견 사항을 dev/active/ 에 기록
+3. /save-and-compact 로 컨텍스트 저장 후 compact
+4. /resume 으로 이전 세션 컨텍스트 복원
 ```
-
-## Integration
-
-- `parallelCoordinator.js` - 에이전트 태스크 시작/종료 시 자동 체크포인트
-- `agentTracer.js` - 에이전트 완료 시 feedback-loop에 메트릭 기록
-- Dev Docs 시스템 (`/dev-docs`, `/save-and-compact`) - 세션 간 컨텍스트 전달

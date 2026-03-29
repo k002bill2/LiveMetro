@@ -7,10 +7,11 @@ Claude Code configuration for LiveMetro React Native subway app.
 ```
 .claude/
 ├── mcp.json           # MCP server configurations
-├── skills/            # Agent skills (13 total)
-├── agents/            # Sub-agents (4 total)
-│   └── shared/        # Common ACE framework
-└── commands/          # Custom commands (2 total)
+├── skills/            # Agent skills (19 total)
+├── agents/            # Sub-agents (5 total)
+│   └── shared/        # Common agent guidelines
+├── commands/          # Custom commands (21 total)
+└── hooks/             # Automation hooks (5 total)
 ```
 
 ## Skills
@@ -33,7 +34,6 @@ Claude Code configuration for LiveMetro React Native subway app.
 | `slash-command-creator` | Create custom commands |
 | `skill-creator` | Build new skills |
 | `subagent-creator` | Create sub-agents |
-| `parallel-coordinator` | ACE Framework coordination |
 | `cc-feature-implementer-main` | Phase-based planning |
 
 ## Sub-agents
@@ -42,28 +42,43 @@ Claude Code configuration for LiveMetro React Native subway app.
 |-------|-------|-----------|
 | `mobile-ui-specialist` | Sonnet | React Native UI/UX + Firebase + Seoul API |
 | `test-automation-specialist` | Haiku | Jest, RNTL, coverage |
-| `quality-validator` | Haiku | 최종 품질 검증 |
-| `eval-grader` | Inherit | 에이전트 평가 채점 |
-| `eval-task-runner` | Inherit | 평가 태스크 실행 |
+| `quality-validator` | Haiku | Final quality validation |
+| `eval-grader` | Inherit | Agent evaluation grading |
+| `eval-task-runner` | Inherit | Evaluation task execution |
 
-## Commands
+## Commands (21 total)
 
-```bash
-/test-coverage    # Analyze test coverage gaps
-/check-health     # Project health check (types, lint, tests)
-```
+| Command | Purpose |
+|---------|---------|
+| `/verify-app` | Type check + lint + test + build |
+| `/check-health` | Full project health check |
+| `/commit-push-pr` | Commit, push, PR automation |
+| `/deploy-with-tests` | Test-verified deployment |
+| `/review` | Code review (security, perf, types) |
+| `/test-coverage` | Coverage analysis |
+| `/simplify-code` | Complexity analysis |
+| `/draft-commits` | Conventional Commits draft |
+| `/start-dev` | Expo dev server |
+| `/dev-docs` | Dev Docs 3-file system |
+| `/update-dev-docs` | Update Dev Docs |
+| `/resume` | Restore task context |
+| `/save-and-compact` | Save + compact |
+| `/session-wrap` | Session end cleanup |
+| `/gemini-review` | Gemini cross-review |
+| `/gemini-scan` | Gemini codebase scan |
+| `/run-eval` | Agent evaluation |
+| `/eval-dashboard` | Evaluation dashboard |
+| `/config-backup` | Settings backup/restore |
+| `/sync-registry` | Registry sync |
+| `/run-workflow` | Workflow execution |
 
 ## MCP Servers
 
 | Server | Status | Purpose |
 |--------|--------|---------|
-| `codex-cli` | Enabled | Code snippets |
 | `context7` | Enabled | Semantic search |
 | `magic` | Enabled | UI components (API key required) |
 | `tavily` | Enabled | Web search (API key required) |
-| `playwright` | Enabled | Browser automation |
-
-See [docs/claude/mcp-setup.md](../docs/claude/mcp-setup.md) for detailed setup.
 
 ## Quick Start
 
@@ -101,4 +116,4 @@ Backups stored in `.claude-backups/` with 30-day retention.
 
 ---
 
-**Skills**: 13 | **Agents**: 5 (mobile-ui, test-automation, quality-validator, eval-grader, eval-task-runner) | **Commands**: 2 | **MCP Servers**: 5 enabled
+**Skills**: 19 | **Agents**: 5 (mobile-ui, test-automation, quality-validator, eval-grader, eval-task-runner) | **Commands**: 21 | **Hooks**: 5

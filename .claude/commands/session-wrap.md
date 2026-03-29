@@ -35,9 +35,9 @@ description: 세션 종료 시 4개 병렬 에이전트로 문서/패턴/학습/
 - `MEMORY.md`에 추가할 패턴 제안
 
 #### Agent 3: Learning Recorder
-- 성공/실패 경험을 Agent Memory에 기록
+- 성공/실패 경험을 MEMORY.md에 기록
 - 디버깅 인사이트, 우회 방법 등 학습 사항 추출
-- `agent-memory/` JSONL 파일에 기록
+- 프로젝트 메모리 파일에 기록
 
 #### Agent 4: Next Steps Planner
 - 미완료 작업 식별 및 우선순위 정리
@@ -49,8 +49,7 @@ description: 세션 종료 시 4개 병렬 에이전트로 문서/패턴/학습/
 4개 에이전트 결과를 통합하여:
 1. **세션 요약 리포트** 생성
 2. **MEMORY.md** 업데이트
-3. **Agent Memory** 기록 확인
-4. 사용자에게 최종 요약 표시
+3. 사용자에게 최종 요약 표시
 
 ## 출력 형식
 
@@ -82,5 +81,4 @@ description: 세션 종료 시 4개 병렬 에이전트로 문서/패턴/학습/
 ## 주의사항
 
 - 커밋되지 않은 변경사항이 있으면 먼저 커밋 여부를 확인합니다
-- Agent Memory 기록 시 confidence 0.7 이상만 기록합니다
 - MEMORY.md는 200줄 제한을 준수합니다

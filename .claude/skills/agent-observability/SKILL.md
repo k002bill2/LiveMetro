@@ -5,7 +5,7 @@ description: Production tracing and metrics for multi-agent workflows. Track age
 
 # Agent Observability Skill
 
-멀티 에이전트 워크플로우의 트레이싱, 메트릭, 성능 분석 시스템.
+멀티 에이전트 워크플로우의 모니터링 및 성능 분석 가이드.
 
 ## When to Use
 
@@ -13,41 +13,19 @@ description: Production tracing and metrics for multi-agent workflows. Track age
 - 병렬 에이전트 작업의 모니터링/디버깅
 - 에이전트 추천 정확도 개선
 
-## Resources
-
-- `.claude/hooks/agentTracer.js` - PostToolUse:Task 이벤트 트레이싱 (JSONL)
-- `.claude/coordination/feedback-loop.js` - 실행 메트릭 기록/조회
-- `.claude/coordination/task-allocator.js` - 에이전트 추천 및 성능 기반 보정
-
-## Tracing Architecture
-
-```
-Agent Spawned → agentTracer.js → events.jsonl (세션별)
-                                ↓
-Agent Completed → agentTracer.js → feedback-loop.js (메트릭 이중 기록)
-                                   ↓
-                            task-allocator.js (성능 데이터 → 추천 점수 보정)
-```
-
 ## How to Use
 
-### 메트릭 조회
-```javascript
-const { feedback } = require('./.claude/coordination');
-const summary = feedback.generateMetricsSummary();
-// { totalTasks, successRate, avgDuration, recentErrors }
+### 에이전트 성능 추적
 
-const byAgent = feedback.analyzeAgentPerformance();
-// { 'mobile-ui-specialist': { totalTasks, successRate, avgDuration } }
-```
+Agent tool 실행 결과와 소요 시간을 기반으로 성능을 분석합니다.
 
-### 트레이스 파일 위치
-- `.temp/traces/sessions/<sessionId>/events.jsonl` - 이벤트 로그
-- `.temp/traces/sessions/<sessionId>/metadata.json` - 세션 메타데이터
+### 모니터링 포인트
 
-## Integration
+- 에이전트 스폰 → 완료 시간
+- 도구 호출 횟수 및 성공률
+- 병렬 실행 시 워크트리 격리 상태
 
-- `parallelCoordinator.js` → 에이전트 등록/해제 시 parallel-state.json 업데이트
-- `agentTracer.js` → 자동 트레이싱 (PostToolUse:Task 훅)
-- `task-allocator.js` → 과거 성능 데이터로 에이전트 추천 점수 보정
+### 통합
+
 - `/eval-dashboard` → 평가 결과 시각화
+- `/run-eval` → 에이전트 평가 태스크 실행

@@ -135,12 +135,25 @@ Multi-agent systems use ~15x more tokens than single-agent.
 ❌ Sequential work when parallel possible
 ❌ No tests for significant features
 
-## Integration
+## Parallel Execution Guidelines
 
-This guide is referenced by:
-- `lead-orchestrator.md` - Uses for effort decisions
-- `parallel-coordinator/SKILL.md` - Embedded in workflow
+When running multiple agents in parallel:
+
+1. **Worktree Isolation**: Use `isolation: "worktree"` for agents editing different files
+2. **No Shared Files**: Agents must not edit the same file simultaneously
+3. **Background Pattern**: Use `run_in_background` for long-running independent tasks
+4. **SendMessage**: Use `SendMessage` to communicate with running agents
+
+### Agent Frontmatter Reference
+
+| Field | Values | Purpose |
+|-------|--------|---------|
+| `model` | sonnet, opus, haiku | Model selection |
+| `effort` | min, standard, max | Resource allocation |
+| `maxTurns` | number | Maximum conversation turns |
+| `disallowedTools` | tool list | Restricted tools |
+| `isolation` | "worktree" | Git worktree isolation |
 
 ---
 
-**Version**: 1.0 | **Last Updated**: 2025-01-04
+**Version**: 1.1 | **Last Updated**: 2026-03-29
