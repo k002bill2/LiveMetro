@@ -131,6 +131,37 @@ stationNameProp → trainService.getStation() (Firebase) → getLocalStation() (
 - [ ] 시간표 API를 HTTPS 페이지에서 호출 (mixed content 차단)
 - [ ] rate limit 없이 연속 API 호출 (키 비활성화)
 
+## BANNED Patterns (Hard Failures)
+
+Seoul API 연동 시 아래 패턴은 장애를 유발합니다. 예외 없음.
+
+### API 호출 Patterns
+| BANNED | USE INSTEAD | WHY |
+|--------|-------------|-----|
+| 30초 미만 폴링 | `RateLimiter(30000)` | API 키 차단 위험 |
+| API 키 하드코딩 | `process.env.EXPO_PUBLIC_*` | 키 노출 → 보안 사고 |
+| `fetch()` without timeout | `AbortController` + 10초 제한 | 무한 대기 |
+| `fetch()` without retry | `withRetry(fn, { maxAttempts: 3 })` | 일시 장애 미복구 |
+| 에러 시 throw → UI 크래시 | `return null` 또는 `return []` | 빈 화면 방지 |
+| `barvlDt` 무시 → `arvlMsg2`만 파싱 | `barvlDt` 우선, 텍스트는 fallback | 초 단위 정확도 손실 |
+| stationId("0222")를 역명으로 전달 | stationName("강남") 사용 | 검색 결과 없음 |
+| 실시간 키로 시간표 API 호출 | 별도 `DATA_PORTAL_API_KEY` 사용 | 인증 실패 |
+
+### 데이터 처리 Patterns
+| BANNED | USE INSTEAD |
+|--------|-------------|
+| `updnLine === '상행'` 만 체크 | `'상행' \|\| '내선'` (2호선 순환선) |
+| `arrivalTime ? ... : fallback` (0 = falsy) | `arrivalTime !== null ? ...` |
+| 캐시 없이 매번 API 호출 | SWR 패턴 (캐시 반환 → 백그라운드 갱신) |
+| API 에러와 빈 데이터 동일 처리 | 에러 = retry, 빈 데이터 = "운행 종료" |
+
+### Response 검증 Patterns
+| BANNED | REQUIRED |
+|--------|----------|
+| response.json() 직접 사용 | `errorMessage.code === 'INFO-000'` 확인 후 사용 |
+| `realtimeArrivalList` 그대로 반환 | `convertToAppTrain()`으로 정규화 후 반환 |
+| HTTP 상태코드만 확인 | API 자체 에러코드 (`ERROR-500`, `ERROR-501`) 분기 처리 |
+
 ## Important Notes
 
 - Always implement fallback to Firebase/cache

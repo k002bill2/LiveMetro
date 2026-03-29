@@ -220,6 +220,42 @@ const [value, setValue] = useState('');
 - Ensure proper contrast ratios
 - Support screen readers
 
+## BANNED Patterns (Hard Failures)
+
+아래 패턴이 발견되면 즉시 수정해야 합니다. 예외 없음.
+
+### Code Patterns
+| BANNED | USE INSTEAD | WHY |
+|--------|-------------|-----|
+| `style={{ color: 'red' }}` (인라인 스타일) | `StyleSheet.create()` | 매 렌더마다 새 객체 생성 → 성능 저하 |
+| `<ScrollView>{items.map(...)}` | `<FlatList data={items} />` | 전체 리스트 렌더링 → 메모리 폭발 |
+| `import X from '../../components/X'` | `import X from '@components/X'` | 상대 경로 → 리팩토링 시 경로 파손 |
+| `any` 타입 | `unknown` + type guard | 타입 안전성 무력화 |
+| `console.log()` in production | 제거 또는 `__DEV__` 가드 | 성능 저하 + 정보 노출 |
+| `useEffect` without cleanup | return cleanup function | 메모리 누수 |
+| `setTimeout`/`setInterval` without clear | `clearTimeout`/`clearInterval` in cleanup | 언마운트 후 상태 업데이트 크래시 |
+| `onPress={() => navigate(...)}` (인라인) | `useCallback`으로 감싸기 | 매 렌더마다 새 함수 생성 |
+| 하드코딩 색상 `'#007AFF'` | `colors.primary` (테마) | 다크모드 미지원 |
+| `Dimensions.get('window')` 모듈 레벨 | `useWindowDimensions()` 훅 | 화면 회전 시 갱신 안 됨 |
+
+### Architecture Patterns
+| BANNED | USE INSTEAD |
+|--------|-------------|
+| 한 파일에 여러 컴포넌트 export | 컴포넌트당 1파일 |
+| 800줄 초과 파일 | 유틸리티/하위 컴포넌트로 분리 |
+| Props drilling 3단계 이상 | Context 또는 composition |
+| 비동기 로직을 컴포넌트에 직접 | Custom hook으로 추출 |
+
+## Pre-Output Checklist
+
+코드 출력 전 다음을 반드시 확인:
+- [ ] 모든 `useEffect`에 cleanup 함수 있는가?
+- [ ] `accessibilityLabel`이 모든 터치 요소에 있는가?
+- [ ] `StyleSheet.create()`로 스타일 정의했는가?
+- [ ] path alias (`@/`)를 사용했는가?
+- [ ] `any` 타입이 없는가?
+- [ ] 컴포넌트에 `displayName`이 있는가?
+
 ## Important Notes
 - Always use path aliases (@/) instead of relative imports
 - Clean up subscriptions and timers in useEffect cleanup
