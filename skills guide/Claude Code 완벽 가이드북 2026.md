@@ -1,7 +1,7 @@
 # Claude Code 완벽 가이드북 2026
 #claude-code #ai-coding #development #guide #livemetro
 
-> 작성일: 2026-03-15 (최신 업데이트) (최신 업데이트)
+> 작성일: 2026-04-15 (최신 업데이트) (최신 업데이트) (최신 업데이트)
 > 환경: macOS (VS Code/Cursor), Git, 단독 개발
 > Claude Code 경험: 초보자 ~ 중급자용
 

@@ -1,6 +1,6 @@
 # LiveMetro Skills Guide 자동 업데이트 보고서
 
-**업데이트 일시**: 2026-03-15 09:37:09
+**업데이트 일시**: 2026-04-15 10:20:10
 
 ## 📊 기술 스택 현황
 
@@ -47,16 +47,16 @@
   - 현재 버전: ^7.0.2
   - 권장 사항: 대체 패키지 검토 필요
 
+- **react-native-web** (마지막 업데이트: 6개월 이상 전)
+  - 현재 버전: ~0.19.6
+  - 권장 사항: 대체 패키지 검토 필요
+
 - **@types/jest** (마지막 업데이트: 6개월 이상 전)
   - 현재 버전: ^29.5.5
   - 권장 사항: 대체 패키지 검토 필요
 
 - **@types/mocha** (마지막 업데이트: 6개월 이상 전)
   - 현재 버전: ^10.0.10
-  - 권장 사항: 대체 패키지 검토 필요
-
-- **babel-plugin-module-resolver** (마지막 업데이트: 6개월 이상 전)
-  - 현재 버전: ^5.0.2
   - 권장 사항: 대체 패키지 검토 필요
 
 - **eslint-import-resolver-typescript** (마지막 업데이트: 6개월 이상 전)
@@ -71,19 +71,31 @@
   - 현재 버전: ^4.1.0
   - 권장 사항: 대체 패키지 검토 필요
 
+- **husky** (마지막 업데이트: 6개월 이상 전)
+  - 현재 버전: ^9.1.7
+  - 권장 사항: 대체 패키지 검토 필요
+
+- **patch-package** (마지막 업데이트: 6개월 이상 전)
+  - 현재 버전: ^8.0.1
+  - 권장 사항: 대체 패키지 검토 필요
+
+- **ts-node** (마지막 업데이트: 6개월 이상 전)
+  - 현재 버전: ^10.9.2
+  - 권장 사항: 대체 패키지 검토 필요
+
 ## 📝 권장 사항
 
 다음 패키지들의 업데이트를 고려하세요:
 
 - @expo/ngrok: ^4.1.3 → 4.1.3
 - @expo/vector-icons: ^13.0.0 → 15.1.1
-- @react-native-async-storage/async-storage: 1.18.2 → 3.0.1
-- @react-native-community/datetimepicker: ^7.2.0 → 8.6.0
-- @react-native-community/slider: ^4.4.2 → 5.1.2
+- @react-native-async-storage/async-storage: 1.18.2 → 3.0.2
+- @react-native-community/datetimepicker: ^7.2.0 → 9.1.0
+- @react-native-community/slider: ^4.4.2 → 5.2.0
 
 ## 🔧 다음 업데이트
 
-다음 자동 업데이트는 **2026-04-14**에 실행됩니다.
+다음 자동 업데이트는 **2026-05-15**에 실행됩니다.
 
 ---
 *이 보고서는 `scripts/skillsGuideUpdater.ts`에 의해 자동 생성되었습니다.*
