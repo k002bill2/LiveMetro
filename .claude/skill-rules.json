@@ -139,17 +139,6 @@
       "intentPatterns": ["(검증|validate|review).*?(code|코드)", "(완료|done|finish).*?(구현|implement)"]
     }
   },
-  "parallel-coordinator": {
-    "type": "workflow",
-    "enforcement": "suggest",
-    "priority": "high",
-    "description": "병렬 에이전트 조정 (ACE Framework 기반)",
-    "skillFile": ".claude/skills/parallel-coordinator/SKILL.md",
-    "promptTriggers": {
-      "keywords": ["parallel", "concurrent", "multi-agent", "병렬"],
-      "intentPatterns": ["(parallel|concurrent|병렬).*?(agent|task|작업)"]
-    }
-  },
   "verification-loop": {
     "type": "workflow",
     "enforcement": "suggest",
@@ -206,17 +195,6 @@
     "promptTriggers": {
       "keywords": ["improvement", "failure", "diagnose", "optimize", "benchmark", "개선", "진단"],
       "intentPatterns": ["(improve|optimize).*?(agent|workflow)", "(diagnose|analyze).*?(failure|error)"]
-    }
-  },
-  "agent-observability": {
-    "type": "meta",
-    "enforcement": "suggest",
-    "priority": "normal",
-    "description": "멀티 에이전트 추적 및 메트릭 (의사결정, 도구 호출, 성능)",
-    "skillFile": ".claude/skills/agent-observability/SKILL.md",
-    "promptTriggers": {
-      "keywords": ["trace", "metrics", "observability", "monitoring", "추적", "메트릭"],
-      "intentPatterns": ["(trace|track).*?(agent|workflow)", "(monitor|observe).*?(performance|decision)"]
     }
   },
   "hook-creator": {

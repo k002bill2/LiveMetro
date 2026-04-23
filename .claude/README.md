@@ -8,8 +8,8 @@ Claude Code configuration for LiveMetro React Native subway app.
 .claude/
 ├── mcp.json           # MCP server configurations
 ├── skills/            # Agent skills (13 total)
-├── agents/            # Sub-agents (4 total)
-│   └── shared/        # Common ACE framework
+├── agents/            # Sub-agents (5 total)
+│   └── shared/        # 공용 에이전트 템플릿
 └── commands/          # Custom commands (2 total)
 ```
 
@@ -33,7 +33,6 @@ Claude Code configuration for LiveMetro React Native subway app.
 | `slash-command-creator` | Create custom commands |
 | `skill-creator` | Build new skills |
 | `subagent-creator` | Create sub-agents |
-| `parallel-coordinator` | ACE Framework coordination |
 | `cc-feature-implementer-main` | Phase-based planning |
 
 ## Sub-agents

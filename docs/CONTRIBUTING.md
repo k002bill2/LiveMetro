@@ -232,7 +232,7 @@ import { StationCard } from '../components/train/StationCard'
 
 ## Parallel Development Guidelines
 
-LiveMetro supports **parallel agent development** using the ACE Framework for complex features. See [PARALLEL_AGENTS_GUIDE.md](./PARALLEL_AGENTS_GUIDE.md) for details.
+LiveMetro supports **parallel agent development** via Claude Code 네이티브 Agent 툴 (`isolation: "worktree"`) for complex features. See [PARALLEL_AGENTS_GUIDE.md](./PARALLEL_AGENTS_GUIDE.md) for details.
 
 ### When to Use Parallel Development
 

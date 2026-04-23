@@ -39,6 +39,4 @@ const latest = checkpoint.restoreCheckpoint(checkpoints[0].checkpointId);
 
 ## Integration
 
-- `parallelCoordinator.js` - 에이전트 태스크 시작/종료 시 자동 체크포인트
-- `agentTracer.js` - 에이전트 완료 시 feedback-loop에 메트릭 기록
 - Dev Docs 시스템 (`/dev-docs`, `/save-and-compact`) - 세션 간 컨텍스트 전달

@@ -341,19 +341,6 @@ Time: 30 min
 
 ---
 
-## ACE Framework Quick Reference
-
-| Layer | Purpose | Key Action |
-|-------|---------|------------|
-| **Layer 1: Aspirational** | Ethics | Check privacy, API limits, stability |
-| **Layer 2: Global Strategy** | Mission | Define success criteria, constraints |
-| **Layer 3: Agent Model** | Self-assess | Match capabilities to tasks |
-| **Layer 4: Executive Function** | Coordinate | Decompose, assign, integrate |
-| **Layer 5: Cognitive Control** | Prevent conflicts | Manage file locks, detect deadlocks |
-| **Layer 6: Task Prosecution** | Execute | Invoke skills, use tools, write code |
-
----
-
 ## Common Commands
 
 ```bash
@@ -377,8 +364,7 @@ npm run type-check && npm run lint && npm test -- --coverage
 
 ## Further Reading
 
-- **DEVELOPMENT.md**: Comprehensive development guide with ACE Framework details
-- **Parallel Agents Safety Protocol v3.0.1**: Full ACE Framework documentation
+- **DEVELOPMENT.md**: Comprehensive development guide
 - **CLAUDE.md**: Project architecture and patterns
 - **CONTRIBUTING.md**: Contribution guidelines
 
