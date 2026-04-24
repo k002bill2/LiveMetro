@@ -193,3 +193,49 @@ metadata:
 2. `tasks/task_{category}_{number}.yaml` 파일 생성
 3. 적절한 루브릭 선택 또는 새로 생성
 4. `/run-eval {task_id}` 로 테스트
+
+## 정기 실행 (Recommended)
+
+평가 결과는 `results/{YYYY-MM-DD}/`에 누적되며 회귀 추적에 사용됩니다.
+**80일 이상 미실행 시** 결과 신뢰도가 떨어지므로 정기 실행을 권장합니다.
+
+### 옵션 A: 수동 트리거 (현재 디폴트)
+```bash
+# 주요 카테고리 1회씩
+/run-eval --category ui_component --k=3
+/run-eval --category service --k=3
+/run-eval --category bug_fix --k=3
+```
+
+### 옵션 B: cron 스케줄 등록 (외부 자원 소모 주의)
+`schedule` 스킬로 주간 routine 등록:
+```
+"매주 금요일 오전 9시에 /run-eval --all --k=3 실행" → schedule 스킬 호출
+```
+**주의**:
+- LLM 채점(60% 비중)이 실제 API 호출 동반 → 비용 발생
+- 매주 전체 평가 실행 시 약 30~60분 소요
+- 결과는 `/eval-dashboard`로 추세 확인
+
+### 옵션 C: PR 게이트 (추천)
+신규 기능 PR 머지 전에 관련 카테고리만 실행:
+- UI 컴포넌트 변경 → `/run-eval --category ui_component --k=1`
+- API 서비스 변경 → `/run-eval --category service --k=1`
+- 비용 ↓, 회귀 탐지 ↑
+
+## 헬스체크
+
+평가 시스템 자체의 정상성 확인:
+```bash
+# 1. 태스크 정의 파싱 가능 여부
+ls .claude/evals/tasks/*.yaml
+
+# 2. 루브릭 존재 확인
+ls .claude/evals/rubrics/
+
+# 3. 최근 결과 디렉토리 확인 (가장 최근 날짜)
+ls -t .claude/evals/results/ | head -1
+
+# 4. 결과 통계
+/eval-dashboard
+```

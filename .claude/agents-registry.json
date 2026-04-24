@@ -1,5 +1,5 @@
 {
-  "_generated": "2026-03-06T00:00:00.000Z",
+  "_generated": "2026-04-23T16:09:00.208Z",
   "_description": "Auto-generated agent registry. Do not edit manually.",
   "agents": {
     "eval-grader": {
@@ -18,9 +18,9 @@
     },
     "mobile-ui-specialist": {
       "file": ".claude/agents/mobile-ui-specialist.md",
-      "description": "React Native UI/UX specialist for LiveMetro. Expert in mobile component design, responsive layouts, and user experience optimization.",
+      "description": "React Native UI/UX specialist for LiveMetro. Expert in mobile component design, responsive layouts, accessibility, and user experience optimization.",
       "tools": "Edit, Write, Read, Grep, Glob, Bash",
-      "model": "sonnet",
+      "model": "inherit",
       "triggers": null
     },
     "quality-validator": {
@@ -32,7 +32,7 @@
     },
     "test-automation-specialist": {
       "file": ".claude/agents/test-automation-specialist.md",
-      "description": "Test automation specialist for LiveMetro. Expert in Jest, React Native Testing Library, coverage analysis, and writing comprehensive test suites.",
+      "description": "Test automation specialist for LiveMetro. Expert in Jest, React Native Testing Library, coverage analysis, and writing comprehensive test suites. Use PROACTIVELY after writing or modifying code to ensure test coverage >75%.",
       "tools": "Edit, Write, Read, Grep, Glob, Bash",
       "model": "haiku",
       "triggers": null

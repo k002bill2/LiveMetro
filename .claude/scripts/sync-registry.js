@@ -343,6 +343,47 @@ function syncCommands() {
   return { synced, errors };
 }
 
+function syncClaudeMdCounts() {
+  const claudeMdPath = path.join(process.cwd(), 'CLAUDE.md');
+  if (!fs.existsSync(claudeMdPath)) return;
+
+  // 실제 디렉토리/파일 개수 기준 (synced 카운트는 frontmatter 조건부라 부정확)
+  const skillsDir = path.join(CLAUDE_DIR, 'skills');
+  const commandsDir = path.join(CLAUDE_DIR, 'commands');
+
+  const skillsCount = fs.existsSync(skillsDir)
+    ? fs.readdirSync(skillsDir).filter(d => {
+        const p = path.join(skillsDir, d);
+        return fs.statSync(p).isDirectory() && fs.existsSync(path.join(p, 'SKILL.md'));
+      }).length
+    : 0;
+
+  const commandsCount = fs.existsSync(commandsDir)
+    ? fs.readdirSync(commandsDir).filter(f => f.endsWith('.md')).length
+    : 0;
+
+  try {
+    let content = fs.readFileSync(claudeMdPath, 'utf-8');
+    const original = content;
+
+    content = content.replace(
+      /### Skills \(`\.claude\/skills\/`\) — \d+개/,
+      `### Skills (\`.claude/skills/\`) — ${skillsCount}개`
+    );
+    content = content.replace(
+      /### Commands \(`\.claude\/commands\/`\) — \d+개/,
+      `### Commands (\`.claude/commands/\`) — ${commandsCount}개`
+    );
+
+    if (content !== original) {
+      fs.writeFileSync(claudeMdPath, content);
+      console.log('\nCLAUDE.md counts synced (skills=' + skillsCount + ', commands=' + commandsCount + ').');
+    }
+  } catch (e) {
+    console.log('Warning: CLAUDE.md sync failed: ' + e.message);
+  }
+}
+
 function syncAll() {
   console.log('Syncing all registries...\n');
 
@@ -352,6 +393,8 @@ function syncAll() {
     hooks: syncHooks(),
     commands: syncCommands()
   };
+
+  syncClaudeMdCounts();
 
   console.log('\n========================================');
   console.log('Sync Summary');

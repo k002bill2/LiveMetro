@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 -c \"import json,sys; p=json.load(sys.stdin).get('tool_input',{}).get('file_path',''); blocked=['.env','secrets','.git/','google-services.json','eas.json','firestore.rules']; sys.exit(2 if any(b in p for b in blocked) else 0)\"",
+            "command": "node .claude/hooks/pathProtection.js",
             "timeout": 5,
             "statusMessage": "Path protection..."
           }

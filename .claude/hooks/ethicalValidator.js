@@ -35,11 +35,12 @@ const BLOCKED_OPERATIONS = {
   },
   git: {
     patterns: [
-      /git\s+push\s+--force\s+origin\s+(main|master)/i,
-      /git\s+reset\s+--hard\s+origin/i,
-      /git\s+branch\s+-D\s+(main|master)/i
+      /git\s+push\s+(--force|-f|--force-with-lease)\s+\S+\s+(main|master|develop|production|release)/i,
+      /git\s+push\s+\S+\s+(main|master|develop|production|release)\s+(--force|-f|--force-with-lease)/i,
+      /git\s+reset\s+--hard\s+origin\/(main|master|develop|production|release)/i,
+      /git\s+branch\s+-D\s+(main|master|develop|production|release)/i
     ],
-    message: 'main/master 강제 푸시/리셋/삭제는 차단됩니다.',
+    message: '보호된 브랜치(main/master/develop/production/release) 강제 푸시/리셋/삭제는 차단됩니다.',
     severity: 'HIGH'
   },
   database: {
@@ -101,6 +102,12 @@ const WARNING_OPERATIONS = {
       /package\.json/i
     ],
     message: '의존성 변경은 테스트 후 커밋하세요.'
+  },
+  force_push_non_protected: {
+    patterns: [
+      /git\s+push\s+(--force|-f|--force-with-lease)\b/i
+    ],
+    message: 'force-push 감지. 공동 작업 브랜치라면 팀원과 조율하세요.'
   }
 };
 
@@ -271,12 +278,11 @@ if (require.main === module) {
         };
         process.stdout.write(JSON.stringify(blockResponse));
 
-        // ACE L1: Ethical Veto Protocol — incidents 기록 + feedback-loop + agent-memory
+        // Veto 감사 로그 — incidents JSONL append-only
         try {
           const vetoRecord = {
             id: `veto_${Date.now()}`,
             timestamp: new Date().toISOString(),
-            layer: 'L1_Aspirational',
             tool_name: event.tool_name,
             blocked_categories: result.blockedReasons.map(r => r.category),
             severities: result.blockedReasons.map(r => r.severity),
@@ -284,34 +290,12 @@ if (require.main === module) {
             command_preview: (event.tool_input?.command || '').substring(0, 100)
           };
 
-          // incidents 디렉토리에 Veto 기록
           const incidentsDir = path.join(__dirname, '../../.temp/incidents');
           if (!fs.existsSync(incidentsDir)) fs.mkdirSync(incidentsDir, { recursive: true });
           fs.appendFileSync(
             path.join(incidentsDir, 'ethical-vetoes.jsonl'),
             JSON.stringify(vetoRecord) + '\n'
           );
-
-          // coordination feedback-loop에 학습 이벤트 기록
-          const feedbackLoop = require('../coordination/feedback-loop');
-          feedbackLoop.recordLearningEvent({
-            agentId: 'ethicalValidator',
-            eventType: 'ethical_block',
-            context: vetoRecord,
-            suggestion: result.blockedReasons[0]?.message || '',
-            severity: result.blockedReasons[0]?.severity === 'CRITICAL' ? 'critical' : 'warning'
-          });
-
-          // agent-memory에 학습 기록 (L3 Self-Evolution 피드백)
-          const agentMemory = require('../agents/agent-memory/agentMemory');
-          agentMemory.recordLearning({
-            agentId: 'ethicalValidator',
-            eventType: 'failure',
-            taskContext: `Blocked ${event.tool_name}: ${vetoRecord.command_preview}`,
-            learning: `${vetoRecord.blocked_categories.join(', ')} 패턴 차단됨: ${vetoRecord.reasons.join('; ')}`,
-            confidence: 0.9,
-            tags: ['ethical_veto', ...vetoRecord.blocked_categories]
-          });
         } catch (e) {
           console.error('[EthicalValidator] Veto recording failed:', e.message);
         }

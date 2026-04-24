@@ -26,7 +26,7 @@ const PROJECT_ROOT = path.resolve(__dirname, '../..');
 const BRIDGE_DIR = path.join(PROJECT_ROOT, '.claude', 'gemini-bridge');
 const TRIGGER_FILE = path.join(BRIDGE_DIR, '.pending-trigger');
 const LOCK_FILE = path.join(BRIDGE_DIR, '.review-lock');
-const STATE_FILE = path.join(PROJECT_ROOT, '.claude', 'coordination', 'gemini-state.json');
+const STATE_FILE = path.join(PROJECT_ROOT, '.claude', 'gemini-bridge', 'state.json');
 
 const DEBOUNCE_MS = 30_000; // 30초 debounce
 const LOCK_TTL_MS = 180_000; // 3분 lock TTL (리뷰 최대 시간)

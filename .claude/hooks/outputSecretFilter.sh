@@ -74,6 +74,33 @@ MASKED=$(echo "$MASKED" | sed -E 's/npm_[A-Za-z0-9]{36}/npm_[REDACTED]/g')
 # 일반 토큰 패턴 (token=xxx, token: xxx)
 MASKED=$(echo "$MASKED" | sed -E 's/(token[=: ]+["'"'"']?)[A-Za-z0-9._\-]{20,}/\1[REDACTED]/g')
 
+# Firebase Service Account JSON private_key 필드
+MASKED=$(echo "$MASKED" | sed -E 's/("private_key"[[:space:]]*:[[:space:]]*")[^"]+(")/\1[REDACTED]\2/g')
+
+# Firebase Service Account client_email / client_id
+MASKED=$(echo "$MASKED" | sed -E \
+    -e 's/("client_email"[[:space:]]*:[[:space:]]*")[^"]+(")/\1[REDACTED]\2/g' \
+    -e 's/("private_key_id"[[:space:]]*:[[:space:]]*")[^"]+(")/\1[REDACTED]\2/g' \
+)
+
+# Expo push token (ExponentPushToken[xxxxx] 또는 ExpoPushToken[xxxxx])
+MASKED=$(echo "$MASKED" | sed -E 's/(Expo(nent)?PushToken)\[[^]]+\]/\1[REDACTED]/g')
+
+# OAuth client secret 패턴 (client_secret, clientSecret)
+MASKED=$(echo "$MASKED" | sed -E 's/(client[_-]?secret[=: "'"'"']+)[A-Za-z0-9._\-]{16,}/\1[REDACTED]/g')
+
+# Google API key (AIza로 시작하는 39자)
+MASKED=$(echo "$MASKED" | sed -E 's/AIza[A-Za-z0-9_\-]{35}/AIza[REDACTED]/g')
+
+# Slack 토큰 (xoxb-, xoxp-, xoxa-, xoxs-)
+MASKED=$(echo "$MASKED" | sed -E 's/xox[baps]-[A-Za-z0-9\-]+/xox*-[REDACTED]/g')
+
+# Stripe 키 (sk_live, sk_test, pk_live, rk_live)
+MASKED=$(echo "$MASKED" | sed -E 's/(sk|pk|rk)_(live|test)_[A-Za-z0-9]{20,}/\1_\2_[REDACTED]/g')
+
+# JWT 토큰 (세 파트 base64.base64.base64)
+MASKED=$(echo "$MASKED" | sed -E 's/eyJ[A-Za-z0-9_\-]+\.eyJ[A-Za-z0-9_\-]+\.[A-Za-z0-9_\-]+/[JWT_REDACTED]/g')
+
 # 마스킹 발생 여부 확인
 if [ "$MASKED" != "$OUTPUT" ]; then
     echo "⚠️  [OutputSecretFilter] 시크릿이 마스킹되었습니다." >&2

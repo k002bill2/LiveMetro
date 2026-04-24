@@ -5,11 +5,22 @@
     "priority": "high",
     "description": "에러 처리 패턴 (React Native: ErrorBoundary, Firebase: try/catch)",
     "promptTriggers": {
-      "keywords": ["error", "catch", "try", "에러", "오류"],
-      "intentPatterns": ["(handle|catch).*?(error|exception)"]
+      "keywords": [
+        "error",
+        "catch",
+        "try",
+        "에러",
+        "오류"
+      ],
+      "intentPatterns": [
+        "(handle|catch).*?(error|exception)"
+      ]
     },
     "fileTriggers": {
-      "pathPatterns": ["**/services/**", "**/hooks/**"]
+      "pathPatterns": [
+        "**/services/**",
+        "**/hooks/**"
+      ]
     },
     "reminder": "에러는 빈 배열/null 반환, throw 지양"
   },
@@ -21,11 +32,26 @@
     "agentFile": ".claude/agents/test-automation-specialist.md",
     "skillFile": ".claude/skills/test-automation/SKILL.md",
     "promptTriggers": {
-      "keywords": ["test", "jest", "coverage", "tdd", "testing library", "테스트", "커버리지"],
-      "intentPatterns": ["(write|add|create).*?test", "(run|check).*?coverage"]
+      "keywords": [
+        "test",
+        "jest",
+        "coverage",
+        "tdd",
+        "testing library",
+        "테스트",
+        "커버리지"
+      ],
+      "intentPatterns": [
+        "(write|add|create).*?test",
+        "(run|check).*?coverage"
+      ]
     },
     "fileTriggers": {
-      "pathPatterns": ["**/__tests__/**", "**/*.test.ts", "**/*.test.tsx"]
+      "pathPatterns": [
+        "**/__tests__/**",
+        "**/*.test.ts",
+        "**/*.test.tsx"
+      ]
     }
   },
   "react-native-development": {
@@ -36,11 +62,25 @@
     "agentFile": ".claude/agents/mobile-ui-specialist.md",
     "skillFile": ".claude/skills/react-native-development/SKILL.md",
     "promptTriggers": {
-      "keywords": ["react native", "component", "screen", "expo", "컴포넌트", "화면", "ui"],
-      "intentPatterns": ["(create|add|make).*?(component|screen)", "(react native|RN).*?(개발|구현)"]
+      "keywords": [
+        "react native",
+        "component",
+        "screen",
+        "expo",
+        "컴포넌트",
+        "화면",
+        "ui"
+      ],
+      "intentPatterns": [
+        "(create|add|make).*?(component|screen)",
+        "(react native|RN).*?(개발|구현)"
+      ]
     },
     "fileTriggers": {
-      "pathPatterns": ["src/components/**/*.tsx", "src/screens/**/*.tsx"]
+      "pathPatterns": [
+        "src/components/**/*.tsx",
+        "src/screens/**/*.tsx"
+      ]
     }
   },
   "firebase-integration": {
@@ -51,11 +91,25 @@
     "agentFile": ".claude/agents/mobile-ui-specialist.md",
     "skillFile": ".claude/skills/firebase-integration/SKILL.md",
     "promptTriggers": {
-      "keywords": ["firebase", "firestore", "auth", "collection", "document", "인증", "로그인"],
-      "intentPatterns": ["(firebase|firestore).*?(auth|query|collection)"]
+      "keywords": [
+        "firebase",
+        "firestore",
+        "auth",
+        "collection",
+        "document",
+        "인증",
+        "로그인"
+      ],
+      "intentPatterns": [
+        "(firebase|firestore).*?(auth|query|collection)"
+      ]
     },
     "fileTriggers": {
-      "pathPatterns": ["src/services/firebase*.ts", "src/config/firebase*.ts", "src/services/auth/**"]
+      "pathPatterns": [
+        "src/services/firebase*.ts",
+        "src/config/firebase*.ts",
+        "src/services/auth/**"
+      ]
     }
   },
   "seoul-api-patterns": {
@@ -65,11 +119,25 @@
     "description": "Seoul Open Data API 통합 (30초 폴링 제한)",
     "skillFile": ".claude/skills/api-integration/SKILL.md",
     "promptTriggers": {
-      "keywords": ["seoul", "metro", "subway", "api", "실시간", "지하철", "도착"],
-      "intentPatterns": ["(seoul|metro|subway).*?(api|data)", "실시간.*?도착"]
+      "keywords": [
+        "seoul",
+        "metro",
+        "subway",
+        "api",
+        "실시간",
+        "지하철",
+        "도착"
+      ],
+      "intentPatterns": [
+        "(seoul|metro|subway).*?(api|data)",
+        "실시간.*?도착"
+      ]
     },
     "fileTriggers": {
-      "pathPatterns": ["src/services/train*.ts", "src/services/seoul*.ts"]
+      "pathPatterns": [
+        "src/services/train*.ts",
+        "src/services/seoul*.ts"
+      ]
     },
     "reminder": "30초 최소 폴링 간격 준수"
   },
@@ -80,11 +148,22 @@
     "description": "지하철 데이터 정규화 및 파싱",
     "skillFile": ".claude/skills/subway-data-processor/SKILL.md",
     "promptTriggers": {
-      "keywords": ["파싱", "정규화", "데이터 변환", "역명", "노선"],
-      "intentPatterns": ["(parse|normalize|transform).*?(data|arrival)"]
+      "keywords": [
+        "파싱",
+        "정규화",
+        "데이터 변환",
+        "역명",
+        "노선"
+      ],
+      "intentPatterns": [
+        "(parse|normalize|transform).*?(data|arrival)"
+      ]
     },
     "fileTriggers": {
-      "pathPatterns": ["src/utils/subway*.ts", "src/models/**"]
+      "pathPatterns": [
+        "src/utils/subway*.ts",
+        "src/models/**"
+      ]
     }
   },
   "location-services": {
@@ -94,11 +173,22 @@
     "description": "위치 기반 기능 (Expo Location, 주변역 검색)",
     "skillFile": ".claude/skills/location-services/SKILL.md",
     "promptTriggers": {
-      "keywords": ["location", "gps", "위치", "주변역", "nearby"],
-      "intentPatterns": ["(location|gps|위치).*?(서비스|기능)"]
+      "keywords": [
+        "location",
+        "gps",
+        "위치",
+        "주변역",
+        "nearby"
+      ],
+      "intentPatterns": [
+        "(location|gps|위치).*?(서비스|기능)"
+      ]
     },
     "fileTriggers": {
-      "pathPatterns": ["src/services/location*.ts", "src/hooks/useLocation*.ts"]
+      "pathPatterns": [
+        "src/services/location*.ts",
+        "src/hooks/useLocation*.ts"
+      ]
     }
   },
   "notification-system": {
@@ -108,11 +198,20 @@
     "description": "푸시 알림 (Expo Notifications, 도착 알림)",
     "skillFile": ".claude/skills/notification-system/SKILL.md",
     "promptTriggers": {
-      "keywords": ["notification", "push", "알림", "푸시"],
-      "intentPatterns": ["(notification|push|알림).*?(설정|구현)"]
+      "keywords": [
+        "notification",
+        "push",
+        "알림",
+        "푸시"
+      ],
+      "intentPatterns": [
+        "(notification|push|알림).*?(설정|구현)"
+      ]
     },
     "fileTriggers": {
-      "pathPatterns": ["src/services/notification*.ts"]
+      "pathPatterns": [
+        "src/services/notification*.ts"
+      ]
     }
   },
   "navigation-patterns": {
@@ -121,11 +220,21 @@
     "priority": "high",
     "description": "React Navigation 6.x 패턴",
     "promptTriggers": {
-      "keywords": ["navigation", "screen", "route", "navigate", "네비게이션"],
-      "intentPatterns": ["(navigate|screen|route).*?(add|create)"]
+      "keywords": [
+        "navigation",
+        "screen",
+        "route",
+        "navigate",
+        "네비게이션"
+      ],
+      "intentPatterns": [
+        "(navigate|screen|route).*?(add|create)"
+      ]
     },
     "fileTriggers": {
-      "pathPatterns": ["src/navigation/**"]
+      "pathPatterns": [
+        "src/navigation/**"
+      ]
     }
   },
   "quality-validation": {
@@ -135,41 +244,71 @@
     "description": "최종 품질 검증 (구현 완료 후 자동 호출)",
     "agentFile": ".claude/agents/quality-validator.md",
     "promptTriggers": {
-      "keywords": ["검증", "validate", "quality", "review", "완료", "done", "finish"],
-      "intentPatterns": ["(검증|validate|review).*?(code|코드)", "(완료|done|finish).*?(구현|implement)"]
+      "keywords": [
+        "quality-validator",
+        "quality validation",
+        "품질 검증"
+      ],
+      "intentPatterns": [
+        "(최종|final)\\s*(검증|validation)",
+        "(구현|implement).*?(완료|done|finish).*(검증|validate)"
+      ]
     }
   },
   "verification-loop": {
     "type": "workflow",
     "enforcement": "suggest",
-    "priority": "high",
+    "priority": "normal",
     "description": "Boris Cherny 검증 피드백 루프",
     "skillFile": ".claude/skills/verification-loop/SKILL.md",
     "promptTriggers": {
-      "keywords": ["verify", "verification", "check", "validate", "검증"],
-      "intentPatterns": ["(verify|validate|검증).*?(code|app|앱)"]
+      "keywords": [
+        "verify-app",
+        "verification loop",
+        "피드백 루프"
+      ],
+      "intentPatterns": [
+        "\\b(verify|validate)\\s+(the\\s+)?(app|build|code)\\b",
+        "(타입체크|typecheck|tsc).*?(테스트|test)"
+      ]
     }
   },
   "cc-feature-implementer-main": {
     "type": "workflow",
     "enforcement": "suggest",
-    "priority": "high",
+    "priority": "normal",
     "description": "Phase 기반 기능 계획 및 품질 게이트",
     "skillFile": ".claude/skills/cc-feature-implementer-main/SKILL.md",
     "promptTriggers": {
-      "keywords": ["plan", "planning", "phases", "roadmap", "계획", "설계"],
-      "intentPatterns": ["(create|make|작성).*?(plan|계획)"]
+      "keywords": [
+        "phase plan",
+        "phase-based",
+        "feature plan",
+        "페이즈 계획"
+      ],
+      "intentPatterns": [
+        "(create|make|작성)\\s+(a\\s+)?(feature|phase|roadmap)\\s+(plan|계획)",
+        "페이즈\\s*기반\\s*(계획|설계)"
+      ]
     }
   },
   "code-review": {
     "type": "command",
     "enforcement": "suggest",
-    "priority": "high",
+    "priority": "normal",
     "description": "체계적 코드 리뷰 (보안, 성능, 타입 안전성 체크리스트)",
     "commandFile": ".claude/commands/review.md",
     "promptTriggers": {
-      "keywords": ["review", "code review", "리뷰", "코드 리뷰", "PR"],
-      "intentPatterns": ["(review|check|inspect).*?(code|changes|PR)", "(코드|변경).*?리뷰"]
+      "keywords": [
+        "code review",
+        "코드 리뷰",
+        "pr review",
+        "pull request"
+      ],
+      "intentPatterns": [
+        "\\b(code|코드)\\s*(review|리뷰)\\b",
+        "\\breview\\s+(the\\s+)?(code|pr|diff|changes|변경)\\b"
+      ]
     },
     "fileTriggers": {
       "pathPatterns": []
@@ -182,8 +321,16 @@
     "description": "장기 작업 컨텍스트 보존 (토큰 한계 대비)",
     "skillFile": ".claude/skills/external-memory/SKILL.md",
     "promptTriggers": {
-      "keywords": ["context", "memory", "checkpoint", "컨텍스트", "저장"],
-      "intentPatterns": ["(save|store|preserve).*?(context|memory)"]
+      "keywords": [
+        "context",
+        "memory",
+        "checkpoint",
+        "컨텍스트",
+        "저장"
+      ],
+      "intentPatterns": [
+        "(save|store|preserve).*?(context|memory)"
+      ]
     }
   },
   "agent-improvement": {
@@ -193,8 +340,19 @@
     "description": "멀티 에이전트 워크플로우 자기 개선 루프 (실패 진단, 도구 설명 개선)",
     "note": "superpowers 시스템 스킬 - Skill tool로 호출",
     "promptTriggers": {
-      "keywords": ["improvement", "failure", "diagnose", "optimize", "benchmark", "개선", "진단"],
-      "intentPatterns": ["(improve|optimize).*?(agent|workflow)", "(diagnose|analyze).*?(failure|error)"]
+      "keywords": [
+        "improvement",
+        "failure",
+        "diagnose",
+        "optimize",
+        "benchmark",
+        "개선",
+        "진단"
+      ],
+      "intentPatterns": [
+        "(improve|optimize).*?(agent|workflow)",
+        "(diagnose|analyze).*?(failure|error)"
+      ]
     }
   },
   "hook-creator": {
@@ -204,8 +362,18 @@
     "description": "Claude Code 훅 생성 및 구성 가이드",
     "note": "superpowers 시스템 스킬 - Skill tool로 호출",
     "promptTriggers": {
-      "keywords": ["hook", "hooks", "PreToolUse", "PostToolUse", "UserPromptSubmit", "훅"],
-      "intentPatterns": ["(create|make|add).*?hook", "(configure|setup).*?hook"]
+      "keywords": [
+        "hook",
+        "hooks",
+        "PreToolUse",
+        "PostToolUse",
+        "UserPromptSubmit",
+        "훅"
+      ],
+      "intentPatterns": [
+        "(create|make|add).*?hook",
+        "(configure|setup).*?hook"
+      ]
     }
   },
   "skill-creator": {
@@ -215,8 +383,17 @@
     "description": "Claude Code 스킬 생성 가이드",
     "note": "superpowers 시스템 스킬 - Skill tool로 호출",
     "promptTriggers": {
-      "keywords": ["skill", "create skill", "new skill", "SKILL.md", "스킬"],
-      "intentPatterns": ["(create|make|add).*?skill", "(update|modify).*?skill"]
+      "keywords": [
+        "skill",
+        "create skill",
+        "new skill",
+        "SKILL.md",
+        "스킬"
+      ],
+      "intentPatterns": [
+        "(create|make|add).*?skill",
+        "(update|modify).*?skill"
+      ]
     }
   },
   "slash-command-creator": {
@@ -226,8 +403,17 @@
     "description": "Claude Code 슬래시 커맨드 생성 가이드",
     "note": "superpowers 시스템 스킬 - Skill tool로 호출",
     "promptTriggers": {
-      "keywords": ["command", "slash command", "/command", "커맨드", "슬래시"],
-      "intentPatterns": ["(create|make|add).*?command", "(new|custom).*?slash"]
+      "keywords": [
+        "command",
+        "slash command",
+        "/command",
+        "커맨드",
+        "슬래시"
+      ],
+      "intentPatterns": [
+        "(create|make|add).*?command",
+        "(new|custom).*?slash"
+      ]
     }
   },
   "subagent-creator": {
@@ -237,8 +423,18 @@
     "description": "Claude Code 서브에이전트 생성 가이드",
     "note": "superpowers 시스템 스킬 - Skill tool로 호출",
     "promptTriggers": {
-      "keywords": ["agent", "subagent", "sub-agent", "specialist", "에이전트", "서브에이전트"],
-      "intentPatterns": ["(create|make|add).*?(agent|subagent)", "(new|custom).*?agent"]
+      "keywords": [
+        "agent",
+        "subagent",
+        "sub-agent",
+        "specialist",
+        "에이전트",
+        "서브에이전트"
+      ],
+      "intentPatterns": [
+        "(create|make|add).*?(agent|subagent)",
+        "(new|custom).*?agent"
+      ]
     }
   }
 }

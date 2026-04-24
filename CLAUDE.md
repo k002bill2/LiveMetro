@@ -208,6 +208,21 @@ Claude Code 네이티브 Agent 툴로 서브에이전트를 스폰합니다. 커
 - **승인 절차**: 파괴적/되돌리기 어려운 작업은 사용자 확인 필수
 - **Fan-Out/Fan-In**: 단일 메시지에서 다수 Agent 호출 → 결과 통합
 
+### File Lock (병렬 충돌 방지)
+
+여러 에이전트가 동시 작업 시 파일 충돌을 막기 위한 규칙:
+
+| 시나리오 | 규칙 |
+|---------|------|
+| 같은 파일 타깃 (예: 2 에이전트가 `src/services/firebase.ts` 편집) | **순차 실행** — Fan-Out 금지, 한 에이전트 완료 후 다음 호출 |
+| 같은 디렉토리, 다른 파일 (A는 `firebase.ts`, B는 `firebase.test.ts`) | **병렬 허용** — 결과를 main에서 diff로 검증 |
+| 크로스 영역 (UI + 테스트 에이전트) | **병렬 권장** — `isolation: "worktree"`로 격리 |
+| 같은 파일 + 다른 worktree | **머지 책임은 main 에이전트** — 충돌 시 수동 해결 |
+
+**판단 기준**: Agent를 spawn하기 전에 "두 에이전트가 편집할 파일 목록이 겹치는가?" 체크. 겹치면 순차, 안 겹치면 병렬 + worktree.
+
+**Anti-pattern**: "작은 변경이니까 병렬로 충분" — 작은 변경도 같은 줄을 동시에 수정하면 last-write-wins로 데이터 손실 발생.
+
 ## Skills 2.0 Three-Tier Architecture
 
 ### Commands (`.claude/commands/`) — 21개, 사용자 `/` 호출
@@ -236,7 +251,7 @@ Claude Code 네이티브 Agent 툴로 서브에이전트를 스폰합니다. 커
 | `/sync-registry` | 레지스트리 동기화 |
 | `/run-workflow` | 워크플로우 실행 |
 
-### Skills (`.claude/skills/`) — 21개, 컨텍스트 기반 on-demand 로드
+### Skills (`.claude/skills/`) — 18개, 컨텍스트 기반 on-demand 로드
 
 구현 전 반드시 해당 스킬을 Skill 도구로 호출할 것:
 

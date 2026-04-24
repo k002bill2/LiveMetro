@@ -1,0 +1,20 @@
+{
+  "blocked_patterns": [
+    ".env",
+    ".env.local",
+    ".env.production",
+    "secrets/",
+    "secrets.json",
+    ".git/",
+    "google-services.json",
+    "GoogleService-Info.plist",
+    "eas.json",
+    "firestore.rules",
+    "storage.rules",
+    "serviceAccount",
+    "id_rsa",
+    "id_ed25519",
+    ".ssh/"
+  ],
+  "description": "PreToolUse Edit|Write 훅이 차단하는 경로 패턴. 부분 문자열 매칭."
+}
