@@ -248,9 +248,32 @@ export const getKoreanDayOfWeek = (date: Date = new Date()): string => {
  */
 export const formatCountdown = (seconds: number): string => {
   if (seconds <= 0) return '00:00';
-  
+
   const minutes = Math.floor(seconds / 60);
   const remainingSeconds = seconds % 60;
-  
+
   return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
+};
+
+/**
+ * Parse "HH:mm:ss" or "H:mm:ss" time string to seconds-of-day.
+ *
+ * Seoul Subway timetable API returns times in non-zero-padded format
+ * (e.g., "9:35:00") which breaks lexicographic string comparison —
+ * "9:35:00" > "14:30:00" evaluates true because '9' > '1'.
+ * Always normalize via this helper before comparing schedule times.
+ *
+ * @param time time string in "H:mm:ss", "HH:mm:ss", or "HH:mm" form
+ * @returns seconds since 00:00:00, or -1 for invalid input
+ */
+export const toSecondsOfDay = (time: string): number => {
+  if (!time || typeof time !== 'string') return -1;
+  const parts = time.split(':');
+  if (parts.length === 0 || parts[0] === '') return -1;
+  const hours = parseInt(parts[0] ?? '', 10);
+  const minutes = parseInt(parts[1] ?? '0', 10);
+  const seconds = parseInt(parts[2] ?? '0', 10);
+  if (Number.isNaN(hours) || Number.isNaN(minutes) || Number.isNaN(seconds)) return -1;
+  if (hours < 0 || minutes < 0 || seconds < 0) return -1;
+  return hours * 3600 + minutes * 60 + seconds;
 };
