@@ -430,4 +430,70 @@ describe('useRealtimeTrains', () => {
       expect(unsubscribeMock).toHaveBeenCalled();
     });
   });
+
+  describe('B3 — callback ref stability (regression)', () => {
+    it('does not re-subscribe when parent passes new inline callbacks', () => {
+      // Simulate a parent that creates new inline callbacks on every render —
+      // the typical React pattern that previously caused subscription churn.
+      const { rerender } = renderHook<
+        ReturnType<typeof useRealtimeTrains>,
+        { tick: number }
+      >(
+        ({ tick }: { tick: number }) =>
+          useRealtimeTrains('강남역', {
+            onDataReceived: () => {
+              // intentionally new identity each render — `tick` referenced
+              // to defeat any compiler memoization
+              void tick;
+            },
+            onError: () => { void tick; },
+          }),
+        { initialProps: { tick: 0 } }
+      );
+
+      const initialCallCount = mockDataManager.subscribeToRealtimeUpdates.mock.calls.length;
+
+      // Force several parent re-renders with new inline callback identities
+      rerender({ tick: 1 });
+      rerender({ tick: 2 });
+      rerender({ tick: 3 });
+      rerender({ tick: 4 });
+
+      // Subscribe must not be called again — callbacks are stashed in refs
+      expect(mockDataManager.subscribeToRealtimeUpdates.mock.calls.length).toBe(initialCallCount);
+    });
+
+    it('still uses the latest onDataReceived after callback change', () => {
+      let lastReceivedTick = -1;
+
+      const { rerender } = renderHook<
+        ReturnType<typeof useRealtimeTrains>,
+        { tick: number }
+      >(
+        ({ tick }: { tick: number }) =>
+          useRealtimeTrains('강남역', {
+            onDataReceived: () => {
+              lastReceivedTick = tick;
+            },
+          }),
+        { initialProps: { tick: 0 } }
+      );
+
+      // Update tick (parent re-renders, new callback)
+      rerender({ tick: 7 });
+
+      // Trigger data delivery using the captured callback from initial subscribe
+      const dataCallback = mockDataManager.subscribeToRealtimeUpdates.mock.calls[0]?.[1];
+      act(() => {
+        dataCallback?.({
+          stationId: 'gn',
+          trains: [],
+          lastUpdated: new Date(),
+        });
+      });
+
+      // The latest closure (tick=7) must run, not the stale tick=0 closure
+      expect(lastReceivedTick).toBe(7);
+    });
+  });
 });

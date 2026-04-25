@@ -3,7 +3,7 @@
  * Custom hook for subscribing to real-time train data with error handling and caching
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
 import { dataManager, RealtimeTrainData } from '../services/data/dataManager';
 import { Train } from '../models/train';
 
@@ -52,21 +52,36 @@ export const useRealtimeTrains = (
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const staleTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Stash external callbacks in refs so the subscribe effect does NOT
+  // re-run on every parent render. Inline callbacks from the parent
+  // (`onDataReceived={(d) => ...}`) get a fresh reference each render —
+  // including those in the effect's deps would cause subscribe / unsubscribe
+  // to fire on every keystroke or unrelated state change, churning the
+  // dataManager polling interval.
+  //
+  // useLayoutEffect (not useEffect) so the ref is updated synchronously
+  // before any other effect in this render reads it. Plain useEffect would
+  // leave a one-render lag under React 18 concurrent rendering.
+  const onErrorRef = useRef(onError);
+  const onDataReceivedRef = useRef(onDataReceived);
+  useLayoutEffect(() => {
+    onErrorRef.current = onError;
+    onDataReceivedRef.current = onDataReceived;
+  });
+
   const updateState = useCallback((updates: Partial<UseRealtimeTrainsState>) => {
     setState(prevState => ({ ...prevState, ...updates }));
   }, []);
 
   const handleError = useCallback((error: string) => {
     console.error('Realtime trains error:', error);
-    updateState({ 
-      error, 
-      loading: false 
+    updateState({
+      error,
+      loading: false
     });
-    
-    if (onError) {
-      onError(error);
-    }
-  }, [updateState, onError]);
+
+    onErrorRef.current?.(error);
+  }, [updateState]);
 
   const handleDataReceived = useCallback((data: RealtimeTrainData | null) => {
     if (data) {
@@ -84,18 +99,16 @@ export const useRealtimeTrains = (
       if (staleTimerRef.current) {
         clearTimeout(staleTimerRef.current);
       }
-      
+
       staleTimerRef.current = setTimeout(() => {
         updateState({ isStale: true });
       }, staleTime) as unknown as NodeJS.Timeout;
 
-      if (onDataReceived) {
-        onDataReceived(data);
-      }
+      onDataReceivedRef.current?.(data);
     } else {
       // Handle retry logic
       retryCountRef.current++;
-      
+
       if (retryCountRef.current >= retryAttempts) {
         handleError(`최대 재시도 횟수(${retryAttempts})에 도달했습니다.`);
       } else {
@@ -105,7 +118,7 @@ export const useRealtimeTrains = (
         });
       }
     }
-  }, [updateState, handleError, onDataReceived, retryAttempts, staleTime]);
+  }, [updateState, handleError, retryAttempts, staleTime]);
 
   const subscribe = useCallback(() => {
     if (!enabled || !stationName.trim()) return;
