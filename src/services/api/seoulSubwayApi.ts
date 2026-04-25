@@ -113,6 +113,21 @@ async function withRetry<T>(
   throw lastError || new Error('All retry attempts failed');
 }
 
+/**
+ * Thrown by getStationTimetable when called on a web platform.
+ *
+ * Seoul Open Data Portal's timetable endpoint is HTTP-only (port 8088, no HTTPS).
+ * Browsers block mixed-content fetch from HTTPS pages, so the call cannot succeed.
+ * Native (iOS/Android) clients are unaffected. Callers should translate this
+ * into a user-facing message rather than treating it as a generic failure.
+ */
+export class TimetableUnsupportedOnWebError extends Error {
+  constructor() {
+    super('Timetable API is not supported on web (HTTP-only endpoint)');
+    this.name = 'TimetableUnsupportedOnWebError';
+  }
+}
+
 interface SeoulApiResponse<T> {
   errorMessage?: {
     status: number;
@@ -434,10 +449,12 @@ class SeoulSubwayApiService {
     weekTag: '1' | '2' | '3' = '1',
     inoutTag: '1' | '2' = '1'
   ): Promise<SeoulTimetableRow[]> {
-    // Skip API call on web platform (HTTP API doesn't work with HTTPS pages)
+    // Skip API call on web platform — HTTP-only endpoint is blocked by mixed-content
+    // policy. Throw a typed error so callers can render an informative message
+    // instead of an empty schedule that looks like a bug.
     if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-      console.debug('[SeoulSubwayApi] Skipping timetable API on web (HTTP only API)');
-      return [];
+      console.debug('[SeoulSubwayApi] Timetable API not supported on web');
+      throw new TimetableUnsupportedOnWebError();
     }
 
     const rateLimitKey = `timetable:${stationCode}:${weekTag}:${inoutTag}`;
