@@ -474,7 +474,36 @@ class SeoulSubwayApiService {
         const url = `${generalBaseUrl}/${apiKey}/json/SearchSTNTimeTableByIDService/1/30/${stationCode}/${weekTag}/${inoutTag}/`;
 
         const response = await this.fetchWithTimeout(url);
-        const data: SeoulTimetableResponse = await response.json();
+
+        // DIAGNOSTIC: clone response so we can capture body preview when the
+        // server returns XML/HTML (e.g. invalid key) instead of JSON. Success
+        // path is unchanged; the clone is only consumed on JSON parse failure.
+        const responseClone = typeof response.clone === 'function' ? response.clone() : null;
+        let data: SeoulTimetableResponse;
+        try {
+          data = await response.json();
+        } catch (parseError) {
+          const contentType = response.headers?.get?.('content-type') ?? 'unknown';
+          let bodyPreview = '<unavailable>';
+          if (responseClone) {
+            try {
+              bodyPreview = (await responseClone.text()).slice(0, 300);
+            } catch {
+              // ignore — preview is best-effort
+            }
+          }
+          console.error(
+            `[SeoulSubwayApi] Timetable response is not JSON. ` +
+            `url=${url.replace(apiKey, '***')} ` +
+            `content-type=${contentType} ` +
+            `body[0..300]=${bodyPreview}`
+          );
+          this.timetableKeyManager.reportError(apiKey);
+          throw new Error(
+            `시간표 응답이 JSON이 아닙니다 (content-type=${contentType}). ` +
+            `API 키 또는 엔드포인트 상태를 확인하세요.`
+          );
+        }
 
         // Handle empty or invalid response structure
         if (!data || !data.SearchSTNTimeTableByIDService) {
