@@ -35,6 +35,7 @@ import { CongestionReportModal } from '@/components/congestion/CongestionReportM
 import { AccessibilitySection } from '@/components/station/AccessibilitySection';
 import { ExitInfoSection } from '@/components/station/ExitInfoSection';
 import { AlertBanner } from '@/components/common/AlertBanner';
+import { LiveClock } from '@/components/common/LiveClock';
 import { CongestionReportInput } from '@/models/congestion';
 import { useTrainSchedule } from '@/hooks/useTrainSchedule';
 import { Clock, ArrowUp, ArrowDown } from 'lucide-react-native';
@@ -60,7 +61,6 @@ const StationDetailScreen: React.FC = () => {
     lineId
   );
 
-  const [currentTime, setCurrentTime] = useState(new Date());
   const [refreshing, setRefreshing] = useState(false);
   const [activeTab, setActiveTab] = useState<TabLabel>('출발');
   const [mapLoadError, setMapLoadError] = useState(false);
@@ -128,10 +128,10 @@ const StationDetailScreen: React.FC = () => {
     await submitReport(input);
   }, [submitReport]);
 
+  // Live clock ticking is now isolated inside <LiveClock /> to avoid
+  // re-rendering this entire screen once per minute.
   useEffect(() => {
-    const timer = setInterval(() => setCurrentTime(new Date()), 60 * 1000);
     return () => {
-      clearInterval(timer);
       // Cleanup animation and timeout on unmount
       if (spinAnimRef.current) {
         spinAnimRef.current.stop();
@@ -171,7 +171,7 @@ const StationDetailScreen: React.FC = () => {
     refetchTrains();
 
     refreshTimeoutRef.current = setTimeout(() => {
-      setCurrentTime(new Date());
+      // LiveClock은 1분 단위로 자체 tick하므로 여기서 시계를 강제 갱신할 필요 없음
       setRefreshing(false);
       if (spinAnimRef.current) {
         spinAnimRef.current.stop();
@@ -181,12 +181,6 @@ const StationDetailScreen: React.FC = () => {
       refreshTimeoutRef.current = null;
     }, 2000);
   };
-
-  const formattedTime = currentTime.toLocaleTimeString('ko-KR', {
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  });
 
   // 실시간 열차 데이터를 도착 정보 형식으로 변환
   const arrivals = useMemo(() => {
@@ -241,7 +235,7 @@ const StationDetailScreen: React.FC = () => {
     <ScrollView style={styles.container} contentInsetAdjustmentBehavior="automatic">
       <View style={styles.header}>
         <View style={styles.statusRow}>
-          <Text style={styles.timeText}>{formattedTime}</Text>
+          <LiveClock style={styles.timeText} />
           <TouchableOpacity
             style={styles.refreshButton}
             onPress={handleManualRefresh}
@@ -321,7 +315,7 @@ const StationDetailScreen: React.FC = () => {
 
       <View style={styles.arrivalContainer}>
         <Text style={styles.lastUpdatedText}>
-          현재 {formattedTime} 기준 실시간 열차
+          현재 <LiveClock /> 기준 실시간 열차
         </Text>
 
         {trainsLoading && (

@@ -4,7 +4,7 @@
  * Minimal grayscale design with black accent
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -134,29 +134,54 @@ export const HomeScreen: React.FC = () => {
     }
   }, [loadFavoriteStations, showError]);
 
-  const onStationSelect = (station: Station): void => {
-    setSelectedStation(station);
-    navigation.navigate('StationNavigator', {
-      stationId: station.id,
-      lineId: station.lineId,
-    });
-  };
+  const onStationSelect = useCallback(
+    (station: Station): void => {
+      setSelectedStation(station);
+      navigation.navigate('StationNavigator', {
+        stationId: station.id,
+        lineId: station.lineId,
+      });
+    },
+    [navigation]
+  );
 
   // 출발 버튼 핸들러 - StationNavigator로 이동 (출발 모드)
-  const handleSetStart = (station: Station): void => {
-    setSelectedStation(station);
-    navigation.navigate('StationNavigator', {
-      stationId: station.id,
-      lineId: station.lineId,
-      mode: 'departure',
-    });
-  };
+  const handleSetStart = useCallback(
+    (station: Station): void => {
+      setSelectedStation(station);
+      navigation.navigate('StationNavigator', {
+        stationId: station.id,
+        lineId: station.lineId,
+        mode: 'departure',
+      });
+    },
+    [navigation]
+  );
 
   // 도착 버튼 핸들러 - 상태 초기화
-  const handleSetEnd = (): void => {
+  const handleSetEnd = useCallback((): void => {
     setSelectedStation(null);
     showInfo('선택이 초기화되었습니다');
-  };
+  }, [showInfo]);
+
+  /**
+   * Station별 onPress/onSetStart 콜백을 캐시한다.
+   * StationCard는 React.memo로 감싸져 있으나 전달되는 onPress가 매 렌더 새 함수면
+   * memo가 무효화된다. nearbyStations 또는 핸들러가 바뀔 때만 콜백을 재생성한다.
+   */
+  const stationCallbacks = useMemo(() => {
+    const map = new Map<
+      string,
+      { onPress: () => void; onSetStart: () => void }
+    >();
+    nearbyStations.forEach((station) => {
+      map.set(station.id, {
+        onPress: () => onStationSelect(station),
+        onSetStart: () => handleSetStart(station),
+      });
+    });
+    return map;
+  }, [nearbyStations, onStationSelect, handleSetStart]);
 
   // 출발 알림 예약 핸들러
   const handleScheduleAlert = async (): Promise<void> => {
@@ -369,18 +394,21 @@ export const HomeScreen: React.FC = () => {
           </View>
         ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.stationList}>
-            {nearbyStations.map((station) => (
-              <StationCard
-                key={station.id}
-                station={station}
-                isSelected={selectedStation?.id === station.id}
-                onPress={() => onStationSelect(station)}
-                onSetStart={() => handleSetStart(station)}
-                onSetEnd={handleSetEnd}
-                showDistance={locationPermission && 'distance' in station}
-                distance={'distance' in station ? (station as { distance: number }).distance / 1000 : undefined}
-              />
-            ))}
+            {nearbyStations.map((station) => {
+              const callbacks = stationCallbacks.get(station.id);
+              return (
+                <StationCard
+                  key={station.id}
+                  station={station}
+                  isSelected={selectedStation?.id === station.id}
+                  onPress={callbacks?.onPress}
+                  onSetStart={callbacks?.onSetStart}
+                  onSetEnd={handleSetEnd}
+                  showDistance={locationPermission && 'distance' in station}
+                  distance={'distance' in station ? (station as { distance: number }).distance / 1000 : undefined}
+                />
+              );
+            })}
           </ScrollView>
         )}
       </View>
