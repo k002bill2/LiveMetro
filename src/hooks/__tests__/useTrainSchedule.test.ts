@@ -78,6 +78,12 @@ describe('useTrainSchedule', () => {
   });
 
   it('should fetch and convert timetable data', async () => {
+    // Pin system time before the mock arrival (06:00) so upcomingTrains is
+    // deterministic regardless of when the test runs (CI usually runs UTC
+    // past 06:00 → flaky without a fixed clock).
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date(2026, 3, 27, 5, 0, 0));
+
     const mockData = [
       {
         TRAIN_NO: '2001',
@@ -113,6 +119,8 @@ describe('useTrainSchedule', () => {
       })
     );
     expect(result.current.upcomingTrains).toHaveLength(1);
+
+    jest.useRealTimers();
   });
 
   it('should handle station not found', async () => {
