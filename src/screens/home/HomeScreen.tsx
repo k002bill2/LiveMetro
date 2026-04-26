@@ -406,6 +406,7 @@ export const HomeScreen: React.FC = () => {
                   onSetEnd={handleSetEnd}
                   showDistance={locationPermission && 'distance' in station}
                   distance={'distance' in station ? (station as { distance: number }).distance / 1000 : undefined}
+                  arrivalsEnabled={isFocused}
                 />
               );
             })}

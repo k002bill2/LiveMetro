@@ -41,6 +41,14 @@ interface StationCardProps {
   onSetEnd?: () => void;
   /** Show real-time arrival preview (default: true) */
   showArrivals?: boolean;
+  /**
+   * Whether the card should actively poll for arrivals.
+   * Defaults to true. Pass `useIsFocused()` from the parent screen so the
+   * underlying Seoul API polling pauses when the user navigates away —
+   * `arrivalService` shares one timer per station, but per-card cleanup
+   * still spares foreground CPU and battery for inactive screens.
+   */
+  arrivalsEnabled?: boolean;
   /** Enable favorite toggle button (default: true) */
   enableFavorite?: boolean;
   /** Delay before entrance animation in ms (for staggered lists) */
@@ -57,6 +65,7 @@ export const StationCard: React.FC<StationCardProps> = memo(
     onSetStart,
     onSetEnd,
     showArrivals = true,
+    arrivalsEnabled = true,
     enableFavorite = true,
     animationDelay = 0,
   }) => {
@@ -73,9 +82,10 @@ export const StationCard: React.FC<StationCardProps> = memo(
     // Local state for optimistic UI updates
     const [isTogglingFavorite, setIsTogglingFavorite] = useState(false);
 
-    // Real-time train data (only fetch if showArrivals is enabled)
+    // Real-time train data — gated by both UI visibility (showArrivals) and
+    // screen focus (arrivalsEnabled). Either being false skips the subscription.
     const { trains, loading: trainsLoading } = useRealtimeTrains(station.name, {
-      enabled: showArrivals,
+      enabled: showArrivals && arrivalsEnabled,
       refetchInterval: 30000, // 30 seconds
       staleTime: 60000, // 1 minute
     });
