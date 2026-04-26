@@ -17,6 +17,7 @@ jest.mock('@services/notification/currentStationAlertService', () => ({
     clearStationHistory: jest.fn().mockResolvedValue(undefined),
     getMonitoredStations: jest.fn().mockReturnValue([]),
     clearAllHistory: jest.fn().mockResolvedValue(undefined),
+    subscribe: jest.fn(() => () => {}),
   },
 }));
 
@@ -131,31 +132,39 @@ describe('useCurrentStationAlert', () => {
     expect(result.current.lastNotificationTime).toBeNull();
   });
 
-  it('should poll for updates', () => {
+  it('should re-sync when service emits a change', () => {
+    let emit: (() => void) | undefined;
+    (currentStationAlertService.subscribe as jest.Mock).mockImplementation(
+      (listener: () => void) => {
+        emit = listener;
+        return () => {};
+      }
+    );
+
     renderHook(() => useCurrentStationAlert('station-1'));
 
-    // Initial call
+    // Initial sync from useEffect mount
     expect(currentStationAlertService.isStationMonitored).toHaveBeenCalledTimes(1);
 
-    // After 5s interval
+    // Service emits → hook re-syncs without polling
     act(() => {
-      jest.advanceTimersByTime(5000);
+      emit?.();
     });
 
     expect(currentStationAlertService.isStationMonitored).toHaveBeenCalledTimes(2);
   });
 
-  it('should cleanup interval on unmount', () => {
+  it('should unsubscribe on unmount', () => {
+    const unsubscribe = jest.fn();
+    (currentStationAlertService.subscribe as jest.Mock).mockReturnValue(unsubscribe);
+
     const { unmount } = renderHook(() => useCurrentStationAlert('station-1'));
+
+    expect(currentStationAlertService.subscribe).toHaveBeenCalledTimes(1);
 
     unmount();
 
-    act(() => {
-      jest.advanceTimersByTime(10000);
-    });
-
-    // Should not be called more after unmount
-    expect(currentStationAlertService.isStationMonitored).toHaveBeenCalledTimes(1);
+    expect(unsubscribe).toHaveBeenCalledTimes(1);
   });
 });
 

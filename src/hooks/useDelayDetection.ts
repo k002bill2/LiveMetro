@@ -40,6 +40,12 @@ interface UseDelayDetectionOptions {
   lineIds?: string[];
   /** 자동 폴링 활성화. 기본값: true */
   autoPolling?: boolean;
+  /**
+   * 훅 활성화 여부. 기본값: true.
+   * false면 초기 fetch와 폴링 모두 중단되며, 진행 중 fetch도 setState를 무시한다.
+   * 화면 포커스 게이트(useIsFocused 등)와 결합해 백그라운드 폴링을 막는다.
+   */
+  enabled?: boolean;
 }
 
 interface UseDelayDetectionResult {
@@ -108,6 +114,7 @@ export function useDelayDetection(
     pollingInterval = 60000, // 1분
     lineIds: lineIdsProp,
     autoPolling = true,
+    enabled = true,
   } = options;
 
   const defaultLineIds = useMemo(() => Object.keys(LINE_REPRESENTATIVE_STATIONS), []);
@@ -211,6 +218,14 @@ export function useDelayDetection(
   useEffect(() => {
     isMountedRef.current = true;
 
+    if (!enabled) {
+      // 비활성 상태: fetch도 polling도 하지 않음.
+      // 진행 중인 fetch가 있다면 isMountedRef로 setState가 차단된다.
+      return () => {
+        isMountedRef.current = false;
+      };
+    }
+
     // 초기 조회
     fetchDelays();
 
@@ -228,7 +243,7 @@ export function useDelayDetection(
         pollingTimerRef.current = null;
       }
     };
-  }, [autoPolling, pollingInterval, fetchDelays]);
+  }, [enabled, autoPolling, pollingInterval, fetchDelays]);
 
   return {
     delays,

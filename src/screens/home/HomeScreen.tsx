@@ -22,7 +22,7 @@ import {
   RefreshCw,
 } from 'lucide-react-native';
 import * as Location from 'expo-location';
-import { NavigationProp, useNavigation } from '@react-navigation/native';
+import { NavigationProp, useIsFocused, useNavigation } from '@react-navigation/native';
 
 import { useAuth } from '../../services/auth/AuthContext';
 import { trainService } from '../../services/train/trainService';
@@ -44,6 +44,7 @@ import { AppStackParamList } from '../../navigation/types';
 
 export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<AppStackParamList>>();
+  const isFocused = useIsFocused();
   const { user } = useAuth();
   const { colors } = useTheme();
   const styles = createStyles(colors);
@@ -72,10 +73,11 @@ export const HomeScreen: React.FC = () => {
   // 위치 권한이 있으면 훅 결과 사용, 없으면 즐겨찾기
   const nearbyStations = locationPermission ? hookNearbyStations : favoriteStations;
 
-  // Seoul API 지연 감지 훅
+  // Seoul API 지연 감지 훅 — 화면 포커스 시에만 폴링 (백그라운드 호출 방지)
   const { delays: activeDelays } = useDelayDetection({
     pollingInterval: 60000, // 1분마다 체크
     autoPolling: true,
+    enabled: isFocused,
   });
 
   // 통합 알림 훅 - ML 기반 출퇴근 예측
