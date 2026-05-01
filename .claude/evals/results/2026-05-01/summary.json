@@ -1,0 +1,74 @@
+{
+  "evaluated_at": "2026-05-01T00:00:00Z",
+  "category": "ui_component",
+  "k": 1,
+  "tasks_total": 4,
+  "tasks_passed": 1,
+  "tasks_failed": 3,
+  "metrics": {
+    "pass_at_1": 0.25,
+    "avg_score": 0.2455,
+    "success_rate": 0.25
+  },
+  "tasks": [
+    {
+      "task_id": "task_ui_001",
+      "task_name": "StationCard 컴포넌트 생성",
+      "difficulty": "simple",
+      "threshold": 0.70,
+      "final_score": 0.982,
+      "grade": "A",
+      "passed": true
+    },
+    {
+      "task_id": "task_ui_hard_001",
+      "task_name": "실시간 노선도 컴포넌트 (애니메이션 + 제스처)",
+      "difficulty": "hard",
+      "threshold": 0.70,
+      "final_score": 0.0,
+      "grade": "F",
+      "passed": false
+    },
+    {
+      "task_id": "task_ui_expert_001",
+      "task_name": "3D 노선도 with 핀치/회전/팬 동시 제스처",
+      "difficulty": "expert",
+      "threshold": 0.80,
+      "final_score": 0.0,
+      "grade": "F",
+      "passed": false
+    },
+    {
+      "task_id": "task_ui_expert_002",
+      "task_name": "AR 증강현실 노선도 with 실시간 열차 추적",
+      "difficulty": "expert_plus",
+      "threshold": 0.75,
+      "final_score": 0.0,
+      "grade": "F",
+      "passed": false
+    }
+  ],
+  "underperforming_tasks": [
+    {
+      "task_id": "task_ui_hard_001",
+      "score": 0.0,
+      "reason": "InteractiveRouteMap.tsx 미구현 (reanimated + gesture-handler 기반 애니메이션 노선도)"
+    },
+    {
+      "task_id": "task_ui_expert_001",
+      "score": 0.0,
+      "reason": "3D 노선도 미구현 (@shopify/react-native-skia 미설치, Skia/3D 코드 없음)"
+    },
+    {
+      "task_id": "task_ui_expert_002",
+      "score": 0.0,
+      "reason": "AR 노선도 미구현 (ViroReact/react-native-arkit 미설치, AR 관련 코드 없음)"
+    }
+  ],
+  "notes": [
+    "task_ui_expert_001 평가 에이전트가 응답 누락(timeout)되어 메인 에이전트가 직접 수동 평가 수행",
+    "현재 구현된 UI 컴포넌트는 task_ui_001(StationCard)만 통과. 나머지 3개는 신규 구현 필요",
+    "expert/expert_plus 태스크의 통과 기준(0.80/0.75)이 simple(0.70)보다 높음"
+  ],
+  "recommendation": "다음 우선순위로 컴포넌트 신규 구현 권장: 1) InteractiveRouteMap (hard, 통과 가능성 가장 높음) 2) 3D 노선도 (Skia 도입 비용 큼) 3) AR 노선도 (디바이스 의존성 + 배터리 이슈)"
+}

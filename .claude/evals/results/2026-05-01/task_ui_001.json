@@ -1,0 +1,47 @@
+{
+  "task_id": "task_ui_001",
+  "task_name": "StationCard 컴포넌트 생성",
+  "evaluated_at": "2026-05-01T00:00:00Z",
+  "k": 1,
+  "runs": [
+    {
+      "run_id": "run_1",
+      "grades": {
+        "code_checks": {
+          "passed": 6,
+          "failed": 0,
+          "score": 1.0,
+          "details": [
+            {"check": "file_exists: src/components/station/StationCard.tsx", "passed": true, "evidence": "196줄 파일 존재, export const StationCard 확인"},
+            {"check": "test_exists: src/components/station/__tests__/StationCard.test.tsx", "passed": true, "evidence": "554줄 테스트 파일 존재, describe('StationCard') 확인"},
+            {"check": "no_any_types", "passed": true, "evidence": ": any 패턴 없음. 모든 타입 명시적 선언"},
+            {"check": "imports_use_aliases: @components, @utils, @hooks", "passed": true, "evidence": "@/ path alias 사용 (상대 경로 없음)"},
+            {"check": "has_accessibility_label", "passed": true, "evidence": "line 85: accessibilityLabel={accessibilityLabel} — useMemo로 동적 생성"},
+            {"check": "uses_typescript_interface", "passed": true, "evidence": "line 23: export interface StationCardProps { ... } — JSDoc 포함, 5개 필드"}
+          ]
+        },
+        "llm_evaluation": {
+          "score": 0.97,
+          "rubric": "code-quality",
+          "criteria_scores": {
+            "React Native 모범 사례 준수": 1.0,
+            "Props 인터페이스 정의": 1.0,
+            "접근성 구현": 1.0,
+            "코드 가독성/유지보수성": 0.9,
+            "성능 최적화 (memo, useCallback)": 0.95
+          },
+          "feedback": "StationCard 컴포넌트가 React Native 모범 사례(StyleSheet.create, memo, TouchableOpacity)를 완벽히 준수. Props 인터페이스 JSDoc 완비, 접근성(accessibilityRole/Label/Hint/State) 완벽 구현, useMemo/useCallback 최적 적용. ThemeColors 로컬 타입 재정의가 소폭 감점 요인."
+        },
+        "final_score": 0.982,
+        "grade": "A"
+      },
+      "passed": true
+    }
+  ],
+  "metrics": {
+    "pass_at_1": 1,
+    "avg_score": 0.982,
+    "success_rate": 1.0
+  },
+  "summary": "StationCard 컴포넌트 코드 체크 6/6 통과, LLM 0.97점. 최종 0.982 (A등급). pass@1=1."
+}

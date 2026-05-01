@@ -1,0 +1,53 @@
+{
+  "task_id": "task_ui_hard_001",
+  "task_name": "실시간 노선도 컴포넌트 (애니메이션 + 제스처)",
+  "evaluated_at": "2026-05-01T00:00:00Z",
+  "k": 1,
+  "runs": [
+    {
+      "run_id": "run_1",
+      "grades": {
+        "code_checks": {
+          "passed": 0,
+          "failed": 9,
+          "score": 0.0,
+          "details": [
+            {"check": "file_exists: src/components/map/InteractiveRouteMap.tsx", "passed": false, "evidence": "File does not exist"},
+            {"check": "test_exists: src/components/map/__tests__/InteractiveRouteMap.test.tsx", "passed": false, "evidence": "File does not exist"},
+            {"check": "imports: react-native-reanimated", "passed": false, "evidence": "Source file missing"},
+            {"check": "imports: react-native-gesture-handler", "passed": false, "evidence": "Source file missing"},
+            {"check": "has_worklet_directive", "passed": false, "evidence": "Source file missing"},
+            {"check": "uses_useSharedValue", "passed": false, "evidence": "Source file missing"},
+            {"check": "uses_useAnimatedStyle", "passed": false, "evidence": "Source file missing"},
+            {"check": "no_any_types", "passed": false, "evidence": "Source file missing"},
+            {"check": "has_accessibility_label", "passed": false, "evidence": "Source file missing"}
+          ]
+        },
+        "llm_evaluation": {
+          "score": 0.0,
+          "rubric": "code-quality-hard",
+          "criteria_scores": {
+            "제스처 핸들링 품질": 0.0,
+            "애니메이션 구현": 0.0,
+            "worklet 분리": 0.0,
+            "메모이제이션": 0.0,
+            "구조/유지보수성": 0.0,
+            "에러 처리": 0.0,
+            "접근성": 0.0
+          },
+          "feedback": "평가 대상 파일 InteractiveRouteMap.tsx가 존재하지 않아 LLM 평가를 수행할 수 없습니다. 컴포넌트가 구현되지 않았으므로 모든 품질 기준에서 0점 처리됩니다."
+        },
+        "final_score": 0.0,
+        "grade": "F"
+      },
+      "passed": false
+    }
+  ],
+  "metrics": {
+    "pass_at_1": 0,
+    "avg_score": 0.0,
+    "success_rate": 0
+  },
+  "summary": "InteractiveRouteMap.tsx 및 테스트 파일 미구현. 코드 체크 9/9 실패. pass@1=0.",
+  "recommendation": "mobile-ui-specialist 에이전트로 react-native-reanimated + gesture-handler 기반 InteractiveRouteMap 컴포넌트를 구현하세요."
+}
