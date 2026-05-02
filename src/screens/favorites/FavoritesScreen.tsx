@@ -24,7 +24,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Heart, Search, AlertCircle, LogIn, Plus } from 'lucide-react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { useFavorites } from '../../hooks/useFavorites';
@@ -42,6 +42,10 @@ type NavigationProp = NativeStackNavigationProp<AppStackParamList>;
 
 export const FavoritesScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
+  // Pause Seoul API polling on the per-card StationCards when this screen
+  // is unfocused (e.g. user opens SubwayMap). Without this, favorites kept
+  // re-fetching realtime arrivals while the user was elsewhere.
+  const isFocused = useIsFocused();
   const { user } = useAuth();
   const { colors } = useTheme();
   const styles = createStyles(colors);
@@ -299,6 +303,7 @@ export const FavoritesScreen: React.FC = () => {
         onSetEnd={() => handleSetEnd(favorite)}
         onSaveEdit={(updates) => handleSaveEdit(favorite.id, updates)}
         isDragEnabled={false} // Will be enabled in Phase 3
+        arrivalsEnabled={isFocused}
       />
     );
   };

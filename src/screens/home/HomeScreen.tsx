@@ -59,10 +59,14 @@ export const HomeScreen: React.FC = () => {
   const rotateAnim = useRef(new Animated.Value(0)).current;
 
   // 주변역 검색 훅 - GPS 기반 자동 업데이트
+  // closestStation/lastUpdated도 destructure해서 LocationDebugPanel에 전달
+  // → dev 패널이 자체 useNearbyStations 두 번째 인스턴스를 만들지 않게 함.
   const {
     nearbyStations: hookNearbyStations,
     loading: _nearbyLoading,
     refresh: refreshNearby,
+    closestStation: nearbyClosestStation,
+    lastUpdated: nearbyLastUpdated,
   } = useNearbyStations({
     radius: 1000,
     maxStations: 5,
@@ -475,7 +479,13 @@ export const HomeScreen: React.FC = () => {
       <ToastComponent />
 
       {/* Location Debug Panel - Development only */}
-      {__DEV__ && <LocationDebugPanel />}
+      {__DEV__ && (
+        <LocationDebugPanel
+          closestStation={nearbyClosestStation}
+          lastUpdated={nearbyLastUpdated}
+          stationsLoading={_nearbyLoading}
+        />
+      )}
     </ScrollView>
   );
 };

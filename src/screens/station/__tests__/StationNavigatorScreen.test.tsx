@@ -21,6 +21,7 @@ jest.mock('lucide-react-native', () => ({
   Flag: 'Flag',
 }));
 jest.mock('@react-navigation/native', () => ({
+  useIsFocused: jest.fn(() => true),
   useNavigation: jest.fn(() => ({
     navigate: jest.fn(),
     goBack: jest.fn(),

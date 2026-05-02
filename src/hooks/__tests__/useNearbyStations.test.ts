@@ -550,6 +550,87 @@ describe('useNearbyStations', () => {
       expect(mockLocationService.findNearbyStationsAdaptive).not.toHaveBeenCalled();
     });
   });
+
+  describe('Regression: stable effect deps (no internal-state churn loop)', () => {
+    // Why: previously findNearbyStations' useCallback deps included
+    // `lastUpdateTime` and `state.closestStation`. Both were mutated by the
+    // function itself (setLastUpdateTime + updateState({ closestStation })),
+    // recreating the callback on every successful run and re-firing the
+    // location effect. Console showed "Loaded 24 subway lines" 9 times in a
+    // row in production. Guard against regression by counting the cheapest
+    // proxy: getSubwayLines invocations after a single mount.
+    it('should not call getSubwayLines repeatedly after a single mount', async () => {
+      renderHook(() => useNearbyStations());
+
+      await waitFor(() => {
+        expect(mockTrainService.getSubwayLines).toHaveBeenCalled();
+      });
+
+      // Drain any pending micro/macro tasks the effect chain might still queue.
+      await act(async () => {
+        jest.advanceTimersByTime(1000);
+      });
+
+      // Tolerated: 1 (mount effect) + 1 (race fallback when allStations is
+      // still empty on the first findNearbyStations entry). 9 (the bug) is
+      // categorically excluded.
+      expect(mockTrainService.getSubwayLines.mock.calls.length).toBeLessThanOrEqual(2);
+    });
+
+    it('should not retrigger findNearbyStations from its own state updates', async () => {
+      const onStationsFound = jest.fn();
+      renderHook(() => useNearbyStations({ onStationsFound }));
+
+      await waitFor(() => {
+        expect(onStationsFound).toHaveBeenCalled();
+      });
+
+      await act(async () => {
+        jest.advanceTimersByTime(1000);
+      });
+
+      // First successful run emits once. Self-retrigger would emit again
+      // before throttle or after deps recreation.
+      expect(onStationsFound).toHaveBeenCalledTimes(1);
+    });
+
+    it('should not call onClosestStationChanged repeatedly when no stations are found', async () => {
+      // Why: a previous regression compared `closestStation?.id` (undefined
+      // when null) against `closestStationIdRef.current` (null), so an empty
+      // result triggered onClosestStationChanged(null) every poll.
+      mockLocationService.findNearbyStationsAdaptive.mockReturnValue({
+        stations: [],
+        effectiveRadius: 1000,
+        expanded: false,
+      });
+      const onClosestStationChanged = jest.fn();
+
+      const { result } = renderHook(() =>
+        useNearbyStations({ onClosestStationChanged })
+      );
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      // Drive a few more cycles via refresh — null→null transition must
+      // not fire the callback again.
+      await act(async () => {
+        result.current.refresh();
+        jest.advanceTimersByTime(1000);
+      });
+      await act(async () => {
+        result.current.refresh();
+        jest.advanceTimersByTime(1000);
+      });
+
+      // Acceptable: zero or one initial call (depending on whether the
+      // hook reports the initial null transition). Repeated calls on
+      // every refresh would mean the comparison still treats undefined
+      // and null as different.
+      expect(onClosestStationChanged.mock.calls.length).toBeLessThanOrEqual(1);
+    });
+  });
 });
 
 describe('useStationDistance', () => {

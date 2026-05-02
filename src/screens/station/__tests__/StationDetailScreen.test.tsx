@@ -11,6 +11,7 @@ import { useRealtimeTrains } from '@/hooks/useRealtimeTrains';
 
 jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
 jest.mock('@react-navigation/native', () => ({
+  useIsFocused: jest.fn(() => true),
   useNavigation: jest.fn(() => ({
     navigate: jest.fn(),
     push: jest.fn(),

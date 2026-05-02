@@ -24,6 +24,7 @@ import {
   ArrowDown,
   Flag,
 } from 'lucide-react-native';
+import { useIsFocused } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AppStackParamList } from '../../navigation/types';
 import { useStationNavigation } from '../../hooks/useStationNavigation';
@@ -55,11 +56,14 @@ export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) =
     lineId,
   });
 
+  // Pause polling when this screen is unfocused so a stack-mounted screen
+  // doesn't keep hitting Seoul API behind another screen.
+  const isFocused = useIsFocused();
   const {
     loading: trainsLoading,
     refetch: refreshTrains,
   } = useRealtimeTrains(currentStation?.name || '', {
-    enabled: !!currentStation,
+    enabled: !!currentStation && isFocused,
   });
 
   // 선택된 방향으로 앞으로 지나갈 역들 계산 (최대 4정거장)

@@ -11,7 +11,7 @@ import {
   Easing,
 } from 'react-native';
 import { WebView } from 'react-native-webview';
-import { RouteProp, useRoute, useNavigation } from '@react-navigation/native';
+import { RouteProp, useRoute, useNavigation, useIsFocused } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   RefreshCw,
@@ -70,13 +70,17 @@ const StationDetailScreen: React.FC = () => {
   const spinAnimRef = useRef<Animated.CompositeAnimation | null>(null);
   const refreshTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 실시간 열차 데이터 가져오기
+  // 실시간 열차 데이터 가져오기 — 화면 unfocus 시 폴링 일시정지
+  // (React Navigation은 stack 화면을 unmount하지 않으므로 이전 화면의
+  // realtime polling이 살아남아 다른 화면에서도 잔여 호출이 발생함)
+  const isFocused = useIsFocused();
   const {
     trains: realtimeTrains,
     loading: trainsLoading,
     error: trainsError,
     refetch: refetchTrains,
   } = useRealtimeTrains(stationName, {
+    enabled: isFocused,
     refetchInterval: 30000, // 30초마다 자동 갱신
     retryAttempts: 3,
   });

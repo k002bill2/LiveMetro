@@ -41,18 +41,24 @@ jest.mock('@/hooks/useLocation', () => ({
   useLocation: (...args: unknown[]) => mockUseLocation(...args),
 }));
 
-jest.mock('@/hooks/useNearbyStations', () => ({
-  useNearbyStations: jest.fn(() => ({
-    closestStation: {
-      name: '시청',
-      lineId: '1',
-      coordinates: { latitude: 37.566, longitude: 126.977 },
-      distance: 150,
-    },
-    lastUpdated: new Date('2026-01-15T10:30:00'),
-    loading: false,
-  })),
-}));
+// LocationDebugPanel no longer calls useNearbyStations directly — see the
+// commit that introduced the props-based interface. Nearby data is supplied
+// by the parent (HomeScreen) so dev mode does not double-mount the hook.
+const defaultStation = {
+  id: 'station-1',
+  name: '시청',
+  nameEn: 'City Hall',
+  lineId: '1',
+  coordinates: { latitude: 37.566, longitude: 126.977 },
+  transfers: [],
+  distance: 150,
+  bearing: 0,
+};
+const defaultPanelProps = {
+  closestStation: defaultStation,
+  lastUpdated: new Date('2026-01-15T10:30:00'),
+  stationsLoading: false,
+};
 
 // Mock LayoutAnimation to prevent animation-related re-render loops
 jest.spyOn(LayoutAnimation, 'configureNext').mockImplementation(() => {});
@@ -72,12 +78,12 @@ describe('LocationDebugPanel', () => {
   });
 
   it('renders collapsed view with coordinates', () => {
-    const { getByText } = render(<LocationDebugPanel />);
+    const { getByText } = render(<LocationDebugPanel {...defaultPanelProps} />);
     expect(getByText(/37\.566500, 126\.978000/)).toBeTruthy();
   });
 
   it('shows "Location Debug" title when expanded', () => {
-    const { getByText, getByLabelText } = render(<LocationDebugPanel />);
+    const { getByText, getByLabelText } = render(<LocationDebugPanel {...defaultPanelProps} />);
     act(() => {
       fireEvent.press(getByLabelText('디버그 패널 펼치기'));
     });
@@ -85,7 +91,7 @@ describe('LocationDebugPanel', () => {
   });
 
   it('shows GPS section when expanded', () => {
-    const { getByText, getByLabelText } = render(<LocationDebugPanel />);
+    const { getByText, getByLabelText } = render(<LocationDebugPanel {...defaultPanelProps} />);
     act(() => {
       fireEvent.press(getByLabelText('디버그 패널 펼치기'));
     });
@@ -93,7 +99,7 @@ describe('LocationDebugPanel', () => {
   });
 
   it('shows nearest station info when expanded', () => {
-    const { getByText, getByLabelText } = render(<LocationDebugPanel />);
+    const { getByText, getByLabelText } = render(<LocationDebugPanel {...defaultPanelProps} />);
     act(() => {
       fireEvent.press(getByLabelText('디버그 패널 펼치기'));
     });
@@ -102,7 +108,7 @@ describe('LocationDebugPanel', () => {
   });
 
   it('shows tracking status as active', () => {
-    const { getByText, getByLabelText } = render(<LocationDebugPanel />);
+    const { getByText, getByLabelText } = render(<LocationDebugPanel {...defaultPanelProps} />);
     act(() => {
       fireEvent.press(getByLabelText('디버그 패널 펼치기'));
     });
@@ -111,7 +117,7 @@ describe('LocationDebugPanel', () => {
 
   it('collapses back when pressing the header again', () => {
     const { getByText, getByLabelText, queryByText } = render(
-      <LocationDebugPanel />,
+      <LocationDebugPanel {...defaultPanelProps} />,
     );
     act(() => {
       fireEvent.press(getByLabelText('디버그 패널 펼치기'));
@@ -132,7 +138,7 @@ describe('LocationDebugPanel', () => {
       error: null,
       startTracking: mockStartTracking,
     });
-    const { getByText } = render(<LocationDebugPanel />);
+    const { getByText } = render(<LocationDebugPanel {...defaultPanelProps} />);
     expect(getByText('위치 없음')).toBeTruthy();
   });
 });
