@@ -1,6 +1,3 @@
-#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
-
 # Check if .claude directory has changes
 if git diff --cached --name-only | grep -q "^\.claude/"; then
   echo "📦 Detected changes in .claude/ directory"

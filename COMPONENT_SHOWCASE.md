@@ -240,13 +240,9 @@ npm run web
 
 ## 🔄 원래 App.tsx로 복구하기
 
-테스트 완료 후:
+데모용으로 App.tsx를 임시 교체했다면 git으로 복구합니다:
 
 ```bash
-# 백업 파일로 복구
-mv App.tsx.backup App.tsx
-
-# 또는 git으로 복구
 git checkout App.tsx
 ```
 
