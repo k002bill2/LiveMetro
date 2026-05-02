@@ -44,6 +44,12 @@ const DEFAULT_CONFIG: CurrentStationAlertConfig = {
 };
 
 /**
+ * Listener invoked whenever config, station list, or notification history changes.
+ * Used by hooks to avoid polling-based state sync.
+ */
+export type CurrentStationAlertListener = () => void;
+
+/**
  * Service for managing current station arrival notifications
  */
 class CurrentStationAlertService {
@@ -51,6 +57,32 @@ class CurrentStationAlertService {
   private notificationHistory: Map<string, number> = new Map();
   private isMonitoring = false;
   private monitoringStations: Station[] = [];
+  private listeners: Set<CurrentStationAlertListener> = new Set();
+
+  /**
+   * Subscribe to state changes (config / monitored stations / notification history).
+   * Returns an unsubscribe function.
+   */
+  subscribe(listener: CurrentStationAlertListener): () => void {
+    this.listeners.add(listener);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  /**
+   * Notify all subscribers. Errors in listeners are isolated so one bad
+   * subscriber cannot break the others.
+   */
+  private emit(): void {
+    this.listeners.forEach((listener) => {
+      try {
+        listener();
+      } catch (error) {
+        console.error('CurrentStationAlertService listener error:', error);
+      }
+    });
+  }
 
   /**
    * Initialize the service by loading saved configuration and history
@@ -87,6 +119,7 @@ class CurrentStationAlertService {
     try {
       this.config = { ...this.config, ...config };
       await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(this.config));
+      this.emit();
     } catch (error) {
       console.error('Failed to save config:', error);
     }
@@ -108,6 +141,7 @@ class CurrentStationAlertService {
     }
     this.config.stationIds.push(stationId);
     await this.saveConfig();
+    this.emit();
   }
 
   /**
@@ -120,6 +154,7 @@ class CurrentStationAlertService {
     }
     this.config.stationIds.splice(index, 1);
     await this.saveConfig();
+    this.emit();
   }
 
   /**
@@ -198,6 +233,7 @@ class CurrentStationAlertService {
         await this.sendStationArrivalNotification(station);
         this.notificationHistory.set(stationId, now);
         await this.saveNotificationHistory();
+        this.emit();
       }
     }
   }
@@ -208,6 +244,7 @@ class CurrentStationAlertService {
   async clearStationHistory(stationId: string): Promise<void> {
     this.notificationHistory.delete(stationId);
     await this.saveNotificationHistory();
+    this.emit();
   }
 
   /**
@@ -216,6 +253,7 @@ class CurrentStationAlertService {
   async clearAllHistory(): Promise<void> {
     this.notificationHistory.clear();
     await this.saveNotificationHistory();
+    this.emit();
   }
 
   /**

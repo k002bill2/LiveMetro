@@ -113,6 +113,21 @@ async function withRetry<T>(
   throw lastError || new Error('All retry attempts failed');
 }
 
+/**
+ * Thrown by getStationTimetable when called on a web platform.
+ *
+ * Seoul Open Data Portal's timetable endpoint is HTTP-only (port 8088, no HTTPS).
+ * Browsers block mixed-content fetch from HTTPS pages, so the call cannot succeed.
+ * Native (iOS/Android) clients are unaffected. Callers should translate this
+ * into a user-facing message rather than treating it as a generic failure.
+ */
+export class TimetableUnsupportedOnWebError extends Error {
+  constructor() {
+    super('Timetable API is not supported on web (HTTP-only endpoint)');
+    this.name = 'TimetableUnsupportedOnWebError';
+  }
+}
+
 interface SeoulApiResponse<T> {
   errorMessage?: {
     status: number;
@@ -434,10 +449,12 @@ class SeoulSubwayApiService {
     weekTag: '1' | '2' | '3' = '1',
     inoutTag: '1' | '2' = '1'
   ): Promise<SeoulTimetableRow[]> {
-    // Skip API call on web platform (HTTP API doesn't work with HTTPS pages)
+    // Skip API call on web platform — HTTP-only endpoint is blocked by mixed-content
+    // policy. Throw a typed error so callers can render an informative message
+    // instead of an empty schedule that looks like a bug.
     if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-      console.debug('[SeoulSubwayApi] Skipping timetable API on web (HTTP only API)');
-      return [];
+      console.debug('[SeoulSubwayApi] Timetable API not supported on web');
+      throw new TimetableUnsupportedOnWebError();
     }
 
     const rateLimitKey = `timetable:${stationCode}:${weekTag}:${inoutTag}`;
@@ -457,7 +474,36 @@ class SeoulSubwayApiService {
         const url = `${generalBaseUrl}/${apiKey}/json/SearchSTNTimeTableByIDService/1/30/${stationCode}/${weekTag}/${inoutTag}/`;
 
         const response = await this.fetchWithTimeout(url);
-        const data: SeoulTimetableResponse = await response.json();
+
+        // DIAGNOSTIC: clone response so we can capture body preview when the
+        // server returns XML/HTML (e.g. invalid key) instead of JSON. Success
+        // path is unchanged; the clone is only consumed on JSON parse failure.
+        const responseClone = typeof response.clone === 'function' ? response.clone() : null;
+        let data: SeoulTimetableResponse;
+        try {
+          data = await response.json();
+        } catch (parseError) {
+          const contentType = response.headers?.get?.('content-type') ?? 'unknown';
+          let bodyPreview = '<unavailable>';
+          if (responseClone) {
+            try {
+              bodyPreview = (await responseClone.text()).slice(0, 300);
+            } catch {
+              // ignore — preview is best-effort
+            }
+          }
+          console.error(
+            `[SeoulSubwayApi] Timetable response is not JSON. ` +
+            `url=${url.replace(apiKey, '***')} ` +
+            `content-type=${contentType} ` +
+            `body[0..300]=${bodyPreview}`
+          );
+          this.timetableKeyManager.reportError(apiKey);
+          throw new Error(
+            `시간표 응답이 JSON이 아닙니다 (content-type=${contentType}). ` +
+            `API 키 또는 엔드포인트 상태를 확인하세요.`
+          );
+        }
 
         // Handle empty or invalid response structure
         if (!data || !data.SearchSTNTimeTableByIDService) {

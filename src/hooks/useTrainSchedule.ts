@@ -7,8 +7,10 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { seoulSubwayApi, SeoulTimetableRow } from '@/services/api/seoulSubwayApi';
+import { seoulSubwayApi, SeoulTimetableRow, TimetableUnsupportedOnWebError } from '@/services/api/seoulSubwayApi';
 import { findStationCdByNameAndLine } from '@/services/data/stationsDataService';
+import { toSecondsOfDay } from '@/utils/dateUtils';
+import { isKoreanHoliday } from '@/utils/koreanHolidays';
 
 /** 시간표 캐시 TTL: 24시간 (시간표는 일 단위 변경) */
 const TIMETABLE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -92,10 +94,20 @@ interface UseTrainScheduleResult {
 
 /**
  * 현재 요일 코드 반환
+ *
+ * 우선순위:
+ * 1. 한국 공휴일 → '3' (휴일/일요일 시간표)
+ * 2. 토요일 → '2'
+ * 3. 일요일 → '3'
+ * 4. 평일 → '1'
+ *
+ * 공휴일이 평일에 떨어지는 경우(예: 어린이날 화요일)에도 휴일 시간표가 운행되므로
+ * isKoreanHoliday 체크가 요일 분기보다 먼저 수행되어야 합니다.
  */
-const getCurrentWeekTag = (): WeekTagCode => {
-  const day = new Date().getDay();
-  if (day === 0) return '3'; // 일요일/공휴일
+const getCurrentWeekTag = (now: Date = new Date()): WeekTagCode => {
+  if (isKoreanHoliday(now)) return '3';
+  const day = now.getDay();
+  if (day === 0) return '3'; // 일요일
   if (day === 6) return '2'; // 토요일
   return '1'; // 평일
 };
@@ -189,16 +201,36 @@ export const useTrainSchedule = (
       );
       setSchedules(convertedData);
 
-      // 현재 시각 이후 열차만 필터링
+      // 현재 시각 이후 열차만 필터링.
+      // Seoul API는 "9:35:00" 같은 비패딩 형식을 반환할 수 있어 lexicographic 비교가
+      // 무너집니다 ('9' > '1'). toSecondsOfDay로 정수 비교해야 정확합니다.
+      //
+      // 자정 롤오버 처리: 서울 지하철은 ~01:00까지 운행하므로 23:55에 있는 사용자는
+      // 00:05·00:30 막차를 "다음 열차"로 봐야 합니다. 시간표 행은 같은 운행일 안에
+      // 인코딩되므로(00:05도 같은 row), 늦은 시간대(LATE_NIGHT_THRESHOLD 이후)에는
+      // 새벽 시간대(EARLY_MORNING_LIMIT 이전) 행을 carry-over로 포함시킵니다.
+      const LATE_NIGHT_THRESHOLD = 22 * 3600; // 22:00
+      const EARLY_MORNING_LIMIT = 3 * 3600;   // 03:00
       const now = new Date();
-      const currentTimeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`;
-      const upcoming = convertedData.filter(
-        (item) => item.arrivalTime >= currentTimeStr
-      );
+      const currentSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+      const isLateNight = currentSeconds >= LATE_NIGHT_THRESHOLD;
+      const upcoming = convertedData.filter((item) => {
+        const itemSec = toSecondsOfDay(item.arrivalTime);
+        if (itemSec < 0) return false;
+        if (itemSec >= currentSeconds) return true;
+        // Late-night carry-over for next-day early morning runs
+        return isLateNight && itemSec < EARLY_MORNING_LIMIT;
+      });
       setUpcomingTrains(upcoming);
     } catch (err) {
       console.error('Error fetching train schedule:', err);
-      setError('시간표를 불러오는데 실패했습니다.');
+      // Friendly message for the web-platform case so users don't see a
+      // generic "failed" state when the limitation is platform-level.
+      if (err instanceof TimetableUnsupportedOnWebError) {
+        setError('시간표는 모바일 앱에서 확인할 수 있습니다.');
+      } else {
+        setError('시간표를 불러오는데 실패했습니다.');
+      }
       setSchedules([]);
       setUpcomingTrains([]);
     } finally {

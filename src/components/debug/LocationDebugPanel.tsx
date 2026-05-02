@@ -25,10 +25,9 @@ import {
 } from 'lucide-react-native';
 
 import { useLocation } from '@/hooks/useLocation';
-import { useNearbyStations } from '@/hooks/useNearbyStations';
 import { useTheme, ThemeColors } from '@/services/theme';
 import { SPACING, RADIUS, TYPOGRAPHY } from '@/styles/modernTheme';
-import { LocationCoordinates } from '@/services/location/locationService';
+import { LocationCoordinates, NearbyStation } from '@/services/location/locationService';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -104,7 +103,23 @@ const getTrackingStatus = (
   return { label: '정지', color: '#757575' };
 };
 
-export const LocationDebugPanel: React.FC = () => {
+/**
+ * Props supplied by the parent screen — see HomeScreen for the canonical
+ * source. Receiving these as props (instead of calling useNearbyStations
+ * here) prevents a *second* nearby-stations hook instance in dev, which
+ * doubled `Location tracking started` and the 24-line fetch logging.
+ */
+interface LocationDebugPanelProps {
+  closestStation?: NearbyStation | null;
+  lastUpdated?: Date | null;
+  stationsLoading?: boolean;
+}
+
+export const LocationDebugPanel: React.FC<LocationDebugPanelProps> = ({
+  closestStation = null,
+  lastUpdated = null,
+  stationsLoading = false,
+}) => {
   // All hooks must be called unconditionally (before any early returns)
   const { colors } = useTheme();
   const styles = createStyles(colors);
@@ -124,18 +139,6 @@ export const LocationDebugPanel: React.FC = () => {
   } = useLocation({
     enableHighAccuracy: true,
     distanceFilter: 10, // More sensitive for debugging
-  });
-
-  // Nearby stations hook
-  const {
-    closestStation,
-    lastUpdated,
-    loading: stationsLoading,
-  } = useNearbyStations({
-    radius: 1000, // 1km
-    maxStations: 1,
-    autoUpdate: true,
-    externalLocation: location, // Pass already-tracking location to avoid duplicate tracking
   });
 
   // Calculate delta when location changes

@@ -16,6 +16,7 @@ import {
   isYesterday,
   getKoreanDayOfWeek,
   formatCountdown,
+  toSecondsOfDay,
 } from '../dateUtils';
 
 describe('dateUtils', () => {
@@ -264,6 +265,52 @@ describe('dateUtils', () => {
     it('should pad with zeros', () => {
       expect(formatCountdown(5)).toBe('00:05');
       expect(formatCountdown(65)).toBe('01:05');
+    });
+  });
+
+  describe('toSecondsOfDay', () => {
+    it('should parse zero-padded HH:mm:ss', () => {
+      expect(toSecondsOfDay('09:35:00')).toBe(9 * 3600 + 35 * 60);
+      expect(toSecondsOfDay('14:30:00')).toBe(14 * 3600 + 30 * 60);
+    });
+
+    it('should parse non-zero-padded H:mm:ss (Seoul API timetable format)', () => {
+      expect(toSecondsOfDay('9:35:00')).toBe(9 * 3600 + 35 * 60);
+      expect(toSecondsOfDay('5:00:00')).toBe(5 * 3600);
+    });
+
+    it('should give consistent ordering across padded and non-padded formats', () => {
+      // The bug we are fixing: lexicographic comparison says "9:35:00" > "14:30:00"
+      // because '9' > '1'. Numeric comparison must place 9:35 before 14:30.
+      expect(toSecondsOfDay('9:35:00')).toBeLessThan(toSecondsOfDay('14:30:00'));
+      expect(toSecondsOfDay('09:35:00')).toBeLessThan(toSecondsOfDay('14:30:00'));
+    });
+
+    it('should handle HH:mm without seconds', () => {
+      expect(toSecondsOfDay('09:35')).toBe(9 * 3600 + 35 * 60);
+    });
+
+    it('should handle midnight and end of day', () => {
+      expect(toSecondsOfDay('00:00:00')).toBe(0);
+      expect(toSecondsOfDay('23:59:59')).toBe(23 * 3600 + 59 * 60 + 59);
+    });
+
+    it('should accept hours >= 24 used by some transit APIs for next-day runs', () => {
+      // Some transit feeds encode "25:30" to mean 1:30 the next day within the
+      // same operating day. Our utility treats them as raw seconds-of-day,
+      // which is what the schedule filter expects (numeric comparison still
+      // works: 25:30 (91800) is correctly "after" 23:00 (82800)).
+      expect(toSecondsOfDay('25:30:00')).toBe(25 * 3600 + 30 * 60);
+      expect(toSecondsOfDay('24:00:00')).toBe(24 * 3600);
+      expect(toSecondsOfDay('25:30:00')).toBeGreaterThan(toSecondsOfDay('23:00:00'));
+    });
+
+    it('should return -1 for invalid input', () => {
+      expect(toSecondsOfDay('')).toBe(-1);
+      expect(toSecondsOfDay('not a time')).toBe(-1);
+      expect(toSecondsOfDay('-1:00:00')).toBe(-1);
+      expect(toSecondsOfDay(undefined as unknown as string)).toBe(-1);
+      expect(toSecondsOfDay(null as unknown as string)).toBe(-1);
     });
   });
 });

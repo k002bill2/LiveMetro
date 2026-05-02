@@ -4,7 +4,7 @@
  * Minimal grayscale design with black accent
  */
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -22,7 +22,7 @@ import {
   RefreshCw,
 } from 'lucide-react-native';
 import * as Location from 'expo-location';
-import { NavigationProp, useNavigation } from '@react-navigation/native';
+import { NavigationProp, useIsFocused, useNavigation } from '@react-navigation/native';
 
 import { useAuth } from '../../services/auth/AuthContext';
 import { trainService } from '../../services/train/trainService';
@@ -44,6 +44,7 @@ import { AppStackParamList } from '../../navigation/types';
 
 export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<AppStackParamList>>();
+  const isFocused = useIsFocused();
   const { user } = useAuth();
   const { colors } = useTheme();
   const styles = createStyles(colors);
@@ -58,10 +59,14 @@ export const HomeScreen: React.FC = () => {
   const rotateAnim = useRef(new Animated.Value(0)).current;
 
   // 주변역 검색 훅 - GPS 기반 자동 업데이트
+  // closestStation/lastUpdated도 destructure해서 LocationDebugPanel에 전달
+  // → dev 패널이 자체 useNearbyStations 두 번째 인스턴스를 만들지 않게 함.
   const {
     nearbyStations: hookNearbyStations,
     loading: _nearbyLoading,
     refresh: refreshNearby,
+    closestStation: nearbyClosestStation,
+    lastUpdated: nearbyLastUpdated,
   } = useNearbyStations({
     radius: 1000,
     maxStations: 5,
@@ -72,10 +77,11 @@ export const HomeScreen: React.FC = () => {
   // 위치 권한이 있으면 훅 결과 사용, 없으면 즐겨찾기
   const nearbyStations = locationPermission ? hookNearbyStations : favoriteStations;
 
-  // Seoul API 지연 감지 훅
+  // Seoul API 지연 감지 훅 — 화면 포커스 시에만 폴링 (백그라운드 호출 방지)
   const { delays: activeDelays } = useDelayDetection({
     pollingInterval: 60000, // 1분마다 체크
     autoPolling: true,
+    enabled: isFocused,
   });
 
   // 통합 알림 훅 - ML 기반 출퇴근 예측
@@ -132,29 +138,54 @@ export const HomeScreen: React.FC = () => {
     }
   }, [loadFavoriteStations, showError]);
 
-  const onStationSelect = (station: Station): void => {
-    setSelectedStation(station);
-    navigation.navigate('StationNavigator', {
-      stationId: station.id,
-      lineId: station.lineId,
-    });
-  };
+  const onStationSelect = useCallback(
+    (station: Station): void => {
+      setSelectedStation(station);
+      navigation.navigate('StationNavigator', {
+        stationId: station.id,
+        lineId: station.lineId,
+      });
+    },
+    [navigation]
+  );
 
   // 출발 버튼 핸들러 - StationNavigator로 이동 (출발 모드)
-  const handleSetStart = (station: Station): void => {
-    setSelectedStation(station);
-    navigation.navigate('StationNavigator', {
-      stationId: station.id,
-      lineId: station.lineId,
-      mode: 'departure',
-    });
-  };
+  const handleSetStart = useCallback(
+    (station: Station): void => {
+      setSelectedStation(station);
+      navigation.navigate('StationNavigator', {
+        stationId: station.id,
+        lineId: station.lineId,
+        mode: 'departure',
+      });
+    },
+    [navigation]
+  );
 
   // 도착 버튼 핸들러 - 상태 초기화
-  const handleSetEnd = (): void => {
+  const handleSetEnd = useCallback((): void => {
     setSelectedStation(null);
     showInfo('선택이 초기화되었습니다');
-  };
+  }, [showInfo]);
+
+  /**
+   * Station별 onPress/onSetStart 콜백을 캐시한다.
+   * StationCard는 React.memo로 감싸져 있으나 전달되는 onPress가 매 렌더 새 함수면
+   * memo가 무효화된다. nearbyStations 또는 핸들러가 바뀔 때만 콜백을 재생성한다.
+   */
+  const stationCallbacks = useMemo(() => {
+    const map = new Map<
+      string,
+      { onPress: () => void; onSetStart: () => void }
+    >();
+    nearbyStations.forEach((station) => {
+      map.set(station.id, {
+        onPress: () => onStationSelect(station),
+        onSetStart: () => handleSetStart(station),
+      });
+    });
+    return map;
+  }, [nearbyStations, onStationSelect, handleSetStart]);
 
   // 출발 알림 예약 핸들러
   const handleScheduleAlert = async (): Promise<void> => {
@@ -367,18 +398,22 @@ export const HomeScreen: React.FC = () => {
           </View>
         ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.stationList}>
-            {nearbyStations.map((station) => (
-              <StationCard
-                key={station.id}
-                station={station}
-                isSelected={selectedStation?.id === station.id}
-                onPress={() => onStationSelect(station)}
-                onSetStart={() => handleSetStart(station)}
-                onSetEnd={handleSetEnd}
-                showDistance={locationPermission && 'distance' in station}
-                distance={'distance' in station ? (station as { distance: number }).distance / 1000 : undefined}
-              />
-            ))}
+            {nearbyStations.map((station) => {
+              const callbacks = stationCallbacks.get(station.id);
+              return (
+                <StationCard
+                  key={station.id}
+                  station={station}
+                  isSelected={selectedStation?.id === station.id}
+                  onPress={callbacks?.onPress}
+                  onSetStart={callbacks?.onSetStart}
+                  onSetEnd={handleSetEnd}
+                  showDistance={locationPermission && 'distance' in station}
+                  distance={'distance' in station ? (station as { distance: number }).distance / 1000 : undefined}
+                  arrivalsEnabled={isFocused}
+                />
+              );
+            })}
           </ScrollView>
         )}
       </View>
@@ -444,7 +479,13 @@ export const HomeScreen: React.FC = () => {
       <ToastComponent />
 
       {/* Location Debug Panel - Development only */}
-      {__DEV__ && <LocationDebugPanel />}
+      {__DEV__ && (
+        <LocationDebugPanel
+          closestStation={nearbyClosestStation}
+          lastUpdated={nearbyLastUpdated}
+          stationsLoading={_nearbyLoading}
+        />
+      )}
     </ScrollView>
   );
 };

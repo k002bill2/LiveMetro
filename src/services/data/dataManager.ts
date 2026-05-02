@@ -5,6 +5,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { seoulSubwayApi, SeoulRealtimeArrival } from '../api/seoulSubwayApi';
+import { arrivalService, ArrivalInfo } from '../arrival/arrivalService';
 import { trainService } from '../train/trainService';
 import { Train, Station, TrainDelay, DelaySeverity, TrainStatus, ServiceDisruption } from '../../models/train';
 import { getLocalStationByName } from './stationsDataService';
@@ -43,7 +44,7 @@ class DataManager {
     errors: []
   };
 
-  private subscribers: Map<string, ((data: any) => void)[]> = new Map();
+  private subscribers: Map<string, ((data: RealtimeTrainData | null) => void)[]> = new Map();
   private activeIntervals: Map<string, ReturnType<typeof setInterval>> = new Map();
 
   /**
@@ -76,7 +77,13 @@ class DataManager {
       const seoulData = await seoulSubwayApi.getRealtimeArrival(stationName);
 
       if (seoulData.length > 0) {
-        const trains: Train[] = seoulData.map(arrival => this.convertSeoulToTrain(arrival));
+        // Filter arvlCd '2' (당역 출발) — already-departed trains have no
+        // meaningful arrival time and would render as info-less rows.
+        // Mirrors the filter in arrivalService.convertToArrivalInfo so both
+        // paths agree on what is "currently approaching".
+        const trains: Train[] = seoulData
+          .filter(arrival => arrival.arvlCd !== '2')
+          .map(arrival => this.convertSeoulToTrain(arrival));
         const result: RealtimeTrainData = {
           stationId: stationName,
           trains,
@@ -186,50 +193,26 @@ class DataManager {
   }
 
   /**
-   * Detect and report delays
+   * Detect and report delays.
+   *
+   * @deprecated The previous implementation was semantically wrong: it treated
+   * "time until arrival" as schedule deviation and flagged every train arriving
+   * more than 5 minutes from now as "delayed". Seoul API does not expose
+   * schedule deviation directly — a correct implementation must compare
+   * realtime arrivals against the published timetable
+   * (`seoulSubwayApi.getStationTimetable`). Until that work is done, this
+   * function returns an empty list to avoid generating false delay alerts
+   * that erode user trust. Track the proper implementation in a follow-up.
+   *
+   * @param stationName Station name (kept for signature compatibility)
    */
   async detectDelays(stationName: string): Promise<TrainDelay[]> {
-    try {
-      const realtimeData = await this.getRealtimeTrains(stationName);
-      if (!realtimeData) return [];
-
-      const delays: TrainDelay[] = [];
-      const now = new Date();
-
-      for (const train of realtimeData.trains) {
-        if (train.arrivalTime) {
-          const arrivalTimeMs = train.arrivalTime.getTime();
-          const currentTimeMs = now.getTime();
-          const delayMs = arrivalTimeMs - currentTimeMs;
-          
-          if (delayMs > 5 * 60 * 1000) { // More than 5 minutes delay
-            const delayMinutes = Math.floor(delayMs / (60 * 1000));
-          let severity: DelaySeverity;
-
-          if (delayMinutes >= 20) severity = DelaySeverity.SEVERE;
-          else if (delayMinutes >= 10) severity = DelaySeverity.MAJOR;
-          else if (delayMinutes >= 5) severity = DelaySeverity.MODERATE;
-          else severity = DelaySeverity.MINOR;
-
-          delays.push({
-            trainId: train.id,
-            lineId: train.lineId,
-            severity,
-            delayMinutes,
-            reason: `예정보다 ${delayMinutes}분 지연`,
-            affectedStations: [train.currentStationId],
-            estimatedResolutionTime: null,
-            reportedAt: now
-          });
-          }
-        }
-      }
-
-      return delays;
-    } catch (error) {
-      console.error('Error detecting delays:', error);
-      return [];
-    }
+    void stationName;
+    console.warn(
+      '[dataManager.detectDelays] deprecated — returns []. ' +
+        'Schedule-vs-actual comparison required for correct delay detection.'
+    );
+    return [];
   }
 
   /**
@@ -307,55 +290,63 @@ class DataManager {
   }
 
   /**
-   * Subscribe to realtime updates
+   * Subscribe to realtime updates.
+   *
+   * Internally delegates to {@link arrivalService.subscribe} so the app has a
+   * single polling source per station. arrivalService handles rate limiting,
+   * retry, caching, and per-station interval deduplication. We adapt its
+   * `ArrivalInfo` payload back to {@link RealtimeTrainData} so existing
+   * callers (e.g. `useRealtimeTrains`) keep working unchanged.
+   *
+   * @deprecated Prefer {@link arrivalService.subscribe} directly when writing
+   * new code. This wrapper exists for legacy compatibility.
    */
   subscribeToRealtimeUpdates(
     stationName: string,
     callback: (data: RealtimeTrainData | null) => void,
-    intervalMs: number = 30000 // 30 seconds
+    intervalMs: number = 30000
   ): () => void {
-    const subscriptionKey = `realtime_${stationName}`;
+    return arrivalService.subscribe(
+      stationName,
+      (info, _error) => {
+        callback(this.adaptArrivalInfoToRealtimeData(info));
+      },
+      intervalMs
+    );
+  }
 
-    if (!this.subscribers.has(subscriptionKey)) {
-      this.subscribers.set(subscriptionKey, []);
-    }
+  /**
+   * Adapter: convert arrivalService's `ArrivalInfo` to legacy `RealtimeTrainData`.
+   *
+   * Maintains backward compatibility for legacy consumers of
+   * {@link subscribeToRealtimeUpdates}. New code should consume `ArrivalInfo`
+   * directly via {@link arrivalService.subscribe}.
+   */
+  private adaptArrivalInfoToRealtimeData(
+    info: ArrivalInfo | null
+  ): RealtimeTrainData | null {
+    if (!info) return null;
 
-    this.subscribers.get(subscriptionKey)!.push(callback);
+    const trains: Train[] = info.arrivals.map((arrival) => ({
+      id: arrival.trainId,
+      lineId: arrival.lineId,
+      currentStationId: info.stationId,
+      nextStationId: null,
+      finalDestination: arrival.destination || '종착역 미확인',
+      direction: arrival.direction,
+      arrivalTime:
+        arrival.arrivalSeconds !== null
+          ? new Date(Date.now() + arrival.arrivalSeconds * 1000)
+          : null,
+      status: TrainStatus.NORMAL,
+      lastUpdated: info.lastUpdated,
+      delayMinutes: 0,
+    }));
 
-    // Only create interval if one doesn't exist for this station
-    // This prevents interval duplication when multiple subscribers join
-    if (!this.activeIntervals.has(subscriptionKey)) {
-      const intervalId = setInterval(async () => {
-        const data = await this.getRealtimeTrains(stationName);
-        // Notify all subscribers for this station
-        const callbacks = this.subscribers.get(subscriptionKey);
-        callbacks?.forEach(cb => cb(data));
-      }, intervalMs);
-
-      this.activeIntervals.set(subscriptionKey, intervalId);
-    }
-
-    // Initial fetch for new subscriber only
-    this.getRealtimeTrains(stationName).then(callback);
-
-    // Return unsubscribe function
-    return () => {
-      const callbacks = this.subscribers.get(subscriptionKey);
-      if (callbacks) {
-        const index = callbacks.indexOf(callback);
-        if (index > -1) {
-          callbacks.splice(index, 1);
-        }
-        // Only clear interval when no more subscribers
-        if (callbacks.length === 0) {
-          const intervalToClean = this.activeIntervals.get(subscriptionKey);
-          if (intervalToClean) {
-            clearInterval(intervalToClean);
-            this.activeIntervals.delete(subscriptionKey);
-          }
-          this.subscribers.delete(subscriptionKey);
-        }
-      }
+    return {
+      stationId: info.stationId,
+      trains,
+      lastUpdated: info.lastUpdated,
     };
   }
 
@@ -493,9 +484,14 @@ class DataManager {
 
   private convertSeoulToTrain(arrival: SeoulRealtimeArrival): Train {
     const converted = seoulSubwayApi.convertToAppTrain(arrival);
-    
+
+    // Stable id matching arrivalService.convertToArrivalInfo. Both paths must
+    // produce the same id for the same train so React keys stay stable when a
+    // screen mixes one-shot fetches (getRealtimeTrains) with subscriptions
+    // (subscribeToRealtimeUpdates → arrivalService).
+    const stableKey = arrival.btrainNo || arrival.ordkey || arrival.statnId;
     return {
-      id: `seoul_${arrival.btrainNo}_${Date.now()}`,
+      id: `train_${stableKey}_${arrival.statnId}`,
       lineId: converted.lineId,
       currentStationId: converted.stationId,
       nextStationId: null,

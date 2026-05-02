@@ -32,31 +32,18 @@ export function useCurrentStationAlert(stationId: string): UseCurrentStationAler
   const [lastNotificationTime, setLastNotificationTime] = useState<number | null>(null);
 
   useEffect(() => {
-    const checkMonitored = (): void => {
-      const monitored = currentStationAlertService.isStationMonitored(stationId);
-      setIsMonitored(monitored);
-
-      const lastTime = currentStationAlertService.getLastNotificationTime(stationId);
-      setLastNotificationTime(lastTime);
+    const sync = (): void => {
+      setIsMonitored(currentStationAlertService.isStationMonitored(stationId));
+      setLastNotificationTime(
+        currentStationAlertService.getLastNotificationTime(stationId)
+      );
+      setConfig(currentStationAlertService.getConfig());
     };
 
-    checkMonitored();
-    const interval = setInterval(checkMonitored, 5000);
-
-    return () => clearInterval(interval);
+    sync();
+    const unsubscribe = currentStationAlertService.subscribe(sync);
+    return unsubscribe;
   }, [stationId]);
-
-  useEffect(() => {
-    const syncConfig = (): void => {
-      const currentConfig = currentStationAlertService.getConfig();
-      setConfig(currentConfig);
-    };
-
-    syncConfig();
-    const interval = setInterval(syncConfig, 5000);
-
-    return () => clearInterval(interval);
-  }, []);
 
   const addStation = useCallback(async () => {
     await currentStationAlertService.addStation(stationId);
@@ -125,17 +112,13 @@ export function useCurrentStationAlerts(): {
 
   useEffect(() => {
     const syncStations = (): void => {
-      const stations = currentStationAlertService.getMonitoredStations();
-      setMonitoredStations(stations);
-
-      const currentConfig = currentStationAlertService.getConfig();
-      setConfig(currentConfig);
+      setMonitoredStations(currentStationAlertService.getMonitoredStations());
+      setConfig(currentStationAlertService.getConfig());
     };
 
     syncStations();
-    const interval = setInterval(syncStations, 5000);
-
-    return () => clearInterval(interval);
+    const unsubscribe = currentStationAlertService.subscribe(syncStations);
+    return unsubscribe;
   }, []);
 
   const addStation = useCallback(async (stationId: string) => {

@@ -642,4 +642,66 @@ describe('DataManager', () => {
       expect(mockAsyncStorage.getItem).toHaveBeenCalled();
     });
   });
+
+  describe('A1/A2 — cross-path consistency (regression)', () => {
+    beforeEach(async () => {
+      await dataManager.clearCache();
+    });
+
+    it('A1: convertSeoulToTrain produces train_* prefix (matches arrivalService)', async () => {
+      mockSeoulApi.getRealtimeArrival.mockResolvedValue([
+        {
+          rowNum: '1', selectedCount: '1', totalCount: '1',
+          subwayId: '1002', updnLine: '상행', trainLineNm: '잠실행',
+          subwayHeading: '내선', statnFid: '0221', statnTid: '0223',
+          statnId: '0222', statnNm: '강남', trainCo: '서울교통공사',
+          ordkey: '00001', subwayList: '1002', statnList: '0222',
+          btrainSttus: '운행', barvlDt: '120', btrainNo: '2001',
+          bstatnId: '0228', bstatnNm: '잠실', recptnDt: '2026-04-26 14:00:00',
+          arvlMsg2: '2분 후 도착', arvlMsg3: '강남역', arvlCd: '99',
+        },
+      ]);
+      mockSeoulApi.convertToAppTrain.mockReturnValue({
+        lineId: '2', stationId: '0222', stationName: '강남',
+        direction: 'up', arrivalMessage: '2분 후 도착', arrivalTime: 120,
+        trainNumber: '2001', destinationStation: '잠실', lastUpdated: new Date(),
+      });
+
+      const data = await dataManager.getRealtimeTrains('강남');
+      expect(data?.trains[0]?.id).toMatch(/^train_/);
+    });
+
+    it('A2: fetchFromSeoulApi filters arvlCd === "2" (departed trains)', async () => {
+      const arrivals = [
+        { rowNum: '1', selectedCount: '2', totalCount: '2',
+          subwayId: '1002', updnLine: '상행', trainLineNm: '잠실행',
+          subwayHeading: '내선', statnFid: '0221', statnTid: '0223',
+          statnId: '0222', statnNm: '강남', trainCo: '서울교통공사',
+          ordkey: '00001', subwayList: '1002', statnList: '0222',
+          btrainSttus: '출발', barvlDt: '0', btrainNo: '2001',
+          bstatnId: '0228', bstatnNm: '잠실', recptnDt: '2026-04-26 14:00:00',
+          arvlMsg2: '출발', arvlMsg3: '강남역', arvlCd: '2' },
+        { rowNum: '2', selectedCount: '2', totalCount: '2',
+          subwayId: '1002', updnLine: '상행', trainLineNm: '잠실행',
+          subwayHeading: '내선', statnFid: '0221', statnTid: '0223',
+          statnId: '0222', statnNm: '강남', trainCo: '서울교통공사',
+          ordkey: '00002', subwayList: '1002', statnList: '0222',
+          btrainSttus: '운행', barvlDt: '120', btrainNo: '2002',
+          bstatnId: '0228', bstatnNm: '잠실', recptnDt: '2026-04-26 14:00:00',
+          arvlMsg2: '2분 후 도착', arvlMsg3: '강남역', arvlCd: '99' },
+      ];
+      mockSeoulApi.getRealtimeArrival.mockResolvedValue(arrivals);
+      mockSeoulApi.convertToAppTrain.mockImplementation((a) => ({
+        lineId: '2', stationId: a.statnId, stationName: a.statnNm,
+        direction: 'up', arrivalMessage: a.arvlMsg2, arrivalTime: 120,
+        trainNumber: a.btrainNo, destinationStation: a.bstatnNm, lastUpdated: new Date(),
+      }));
+
+      const data = await dataManager.getRealtimeTrains('강남');
+
+      // Departed train (arvlCd '2') must be excluded
+      expect(data?.trains).toHaveLength(1);
+      expect(data?.trains[0]?.id).toContain('2002');
+    });
+  });
 });

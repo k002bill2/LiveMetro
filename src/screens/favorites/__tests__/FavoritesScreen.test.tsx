@@ -19,6 +19,9 @@ jest.mock('@react-navigation/native', () => {
       goBack: jest.fn(),
     })),
     useRoute: jest.fn(() => ({ params: {} })),
+    // useIsFocused needs an explicit mock — actualNav's version requires a
+    // NavigationContainer parent that the unit test doesn't provide.
+    useIsFocused: jest.fn(() => true),
   };
 });
 jest.mock('@/services/auth/AuthContext', () => ({

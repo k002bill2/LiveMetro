@@ -123,8 +123,13 @@ class ArrivalService {
       const arrivals = await this.fetchWithRetry(trimmedName);
       this.lastFetchTime.set(trimmedName, now);
 
-      // Cache the result
-      await this.setCachedArrivals(trimmedName, arrivals);
+      // Cache the result — but skip empty arrivals so the next call re-fetches
+      // immediately instead of returning an empty cache for the polling window.
+      // An empty result usually means transient API hiccup or rate-limit; caching
+      // it would freeze the UI for 30-60s on a stale empty state.
+      if (arrivals.arrivals.length > 0) {
+        await this.setCachedArrivals(trimmedName, arrivals);
+      }
 
       return arrivals;
     } catch (error) {
@@ -245,24 +250,49 @@ class ArrivalService {
   }
 
   /**
-   * Convert Seoul API response to ArrivalInfo
+   * Convert Seoul API response to ArrivalInfo.
+   *
+   * Filters:
+   * - arvlCd === '2' (당역 출발): the train just left this station and no longer
+   *   has a meaningful arrival time. Including it leaves a "no info" row in the UI
+   *   that confuses users. Drop it.
+   *
+   * Stable trainId: derived from btrainNo + statnId so that the same train across
+   * repeated polls gets the same React key. Including Date.now() invalidates keys
+   * on every poll and forces full FlatList re-render (frame drops on long lists).
    */
   private convertToArrivalInfo(
     stationName: string,
     seoulData: SeoulRealtimeArrival[]
   ): ArrivalInfo {
-    const arrivals: TrainArrival[] = seoulData.map((arrival, index) => {
-      const converted = seoulSubwayApi.convertToAppTrain(arrival);
-      return {
-        trainId: `train_${arrival.btrainNo || index}_${Date.now()}`,
-        lineId: this.normalizeLineId(converted.lineId),
-        direction: converted.direction as 'up' | 'down',
-        destination: converted.destinationStation,
-        arrivalSeconds: converted.arrivalTime,
-        arrivalMessage: converted.arrivalMessage,
-        trainNumber: converted.trainNumber,
-      };
-    });
+    const arrivals: TrainArrival[] = seoulData
+      .filter((arrival) => arrival.arvlCd !== '2')
+      .map((arrival, index) => {
+        const converted = seoulSubwayApi.convertToAppTrain(arrival);
+        // Stable key matching dataManager.convertSeoulToTrain so both legacy
+        // one-shot fetches and arrivalService subscriptions produce the same
+        // trainId for the same train.
+        //
+        // Fallback chain rationale:
+        //   1. btrainNo: present in 100% of well-formed Seoul API responses.
+        //   2. ordkey: also present in 100% of well-formed responses.
+        //   3. statnId + index: only reached for truly malformed rows missing
+        //      both above. statnId alone collides (every row shares the same
+        //      statnId), so we append index. List-shift instability in this
+        //      branch is accepted because at this point the data is malformed
+        //      anyway — any stable identity would be fabricated.
+        const stableKey =
+          arrival.btrainNo || arrival.ordkey || `${arrival.statnId}_${index}`;
+        return {
+          trainId: `train_${stableKey}_${arrival.statnId}`,
+          lineId: this.normalizeLineId(converted.lineId),
+          direction: converted.direction as 'up' | 'down',
+          destination: converted.destinationStation,
+          arrivalSeconds: converted.arrivalTime,
+          arrivalMessage: converted.arrivalMessage,
+          trainNumber: converted.trainNumber,
+        };
+      });
 
     return {
       stationName,

@@ -3,7 +3,7 @@
  * Custom hook for finding and managing nearby subway stations based on user location
  */
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useLocation } from './useLocation';
 import { locationService, NearbyStation, LocationCoordinates, AdaptiveRadiusResult } from '../services/location/locationService';
 import { trainService } from '../services/train/trainService';
@@ -58,7 +58,21 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
   });
 
   const [allStations, setAllStations] = useState<Station[]>([]);
-  const [lastUpdateTime, setLastUpdateTime] = useState<number>(0);
+
+  // Refs (not state) for values mutated *inside* findNearbyStations:
+  // listing them in the useCallback deps below would recreate the callback
+  // on every successful run, re-fire the location useEffect, and produce the
+  // "Loaded 24 subway lines" 9x logging signature observed in production.
+  // Refs also give us synchronous updates so two concurrent triggers
+  // (location effect + onLocationUpdate callback) cannot both pass throttle.
+  const lastUpdateTimeRef = useRef<number>(0);
+  const closestStationIdRef = useRef<string | null>(null);
+
+  // In-flight dedup for loadAllStations: mount effect and the
+  // findNearbyStations fallback both call this; without dedup setAllStations
+  // hasn't committed yet on the second caller, so they both refetch all 24
+  // lines (the 2x "Loaded 24 subway lines" residual after the deps fix).
+  const loadAllStationsPromiseRef = useRef<Promise<Station[]> | null>(null);
 
   // Use mockLocation in test mode, otherwise use real GPS
   // Skip onLocationUpdate when external location is provided (parent handles tracking)
@@ -76,33 +90,48 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
   }, []);
 
   /**
-   * Load all stations from the service (Firebase/API)
+   * Load all stations from the service (Firebase/API).
+   * Dedup: if a previous call is in-flight, return its promise so the mount
+   * effect and the findNearbyStations fallback don't both refetch 24 lines.
    */
-  const loadAllStations = useCallback(async () => {
-    try {
-      const lines = await trainService.getSubwayLines();
-      if (__DEV__) {
-        console.log(`[useNearbyStations] Loaded ${lines.length} subway lines`);
-      }
-
-      const stationsPromises = lines.map(line => trainService.getStationsByLine(line.id));
-      const stationArrays = await Promise.all(stationsPromises);
-
-      const stations = stationArrays.flat();
-      if (__DEV__) {
-        console.log(`[useNearbyStations] Loaded ${stations.length} total stations`);
-      }
-
-      setAllStations(stations);
-      return stations;
-    } catch (error) {
-      console.error('Error loading stations:', error);
-      updateState({
-        error: '역 정보를 불러올 수 없습니다.',
-        loading: false
-      });
-      return [];
+  const loadAllStations = useCallback(async (): Promise<Station[]> => {
+    if (loadAllStationsPromiseRef.current) {
+      return loadAllStationsPromiseRef.current;
     }
+
+    const promise = (async (): Promise<Station[]> => {
+      try {
+        const lines = await trainService.getSubwayLines();
+        if (__DEV__) {
+          console.log(`[useNearbyStations] Loaded ${lines.length} subway lines`);
+        }
+
+        const stationsPromises = lines.map(line => trainService.getStationsByLine(line.id));
+        const stationArrays = await Promise.all(stationsPromises);
+
+        const stations = stationArrays.flat();
+        if (__DEV__) {
+          console.log(`[useNearbyStations] Loaded ${stations.length} total stations`);
+        }
+
+        setAllStations(stations);
+        return stations;
+      } catch (error) {
+        console.error('Error loading stations:', error);
+        updateState({
+          error: '역 정보를 불러올 수 없습니다.',
+          loading: false,
+        });
+        return [];
+      } finally {
+        // Clear the in-flight ref so subsequent calls can refetch when needed
+        // (e.g. an explicit refresh after the cached set has changed).
+        loadAllStationsPromiseRef.current = null;
+      }
+    })();
+
+    loadAllStationsPromiseRef.current = promise;
+    return promise;
   }, [updateState]);
 
   /**
@@ -113,11 +142,13 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
       return;
     }
 
-    // Throttle updates
+    // Throttle updates (synchronous via ref to avoid race when location
+    // effect and onLocationUpdate fire in the same tick).
     const now = Date.now();
-    if (now - lastUpdateTime < minUpdateInterval) {
+    if (now - lastUpdateTimeRef.current < minUpdateInterval) {
       return;
     }
+    lastUpdateTimeRef.current = now;
 
     try {
       updateState({ loading: true, error: null });
@@ -142,10 +173,17 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
 
       const closestStation: NearbyStation | null = nearbyStations.at(0) ?? null;
 
-      // Check if closest station changed
-      if (closestStation?.id !== state.closestStation?.id && onClosestStationChanged) {
+      // Check if closest station changed — compare against ref (not state)
+      // so this comparison doesn't depend on the rendered state, removing
+      // `state.closestStation` from the useCallback deps below.
+      // Normalize both sides to `string | null` so an absent station
+      // (undefined from optional chaining) compares equal to a previous
+      // null state, instead of always firing the callback.
+      const newClosestId: string | null = closestStation?.id ?? null;
+      if (newClosestId !== closestStationIdRef.current && onClosestStationChanged) {
         onClosestStationChanged(closestStation);
       }
+      closestStationIdRef.current = newClosestId;
 
       updateState({
         nearbyStations,
@@ -155,8 +193,6 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
         effectiveRadius: adaptiveResult.effectiveRadius,
         radiusExpanded: adaptiveResult.expanded,
       });
-
-      setLastUpdateTime(now);
 
       if (onStationsFound) {
         onStationsFound(nearbyStations);
@@ -177,9 +213,7 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
     radius,
     maxStations,
     minStations,
-    lastUpdateTime,
     minUpdateInterval,
-    state.closestStation,
     onStationsFound,
     onClosestStationChanged,
   ]);
@@ -195,7 +229,7 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
    * Manually refresh nearby stations
    */
   const refresh = useCallback(() => {
-    setLastUpdateTime(0); // Reset throttle
+    lastUpdateTimeRef.current = 0; // Reset throttle (sync, no re-render)
     findNearbyStations();
   }, [findNearbyStations]);
 

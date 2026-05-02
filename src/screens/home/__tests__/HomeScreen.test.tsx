@@ -28,6 +28,7 @@ jest.mock('@react-navigation/native', () => ({
   useNavigation: jest.fn(() => ({ navigate: mockNavigate, goBack: jest.fn() })),
   useRoute: jest.fn(() => ({ params: {} })),
   useFocusEffect: jest.fn((cb: () => void) => cb()),
+  useIsFocused: jest.fn(() => true),
 }));
 
 const createMockUser = (overrides: Record<string, unknown> = {}) => ({

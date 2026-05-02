@@ -9,7 +9,8 @@ import {
   Text,
   StyleSheet,
   SafeAreaView,
-  ScrollView,
+  FlatList,
+  type ListRenderItem,
   RefreshControl,
   TouchableOpacity,
   Alert,
@@ -181,53 +182,60 @@ export const AlertsScreen: React.FC = () => {
   );
 
 
-  const renderNotificationItem = (notification: StoredNotification) => {
-    const IconComponent = getNotificationIcon(notification.type);
+  const keyExtractor = useCallback(
+    (notification: StoredNotification) => notification.id,
+    []
+  );
 
-    return (
-      <TouchableOpacity
-        key={notification.id}
-        style={[
-          styles.notificationCard,
-          !notification.isRead && styles.unreadCard,
-        ]}
-        onPress={() => handleNotificationPress(notification)}
-        activeOpacity={0.6}
-      >
-        <View style={styles.notificationContent}>
-          <View style={styles.iconContainer}>
-            <IconComponent
-              size={8}
-              color={notification.isRead ? colors.textTertiary : colors.textPrimary}
-              fill={notification.isRead ? colors.textTertiary : colors.textPrimary}
-            />
-          </View>
+  const renderNotificationItem: ListRenderItem<StoredNotification> = useCallback(
+    ({ item: notification }) => {
+      const IconComponent = getNotificationIcon(notification.type);
 
-          <View style={styles.textContainer}>
-            <View style={styles.headerRow}>
-              <Text style={styles.notificationTitle} numberOfLines={1}>
-                {notification.title}
-              </Text>
-              <Text style={styles.timestamp}>
-                {formatTimestamp(notification.createdAt)}
+      return (
+        <TouchableOpacity
+          style={[
+            styles.notificationCard,
+            !notification.isRead && styles.unreadCard,
+          ]}
+          onPress={() => handleNotificationPress(notification)}
+          activeOpacity={0.6}
+        >
+          <View style={styles.notificationContent}>
+            <View style={styles.iconContainer}>
+              <IconComponent
+                size={8}
+                color={notification.isRead ? colors.textTertiary : colors.textPrimary}
+                fill={notification.isRead ? colors.textTertiary : colors.textPrimary}
+              />
+            </View>
+
+            <View style={styles.textContainer}>
+              <View style={styles.headerRow}>
+                <Text style={styles.notificationTitle} numberOfLines={1}>
+                  {notification.title}
+                </Text>
+                <Text style={styles.timestamp}>
+                  {formatTimestamp(notification.createdAt)}
+                </Text>
+              </View>
+              <Text style={styles.notificationBody} numberOfLines={2}>
+                {notification.body}
               </Text>
             </View>
-            <Text style={styles.notificationBody} numberOfLines={2}>
-              {notification.body}
-            </Text>
-          </View>
 
-          <TouchableOpacity
-            style={styles.deleteButton}
-            onPress={() => handleDelete(notification.id)}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <X size={18} color={colors.textTertiary} />
-          </TouchableOpacity>
-        </View>
-      </TouchableOpacity>
-    );
-  };
+            <TouchableOpacity
+              style={styles.deleteButton}
+              onPress={() => handleDelete(notification.id)}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <X size={18} color={colors.textTertiary} />
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      );
+    },
+    [colors, styles, handleNotificationPress, handleDelete]
+  );
 
   if (loading && notifications.length === 0) {
     return (
@@ -295,9 +303,17 @@ export const AlertsScreen: React.FC = () => {
       </View>
 
       {/* Content */}
-      <ScrollView
+      <FlatList
         style={styles.content}
-        contentContainerStyle={styles.contentContainer}
+        contentContainerStyle={
+          notifications.length === 0
+            ? styles.contentContainer
+            : [styles.contentContainer, styles.listContainer]
+        }
+        data={notifications}
+        keyExtractor={keyExtractor}
+        renderItem={renderNotificationItem}
+        ListEmptyComponent={renderEmptyState}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -306,15 +322,11 @@ export const AlertsScreen: React.FC = () => {
           />
         }
         showsVerticalScrollIndicator={false}
-      >
-        {notifications.length === 0 ? (
-          renderEmptyState()
-        ) : (
-          <View style={styles.listContainer}>
-            {notifications.map(renderNotificationItem)}
-          </View>
-        )}
-      </ScrollView>
+        removeClippedSubviews
+        initialNumToRender={10}
+        maxToRenderPerBatch={10}
+        windowSize={7}
+      />
     </SafeAreaView>
   );
 };

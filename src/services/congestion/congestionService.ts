@@ -140,14 +140,27 @@ class CongestionService {
     const summaryId = generateSummaryId(lineId, direction, trainId);
     const summaryRef = doc(db, SUMMARY_COLLECTION, summaryId);
 
-    return onSnapshot(summaryRef, docSnap => {
-      if (!docSnap.exists()) {
-        callback(null);
-        return;
-      }
+    return onSnapshot(
+      summaryRef,
+      docSnap => {
+        if (!docSnap.exists()) {
+          callback(null);
+          return;
+        }
 
-      callback(fromCongestionSummaryDoc(docSnap.id, docSnap.data() as CongestionSummaryDoc));
-    });
+        callback(fromCongestionSummaryDoc(docSnap.id, docSnap.data() as CongestionSummaryDoc));
+      },
+      error => {
+        // DIAGNOSTIC: identify which collection/doc was denied so missing
+        // firestore.rules entries can be pinpointed instead of guessed.
+        console.error(
+          `[CongestionService] subscribeToTrainCongestion failed for ` +
+          `${SUMMARY_COLLECTION}/${summaryId}:`,
+          error
+        );
+        callback(null);
+      }
+    );
   }
 
   /**
@@ -164,12 +177,24 @@ class CongestionService {
       limit(50)
     );
 
-    return onSnapshot(q, snapshot => {
-      const summaries = snapshot.docs.map(docSnap =>
-        fromCongestionSummaryDoc(docSnap.id, docSnap.data() as CongestionSummaryDoc)
-      );
-      callback(summaries);
-    });
+    return onSnapshot(
+      q,
+      snapshot => {
+        const summaries = snapshot.docs.map(docSnap =>
+          fromCongestionSummaryDoc(docSnap.id, docSnap.data() as CongestionSummaryDoc)
+        );
+        callback(summaries);
+      },
+      error => {
+        // DIAGNOSTIC: identify which collection was denied.
+        console.error(
+          `[CongestionService] subscribeToLineCongestion failed for ` +
+          `${SUMMARY_COLLECTION} (lineId=${lineId}):`,
+          error
+        );
+        callback([]);
+      }
+    );
   }
 
   /**

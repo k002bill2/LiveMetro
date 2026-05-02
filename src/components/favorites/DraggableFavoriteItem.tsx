@@ -32,6 +32,12 @@ interface DraggableFavoriteItemProps {
     isCommuteStation?: boolean;
   }) => Promise<void>;
   isDragEnabled?: boolean; // For future drag implementation
+  /**
+   * Forwarded to StationCard so favorites stop polling Seoul API when the
+   * Favorites screen is unfocused (e.g. user navigates to SubwayMap).
+   * Pass `useIsFocused()` from the parent screen.
+   */
+  arrivalsEnabled?: boolean;
 }
 
 export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
@@ -45,6 +51,7 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
   onSetEnd,
   onSaveEdit,
   isDragEnabled = false,
+  arrivalsEnabled = true,
 }) => {
   const { colors } = useTheme();
   const styles = createStyles(colors);
@@ -85,6 +92,7 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
           onSetStart={onSetStart}
           onSetEnd={onSetEnd}
           showArrivals={true}
+          arrivalsEnabled={arrivalsEnabled}
           enableFavorite={false}
           animationDelay={index * 50}
         />

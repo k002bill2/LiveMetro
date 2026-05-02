@@ -1,6 +1,6 @@
 # LiveMetro 구현 현황 문서
 
-> 최종 업데이트: 2026-02-02
+> 최종 업데이트: 2026-05-03
 
 ## 프로젝트 개요
 
@@ -562,7 +562,73 @@ functions/                     # Cloud Functions
 
 ---
 
-## 9. 참고 문서
+## 9. 최근 변경 이력 (2026-04-25 ~ 2026-05-03)
+
+> 브랜치: `fix/realtime-timetable-reliability` ([PR #5](https://github.com/k002bill2/LiveMetro/pull/5))
+
+### 9.1 성능 개선 (Performance Overhaul)
+
+- **백그라운드 폴링 제거**: `useCurrentStationAlert`/`useCurrentStationAlerts`의 5s `setInterval` 3개 폐기 → `currentStationAlertService.subscribe()` 기반 pub/sub 전환 (분당 ~60 setState 절감)
+- **AlertsScreen 가상화**: `ScrollView + .map()` → `FlatList` + `removeClippedSubviews` + memoized `renderItem`
+- **StationCard 메모이제이션 안정화**: 인라인 콜백을 `useCallback` + `useMemo` Map으로 캐싱 → React.memo 동작 복원
+- **LiveClock 컴포넌트 분리**: StationDetailScreen의 60s 시계 tick이 화면 전체 re-render 유발 → 시계 노드만 격리
+- **StationCard 폴링 게이팅**: HomeScreen 5개 카드의 30s 폴링이 탭 전환 후에도 계속됨 → `arrivalsEnabled` prop + `useIsFocused()` 조합으로 비활성 시 정지
+- **useDelayDetection enabled 옵션**: 호출자가 effect 전체(초기 fetch + 폴링 + setState)를 게이트 가능
+
+**관련 파일**:
+- `src/hooks/useCurrentStationAlert.ts`, `src/hooks/useDelayDetection.ts`
+- `src/screens/main/HomeScreen.tsx`, `src/screens/main/StationDetailScreen.tsx`, `src/screens/alerts/AlertsScreen.tsx`
+- `src/components/cards/StationCard.tsx`, `src/components/clock/LiveClock.tsx`
+- `src/services/alert/currentStationAlertService.ts`
+
+### 9.2 실시간 도착 안정화 (Realtime Arrival Fixes)
+
+- **arrivalService 단일 소스**: `dataManager.subscribeToRealtimeUpdates`가 자체 폴러 대신 `arrivalService.subscribe()`로 위임 → 역당 폴러 1개 보장. `dataManager` 메서드는 `@deprecated` 표기, 기존 호출자 무중단 동작
+- **trainId 결정성**: 기존 `Date.now()` 포함 → `btrainNo|ordkey|statnId+index` 결정적 키. FlatList re-render 폭발 해결
+- **arvlCd '2' 필터링**: 당역 출발 열차 정보 행 UI 제거
+- **빈 결과 캐시 금지**: 60초 stale empty state 차단 (다음 폴링이 즉시 재시도)
+- **detectDelays 일시 비활성화**: 기존 구현이 "도착까지 남은 시간"을 schedule deviation으로 오인해 5분+ 모든 열차를 "지연"으로 false alert → `[]` 반환. 실제 지연 감지는 timetable과의 비교로 별도 후속 작업
+
+**관련 파일**:
+- `src/services/arrival/arrivalService.ts`, `src/services/data/dataManager.ts`
+- `src/hooks/useRealtimeTrains.ts`
+
+### 9.3 시간표 (Timetable) 개선
+
+- **시간 비교 정확도**: 문자열 lexicographic → `toSecondsOfDay()` 숫자 비교. `"9:35:00"` vs `"14:30:00"` 정렬 오류 수정. 24시간 초과(`"25:30:00"`) 입력 허용으로 자정 인접 비교 단순화
+- **한국 공휴일 인식**: `isKoreanHoliday()` 신규 utility — 2025-2027 fixed-date + 대체공휴일 + 음력 기반(설날/추석/부처님오신날). 평일 공휴일에 weekTag `'3'` 적용 → 어린이날 화요일 등 ~12-15일/년 잘못된 시간표 표시 수정 (TODO: 2027 이후 만료)
+- **자정 carry-over**: 22:00+에는 다음날 < 03:00 시간표 행도 upcoming에 포함 (서울 지하철 ~01:00 운행 반영). 23:55에 0건 표시되던 silent failure 해결
+- **observability 강화**: `SearchSTNTimeTableByIDService`가 XML/HTML 반환 시 (key 무효/quota 초과 등) content-type + 200자 본문을 **API 키 마스킹 후** 로깅, `timetableKeyManager.reportError()` 자동 호출
+- **웹 플랫폼 처리**: HTTP-only timetable endpoint를 웹에서 호출 시 silent `[]` 반환 → `TimetableUnsupportedOnWebError` 명시 throw. UI는 "시간표는 모바일 앱에서 확인할 수 있습니다" 표시
+
+**관련 파일**:
+- `src/utils/timeUtils.ts` (toSecondsOfDay), `src/utils/koreanHolidays.ts` (isKoreanHoliday)
+- `src/hooks/useTrainSchedule.ts`
+- `src/services/api/seoulSubwayApi.ts`
+
+### 9.4 Firestore observability
+
+- **congestionService 에러 핸들러**: `subscribeToTrainCongestion`/`subscribeToLineCongestion`이 `onSnapshot`에 error callback 없이 등록되던 문제 해결. 권한 거부/규칙 미스매치가 silent runtime error로 묻히던 것 → SUMMARY_COLLECTION + summaryId/lineId 함께 로깅, firestore.rules 누락 항목 즉시 식별 가능
+
+**관련 파일**: `src/services/congestion/congestionService.ts`
+
+### 9.5 환경설정 표준화
+
+- **변수명 sync**: `EXPO_PUBLIC_DATA_GO_KR_API_KEY` → `EXPO_PUBLIC_DATA_PORTAL_API_KEY` 리네임 (코드 참조와 일치). `EXPO_PUBLIC_DATA_PORTAL_API_KEY_2` 폴백 키 추가
+- **사용 안 되는 placeholder 제거**: AWS S3, LLM API 키 (코드 0회 참조 검증 후)
+- **`.editorconfig` 도입**: `[.env*]` 섹션에 `trim_trailing_whitespace = true` + `indent_style = unset` → dotenv silent parsing failure 재발 방지
+
+**Breaking change**: 기존 로컬 `.env`/CI secret store에서 `DATA_GO_KR_API_KEY` → `DATA_PORTAL_API_KEY` 리네임 필요.
+
+### 9.6 DX / 도구
+
+- **`functions/` ESLint 분리**: 루트 ESLint가 `firebase-functions`/`@sendgrid/mail` resolve 실패하던 CI 이슈 해결 (functions/는 자체 package.json + lint script 보유)
+- **테스트 결정성**: `useTrainSchedule` "fetch and convert" 테스트에 `setSystemTime(05:00)` 도입 → CI 실행 시각 의존성 제거
+- **`@types/react-native` devDep 추가**: RN intrinsic 타입 검사 강화
+
+---
+
+## 10. 참고 문서
 
 - [아키텍처 상세](./architecture.md)
 - [API 레퍼런스](./api-reference.md)
