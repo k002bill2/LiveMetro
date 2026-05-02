@@ -242,6 +242,18 @@ npm install
 # 환경 변수 설정
 cp .env.example .env
 # .env 파일 편집 (API 키 입력)
+# 전체 변수 목록: docs/claude/api-reference.md "Environment Variables" 섹션 참조
+#
+# 핵심 키 (최소 동작 요구):
+#   - EXPO_PUBLIC_FIREBASE_*           (6개, Firebase Console에서 발급)
+#   - EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY (실시간 인증키, data.seoul.go.kr)
+#   - EXPO_PUBLIC_DATA_PORTAL_API_KEY  (일반 인증키, data.seoul.go.kr — 별도 발급)
+#
+# 2026-05-03 변경: EXPO_PUBLIC_DATA_GO_KR_API_KEY → EXPO_PUBLIC_DATA_PORTAL_API_KEY 리네임됨.
+# 기존 .env 사용자는 변수명 업데이트 필요. CI/CD secret store도 동일하게 갱신.
+#
+# .editorconfig가 .env* 파일의 trailing whitespace와 leading indent를 자동 차단합니다.
+# 에디터에 EditorConfig 확장이 설치되어 있어야 적용됩니다.
 
 # TypeScript 타입 체크
 npm run type-check
