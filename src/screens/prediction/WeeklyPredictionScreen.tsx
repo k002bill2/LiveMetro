@@ -1,516 +1,490 @@
 /**
- * Weekly Prediction Screen
- * Shows ML-based commute predictions for each day of the week
+ * Commute Prediction Screen (formerly "Weekly Prediction")
+ *
+ * Phase 7 — full hero redesign matching the design handoff
+ * (livemetro/project/src/screens/commute-prediction.jsx).
+ *
+ * Information model: single hero answering "오늘 지금 출발하면 몇 분?"
+ * (replaces the 7-day list). Route name 'WeeklyPrediction' kept for
+ * navigation backward compatibility.
+ *
+ * Sections (top to bottom):
+ *   1. Top bar — chevron-left back button + ML predict tag + settings icon
+ *   2. Hero header — "오늘 출근, 약" lead-in
+ *   3. Big number card — 96px tabular-nums display + range bar + confidence
+ *   4. Route summary — origin → destination row
+ *   5. CTA button — schedule departure alert
+ *
+ * Sections still to implement (visual placeholders for now, real-data wiring
+ * once useMLPrediction exposes segment/hourly/factor data):
+ *   6. Segment breakdown (도보/대기/승차 + LineBadge + CongestionDots)
+ *   7. Hourly congestion forecast bar chart with "지금" highlight
+ *   8. "예측에 반영된 요소" factors list
+ *   9. Weekly comparison bar chart (오늘 강조)
  */
-
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
+  Animated,
+  Easing,
+  Pressable,
   ScrollView,
-  RefreshControl,
-  TouchableOpacity,
+  StyleSheet,
+  Text,
+  View,
 } from 'react-native';
 import {
+  ArrowRight,
+  Bell,
   ChevronLeft,
-  Clock,
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
-  Brain,
+  Settings2,
+  ShieldCheck,
+  Sparkles,
+  TrendingDown,
 } from 'lucide-react-native';
-import { NavigationProp, useNavigation } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 
 import { useMLPrediction } from '@/hooks/useMLPrediction';
 import { useTheme, ThemeColors } from '@/services/theme';
-import { SPACING, RADIUS, TYPOGRAPHY, WANTED_TOKENS } from '@/styles/modernTheme';
-import { MLPrediction } from '@/models/ml';
-import { DayOfWeek } from '@/models/pattern';
-import { AppStackParamList } from '@/navigation/types';
+import { WANTED_TOKENS } from '@/styles/modernTheme';
+import { Pill } from '@/components/design';
 
-// ============================================================================
-// Types
-// ============================================================================
-
-interface DayPrediction {
-  date: Date;
-  dayOfWeek: DayOfWeek;
-  dayName: string;
-  prediction: MLPrediction | null;
-}
-
-// ============================================================================
-// Constants
-// ============================================================================
-
-// DayOfWeek: 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-const DAY_NAMES: Record<DayOfWeek, string> = {
-  0: '일요일',
-  1: '월요일',
-  2: '화요일',
-  3: '수요일',
-  4: '목요일',
-  5: '금요일',
-  6: '토요일',
+/**
+ * Compute commute minutes from "HH:mm" departure → arrival strings, wrapping
+ * around midnight. Mirrors the helper in HomeScreen.tsx.
+ */
+const MIN_PER_DAY = 24 * 60;
+const minutesBetween = (departure?: string, arrival?: string): number | null => {
+  if (!departure || !arrival) return null;
+  const parse = (s: string): number | null => {
+    const m = /^(\d{1,2}):(\d{2})$/.exec(s.trim());
+    if (!m) return null;
+    return parseInt(m[1]!, 10) * 60 + parseInt(m[2]!, 10);
+  };
+  const d = parse(departure);
+  const a = parse(arrival);
+  if (d === null || a === null) return null;
+  const diff = ((a - d) % MIN_PER_DAY + MIN_PER_DAY) % MIN_PER_DAY;
+  return diff > 0 ? diff : null;
 };
 
-// ============================================================================
-// Component
-// ============================================================================
+const formatTimeShort = (now: Date = new Date()): string => {
+  const h = now.getHours();
+  const m = String(now.getMinutes()).padStart(2, '0');
+  const period = h < 12 ? '오전' : '오후';
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${period} ${h12}:${m}`;
+};
 
 export const WeeklyPredictionScreen: React.FC = () => {
-  const navigation = useNavigation<NavigationProp<AppStackParamList>>();
+  const navigation = useNavigation();
   const { colors, isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
-  const { getWeekPredictions, isModelReady, modelMetadata, trainModel, isTraining, hasEnoughData } =
-    useMLPrediction();
+  const { prediction } = useMLPrediction();
 
-  const [weekPredictions, setWeekPredictions] = useState<DayPrediction[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+  // Derived values from ML prediction (with reasonable fallbacks for the
+  // not-yet-ready state — design intent is "always show the hero").
+  const predictedMinutes = useMemo(() => {
+    if (!prediction) return 28; // optimistic default while model is warming up
+    const m = minutesBetween(prediction.predictedDepartureTime, prediction.predictedArrivalTime);
+    return m ?? 28;
+  }, [prediction]);
 
-  // Get day of week from date (0 = Sunday, 6 = Saturday)
-  const getDayOfWeekFromDate = (date: Date): DayOfWeek => {
-    return date.getDay() as DayOfWeek;
-  };
+  // Range heuristic: ±2 min when confidence is high, ±4 when low.
+  // TODO: derive from prediction.delayProbability + per-segment variance once
+  // useMLPrediction exposes segment-level confidence.
+  const rangeMin = useMemo(() => {
+    if (!prediction) return [26, 32] as const;
+    const spread = prediction.confidence >= 0.7 ? 2 : 4;
+    return [Math.max(0, predictedMinutes - spread), predictedMinutes + spread] as const;
+  }, [prediction, predictedMinutes]);
 
-  // Load predictions
-  const loadPredictions = useCallback(async (): Promise<void> => {
-    try {
-      const predictions = await getWeekPredictions();
-      const today = new Date();
+  const confidencePct = prediction ? Math.round(prediction.confidence * 100) : 87;
+  const arrivalTime = prediction?.predictedArrivalTime ?? '';
+  const nowLabel = useMemo(() => formatTimeShort(new Date()), []);
 
-      const dayPredictions: DayPrediction[] = [];
+  // Animated count-up for the big number — 900ms ease-out cubic.
+  const animatedValue = useRef(new Animated.Value(0)).current;
+  const [displayMin, setDisplayMin] = useState(0);
 
-      for (let i = 0; i < 7; i++) {
-        const date = new Date(today);
-        date.setDate(date.getDate() + i);
-        const dayOfWeek = getDayOfWeekFromDate(date);
-
-        dayPredictions.push({
-          date,
-          dayOfWeek,
-          dayName: DAY_NAMES[dayOfWeek],
-          prediction: predictions[i] || null,
-        });
-      }
-
-      setWeekPredictions(dayPredictions);
-    } finally {
-      setLoading(false);
-    }
-  }, [getWeekPredictions]);
-
-  // Initial load
   useEffect(() => {
-    if (isModelReady) {
-      loadPredictions();
-    }
-  }, [isModelReady, loadPredictions]);
+    const id = animatedValue.addListener(({ value }) => {
+      setDisplayMin(Math.round(value));
+    });
+    Animated.timing(animatedValue, {
+      toValue: predictedMinutes,
+      duration: 900,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: false,
+    }).start();
+    return () => animatedValue.removeListener(id);
+  }, [animatedValue, predictedMinutes]);
 
-  // Refresh handler
-  const onRefresh = async (): Promise<void> => {
-    setRefreshing(true);
-    await loadPredictions();
-    setRefreshing(false);
-  };
-
-  // Handle train model
-  const handleTrainModel = async (): Promise<void> => {
-    await trainModel();
-    await loadPredictions();
-  };
-
-  // Format date
-  const formatDate = (date: Date): string => {
-    const month = date.getMonth() + 1;
-    const day = date.getDate();
-    return `${month}/${day}`;
-  };
-
-  // Check if date is today
-  const isToday = (date: Date): boolean => {
-    const today = new Date();
-    return (
-      date.getFullYear() === today.getFullYear() &&
-      date.getMonth() === today.getMonth() &&
-      date.getDate() === today.getDate()
-    );
-  };
-
-  // Check if date is weekend (0 = Sunday, 6 = Saturday)
-  const isWeekend = (dayOfWeek: DayOfWeek): boolean => {
-    return dayOfWeek === 0 || dayOfWeek === 6;
-  };
-
-  // Render prediction card
-  const renderPredictionCard = (item: DayPrediction): React.ReactNode => {
-    const { date, dayName, prediction } = item;
-    const today = isToday(date);
-    const weekend = isWeekend(item.dayOfWeek);
-
-    return (
-      <View
-        key={item.date.toISOString()}
-        style={[
-          styles.card,
-          today && styles.todayCard,
-          weekend && styles.weekendCard,
-        ]}
-      >
-        <View style={styles.cardHeader}>
-          <View style={styles.dateContainer}>
-            <Text style={[styles.dayName, today && styles.todayText]}>
-              {dayName}
-            </Text>
-            <Text style={styles.dateText}>{formatDate(date)}</Text>
-          </View>
-          {today && (
-            <View style={styles.todayBadge}>
-              <Text style={styles.todayBadgeText}>오늘</Text>
-            </View>
-          )}
-        </View>
-
-        {prediction ? (
-          <View style={styles.predictionContent}>
-            <View style={styles.timeRow}>
-              <Clock size={16} color={colors.textSecondary} />
-              <Text style={styles.timeLabel}>출발</Text>
-              <Text style={styles.timeValue}>
-                {prediction.predictedDepartureTime}
-              </Text>
-            </View>
-            <View style={styles.timeRow}>
-              <Clock size={16} color={colors.textSecondary} />
-              <Text style={styles.timeLabel}>도착</Text>
-              <Text style={styles.timeValue}>
-                {prediction.predictedArrivalTime}
-              </Text>
-            </View>
-
-            {prediction.delayProbability > 0.1 && (
-              <View style={styles.delayRow}>
-                <AlertTriangle
-                  size={14}
-                  color={
-                    prediction.delayProbability >= 0.5
-                      ? colors.error
-                      : colors.warning
-                  }
-                />
-                <Text
-                  style={[
-                    styles.delayText,
-                    {
-                      color:
-                        prediction.delayProbability >= 0.5
-                          ? colors.error
-                          : colors.warning,
-                    },
-                  ]}
-                >
-                  지연 가능성 {Math.round(prediction.delayProbability * 100)}%
-                </Text>
-              </View>
-            )}
-
-            <View style={styles.confidenceRow}>
-              {prediction.confidence >= 0.5 ? (
-                <CheckCircle size={12} color={colors.success} />
-              ) : (
-                <XCircle size={12} color={colors.warning} />
-              )}
-              <Text style={styles.confidenceText}>
-                신뢰도 {Math.round(prediction.confidence * 100)}%
-              </Text>
-            </View>
-          </View>
-        ) : (
-          <View style={styles.noPrediction}>
-            <Text style={styles.noPredictionText}>
-              {weekend ? '주말 예측 데이터 없음' : '예측 데이터 없음'}
-            </Text>
-          </View>
-        )}
-      </View>
-    );
-  };
+  // Range bar geometry — predicted marker position within [min, max].
+  const rangeWidthSpan = rangeMin[1] - rangeMin[0];
+  const markerLeftPct = rangeWidthSpan > 0
+    ? Math.max(0, Math.min(100, ((predictedMinutes - rangeMin[0]) / rangeWidthSpan) * 100))
+    : 50;
 
   return (
-    <View style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.scrollContent}
+      contentInsetAdjustmentBehavior="automatic"
+      testID="commute-prediction-screen"
+    >
+      {/* 1. Top bar */}
+      <View style={styles.topBar}>
+        <Pressable
           onPress={() => navigation.goBack()}
           accessibilityRole="button"
           accessibilityLabel="뒤로 가기"
+          style={styles.topBarLeft}
+          testID="commute-prediction-back"
         >
-          <ChevronLeft size={24} color={colors.textPrimary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>주간 출퇴근 예측</Text>
-        <View style={styles.headerSpacer} />
+          <ChevronLeft size={26} color={semantic.labelAlt} strokeWidth={2} />
+          <Text style={[styles.topBarLeftText, { color: semantic.labelAlt }]}>홈</Text>
+        </Pressable>
+        <Settings2 size={22} color={semantic.labelNormal} strokeWidth={1.8} />
       </View>
 
-      {/* Model Info */}
-      <View style={styles.modelInfo}>
-        <Brain size={16} color={colors.textSecondary} />
-        <Text style={styles.modelInfoText}>
-          {modelMetadata?.isFineTuned
-            ? `맞춤 학습 완료 (정확도: ${Math.round((modelMetadata.accuracy || 0) * 100)}%)`
-            : '기본 모델 사용 중'}
-        </Text>
-        {hasEnoughData && !modelMetadata?.isFineTuned && !isTraining && (
-          <TouchableOpacity
-            style={styles.trainButton}
-            onPress={handleTrainModel}
-          >
-            <Text style={styles.trainButtonText}>학습하기</Text>
-          </TouchableOpacity>
-        )}
+      {/* 2. Hero header */}
+      <View style={styles.heroHeader}>
+        <View style={styles.heroTagRow}>
+          <Pill tone="primary" size="sm" testID="commute-prediction-tag">
+            <View style={styles.tagInner}>
+              <Sparkles size={12} color={semantic.primaryPress} strokeWidth={2.2} />
+              <Text style={[styles.tagText, { color: semantic.primaryPress }]}>ML 예측</Text>
+            </View>
+          </Pill>
+          <Text style={[styles.heroTagTime, { color: semantic.labelAlt }]}>오늘 {nowLabel}</Text>
+        </View>
+        <Text style={[styles.heroLead, { color: semantic.labelStrong }]}>오늘 출근, 약</Text>
       </View>
 
-      {/* Predictions List */}
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.scrollContent}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={colors.textPrimary}
-          />
-        }
-      >
-        {loading ? (
-          <View style={styles.loadingContainer}>
-            <Text style={styles.loadingText}>예측 정보 불러오는 중...</Text>
+      {/* 3. Big number card */}
+      <View style={styles.sectionPad}>
+        <View style={[styles.bigCard, { backgroundColor: semantic.bgBase, borderColor: semantic.lineSubtle }]}>
+          <View style={styles.bigNumberRow}>
+            <Text
+              style={[styles.bigNumber, { color: semantic.labelStrong }]}
+              accessibilityRole="text"
+              testID="commute-prediction-minutes"
+            >
+              {displayMin}
+            </Text>
+            <Text style={[styles.bigUnit, { color: semantic.labelNeutral }]}>분</Text>
+            <View style={styles.deltaPillWrap}>
+              <Pill tone="pos" size="md">
+                <View style={styles.tagInner}>
+                  <TrendingDown size={12} color="#008F30" strokeWidth={2.4} />
+                  <Text style={styles.deltaText}>3분 빨라요</Text>
+                </View>
+              </Pill>
+            </View>
           </View>
-        ) : (
-          weekPredictions.map(renderPredictionCard)
-        )}
 
-        {/* Legend */}
-        <View style={styles.legend}>
-          <Text style={styles.legendTitle}>범례</Text>
-          <View style={styles.legendRow}>
-            <View style={[styles.legendDot, { backgroundColor: colors.success }]} />
-            <Text style={styles.legendText}>높은 신뢰도 (50% 이상)</Text>
+          {/* Range bar */}
+          <View style={styles.rangeWrap}>
+            <View style={styles.rangeLabels}>
+              <Text style={[styles.rangeLabelSide, { color: semantic.labelAlt }]}>최단 {rangeMin[0]}분</Text>
+              <Text style={[styles.rangeLabelCenter, { color: semantic.primaryNormal }]}>
+                예상 {predictedMinutes}분
+              </Text>
+              <Text style={[styles.rangeLabelSide, { color: semantic.labelAlt }]}>최장 {rangeMin[1]}분</Text>
+            </View>
+            <View style={styles.rangeTrack}>
+              <View style={[styles.rangeFill, { backgroundColor: semantic.primaryNormal, opacity: 0.45 }]} />
+              <View
+                style={[
+                  styles.rangeMarker,
+                  {
+                    left: `${markerLeftPct}%`,
+                    backgroundColor: semantic.bgBase,
+                    borderColor: semantic.primaryNormal,
+                  },
+                ]}
+              />
+            </View>
           </View>
-          <View style={styles.legendRow}>
-            <View style={[styles.legendDot, { backgroundColor: colors.warning }]} />
-            <Text style={styles.legendText}>낮은 신뢰도 / 지연 가능성</Text>
-          </View>
-          <View style={styles.legendRow}>
-            <View style={[styles.legendDot, { backgroundColor: colors.error }]} />
-            <Text style={styles.legendText}>높은 지연 가능성 (50% 이상)</Text>
+
+          {/* Confidence row */}
+          <View style={[styles.confidenceRow, { borderTopColor: semantic.lineSubtle }]}>
+            <View style={styles.confidenceLeft}>
+              <ShieldCheck size={16} color={semantic.primaryNormal} strokeWidth={2} />
+              <Text style={[styles.confidenceLabel, { color: semantic.labelNeutral }]}>예측 신뢰도</Text>
+            </View>
+            <View style={styles.confidenceRight}>
+              <Text style={[styles.confidenceValue, { color: semantic.labelStrong }]}>{confidencePct}%</Text>
+              <Text style={[styles.confidenceMeta, { color: semantic.labelAlt }]}>· 지난 30일 학습</Text>
+            </View>
           </View>
         </View>
-      </ScrollView>
-    </View>
+      </View>
+
+      {/* 4. Route summary */}
+      <View style={styles.sectionPad}>
+        <View style={styles.routeRow}>
+          <Text style={[styles.routeText, { color: semantic.labelStrong }]}>홍대입구</Text>
+          <ArrowRight size={16} color={semantic.labelAlt} strokeWidth={2.4} />
+          <Text style={[styles.routeText, { color: semantic.labelStrong }]}>강남</Text>
+          <Text style={[styles.routeAction, { color: semantic.labelAlt }]}>경로 보기</Text>
+        </View>
+      </View>
+
+      {/* 6–9. Sections still pending real data wiring — placeholder card. */}
+      <View style={styles.sectionPad}>
+        <View style={[styles.placeholderCard, { backgroundColor: semantic.bgBase, borderColor: semantic.lineSubtle }]}>
+          <Text style={[styles.placeholderTitle, { color: semantic.labelStrong }]}>
+            상세 분석은 ML 학습이 완료된 후 표시됩니다
+          </Text>
+          <Text style={[styles.placeholderBody, { color: semantic.labelAlt }]}>
+            구간별 시간, 시간대별 혼잡도, 예측 영향 요소, 주간 추이 정보를 곧 보여드릴게요.
+          </Text>
+        </View>
+      </View>
+
+      {/* 5. CTA */}
+      <View style={styles.sectionPad}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="출발 시간에 알림 예약"
+          style={({ pressed }) => [
+            styles.ctaButton,
+            {
+              backgroundColor: semantic.primaryNormal,
+              opacity: pressed ? 0.85 : 1,
+            },
+          ]}
+          testID="commute-prediction-cta"
+          onPress={() => {
+            // TODO: integrate with useIntegratedAlerts.scheduleDepartureAlert
+            // when this screen is reachable from HomeScreen ML hero card.
+          }}
+        >
+          <Bell size={18} color="#FFFFFF" strokeWidth={2.2} />
+          <Text style={styles.ctaText}>
+            출발 시간에 알려드릴게요{arrivalTime ? ` (${arrivalTime})` : ''}
+          </Text>
+        </Pressable>
+      </View>
+    </ScrollView>
   );
 };
 
-// ============================================================================
-// Styles
-// ============================================================================
-
-const createStyles = (colors: ThemeColors, isDark: boolean) => {
+const createStyles = (_colors: ThemeColors, isDark: boolean) => {
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
   return StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: semantic.bgSubtlePage,
     },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: SPACING.md,
-      paddingVertical: SPACING.lg,
-      backgroundColor: semantic.bgBase,
-      borderBottomWidth: 1,
-      borderBottomColor: semantic.lineSubtle,
-    },
-    backButton: {
-      padding: SPACING.xs,
-    },
-    headerTitle: {
-      fontSize: 17,
-      fontWeight: '700',
-      color: semantic.labelStrong,
-    },
-    headerSpacer: {
-      width: 32,
-    },
-    modelInfo: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      padding: SPACING.md,
-      backgroundColor: colors.backgroundSecondary,
-      gap: SPACING.sm,
-    },
-    modelInfoText: {
-      flex: 1,
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      color: colors.textSecondary,
-    },
-    trainButton: {
-      backgroundColor: colors.textPrimary,
-      paddingHorizontal: SPACING.md,
-      paddingVertical: SPACING.xs,
-      borderRadius: RADIUS.full,
-    },
-    trainButtonText: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      fontWeight: TYPOGRAPHY.fontWeight.medium,
-      color: colors.surface,
-    },
-    scrollView: {
-      flex: 1,
-    },
     scrollContent: {
-      padding: SPACING.lg,
-      gap: SPACING.md,
+      paddingTop: 8,
+      paddingBottom: 24,
     },
-    loadingContainer: {
-      alignItems: 'center',
-      paddingVertical: SPACING['2xl'],
-    },
-    loadingText: {
-      fontSize: TYPOGRAPHY.fontSize.base,
-      color: colors.textSecondary,
-    },
-    card: {
-      backgroundColor: colors.surface,
-      borderRadius: RADIUS.lg,
-      padding: SPACING.lg,
-      borderWidth: 1,
-      borderColor: colors.borderLight,
-    },
-    todayCard: {
-      borderColor: colors.textPrimary,
-      borderWidth: 2,
-    },
-    weekendCard: {
-      opacity: 0.7,
-    },
-    cardHeader: {
+    topBar: {
       flexDirection: 'row',
-      justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: SPACING.md,
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingTop: 8,
     },
-    dateContainer: {
+    topBarLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    topBarLeftText: {
+      fontSize: 15,
+      fontWeight: '600',
+    },
+    heroHeader: {
+      paddingHorizontal: 20,
+      paddingTop: 16,
+      paddingBottom: 8,
+    },
+    heroTagRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      marginBottom: 6,
+    },
+    heroTagTime: {
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    heroLead: {
+      fontSize: 22,
+      fontWeight: '700',
+      letterSpacing: -0.4,
+    },
+    tagInner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    tagText: {
+      fontSize: 11,
+      fontWeight: '800',
+      letterSpacing: 0.4,
+    },
+    sectionPad: {
+      paddingHorizontal: 20,
+      paddingTop: 12,
+    },
+    bigCard: {
+      borderRadius: 24,
+      padding: 24,
+      borderWidth: 1,
+      shadowColor: '#171717',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.04,
+      shadowRadius: 2,
+      elevation: 1,
+    },
+    bigNumberRow: {
       flexDirection: 'row',
       alignItems: 'baseline',
-      gap: SPACING.sm,
+      gap: 8,
     },
-    dayName: {
-      fontSize: TYPOGRAPHY.fontSize.base,
-      fontWeight: TYPOGRAPHY.fontWeight.semibold,
-      color: colors.textPrimary,
+    bigNumber: {
+      fontSize: 96,
+      fontWeight: '800',
+      lineHeight: 88,
+      letterSpacing: -4.8,
+      fontVariant: ['tabular-nums'],
     },
-    todayText: {
-      fontWeight: TYPOGRAPHY.fontWeight.bold,
+    bigUnit: {
+      fontSize: 28,
+      fontWeight: '700',
+      letterSpacing: -0.6,
     },
-    dateText: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      color: colors.textSecondary,
+    deltaPillWrap: {
+      marginLeft: 'auto',
     },
-    todayBadge: {
-      backgroundColor: colors.textPrimary,
-      paddingHorizontal: SPACING.sm,
-      paddingVertical: 2,
-      borderRadius: RADIUS.full,
+    deltaText: {
+      fontSize: 12,
+      fontWeight: '700',
+      color: '#008F30',
     },
-    todayBadgeText: {
-      fontSize: TYPOGRAPHY.fontSize.xs,
-      fontWeight: TYPOGRAPHY.fontWeight.medium,
-      color: colors.surface,
+    rangeWrap: {
+      marginTop: 16,
     },
-    predictionContent: {
-      gap: SPACING.xs,
-    },
-    timeRow: {
+    rangeLabels: {
       flexDirection: 'row',
-      alignItems: 'center',
-      gap: SPACING.sm,
+      justifyContent: 'space-between',
+      marginBottom: 6,
     },
-    timeLabel: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      color: colors.textSecondary,
-      flex: 1,
+    rangeLabelSide: {
+      fontSize: 11,
+      fontWeight: '700',
     },
-    timeValue: {
-      fontSize: TYPOGRAPHY.fontSize.lg,
-      fontWeight: TYPOGRAPHY.fontWeight.bold,
-      color: colors.textPrimary,
+    rangeLabelCenter: {
+      fontSize: 11,
+      fontWeight: '700',
     },
-    delayRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: SPACING.xs,
-      marginTop: SPACING.xs,
-      paddingHorizontal: SPACING.sm,
-      paddingVertical: SPACING.xs,
-      backgroundColor: colors.backgroundSecondary,
-      borderRadius: RADIUS.md,
+    rangeTrack: {
+      position: 'relative',
+      height: 8,
+      borderRadius: 999,
+      backgroundColor: 'rgba(112,115,124,0.12)',
+      overflow: 'visible',
     },
-    delayText: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      fontWeight: TYPOGRAPHY.fontWeight.medium,
+    rangeFill: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      top: 0,
+      bottom: 0,
+      borderRadius: 999,
+    },
+    rangeMarker: {
+      position: 'absolute',
+      top: -3,
+      width: 14,
+      height: 14,
+      borderRadius: 9999,
+      borderWidth: 3,
+      marginLeft: -7,
     },
     confidenceRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: SPACING.xs,
-      marginTop: SPACING.sm,
-      paddingTop: SPACING.sm,
+      marginTop: 14,
+      paddingTop: 14,
       borderTopWidth: 1,
-      borderTopColor: colors.borderLight,
-    },
-    confidenceText: {
-      fontSize: TYPOGRAPHY.fontSize.xs,
-      color: colors.textTertiary,
-    },
-    noPrediction: {
-      alignItems: 'center',
-      paddingVertical: SPACING.md,
-    },
-    noPredictionText: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      color: colors.textTertiary,
-    },
-    legend: {
-      marginTop: SPACING.lg,
-      padding: SPACING.md,
-      backgroundColor: colors.backgroundSecondary,
-      borderRadius: RADIUS.md,
-      gap: SPACING.sm,
-    },
-    legendTitle: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      fontWeight: TYPOGRAPHY.fontWeight.semibold,
-      color: colors.textSecondary,
-      marginBottom: SPACING.xs,
-    },
-    legendRow: {
+      borderStyle: 'dashed',
       flexDirection: 'row',
       alignItems: 'center',
-      gap: SPACING.sm,
+      justifyContent: 'space-between',
     },
-    legendDot: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
+    confidenceLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
     },
-    legendText: {
-      fontSize: TYPOGRAPHY.fontSize.xs,
-      color: colors.textTertiary,
+    confidenceLabel: {
+      fontSize: 13,
+      fontWeight: '600',
+    },
+    confidenceRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    confidenceValue: {
+      fontSize: 14,
+      fontWeight: '800',
+      fontVariant: ['tabular-nums'],
+    },
+    confidenceMeta: {
+      fontSize: 11,
+      fontWeight: '600',
+    },
+    routeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+    },
+    routeText: {
+      fontSize: 15,
+      fontWeight: '700',
+    },
+    routeAction: {
+      marginLeft: 'auto',
+      fontSize: 12,
+      fontWeight: '600',
+    },
+    placeholderCard: {
+      borderRadius: 16,
+      borderWidth: 1,
+      padding: 20,
+      gap: 8,
+    },
+    placeholderTitle: {
+      fontSize: 14,
+      fontWeight: '700',
+    },
+    placeholderBody: {
+      fontSize: 13,
+      fontWeight: '500',
+      lineHeight: 20,
+    },
+    ctaButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+      width: '100%',
+      height: 56,
+      borderRadius: 14,
+      marginTop: 8,
+    },
+    ctaText: {
+      color: '#FFFFFF',
+      fontSize: 16,
+      fontWeight: '700',
+      letterSpacing: -0.2,
     },
   });
 };

@@ -459,5 +459,5 @@ export const WANTED_TOKENS = {
   },
 } as const;
 
-export type WantedSemanticTheme = typeof WANTED_TOKENS.light;
+export type WantedSemanticTheme = typeof WANTED_TOKENS.light | typeof WANTED_TOKENS.dark;
 export type CongestionLevel = keyof typeof WANTED_TOKENS.congestion;

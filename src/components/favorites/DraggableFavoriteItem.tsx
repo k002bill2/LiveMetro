@@ -11,7 +11,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { AlertCircle, Trash2, Tag, Pencil, XCircle, GripVertical, ArrowUp, ArrowDown, Briefcase } from 'lucide-react-native';
-import { SPACING, RADIUS, TYPOGRAPHY, WANTED_TOKENS } from '../../styles/modernTheme';
+import { SPACING, RADIUS, TYPOGRAPHY, WANTED_TOKENS, WantedSemanticTheme } from '../../styles/modernTheme';
 import { useTheme, ThemeColors } from '../../services/theme';
 import { FavoriteWithDetails } from '../../hooks/useFavorites';
 import { StationCard } from '../train/StationCard';
@@ -55,7 +55,8 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
   arrivalsEnabled = true,
 }) => {
   const { colors, isDark } = useTheme();
-  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const styles = useMemo(() => createStyles(colors, semantic), [colors, semantic]);
   const { station } = favorite;
 
   /**
@@ -146,7 +147,7 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
           {favorite.alias && (
             <Pill tone="primary" size="sm" testID="favorite-alias-pill">
               <View style={styles.pillContent}>
-                <Tag size={11} color={WANTED_TOKENS.light.primaryPress} />
+                <Tag size={11} color={semantic.primaryPress} />
                 <Text style={styles.pillText}>{favorite.alias}</Text>
               </View>
             </Pill>
@@ -166,7 +167,7 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
           {favorite.isCommuteStation && (
             <Pill tone="neutral" size="sm" testID="favorite-commute-pill">
               <View style={styles.pillContent}>
-                <Briefcase size={11} color={WANTED_TOKENS.light.labelNeutral} />
+                <Briefcase size={11} color={semantic.labelNeutral} />
                 <Text style={styles.commuteTextPill}>출퇴근</Text>
               </View>
             </Pill>
@@ -177,8 +178,7 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
   );
 };
 
-const createStyles = (colors: ThemeColors, isDark: boolean) => {
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+const createStyles = (colors: ThemeColors, semantic: WantedSemanticTheme) => {
   return StyleSheet.create({
   container: {
     marginBottom: SPACING.xl,
