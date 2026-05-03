@@ -6,10 +6,11 @@
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Home, Heart, Bell, Settings, CircleHelp } from 'lucide-react-native';
+import { Home, Heart, Bell, Settings, CircleHelp, Map as MapIcon } from 'lucide-react-native';
 
 import { useAuth } from '../services/auth/AuthContext';
 import { useTheme } from '../services/theme';
+import { WANTED_TOKENS } from '../styles/modernTheme';
 import { LoadingScreen } from '../components/common/LoadingScreen';
 import { OnboardingProvider, useOnboarding } from '../contexts/OnboardingContext';
 
@@ -71,37 +72,49 @@ const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 const MainTabNavigator: React.FC = () => {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
 
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
-        tabBarIcon: ({ color, size }) => {
+        tabBarIcon: ({ color, size, focused }) => {
+          // Phase 4: stroke weight follows focus (active 2.2 / inactive 1.7)
+          // matching the design handoff TabBar atom.
+          const strokeWidth = focused ? 2.2 : 1.7;
           switch (route.name) {
             case 'Home':
-              return <Home size={size} color={color} fill="none" />;
+              return <Home size={size} color={color} strokeWidth={strokeWidth} fill="none" />;
+            case 'Map':
+              return <MapIcon size={size} color={color} strokeWidth={strokeWidth} fill="none" />;
             case 'Favorites':
-              return <Heart size={size} color={color} fill="none" />;
+              return <Heart size={size} color={color} strokeWidth={strokeWidth} fill="none" />;
             case 'Alerts':
-              return <Bell size={size} color={color} fill="none" />;
+              return <Bell size={size} color={color} strokeWidth={strokeWidth} fill="none" />;
             case 'Settings':
-              return <Settings size={size} color={color} fill="none" />;
+              return <Settings size={size} color={color} strokeWidth={strokeWidth} fill="none" />;
             default:
-              return <CircleHelp size={size} color={color} fill="none" />;
+              return <CircleHelp size={size} color={color} strokeWidth={strokeWidth} fill="none" />;
           }
         },
-        tabBarActiveTintColor: colors.primary,
-        tabBarInactiveTintColor: colors.textSecondary,
+        // Phase 4 — Wanted-aligned tint: primaryNormal active, labelAlt inactive
+        tabBarActiveTintColor: semantic.primaryNormal,
+        tabBarInactiveTintColor: semantic.labelAlt,
         tabBarStyle: {
-          backgroundColor: colors.background,
+          backgroundColor: semantic.bgBase,
           borderTopWidth: 1,
-          borderTopColor: colors.borderMedium,
+          borderTopColor: semantic.lineSubtle,
           height: 60,
           paddingBottom: 8,
           paddingTop: 8,
         },
+        tabBarLabelStyle: {
+          fontSize: 10,
+          fontWeight: '700',
+          letterSpacing: 0,
+        },
         headerStyle: {
-          backgroundColor: colors.primary,
+          backgroundColor: semantic.primaryNormal,
         },
         headerTintColor: colors.textInverse,
         headerTitleStyle: {

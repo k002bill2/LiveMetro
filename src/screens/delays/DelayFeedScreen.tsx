@@ -35,14 +35,14 @@ import {
 } from '@/models/delayReport';
 import { DelayReportForm } from '@/components/delays/DelayReportForm';
 import { getSubwayLineColor } from '@/utils/colorUtils';
-import { SPACING, RADIUS, TYPOGRAPHY } from '@/styles/modernTheme';
+import { SPACING, RADIUS, TYPOGRAPHY, WANTED_TOKENS } from '@/styles/modernTheme';
 
 const LINES = ['전체', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
 export const DelayFeedScreen: React.FC = () => {
   const { user } = useAuth();
-  const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const { colors, isDark } = useTheme();
+  const styles = createStyles(colors, isDark);
 
   const [reports, setReports] = useState<DelayReport[]>([]);
   const [_loading, setLoading] = useState(true);
@@ -231,19 +231,26 @@ export const DelayFeedScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
+      {/* Header — Phase 4 redesign: 28px title + round add button */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>실시간 제보</Text>
-          <Text style={styles.headerSubtitle}>
-            승객들의 실시간 지연 정보
+        <View style={styles.headerTitleWrap}>
+          <Text
+            style={styles.headerTitle}
+            accessibilityRole="header"
+            testID="delay-feed-header-title"
+          >
+            실시간 제보
           </Text>
+          <Text style={styles.headerSubtitle}>승객들의 실시간 지연 정보</Text>
         </View>
         <TouchableOpacity
           style={styles.addButton}
+          accessibilityRole="button"
+          accessibilityLabel="제보 작성"
+          testID="delay-feed-add-button"
           onPress={() => setShowReportModal(true)}
         >
-          <Plus size={24} color="#FFFFFF" />
+          <Plus size={20} color="#FFFFFF" strokeWidth={2.4} />
         </TouchableOpacity>
       </View>
 
@@ -323,37 +330,41 @@ export const DelayFeedScreen: React.FC = () => {
   );
 };
 
-const createStyles = (colors: ThemeColors) =>
-  StyleSheet.create({
+const createStyles = (colors: ThemeColors, isDark: boolean) => {
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background,
+      backgroundColor: semantic.bgSubtlePage,
     },
     header: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      paddingHorizontal: SPACING.lg,
-      paddingVertical: SPACING.lg,
-      backgroundColor: colors.surface,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.borderLight,
+      paddingHorizontal: 20,
+      paddingTop: 8,
+      paddingBottom: 12,
+    },
+    headerTitleWrap: {
+      flex: 1,
     },
     headerTitle: {
-      fontSize: TYPOGRAPHY.fontSize['2xl'],
-      fontWeight: '700',
-      color: colors.textPrimary,
+      fontSize: 28,
+      fontWeight: '800',
+      color: semantic.labelStrong,
+      letterSpacing: -0.6,
     },
     headerSubtitle: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      color: colors.textSecondary,
+      fontSize: 13,
+      color: semantic.labelAlt,
+      fontWeight: '600',
       marginTop: 2,
     },
     addButton: {
-      width: 44,
-      height: 44,
-      borderRadius: RADIUS.full,
-      backgroundColor: colors.primary,
+      width: 36,
+      height: 36,
+      borderRadius: 9999,
+      backgroundColor: semantic.primaryNormal,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -547,5 +558,6 @@ const createStyles = (colors: ThemeColors) =>
       lineHeight: 20,
     },
   });
+};
 
 export default DelayFeedScreen;

@@ -27,13 +27,13 @@ import {
 } from 'lucide-react-native';
 import { useAlerts } from '../../hooks/useAlerts';
 import { StoredNotification } from '../../services/notification/notificationStorageService';
-import { SPACING, RADIUS, TYPOGRAPHY } from '../../styles/modernTheme';
+import { SPACING, RADIUS, TYPOGRAPHY, WANTED_TOKENS } from '../../styles/modernTheme';
 import { useTheme, ThemeColors } from '../../services/theme';
 import { addTestNotifications, addRandomNotification } from '../../utils/notificationTestHelper';
 
 export const AlertsScreen: React.FC = () => {
-  const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const { colors, isDark } = useTheme();
+  const styles = createStyles(colors, isDark);
   const {
     notifications,
     unreadCount,
@@ -264,14 +264,21 @@ export const AlertsScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
+      {/* Header — Phase 4 redesign: 28px Korean title, no English subtitle */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>Notifications</Text>
-          <Text style={styles.headerSubtitle}>
-            {notifications.length} total
-            {unreadCount > 0 && ` · ${unreadCount} new`}
+        <View style={styles.headerTitleWrap}>
+          <Text
+            style={styles.headerTitle}
+            accessibilityRole="header"
+            testID="alerts-header-title"
+          >
+            알림
           </Text>
+          {unreadCount > 0 && (
+            <Text style={styles.headerSubtitle}>
+              새 알림 {unreadCount}개
+            </Text>
+          )}
         </View>
         <View style={styles.headerActions}>
           {__DEV__ && (
@@ -331,42 +338,49 @@ export const AlertsScreen: React.FC = () => {
   );
 };
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
+const createStyles = (colors: ThemeColors, isDark: boolean) => {
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: semantic.bgSubtlePage,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 4,
+  },
+  headerTitleWrap: {
+    flex: 1,
   },
   headerTitle: {
-    fontSize: TYPOGRAPHY.fontSize['2xl'],
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: colors.textPrimary,
-    letterSpacing: TYPOGRAPHY.letterSpacing.tight,
+    fontSize: 28,
+    fontWeight: '800',
+    color: semantic.labelStrong,
+    letterSpacing: -0.6,
   },
   headerSubtitle: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: colors.textTertiary,
+    fontSize: 12,
+    fontWeight: '700',
+    color: semantic.primaryNormal,
     marginTop: 2,
   },
   headerActions: {
     flexDirection: 'row',
-    gap: SPACING.sm,
+    gap: 6,
   },
   headerButton: {
     width: 36,
     height: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: RADIUS.base,
-    backgroundColor: colors.backgroundSecondary,
+    borderRadius: 9999,
+    backgroundColor: semantic.bgBase,
+    borderWidth: 1,
+    borderColor: semantic.lineSubtle,
   },
   content: {
     flex: 1,
@@ -497,6 +511,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
     color: colors.textInverse,
   },
-});
+  });
+};
 
 export default AlertsScreen;

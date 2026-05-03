@@ -95,18 +95,19 @@ describe('AlertsScreen', () => {
   });
 
   it('renders without crashing', () => {
-    const { getByText } = render(<AlertsScreen />);
-    expect(getByText('Notifications')).toBeTruthy();
+    const { getByTestId } = render(<AlertsScreen />);
+    expect(getByTestId('alerts-header-title')).toBeTruthy();
   });
 
-  it('displays header with title', () => {
-    const { getByText } = render(<AlertsScreen />);
-    expect(getByText('Notifications')).toBeTruthy();
+  it('displays header with title (Phase 4 — Korean "알림")', () => {
+    const { getByTestId } = render(<AlertsScreen />);
+    expect(getByTestId('alerts-header-title')).toBeTruthy();
   });
 
-  it('shows notification count in subtitle', () => {
-    const { getByText } = render(<AlertsScreen />);
-    expect(getByText('0 total')).toBeTruthy();
+  it('hides the unread count subtitle when there are no notifications', () => {
+    // Phase 4: empty state shows no subtitle (design hides "0 total" line).
+    const { queryByText } = render(<AlertsScreen />);
+    expect(queryByText(/새 알림/)).toBeNull();
   });
 
   it('displays unread count when present', () => {
@@ -133,7 +134,8 @@ describe('AlertsScreen', () => {
     });
 
     const { getByText } = render(<AlertsScreen />);
-    expect(getByText('1 total · 1 new')).toBeTruthy();
+    // Phase 4: Korean format "새 알림 N개" (replaces "X total · Y new").
+    expect(getByText('새 알림 1개')).toBeTruthy();
   });
 
   it('shows empty state when no notifications', () => {
@@ -409,8 +411,8 @@ describe('AlertsScreen', () => {
         refresh: mockRefresh,
       });
 
-      const { getByText } = render(<AlertsScreen />);
-      expect(getByText('Notifications')).toBeTruthy();
+      const { getByTestId } = render(<AlertsScreen />);
+      expect(getByTestId('alerts-header-title')).toBeTruthy();
     });
 
     it('displays unread count correctly', () => {
@@ -437,7 +439,7 @@ describe('AlertsScreen', () => {
       });
 
       const { getByText } = render(<AlertsScreen />);
-      expect(getByText('1 total · 1 new')).toBeTruthy();
+      expect(getByText('새 알림 1개')).toBeTruthy();
     });
 
     it('does not mark when unreadCount is 0', async () => {
@@ -487,8 +489,8 @@ describe('AlertsScreen', () => {
         refresh: mockRefresh,
       });
 
-      const { getByText } = render(<AlertsScreen />);
-      expect(getByText('Notifications')).toBeTruthy();
+      const { getByTestId } = render(<AlertsScreen />);
+      expect(getByTestId('alerts-header-title')).toBeTruthy();
     });
 
     it('hides clear all button when no notifications', () => {
@@ -833,7 +835,7 @@ describe('AlertsScreen', () => {
       expect(getByText('2호선 도착')).toBeTruthy();
       expect(getByText('3호선 지연')).toBeTruthy();
       expect(getByText('운영 변경')).toBeTruthy();
-      expect(getByText('3 total · 2 new')).toBeTruthy();
+      expect(getByText('새 알림 2개')).toBeTruthy();
     });
 
     it('displays read and unread notifications with different styles', () => {
@@ -1005,8 +1007,9 @@ describe('AlertsScreen', () => {
         refresh: mockRefresh,
       });
 
-      const { getByText } = render(<AlertsScreen />);
-      expect(getByText('알림')).toBeTruthy();
+      // Phase 4: notification body also contains "알림", so disambiguate via testID.
+      const { getByTestId } = render(<AlertsScreen />);
+      expect(getByTestId('alerts-header-title')).toBeTruthy();
     });
   });
 
