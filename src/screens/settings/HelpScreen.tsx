@@ -19,8 +19,8 @@ import {
   UIManager,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
-import { useTheme, ThemeColors } from '@/services/theme';
+import { WANTED_TOKENS, type WantedSemanticTheme } from '@/styles/modernTheme';
+import { useTheme } from '@/services/theme';
 import {
   FAQ_DATA,
   FAQ_CATEGORIES,
@@ -38,8 +38,9 @@ if (
 }
 
 export const HelpScreen: React.FC = () => {
-  const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const styles = createStyles(semantic);
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
@@ -125,7 +126,7 @@ export const HelpScreen: React.FC = () => {
             <Ionicons
               name="help-circle-outline"
               size={20}
-              color={colors.textPrimary}
+              color={semantic.labelStrong}
               style={styles.faqQuestionIcon}
             />
             <Text style={styles.faqQuestionText}>{item.question}</Text>
@@ -133,7 +134,7 @@ export const HelpScreen: React.FC = () => {
           <Ionicons
             name={isExpanded ? 'chevron-up' : 'chevron-down'}
             size={20}
-            color={colors.textTertiary}
+            color={semantic.labelAlt}
           />
         </TouchableOpacity>
 
@@ -175,13 +176,13 @@ export const HelpScreen: React.FC = () => {
           <Ionicons
             name="search"
             size={20}
-            color={colors.textTertiary}
+            color={semantic.labelAlt}
             style={styles.searchIcon}
           />
           <TextInput
             style={styles.searchInput}
             placeholder="질문 검색..."
-            placeholderTextColor={colors.textTertiary}
+            placeholderTextColor={semantic.labelAlt}
             value={searchQuery}
             onChangeText={setSearchQuery}
             returnKeyType="search"
@@ -191,7 +192,7 @@ export const HelpScreen: React.FC = () => {
               onPress={() => setSearchQuery('')}
               style={styles.clearButton}
             >
-              <Ionicons name="close-circle" size={20} color={colors.textTertiary} />
+              <Ionicons name="close-circle" size={20} color={semantic.labelAlt} />
             </TouchableOpacity>
           )}
         </View>
@@ -201,7 +202,7 @@ export const HelpScreen: React.FC = () => {
         {/* No Results Message */}
         {filteredFAQs.length === 0 && (
           <View style={styles.noResultsContainer}>
-            <Ionicons name="search-outline" size={64} color={colors.textDisabled} />
+            <Ionicons name="search-outline" size={64} color={semantic.labelDisabled} />
             <Text style={styles.noResultsTitle}>검색 결과가 없습니다</Text>
             <Text style={styles.noResultsSubtitle}>
               다른 키워드로 검색하거나{'\n'}고객 지원에 문의해주세요
@@ -222,7 +223,7 @@ export const HelpScreen: React.FC = () => {
                 <Ionicons
                   name="chatbubble-ellipses"
                   size={32}
-                  color={colors.textPrimary}
+                  color={semantic.labelStrong}
                 />
               </View>
               <View style={styles.supportContent}>
@@ -237,17 +238,17 @@ export const HelpScreen: React.FC = () => {
               style={styles.contactButton}
               onPress={handleContactSupport}
             >
-              <Ionicons name="mail" size={20} color={colors.textInverse} />
+              <Ionicons name="mail" size={20} color={'#FFFFFF'} />
               <Text style={styles.contactButtonText}>고객 지원 문의</Text>
             </TouchableOpacity>
 
             <View style={styles.contactInfo}>
               <View style={styles.contactInfoItem}>
-                <Ionicons name="mail-outline" size={16} color={colors.textSecondary} />
+                <Ionicons name="mail-outline" size={16} color={semantic.labelAlt} />
                 <Text style={styles.contactInfoText}>{SUPPORT_EMAIL}</Text>
               </View>
               <View style={styles.contactInfoItem}>
-                <Ionicons name="call-outline" size={16} color={colors.textSecondary} />
+                <Ionicons name="call-outline" size={16} color={semantic.labelAlt} />
                 <Text style={styles.contactInfoText}>{SUPPORT_PHONE}</Text>
               </View>
             </View>
@@ -258,38 +259,38 @@ export const HelpScreen: React.FC = () => {
   );
 };
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
+const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: semantic.bgSubtlePage,
   },
   searchContainer: {
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    backgroundColor: colors.surface,
+    paddingHorizontal: WANTED_TOKENS.spacing.s4,
+    paddingVertical: WANTED_TOKENS.spacing.s3,
+    backgroundColor: semantic.bgBase,
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
+    borderBottomColor: semantic.lineSubtle,
   },
   searchInputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.backgroundSecondary,
-    borderRadius: RADIUS.lg,
-    paddingHorizontal: SPACING.md,
+    backgroundColor: semantic.bgSubtle,
+    borderRadius: WANTED_TOKENS.radius.r6,
+    paddingHorizontal: WANTED_TOKENS.spacing.s3,
     borderWidth: 1,
-    borderColor: colors.borderLight,
+    borderColor: semantic.lineSubtle,
   },
   searchIcon: {
-    marginRight: SPACING.sm,
+    marginRight: WANTED_TOKENS.spacing.s2,
   },
   searchInput: {
     flex: 1,
-    fontSize: TYPOGRAPHY.fontSize.base,
-    color: colors.textPrimary,
-    paddingVertical: SPACING.md,
+    fontSize: WANTED_TOKENS.type.body1.size,
+    color: semantic.labelStrong,
+    paddingVertical: WANTED_TOKENS.spacing.s3,
   },
   clearButton: {
-    padding: SPACING.xs,
+    padding: WANTED_TOKENS.spacing.s1,
   },
   content: {
     flex: 1,
@@ -297,60 +298,60 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   noResultsContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: SPACING['3xl'],
+    paddingVertical: WANTED_TOKENS.spacing.s12,
   },
   noResultsTitle: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: colors.textPrimary,
-    marginTop: SPACING.lg,
-    marginBottom: SPACING.sm,
+    fontSize: WANTED_TOKENS.type.heading2.size,
+    fontWeight: '700',
+    color: semantic.labelStrong,
+    marginTop: WANTED_TOKENS.spacing.s4,
+    marginBottom: WANTED_TOKENS.spacing.s2,
   },
   noResultsSubtitle: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: colors.textTertiary,
+    fontSize: WANTED_TOKENS.type.body2.size,
+    color: semantic.labelAlt,
     textAlign: 'center',
-    lineHeight: TYPOGRAPHY.lineHeight.relaxed * TYPOGRAPHY.fontSize.sm,
+    lineHeight: WANTED_TOKENS.type.body2.lh,
   },
   categorySection: {
-    marginTop: SPACING.lg,
+    marginTop: WANTED_TOKENS.spacing.s4,
   },
   categoryHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
+    paddingHorizontal: WANTED_TOKENS.spacing.s4,
+    paddingVertical: WANTED_TOKENS.spacing.s3,
   },
   categoryTitle: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: colors.textSecondary,
+    fontSize: WANTED_TOKENS.type.label2.size,
+    fontWeight: '700',
+    color: semantic.labelAlt,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   categoryBadge: {
-    backgroundColor: colors.backgroundSecondary,
-    borderRadius: RADIUS.full,
-    paddingHorizontal: SPACING.sm,
+    backgroundColor: semantic.bgSubtle,
+    borderRadius: WANTED_TOKENS.radius.pill,
+    paddingHorizontal: WANTED_TOKENS.spacing.s2,
     paddingVertical: 2,
-    marginLeft: SPACING.sm,
+    marginLeft: WANTED_TOKENS.spacing.s2,
   },
   categoryBadgeText: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: colors.textTertiary,
+    fontSize: WANTED_TOKENS.type.caption1.size,
+    fontWeight: '600',
+    color: semantic.labelAlt,
   },
   faqItem: {
-    backgroundColor: colors.surface,
+    backgroundColor: semantic.bgBase,
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
+    borderBottomColor: semantic.lineSubtle,
   },
   faqQuestion: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.lg,
+    paddingHorizontal: WANTED_TOKENS.spacing.s4,
+    paddingVertical: WANTED_TOKENS.spacing.s4,
   },
   faqQuestionContent: {
     flex: 1,
@@ -358,77 +359,77 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     alignItems: 'center',
   },
   faqQuestionIcon: {
-    marginRight: SPACING.md,
+    marginRight: WANTED_TOKENS.spacing.s3,
   },
   faqQuestionText: {
     flex: 1,
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: colors.textPrimary,
-    lineHeight: TYPOGRAPHY.lineHeight.normal * TYPOGRAPHY.fontSize.base,
+    fontSize: WANTED_TOKENS.type.body1.size,
+    fontWeight: '600',
+    color: semantic.labelStrong,
+    lineHeight: WANTED_TOKENS.type.body1.lh,
   },
   faqAnswer: {
-    paddingHorizontal: SPACING.lg,
-    paddingLeft: SPACING.lg + 20 + SPACING.md, // Align with question text
-    paddingBottom: SPACING.lg,
+    paddingHorizontal: WANTED_TOKENS.spacing.s4,
+    paddingLeft: WANTED_TOKENS.spacing.s4 + 20 + WANTED_TOKENS.spacing.s3,
+    paddingBottom: WANTED_TOKENS.spacing.s4,
     paddingTop: 0,
   },
   faqAnswerText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: colors.textSecondary,
-    lineHeight: TYPOGRAPHY.lineHeight.relaxed * TYPOGRAPHY.fontSize.sm,
+    fontSize: WANTED_TOKENS.type.body2.size,
+    color: semantic.labelAlt,
+    lineHeight: WANTED_TOKENS.type.body2.lh,
   },
   supportSection: {
-    marginTop: SPACING.xl,
-    marginBottom: SPACING['2xl'],
-    paddingHorizontal: SPACING.lg,
+    marginTop: WANTED_TOKENS.spacing.s5,
+    marginBottom: WANTED_TOKENS.spacing.s8,
+    paddingHorizontal: WANTED_TOKENS.spacing.s4,
   },
   supportCard: {
     flexDirection: 'row',
-    backgroundColor: colors.primaryLight,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.lg,
+    backgroundColor: semantic.primaryBg,
+    borderRadius: WANTED_TOKENS.radius.r6,
+    padding: WANTED_TOKENS.spacing.s4,
     borderWidth: 1,
-    borderColor: colors.borderMedium,
-    marginBottom: SPACING.lg,
+    borderColor: semantic.lineSubtle,
+    marginBottom: WANTED_TOKENS.spacing.s4,
   },
   supportIconContainer: {
     width: 56,
     height: 56,
-    backgroundColor: colors.surface,
-    borderRadius: RADIUS.lg,
+    backgroundColor: semantic.bgBase,
+    borderRadius: WANTED_TOKENS.radius.r6,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: SPACING.md,
+    marginRight: WANTED_TOKENS.spacing.s3,
   },
   supportContent: {
     flex: 1,
   },
   supportTitle: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: colors.textPrimary,
+    fontSize: WANTED_TOKENS.type.body1.size,
+    fontWeight: '700',
+    color: semantic.labelStrong,
     marginBottom: 4,
   },
   supportDescription: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: colors.textTertiary,
-    lineHeight: TYPOGRAPHY.lineHeight.normal * TYPOGRAPHY.fontSize.sm,
+    fontSize: WANTED_TOKENS.type.body2.size,
+    color: semantic.labelAlt,
+    lineHeight: WANTED_TOKENS.type.body2.lh,
   },
   contactButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.textPrimary,
-    paddingVertical: SPACING.lg,
-    borderRadius: RADIUS.lg,
-    marginBottom: SPACING.md,
+    backgroundColor: semantic.primaryNormal,
+    paddingVertical: WANTED_TOKENS.spacing.s4,
+    borderRadius: WANTED_TOKENS.radius.r6,
+    marginBottom: WANTED_TOKENS.spacing.s3,
   },
   contactButtonText: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: colors.textInverse,
-    marginLeft: SPACING.sm,
+    fontSize: WANTED_TOKENS.type.body1.size,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginLeft: WANTED_TOKENS.spacing.s2,
   },
   contactInfo: {
     alignItems: 'center',
@@ -436,12 +437,12 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   contactInfoItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: SPACING.xs,
+    marginVertical: WANTED_TOKENS.spacing.s1,
   },
   contactInfoText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: colors.textSecondary,
-    marginLeft: SPACING.sm,
+    fontSize: WANTED_TOKENS.type.body2.size,
+    color: semantic.labelAlt,
+    marginLeft: WANTED_TOKENS.spacing.s2,
   },
 });
 
