@@ -35,6 +35,14 @@ import { AlternativeRoutesScreen } from '../screens/route/AlternativeRoutesScree
 const DEBUG_FORCE_ONBOARDING = __DEV__ && false;
 
 // Navigation types
+//
+// NOTE: This `RootStackParamList` describes the OUTER (root) navigator —
+// Welcome, Auth, Onboarding, Main, plus the modal stack (StationDetail,
+// DelayCertificate, AlternativeRoutes, EmailLogin, SignUp). The INNER
+// authenticated stack (MainTabs, etc.) lives in `./types.ts` as
+// `AppStackParamList`. The two stacks have overlapping but non-identical
+// route sets (e.g. this file uses `Main`, types.ts uses `MainTabs`), so
+// they intentionally remain separate.
 export type RootStackParamList = {
   Welcome: undefined;
   Auth: undefined;

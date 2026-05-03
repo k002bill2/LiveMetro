@@ -104,5 +104,11 @@ export type AppStackParamList = {
   Onboarding: undefined;
 };
 
-// Type alias for consistency across codebase
+// Type alias for code that historically imported `RootStackParamList` from
+// here. The OUTER navigator's true definition lives in
+// `./RootNavigator.tsx` (it has different route names like `Main` vs the
+// `MainTabs` route that lives in `AppStackParamList`). When adding new
+// outer-stack routes (Welcome, Auth, EmailLogin, SignUp, Onboarding,
+// modals), update both this `AppStackParamList` AND
+// `RootNavigator.tsx#RootStackParamList` to keep the two in sync.
 export type RootStackParamList = AppStackParamList;
