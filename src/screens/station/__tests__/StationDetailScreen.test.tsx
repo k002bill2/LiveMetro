@@ -1,54 +1,34 @@
 /**
- * StationDetailScreen Test Suite
- * Tests station detail screen rendering and functionality
+ * StationDetailScreen Test Suite (Phase 7 — Wanted Design System rewrite).
+ *
+ * Covers the orchestrator's responsibilities only. Sub-component visuals are
+ * exercised in their own __tests__ folders.
  */
-
-// Mock modules BEFORE imports (Jest hoisting)
 import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
+import { Share } from 'react-native';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import StationDetailScreen from '../StationDetailScreen';
 import { useRealtimeTrains } from '@/hooks/useRealtimeTrains';
+import { useFavorites } from '@/hooks/useFavorites';
+import { usePublicDataForStation } from '@/hooks/usePublicData';
 
-jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
 jest.mock('@react-navigation/native', () => ({
   useIsFocused: jest.fn(() => true),
   useNavigation: jest.fn(() => ({
     navigate: jest.fn(),
     push: jest.fn(),
     goBack: jest.fn(),
+    canGoBack: jest.fn(() => true),
   })),
   useRoute: jest.fn(() => ({
-    params: {
-      stationId: 'gangnam',
-      stationName: '강남',
-      lineId: '2',
-    },
+    params: { stationId: 'gangnam', stationName: '강남', lineId: '2' },
   })),
-  useFocusEffect: jest.fn((cb) => cb()),
 }));
-jest.mock('@/services/theme', () => ({
-  useTheme: jest.fn(() => ({
-    colors: {
-      primary: '#000000',
-      primaryLight: '#E5E5E5',
-      surface: '#FFFFFF',
-      background: '#F5F5F5',
-      backgroundSecondary: '#FAFAFA',
-      textPrimary: '#1A1A1A',
-      textSecondary: '#666666',
-      textTertiary: '#999999',
-      textInverse: '#FFFFFF',
-      borderLight: '#E5E5E5',
-      borderMedium: '#CCCCCC',
-      warning: '#FFA500',
-      error: '#FF0000',
-      errorLight: '#FFE5E5',
-      success: '#00FF00',
-      black: '#000000',
-    },
-  })),
-  ThemeColors: {},
+
+jest.mock('@/services/theme/themeContext', () => ({
+  useTheme: jest.fn(() => ({ isDark: false })),
 }));
+
 jest.mock('@/hooks/useRealtimeTrains', () => ({
   useRealtimeTrains: jest.fn(() => ({
     trains: [],
@@ -57,14 +37,7 @@ jest.mock('@/hooks/useRealtimeTrains', () => ({
     refetch: jest.fn(),
   })),
 }));
-jest.mock('@/hooks/useAdjacentStations', () => ({
-  useAdjacentStations: jest.fn(() => ({
-    prevStation: null,
-    nextStation: null,
-    hasPrev: false,
-    hasNext: false,
-  })),
-}));
+
 jest.mock('@/hooks/useCongestion', () => ({
   useCongestion: jest.fn(() => ({
     trainCongestion: null,
@@ -72,6 +45,7 @@ jest.mock('@/hooks/useCongestion', () => ({
     submitting: false,
   })),
 }));
+
 jest.mock('@/hooks/usePublicData', () => ({
   usePublicDataForStation: jest.fn(() => ({
     accessibility: null,
@@ -80,142 +54,189 @@ jest.mock('@/hooks/usePublicData', () => ({
     loading: false,
   })),
 }));
-jest.mock('@/hooks/useTrainSchedule', () => ({
-  useTrainSchedule: jest.fn(() => ({
-    upcomingTrains: [],
-    loading: false,
-    error: null,
-    refresh: jest.fn(),
+
+jest.mock('@/hooks/useFavorites', () => ({
+  useFavorites: jest.fn(() => ({
+    isFavorite: jest.fn(() => false),
+    toggleFavorite: jest.fn(),
   })),
 }));
-jest.mock('@/components/congestion/TrainCongestionView', () => ({
-  TrainCongestionView: () => null,
-}));
-jest.mock('@/components/congestion/CongestionReportModal', () => ({
-  CongestionReportModal: () => null,
-}));
-jest.mock('@/components/station/AccessibilitySection', () => ({
-  AccessibilitySection: () => null,
-}));
-jest.mock('@/components/station/ExitInfoSection', () => ({
-  ExitInfoSection: () => null,
-}));
-jest.mock('@/components/common/AlertBanner', () => ({
-  AlertBanner: () => null,
-}));
-jest.mock('react-native-webview', () => ({
-  WebView: () => null,
-}));
+
+jest.mock('@/components/common/AlertBanner', () => {
+  const { View } = jest.requireActual('react-native');
+  return {
+    AlertBanner: ({ testID }: { testID?: string }) => <View testID={testID} />,
+  };
+});
+
+const mockedUseRealtimeTrains = useRealtimeTrains as jest.Mock;
+const mockedUseFavorites = useFavorites as jest.Mock;
+const mockedUsePublicData = usePublicDataForStation as jest.Mock;
+
+const buildTrain = (overrides: Partial<{ id: string; finalDestination: string; minutesAway: number; direction: 'up' | 'down'; lineId: string }> = {}) => {
+  const minutesAway = overrides.minutesAway ?? 2;
+  return {
+    id: overrides.id ?? 't1',
+    lineId: overrides.lineId ?? '2',
+    direction: overrides.direction ?? 'up',
+    currentStationId: 'X',
+    nextStationId: 'Y',
+    finalDestination: overrides.finalDestination ?? '잠실',
+    status: 'normal',
+    arrivalTime: new Date(Date.now() + minutesAway * 60_000),
+    delayMinutes: 0,
+    lastUpdated: new Date(),
+  };
+};
 
 describe('StationDetailScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-  });
-
-  it('renders without crashing', () => {
-    const { getByText } = render(<StationDetailScreen />);
-    expect(getByText('강남')).toBeTruthy();
-  });
-
-  it('displays station name', () => {
-    const { getByText } = render(<StationDetailScreen />);
-    expect(getByText('강남')).toBeTruthy();
-  });
-
-  it('displays line badge', () => {
-    const { getByText } = render(<StationDetailScreen />);
-    expect(getByText('2')).toBeTruthy();
-  });
-
-  it('shows refresh button', () => {
-    const { getByLabelText } = render(<StationDetailScreen />);
-    expect(getByLabelText('시간 및 도착 정보 새로고침')).toBeTruthy();
-  });
-
-  it('displays GPS chip', () => {
-    const { getByText } = render(<StationDetailScreen />);
-    expect(getByText('GPS 동기화')).toBeTruthy();
-  });
-
-  it('shows empty state when no trains', () => {
-    const { getByText } = render(<StationDetailScreen />);
-    expect(getByText('현재 운행 중인 열차가 없습니다')).toBeTruthy();
-    expect(getByText('운행 종료 시간대입니다')).toBeTruthy();
-  });
-
-  it('displays trains when available', () => {
-    (useRealtimeTrains as jest.Mock).mockReturnValue({
-      trains: [
-        {
-          id: 'train1',
-          finalDestination: '잠실',
-          arrivalTime: new Date(Date.now() + 120000), // 2 minutes from now
-          delayMinutes: 0,
-          direction: 'up',
-        },
-      ],
+    mockedUseRealtimeTrains.mockReturnValue({
+      trains: [],
       loading: false,
       error: null,
       refetch: jest.fn(),
     });
-
-    const { getByText } = render(<StationDetailScreen />);
-    expect(getByText('잠실행')).toBeTruthy();
+    mockedUseFavorites.mockReturnValue({
+      isFavorite: jest.fn(() => false),
+      toggleFavorite: jest.fn(),
+    });
+    mockedUsePublicData.mockReturnValue({
+      accessibility: null,
+      exitInfo: [],
+      alerts: [],
+      loading: false,
+    });
   });
 
-  it('shows loading state', () => {
-    (useRealtimeTrains as jest.Mock).mockReturnValue({
+  it('renders the station hero', () => {
+    const { getByText } = render(<StationDetailScreen />);
+    expect(getByText('강남')).toBeTruthy();
+  });
+
+  it('renders the direction segment with both options', () => {
+    const { getByTestId } = render(<StationDetailScreen />);
+    expect(getByTestId('station-detail-direction-up')).toBeTruthy();
+    expect(getByTestId('station-detail-direction-down')).toBeTruthy();
+  });
+
+  it('shows the empty state when no trains are returned', () => {
+    const { getByText, getByTestId } = render(<StationDetailScreen />);
+    expect(getByTestId('station-detail-empty')).toBeTruthy();
+    expect(getByText('현재 운행 중인 열차가 없습니다')).toBeTruthy();
+  });
+
+  it('shows the loading state while trains are fetching', () => {
+    mockedUseRealtimeTrains.mockReturnValue({
       trains: [],
       loading: true,
       error: null,
       refetch: jest.fn(),
     });
-
-    const { getByText } = render(<StationDetailScreen />);
+    const { getByTestId, getByText } = render(<StationDetailScreen />);
+    expect(getByTestId('station-detail-loading')).toBeTruthy();
     expect(getByText('열차 정보를 불러오는 중...')).toBeTruthy();
   });
 
-  it('shows error state', () => {
-    (useRealtimeTrains as jest.Mock).mockReturnValue({
+  it('shows the error state with a retry affordance', () => {
+    mockedUseRealtimeTrains.mockReturnValue({
       trains: [],
       loading: false,
       error: '데이터를 불러올 수 없습니다',
       refetch: jest.fn(),
     });
-
-    const { getByText } = render(<StationDetailScreen />);
+    const { getByText, getByTestId } = render(<StationDetailScreen />);
+    expect(getByTestId('station-detail-error')).toBeTruthy();
     expect(getByText('데이터를 불러올 수 없습니다')).toBeTruthy();
     expect(getByText('다시 시도')).toBeTruthy();
   });
 
-  it('handles refresh button press', () => {
-    const mockRefetch = jest.fn();
-    (useRealtimeTrains as jest.Mock).mockReturnValue({
-      trains: [],
+  it('renders one ArrivalCard per up-direction train when 상행 is selected', () => {
+    mockedUseRealtimeTrains.mockReturnValue({
+      trains: [
+        buildTrain({ id: 'u1', finalDestination: '잠실', direction: 'up' }),
+        buildTrain({ id: 'd1', finalDestination: '서울대입구', direction: 'down' }),
+      ],
       loading: false,
       error: null,
-      refetch: mockRefetch,
+      refetch: jest.fn(),
     });
-
-    const { getByLabelText } = render(<StationDetailScreen />);
-    const refreshButton = getByLabelText('시간 및 도착 정보 새로고침');
-    fireEvent.press(refreshButton);
-
-    expect(mockRefetch).toHaveBeenCalled();
+    const { getByText, queryByText } = render(<StationDetailScreen />);
+    expect(getByText('잠실행')).toBeTruthy();
+    // Only the up-direction train shows by default.
+    expect(queryByText('서울대입구행')).toBeNull();
   });
 
-  it('displays tab buttons', () => {
-    const { getByText } = render(<StationDetailScreen />);
-    expect(getByText('출발')).toBeTruthy();
-    expect(getByText('도착')).toBeTruthy();
-    expect(getByText('시간표')).toBeTruthy();
-    expect(getByText('즐겨찾기')).toBeTruthy();
+  it('switches the visible arrivals when the direction segment changes', () => {
+    mockedUseRealtimeTrains.mockReturnValue({
+      trains: [
+        buildTrain({ id: 'u1', finalDestination: '잠실', direction: 'up' }),
+        buildTrain({ id: 'd1', finalDestination: '서울대입구', direction: 'down' }),
+      ],
+      loading: false,
+      error: null,
+      refetch: jest.fn(),
+    });
+    const { getByText, getByTestId, queryByText } = render(<StationDetailScreen />);
+    expect(queryByText('서울대입구행')).toBeNull();
+    fireEvent.press(getByTestId('station-detail-direction-down'));
+    expect(getByText('서울대입구행')).toBeTruthy();
+    expect(queryByText('잠실행')).toBeNull();
   });
 
-  it('switches tabs on press', () => {
-    const { getByText } = render(<StationDetailScreen />);
+  it('invokes Share.share when the share affordance is pressed', async () => {
+    const shareSpy = jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' });
+    const { getByTestId } = render(<StationDetailScreen />);
+    fireEvent.press(getByTestId('station-detail-header-share'));
+    await waitFor(() => expect(shareSpy).toHaveBeenCalled());
+    shareSpy.mockRestore();
+  });
 
-    fireEvent.press(getByText('도착'));
-    expect(getByText('서울 지하철 노선도')).toBeTruthy();
+  it('toggles favorite via useFavorites when the star is pressed', async () => {
+    const toggleFavorite = jest.fn().mockResolvedValue(undefined);
+    mockedUseFavorites.mockReturnValue({
+      isFavorite: jest.fn(() => false),
+      toggleFavorite,
+    });
+    const { getByTestId } = render(<StationDetailScreen />);
+    fireEvent.press(getByTestId('station-detail-header-favorite'));
+    await waitFor(() => expect(toggleFavorite).toHaveBeenCalled());
+  });
+
+  it('renders ExitInfoGrid with public data exits', () => {
+    mockedUsePublicData.mockReturnValue({
+      accessibility: null,
+      exitInfo: [
+        {
+          exitNumber: '1',
+          landmarks: [
+            { stationCode: 'X', stationName: '강남', lineNum: '2', exitNumber: '1', landmarkName: '강남역사거리', category: 'transport' },
+          ],
+        },
+      ],
+      alerts: [],
+      loading: false,
+    });
+    const { getByTestId, getByText } = render(<StationDetailScreen />);
+    expect(getByTestId('station-detail-exits')).toBeTruthy();
+    expect(getByText('출구 안내')).toBeTruthy();
+    expect(getByText('강남역사거리')).toBeTruthy();
+  });
+
+  it('hides the AlertBanner when there are no alerts', () => {
+    const { queryByTestId } = render(<StationDetailScreen />);
+    expect(queryByTestId('station-detail-alerts')).toBeNull();
+  });
+
+  it('renders the AlertBanner when alerts exist', () => {
+    mockedUsePublicData.mockReturnValue({
+      accessibility: null,
+      exitInfo: [],
+      alerts: [{ id: 'a1', type: 'delay', severity: 'minor', title: 'X', message: 'Y' }],
+      loading: false,
+    });
+    const { queryByTestId } = render(<StationDetailScreen />);
+    expect(queryByTestId('station-detail-alerts')).toBeTruthy();
   });
 });
