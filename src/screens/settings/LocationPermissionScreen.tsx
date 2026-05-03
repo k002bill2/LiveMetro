@@ -17,8 +17,8 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import { SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
-import { useTheme, ThemeColors } from '@/services/theme';
+import { WANTED_TOKENS, type WantedSemanticTheme } from '@/styles/modernTheme';
+import { useTheme } from '@/services/theme';
 import SettingSection from '@/components/settings/SettingSection';
 import { locationService } from '@/services/location/locationService';
 
@@ -30,8 +30,9 @@ interface PermissionState {
 type PermissionStatusString = 'granted' | 'denied' | 'undetermined' | 'loading';
 
 export const LocationPermissionScreen: React.FC = () => {
-  const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const styles = createStyles(semantic);
   const [permissionState, setPermissionState] = useState<PermissionState>({
     foreground: Location.PermissionStatus.UNDETERMINED,
     background: Location.PermissionStatus.UNDETERMINED,
@@ -181,11 +182,11 @@ export const LocationPermissionScreen: React.FC = () => {
   const getStatusColor = (): string => {
     switch (permissionStatus) {
       case 'granted':
-        return colors.success;
+        return semantic.statusPositive;
       case 'denied':
-        return colors.error;
+        return semantic.statusNegative;
       default:
-        return colors.warning;
+        return semantic.statusCautionary;
     }
   };
 
@@ -236,7 +237,7 @@ export const LocationPermissionScreen: React.FC = () => {
         <SettingSection title="위치 정보 사용 목적">
           <View style={styles.featureItem}>
             <View style={styles.featureIcon}>
-              <Ionicons name="locate" size={24} color={colors.textPrimary} />
+              <Ionicons name="locate" size={24} color={semantic.labelStrong} />
             </View>
             <View style={styles.featureContent}>
               <Text style={styles.featureTitle}>주변 역 찾기</Text>
@@ -248,7 +249,7 @@ export const LocationPermissionScreen: React.FC = () => {
 
           <View style={styles.featureItem}>
             <View style={styles.featureIcon}>
-              <Ionicons name="subway" size={24} color={colors.textPrimary} />
+              <Ionicons name="subway" size={24} color={semantic.labelStrong} />
             </View>
             <View style={styles.featureContent}>
               <Text style={styles.featureTitle}>출퇴근 경로 설정</Text>
@@ -260,7 +261,7 @@ export const LocationPermissionScreen: React.FC = () => {
 
           <View style={styles.featureItem}>
             <View style={styles.featureIcon}>
-              <Ionicons name="notifications" size={24} color={colors.textPrimary} />
+              <Ionicons name="notifications" size={24} color={semantic.labelStrong} />
             </View>
             <View style={styles.featureContent}>
               <Text style={styles.featureTitle}>맞춤 알림</Text>
@@ -279,7 +280,7 @@ export const LocationPermissionScreen: React.FC = () => {
               onPress={requestPermission}
               disabled={requesting}
             >
-              <Ionicons name="location" size={20} color={colors.textInverse} />
+              <Ionicons name="location" size={20} color={'#FFFFFF'} />
               <Text style={styles.actionButtonText}>
                 {requesting ? '권한 요청 중...' : '위치 권한 요청'}
               </Text>
@@ -292,7 +293,7 @@ export const LocationPermissionScreen: React.FC = () => {
               onPress={requestBackgroundPermission}
               disabled={requestingBackground}
             >
-              <Ionicons name="navigate" size={20} color={colors.textInverse} />
+              <Ionicons name="navigate" size={20} color={'#FFFFFF'} />
               <Text style={styles.actionButtonText}>
                 {requestingBackground ? '권한 요청 중...' : '백그라운드 권한 요청'}
               </Text>
@@ -301,8 +302,8 @@ export const LocationPermissionScreen: React.FC = () => {
 
           {permissionState.background === 'granted' && (
             <View style={styles.permissionGrantedBadge}>
-              <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-              <Text style={[styles.badgeText, { color: colors.success }]}>
+              <Ionicons name="checkmark-circle" size={20} color={semantic.statusPositive} />
+              <Text style={[styles.badgeText, { color: semantic.statusPositive }]}>
                 백그라운드 위치 허용됨
               </Text>
             </View>
@@ -312,7 +313,7 @@ export const LocationPermissionScreen: React.FC = () => {
             style={[styles.actionButton, styles.secondaryButton]}
             onPress={openSettings}
           >
-            <Ionicons name="settings" size={20} color={colors.textPrimary} />
+            <Ionicons name="settings" size={20} color={semantic.labelStrong} />
             <Text style={[styles.actionButtonText, styles.secondaryButtonText]}>
               앱 설정 열기
             </Text>
@@ -321,7 +322,7 @@ export const LocationPermissionScreen: React.FC = () => {
 
         {/* Privacy Notice */}
         <View style={styles.privacyBox}>
-          <Ionicons name="shield-checkmark" size={20} color={colors.textSecondary} />
+          <Ionicons name="shield-checkmark" size={20} color={semantic.labelAlt} />
           <Text style={styles.privacyText}>
             위치 정보는 기기에만 저장되며 서버로 전송되지 않습니다. 개인정보는
             안전하게 보호됩니다.
@@ -332,125 +333,125 @@ export const LocationPermissionScreen: React.FC = () => {
   );
 };
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
+const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: semantic.bgSubtlePage,
   },
   content: {
     flex: 1,
   },
   statusCard: {
-    backgroundColor: colors.surface,
-    marginHorizontal: SPACING.lg,
-    marginTop: SPACING.lg,
-    marginBottom: SPACING.xl,
-    paddingVertical: SPACING['2xl'],
-    borderRadius: RADIUS.lg,
+    backgroundColor: semantic.bgBase,
+    marginHorizontal: WANTED_TOKENS.spacing.s4,
+    marginTop: WANTED_TOKENS.spacing.s4,
+    marginBottom: WANTED_TOKENS.spacing.s5,
+    paddingVertical: WANTED_TOKENS.spacing.s8,
+    borderRadius: WANTED_TOKENS.radius.r6,
     borderWidth: 1,
-    borderColor: colors.borderLight,
+    borderColor: semantic.lineSubtle,
     alignItems: 'center',
   },
   statusIcon: {
     width: 80,
     height: 80,
-    borderRadius: RADIUS.full,
+    borderRadius: WANTED_TOKENS.radius.pill,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: SPACING.lg,
+    marginBottom: WANTED_TOKENS.spacing.s4,
   },
   statusText: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    fontSize: WANTED_TOKENS.type.body1.size,
+    fontWeight: '600',
     textAlign: 'center',
-    paddingHorizontal: SPACING.lg,
+    paddingHorizontal: WANTED_TOKENS.spacing.s4,
   },
   featureItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.lg,
+    paddingHorizontal: WANTED_TOKENS.spacing.s4,
+    paddingVertical: WANTED_TOKENS.spacing.s4,
     borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
+    borderBottomColor: semantic.lineSubtle,
   },
   featureIcon: {
     width: 40,
     height: 40,
-    backgroundColor: colors.backgroundSecondary,
-    borderRadius: RADIUS.full,
+    backgroundColor: semantic.bgSubtle,
+    borderRadius: WANTED_TOKENS.radius.pill,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: SPACING.md,
+    marginRight: WANTED_TOKENS.spacing.s3,
   },
   featureContent: {
     flex: 1,
   },
   featureTitle: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: colors.textPrimary,
+    fontSize: WANTED_TOKENS.type.body1.size,
+    fontWeight: '600',
+    color: semantic.labelStrong,
     marginBottom: 4,
   },
   featureDescription: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: colors.textTertiary,
-    lineHeight: TYPOGRAPHY.lineHeight.normal * TYPOGRAPHY.fontSize.sm,
+    fontSize: WANTED_TOKENS.type.label2.size,
+    color: semantic.labelAlt,
+    lineHeight: WANTED_TOKENS.type.label2.lh,
   },
   actionButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.textPrimary,
-    paddingVertical: SPACING.lg,
-    marginHorizontal: SPACING.lg,
-    marginBottom: SPACING.md,
-    borderRadius: RADIUS.lg,
+    backgroundColor: semantic.labelStrong,
+    paddingVertical: WANTED_TOKENS.spacing.s4,
+    marginHorizontal: WANTED_TOKENS.spacing.s4,
+    marginBottom: WANTED_TOKENS.spacing.s3,
+    borderRadius: WANTED_TOKENS.radius.r6,
   },
   secondaryButton: {
-    backgroundColor: colors.surface,
+    backgroundColor: semantic.bgBase,
     borderWidth: 1,
-    borderColor: colors.borderMedium,
+    borderColor: semantic.lineNormal,
   },
   actionButtonText: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: colors.textInverse,
-    marginLeft: SPACING.sm,
+    fontSize: WANTED_TOKENS.type.body1.size,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    marginLeft: WANTED_TOKENS.spacing.s2,
   },
   secondaryButtonText: {
-    color: colors.textPrimary,
+    color: semantic.labelStrong,
   },
   privacyBox: {
     flexDirection: 'row',
-    backgroundColor: colors.primaryLight,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.lg,
-    marginHorizontal: SPACING.lg,
-    marginTop: SPACING.xl,
-    marginBottom: SPACING.xl,
-    borderRadius: RADIUS.lg,
+    backgroundColor: semantic.primaryBg,
+    paddingHorizontal: WANTED_TOKENS.spacing.s4,
+    paddingVertical: WANTED_TOKENS.spacing.s4,
+    marginHorizontal: WANTED_TOKENS.spacing.s4,
+    marginTop: WANTED_TOKENS.spacing.s5,
+    marginBottom: WANTED_TOKENS.spacing.s5,
+    borderRadius: WANTED_TOKENS.radius.r6,
     borderWidth: 1,
-    borderColor: colors.borderMedium,
+    borderColor: semantic.lineNormal,
   },
   privacyText: {
     flex: 1,
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: colors.textSecondary,
-    lineHeight: TYPOGRAPHY.lineHeight.relaxed * TYPOGRAPHY.fontSize.sm,
-    marginLeft: SPACING.md,
+    fontSize: WANTED_TOKENS.type.label2.size,
+    color: semantic.labelAlt,
+    lineHeight: 1.5 * WANTED_TOKENS.type.label2.size,
+    marginLeft: WANTED_TOKENS.spacing.s3,
   },
   permissionGrantedBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: SPACING.md,
-    marginHorizontal: SPACING.lg,
-    marginBottom: SPACING.md,
+    paddingVertical: WANTED_TOKENS.spacing.s3,
+    marginHorizontal: WANTED_TOKENS.spacing.s4,
+    marginBottom: WANTED_TOKENS.spacing.s3,
   },
   badgeText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    marginLeft: SPACING.sm,
+    fontSize: WANTED_TOKENS.type.label2.size,
+    fontWeight: '600',
+    marginLeft: WANTED_TOKENS.spacing.s2,
   },
 });
 
