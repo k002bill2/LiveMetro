@@ -263,10 +263,11 @@ describe('FavoritesScreen', () => {
       expect(getByText('즐겨찾기')).toBeTruthy();
     });
 
-    it('displays header with title and count', () => {
-      const { getByText } = render(<FavoritesScreen />);
+    it('displays header with title and add/sort buttons (Phase 3 redesign)', () => {
+      const { getByText, getByTestId } = render(<FavoritesScreen />);
       expect(getByText('즐겨찾기')).toBeTruthy();
-      expect(getByText('0개의 역')).toBeTruthy();
+      expect(getByTestId('favorites-add-button')).toBeTruthy();
+      expect(getByTestId('favorites-sort-button')).toBeTruthy();
     });
 
     it('shows empty state when no favorites', () => {
@@ -275,7 +276,7 @@ describe('FavoritesScreen', () => {
       expect(getByText('자주 이용하는 역을 즐겨찾기에 추가해보세요')).toBeTruthy();
     });
 
-    it('displays correct favorites count', () => {
+    it('renders the favorite list when one item is present', () => {
       (useFavorites as jest.Mock).mockReturnValue({
         favoritesWithDetails: [mockFavorite1],
         loading: false,
@@ -286,8 +287,9 @@ describe('FavoritesScreen', () => {
         refresh: mockRefresh,
       });
 
-      const { getByText } = render(<FavoritesScreen />);
-      expect(getByText('1개의 역')).toBeTruthy();
+      // Phase 3: header no longer surfaces a count subtitle; verify item renders.
+      const { getByTestId } = render(<FavoritesScreen />);
+      expect(getByTestId('favorite-item-fav1')).toBeTruthy();
     });
 
     it('renders multiple favorites correctly', () => {
@@ -302,7 +304,7 @@ describe('FavoritesScreen', () => {
       });
 
       const { getByText, getByTestId } = render(<FavoritesScreen />);
-      expect(getByText('2개의 역')).toBeTruthy();
+      expect(getByText('즐겨찾기')).toBeTruthy();
       expect(getByTestId('favorite-item-fav1')).toBeTruthy();
       expect(getByTestId('favorite-item-fav2')).toBeTruthy();
     });
@@ -441,8 +443,9 @@ describe('FavoritesScreen', () => {
         refresh: mockRefresh,
       });
 
-      const { getByText } = render(<FavoritesScreen />);
-      expect(getByText('1개의 역')).toBeTruthy();
+      // Phase 3: count subtitle removed; verify the favorite item renders instead.
+      const { getByTestId } = render(<FavoritesScreen />);
+      expect(getByTestId('favorite-item-fav1')).toBeTruthy();
     });
   });
 
@@ -956,9 +959,9 @@ describe('FavoritesScreen', () => {
 
       const { getByText, getByTestId } = render(<FavoritesScreen />);
 
-      // Header with count
+      // Header (count subtitle removed in Phase 3)
       expect(getByText('즐겨찾기')).toBeTruthy();
-      expect(getByText('2개의 역')).toBeTruthy();
+      expect(getByTestId('favorites-add-button')).toBeTruthy();
 
       // Search bar
       expect(getByTestId('search-bar')).toBeTruthy();
@@ -998,7 +1001,8 @@ describe('FavoritesScreen', () => {
         refresh: mockRefresh,
       });
       rerender(<FavoritesScreen />);
-      expect(getByText('1개의 역')).toBeTruthy();
+      // Phase 3: count subtitle removed; loading text gone + favorite renders.
+      expect(getByText('즐겨찾기')).toBeTruthy();
     });
   });
 });

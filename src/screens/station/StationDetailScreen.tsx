@@ -24,7 +24,7 @@ import {
 } from 'lucide-react-native';
 
 import { AppStackParamList } from '../../navigation/types';
-import { getSubwayLineColor } from '../../utils/colorUtils';
+import { LineBadge } from '../../components/design';
 import { useRealtimeTrains } from '../../hooks/useRealtimeTrains';
 import { useAdjacentStations } from '../../hooks/useAdjacentStations';
 import { useTheme, ThemeColors } from '../../services/theme';
@@ -226,8 +226,6 @@ const StationDetailScreen: React.FC = () => {
     });
   }, [realtimeTrains]);
 
-  const lineColor = getSubwayLineColor(lineId);
-
 
   const openKakaoSubway = () => {
     Linking.openURL('https://map.kakao.com/?subwayMap').catch(() => {
@@ -270,8 +268,8 @@ const StationDetailScreen: React.FC = () => {
             <Text style={styles.locationChipText}>GPS 동기화</Text>
           </View>
         </View>
-        <View style={[styles.lineBadge, { backgroundColor: lineColor }]}>
-          <Text style={styles.lineBadgeText}>{lineId}</Text>
+        <View style={styles.lineBadgeWrap}>
+          <LineBadge line={lineId} size={36} testID="station-detail-line-badge" />
         </View>
         <View style={styles.stationSwitcher}>
           {hasPrev && prevStation ? (
@@ -674,19 +672,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.primaryLight,
   },
-  lineBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
+  lineBadgeWrap: {
     alignSelf: 'center',
     marginBottom: 12,
-  },
-  lineBadgeText: {
-    color: colors.textInverse,
-    fontWeight: 'bold',
-    fontSize: 16,
   },
   stationSwitcher: {
     flexDirection: 'row',

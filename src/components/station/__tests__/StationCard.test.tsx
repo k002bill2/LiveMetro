@@ -27,10 +27,10 @@ jest.mock('@/services/theme/themeContext', () => ({
 jest.mock('@/utils/colorUtils', () => ({
   getSubwayLineColor: jest.fn((lineId: string) => {
     const colors: Record<string, string> = {
-      '1': '#0d3692',
-      '2': '#00a84d',
-      '3': '#ef7c1c',
-      '9': '#bb8336',
+      '1': '#0052A4',
+      '2': '#00A84D',
+      '3': '#EF7C1C',
+      '9': '#BDB092',
     };
     return colors[lineId] ?? '#6b7280';
   }),

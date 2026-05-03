@@ -23,24 +23,31 @@ import {
 
 describe('colorUtils', () => {
   describe('SUBWAY_LINE_COLORS', () => {
-    it('should have colors for all main lines 1-9', () => {
-      expect(SUBWAY_LINE_COLORS['1']).toBe('#0d3692');
-      expect(SUBWAY_LINE_COLORS['2']).toBe('#00a84d');
-      expect(SUBWAY_LINE_COLORS['3']).toBe('#ef7c1c');
-      expect(SUBWAY_LINE_COLORS['4']).toBe('#00a2d1');
-      expect(SUBWAY_LINE_COLORS['5']).toBe('#996cac');
-      expect(SUBWAY_LINE_COLORS['6']).toBe('#cd7c2f');
-      expect(SUBWAY_LINE_COLORS['7']).toBe('#747f00');
-      expect(SUBWAY_LINE_COLORS['8']).toBe('#e6186c');
-      expect(SUBWAY_LINE_COLORS['9']).toBe('#bb8336');
+    it('should have colors for all main lines 1-9 (Wanted-aligned, official Seoul Metro)', () => {
+      expect(SUBWAY_LINE_COLORS['1']).toBe('#0052A4');
+      expect(SUBWAY_LINE_COLORS['2']).toBe('#00A84D');
+      expect(SUBWAY_LINE_COLORS['3']).toBe('#EF7C1C');
+      expect(SUBWAY_LINE_COLORS['4']).toBe('#00A5DE');
+      expect(SUBWAY_LINE_COLORS['5']).toBe('#996CAC');
+      expect(SUBWAY_LINE_COLORS['6']).toBe('#CD7C2F');
+      expect(SUBWAY_LINE_COLORS['7']).toBe('#747F00');
+      expect(SUBWAY_LINE_COLORS['8']).toBe('#E6186C');
+      expect(SUBWAY_LINE_COLORS['9']).toBe('#BDB092');
     });
 
     it('should have colors for extension lines', () => {
-      expect(SUBWAY_LINE_COLORS.gyeongui).toBe('#77c4a3');
-      expect(SUBWAY_LINE_COLORS.bundang).toBe('#fabe00');
-      expect(SUBWAY_LINE_COLORS.sinbundang).toBe('#d4003b');
-      expect(SUBWAY_LINE_COLORS.gyeongchun).toBe('#32c6a6');
-      expect(SUBWAY_LINE_COLORS.airport).toBe('#0090d2');
+      expect(SUBWAY_LINE_COLORS.gyeongui).toBe('#77C4A3');
+      expect(SUBWAY_LINE_COLORS.bundang).toBe('#FABE00');
+      expect(SUBWAY_LINE_COLORS.sinbundang).toBe('#D4003B');
+      expect(SUBWAY_LINE_COLORS.gyeongchun).toBe('#32C6A6');
+      expect(SUBWAY_LINE_COLORS.airport).toBe('#0090D2');
+    });
+
+    it('should expose short aliases (sb/bd/gj/gx) used by LineBadge', () => {
+      expect(SUBWAY_LINE_COLORS.sb).toBe('#D4003B');
+      expect(SUBWAY_LINE_COLORS.bd).toBe('#FABE00');
+      expect(SUBWAY_LINE_COLORS.gj).toBe('#77C4A3');
+      expect(SUBWAY_LINE_COLORS.gx).toBe('#0090D2');
     });
   });
 
@@ -85,20 +92,20 @@ describe('colorUtils', () => {
 
   describe('getSubwayLineColor', () => {
     it('should return correct color for numeric line IDs', () => {
-      expect(getSubwayLineColor('1')).toBe('#0d3692');
-      expect(getSubwayLineColor('2')).toBe('#00a84d');
-      expect(getSubwayLineColor('9')).toBe('#bb8336');
+      expect(getSubwayLineColor('1')).toBe('#0052A4');
+      expect(getSubwayLineColor('2')).toBe('#00A84D');
+      expect(getSubwayLineColor('9')).toBe('#BDB092');
     });
 
     it('should return correct color for named lines', () => {
-      expect(getSubwayLineColor('gyeongui')).toBe('#77c4a3');
-      expect(getSubwayLineColor('bundang')).toBe('#fabe00');
+      expect(getSubwayLineColor('gyeongui')).toBe('#77C4A3');
+      expect(getSubwayLineColor('bundang')).toBe('#FABE00');
     });
 
     it('should handle case-insensitive line IDs', () => {
-      expect(getSubwayLineColor('GYEONGUI')).toBe('#77c4a3');
-      expect(getSubwayLineColor('Bundang')).toBe('#fabe00');
-      expect(getSubwayLineColor('AIRPORT')).toBe('#0090d2');
+      expect(getSubwayLineColor('GYEONGUI')).toBe('#77C4A3');
+      expect(getSubwayLineColor('Bundang')).toBe('#FABE00');
+      expect(getSubwayLineColor('AIRPORT')).toBe('#0090D2');
     });
 
     it('should return default color for unknown lines', () => {
@@ -115,14 +122,14 @@ describe('colorUtils', () => {
     });
 
     it('should handle English partial matches', () => {
-      expect(getSubwayLineColor('ever-line')).toBe('#7cc4a0');
-      expect(getSubwayLineColor('airport-express')).toBe('#0090d2');
+      expect(getSubwayLineColor('ever-line')).toBe('#7CC4A0');
+      expect(getSubwayLineColor('airport-express')).toBe('#0090D2');
     });
 
     it('should extract numeric line from Korean format', () => {
-      expect(getSubwayLineColor('1호선')).toBe('#0d3692');
-      expect(getSubwayLineColor('2호선')).toBe('#00a84d');
-      expect(getSubwayLineColor('9호선')).toBe('#bb8336');
+      expect(getSubwayLineColor('1호선')).toBe('#0052A4');
+      expect(getSubwayLineColor('2호선')).toBe('#00A84D');
+      expect(getSubwayLineColor('9호선')).toBe('#BDB092');
     });
   });
 
@@ -234,12 +241,12 @@ describe('colorUtils', () => {
   describe('getContrastingColor', () => {
     it('should return white for dark backgrounds', () => {
       expect(getContrastingColor('#000000')).toBe('white');
-      expect(getContrastingColor('#0d3692')).toBe('white');
+      expect(getContrastingColor('#0052A4')).toBe('white');
     });
 
     it('should return black for light backgrounds', () => {
       expect(getContrastingColor('#ffffff')).toBe('black');
-      expect(getContrastingColor('#fabe00')).toBe('black');
+      expect(getContrastingColor('#FABE00')).toBe('black');
     });
 
     it('should return black for invalid hex', () => {

@@ -23,7 +23,7 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { Heart, Search, AlertCircle, LogIn, Plus } from 'lucide-react-native';
+import { Heart, Search, AlertCircle, LogIn, Plus, ArrowUpDown } from 'lucide-react-native';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -35,7 +35,7 @@ import { DraggableFavoriteItem } from '../../components/favorites/DraggableFavor
 import { StationSearchModal } from '../../components/commute/StationSearchModal';
 import { StationSelection } from '../../models/commute';
 import { Station } from '../../models/train';
-import { SPACING, RADIUS, TYPOGRAPHY } from '../../styles/modernTheme';
+import { SPACING, RADIUS, TYPOGRAPHY, WANTED_TOKENS } from '../../styles/modernTheme';
 import { useTheme, ThemeColors } from '../../services/theme';
 
 type NavigationProp = NativeStackNavigationProp<AppStackParamList>;
@@ -47,8 +47,8 @@ export const FavoritesScreen: React.FC = () => {
   // re-fetching realtime arrivals while the user was elsewhere.
   const isFocused = useIsFocused();
   const { user } = useAuth();
-  const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const { colors, isDark } = useTheme();
+  const styles = createStyles(colors, isDark);
   const {
     favoritesWithDetails,
     loading,
@@ -356,20 +356,40 @@ export const FavoritesScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
+      {/* Header — Phase 3 redesign: large title + sort/add round buttons */}
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.headerTitle}>즐겨찾기</Text>
-          <Text style={styles.headerSubtitle}>
-            {favoritesWithDetails.length}개의 역
-          </Text>
-        </View>
-        <TouchableOpacity
-          style={styles.addButton}
-          onPress={() => setIsSearchModalVisible(true)}
+        <Text
+          style={styles.headerTitle}
+          accessibilityRole="header"
         >
-          <Plus size={24} color={colors.textInverse} />
-        </TouchableOpacity>
+          즐겨찾기
+        </Text>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.sortButton}
+            accessibilityLabel="정렬 변경"
+            accessibilityRole="button"
+            testID="favorites-sort-button"
+            onPress={() => {
+              // TODO Phase 3B: open reorder mode for DraggableFavoriteItem
+              Alert.alert('정렬', '정렬 기능은 곧 제공될 예정입니다.');
+            }}
+          >
+            <ArrowUpDown
+              size={16}
+              color={(isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light).labelNeutral}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.addButton}
+            accessibilityLabel="즐겨찾기 추가"
+            accessibilityRole="button"
+            testID="favorites-add-button"
+            onPress={() => setIsSearchModalVisible(true)}
+          >
+            <Plus size={18} color="#FFFFFF" strokeWidth={2.4} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Search Bar */}
@@ -420,42 +440,50 @@ export const FavoritesScreen: React.FC = () => {
   );
 };
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
+const createStyles = (colors: ThemeColors, isDark: boolean) => {
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  return StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: semantic.bgSubtlePage,
   },
   header: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.lg,
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingTop: 8,
+    paddingBottom: 4,
+    backgroundColor: 'transparent',
   },
-  headerLeft: {
-    flex: 1,
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  sortButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 9999,
+    backgroundColor: semantic.bgBase,
+    borderWidth: 1,
+    borderColor: semantic.lineSubtle,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   addButton: {
-    width: 40,
-    height: 40,
-    borderRadius: RADIUS.full,
-    backgroundColor: colors.textPrimary,
+    width: 36,
+    height: 36,
+    borderRadius: 9999,
+    backgroundColor: semantic.primaryNormal,
     justifyContent: 'center',
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: TYPOGRAPHY.fontSize['2xl'],
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: colors.textPrimary,
-    letterSpacing: TYPOGRAPHY.letterSpacing.tight,
-  },
-  headerSubtitle: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: colors.textTertiary,
-    marginTop: 2,
+    fontSize: 28,
+    fontWeight: '800',
+    color: semantic.labelStrong,
+    letterSpacing: -0.6,
   },
   content: {
     flex: 1,
@@ -623,7 +651,8 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
     color: colors.textInverse,
   },
-});
+  });
+};
 
 // Memoize to prevent unnecessary re-renders
 export default memo(FavoritesScreen);

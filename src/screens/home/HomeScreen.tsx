@@ -20,6 +20,10 @@ import {
   ChevronRight,
   TrainFront,
   RefreshCw,
+  Search,
+  Map as MapIcon,
+  Megaphone,
+  FileText,
 } from 'lucide-react-native';
 import * as Location from 'expo-location';
 import { NavigationProp, useIsFocused, useNavigation } from '@react-navigation/native';
@@ -32,22 +36,63 @@ import { StationCard } from '../../components/train/StationCard';
 import { TrainArrivalList } from '../../components/train/TrainArrivalList';
 import { DelayAlertBanner } from '../../components/delays';
 import { CommutePredictionCard } from '../../components/prediction';
+import { HomeTopBar, MLHeroCard, QuickActionsGrid } from '../../components/design';
 import { LocationDebugPanel } from '../../components/debug';
 import { useToast } from '../../components/common/Toast';
 import { useDelayDetection } from '../../hooks/useDelayDetection';
 import { useIntegratedAlerts } from '../../hooks/useIntegratedAlerts';
-import { SPACING, RADIUS, TYPOGRAPHY } from '../../styles/modernTheme';
+import { useMLPrediction } from '../../hooks/useMLPrediction';
+import { SPACING, RADIUS, TYPOGRAPHY, WANTED_TOKENS } from '../../styles/modernTheme';
 import { useTheme, ThemeColors } from '../../services/theme';
 
 import { Station } from '../../models/train';
 import { AppStackParamList } from '../../navigation/types';
 
+/**
+ * Compute commute minutes from "HH:mm" departure → arrival strings.
+ *
+ * Wraps midnight: a 23:55 → 00:20 commute (real on Seoul late-night service)
+ * yields 25 min, not null. Returns null only on malformed inputs or when
+ * departure equals arrival (zero-minute commute is treated as invalid).
+ */
+const MIN_PER_DAY = 24 * 60;
+
+const minutesBetween = (departure?: string, arrival?: string): number | null => {
+  if (!departure || !arrival) return null;
+  const parse = (s: string): number | null => {
+    const m = /^(\d{1,2}):(\d{2})$/.exec(s.trim());
+    if (!m) return null;
+    return parseInt(m[1]!, 10) * 60 + parseInt(m[2]!, 10);
+  };
+  const d = parse(departure);
+  const a = parse(arrival);
+  if (d === null || a === null) return null;
+  const diff = ((a - d) % MIN_PER_DAY + MIN_PER_DAY) % MIN_PER_DAY;
+  return diff > 0 ? diff : null;
+};
+
+/**
+ * Format the current date as "2026.05.03 (수) · 오전 8:32" for the top bar.
+ */
+const formatDateTimeLabel = (now: Date = new Date()): string => {
+  const days = ['일', '월', '화', '수', '목', '금', '토'];
+  const yyyy = now.getFullYear();
+  const mm = String(now.getMonth() + 1).padStart(2, '0');
+  const dd = String(now.getDate()).padStart(2, '0');
+  const dow = days[now.getDay()];
+  const h = now.getHours();
+  const min = String(now.getMinutes()).padStart(2, '0');
+  const period = h < 12 ? '오전' : '오후';
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${yyyy}.${mm}.${dd} (${dow}) · ${period} ${h12}:${min}`;
+};
+
 export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<AppStackParamList>>();
   const isFocused = useIsFocused();
   const { user } = useAuth();
-  const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const { colors, isDark } = useTheme();
+  const styles = createStyles(colors, isDark);
   const { showError, showSuccess, showInfo, ToastComponent } = useToast();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -90,6 +135,32 @@ export const HomeScreen: React.FC = () => {
     enableDeparture: true,
     enableDelay: true,
   });
+
+  // ML 예측 — Hero 카드 데이터 소스
+  const { prediction: mlPrediction } = useMLPrediction();
+
+  // Hero 카드 props 도출 — prediction이 있고 정상 계산 가능할 때만 표시.
+  // origin/destination 이름은 stationId 기반으로 조회 필요(다음 sub-phase에서 추가).
+  const heroProps = useMemo(() => {
+    if (!mlPrediction) return null;
+    const minutes = minutesBetween(
+      mlPrediction.predictedDepartureTime,
+      mlPrediction.predictedArrivalTime,
+    );
+    if (minutes === null) return null;
+    return {
+      predictedMinutes: minutes,
+      arrivalTime: mlPrediction.predictedArrivalTime,
+      confidence: mlPrediction.confidence,
+    };
+  }, [mlPrediction]);
+
+  // 상단 바에 표시할 날짜/시간 — 1분마다 갱신 (분 단위까지만 표시하므로 충분).
+  const [dateTimeLabel, setDateTimeLabel] = useState(() => formatDateTimeLabel(new Date()));
+  useEffect(() => {
+    const id = setInterval(() => setDateTimeLabel(formatDateTimeLabel(new Date())), 60_000);
+    return () => clearInterval(id);
+  }, []);
 
 
   const loadFavoriteStations = useCallback(async (): Promise<void> => {
@@ -291,21 +362,75 @@ export const HomeScreen: React.FC = () => {
       contentInsetAdjustmentBehavior="automatic"
       testID="home-screen"
     >
-      {/* Welcome Section */}
-      <View style={styles.welcomeSection}>
-        <Text style={styles.welcomeText}>
-          안녕하세요, {user?.displayName || '사용자'}님! 👋
-        </Text>
-        <Text style={styles.subtitle}>
-          실시간 지하철 정보를 확인하세요
-        </Text>
+      {/* Top bar — greeting + bell (Phase 2 redesign) */}
+      <HomeTopBar
+        userName={user?.displayName ?? undefined}
+        dateTime={dateTimeLabel}
+        hasUnread={activeDelays.length > 0}
+        onBellPress={() => navigation.navigate('Alerts' as never)}
+      />
+
+      {/* ML hero — gradient teaser when prediction is ready, otherwise fall
+          back to the rich CommutePredictionCard (covers training/empty states). */}
+      <View style={styles.heroWrap}>
+        {heroProps ? (
+          <MLHeroCard
+            predictedMinutes={heroProps.predictedMinutes}
+            arrivalTime={heroProps.arrivalTime}
+            confidence={heroProps.confidence}
+            onPress={handleViewPredictions}
+          />
+        ) : (
+          <CommutePredictionCard
+            onScheduleAlert={handleScheduleAlert}
+            onViewDetails={handleViewPredictions}
+          />
+        )}
       </View>
 
-      {/* ML-based Commute Prediction Card */}
-      <CommutePredictionCard
-        onScheduleAlert={handleScheduleAlert}
-        onViewDetails={handleViewPredictions}
-      />
+      {/* Quick actions — 4-button grid */}
+      <View style={styles.quickActionsWrap}>
+        <QuickActionsGrid
+          actions={[
+            {
+              id: 'route',
+              Icon: Search,
+              label: '경로검색',
+              onPress: () => {
+                // 경로 검색 — 선택된 역이 있으면 출발역으로 시드, 도착은 강남 기본값
+                if (selectedStation) {
+                  navigation.navigate('AlternativeRoutes', {
+                    fromStationId: selectedStation.id,
+                    toStationId: 'gangnam',
+                    fromStationName: selectedStation.name,
+                    toStationName: '강남',
+                  });
+                } else {
+                  navigation.navigate('AlternativeRoutes' as never);
+                }
+              },
+            },
+            {
+              id: 'map',
+              Icon: MapIcon,
+              label: '노선도',
+              onPress: () => navigation.navigate('SubwayMap' as never),
+            },
+            {
+              id: 'report',
+              Icon: Megaphone,
+              label: '제보',
+              onPress: () => navigation.navigate('DelayFeed' as never),
+            },
+            {
+              id: 'cert',
+              Icon: FileText,
+              label: '증명서',
+              onPress: () => navigation.navigate('DelayCertificate' as never),
+            },
+          ]}
+        />
+      </View>
 
       {/* Offline Banner */}
       {!isOnline && (
@@ -490,28 +615,19 @@ export const HomeScreen: React.FC = () => {
   );
 };
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
+const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: isDark
+      ? WANTED_TOKENS.dark.bgSubtlePage
+      : WANTED_TOKENS.light.bgSubtlePage,
   },
-  welcomeSection: {
-    backgroundColor: colors.surface,
-    padding: SPACING.lg,
-    marginBottom: SPACING.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.borderLight,
+  heroWrap: {
+    paddingHorizontal: 20,
+    paddingBottom: 16,
   },
-  welcomeText: {
-    fontSize: TYPOGRAPHY.fontSize['2xl'],
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: colors.textPrimary,
-    marginBottom: 4,
-    letterSpacing: TYPOGRAPHY.letterSpacing.tight,
-  },
-  subtitle: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    color: colors.textSecondary,
+  quickActionsWrap: {
+    paddingBottom: 8,
   },
   permissionBanner: {
     backgroundColor: colors.backgroundSecondary,

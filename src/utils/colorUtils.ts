@@ -4,33 +4,43 @@
  */
 
 /**
- * Seoul Subway Line Colors (Official Colors)
+ * Seoul Subway Line Colors (Official Colors — Wanted Design System aligned)
+ *
+ * Source of truth for all subway line color usage. Numeric line ids match
+ * Seoul Metro official colors; short aliases (sb/bd/gj/gx) match the design
+ * handoff data.js LINES map for use with LineBadge.
  */
 export const SUBWAY_LINE_COLORS = {
-  '1': '#0d3692',   // Line 1 - Dark Blue
-  '2': '#00a84d',   // Line 2 - Green  
-  '3': '#ef7c1c',   // Line 3 - Orange
-  '4': '#00a2d1',   // Line 4 - Light Blue
-  '5': '#996cac',   // Line 5 - Purple
-  '6': '#cd7c2f',   // Line 6 - Brown
-  '7': '#747f00',   // Line 7 - Olive Green
-  '8': '#e6186c',   // Line 8 - Pink
-  '9': '#bb8336',   // Line 9 - Brown Gold
-  
-  // Subway Extensions
-  'gyeongui': '#77c4a3',        // Gyeongui-Jungang Line
-  'jungang': '#77c4a3',         // Gyeongui-Jungang Line
-  'bundang': '#fabe00',         // Bundang Line - Yellow
-  'sinbundang': '#d4003b',      // Sinbundang Line - Red
-  'gyeongchun': '#32c6a6',      // Gyeongchun Line - Mint
-  'suin': '#fabe00',            // Suin-Bundang Line - Yellow
-  'uijeongbu': '#ffa500',       // Uijeongbu Line - Orange
-  'ever': '#7cc4a0',            // Everline - Light Green
-  'seohae': '#8fc31f',          // Seohae Line - Light Green
-  'gimpo': '#888b8d',           // Gimpo Gold Line - Gray
-  'wooyisinseol': '#b0ce18',    // Ui-Sinseol Line - Light Green
-  'airport': '#0090d2',         // Airport Railroad - Sky Blue
-  'gyeonggang': '#0054a6',      // Gyeonggang Line - Navy
+  '1': '#0052A4',   // Line 1 - Dark Blue (official)
+  '2': '#00A84D',   // Line 2 - Green
+  '3': '#EF7C1C',   // Line 3 - Orange
+  '4': '#00A5DE',   // Line 4 - Sky Blue (official)
+  '5': '#996CAC',   // Line 5 - Purple
+  '6': '#CD7C2F',   // Line 6 - Brown
+  '7': '#747F00',   // Line 7 - Olive Green
+  '8': '#E6186C',   // Line 8 - Pink
+  '9': '#BDB092',   // Line 9 - Gold (official)
+
+  // Short aliases (design handoff convention)
+  'sb': '#D4003B',  // 신분당
+  'bd': '#FABE00',  // 분당 / 수인분당
+  'gj': '#77C4A3',  // 경의중앙
+  'gx': '#0090D2',  // 공항철도
+
+  // Long-form aliases (legacy / Korean-name partial matchers)
+  'gyeongui': '#77C4A3',
+  'jungang': '#77C4A3',
+  'bundang': '#FABE00',
+  'sinbundang': '#D4003B',
+  'gyeongchun': '#32C6A6',
+  'suin': '#FABE00',
+  'uijeongbu': '#FFA500',
+  'ever': '#7CC4A0',
+  'seohae': '#8FC31F',
+  'gimpo': '#888B8D',
+  'wooyisinseol': '#B0CE18',
+  'airport': '#0090D2',
+  'gyeonggang': '#0054A6',
 } as const;
 
 /**

@@ -144,10 +144,44 @@ jest.mock('@/hooks/useIntegratedAlerts', () => ({
   })),
 }));
 
+// Phase 2 — HomeScreen now consumes useMLPrediction for the gradient hero card.
+jest.mock('@/hooks/useMLPrediction', () => ({
+  useMLPrediction: jest.fn(() => ({
+    prediction: null,
+    loading: false,
+    error: null,
+    isModelReady: false,
+    logCount: 0,
+    hasEnoughData: false,
+    refreshPrediction: jest.fn(),
+    trainModel: jest.fn(),
+    isTraining: false,
+    trainingProgress: 0,
+    modelMetadata: null,
+    isTensorFlowReady: false,
+    getWeekPredictions: jest.fn(),
+    clearCache: jest.fn(),
+    checkReliability: jest.fn(),
+  })),
+}));
+
 jest.mock('lucide-react-native', () => ({
   CloudOff: () => null, MapPin: () => null, ChevronRight: () => null,
   TrainFront: () => null, RefreshCw: () => null,
+  // Phase 2 icons used by the redesigned HomeScreen + design atoms
+  Search: () => null, Map: () => null, Megaphone: () => null, FileText: () => null,
+  Bell: () => null, Sparkles: () => null, TrendingDown: () => null, TrendingUp: () => null,
 }));
+
+// expo-linear-gradient is used by MLHeroCard
+jest.mock('expo-linear-gradient', () => {
+  const ReactRef = require('react');
+  const { View } = require('react-native');
+  return {
+    LinearGradient: (props: { children?: unknown; testID?: string }) =>
+      ReactRef.createElement(View, props, props.children),
+  };
+});
 
 jest.mock('@/components/common/LoadingScreen', () => {
   const { View: V, Text: T } = require('react-native');
@@ -245,6 +279,18 @@ jest.mock('@/styles/modernTheme', () => ({
     letterSpacing: { tight: -0.5 },
     lineHeight: { relaxed: 1.5 },
   },
+  // Phase 1 added — Wanted Design System tokens. Tests only need the
+  // congestion map (consumed by design components imported transitively).
+  WANTED_TOKENS: {
+    light: { bgSubtlePage: '#F7F8FA', bgBase: '#FFFFFF', labelStrong: '#000000', labelNormal: '#171719', labelNeutral: '#37383C', labelAlt: '#70737C', lineSubtle: 'rgba(112,115,124,0.16)' },
+    dark: { bgSubtlePage: '#14191E', bgBase: '#1B1C1E', labelStrong: '#FFFFFF', labelNormal: '#F4F4F5', labelNeutral: 'rgba(255,255,255,0.88)', labelAlt: '#989BA2', lineSubtle: 'rgba(255,255,255,0.10)' },
+    congestion: {
+      low:   { color: '#00BF40', label: '여유',     pct: 0.30 },
+      mid:   { color: '#FFB400', label: '보통',     pct: 0.55 },
+      high:  { color: '#FF7A1A', label: '혼잡',     pct: 0.80 },
+      vhigh: { color: '#FF4242', label: '매우혼잡', pct: 0.95 },
+    },
+  },
 }));
 
 const mockLocationRequest = Location.requestForegroundPermissionsAsync as jest.Mock;
@@ -299,9 +345,9 @@ describe('HomeScreen', () => {
       await waitFor(() => expect(getByText(/Test User/)).toBeTruthy());
     });
 
-    it('shows subtitle', async () => {
-      const { getByText } = render(<HomeScreen />);
-      await waitFor(() => expect(getByText('실시간 지하철 정보를 확인하세요')).toBeTruthy());
+    it('shows the redesigned HomeTopBar (Phase 2 — replaces old subtitle)', async () => {
+      const { getByTestId } = render(<HomeScreen />);
+      await waitFor(() => expect(getByTestId('home-top-bar')).toBeTruthy());
     });
 
     it('shows CommutePredictionCard and Toast', async () => {
@@ -688,8 +734,9 @@ describe('HomeScreen', () => {
       };
       useAuth.mockReturnValue(nullNameAuth);
 
+      // HomeTopBar falls back to "안녕하세요" (no name) when displayName is missing.
       const { getByText } = render(<HomeScreen />);
-      await waitFor(() => expect(getByText(/사용자님/)).toBeTruthy());
+      await waitFor(() => expect(getByText('안녕하세요')).toBeTruthy());
     });
   });
 
