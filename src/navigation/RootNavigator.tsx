@@ -17,6 +17,8 @@ import { OnboardingProvider, useOnboarding } from '../contexts/OnboardingContext
 // Import screens
 import { WelcomeScreen } from '../screens/auth/WelcomeScreen';
 import { AuthScreen } from '../screens/auth/AuthScreen';
+import { EmailLoginScreen } from '../screens/auth/EmailLoginScreen';
+import { SignUpScreen } from '../screens/auth/SignUpScreen';
 import { HomeScreen } from '../screens/home/HomeScreen';
 import { SubwayMapScreen } from '../screens/map/SubwayMapScreen';
 import { FavoritesScreen } from '../screens/favorites/FavoritesScreen';
@@ -36,6 +38,8 @@ const DEBUG_FORCE_ONBOARDING = __DEV__ && false;
 export type RootStackParamList = {
   Welcome: undefined;
   Auth: undefined;
+  EmailLogin: undefined;
+  SignUp: undefined;
   Main: undefined;
   Onboarding: undefined;
   StationNavigator: {
@@ -191,6 +195,8 @@ const RootNavigatorContent: React.FC = () => {
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Welcome" component={WelcomeScreen} />
         <Stack.Screen name="Auth" component={AuthScreen} />
+        <Stack.Screen name="EmailLogin" component={EmailLoginScreen} />
+        <Stack.Screen name="SignUp" component={SignUpScreen} />
       </Stack.Navigator>
     );
   }

@@ -1,297 +1,229 @@
 /**
- * AuthScreen Test Suite
- * Tests authentication screen rendering and user interactions
+ * AuthScreen Test Suite (Phase 8 — Wanted Design System rewrite).
+ *
+ * Covers the orchestrator-only behavior. Sub-component visuals (Hero, Face ID
+ * button, social buttons, divider, terms) are exercised in
+ *   src/components/auth/__tests__/.
+ *
+ * The legacy email/password flow lives in EmailLoginScreen / SignUpScreen now
+ * and has its own test scope.
  */
-
-// Mock modules BEFORE imports (Jest hoisting)
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
-import { Alert } from 'react-native';
+import { Alert, Linking } from 'react-native';
+import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { AuthScreen } from '../AuthScreen';
 import { useAuth } from '@/services/auth/AuthContext';
+import {
+  isBiometricAvailable,
+  isBiometricLoginEnabled,
+  performBiometricLogin,
+  getBiometricTypeName,
+} from '@/services/auth/biometricService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as SecureStore from 'expo-secure-store';
 
-jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
-jest.mock('@react-native-async-storage/async-storage', () =>
-  require('@react-native-async-storage/async-storage/jest/async-storage-mock')
-);
+const mockNavigate = jest.fn();
+const mockGoBack = jest.fn();
+
+jest.mock('@react-navigation/native', () => ({
+  useNavigation: jest.fn(() => ({
+    navigate: mockNavigate,
+    goBack: mockGoBack,
+    canGoBack: jest.fn(() => true),
+  })),
+}));
+
+jest.mock('@/services/theme/themeContext', () => ({
+  useTheme: jest.fn(() => ({ isDark: false })),
+}));
+
+jest.mock('@/services/auth/AuthContext', () => ({
+  useAuth: jest.fn(),
+}));
+
+jest.mock('@/services/auth/biometricService', () => ({
+  isBiometricAvailable: jest.fn(),
+  isBiometricLoginEnabled: jest.fn(),
+  performBiometricLogin: jest.fn(),
+  getBiometricTypeName: jest.fn(),
+  enableBiometricLogin: jest.fn(),
+}));
+
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  getItem: jest.fn(),
+  setItem: jest.fn(),
+  removeItem: jest.fn(),
+}));
+
 jest.mock('expo-secure-store', () => ({
-  getItemAsync: jest.fn(),
+  getItemAsync: jest.fn(() => Promise.resolve(null)),
   setItemAsync: jest.fn(),
   deleteItemAsync: jest.fn(),
 }));
-jest.mock('@/services/auth/AuthContext', () => ({
-  useAuth: jest.fn(() => ({
-    signInWithEmail: jest.fn(),
-    signUpWithEmail: jest.fn(),
-    signInAnonymously: jest.fn(),
-    resetPassword: jest.fn(),
-    user: null,
-    isAuthenticated: false,
-  })),
-}));
-jest.mock('@/services/theme', () => ({
-  useTheme: jest.fn(() => ({
-    colors: {
-      primary: '#000000',
-      primaryLight: '#E5E5E5',
-      surface: '#FFFFFF',
-      background: '#F5F5F5',
-      backgroundSecondary: '#FAFAFA',
-      textPrimary: '#1A1A1A',
-      textSecondary: '#666666',
-      textTertiary: '#999999',
-      textInverse: '#FFFFFF',
-      borderLight: '#E5E5E5',
-      borderMedium: '#CCCCCC',
-    },
-  })),
-  ThemeColors: {},
-}));
-jest.mock('@/services/auth/biometricService', () => ({
-  isBiometricAvailable: jest.fn(() => Promise.resolve(false)),
-  isBiometricLoginEnabled: jest.fn(() => Promise.resolve(false)),
-  getBiometricTypeName: jest.fn(() => Promise.resolve('생체인증')),
-  performBiometricLogin: jest.fn(),
-  enableBiometricLogin: jest.fn(),
-}));
-jest.mock('@/utils/firebaseDebug', () => ({
-  analyzeAuthError: jest.fn(() => ({
-    errorType: 'UNKNOWN',
-    errorCode: '',
-    errorMessage: '',
-    missingEnvVars: [],
-    recommendations: [],
-  })),
-  printFirebaseDebugInfo: jest.fn(),
-}));
+
+jest.mock('react-native-svg', () => {
+  const { View } = jest.requireActual('react-native');
+  const passthrough = ({ children, testID }: { children?: React.ReactNode; testID?: string }) => (
+    <View testID={testID}>{children}</View>
+  );
+  return {
+    __esModule: true,
+    default: passthrough,
+    Svg: passthrough,
+    Path: passthrough,
+    Circle: passthrough,
+    G: passthrough,
+  };
+});
+
+// lucide-react-native uses react-native-svg internally; with the mock above
+// some icons resolve to undefined. Replace every icon export with a stub View.
+jest.mock('lucide-react-native', () => {
+  const { View } = jest.requireActual('react-native');
+  const stub = () => <View />;
+  return new Proxy(
+    { __esModule: true },
+    {
+      get: (_target, prop) => {
+        if (prop === '__esModule') return true;
+        return stub;
+      },
+    }
+  );
+});
+
+const mockedUseAuth = useAuth as jest.Mock;
+const mockedAsyncStorage = AsyncStorage as unknown as { getItem: jest.Mock };
+const mockedBiometricAvailable = isBiometricAvailable as jest.Mock;
+const mockedBiometricEnabled = isBiometricLoginEnabled as jest.Mock;
+const mockedBiometricLogin = performBiometricLogin as jest.Mock;
+const mockedBiometricTypeName = getBiometricTypeName as jest.Mock;
+
+const flushBootstrap = async () => {
+  // Allow the bootstrap effect (3 awaits) to settle.
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+};
 
 describe('AuthScreen', () => {
-  const mockSignInWithEmail = jest.fn();
-  const mockSignUpWithEmail = jest.fn();
-  const mockSignInAnonymously = jest.fn();
-  const mockResetPassword = jest.fn();
-
   beforeEach(() => {
     jest.clearAllMocks();
-    (useAuth as jest.Mock).mockReturnValue({
-      signInWithEmail: mockSignInWithEmail,
-      signUpWithEmail: mockSignUpWithEmail,
-      signInAnonymously: mockSignInAnonymously,
-      resetPassword: mockResetPassword,
-      user: null,
-      isAuthenticated: false,
+    mockedUseAuth.mockReturnValue({
+      signInWithEmail: jest.fn(),
+      signInAnonymously: jest.fn(),
     });
-    (AsyncStorage.getItem as jest.Mock).mockResolvedValue(null);
-    (SecureStore.getItemAsync as jest.Mock).mockResolvedValue(null);
-    jest.spyOn(Alert, 'alert').mockImplementation(() => {});
+    mockedAsyncStorage.getItem.mockResolvedValue('false');
+    mockedBiometricAvailable.mockResolvedValue(true);
+    mockedBiometricEnabled.mockResolvedValue(false);
+    mockedBiometricTypeName.mockResolvedValue('Face ID');
+    mockedBiometricLogin.mockResolvedValue({ success: false });
   });
 
-  afterEach(() => {
-    jest.restoreAllMocks();
+  it('shows the auto-login state on mount, then transitions to the entry UI', async () => {
+    const { getByTestId, queryByTestId } = render(<AuthScreen />);
+    expect(getByTestId('auth-autologin')).toBeTruthy();
+    await flushBootstrap();
+    expect(queryByTestId('auth-autologin')).toBeNull();
+    expect(getByTestId('face-cta')).toBeTruthy();
   });
 
-  it('renders login screen by default', async () => {
-    const { getByTestId } = render(<AuthScreen />);
-
-    // Wait for auto-login check to complete and form to appear
-    await waitFor(() => {
-      expect(getByTestId('email-input')).toBeTruthy();
-    }, { timeout: 15000 });
-
-    expect(getByTestId('password-input')).toBeTruthy();
-    expect(getByTestId('submit-button')).toBeTruthy();
-  });
-
-  it('switches to sign up mode', async () => {
-    const { getByText, getByTestId, queryByTestId } = render(<AuthScreen />);
-
-    await waitFor(() => {
-      expect(getByTestId('email-input')).toBeTruthy();
-    });
-
-    fireEvent.press(getByText('계정이 없으신가요? 가입하기'));
-
-    await waitFor(() => {
-      expect(queryByTestId('displayname-input')).toBeTruthy();
-    });
-  });
-
-  it('validates email input', async () => {
-    const { getByTestId } = render(<AuthScreen />);
-
-    await waitFor(() => {
-      expect(getByTestId('email-input')).toBeTruthy();
-    });
-
-    const submitButton = getByTestId('submit-button');
-
-    // Empty email
-    fireEvent.press(submitButton);
-    expect(Alert.alert).toHaveBeenCalledWith('오류', '이메일을 입력해주세요.');
-
-    // Invalid email format
-    const emailInput = getByTestId('email-input');
-    fireEvent.changeText(emailInput, 'invalid-email');
-    fireEvent.press(submitButton);
-    expect(Alert.alert).toHaveBeenCalledWith('오류', '올바른 이메일 형식을 입력해주세요.');
-  });
-
-  it('validates password input', async () => {
-    const { getByTestId } = render(<AuthScreen />);
-
-    await waitFor(() => {
-      expect(getByTestId('email-input')).toBeTruthy();
-    });
-
-    const emailInput = getByTestId('email-input');
-    const submitButton = getByTestId('submit-button');
-
-    fireEvent.changeText(emailInput, 'test@example.com');
-
-    // Empty password
-    fireEvent.press(submitButton);
-    expect(Alert.alert).toHaveBeenCalledWith('오류', '비밀번호를 입력해주세요.');
-
-    // Short password
-    const passwordInput = getByTestId('password-input');
-    fireEvent.changeText(passwordInput, '12345');
-    fireEvent.press(submitButton);
-    expect(Alert.alert).toHaveBeenCalledWith('오류', '비밀번호는 최소 6자 이상이어야 합니다.');
-  });
-
-  it('handles successful login', async () => {
-    mockSignInWithEmail.mockResolvedValueOnce(undefined);
-
-    const { getByTestId } = render(<AuthScreen />);
-
-    await waitFor(() => {
-      expect(getByTestId('email-input')).toBeTruthy();
-    });
-
-    fireEvent.changeText(getByTestId('email-input'), 'test@example.com');
-    fireEvent.changeText(getByTestId('password-input'), 'password123');
-    fireEvent.press(getByTestId('submit-button'));
-
-    await waitFor(() => {
-      expect(mockSignInWithEmail).toHaveBeenCalledWith('test@example.com', 'password123');
-    });
-  });
-
-  it('handles failed login', async () => {
-    mockSignInWithEmail.mockRejectedValueOnce(new Error('Invalid credentials'));
-
-    const { getByTestId } = render(<AuthScreen />);
-
-    await waitFor(() => {
-      expect(getByTestId('email-input')).toBeTruthy();
-    });
-
-    fireEvent.changeText(getByTestId('email-input'), 'test@example.com');
-    fireEvent.changeText(getByTestId('password-input'), 'wrongpassword');
-    fireEvent.press(getByTestId('submit-button'));
-
-    await waitFor(() => {
-      expect(Alert.alert).toHaveBeenCalled();
-    });
-  });
-
-  it('handles sign up with valid data', async () => {
-    mockSignUpWithEmail.mockResolvedValueOnce(undefined);
-
-    const { getByTestId, getByText } = render(<AuthScreen />);
-
-    await waitFor(() => {
-      expect(getByTestId('email-input')).toBeTruthy();
-    });
-
-    // Switch to sign up
-    fireEvent.press(getByText('계정이 없으신가요? 가입하기'));
-
-    await waitFor(() => {
-      expect(getByTestId('displayname-input')).toBeTruthy();
-    });
-
-    fireEvent.changeText(getByTestId('displayname-input'), 'Test User');
-    fireEvent.changeText(getByTestId('email-input'), 'newuser@example.com');
-    fireEvent.changeText(getByTestId('password-input'), 'password123');
-    fireEvent.press(getByTestId('submit-button'));
-
-    await waitFor(() => {
-      expect(mockSignUpWithEmail).toHaveBeenCalledWith(
-        'newuser@example.com',
-        'password123',
-        'Test User'
-      );
-    });
-  });
-
-  it('toggles auto login checkbox', async () => {
+  it('renders the title, hero, social, divider, and terms', async () => {
     const { getByText, getByTestId } = render(<AuthScreen />);
-
-    await waitFor(() => {
-      expect(getByTestId('email-input')).toBeTruthy();
-    });
-
-    const autoLoginCheckbox = getByText('자동로그인');
-    fireEvent.press(autoLoginCheckbox);
-
-    // Checkbox state should toggle
-    expect(autoLoginCheckbox).toBeTruthy();
+    await flushBootstrap();
+    expect(getByText('출퇴근, 1초도 낭비 없이.')).toBeTruthy();
+    expect(getByTestId('auth-hero')).toBeTruthy();
+    expect(getByTestId('social-apple')).toBeTruthy();
+    expect(getByTestId('social-google')).toBeTruthy();
+    expect(getByTestId('social-kakao')).toBeTruthy();
+    expect(getByTestId('auth-divider')).toBeTruthy();
+    expect(getByTestId('auth-terms')).toBeTruthy();
   });
 
-  it('handles anonymous sign in', async () => {
-    mockSignInAnonymously.mockResolvedValueOnce(undefined);
-
+  it('navigates to EmailLogin when the email CTA is pressed', async () => {
     const { getByTestId } = render(<AuthScreen />);
-
-    await waitFor(() => {
-      expect(getByTestId('email-input')).toBeTruthy();
-    });
-
-    fireEvent.press(getByTestId('anonymous-login-button'));
-
-    await waitFor(() => {
-      expect(mockSignInAnonymously).toHaveBeenCalled();
-    });
+    await flushBootstrap();
+    fireEvent.press(getByTestId('email-cta'));
+    expect(mockNavigate).toHaveBeenCalledWith('EmailLogin');
   });
 
-  it('handles forgot password', async () => {
-    mockResetPassword.mockResolvedValueOnce(undefined);
-
-    const { getByText, getByTestId } = render(<AuthScreen />);
-
-    await waitFor(() => {
-      expect(getByTestId('email-input')).toBeTruthy();
-    });
-
-    fireEvent.changeText(getByTestId('email-input'), 'test@example.com');
-    fireEvent.press(getByText('비밀번호를 잊으셨나요?'));
-
-    await waitFor(() => {
-      expect(mockResetPassword).toHaveBeenCalledWith('test@example.com');
-      expect(Alert.alert).toHaveBeenCalled();
-    });
+  it('shows a "준비 중" alert for each social provider', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const { getByTestId } = render(<AuthScreen />);
+    await flushBootstrap();
+    fireEvent.press(getByTestId('social-apple'));
+    fireEvent.press(getByTestId('social-google'));
+    fireEvent.press(getByTestId('social-kakao'));
+    expect(alertSpy).toHaveBeenCalledTimes(3);
+    expect(alertSpy.mock.calls[0]?.[0]).toBe('준비 중');
+    alertSpy.mockRestore();
   });
 
-  it('shows loading state during submission', async () => {
-    mockSignInWithEmail.mockImplementation(
-      () => new Promise((resolve) => setTimeout(resolve, 100))
+  it('invokes signInAnonymously when the browse-as-guest CTA is pressed', async () => {
+    const signInAnonymously = jest.fn().mockResolvedValue(undefined);
+    mockedUseAuth.mockReturnValue({
+      signInWithEmail: jest.fn(),
+      signInAnonymously,
+    });
+    const { getByTestId } = render(<AuthScreen />);
+    await flushBootstrap();
+    fireEvent.press(getByTestId('browse-cta'));
+    await waitFor(() => expect(signInAnonymously).toHaveBeenCalled());
+  });
+
+  it('opens external URLs when terms / privacy links are pressed', async () => {
+    const linkingSpy = jest.spyOn(Linking, 'openURL').mockResolvedValue(true);
+    const { getByTestId } = render(<AuthScreen />);
+    await flushBootstrap();
+    fireEvent.press(getByTestId('auth-terms-tos'));
+    fireEvent.press(getByTestId('auth-terms-privacy'));
+    expect(linkingSpy).toHaveBeenCalledTimes(2);
+    linkingSpy.mockRestore();
+  });
+
+  it('falls back with an alert when biometric login is not available', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    mockedBiometricAvailable.mockResolvedValue(false);
+    const { getByTestId } = render(<AuthScreen />);
+    await flushBootstrap();
+    fireEvent.press(getByTestId('face-cta'));
+    await waitFor(() =>
+      expect(alertSpy).toHaveBeenCalledWith(
+        '생체인증 사용 불가',
+        expect.any(String)
+      )
     );
+    alertSpy.mockRestore();
+  });
 
-    const { getByTestId, getByText } = render(<AuthScreen />);
+  it('falls back with an alert when biometric login is not enabled yet', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    mockedBiometricAvailable.mockResolvedValue(true);
+    mockedBiometricEnabled.mockResolvedValue(false);
+    const { getByTestId } = render(<AuthScreen />);
+    await flushBootstrap();
+    fireEvent.press(getByTestId('face-cta'));
+    await waitFor(() =>
+      expect(alertSpy).toHaveBeenCalledWith('생체인증 미설정', expect.any(String))
+    );
+    alertSpy.mockRestore();
+  });
 
-    await waitFor(() => {
-      expect(getByTestId('email-input')).toBeTruthy();
+  it('signs in via stored credentials when biometric login succeeds', async () => {
+    const signInWithEmail = jest.fn().mockResolvedValue(undefined);
+    mockedUseAuth.mockReturnValue({
+      signInWithEmail,
+      signInAnonymously: jest.fn(),
     });
-
-    fireEvent.changeText(getByTestId('email-input'), 'test@example.com');
-    fireEvent.changeText(getByTestId('password-input'), 'password123');
-    fireEvent.press(getByTestId('submit-button'));
-
-    await waitFor(() => {
-      expect(getByText('처리중...')).toBeTruthy();
+    mockedBiometricEnabled.mockResolvedValue(true);
+    mockedBiometricLogin.mockResolvedValue({
+      success: true,
+      credentials: { email: 'a@b.com', password: 'pw' },
     });
+    const { getByTestId } = render(<AuthScreen />);
+    await flushBootstrap();
+    fireEvent.press(getByTestId('face-cta'));
+    await waitFor(() => expect(signInWithEmail).toHaveBeenCalledWith('a@b.com', 'pw'));
   });
 });

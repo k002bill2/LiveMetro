@@ -97,6 +97,8 @@ export type AppStackParamList = {
   // Unauthenticated screens
   Welcome: undefined;
   Auth: undefined;
+  EmailLogin: undefined;
+  SignUp: undefined;
 
   // Onboarding screens
   Onboarding: undefined;

@@ -1,680 +1,360 @@
 /**
- * Authentication Screen Component
- * Handles user sign-in and sign-up
+ * AuthScreen — entry-point auth screen (Wanted Design System).
+ *
+ * Phase 8 rewrite: lightweight orchestrator that mirrors the Wanted handoff's
+ * LoginScreen 1:1. Heavy email/password and signup flows live in
+ *   - EmailLoginScreen
+ *   - SignUpScreen
+ *
+ * The legacy 679-line implementation is replaced by this orchestrator + the
+ * five atomic components in `src/components/auth/`.
+ *
+ * Removed (per the design contract):
+ *   - Inline email/password form (moved to EmailLoginScreen)
+ *   - Auto-login checkbox (moved to EmailLoginScreen)
+ *   - Forgot-password link (moved to EmailLoginScreen)
+ *   - Sign-up toggle (now SignUpScreen)
+ *
+ * Added:
+ *   - LoginHero        (illustration + wordmark)
+ *   - FaceIDButton     (always visible; falls back to email if not configured)
+ *   - SocialButton x3  (placeholder UI — backend follow-up)
+ *   - OrDivider        ("간편 로그인")
+ *   - TermsFooter      (ToS / privacy micro-copy)
  */
-
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
+  Linking,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  ViewStyle,
+  TextStyle,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { ChevronRight, Eye, Mail } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-
 import * as SecureStore from 'expo-secure-store';
-import { useAuth } from '../../services/auth/AuthContext';
-import { useTheme, ThemeColors } from '../../services/theme';
-import { analyzeAuthError, printFirebaseDebugInfo } from '../../utils/firebaseDebug';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useNavigation } from '@react-navigation/native';
+
+import { WANTED_TOKENS } from '@/styles/modernTheme';
+import { useTheme } from '@/services/theme/themeContext';
+import { useAuth } from '@/services/auth/AuthContext';
 import {
   isBiometricAvailable,
   isBiometricLoginEnabled,
   getBiometricTypeName,
   performBiometricLogin,
-  enableBiometricLogin,
-} from '../../services/auth/biometricService';
+} from '@/services/auth/biometricService';
+import { LoginHero } from '@/components/auth/LoginHero';
+import { FaceIDButton } from '@/components/auth/FaceIDButton';
+import { SocialButton, type SocialProvider } from '@/components/auth/SocialButton';
+import { OrDivider } from '@/components/auth/OrDivider';
+import { TermsFooter } from '@/components/auth/TermsFooter';
+import { AppStackParamList } from '@/navigation/types';
 
-// Storage keys for auto login
 const AUTO_LOGIN_ENABLED_KEY = '@livemetro_auto_login_enabled';
 const AUTO_LOGIN_EMAIL_KEY = 'livemetro_auto_login_email';
 const AUTO_LOGIN_PASSWORD_KEY = 'livemetro_auto_login_password';
 
+const TOS_URL = 'https://livemetro.app/terms';
+const PRIVACY_URL = 'https://livemetro.app/privacy';
+
+type Nav = NativeStackNavigationProp<AppStackParamList>;
+
 export const AuthScreen: React.FC = () => {
-  const { colors } = useTheme();
-  const [isSignUp, setIsSignUp] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [displayName, setDisplayName] = useState('');
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const navigation = useNavigation<Nav>();
+  const { signInWithEmail, signInAnonymously } = useAuth();
+
+  const [biometricLabel, setBiometricLabel] = useState<string>('생체인증으로 계속하기');
+  const [biometricVariant, setBiometricVariant] = useState<'face' | 'touch'>('face');
+  const [autoLoggingIn, setAutoLoggingIn] = useState(true);
   const [loading, setLoading] = useState(false);
 
-  // Auto login state
-  const [autoLogin, setAutoLogin] = useState(false);
-  const [isAutoLoggingIn, setIsAutoLoggingIn] = useState(true);
-
-  // Biometric state
-  const [biometricAvailable, setBiometricAvailable] = useState(false);
-  const [biometricEnabled, setBiometricEnabled] = useState(false);
-  const [biometricTypeName, setBiometricTypeName] = useState('생체인증');
-
-  const { signInWithEmail, signUpWithEmail, signInAnonymously, resetPassword } = useAuth();
-  const styles = createStyles(colors);
-
-  // Load saved data and attempt auto login on mount
+  // Bootstrap: try silent auto-login + detect biometric type
   useEffect(() => {
-    const loadSavedData = async (): Promise<void> => {
+    let cancelled = false;
+    const bootstrap = async (): Promise<void> => {
       try {
-        // Check auto login setting
-        const savedAutoLogin = await AsyncStorage.getItem(AUTO_LOGIN_ENABLED_KEY);
-        const isAutoLoginEnabled = savedAutoLogin === 'true';
-        setAutoLogin(isAutoLoginEnabled);
-
-        // Check biometric availability
         const available = await isBiometricAvailable();
-        setBiometricAvailable(available);
-
         if (available) {
-          const enabled = await isBiometricLoginEnabled();
-          setBiometricEnabled(enabled);
-
           const typeName = await getBiometricTypeName();
-          setBiometricTypeName(typeName);
+          if (!cancelled) {
+            setBiometricLabel(`${typeName}로 계속하기`);
+            setBiometricVariant(typeName === 'Touch ID' ? 'touch' : 'face');
+          }
         }
-
-        // Attempt auto login if enabled
-        if (isAutoLoginEnabled) {
+        const autoLoginPref = await AsyncStorage.getItem(AUTO_LOGIN_ENABLED_KEY);
+        if (autoLoginPref === 'true') {
           const savedEmail = await SecureStore.getItemAsync(AUTO_LOGIN_EMAIL_KEY);
           const savedPassword = await SecureStore.getItemAsync(AUTO_LOGIN_PASSWORD_KEY);
-
-          if (savedEmail && savedPassword) {
-            setEmail(savedEmail);
-            setLoading(true);
+          if (savedEmail && savedPassword && !cancelled) {
             try {
               await signInWithEmail(savedEmail, savedPassword);
-              return; // Auto login successful
-            } catch (error) {
-              console.log('Auto login failed, showing login form');
-              // Auto login failed, show login form with saved email
-            } finally {
-              setLoading(false);
+              return;
+            } catch {
+              // Auto-login failed silently — fall through to UI
             }
           }
         }
-      } catch (error) {
-        console.error('Error loading saved data:', error);
+      } catch (err) {
+        console.error('Auth bootstrap error:', err);
       } finally {
-        setIsAutoLoggingIn(false);
+        if (!cancelled) setAutoLoggingIn(false);
       }
     };
-
-    loadSavedData();
+    bootstrap();
+    return () => {
+      cancelled = true;
+    };
   }, [signInWithEmail]);
 
-  // Handle biometric login
-  const handleBiometricLogin = useCallback(async (): Promise<void> => {
+  const handleBiometricLogin = useCallback(async () => {
     setLoading(true);
     try {
+      const available = await isBiometricAvailable();
+      if (!available) {
+        Alert.alert(
+          '생체인증 사용 불가',
+          '디바이스에서 생체인증을 지원하지 않거나 활성화되어 있지 않습니다.\n이메일로 로그인 후 설정에서 활성화하세요.'
+        );
+        return;
+      }
+      const enabled = await isBiometricLoginEnabled();
+      if (!enabled) {
+        Alert.alert(
+          '생체인증 미설정',
+          '아직 생체인증이 등록되지 않았습니다. 이메일로 한 번 로그인하면 자동으로 설정 안내가 나타납니다.'
+        );
+        return;
+      }
       const result = await performBiometricLogin();
-
       if (result.success && result.credentials) {
-        // Perform actual login with stored credentials
         await signInWithEmail(result.credentials.email, result.credentials.password);
       } else if (result.error && result.error !== 'fallback') {
         Alert.alert('인증 실패', result.error);
       }
-    } catch (error) {
-      console.error('Biometric login error:', error);
+    } catch (err) {
+      console.error('Biometric login error:', err);
       Alert.alert('오류', '생체인증 로그인에 실패했습니다.');
     } finally {
       setLoading(false);
     }
   }, [signInWithEmail]);
 
-  // Save auto login credentials
-  const saveAutoLoginCredentials = useCallback(async (
-    emailToSave: string,
-    passwordToSave: string
-  ): Promise<void> => {
-    try {
-      if (autoLogin) {
-        await AsyncStorage.setItem(AUTO_LOGIN_ENABLED_KEY, 'true');
-        await SecureStore.setItemAsync(AUTO_LOGIN_EMAIL_KEY, emailToSave);
-        await SecureStore.setItemAsync(AUTO_LOGIN_PASSWORD_KEY, passwordToSave);
-      } else {
-        await AsyncStorage.setItem(AUTO_LOGIN_ENABLED_KEY, 'false');
-        await SecureStore.deleteItemAsync(AUTO_LOGIN_EMAIL_KEY);
-        await SecureStore.deleteItemAsync(AUTO_LOGIN_PASSWORD_KEY);
-      }
-    } catch (error) {
-      console.error('Error saving auto login credentials:', error);
-    }
-  }, [autoLogin]);
+  const handleSocialLogin = useCallback((provider: SocialProvider) => {
+    const labels: Record<SocialProvider, string> = {
+      apple: 'Apple',
+      google: 'Google',
+      kakao: '카카오',
+    };
+    Alert.alert('준비 중', `${labels[provider]} 로그인은 곧 출시 예정입니다.`);
+  }, []);
 
-  // Prompt to enable biometric after successful login
-  const promptBiometricSetup = useCallback(async (
-    loginEmail: string,
-    loginPassword: string
-  ): Promise<void> => {
-    if (!biometricAvailable || biometricEnabled) return;
-
-    Alert.alert(
-      `${biometricTypeName} 설정`,
-      `다음에 ${biometricTypeName}로 빠르게 로그인하시겠습니까?`,
-      [
-        { text: '나중에', style: 'cancel' },
-        {
-          text: '설정하기',
-          onPress: async () => {
-            const success = await enableBiometricLogin(loginEmail, loginPassword);
-            if (success) {
-              setBiometricEnabled(true);
-              Alert.alert('완료', `${biometricTypeName} 로그인이 활성화되었습니다.`);
-            }
-          },
-        },
-      ]
-    );
-  }, [biometricAvailable, biometricEnabled, biometricTypeName]);
-
-  // Email validation
-  const isValidEmail = (email: string): boolean => {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  };
-
-  // Password validation
-  const isValidPassword = (password: string): boolean => {
-    return password.length >= 6;
-  };
-
-  const handleSubmit = async (): Promise<void> => {
-    // Validation
-    if (!email.trim()) {
-      Alert.alert('오류', '이메일을 입력해주세요.');
-      return;
-    }
-
-    if (!isValidEmail(email.trim())) {
-      Alert.alert('오류', '올바른 이메일 형식을 입력해주세요.');
-      return;
-    }
-
-    if (!password.trim()) {
-      Alert.alert('오류', '비밀번호를 입력해주세요.');
-      return;
-    }
-
-    if (!isValidPassword(password)) {
-      Alert.alert('오류', '비밀번호는 최소 6자 이상이어야 합니다.');
-      return;
-    }
-
-    if (isSignUp && !displayName.trim()) {
-      Alert.alert('오류', '이름을 입력해주세요.');
-      return;
-    }
-
-    setLoading(true);
-
-    const trimmedEmail = email.trim();
-
-    try {
-      if (isSignUp) {
-        await signUpWithEmail(trimmedEmail, password, displayName.trim());
-        Alert.alert('성공', '계정이 생성되었습니다!');
-      } else {
-        await signInWithEmail(trimmedEmail, password);
-
-        // Save auto login credentials after successful login
-        await saveAutoLoginCredentials(trimmedEmail, password);
-
-        // Prompt for biometric setup (only on login, not signup)
-        await promptBiometricSetup(trimmedEmail, password);
-      }
-    } catch (error) {
-      console.error('Auth error:', error);
-
-      // Analyze error and get recommendations
-      const debugInfo = analyzeAuthError(error);
-      printFirebaseDebugInfo(debugInfo);
-
-      // Get user-friendly error message
-      let errorTitle = isSignUp ? '계정 생성 실패' : '로그인 실패';
-      let errorMessage = '';
-
-      if (debugInfo.errorType === 'AUTH_DISABLED') {
-        errorTitle = 'Firebase 설정 필요';
-        errorMessage = 'Firebase 콘솔에서 이메일/비밀번호 인증을 활성화해야 합니다.\n\n자세한 내용은 콘솔 로그를 확인하세요.';
-      } else if (debugInfo.errorType === 'EMAIL_IN_USE') {
-        errorMessage = '이미 사용 중인 이메일입니다. 다른 이메일을 사용하거나 로그인하세요.';
-      } else if (debugInfo.errorType === 'FIRESTORE_PERMISSION') {
-        errorTitle = 'Firestore 권한 오류';
-        errorMessage = 'Firestore 보안 규칙을 확인해야 합니다.\n\n자세한 내용은 콘솔 로그를 확인하세요.';
-      } else if (debugInfo.missingEnvVars.length > 0) {
-        errorTitle = '설정 오류';
-        errorMessage = 'Firebase 환경 변수가 설정되지 않았습니다.\n\n.env 파일을 확인하고 앱을 재시작하세요.';
-      } else {
-        errorMessage = error instanceof Error ? error.message : '인증에 실패했습니다.';
-      }
-
-      Alert.alert(errorTitle, errorMessage);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleForgotPassword = async (): Promise<void> => {
-    if (!email.trim()) {
-      Alert.alert('알림', '이메일을 먼저 입력해주세요.');
-      return;
-    }
-
-    if (!isValidEmail(email.trim())) {
-      Alert.alert('오류', '올바른 이메일 형식을 입력해주세요.');
-      return;
-    }
-
-    try {
-      setLoading(true);
-      await resetPassword(email.trim());
-      Alert.alert(
-        '이메일 전송 완료',
-        `${email}로 비밀번호 재설정 이메일을 보냈습니다. 이메일을 확인해주세요.`,
-        [{ text: '확인' }]
-      );
-    } catch (error) {
-      console.error('Password reset error:', error);
-      Alert.alert('오류', '비밀번호 재설정 이메일 전송에 실패했습니다.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleAnonymousSignIn = async (): Promise<void> => {
+  const handleAnonymous = useCallback(async () => {
     try {
       setLoading(true);
       await signInAnonymously();
-    } catch (error) {
-      console.error('Anonymous sign in error:', error);
-      Alert.alert('오류', '익명 로그인에 실패했습니다.');
+    } catch (err) {
+      console.error('Anonymous sign in error:', err);
+      Alert.alert('오류', '둘러보기 모드 진입에 실패했습니다.');
     } finally {
       setLoading(false);
     }
-  };
+  }, [signInAnonymously]);
 
-  // Show loading while checking auto login
-  if (isAutoLoggingIn) {
+  const openExternal = useCallback((url: string) => {
+    Linking.openURL(url).catch(() => {
+      // silently ignore — link unavailable
+    });
+  }, []);
+
+  if (autoLoggingIn) {
     return (
-      <SafeAreaView style={styles.container}>
-        <View style={styles.autoLoginContainer}>
-          <View style={styles.logoContainer}>
-            <Ionicons name="train" size={48} color={colors.primary} />
-          </View>
-          <Text style={styles.autoLoginText}>자동 로그인 중...</Text>
+      <SafeAreaView style={[styles.safe, { backgroundColor: semantic.bgBase }]}>
+        <View style={styles.autoLoginPanel} testID="auth-autologin">
+          <Text style={[styles.autoLoginText, { color: semantic.labelNeutral }]}>
+            자동 로그인 중...
+          </Text>
         </View>
       </SafeAreaView>
     );
   }
 
+  const titleStyle: TextStyle = {
+    fontSize: WANTED_TOKENS.type.heading1.size,
+    lineHeight: WANTED_TOKENS.type.heading1.lh * 1.1,
+    letterSpacing:
+      WANTED_TOKENS.type.heading1.size * WANTED_TOKENS.type.heading1.tracking,
+    fontWeight: '800',
+    color: semantic.labelStrong,
+  };
+
+  const subtitleStyle: TextStyle = {
+    marginTop: 6,
+    fontSize: WANTED_TOKENS.type.label1.size,
+    lineHeight: WANTED_TOKENS.type.label1.size * 1.5,
+    fontWeight: '500',
+    color: semantic.labelAlt,
+  };
+
+  const emailButtonStyle: ViewStyle = {
+    marginTop: 10,
+    height: 52,
+    borderRadius: WANTED_TOKENS.radius.r6,
+    borderWidth: 1,
+    borderColor: semantic.lineSubtle,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: WANTED_TOKENS.spacing.s2,
+    backgroundColor: 'transparent',
+  };
+
+  const emailButtonLabel: TextStyle = {
+    color: semantic.labelStrong,
+    fontSize: 15,
+    fontWeight: '700',
+  };
+
+  const browseButtonStyle: ViewStyle = {
+    marginTop: WANTED_TOKENS.spacing.s5,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    paddingHorizontal: WANTED_TOKENS.spacing.s3,
+  };
+
+  const browseLabel: TextStyle = {
+    fontSize: 13,
+    fontWeight: '700',
+    color: semantic.labelNeutral,
+  };
+
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.keyboardView}
+    <SafeAreaView style={[styles.safe, { backgroundColor: semantic.bgBase }]}>
+      <ScrollView
+        contentContainerStyle={styles.scroll}
+        showsVerticalScrollIndicator={false}
       >
-        <View style={styles.content}>
-          {/* Header */}
-          <View style={styles.header}>
-            <View style={styles.logoContainer}>
-              <Ionicons name="train" size={48} color={colors.primary} />
-            </View>
-            <Text style={styles.title}>
-              {isSignUp ? '계정 만들기' : '로그인'}
-            </Text>
-            <Text style={styles.subtitle}>
-              {isSignUp
-                ? 'LiveMetro에 오신 것을 환영합니다!'
-                : '계정에 로그인하여 개인화된 서비스를 이용하세요'
-              }
-            </Text>
+        <LoginHero testID="auth-hero" />
+
+        <View style={styles.body}>
+          <Text style={titleStyle}>출퇴근, 1초도 낭비 없이.</Text>
+          <Text style={subtitleStyle}>
+            내 출퇴근 패턴을 학습해 도착 시간을 예측하고,{'\n'}실시간 혼잡도와 지연 정보를 알려드려요.
+          </Text>
+
+          <View style={styles.faceCtaWrap}>
+            <FaceIDButton
+              label={biometricLabel}
+              onPress={handleBiometricLogin}
+              loading={loading}
+              variant={biometricVariant}
+              testID="face-cta"
+            />
           </View>
 
-          {/* Form */}
-          <View style={styles.form}>
-            {isSignUp && (
-              <View style={styles.inputContainer}>
-                <Text style={styles.label}>이름</Text>
-                <TextInput
-                  style={styles.input}
-                  value={displayName}
-                  onChangeText={setDisplayName}
-                  placeholder="홍길동"
-                  autoCapitalize="words"
-                  textContentType="name"
-                  testID="displayname-input"
-                  accessibilityLabel="이름 입력"
-                />
-              </View>
-            )}
+          <TouchableOpacity
+            testID="email-cta"
+            style={emailButtonStyle}
+            onPress={() => navigation.navigate('EmailLogin')}
+            disabled={loading}
+            accessible
+            accessibilityRole="button"
+            accessibilityLabel="이메일로 로그인"
+            activeOpacity={0.8}
+          >
+            <Mail size={18} color={semantic.labelStrong} strokeWidth={2} />
+            <Text style={emailButtonLabel}>이메일로 로그인</Text>
+          </TouchableOpacity>
 
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>이메일</Text>
-              <TextInput
-                style={styles.input}
-                value={email}
-                onChangeText={setEmail}
-                placeholder="example@gmail.com"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                textContentType="emailAddress"
-                autoComplete="email"
-                testID="email-input"
-                accessibilityLabel="이메일 입력"
-              />
-            </View>
-
-            <View style={styles.inputContainer}>
-              <Text style={styles.label}>비밀번호</Text>
-              <TextInput
-                style={styles.input}
-                value={password}
-                onChangeText={setPassword}
-                placeholder="비밀번호를 입력하세요"
-                secureTextEntry
-                textContentType="password"
-                autoComplete={isSignUp ? 'password-new' : 'password'}
-                testID="password-input"
-                accessibilityLabel="비밀번호 입력"
-              />
-            </View>
-
-            {/* Auto Login Checkbox (only for login) */}
-            {!isSignUp && (
-              <View style={styles.rememberContainer}>
-                <TouchableOpacity
-                  style={styles.rememberRow}
-                  onPress={() => setAutoLogin(!autoLogin)}
-                  activeOpacity={0.7}
-                >
-                  <View style={[
-                    styles.checkbox,
-                    autoLogin && styles.checkboxChecked
-                  ]}>
-                    {autoLogin && (
-                      <Ionicons name="checkmark" size={14} color={colors.textInverse} />
-                    )}
-                  </View>
-                  <Text style={styles.rememberText}>자동로그인</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
-            <TouchableOpacity
-              style={[styles.primaryButton, loading && styles.disabledButton]}
-              onPress={handleSubmit}
-              disabled={loading}
-              testID="submit-button"
-              accessibilityLabel={isSignUp ? '계정 만들기' : '로그인'}
-            >
-              <Text style={styles.primaryButtonText}>
-                {loading ? '처리중...' : (isSignUp ? '계정 만들기' : '로그인')}
-              </Text>
-            </TouchableOpacity>
-
-            {/* Biometric Login Button */}
-            {!isSignUp && biometricAvailable && biometricEnabled && (
-              <TouchableOpacity
-                style={[styles.biometricButton, loading && styles.disabledButton]}
-                onPress={handleBiometricLogin}
-                disabled={loading}
-                testID="biometric-login-button"
-                accessibilityLabel={`${biometricTypeName}로 로그인`}
-              >
-                <Ionicons
-                  name={biometricTypeName === 'Face ID' ? 'scan-outline' : 'finger-print-outline'}
-                  size={24}
-                  color={colors.primary}
-                />
-                <Text style={styles.biometricButtonText}>
-                  {biometricTypeName}로 로그인
-                </Text>
-              </TouchableOpacity>
-            )}
-
-            {/* Forgot Password */}
-            {!isSignUp && (
-              <TouchableOpacity
-                style={styles.forgotPasswordButton}
-                onPress={handleForgotPassword}
-                disabled={loading}
-              >
-                <Text style={styles.forgotPasswordText}>
-                  비밀번호를 잊으셨나요?
-                </Text>
-              </TouchableOpacity>
-            )}
+          <View style={styles.dividerWrap}>
+            <OrDivider label="간편 로그인" testID="auth-divider" />
           </View>
 
-          {/* Alternative Actions */}
-          <View style={styles.alternativeSection}>
-            <TouchableOpacity
-              style={styles.switchButton}
-              onPress={() => setIsSignUp(!isSignUp)}
-            >
-              <Text style={styles.switchButtonText}>
-                {isSignUp
-                  ? '이미 계정이 있으신가요? 로그인'
-                  : '계정이 없으신가요? 가입하기'
-                }
-              </Text>
-            </TouchableOpacity>
-
-            <View style={styles.divider}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>또는</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            <TouchableOpacity
-              style={styles.secondaryButton}
-              onPress={handleAnonymousSignIn}
-              disabled={loading}
-              testID="anonymous-login-button"
-              accessibilityLabel="익명으로 계속하기"
-            >
-              <Ionicons name="person-outline" size={20} color={colors.textSecondary} />
-              <Text style={styles.secondaryButtonText}>
-                익명으로 계속하기
-              </Text>
-            </TouchableOpacity>
+          <View style={styles.socialStack}>
+            <SocialButton
+              provider="apple"
+              label="Apple로 계속하기"
+              onPress={() => handleSocialLogin('apple')}
+              testID="social-apple"
+            />
+            <SocialButton
+              provider="google"
+              label="Google로 계속하기"
+              onPress={() => handleSocialLogin('google')}
+              testID="social-google"
+            />
+            <SocialButton
+              provider="kakao"
+              label="카카오로 계속하기"
+              onPress={() => handleSocialLogin('kakao')}
+              testID="social-kakao"
+            />
           </View>
+
+          <TouchableOpacity
+            testID="browse-cta"
+            style={browseButtonStyle}
+            onPress={handleAnonymous}
+            disabled={loading}
+            accessible
+            accessibilityRole="button"
+            accessibilityLabel="로그인 없이 둘러보기"
+          >
+            <Eye size={15} color={semantic.labelNeutral} strokeWidth={2} />
+            <Text style={browseLabel}>로그인 없이 둘러보기</Text>
+            <ChevronRight size={14} color={semantic.labelNeutral} strokeWidth={2} />
+          </TouchableOpacity>
+
+          <TermsFooter
+            onTermsPress={() => openExternal(TOS_URL)}
+            onPrivacyPress={() => openExternal(PRIVACY_URL)}
+            testID="auth-terms"
+          />
         </View>
-      </KeyboardAvoidingView>
+      </ScrollView>
     </SafeAreaView>
   );
 };
 
-const createStyles = (colors: ThemeColors) =>
-  StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.backgroundSecondary,
-    },
-    autoLoginContainer: {
-      flex: 1,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    autoLoginText: {
-      fontSize: 16,
-      color: colors.textSecondary,
-      marginTop: 16,
-    },
-    keyboardView: {
-      flex: 1,
-    },
-    content: {
-      flex: 1,
-      paddingHorizontal: 32,
-      paddingVertical: 24,
-      justifyContent: 'center',
-    },
-    header: {
-      alignItems: 'center',
-      marginBottom: 32,
-    },
-    logoContainer: {
-      width: 80,
-      height: 80,
-      backgroundColor: colors.primaryLight,
-      borderRadius: 40,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginBottom: 16,
-    },
-    title: {
-      fontSize: 28,
-      fontWeight: 'bold',
-      color: colors.textPrimary,
-      marginBottom: 8,
-    },
-    subtitle: {
-      fontSize: 16,
-      color: colors.textSecondary,
-      textAlign: 'center',
-      lineHeight: 22,
-    },
-    form: {
-      marginBottom: 24,
-    },
-    inputContainer: {
-      marginBottom: 16,
-    },
-    label: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: colors.textPrimary,
-      marginBottom: 6,
-    },
-    input: {
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.borderMedium,
-      borderRadius: 12,
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      fontSize: 16,
-      color: colors.textPrimary,
-    },
-    primaryButton: {
-      backgroundColor: colors.primary,
-      paddingVertical: 16,
-      borderRadius: 16,
-      alignItems: 'center',
-      marginTop: 8,
-    },
-    disabledButton: {
-      opacity: 0.6,
-    },
-    forgotPasswordButton: {
-      paddingVertical: 12,
-      alignItems: 'center',
-      marginTop: 8,
-    },
-    forgotPasswordText: {
-      fontSize: 14,
-      color: colors.primary,
-      fontWeight: '600',
-    },
-    primaryButtonText: {
-      fontSize: 16,
-      fontWeight: 'bold',
-      color: colors.textInverse,
-    },
-    alternativeSection: {
-      alignItems: 'center',
-    },
-    switchButton: {
-      paddingVertical: 8,
-      marginBottom: 20,
-    },
-    switchButtonText: {
-      fontSize: 14,
-      color: colors.primary,
-      fontWeight: '600',
-    },
-    divider: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      width: '100%',
-      marginBottom: 20,
-    },
-    dividerLine: {
-      flex: 1,
-      height: 1,
-      backgroundColor: colors.borderMedium,
-    },
-    dividerText: {
-      paddingHorizontal: 16,
-      fontSize: 14,
-      color: colors.textTertiary,
-    },
-    secondaryButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.borderMedium,
-      paddingVertical: 14,
-      paddingHorizontal: 20,
-      borderRadius: 16,
-      width: '100%',
-      justifyContent: 'center',
-    },
-    secondaryButtonText: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: colors.textPrimary,
-      marginLeft: 8,
-    },
-    // Remember email styles
-    rememberContainer: {
-      marginBottom: 16,
-    },
-    rememberRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    checkbox: {
-      width: 20,
-      height: 20,
-      borderRadius: 4,
-      borderWidth: 2,
-      borderColor: colors.borderMedium,
-      backgroundColor: colors.surface,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginRight: 8,
-    },
-    checkboxChecked: {
-      backgroundColor: colors.primary,
-      borderColor: colors.primary,
-    },
-    rememberText: {
-      fontSize: 14,
-      color: colors.textPrimary,
-    },
-    // Biometric button styles
-    biometricButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.primaryLight,
-      borderWidth: 1,
-      borderColor: colors.primary,
-      paddingVertical: 14,
-      borderRadius: 16,
-      marginTop: 12,
-    },
-    biometricButtonText: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: colors.primary,
-      marginLeft: 8,
-    },
-  });
+const styles = StyleSheet.create({
+  safe: { flex: 1 },
+  scroll: { paddingBottom: 0 },
+  body: {
+    flex: 1,
+    paddingHorizontal: WANTED_TOKENS.spacing.s6,
+    paddingTop: 28,
+    paddingBottom: WANTED_TOKENS.spacing.s4,
+  },
+  faceCtaWrap: {
+    marginTop: WANTED_TOKENS.spacing.s6,
+  },
+  dividerWrap: {
+    marginTop: WANTED_TOKENS.spacing.s5,
+  },
+  socialStack: {
+    marginTop: WANTED_TOKENS.spacing.s4,
+    gap: WANTED_TOKENS.spacing.s2,
+  },
+  autoLoginPanel: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  autoLoginText: {
+    fontSize: WANTED_TOKENS.type.body1.size,
+    fontWeight: '600',
+  },
+});
+
+export default AuthScreen;
