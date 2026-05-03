@@ -3,7 +3,7 @@
  * Minimal grayscale with black accent
  */
 
-import React, { useCallback } from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -33,7 +33,9 @@ import { addTestNotifications, addRandomNotification } from '../../utils/notific
 
 export const AlertsScreen: React.FC = () => {
   const { colors, isDark } = useTheme();
-  const styles = createStyles(colors, isDark);
+  // Memoize styles so notification updates don't recreate the StyleSheet
+  // object on every render (regression noted in cross-review).
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const {
     notifications,
     unreadCount,

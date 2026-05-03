@@ -23,3 +23,6 @@ export { MLHeroCard } from './MLHeroCard';
 export { HomeTopBar } from './HomeTopBar';
 export { QuickActionsGrid } from './QuickActionsGrid';
 export type { QuickAction } from './QuickActionsGrid';
+
+/* Phase 3B — list row primitive */
+export { FavoriteRow } from './FavoriteRow';

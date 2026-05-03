@@ -92,7 +92,7 @@ export const HomeScreen: React.FC = () => {
   const isFocused = useIsFocused();
   const { user } = useAuth();
   const { colors, isDark } = useTheme();
-  const styles = createStyles(colors, isDark);
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const { showError, showSuccess, showInfo, ToastComponent } = useToast();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);

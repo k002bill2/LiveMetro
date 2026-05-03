@@ -4,7 +4,7 @@
  * Minimal grayscale design with black accent
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -44,7 +44,7 @@ import { useAuth } from '../../services/auth/AuthContext';
 import { AppStackParamList } from '@/navigation/types';
 import { useI18n } from '../../services/i18n';
 import { useTheme } from '../../services/theme';
-import { SPACING, RADIUS, TYPOGRAPHY } from '../../styles/modernTheme';
+import { SPACING, RADIUS, TYPOGRAPHY, WANTED_TOKENS } from '../../styles/modernTheme';
 import { SettingsStackParamList } from '@/navigation/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
@@ -67,7 +67,7 @@ type Props = NativeStackScreenProps<SettingsStackParamList, 'SettingsHome'>;
 export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   const { user, signOut } = useAuth();
   const { language, t } = useI18n();
-  const { themeMode, colors } = useTheme();
+  const { themeMode, colors, isDark } = useTheme();
   // Root navigation for screens outside SettingsNavigator
   const rootNavigation = useNavigation<NavigationProp<AppStackParamList>>();
 
@@ -219,7 +219,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
     );
   };
 
-  const styles = createStyles(colors);
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
   const SettingItem: React.FC<{
     Icon: React.ElementType;
@@ -462,11 +462,14 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const createStyles = (colors: any) =>
-  StyleSheet.create({
+const createStyles = (colors: any, isDark: boolean) => {
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background,
+      // Phase 5 alignment: bgSubtlePage gives Settings its own quiet shade
+      // distinct from card surfaces. Theme-reactive via isDark.
+      backgroundColor: semantic.bgSubtlePage,
     },
     content: {
       flex: 1,
@@ -589,5 +592,6 @@ const createStyles = (colors: any) =>
       marginLeft: SPACING.sm,
     },
   });
+};
 
 export default SettingsScreen;

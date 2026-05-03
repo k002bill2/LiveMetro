@@ -72,7 +72,7 @@ const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 const MainTabNavigator: React.FC = () => {
-  const { colors, isDark } = useTheme();
+  const { isDark } = useTheme();
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
 
   return (
@@ -110,15 +110,19 @@ const MainTabNavigator: React.FC = () => {
         },
         tabBarLabelStyle: {
           fontSize: 10,
-          fontWeight: '700',
+          // '600' matches WANTED_TOKENS.type.caption2 weight; '700' was a
+          // mismatch noted in cross-review.
+          fontWeight: '600',
           letterSpacing: 0,
         },
         headerStyle: {
           backgroundColor: semantic.primaryNormal,
         },
-        headerTintColor: colors.textInverse,
+        // Use semantic.labelOnColor — colors.textInverse is #121212 in dark
+        // mode, which would render dark text on a blue header (poor contrast).
+        headerTintColor: semantic.labelOnColor,
         headerTitleStyle: {
-          fontWeight: 'bold',
+          fontWeight: '700',
         },
       })}
     >

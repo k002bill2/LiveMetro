@@ -3,7 +3,7 @@
  * Shows ML-based commute predictions for each day of the week
  */
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -24,7 +24,7 @@ import { NavigationProp, useNavigation } from '@react-navigation/native';
 
 import { useMLPrediction } from '@/hooks/useMLPrediction';
 import { useTheme, ThemeColors } from '@/services/theme';
-import { SPACING, RADIUS, TYPOGRAPHY } from '@/styles/modernTheme';
+import { SPACING, RADIUS, TYPOGRAPHY, WANTED_TOKENS } from '@/styles/modernTheme';
 import { MLPrediction } from '@/models/ml';
 import { DayOfWeek } from '@/models/pattern';
 import { AppStackParamList } from '@/navigation/types';
@@ -61,8 +61,8 @@ const DAY_NAMES: Record<DayOfWeek, string> = {
 
 export const WeeklyPredictionScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<AppStackParamList>>();
-  const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
   const { getWeekPredictions, isModelReady, modelMetadata, trainModel, isTraining, hasEnoughData } =
     useMLPrediction();
@@ -318,11 +318,12 @@ export const WeeklyPredictionScreen: React.FC = () => {
 // Styles
 // ============================================================================
 
-const createStyles = (colors: ThemeColors) =>
-  StyleSheet.create({
+const createStyles = (colors: ThemeColors, isDark: boolean) => {
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  return StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background,
+      backgroundColor: semantic.bgSubtlePage,
     },
     header: {
       flexDirection: 'row',
@@ -330,17 +331,17 @@ const createStyles = (colors: ThemeColors) =>
       justifyContent: 'space-between',
       paddingHorizontal: SPACING.md,
       paddingVertical: SPACING.lg,
-      backgroundColor: colors.surface,
+      backgroundColor: semantic.bgBase,
       borderBottomWidth: 1,
-      borderBottomColor: colors.borderLight,
+      borderBottomColor: semantic.lineSubtle,
     },
     backButton: {
       padding: SPACING.xs,
     },
     headerTitle: {
-      fontSize: TYPOGRAPHY.fontSize.lg,
-      fontWeight: TYPOGRAPHY.fontWeight.bold,
-      color: colors.textPrimary,
+      fontSize: 17,
+      fontWeight: '700',
+      color: semantic.labelStrong,
     },
     headerSpacer: {
       width: 32,
@@ -512,5 +513,6 @@ const createStyles = (colors: ThemeColors) =>
       color: colors.textTertiary,
     },
   });
+};
 
 export default WeeklyPredictionScreen;

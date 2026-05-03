@@ -3,7 +3,7 @@
  * 실시간 지연 제보 피드 화면
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -42,7 +42,8 @@ const LINES = ['전체', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 export const DelayFeedScreen: React.FC = () => {
   const { user } = useAuth();
   const { colors, isDark } = useTheme();
-  const styles = createStyles(colors, isDark);
+  // Memoize styles — feed re-renders on report stream updates (cross-review).
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
   const [reports, setReports] = useState<DelayReport[]>([]);
   const [_loading, setLoading] = useState(true);
