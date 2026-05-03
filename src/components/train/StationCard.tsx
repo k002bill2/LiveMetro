@@ -106,6 +106,16 @@ export const StationCard: React.FC<StationCardProps> = memo(
       staleTime: 60000, // 1 minute
     });
 
+    // Tick to refresh "N분 후" text every 30s even when the realtime stream
+    // is silent (Seoul API polling only updates trains[]). Without this the
+    // displayed minutes drift between fetches (Gemini cross-review).
+    const [arrivalTick, setArrivalTick] = useState(0);
+    useEffect(() => {
+      if (!showArrivals || !arrivalsEnabled) return;
+      const id = setInterval(() => setArrivalTick(t => t + 1), 30_000);
+      return () => clearInterval(id);
+    }, [showArrivals, arrivalsEnabled]);
+
     // ============ ANIMATIONS ============
     // Entrance animation on mount
     useEffect(() => {
@@ -258,7 +268,10 @@ export const StationCard: React.FC<StationCardProps> = memo(
           };
         })
         .filter((a): a is UpcomingArrival => a !== null);
-    }, [trains, showArrivals]);
+      // arrivalTick is intentional in deps — recompute "N분 후" every 30s so
+      // text doesn't drift between trains[] fetches.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [trains, showArrivals, arrivalTick]);
 
     return (
       <Animated.View
@@ -459,9 +472,12 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       marginBottom: SPACING.xs,
     },
     stationName: {
-      // Headline1 (18 / weight 600) bumped to 800 for emphasis on station name.
+      // 700 (bold) instead of 800 — Android 시스템 폰트는 numeric weight를
+      // 400/700만 보장. 800은 일부 디바이스에서 700으로 fallback돼 시각
+      // 일관성 손상. iOS는 800을 정확히 표현하지만 cross-platform 안정성
+      // 우선 (Gemini cross-review).
       fontSize: TYPOGRAPHY.fontSize.lg,
-      fontWeight: '800',
+      fontWeight: TYPOGRAPHY.fontWeight.bold,
       color: semantic.labelStrong,
       letterSpacing: -0.3,
     },
@@ -559,7 +575,8 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     },
     arrivalTime: {
       fontSize: TYPOGRAPHY.fontSize.base,
-      fontWeight: '800',
+      // 700 instead of 800 (cross-platform consistency — see stationName).
+      fontWeight: TYPOGRAPHY.fontWeight.bold,
       color: semantic.labelStrong,
       minWidth: 60,
       // Tabular-nums prevents the countdown digits from shifting horizontally
