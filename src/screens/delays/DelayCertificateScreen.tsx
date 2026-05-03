@@ -25,7 +25,7 @@ import {
 } from 'lucide-react-native';
 
 import { useAuth } from '@/services/auth/AuthContext';
-import { useTheme, ThemeColors } from '@/services/theme';
+import { useTheme } from '@/services/theme';
 import { delayHistoryService } from '@/services/delay/delayHistoryService';
 import {
   DelayCertificate,
@@ -33,12 +33,13 @@ import {
   DelayReasonLabels,
 } from '@/models/delayCertificate';
 import { getSubwayLineColor } from '@/utils/colorUtils';
-import { SPACING, RADIUS, TYPOGRAPHY } from '@/styles/modernTheme';
+import { WANTED_TOKENS, type WantedSemanticTheme } from '@/styles/modernTheme';
 
 export const DelayCertificateScreen: React.FC = () => {
   const { user } = useAuth();
-  const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const styles = createStyles(semantic);
 
   const [certificates, setCertificates] = useState<DelayCertificate[]>([]);
   const [history, setHistory] = useState<DelayHistoryEntry[]>([]);
@@ -163,7 +164,7 @@ export const DelayCertificateScreen: React.FC = () => {
           {/* Header */}
           <View style={styles.cardHeader}>
             <View style={styles.certificateNumber}>
-              <FileText size={16} color={colors.textSecondary} />
+              <FileText size={16} color={semantic.labelAlt} />
               <Text style={styles.certificateNumberText}>
                 {certificate.certificateNumber}
               </Text>
@@ -182,7 +183,7 @@ export const DelayCertificateScreen: React.FC = () => {
           </View>
 
           <View style={styles.delayInfo}>
-            <Clock size={14} color={colors.error} />
+            <Clock size={14} color={semantic.statusNegative} />
             <Text style={styles.delayText}>
               {certificate.delayMinutes}분 지연
             </Text>
@@ -197,8 +198,8 @@ export const DelayCertificateScreen: React.FC = () => {
               style={styles.actionButton}
               onPress={() => handleShareCertificate(certificate)}
             >
-              <Share2 size={18} color={colors.primary} />
-              <Text style={[styles.actionText, { color: colors.primary }]}>
+              <Share2 size={18} color={semantic.primaryNormal} />
+              <Text style={[styles.actionText, { color: semantic.primaryNormal }]}>
                 공유
               </Text>
             </TouchableOpacity>
@@ -207,8 +208,8 @@ export const DelayCertificateScreen: React.FC = () => {
               style={styles.actionButton}
               onPress={() => handleDeleteCertificate(certificate)}
             >
-              <Trash2 size={18} color={colors.error} />
-              <Text style={[styles.actionText, { color: colors.error }]}>
+              <Trash2 size={18} color={semantic.statusNegative} />
+              <Text style={[styles.actionText, { color: semantic.statusNegative }]}>
                 삭제
               </Text>
             </TouchableOpacity>
@@ -244,7 +245,7 @@ export const DelayCertificateScreen: React.FC = () => {
           </View>
 
           <View style={styles.delayInfo}>
-            <AlertCircle size={14} color={colors.error} />
+            <AlertCircle size={14} color={semantic.statusNegative} />
             <Text style={styles.delayText}>
               {entry.delayMinutes}분 지연
             </Text>
@@ -261,13 +262,13 @@ export const DelayCertificateScreen: React.FC = () => {
 
           {entry.certificateGenerated ? (
             <View style={styles.generatedBadge}>
-              <FileText size={12} color={colors.success} />
+              <FileText size={12} color={semantic.statusPositive} />
               <Text style={styles.generatedText}>증명서 발급됨</Text>
             </View>
           ) : (
             <View style={styles.generateHint}>
               <Text style={styles.generateHintText}>탭하여 증명서 발급</Text>
-              <ChevronRight size={16} color={colors.textTertiary} />
+              <ChevronRight size={16} color={semantic.labelAlt} />
             </View>
           )}
         </View>
@@ -290,7 +291,7 @@ export const DelayCertificateScreen: React.FC = () => {
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
-      <FileText size={64} color={colors.textTertiary} />
+      <FileText size={64} color={semantic.labelAlt} />
       <Text style={styles.emptyTitle}>
         {activeTab === 'certificates'
           ? '발급된 증명서가 없습니다'
@@ -334,7 +335,7 @@ export const DelayCertificateScreen: React.FC = () => {
         >
           <FileText
             size={18}
-            color={activeTab === 'certificates' ? colors.primary : colors.textSecondary}
+            color={activeTab === 'certificates' ? semantic.primaryNormal : semantic.labelAlt}
           />
           <Text
             style={[
@@ -356,7 +357,7 @@ export const DelayCertificateScreen: React.FC = () => {
         >
           <Clock
             size={18}
-            color={activeTab === 'history' ? colors.primary : colors.textSecondary}
+            color={activeTab === 'history' ? semantic.primaryNormal : semantic.labelAlt}
           />
           <Text
             style={[
@@ -377,7 +378,7 @@ export const DelayCertificateScreen: React.FC = () => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={colors.textPrimary}
+            tintColor={semantic.labelStrong}
           />
         }
       >
@@ -395,7 +396,7 @@ export const DelayCertificateScreen: React.FC = () => {
 
         {/* Info Box */}
         <View style={styles.infoBox}>
-          <AlertCircle size={16} color={colors.textSecondary} />
+          <AlertCircle size={16} color={semantic.labelAlt} />
           <Text style={styles.infoText}>
             공식 지연증명서는 또타지하철 앱에서 발급받으실 수 있습니다.
             본 서비스는 참고용 기록입니다.
@@ -406,74 +407,74 @@ export const DelayCertificateScreen: React.FC = () => {
   );
 };
 
-const createStyles = (colors: ThemeColors) =>
+const createStyles = (semantic: WantedSemanticTheme) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background,
+      backgroundColor: semantic.bgSubtlePage,
     },
     header: {
-      paddingHorizontal: SPACING.lg,
-      paddingVertical: SPACING.lg,
-      backgroundColor: colors.surface,
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s4,
+      backgroundColor: semantic.bgBase,
       borderBottomWidth: 1,
-      borderBottomColor: colors.borderLight,
+      borderBottomColor: semantic.lineSubtle,
     },
     headerTitle: {
-      fontSize: TYPOGRAPHY.fontSize['2xl'],
+      fontSize: WANTED_TOKENS.type.title3.size,
       fontWeight: '700',
-      color: colors.textPrimary,
+      color: semantic.labelStrong,
     },
     headerSubtitle: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      color: colors.textSecondary,
-      marginTop: SPACING.xs,
+      fontSize: WANTED_TOKENS.type.caption1.size,
+      color: semantic.labelAlt,
+      marginTop: WANTED_TOKENS.spacing.s1,
     },
     tabContainer: {
       flexDirection: 'row',
-      backgroundColor: colors.surface,
-      paddingHorizontal: SPACING.md,
+      backgroundColor: semantic.bgBase,
+      paddingHorizontal: WANTED_TOKENS.spacing.s3,
       borderBottomWidth: 1,
-      borderBottomColor: colors.borderLight,
+      borderBottomColor: semantic.lineSubtle,
     },
     tab: {
       flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: SPACING.md,
-      gap: SPACING.xs,
+      paddingVertical: WANTED_TOKENS.spacing.s3,
+      gap: WANTED_TOKENS.spacing.s1,
     },
     tabActive: {
       borderBottomWidth: 2,
-      borderBottomColor: colors.primary,
+      borderBottomColor: semantic.primaryNormal,
     },
     tabText: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      color: colors.textSecondary,
+      fontSize: WANTED_TOKENS.type.caption1.size,
+      color: semantic.labelAlt,
       fontWeight: '500',
     },
     tabTextActive: {
-      color: colors.primary,
+      color: semantic.primaryNormal,
       fontWeight: '600',
     },
     content: {
       flex: 1,
     },
     contentContainer: {
-      padding: SPACING.lg,
+      padding: WANTED_TOKENS.spacing.s4,
     },
     certificateCard: {
-      backgroundColor: colors.surface,
-      borderRadius: RADIUS.lg,
-      marginBottom: SPACING.md,
+      backgroundColor: semantic.bgBase,
+      borderRadius: WANTED_TOKENS.radius.r6,
+      marginBottom: WANTED_TOKENS.spacing.s3,
       overflow: 'hidden',
       flexDirection: 'row',
     },
     historyCard: {
-      backgroundColor: colors.surface,
-      borderRadius: RADIUS.lg,
-      marginBottom: SPACING.md,
+      backgroundColor: semantic.bgBase,
+      borderRadius: WANTED_TOKENS.radius.r6,
+      marginBottom: WANTED_TOKENS.spacing.s3,
       overflow: 'hidden',
       flexDirection: 'row',
     },
@@ -482,152 +483,152 @@ const createStyles = (colors: ThemeColors) =>
     },
     cardContent: {
       flex: 1,
-      padding: SPACING.md,
+      padding: WANTED_TOKENS.spacing.s3,
     },
     cardHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: SPACING.sm,
+      marginBottom: WANTED_TOKENS.spacing.s2,
     },
     certificateNumber: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: SPACING.xs,
+      gap: WANTED_TOKENS.spacing.s1,
     },
     certificateNumberText: {
-      fontSize: TYPOGRAPHY.fontSize.xs,
-      color: colors.textSecondary,
+      fontSize: WANTED_TOKENS.type.caption1.size,
+      color: semantic.labelAlt,
       fontFamily: 'monospace',
     },
     dateText: {
-      fontSize: TYPOGRAPHY.fontSize.xs,
-      color: colors.textTertiary,
+      fontSize: WANTED_TOKENS.type.caption1.size,
+      color: semantic.labelAlt,
     },
     infoRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: SPACING.sm,
+      gap: WANTED_TOKENS.spacing.s2,
     },
     lineBadge: {
-      paddingHorizontal: SPACING.sm,
+      paddingHorizontal: WANTED_TOKENS.spacing.s2,
       paddingVertical: 2,
-      borderRadius: RADIUS.sm,
+      borderRadius: WANTED_TOKENS.radius.r2,
     },
     lineBadgeText: {
-      fontSize: TYPOGRAPHY.fontSize.xs,
+      fontSize: WANTED_TOKENS.type.caption1.size,
       color: '#FFFFFF',
       fontWeight: '600',
     },
     stationText: {
-      fontSize: TYPOGRAPHY.fontSize.base,
+      fontSize: WANTED_TOKENS.type.body1.size,
       fontWeight: '600',
-      color: colors.textPrimary,
+      color: semantic.labelStrong,
     },
     delayInfo: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: SPACING.xs,
-      marginTop: SPACING.sm,
+      gap: WANTED_TOKENS.spacing.s1,
+      marginTop: WANTED_TOKENS.spacing.s2,
     },
     delayText: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
+      fontSize: WANTED_TOKENS.type.caption1.size,
       fontWeight: '600',
-      color: colors.error,
+      color: semantic.statusNegative,
     },
     timeText: {
-      fontSize: TYPOGRAPHY.fontSize.xs,
-      color: colors.textSecondary,
+      fontSize: WANTED_TOKENS.type.caption1.size,
+      color: semantic.labelAlt,
     },
     reasonText: {
-      fontSize: TYPOGRAPHY.fontSize.xs,
-      color: colors.textSecondary,
-      marginTop: SPACING.xs,
+      fontSize: WANTED_TOKENS.type.caption1.size,
+      color: semantic.labelAlt,
+      marginTop: WANTED_TOKENS.spacing.s1,
     },
     cardActions: {
       flexDirection: 'row',
       justifyContent: 'flex-end',
-      gap: SPACING.md,
-      marginTop: SPACING.md,
-      paddingTop: SPACING.sm,
+      gap: WANTED_TOKENS.spacing.s3,
+      marginTop: WANTED_TOKENS.spacing.s3,
+      paddingTop: WANTED_TOKENS.spacing.s2,
       borderTopWidth: 1,
-      borderTopColor: colors.borderLight,
+      borderTopColor: semantic.lineSubtle,
     },
     actionButton: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: SPACING.xs,
-      paddingVertical: SPACING.xs,
-      paddingHorizontal: SPACING.sm,
+      gap: WANTED_TOKENS.spacing.s1,
+      paddingVertical: WANTED_TOKENS.spacing.s1,
+      paddingHorizontal: WANTED_TOKENS.spacing.s2,
     },
     actionText: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
+      fontSize: WANTED_TOKENS.type.caption1.size,
       fontWeight: '500',
     },
     generatedBadge: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: SPACING.xs,
-      marginTop: SPACING.sm,
+      gap: WANTED_TOKENS.spacing.s1,
+      marginTop: WANTED_TOKENS.spacing.s2,
     },
     generatedText: {
-      fontSize: TYPOGRAPHY.fontSize.xs,
-      color: colors.success,
+      fontSize: WANTED_TOKENS.type.caption1.size,
+      color: semantic.statusPositive,
       fontWeight: '500',
     },
     generateHint: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'flex-end',
-      marginTop: SPACING.sm,
+      marginTop: WANTED_TOKENS.spacing.s2,
     },
     generateHintText: {
-      fontSize: TYPOGRAPHY.fontSize.xs,
-      color: colors.textTertiary,
+      fontSize: WANTED_TOKENS.type.caption1.size,
+      color: semantic.labelAlt,
     },
     emptyState: {
       alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: SPACING['3xl'],
+      paddingVertical: WANTED_TOKENS.spacing.s12,
     },
     emptyTitle: {
-      fontSize: TYPOGRAPHY.fontSize.lg,
+      fontSize: WANTED_TOKENS.type.heading2.size,
       fontWeight: '600',
-      color: colors.textPrimary,
-      marginTop: SPACING.lg,
+      color: semantic.labelStrong,
+      marginTop: WANTED_TOKENS.spacing.s4,
     },
     emptySubtitle: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      color: colors.textSecondary,
+      fontSize: WANTED_TOKENS.type.body2.size,
+      color: semantic.labelAlt,
       textAlign: 'center',
-      marginTop: SPACING.sm,
+      marginTop: WANTED_TOKENS.spacing.s2,
       lineHeight: 20,
     },
     sampleButton: {
-      marginTop: SPACING.lg,
-      paddingHorizontal: SPACING.lg,
-      paddingVertical: SPACING.sm,
-      backgroundColor: colors.primary,
-      borderRadius: RADIUS.md,
+      marginTop: WANTED_TOKENS.spacing.s4,
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s2,
+      backgroundColor: semantic.primaryNormal,
+      borderRadius: WANTED_TOKENS.radius.r4,
     },
     sampleButtonText: {
       color: '#FFFFFF',
-      fontSize: TYPOGRAPHY.fontSize.sm,
+      fontSize: WANTED_TOKENS.type.label1.size,
       fontWeight: '600',
     },
     infoBox: {
       flexDirection: 'row',
       alignItems: 'flex-start',
-      backgroundColor: colors.backgroundSecondary,
-      padding: SPACING.md,
-      borderRadius: RADIUS.md,
-      marginTop: SPACING.lg,
-      gap: SPACING.sm,
+      backgroundColor: semantic.bgSubtle,
+      padding: WANTED_TOKENS.spacing.s3,
+      borderRadius: WANTED_TOKENS.radius.r4,
+      marginTop: WANTED_TOKENS.spacing.s4,
+      gap: WANTED_TOKENS.spacing.s2,
     },
     infoText: {
       flex: 1,
-      fontSize: TYPOGRAPHY.fontSize.xs,
-      color: colors.textSecondary,
+      fontSize: WANTED_TOKENS.type.caption1.size,
+      color: semantic.labelAlt,
       lineHeight: 18,
     },
   });
