@@ -3,7 +3,7 @@
  * Wraps StationCard with edit and drag functionality
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,11 +11,12 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { AlertCircle, Trash2, Tag, Pencil, XCircle, GripVertical, ArrowUp, ArrowDown, Briefcase } from 'lucide-react-native';
-import { SPACING, RADIUS, TYPOGRAPHY } from '../../styles/modernTheme';
+import { SPACING, RADIUS, TYPOGRAPHY, WANTED_TOKENS } from '../../styles/modernTheme';
 import { useTheme, ThemeColors } from '../../services/theme';
 import { FavoriteWithDetails } from '../../hooks/useFavorites';
 import { StationCard } from '../train/StationCard';
 import { FavoriteEditForm } from './FavoriteEditForm';
+import { Pill } from '../design';
 
 interface DraggableFavoriteItemProps {
   favorite: FavoriteWithDetails;
@@ -53,8 +54,8 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
   isDragEnabled = false,
   arrivalsEnabled = true,
 }) => {
-  const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const { colors, isDark } = useTheme();
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const { station } = favorite;
 
   /**
@@ -137,14 +138,18 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
         onCancel={onEditToggle}
       />
 
-      {/* Alias, Direction & Commute Metadata (hidden when editing) */}
+      {/* Alias, Direction & Commute Metadata (hidden when editing).
+          Phase 3B/5: alias + 출퇴근은 Pill atomic으로 시각 정렬 (디자인의
+          nickname Pill 패턴과 동일). 방향 화살표는 inline icon 유지. */}
       {!isEditing && (
         <View style={styles.metadataRow}>
           {favorite.alias && (
-            <View style={[styles.metadataItem, styles.aliasIndicator]}>
-              <Tag size={14} color={colors.textSecondary} />
-              <Text style={styles.aliasText}>{favorite.alias}</Text>
-            </View>
+            <Pill tone="primary" size="sm" testID="favorite-alias-pill">
+              <View style={styles.pillContent}>
+                <Tag size={11} color={WANTED_TOKENS.light.primaryPress} />
+                <Text style={styles.pillText}>{favorite.alias}</Text>
+              </View>
+            </Pill>
           )}
           <View style={styles.metadataItem}>
             {favorite.direction === 'both' ? (
@@ -159,10 +164,12 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
             )}
           </View>
           {favorite.isCommuteStation && (
-            <View style={[styles.metadataItem, styles.commuteIndicator]}>
-              <Briefcase size={14} color={colors.textPrimary} />
-              <Text style={styles.commuteText}>출퇴근</Text>
-            </View>
+            <Pill tone="neutral" size="sm" testID="favorite-commute-pill">
+              <View style={styles.pillContent}>
+                <Briefcase size={11} color={WANTED_TOKENS.light.labelNeutral} />
+                <Text style={styles.commuteTextPill}>출퇴근</Text>
+              </View>
+            </Pill>
           )}
         </View>
       )}
@@ -170,7 +177,9 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
   );
 };
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
+const createStyles = (colors: ThemeColors, isDark: boolean) => {
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  return StyleSheet.create({
   container: {
     marginBottom: SPACING.xl,
   },
@@ -194,15 +203,36 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     top: SPACING.sm,
     right: SPACING.sm,
     flexDirection: 'row',
-    gap: SPACING.xs,
+    gap: 6,
   },
   actionButton: {
-    backgroundColor: colors.surface,
-    borderRadius: RADIUS.full,
-    padding: SPACING.xs,
+    width: 32,
+    height: 32,
+    borderRadius: 9999,
+    backgroundColor: semantic.bgBase,
+    borderWidth: 1,
+    borderColor: semantic.lineSubtle,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   actionButtonActive: {
-    backgroundColor: colors.backgroundSecondary,
+    backgroundColor: semantic.primaryBg,
+    borderColor: semantic.primaryNormal,
+  },
+  pillContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  pillText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: semantic.primaryPress,
+  },
+  commuteTextPill: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: semantic.labelNeutral,
   },
   dragHandle: {
     position: 'absolute',
@@ -282,4 +312,5 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     padding: SPACING.xs,
     marginLeft: SPACING.sm,
   },
-});
+  });
+};
