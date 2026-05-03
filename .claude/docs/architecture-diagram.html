@@ -75,7 +75,7 @@
 <body>
 
 <h1>LiveMetro Claude Code System Architecture</h1>
-<p class="subtitle">ACE Framework 6-Layer | 7 Hooks | 5 Agents | 42 Skills | 4 Coordination Modules | 2 MCP Servers</p>
+<p class="subtitle">6 Hooks | 5 Agents | 17 Skills | 21 Commands | 2 MCP Servers</p>
 
 <div class="diagram">
 
@@ -90,7 +90,8 @@
   <div class="ace-body">
     <div class="node hook"><span class="icon">🛡</span><div><div class="label">ethicalValidator.js</div><div class="detail">PreToolUse:Bash &mdash; rm -rf, force push, 하드코딩 키 차단</div></div></div>
     <div class="node hook"><span class="icon">🔒</span><div><div class="label">Path Protection (inline)</div><div class="detail">PreToolUse:Edit|Write &mdash; .env, secrets, google-services.json 보호</div></div></div>
-    <div class="node hook"><span class="icon">🔑</span><div><div class="label">outputSecretFilter.sh</div><div class="detail">PostToolUse:Bash &mdash; API키/토큰 자동 마스킹</div></div></div>
+    <div class="node hook"><span class="icon">🔑</span><div><div class="label">outputSecretFilter.js</div><div class="detail">PostToolUse:Bash &mdash; API키/토큰 자동 마스킹</div></div></div>
+    <div class="node hook"><span class="icon">📐</span><div><div class="label">typeCheckHook.sh</div><div class="detail">PostToolUse:Edit|Write &mdash; .ts/.tsx 자동 tsc --noEmit</div></div></div>
     <div class="node config"><span class="icon">📋</span><div><div class="label">CLAUDE.md</div><div class="detail">Golden Rules: strict TS, 30s polling, cleanup, no any</div></div></div>
   </div>
 </div>
@@ -107,6 +108,7 @@
     <div class="node config"><span class="icon">📊</span><div><div class="label">effort-scaling.md</div><div class="detail">복잡도별 에이전트 할당: Trivial(0) ~ Complex(3+)</div></div></div>
     <div class="node skill"><span class="icon">🎯</span><div><div class="label">CLAUDE.md Skill Routing</div><div class="detail">작업 유형 → 스킬 자동 매핑 (21개 도메인)</div></div></div>
     <div class="node hook"><span class="icon">🚀</span><div><div class="label">userPromptSubmit.js</div><div class="detail">UserPromptSubmit &mdash; 스킬/에이전트 자동 활성화, Gemini 결과 주입</div></div></div>
+    <div class="node hook"><span class="icon">⚡</span><div><div class="label">geminiAutoTrigger.js</div><div class="detail">PostToolUse:Edit|Write &mdash; 30초 debounce 후 Gemini 크로스 리뷰</div></div></div>
     <div class="node config"><span class="icon">📁</span><div><div class="label">commands-registry.json</div><div class="detail">21개 스킬 라우팅 레지스트리</div></div></div>
   </div>
 </div>
@@ -131,35 +133,7 @@
 
     <div class="section-title" style="margin-top: 14px;">Shared Agent Knowledge</div>
     <div style="display: flex; flex-wrap: wrap; gap: 10px;">
-      <div class="node config"><span class="icon">🏗</span><div><div class="label">ace-framework.md</div><div class="detail">ACE 6-Layer 아키텍처 가이드</div></div></div>
       <div class="node config"><span class="icon">📋</span><div><div class="label">delegation-template.md</div><div class="detail">태스크 위임 구조 템플릿</div></div></div>
-      <div class="node config"><span class="icon">⚖️</span><div><div class="label">quality-gates.md</div><div class="detail">Ethical + Technical 품질 게이트</div></div></div>
-      <div class="node config"><span class="icon">🔀</span><div><div class="label">parallel-agents-protocol.md</div><div class="detail">병렬 실행 안전 프로토콜</div></div></div>
-    </div>
-  </div>
-</div>
-
-<!-- ============================================================ -->
-<!-- ACE Layer 5: Cognitive Control (Coordination) -->
-<!-- ============================================================ -->
-<div class="ace-layer l4">
-  <div class="ace-header">
-    <span>L5 Cognitive Control</span>
-    <span style="font-weight:400; font-size:11px; opacity:0.7;">충돌 방지, 파일 락, 상태 관리 &mdash; coordination/index.js</span>
-  </div>
-  <div class="ace-body" style="flex-direction: column;">
-    <div style="display: flex; flex-wrap: wrap; gap: 10px;">
-      <div class="node coordination"><span class="icon">🔐</span><div><div class="label">file-lock-manager.js</div><div class="detail">파일 레벨 락 획득/해제, 타임아웃 정리</div></div></div>
-      <div class="node coordination"><span class="icon">💾</span><div><div class="label">checkpoint-manager.js</div><div class="detail">작업 상태 체크포인트 저장/복원</div></div></div>
-      <div class="node coordination"><span class="icon">🎯</span><div><div class="label">task-allocator.js</div><div class="detail">작업 분류, 에이전트 추천, 성능 보정</div></div></div>
-      <div class="node coordination"><span class="icon">📈</span><div><div class="label">feedback-loop.js</div><div class="detail">실행 메트릭 기록, 성능 분석</div></div></div>
-    </div>
-
-    <div class="section-title" style="margin-top: 14px;">Orchestration Hooks</div>
-    <div style="display: flex; flex-wrap: wrap; gap: 10px;">
-      <div class="node hook"><span class="icon">🔄</span><div><div class="label">parallelCoordinator.js</div><div class="detail">PreToolUse:Task + PostToolUse:Task &mdash; HITL 분류, 파일 락, 체크포인트</div></div></div>
-      <div class="node hook"><span class="icon">📍</span><div><div class="label">agentTracer.js</div><div class="detail">PostToolUse:Task &mdash; 에이전트 트레이싱 → feedback-loop 연동</div></div></div>
-      <div class="node hook"><span class="icon">🔗</span><div><div class="label">aceMatrixSync.js</div><div class="detail">PostToolUse:Edit|Write &mdash; enforcement-matrix drift 감지</div></div></div>
     </div>
   </div>
 </div>
@@ -168,15 +142,10 @@
 <!-- Connection Diagram -->
 <!-- ============================================================ -->
 <div class="connectors">
-  <div class="conn-title">Module Dependencies (require 관계)</div>
-  <div class="conn-line"><span class="src">parallelCoordinator.js</span> <span class="arrow">──require──▶</span> <span class="tgt">file-lock-manager.js</span></div>
-  <div class="conn-line"><span class="src">parallelCoordinator.js</span> <span class="arrow">──require──▶</span> <span class="tgt">checkpoint-manager.js</span></div>
-  <div class="conn-line"><span class="src">parallelCoordinator.js</span> <span class="arrow">──require──▶</span> <span class="tgt">task-allocator.js</span></div>
-  <div class="conn-line"><span class="src">agentTracer.js</span> <span class="arrow">──require──▶</span> <span class="tgt">feedback-loop.js</span></div>
-  <div class="conn-line"><span class="src">task-allocator.js</span> <span class="arrow">──require──▶</span> <span class="tgt">feedback-loop.js</span> <span style="color:#8b949e;">(성능 데이터 → 추천 보정)</span></div>
+  <div class="conn-title">Module Dependencies</div>
   <div class="conn-line"><span class="src">geminiAutoTrigger.js</span> <span class="arrow">──spawn───▶</span> <span class="tgt">scripts/gemini-bridge.js</span></div>
-  <div class="conn-line"><span class="src">aceMatrixSync.js</span> <span class="arrow">──read────▶</span> <span class="tgt">ace-framework/references/enforcement-matrix.md</span></div>
-  <div class="conn-line"><span class="src">coordination/index.js</span> <span class="arrow">──export──▶</span> <span class="tgt">{fileLock, feedback, checkpoint, taskAllocator}</span></div>
+  <div class="conn-line"><span class="src">pathProtection.js</span> <span class="arrow">──read────▶</span> <span class="tgt">pathProtection.config.json</span></div>
+  <div class="conn-line"><span class="src">typeCheckHook.sh</span> <span class="arrow">──run─────▶</span> <span class="tgt">npx tsc --noEmit (PostToolUse:Edit|Write)</span></div>
 </div>
 
 <!-- ============================================================ -->
@@ -187,9 +156,9 @@
 
   <div class="grid-2">
     <div>
-      <div style="font-size: 12px; font-weight: 600; color: #3fb950; margin-bottom: 8px;">Domain Skills (21)</div>
+      <div style="font-size: 12px; font-weight: 600; color: #3fb950; margin-bottom: 8px;">Domain Skills (17)</div>
       <div class="grid-3" style="grid-template-columns: 1fr 1fr;">
-        <div class="node skill"><span class="icon">📱</span><div class="label">react-native-dev</div></div>
+        <div class="node skill"><span class="icon">📱</span><div class="label">react-native-development</div></div>
         <div class="node skill"><span class="icon">🔥</span><div class="label">firebase-integration</div></div>
         <div class="node skill"><span class="icon">🌐</span><div class="label">api-integration</div></div>
         <div class="node skill"><span class="icon">🚇</span><div class="label">subway-data-processor</div></div>
@@ -204,14 +173,12 @@
         <div class="node skill"><span class="icon">⭐</span><div class="label">user-trust-reputation</div></div>
         <div class="node skill"><span class="icon">📈</span><div class="label">monitoring-observability</div></div>
         <div class="node skill"><span class="icon">🧪</span><div class="label">test-automation</div></div>
-        <div class="node skill"><span class="icon">🔍</span><div class="label">code-review</div></div>
-        <div class="node skill"><span class="icon">🏗</span><div class="label">cc-feature-implementer</div></div>
-        <div class="node skill"><span class="icon">🔄</span><div class="label">parallel-coordinator</div></div>
-        <div class="node skill"><span class="icon">👁</span><div class="label">agent-observability</div></div>
+        <div class="node skill"><span class="icon">✓</span><div class="label">verification-loop</div></div>
+        <div class="node skill"><span class="icon">🏗</span><div class="label">cc-feature-implementer-main</div></div>
       </div>
     </div>
     <div>
-      <div style="font-size: 12px; font-weight: 600; color: #d29922; margin-bottom: 8px;">Workflow Skills (21)</div>
+      <div style="font-size: 12px; font-weight: 600; color: #d29922; margin-bottom: 8px;">Workflow Commands (21)</div>
       <div class="grid-3" style="grid-template-columns: 1fr 1fr;">
         <div class="node skill"><span class="icon">✓</span><div class="label">verify-app</div></div>
         <div class="node skill"><span class="icon">🏥</span><div class="label">check-health</div></div>
@@ -221,7 +188,6 @@
         <div class="node skill"><span class="icon">🔍</span><div class="label">review</div></div>
         <div class="node skill"><span class="icon">♻️</span><div class="label">simplify-code</div></div>
         <div class="node skill"><span class="icon">🧪</span><div class="label">test-coverage</div></div>
-        <div class="node skill"><span class="icon">✓</span><div class="label">verification-loop</div></div>
         <div class="node skill"><span class="icon">🔄</span><div class="label">sync-registry</div></div>
         <div class="node skill"><span class="icon">💾</span><div class="label">save-and-compact</div></div>
         <div class="node skill"><span class="icon">📄</span><div class="label">dev-docs</div></div>
@@ -234,6 +200,7 @@
         <div class="node skill"><span class="icon">🔬</span><div class="label">gemini-scan</div></div>
         <div class="node skill"><span class="icon">🏃</span><div class="label">run-eval</div></div>
         <div class="node skill"><span class="icon">📊</span><div class="label">eval-dashboard</div></div>
+        <div class="node skill"><span class="icon">▶</span><div class="label">run-workflow</div></div>
       </div>
     </div>
   </div>
@@ -294,44 +261,28 @@
     </div>
     <div class="flow-row">
       <span class="flow-arrow">5.</span>
-      <span class="flow-label">Agent 스폰</span>
+      <span class="flow-label">Bash 출력</span>
       <span class="flow-arrow">→</span>
-      <span class="flow-target">parallelCoordinator.js (pre)</span>
+      <span class="flow-target">outputSecretFilter.js</span>
       <span class="flow-arrow">→</span>
-      <span class="flow-label">HITL 분류 + 파일 락 + 체크포인트 + 에이전트 추천</span>
-    </div>
-    <div class="flow-row">
-      <span class="flow-arrow">6.</span>
-      <span class="flow-label">Agent 완료</span>
-      <span class="flow-arrow">→</span>
-      <span class="flow-target">agentTracer.js + parallelCoordinator.js (post)</span>
-      <span class="flow-arrow">→</span>
-      <span class="flow-label">트레이싱 → feedback-loop → 락 해제</span>
-    </div>
-    <div class="flow-row">
-      <span class="flow-arrow">7.</span>
-      <span class="flow-label">세션 종료</span>
-      <span class="flow-arrow">→</span>
-      <span class="flow-target">SessionEnd hook</span>
-      <span class="flow-arrow">→</span>
-      <span class="flow-label">active-locks.json + parallel-state.json 초기화</span>
+      <span class="flow-label">API키/토큰/시크릿 자동 마스킹</span>
     </div>
   </div>
 </div>
 
 <!-- Legend -->
 <div class="legend">
-  <div class="legend-item"><div class="legend-color" style="background:#f85149;"></div> Hook (7)</div>
+  <div class="legend-item"><div class="legend-color" style="background:#f85149;"></div> Hook (6)</div>
   <div class="legend-item"><div class="legend-color" style="background:#58a6ff;"></div> Agent (5)</div>
-  <div class="legend-item"><div class="legend-color" style="background:#3fb950;"></div> Skill (42)</div>
-  <div class="legend-item"><div class="legend-color" style="background:#d29922;"></div> Coordination (4)</div>
+  <div class="legend-item"><div class="legend-color" style="background:#3fb950;"></div> Skill (17)</div>
+  <div class="legend-item"><div class="legend-color" style="background:#d29922;"></div> Command (21)</div>
   <div class="legend-item"><div class="legend-color" style="background:#d2a8ff;"></div> MCP Server (2)</div>
   <div class="legend-item"><div class="legend-color" style="background:#388bfd;"></div> Data/External</div>
   <div class="legend-item"><div class="legend-color" style="background:#8b949e;"></div> Config</div>
 </div>
 
 <p style="text-align: center; margin-top: 16px; font-size: 11px; color: #484f58;">
-  Generated 2026-03-15 | LiveMetro Claude Code System v3.0
+  Generated 2026-05-03 | LiveMetro Claude Code System (post-ACE removal)
 </p>
 
 </div>
