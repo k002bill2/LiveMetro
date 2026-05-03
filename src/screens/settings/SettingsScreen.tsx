@@ -44,7 +44,7 @@ import { useAuth } from '../../services/auth/AuthContext';
 import { AppStackParamList } from '@/navigation/types';
 import { useI18n } from '../../services/i18n';
 import { useTheme } from '../../services/theme';
-import { SPACING, RADIUS, TYPOGRAPHY, WANTED_TOKENS } from '../../styles/modernTheme';
+import { WANTED_TOKENS, type WantedSemanticTheme } from '../../styles/modernTheme';
 import { SettingsStackParamList } from '@/navigation/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
@@ -67,7 +67,8 @@ type Props = NativeStackScreenProps<SettingsStackParamList, 'SettingsHome'>;
 export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   const { user, signOut } = useAuth();
   const { language, t } = useI18n();
-  const { themeMode, colors, isDark } = useTheme();
+  const { themeMode, isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
   // Root navigation for screens outside SettingsNavigator
   const rootNavigation = useNavigation<NavigationProp<AppStackParamList>>();
 
@@ -219,7 +220,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
     );
   };
 
-  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+  const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   const SettingItem: React.FC<{
     Icon: React.ElementType;
@@ -231,7 +232,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
     <TouchableOpacity style={styles.settingItem} onPress={onPress}>
       <View style={styles.settingItemLeft}>
         <View style={styles.iconContainer}>
-          <Icon size={20} color={colors.textPrimary} />
+          <Icon size={20} color={semantic.labelStrong} />
         </View>
         <View style={styles.textContainer}>
           <Text style={styles.settingTitle}>{title}</Text>
@@ -239,7 +240,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
         </View>
       </View>
       {showChevron && (
-        <ChevronRight size={20} color={colors.textTertiary} />
+        <ChevronRight size={20} color={semantic.labelAlt} />
       )}
     </TouchableOpacity>
   );
@@ -255,7 +256,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
             activeOpacity={0.7}
           >
             <View style={styles.profileIcon}>
-              <User size={32} color={colors.textPrimary} />
+              <User size={32} color={semantic.labelStrong} />
             </View>
             <View style={styles.profileInfo}>
               <Text style={styles.profileName}>
@@ -270,7 +271,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
               onPress={() => navigation.navigate('EditProfile')}
               hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             >
-              <Pencil size={20} color={colors.textTertiary} />
+              <Pencil size={20} color={semantic.labelAlt} />
             </TouchableOpacity>
           </TouchableOpacity>
         </View>
@@ -360,7 +361,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
             <View style={styles.settingItem}>
               <View style={styles.settingItemLeft}>
                 <View style={styles.iconContainer}>
-                  <LogIn size={20} color={colors.textPrimary} />
+                  <LogIn size={20} color={semantic.labelStrong} />
                 </View>
                 <View style={styles.textContainer}>
                   <Text style={styles.settingTitle}>
@@ -374,8 +375,8 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
               <Switch
                 value={autoLoginEnabled}
                 onValueChange={handleAutoLoginToggle}
-                trackColor={{ false: colors.borderMedium, true: colors.primary }}
-                thumbColor={colors.white}
+                trackColor={{ false: semantic.lineNormal, true: semantic.primaryNormal }}
+                thumbColor={'#FFFFFF'}
               />
             </View>
             {/* Biometric Login Toggle */}
@@ -385,19 +386,19 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
                   {biometricTypeName === 'Face ID' ? (
                     <ScanFace
                       size={20}
-                      color={biometricAvailable ? colors.textPrimary : colors.textDisabled}
+                      color={biometricAvailable ? semantic.labelStrong : semantic.labelDisabled}
                     />
                   ) : (
                     <Fingerprint
                       size={20}
-                      color={biometricAvailable ? colors.textPrimary : colors.textDisabled}
+                      color={biometricAvailable ? semantic.labelStrong : semantic.labelDisabled}
                     />
                   )}
                 </View>
                 <View style={styles.textContainer}>
                   <Text style={[
                     styles.settingTitle,
-                    !biometricAvailable && { color: colors.textDisabled }
+                    !biometricAvailable && { color: semantic.labelDisabled }
                   ]}>
                     {biometricTypeName} {language === 'ko' ? '로그인' : 'Login'}
                   </Text>
@@ -411,8 +412,8 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
               <Switch
                 value={biometricEnabled}
                 onValueChange={handleBiometricToggle}
-                trackColor={{ false: colors.borderMedium, true: colors.primary }}
-                thumbColor={colors.white}
+                trackColor={{ false: semantic.lineNormal, true: semantic.primaryNormal }}
+                thumbColor={'#FFFFFF'}
                 disabled={!biometricAvailable}
               />
             </View>
@@ -453,7 +454,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
         {/* Sign Out */}
         <View style={styles.section}>
           <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
-            <LogOut size={20} color={colors.textSecondary} />
+            <LogOut size={20} color={semantic.labelAlt} />
             <Text style={styles.signOutText}>{t.settings.signOut}</Text>
           </TouchableOpacity>
         </View>
@@ -462,9 +463,8 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const createStyles = (colors: any, isDark: boolean) => {
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
-  return StyleSheet.create({
+const createStyles = (semantic: WantedSemanticTheme) =>
+  StyleSheet.create({
     container: {
       flex: 1,
       // Phase 5 alignment: bgSubtlePage gives Settings its own quiet shade
@@ -475,77 +475,79 @@ const createStyles = (colors: any, isDark: boolean) => {
       flex: 1,
     },
     section: {
-      marginBottom: SPACING.xl,
+      marginBottom: WANTED_TOKENS.spacing.s5,
     },
     sectionTitle: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      fontWeight: TYPOGRAPHY.fontWeight.semibold,
-      color: colors.textSecondary,
-      marginBottom: SPACING.md,
-      marginHorizontal: SPACING.lg,
-      letterSpacing: TYPOGRAPHY.letterSpacing.wide,
+      fontSize: WANTED_TOKENS.type.label2.size,
+      fontWeight: '600',
+      color: semantic.labelAlt,
+      marginBottom: WANTED_TOKENS.spacing.s3,
+      marginHorizontal: WANTED_TOKENS.spacing.s4,
+      letterSpacing: 0.6,
       textTransform: 'uppercase',
     },
     profileCard: {
-      backgroundColor: colors.surface,
+      backgroundColor: semantic.bgBase,
       flexDirection: 'row',
       alignItems: 'center',
-      padding: SPACING.lg,
-      marginHorizontal: SPACING.lg,
-      borderRadius: RADIUS.lg,
+      padding: WANTED_TOKENS.spacing.s4,
+      marginHorizontal: WANTED_TOKENS.spacing.s4,
+      borderRadius: WANTED_TOKENS.radius.r6,
       borderWidth: 1,
-      borderColor: colors.borderLight,
+      borderColor: semantic.lineSubtle,
     },
     profileIcon: {
       width: 56,
       height: 56,
-      backgroundColor: colors.backgroundSecondary,
-      borderRadius: RADIUS.full,
+      backgroundColor: semantic.bgSubtle,
+      borderRadius: WANTED_TOKENS.radius.pill,
       justifyContent: 'center',
       alignItems: 'center',
-      marginRight: SPACING.lg,
+      marginRight: WANTED_TOKENS.spacing.s4,
       borderWidth: 1,
-      borderColor: colors.borderMedium,
+      borderColor: semantic.lineSubtle,
     },
     profileInfo: {
       flex: 1,
     },
     profileName: {
-      fontSize: TYPOGRAPHY.fontSize.lg,
-      fontWeight: TYPOGRAPHY.fontWeight.bold,
-      color: colors.textPrimary,
+      fontSize: WANTED_TOKENS.type.heading2.size,
+      lineHeight: WANTED_TOKENS.type.heading2.lh,
+      fontWeight: '700',
+      color: semantic.labelStrong,
       marginBottom: 4,
-      letterSpacing: TYPOGRAPHY.letterSpacing.tight,
+      letterSpacing:
+        WANTED_TOKENS.type.heading2.size * WANTED_TOKENS.type.heading2.tracking,
     },
     profileEmail: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      color: colors.textTertiary,
+      fontSize: WANTED_TOKENS.type.caption1.size,
+      color: semantic.labelAlt,
     },
     editButton: {
       width: 36,
       height: 36,
-      borderRadius: RADIUS.full,
-      backgroundColor: colors.backgroundSecondary,
+      borderRadius: WANTED_TOKENS.radius.pill,
+      backgroundColor: semantic.bgSubtle,
       justifyContent: 'center',
       alignItems: 'center',
-      marginLeft: SPACING.sm,
+      marginLeft: WANTED_TOKENS.spacing.s2,
     },
     settingGroup: {
-      backgroundColor: colors.surface,
-      marginHorizontal: SPACING.lg,
-      borderRadius: RADIUS.lg,
+      backgroundColor: semantic.bgBase,
+      marginHorizontal: WANTED_TOKENS.spacing.s4,
+      borderRadius: WANTED_TOKENS.radius.r6,
       borderWidth: 1,
-      borderColor: colors.borderLight,
+      borderColor: semantic.lineSubtle,
       overflow: 'hidden',
     },
     settingItem: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingHorizontal: SPACING.lg,
-      paddingVertical: SPACING.lg,
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s4,
       borderBottomWidth: 1,
-      borderBottomColor: colors.borderLight,
+      borderBottomColor: semantic.lineSubtle,
     },
     settingItemLeft: {
       flexDirection: 'row',
@@ -555,43 +557,42 @@ const createStyles = (colors: any, isDark: boolean) => {
     iconContainer: {
       width: 36,
       height: 36,
-      backgroundColor: colors.backgroundSecondary,
-      borderRadius: RADIUS.full,
+      backgroundColor: semantic.bgSubtle,
+      borderRadius: WANTED_TOKENS.radius.pill,
       justifyContent: 'center',
       alignItems: 'center',
-      marginRight: SPACING.md,
+      marginRight: WANTED_TOKENS.spacing.s3,
     },
     textContainer: {
       flex: 1,
     },
     settingTitle: {
-      fontSize: TYPOGRAPHY.fontSize.base,
-      fontWeight: TYPOGRAPHY.fontWeight.semibold,
-      color: colors.textPrimary,
+      fontSize: WANTED_TOKENS.type.body1.size,
+      fontWeight: '600',
+      color: semantic.labelStrong,
     },
     settingSubtitle: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      color: colors.textTertiary,
+      fontSize: WANTED_TOKENS.type.body2.size,
+      color: semantic.labelAlt,
       marginTop: 2,
     },
     signOutButton: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.surface,
-      marginHorizontal: SPACING.lg,
-      paddingVertical: SPACING.lg,
-      borderRadius: RADIUS.lg,
+      backgroundColor: semantic.bgBase,
+      marginHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s4,
+      borderRadius: WANTED_TOKENS.radius.r6,
       borderWidth: 1,
-      borderColor: colors.borderMedium,
+      borderColor: semantic.lineSubtle,
     },
     signOutText: {
-      fontSize: TYPOGRAPHY.fontSize.base,
-      fontWeight: TYPOGRAPHY.fontWeight.semibold,
-      color: colors.textSecondary,
-      marginLeft: SPACING.sm,
+      fontSize: WANTED_TOKENS.type.body1.size,
+      fontWeight: '600',
+      color: semantic.labelAlt,
+      marginLeft: WANTED_TOKENS.spacing.s2,
     },
   });
-};
 
 export default SettingsScreen;
