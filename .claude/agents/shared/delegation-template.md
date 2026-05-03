@@ -55,7 +55,7 @@ Success Criteria:
 - [ ] {criterion_3}
 
 ### Output Format
-**Location**: `.temp/agent_workspaces/{agent}/proposals/`
+**Location**: 격리된 worktree (Agent 호출 시 `isolation: "worktree"` 옵션 사용 — 결과 패치는 메인이 통합)
 
 **Files to create:**
 - `{FileName}.tsx` - {description}
@@ -111,7 +111,7 @@ Success Criteria:
 - [ ] Has accessibility labels
 
 ### Output Format
-**Location**: `.temp/agent_workspaces/mobile-ui/proposals/`
+**Location**: 격리된 worktree (Agent 호출 시 `isolation: "worktree"`)
 
 **Files to create:**
 - `AgentInfoCard.tsx` - Main component with styles
@@ -159,7 +159,7 @@ Success Criteria:
 - [ ] Handles errors gracefully (return empty arrays, no throws)
 
 ### Output Format
-**Location**: `.temp/agent_workspaces/mobile-ui/proposals/`
+**Location**: 격리된 worktree (Agent 호출 시 `isolation: "worktree"`)
 
 **Files to create:**
 - `favoritesService.ts` - Service with all methods
@@ -204,7 +204,7 @@ Success Criteria:
 - [ ] Coverage > 80%
 
 ### Output Format
-**Location**: `.temp/agent_workspaces/test-automation/proposals/`
+**Location**: 격리된 worktree (Agent 호출 시 `isolation: "worktree"`)
 
 **Files to create:**
 - `AgentInfoCard.test.tsx` - Test suite

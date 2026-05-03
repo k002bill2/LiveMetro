@@ -232,7 +232,7 @@ import { StationCard } from '../components/train/StationCard'
 
 ## Parallel Development Guidelines
 
-LiveMetro supports **parallel agent development** via Claude Code 네이티브 Agent 툴 (`isolation: "worktree"`) for complex features. See [PARALLEL_AGENTS_GUIDE.md](./PARALLEL_AGENTS_GUIDE.md) for details.
+LiveMetro supports **parallel agent development** via Claude Code 네이티브 Agent 툴 (`isolation: "worktree"`) for complex features. 자세한 가이드는 `CLAUDE.md`의 "Multi-Agent Orchestration" 섹션 참조.
 
 ### When to Use Parallel Development
 
@@ -252,26 +252,23 @@ LiveMetro supports **parallel agent development** via Claude Code 네이티브 A
 
 ### Parallel Development Workflow
 
-If you're working on a complex feature that could benefit from parallel development:
+복잡한 기능을 병렬 개발할 때:
 
-1. **Plan First**: Use the `parallel-coordinator` skill to decompose the task
-2. **Workspace Isolation**: Each specialist works in `.temp/agent_workspaces/{agent-name}/`
-3. **No Direct src/ Writes**: Specialists write to `proposals/` subdirectory
-4. **Primary Integration**: Primary agent integrates all proposals to `src/`
-5. **Quality Gates**: Run type-check, lint, and tests after integration
+1. **Plan First**: 태스크를 분해하고 영역을 식별 (UI / 서비스 / 테스트)
+2. **Worktree Isolation**: Agent 툴 호출 시 `isolation: "worktree"`로 격리된 워크트리 생성
+3. **Parallel Spawn**: 단일 메시지에서 여러 specialist 에이전트를 병렬 호출
+4. **Main Integration**: 메인 에이전트가 각 워크트리의 변경을 review·통합
+5. **Quality Gates**: 통합 후 type-check + lint + test 실행
 
 **Example:**
 
 ```bash
-# 1. Primary agent invokes coordinator
-Skill parallel-coordinator
-
-# 2. Agents work in parallel in isolated workspaces
-# mobile-ui-specialist → .temp/agent_workspaces/mobile-ui/proposals/
-# backend-integration-specialist → .temp/agent_workspaces/backend-integration/proposals/
-# test-automation-specialist → .temp/agent_workspaces/test-automation/proposals/
-
-# 3. Primary agent integrates and validates
+# 1. 메인 에이전트가 단일 메시지에서 mobile-ui-specialist + test-automation-specialist
+#    등을 병렬 Agent 호출 (각 호출에 isolation: "worktree")
+#
+# 2. 각 에이전트가 독립 워크트리에서 작업 → main에 패치 반환
+#
+# 3. 메인 에이전트가 통합 + 검증
 npm run type-check && npm run lint && npm test
 ```
 
@@ -726,7 +723,7 @@ export function StationDetailScreen({ route, navigation }: Props) {
 
 If you have questions about contributing:
 
-1. **Check Documentation**: Read [DEVELOPMENT.md](./DEVELOPMENT.md) and [PARALLEL_AGENTS_GUIDE.md](./PARALLEL_AGENTS_GUIDE.md)
+1. **Check Documentation**: Read [DEVELOPMENT.md](./DEVELOPMENT.md) and [CLAUDE.md](../CLAUDE.md)
 2. **Search Issues**: See if your question has been asked before
 3. **Ask in Discussions**: Use GitHub Discussions for general questions
 4. **Open an Issue**: For bug reports or feature requests

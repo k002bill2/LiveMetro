@@ -97,53 +97,29 @@ git commit -m "feat: add station card component"
 
 ### Parallel-Agent Development (Advanced)
 
-**When to use**:
-- ✅ Feature with 3+ independent subtasks
-- ✅ Multi-layer work (UI + API + Firebase + Tests)
-- ✅ Different file types (screens + services + hooks)
-- ✅ Performance optimization across multiple modules
-- ✅ Test coverage improvement for multiple files
+복잡한 기능은 Claude Code 네이티브 Agent 툴로 병렬 개발한다. 자세한 가이드는 `CLAUDE.md`의 "Multi-Agent Orchestration" 섹션 참조.
 
-**When NOT to use**:
-- ❌ Sequential dependencies (task B requires task A output)
-- ❌ Same file modifications
-- ❌ Exploratory code reading
-- ❌ Single, focused task
+**When to use**:
+- ✅ 3+ 독립 서브태스크 (UI + API + Tests)
+- ✅ 크로스 영역 작업 (화면 + 서비스 + 훅)
+- ❌ 순차 의존성 또는 같은 파일 수정
 
 **Workflow**:
+
+1. Agent 툴로 specialist 에이전트를 단일 메시지에서 병렬 호출
+2. 각 에이전트 호출에 `isolation: "worktree"` 옵션으로 격리된 워크트리 생성
+3. 메인 에이전트가 각 워크트리 결과를 review·통합
+4. 품질 게이트 실행 후 커밋
+
 ```bash
-# 1. Primary Agent invokes parallel-coordinator skill
-Skill parallel-coordinator
-
-# 2. Primary Agent decomposes task using ACE Layer 4
-# Example: "Implement real-time train arrival feature"
-
-Subtasks:
-- backend-integration-specialist: Seoul API client
-- mobile-ui-specialist: StationDetailScreen
-- test-automation-specialist: Jest tests
-
-# 3. Parallel execution in isolated workspaces
-# Agents work in .temp/agent_workspaces/{agent-name}/
-
-# 4. Primary Agent integrates proposals
-# Reviews files in .temp/agent_workspaces/*/proposals/
-# Merges to src/ after validation
-
-# 5. Run quality gates
-npm run type-check
-npm run lint
-npm test
-
-# 6. Commit integrated work
-git add .
-git commit -m "feat: implement real-time train arrivals"
+npm run type-check && npm run lint && npm test
+git add . && git commit -m "feat: implement <feature>"
 ```
 
-**Advantages**:
-- 1.6-2.0x faster development
-- Maintained code quality (parallel quality checks)
-- Clear separation of concerns
+**File lock 규칙** (`CLAUDE.md` "Multi-Agent Orchestration" → File Lock 표 참조):
+- 같은 파일 타깃 → 순차 실행
+- 같은 디렉토리·다른 파일 → 병렬 허용
+- 크로스 영역 → 병렬 + worktree 격리 권장
 
 ---
 
@@ -439,8 +415,7 @@ npm run type-check
 
 ## Additional Resources
 
-- **CLAUDE.md**: Project architecture and guidelines
-- **PARALLEL_AGENTS_GUIDE.md**: Quick reference for parallel execution
+- **CLAUDE.md**: Project architecture and guidelines (Multi-Agent Orchestration 섹션 포함)
 - **CONTRIBUTING.md**: Contribution guidelines
 
 ---
