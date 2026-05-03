@@ -314,25 +314,6 @@
       "pathPatterns": []
     }
   },
-  "external-memory": {
-    "type": "workflow",
-    "enforcement": "suggest",
-    "priority": "normal",
-    "description": "장기 작업 컨텍스트 보존 (토큰 한계 대비)",
-    "skillFile": ".claude/skills/external-memory/SKILL.md",
-    "promptTriggers": {
-      "keywords": [
-        "context",
-        "memory",
-        "checkpoint",
-        "컨텍스트",
-        "저장"
-      ],
-      "intentPatterns": [
-        "(save|store|preserve).*?(context|memory)"
-      ]
-    }
-  },
   "agent-improvement": {
     "type": "meta",
     "enforcement": "suggest",

@@ -266,7 +266,6 @@ Claude Code 네이티브 Agent 툴로 서브에이전트를 스폰합니다. 커
 | 푸시 알림/도착 알림 | `notification-system` |
 | 구현 완료 검증 | `verification-loop` |
 | 기능 계획/페이즈 설계 | `cc-feature-implementer-main` |
-| 장기 작업 컨텍스트 보존 | `external-memory` |
 | 에이전트 성능 추적 | `agent-observability` |
 | 역정보 조회/역 검색/주변역 | `station-info` |
 | 혼잡도/크라우드소싱/히트맵 | `crowdsourced-congestion` |
