@@ -26,12 +26,14 @@ import {
   Circle,
 } from 'lucide-react-native';
 import { useAlerts } from '../../hooks/useAlerts';
+import { useTranslation } from '@/services/i18n';
 import { StoredNotification } from '../../services/notification/notificationStorageService';
 import { SPACING, RADIUS, TYPOGRAPHY, WANTED_TOKENS } from '../../styles/modernTheme';
 import { useTheme, ThemeColors } from '../../services/theme';
 import { addTestNotifications, addRandomNotification } from '../../utils/notificationTestHelper';
 
 export const AlertsScreen: React.FC = () => {
+  const t = useTranslation();
   const { colors, isDark } = useTheme();
   // Memoize styles so notification updates don't recreate the StyleSheet
   // object on every render (regression noted in cross-review).
@@ -168,10 +170,8 @@ export const AlertsScreen: React.FC = () => {
       <View style={styles.emptyIcon}>
         <Bell size={48} color={colors.textTertiary} />
       </View>
-      <Text style={styles.emptyTitle}>알림 없음</Text>
-      <Text style={styles.emptySubtitle}>
-        새로운 알림이 도착하면 여기에 표시됩니다
-      </Text>
+      <Text style={styles.emptyTitle}>{t.alerts.noAlerts}</Text>
+      <Text style={styles.emptySubtitle}>{t.alerts.emptyDescription}</Text>
       {__DEV__ && (
         <TouchableOpacity
           style={styles.devButton}
@@ -274,11 +274,11 @@ export const AlertsScreen: React.FC = () => {
             accessibilityRole="header"
             testID="alerts-header-title"
           >
-            알림
+            {t.alerts.title}
           </Text>
           {unreadCount > 0 && (
             <Text style={styles.headerSubtitle}>
-              새 알림 {unreadCount}개
+              {t.alerts.unreadCountText(unreadCount)}
             </Text>
           )}
         </View>

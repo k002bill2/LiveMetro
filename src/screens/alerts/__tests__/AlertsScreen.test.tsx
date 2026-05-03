@@ -55,6 +55,21 @@ jest.mock('@/hooks/useAlerts', () => ({
   })),
 }));
 
+// AlertsScreen now consumes i18n; provide a static mock translation tree.
+jest.mock('@/services/i18n', () => ({
+  useTranslation: jest.fn(() => ({
+    alerts: {
+      title: '알림',
+      noAlerts: '알림 없음',
+      emptyDescription: '새로운 알림이 도착하면 여기에 표시됩니다',
+      unreadCountText: (count: number) => `새 알림 ${count}개`,
+      delay: '지연',
+      suspension: '운행 중단',
+      serviceUpdate: '서비스 업데이트',
+    },
+  })),
+}));
+
 jest.mock('@/utils/notificationTestHelper', () => ({
   addTestNotifications: jest.fn(),
   addRandomNotification: jest.fn(),

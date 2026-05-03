@@ -100,6 +100,10 @@ export interface Translations {
   alerts: {
     title: string;
     noAlerts: string;
+    /** Empty-state description shown under "noAlerts" */
+    emptyDescription: string;
+    /** "새 알림 N개" / "N new" — pluralization differs per locale */
+    unreadCountText: (count: number) => string;
     delay: string;
     suspension: string;
     serviceUpdate: string;
@@ -206,7 +210,9 @@ export const translations: Record<Language, Translations> = {
     },
     alerts: {
       title: '알림',
-      noAlerts: '알림이 없습니다',
+      noAlerts: '알림 없음',
+      emptyDescription: '새로운 알림이 도착하면 여기에 표시됩니다',
+      unreadCountText: (count: number) => `새 알림 ${count}개`,
       delay: '지연',
       suspension: '운행 중단',
       serviceUpdate: '서비스 업데이트',
@@ -310,6 +316,8 @@ export const translations: Record<Language, Translations> = {
     alerts: {
       title: 'Alerts',
       noAlerts: 'No alerts',
+      emptyDescription: 'New notifications will appear here',
+      unreadCountText: (count: number) => `${count} new`,
       delay: 'Delay',
       suspension: 'Suspension',
       serviceUpdate: 'Service Update',
