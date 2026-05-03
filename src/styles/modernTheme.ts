@@ -448,13 +448,19 @@ export const WANTED_TOKENS = {
     durationSlow: 400,
   },
 
-  /* Font family — set once Pretendard fonts are loaded via expo-font */
+  /* Font family — Pretendard 9 weights are loaded in App.tsx via useFonts.
+     Each weight is a separate face (no PostScript "Pretendard" alias), so
+     consumers must reference the suffixed name matching the desired weight. */
   fontFamily: {
-    sans: 'Pretendard',                 // Pretendard-Regular/Medium/SemiBold/Bold
+    sans: 'Pretendard-Regular',
     sansMedium: 'Pretendard-Medium',
     sansSemibold: 'Pretendard-SemiBold',
     sansBold: 'Pretendard-Bold',
-    display: 'WantedSans',              // optional, falls back to Pretendard
+    sansExtraBold: 'Pretendard-ExtraBold',
+    sansBlack: 'Pretendard-Black',
+    sansLight: 'Pretendard-Light',
+    sansThin: 'Pretendard-Thin',
+    display: 'Pretendard-Bold',         // headline/display tier
     mono: 'Menlo',
   },
 } as const;
