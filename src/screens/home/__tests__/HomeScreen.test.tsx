@@ -616,12 +616,51 @@ describe('HomeScreen', () => {
       expect(mockShowSuccess).not.toHaveBeenCalled();
     });
 
-    it('view details navigates to WeeklyPrediction', async () => {
+    it('view details navigates to Onboarding when morningCommute is unset', async () => {
+      // Default mockUser has morningCommute: null — handler should redirect
+      // to Onboarding to capture commute info before showing predictions.
       const { getByTestId } = render(<HomeScreen />);
       await waitFor(() => expect(getByTestId('view-details-btn')).toBeTruthy());
 
       fireEvent.press(getByTestId('view-details-btn'));
-      expect(mockNavigate).toHaveBeenCalledWith('WeeklyPrediction');
+      expect(mockNavigate).toHaveBeenCalledWith('Onboarding');
+    });
+
+    it('view details navigates to WeeklyPrediction when morningCommute is set', async () => {
+      const { useAuth } = require('@/services/auth/AuthContext');
+      const originalImpl = useAuth.getMockImplementation();
+      const baseMock = originalImpl();
+      const overriddenUser = {
+        ...baseMock.user,
+        preferences: {
+          ...baseMock.user.preferences,
+          commuteSchedule: {
+            ...baseMock.user.preferences.commuteSchedule,
+            weekdays: {
+              morningCommute: {
+                departureTime: '08:30',
+                stationId: 'gangnam',
+                destinationStationId: 'jamsil',
+                bufferMinutes: 5,
+              },
+              eveningCommute: null,
+            },
+          },
+        },
+      };
+      // Override across all renders/effects (mockReturnValueOnce only fires
+      // on the first call which isn't enough — useAuth is read in the
+      // render body each time React re-renders).
+      useAuth.mockImplementation(() => ({ ...baseMock, user: overriddenUser }));
+      try {
+        const { getByTestId } = render(<HomeScreen />);
+        await waitFor(() => expect(getByTestId('view-details-btn')).toBeTruthy());
+
+        fireEvent.press(getByTestId('view-details-btn'));
+        expect(mockNavigate).toHaveBeenCalledWith('WeeklyPrediction');
+      } finally {
+        useAuth.mockImplementation(originalImpl);
+      }
     });
   });
 

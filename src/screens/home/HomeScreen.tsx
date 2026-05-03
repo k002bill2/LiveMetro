@@ -305,6 +305,13 @@ export const HomeScreen: React.FC = () => {
 
   // 주간 예측 보기 핸들러
   const handleViewPredictions = (): void => {
+    // commute 미설정 시 onboarding으로 안내. 설정된 후에 ML hero detail이
+    // 의미 있는 데이터를 보여줄 수 있음.
+    if (!morningCommute) {
+      navigation.navigate('Onboarding' as never);
+      showInfo('출퇴근 경로를 먼저 설정해 주세요');
+      return;
+    }
     navigation.navigate('WeeklyPrediction' as never);
   };
 
