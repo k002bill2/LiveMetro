@@ -16,7 +16,8 @@ import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 
 import { useAuth } from '../../services/auth/AuthContext';
-import { useTheme, ThemeColors } from '../../services/theme';
+import { useTheme } from '../../services/theme';
+import { WANTED_TOKENS, type WantedSemanticTheme } from '../../styles/modernTheme';
 import { RootStackParamList } from '../../navigation/RootNavigator';
 
 type WelcomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Welcome'>;
@@ -24,8 +25,9 @@ type WelcomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Welc
 export const WelcomeScreen: React.FC = () => {
   const navigation = useNavigation<WelcomeScreenNavigationProp>();
   const { signInAnonymously } = useAuth();
-  const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const styles = createStyles(semantic);
 
   const handleGetStarted = (): void => {
     navigation.navigate('Auth');
@@ -46,7 +48,7 @@ export const WelcomeScreen: React.FC = () => {
         {/* Logo Section */}
         <View style={styles.logoSection}>
           <View style={styles.logoContainer} testID="welcome-logo">
-            <Ionicons name="train" size={64} color={colors.primary} />
+            <Ionicons name="train" size={64} color={semantic.primaryNormal} />
           </View>
           <Text style={styles.appName}>LiveMetro</Text>
           <Text style={styles.tagline}>실시간 전철 알림</Text>
@@ -58,17 +60,17 @@ export const WelcomeScreen: React.FC = () => {
         {/* Features Section */}
         <View style={styles.featuresSection}>
           <View style={styles.feature}>
-            <Ionicons name="notifications" size={24} color={colors.success} />
+            <Ionicons name="notifications" size={24} color={semantic.statusPositive} />
             <Text style={styles.featureText}>실시간 지연 알림</Text>
           </View>
 
           <View style={styles.feature}>
-            <Ionicons name="location" size={24} color={colors.error} />
+            <Ionicons name="location" size={24} color={semantic.statusNegative} />
             <Text style={styles.featureText}>주변 역 자동 감지</Text>
           </View>
 
           <View style={styles.feature}>
-            <Ionicons name="map" size={24} color={colors.primary} />
+            <Ionicons name="map" size={24} color={semantic.primaryNormal} />
             <Text style={styles.featureText}>대체 경로 제안</Text>
           </View>
         </View>
@@ -82,7 +84,7 @@ export const WelcomeScreen: React.FC = () => {
             accessibilityLabel="시작하기"
           >
             <Text style={styles.primaryButtonText}>시작하기</Text>
-            <Ionicons name="arrow-forward" size={20} color={colors.textInverse} />
+            <Ionicons name="arrow-forward" size={20} color={'#FFFFFF'} />
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -106,11 +108,11 @@ export const WelcomeScreen: React.FC = () => {
   );
 };
 
-const createStyles = (colors: ThemeColors) =>
+const createStyles = (semantic: WantedSemanticTheme) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.backgroundSecondary,
+      backgroundColor: semantic.bgSubtlePage,
     },
     content: {
       flex: 1,
@@ -125,7 +127,7 @@ const createStyles = (colors: ThemeColors) =>
     logoContainer: {
       width: 120,
       height: 120,
-      backgroundColor: colors.primaryLight,
+      backgroundColor: semantic.primaryBg,
       borderRadius: 60,
       justifyContent: 'center',
       alignItems: 'center',
@@ -134,18 +136,18 @@ const createStyles = (colors: ThemeColors) =>
     appName: {
       fontSize: 36,
       fontWeight: 'bold',
-      color: colors.textPrimary,
+      color: semantic.labelStrong,
       marginBottom: 8,
     },
     tagline: {
       fontSize: 18,
-      color: colors.primary,
+      color: semantic.primaryNormal,
       fontWeight: '600',
       marginBottom: 16,
     },
     subtitle: {
       fontSize: 16,
-      color: colors.textSecondary,
+      color: semantic.labelAlt,
       textAlign: 'center',
       lineHeight: 24,
       paddingHorizontal: 16,
@@ -156,12 +158,12 @@ const createStyles = (colors: ThemeColors) =>
     feature: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: colors.surface,
+      backgroundColor: semantic.bgBase,
       padding: 16,
       borderRadius: 12,
       marginBottom: 12,
       elevation: 1,
-      shadowColor: colors.black,
+      shadowColor: '#000000',
       shadowOffset: {
         width: 0,
         height: 1,
@@ -172,14 +174,14 @@ const createStyles = (colors: ThemeColors) =>
     featureText: {
       fontSize: 16,
       fontWeight: '600',
-      color: colors.textPrimary,
+      color: semantic.labelStrong,
       marginLeft: 16,
     },
     buttonSection: {
       paddingVertical: 16,
     },
     primaryButton: {
-      backgroundColor: colors.primary,
+      backgroundColor: semantic.primaryNormal,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
@@ -187,7 +189,7 @@ const createStyles = (colors: ThemeColors) =>
       borderRadius: 16,
       marginBottom: 12,
       elevation: 2,
-      shadowColor: colors.primary,
+      shadowColor: semantic.primaryNormal,
       shadowOffset: {
         width: 0,
         height: 2,
@@ -198,13 +200,13 @@ const createStyles = (colors: ThemeColors) =>
     primaryButtonText: {
       fontSize: 18,
       fontWeight: 'bold',
-      color: colors.textInverse,
+      color: '#FFFFFF',
       marginRight: 8,
     },
     secondaryButton: {
       backgroundColor: 'transparent',
       borderWidth: 1.5,
-      borderColor: colors.borderMedium,
+      borderColor: semantic.lineNormal,
       paddingVertical: 16,
       borderRadius: 16,
       alignItems: 'center',
@@ -212,14 +214,14 @@ const createStyles = (colors: ThemeColors) =>
     secondaryButtonText: {
       fontSize: 16,
       fontWeight: '600',
-      color: colors.textPrimary,
+      color: semantic.labelStrong,
     },
     footer: {
       paddingVertical: 16,
     },
     footerText: {
       fontSize: 14,
-      color: colors.textTertiary,
+      color: semantic.labelAlt,
       textAlign: 'center',
       lineHeight: 20,
     },
