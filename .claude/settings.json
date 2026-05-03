@@ -53,7 +53,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash .claude/hooks/outputSecretFilter.sh 2>/dev/null || true",
+            "command": "node .claude/hooks/outputSecretFilter.js 2>/dev/null || true",
             "timeout": 5,
             "statusMessage": "Secret filtering..."
           }

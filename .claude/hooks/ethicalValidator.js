@@ -81,6 +81,8 @@ const BLOCKED_OPERATIONS = {
     severity: 'HIGH'
   },
   polling_interval: {
+    // pathGate: only enforce in Seoul API service files. Animations, UI timers, debounce, etc. elsewhere are fine.
+    pathGate: /src\/services\/(train|seoul)/i,
     patterns: [
       /setInterval\s*\(\s*\w+\s*,\s*([1-9]\d{0,3}|[12]\d{4})\s*\)/,  // setInterval < 30000ms
       /polling.*interval.*=\s*([1-9]\d{0,3}|[12]\d{4})\b/i,           // pollingInterval < 30000
@@ -144,7 +146,12 @@ function validateEthically(toolName, toolInput, context) {
   }
 
   // 차단 패턴 검사
+  const filePathForGate = toolInput.file_path || '';
   for (const [category, config] of Object.entries(BLOCKED_OPERATIONS)) {
+    // Path-gated category: skip unless file_path matches the gate (e.g., polling_interval only on Seoul API files)
+    if (config.pathGate && !config.pathGate.test(filePathForGate)) {
+      continue;
+    }
     for (const pattern of config.patterns) {
       if (pattern.test(content)) {
         result.allowed = false;
