@@ -93,6 +93,13 @@ jest.mock('@/services/auth/AuthContext', () => {
   };
 });
 
+// Phase 9 — Wanted Design System atoms (e.g. SectionHeader) import useTheme
+// directly from `@/services/theme/themeContext`. Mock that path too so the
+// real provider isn't required when the test renders the screen tree.
+jest.mock('@/services/theme/themeContext', () => ({
+  useTheme: jest.fn(() => ({ isDark: false })),
+}));
+
 jest.mock('@/services/theme', () => ({
   useTheme: jest.fn(() => ({
     colors: {
@@ -171,6 +178,8 @@ jest.mock('lucide-react-native', () => ({
   // Phase 2 icons used by the redesigned HomeScreen + design atoms
   Search: () => null, Map: () => null, Megaphone: () => null, FileText: () => null,
   Bell: () => null, Sparkles: () => null, TrendingDown: () => null, TrendingUp: () => null,
+  // Phase 9 — MLHeroCardPlaceholder uses ArrowRight in its CTA row
+  ArrowRight: () => null,
 }));
 
 // expo-linear-gradient is used by MLHeroCard
@@ -279,11 +288,23 @@ jest.mock('@/styles/modernTheme', () => ({
     letterSpacing: { tight: -0.5 },
     lineHeight: { relaxed: 1.5 },
   },
-  // Phase 1 added — Wanted Design System tokens. Tests only need the
-  // congestion map (consumed by design components imported transitively).
+  // Phase 1 added — Wanted Design System tokens. Phase 9 expanded the mock
+  // with spacing/radius/type so HomeScreen's createStyles can hydrate fully.
   WANTED_TOKENS: {
-    light: { bgSubtlePage: '#F7F8FA', bgBase: '#FFFFFF', labelStrong: '#000000', labelNormal: '#171719', labelNeutral: '#37383C', labelAlt: '#70737C', lineSubtle: 'rgba(112,115,124,0.16)' },
-    dark: { bgSubtlePage: '#14191E', bgBase: '#1B1C1E', labelStrong: '#FFFFFF', labelNormal: '#F4F4F5', labelNeutral: 'rgba(255,255,255,0.88)', labelAlt: '#989BA2', lineSubtle: 'rgba(255,255,255,0.10)' },
+    light: { bgSubtlePage: '#F7F8FA', bgBase: '#FFFFFF', bgSubtle: 'rgba(112,115,124,0.08)', labelStrong: '#000000', labelNormal: '#171719', labelNeutral: '#37383C', labelAlt: '#70737C', lineSubtle: 'rgba(112,115,124,0.16)', primaryNormal: '#0066FF' },
+    dark: { bgSubtlePage: '#14191E', bgBase: '#1B1C1E', bgSubtle: 'rgba(255,255,255,0.06)', labelStrong: '#FFFFFF', labelNormal: '#F4F4F5', labelNeutral: 'rgba(255,255,255,0.88)', labelAlt: '#989BA2', lineSubtle: 'rgba(255,255,255,0.10)', primaryNormal: '#3385FF' },
+    spacing: { s1: 4, s2: 8, s3: 12, s4: 16, s5: 20, s6: 24, s8: 32, s10: 40, s12: 48 },
+    radius: { r2: 4, r4: 8, r5: 10, r6: 12, r8: 16, pill: 9999 },
+    type: {
+      heading2: { size: 20, lh: 28, tracking: -0.012, weight: '700' },
+      body1: { size: 16, lh: 24, tracking: 0.0057, weight: '500' },
+      body2: { size: 15, lh: 22, tracking: 0.0096, weight: '500' },
+      label1: { size: 14, lh: 20, tracking: 0.0145, weight: '600' },
+      label2: { size: 13, lh: 18, tracking: 0.0194, weight: '600' },
+      caption1: { size: 12, lh: 16, tracking: 0.0252, weight: '600' },
+    },
+    blue: { 50: '#EAF2FE', 500: '#0066FF', 700: '#0044BB' },
+    status: { red500: '#FF4242' },
     congestion: {
       low:   { color: '#00BF40', label: '여유',     pct: 0.30 },
       mid:   { color: '#FFB400', label: '보통',     pct: 0.55 },
@@ -305,9 +326,43 @@ const mockStation = (id: string, name: string) => ({
 // Tests
 // ============================================================================
 
+// Phase 9 — helpers for the new 3-way ML hero branch (placeholder vs card)
+let originalAuthImpl: () => unknown;
+
+const withMorningCommute = (): void => {
+  const { useAuth } = require('@/services/auth/AuthContext');
+  if (!originalAuthImpl) originalAuthImpl = useAuth.getMockImplementation();
+  const baseMock = originalAuthImpl() as { user: { preferences: Record<string, unknown> } };
+  const overriddenUser = {
+    ...baseMock.user,
+    preferences: {
+      ...baseMock.user.preferences,
+      commuteSchedule: {
+        ...(baseMock.user.preferences.commuteSchedule as object),
+        weekdays: {
+          morningCommute: {
+            departureTime: '08:30',
+            stationId: 'gangnam',
+            destinationStationId: 'jamsil',
+            bufferMinutes: 5,
+          },
+          eveningCommute: null,
+        },
+      },
+    },
+  };
+  useAuth.mockImplementation(() => ({ ...baseMock, user: overriddenUser }));
+};
+
 describe('HomeScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Capture (once) and restore the default auth mock — withMorningCommute()
+    // overrides useAuth.mockImplementation, and that override would otherwise
+    // bleed into the next test (clearAllMocks only resets call history).
+    const { useAuth } = require('@/services/auth/AuthContext');
+    if (!originalAuthImpl) originalAuthImpl = useAuth.getMockImplementation();
+    useAuth.mockImplementation(originalAuthImpl);
     // Get fresh references to mock functions after clearAllMocks
     const { trainService } = require('@/services/train/trainService');
     mockGetStation = trainService.getStation;
@@ -350,10 +405,20 @@ describe('HomeScreen', () => {
       await waitFor(() => expect(getByTestId('home-top-bar')).toBeTruthy());
     });
 
-    it('shows CommutePredictionCard and Toast', async () => {
+    it('shows CommutePredictionCard and Toast when morningCommute is set', async () => {
+      withMorningCommute();
       const { getByTestId } = render(<HomeScreen />);
       await waitFor(() => {
         expect(getByTestId('prediction-card')).toBeTruthy();
+        expect(getByTestId('toast')).toBeTruthy();
+      });
+    });
+
+    it('shows MLHeroCardPlaceholder and Toast when morningCommute is unset', async () => {
+      // Default mockUser has morningCommute: null — placeholder branch fires.
+      const { getByTestId } = render(<HomeScreen />);
+      await waitFor(() => {
+        expect(getByTestId('ml-hero-card-placeholder')).toBeTruthy();
         expect(getByTestId('toast')).toBeTruthy();
       });
     });
@@ -583,6 +648,13 @@ describe('HomeScreen', () => {
   // ---------- Commute Prediction (lines 177-187) ----------
 
   describe('Commute Prediction', () => {
+    // The Commute Prediction CTAs (Schedule / View details) live inside
+    // CommutePredictionCard, which only renders when morningCommute is set.
+    // Without it, the screen shows MLHeroCardPlaceholder instead.
+    beforeEach(() => {
+      withMorningCommute();
+    });
+
     it('schedule alert calls scheduleDepartureAlert(15)', async () => {
       mockScheduleDepartureAlert.mockResolvedValue({ alertTime: '08:00' });
 
@@ -617,50 +689,24 @@ describe('HomeScreen', () => {
     });
 
     it('view details navigates to Onboarding when morningCommute is unset', async () => {
-      // Default mockUser has morningCommute: null — handler should redirect
-      // to Onboarding to capture commute info before showing predictions.
-      const { getByTestId } = render(<HomeScreen />);
-      await waitFor(() => expect(getByTestId('view-details-btn')).toBeTruthy());
+      // Reset the beforeEach override so the placeholder branch fires.
+      const { useAuth } = require('@/services/auth/AuthContext');
+      useAuth.mockImplementation(originalAuthImpl);
 
-      fireEvent.press(getByTestId('view-details-btn'));
+      const { getByTestId } = render(<HomeScreen />);
+      await waitFor(() => expect(getByTestId('ml-hero-card-placeholder')).toBeTruthy());
+
+      fireEvent.press(getByTestId('ml-hero-card-placeholder'));
       expect(mockNavigate).toHaveBeenCalledWith('Onboarding');
     });
 
     it('view details navigates to WeeklyPrediction when morningCommute is set', async () => {
-      const { useAuth } = require('@/services/auth/AuthContext');
-      const originalImpl = useAuth.getMockImplementation();
-      const baseMock = originalImpl();
-      const overriddenUser = {
-        ...baseMock.user,
-        preferences: {
-          ...baseMock.user.preferences,
-          commuteSchedule: {
-            ...baseMock.user.preferences.commuteSchedule,
-            weekdays: {
-              morningCommute: {
-                departureTime: '08:30',
-                stationId: 'gangnam',
-                destinationStationId: 'jamsil',
-                bufferMinutes: 5,
-              },
-              eveningCommute: null,
-            },
-          },
-        },
-      };
-      // Override across all renders/effects (mockReturnValueOnce only fires
-      // on the first call which isn't enough — useAuth is read in the
-      // render body each time React re-renders).
-      useAuth.mockImplementation(() => ({ ...baseMock, user: overriddenUser }));
-      try {
-        const { getByTestId } = render(<HomeScreen />);
-        await waitFor(() => expect(getByTestId('view-details-btn')).toBeTruthy());
+      // beforeEach already set morningCommute via withMorningCommute().
+      const { getByTestId } = render(<HomeScreen />);
+      await waitFor(() => expect(getByTestId('view-details-btn')).toBeTruthy());
 
-        fireEvent.press(getByTestId('view-details-btn'));
-        expect(mockNavigate).toHaveBeenCalledWith('WeeklyPrediction');
-      } finally {
-        useAuth.mockImplementation(originalImpl);
-      }
+      fireEvent.press(getByTestId('view-details-btn'));
+      expect(mockNavigate).toHaveBeenCalledWith('WeeklyPrediction');
     });
   });
 

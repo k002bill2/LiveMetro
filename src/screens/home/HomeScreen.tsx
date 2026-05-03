@@ -36,14 +36,14 @@ import { StationCard } from '../../components/train/StationCard';
 import { TrainArrivalList } from '../../components/train/TrainArrivalList';
 import { DelayAlertBanner } from '../../components/delays';
 import { CommutePredictionCard } from '../../components/prediction';
-import { HomeTopBar, MLHeroCard, QuickActionsGrid } from '../../components/design';
+import { HomeTopBar, MLHeroCard, MLHeroCardPlaceholder, QuickActionsGrid, SectionHeader } from '../../components/design';
 import { LocationDebugPanel } from '../../components/debug';
 import { useToast } from '../../components/common/Toast';
 import { useDelayDetection } from '../../hooks/useDelayDetection';
 import { useIntegratedAlerts } from '../../hooks/useIntegratedAlerts';
 import { useMLPrediction } from '../../hooks/useMLPrediction';
-import { SPACING, RADIUS, TYPOGRAPHY, WANTED_TOKENS } from '../../styles/modernTheme';
-import { useTheme, ThemeColors } from '../../services/theme';
+import { WANTED_TOKENS, type WantedSemanticTheme } from '../../styles/modernTheme';
+import { useTheme } from '../../services/theme';
 
 import { Station } from '../../models/train';
 import { AppStackParamList } from '../../navigation/types';
@@ -91,8 +91,9 @@ export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<AppStackParamList>>();
   const isFocused = useIsFocused();
   const { user } = useAuth();
-  const { colors, isDark } = useTheme();
-  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const styles = useMemo(() => createStyles(semantic), [semantic]);
   const { showError, showSuccess, showInfo, ToastComponent } = useToast();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -399,7 +400,7 @@ export const HomeScreen: React.FC = () => {
         <RefreshControl
           refreshing={refreshing}
           onRefresh={onRefresh}
-          tintColor={colors.textPrimary}
+          tintColor={semantic.labelStrong}
         />
       }
       accessible={false}
@@ -414,8 +415,13 @@ export const HomeScreen: React.FC = () => {
         onBellPress={() => navigation.navigate('Alerts' as never)}
       />
 
-      {/* ML hero — gradient teaser when prediction is ready, otherwise fall
-          back to the rich CommutePredictionCard (covers training/empty states). */}
+      {/* ML hero — three states:
+          1. heroProps available → gradient MLHeroCard with real prediction
+          2. commute set but prediction unavailable → CommutePredictionCard
+             (handles training / empty / loading / error)
+          3. commute unset → MLHeroCardPlaceholder with explicit setup CTA
+             (avoids misleading "데이터 학습 필요" copy when the real issue
+             is no commute exists yet) */}
       <View style={styles.heroWrap}>
         {heroProps ? (
           <MLHeroCard
@@ -426,11 +432,13 @@ export const HomeScreen: React.FC = () => {
             confidence={heroProps.confidence}
             onPress={handleViewPredictions}
           />
-        ) : (
+        ) : morningCommute ? (
           <CommutePredictionCard
             onScheduleAlert={handleScheduleAlert}
             onViewDetails={handleViewPredictions}
           />
+        ) : (
+          <MLHeroCardPlaceholder onPress={handleViewPredictions} />
         )}
       </View>
 
@@ -486,7 +494,7 @@ export const HomeScreen: React.FC = () => {
           accessibilityRole="text"
           accessibilityLabel="현재 오프라인 상태입니다. 캐시된 정보가 표시됩니다"
         >
-          <CloudOff size={20} color={colors.textSecondary} />
+          <CloudOff size={20} color={semantic.labelAlt} />
           <Text style={styles.offlineText}>
             오프라인 상태 - 캐시된 정보가 표시됩니다
           </Text>
@@ -524,25 +532,25 @@ export const HomeScreen: React.FC = () => {
           accessibilityLabel="위치 권한 허용하기"
           accessibilityHint="주변 지하철역 정보를 받기 위해 위치 권한을 허용하세요"
         >
-          <MapPin size={24} color={colors.textPrimary} />
+          <MapPin size={24} color={semantic.labelStrong} />
           <View style={styles.permissionText}>
             <Text style={styles.permissionTitle}>위치 권한 허용</Text>
             <Text style={styles.permissionSubtitle}>
               주변 역 정보를 보려면 위치 권한이 필요합니다
             </Text>
           </View>
-          <ChevronRight size={20} color={colors.textTertiary} />
+          <ChevronRight size={20} color={semantic.labelAlt} />
         </TouchableOpacity>
       )}
 
       {/* Station Selection */}
       <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>
-            {locationPermission ? '주변 역' : '즐겨찾기'}
-          </Text>
-        </View>
-        
+        <SectionHeader
+          title={locationPermission ? '주변 역' : '즐겨찾기'}
+          subtitle={locationPermission ? 'GPS 기반 자동 갱신' : undefined}
+          testID="home-stations-section"
+        />
+
         {nearbyStations.length === 0 ? (
           <View
             style={styles.emptyState}
@@ -553,7 +561,7 @@ export const HomeScreen: React.FC = () => {
               : '즐겨찾기에 추가된 역이 없습니다. 설정에서 자주 이용하는 역을 추가해보세요'
             }
           >
-            <TrainFront size={48} color={colors.textTertiary} />
+            <TrainFront size={48} color={semantic.labelAlt} />
             <Text style={styles.emptyText}>
               {locationPermission
                 ? '주변에 지하철역이 없습니다'
@@ -611,7 +619,7 @@ export const HomeScreen: React.FC = () => {
                 accessibilityLabel={`${selectedStation.name} 역 상세 정보 보기`}
               >
                 <Text style={styles.detailButtonText}>상세보기</Text>
-                <ChevronRight size={18} color={colors.textPrimary} />
+                <ChevronRight size={18} color={semantic.labelStrong} />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={onRefresh}
@@ -637,7 +645,7 @@ export const HomeScreen: React.FC = () => {
                 >
                   <RefreshCw
                     size={24}
-                    color={refreshing ? colors.textTertiary : colors.textPrimary}
+                    color={refreshing ? semantic.labelAlt : semantic.labelStrong}
                   />
                 </Animated.View>
               </TouchableOpacity>
@@ -661,133 +669,139 @@ export const HomeScreen: React.FC = () => {
   );
 };
 
-const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
+const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: isDark
-      ? WANTED_TOKENS.dark.bgSubtlePage
-      : WANTED_TOKENS.light.bgSubtlePage,
+    backgroundColor: semantic.bgSubtlePage,
   },
   heroWrap: {
-    paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingHorizontal: WANTED_TOKENS.spacing.s5,
+    paddingBottom: WANTED_TOKENS.spacing.s4,
   },
   quickActionsWrap: {
-    paddingBottom: 8,
+    paddingBottom: WANTED_TOKENS.spacing.s2,
   },
   permissionBanner: {
-    backgroundColor: colors.backgroundSecondary,
+    backgroundColor: semantic.bgBase,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: SPACING.lg,
-    marginHorizontal: SPACING.lg,
-    marginBottom: SPACING.sm,
-    borderRadius: RADIUS.lg,
+    padding: WANTED_TOKENS.spacing.s4,
+    marginHorizontal: WANTED_TOKENS.spacing.s4,
+    marginBottom: WANTED_TOKENS.spacing.s2,
+    borderRadius: WANTED_TOKENS.radius.r6,
     borderWidth: 1,
-    borderColor: colors.borderMedium,
+    borderColor: semantic.lineSubtle,
   },
   permissionText: {
     flex: 1,
-    marginLeft: SPACING.md,
+    marginLeft: WANTED_TOKENS.spacing.s3,
   },
   permissionTitle: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: colors.textPrimary,
+    fontSize: WANTED_TOKENS.type.body1.size,
+    lineHeight: WANTED_TOKENS.type.body1.lh,
+    fontWeight: '600',
+    color: semantic.labelStrong,
     marginBottom: 2,
   },
   permissionSubtitle: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: colors.textSecondary,
+    fontSize: WANTED_TOKENS.type.caption1.size,
+    lineHeight: WANTED_TOKENS.type.caption1.lh,
+    fontWeight: '500',
+    color: semantic.labelAlt,
   },
   offlineBanner: {
-    backgroundColor: colors.backgroundSecondary,
+    backgroundColor: semantic.bgBase,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: SPACING.lg,
-    marginHorizontal: SPACING.lg,
-    marginBottom: SPACING.sm,
-    borderRadius: RADIUS.lg,
+    padding: WANTED_TOKENS.spacing.s4,
+    marginHorizontal: WANTED_TOKENS.spacing.s4,
+    marginBottom: WANTED_TOKENS.spacing.s2,
+    borderRadius: WANTED_TOKENS.radius.r6,
     borderWidth: 1,
-    borderColor: colors.borderMedium,
+    borderColor: semantic.lineSubtle,
   },
   offlineText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: colors.textSecondary,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    marginLeft: SPACING.sm,
+    fontSize: WANTED_TOKENS.type.caption1.size,
+    lineHeight: WANTED_TOKENS.type.caption1.lh,
+    color: semantic.labelAlt,
+    fontWeight: '600',
+    marginLeft: WANTED_TOKENS.spacing.s2,
     flex: 1,
   },
   section: {
-    backgroundColor: colors.surface,
-    marginBottom: SPACING.sm,
-    paddingVertical: SPACING.lg,
+    backgroundColor: semantic.bgBase,
+    marginBottom: WANTED_TOKENS.spacing.s2,
+    paddingBottom: WANTED_TOKENS.spacing.s4,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.lg,
+    paddingHorizontal: WANTED_TOKENS.spacing.s5,
+    paddingTop: WANTED_TOKENS.spacing.s4,
+    paddingBottom: WANTED_TOKENS.spacing.s3,
   },
   sectionHeaderActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    columnGap: SPACING.md,
+    columnGap: WANTED_TOKENS.spacing.s3,
   },
   sectionTitle: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: colors.textPrimary,
+    fontSize: WANTED_TOKENS.type.heading2.size,
+    lineHeight: WANTED_TOKENS.type.heading2.lh,
+    fontWeight: '700',
+    color: semantic.labelStrong,
     flex: 1,
-    letterSpacing: TYPOGRAPHY.letterSpacing.tight,
+    letterSpacing:
+      WANTED_TOKENS.type.heading2.size * WANTED_TOKENS.type.heading2.tracking,
   },
   detailButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.full,
+    paddingHorizontal: WANTED_TOKENS.spacing.s3,
+    paddingVertical: WANTED_TOKENS.spacing.s2,
+    borderRadius: WANTED_TOKENS.radius.pill,
     borderWidth: 1,
-    borderColor: colors.borderMedium,
-    backgroundColor: colors.backgroundSecondary,
+    borderColor: semantic.lineSubtle,
+    backgroundColor: semantic.bgSubtle,
   },
   detailButtonText: {
-    color: colors.textPrimary,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: semantic.labelStrong,
+    fontWeight: '600',
     marginRight: 4,
-    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontSize: WANTED_TOKENS.type.label1.size,
   },
   refreshButton: {
-    padding: SPACING.sm,
-    borderRadius: RADIUS.full,
-    backgroundColor: colors.backgroundSecondary,
+    padding: WANTED_TOKENS.spacing.s2,
+    borderRadius: WANTED_TOKENS.radius.pill,
+    backgroundColor: semantic.bgSubtle,
     width: 40,
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
   },
   stationList: {
-    paddingLeft: SPACING.lg,
+    paddingLeft: WANTED_TOKENS.spacing.s4,
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: SPACING['2xl'],
-    paddingHorizontal: SPACING.lg,
+    paddingVertical: WANTED_TOKENS.spacing.s10,
+    paddingHorizontal: WANTED_TOKENS.spacing.s4,
   },
   emptyText: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: colors.textSecondary,
-    marginTop: SPACING.lg,
+    fontSize: WANTED_TOKENS.type.body1.size,
+    lineHeight: WANTED_TOKENS.type.body1.lh,
+    fontWeight: '600',
+    color: semantic.labelAlt,
+    marginTop: WANTED_TOKENS.spacing.s4,
     textAlign: 'center',
   },
   emptySubtext: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: colors.textTertiary,
-    marginTop: SPACING.sm,
+    fontSize: WANTED_TOKENS.type.caption1.size,
+    lineHeight: WANTED_TOKENS.type.caption1.lh * 1.4,
+    color: semantic.labelAlt,
+    marginTop: WANTED_TOKENS.spacing.s2,
     textAlign: 'center',
-    lineHeight: TYPOGRAPHY.lineHeight.relaxed * TYPOGRAPHY.fontSize.sm,
   },
 });
 

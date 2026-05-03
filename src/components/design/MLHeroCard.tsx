@@ -10,7 +10,7 @@
 import React, { memo } from 'react';
 import { Pressable, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Sparkles, TrendingDown, TrendingUp } from 'lucide-react-native';
+import { ArrowRight, Sparkles, TrendingDown, TrendingUp } from 'lucide-react-native';
 
 interface MLHeroCardProps {
   /** "홍대입구" → 출발역 표시명 */
@@ -26,6 +26,19 @@ interface MLHeroCardProps {
   /** Confidence 0–1 */
   confidence?: number;
   /** Tap handler — typically navigates to WeeklyPrediction */
+  onPress?: () => void;
+  style?: ViewStyle;
+  testID?: string;
+}
+
+interface MLHeroCardPlaceholderProps {
+  /** Heading text — defaults to "출퇴근 경로 설정" */
+  title?: string;
+  /** Body copy explaining what tapping does */
+  message?: string;
+  /** CTA button label — defaults to "지금 설정하기" */
+  ctaLabel?: string;
+  /** Tap handler — typically navigates to Onboarding */
   onPress?: () => void;
   style?: ViewStyle;
   testID?: string;
@@ -116,6 +129,58 @@ const MLHeroCardImpl: React.FC<MLHeroCardProps> = ({
 
 export const MLHeroCard = memo(MLHeroCardImpl);
 MLHeroCard.displayName = 'MLHeroCard';
+
+/**
+ * Placeholder variant — shown when the user hasn't set up a commute route yet.
+ * Same gradient surface as MLHeroCard for visual continuity, but with CTA copy
+ * instead of prediction numbers. Tapping should navigate to Onboarding.
+ */
+const MLHeroCardPlaceholderImpl: React.FC<MLHeroCardPlaceholderProps> = ({
+  title = '출퇴근 경로 설정',
+  message = '경로를 설정하면 ML이 예상 소요 시간과 도착 시각을 알려드려요',
+  ctaLabel = '지금 설정하기',
+  onPress,
+  style,
+  testID,
+}) => (
+  <Pressable
+    testID={testID ?? 'ml-hero-card-placeholder'}
+    onPress={onPress}
+    accessibilityRole={onPress ? 'button' : undefined}
+    accessibilityLabel={`${title}. ${message}`}
+    style={[styles.wrap, style]}
+  >
+    <LinearGradient
+      colors={['#0066FF', '#0044BB']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={styles.card}
+    >
+      <View style={styles.blobTop} />
+      <View style={styles.blobBottom} />
+
+      <View style={styles.content}>
+        <View style={styles.tagRow}>
+          <Sparkles size={12} color="#FFFFFF" strokeWidth={2.4} />
+          <Text style={styles.tagText}>ML 출퇴근 예측</Text>
+        </View>
+
+        <Text style={styles.placeholderTitle}>{title}</Text>
+        <Text style={styles.placeholderMessage}>{message}</Text>
+
+        {onPress && (
+          <View style={styles.ctaRow}>
+            <Text style={styles.ctaText}>{ctaLabel}</Text>
+            <ArrowRight size={14} color="#FFFFFF" strokeWidth={2.4} />
+          </View>
+        )}
+      </View>
+    </LinearGradient>
+  </Pressable>
+);
+
+export const MLHeroCardPlaceholder = memo(MLHeroCardPlaceholderImpl);
+MLHeroCardPlaceholder.displayName = 'MLHeroCardPlaceholder';
 
 const styles = StyleSheet.create({
   wrap: {
@@ -214,5 +279,36 @@ const styles = StyleSheet.create({
     opacity: 0.8,
     fontSize: 12,
     fontWeight: '600',
+  },
+  placeholderTitle: {
+    marginTop: 10,
+    color: '#FFFFFF',
+    fontSize: 22,
+    fontWeight: '800',
+    letterSpacing: -0.5,
+  },
+  placeholderMessage: {
+    marginTop: 6,
+    color: '#FFFFFF',
+    opacity: 0.85,
+    fontSize: 13,
+    fontWeight: '500',
+    lineHeight: 18,
+  },
+  ctaRow: {
+    marginTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderRadius: 9999,
+  },
+  ctaText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

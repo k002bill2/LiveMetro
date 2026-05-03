@@ -19,10 +19,13 @@ export { CONG_TONE, congFromPct } from './congestion';
 export type { CongestionLevel } from './congestion';
 
 /* Phase 2 — HomeScreen building blocks */
-export { MLHeroCard } from './MLHeroCard';
+export { MLHeroCard, MLHeroCardPlaceholder } from './MLHeroCard';
 export { HomeTopBar } from './HomeTopBar';
 export { QuickActionsGrid } from './QuickActionsGrid';
 export type { QuickAction } from './QuickActionsGrid';
 
 /* Phase 3B — list row primitive */
 export { FavoriteRow } from './FavoriteRow';
+
+/* Phase 9 — section divider/title with optional action */
+export { SectionHeader } from './SectionHeader';
