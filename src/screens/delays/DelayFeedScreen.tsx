@@ -251,7 +251,7 @@ export const DelayFeedScreen: React.FC = () => {
           testID="delay-feed-add-button"
           onPress={() => setShowReportModal(true)}
         >
-          <Plus size={20} color="#FFFFFF" strokeWidth={2.4} />
+          <Plus size={20} color={WANTED_TOKENS.light.labelOnColor} strokeWidth={2.4} />
         </TouchableOpacity>
       </View>
 
@@ -368,6 +368,11 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => {
       backgroundColor: semantic.primaryNormal,
       alignItems: 'center',
       justifyContent: 'center',
+      shadowColor: semantic.primaryNormal,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.25,
+      shadowRadius: 10,
+      elevation: 4,
     },
     filterContainer: {
       backgroundColor: colors.surface,
@@ -392,7 +397,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => {
       fontWeight: '500',
     },
     filterTextSelected: {
-      color: '#FFFFFF',
+      color: semantic.labelOnColor,
     },
     countBar: {
       flexDirection: 'row',
@@ -414,6 +419,8 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => {
       marginBottom: SPACING.md,
       overflow: 'hidden',
       flexDirection: 'row',
+      borderWidth: 1,
+      borderColor: semantic.lineSubtle,
     },
     reportCardHighlighted: {
       borderWidth: 1,
@@ -444,7 +451,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => {
     },
     lineBadgeText: {
       fontSize: TYPOGRAPHY.fontSize.xs,
-      color: '#FFFFFF',
+      color: semantic.labelOnColor,
       fontWeight: '600',
     },
     stationText: {

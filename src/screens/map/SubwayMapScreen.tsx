@@ -20,6 +20,8 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { getSubwayLineColor, getLineTextColor } from '@utils/colorUtils';
 import { getLocalStationsByLine } from '@services/data/stationsDataService';
 import { useFavorites } from '@hooks/useFavorites';
+import { useTheme } from '@services/theme';
+import { WANTED_TOKENS, type WantedSemanticTheme } from '@/styles/modernTheme';
 import type { Station } from '@models/train';
 import type { AppStackParamList } from '@/navigation/types';
 
@@ -123,6 +125,9 @@ type NavigationProp = NativeStackNavigationProp<AppStackParamList>;
 export const SubwayMapScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const { toggleFavorite, isFavorite } = useFavorites();
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const styles = useMemo(() => createStyles(semantic), [semantic]);
   const subwayLines = useMemo(() => buildSubwayLines(), []);
   const [selectedLine, setSelectedLine] = useState<string | null>('2');
   const [selectedStation, setSelectedStation] = useState<StationDisplay | null>(null);
@@ -183,9 +188,16 @@ export const SubwayMapScreen: React.FC = () => {
                 style={[
                   styles.lineButton,
                   {
-                    backgroundColor: isSelected ? lineColor : '#f3f4f6',
+                    backgroundColor: isSelected ? lineColor : semantic.bgSubtle,
                     borderColor: lineColor,
                     borderWidth: isSelected ? 0 : 2,
+                  },
+                  isSelected && {
+                    shadowColor: lineColor,
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.25,
+                    shadowRadius: 10,
+                    elevation: 4,
                   },
                 ]}
                 onPress={() => handleLineSelect(line.id)}
@@ -234,7 +246,7 @@ export const SubwayMapScreen: React.FC = () => {
                       style={[
                         styles.stationCircle,
                         {
-                          backgroundColor: station.isTransfer ? '#ffffff' : lineColor,
+                          backgroundColor: station.isTransfer ? semantic.bgBase : lineColor,
                           borderColor: lineColor,
                           borderWidth: station.isTransfer ? 4 : 0,
                         },
@@ -297,7 +309,7 @@ export const SubwayMapScreen: React.FC = () => {
                   </TouchableOpacity>
 
                   {/* Chevron */}
-                  <Ionicons name="chevron-forward" size={20} color="#9ca3af" />
+                  <Ionicons name="chevron-forward" size={20} color={semantic.labelAlt} />
                 </View>
               );
             })}
@@ -332,7 +344,7 @@ export const SubwayMapScreen: React.FC = () => {
                     accessibilityRole="button"
                     accessibilityLabel="닫기"
                   >
-                    <Ionicons name="close" size={28} color="#6b7280" />
+                    <Ionicons name="close" size={28} color={semantic.labelAlt} />
                   </TouchableOpacity>
                 </View>
 
@@ -378,11 +390,11 @@ export const SubwayMapScreen: React.FC = () => {
                     accessibilityRole="button"
                     accessibilityLabel="도착 정보 보기"
                   >
-                    <Ionicons name="train" size={20} color="#2563eb" />
+                    <Ionicons name="train" size={20} color={semantic.primaryNormal} />
                     <Text style={styles.viewArrivalButtonText}>
                       도착 정보 보기
                     </Text>
-                    <Ionicons name="chevron-forward" size={20} color="#2563eb" />
+                    <Ionicons name="chevron-forward" size={20} color={semantic.primaryNormal} />
                   </TouchableOpacity>
                 </View>
 
@@ -414,16 +426,16 @@ export const SubwayMapScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f9fafb',
+    backgroundColor: semantic.bgSubtlePage,
   },
   lineSelector: {
-    backgroundColor: '#ffffff',
+    backgroundColor: semantic.bgBase,
     paddingVertical: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
+    borderBottomColor: semantic.lineSubtle,
     elevation: 2,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -451,21 +463,21 @@ const styles = StyleSheet.create({
   },
   stationListHeader: {
     padding: 20,
-    backgroundColor: '#ffffff',
+    backgroundColor: semantic.bgBase,
     marginBottom: 8,
   },
   stationListTitle: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#111827',
+    color: semantic.labelStrong,
     marginBottom: 4,
   },
   stationListSubtitle: {
     fontSize: 14,
-    color: '#6b7280',
+    color: semantic.labelAlt,
   },
   lineVisualization: {
-    backgroundColor: '#ffffff',
+    backgroundColor: semantic.bgBase,
     paddingHorizontal: 20,
     paddingVertical: 16,
   },
@@ -501,12 +513,12 @@ const styles = StyleSheet.create({
   stationName: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#111827',
+    color: semantic.labelStrong,
     marginBottom: 2,
   },
   stationNameEn: {
     fontSize: 13,
-    color: '#6b7280',
+    color: semantic.labelAlt,
     marginBottom: 4,
   },
   transferBadges: {
@@ -541,7 +553,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#ffffff',
+    backgroundColor: semantic.bgBase,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 24,
@@ -556,12 +568,12 @@ const styles = StyleSheet.create({
   modalStationName: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: '#111827',
+    color: semantic.labelStrong,
     marginBottom: 4,
   },
   modalStationNameEn: {
     fontSize: 16,
-    color: '#6b7280',
+    color: semantic.labelAlt,
   },
   modalCloseButton: {
     padding: 4,
@@ -572,13 +584,13 @@ const styles = StyleSheet.create({
   modalSectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: '#374151',
+    color: semantic.labelNormal,
     marginBottom: 12,
   },
   viewArrivalButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#dbeafe',
+    backgroundColor: semantic.primaryBg,
     paddingHorizontal: 16,
     paddingVertical: 14,
     borderRadius: 12,
@@ -587,14 +599,14 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: '600',
-    color: '#2563eb',
+    color: semantic.primaryNormal,
     marginLeft: 12,
   },
   addFavoriteButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#2563eb',
+    backgroundColor: semantic.primaryNormal,
     paddingVertical: 16,
     borderRadius: 12,
     gap: 8,
@@ -602,9 +614,9 @@ const styles = StyleSheet.create({
   addFavoriteButtonText: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#ffffff',
+    color: semantic.labelOnColor,
   },
   removeFavoriteButton: {
-    backgroundColor: '#ef4444',
+    backgroundColor: semantic.statusNegative,
   },
 });
