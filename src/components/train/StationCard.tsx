@@ -27,10 +27,24 @@ import { Animated, StyleSheet, Text, TouchableOpacity, View, Pressable, GestureR
 import { useRealtimeTrains } from '../../hooks/useRealtimeTrains';
 import { Station } from '../../models/train';
 import { useAuth } from '../../services/auth/AuthContext';
-import { RADIUS, SPACING, TRANSITIONS, WANTED_TOKENS, type WantedSemanticTheme } from '../../styles/modernTheme';
+import { RADIUS, SPACING, TRANSITIONS, TYPOGRAPHY, WANTED_TOKENS, type WantedSemanticTheme } from '../../styles/modernTheme';
 import { useTheme } from '../../services/theme';
 import { getSubwayLineColor } from '../../utils/colorUtils';
 import { LineBadge } from '../design';
+
+/**
+ * Internal — typed shape for the realtime arrival preview rows.
+ * Replaces the previous untyped `any` used in the JSX map.
+ */
+interface UpcomingArrival {
+  /** Stable train identifier — used as React key. */
+  id: string;
+  direction: '상행' | '하행';
+  /** Pre-formatted "N분 후" or "도착" label. */
+  time: string;
+  isImmediate: boolean;
+  destination: string;
+}
 
 interface StationCardProps {
   station: Station;
@@ -204,8 +218,11 @@ export const StationCard: React.FC<StationCardProps> = memo(
       return `${distance.toFixed(1)}km`;
     }, [distance, showDistance]);
 
-    // Process arrival preview data (show up to 2 upcoming trains)
-    const upcomingArrivals = useMemo(() => {
+    // Process arrival preview data (show up to 2 upcoming trains).
+    // Typed shape — Gemini cross-review flagged the previous `any` usage in
+    // the JSX map. Including train.id gives a stable React key that survives
+    // list reorder/removal in the realtime stream.
+    const upcomingArrivals = useMemo<UpcomingArrival[]>(() => {
       if (!showArrivals || !trains || trains.length === 0) return [];
 
       return trains
@@ -215,7 +232,7 @@ export const StationCard: React.FC<StationCardProps> = memo(
           return new Date(a.arrivalTime).getTime() - new Date(b.arrivalTime).getTime();
         })
         .slice(0, 2)
-        .map(train => {
+        .map((train): UpcomingArrival | null => {
           if (!train.arrivalTime) return null;
 
           const now = new Date();
@@ -233,13 +250,14 @@ export const StationCard: React.FC<StationCardProps> = memo(
           }
 
           return {
+            id: train.id,
             direction: train.direction === 'up' ? '상행' : '하행',
             time: displayText,
             isImmediate: diffMinutes <= 1,
             destination: train.finalDestination,
           };
         })
-        .filter(Boolean);
+        .filter((a): a is UpcomingArrival => a !== null);
     }, [trains, showArrivals]);
 
     return (
@@ -328,8 +346,8 @@ export const StationCard: React.FC<StationCardProps> = memo(
                 <TrainFront size={14} color={semantic.labelAlt} />
                 <Text style={styles.arrivalsHeaderText}>실시간 도착 정보</Text>
               </View>
-              {upcomingArrivals.map((arrival: any, index: number) => (
-                <View key={index} style={styles.arrivalItem}>
+              {upcomingArrivals.map((arrival) => (
+                <View key={arrival.id} style={styles.arrivalItem}>
                   <View style={styles.arrivalDirection}>
                     {arrival.direction === '상행' ? (
                        <ArrowUp size={12} color={lineColor} />
@@ -398,7 +416,8 @@ const createStyles = (semantic: WantedSemanticTheme) =>
   StyleSheet.create({
     container: {
       backgroundColor: semantic.bgBase,
-      borderRadius: 16,
+      // Wanted radius-8 = 16. Use token for design-system maintainability.
+      borderRadius: RADIUS.lg,
       padding: SPACING.lg,
       marginRight: SPACING.md,
       minWidth: 240,
@@ -440,7 +459,8 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       marginBottom: SPACING.xs,
     },
     stationName: {
-      fontSize: 18,
+      // Headline1 (18 / weight 600) bumped to 800 for emphasis on station name.
+      fontSize: TYPOGRAPHY.fontSize.lg,
       fontWeight: '800',
       color: semantic.labelStrong,
       letterSpacing: -0.3,
@@ -451,7 +471,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     favoriteBadge: {
       marginLeft: SPACING.xs,
       backgroundColor: semantic.bgBase,
-      borderRadius: 9999,
+      borderRadius: RADIUS.full,
       width: 20,
       height: 20,
       alignItems: 'center',
@@ -460,10 +480,10 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       borderColor: semantic.lineNormal,
     },
     stationNameEn: {
-      fontSize: 12,
+      fontSize: TYPOGRAPHY.fontSize.xs,
       color: semantic.labelAlt,
       marginBottom: 4,
-      fontWeight: '500',
+      fontWeight: TYPOGRAPHY.fontWeight.medium,
     },
     headerRight: {
       flexDirection: 'row',
@@ -471,9 +491,9 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       gap: SPACING.sm,
     },
     distance: {
-      fontSize: 13,
+      fontSize: TYPOGRAPHY.fontSize.sm,
       color: semantic.labelNeutral,
-      fontWeight: '700',
+      fontWeight: TYPOGRAPHY.fontWeight.bold,
     },
     favoriteButton: {
       padding: 4,
@@ -481,13 +501,13 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     lineInfo: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 6,
+      gap: SPACING.xs / 1,  // 4px
       marginBottom: SPACING.xs,
     },
     lineText: {
-      fontSize: 13,
+      fontSize: TYPOGRAPHY.fontSize.sm,
       color: semantic.labelNeutral,
-      fontWeight: '600',
+      fontWeight: TYPOGRAPHY.fontWeight.semibold,
     },
     transfersContainer: {
       flexDirection: 'row',
@@ -496,10 +516,10 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       marginBottom: SPACING.sm,
     },
     transfersText: {
-      fontSize: 12,
+      fontSize: TYPOGRAPHY.fontSize.xs,
       color: semantic.labelAlt,
       marginLeft: 4,
-      fontWeight: '500',
+      fontWeight: TYPOGRAPHY.fontWeight.medium,
     },
     // Arrivals Section
     arrivalsContainer: {
@@ -515,10 +535,10 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       marginBottom: SPACING.xs,
     },
     arrivalsHeaderText: {
-      fontSize: 11,
+      fontSize: TYPOGRAPHY.fontSize.xs,
       color: semantic.labelAlt,
       marginLeft: 4,
-      fontWeight: '700',
+      fontWeight: TYPOGRAPHY.fontWeight.bold,
       letterSpacing: 0.3,
     },
     arrivalItem: {
@@ -533,22 +553,24 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       minWidth: 45,
     },
     arrivalDirectionText: {
-      fontSize: 12,
-      fontWeight: '700',
+      fontSize: TYPOGRAPHY.fontSize.xs,
+      fontWeight: TYPOGRAPHY.fontWeight.bold,
       marginLeft: 2,
     },
     arrivalTime: {
-      fontSize: 14,
+      fontSize: TYPOGRAPHY.fontSize.base,
       fontWeight: '800',
       color: semantic.labelStrong,
       minWidth: 60,
+      // Tabular-nums prevents the countdown digits from shifting horizontally
+      // on each tick — Gemini cross-review confirmed this is the right call.
       fontVariant: ['tabular-nums'],
     },
     arrivalTimeImmediate: {
       color: semantic.statusNegative,
     },
     arrivalDestination: {
-      fontSize: 11,
+      fontSize: TYPOGRAPHY.fontSize.xs,
       color: semantic.labelAlt,
       flex: 1,
     },
@@ -557,7 +579,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       alignItems: 'center',
     },
     arrivalsLoadingText: {
-      fontSize: 11,
+      fontSize: TYPOGRAPHY.fontSize.xs,
       color: semantic.labelAlt,
       fontStyle: 'italic',
     },
@@ -586,8 +608,8 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     },
     actionButtonText: {
       color: semantic.labelOnColor,
-      fontSize: 12,
-      fontWeight: '700',
+      fontSize: TYPOGRAPHY.fontSize.xs,
+      fontWeight: TYPOGRAPHY.fontWeight.bold,
     },
     selectedIndicator: {
       position: 'absolute',
