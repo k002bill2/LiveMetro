@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
+import { WANTED_TOKENS, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { useTheme, ThemeMode } from '@/services/theme';
 import { useI18n } from '@/services/i18n';
 import { SettingsStackParamList } from '@/navigation/types';
@@ -59,7 +59,8 @@ const themeOptions: ThemeOptionData[] = [
 ];
 
 export const ThemeSettingsScreen: React.FC<Props> = ({ navigation }) => {
-  const { themeMode, setThemeMode, colors, isDark } = useTheme();
+  const { themeMode, setThemeMode, isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
   const { language, t } = useI18n();
 
   const handleThemeChange = async (theme: ThemeMode): Promise<void> => {
@@ -67,7 +68,7 @@ export const ThemeSettingsScreen: React.FC<Props> = ({ navigation }) => {
     navigation.goBack();
   };
 
-  const styles = createStyles(colors);
+  const styles = createStyles(semantic);
 
   const ThemeOptionItem: React.FC<{
     icon: keyof typeof Ionicons.glyphMap;
@@ -84,7 +85,7 @@ export const ThemeSettingsScreen: React.FC<Props> = ({ navigation }) => {
         <Ionicons
           name={icon}
           size={32}
-          color={isSelected ? colors.primary : colors.textTertiary}
+          color={isSelected ? semantic.primaryNormal : semantic.labelAlt}
         />
       </View>
       <View style={styles.themeContent}>
@@ -93,7 +94,7 @@ export const ThemeSettingsScreen: React.FC<Props> = ({ navigation }) => {
             {title}
           </Text>
           {isSelected && (
-            <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+            <Ionicons name="checkmark-circle" size={24} color={semantic.primaryNormal} />
           )}
         </View>
         <Text style={styles.themeDescription}>{description}</Text>
@@ -130,11 +131,11 @@ export const ThemeSettingsScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const createStyles = (colors: any) =>
+const createStyles = (semantic: WantedSemanticTheme) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background,
+      backgroundColor: semantic.bgSubtlePage,
     },
     content: {
       flex: 1,
@@ -142,26 +143,26 @@ const createStyles = (colors: any) =>
     themeOption: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingHorizontal: SPACING.lg,
-      paddingVertical: SPACING.lg,
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s4,
       borderBottomWidth: 1,
-      borderBottomColor: colors.borderLight,
+      borderBottomColor: semantic.lineSubtle,
       borderLeftWidth: 3,
       borderLeftColor: 'transparent',
-      backgroundColor: colors.surface,
+      backgroundColor: semantic.bgBase,
     },
     themeOptionSelected: {
-      borderLeftColor: colors.primary,
-      backgroundColor: colors.primaryLight,
+      borderLeftColor: semantic.primaryNormal,
+      backgroundColor: semantic.primaryBg,
     },
     themeIconContainer: {
       width: 56,
       height: 56,
-      backgroundColor: colors.backgroundSecondary,
-      borderRadius: RADIUS.lg,
+      backgroundColor: semantic.bgSubtle,
+      borderRadius: WANTED_TOKENS.radius.r6,
       justifyContent: 'center',
       alignItems: 'center',
-      marginRight: SPACING.lg,
+      marginRight: WANTED_TOKENS.spacing.s4,
     },
     themeContent: {
       flex: 1,
@@ -173,33 +174,33 @@ const createStyles = (colors: any) =>
       marginBottom: 4,
     },
     themeTitle: {
-      fontSize: TYPOGRAPHY.fontSize.base,
-      fontWeight: TYPOGRAPHY.fontWeight.bold,
-      color: colors.textPrimary,
+      fontSize: WANTED_TOKENS.type.body1.size,
+      fontWeight: '700',
+      color: semantic.labelStrong,
       flex: 1,
     },
     selectedText: {
-      color: colors.primary,
+      color: semantic.primaryNormal,
     },
     themeDescription: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      color: colors.textTertiary,
+      fontSize: WANTED_TOKENS.type.label2.size,
+      color: semantic.labelAlt,
     },
     infoBox: {
-      backgroundColor: colors.primaryLight,
-      paddingHorizontal: SPACING.lg,
-      paddingVertical: SPACING.lg,
-      marginHorizontal: SPACING.lg,
-      marginTop: SPACING.xl,
-      marginBottom: SPACING.xl,
-      borderRadius: RADIUS.lg,
+      backgroundColor: semantic.primaryBg,
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s4,
+      marginHorizontal: WANTED_TOKENS.spacing.s4,
+      marginTop: WANTED_TOKENS.spacing.s5,
+      marginBottom: WANTED_TOKENS.spacing.s5,
+      borderRadius: WANTED_TOKENS.radius.r6,
       borderWidth: 1,
-      borderColor: colors.borderMedium,
+      borderColor: semantic.lineNormal,
     },
     infoText: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      color: colors.textSecondary,
-      lineHeight: TYPOGRAPHY.lineHeight.relaxed * TYPOGRAPHY.fontSize.sm,
+      fontSize: WANTED_TOKENS.type.body2.size,
+      color: semantic.labelAlt,
+      lineHeight: WANTED_TOKENS.type.body2.lh,
     },
   });
 
