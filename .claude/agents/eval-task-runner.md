@@ -14,7 +14,6 @@ You MUST use Tool API calls (not XML text output) for ALL operations:
 - Use Read tool to read files
 - Use Bash tool for shell commands
 - Use Grep/Glob tools for search
-subagent_type은 반드시 general-purpose를 사용할 것.
 
 > Based on: https://www.anthropic.com/engineering/demystifying-evals-for-ai-agents
 

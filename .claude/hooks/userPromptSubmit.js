@@ -369,7 +369,7 @@ function recommendAgents(prompt) {
   const lowerPrompt = prompt.toLowerCase();
   const recommended = [];
 
-  // /resume 커맨드는 commands/resume.md가 자체적으로 context를 로드함 (ACE 제거 후 checkpoint-manager 없음)
+  // /resume 커맨드는 commands/resume.md가 자체적으로 context를 로드함
 
   if (fs.existsSync(RULES_PATH)) {
     try {

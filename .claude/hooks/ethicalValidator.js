@@ -16,12 +16,18 @@ const path = require('path');
  */
 const BLOCKED_OPERATIONS = {
   filesystem: {
+    // Only block truly dangerous targets — allow normal user paths like /Users/.../, /tmp/...
+    // Dangerous: rm -rf / (root), ~ (home), /* (root wildcard), $HOME, system dirs
     patterns: [
-      /rm\s+-rf\s+[\/~]/,
+      /rm\s+-rf\s+\/(\s|$)/,                                              // rm -rf /
+      /rm\s+-rf\s+~(\s|$|\/(\s|$))/,                                      // rm -rf ~ or rm -rf ~/
+      /rm\s+-rf\s+\/\*/,                                                  // rm -rf /*
+      /rm\s+-rf\s+(\$\{?HOME\}?|\$\{?USER\}?)(\/|\s|$)/,                  // rm -rf $HOME, ${HOME}, $USER
+      /rm\s+-rf\s+\/(usr|etc|var|bin|sbin|System|Library|Applications|boot|root|opt|private)\/?(\s|$)/i, // system dir as terminal target (allows /var/folders/.../T/x, /private/tmp/x, /usr/local/myproj)
       /rmdir.*\/s.*\/q/i,
       /del.*\/f.*\/s/i
     ],
-    message: '시스템 파일 삭제는 차단됩니다.',
+    message: '시스템 파일 삭제는 차단됩니다. (사용자 경로 /Users, /tmp 는 허용)',
     severity: 'CRITICAL'
   },
   credentials: {
@@ -79,7 +85,7 @@ const BLOCKED_OPERATIONS = {
       /setInterval\s*\(\s*\w+\s*,\s*([1-9]\d{0,3}|[12]\d{4})\s*\)/,  // setInterval < 30000ms
       /polling.*interval.*=\s*([1-9]\d{0,3}|[12]\d{4})\b/i,           // pollingInterval < 30000
     ],
-    message: 'Seoul API 폴링 간격은 최소 30초(30000ms)여야 합니다. (ACE L1: Reduce Suffering)',
+    message: 'Seoul API 폴링 간격은 최소 30초(30000ms)여야 합니다. (Seoul Open API rate-limit protection)',
     severity: 'HIGH'
   }
 };
@@ -271,7 +277,7 @@ if (require.main === module) {
       const result = validateEthically(event.tool_name || '', event.tool_input || {}, {});
 
       if (!result.allowed) {
-        // ACE Layer 1: 윤리적 거부 — 차단 결정을 JSON으로 반환
+        // Return block decision as JSON per PreToolUse hook contract
         const blockResponse = {
           decision: 'block',
           reason: result.blockedReasons.map(r => `[${r.severity}] ${r.message}`).join('; ')

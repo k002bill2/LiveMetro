@@ -9,6 +9,12 @@
             "command": "node .claude/hooks/pathProtection.js",
             "timeout": 5,
             "statusMessage": "Path protection..."
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/fileLock.js acquire",
+            "timeout": 5,
+            "statusMessage": "File lock acquire..."
           }
         ]
       },
@@ -28,6 +34,12 @@
       {
         "matcher": "Edit|Write",
         "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/fileLock.js release 2>/dev/null || true",
+            "timeout": 5,
+            "statusMessage": "File lock release..."
+          },
           {
             "type": "command",
             "command": "node .claude/hooks/geminiAutoTrigger.js 2>/dev/null || true",

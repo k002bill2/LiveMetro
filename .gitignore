@@ -107,6 +107,9 @@ dev-debug.log
 .claude/gemini-bridge/
 .claude/coordination/
 
+# File lock state (advisory, runtime-only)
+.claude/.locks/
+
 # Claude Code backups (local)
 # Comment out this line if you want to commit backups to git
 .claude-backups/
