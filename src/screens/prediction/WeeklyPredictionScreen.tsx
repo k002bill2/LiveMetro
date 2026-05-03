@@ -23,6 +23,8 @@
  *   9. Weekly comparison bar chart (오늘 강조)
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useAuth } from '@/services/auth/AuthContext';
+import { trainService } from '@/services/train/trainService';
 import {
   Animated,
   Easing,
@@ -82,6 +84,31 @@ export const WeeklyPredictionScreen: React.FC = () => {
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
   const { prediction } = useMLPrediction();
+  const { user } = useAuth();
+
+  // Origin/destination 이름 lookup — HomeScreen과 동일 패턴.
+  const morningCommute = user?.preferences.commuteSchedule?.weekdays?.morningCommute;
+  const [routeNames, setRouteNames] = useState<{ origin?: string; destination?: string }>({});
+
+  useEffect(() => {
+    if (!morningCommute) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const [origin, dest] = await Promise.all([
+          trainService.getStation(morningCommute.stationId).catch(() => null),
+          trainService.getStation(morningCommute.destinationStationId).catch(() => null),
+        ]);
+        if (cancelled) return;
+        setRouteNames({ origin: origin?.name, destination: dest?.name });
+      } catch {
+        // graceful fallback — route summary 라인 자체를 생략
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [morningCommute]);
 
   // Derived values from ML prediction (with reasonable fallbacks for the
   // not-yet-ready state — design intent is "always show the hero").
@@ -223,15 +250,21 @@ export const WeeklyPredictionScreen: React.FC = () => {
         </View>
       </View>
 
-      {/* 4. Route summary */}
-      <View style={styles.sectionPad}>
-        <View style={styles.routeRow}>
-          <Text style={[styles.routeText, { color: semantic.labelStrong }]}>홍대입구</Text>
-          <ArrowRight size={16} color={semantic.labelAlt} strokeWidth={2.4} />
-          <Text style={[styles.routeText, { color: semantic.labelStrong }]}>강남</Text>
-          <Text style={[styles.routeAction, { color: semantic.labelAlt }]}>경로 보기</Text>
+      {/* 4. Route summary — commuteSchedule 설정 시에만 표시 */}
+      {routeNames.origin && routeNames.destination && (
+        <View style={styles.sectionPad}>
+          <View style={styles.routeRow}>
+            <Text style={[styles.routeText, { color: semantic.labelStrong }]}>
+              {routeNames.origin}
+            </Text>
+            <ArrowRight size={16} color={semantic.labelAlt} strokeWidth={2.4} />
+            <Text style={[styles.routeText, { color: semantic.labelStrong }]}>
+              {routeNames.destination}
+            </Text>
+            <Text style={[styles.routeAction, { color: semantic.labelAlt }]}>경로 보기</Text>
+          </View>
         </View>
-      </View>
+      )}
 
       {/* 6–9. Sections still pending real data wiring — placeholder card. */}
       <View style={styles.sectionPad}>

@@ -139,8 +139,43 @@ export const HomeScreen: React.FC = () => {
   // ML 예측 — Hero 카드 데이터 소스
   const { prediction: mlPrediction } = useMLPrediction();
 
+  // Origin/destination 이름 lookup — commuteSchedule.weekdays.morningCommute의
+  // stationId/destinationStationId를 station 이름으로 변환. async라 useMemo
+  // 안에서 못 함, 별도 effect로 fetch 후 state에 보관.
+  const morningCommute = user?.preferences.commuteSchedule?.weekdays?.morningCommute;
+  const [commuteStationNames, setCommuteStationNames] = useState<{
+    origin?: string;
+    destination?: string;
+  }>({});
+
+  useEffect(() => {
+    if (!morningCommute) {
+      setCommuteStationNames({});
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const [origin, dest] = await Promise.all([
+          trainService.getStation(morningCommute.stationId).catch(() => null),
+          trainService.getStation(morningCommute.destinationStationId).catch(() => null),
+        ]);
+        if (cancelled) return;
+        setCommuteStationNames({
+          origin: origin?.name,
+          destination: dest?.name,
+        });
+      } catch {
+        // 실패 시 빈 객체 유지 — MLHeroCard는 origin/destination이 없으면
+        // route 라인 자체를 생략 (optional UI).
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [morningCommute]);
+
   // Hero 카드 props 도출 — prediction이 있고 정상 계산 가능할 때만 표시.
-  // origin/destination 이름은 stationId 기반으로 조회 필요(다음 sub-phase에서 추가).
   const heroProps = useMemo(() => {
     if (!mlPrediction) return null;
     const minutes = minutesBetween(
@@ -152,8 +187,10 @@ export const HomeScreen: React.FC = () => {
       predictedMinutes: minutes,
       arrivalTime: mlPrediction.predictedArrivalTime,
       confidence: mlPrediction.confidence,
+      origin: commuteStationNames.origin,
+      destination: commuteStationNames.destination,
     };
-  }, [mlPrediction]);
+  }, [mlPrediction, commuteStationNames]);
 
   // 상단 바에 표시할 날짜/시간 — 1분마다 갱신 (분 단위까지만 표시하므로 충분).
   const [dateTimeLabel, setDateTimeLabel] = useState(() => formatDateTimeLabel(new Date()));
@@ -375,6 +412,8 @@ export const HomeScreen: React.FC = () => {
       <View style={styles.heroWrap}>
         {heroProps ? (
           <MLHeroCard
+            origin={heroProps.origin}
+            destination={heroProps.destination}
             predictedMinutes={heroProps.predictedMinutes}
             arrivalTime={heroProps.arrivalTime}
             confidence={heroProps.confidence}
