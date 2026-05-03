@@ -3,7 +3,7 @@
  * Screen for setting departure time during onboarding
  */
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -14,7 +14,8 @@ import {
 } from 'react-native';
 import { Sun, Moon, Info, ArrowRight } from 'lucide-react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { COLORS, SPACING, TYPOGRAPHY, RADIUS, SHADOWS } from '@/styles/modernTheme';
+import { COLORS, SPACING, TYPOGRAPHY, RADIUS, SHADOWS, WANTED_TOKENS, type WantedSemanticTheme } from '@/styles/modernTheme';
+import { useTheme } from '@/services/theme';
 import { SettingTimePicker } from '@/components/settings/SettingTimePicker';
 import { OnboardingStackParamList } from '@/navigation/types';
 import { useOnboardingCallbacks } from '@/navigation/OnboardingNavigator';
@@ -25,6 +26,9 @@ export const CommuteTimeScreen: React.FC<Props> = ({ navigation, route }) => {
   const { commuteType, onTimeSet, initialTime } = route.params;
   const [time, setTime] = useState(initialTime || (commuteType === 'morning' ? '08:00' : '18:00'));
   const { onSkip } = useOnboardingCallbacks();
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   const isMorning = commuteType === 'morning';
 
@@ -58,7 +62,7 @@ export const CommuteTimeScreen: React.FC<Props> = ({ navigation, route }) => {
             ) : (
               <Moon
                 size={48}
-                color={COLORS.secondary.blue}
+                color={semantic.primaryNormal}
               />
             )}
           </View>
@@ -86,7 +90,7 @@ export const CommuteTimeScreen: React.FC<Props> = ({ navigation, route }) => {
         <View style={styles.infoContainer}>
             <Info
             size={20}
-            color={COLORS.text.tertiary}
+            color={semantic.labelAlt}
           />
           <Text style={styles.infoText}>
             설정한 시간 기준으로 출발 알림을 보내드립니다.{'\n'}
@@ -110,99 +114,100 @@ export const CommuteTimeScreen: React.FC<Props> = ({ navigation, route }) => {
           onPress={handleNext}
         >
           <Text style={styles.nextButtonText}>다음</Text>
-          <ArrowRight size={20} color={COLORS.white} />
+          <ArrowRight size={20} color={semantic.labelOnColor} />
         </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.white,
-  },
-  content: {
-    flexGrow: 1,
-    paddingHorizontal: SPACING.xl,
-    paddingTop: SPACING['3xl'],
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: SPACING['3xl'],
-  },
-  iconContainer: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: COLORS.surface.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.lg,
-  },
-  title: {
-    fontSize: TYPOGRAPHY.fontSize['3xl'],
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.text.primary,
-    marginBottom: SPACING.sm,
-  },
-  subtitle: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    color: COLORS.text.tertiary,
-    textAlign: 'center',
-  },
-  pickerContainer: {
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: COLORS.border.medium,
-    overflow: 'hidden',
-    marginBottom: SPACING.xl,
-    ...SHADOWS.sm,
-  },
-  infoContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: COLORS.surface.background,
-    borderRadius: RADIUS.base,
-    padding: SPACING.lg,
-  },
-  infoText: {
-    flex: 1,
-    marginLeft: SPACING.sm,
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.tertiary,
-    lineHeight: 20,
-  },
-  bottomContainer: {
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.lg,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border.light,
-    gap: SPACING.md,
-  },
-  skipButton: {
-    alignItems: 'center',
-    paddingVertical: SPACING.md,
-  },
-  skipButtonText: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    color: COLORS.text.tertiary,
-  },
-  nextButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.black,
-    paddingVertical: SPACING.lg,
-    borderRadius: RADIUS.base,
-    gap: SPACING.sm,
-  },
-  nextButtonText: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.white,
-  },
-});
+const createStyles = (semantic: WantedSemanticTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: semantic.bgBase,
+    },
+    content: {
+      flexGrow: 1,
+      paddingHorizontal: SPACING.xl,
+      paddingTop: SPACING['3xl'],
+    },
+    header: {
+      alignItems: 'center',
+      marginBottom: SPACING['3xl'],
+    },
+    iconContainer: {
+      width: 96,
+      height: 96,
+      borderRadius: 48,
+      backgroundColor: semantic.bgSubtlePage,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: SPACING.lg,
+    },
+    title: {
+      fontSize: TYPOGRAPHY.fontSize['3xl'],
+      fontWeight: TYPOGRAPHY.fontWeight.bold,
+      color: semantic.labelStrong,
+      marginBottom: SPACING.sm,
+    },
+    subtitle: {
+      fontSize: TYPOGRAPHY.fontSize.base,
+      color: semantic.labelAlt,
+      textAlign: 'center',
+    },
+    pickerContainer: {
+      backgroundColor: semantic.bgBase,
+      borderRadius: RADIUS.lg,
+      borderWidth: 1,
+      borderColor: semantic.lineNormal,
+      overflow: 'hidden',
+      marginBottom: SPACING.xl,
+      ...SHADOWS.sm,
+    },
+    infoContainer: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      backgroundColor: semantic.bgSubtlePage,
+      borderRadius: RADIUS.base,
+      padding: SPACING.lg,
+    },
+    infoText: {
+      flex: 1,
+      marginLeft: SPACING.sm,
+      fontSize: TYPOGRAPHY.fontSize.sm,
+      color: semantic.labelAlt,
+      lineHeight: 20,
+    },
+    bottomContainer: {
+      paddingHorizontal: SPACING.xl,
+      paddingVertical: SPACING.lg,
+      borderTopWidth: 1,
+      borderTopColor: semantic.lineSubtle,
+      gap: SPACING.md,
+    },
+    skipButton: {
+      alignItems: 'center',
+      paddingVertical: SPACING.md,
+    },
+    skipButtonText: {
+      fontSize: TYPOGRAPHY.fontSize.base,
+      color: semantic.labelAlt,
+    },
+    nextButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: semantic.primaryNormal,
+      paddingVertical: SPACING.lg,
+      borderRadius: RADIUS.base,
+      gap: SPACING.sm,
+    },
+    nextButtonText: {
+      fontSize: TYPOGRAPHY.fontSize.lg,
+      fontWeight: TYPOGRAPHY.fontWeight.semibold,
+      color: semantic.labelOnColor,
+    },
+  });
 
 export default CommuteTimeScreen;

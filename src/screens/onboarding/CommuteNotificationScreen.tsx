@@ -3,7 +3,7 @@
  * Screen for setting notification preferences during onboarding
  */
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -24,7 +24,8 @@ import {
   ArrowRight
 } from 'lucide-react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { COLORS, SPACING, TYPOGRAPHY, RADIUS, SHADOWS } from '@/styles/modernTheme';
+import { COLORS, SPACING, TYPOGRAPHY, RADIUS, SHADOWS, WANTED_TOKENS, type WantedSemanticTheme } from '@/styles/modernTheme';
+import { useTheme } from '@/services/theme';
 import { OnboardingStackParamList } from '@/navigation/types';
 import {
   CommuteNotifications,
@@ -46,6 +47,10 @@ export const CommuteNotificationScreen: React.FC<Props> = ({ navigation, route }
   const [notifications, setNotifications] = useState<CommuteNotifications>(
     DEFAULT_COMMUTE_NOTIFICATIONS
   );
+
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   const isMorning = commuteType === 'morning';
   const hasTransfers = transferStations.length > 0;
@@ -108,7 +113,7 @@ export const CommuteNotificationScreen: React.FC<Props> = ({ navigation, route }
           <View style={styles.iconContainer}>
             <Bell
               size={48}
-              color={COLORS.secondary.blue}
+              color={semantic.primaryNormal}
             />
           </View>
           <Text style={styles.title}>
@@ -129,7 +134,7 @@ export const CommuteNotificationScreen: React.FC<Props> = ({ navigation, route }
               <View style={styles.settingIcon}>
                 <ArrowLeftRight
                   size={22}
-                  color={COLORS.secondary.blue}
+                  color={semantic.primaryNormal}
                 />
               </View>
               <View style={styles.settingContent}>
@@ -155,7 +160,7 @@ export const CommuteNotificationScreen: React.FC<Props> = ({ navigation, route }
             <View style={styles.settingIcon}>
               <Flag
                 size={22}
-                color={COLORS.semantic.error}
+                color={semantic.statusNegative}
               />
             </View>
             <View style={styles.settingContent}>
@@ -205,7 +210,7 @@ export const CommuteNotificationScreen: React.FC<Props> = ({ navigation, route }
             <View style={styles.settingIcon}>
               <AlertTriangle
                 size={22}
-                color={COLORS.semantic.error}
+                color={semantic.statusNegative}
               />
             </View>
             <View style={styles.settingContent}>
@@ -261,7 +266,7 @@ export const CommuteNotificationScreen: React.FC<Props> = ({ navigation, route }
         <View style={styles.infoContainer}>
           <Info
             size={20}
-            color={COLORS.text.tertiary}
+            color={semantic.labelAlt}
           />
           <Text style={styles.infoText}>
             알림 설정은 나중에 설정 메뉴에서 변경할 수 있습니다.
@@ -275,191 +280,192 @@ export const CommuteNotificationScreen: React.FC<Props> = ({ navigation, route }
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <ArrowLeft size={20} color={COLORS.text.secondary} />
+          <ArrowLeft size={20} color={semantic.labelNeutral} />
           <Text style={styles.backButtonText}>이전</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.nextButton} onPress={handleNext}>
           <Text style={styles.nextButtonText}>
             {isMorning ? '퇴근 설정하기' : '완료'}
           </Text>
-          <ArrowRight size={20} color={COLORS.white} />
+          <ArrowRight size={20} color={semantic.labelOnColor} />
         </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.white,
-  },
-  content: {
-    flexGrow: 1,
-    paddingHorizontal: SPACING.xl,
-    paddingTop: SPACING['2xl'],
-    paddingBottom: SPACING.xl,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: SPACING['2xl'],
-  },
-  iconContainer: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: COLORS.surface.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.lg,
-  },
-  title: {
-    fontSize: TYPOGRAPHY.fontSize['3xl'],
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.text.primary,
-    marginBottom: SPACING.sm,
-  },
-  subtitle: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    color: COLORS.text.tertiary,
-    textAlign: 'center',
-  },
-  settingsSection: {
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: COLORS.border.light,
-    overflow: 'hidden',
-    marginBottom: SPACING.xl,
-    ...SHADOWS.sm,
-  },
-  settingItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: SPACING.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.light,
-  },
-  settingIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: COLORS.surface.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SPACING.md,
-  },
-  settingContent: {
-    flex: 1,
-    marginRight: SPACING.md,
-  },
-  settingTitle: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
-  },
-  settingDescription: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.tertiary,
-    marginTop: 2,
-  },
-  timingSection: {
-    backgroundColor: COLORS.surface.background,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.lg,
-    marginBottom: SPACING.xl,
-  },
-  timingTitle: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
-    marginBottom: SPACING.xs,
-  },
-  timingDescription: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.tertiary,
-    marginBottom: SPACING.lg,
-  },
-  timingOptions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: SPACING.sm,
-  },
-  timingButton: {
-    flex: 1,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.sm,
-    borderRadius: RADIUS.base,
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.border.medium,
-    alignItems: 'center',
-  },
-  timingButtonActive: {
-    backgroundColor: COLORS.black,
-    borderColor: COLORS.black,
-  },
-  timingButtonText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.medium,
-    color: COLORS.text.secondary,
-  },
-  timingButtonTextActive: {
-    color: COLORS.white,
-  },
-  infoContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    backgroundColor: COLORS.surface.background,
-    borderRadius: RADIUS.base,
-    padding: SPACING.lg,
-  },
-  infoText: {
-    flex: 1,
-    marginLeft: SPACING.sm,
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.tertiary,
-    lineHeight: 20,
-  },
-  bottomContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.lg,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border.light,
-    gap: SPACING.md,
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: SPACING.lg,
-    paddingHorizontal: SPACING.xl,
-    borderRadius: RADIUS.base,
-    borderWidth: 1,
-    borderColor: COLORS.border.medium,
-    gap: SPACING.xs,
-  },
-  backButtonText: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.medium,
-    color: COLORS.text.secondary,
-  },
-  nextButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.black,
-    paddingVertical: SPACING.lg,
-    borderRadius: RADIUS.base,
-    gap: SPACING.sm,
-  },
-  nextButtonText: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.white,
-  },
-});
+const createStyles = (semantic: WantedSemanticTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: semantic.bgBase,
+    },
+    content: {
+      flexGrow: 1,
+      paddingHorizontal: SPACING.xl,
+      paddingTop: SPACING['2xl'],
+      paddingBottom: SPACING.xl,
+    },
+    header: {
+      alignItems: 'center',
+      marginBottom: SPACING['2xl'],
+    },
+    iconContainer: {
+      width: 96,
+      height: 96,
+      borderRadius: 48,
+      backgroundColor: semantic.bgSubtlePage,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: SPACING.lg,
+    },
+    title: {
+      fontSize: TYPOGRAPHY.fontSize['3xl'],
+      fontWeight: TYPOGRAPHY.fontWeight.bold,
+      color: semantic.labelStrong,
+      marginBottom: SPACING.sm,
+    },
+    subtitle: {
+      fontSize: TYPOGRAPHY.fontSize.base,
+      color: semantic.labelAlt,
+      textAlign: 'center',
+    },
+    settingsSection: {
+      backgroundColor: semantic.bgBase,
+      borderRadius: RADIUS.lg,
+      borderWidth: 1,
+      borderColor: semantic.lineSubtle,
+      overflow: 'hidden',
+      marginBottom: SPACING.xl,
+      ...SHADOWS.sm,
+    },
+    settingItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: SPACING.lg,
+      borderBottomWidth: 1,
+      borderBottomColor: semantic.lineSubtle,
+    },
+    settingIcon: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: semantic.bgSubtlePage,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: SPACING.md,
+    },
+    settingContent: {
+      flex: 1,
+      marginRight: SPACING.md,
+    },
+    settingTitle: {
+      fontSize: TYPOGRAPHY.fontSize.base,
+      fontWeight: TYPOGRAPHY.fontWeight.semibold,
+      color: semantic.labelStrong,
+    },
+    settingDescription: {
+      fontSize: TYPOGRAPHY.fontSize.sm,
+      color: semantic.labelAlt,
+      marginTop: 2,
+    },
+    timingSection: {
+      backgroundColor: semantic.bgSubtlePage,
+      borderRadius: RADIUS.lg,
+      padding: SPACING.lg,
+      marginBottom: SPACING.xl,
+    },
+    timingTitle: {
+      fontSize: TYPOGRAPHY.fontSize.base,
+      fontWeight: TYPOGRAPHY.fontWeight.semibold,
+      color: semantic.labelStrong,
+      marginBottom: SPACING.xs,
+    },
+    timingDescription: {
+      fontSize: TYPOGRAPHY.fontSize.sm,
+      color: semantic.labelAlt,
+      marginBottom: SPACING.lg,
+    },
+    timingOptions: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      gap: SPACING.sm,
+    },
+    timingButton: {
+      flex: 1,
+      paddingVertical: SPACING.md,
+      paddingHorizontal: SPACING.sm,
+      borderRadius: RADIUS.base,
+      backgroundColor: semantic.bgBase,
+      borderWidth: 1,
+      borderColor: semantic.lineNormal,
+      alignItems: 'center',
+    },
+    timingButtonActive: {
+      backgroundColor: semantic.primaryNormal,
+      borderColor: semantic.primaryNormal,
+    },
+    timingButtonText: {
+      fontSize: TYPOGRAPHY.fontSize.sm,
+      fontWeight: TYPOGRAPHY.fontWeight.medium,
+      color: semantic.labelNeutral,
+    },
+    timingButtonTextActive: {
+      color: semantic.labelOnColor,
+    },
+    infoContainer: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      backgroundColor: semantic.bgSubtlePage,
+      borderRadius: RADIUS.base,
+      padding: SPACING.lg,
+    },
+    infoText: {
+      flex: 1,
+      marginLeft: SPACING.sm,
+      fontSize: TYPOGRAPHY.fontSize.sm,
+      color: semantic.labelAlt,
+      lineHeight: 20,
+    },
+    bottomContainer: {
+      flexDirection: 'row',
+      paddingHorizontal: SPACING.xl,
+      paddingVertical: SPACING.lg,
+      borderTopWidth: 1,
+      borderTopColor: semantic.lineSubtle,
+      gap: SPACING.md,
+    },
+    backButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: SPACING.lg,
+      paddingHorizontal: SPACING.xl,
+      borderRadius: RADIUS.base,
+      borderWidth: 1,
+      borderColor: semantic.lineNormal,
+      gap: SPACING.xs,
+    },
+    backButtonText: {
+      fontSize: TYPOGRAPHY.fontSize.base,
+      fontWeight: TYPOGRAPHY.fontWeight.medium,
+      color: semantic.labelNeutral,
+    },
+    nextButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: semantic.primaryNormal,
+      paddingVertical: SPACING.lg,
+      borderRadius: RADIUS.base,
+      gap: SPACING.sm,
+    },
+    nextButtonText: {
+      fontSize: TYPOGRAPHY.fontSize.lg,
+      fontWeight: TYPOGRAPHY.fontWeight.semibold,
+      color: semantic.labelOnColor,
+    },
+  });
 
 export default CommuteNotificationScreen;

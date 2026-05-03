@@ -3,7 +3,7 @@
  * Final screen showing summary of commute settings during onboarding
  */
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -25,7 +25,8 @@ import {
   ArrowRight
 } from 'lucide-react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { COLORS, SPACING, TYPOGRAPHY, RADIUS, SHADOWS } from '@/styles/modernTheme';
+import { COLORS, SPACING, TYPOGRAPHY, RADIUS, SHADOWS, WANTED_TOKENS, type WantedSemanticTheme } from '@/styles/modernTheme';
+import { useTheme } from '@/services/theme';
 import { OnboardingStackParamList } from '@/navigation/types';
 import { useOnboardingCallbacks } from '@/navigation/OnboardingNavigator';
 import { RoutePreview } from '@/components/commute/RoutePreview';
@@ -54,13 +55,16 @@ export const CommuteCompleteScreen: React.FC<Props> = ({ navigation, route }) =>
   const [saving, setSaving] = useState(false);
   const { onComplete } = useOnboardingCallbacks();
   const { user } = useAuth();
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   // 파라미터가 없으면 로딩 상태 표시 (Native Stack pre-render 대응)
   if (!route.params?.morningRoute || !route.params?.eveningRoute) {
     return (
       <SafeAreaView style={styles.container}>
         <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <ActivityIndicator size="large" color={COLORS.primary.main} />
+          <ActivityIndicator size="large" color={semantic.primaryNormal} />
         </View>
       </SafeAreaView>
     );
@@ -188,7 +192,7 @@ export const CommuteCompleteScreen: React.FC<Props> = ({ navigation, route }) =>
           <View style={styles.iconContainer}>
             <CheckCircle
               size={64}
-              color={COLORS.semantic.success}
+              color={semantic.statusPositive}
             />
           </View>
           <Text style={styles.title}>설정 완료!</Text>
@@ -216,7 +220,7 @@ export const CommuteCompleteScreen: React.FC<Props> = ({ navigation, route }) =>
               style={styles.editButton}
               onPress={() => handleEdit('morning')}
             >
-              <Pencil size={16} color={COLORS.text.tertiary} />
+              <Pencil size={16} color={semantic.labelAlt} />
               <Text style={styles.editButtonText}>수정</Text>
             </TouchableOpacity>
           </View>
@@ -226,7 +230,7 @@ export const CommuteCompleteScreen: React.FC<Props> = ({ navigation, route }) =>
           <View style={styles.notificationSummary}>
             <Bell
               size={16}
-              color={COLORS.text.tertiary}
+              color={semantic.labelAlt}
             />
             <Text style={styles.notificationText}>
               {countActiveNotifications(morningRoute.notifications)}개 알림 활성화
@@ -239,7 +243,7 @@ export const CommuteCompleteScreen: React.FC<Props> = ({ navigation, route }) =>
           <View style={styles.routeHeader}>
             <View style={styles.routeHeaderLeft}>
               <View style={[styles.routeIcon, styles.eveningIcon]}>
-                <Moon size={20} color={COLORS.secondary.blue} />
+                <Moon size={20} color={semantic.primaryNormal} />
               </View>
               <View>
                 <Text style={styles.routeTitle}>퇴근</Text>
@@ -252,7 +256,7 @@ export const CommuteCompleteScreen: React.FC<Props> = ({ navigation, route }) =>
               style={styles.editButton}
               onPress={() => handleEdit('evening')}
             >
-              <Pencil size={16} color={COLORS.text.tertiary} />
+              <Pencil size={16} color={semantic.labelAlt} />
               <Text style={styles.editButtonText}>수정</Text>
             </TouchableOpacity>
           </View>
@@ -262,7 +266,7 @@ export const CommuteCompleteScreen: React.FC<Props> = ({ navigation, route }) =>
           <View style={styles.notificationSummary}>
             <Bell
               size={16}
-              color={COLORS.text.tertiary}
+              color={semantic.labelAlt}
             />
             <Text style={styles.notificationText}>
               {countActiveNotifications(eveningRoute.notifications)}개 알림 활성화
@@ -277,7 +281,7 @@ export const CommuteCompleteScreen: React.FC<Props> = ({ navigation, route }) =>
             <View style={styles.featureItem}>
               <Clock
                 size={20}
-                color={COLORS.primary.main}
+                color={semantic.primaryNormal}
               />
               <Text style={styles.featureText}>
                 출발 시간에 맞춘 실시간 도착 정보
@@ -286,7 +290,7 @@ export const CommuteCompleteScreen: React.FC<Props> = ({ navigation, route }) =>
             <View style={styles.featureItem}>
               <Bell
                 size={20}
-                color={COLORS.secondary.blue}
+                color={semantic.primaryNormal}
               />
               <Text style={styles.featureText}>
                 환승역/도착역 미리 알림
@@ -295,7 +299,7 @@ export const CommuteCompleteScreen: React.FC<Props> = ({ navigation, route }) =>
             <View style={styles.featureItem}>
               <AlertCircle
                 size={20}
-                color={COLORS.semantic.error}
+                color={semantic.statusNegative}
               />
               <Text style={styles.featureText}>
                 연착 및 사고 발생 시 즉시 알림
@@ -313,11 +317,11 @@ export const CommuteCompleteScreen: React.FC<Props> = ({ navigation, route }) =>
           disabled={saving}
         >
           {saving ? (
-            <ActivityIndicator color={COLORS.white} />
+            <ActivityIndicator color={semantic.labelOnColor} />
           ) : (
             <>
               <Text style={styles.completeButtonText}>시작하기</Text>
-              <ArrowRight size={20} color={COLORS.white} />
+              <ArrowRight size={20} color={semantic.labelOnColor} />
             </>
           )}
         </TouchableOpacity>
@@ -326,153 +330,154 @@ export const CommuteCompleteScreen: React.FC<Props> = ({ navigation, route }) =>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.white,
-  },
-  content: {
-    flexGrow: 1,
-    paddingHorizontal: SPACING.xl,
-    paddingTop: SPACING['2xl'],
-    paddingBottom: SPACING.xl,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: SPACING['2xl'],
-  },
-  iconContainer: {
-    marginBottom: SPACING.lg,
-  },
-  title: {
-    fontSize: TYPOGRAPHY.fontSize['3xl'],
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.text.primary,
-    marginBottom: SPACING.sm,
-  },
-  subtitle: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    color: COLORS.text.tertiary,
-    textAlign: 'center',
-    lineHeight: 24,
-  },
-  routeSection: {
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: COLORS.border.light,
-    padding: SPACING.lg,
-    marginBottom: SPACING.lg,
-    ...SHADOWS.sm,
-  },
-  routeHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SPACING.md,
-    paddingBottom: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.light,
-  },
-  routeHeaderLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  routeIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SPACING.md,
-  },
-  morningIcon: {
-    backgroundColor: COLORS.secondary.yellowLight,
-  },
-  eveningIcon: {
-    backgroundColor: COLORS.secondary.blueLight,
-  },
-  routeTitle: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.text.primary,
-  },
-  routeTime: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.tertiary,
-    marginTop: 2,
-  },
-  editButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: SPACING.xs,
-    paddingHorizontal: SPACING.sm,
-    gap: SPACING.xs,
-  },
-  editButtonText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.tertiary,
-  },
-  notificationSummary: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: SPACING.md,
-    paddingTop: SPACING.md,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border.light,
-  },
-  notificationText: {
-    marginLeft: SPACING.xs,
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.tertiary,
-  },
-  featureSection: {
-    backgroundColor: COLORS.surface.background,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.lg,
-    marginTop: SPACING.md,
-  },
-  featureTitle: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
-    marginBottom: SPACING.md,
-  },
-  featureList: {
-    gap: SPACING.md,
-  },
-  featureItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  featureText: {
-    marginLeft: SPACING.sm,
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.secondary,
-  },
-  bottomContainer: {
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.lg,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border.light,
-  },
-  completeButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.black,
-    paddingVertical: SPACING.lg,
-    borderRadius: RADIUS.base,
-    gap: SPACING.sm,
-  },
-  completeButtonDisabled: {
-    backgroundColor: COLORS.gray[400],
-  },
-  completeButtonText: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.white,
-  },
-});
+const createStyles = (semantic: WantedSemanticTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: semantic.bgBase,
+    },
+    content: {
+      flexGrow: 1,
+      paddingHorizontal: SPACING.xl,
+      paddingTop: SPACING['2xl'],
+      paddingBottom: SPACING.xl,
+    },
+    header: {
+      alignItems: 'center',
+      marginBottom: SPACING['2xl'],
+    },
+    iconContainer: {
+      marginBottom: SPACING.lg,
+    },
+    title: {
+      fontSize: TYPOGRAPHY.fontSize['3xl'],
+      fontWeight: TYPOGRAPHY.fontWeight.bold,
+      color: semantic.labelStrong,
+      marginBottom: SPACING.sm,
+    },
+    subtitle: {
+      fontSize: TYPOGRAPHY.fontSize.base,
+      color: semantic.labelAlt,
+      textAlign: 'center',
+      lineHeight: 24,
+    },
+    routeSection: {
+      backgroundColor: semantic.bgBase,
+      borderRadius: RADIUS.lg,
+      borderWidth: 1,
+      borderColor: semantic.lineSubtle,
+      padding: SPACING.lg,
+      marginBottom: SPACING.lg,
+      ...SHADOWS.sm,
+    },
+    routeHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: SPACING.md,
+      paddingBottom: SPACING.md,
+      borderBottomWidth: 1,
+      borderBottomColor: semantic.lineSubtle,
+    },
+    routeHeaderLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    routeIcon: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: SPACING.md,
+    },
+    morningIcon: {
+      backgroundColor: COLORS.secondary.yellowLight,
+    },
+    eveningIcon: {
+      backgroundColor: semantic.primaryBg,
+    },
+    routeTitle: {
+      fontSize: TYPOGRAPHY.fontSize.lg,
+      fontWeight: TYPOGRAPHY.fontWeight.bold,
+      color: semantic.labelStrong,
+    },
+    routeTime: {
+      fontSize: TYPOGRAPHY.fontSize.sm,
+      color: semantic.labelAlt,
+      marginTop: 2,
+    },
+    editButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: SPACING.xs,
+      paddingHorizontal: SPACING.sm,
+      gap: SPACING.xs,
+    },
+    editButtonText: {
+      fontSize: TYPOGRAPHY.fontSize.sm,
+      color: semantic.labelAlt,
+    },
+    notificationSummary: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: SPACING.md,
+      paddingTop: SPACING.md,
+      borderTopWidth: 1,
+      borderTopColor: semantic.lineSubtle,
+    },
+    notificationText: {
+      marginLeft: SPACING.xs,
+      fontSize: TYPOGRAPHY.fontSize.sm,
+      color: semantic.labelAlt,
+    },
+    featureSection: {
+      backgroundColor: semantic.bgSubtlePage,
+      borderRadius: RADIUS.lg,
+      padding: SPACING.lg,
+      marginTop: SPACING.md,
+    },
+    featureTitle: {
+      fontSize: TYPOGRAPHY.fontSize.base,
+      fontWeight: TYPOGRAPHY.fontWeight.semibold,
+      color: semantic.labelStrong,
+      marginBottom: SPACING.md,
+    },
+    featureList: {
+      gap: SPACING.md,
+    },
+    featureItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    featureText: {
+      marginLeft: SPACING.sm,
+      fontSize: TYPOGRAPHY.fontSize.sm,
+      color: semantic.labelNeutral,
+    },
+    bottomContainer: {
+      paddingHorizontal: SPACING.xl,
+      paddingVertical: SPACING.lg,
+      borderTopWidth: 1,
+      borderTopColor: semantic.lineSubtle,
+    },
+    completeButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: semantic.primaryNormal,
+      paddingVertical: SPACING.lg,
+      borderRadius: RADIUS.base,
+      gap: SPACING.sm,
+    },
+    completeButtonDisabled: {
+      backgroundColor: 'rgba(112,115,124,0.32)',
+    },
+    completeButtonText: {
+      fontSize: TYPOGRAPHY.fontSize.lg,
+      fontWeight: TYPOGRAPHY.fontWeight.semibold,
+      color: semantic.labelOnColor,
+    },
+  });
 
 export default CommuteCompleteScreen;
