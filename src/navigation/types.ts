@@ -36,6 +36,9 @@ export interface OnboardingRouteData {
 }
 
 export type OnboardingStackParamList = {
+  // Step 1/4 — entry screen with brand graphic + value props.
+  // Will become initialRouteName once Chunk 5 wires up the full flow.
+  WelcomeOnboarding: undefined;
   CommuteTime: {
     commuteType: CommuteType;
     initialTime?: string;
