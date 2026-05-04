@@ -12,3 +12,8 @@ if git diff --cached --name-only | grep -q "^\.claude/"; then
   # uncomment the `.claude-backups/` line in .gitignore *and* re-add the
   # `git add -f` here.
 fi
+
+# Typography guard — Pretendard wiring regression prevention.
+# Hard-fail on whitelisted directories (src/components/{design,station}, src/styles).
+# See scripts/lint-typography.cjs for the rule and HARD_PREFIXES.
+npm run --silent lint:typography || exit 1

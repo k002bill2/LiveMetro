@@ -20,6 +20,8 @@
     "submit:android": "eas submit --platform android",
     "submit:all": "eas submit --platform all",
     "lint": "eslint . --ext .ts,.tsx --fix",
+    "lint:typography": "node scripts/lint-typography.cjs",
+    "lint:typography:audit": "node scripts/lint-typography.cjs --all",
     "type-check": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",
