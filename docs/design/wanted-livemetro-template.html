@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="ko"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>LiveMetro — 화면 디자인</title>
+<style>/* =====================================================================
+   Wanted Design System — Tokens
+   Color, typography, spacing, radius, shadow, motion
+   ===================================================================== */
+
+/* -- Pretendard (closest available substitute for Pretendard JP) ------- */
+/*
+Copyright (c) 2021 Kil Hyung-jin, with Reserved Font Name Pretendard.
+https://github.com/orioncactus/pretendard
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+This license is copied below, and is also available with a FAQ at:
+http://scripts.sil.org/OFL
+*/
+
+@font-face {
+	font-family: 'Pretendard';
+	font-weight: 900;
+	font-display: swap;
+	src: local('Pretendard Black'), url("4290c541-a4a6-45e1-b760-8ff5ca309c08") format('woff2'), url("270cd9ed-cd93-4b3d-8168-6a0fbdeef74c") format('woff');
+}
+
+@font-face {
+	font-family: 'Pretendard';
+	font-weight: 800;
+	font-display: swap;
+	src: local('Pretendard ExtraBold'), url("a50ccac7-e498-4e99-8c99-3b1f0a5eac23") format('woff2'), url("18c88733-12ac-498b-a6f4-cad8a648a8cb") format('woff');
+}
+
+@font-face {
+	font-family: 'Pretendard';
+	font-weight: 700;
+	font-display: swap;
+	src: local('Pretendard Bold'), url("5218c2ae-9d5c-4364-9f73-f3a5a6db068a") format('woff2'), url("959fa9af-71ae-4dfa-813e-55587f35a340") format('woff');
+}
+
+@font-face {
+	font-family: 'Pretendard';
+	font-weight: 600;
+	font-display: swap;
+	src: local('Pretendard SemiBold'), url("02d82bbc-41e0-4520-8803-015d53866c10") format('woff2'), url("1f7bc3c4-863f-457e-b8df-109e3c8d8043") format('woff');
+}
+
+@font-face {
+	font-family: 'Pretendard';
+	font-weight: 500;
+	font-display: swap;
+	src: local('Pretendard Medium'), url("d118a5c8-8729-4795-9c28-eb27d0f68ea5") format('woff2'), url("26e4fd5a-cca4-458b-b888-43d47abb81fe") format('woff');
+}
+
+@font-face {
+	font-family: 'Pretendard';
+	font-weight: 400;
+	font-display: swap;
+	src: local('Pretendard Regular'), url("f9612d43-4628-4f6f-83fb-48178cf227a7") format('woff2'), url("85f29c96-cef5-44f6-8711-e43384489746") format('woff');
+}
+
+@font-face {
+	font-family: 'Pretendard';
+	font-weight: 300;
+	font-display: swap;
+	src: local('Pretendard Light'), url("f3d41718-c282-4be2-a71c-bb395362b61c") format('woff2'), url("51f097d4-0c04-4901-8bf3-97fb5761056c") format('woff');
+}
+
+@font-face {
+	font-family: 'Pretendard';
+	font-weight: 200;
+	font-display: swap;
+	src: local('Pretendard ExtraLight'), url("7512d95d-0e8c-404e-8afd-a74eaefb2b2d") format('woff2'), url("2c3d18d6-dce6-41ab-872b-91c21f6bdd06") format('woff');
+}
+
+@font-face {
+	font-family: 'Pretendard';
+	font-weight: 100;
+	font-display: swap;
+	src: local('Pretendard Thin'), url("dbc90ca6-8cd3-43b6-acd7-d16cb0231364") format('woff2'), url("d83c965f-f740-4b6a-a7f9-13fd23180146") format('woff');
+}
+
+/*
+Copyright (c) 2024 Wanted Lab, Inc., with Reserved Font Name Wanted Sans Variable.
+https://github.com/wanteddev/wanted-sans
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+This license is copied below, and is also available with a FAQ at:
+http://scripts.sil.org/OFL
+*/
+@font-face {
+    font-family: "Wanted Sans Variable";
+    font-style: normal;
+    font-display: swap;
+    font-weight: 400 1000;
+    src: url("1f5f98b7-3b9a-41fe-bda2-1aa343d5a94f") format("woff2-variations");
+}
+
+
+:root {
+  /* ===== Atomic palette ============================================== */
+  /* Neutral (true gray) */
+  --neutral-50:  #FAFAFA;
+  --neutral-100: #F7F7F8;
+  --neutral-200: #F4F4F5;
+  --neutral-300: #DBDCDF;
+  --neutral-400: #C2C4C8;
+  --neutral-500: #AEB0B6;
+  --neutral-600: #989BA2;
+  --neutral-700: #70737C;
+  --neutral-800: #46474C;
+  --neutral-900: #1B1C1E;
+
+  /* Cool Neutral (slightly blue-tinted) */
+  --cool-100: #F7F8FA;
+  --cool-200: #F1F5F8;
+  --cool-300: #DCE0E5;
+  --cool-700: #6B7785;
+  --cool-900: #14191E;
+
+  /* Brand blue */
+  --blue-50:  #EAF2FE;
+  --blue-100: #D4E3FE;
+  --blue-300: #6FA8FF;
+  --blue-400: #3385FF;
+  --blue-500: #0066FF;     /* primary */
+  --blue-600: #005EEB;     /* hover */
+  --blue-700: #0044BB;     /* pressed */
+  --blue-900: #002D7A;
+
+  /* Status */
+  --red-100:    #FEE9E9;
+  --red-500:    #FF4242;
+  --red-700:    #C42727;
+  --green-500:  #00BF40;
+  --green-700:  #008F30;
+  --yellow-500: #FFB400;
+  --yellow-700: #C28800;
+  --violet-500: #9747FF;
+  --violet-700: #6541F2;
+  --cyan-500:   #0098B2;
+
+  /* ===== Semantic — Light ============================================ */
+  --bg-base:        #FFFFFF;
+  --bg-subtle:      rgba(112,115,124,0.08);
+  --bg-elevated:    #FFFFFF;
+  --bg-translucent: rgba(255,255,255,0.6);
+
+  --label-strong:   #000000;
+  --label-normal:   #171719;
+  --label-neutral:  #37383C;          /* "88% black" */
+  --label-alt:      #70737C;
+  --label-disabled: rgba(112,115,124,0.40);
+  --label-on-color: #FFFFFF;
+
+  --line-normal:   rgba(112,115,124,0.22);
+  --line-subtle:   rgba(112,115,124,0.16);
+  --line-strong:   #000000;
+
+  --primary-normal: #0066FF;
+  --primary-hover:  #005EEB;
+  --primary-press:  #0044BB;
+  --primary-bg:     #EAF2FE;
+  --bg-subtle-page: #F7F8FA;
+
+  --status-positive: #00BF40;
+  --status-negative: #FF4242;
+  --status-cautionary: #FFB400;
+  --status-info: #0098B2;
+
+  /* ===== Type scale ================================================== */
+  --font-sans: 'Pretendard JP', 'Pretendard', -apple-system, BlinkMacSystemFont,
+               system-ui, 'Segoe UI', Roboto, 'Apple SD Gothic Neo', 'Noto Sans KR',
+               sans-serif;
+  --font-display: 'Wanted Sans Variable', 'Wanted Sans', var(--font-sans);
+  --font-mono: 'SF Mono', ui-monospace, Menlo, Monaco, monospace;
+
+  /* Display */
+  --t-display2-size: 40px;   --t-display2-lh: 52px;   --t-display2-tracking: -0.0282em; --t-display2-weight: 700;
+  --t-display3-size: 36px;   --t-display3-lh: 48px;   --t-display3-tracking: -0.027em;  --t-display3-weight: 700;
+  /* Title */
+  --t-title1-size: 32px;     --t-title1-lh: 44px;     --t-title1-tracking: -0.0253em;   --t-title1-weight: 700;
+  --t-title2-size: 28px;     --t-title2-lh: 38px;     --t-title2-tracking: -0.0236em;   --t-title2-weight: 700;
+  --t-title3-size: 24px;     --t-title3-lh: 32px;     --t-title3-tracking: -0.023em;    --t-title3-weight: 700;
+  /* Heading */
+  --t-heading1-size: 22px;   --t-heading1-lh: 30px;   --t-heading1-tracking: -0.0194em; --t-heading1-weight: 700;
+  --t-heading2-size: 20px;   --t-heading2-lh: 28px;   --t-heading2-tracking: -0.012em;  --t-heading2-weight: 700;
+  /* Headline */
+  --t-headline1-size: 18px;  --t-headline1-lh: 26px;  --t-headline1-tracking: -0.002em; --t-headline1-weight: 600;
+  --t-headline2-size: 17px;  --t-headline2-lh: 24px;  --t-headline2-tracking: 0em;      --t-headline2-weight: 600;
+  /* Body */
+  --t-body1-size: 16px;      --t-body1-lh: 24px;      --t-body1-tracking: 0.0057em;     --t-body1-weight: 500;
+  --t-body1-reading-lh: 26px;
+  --t-body2-size: 15px;      --t-body2-lh: 22px;      --t-body2-tracking: 0.0096em;     --t-body2-weight: 500;
+  --t-body2-reading-lh: 24px;
+  /* Label */
+  --t-label1-size: 14px;     --t-label1-lh: 20px;     --t-label1-tracking: 0.0145em;    --t-label1-weight: 600;
+  --t-label1-reading-lh: 22px;
+  --t-label2-size: 13px;     --t-label2-lh: 18px;     --t-label2-tracking: 0.0194em;    --t-label2-weight: 600;
+  /* Caption */
+  --t-caption1-size: 12px;   --t-caption1-lh: 16px;   --t-caption1-tracking: 0.0252em;  --t-caption1-weight: 600;
+  --t-caption2-size: 11px;   --t-caption2-lh: 14px;   --t-caption2-tracking: 0.0311em;  --t-caption2-weight: 600;
+
+  /* ===== Spacing (8px base) ========================================== */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-24: 96px;
+  --space-32: 128px;
+
+  /* ===== Radius ====================================================== */
+  --radius-2: 4px;
+  --radius-4: 8px;       /* chip, small button */
+  --radius-5: 10px;      /* button medium */
+  --radius-6: 12px;      /* input, button large */
+  --radius-8: 16px;      /* card */
+  --radius-10: 20px;     /* card emphasis */
+  --radius-12: 24px;     /* sheet */
+  --radius-16: 32px;     /* panel */
+  --radius-30: 60px;     /* hero container */
+  --radius-pill: 9999px;
+
+  /* ===== Shadow ====================================================== */
+  --shadow-flat:    0 1px 2px rgba(23,23,23,0.06);
+  --shadow-card:    0 4px 8px rgba(23,23,23,0.07), 0 1px 2px rgba(23,23,23,0.06);
+  --shadow-popover: 0 8px 24px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.12);
+  --shadow-modal:   0 16px 48px rgba(0,0,0,0.12);
+
+  /* ===== Motion ====================================================== */
+  --ease-out: cubic-bezier(0.2, 0, 0.2, 1);
+  --ease-in:  cubic-bezier(0.4, 0, 0.6, 0.2);
+  --d-fast: 150ms;
+  --d-base: 250ms;
+  --d-slow: 400ms;
+}
+
+/* ===== Dark theme override ============================================ */
+[data-theme="dark"] {
+  --bg-base:    #1B1C1E;
+  --bg-subtle:  rgba(255,255,255,0.06);
+  --bg-subtle-page: #14191E;
+  --bg-elevated: #1B1C1E;
+  --label-strong:  #FFFFFF;
+  --label-normal:  #F4F4F5;
+  --label-neutral: rgba(255,255,255,0.88);
+  --label-alt:     #989BA2;
+  --label-disabled: rgba(255,255,255,0.32);
+  --line-normal: rgba(255,255,255,0.16);
+  --line-subtle: rgba(255,255,255,0.10);
+  --primary-bg: rgba(0,102,255,0.16);
+  --blue-50: rgba(0,102,255,0.14);
+}
+
+/* ===== Base reset ==================================================== */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font-sans);
+  color: var(--label-normal);
+  background: var(--bg-base);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* ===== Semantic typography classes =================================== */
+.t-display2 { font-size: var(--t-display2-size); line-height: var(--t-display2-lh); letter-spacing: var(--t-display2-tracking); font-weight: var(--t-display2-weight); }
+.t-display3 { font-size: var(--t-display3-size); line-height: var(--t-display3-lh); letter-spacing: var(--t-display3-tracking); font-weight: var(--t-display3-weight); }
+.t-title1   { font-size: var(--t-title1-size);   line-height: var(--t-title1-lh);   letter-spacing: var(--t-title1-tracking);   font-weight: var(--t-title1-weight); }
+.t-title2   { font-size: var(--t-title2-size);   line-height: var(--t-title2-lh);   letter-spacing: var(--t-title2-tracking);   font-weight: var(--t-title2-weight); }
+.t-title3   { font-size: var(--t-title3-size);   line-height: var(--t-title3-lh);   letter-spacing: var(--t-title3-tracking);   font-weight: var(--t-title3-weight); }
+.t-heading1 { font-size: var(--t-heading1-size); line-height: var(--t-heading1-lh); letter-spacing: var(--t-heading1-tracking); font-weight: var(--t-heading1-weight); }
+.t-heading2 { font-size: var(--t-heading2-size); line-height: var(--t-heading2-lh); letter-spacing: var(--t-heading2-tracking); font-weight: var(--t-heading2-weight); }
+.t-headline1 { font-size: var(--t-headline1-size); line-height: var(--t-headline1-lh); letter-spacing: var(--t-headline1-tracking); font-weight: var(--t-headline1-weight); }
+.t-headline2 { font-size: var(--t-headline2-size); line-height: var(--t-headline2-lh); letter-spacing: var(--t-headline2-tracking); font-weight: var(--t-headline2-weight); }
+.t-body1     { font-size: var(--t-body1-size);     line-height: var(--t-body1-lh);     letter-spacing: var(--t-body1-tracking);     font-weight: 500; }
+.t-body1-r   { font-size: var(--t-body1-size);     line-height: var(--t-body1-reading-lh); letter-spacing: var(--t-body1-tracking); font-weight: 500; }
+.t-body2     { font-size: var(--t-body2-size);     line-height: var(--t-body2-lh);     letter-spacing: var(--t-body2-tracking);     font-weight: 500; }
+.t-label1    { font-size: var(--t-label1-size);    line-height: var(--t-label1-lh);    letter-spacing: var(--t-label1-tracking);    font-weight: 600; }
+.t-label2    { font-size: var(--t-label2-size);    line-height: var(--t-label2-lh);    letter-spacing: var(--t-label2-tracking);    font-weight: 600; }
+.t-caption1  { font-size: var(--t-caption1-size);  line-height: var(--t-caption1-lh);  letter-spacing: var(--t-caption1-tracking);  font-weight: 600; }
+.t-caption2  { font-size: var(--t-caption2-size);  line-height: var(--t-caption2-lh);  letter-spacing: var(--t-caption2-tracking);  font-weight: 600; }
+</style>
+<style>/* LiveMetro — Seoul Metro line colors + product tokens
+   Layered on top of Wanted design system tokens. */
+
+:root {
+  /* Seoul Metro official line colors */
+  --line-1:  #0052A4;
+  --line-2:  #00A84D;
+  --line-3:  #EF7C1C;
+  --line-4:  #00A5DE;
+  --line-5:  #996CAC;
+  --line-6:  #CD7C2F;
+  --line-7:  #747F00;
+  --line-8:  #E6186C;
+  --line-9:  #BDB092;
+  --line-bd: #FABE00;  /* 분당 */
+  --line-sb: #D4003B;  /* 신분당 */
+  --line-gj: #77C4A3;  /* 경의중앙 */
+  --line-gx: #C28E78;  /* 공항 */
+
+  /* Congestion semantic */
+  --cong-low:    #00BF40;
+  --cong-mid:    #FFB400;
+  --cong-high:   #FF7A1A;
+  --cong-vhigh:  #FF4242;
+
+  /* Live data accents */
+  --live-pulse: #00BF40;
+
+  /* Direction tints */
+  --dir-up:   #FF4242;  /* 상행 */
+  --dir-down: #0066FF;  /* 하행 */
+}
+
+/* Mute lines when "라인 컬러 강조" off */
+[data-line-emphasis="off"] {
+  --line-1:  #4A5568;
+  --line-2:  #4A5568;
+  --line-3:  #4A5568;
+  --line-4:  #4A5568;
+  --line-5:  #4A5568;
+  --line-6:  #4A5568;
+  --line-7:  #4A5568;
+  --line-8:  #4A5568;
+  --line-9:  #4A5568;
+  --line-bd: #4A5568;
+  --line-sb: #4A5568;
+}
+</style>
+<style>
+  body { background: var(--bg-subtle-page); font-family: 'Pretendard', system-ui, sans-serif; }
+  [data-theme="dark"] body { background: #0F1115; }
+  .frame-label {
+    font-size: 11px; font-weight: 700; color: #70737C;
+    letter-spacing: 0.04em; text-transform: uppercase;
+  }
+</style>
+<script src="df1146b0-2501-44d4-b1a2-09fa28079708"></script>
+<script src="93aa0060-3606-4814-b469-25d687f10cec" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="33122b9e-808b-4c38-a05b-f835990aac12" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="1d6c031a-4ca3-4094-8cf0-05c4e47edfec" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+
+</head>
+<body>
+<div id="root"></div>
+
+<!-- Data -->
+<script src="bcda7471-24e6-4dc6-a3b6-50531a2988b0"></script>
+
+<!-- Starter components & atoms -->
+<script type="text/babel" src="4351b102-e1c0-4f14-9bf9-d43fb5a28174"></script>
+<script type="text/babel" src="c9efba38-be52-497f-a440-b08d30d1da50"></script>
+<script type="text/babel" src="69d6b7ba-81a8-442b-a78e-0975c9f4a0cb"></script>
+<script type="text/babel" src="742f98f6-914a-409d-871f-10b575a601ed"></script>
+<script type="text/babel" src="3d77f00f-0b1d-4bc3-842d-f512d341e1c7"></script>
+
+<!-- Screens -->
+<script type="text/babel" src="83fe8f1a-b7d5-4af0-83e5-bbd810d2fed4"></script>
+<script type="text/babel" src="9a7fe457-ef02-4012-b8be-1772bed370d0"></script>
+<script type="text/babel" src="65629bcd-1f10-4e73-9a3d-fd426ea112ec"></script>
+<script type="text/babel" src="ee09cc40-10e0-495c-b56f-3a1f8aa1f4ff"></script>
+
+<!-- App -->
+<script type="text/babel" data-presets="env,react">
+const { useState, useEffect } = React;
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "dark": false,
+  "lineEmphasis": true,
+  "density": "balanced",
+  "congStyle": "bar"
+}/*EDITMODE-END*/;
+
+function App() {
+  const [tweaks, setTweakRaw] = useTweaks(TWEAK_DEFAULTS);
+  const setTweak = (k, v) => setTweakRaw(k, v);
+
+  // Apply globally to root
+  useEffect(() => {
+    document.documentElement.dataset.theme = tweaks.dark ? 'dark' : 'light';
+    document.documentElement.dataset.lineEmphasis = tweaks.lineEmphasis ? 'on' : 'off';
+  }, [tweaks.dark, tweaks.lineEmphasis]);
+
+  // Wrap any screen in iOS frame
+  const iOS = (Comp, extraProps = {}) => (
+    <IOSDevice width={390} height={844} dark={tweaks.dark}>
+      <Comp density={tweaks.density} congStyle={tweaks.congStyle} {...extraProps} />
+    </IOSDevice>
+  );
+  const And = (Comp) => (
+    <AndroidDevice width={390} height={844} dark={tweaks.dark}>
+      <Comp density={tweaks.density} congStyle={tweaks.congStyle} />
+    </AndroidDevice>
+  );
+
+  return (
+    <>
+      <DesignCanvas
+        title="LiveMetro"
+        subtitle="서울 지하철 실시간 도착 앱 · 11개 화면 · Wanted Design System"
+        theme="light"
+      >
+        <DCSection id="entry" title="진입 — 로그인 & 홈" subtitle="Face ID · 소셜 · 익명(둘러보기) + 실시간 홈 대시보드">
+          <DCArtboard id="login-ios" label="iOS · 로그인" width={420} height={920}>
+            {iOS(LoginScreen, { dark: tweaks.dark })}
+          </DCArtboard>
+          <DCArtboard id="login-and" label="Android · 로그인" width={420} height={920}>
+            {And(LoginScreen)}
+          </DCArtboard>
+          <DCArtboard id="login-flat" label="로그인 (프레임 없이)" width={390} height={900}>
+            <LoginScreen dark={tweaks.dark} />
+          </DCArtboard>
+          <DCArtboard id="home-ios-entry" label="iOS · 홈 (로그인 후)" width={420} height={920}>
+            {iOS(HomeScreen)}
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="hero" title="히어로 — ML 출퇴근 예측" subtitle="가장 차별화된 기능. 오늘 몇 분 걸릴지 + 신뢰구간 + 영향 요소.">
+          <DCArtboard id="hero-ios" label="iOS · ML 예측 (메인)" width={390} height={1380}>
+            <CommutePredictionScreen density={tweaks.density} congStyle={tweaks.congStyle} />
+          </DCArtboard>
+          <DCArtboard id="hero-ios-frame" label="iOS 프레임 안" width={420} height={900}>
+            {iOS(CommutePredictionScreen)}
+          </DCArtboard>
+          <DCArtboard id="hero-and-frame" label="Android 프레임 안" width={420} height={920}>
+            {And(CommutePredictionScreen)}
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="core" title="핵심 화면" subtitle="홈 · 즐겨찾기 · 역 상세 · 경로 비교">
+          <DCArtboard id="home" label="홈 (실시간 대시보드)" width={420} height={900}>
+            {iOS(HomeScreen)}
+          </DCArtboard>
+          <DCArtboard id="fav" label="즐겨찾기" width={420} height={900}>
+            {iOS(FavoritesScreen)}
+          </DCArtboard>
+          <DCArtboard id="station" label="역 상세 (강남)" width={420} height={900}>
+            {iOS(StationDetailScreen)}
+          </DCArtboard>
+          <DCArtboard id="routes" label="경로 비교" width={420} height={900}>
+            {iOS(RoutesScreen)}
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="community" title="커뮤니티 · 통계 · 노선도" subtitle="지연 제보 피드 · 통계 대시보드 · 오프라인 노선도">
+          <DCArtboard id="feed" label="지연 제보 피드" width={420} height={900}>
+            {iOS(DelayFeedScreen)}
+          </DCArtboard>
+          <DCArtboard id="stats" label="통계 대시보드" width={420} height={900}>
+            {iOS(StatsScreen)}
+          </DCArtboard>
+          <DCArtboard id="map" label="노선도" width={420} height={900}>
+            {iOS(MapScreen)}
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="utility" title="알림 · 온보딩 · 설정">
+          <DCArtboard id="alerts" label="알림 목록" width={420} height={900}>
+            {iOS(AlertsScreen)}
+          </DCArtboard>
+          <DCArtboard id="onboard" label="온보딩 — 출퇴근 설정" width={420} height={900}>
+            {iOS(OnboardingScreen)}
+          </DCArtboard>
+          <DCArtboard id="settings" label="설정" width={420} height={900}>
+            {iOS(SettingsScreen)}
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="android" title="Android 비교 — 핵심 화면" subtitle="Material 시스템 차임에서의 동일 디자인">
+          <DCArtboard id="and-home" label="Android · 홈" width={420} height={920}>
+            {And(HomeScreen)}
+          </DCArtboard>
+          <DCArtboard id="and-station" label="Android · 역 상세" width={420} height={920}>
+            {And(StationDetailScreen)}
+          </DCArtboard>
+          <DCArtboard id="and-routes" label="Android · 경로 비교" width={420} height={920}>
+            {And(RoutesScreen)}
+          </DCArtboard>
+        </DCSection>
+      </DesignCanvas>
+
+      <TweaksPanel title="Tweaks">
+        <TweakSection title="모드">
+          <TweakToggle label="다크 모드" value={tweaks.dark} onChange={v => setTweak('dark', v)} />
+          <TweakToggle label="노선 컬러 강조" hint="끄면 모든 노선이 회색으로" value={tweaks.lineEmphasis} onChange={v => setTweak('lineEmphasis', v)} />
+        </TweakSection>
+        <TweakSection title="정보 밀도">
+          <TweakRadio
+            label="레이아웃 밀도"
+            value={tweaks.density}
+            onChange={v => setTweak('density', v)}
+            options={[
+              { value: 'loose', label: '여유' },
+              { value: 'balanced', label: '균형' },
+              { value: 'dense', label: '조밀' },
+            ]}
+          />
+        </TweakSection>
+        <TweakSection title="혼잡도 시각화">
+          <TweakRadio
+            label="스타일"
+            value={tweaks.congStyle}
+            onChange={v => setTweak('congStyle', v)}
+            options={[
+              { value: 'bar', label: '막대' },
+              { value: 'dots', label: '점' },
+              { value: 'heat', label: '히트맵' },
+            ]}
+          />
+        </TweakSection>
+      </TweaksPanel>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+
+
+</body></html>
