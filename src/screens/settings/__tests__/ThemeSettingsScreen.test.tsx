@@ -14,6 +14,7 @@ jest.mock('@react-navigation/native-stack', () => ({
 }));
 
 jest.mock('@/styles/modernTheme', () => ({
+  ...jest.requireActual('@/styles/modernTheme'),
   SPACING: { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 },
   RADIUS: { sm: 4, md: 8, lg: 12, xl: 16, full: 9999 },
   TYPOGRAPHY: {

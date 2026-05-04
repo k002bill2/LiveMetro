@@ -33,7 +33,7 @@ import {
   DelayReasonLabels,
 } from '@/models/delayCertificate';
 import { getSubwayLineColor } from '@/utils/colorUtils';
-import { WANTED_TOKENS, type WantedSemanticTheme } from '@/styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 
 export const DelayCertificateScreen: React.FC = () => {
   const { user } = useAuth();
@@ -423,6 +423,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     headerTitle: {
       fontSize: WANTED_TOKENS.type.title3.size,
       fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
       color: semantic.labelStrong,
     },
     headerSubtitle: {
@@ -453,10 +454,12 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       fontSize: WANTED_TOKENS.type.caption1.size,
       color: semantic.labelAlt,
       fontWeight: '500',
+      fontFamily: weightToFontFamily('500'),
     },
     tabTextActive: {
       color: semantic.primaryNormal,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
     },
     content: {
       flex: 1,
@@ -519,10 +522,12 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       fontSize: WANTED_TOKENS.type.caption1.size,
       color: '#FFFFFF',
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
     },
     stationText: {
       fontSize: WANTED_TOKENS.type.body1.size,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
       color: semantic.labelStrong,
     },
     delayInfo: {
@@ -534,6 +539,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     delayText: {
       fontSize: WANTED_TOKENS.type.caption1.size,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
       color: semantic.statusNegative,
     },
     timeText: {
@@ -564,6 +570,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     actionText: {
       fontSize: WANTED_TOKENS.type.caption1.size,
       fontWeight: '500',
+      fontFamily: weightToFontFamily('500'),
     },
     generatedBadge: {
       flexDirection: 'row',
@@ -575,6 +582,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       fontSize: WANTED_TOKENS.type.caption1.size,
       color: semantic.statusPositive,
       fontWeight: '500',
+      fontFamily: weightToFontFamily('500'),
     },
     generateHint: {
       flexDirection: 'row',
@@ -594,6 +602,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     emptyTitle: {
       fontSize: WANTED_TOKENS.type.heading2.size,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
       color: semantic.labelStrong,
       marginTop: WANTED_TOKENS.spacing.s4,
     },
@@ -615,6 +624,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       color: '#FFFFFF',
       fontSize: WANTED_TOKENS.type.label1.size,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
     },
     infoBox: {
       flexDirection: 'row',

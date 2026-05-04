@@ -35,7 +35,7 @@ import {
 } from '@/models/delayReport';
 import { DelayReportForm } from '@/components/delays/DelayReportForm';
 import { getSubwayLineColor } from '@/utils/colorUtils';
-import { WANTED_TOKENS, type WantedSemanticTheme } from '@/styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 
 const LINES = ['전체', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
@@ -352,6 +352,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     headerTitle: {
       fontSize: 28,
       fontWeight: '800',
+      fontFamily: weightToFontFamily('800'),
       color: semantic.labelStrong,
       letterSpacing: -0.6,
     },
@@ -359,6 +360,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       fontSize: 13,
       color: semantic.labelAlt,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
       marginTop: 2,
     },
     addButton: {
@@ -395,6 +397,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     filterText: {
       fontSize: WANTED_TOKENS.type.label2.size,
       fontWeight: '500',
+      fontFamily: weightToFontFamily('500'),
     },
     filterTextSelected: {
       color: semantic.labelOnColor,
@@ -453,10 +456,12 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       fontSize: WANTED_TOKENS.type.caption1.size,
       color: semantic.labelOnColor,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
     },
     stationText: {
       fontSize: WANTED_TOKENS.type.label2.size,
       fontWeight: '500',
+      fontFamily: weightToFontFamily('500'),
       color: semantic.labelStrong,
     },
     timeText: {
@@ -475,6 +480,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     reportType: {
       fontSize: WANTED_TOKENS.type.body1.size,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
     },
     delayBadge: {
       flexDirection: 'row',
@@ -489,6 +495,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       fontSize: WANTED_TOKENS.type.caption1.size,
       color: semantic.statusNegative,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
     },
     description: {
       fontSize: WANTED_TOKENS.type.label2.size,
@@ -543,6 +550,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       fontSize: WANTED_TOKENS.type.label2.size,
       color: semantic.labelAlt,
       fontWeight: '500',
+      fontFamily: weightToFontFamily('500'),
     },
     upvoteCountActive: {
       color: semantic.primaryNormal,
@@ -555,6 +563,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     emptyTitle: {
       fontSize: WANTED_TOKENS.type.heading2.size,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
       color: semantic.labelStrong,
       marginTop: WANTED_TOKENS.spacing.s4,
     },

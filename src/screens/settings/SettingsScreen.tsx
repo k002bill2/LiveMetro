@@ -44,7 +44,7 @@ import { useAuth } from '../../services/auth/AuthContext';
 import { AppStackParamList } from '@/navigation/types';
 import { useI18n } from '../../services/i18n';
 import { useTheme } from '../../services/theme';
-import { WANTED_TOKENS, type WantedSemanticTheme } from '../../styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '../../styles/modernTheme';
 import { SettingsStackParamList } from '@/navigation/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
@@ -480,6 +480,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     sectionTitle: {
       fontSize: WANTED_TOKENS.type.label2.size,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
       color: semantic.labelAlt,
       marginBottom: WANTED_TOKENS.spacing.s3,
       marginHorizontal: WANTED_TOKENS.spacing.s4,
@@ -514,6 +515,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       fontSize: WANTED_TOKENS.type.heading2.size,
       lineHeight: WANTED_TOKENS.type.heading2.lh,
       fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
       color: semantic.labelStrong,
       marginBottom: 4,
       letterSpacing:
@@ -569,6 +571,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     settingTitle: {
       fontSize: WANTED_TOKENS.type.body1.size,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
       color: semantic.labelStrong,
     },
     settingSubtitle: {
@@ -590,6 +593,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     signOutText: {
       fontSize: WANTED_TOKENS.type.body1.size,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
       color: semantic.labelAlt,
       marginLeft: WANTED_TOKENS.spacing.s2,
     },

@@ -23,7 +23,7 @@ import { ChevronLeft } from 'lucide-react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 
-import { WANTED_TOKENS } from '@/styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme/themeContext';
 import { useAuth } from '@/services/auth/AuthContext';
 import { analyzeAuthError, printFirebaseDebugInfo } from '@/utils/firebaseDebug';
@@ -96,6 +96,7 @@ export const SignUpScreen: React.FC = () => {
   const labelStyle: TextStyle = {
     fontSize: WANTED_TOKENS.type.label1.size,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     color: semantic.labelNormal,
     marginBottom: WANTED_TOKENS.spacing.s2,
   };
@@ -236,12 +237,14 @@ const styles = StyleSheet.create({
     fontSize: WANTED_TOKENS.type.title3.size,
     lineHeight: WANTED_TOKENS.type.title3.lh,
     fontWeight: '800',
+    fontFamily: weightToFontFamily('800'),
   },
   subtitle: {
     marginTop: WANTED_TOKENS.spacing.s2,
     fontSize: WANTED_TOKENS.type.body2.size,
     lineHeight: WANTED_TOKENS.type.body2.lh,
     fontWeight: '500',
+    fontFamily: weightToFontFamily('500'),
   },
   field: {
     marginTop: WANTED_TOKENS.spacing.s5,
@@ -250,6 +253,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '800',
+    fontFamily: weightToFontFamily('800'),
   },
   linkRow: {
     marginTop: WANTED_TOKENS.spacing.s4,
@@ -259,6 +263,7 @@ const styles = StyleSheet.create({
   linkText: {
     fontSize: WANTED_TOKENS.type.label1.size,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
   },
 });
 

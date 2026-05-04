@@ -17,7 +17,7 @@ import { StackNavigationProp } from '@react-navigation/stack';
 
 import { useAuth } from '../../services/auth/AuthContext';
 import { useTheme } from '../../services/theme';
-import { WANTED_TOKENS, type WantedSemanticTheme } from '../../styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '../../styles/modernTheme';
 import { RootStackParamList } from '../../navigation/RootNavigator';
 
 type WelcomeScreenNavigationProp = StackNavigationProp<RootStackParamList, 'Welcome'>;
@@ -136,6 +136,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     appName: {
       fontSize: 36,
       fontWeight: 'bold',
+      fontFamily: weightToFontFamily('bold'),
       color: semantic.labelStrong,
       marginBottom: 8,
     },
@@ -143,6 +144,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       fontSize: 18,
       color: semantic.primaryNormal,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
       marginBottom: 16,
     },
     subtitle: {
@@ -174,6 +176,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     featureText: {
       fontSize: 16,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
       color: semantic.labelStrong,
       marginLeft: 16,
     },
@@ -200,6 +203,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     primaryButtonText: {
       fontSize: 18,
       fontWeight: 'bold',
+      fontFamily: weightToFontFamily('bold'),
       color: '#FFFFFF',
       marginRight: 8,
     },
@@ -214,6 +218,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     secondaryButtonText: {
       fontSize: 16,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
       color: semantic.labelStrong,
     },
     footer: {

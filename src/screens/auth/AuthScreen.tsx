@@ -41,7 +41,7 @@ import * as SecureStore from 'expo-secure-store';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 
-import { WANTED_TOKENS } from '@/styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme/themeContext';
 import { useAuth } from '@/services/auth/AuthContext';
 import {
@@ -193,6 +193,7 @@ export const AuthScreen: React.FC = () => {
     letterSpacing:
       WANTED_TOKENS.type.heading1.size * WANTED_TOKENS.type.heading1.tracking,
     fontWeight: '800',
+    fontFamily: weightToFontFamily('800'),
     color: semantic.labelStrong,
   };
 
@@ -201,6 +202,7 @@ export const AuthScreen: React.FC = () => {
     fontSize: WANTED_TOKENS.type.label1.size,
     lineHeight: WANTED_TOKENS.type.label1.size * 1.5,
     fontWeight: '500',
+    fontFamily: weightToFontFamily('500'),
     color: semantic.labelAlt,
   };
 
@@ -221,6 +223,7 @@ export const AuthScreen: React.FC = () => {
     color: semantic.labelStrong,
     fontSize: 15,
     fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
   };
 
   const browseButtonStyle: ViewStyle = {
@@ -236,6 +239,7 @@ export const AuthScreen: React.FC = () => {
   const browseLabel: TextStyle = {
     fontSize: 13,
     fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
     color: semantic.labelNeutral,
   };
 
@@ -354,6 +358,7 @@ const styles = StyleSheet.create({
   autoLoginText: {
     fontSize: WANTED_TOKENS.type.body1.size,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
   },
 });
 

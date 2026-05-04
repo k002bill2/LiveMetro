@@ -14,7 +14,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { WANTED_TOKENS, type WantedSemanticTheme } from '@/styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { useI18n, Language } from '@/services/i18n';
 import { useTheme } from '@/services/theme';
 import { SettingsStackParamList } from '@/navigation/types';
@@ -145,6 +145,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     languageTitle: {
       fontSize: WANTED_TOKENS.type.body1.size,
       fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
       color: semantic.labelStrong,
       marginBottom: 4,
     },

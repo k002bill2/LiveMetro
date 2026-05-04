@@ -19,7 +19,7 @@ import {
   UIManager,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { WANTED_TOKENS, type WantedSemanticTheme } from '@/styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme';
 import {
   FAQ_DATA,
@@ -303,6 +303,7 @@ const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
   noResultsTitle: {
     fontSize: WANTED_TOKENS.type.heading2.size,
     fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
     color: semantic.labelStrong,
     marginTop: WANTED_TOKENS.spacing.s4,
     marginBottom: WANTED_TOKENS.spacing.s2,
@@ -325,6 +326,7 @@ const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
   categoryTitle: {
     fontSize: WANTED_TOKENS.type.label2.size,
     fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
     color: semantic.labelAlt,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -339,6 +341,7 @@ const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
   categoryBadgeText: {
     fontSize: WANTED_TOKENS.type.caption1.size,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     color: semantic.labelAlt,
   },
   faqItem: {
@@ -365,6 +368,7 @@ const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
     flex: 1,
     fontSize: WANTED_TOKENS.type.body1.size,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     color: semantic.labelStrong,
     lineHeight: WANTED_TOKENS.type.body1.lh,
   },
@@ -408,6 +412,7 @@ const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
   supportTitle: {
     fontSize: WANTED_TOKENS.type.body1.size,
     fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
     color: semantic.labelStrong,
     marginBottom: 4,
   },
@@ -428,6 +433,7 @@ const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
   contactButtonText: {
     fontSize: WANTED_TOKENS.type.body1.size,
     fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
     color: '#FFFFFF',
     marginLeft: WANTED_TOKENS.spacing.s2,
   },

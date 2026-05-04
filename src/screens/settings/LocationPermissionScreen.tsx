@@ -17,7 +17,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
-import { WANTED_TOKENS, type WantedSemanticTheme } from '@/styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme';
 import SettingSection from '@/components/settings/SettingSection';
 import { locationService } from '@/services/location/locationService';
@@ -363,6 +363,7 @@ const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
   statusText: {
     fontSize: WANTED_TOKENS.type.body1.size,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     textAlign: 'center',
     paddingHorizontal: WANTED_TOKENS.spacing.s4,
   },
@@ -389,6 +390,7 @@ const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
   featureTitle: {
     fontSize: WANTED_TOKENS.type.body1.size,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     color: semantic.labelStrong,
     marginBottom: 4,
   },
@@ -415,6 +417,7 @@ const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
   actionButtonText: {
     fontSize: WANTED_TOKENS.type.body1.size,
     fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
     color: '#FFFFFF',
     marginLeft: WANTED_TOKENS.spacing.s2,
   },
@@ -451,6 +454,7 @@ const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
   badgeText: {
     fontSize: WANTED_TOKENS.type.label2.size,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     marginLeft: WANTED_TOKENS.spacing.s2,
   },
 });

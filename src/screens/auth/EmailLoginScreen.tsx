@@ -26,7 +26,7 @@ import { ChevronLeft } from 'lucide-react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 
-import { WANTED_TOKENS } from '@/styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme/themeContext';
 import { useAuth } from '@/services/auth/AuthContext';
 import {
@@ -178,6 +178,7 @@ export const EmailLoginScreen: React.FC = () => {
   const labelStyle: TextStyle = {
     fontSize: WANTED_TOKENS.type.label1.size,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     color: semantic.labelNormal,
     marginBottom: WANTED_TOKENS.spacing.s2,
   };
@@ -310,7 +311,7 @@ export const EmailLoginScreen: React.FC = () => {
             style={styles.linkRow}
             onPress={() => navigation.navigate('SignUp')}
           >
-            <Text style={[styles.linkText, { color: semantic.primaryNormal, fontWeight: '700' }]}>
+            <Text style={[styles.linkText, { color: semantic.primaryNormal, fontWeight: '700', fontFamily: weightToFontFamily('700') }]}>
               계정이 없으신가요? 가입하기
             </Text>
           </TouchableOpacity>
@@ -337,12 +338,14 @@ const styles = StyleSheet.create({
     fontSize: WANTED_TOKENS.type.title3.size,
     lineHeight: WANTED_TOKENS.type.title3.lh,
     fontWeight: '800',
+    fontFamily: weightToFontFamily('800'),
   },
   subtitle: {
     marginTop: WANTED_TOKENS.spacing.s2,
     fontSize: WANTED_TOKENS.type.body2.size,
     lineHeight: WANTED_TOKENS.type.body2.lh,
     fontWeight: '500',
+    fontFamily: weightToFontFamily('500'),
   },
   field: {
     marginTop: WANTED_TOKENS.spacing.s5,
@@ -365,16 +368,19 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '900',
+    fontFamily: weightToFontFamily('900'),
     lineHeight: 14,
   },
   checkLabel: {
     fontSize: WANTED_TOKENS.type.label1.size,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
   },
   primaryLabel: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '800',
+    fontFamily: weightToFontFamily('800'),
   },
   linkRow: {
     alignItems: 'center',
@@ -383,6 +389,7 @@ const styles = StyleSheet.create({
   linkText: {
     fontSize: WANTED_TOKENS.type.label1.size,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
   },
 });
 
