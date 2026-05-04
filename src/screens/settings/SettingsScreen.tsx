@@ -52,12 +52,12 @@ import {
   isBiometricAvailable,
   isBiometricLoginEnabled,
   getBiometricTypeName,
+  reEnableBiometricLogin,
   disableBiometricLogin,
   hasStoredCredentials,
 } from '../../services/auth/biometricService';
 
 // Storage keys
-const BIOMETRIC_ENABLED_KEY = '@livemetro_biometric_enabled';
 const AUTO_LOGIN_ENABLED_KEY = '@livemetro_auto_login_enabled';
 const AUTO_LOGIN_EMAIL_KEY = 'livemetro_auto_login_email';
 const AUTO_LOGIN_PASSWORD_KEY = 'livemetro_auto_login_password';
@@ -164,12 +164,12 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
         );
         return;
       }
-      // Enable biometric login (credentials already stored)
-      try {
-        await AsyncStorage.setItem(BIOMETRIC_ENABLED_KEY, 'true');
+      // Enable biometric login via service SoT (credentials already stored)
+      const success = await reEnableBiometricLogin();
+      if (success) {
         setBiometricEnabled(true);
         Alert.alert('완료', `${biometricTypeName} 로그인이 활성화되었습니다.`);
-      } catch {
+      } else {
         Alert.alert('오류', '설정 변경에 실패했습니다.');
       }
     } else {

@@ -385,6 +385,43 @@ describe('BiometricService', () => {
     });
   });
 
+  describe('reEnableBiometricLogin', () => {
+    it('should set flag to true and return true when credentials exist', async () => {
+      mockSecureStore.getItemAsync
+        .mockResolvedValueOnce('test@example.com')
+        .mockResolvedValueOnce('password123');
+      mockAsyncStorage.setItem.mockResolvedValue(undefined);
+
+      const result = await biometricService.reEnableBiometricLogin();
+
+      expect(result).toBe(true);
+      expect(mockAsyncStorage.setItem).toHaveBeenCalledWith(
+        '@livemetro_biometric_enabled',
+        'true'
+      );
+    });
+
+    it('should return false and skip setItem when credentials are missing', async () => {
+      mockSecureStore.getItemAsync.mockResolvedValue(null);
+
+      const result = await biometricService.reEnableBiometricLogin();
+
+      expect(result).toBe(false);
+      expect(mockAsyncStorage.setItem).not.toHaveBeenCalled();
+    });
+
+    it('should return false on storage error', async () => {
+      mockSecureStore.getItemAsync
+        .mockResolvedValueOnce('test@example.com')
+        .mockResolvedValueOnce('password123');
+      mockAsyncStorage.setItem.mockRejectedValue(new Error('Storage error'));
+
+      const result = await biometricService.reEnableBiometricLogin();
+
+      expect(result).toBe(false);
+    });
+  });
+
   describe('disableBiometricLogin', () => {
     it('should disable biometric login and remove credentials', async () => {
       mockSecureStore.deleteItemAsync.mockResolvedValue(undefined);
