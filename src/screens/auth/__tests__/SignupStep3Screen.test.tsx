@@ -7,6 +7,7 @@ import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { SignupStep3Screen } from '../SignupStep3Screen';
 import {
   __resetPendingBiometricCredentials,
+  consumePendingBiometricCredentials,
   setPendingBiometricCredentials,
 } from '@/services/auth/pendingBiometricSetup';
 
@@ -166,6 +167,18 @@ describe('SignupStep3Screen', () => {
     // Both Alerts fired (setup prompt + success acknowledgement).
     expect(alertSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
     alertSpy.mockRestore();
+  });
+
+  it('clears pending biometric credentials when the screen unmounts before CTA', () => {
+    // User navigates away from celebration (back gesture, deep link, etc.)
+    // without tapping CTA. Stashed credentials must not survive in the
+    // module-level ref, otherwise they would silently feed the next prompt.
+    setPendingBiometricCredentials({ email: 'a@test.com', password: 'pw123456' });
+
+    const { unmount } = render(<SignupStep3Screen />);
+    unmount();
+
+    expect(consumePendingBiometricCredentials()).toBeNull();
   });
 
   it('ignores rapid double-taps on the CTA — markCelebrationSeen runs once', async () => {

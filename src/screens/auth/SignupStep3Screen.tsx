@@ -94,6 +94,15 @@ export const SignupStep3Screen: React.FC = () => {
     };
   }, [ringValues]);
 
+  // Drop any stashed biometric credentials if the user leaves this screen
+  // without tapping the CTA (back gesture, deep-link redirect, etc.).
+  // handleCta consumes them on the happy path, making this a no-op then.
+  useEffect(() => {
+    return () => {
+      consumePendingBiometricCredentials();
+    };
+  }, []);
+
   /**
    * Offer biometric login setup if the device supports it and the user has
    * not already enabled it. Mirrors EmailLoginScreen's promptBiometricSetup
