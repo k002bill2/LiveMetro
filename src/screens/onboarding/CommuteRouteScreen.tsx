@@ -28,6 +28,8 @@ import { OnboardingStackParamList } from '@/navigation/types';
 import { StationSearchModal } from '@/components/commute/StationSearchModal';
 import { TransferStationList } from '@/components/commute/TransferStationList';
 import { RoutePreview } from '@/components/commute/RoutePreview';
+import { OnbHeader } from '@/components/onboarding/OnbHeader';
+import { useOnboardingCallbacks } from '@/navigation/OnboardingNavigator';
 import {
   StationSelection,
   TransferStation,
@@ -44,6 +46,7 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
   const { isDark } = useTheme();
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
   const styles = useMemo(() => createStyles(semantic), [semantic]);
+  const { onSkip } = useOnboardingCallbacks();
 
   // Station states
   const [departureStation, setDepartureStation] = useState<StationSelection | null>(null);
@@ -54,7 +57,12 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [selectionType, setSelectionType] = useState<StationSelectionType>('departure');
 
-  const isMorning = commuteType === 'morning';
+  // Morning/evening branching is retained as a no-op until Chunk 5 simplifies
+  // the OnboardingStackParamList to single-route. The onboarding flow is now
+  // single-route per chat3 redefinition; the existing param shape is bridged
+  // until then.
+  // (commuteType + departureTime are still in route.params but unused for
+  // copy decisions — single-label "출퇴근 경로 설정" is shown.)
 
   // Get excluded station IDs (can't select same station twice)
   const getExcludedStationIds = useCallback((): string[] => {
@@ -148,6 +156,11 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <OnbHeader
+        currentStep={2}
+        onBack={() => navigation.canGoBack() && navigation.goBack()}
+        onSkip={onSkip}
+      />
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
@@ -160,13 +173,9 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
               color={semantic.primaryNormal}
             />
           </View>
-          <Text style={styles.title}>
-            {isMorning ? '출근 경로 설정' : '퇴근 경로 설정'}
-          </Text>
+          <Text style={styles.title}>출퇴근 경로 설정</Text>
           <Text style={styles.subtitle}>
-            {isMorning
-              ? '출근할 때 이용하는 경로를 알려주세요'
-              : '퇴근할 때 이용하는 경로를 알려주세요'}
+            출발역과 도착역을 알려주세요
           </Text>
         </View>
 
