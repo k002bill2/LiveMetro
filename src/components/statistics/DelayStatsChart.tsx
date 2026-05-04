@@ -6,6 +6,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { ChartDataPoint } from '@/services/statistics/statisticsService';
+import { weightToFontFamily } from '@/styles/modernTheme';
 
 // ============================================================================
 // Types
@@ -139,10 +140,12 @@ const styles = StyleSheet.create({
     color: '#666',
     marginBottom: 4,
     fontWeight: '500',
+    fontFamily: weightToFontFamily('500'),
   },
   dayLabel: {
     fontSize: 13,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     color: '#333',
     marginTop: 8,
   },

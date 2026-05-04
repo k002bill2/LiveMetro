@@ -25,6 +25,12 @@ jest.mock('@react-navigation/native', () => ({
   })),
   useRoute: jest.fn(() => ({ params: {} })),
 }));
+jest.mock('@/services/theme', () => ({
+  useTheme: jest.fn(() => ({ isDark: false })),
+}));
+jest.mock('@/services/theme/themeContext', () => ({
+  useTheme: jest.fn(() => ({ isDark: false })),
+}));
 jest.mock('@/services/auth/AuthContext', () => ({
   useAuth: jest.fn(() => ({
     user: { id: 'test-user-id', displayName: 'Test User' },

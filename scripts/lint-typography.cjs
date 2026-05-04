@@ -24,15 +24,26 @@ const SIBLING_RE = /\bfontFamily:|\btypeStyle\(|\bweightToFontFamily\(/;
 const WINDOW = 15;
 
 /**
- * Hard-fail whitelist — directories where Pretendard wiring is already
- * complete (Phase 21). Files outside these prefixes are scanned only when
- * `--all` is passed (so we can audit, but pre-commit stays surgical).
+ * Enforcement set — directories where Pretendard wiring is already
+ * complete and must stay that way. Files outside these prefixes are
+ * scanned only when `--all` is passed (so we can audit, but pre-commit
+ * stays surgical).
  *
  * Extend this list whenever a new directory is migrated.
+ *   Phase 21: design/, station/, styles/
+ *   Phase 22: screens/statistics/, components/statistics/
+ *   Phase 23: screens/settings/
+ *   Phase 24: screens/auth/
+ *   Phase 25: screens/delays/
  */
 const HARD_PREFIXES = [
   'src/components/design/',
   'src/components/station/',
+  'src/components/statistics/',
+  'src/screens/auth/',
+  'src/screens/delays/',
+  'src/screens/settings/',
+  'src/screens/statistics/',
   'src/styles/',
 ];
 

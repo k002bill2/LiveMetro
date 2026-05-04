@@ -15,7 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/services/auth/AuthContext';
 import { useTheme } from '@/services/theme';
-import { WANTED_TOKENS, type WantedSemanticTheme } from '@/styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { statisticsService, StatsSummary, WeeklyStats } from '@/services/statistics/statisticsService';
 import { commuteLogService } from '@/services/pattern';
 import { CommuteLog } from '@/models/pattern';
@@ -282,6 +282,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     emptyTitle: {
       fontSize: 20,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
       color: semantic.labelStrong,
       marginBottom: 8,
     },
@@ -296,6 +297,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     title: {
       fontSize: 28,
       fontWeight: '800',
+      fontFamily: weightToFontFamily('800'),
       color: semantic.labelStrong,
       letterSpacing: -0.6,
     },
@@ -320,6 +322,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     sectionTitle: {
       fontSize: 16,
       fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
       color: semantic.labelStrong,
       marginBottom: 16,
     },
@@ -364,6 +367,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     weekSummaryValue: {
       fontSize: 32,
       fontWeight: '800',
+      fontFamily: weightToFontFamily('800'),
       color: semantic.primaryNormal,
       letterSpacing: -0.4,
     },

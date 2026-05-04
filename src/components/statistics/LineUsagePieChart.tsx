@@ -6,6 +6,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { LineUsageData } from '@/services/statistics/statisticsService';
+import { weightToFontFamily } from '@/styles/modernTheme';
 
 // ============================================================================
 // Types
@@ -158,6 +159,7 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#333',
     fontWeight: '500',
+    fontFamily: weightToFontFamily('500'),
   },
   barContainer: {
     flex: 1,
@@ -214,6 +216,7 @@ const styles = StyleSheet.create({
   totalValue: {
     fontSize: 20,
     fontWeight: 'bold',
+    fontFamily: weightToFontFamily('bold'),
     color: '#333',
   },
   totalUnit: {
