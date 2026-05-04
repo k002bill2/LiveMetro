@@ -3,6 +3,13 @@
  *
  * Hosts the name + email + password form. Mirrors EmailLoginScreen's visual
  * language (Wanted tokens, large primary CTA).
+ *
+ * Two modes:
+ * - 'create' (default): plain email/password signup via createUserWithEmailAndPassword.
+ * - 'link': called after Step1 phone verification when auth.currentUser is a
+ *   phone-only Firebase user. Uses linkWithCredential to attach email +
+ *   password to the same user. Reaches this mode when registered as the
+ *   `EmailLink` route in the post-auth/!hasCompletedOnboarding stack.
  */
 import React, { useCallback, useState } from 'react';
 import {
@@ -33,11 +40,18 @@ const isValidEmail = (value: string): boolean => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.te
 
 type Nav = NativeStackNavigationProp<AppStackParamList>;
 
-export const SignUpScreen: React.FC = () => {
+export type SignUpMode = 'create' | 'link';
+
+interface SignUpScreenProps {
+  mode?: SignUpMode;
+}
+
+export const SignUpScreen: React.FC<SignUpScreenProps> = ({ mode = 'create' }) => {
   const { isDark } = useTheme();
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
   const navigation = useNavigation<Nav>();
-  const { signUpWithEmail } = useAuth();
+  const { signUpWithEmail, linkEmailToCurrentUser } = useAuth();
+  const isLinkMode = mode === 'link';
 
   const [displayName, setDisplayName] = useState('');
   const [email, setEmail] = useState('');
@@ -64,7 +78,11 @@ export const SignUpScreen: React.FC = () => {
 
     setLoading(true);
     try {
-      await signUpWithEmail(email.trim(), password, displayName.trim());
+      if (isLinkMode) {
+        await linkEmailToCurrentUser(email.trim(), password, displayName.trim());
+      } else {
+        await signUpWithEmail(email.trim(), password, displayName.trim());
+      }
       // Auth state transition + SignupStep3 celebration handle the
       // post-success UX; no Alert here.
     } catch (err) {
@@ -81,7 +99,7 @@ export const SignUpScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [displayName, email, password, signUpWithEmail]);
+  }, [displayName, email, password, signUpWithEmail, linkEmailToCurrentUser, isLinkMode]);
 
   const inputStyle: TextStyle = {
     height: 52,
@@ -119,7 +137,11 @@ export const SignUpScreen: React.FC = () => {
       >
         <SignupHeader
           currentStep={2}
-          onBack={() => navigation.canGoBack() && navigation.goBack()}
+          onBack={
+            isLinkMode
+              ? undefined
+              : () => navigation.canGoBack() && navigation.goBack()
+          }
         />
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           <Text
@@ -132,10 +154,12 @@ export const SignUpScreen: React.FC = () => {
               },
             ]}
           >
-            계정 만들기
+            {isLinkMode ? '이메일과 비밀번호 설정' : '계정 만들기'}
           </Text>
           <Text style={[styles.subtitle, { color: semantic.labelAlt }]}>
-            LiveMetro에 오신 것을 환영합니다!
+            {isLinkMode
+              ? '본인 인증이 완료되었습니다. 가입을 마무리해 주세요.'
+              : 'LiveMetro에 오신 것을 환영합니다!'}
           </Text>
 
           <View style={styles.field}>
@@ -198,15 +222,17 @@ export const SignUpScreen: React.FC = () => {
             <Text style={styles.primaryLabel}>{loading ? '처리중...' : '계정 만들기'}</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity
-            testID="goto-login"
-            style={styles.linkRow}
-            onPress={() => navigation.canGoBack() && navigation.goBack()}
-          >
-            <Text style={[styles.linkText, { color: semantic.labelAlt }]}>
-              이미 계정이 있으신가요? 로그인
-            </Text>
-          </TouchableOpacity>
+          {!isLinkMode ? (
+            <TouchableOpacity
+              testID="goto-login"
+              style={styles.linkRow}
+              onPress={() => navigation.canGoBack() && navigation.goBack()}
+            >
+              <Text style={[styles.linkText, { color: semantic.labelAlt }]}>
+                이미 계정이 있으신가요? 로그인
+              </Text>
+            </TouchableOpacity>
+          ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>

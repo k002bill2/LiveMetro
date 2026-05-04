@@ -52,6 +52,7 @@ export type RootStackParamList = {
   SignupStep1: undefined;
   SignUp: undefined;
   SignupStep3: undefined;
+  EmailLink: undefined;
   Main: undefined;
   Onboarding: undefined;
   StationNavigator: {
@@ -217,20 +218,35 @@ const RootNavigatorContent: React.FC = () => {
 
   // Authenticated but hasn't completed onboarding (or DEBUG mode).
   //
-  // SignupStep3 (celebration) is shown ONCE per user — controlled by the
-  // AsyncStorage-backed `hasSeenSignupCelebration` flag. The flag flips to
-  // `true` via `markCelebrationSeen()` when the user taps the celebration
-  // CTA. Because the auth state listener (onAuthStateChanged) flips `user`
-  // before this branch renders, we use `initialRouteName` rather than
-  // navigating from the unauth stack — that approach would race with the
-  // unauth stack unmounting and the celebration screen would disappear.
+  // Three possible first screens, in priority order:
+  //   1. EmailLink — phone-only user (Step1 OTP succeeded, no email yet).
+  //      Forces email + password collection via SignUpScreen in 'link' mode.
+  //   2. SignupStep3 — fresh signup celebration (shown once per user via
+  //      `hasSeenSignupCelebration` AsyncStorage flag).
+  //   3. Onboarding — returning user who hasn't completed onboarding.
+  //
+  // We use `initialRouteName` rather than `navigation.navigate` from the
+  // unauth stack to avoid the race where the unauth stack unmounts before
+  // a navigate call lands.
   if (!hasCompletedOnboarding || DEBUG_FORCE_ONBOARDING) {
+    // phone-only signal: authenticated, not anonymous, but no email attached.
+    // Anonymous users (signInAnonymously) should NOT be routed to EmailLink —
+    // they have a different (browse-only) flow.
+    const phoneOnly = !user.isAnonymous && (user.email == null || user.email === '');
     const showCelebration = hasSeenSignupCelebration === false;
+    const initial: 'EmailLink' | 'SignupStep3' | 'Onboarding' = phoneOnly
+      ? 'EmailLink'
+      : showCelebration
+        ? 'SignupStep3'
+        : 'Onboarding';
     return (
       <Stack.Navigator
         screenOptions={{ headerShown: false }}
-        initialRouteName={showCelebration ? 'SignupStep3' : 'Onboarding'}
+        initialRouteName={initial}
       >
+        <Stack.Screen name="EmailLink">
+          {() => <SignUpScreen mode="link" />}
+        </Stack.Screen>
         <Stack.Screen name="SignupStep3" component={SignupStep3Screen} />
         <Stack.Screen name="Onboarding">
           {() => (

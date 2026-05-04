@@ -16,6 +16,13 @@ const mockUpdateProfile = jest.fn();
 const mockSendPasswordResetEmail = jest.fn();
 const mockUpdatePassword = jest.fn();
 const mockReauthenticateWithCredential = jest.fn();
+const mockSignInWithPhoneNumber = jest.fn();
+const mockSignInWithCredential = jest.fn();
+const mockLinkWithCredential = jest.fn();
+const mockPhoneAuthProviderCredential = jest.fn(
+  (..._args: unknown[]) => 'mockPhoneCredential' as unknown,
+);
+const mockCurrentUser: { value: { uid?: string } | null } = { value: null };
 
 jest.mock('firebase/auth', () => ({
   signInAnonymously: (...args: unknown[]) => mockSignInAnonymously(...args),
@@ -27,8 +34,14 @@ jest.mock('firebase/auth', () => ({
   sendPasswordResetEmail: (...args: unknown[]) => mockSendPasswordResetEmail(...args),
   updatePassword: (...args: unknown[]) => mockUpdatePassword(...args),
   reauthenticateWithCredential: (...args: unknown[]) => mockReauthenticateWithCredential(...args),
+  signInWithPhoneNumber: (...args: unknown[]) => mockSignInWithPhoneNumber(...args),
+  signInWithCredential: (...args: unknown[]) => mockSignInWithCredential(...args),
+  linkWithCredential: (...args: unknown[]) => mockLinkWithCredential(...args),
   EmailAuthProvider: {
     credential: jest.fn(() => 'mockCredential'),
+  },
+  PhoneAuthProvider: {
+    credential: (...args: unknown[]) => mockPhoneAuthProviderCredential(...args),
   },
 }));
 
@@ -42,10 +55,23 @@ jest.mock('firebase/firestore', () => ({
   setDoc: (...args: unknown[]) => mockSetDoc(...args),
 }));
 
-// Mock Firebase config
+// Mock Firebase config — `auth` is referenced via `auth.currentUser` inside
+// linkEmailToCurrentUser, so use a getter to expose the mutable mock value.
 jest.mock('../../firebase/config', () => ({
-  auth: {},
+  auth: {
+    get currentUser() {
+      return mockCurrentUser.value;
+    },
+  },
   firestore: {},
+  firebaseConfig: {
+    apiKey: 'mock',
+    authDomain: 'mock',
+    projectId: 'mock',
+    storageBucket: 'mock',
+    messagingSenderId: 'mock',
+    appId: 'mock',
+  },
 }));
 
 describe('AuthContext', () => {
@@ -365,6 +391,104 @@ describe('AuthContext', () => {
           await result.current.changePassword('oldpass', 'newpass');
         })
       ).rejects.toThrow('로그인된 사용자가 없습니다.');
+    });
+  });
+
+  describe('requestPhoneVerification', () => {
+    it('returns the verificationId from signInWithPhoneNumber', async () => {
+      mockSignInWithPhoneNumber.mockResolvedValue({ verificationId: 'vid-123' });
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      let verificationId = '';
+      await act(async () => {
+        verificationId = await result.current.requestPhoneVerification(
+          '+821012345678',
+          {} as never,
+        );
+      });
+
+      expect(verificationId).toBe('vid-123');
+      expect(mockSignInWithPhoneNumber).toHaveBeenCalledWith(
+        expect.anything(),
+        '+821012345678',
+        expect.anything(),
+      );
+    });
+
+    it('maps auth/invalid-phone-number to a Korean message', async () => {
+      mockSignInWithPhoneNumber.mockRejectedValue({ code: 'auth/invalid-phone-number' });
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await expect(
+        act(async () => {
+          await result.current.requestPhoneVerification('+82bad', {} as never);
+        }),
+      ).rejects.toThrow(/휴대폰 번호 형식/);
+    });
+  });
+
+  describe('confirmPhoneCode', () => {
+    it('signs in with PhoneAuthProvider credential on success', async () => {
+      mockSignInWithCredential.mockResolvedValue({ user: { uid: 'phone-uid' } });
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => {
+        await result.current.confirmPhoneCode('vid-123', '654321');
+      });
+
+      expect(mockPhoneAuthProviderCredential).toHaveBeenCalledWith('vid-123', '654321');
+      expect(mockSignInWithCredential).toHaveBeenCalledWith(
+        expect.anything(),
+        'mockPhoneCredential',
+      );
+    });
+
+    it('maps auth/invalid-verification-code to a Korean message', async () => {
+      mockSignInWithCredential.mockRejectedValue({ code: 'auth/invalid-verification-code' });
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await expect(
+        act(async () => {
+          await result.current.confirmPhoneCode('vid-123', '000000');
+        }),
+      ).rejects.toThrow(/인증번호가 올바르지 않습니다/);
+    });
+  });
+
+  describe('linkEmailToCurrentUser', () => {
+    it('throws when there is no current user', async () => {
+      mockCurrentUser.value = null;
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await expect(
+        act(async () => {
+          await result.current.linkEmailToCurrentUser('a@test.com', 'pw123456');
+        }),
+      ).rejects.toThrow(/로그인된 사용자가 없습니다/);
+    });
+
+    it('calls linkWithCredential and updateProfile when displayName is provided', async () => {
+      const fakeUser = { uid: 'phone-uid' };
+      mockCurrentUser.value = fakeUser;
+      mockLinkWithCredential.mockResolvedValue({ user: fakeUser });
+      mockUpdateProfile.mockResolvedValue(undefined);
+
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => {
+        await result.current.linkEmailToCurrentUser('a@test.com', 'pw123456', '홍길동');
+      });
+
+      expect(mockLinkWithCredential).toHaveBeenCalledWith(fakeUser, 'mockCredential');
+      expect(mockUpdateProfile).toHaveBeenCalledWith(fakeUser, { displayName: '홍길동' });
+
+      mockCurrentUser.value = null; // reset for other tests
     });
   });
 });

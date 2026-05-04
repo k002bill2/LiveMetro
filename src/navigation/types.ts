@@ -101,6 +101,9 @@ export type AppStackParamList = {
   SignupStep1: undefined;
   SignUp: undefined;
   SignupStep3: undefined;
+  // Post-auth/!hasCompletedOnboarding stack — shown when a phone-only user
+  // (created by Step1 OTP verification) needs to attach email + password.
+  EmailLink: undefined;
 
   // Onboarding screens
   Onboarding: undefined;

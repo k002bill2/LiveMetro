@@ -18,8 +18,11 @@ interface FirebaseConfig {
   appId: string;
 }
 
-// Environment variables with fallbacks for development
-const firebaseConfig: FirebaseConfig = {
+// Environment variables with fallbacks for development.
+// Exported so that components needing the raw config (e.g. the
+// FirebaseRecaptchaVerifierModal in expo-firebase-recaptcha) can pass it
+// in directly. Do not mutate.
+export const firebaseConfig: FirebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || 'development-key',
   authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || 'livemetro-dev.firebaseapp.com',
   projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || 'livemetro-dev',

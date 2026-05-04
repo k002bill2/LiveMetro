@@ -5,6 +5,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import {
+  ApplicationVerifier,
   User as FirebaseUser,
   signInAnonymously,
   signInWithEmailAndPassword,
@@ -16,6 +17,10 @@ import {
   updatePassword,
   reauthenticateWithCredential,
   EmailAuthProvider,
+  PhoneAuthProvider,
+  signInWithCredential,
+  linkWithCredential,
+  signInWithPhoneNumber,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 
@@ -33,6 +38,22 @@ interface AuthContextType {
   updateUserProfile: (updates: Partial<User>) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
+  // Phone auth — request OTP via SMS, returns a verificationId.
+  requestPhoneVerification: (
+    e164PhoneNumber: string,
+    recaptchaVerifier: ApplicationVerifier
+  ) => Promise<string>;
+  // Phone auth — confirm the OTP and sign the user in (creates phone-only user
+  // if no current session, or signs into existing phone-credential user).
+  confirmPhoneCode: (verificationId: string, code: string) => Promise<void>;
+  // Link an email/password credential onto the currently signed-in user.
+  // Used after a phone-only sign-in to attach email + displayName, yielding
+  // a single Firebase user with both providers.
+  linkEmailToCurrentUser: (
+    email: string,
+    password: string,
+    displayName?: string
+  ) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -252,6 +273,84 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, []);
 
+  const handleRequestPhoneVerification = useCallback(async (
+    e164PhoneNumber: string,
+    recaptchaVerifier: ApplicationVerifier
+  ): Promise<string> => {
+    try {
+      const confirmation = await signInWithPhoneNumber(
+        auth,
+        e164PhoneNumber,
+        recaptchaVerifier
+      );
+      return confirmation.verificationId;
+    } catch (error: unknown) {
+      console.error('Phone verification request error:', error);
+      const firebaseError = error as { code?: string };
+      if (firebaseError.code === 'auth/invalid-phone-number') {
+        throw new Error('휴대폰 번호 형식이 올바르지 않습니다.');
+      }
+      if (firebaseError.code === 'auth/too-many-requests') {
+        throw new Error('요청이 너무 많습니다. 잠시 후 다시 시도해주세요.');
+      }
+      if (firebaseError.code === 'auth/quota-exceeded') {
+        throw new Error('SMS 인증 한도를 초과했습니다. 잠시 후 다시 시도해주세요.');
+      }
+      throw new Error('인증번호 요청에 실패했습니다.');
+    }
+  }, []);
+
+  const handleConfirmPhoneCode = useCallback(async (
+    verificationId: string,
+    code: string
+  ): Promise<void> => {
+    try {
+      const credential = PhoneAuthProvider.credential(verificationId, code);
+      await signInWithCredential(auth, credential);
+    } catch (error: unknown) {
+      console.error('Phone code confirmation error:', error);
+      const firebaseError = error as { code?: string };
+      if (firebaseError.code === 'auth/invalid-verification-code') {
+        throw new Error('인증번호가 올바르지 않습니다.');
+      }
+      if (firebaseError.code === 'auth/code-expired') {
+        throw new Error('인증번호가 만료되었습니다. 다시 요청해주세요.');
+      }
+      throw new Error('인증에 실패했습니다.');
+    }
+  }, []);
+
+  const handleLinkEmailToCurrentUser = useCallback(async (
+    email: string,
+    password: string,
+    displayName?: string
+  ): Promise<void> => {
+    const current = auth.currentUser;
+    if (!current) {
+      throw new Error('로그인된 사용자가 없습니다. 본인 인증을 먼저 완료해주세요.');
+    }
+    try {
+      const credential = EmailAuthProvider.credential(email, password);
+      await linkWithCredential(current, credential);
+      if (displayName) {
+        await updateProfile(current, { displayName });
+      }
+    } catch (error: unknown) {
+      console.error('Link email credential error:', error);
+      const firebaseError = error as { code?: string };
+      if (firebaseError.code === 'auth/email-already-in-use') {
+        throw new Error('이미 사용 중인 이메일입니다.');
+      }
+      if (firebaseError.code === 'auth/credential-already-in-use') {
+        throw new Error('이미 다른 계정에 연결된 이메일입니다.');
+      }
+      if (firebaseError.code === 'auth/weak-password') {
+        throw new Error('비밀번호가 너무 약합니다. 6자 이상 입력해주세요.');
+      }
+      throw new Error('계정 생성에 실패했습니다.');
+    }
+  }, []);
+
   const handleChangePassword = useCallback(async (
     currentPassword: string,
     newPassword: string
@@ -295,6 +394,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     updateUserProfile: handleUpdateUserProfile,
     resetPassword: handleResetPassword,
     changePassword: handleChangePassword,
+    requestPhoneVerification: handleRequestPhoneVerification,
+    confirmPhoneCode: handleConfirmPhoneCode,
+    linkEmailToCurrentUser: handleLinkEmailToCurrentUser,
   }), [
     user,
     firebaseUser,
@@ -306,6 +408,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     handleUpdateUserProfile,
     handleResetPassword,
     handleChangePassword,
+    handleRequestPhoneVerification,
+    handleConfirmPhoneCode,
+    handleLinkEmailToCurrentUser,
   ]);
 
   return (

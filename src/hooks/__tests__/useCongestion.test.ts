@@ -36,6 +36,9 @@ jest.mock('@/services/auth/AuthContext', () => ({
     updateUserProfile: jest.fn(),
     resetPassword: jest.fn(),
     changePassword: jest.fn(),
+    requestPhoneVerification: jest.fn(),
+    confirmPhoneCode: jest.fn(),
+    linkEmailToCurrentUser: jest.fn(),
   })),
 }));
 
@@ -352,6 +355,9 @@ describe('useCongestionReport', () => {
         updateUserProfile: jest.fn(),
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
+      requestPhoneVerification: jest.fn(),
+      confirmPhoneCode: jest.fn(),
+      linkEmailToCurrentUser: jest.fn(),
       } as ReturnType<typeof useAuth>);
     });
 
@@ -399,6 +405,9 @@ describe('useCongestionReport', () => {
         updateUserProfile: jest.fn(),
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
+      requestPhoneVerification: jest.fn(),
+      confirmPhoneCode: jest.fn(),
+      linkEmailToCurrentUser: jest.fn(),
       } as unknown as ReturnType<typeof useAuth>);
     });
 
@@ -564,6 +573,9 @@ describe('useCongestion (combined hook)', () => {
       updateUserProfile: jest.fn(),
       resetPassword: jest.fn(),
       changePassword: jest.fn(),
+      requestPhoneVerification: jest.fn(),
+      confirmPhoneCode: jest.fn(),
+      linkEmailToCurrentUser: jest.fn(),
     } as unknown as ReturnType<typeof useAuth>);
   });
 
@@ -781,6 +793,9 @@ describe('useCongestion (combined hook)', () => {
       updateUserProfile: jest.fn(),
       resetPassword: jest.fn(),
       changePassword: jest.fn(),
+      requestPhoneVerification: jest.fn(),
+      confirmPhoneCode: jest.fn(),
+      linkEmailToCurrentUser: jest.fn(),
     } as ReturnType<typeof useAuth>);
 
     const { result } = renderHook(() =>

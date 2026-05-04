@@ -10,6 +10,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Alert,
   Animated,
   Easing,
   KeyboardAvoidingView,
@@ -26,6 +27,7 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
+import { FirebaseRecaptchaVerifierModal } from 'expo-firebase-recaptcha';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 
@@ -33,6 +35,9 @@ import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme/themeContext';
 import { SignupHeader } from '@/components/auth/SignupHeader';
 import { RootStackParamList } from '@/navigation/RootNavigator';
+import { useAuth } from '@/services/auth/AuthContext';
+import { firebaseConfig } from '@/services/firebase/config';
+import { toE164KR } from '@/utils/phoneFormat';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -77,17 +82,22 @@ export const SignupStep1Screen: React.FC = () => {
   const { isDark } = useTheme();
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
   const navigation = useNavigation<Nav>();
+  const { requestPhoneVerification, confirmPhoneCode } = useAuth();
 
   const [phase, setPhase] = useState<Phase>('input');
+  const [requesting, setRequesting] = useState(false);
+  const [verifying, setVerifying] = useState(false);
 
   const [carrierId, setCarrierId] = useState<string | null>(null);
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [birth, setBirth] = useState('');
+  const [verificationId, setVerificationId] = useState<string | null>(null);
 
   const [otpDigits, setOtpDigits] = useState<string[]>(() => Array(OTP_LENGTH).fill(''));
   const [secondsLeft, setSecondsLeft] = useState(OTP_TIMEOUT_SECONDS);
   const otpRefs = useRef<(TextInput | null)[]>(Array(OTP_LENGTH).fill(null));
+  const recaptchaRef = useRef<FirebaseRecaptchaVerifierModal>(null);
 
   const cursorOpacity = useRef(new Animated.Value(1)).current;
   useEffect(() => {
@@ -127,18 +137,43 @@ export const SignupStep1Screen: React.FC = () => {
 
   const isOtpComplete = useMemo(() => otpDigits.every((d) => d.length === 1), [otpDigits]);
 
-  const handleRequestOtp = useCallback(() => {
-    if (!isInputComplete) return;
-    setOtpDigits(Array(OTP_LENGTH).fill(''));
-    setSecondsLeft(OTP_TIMEOUT_SECONDS);
-    setPhase('otp');
-  }, [isInputComplete]);
+  const handleRequestOtp = useCallback(async () => {
+    if (!isInputComplete || requesting) return;
+    if (!recaptchaRef.current) {
+      Alert.alert('오류', '인증 모듈을 초기화하지 못했습니다. 잠시 후 다시 시도해주세요.');
+      return;
+    }
+    setRequesting(true);
+    try {
+      const e164 = toE164KR(phone);
+      const id = await requestPhoneVerification(e164, recaptchaRef.current);
+      setVerificationId(id);
+      setOtpDigits(Array(OTP_LENGTH).fill(''));
+      setSecondsLeft(OTP_TIMEOUT_SECONDS);
+      setPhase('otp');
+    } catch (err) {
+      Alert.alert('인증 요청 실패', err instanceof Error ? err.message : '잠시 후 다시 시도해주세요.');
+    } finally {
+      setRequesting(false);
+    }
+  }, [isInputComplete, requesting, phone, requestPhoneVerification]);
 
-  const handleResend = useCallback(() => {
-    setOtpDigits(Array(OTP_LENGTH).fill(''));
-    setSecondsLeft(OTP_TIMEOUT_SECONDS);
-    otpRefs.current[0]?.focus();
-  }, []);
+  const handleResend = useCallback(async () => {
+    if (!recaptchaRef.current) return;
+    setRequesting(true);
+    try {
+      const e164 = toE164KR(phone);
+      const id = await requestPhoneVerification(e164, recaptchaRef.current);
+      setVerificationId(id);
+      setOtpDigits(Array(OTP_LENGTH).fill(''));
+      setSecondsLeft(OTP_TIMEOUT_SECONDS);
+      otpRefs.current[0]?.focus();
+    } catch (err) {
+      Alert.alert('재전송 실패', err instanceof Error ? err.message : '잠시 후 다시 시도해주세요.');
+    } finally {
+      setRequesting(false);
+    }
+  }, [phone, requestPhoneVerification]);
 
   const handleOtpChange = useCallback((index: number, value: string) => {
     const digit = value.replace(/[^0-9]/g, '').slice(0, 1);
@@ -161,10 +196,21 @@ export const SignupStep1Screen: React.FC = () => {
     [otpDigits],
   );
 
-  const handleVerify = useCallback(() => {
-    if (!isOtpComplete) return;
-    navigation.navigate('SignUp');
-  }, [isOtpComplete, navigation]);
+  const handleVerify = useCallback(async () => {
+    if (!isOtpComplete || verifying || !verificationId) return;
+    setVerifying(true);
+    try {
+      await confirmPhoneCode(verificationId, otpDigits.join(''));
+      // signInWithCredential succeeded inside the handler. The
+      // onAuthStateChanged listener will flip user → truthy and the
+      // RootNavigator will route to EmailLink (SignUp form, link mode)
+      // because the new user has no email yet.
+    } catch (err) {
+      Alert.alert('인증 실패', err instanceof Error ? err.message : '인증번호를 다시 확인해주세요.');
+    } finally {
+      setVerifying(false);
+    }
+  }, [isOtpComplete, verifying, verificationId, otpDigits, confirmPhoneCode]);
 
   const handleBack = useCallback(() => {
     if (phase === 'otp') {
@@ -317,8 +363,8 @@ export const SignupStep1Screen: React.FC = () => {
 
               <TouchableOpacity
                 testID="request-otp-button"
-                style={primaryStyle(isInputComplete)}
-                disabled={!isInputComplete}
+                style={primaryStyle(isInputComplete && !requesting)}
+                disabled={!isInputComplete || requesting}
                 onPress={handleRequestOtp}
                 accessibilityRole="button"
                 accessibilityLabel="인증 요청"
@@ -332,7 +378,7 @@ export const SignupStep1Screen: React.FC = () => {
                     },
                   ]}
                 >
-                  인증 요청
+                  {requesting ? '요청 중…' : '인증 요청'}
                 </Text>
               </TouchableOpacity>
 
@@ -419,8 +465,8 @@ export const SignupStep1Screen: React.FC = () => {
 
               <TouchableOpacity
                 testID="verify-button"
-                style={primaryStyle(isOtpComplete)}
-                disabled={!isOtpComplete}
+                style={primaryStyle(isOtpComplete && !verifying)}
+                disabled={!isOtpComplete || verifying}
                 onPress={handleVerify}
                 accessibilityRole="button"
                 accessibilityLabel="인증 확인"
@@ -434,13 +480,20 @@ export const SignupStep1Screen: React.FC = () => {
                     },
                   ]}
                 >
-                  인증
+                  {verifying ? '인증 중…' : '인증'}
                 </Text>
               </TouchableOpacity>
             </>
           )}
         </ScrollView>
       </KeyboardAvoidingView>
+      <FirebaseRecaptchaVerifierModal
+        ref={recaptchaRef}
+        firebaseConfig={firebaseConfig}
+        attemptInvisibleVerification
+        title="reCAPTCHA 본인 확인"
+        cancelLabel="취소"
+      />
     </SafeAreaView>
   );
 };
