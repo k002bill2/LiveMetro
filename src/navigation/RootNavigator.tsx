@@ -19,6 +19,8 @@ import { WelcomeScreen } from '../screens/auth/WelcomeScreen';
 import { AuthScreen } from '../screens/auth/AuthScreen';
 import { EmailLoginScreen } from '../screens/auth/EmailLoginScreen';
 import { SignUpScreen } from '../screens/auth/SignUpScreen';
+import { SignupStep1Screen } from '../screens/auth/SignupStep1Screen';
+import { SignupStep3Screen } from '../screens/auth/SignupStep3Screen';
 import { HomeScreen } from '../screens/home/HomeScreen';
 import { SubwayMapScreen } from '../screens/map/SubwayMapScreen';
 import { FavoritesScreen } from '../screens/favorites/FavoritesScreen';
@@ -47,7 +49,9 @@ export type RootStackParamList = {
   Welcome: undefined;
   Auth: undefined;
   EmailLogin: undefined;
+  SignupStep1: undefined;
   SignUp: undefined;
+  SignupStep3: undefined;
   Main: undefined;
   Onboarding: undefined;
   StationNavigator: {
@@ -188,6 +192,7 @@ const RootNavigatorContent: React.FC = () => {
   const { user, loading } = useAuth();
   const {
     hasCompletedOnboarding,
+    hasSeenSignupCelebration,
     isCheckingStatus,
     completeOnboarding,
     skipOnboarding,
@@ -204,15 +209,29 @@ const RootNavigatorContent: React.FC = () => {
         <Stack.Screen name="Welcome" component={WelcomeScreen} />
         <Stack.Screen name="Auth" component={AuthScreen} />
         <Stack.Screen name="EmailLogin" component={EmailLoginScreen} />
+        <Stack.Screen name="SignupStep1" component={SignupStep1Screen} />
         <Stack.Screen name="SignUp" component={SignUpScreen} />
       </Stack.Navigator>
     );
   }
 
-  // Authenticated but hasn't completed onboarding (or DEBUG mode)
+  // Authenticated but hasn't completed onboarding (or DEBUG mode).
+  //
+  // SignupStep3 (celebration) is shown ONCE per user — controlled by the
+  // AsyncStorage-backed `hasSeenSignupCelebration` flag. The flag flips to
+  // `true` via `markCelebrationSeen()` when the user taps the celebration
+  // CTA. Because the auth state listener (onAuthStateChanged) flips `user`
+  // before this branch renders, we use `initialRouteName` rather than
+  // navigating from the unauth stack — that approach would race with the
+  // unauth stack unmounting and the celebration screen would disappear.
   if (!hasCompletedOnboarding || DEBUG_FORCE_ONBOARDING) {
+    const showCelebration = hasSeenSignupCelebration === false;
     return (
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Navigator
+        screenOptions={{ headerShown: false }}
+        initialRouteName={showCelebration ? 'SignupStep3' : 'Onboarding'}
+      >
+        <Stack.Screen name="SignupStep3" component={SignupStep3Screen} />
         <Stack.Screen name="Onboarding">
           {() => (
             <OnboardingNavigator

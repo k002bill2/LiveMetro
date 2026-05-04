@@ -309,7 +309,7 @@ export const EmailLoginScreen: React.FC = () => {
           <TouchableOpacity
             testID="goto-signup"
             style={styles.linkRow}
-            onPress={() => navigation.navigate('SignUp')}
+            onPress={() => navigation.navigate('SignupStep1')}
           >
             <Text style={[styles.linkText, { color: semantic.primaryNormal, fontWeight: '700', fontFamily: weightToFontFamily('700') }]}>
               계정이 없으신가요? 가입하기

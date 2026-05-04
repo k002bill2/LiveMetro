@@ -19,7 +19,6 @@ import {
   ViewStyle,
   TextStyle,
 } from 'react-native';
-import { ChevronLeft } from 'lucide-react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 
@@ -28,6 +27,7 @@ import { useTheme } from '@/services/theme/themeContext';
 import { useAuth } from '@/services/auth/AuthContext';
 import { analyzeAuthError, printFirebaseDebugInfo } from '@/utils/firebaseDebug';
 import { AppStackParamList } from '@/navigation/types';
+import { SignupHeader } from '@/components/auth/SignupHeader';
 
 const isValidEmail = (value: string): boolean => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
@@ -65,7 +65,8 @@ export const SignUpScreen: React.FC = () => {
     setLoading(true);
     try {
       await signUpWithEmail(email.trim(), password, displayName.trim());
-      Alert.alert('성공', '계정이 생성되었습니다!');
+      // Auth state transition + SignupStep3 celebration handle the
+      // post-success UX; no Alert here.
     } catch (err) {
       console.error('Signup error:', err);
       const debugInfo = analyzeAuthError(err);
@@ -116,18 +117,10 @@ export const SignUpScreen: React.FC = () => {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.flex}
       >
-        <View style={styles.topBar}>
-          <TouchableOpacity
-            testID="signup-back"
-            onPress={() => navigation.canGoBack() && navigation.goBack()}
-            accessible
-            accessibilityRole="button"
-            accessibilityLabel="뒤로 가기"
-            hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
-          >
-            <ChevronLeft size={26} color={semantic.labelNeutral} strokeWidth={2} />
-          </TouchableOpacity>
-        </View>
+        <SignupHeader
+          currentStep={2}
+          onBack={() => navigation.canGoBack() && navigation.goBack()}
+        />
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           <Text
             style={[
@@ -223,11 +216,6 @@ export const SignUpScreen: React.FC = () => {
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   flex: { flex: 1 },
-  topBar: {
-    paddingTop: WANTED_TOKENS.spacing.s2,
-    paddingHorizontal: WANTED_TOKENS.spacing.s5,
-    paddingBottom: WANTED_TOKENS.spacing.s2,
-  },
   body: {
     paddingHorizontal: WANTED_TOKENS.spacing.s6,
     paddingTop: WANTED_TOKENS.spacing.s4,
