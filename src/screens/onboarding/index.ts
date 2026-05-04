@@ -5,5 +5,6 @@
 
 export { CommuteTimeScreen } from './CommuteTimeScreen';
 export { CommuteRouteScreen } from './CommuteRouteScreen';
-export { CommuteNotificationScreen } from './CommuteNotificationScreen';
+export { NotificationPermissionScreen } from './NotificationPermissionScreen';
+export { WelcomeOnboardingScreen } from './WelcomeOnboardingScreen';
 export { CommuteCompleteScreen } from './CommuteCompleteScreen';

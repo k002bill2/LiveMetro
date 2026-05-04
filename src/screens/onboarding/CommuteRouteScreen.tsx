@@ -42,7 +42,7 @@ type Props = NativeStackScreenProps<OnboardingStackParamList, 'CommuteRoute'>;
 type StationSelectionType = 'departure' | 'arrival' | 'transfer';
 
 export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { commuteType, departureTime } = route.params;
+  const { departureTime } = route.params;
   const { isDark } = useTheme();
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
   const styles = useMemo(() => createStyles(semantic), [semantic]);
@@ -128,17 +128,19 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
   // Validation
   const isValid = departureStation && arrivalStation;
 
-  // Handle next
+  // Handle next — single-route flow forwards to NotificationPermission with
+  // a packaged OnboardingRouteData. departureTime carries forward from the
+  // bridge param shape (Chunk 5 will drop it from ParamList entirely).
   const handleNext = () => {
     if (!isValid || !departureStation || !arrivalStation) return;
 
-    navigation.navigate('CommuteNotification', {
-      commuteType,
-      departureTime,
-      departureStation,
-      arrivalStation,
-      transferStations,
-      morningRoute: route.params.morningRoute,
+    navigation.navigate('NotificationPermission', {
+      route: {
+        departureTime,
+        departureStation,
+        arrivalStation,
+        transferStations,
+      },
     });
   };
 

@@ -51,13 +51,18 @@ export type OnboardingStackParamList = {
     departureTime: string;
     morningRoute?: OnboardingRouteData;
   };
-  CommuteNotification: {
-    commuteType: CommuteType;
-    departureTime: string;
-    departureStation: StationSelection;
-    arrivalStation: StationSelection;
-    transferStations: TransferStation[];
-    morningRoute?: OnboardingRouteData;
+  // CommuteNotification was removed in Chunk 4 (replaced by NotificationPermission).
+  // Step 3/4 — OS notification permission request + alert toggles.
+  // Replaces CommuteNotification in the redefined flow (Chunk 4).
+  NotificationPermission: {
+    route: OnboardingRouteData;
+  };
+  // Step 4/4 — favorites picker; commits route + favorites + onComplete.
+  // The screen is added in Chunk 5.
+  FavoritesOnboarding: {
+    route: OnboardingRouteData;
+    notificationGranted: boolean;
+    notifications: CommuteNotifications;
   };
   CommuteComplete: {
     morningRoute: OnboardingRouteData;

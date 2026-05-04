@@ -8,7 +8,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from './types';
 import { CommuteTimeScreen } from '@/screens/onboarding/CommuteTimeScreen';
 import { CommuteRouteScreen } from '@/screens/onboarding/CommuteRouteScreen';
-import { CommuteNotificationScreen } from '@/screens/onboarding/CommuteNotificationScreen';
+import { NotificationPermissionScreen } from '@/screens/onboarding/NotificationPermissionScreen';
 import { CommuteCompleteScreen } from '@/screens/onboarding/CommuteCompleteScreen';
 import { COLORS } from '@/styles/modernTheme';
 
@@ -85,8 +85,8 @@ export const OnboardingNavigator: React.FC<OnboardingNavigatorProps> = ({
         />
         <Stack.Screen name="CommuteRoute" component={CommuteRouteScreen} />
         <Stack.Screen
-          name="CommuteNotification"
-          component={CommuteNotificationScreen}
+          name="NotificationPermission"
+          component={NotificationPermissionScreen}
         />
         <Stack.Screen name="CommuteComplete" component={CommuteCompleteScreen} />
       </Stack.Navigator>
