@@ -41,8 +41,12 @@ type Props = NativeStackScreenProps<OnboardingStackParamList, 'CommuteRoute'>;
 
 type StationSelectionType = 'departure' | 'arrival' | 'transfer';
 
-export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { departureTime } = route.params;
+// Default departure time — the dedicated CommuteTime step was removed in
+// Chunk 5; users adjust this later from the SettingsCommute screen.
+const DEFAULT_DEPARTURE_TIME = '08:00';
+
+export const CommuteRouteScreen: React.FC<Props> = ({ navigation }) => {
+  const departureTime = DEFAULT_DEPARTURE_TIME;
   const { isDark } = useTheme();
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
   const styles = useMemo(() => createStyles(semantic), [semantic]);

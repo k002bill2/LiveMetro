@@ -103,13 +103,7 @@ export const WelcomeOnboardingScreen: React.FC<Props> = ({ navigation }) => {
   }, [ringValues]);
 
   const handleStart = useCallback(() => {
-    // Bridge step — Chunk 3 will simplify CommuteRoute to take no params.
-    // For now we satisfy the existing OnboardingStackParamList contract with
-    // sensible stubs. The user will reconfigure these on the route screen.
-    navigation.navigate('CommuteRoute', {
-      commuteType: 'morning',
-      departureTime: '08:00',
-    });
+    navigation.navigate('CommuteRoute');
   }, [navigation]);
 
   return (

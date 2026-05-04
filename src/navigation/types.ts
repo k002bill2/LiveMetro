@@ -2,7 +2,6 @@ import {
   StationSelection,
   TransferStation,
   CommuteNotifications,
-  CommuteType,
 } from '@/models/commute';
 
 export type AppTabParamList = {
@@ -36,37 +35,20 @@ export interface OnboardingRouteData {
 }
 
 export type OnboardingStackParamList = {
-  // Step 1/4 — entry screen with brand graphic + value props.
-  // Will become initialRouteName once Chunk 5 wires up the full flow.
+  // Redefined onboarding flow:
+  //   1/4 Welcome (brand + value props, no params)
+  //   2/4 CommuteRoute (route picker, no params — defaults departureTime)
+  //   3/4 NotificationPermission (OS prompt + alert toggles)
+  //   4/4 FavoritesOnboarding (commit + onComplete)
   WelcomeOnboarding: undefined;
-  CommuteTime: {
-    commuteType: CommuteType;
-    initialTime?: string;
-    morningRoute?: OnboardingRouteData;
-    onTimeSet: (time: string) => void;
-    onSkip?: () => void;
-  };
-  CommuteRoute: {
-    commuteType: CommuteType;
-    departureTime: string;
-    morningRoute?: OnboardingRouteData;
-  };
-  // CommuteNotification was removed in Chunk 4 (replaced by NotificationPermission).
-  // Step 3/4 — OS notification permission request + alert toggles.
-  // Replaces CommuteNotification in the redefined flow (Chunk 4).
+  CommuteRoute: undefined;
   NotificationPermission: {
     route: OnboardingRouteData;
   };
-  // Step 4/4 — favorites picker; commits route + favorites + onComplete.
-  // The screen is added in Chunk 5.
   FavoritesOnboarding: {
     route: OnboardingRouteData;
     notificationGranted: boolean;
     notifications: CommuteNotifications;
-  };
-  CommuteComplete: {
-    morningRoute: OnboardingRouteData;
-    eveningRoute: OnboardingRouteData;
   };
 };
 
