@@ -8,7 +8,7 @@
  * Pulse hero animates 3 staggered concentric rings; the rest is a static
  * summary card + 3-item next-steps checklist + bonus banner.
  */
-import React, { useCallback, useEffect, useRef } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Alert,
   Animated,
@@ -62,6 +62,8 @@ export const SignupStep3Screen: React.FC = () => {
   const navigation = useNavigation<Nav>();
   const { user } = useAuth();
   const { markCelebrationSeen } = useOnboarding();
+
+  const [submitting, setSubmitting] = useState(false);
 
   const ringValues = useRef(
     Array.from({ length: RING_COUNT }, () => new Animated.Value(0)),
@@ -122,7 +124,17 @@ export const SignupStep3Screen: React.FC = () => {
               onPress: async () => {
                 const success = await enableBiometricLogin(creds.email, creds.password);
                 if (success) {
-                  Alert.alert('완료', `${typeName} 로그인이 활성화되었습니다.`);
+                  // Await the success Alert dismissal too — otherwise the
+                  // outer flow continues to navigate('Onboarding') while the
+                  // success notification is still on screen.
+                  await new Promise<void>((doneResolve) => {
+                    Alert.alert(
+                      '완료',
+                      `${typeName} 로그인이 활성화되었습니다.`,
+                      [{ text: '확인', onPress: () => doneResolve() }],
+                      { onDismiss: () => doneResolve() },
+                    );
+                  });
                 }
                 resolve();
               },
@@ -138,10 +150,20 @@ export const SignupStep3Screen: React.FC = () => {
   }, []);
 
   const handleCta = useCallback(async () => {
-    await promptBiometricSetup();
-    await markCelebrationSeen();
-    navigation.navigate('Onboarding');
-  }, [promptBiometricSetup, markCelebrationSeen, navigation]);
+    // Guard against double-taps. Without this, a second tap would race
+    // through promptBiometricSetup (consume already returned null on the
+    // first tap) and reach markCelebrationSeen + navigate while the first
+    // tap's Alert is still on screen.
+    if (submitting) return;
+    setSubmitting(true);
+    try {
+      await promptBiometricSetup();
+      await markCelebrationSeen();
+      navigation.navigate('Onboarding');
+    } finally {
+      setSubmitting(false);
+    }
+  }, [submitting, promptBiometricSetup, markCelebrationSeen, navigation]);
 
   const displayName = user?.displayName ?? '신규 사용자';
   const email = user?.email ?? '';
@@ -311,15 +333,19 @@ export const SignupStep3Screen: React.FC = () => {
 
         <TouchableOpacity
           testID="signup-step3-cta"
-          style={[styles.primary, { backgroundColor: semantic.primaryNormal }]}
+          style={[
+            styles.primary,
+            { backgroundColor: submitting ? semantic.primaryHover : semantic.primaryNormal },
+          ]}
           onPress={handleCta}
+          disabled={submitting}
           accessibilityRole="button"
           accessibilityLabel="출퇴근 설정하러 가기"
         >
           <Text
             style={[styles.primaryLabel, { color: semantic.labelOnColor, fontFamily: weightToFontFamily('800') }]}
           >
-            출퇴근 설정하러 가기
+            {submitting ? '진행 중…' : '출퇴근 설정하러 가기'}
           </Text>
         </TouchableOpacity>
       </ScrollView>

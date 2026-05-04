@@ -129,24 +129,28 @@ describe('SignupStep3Screen', () => {
     alertSpy.mockRestore();
   });
 
-  it('shows the biometric setup Alert and enables biometric login on "설정하기"', async () => {
+  it('shows the biometric setup Alert and enables biometric login on "설정하기" — awaiting both Alerts before navigating', async () => {
     setPendingBiometricCredentials({ email: 'a@test.com', password: 'pw123456' });
     mockIsBiometricAvailable.mockResolvedValue(true);
     mockIsBiometricLoginEnabled.mockResolvedValue(false);
     mockGetBiometricTypeName.mockResolvedValue('Face ID');
     mockEnableBiometricLogin.mockResolvedValue(true);
 
-    // Auto-confirm the first Alert by invoking the "설정하기" button onPress.
-    // The follow-up "완료" Alert has no buttons callback in the screen, so we
-    // ignore it after the first.
+    // Both Alerts (setup prompt + success) must drive their callback before
+    // the screen navigates. We pick the first matching button per call.
     const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(
       (
         _title: string,
         _message?: string,
         buttons?: readonly { text?: string; onPress?: () => unknown; style?: string }[],
       ) => {
-        const setupButton = buttons?.find((b) => b.text === '설정하기');
-        setupButton?.onPress?.();
+        const setup = buttons?.find((b) => b.text === '설정하기');
+        if (setup) {
+          setup.onPress?.();
+          return;
+        }
+        const ack = buttons?.find((b) => b.text === '확인');
+        ack?.onPress?.();
       },
     );
 
@@ -159,6 +163,27 @@ describe('SignupStep3Screen', () => {
       expect(mockNavigate).toHaveBeenCalledWith('Onboarding');
     });
 
+    // Both Alerts fired (setup prompt + success acknowledgement).
+    expect(alertSpy.mock.calls.length).toBeGreaterThanOrEqual(2);
     alertSpy.mockRestore();
+  });
+
+  it('ignores rapid double-taps on the CTA — markCelebrationSeen runs once', async () => {
+    // No biometric available → prompt path is skipped, so we can race the
+    // CTA without dealing with Alert callbacks.
+    setPendingBiometricCredentials({ email: 'a@test.com', password: 'pw123456' });
+    mockIsBiometricAvailable.mockResolvedValue(false);
+
+    const { getByTestId } = render(<SignupStep3Screen />);
+    const cta = getByTestId('signup-step3-cta');
+
+    // Two synchronous taps before the first promise chain resolves.
+    fireEvent.press(cta);
+    fireEvent.press(cta);
+
+    await waitFor(() => {
+      expect(mockMarkCelebrationSeen).toHaveBeenCalledTimes(1);
+      expect(mockNavigate).toHaveBeenCalledTimes(1);
+    });
   });
 });
