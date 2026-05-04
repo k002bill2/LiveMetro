@@ -23,7 +23,11 @@ import { SettingsStackParamList } from '@/navigation/types';
 import { useAuth } from '@/services/auth/AuthContext';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { loadCommuteRoutes } from '@/services/commute/commuteService';
-import { CommuteRoute } from '@/models/commute';
+import { CommuteRoute, TransferStation } from '@/models/commute';
+import {
+  RouteWithTransfer,
+  TransferOption,
+} from '@/components/commute/RouteWithTransfer';
 
 type Props = NativeStackScreenProps<SettingsStackParamList, 'CommuteSettings'>;
 
@@ -46,12 +50,50 @@ interface CommuteRouteData {
   }[];
 }
 
+// Static recommended transfer alternatives for the 출근 / 퇴근 cards.
+// chat3 design hand-off referenced 합정(직행, 추천) / 신도림 / 사당 / 교대.
+// Replacing this with `useAlternativeRoutes` lookup is a follow-up phase.
+const STATIC_TRANSFER_ALTERNATIVES: readonly TransferOption[] = [
+  {
+    id: 'direct',
+    transfer: null,
+    etaMinutes: 28,
+    reason: '환승 없음, 가장 빠름',
+    recommended: true,
+  },
+  {
+    id: 'sindorim',
+    transfer: { stationId: 'stn-sindorim', stationName: '신도림', lineId: '2', lineName: '2호선', order: 0 },
+    etaMinutes: 33,
+    reason: '1·2호선 환승',
+  },
+  {
+    id: 'sadang',
+    transfer: { stationId: 'stn-sadang', stationName: '사당', lineId: '4', lineName: '4호선', order: 0 },
+    etaMinutes: 35,
+    reason: '2·4호선 환승',
+  },
+  {
+    id: 'gyodae',
+    transfer: { stationId: 'stn-gyodae', stationName: '교대', lineId: '3', lineName: '3호선', order: 0 },
+    etaMinutes: 32,
+    reason: '2·3호선 환승',
+  },
+];
+
 export const CommuteSettingsScreen: React.FC<Props> = ({ navigation: _navigation }) => {
   const { user } = useAuth();
   const { resetOnboarding } = useOnboarding();
   const [morningRoute, setMorningRoute] = useState<CommuteRouteData | null>(null);
   const [eveningRoute, setEveningRoute] = useState<CommuteRouteData | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Per-route transfer editing state. The "out" suffix maps to the 출근 card,
+  // "in" to the 퇴근 card, mirroring chat3 nomenclature.
+  const [outTransfer, setOutTransfer] = useState<TransferStation | null>(null);
+  const [inTransfer, setInTransfer] = useState<TransferStation | null>(null);
+  const [outExpanded, setOutExpanded] = useState(false);
+  const [inExpanded, setInExpanded] = useState(false);
 
   // Convert Firebase CommuteRoute to local CommuteRouteData format
   const convertToRouteData = (route: CommuteRoute | null): CommuteRouteData | null => {
@@ -92,11 +134,21 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation: _navigation
       if (settings) {
         setMorningRoute(convertToRouteData(settings.morningRoute));
         setEveningRoute(convertToRouteData(settings.eveningRoute));
+        // Initialize the transfer-edit state from the first transfer station
+        // of the loaded route. Multi-transfer routes show only the first
+        // transfer in this UI; full multi-transfer editing is out of scope
+        // for the Topic 2 surgical addition.
+        const morningFirst = settings.morningRoute?.transferStations?.[0];
+        const eveningFirst = settings.eveningRoute?.transferStations?.[0];
+        setOutTransfer(morningFirst ? { ...morningFirst } : null);
+        setInTransfer(eveningFirst ? { ...eveningFirst } : null);
         console.log('Commute settings loaded from Firebase');
       } else {
         console.log('No commute settings found in Firebase');
         setMorningRoute(null);
         setEveningRoute(null);
+        setOutTransfer(null);
+        setInTransfer(null);
       }
     } catch (error) {
       console.error('Error loading commute settings:', error);
@@ -134,7 +186,11 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation: _navigation
     icon: string;
     route: CommuteRouteData | null;
     onEdit: () => void;
-  }> = ({ title, icon, route, onEdit }) => (
+    transfer: TransferStation | null;
+    onTransferChange: (next: TransferStation | null) => void;
+    expanded: boolean;
+    onToggleExpanded: () => void;
+  }> = ({ title, icon, route, onEdit, transfer, onTransferChange, expanded, onToggleExpanded }) => (
     <View style={styles.routeCard}>
       <View style={styles.routeHeader}>
         <View style={styles.routeIconContainer}>
@@ -149,22 +205,19 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation: _navigation
             <Text style={styles.routeLabel}>출발 시간</Text>
             <Text style={styles.routeValue}>{route.departureTime}</Text>
           </View>
-          <View style={styles.routeRow}>
-            <Text style={styles.routeLabel}>출발역</Text>
-            <Text style={styles.routeValue}>{route.departureStation.stationName}역</Text>
-          </View>
-          {route.transferStations.length > 0 && (
-            <View style={styles.routeRow}>
-              <Text style={styles.routeLabel}>환승역</Text>
-              <Text style={styles.routeValue}>
-                {route.transferStations.map(s => s.stationName).join(' → ')}역
-              </Text>
-            </View>
-          )}
-          <View style={styles.routeRow}>
-            <Text style={styles.routeLabel}>도착역</Text>
-            <Text style={styles.routeValue}>{route.arrivalStation.stationName}역</Text>
-          </View>
+          {/* Editable origin → transfer → destination diagram (Topic 2). */}
+          <RouteWithTransfer
+            origin={route.departureStation}
+            destination={route.arrivalStation}
+            transfer={transfer}
+            alternatives={STATIC_TRANSFER_ALTERNATIVES}
+            onTransferChange={(next) => {
+              onTransferChange(next);
+              onToggleExpanded();
+            }}
+            expanded={expanded}
+            onToggleExpanded={onToggleExpanded}
+          />
         </View>
       ) : (
         <View style={styles.emptyContent}>
@@ -208,6 +261,10 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation: _navigation
           icon="sunny-outline"
           route={morningRoute}
           onEdit={handleSetupCommute}
+          transfer={outTransfer}
+          onTransferChange={setOutTransfer}
+          expanded={outExpanded}
+          onToggleExpanded={() => setOutExpanded((v) => !v)}
         />
 
         <RouteCard
@@ -215,6 +272,10 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation: _navigation
           icon="moon-outline"
           route={eveningRoute}
           onEdit={handleSetupCommute}
+          transfer={inTransfer}
+          onTransferChange={setInTransfer}
+          expanded={inExpanded}
+          onToggleExpanded={() => setInExpanded((v) => !v)}
         />
 
         <View style={styles.infoSection}>

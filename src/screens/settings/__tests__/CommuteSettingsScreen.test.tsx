@@ -31,6 +31,18 @@ jest.mock('@/contexts/OnboardingContext', () => ({
   }),
 }));
 
+// RouteWithTransfer (introduced in Topic 2) reads theme directly via
+// `@/services/theme/themeContext`. Without this mock the atom's useTheme()
+// throws "must be used within a ThemeProvider" when CommuteSettingsScreen
+// renders a populated route.
+jest.mock('@/services/theme/themeContext', () => ({
+  useTheme: jest.fn(() => ({ isDark: false })),
+}));
+
+jest.mock('@/components/design/LineBadge', () => ({
+  LineBadge: 'LineBadge',
+}));
+
 jest.mock('@/services/commute/commuteService', () => ({
   loadCommuteRoutes: jest.fn(),
 }));
@@ -101,10 +113,12 @@ describe('CommuteSettingsScreen', () => {
     });
 
     const { getByText, getAllByText } = render(<CommuteSettingsScreen {...createProps()} />);
+    // RouteWithTransfer renders bare station names (no '역' suffix); the
+    // legacy '{station}역' string disappeared with the Topic 2 redesign.
     await waitFor(() => {
-      expect(getByText('강남역')).toBeTruthy();
+      expect(getByText('강남')).toBeTruthy();
     });
-    expect(getByText('시청역')).toBeTruthy();
+    expect(getByText('시청')).toBeTruthy();
     expect(getByText('08:00')).toBeTruthy();
     expect(getAllByText('수정하기').length).toBe(1);
   });
@@ -165,8 +179,10 @@ describe('CommuteSettingsScreen', () => {
     });
 
     const { getByText } = render(<CommuteSettingsScreen {...createProps()} />);
+    // The transfer station now appears in the RouteWithTransfer atom or
+    // the recommended-routes panel; the legacy "역" suffix is gone.
     await waitFor(() => {
-      expect(getByText('신도림역')).toBeTruthy();
+      expect(getByText('신도림')).toBeTruthy();
     });
   });
 });
