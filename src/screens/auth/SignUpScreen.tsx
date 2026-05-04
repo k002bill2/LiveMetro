@@ -35,6 +35,7 @@ import { useAuth } from '@/services/auth/AuthContext';
 import { analyzeAuthError, printFirebaseDebugInfo } from '@/utils/firebaseDebug';
 import { AppStackParamList } from '@/navigation/types';
 import { SignupHeader } from '@/components/auth/SignupHeader';
+import { setPendingBiometricCredentials } from '@/services/auth/pendingBiometricSetup';
 
 const isValidEmail = (value: string): boolean => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
@@ -83,6 +84,10 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ mode = 'create' }) =
       } else {
         await signUpWithEmail(email.trim(), password, displayName.trim());
       }
+      // Stash credentials so SignupStep3 can offer a biometric setup prompt
+      // when the user taps the celebration CTA. The pending module clears
+      // them after a single consume.
+      setPendingBiometricCredentials({ email: email.trim(), password });
       // Auth state transition + SignupStep3 celebration handle the
       // post-success UX; no Alert here.
     } catch (err) {

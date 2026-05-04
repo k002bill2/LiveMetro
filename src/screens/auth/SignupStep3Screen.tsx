@@ -10,6 +10,7 @@
  */
 import React, { useCallback, useEffect, useRef } from 'react';
 import {
+  Alert,
   Animated,
   Easing,
   SafeAreaView,
@@ -29,6 +30,13 @@ import { useTheme } from '@/services/theme/themeContext';
 import { useAuth } from '@/services/auth/AuthContext';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { RootStackParamList } from '@/navigation/RootNavigator';
+import {
+  enableBiometricLogin,
+  getBiometricTypeName,
+  isBiometricAvailable,
+  isBiometricLoginEnabled,
+} from '@/services/auth/biometricService';
+import { consumePendingBiometricCredentials } from '@/services/auth/pendingBiometricSetup';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -84,10 +92,56 @@ export const SignupStep3Screen: React.FC = () => {
     };
   }, [ringValues]);
 
+  /**
+   * Offer biometric login setup if the device supports it and the user has
+   * not already enabled it. Mirrors EmailLoginScreen's promptBiometricSetup
+   * but reads credentials from `pendingBiometricSetup` (the password is not
+   * in scope on this screen — it was entered in SignUpScreen step 2/3).
+   *
+   * Resolves a Promise once the user responds to the Alert (or immediately
+   * if no prompt is shown), so the caller can serialize this with the rest
+   * of the CTA flow (markCelebrationSeen → Onboarding navigation).
+   */
+  const promptBiometricSetup = useCallback(async (): Promise<void> => {
+    const creds = consumePendingBiometricCredentials();
+    if (!creds) return; // password not available — skip silently
+    try {
+      const available = await isBiometricAvailable();
+      if (!available) return;
+      const enabled = await isBiometricLoginEnabled();
+      if (enabled) return;
+      const typeName = await getBiometricTypeName();
+      await new Promise<void>((resolve) => {
+        Alert.alert(
+          `${typeName} 설정`,
+          `다음에 ${typeName}로 빠르게 로그인하시겠습니까?`,
+          [
+            { text: '나중에', style: 'cancel', onPress: () => resolve() },
+            {
+              text: '설정하기',
+              onPress: async () => {
+                const success = await enableBiometricLogin(creds.email, creds.password);
+                if (success) {
+                  Alert.alert('완료', `${typeName} 로그인이 활성화되었습니다.`);
+                }
+                resolve();
+              },
+            },
+          ],
+          { onDismiss: () => resolve() },
+        );
+      });
+    } catch (err) {
+      console.error('Biometric setup prompt error:', err);
+      // Non-fatal — never block the celebration → onboarding flow.
+    }
+  }, []);
+
   const handleCta = useCallback(async () => {
+    await promptBiometricSetup();
     await markCelebrationSeen();
     navigation.navigate('Onboarding');
-  }, [markCelebrationSeen, navigation]);
+  }, [promptBiometricSetup, markCelebrationSeen, navigation]);
 
   const displayName = user?.displayName ?? '신규 사용자';
   const email = user?.email ?? '';
