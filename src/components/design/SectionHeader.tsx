@@ -9,7 +9,7 @@
  */
 import React, { memo, ReactNode } from 'react';
 import { Text, View, StyleSheet, ViewStyle, TextStyle, StyleProp } from 'react-native';
-import { WANTED_TOKENS } from '@/styles/modernTheme';
+import { WANTED_TOKENS, typeStyle } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme/themeContext';
 
 interface SectionHeaderProps {
@@ -33,19 +33,13 @@ const SectionHeaderImpl: React.FC<SectionHeaderProps> = ({
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
 
   const titleStyle: TextStyle = {
-    fontSize: WANTED_TOKENS.type.heading2.size,
-    lineHeight: WANTED_TOKENS.type.heading2.lh,
-    letterSpacing:
-      WANTED_TOKENS.type.heading2.size * WANTED_TOKENS.type.heading2.tracking,
-    fontWeight: '700',
+    ...typeStyle('heading2'),
     color: semantic.labelStrong,
   };
 
   const subtitleStyle: TextStyle = {
     marginTop: 2,
-    fontSize: WANTED_TOKENS.type.caption1.size,
-    lineHeight: WANTED_TOKENS.type.caption1.lh,
-    fontWeight: '600',
+    ...typeStyle('caption1'),
     color: semantic.labelAlt,
   };
 

@@ -467,3 +467,48 @@ export const WANTED_TOKENS = {
 
 export type WantedSemanticTheme = typeof WANTED_TOKENS.light | typeof WANTED_TOKENS.dark;
 export type CongestionLevel = keyof typeof WANTED_TOKENS.congestion;
+
+type WantedFontWeight =
+  | '100' | '200' | '300' | '400' | '500' | '600' | '700' | '800' | '900'
+  | 'normal' | 'bold';
+
+type WantedTypeKey = keyof typeof WANTED_TOKENS.type;
+
+type WantedTextStyle = {
+  fontSize: number;
+  lineHeight: number;
+  letterSpacing: number;
+  fontFamily: string;
+};
+
+const WEIGHT_TO_FONT_FAMILY: Record<WantedFontWeight, string> = {
+  '100': 'Pretendard-Thin',
+  '200': 'Pretendard-Thin',
+  '300': 'Pretendard-Light',
+  '400': 'Pretendard-Regular',
+  '500': 'Pretendard-Medium',
+  '600': 'Pretendard-SemiBold',
+  '700': 'Pretendard-Bold',
+  '800': 'Pretendard-ExtraBold',
+  '900': 'Pretendard-Black',
+  normal: 'Pretendard-Regular',
+  bold: 'Pretendard-Bold',
+};
+
+export function weightToFontFamily(weight: WantedFontWeight): string {
+  return WEIGHT_TO_FONT_FAMILY[weight];
+}
+
+export function typeStyle(
+  key: WantedTypeKey,
+  weightOverride?: WantedFontWeight,
+): WantedTextStyle {
+  const t = WANTED_TOKENS.type[key];
+  const weight: WantedFontWeight = weightOverride ?? t.weight;
+  return {
+    fontSize: t.size,
+    lineHeight: t.lh,
+    letterSpacing: t.size * t.tracking,
+    fontFamily: WEIGHT_TO_FONT_FAMILY[weight],
+  };
+}

@@ -14,7 +14,7 @@
  */
 import React, { memo, useMemo } from 'react';
 import { Text, View, StyleSheet, ViewStyle, TextStyle } from 'react-native';
-import { WANTED_TOKENS } from '@/styles/modernTheme';
+import { WANTED_TOKENS, typeStyle, weightToFontFamily } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme/themeContext';
 import { LineBadge, Pill, congFromPct, CONG_TONE, type LineId } from '@/components/design';
 
@@ -76,38 +76,32 @@ const ArrivalCardImpl: React.FC<ArrivalCardProps> = ({
   }, [isFirst, semantic]);
 
   const destinationStyle: TextStyle = {
-    fontSize: WANTED_TOKENS.type.body2.size,
-    lineHeight: WANTED_TOKENS.type.body2.lh,
-    fontWeight: '800',
+    ...typeStyle('body2', '800'),
     color: semantic.labelStrong,
   };
 
   const subtitleStyle: TextStyle = {
     marginTop: 2,
-    fontSize: WANTED_TOKENS.type.caption1.size,
-    lineHeight: WANTED_TOKENS.type.caption1.lh,
-    fontWeight: '600',
+    ...typeStyle('caption1'),
     color: delayMinutes > 0 ? WANTED_TOKENS.status.red500 : semantic.labelAlt,
   };
 
   const minutesNumStyle: TextStyle = {
     fontSize: 28,
-    fontWeight: '800',
+    fontFamily: weightToFontFamily('800'),
     color: isFirst ? semantic.primaryNormal : semantic.labelStrong,
     fontVariant: ['tabular-nums'],
     letterSpacing: -0.84,
   };
 
   const minutesUnitStyle: TextStyle = {
-    fontSize: WANTED_TOKENS.type.label2.size,
-    fontWeight: '700',
+    ...typeStyle('label2', '700'),
     color: isFirst ? semantic.primaryNormal : semantic.labelNeutral,
     marginLeft: 1,
   };
 
   const secondsStyle: TextStyle = {
-    fontSize: WANTED_TOKENS.type.label2.size,
-    fontWeight: '700',
+    ...typeStyle('label2', '700'),
     color: semantic.labelAlt,
     marginLeft: 4,
     fontVariant: ['tabular-nums'],
@@ -228,11 +222,11 @@ const styles = StyleSheet.create({
   },
   congestionLabel: {
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
   },
   congestionAxis: {
     fontSize: 10,
-    fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
   },
   barRow: {
     flexDirection: 'row',
@@ -256,7 +250,7 @@ const styles = StyleSheet.create({
   },
   barNum: {
     fontSize: 9,
-    fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
   },
 });
 

@@ -6,7 +6,7 @@
  */
 import React, { memo, useMemo } from 'react';
 import { Text, View, StyleSheet, ViewStyle, TextStyle } from 'react-native';
-import { WANTED_TOKENS } from '@/styles/modernTheme';
+import { WANTED_TOKENS, typeStyle } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme/themeContext';
 import type { ExitInfo } from '@/models/publicData';
 
@@ -51,15 +51,13 @@ const ExitInfoGridImpl: React.FC<ExitInfoGridProps> = ({ exits, max, testID }) =
   };
 
   const badgeText: TextStyle = {
+    ...typeStyle('label2', '800'),
     color: WANTED_TOKENS.blue[700],
-    fontWeight: '800',
-    fontSize: WANTED_TOKENS.type.label2.size,
   };
 
   const landmarkText: TextStyle = {
+    ...typeStyle('caption1'),
     color: semantic.labelNeutral,
-    fontWeight: '600',
-    fontSize: WANTED_TOKENS.type.caption1.size,
     flexShrink: 1,
   };
 
@@ -96,8 +94,7 @@ const styles = StyleSheet.create({
     paddingVertical: WANTED_TOKENS.spacing.s6,
   },
   emptyText: {
-    fontSize: WANTED_TOKENS.type.body2.size,
-    fontWeight: '500',
+    ...typeStyle('body2'),
   },
   grid: {
     flexDirection: 'row',

@@ -11,6 +11,7 @@ import React, { memo } from 'react';
 import { Pressable, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowRight, Sparkles, TrendingDown, TrendingUp } from 'lucide-react-native';
+import { weightToFontFamily } from '@/styles/modernTheme';
 
 interface MLHeroCardProps {
   /** "홍대입구" → 출발역 표시명 */
@@ -228,7 +229,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     opacity: 0.85,
     fontSize: 11,
-    fontWeight: '800',
+    fontFamily: weightToFontFamily('800'),
     letterSpacing: 0.5,
   },
   routeText: {
@@ -236,7 +237,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     opacity: 0.9,
     fontSize: 14,
-    fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
   },
   numberRow: {
     marginTop: 4,
@@ -247,7 +248,7 @@ const styles = StyleSheet.create({
   numberText: {
     color: '#FFFFFF',
     fontSize: 56,
-    fontWeight: '800',
+    fontFamily: weightToFontFamily('800'),
     lineHeight: 60,
     letterSpacing: -2,
     fontVariant: ['tabular-nums'],
@@ -255,7 +256,7 @@ const styles = StyleSheet.create({
   numberUnit: {
     color: '#FFFFFF',
     fontSize: 20,
-    fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
   },
   deltaPill: {
     marginLeft: 'auto',
@@ -271,20 +272,20 @@ const styles = StyleSheet.create({
   deltaText: {
     color: '#FFFFFF',
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
   },
   subtext: {
     marginTop: 10,
     color: '#FFFFFF',
     opacity: 0.8,
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
   },
   placeholderTitle: {
     marginTop: 10,
     color: '#FFFFFF',
     fontSize: 22,
-    fontWeight: '800',
+    fontFamily: weightToFontFamily('800'),
     letterSpacing: -0.5,
   },
   placeholderMessage: {
@@ -292,7 +293,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     opacity: 0.85,
     fontSize: 13,
-    fontWeight: '500',
+    fontFamily: weightToFontFamily('500'),
     lineHeight: 18,
   },
   ctaRow: {
@@ -309,6 +310,6 @@ const styles = StyleSheet.create({
   ctaText: {
     color: '#FFFFFF',
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
   },
 });

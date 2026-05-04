@@ -8,7 +8,7 @@ import React, { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { useTheme } from '@/services/theme';
-import { WANTED_TOKENS } from '@/styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 
 export interface QuickAction {
   /** Stable id for keying & testID */
@@ -77,6 +77,6 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: 11,
-    fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
   },
 });

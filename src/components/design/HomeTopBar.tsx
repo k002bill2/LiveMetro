@@ -8,7 +8,7 @@ import React, { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Bell } from 'lucide-react-native';
 import { useTheme } from '@/services/theme';
-import { WANTED_TOKENS } from '@/styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 
 interface HomeTopBarProps {
   /** "지수님" — preferred display name */
@@ -88,12 +88,12 @@ const styles = StyleSheet.create({
   },
   date: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
     marginBottom: 2,
   },
   greeting: {
     fontSize: 22,
-    fontWeight: '800',
+    fontFamily: weightToFontFamily('800'),
     letterSpacing: -0.4,
   },
   bellWrap: {

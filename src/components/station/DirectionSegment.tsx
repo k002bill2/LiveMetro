@@ -6,7 +6,7 @@
  */
 import React, { memo, useCallback } from 'react';
 import { Text, TouchableOpacity, View, ViewStyle, TextStyle } from 'react-native';
-import { WANTED_TOKENS } from '@/styles/modernTheme';
+import { WANTED_TOKENS, typeStyle } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme/themeContext';
 
 export type DirectionValue = 'up' | 'down';
@@ -64,9 +64,7 @@ const DirectionSegmentImpl: React.FC<DirectionSegmentProps> = ({
     };
 
     const labelStyle: TextStyle = {
-      fontSize: WANTED_TOKENS.type.label2.size,
-      lineHeight: WANTED_TOKENS.type.label2.lh,
-      fontWeight: '700',
+      ...typeStyle('label2', '700'),
       color: active ? semantic.labelStrong : semantic.labelAlt,
     };
 

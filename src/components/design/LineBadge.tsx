@@ -8,6 +8,7 @@
 import React, { memo, useMemo } from 'react';
 import { Text, View, ViewStyle } from 'react-native';
 import { SUBWAY_LINE_COLORS } from '@/utils/colorUtils';
+import { weightToFontFamily } from '@/styles/modernTheme';
 
 export type LineId = keyof typeof SUBWAY_LINE_COLORS | string;
 
@@ -86,7 +87,7 @@ const LineBadgeImpl: React.FC<LineBadgeProps> = ({ line, size = 24, style, testI
       <Text
         style={{
           color: '#FFFFFF',
-          fontWeight: '800',
+          fontFamily: weightToFontFamily('800'),
           fontSize: computed.fontSize,
           letterSpacing: -0.1,
           lineHeight: computed.fontSize,

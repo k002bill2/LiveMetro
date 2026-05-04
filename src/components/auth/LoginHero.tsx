@@ -15,7 +15,7 @@ interface LoginHeroProps {
   testID?: string;
 }
 
-const LINE_DATA: ReadonlyArray<{ color: string; y: number; dy: number }> = [
+const LINE_DATA: readonly { color: string; y: number; dy: number }[] = [
   { color: '#00A84D', y: 64, dy: -12 }, // 2호선
   { color: '#0052A4', y: 96, dy: 0 }, // 1호선
   { color: '#EF7C1C', y: 128, dy: 14 }, // 3호선

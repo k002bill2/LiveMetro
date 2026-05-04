@@ -10,6 +10,7 @@ import { Text, View, ViewStyle } from 'react-native';
 import { CongestionBar } from './CongestionBar';
 import { CongestionDots } from './CongestionDots';
 import { CONG_TONE, type CongestionLevel } from './congestion';
+import { weightToFontFamily } from '@/styles/modernTheme';
 
 export type CongestionStyle = 'bar' | 'dots' | 'heat';
 
@@ -48,7 +49,7 @@ const CongestionMeterImpl: React.FC<CongestionMeterProps> = ({
             style={{
               color: '#FFFFFF',
               fontSize: 11,
-              fontWeight: '800',
+              fontFamily: weightToFontFamily('800'),
               lineHeight: 14,
             }}
           >
@@ -71,7 +72,7 @@ const CongestionMeterImpl: React.FC<CongestionMeterProps> = ({
           style={{
             color: tone.color,
             fontSize: 11,
-            fontWeight: '700',
+            fontFamily: weightToFontFamily('700'),
             lineHeight: 14,
           }}
         >

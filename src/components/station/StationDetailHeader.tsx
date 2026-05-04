@@ -10,7 +10,7 @@
 import React, { memo } from 'react';
 import { Text, TouchableOpacity, View, StyleSheet, ViewStyle, TextStyle } from 'react-native';
 import { ChevronLeft, Share2, Star } from 'lucide-react-native';
-import { WANTED_TOKENS } from '@/styles/modernTheme';
+import { WANTED_TOKENS, typeStyle } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme/themeContext';
 import { LineBadge, type LineId } from '@/components/design';
 
@@ -42,18 +42,13 @@ const StationDetailHeaderImpl: React.FC<StationDetailHeaderProps> = ({
 
   const titleStyle: TextStyle = {
     marginTop: WANTED_TOKENS.spacing.s3,
-    fontSize: WANTED_TOKENS.type.title1.size,
-    lineHeight: WANTED_TOKENS.type.title1.lh,
-    letterSpacing: WANTED_TOKENS.type.title1.size * WANTED_TOKENS.type.title1.tracking,
-    fontWeight: '800',
+    ...typeStyle('title1', '800'),
     color: semantic.labelStrong,
   };
 
   const subtitleStyle: TextStyle = {
     marginTop: 2,
-    fontSize: WANTED_TOKENS.type.label2.size,
-    lineHeight: WANTED_TOKENS.type.label2.lh,
-    fontWeight: '600',
+    ...typeStyle('label2'),
     color: semantic.labelAlt,
   };
 
