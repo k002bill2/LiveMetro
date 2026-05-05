@@ -17,14 +17,19 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import {
-  Bell,
-  Plus,
-  CheckCheck,
-  Trash2,
   AlertCircle,
+  AlertTriangle,
+  BarChart3,
+  Bell,
+  CheckCheck,
+  Clock,
+  Plus,
+  Star,
+  TrainFront,
+  Trash2,
   X,
-  Circle,
 } from 'lucide-react-native';
+import type { LucideIcon } from 'lucide-react-native';
 import { useAlerts } from '../../hooks/useAlerts';
 import { useTranslation } from '@/services/i18n';
 import { StoredNotification } from '../../services/notification/notificationStorageService';
@@ -52,16 +57,68 @@ export const AlertsScreen: React.FC = () => {
     refresh,
   } = useAlerts();
 
-  const getNotificationIcon = (type: string) => {
+  /**
+   * Phase 37 (AL3): map StoredNotification.type to a distinct lucide icon
+   * so the alert list visually differentiates types at a glance — mirrors
+   * the design handoff's iconForType() in AlertsScreen (ee09cc40 lines
+   * 482-489). Type strings are the values written by saveNotification()
+   * (see notificationTestHelper for the canonical set).
+   */
+  const getNotificationIcon = (type: string): LucideIcon => {
     switch (type) {
       case 'ARRIVAL':
+      case 'arrival_reminder':
+        return TrainFront;
+      case 'COMMUTE_REMINDER':
+      case 'commute_reminder':
+        return Clock;
       case 'DELAY':
+      case 'DELAY_ALERT':
+      case 'delay_alert':
       case 'DISRUPTION':
+      case 'EMERGENCY_ALERT':
+      case 'emergency_alert':
+        return AlertTriangle;
       case 'SERVICE_CHANGE':
+      case 'SERVICE_UPDATE':
+      case 'service_update':
+        return BarChart3;
       case 'FAVORITE':
-        return Circle;
+        return Star;
       default:
-        return Circle;
+        return Bell;
+    }
+  };
+
+  /**
+   * Phase 37 (AL3): semantic color for the notification icon. Matches the
+   * bundle's colorForType() palette — blue for arrival/depart, red for
+   * delay/disruption, cyan for service updates, yellow/warn for community
+   * + favorite. Returns a string color (not a token name) so callers can
+   * pass it directly to Lucide's `color` prop.
+   */
+  const getNotificationColor = (type: string): string => {
+    switch (type) {
+      case 'ARRIVAL':
+      case 'arrival_reminder':
+      case 'COMMUTE_REMINDER':
+      case 'commute_reminder':
+        return semantic.primaryNormal;
+      case 'DELAY':
+      case 'DELAY_ALERT':
+      case 'delay_alert':
+      case 'DISRUPTION':
+      case 'EMERGENCY_ALERT':
+      case 'emergency_alert':
+        return semantic.statusNegative;
+      case 'SERVICE_CHANGE':
+      case 'SERVICE_UPDATE':
+      case 'service_update':
+        return WANTED_TOKENS.status.cyan500;
+      case 'FAVORITE':
+        return WANTED_TOKENS.status.yellow500;
+      default:
+        return semantic.labelAlt;
     }
   };
 
@@ -193,6 +250,7 @@ export const AlertsScreen: React.FC = () => {
   const renderNotificationItem: ListRenderItem<StoredNotification> = useCallback(
     ({ item: notification }) => {
       const IconComponent = getNotificationIcon(notification.type);
+      const iconColor = getNotificationColor(notification.type);
 
       return (
         <TouchableOpacity
@@ -206,9 +264,9 @@ export const AlertsScreen: React.FC = () => {
           <View style={styles.notificationContent}>
             <View style={styles.iconContainer}>
               <IconComponent
-                size={8}
-                color={notification.isRead ? semantic.labelAlt : semantic.labelStrong}
-                fill={notification.isRead ? semantic.labelAlt : semantic.labelStrong}
+                size={18}
+                color={iconColor}
+                strokeWidth={2}
               />
             </View>
 
@@ -416,11 +474,14 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       gap: WANTED_TOKENS.spacing.s3,
     },
     iconContainer: {
-      width: 20,
-      height: 20,
+      width: 36,
+      height: 36,
+      borderRadius: WANTED_TOKENS.radius.pill,
+      backgroundColor: semantic.bgBase,
+      borderWidth: 1,
+      borderColor: semantic.lineSubtle,
       alignItems: 'center',
       justifyContent: 'center',
-      marginTop: 2,
     },
     textContainer: {
       flex: 1,

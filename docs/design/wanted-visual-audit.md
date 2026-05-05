@@ -122,7 +122,7 @@ R3 visual journey strip은 어느 화면에서든 가치 있는 atom — Journey
 
 ---
 
-## DelayFeedScreen (번들 ee09cc40, 코드 src/screens/delays/DelayFeedScreen.tsx) — ✅ 검증 완료
+## DelayFeedScreen (번들 ee09cc40, 코드 src/screens/delays/DelayFeedScreen.tsx) — 🟨 부분 검증
 
 ### ✅ 일치 / 부분 일치 (검증됨)
 - delayReportService 기반 실시간 구독 + filter chip + 카드 list ✓ 구조 일치
@@ -181,7 +181,7 @@ MP2 high severity 가정 **틀림** — vertical timeline은 정확히 구현되
 
 ---
 
-## AlertsScreen (번들 ee09cc40, 코드 src/screens/alerts/AlertsScreen.tsx) — ✅ 검증 완료
+## AlertsScreen (번들 ee09cc40, 코드 src/screens/alerts/AlertsScreen.tsx) — 🟨 부분 검증
 
 ### ✅ 일치 (검증됨)
 - useAlerts hook + StoredNotification 모델 ✓
@@ -193,15 +193,15 @@ MP2 high severity 가정 **틀림** — vertical timeline은 정확히 구현되
 |---|---|---|---|
 | AL1 | "모두 읽음" blue 텍스트 | markAllAsRead handler 존재, 시각 표현 별도 검증 필요 | **L** |
 | AL2 | filter chips `전체/읽지않음 N/도착/지연/제보` | 코드의 render 영역 미독해 — filter UI 존재 여부 미확정 | **M** (확인 필요) |
-| AL3 | type-별 차별화 아이콘+색상 (arriving/depart/delay/community/cert/weekly) | **getNotificationIcon 모든 타입 → Circle 단일 아이콘 (line 56-66)**. type-color 매핑도 부재 | **H** (확정 gap) |
+| AL3 | type-별 차별화 아이콘+색상 | ✅ Phase 37에서 해소 — getNotificationIcon에 ARRIVAL→TrainFront, DELAY→AlertTriangle, SERVICE→BarChart3, FAVORITE→Star, COMMUTE→Clock 매핑 + getNotificationColor 신설 | ~~H~~ → ✅ |
 | AL4 | read=bgBase, unread=blue-50 + blue border | render 영역 미독해 | **M** (확인 필요) |
 
 ### 결론
-**AL3는 확정된 의미 있는 gap** — getNotificationIcon switch 모든 case가 `Circle` 반환. 번들의 type-별 시각 차별화(arriving=train/depart=clock/delay=alert-triangle 등)가 미구현. 사용자가 알림 list에서 type을 한눈에 구분 못함.
+~~AL3는 확정된 의미 있는 gap~~ → **Phase 37에서 해소 완료**. iconContainer도 20x20→36x36으로 키워 번들의 circle wrapper 매칭. AL2/AL4는 render 영역 미독해라 별도 검증 필요(med 등급 유지).
 
 ---
 
-## OnboardingScreen (번들 ee09cc40, 코드 src/screens/onboarding/CommuteRouteScreen.tsx + others) — ✅ 검증 완료
+## OnboardingScreen (번들 ee09cc40, 코드 src/screens/onboarding/CommuteRouteScreen.tsx + others) — 🟨 부분 검증
 
 ### ✅ 일치 (검증됨)
 - **OnbHeader atom** (`@/components/onboarding/OnbHeader`): 4-step progress bar, Phase Chunk 1/6 commit `6b578cd`로 신설. CommuteRouteScreen의 step 2/4 위치에 wired (line 31)
@@ -221,7 +221,7 @@ ON1은 완전 구현. ON3은 의도적으로 Onboarding에서 제외 (다른 화
 
 ---
 
-## SettingsScreen (번들 ee09cc40, 코드 src/screens/settings/SettingsScreen.tsx) — ✅ 검증 완료
+## SettingsScreen (번들 ee09cc40, 코드 src/screens/settings/SettingsScreen.tsx) — 🟨 부분 검증
 
 ### ✅ 일치 (검증됨)
 - AsyncStorage + SecureStore 기반 자동로그인/생체인증 토글 ✓
@@ -256,8 +256,8 @@ SettingsScreen은 25개 sub-screen으로 **번들보다 훨씬 풍부**. 중심 
 3. ~~FavoritesScreen F1~~ — FavoriteRow 통합 (Phase 34)
 4. ~~RoutesScreen R3~~ — JourneyStrip atom + AlternativeRouteCard (Phase 35)
 
-### 🔴 새로 식별된 high gap (Phase 36 검증)
-1. **AlertsScreen AL3**: getNotificationIcon이 모든 type을 `Circle`로 매핑 — 번들의 type-별 차별화 아이콘+색상(arriving/depart/delay/community/cert/weekly) 미구현. 사용자가 알림 list에서 type을 한눈에 구분 못함
+### ✅ 새로 식별 + 즉시 해소된 high gap
+1. ~~AlertsScreen AL3~~: Phase 37에서 type-별 icon+color 매핑 구현 (commit 추적용)
 
 ### Med (Phase 36 검증 결과)
 - DelayFeed D3 (filter 축 결정 — line vs type)
@@ -325,13 +325,13 @@ SettingsScreen은 25개 sub-screen으로 **번들보다 훨씬 풍부**. 중심 
 | ✅ 33 | HomeScreen H1+H2+H3 (vertical 즐겨찾기 + delta + community card) | `8838140` |
 | ✅ 34 | FavoritesScreen FavoriteRow 통합 | `9f453ef` |
 | ✅ 35 | JourneyStrip atom + RoutesScreen R3 | `8986441` |
-| ✅ 36 | LoginScreen/DelayFeed/Alerts/Onboarding/Settings 검증 (audit 정확도 보강) | (this) |
+| ✅ 36 | LoginScreen/DelayFeed/Alerts/Onboarding/Settings 검증 (audit 정확도 보강) | `a91f1ee` |
+| ✅ 37 | AlertsScreen AL3: type-별 icon+color 매핑 + audit 라벨 정확도 수정 | (this) |
 
 ### 향후 (Phase 36 검증 후 우선순위 재조정)
 
 | Phase | 핵심 작업 | 추정 작업량 | 영향 |
 |-------|-----------|-----------|------|
-| **37** | AlertsScreen AL3: type-별 icon + color 매핑 구현 (가장 큰 잔여 gap) | 작 (getNotificationIcon switch 6 case 매핑 + color helper) | H |
 | **38** | DelayFeed 디테일 (filter 축 결정 D3 + comment/share D4 + megaphone D1) | 중 (사용자 결정 D3 우선 필요) | M |
 | **39** | StatsScreen + MapScreen 디테일 정리 (이모지 prefix 제거 + lucide 통일) | 작 | L-M |
 | **40** | AlertsScreen AL2/AL4 + Settings SE1/SE2 render 보강 검증 | 작 (read 영역 추가 검증) | M |
