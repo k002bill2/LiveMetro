@@ -22,12 +22,38 @@ import {
 import { useTheme } from '@/services/theme';
 import { SPACING, RADIUS, TYPOGRAPHY } from '@/styles/modernTheme';
 import { getSubwayLineColor } from '@/utils/colorUtils';
+import { JourneyStrip, type JourneyStripLeg } from '@/components/design';
 import {
   AlternativeRoute,
   Route,
   formatTimeDifference,
   getTimeDifferenceSeverity,
 } from '@/models/route';
+
+/**
+ * Map a domain Route into the JourneyStrip leg sequence.
+ *
+ * RouteSegment models train legs only — walking is implicit at start/end
+ * and not represented. Transfer markers are derived from line-id changes
+ * between consecutive segments rather than the `isTransfer` flag, which
+ * tags the *segment* itself rather than the boundary.
+ */
+const routeToLegs = (route: Route): JourneyStripLeg[] => {
+  const legs: JourneyStripLeg[] = [];
+  for (let i = 0; i < route.segments.length; i++) {
+    const seg = route.segments[i]!;
+    const prev = i > 0 ? route.segments[i - 1] : null;
+    if (prev && prev.lineId !== seg.lineId) {
+      legs.push({ type: 'transfer' });
+    }
+    legs.push({
+      type: 'train',
+      lineId: seg.lineId,
+      minutes: seg.estimatedMinutes,
+    });
+  }
+  return legs;
+};
 
 // ============================================================================
 // Types
@@ -219,9 +245,16 @@ export const AlternativeRouteCard: React.FC<AlternativeRouteCardProps> = ({
         <TimeDifferenceIndicator minutes={timeDifference} />
       </View>
 
-      {/* Route Line Path */}
+      {/* Visual journey strip — Phase 35: replaces the simpler LineIndicator
+          chain with the design handoff's per-leg coloured blocks (proportional
+          width, line label + minutes inside). Falls back to RouteLinePath
+          only when route has no segments. */}
       <View style={styles.routePathContainer}>
-        <RouteLinePath route={alternativeRoute} />
+        {alternativeRoute.segments.length > 0 ? (
+          <JourneyStrip legs={routeToLegs(alternativeRoute)} />
+        ) : (
+          <RouteLinePath route={alternativeRoute} />
+        )}
       </View>
 
       {/* Route Details */}
@@ -266,7 +299,11 @@ export const AlternativeRouteCard: React.FC<AlternativeRouteCardProps> = ({
             기존 경로:
           </Text>
           <View style={styles.comparisonContent}>
-            <RouteLinePath route={originalRoute} />
+            {originalRoute.segments.length > 0 ? (
+              <JourneyStrip legs={routeToLegs(originalRoute)} />
+            ) : (
+              <RouteLinePath route={originalRoute} />
+            )}
             <Text style={[styles.comparisonTime, { color: colors.textSecondary }]}>
               {originalRoute.totalMinutes}분
             </Text>

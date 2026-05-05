@@ -32,3 +32,7 @@ export { SectionHeader } from './SectionHeader';
 
 /* Phase 33 — community/system delay preview card for HomeScreen "실시간 제보" slot */
 export { CommunityDelayCard } from './CommunityDelayCard';
+
+/* Phase 35 — multi-leg journey visual strip for RoutesScreen */
+export { JourneyStrip } from './JourneyStrip';
+export type { JourneyStripLeg } from './JourneyStrip';

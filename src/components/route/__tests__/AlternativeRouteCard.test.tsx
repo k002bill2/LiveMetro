@@ -27,6 +27,10 @@ jest.mock('@/services/theme', () => ({
 }));
 
 jest.mock('@/styles/modernTheme', () => ({
+  // Spread real exports so WANTED_TOKENS, weightToFontFamily, and other
+  // tokens stay defined for the design atoms reached through the
+  // JourneyStrip → CongestionBar transitive import chain (Phase 35).
+  ...jest.requireActual('@/styles/modernTheme'),
   SPACING: { xs: 4, sm: 8, md: 12, lg: 16 },
   RADIUS: { sm: 4, md: 8, lg: 12 },
   TYPOGRAPHY: {
@@ -36,6 +40,11 @@ jest.mock('@/styles/modernTheme', () => ({
 }));
 
 jest.mock('@/utils/colorUtils', () => ({
+  // Spread real exports so SUBWAY_LINE_COLORS et al. stay available for
+  // transitively imported design atoms (LineBadge → JourneyStrip path
+  // introduced in Phase 35). Without this spread the partial mock leaves
+  // every other export undefined and LineBadge crashes at module load.
+  ...jest.requireActual('@/utils/colorUtils'),
   getSubwayLineColor: (lineId: string) => (lineId === '2' ? '#00A84D' : '#0052A4'),
 }));
 
