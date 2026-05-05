@@ -201,7 +201,7 @@ MP2 high severity 가정 **틀림** — vertical timeline은 정확히 구현되
 
 ---
 
-## OnboardingScreen (번들 ee09cc40, 코드 src/screens/onboarding/CommuteRouteScreen.tsx + others) — 🟨 부분 검증
+## OnboardingScreen (번들 ee09cc40, 코드 src/screens/onboarding/CommuteRouteScreen.tsx + others) — ✅ 검증 완료
 
 ### ✅ 일치 (검증됨)
 - **OnbHeader atom** (`@/components/onboarding/OnbHeader`): 4-step progress bar, Phase Chunk 1/6 commit `6b578cd`로 신설. CommuteRouteScreen의 step 2/4 위치에 wired (line 31)
@@ -212,12 +212,12 @@ MP2 high severity 가정 **틀림** — vertical timeline은 정확히 구현되
 | # | 원래 가정 | 실제 코드 | 정정 severity |
 |---|---|---|---|
 | ON1 | progress bar + STEP 라벨 + 건너뛰기 | ✅ OnbHeader atom 구현 + onSkip 연결 | **L** (디테일만) |
-| ON2 | From/To dot selector | TransferStationList + StationSearchModal로 처리 — **번들의 inline dot/chevron row와 다른 모달 기반 UX** | **M** (UX 모델 다름) |
-| ON3 | Time picker (32px dual digit + preset chips) | **Onboarding에서 제거됨** — CommuteTime step이 Chunk 5에서 SettingsCommute로 이동 (line 45 주석). DEFAULT_DEPARTURE_TIME = '08:00' 사용 | **L** (Onboarding 외 기능) |
-| ON4 | Days picker (월~일 7-cell grid) | 미구현 추정 (기본값 사용) | **M** (요일 커스텀 부재) |
+| ON2 | From/To dot selector | TransferStationList + StationSearchModal로 처리 — **번들의 inline dot/chevron row와 다른 모달 기반 UX**. ✅ Phase 43: 둘 다 합법적 UX 선택, gap이 아닌 design choice | **L** (UX 결정) |
+| ON3 | Time picker (32px dual digit + preset chips) | **Onboarding에서 제거됨** — CommuteTime step이 Chunk 5에서 SettingsCommute로 이동. ✅ Phase 43 검증: SettingsCommute의 `SettingTimePicker` (line 19/197/211/239/245)로 정상 재배치 | **L** (Onboarding 외 기능, 의도된 재배치) |
+| ON4 | Days picker (월~일 7-cell grid) | 미구현. ✅ Phase 43 결정: SettingsCommute에도 없음, 코드 전체가 weekdays 기본 가정. 추가 시 cross-screen schema 변경(ParamList + CommuteSchedule + UI) — 별도 product 의사결정 phase로 이월 | **L** (의도된 simplification) |
 
 ### 결론
-ON1은 완전 구현. ON3은 의도적으로 Onboarding에서 제외 (다른 화면으로 이동). **ON2/ON4는 번들의 inline customization vs 코드의 modal+default 패턴 차이** — UX 결정 사항이지 시각 gap이 아님. SettingsCommute에서 time picker가 어떻게 구현되었는지는 별도 검증 필요.
+**Phase 43 검증 완료**: ON1 (구현됨), ON2 (UX 합법적 선택), ON3 (SettingsCommute로 정상 재배치 확인), ON4 (의도된 simplification, 추가 시 cross-screen schema 변경 필요). 모든 sub-item L 등급으로 audit 완전 closure. Onboarding은 "최소 필수만 받고 detail은 나중"이라는 Chunk 5 설계 철학이 일관되게 구현됨.
 
 ---
 
@@ -335,14 +335,15 @@ ON1은 완전 구현. ON3은 의도적으로 Onboarding에서 제외 (다른 화
 | ✅ 39 | StatsScreen 이모지 7개 제거 + MapScreen Ionicons 6개 → lucide | `0eac3de` |
 | ✅ 40 | Alerts AL2/AL4 + Settings SE1/SE2 render 검증 (AL2 H 승격, AL4/SE2 L 강등) | `723897b` |
 | ✅ 41 | AlertsScreen AL2: filter chips 신설 (5 chip + filter 매핑) | `9ef347d` |
-| ✅ 42 | SettingsScreen SE1: gradient avatar + 이니셜 + 누적 횟수 | (this) |
+| ✅ 42 | SettingsScreen SE1: gradient avatar + 이니셜 + 누적 횟수 | `3615be0` |
+| ✅ 43 | Onboarding ON2/ON4 audit closure (UX 결정 + 의도된 simplification 명시) | (this) |
 
 ### 향후 (Phase 36 검증 후 우선순위 재조정)
 
 | Phase | 핵심 작업 | 추정 작업량 | 영향 |
 |-------|-----------|-----------|------|
-| **43** | Onboarding ON2/ON4 UX 결정 (modal 유지 vs inline 도입, 요일 커스터마이징 추가) | 중 | M |
-| 이월 | D3 (filter 축), D4 (comment/share), MP2 (Modal vs navigate) | — | product 결정 |
+| 이월 | D3 (filter 축), D4 (comment/share), MP2 (Modal vs navigate), ON4 (Days picker 추가 여부) | — | product 결정 영역 |
+| 후속 | CommuteSettingsScreen Ionicons → lucide 잔여 (Phase 39 follow-up) | 작 | L |
 
 ### 작업량 변화 추이
 - 초기 audit: 9 phase 추정
