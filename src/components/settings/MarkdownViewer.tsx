@@ -182,7 +182,10 @@ const buildStyles = (semantic: WantedSemanticTheme) => ({
     marginBottom: WANTED_TOKENS.spacing.s3,
   },
   blockquote: {
-    backgroundColor: WANTED_TOKENS.blue[50],
+    // Translucent blue tint works in both light and dark themes — the
+    // hardcoded blue[50] (#EAF2FE) regressed in dark mode (Gemini cross-
+    // review Phase 45). Same pattern as CommuteRouteCard's origin node.
+    backgroundColor: 'rgba(0,102,255,0.10)',
     borderLeftColor: WANTED_TOKENS.blue[500],
     borderLeftWidth: 3,
     paddingHorizontal: WANTED_TOKENS.spacing.s3,
