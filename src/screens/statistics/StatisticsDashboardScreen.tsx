@@ -131,7 +131,7 @@ const StatisticsDashboardScreen: React.FC = () => {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>📊 통계 대시보드</Text>
+          <Text style={styles.title}>통계 대시보드</Text>
           <Text style={styles.subtitle}>
             {summary.memberSince} 이후 기록
           </Text>
@@ -142,27 +142,27 @@ const StatisticsDashboardScreen: React.FC = () => {
 
         {/* Weekly On-Time Rate Chart */}
         <View style={styles.chartSection}>
-          <Text style={styles.sectionTitle}>📈 주간 정시율 추이</Text>
+          <Text style={styles.sectionTitle}>주간 정시율 추이</Text>
           <WeeklyStatsChart data={weeklyTrendData} />
         </View>
 
         {/* Delay by Day Chart */}
         <View style={styles.chartSection}>
-          <Text style={styles.sectionTitle}>📅 요일별 평균 지연</Text>
+          <Text style={styles.sectionTitle}>요일별 평균 지연</Text>
           <DelayStatsChart data={delayByDayData} />
         </View>
 
         {/* Line Usage Pie Chart */}
         {lineUsageData.length > 0 && (
           <View style={styles.chartSection}>
-            <Text style={styles.sectionTitle}>🚇 노선별 이용 현황</Text>
+            <Text style={styles.sectionTitle}>노선별 이용 현황</Text>
             <LineUsagePieChart data={lineUsageData} />
           </View>
         )}
 
         {/* Delay Distribution */}
         <View style={styles.chartSection}>
-          <Text style={styles.sectionTitle}>⏱️ 지연 시간 분포</Text>
+          <Text style={styles.sectionTitle}>지연 시간 분포</Text>
           <View style={styles.distributionContainer}>
             {delayDistribution.map((item, index) => (
               <View key={index} style={styles.distributionItem}>
@@ -186,7 +186,7 @@ const StatisticsDashboardScreen: React.FC = () => {
         {/* This Week Summary */}
         {weeklyStats && (
           <View style={styles.chartSection}>
-            <Text style={styles.sectionTitle}>📆 이번 주 요약</Text>
+            <Text style={styles.sectionTitle}>이번 주 요약</Text>
             <View style={styles.weekSummary}>
               <View style={styles.weekSummaryItem}>
                 <Text style={styles.weekSummaryValue}>
@@ -212,7 +212,7 @@ const StatisticsDashboardScreen: React.FC = () => {
 
         {/* Insights */}
         <View style={styles.insightsSection}>
-          <Text style={styles.sectionTitle}>💡 인사이트</Text>
+          <Text style={styles.sectionTitle}>인사이트</Text>
           <View style={styles.insightCard}>
             {summary.mostUsedLine && (
               <Text style={styles.insightText}>

@@ -13,7 +13,13 @@ import {
   Modal,
   Alert,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import {
+  ArrowRightLeft,
+  ChevronRight,
+  Heart,
+  Train,
+  X,
+} from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -257,7 +263,7 @@ export const SubwayMapScreen: React.FC = () => {
                       accessibilityLabel={`${station.name}역${station.isTransfer ? ', 환승역' : ''}`}
                     >
                       {station.isTransfer && (
-                        <Ionicons name="swap-horizontal" size={16} color={lineColor} />
+                        <ArrowRightLeft size={14} color={lineColor} strokeWidth={2.6} />
                       )}
                     </TouchableOpacity>
 
@@ -309,7 +315,7 @@ export const SubwayMapScreen: React.FC = () => {
                   </TouchableOpacity>
 
                   {/* Chevron */}
-                  <Ionicons name="chevron-forward" size={20} color={semantic.labelAlt} />
+                  <ChevronRight size={18} color={semantic.labelAlt} strokeWidth={2} />
                 </View>
               );
             })}
@@ -344,7 +350,7 @@ export const SubwayMapScreen: React.FC = () => {
                     accessibilityRole="button"
                     accessibilityLabel="닫기"
                   >
-                    <Ionicons name="close" size={28} color={semantic.labelAlt} />
+                    <X size={24} color={semantic.labelAlt} strokeWidth={2} />
                   </TouchableOpacity>
                 </View>
 
@@ -390,11 +396,11 @@ export const SubwayMapScreen: React.FC = () => {
                     accessibilityRole="button"
                     accessibilityLabel="도착 정보 보기"
                   >
-                    <Ionicons name="train" size={20} color={semantic.primaryNormal} />
+                    <Train size={20} color={semantic.primaryNormal} />
                     <Text style={styles.viewArrivalButtonText}>
                       도착 정보 보기
                     </Text>
-                    <Ionicons name="chevron-forward" size={20} color={semantic.primaryNormal} />
+                    <ChevronRight size={18} color={semantic.primaryNormal} strokeWidth={2} />
                   </TouchableOpacity>
                 </View>
 
@@ -408,10 +414,11 @@ export const SubwayMapScreen: React.FC = () => {
                   accessibilityRole="button"
                   accessibilityLabel={isStationFavorite ? '즐겨찾기 제거' : '즐겨찾기 추가'}
                 >
-                  <Ionicons
-                    name={isStationFavorite ? 'heart' : 'heart-outline'}
+                  <Heart
                     size={20}
                     color="#ffffff"
+                    fill={isStationFavorite ? '#ffffff' : 'transparent'}
+                    strokeWidth={2}
                   />
                   <Text style={styles.addFavoriteButtonText}>
                     {isStationFavorite ? '즐겨찾기 제거' : '즐겨찾기 추가'}
