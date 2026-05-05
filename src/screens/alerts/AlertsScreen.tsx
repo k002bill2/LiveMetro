@@ -28,7 +28,7 @@ import {
 import { useAlerts } from '../../hooks/useAlerts';
 import { useTranslation } from '@/services/i18n';
 import { StoredNotification } from '../../services/notification/notificationStorageService';
-import { WANTED_TOKENS, type WantedSemanticTheme } from '../../styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '../../styles/modernTheme';
 import { useTheme } from '../../services/theme';
 import { addTestNotifications, addRandomNotification } from '../../utils/notificationTestHelper';
 
@@ -362,6 +362,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       fontSize: WANTED_TOKENS.type.title2.size,
       lineHeight: WANTED_TOKENS.type.title2.lh,
       fontWeight: '800',
+      fontFamily: weightToFontFamily('800'),
       color: semantic.labelStrong,
       letterSpacing:
         WANTED_TOKENS.type.title2.size * WANTED_TOKENS.type.title2.tracking,
@@ -369,6 +370,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     headerSubtitle: {
       fontSize: WANTED_TOKENS.type.caption1.size,
       fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
       color: semantic.primaryNormal,
       marginTop: 2,
     },
@@ -432,6 +434,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     notificationTitle: {
       fontSize: WANTED_TOKENS.type.body1.size,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
       color: semantic.labelStrong,
       flex: 1,
       marginRight: WANTED_TOKENS.spacing.s2,
@@ -468,6 +471,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     errorTitle: {
       fontSize: WANTED_TOKENS.type.body1.size,
       fontWeight: '500',
+      fontFamily: weightToFontFamily('500'),
       color: semantic.labelAlt,
       textAlign: 'center',
     },
@@ -480,6 +484,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     retryButtonText: {
       fontSize: WANTED_TOKENS.type.label1.size,
       fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
       color: '#FFFFFF',
     },
     emptyState: {
@@ -495,6 +500,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     emptyTitle: {
       fontSize: WANTED_TOKENS.type.heading2.size,
       fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
       color: semantic.labelStrong,
     },
     emptySubtitle: {
@@ -513,6 +519,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     devButtonText: {
       fontSize: WANTED_TOKENS.type.label1.size,
       fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
       color: '#FFFFFF',
     },
   });

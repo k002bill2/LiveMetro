@@ -42,7 +42,7 @@ import { useToast } from '../../components/common/Toast';
 import { useDelayDetection } from '../../hooks/useDelayDetection';
 import { useIntegratedAlerts } from '../../hooks/useIntegratedAlerts';
 import { useMLPrediction } from '../../hooks/useMLPrediction';
-import { WANTED_TOKENS, type WantedSemanticTheme } from '../../styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '../../styles/modernTheme';
 import { useTheme } from '../../services/theme';
 
 import { Station } from '../../models/train';
@@ -700,6 +700,7 @@ const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
     fontSize: WANTED_TOKENS.type.body1.size,
     lineHeight: WANTED_TOKENS.type.body1.lh,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     color: semantic.labelStrong,
     marginBottom: 2,
   },
@@ -707,6 +708,7 @@ const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
     fontSize: WANTED_TOKENS.type.caption1.size,
     lineHeight: WANTED_TOKENS.type.caption1.lh,
     fontWeight: '500',
+    fontFamily: weightToFontFamily('500'),
     color: semantic.labelAlt,
   },
   offlineBanner: {
@@ -725,6 +727,7 @@ const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
     lineHeight: WANTED_TOKENS.type.caption1.lh,
     color: semantic.labelAlt,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     marginLeft: WANTED_TOKENS.spacing.s2,
     flex: 1,
   },
@@ -750,6 +753,7 @@ const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
     fontSize: WANTED_TOKENS.type.heading2.size,
     lineHeight: WANTED_TOKENS.type.heading2.lh,
     fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
     color: semantic.labelStrong,
     flex: 1,
     letterSpacing:
@@ -768,6 +772,7 @@ const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
   detailButtonText: {
     color: semantic.labelStrong,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     marginRight: 4,
     fontSize: WANTED_TOKENS.type.label1.size,
   },
@@ -792,6 +797,7 @@ const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
     fontSize: WANTED_TOKENS.type.body1.size,
     lineHeight: WANTED_TOKENS.type.body1.lh,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     color: semantic.labelAlt,
     marginTop: WANTED_TOKENS.spacing.s4,
     textAlign: 'center',

@@ -280,6 +280,7 @@ jest.mock('expo-location', () => ({
 }));
 
 jest.mock('@/styles/modernTheme', () => ({
+  ...jest.requireActual('@/styles/modernTheme'),
   SPACING: { sm: 4, md: 8, lg: 16, xl: 24, '2xl': 32 },
   RADIUS: { sm: 4, md: 8, lg: 12, full: 999 },
   TYPOGRAPHY: {

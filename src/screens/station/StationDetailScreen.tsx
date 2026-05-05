@@ -29,7 +29,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AlertCircle, Moon } from 'lucide-react-native';
 
 import { AppStackParamList } from '../../navigation/types';
-import { WANTED_TOKENS } from '@/styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme/themeContext';
 import { useRealtimeTrains } from '@/hooks/useRealtimeTrains';
 import { useCongestion } from '@/hooks/useCongestion';
@@ -307,18 +307,21 @@ const styles = StyleSheet.create({
     fontSize: WANTED_TOKENS.type.body2.size,
     lineHeight: WANTED_TOKENS.type.body2.lh,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     textAlign: 'center',
   },
   stateSub: {
     fontSize: WANTED_TOKENS.type.caption1.size,
     lineHeight: WANTED_TOKENS.type.caption1.lh,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     textAlign: 'center',
   },
   retryText: {
     fontSize: WANTED_TOKENS.type.label1.size,
     lineHeight: WANTED_TOKENS.type.label1.lh,
     fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
   },
   sectionHeaderWrap: {
     paddingTop: WANTED_TOKENS.spacing.s6,
@@ -329,6 +332,7 @@ const styles = StyleSheet.create({
     fontSize: WANTED_TOKENS.type.heading2.size,
     lineHeight: WANTED_TOKENS.type.heading2.lh,
     fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
   },
   exitWrap: {
     paddingHorizontal: WANTED_TOKENS.spacing.s5,
