@@ -36,7 +36,15 @@ import { StationCard } from '../../components/train/StationCard';
 import { TrainArrivalList } from '../../components/train/TrainArrivalList';
 import { DelayAlertBanner } from '../../components/delays';
 import { CommutePredictionCard } from '../../components/prediction';
-import { HomeTopBar, MLHeroCard, MLHeroCardPlaceholder, QuickActionsGrid, SectionHeader } from '../../components/design';
+import {
+  CommunityDelayCard,
+  HomeTopBar,
+  MLHeroCard,
+  MLHeroCardPlaceholder,
+  QuickActionsGrid,
+  SectionHeader,
+} from '../../components/design';
+import type { LineId } from '../../components/design';
 import { LocationDebugPanel } from '../../components/debug';
 import { useToast } from '../../components/common/Toast';
 import { useDelayDetection } from '../../hooks/useDelayDetection';
@@ -69,6 +77,23 @@ const minutesBetween = (departure?: string, arrival?: string): number | null => 
   if (d === null || a === null) return null;
   const diff = ((a - d) % MIN_PER_DAY + MIN_PER_DAY) % MIN_PER_DAY;
   return diff > 0 ? diff : null;
+};
+
+/**
+ * Format an absolute timestamp into a relative Korean label
+ * ("방금 전" / "12분 전" / "3시간 전"). Returns null for invalid input.
+ * Used by CommunityDelayCard meta line.
+ */
+const formatRelativeKorean = (ts?: Date, now: Date = new Date()): string | null => {
+  if (!ts) return null;
+  const diffSec = Math.max(0, Math.floor((now.getTime() - ts.getTime()) / 1000));
+  if (diffSec < 60) return '방금 전';
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}분 전`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}시간 전`;
+  const diffDay = Math.floor(diffHr / 24);
+  return `${diffDay}일 전`;
 };
 
 /**
@@ -138,7 +163,7 @@ export const HomeScreen: React.FC = () => {
   });
 
   // ML 예측 — Hero 카드 데이터 소스
-  const { prediction: mlPrediction } = useMLPrediction();
+  const { prediction: mlPrediction, baselineMinutes } = useMLPrediction();
 
   // Origin/destination 이름 lookup — commuteSchedule.weekdays.morningCommute의
   // stationId/destinationStationId를 station 이름으로 변환. async라 useMemo
@@ -177,6 +202,8 @@ export const HomeScreen: React.FC = () => {
   }, [morningCommute]);
 
   // Hero 카드 props 도출 — prediction이 있고 정상 계산 가능할 때만 표시.
+  // deltaMinutes: 예측 시간과 사용자 평소 평균(baseline)의 차이.
+  // 음수 = 평소보다 빠름 → MLHeroCard의 delta pill에 "평소보다 -N분" 표시.
   const heroProps = useMemo(() => {
     if (!mlPrediction) return null;
     const minutes = minutesBetween(
@@ -184,14 +211,17 @@ export const HomeScreen: React.FC = () => {
       mlPrediction.predictedArrivalTime,
     );
     if (minutes === null) return null;
+    const delta =
+      baselineMinutes !== null ? minutes - baselineMinutes : undefined;
     return {
       predictedMinutes: minutes,
+      deltaMinutes: delta,
       arrivalTime: mlPrediction.predictedArrivalTime,
       confidence: mlPrediction.confidence,
       origin: commuteStationNames.origin,
       destination: commuteStationNames.destination,
     };
-  }, [mlPrediction, commuteStationNames]);
+  }, [mlPrediction, baselineMinutes, commuteStationNames]);
 
   // 상단 바에 표시할 날짜/시간 — 1분마다 갱신 (분 단위까지만 표시하므로 충분).
   const [dateTimeLabel, setDateTimeLabel] = useState(() => formatDateTimeLabel(new Date()));
@@ -428,6 +458,7 @@ export const HomeScreen: React.FC = () => {
             origin={heroProps.origin}
             destination={heroProps.destination}
             predictedMinutes={heroProps.predictedMinutes}
+            deltaMinutes={heroProps.deltaMinutes}
             arrivalTime={heroProps.arrivalTime}
             confidence={heroProps.confidence}
             onPress={handleViewPredictions}
@@ -576,26 +607,57 @@ export const HomeScreen: React.FC = () => {
             </Text>
           </View>
         ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.stationList}>
+          // Phase 33-C1: vertical stack to mirror the design handoff's
+          // 즐겨찾는 역 / 주변 역 column layout. StationCard retains its own
+          // realtime polling; the wrapper neutralizes its horizontal-list
+          // marginRight via flex-column gap.
+          <View style={styles.stationListVertical}>
             {nearbyStations.map((station) => {
               const callbacks = stationCallbacks.get(station.id);
               return (
-                <StationCard
-                  key={station.id}
-                  station={station}
-                  isSelected={selectedStation?.id === station.id}
-                  onPress={callbacks?.onPress}
-                  onSetStart={callbacks?.onSetStart}
-                  onSetEnd={handleSetEnd}
-                  showDistance={locationPermission && 'distance' in station}
-                  distance={'distance' in station ? (station as { distance: number }).distance / 1000 : undefined}
-                  arrivalsEnabled={isFocused}
-                />
+                <View key={station.id} style={styles.stationRowWrap}>
+                  <StationCard
+                    station={station}
+                    isSelected={selectedStation?.id === station.id}
+                    onPress={callbacks?.onPress}
+                    onSetStart={callbacks?.onSetStart}
+                    onSetEnd={handleSetEnd}
+                    showDistance={locationPermission && 'distance' in station}
+                    distance={'distance' in station ? (station as { distance: number }).distance / 1000 : undefined}
+                    arrivalsEnabled={isFocused}
+                  />
+                </View>
               );
             })}
-          </ScrollView>
+          </View>
         )}
       </View>
+
+      {/* Community delays preview — single-card representation of the most
+          recent active delay, mirroring the design handoff's "실시간 제보" slot.
+          The DelayAlertBanner above remains as the dismissible alert affordance;
+          this card is the always-on feed preview that links to DelayFeed. */}
+      {activeDelays.length > 0 && (
+        <View style={styles.section}>
+          <SectionHeader title="실시간 제보" subtitle="근처 노선" />
+          <View style={styles.communityCardWrap}>
+            <CommunityDelayCard
+              line={activeDelays[0]!.lineId as LineId}
+              title={`${activeDelays[0]!.lineName ?? `${activeDelays[0]!.lineId}호선`}${
+                activeDelays[0]!.reason ? ` ${activeDelays[0]!.reason}` : ' 지연 발생'
+              }`}
+              description={
+                activeDelays[0]!.delayMinutes > 0
+                  ? `약 ${activeDelays[0]!.delayMinutes}분 지연 중`
+                  : undefined
+              }
+              timestampLabel={formatRelativeKorean(activeDelays[0]!.timestamp) ?? undefined}
+              onPress={() => navigation.navigate('DelayFeed' as never)}
+              testID="home-community-delay-card"
+            />
+          </View>
+        </View>
+      )}
 
       {/* Real-time Train Information */}
       {selectedStation && (
@@ -680,6 +742,10 @@ const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
   },
   quickActionsWrap: {
     paddingBottom: WANTED_TOKENS.spacing.s2,
+  },
+  communityCardWrap: {
+    paddingHorizontal: WANTED_TOKENS.spacing.s5,
+    paddingBottom: WANTED_TOKENS.spacing.s4,
   },
   permissionBanner: {
     backgroundColor: semantic.bgBase,
@@ -787,6 +853,13 @@ const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
   },
   stationList: {
     paddingLeft: WANTED_TOKENS.spacing.s4,
+  },
+  stationListVertical: {
+    paddingHorizontal: WANTED_TOKENS.spacing.s5,
+    rowGap: WANTED_TOKENS.spacing.s2,
+  },
+  stationRowWrap: {
+    width: '100%',
   },
   emptyState: {
     alignItems: 'center',

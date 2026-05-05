@@ -4,7 +4,7 @@
  * TensorFlow is disabled - uses fallback predictions
  */
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from '@/services/auth/AuthContext';
 import { modelService, trainingService } from '@/services/ml';
 import { commuteLogService } from '@/services/pattern/commuteLogService';
@@ -43,6 +43,14 @@ export interface UseMLPredictionState {
   logCount: number;
   /** Whether enough data for ML training */
   hasEnoughData: boolean;
+  /**
+   * User's personal baseline commute duration in minutes.
+   *
+   * Average of actual durations from recent logs that have both
+   * departureTime and arrivalTime. `null` when there are no usable logs.
+   * Drives MLHeroCard's "평소보다 ±N분" delta pill.
+   */
+  baselineMinutes: number | null;
 }
 
 export interface UseMLPredictionActions {
@@ -83,6 +91,28 @@ export function useMLPrediction(): UseMLPredictionReturn {
   const [logs, setLogs] = useState<CommuteLog[]>([]);
 
   const unsubscribeRef = useRef<(() => void) | null>(null);
+
+  // Baseline = simple average of past actual commute durations (HH:mm pairs).
+  // Wraps midnight to handle late-night commutes (23:55 → 00:20 = 25min).
+  const baselineMinutes = useMemo<number | null>(() => {
+    const MIN_PER_DAY = 24 * 60;
+    const parse = (s?: string): number | null => {
+      if (!s) return null;
+      const m = /^(\d{1,2}):(\d{2})$/.exec(s.trim());
+      if (!m) return null;
+      return parseInt(m[1]!, 10) * 60 + parseInt(m[2]!, 10);
+    };
+    const durations: number[] = [];
+    for (const log of logs) {
+      const d = parse(log.departureTime);
+      const a = parse(log.arrivalTime);
+      if (d === null || a === null) continue;
+      const diff = ((a - d) % MIN_PER_DAY + MIN_PER_DAY) % MIN_PER_DAY;
+      if (diff > 0) durations.push(diff);
+    }
+    if (durations.length === 0) return null;
+    return durations.reduce((sum, n) => sum + n, 0) / durations.length;
+  }, [logs]);
 
   // Initialize model on mount (fallback mode)
   useEffect(() => {
@@ -255,6 +285,7 @@ export function useMLPrediction(): UseMLPredictionReturn {
     isTraining,
     logCount,
     hasEnoughData: logCount >= MIN_LOGS_FOR_ML_TRAINING,
+    baselineMinutes,
 
     // Actions
     refreshPrediction,
