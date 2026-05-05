@@ -47,7 +47,7 @@ import { useNavigation } from '@react-navigation/native';
 
 import { useMLPrediction } from '@/hooks/useMLPrediction';
 import { useTheme, ThemeColors } from '@/services/theme';
-import { WANTED_TOKENS } from '@/styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { Pill } from '@/components/design';
 
 /**
@@ -332,6 +332,7 @@ const createStyles = (_colors: ThemeColors, isDark: boolean) => {
     topBarLeftText: {
       fontSize: 15,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
     },
     heroHeader: {
       paddingHorizontal: 20,
@@ -347,10 +348,12 @@ const createStyles = (_colors: ThemeColors, isDark: boolean) => {
     heroTagTime: {
       fontSize: 12,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
     },
     heroLead: {
       fontSize: 22,
       fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
       letterSpacing: -0.4,
     },
     tagInner: {
@@ -361,6 +364,7 @@ const createStyles = (_colors: ThemeColors, isDark: boolean) => {
     tagText: {
       fontSize: 11,
       fontWeight: '800',
+      fontFamily: weightToFontFamily('800'),
       letterSpacing: 0.4,
     },
     sectionPad: {
@@ -385,6 +389,7 @@ const createStyles = (_colors: ThemeColors, isDark: boolean) => {
     bigNumber: {
       fontSize: 96,
       fontWeight: '800',
+      fontFamily: weightToFontFamily('800'),
       lineHeight: 88,
       letterSpacing: -4.8,
       fontVariant: ['tabular-nums'],
@@ -392,6 +397,7 @@ const createStyles = (_colors: ThemeColors, isDark: boolean) => {
     bigUnit: {
       fontSize: 28,
       fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
       letterSpacing: -0.6,
     },
     deltaPillWrap: {
@@ -400,6 +406,7 @@ const createStyles = (_colors: ThemeColors, isDark: boolean) => {
     deltaText: {
       fontSize: 12,
       fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
       color: '#008F30',
     },
     rangeWrap: {
@@ -413,10 +420,12 @@ const createStyles = (_colors: ThemeColors, isDark: boolean) => {
     rangeLabelSide: {
       fontSize: 11,
       fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
     },
     rangeLabelCenter: {
       fontSize: 11,
       fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
     },
     rangeTrack: {
       position: 'relative',
@@ -459,6 +468,7 @@ const createStyles = (_colors: ThemeColors, isDark: boolean) => {
     confidenceLabel: {
       fontSize: 13,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
     },
     confidenceRight: {
       flexDirection: 'row',
@@ -468,11 +478,13 @@ const createStyles = (_colors: ThemeColors, isDark: boolean) => {
     confidenceValue: {
       fontSize: 14,
       fontWeight: '800',
+      fontFamily: weightToFontFamily('800'),
       fontVariant: ['tabular-nums'],
     },
     confidenceMeta: {
       fontSize: 11,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
     },
     routeRow: {
       flexDirection: 'row',
@@ -482,11 +494,13 @@ const createStyles = (_colors: ThemeColors, isDark: boolean) => {
     routeText: {
       fontSize: 15,
       fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
     },
     routeAction: {
       marginLeft: 'auto',
       fontSize: 12,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
     },
     placeholderCard: {
       borderRadius: 16,
@@ -497,10 +511,12 @@ const createStyles = (_colors: ThemeColors, isDark: boolean) => {
     placeholderTitle: {
       fontSize: 14,
       fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
     },
     placeholderBody: {
       fontSize: 13,
       fontWeight: '500',
+      fontFamily: weightToFontFamily('500'),
       lineHeight: 20,
     },
     ctaButton: {
@@ -517,6 +533,7 @@ const createStyles = (_colors: ThemeColors, isDark: boolean) => {
       color: '#FFFFFF',
       fontSize: 16,
       fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
       letterSpacing: -0.2,
     },
   });

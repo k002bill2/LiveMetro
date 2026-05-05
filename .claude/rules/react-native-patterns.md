@@ -19,4 +19,4 @@
 | 하드코딩 색상 `'#007AFF'` | `colors.primary` (테마) | 다크모드 미지원 |
 | `Dimensions.get()` 모듈 레벨 | `useWindowDimensions()` 훅 | 화면 회전 시 갱신 안 됨 |
 | `onPress={() => fn()}` 인라인 | `useCallback`으로 감싸기 | 매 렌더마다 새 함수 |
-| `fontWeight: '700'` 단독 | `weightToFontFamily('700')` 또는 `typeStyle('label2')` 동반 | Pretendard는 9 face별 PostScript name. fontWeight 단독은 system font fallback. pre-commit `lint:typography`가 차단 (enforced: `src/components/{design,station,statistics}/`, `src/screens/{auth,delays,settings,statistics}/`, `src/styles/`) |
+| `fontWeight: '700'` 단독 | `weightToFontFamily('700')` 또는 `typeStyle('label2')` 동반 | Pretendard는 9 face별 PostScript name. fontWeight 단독은 system font fallback. pre-commit `lint:typography`가 차단 (enforced: `src/components/{design,station,statistics}/`, `src/screens/{auth,delays,prediction,settings,statistics}/`, `src/styles/`) |

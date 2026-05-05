@@ -35,6 +35,7 @@ const WINDOW = 15;
  *   Phase 23: screens/settings/
  *   Phase 24: screens/auth/
  *   Phase 25: screens/delays/
+ *   Phase 26: screens/prediction/
  */
 const HARD_PREFIXES = [
   'src/components/design/',
@@ -42,6 +43,7 @@ const HARD_PREFIXES = [
   'src/components/statistics/',
   'src/screens/auth/',
   'src/screens/delays/',
+  'src/screens/prediction/',
   'src/screens/settings/',
   'src/screens/statistics/',
   'src/styles/',
