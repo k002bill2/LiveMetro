@@ -51,6 +51,7 @@ import { useToast } from '../../components/common/Toast';
 import { useDelayDetection } from '../../hooks/useDelayDetection';
 import { useIntegratedAlerts } from '../../hooks/useIntegratedAlerts';
 import { useMLPrediction } from '../../hooks/useMLPrediction';
+import { useCommuteRouteSummary } from '../../hooks/useCommuteRouteSummary';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '../../styles/modernTheme';
 import { useTheme } from '../../services/theme';
 
@@ -170,6 +171,14 @@ export const HomeScreen: React.FC = () => {
   // stationId/destinationStationId를 station 이름으로 변환. async라 useMemo
   // 안에서 못 함, 별도 effect로 fetch 후 state에 보관.
   const morningCommute = user?.preferences.commuteSchedule?.weekdays?.morningCommute;
+
+  // 출퇴근 경로 카드 fact grid 데이터 — routeService + fareService
+  // (Phase 44.1). morningCommute 미설정 시 자동으로 ready=false → 팩트 grid hide.
+  const routeSummary = useCommuteRouteSummary(
+    morningCommute?.stationId,
+    morningCommute?.destinationStationId,
+  );
+
   const [commuteStationNames, setCommuteStationNames] = useState<{
     origin?: string;
     destination?: string;
@@ -497,6 +506,9 @@ export const HomeScreen: React.FC = () => {
               departureTime={mlPrediction?.predictedDepartureTime}
               arrivalTime={heroProps.arrivalTime}
               rideMinutes={heroProps.predictedMinutes}
+              transferCount={routeSummary.transferCount}
+              stationCount={routeSummary.stationCount}
+              fareKrw={routeSummary.fareKrw}
               onPressEdit={() =>
                 navigation.navigate('CommuteSettings' as never)
               }
