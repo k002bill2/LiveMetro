@@ -1,9 +1,12 @@
 /**
  * Notification Time Settings Screen
- * Configure commute schedule and quiet hours
+ * Configure commute schedule and quiet hours.
+ *
+ * Phase 46 — migrated from legacy COLORS/SPACING/RADIUS/TYPOGRAPHY API
+ * to Wanted Design System tokens.
  */
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -12,15 +15,23 @@ import {
   ScrollView,
   Alert,
 } from 'react-native';
-import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
+import {
+  WANTED_TOKENS,
+  weightToFontFamily,
+  type WantedSemanticTheme,
+} from '@/styles/modernTheme';
 import { Calendar, Clock, Moon, Sun } from 'lucide-react-native';
 import { useAuth } from '@/services/auth/AuthContext';
+import { useTheme } from '@/services/theme';
 import SettingSection from '@/components/settings/SettingSection';
 import SettingToggle from '@/components/settings/SettingToggle';
 import SettingTimePicker from '@/components/settings/SettingTimePicker';
 
 export const NotificationTimeScreen: React.FC = () => {
   const { user, updateUserProfile } = useAuth();
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const styles = useMemo(() => createStyles(semantic), [semantic]);
   const [saving, setSaving] = useState(false);
 
   const notificationSettings = user?.preferences.notificationSettings;
@@ -277,39 +288,45 @@ export const NotificationTimeScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.white,
-  },
-  content: {
-    flex: 1,
-  },
-  stationInfo: {
-    paddingHorizontal: SPACING.lg,
-    paddingBottom: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.light,
-  },
-  stationLabel: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.tertiary,
-  },
-  infoBox: {
-    backgroundColor: COLORS.primary.light,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.lg,
-    marginHorizontal: SPACING.lg,
-    marginBottom: SPACING.xl,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: COLORS.border.medium,
-  },
-  infoText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.secondary,
-    lineHeight: TYPOGRAPHY.lineHeight.relaxed * TYPOGRAPHY.fontSize.sm,
-  },
-});
+const INFO_FONT_SIZE = 13;
+const INFO_LINE_HEIGHT = INFO_FONT_SIZE * 1.6;
+
+const createStyles = (semantic: WantedSemanticTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: semantic.bgBase,
+    },
+    content: {
+      flex: 1,
+    },
+    stationInfo: {
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingBottom: WANTED_TOKENS.spacing.s3,
+      borderBottomWidth: 1,
+      borderBottomColor: semantic.lineSubtle,
+    },
+    stationLabel: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+    },
+    infoBox: {
+      backgroundColor: 'rgba(0,102,255,0.10)',
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s4,
+      marginHorizontal: WANTED_TOKENS.spacing.s4,
+      marginBottom: WANTED_TOKENS.spacing.s5,
+      borderRadius: WANTED_TOKENS.radius.r8,
+      borderWidth: 1,
+      borderColor: semantic.lineSubtle,
+    },
+    infoText: {
+      fontSize: INFO_FONT_SIZE,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelNeutral,
+      lineHeight: INFO_LINE_HEIGHT,
+    },
+  });
 
 export default NotificationTimeScreen;
