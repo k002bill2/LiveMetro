@@ -10,13 +10,13 @@ import {
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
-import { AlertCircle, Trash2, Tag, Pencil, XCircle, GripVertical, ArrowUp, ArrowDown, Briefcase } from 'lucide-react-native';
+import { AlertCircle, Trash2, Pencil, XCircle, Briefcase } from 'lucide-react-native';
 import { SPACING, RADIUS, TYPOGRAPHY, WANTED_TOKENS, WantedSemanticTheme, weightToFontFamily } from '../../styles/modernTheme';
 import { useTheme, ThemeColors } from '../../services/theme';
 import { FavoriteWithDetails } from '../../hooks/useFavorites';
-import { StationCard } from '../train/StationCard';
+import { useRealtimeTrains } from '../../hooks/useRealtimeTrains';
 import { FavoriteEditForm } from './FavoriteEditForm';
-import { Pill } from '../design';
+import { FavoriteRow, Pill, type LineId } from '../design';
 
 interface DraggableFavoriteItemProps {
   favorite: FavoriteWithDetails;
@@ -41,15 +41,29 @@ interface DraggableFavoriteItemProps {
   arrivalsEnabled?: boolean;
 }
 
+/**
+ * Map favorite.direction to a human-friendly destination label that fits
+ * the FavoriteRow layout. Returns undefined for unknown values so the row
+ * gracefully omits the line.
+ */
+const directionToLabel = (
+  direction?: 'up' | 'down' | 'both'
+): string | undefined => {
+  if (direction === 'up') return '상행 방면';
+  if (direction === 'down') return '하행 방면';
+  if (direction === 'both') return '양방향';
+  return undefined;
+};
+
 export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
   favorite,
-  index,
+  index: _index,
   isEditing,
   onEditToggle,
   onRemove,
   onPress,
-  onSetStart,
-  onSetEnd,
+  onSetStart: _onSetStart,
+  onSetEnd: _onSetEnd,
   onSaveEdit,
   isDragEnabled = false,
   arrivalsEnabled = true,
@@ -58,6 +72,45 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
   const styles = useMemo(() => createStyles(colors, semantic), [colors, semantic]);
   const { station } = favorite;
+
+  // Per-row arrival fetch — replaces StationCard's internal polling.
+  // Gated by `arrivalsEnabled` (parent uses useIsFocused) and disabled
+  // when editing (no need to refresh during a non-visible card).
+  const shouldFetchArrivals = !!station && arrivalsEnabled && !isEditing;
+  const { trains } = useRealtimeTrains(station?.name ?? '', {
+    enabled: shouldFetchArrivals,
+    refetchInterval: 30_000,
+  });
+
+  // Pick the next train matching the favorite's direction (or the soonest
+  // overall when 'both' / unknown). Returns minutes-until-arrival for the
+  // FavoriteRow primary signal, or 0 when nothing is available.
+  const nextMinutes = useMemo(() => {
+    if (!trains?.length) return 0;
+    const now = Date.now();
+    const filtered = trains.filter((t) => {
+      if (!t.arrivalTime) return false;
+      if (favorite.direction === 'both' || !favorite.direction) return true;
+      return t.direction === favorite.direction;
+    });
+    if (filtered.length === 0) return 0;
+    const earliest = filtered.reduce((min, t) =>
+      t.arrivalTime!.getTime() < min.arrivalTime!.getTime() ? t : min
+    );
+    const diffMin = Math.max(
+      0,
+      Math.ceil((earliest.arrivalTime!.getTime() - now) / 60_000)
+    );
+    return diffMin;
+  }, [trains, favorite.direction]);
+
+  // Lines passing through this station — bundle's FavoriteRow stacks up to 2
+  // LineBadges (primary + first transfer).
+  const linesForRow = useMemo<LineId[]>(() => {
+    if (!station) return [];
+    const all = [station.lineId, ...(station.transfers ?? [])];
+    return all.slice(0, 2) as LineId[];
+  }, [station]);
 
   /**
    * Render error card if station data is missing
@@ -86,49 +139,47 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
 
   return (
     <View style={styles.container}>
-      {/* Station Card with Action Buttons */}
+      {/* Phase 34: FavoriteRow atom replaces StationCard for the bundle's
+          dense vertical row. Edit/Delete buttons remain as a small overlay
+          at the row's top-right; they sit above the minutes label and
+          surface most clearly during the brief edit interaction. */}
       <View style={styles.cardWrapper}>
-        <StationCard
-          station={station}
+        <FavoriteRow
+          lines={linesForRow}
+          stationName={station.name}
+          nickname={favorite.alias ?? undefined}
+          destinationLabel={directionToLabel(favorite.direction)}
+          nextMinutes={nextMinutes}
+          showDragHandle={isDragEnabled}
           onPress={onPress}
-          onSetStart={onSetStart}
-          onSetEnd={onSetEnd}
-          showArrivals={true}
-          arrivalsEnabled={arrivalsEnabled}
-          enableFavorite={false}
-          animationDelay={index * 50}
         />
 
-        {/* Action Buttons Overlay */}
+        {/* Action Buttons Overlay (top-right). Smaller than the StationCard
+            era because the row's right edge is occupied by the minutes
+            label — a 24px chip is enough to remain tappable. */}
         <View style={styles.actionButtons}>
-          {/* Edit Button */}
           <TouchableOpacity
             style={[styles.actionButton, isEditing && styles.actionButtonActive]}
             onPress={onEditToggle}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel={isEditing ? '편집 완료' : '편집'}
           >
             <Pencil
-              size={20}
+              size={14}
               color={isEditing ? colors.textPrimary : colors.textSecondary}
             />
           </TouchableOpacity>
-
-          {/* Delete Button */}
           <TouchableOpacity
             style={styles.actionButton}
             onPress={onRemove}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            accessibilityRole="button"
+            accessibilityLabel="즐겨찾기 삭제"
           >
-            <XCircle size={24} color={colors.textSecondary} />
+            <XCircle size={16} color={colors.textSecondary} />
           </TouchableOpacity>
         </View>
-
-        {/* Drag Handle (shown when drag is enabled - Phase 3) */}
-        {isDragEnabled && (
-          <View style={styles.dragHandle}>
-            <GripVertical size={24} color={colors.textTertiary} />
-          </View>
-        )}
       </View>
 
       {/* Edit Form */}
@@ -139,39 +190,17 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
         onCancel={onEditToggle}
       />
 
-      {/* Alias, Direction & Commute Metadata (hidden when editing).
-          Phase 3B/5: alias + 출퇴근은 Pill atomic으로 시각 정렬 (디자인의
-          nickname Pill 패턴과 동일). 방향 화살표는 inline icon 유지. */}
-      {!isEditing && (
+      {/* Commute pill — alias + direction are now rendered inside FavoriteRow,
+          so the metadata row only carries the commute marker. Hidden during
+          edit to keep the form focused. */}
+      {!isEditing && favorite.isCommuteStation && (
         <View style={styles.metadataRow}>
-          {favorite.alias && (
-            <Pill tone="primary" size="sm" testID="favorite-alias-pill">
-              <View style={styles.pillContent}>
-                <Tag size={11} color={semantic.primaryPress} />
-                <Text style={styles.pillText}>{favorite.alias}</Text>
-              </View>
-            </Pill>
-          )}
-          <View style={styles.metadataItem}>
-            {favorite.direction === 'both' ? (
-              <>
-                <ArrowUp size={14} color={colors.textSecondary} />
-                <ArrowDown size={14} color={colors.textSecondary} />
-              </>
-            ) : favorite.direction === 'down' ? (
-              <ArrowDown size={14} color={colors.textSecondary} />
-            ) : (
-              <ArrowUp size={14} color={colors.textSecondary} />
-            )}
-          </View>
-          {favorite.isCommuteStation && (
-            <Pill tone="neutral" size="sm" testID="favorite-commute-pill">
-              <View style={styles.pillContent}>
-                <Briefcase size={11} color={semantic.labelNeutral} />
-                <Text style={styles.commuteTextPill}>출퇴근</Text>
-              </View>
-            </Pill>
-          )}
+          <Pill tone="neutral" size="sm" testID="favorite-commute-pill">
+            <View style={styles.pillContent}>
+              <Briefcase size={11} color={semantic.labelNeutral} />
+              <Text style={styles.commuteTextPill}>출퇴근</Text>
+            </View>
+          </Pill>
         </View>
       )}
     </View>
