@@ -9,21 +9,11 @@ import { Smartphone } from 'lucide-react-native';
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: (_, name) => name }));
 
-jest.mock('@/styles/modernTheme', () => ({
-  COLORS: {
-    black: '#000000',
-    white: '#FFFFFF',
-    gray: { 400: '#999999' },
-    border: { light: '#E5E5EA', medium: '#D1D1D6' },
-    surface: { card: '#F2F2F7', overlay: 'rgba(0,0,0,0.5)' },
-    text: { primary: '#000000', tertiary: '#C7C7CC' },
-  },
-  SPACING: { xs: 4, sm: 8, md: 12, lg: 16 },
-  RADIUS: { sm: 4, md: 8, lg: 12, xl: 16, full: 9999 },
-  TYPOGRAPHY: {
-    fontSize: { xs: 10, sm: 12, base: 14, lg: 18 },
-    fontWeight: { medium: '500', semibold: '600', bold: '700' },
-  },
+// Phase 45 — Wanted DS migration: legacy modernTheme mock removed because
+// the component no longer imports COLORS/SPACING/RADIUS/TYPOGRAPHY. useTheme
+// drives the WANTED_TOKENS light/dark selection.
+jest.mock('@/services/theme', () => ({
+  useTheme: () => ({ isDark: false }),
 }));
 
 jest.mock('@/services/sound/soundService', () => ({

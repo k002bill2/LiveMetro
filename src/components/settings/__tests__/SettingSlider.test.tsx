@@ -12,6 +12,12 @@ jest.mock('@react-native-community/slider', () => {
   };
 });
 
+// Phase 45 — Wanted DS migration: useTheme().isDark drives the semantic
+// theme. Mock light variant for deterministic snapshots.
+jest.mock('@/services/theme', () => ({
+  useTheme: () => ({ isDark: false }),
+}));
+
 describe('SettingSlider', () => {
   const defaultProps = {
     label: '알림 시간',

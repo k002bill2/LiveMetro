@@ -13,6 +13,12 @@ jest.mock('lucide-react-native', () =>
   new Proxy({}, { get: (_, name) => name })
 );
 
+// Phase 45 — Wanted DS migration: useTheme().isDark drives the semantic
+// theme. Mock light variant for deterministic snapshots.
+jest.mock('@/services/theme', () => ({
+  useTheme: () => ({ isDark: false }),
+}));
+
 const options: PickerOption[] = [
   { label: '한국어', value: 'ko', description: 'Korean' },
   { label: 'English', value: 'en', description: 'English' },

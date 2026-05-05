@@ -1,9 +1,11 @@
 /**
  * Vibration Picker Component
- * Modal-based picker for selecting vibration patterns with preview
+ * Modal-based picker for selecting vibration patterns with preview.
+ *
+ * Phase 45 — Wanted Design System migration.
  */
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -15,7 +17,12 @@ import {
 } from 'react-native';
 import { ChevronRight, X, Check, Smartphone } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
-import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
+import {
+  WANTED_TOKENS,
+  weightToFontFamily,
+  type WantedSemanticTheme,
+} from '@/styles/modernTheme';
+import { useTheme } from '@/services/theme';
 import { VibrationPatternId } from '@/models/user';
 import { VibrationOption, soundService } from '@/services/sound/soundService';
 
@@ -36,6 +43,9 @@ export const VibrationPicker: React.FC<VibrationPickerProps> = ({
   icon: IconComponent,
   disabled = false,
 }) => {
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const styles = useMemo(() => createStyles(semantic), [semantic]);
   const [modalVisible, setModalVisible] = useState(false);
 
   const selectedOption = options.find((opt) => opt.id === value);
@@ -61,7 +71,7 @@ export const VibrationPicker: React.FC<VibrationPickerProps> = ({
             <View style={styles.iconContainer}>
               <IconComponent
                 size={20}
-                color={disabled ? COLORS.gray[400] : COLORS.black}
+                color={disabled ? semantic.labelDisabled : semantic.labelStrong}
                 strokeWidth={2}
               />
             </View>
@@ -75,7 +85,7 @@ export const VibrationPicker: React.FC<VibrationPickerProps> = ({
             )}
           </View>
         </View>
-        <ChevronRight size={20} color={COLORS.gray[400]} />
+        <ChevronRight size={20} color={semantic.labelAlt} />
       </TouchableOpacity>
 
       <Modal
@@ -93,7 +103,7 @@ export const VibrationPicker: React.FC<VibrationPickerProps> = ({
                   onPress={() => setModalVisible(false)}
                   style={styles.closeButton}
                 >
-                  <X size={24} color={COLORS.black} />
+                  <X size={24} color={semantic.labelStrong} />
                 </TouchableOpacity>
               </View>
 
@@ -113,7 +123,7 @@ export const VibrationPicker: React.FC<VibrationPickerProps> = ({
                       {value === option.id && (
                         <Check
                           size={24}
-                          color={COLORS.black}
+                          color={WANTED_TOKENS.blue[500]}
                         />
                       )}
                     </TouchableOpacity>
@@ -125,7 +135,7 @@ export const VibrationPicker: React.FC<VibrationPickerProps> = ({
                       >
                         <Smartphone
                           size={28}
-                          color={COLORS.black}
+                          color={WANTED_TOKENS.blue[500]}
                         />
                       </TouchableOpacity>
                     )}
@@ -140,113 +150,116 @@ export const VibrationPicker: React.FC<VibrationPickerProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.light,
-  },
-  disabled: {
-    opacity: 0.5,
-  },
-  leftContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: SPACING.md,
-  },
-  iconContainer: {
-    width: 36,
-    height: 36,
-    backgroundColor: COLORS.surface.card,
-    borderRadius: RADIUS.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: SPACING.md,
-  },
-  textContainer: {
-    flex: 1,
-  },
-  label: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
-  },
-  disabledText: {
-    color: COLORS.gray[400],
-  },
-  selectedValue: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.tertiary,
-    marginTop: 2,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: COLORS.surface.overlay,
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: COLORS.white,
-    borderTopLeftRadius: RADIUS.xl,
-    borderTopRightRadius: RADIUS.xl,
-    maxHeight: '80%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.light,
-  },
-  modalTitle: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.text.primary,
-  },
-  closeButton: {
-    padding: SPACING.sm,
-  },
-  optionsList: {
-    paddingVertical: SPACING.md,
-  },
-  optionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.light,
-  },
-  optionItem: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.lg,
-  },
-  optionContent: {
-    flex: 1,
-    marginRight: SPACING.md,
-  },
-  optionLabel: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
-  },
-  optionDescription: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.tertiary,
-    marginTop: 4,
-  },
-  playButton: {
-    padding: SPACING.md,
-    marginRight: SPACING.sm,
-  },
-});
+const createStyles = (semantic: WantedSemanticTheme) =>
+  StyleSheet.create({
+    container: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s4,
+      borderBottomWidth: 1,
+      borderBottomColor: semantic.lineSubtle,
+    },
+    disabled: {
+      opacity: 0.5,
+    },
+    leftContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+      marginRight: WANTED_TOKENS.spacing.s3,
+    },
+    iconContainer: {
+      width: 36,
+      height: 36,
+      backgroundColor: semantic.bgSubtle,
+      borderRadius: WANTED_TOKENS.radius.pill,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: WANTED_TOKENS.spacing.s3,
+    },
+    textContainer: {
+      flex: 1,
+    },
+    label: {
+      fontSize: 14,
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelStrong,
+    },
+    disabledText: {
+      color: semantic.labelDisabled,
+    },
+    selectedValue: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+      marginTop: 2,
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'flex-end',
+    },
+    modalContent: {
+      backgroundColor: semantic.bgBase,
+      borderTopLeftRadius: WANTED_TOKENS.radius.r10,
+      borderTopRightRadius: WANTED_TOKENS.radius.r10,
+      maxHeight: '80%',
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s4,
+      borderBottomWidth: 1,
+      borderBottomColor: semantic.lineSubtle,
+    },
+    modalTitle: {
+      fontSize: 16,
+      fontFamily: weightToFontFamily('700'),
+      color: semantic.labelStrong,
+    },
+    closeButton: {
+      padding: WANTED_TOKENS.spacing.s2,
+    },
+    optionsList: {
+      paddingVertical: WANTED_TOKENS.spacing.s3,
+    },
+    optionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderBottomWidth: 1,
+      borderBottomColor: semantic.lineSubtle,
+    },
+    optionItem: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s4,
+    },
+    optionContent: {
+      flex: 1,
+      marginRight: WANTED_TOKENS.spacing.s3,
+    },
+    optionLabel: {
+      fontSize: 14,
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelStrong,
+    },
+    optionDescription: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+      marginTop: 4,
+    },
+    playButton: {
+      padding: WANTED_TOKENS.spacing.s3,
+      marginRight: WANTED_TOKENS.spacing.s2,
+    },
+  });
 
 export default VibrationPicker;
