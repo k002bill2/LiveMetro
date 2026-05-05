@@ -17,7 +17,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { Eye, EyeOff, Lock, User } from 'lucide-react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useAuth } from '@/services/auth/AuthContext';
@@ -138,7 +138,7 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
           {/* Profile Icon */}
           <View style={styles.profileIconSection}>
             <View style={styles.profileIcon}>
-              <Ionicons name="person" size={48} color={COLORS.black} />
+              <User size={48} color={COLORS.black} strokeWidth={2} />
             </View>
           </View>
 
@@ -167,7 +167,7 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
                 <Text style={styles.readOnlyText}>
                   {user?.email || '이메일 없음'}
                 </Text>
-                <Ionicons name="lock-closed" size={16} color={COLORS.gray[400]} />
+                <Lock size={16} color={COLORS.gray[400]} strokeWidth={2} />
               </View>
               <Text style={styles.helperText}>
                 이메일은 변경할 수 없습니다.
@@ -214,11 +214,11 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
                     style={styles.eyeButton}
                     onPress={() => setShowCurrentPassword(!showCurrentPassword)}
                   >
-                    <Ionicons
-                      name={showCurrentPassword ? 'eye-off' : 'eye'}
-                      size={20}
-                      color={COLORS.gray[400]}
-                    />
+                    {showCurrentPassword ? (
+                      <EyeOff size={20} color={COLORS.gray[400]} strokeWidth={2} />
+                    ) : (
+                      <Eye size={20} color={COLORS.gray[400]} strokeWidth={2} />
+                    )}
                   </TouchableOpacity>
                 </View>
               </View>
@@ -241,11 +241,11 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
                     style={styles.eyeButton}
                     onPress={() => setShowNewPassword(!showNewPassword)}
                   >
-                    <Ionicons
-                      name={showNewPassword ? 'eye-off' : 'eye'}
-                      size={20}
-                      color={COLORS.gray[400]}
-                    />
+                    {showNewPassword ? (
+                      <EyeOff size={20} color={COLORS.gray[400]} strokeWidth={2} />
+                    ) : (
+                      <Eye size={20} color={COLORS.gray[400]} strokeWidth={2} />
+                    )}
                   </TouchableOpacity>
                 </View>
               </View>
@@ -268,11 +268,11 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
                     style={styles.eyeButton}
                     onPress={() => setShowConfirmPassword(!showConfirmPassword)}
                   >
-                    <Ionicons
-                      name={showConfirmPassword ? 'eye-off' : 'eye'}
-                      size={20}
-                      color={COLORS.gray[400]}
-                    />
+                    {showConfirmPassword ? (
+                      <EyeOff size={20} color={COLORS.gray[400]} strokeWidth={2} />
+                    ) : (
+                      <Eye size={20} color={COLORS.gray[400]} strokeWidth={2} />
+                    )}
                   </TouchableOpacity>
                 </View>
                 {newPassword && confirmPassword && newPassword !== confirmPassword && (

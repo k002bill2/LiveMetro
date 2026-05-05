@@ -15,7 +15,7 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { CheckCircle, HelpCircle, Locate, MapPin, Navigation, Bell, Settings, ShieldCheck, Train, XCircle, type LucideIcon } from 'lucide-react-native';
 import * as Location from 'expo-location';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme';
@@ -203,14 +203,14 @@ export const LocationPermissionScreen: React.FC = () => {
     }
   };
 
-  const getStatusIcon = (): keyof typeof Ionicons.glyphMap => {
+  const getStatusIcon = (): LucideIcon => {
     switch (permissionStatus) {
       case 'granted':
-        return 'checkmark-circle';
+        return CheckCircle;
       case 'denied':
-        return 'close-circle';
+        return XCircle;
       default:
-        return 'help-circle';
+        return HelpCircle;
     }
   };
 
@@ -222,11 +222,10 @@ export const LocationPermissionScreen: React.FC = () => {
           <View
             style={[styles.statusIcon, { backgroundColor: getStatusColor() + '20' }]}
           >
-            <Ionicons
-              name={getStatusIcon()}
-              size={48}
-              color={getStatusColor()}
-            />
+            {(() => {
+              const StatusIcon = getStatusIcon();
+              return <StatusIcon size={48} color={getStatusColor()} strokeWidth={2} />;
+            })()}
           </View>
           <Text style={[styles.statusText, { color: getStatusColor() }]}>
             {getStatusText()}
@@ -237,7 +236,7 @@ export const LocationPermissionScreen: React.FC = () => {
         <SettingSection title="위치 정보 사용 목적">
           <View style={styles.featureItem}>
             <View style={styles.featureIcon}>
-              <Ionicons name="locate" size={24} color={semantic.labelStrong} />
+              <Locate size={24} color={semantic.labelStrong} strokeWidth={2} />
             </View>
             <View style={styles.featureContent}>
               <Text style={styles.featureTitle}>주변 역 찾기</Text>
@@ -249,7 +248,7 @@ export const LocationPermissionScreen: React.FC = () => {
 
           <View style={styles.featureItem}>
             <View style={styles.featureIcon}>
-              <Ionicons name="subway" size={24} color={semantic.labelStrong} />
+              <Train size={24} color={semantic.labelStrong} strokeWidth={2} />
             </View>
             <View style={styles.featureContent}>
               <Text style={styles.featureTitle}>출퇴근 경로 설정</Text>
@@ -261,7 +260,7 @@ export const LocationPermissionScreen: React.FC = () => {
 
           <View style={styles.featureItem}>
             <View style={styles.featureIcon}>
-              <Ionicons name="notifications" size={24} color={semantic.labelStrong} />
+              <Bell size={24} color={semantic.labelStrong} strokeWidth={2} />
             </View>
             <View style={styles.featureContent}>
               <Text style={styles.featureTitle}>맞춤 알림</Text>
@@ -280,7 +279,7 @@ export const LocationPermissionScreen: React.FC = () => {
               onPress={requestPermission}
               disabled={requesting}
             >
-              <Ionicons name="location" size={20} color={'#FFFFFF'} />
+              <MapPin size={20} color={'#FFFFFF'} strokeWidth={2} />
               <Text style={styles.actionButtonText}>
                 {requesting ? '권한 요청 중...' : '위치 권한 요청'}
               </Text>
@@ -293,7 +292,7 @@ export const LocationPermissionScreen: React.FC = () => {
               onPress={requestBackgroundPermission}
               disabled={requestingBackground}
             >
-              <Ionicons name="navigate" size={20} color={'#FFFFFF'} />
+              <Navigation size={20} color={'#FFFFFF'} strokeWidth={2} />
               <Text style={styles.actionButtonText}>
                 {requestingBackground ? '권한 요청 중...' : '백그라운드 권한 요청'}
               </Text>
@@ -302,7 +301,7 @@ export const LocationPermissionScreen: React.FC = () => {
 
           {permissionState.background === 'granted' && (
             <View style={styles.permissionGrantedBadge}>
-              <Ionicons name="checkmark-circle" size={20} color={semantic.statusPositive} />
+              <CheckCircle size={20} color={semantic.statusPositive} strokeWidth={2} />
               <Text style={[styles.badgeText, { color: semantic.statusPositive }]}>
                 백그라운드 위치 허용됨
               </Text>
@@ -313,7 +312,7 @@ export const LocationPermissionScreen: React.FC = () => {
             style={[styles.actionButton, styles.secondaryButton]}
             onPress={openSettings}
           >
-            <Ionicons name="settings" size={20} color={semantic.labelStrong} />
+            <Settings size={20} color={semantic.labelStrong} strokeWidth={2} />
             <Text style={[styles.actionButtonText, styles.secondaryButtonText]}>
               앱 설정 열기
             </Text>
@@ -322,7 +321,7 @@ export const LocationPermissionScreen: React.FC = () => {
 
         {/* Privacy Notice */}
         <View style={styles.privacyBox}>
-          <Ionicons name="shield-checkmark" size={20} color={semantic.labelAlt} />
+          <ShieldCheck size={20} color={semantic.labelAlt} strokeWidth={2} />
           <Text style={styles.privacyText}>
             위치 정보는 기기에만 저장되며 서버로 전송되지 않습니다. 개인정보는
             안전하게 보호됩니다.

@@ -12,7 +12,7 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { CheckCircle } from 'lucide-react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { useI18n, Language } from '@/services/i18n';
@@ -69,7 +69,7 @@ export const LanguageSettingsScreen: React.FC<Props> = ({ navigation }) => {
         <Text style={styles.languageSubtitle}>{subtitle}</Text>
       </View>
       {isSelected && (
-        <Ionicons name="checkmark-circle" size={24} color={semantic.primaryNormal} />
+        <CheckCircle size={24} color={semantic.primaryNormal} strokeWidth={2} />
       )}
     </TouchableOpacity>
   );

@@ -18,7 +18,7 @@ import {
   Platform,
   UIManager,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { ChevronDown, ChevronUp, HelpCircle, MessageCircle, Mail, Phone, Search, XCircle } from 'lucide-react-native';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme';
 import {
@@ -123,19 +123,19 @@ export const HelpScreen: React.FC = () => {
           activeOpacity={0.7}
         >
           <View style={styles.faqQuestionContent}>
-            <Ionicons
-              name="help-circle-outline"
+            <HelpCircle
               size={20}
               color={semantic.labelStrong}
+              strokeWidth={2}
               style={styles.faqQuestionIcon}
             />
             <Text style={styles.faqQuestionText}>{item.question}</Text>
           </View>
-          <Ionicons
-            name={isExpanded ? 'chevron-up' : 'chevron-down'}
-            size={20}
-            color={semantic.labelAlt}
-          />
+          {isExpanded ? (
+            <ChevronUp size={20} color={semantic.labelAlt} strokeWidth={2} />
+          ) : (
+            <ChevronDown size={20} color={semantic.labelAlt} strokeWidth={2} />
+          )}
         </TouchableOpacity>
 
         {isExpanded && (
@@ -173,10 +173,10 @@ export const HelpScreen: React.FC = () => {
       {/* Search Bar */}
       <View style={styles.searchContainer}>
         <View style={styles.searchInputWrapper}>
-          <Ionicons
-            name="search"
+          <Search
             size={20}
             color={semantic.labelAlt}
+            strokeWidth={2}
             style={styles.searchIcon}
           />
           <TextInput
@@ -192,7 +192,7 @@ export const HelpScreen: React.FC = () => {
               onPress={() => setSearchQuery('')}
               style={styles.clearButton}
             >
-              <Ionicons name="close-circle" size={20} color={semantic.labelAlt} />
+              <XCircle size={20} color={semantic.labelAlt} strokeWidth={2} />
             </TouchableOpacity>
           )}
         </View>
@@ -202,7 +202,7 @@ export const HelpScreen: React.FC = () => {
         {/* No Results Message */}
         {filteredFAQs.length === 0 && (
           <View style={styles.noResultsContainer}>
-            <Ionicons name="search-outline" size={64} color={semantic.labelDisabled} />
+            <Search size={64} color={semantic.labelDisabled} strokeWidth={1.5} />
             <Text style={styles.noResultsTitle}>검색 결과가 없습니다</Text>
             <Text style={styles.noResultsSubtitle}>
               다른 키워드로 검색하거나{'\n'}고객 지원에 문의해주세요
@@ -220,10 +220,10 @@ export const HelpScreen: React.FC = () => {
           <View style={styles.supportSection}>
             <View style={styles.supportCard}>
               <View style={styles.supportIconContainer}>
-                <Ionicons
-                  name="chatbubble-ellipses"
+                <MessageCircle
                   size={32}
                   color={semantic.labelStrong}
+                  strokeWidth={2}
                 />
               </View>
               <View style={styles.supportContent}>
@@ -238,17 +238,17 @@ export const HelpScreen: React.FC = () => {
               style={styles.contactButton}
               onPress={handleContactSupport}
             >
-              <Ionicons name="mail" size={20} color={'#FFFFFF'} />
+              <Mail size={20} color={'#FFFFFF'} strokeWidth={2} />
               <Text style={styles.contactButtonText}>고객 지원 문의</Text>
             </TouchableOpacity>
 
             <View style={styles.contactInfo}>
               <View style={styles.contactInfoItem}>
-                <Ionicons name="mail-outline" size={16} color={semantic.labelAlt} />
+                <Mail size={16} color={semantic.labelAlt} strokeWidth={2} />
                 <Text style={styles.contactInfoText}>{SUPPORT_EMAIL}</Text>
               </View>
               <View style={styles.contactInfoItem}>
-                <Ionicons name="call-outline" size={16} color={semantic.labelAlt} />
+                <Phone size={16} color={semantic.labelAlt} strokeWidth={2} />
                 <Text style={styles.contactInfoText}>{SUPPORT_PHONE}</Text>
               </View>
             </View>

@@ -12,7 +12,7 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { CheckCircle, Moon, Smartphone, Sun, type LucideIcon } from 'lucide-react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { useTheme, ThemeMode } from '@/services/theme';
@@ -24,7 +24,7 @@ type Props = NativeStackScreenProps<SettingsStackParamList, 'ThemeSettings'>;
 
 interface ThemeOptionData {
   id: ThemeMode;
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: LucideIcon;
   titleKo: string;
   titleEn: string;
   descKo: string;
@@ -34,7 +34,7 @@ interface ThemeOptionData {
 const themeOptions: ThemeOptionData[] = [
   {
     id: 'system',
-    icon: 'phone-portrait',
+    icon: Smartphone,
     titleKo: '시스템 설정 따름',
     titleEn: 'Follow System',
     descKo: '기기의 테마 설정을 따릅니다',
@@ -42,7 +42,7 @@ const themeOptions: ThemeOptionData[] = [
   },
   {
     id: 'light',
-    icon: 'sunny',
+    icon: Sun,
     titleKo: '라이트 모드',
     titleEn: 'Light Mode',
     descKo: '밝은 화면으로 표시합니다',
@@ -50,7 +50,7 @@ const themeOptions: ThemeOptionData[] = [
   },
   {
     id: 'dark',
-    icon: 'moon',
+    icon: Moon,
     titleKo: '다크 모드',
     titleEn: 'Dark Mode',
     descKo: '어두운 화면으로 표시합니다',
@@ -71,21 +71,21 @@ export const ThemeSettingsScreen: React.FC<Props> = ({ navigation }) => {
   const styles = createStyles(semantic);
 
   const ThemeOptionItem: React.FC<{
-    icon: keyof typeof Ionicons.glyphMap;
+    icon: LucideIcon;
     title: string;
     description: string;
     value: ThemeMode;
     isSelected: boolean;
-  }> = ({ icon, title, description, value, isSelected }) => (
+  }> = ({ icon: IconComponent, title, description, value, isSelected }) => (
     <TouchableOpacity
       style={[styles.themeOption, isSelected && styles.themeOptionSelected]}
       onPress={() => handleThemeChange(value)}
     >
       <View style={styles.themeIconContainer}>
-        <Ionicons
-          name={icon}
+        <IconComponent
           size={32}
           color={isSelected ? semantic.primaryNormal : semantic.labelAlt}
+          strokeWidth={2}
         />
       </View>
       <View style={styles.themeContent}>
@@ -94,7 +94,7 @@ export const ThemeSettingsScreen: React.FC<Props> = ({ navigation }) => {
             {title}
           </Text>
           {isSelected && (
-            <Ionicons name="checkmark-circle" size={24} color={semantic.primaryNormal} />
+            <CheckCircle size={24} color={semantic.primaryNormal} strokeWidth={2} />
           )}
         </View>
         <Text style={styles.themeDescription}>{description}</Text>
