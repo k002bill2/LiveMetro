@@ -1,6 +1,10 @@
 /**
  * AlertBanner Component
- * Displays active subway alerts/disruptions as a banner
+ * Displays active subway alerts/disruptions as a banner.
+ *
+ * Phase 51 — migrated to Wanted Design System tokens. Banner color
+ * (accident/delay/maintenance) resolves through WANTED_TOKENS.status
+ * palette + brand blue. Text on color always white.
  */
 
 import React, { memo, useMemo, useState, useCallback } from 'react';
@@ -15,30 +19,22 @@ import {
   UIManager,
 } from 'react-native';
 import { useTheme } from '@/services/theme/themeContext';
-import { SPACING, RADIUS, TYPOGRAPHY } from '@/styles/modernTheme';
+import {
+  WANTED_TOKENS,
+  weightToFontFamily,
+  type WantedSemanticTheme,
+} from '@/styles/modernTheme';
 import type { SubwayAlert, AlertType } from '@/models/publicData';
 
-// Enable LayoutAnimation for Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
 
-// ============================================================================
-// Types
-// ============================================================================
-
 interface AlertBannerProps {
-  /** Active alerts to display */
   alerts: SubwayAlert[];
-  /** Called when banner is dismissed */
   onDismiss?: () => void;
-  /** Test ID for testing */
   testID?: string;
 }
-
-// ============================================================================
-// Constants
-// ============================================================================
 
 const ALERT_TYPE_CONFIG: Record<AlertType, { icon: string; priority: number }> = {
   accident: { icon: '🚨', priority: 1 },
@@ -49,17 +45,26 @@ const ALERT_TYPE_CONFIG: Record<AlertType, { icon: string; priority: number }> =
   other: { icon: 'ℹ️', priority: 6 },
 };
 
-// ============================================================================
-// Main Component
-// ============================================================================
+const getBannerColor = (type: AlertType, semantic: WantedSemanticTheme): string => {
+  switch (type) {
+    case 'accident':
+      return WANTED_TOKENS.status.red500;
+    case 'delay':
+      return WANTED_TOKENS.status.yellow500;
+    case 'maintenance':
+      return WANTED_TOKENS.blue[500];
+    default:
+      return semantic.bgSubtle;
+  }
+};
 
 export const AlertBanner: React.FC<AlertBannerProps> = memo(
   ({ alerts, onDismiss, testID }) => {
-    const { colors } = useTheme();
+    const { isDark } = useTheme();
+    const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
     const [expanded, setExpanded] = useState(false);
     const [dismissed, setDismissed] = useState(false);
 
-    // Filter active alerts and sort by priority
     const activeAlerts = useMemo(() => {
       return alerts
         .filter((alert) => alert.isActive)
@@ -70,21 +75,11 @@ export const AlertBanner: React.FC<AlertBannerProps> = memo(
         });
     }, [alerts]);
 
-    // Get banner color based on highest priority alert type
     const bannerColor = useMemo(() => {
       const firstAlert = activeAlerts[0];
-      if (!firstAlert) return colors.surface;
-      switch (firstAlert.alertType) {
-        case 'accident':
-          return colors.error;
-        case 'delay':
-          return colors.warning;
-        case 'maintenance':
-          return colors.info || colors.primary;
-        default:
-          return colors.surface;
-      }
-    }, [activeAlerts, colors]);
+      if (!firstAlert) return semantic.bgSubtle;
+      return getBannerColor(firstAlert.alertType, semantic);
+    }, [activeAlerts, semantic]);
 
     const handleToggleExpand = useCallback(() => {
       LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
@@ -97,7 +92,6 @@ export const AlertBanner: React.FC<AlertBannerProps> = memo(
       onDismiss?.();
     }, [onDismiss]);
 
-    // Don't render if no active alerts or dismissed
     const topAlert = activeAlerts[0];
     if (!topAlert || dismissed) {
       return null;
@@ -146,7 +140,6 @@ export const AlertBanner: React.FC<AlertBannerProps> = memo(
           </TouchableOpacity>
         </TouchableOpacity>
 
-        {/* Expanded view showing all alerts */}
         {expanded && activeAlerts.length > 1 && (
           <View style={styles.expandedList}>
             {activeAlerts.slice(1).map((alert) => {
@@ -175,75 +168,72 @@ export const AlertBanner: React.FC<AlertBannerProps> = memo(
 
 AlertBanner.displayName = 'AlertBanner';
 
-// ============================================================================
-// Styles
-// ============================================================================
-
 const styles = StyleSheet.create({
   container: {
-    marginHorizontal: SPACING.md,
-    marginVertical: SPACING.sm,
-    borderRadius: RADIUS.lg,
+    marginHorizontal: WANTED_TOKENS.spacing.s3,
+    marginVertical: WANTED_TOKENS.spacing.s2,
+    borderRadius: WANTED_TOKENS.radius.r8,
     overflow: 'hidden',
   },
   mainContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: SPACING.md,
+    padding: WANTED_TOKENS.spacing.s3,
   },
   icon: {
     fontSize: 20,
-    marginRight: SPACING.sm,
+    marginRight: WANTED_TOKENS.spacing.s2,
   },
   textContainer: {
     flex: 1,
   },
   title: {
     color: '#FFFFFF',
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold as '600',
+    fontSize: 14,
+    fontFamily: weightToFontFamily('600'),
   },
   content: {
     color: 'rgba(255, 255, 255, 0.9)',
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    marginTop: SPACING.xs,
+    fontSize: 13,
+    fontFamily: weightToFontFamily('500'),
+    marginTop: WANTED_TOKENS.spacing.s1,
     lineHeight: 18,
   },
   badge: {
     backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    paddingHorizontal: SPACING.xs,
+    paddingHorizontal: WANTED_TOKENS.spacing.s1,
     paddingVertical: 2,
-    borderRadius: RADIUS.sm,
-    marginRight: SPACING.sm,
+    borderRadius: WANTED_TOKENS.radius.r4,
+    marginRight: WANTED_TOKENS.spacing.s2,
   },
   badgeText: {
     color: '#FFFFFF',
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    fontWeight: TYPOGRAPHY.fontWeight.medium as '500',
+    fontSize: 12,
+    fontFamily: weightToFontFamily('500'),
   },
   dismissButton: {
-    padding: SPACING.xs,
+    padding: WANTED_TOKENS.spacing.s1,
   },
   dismissIcon: {
     color: '#FFFFFF',
     fontSize: 16,
-    fontWeight: TYPOGRAPHY.fontWeight.bold as '700',
+    fontFamily: weightToFontFamily('700'),
   },
   expandedList: {
     borderTopWidth: 1,
     borderTopColor: 'rgba(255, 255, 255, 0.2)',
-    paddingTop: SPACING.sm,
-    paddingHorizontal: SPACING.md,
-    paddingBottom: SPACING.md,
+    paddingTop: WANTED_TOKENS.spacing.s2,
+    paddingHorizontal: WANTED_TOKENS.spacing.s3,
+    paddingBottom: WANTED_TOKENS.spacing.s3,
   },
   expandedItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: SPACING.sm,
+    marginBottom: WANTED_TOKENS.spacing.s2,
   },
   expandedIcon: {
     fontSize: 14,
-    marginRight: SPACING.xs,
+    marginRight: WANTED_TOKENS.spacing.s1,
     marginTop: 2,
   },
   expandedTextContainer: {
@@ -251,12 +241,13 @@ const styles = StyleSheet.create({
   },
   expandedTitle: {
     color: '#FFFFFF',
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.medium as '500',
+    fontSize: 13,
+    fontFamily: weightToFontFamily('500'),
   },
   expandedContent: {
     color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: TYPOGRAPHY.fontSize.xs,
+    fontSize: 12,
+    fontFamily: weightToFontFamily('500'),
     marginTop: 2,
     lineHeight: 16,
   },
