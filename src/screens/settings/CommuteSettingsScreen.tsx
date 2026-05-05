@@ -14,7 +14,16 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import {
+  AlertTriangle,
+  ArrowRightLeft,
+  Bell,
+  ChevronRight,
+  Moon,
+  PlusCircle,
+  Sun,
+  type LucideIcon,
+} from 'lucide-react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 
@@ -183,18 +192,18 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation: _navigation
 
   const RouteCard: React.FC<{
     title: string;
-    icon: string;
+    icon: LucideIcon;
     route: CommuteRouteData | null;
     onEdit: () => void;
     transfer: TransferStation | null;
     onTransferChange: (next: TransferStation | null) => void;
     expanded: boolean;
     onToggleExpanded: () => void;
-  }> = ({ title, icon, route, onEdit, transfer, onTransferChange, expanded, onToggleExpanded }) => (
+  }> = ({ title, icon: IconComponent, route, onEdit, transfer, onTransferChange, expanded, onToggleExpanded }) => (
     <View style={styles.routeCard}>
       <View style={styles.routeHeader}>
         <View style={styles.routeIconContainer}>
-          <Ionicons name={icon as any} size={24} color={COLORS.black} />
+          <IconComponent size={24} color={COLORS.black} strokeWidth={2} />
         </View>
         <Text style={styles.routeTitle}>{title}</Text>
       </View>
@@ -221,7 +230,7 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation: _navigation
         </View>
       ) : (
         <View style={styles.emptyContent}>
-          <Ionicons name="add-circle-outline" size={48} color={COLORS.gray[300]} />
+          <PlusCircle size={48} color={COLORS.gray[300]} strokeWidth={1.5} />
           <Text style={styles.emptyText}>설정된 경로가 없습니다</Text>
         </View>
       )}
@@ -230,7 +239,7 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation: _navigation
         <Text style={styles.editButtonText}>
           {route ? '수정하기' : '설정하기'}
         </Text>
-        <Ionicons name="chevron-forward" size={16} color={COLORS.black} />
+        <ChevronRight size={16} color={COLORS.black} strokeWidth={2} />
       </TouchableOpacity>
     </View>
   );
@@ -258,7 +267,7 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation: _navigation
 
         <RouteCard
           title="출근"
-          icon="sunny-outline"
+          icon={Sun}
           route={morningRoute}
           onEdit={handleSetupCommute}
           transfer={outTransfer}
@@ -269,7 +278,7 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation: _navigation
 
         <RouteCard
           title="퇴근"
-          icon="moon-outline"
+          icon={Moon}
           route={eveningRoute}
           onEdit={handleSetupCommute}
           transfer={inTransfer}
@@ -280,15 +289,15 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation: _navigation
 
         <View style={styles.infoSection}>
           <View style={styles.infoItem}>
-            <Ionicons name="notifications-outline" size={20} color={COLORS.text.secondary} />
+            <Bell size={20} color={COLORS.text.secondary} strokeWidth={2} />
             <Text style={styles.infoText}>출발 시간에 맞춰 실시간 도착 정보 알림</Text>
           </View>
           <View style={styles.infoItem}>
-            <Ionicons name="swap-horizontal-outline" size={20} color={COLORS.text.secondary} />
+            <ArrowRightLeft size={20} color={COLORS.text.secondary} strokeWidth={2} />
             <Text style={styles.infoText}>환승역 도착 전 미리 알림</Text>
           </View>
           <View style={styles.infoItem}>
-            <Ionicons name="warning-outline" size={20} color={COLORS.text.secondary} />
+            <AlertTriangle size={20} color={COLORS.text.secondary} strokeWidth={2} />
             <Text style={styles.infoText}>지연/사고 발생 시 즉시 알림</Text>
           </View>
         </View>
