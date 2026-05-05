@@ -5,15 +5,12 @@ import { ThemeSettingsScreen } from '../ThemeSettingsScreen';
 import { useTheme } from '@/services/theme';
 import { useI18n } from '@/services/i18n';
 
-jest.mock('@expo/vector-icons', () => ({
-  Ionicons: 'Ionicons',
-}));
-
 jest.mock('@react-navigation/native-stack', () => ({
   NativeStackScreenProps: {},
 }));
 
 jest.mock('@/styles/modernTheme', () => ({
+  ...jest.requireActual('@/styles/modernTheme'),
   SPACING: { xs: 4, sm: 8, md: 12, lg: 16, xl: 24 },
   RADIUS: { sm: 4, md: 8, lg: 12, xl: 16, full: 9999 },
   TYPOGRAPHY: {

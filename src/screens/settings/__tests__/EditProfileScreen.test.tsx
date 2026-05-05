@@ -9,10 +9,6 @@ import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import { EditProfileScreen } from '../EditProfileScreen';
 
-jest.mock('@expo/vector-icons', () => ({
-  Ionicons: 'Ionicons',
-}));
-
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({
     navigate: jest.fn(),
@@ -22,6 +18,12 @@ jest.mock('@react-navigation/native', () => ({
 
 jest.mock('@react-navigation/native-stack', () => ({
   NativeStackScreenProps: {},
+}));
+
+// Phase 47 — screen now calls useTheme().isDark to drive WANTED_TOKENS
+// semantic selection. Force light variant for stable assertions.
+jest.mock('@/services/theme', () => ({
+  useTheme: () => ({ isDark: false }),
 }));
 
 jest.mock('@/services/auth/AuthContext', () => ({

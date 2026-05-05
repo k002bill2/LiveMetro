@@ -1,18 +1,21 @@
 # Check if .claude directory has changes
 if git diff --cached --name-only | grep -q "^\.claude/"; then
   echo "📦 Detected changes in .claude/ directory"
-  echo "🔄 Creating automatic backup..."
+  echo "🔄 Creating automatic backup (local-only — see .gitignore)..."
 
   npm run backup:claude
 
-  # Add backup to commit if it was created
-  if [ -d ".claude-backups" ]; then
-    # Get the latest backup directory
-    LATEST_BACKUP=$(ls -t .claude-backups | head -1)
-
-    if [ -n "$LATEST_BACKUP" ]; then
-      git add ".claude-backups/$LATEST_BACKUP"
-      echo "✅ Backup added to commit: $LATEST_BACKUP"
-    fi
-  fi
+  # Backups are intentionally gitignored (.claude-backups/ — see .gitignore
+  # line ~113). They serve as local rollback safety, not version history.
+  # `git add` was previously attempted here but failed on the gitignore rule
+  # and aborted the entire commit. If you want backups to ship in git,
+  # uncomment the `.claude-backups/` line in .gitignore *and* re-add the
+  # `git add -f` here.
 fi
+
+# Typography guard — Pretendard wiring regression prevention.
+# Hard-fails when any staged tsx/ts file under src/ uses `fontWeight`
+# without a matching `fontFamily` / `typeStyle()` / `weightToFontFamily()`.
+# Phase 31.1: HARD_PREFIXES filter removed — every src/ directory is
+# enforced from its first commit, including any new directory.
+npm run --silent lint:typography || exit 1

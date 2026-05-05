@@ -1,9 +1,11 @@
 /**
  * Sound Picker Component
- * Modal-based picker for selecting notification sounds with preview
+ * Modal-based picker for selecting notification sounds with preview.
+ *
+ * Phase 45 — Wanted Design System migration.
  */
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -15,8 +17,13 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { ChevronRight, X, Check, PlayCircle } from 'lucide-react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
+import type { LucideIcon } from 'lucide-react-native';
+import {
+  WANTED_TOKENS,
+  weightToFontFamily,
+  type WantedSemanticTheme,
+} from '@/styles/modernTheme';
+import { useTheme } from '@/services/theme';
 import { NotificationSoundId } from '@/models/user';
 import { SoundOption, soundService } from '@/services/sound/soundService';
 
@@ -26,7 +33,7 @@ interface SoundPickerProps {
   value: NotificationSoundId;
   volume: number;
   onValueChange: (value: NotificationSoundId) => void;
-  icon?: string;
+  icon?: LucideIcon;
   disabled?: boolean;
 }
 
@@ -36,9 +43,12 @@ export const SoundPicker: React.FC<SoundPickerProps> = ({
   value,
   volume,
   onValueChange,
-  icon,
+  icon: IconComponent,
   disabled = false,
 }) => {
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const styles = useMemo(() => createStyles(semantic), [semantic]);
   const [modalVisible, setModalVisible] = useState(false);
   const [playingId, setPlayingId] = useState<NotificationSoundId | null>(null);
 
@@ -81,12 +91,12 @@ export const SoundPicker: React.FC<SoundPickerProps> = ({
         disabled={disabled}
       >
         <View style={styles.leftContent}>
-          {icon && (
+          {IconComponent && (
             <View style={styles.iconContainer}>
-              <Ionicons
-                name={icon as keyof typeof Ionicons.glyphMap}
+              <IconComponent
                 size={20}
-                color={disabled ? COLORS.gray[400] : COLORS.black}
+                color={disabled ? semantic.labelDisabled : semantic.labelStrong}
+                strokeWidth={2}
               />
             </View>
           )}
@@ -99,7 +109,7 @@ export const SoundPicker: React.FC<SoundPickerProps> = ({
             )}
           </View>
         </View>
-        <ChevronRight size={20} color={COLORS.gray[400]} />
+        <ChevronRight size={20} color={semantic.labelAlt} />
       </TouchableOpacity>
 
       <Modal
@@ -117,7 +127,7 @@ export const SoundPicker: React.FC<SoundPickerProps> = ({
                   onPress={handleCloseModal}
                   style={styles.closeButton}
                 >
-                  <X size={24} color={COLORS.black} />
+                  <X size={24} color={semantic.labelStrong} />
                 </TouchableOpacity>
               </View>
 
@@ -137,7 +147,7 @@ export const SoundPicker: React.FC<SoundPickerProps> = ({
                       {value === option.id && (
                         <Check
                           size={24}
-                          color={COLORS.black}
+                          color={WANTED_TOKENS.blue[500]}
                         />
                       )}
                     </TouchableOpacity>
@@ -148,11 +158,11 @@ export const SoundPicker: React.FC<SoundPickerProps> = ({
                         onPress={() => handlePreview(option.id)}
                       >
                         {playingId === option.id ? (
-                          <ActivityIndicator size="small" color={COLORS.black} />
+                          <ActivityIndicator size="small" color={WANTED_TOKENS.blue[500]} />
                         ) : (
                           <PlayCircle
                             size={32}
-                            color={COLORS.black}
+                            color={WANTED_TOKENS.blue[500]}
                           />
                         )}
                       </TouchableOpacity>
@@ -168,113 +178,116 @@ export const SoundPicker: React.FC<SoundPickerProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.light,
-  },
-  disabled: {
-    opacity: 0.5,
-  },
-  leftContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: SPACING.md,
-  },
-  iconContainer: {
-    width: 36,
-    height: 36,
-    backgroundColor: COLORS.surface.card,
-    borderRadius: RADIUS.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: SPACING.md,
-  },
-  textContainer: {
-    flex: 1,
-  },
-  label: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
-  },
-  disabledText: {
-    color: COLORS.gray[400],
-  },
-  selectedValue: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.tertiary,
-    marginTop: 2,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: COLORS.surface.overlay,
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: COLORS.white,
-    borderTopLeftRadius: RADIUS.xl,
-    borderTopRightRadius: RADIUS.xl,
-    maxHeight: '80%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.light,
-  },
-  modalTitle: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.text.primary,
-  },
-  closeButton: {
-    padding: SPACING.sm,
-  },
-  optionsList: {
-    paddingVertical: SPACING.md,
-  },
-  optionRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.light,
-  },
-  optionItem: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.lg,
-  },
-  optionContent: {
-    flex: 1,
-    marginRight: SPACING.md,
-  },
-  optionLabel: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
-  },
-  optionDescription: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.tertiary,
-    marginTop: 4,
-  },
-  playButton: {
-    padding: SPACING.md,
-    marginRight: SPACING.sm,
-  },
-});
+const createStyles = (semantic: WantedSemanticTheme) =>
+  StyleSheet.create({
+    container: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s4,
+      borderBottomWidth: 1,
+      borderBottomColor: semantic.lineSubtle,
+    },
+    disabled: {
+      opacity: 0.5,
+    },
+    leftContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+      marginRight: WANTED_TOKENS.spacing.s3,
+    },
+    iconContainer: {
+      width: 36,
+      height: 36,
+      backgroundColor: semantic.bgSubtle,
+      borderRadius: WANTED_TOKENS.radius.pill,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: WANTED_TOKENS.spacing.s3,
+    },
+    textContainer: {
+      flex: 1,
+    },
+    label: {
+      fontSize: 14,
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelStrong,
+    },
+    disabledText: {
+      color: semantic.labelDisabled,
+    },
+    selectedValue: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+      marginTop: 2,
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'flex-end',
+    },
+    modalContent: {
+      backgroundColor: semantic.bgBase,
+      borderTopLeftRadius: WANTED_TOKENS.radius.r10,
+      borderTopRightRadius: WANTED_TOKENS.radius.r10,
+      maxHeight: '80%',
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s4,
+      borderBottomWidth: 1,
+      borderBottomColor: semantic.lineSubtle,
+    },
+    modalTitle: {
+      fontSize: 16,
+      fontFamily: weightToFontFamily('700'),
+      color: semantic.labelStrong,
+    },
+    closeButton: {
+      padding: WANTED_TOKENS.spacing.s2,
+    },
+    optionsList: {
+      paddingVertical: WANTED_TOKENS.spacing.s3,
+    },
+    optionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderBottomWidth: 1,
+      borderBottomColor: semantic.lineSubtle,
+    },
+    optionItem: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s4,
+    },
+    optionContent: {
+      flex: 1,
+      marginRight: WANTED_TOKENS.spacing.s3,
+    },
+    optionLabel: {
+      fontSize: 14,
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelStrong,
+    },
+    optionDescription: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+      marginTop: 4,
+    },
+    playButton: {
+      padding: WANTED_TOKENS.spacing.s3,
+      marginRight: WANTED_TOKENS.spacing.s2,
+    },
+  });
 
 export default SoundPicker;

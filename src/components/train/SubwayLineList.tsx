@@ -3,6 +3,7 @@ import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-nati
 import { SubwayLine } from '../../models/train';
 import { trainService } from '../../services/train/trainService';
 import { useTheme, ThemeColors } from '../../services/theme';
+import { weightToFontFamily } from '../../styles/modernTheme';
 
 export const SubwayLineList: React.FC = () => {
   const { colors } = useTheme();
@@ -71,6 +72,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: 'bold',
+    fontFamily: weightToFontFamily('bold'),
     color: colors.textPrimary,
     marginBottom: 12,
     paddingHorizontal: 20,
@@ -105,10 +107,12 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     color: colors.textInverse,
     fontSize: 12,
     fontWeight: 'bold',
+    fontFamily: weightToFontFamily('bold'),
   },
   name: {
     fontSize: 15,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     color: colors.textPrimary,
   },
 });

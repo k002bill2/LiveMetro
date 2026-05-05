@@ -1,21 +1,28 @@
 /**
  * Setting Time Picker Component
- * Reusable time picker for settings screens
+ * Reusable time picker for settings screens.
+ *
+ * Phase 45 — Wanted Design System migration.
  */
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 // @ts-ignore - expo-datetimepicker wraps @react-native-community/datetimepicker
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Clock } from 'lucide-react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
+import type { LucideIcon } from 'lucide-react-native';
+import {
+  WANTED_TOKENS,
+  weightToFontFamily,
+  type WantedSemanticTheme,
+} from '@/styles/modernTheme';
+import { useTheme } from '@/services/theme';
 
 interface SettingTimePickerProps {
   label: string;
   value: string; // HH:mm format (e.g., "08:00")
   onValueChange: (time: string) => void;
-  icon?: string;
+  icon?: LucideIcon;
   minTime?: string;
   maxTime?: string;
 }
@@ -24,8 +31,11 @@ export const SettingTimePicker: React.FC<SettingTimePickerProps> = ({
   label,
   value,
   onValueChange,
-  icon,
+  icon: IconComponent,
 }) => {
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const styles = useMemo(() => createStyles(semantic), [semantic]);
   const [showPicker, setShowPicker] = useState(false);
 
   // Convert HH:mm string to Date object
@@ -78,9 +88,9 @@ export const SettingTimePicker: React.FC<SettingTimePickerProps> = ({
         onPress={() => setShowPicker(true)}
       >
         <View style={styles.leftContent}>
-          {icon && (
+          {IconComponent && (
             <View style={styles.iconContainer}>
-              <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={20} color={COLORS.black} />
+              <IconComponent size={20} color={semantic.labelStrong} strokeWidth={2} />
             </View>
           )}
           <View style={styles.textContainer}>
@@ -91,7 +101,7 @@ export const SettingTimePicker: React.FC<SettingTimePickerProps> = ({
           <Text style={styles.value}>{formatTimeForDisplay(value)}</Text>
           <Clock
             size={20}
-            color={COLORS.gray[400]}
+            color={semantic.labelAlt}
             style={styles.icon}
           />
         </View>
@@ -126,78 +136,79 @@ export const SettingTimePicker: React.FC<SettingTimePickerProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.light,
-  },
-  leftContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: SPACING.md,
-  },
-  iconContainer: {
-    width: 36,
-    height: 36,
-    backgroundColor: COLORS.surface.card,
-    borderRadius: RADIUS.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: SPACING.md,
-  },
-  textContainer: {
-    flex: 1,
-  },
-  label: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
-  },
-  valueContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.surface.card,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.base,
-    borderWidth: 1,
-    borderColor: COLORS.border.medium,
-  },
-  value: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
-  },
-  icon: {
-    marginLeft: SPACING.sm,
-  },
-  iosPickerContainer: {
-    backgroundColor: COLORS.white,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border.light,
-  },
-  iosPickerHeader: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.light,
-  },
-  doneButton: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.black,
-  },
-  iosPicker: {
-    height: 200,
-  },
-});
+const createStyles = (semantic: WantedSemanticTheme) =>
+  StyleSheet.create({
+    container: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s4,
+      borderBottomWidth: 1,
+      borderBottomColor: semantic.lineSubtle,
+    },
+    leftContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+      marginRight: WANTED_TOKENS.spacing.s3,
+    },
+    iconContainer: {
+      width: 36,
+      height: 36,
+      backgroundColor: semantic.bgSubtle,
+      borderRadius: WANTED_TOKENS.radius.pill,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: WANTED_TOKENS.spacing.s3,
+    },
+    textContainer: {
+      flex: 1,
+    },
+    label: {
+      fontSize: 14,
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelStrong,
+    },
+    valueContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: semantic.bgSubtle,
+      paddingHorizontal: WANTED_TOKENS.spacing.s3,
+      paddingVertical: WANTED_TOKENS.spacing.s2,
+      borderRadius: WANTED_TOKENS.radius.r4,
+      borderWidth: 1,
+      borderColor: semantic.lineNormal,
+    },
+    value: {
+      fontSize: 14,
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelStrong,
+    },
+    icon: {
+      marginLeft: WANTED_TOKENS.spacing.s2,
+    },
+    iosPickerContainer: {
+      backgroundColor: semantic.bgBase,
+      borderTopWidth: 1,
+      borderTopColor: semantic.lineSubtle,
+    },
+    iosPickerHeader: {
+      flexDirection: 'row',
+      justifyContent: 'flex-end',
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s3,
+      borderBottomWidth: 1,
+      borderBottomColor: semantic.lineSubtle,
+    },
+    doneButton: {
+      fontSize: 14,
+      fontFamily: weightToFontFamily('600'),
+      color: WANTED_TOKENS.blue[500],
+    },
+    iosPicker: {
+      height: 200,
+    },
+  });
 
 export default SettingTimePicker;

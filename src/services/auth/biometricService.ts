@@ -189,6 +189,27 @@ export const enableBiometricLogin = async (
 };
 
 /**
+ * Re-enable biometric login when credentials are already stored.
+ *
+ * Password-less reactivation for the SettingsScreen toggle scenario:
+ * user previously called enableBiometricLogin(email, password), then
+ * disabled, and now wants to flip the flag back without re-typing the
+ * password. Returns false if no credentials are present so the caller
+ * cannot accidentally enable biometric login against an empty SecureStore.
+ */
+export const reEnableBiometricLogin = async (): Promise<boolean> => {
+  try {
+    const hasCredentials = await hasStoredCredentials();
+    if (!hasCredentials) return false;
+    await AsyncStorage.setItem(BIOMETRIC_ENABLED_KEY, 'true');
+    return true;
+  } catch (error) {
+    console.error('Error re-enabling biometric login:', error);
+    return false;
+  }
+};
+
+/**
  * Disable biometric login and remove stored credentials
  */
 export const disableBiometricLogin = async (): Promise<boolean> => {
@@ -289,6 +310,7 @@ export default {
   authenticateWithBiometric,
   isBiometricLoginEnabled,
   enableBiometricLogin,
+  reEnableBiometricLogin,
   disableBiometricLogin,
   getStoredCredentials,
   hasStoredCredentials,

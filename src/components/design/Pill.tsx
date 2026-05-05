@@ -6,6 +6,7 @@
  */
 import React, { memo, ReactNode } from 'react';
 import { Text, View, ViewStyle, TextStyle } from 'react-native';
+import { weightToFontFamily } from '@/styles/modernTheme';
 
 export type PillTone = 'neutral' | 'primary' | 'pos' | 'neg' | 'warn' | 'cool';
 export type PillSize = 'sm' | 'md' | 'lg';
@@ -58,7 +59,7 @@ const PillImpl: React.FC<PillProps> = ({
   const textStyle: TextStyle = {
     color: t.fg,
     fontSize: s.fontSize,
-    fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
     lineHeight: s.fontSize + 2,
   };
 

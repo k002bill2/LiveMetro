@@ -3,6 +3,12 @@ import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { Alert, Switch } from 'react-native';
 import { DelayNotificationScreen } from '../DelayNotificationScreen';
 
+// Phase 46 — screen now calls useTheme().isDark to drive WANTED_TOKENS
+// semantic selection. Force light variant for stable assertions.
+jest.mock('@/services/theme', () => ({
+  useTheme: () => ({ isDark: false }),
+}));
+
 interface NotificationCallArgs {
   preferences: {
     notificationSettings: {
@@ -18,10 +24,6 @@ interface NotificationCallArgs {
     };
   };
 }
-
-jest.mock('@expo/vector-icons', () => ({
-  Ionicons: 'Ionicons',
-}));
 
 jest.mock('@/services/auth/AuthContext', () => ({
   useAuth: jest.fn(() => ({

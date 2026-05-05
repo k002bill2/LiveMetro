@@ -1,9 +1,11 @@
 /**
  * Setting Picker Component
- * Custom modal-based picker for settings selection
+ * Custom modal-based picker for settings selection.
+ *
+ * Phase 45 — Wanted Design System migration.
  */
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -14,8 +16,13 @@ import {
   ScrollView,
 } from 'react-native';
 import { ChevronRight, X, Check } from 'lucide-react-native';
-import { Ionicons } from '@expo/vector-icons';
-import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
+import type { LucideIcon } from 'lucide-react-native';
+import {
+  WANTED_TOKENS,
+  weightToFontFamily,
+  type WantedSemanticTheme,
+} from '@/styles/modernTheme';
+import { useTheme } from '@/services/theme';
 
 export interface PickerOption {
   label: string;
@@ -28,7 +35,7 @@ interface SettingPickerProps {
   options: PickerOption[];
   value: string;
   onValueChange: (value: string) => void;
-  icon?: string;
+  icon?: LucideIcon;
 }
 
 export const SettingPicker: React.FC<SettingPickerProps> = ({
@@ -36,8 +43,11 @@ export const SettingPicker: React.FC<SettingPickerProps> = ({
   options,
   value,
   onValueChange,
-  icon,
+  icon: IconComponent,
 }) => {
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const styles = useMemo(() => createStyles(semantic), [semantic]);
   const [modalVisible, setModalVisible] = useState(false);
 
   const selectedOption = options.find((opt) => opt.value === value);
@@ -54,9 +64,9 @@ export const SettingPicker: React.FC<SettingPickerProps> = ({
         onPress={() => setModalVisible(true)}
       >
         <View style={styles.leftContent}>
-          {icon && (
+          {IconComponent && (
             <View style={styles.iconContainer}>
-              <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={20} color={COLORS.black} />
+              <IconComponent size={20} color={semantic.labelStrong} strokeWidth={2} />
             </View>
           )}
           <View style={styles.textContainer}>
@@ -66,7 +76,7 @@ export const SettingPicker: React.FC<SettingPickerProps> = ({
             )}
           </View>
         </View>
-        <ChevronRight size={20} color={COLORS.gray[400]} />
+        <ChevronRight size={20} color={semantic.labelAlt} />
       </TouchableOpacity>
 
       <Modal
@@ -84,7 +94,7 @@ export const SettingPicker: React.FC<SettingPickerProps> = ({
                   onPress={() => setModalVisible(false)}
                   style={styles.closeButton}
                 >
-                  <X size={24} color={COLORS.black} />
+                  <X size={24} color={semantic.labelStrong} />
                 </TouchableOpacity>
               </View>
 
@@ -104,7 +114,7 @@ export const SettingPicker: React.FC<SettingPickerProps> = ({
                       )}
                     </View>
                     {value === option.value && (
-                      <Check size={24} color={COLORS.black} />
+                      <Check size={24} color={WANTED_TOKENS.blue[500]} />
                     )}
                   </TouchableOpacity>
                 ))}
@@ -117,98 +127,101 @@ export const SettingPicker: React.FC<SettingPickerProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.light,
-  },
-  leftContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: SPACING.md,
-  },
-  iconContainer: {
-    width: 36,
-    height: 36,
-    backgroundColor: COLORS.surface.card,
-    borderRadius: RADIUS.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: SPACING.md,
-  },
-  textContainer: {
-    flex: 1,
-  },
-  label: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
-  },
-  selectedValue: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.tertiary,
-    marginTop: 2,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: COLORS.surface.overlay,
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: COLORS.white,
-    borderTopLeftRadius: RADIUS.xl,
-    borderTopRightRadius: RADIUS.xl,
-    maxHeight: '80%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.light,
-  },
-  modalTitle: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.text.primary,
-  },
-  closeButton: {
-    padding: SPACING.sm,
-  },
-  optionsList: {
-    paddingVertical: SPACING.md,
-  },
-  optionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.light,
-  },
-  optionContent: {
-    flex: 1,
-    marginRight: SPACING.md,
-  },
-  optionLabel: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
-  },
-  optionDescription: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.tertiary,
-    marginTop: 4,
-  },
-});
+const createStyles = (semantic: WantedSemanticTheme) =>
+  StyleSheet.create({
+    container: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s4,
+      borderBottomWidth: 1,
+      borderBottomColor: semantic.lineSubtle,
+    },
+    leftContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+      marginRight: WANTED_TOKENS.spacing.s3,
+    },
+    iconContainer: {
+      width: 36,
+      height: 36,
+      backgroundColor: semantic.bgSubtle,
+      borderRadius: WANTED_TOKENS.radius.pill,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: WANTED_TOKENS.spacing.s3,
+    },
+    textContainer: {
+      flex: 1,
+    },
+    label: {
+      fontSize: 14,
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelStrong,
+    },
+    selectedValue: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+      marginTop: 2,
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: 'rgba(0,0,0,0.5)',
+      justifyContent: 'flex-end',
+    },
+    modalContent: {
+      backgroundColor: semantic.bgBase,
+      borderTopLeftRadius: WANTED_TOKENS.radius.r10,
+      borderTopRightRadius: WANTED_TOKENS.radius.r10,
+      maxHeight: '80%',
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s4,
+      borderBottomWidth: 1,
+      borderBottomColor: semantic.lineSubtle,
+    },
+    modalTitle: {
+      fontSize: 16,
+      fontFamily: weightToFontFamily('700'),
+      color: semantic.labelStrong,
+    },
+    closeButton: {
+      padding: WANTED_TOKENS.spacing.s2,
+    },
+    optionsList: {
+      paddingVertical: WANTED_TOKENS.spacing.s3,
+    },
+    optionItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s4,
+      borderBottomWidth: 1,
+      borderBottomColor: semantic.lineSubtle,
+    },
+    optionContent: {
+      flex: 1,
+      marginRight: WANTED_TOKENS.spacing.s3,
+    },
+    optionLabel: {
+      fontSize: 14,
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelStrong,
+    },
+    optionDescription: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+      marginTop: 4,
+    },
+  });
 
 export default SettingPicker;

@@ -23,7 +23,7 @@ import {
   Map,
 } from 'lucide-react-native';
 import { useTheme } from '@/services/theme';
-import { SPACING, RADIUS, TYPOGRAPHY } from '@/styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { getSubwayLineColor } from '@/utils/colorUtils';
 import { AlternativeRouteCard } from '@/components/route/AlternativeRouteCard';
 import { RouteComparisonView } from '@/components/route/RouteComparisonView';
@@ -51,7 +51,8 @@ type AlternativeRoutesScreenNavigationProp = NativeStackNavigationProp<
 // ============================================================================
 
 export const AlternativeRoutesScreen: React.FC = () => {
-  const { colors, isDark } = useTheme();
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
   const navigation = useNavigation<AlternativeRoutesScreenNavigationProp>();
   const route = useRoute<AlternativeRoutesScreenRouteProp>();
 
@@ -113,8 +114,8 @@ export const AlternativeRoutesScreen: React.FC = () => {
     return (
       <View style={styles.affectedContainer}>
         <View style={styles.affectedHeader}>
-          <AlertTriangle size={18} color={colors.error} />
-          <Text style={[styles.affectedTitle, { color: colors.error }]}>
+          <AlertTriangle size={18} color={semantic.statusNegative} />
+          <Text style={[styles.affectedTitle, { color: semantic.statusNegative }]}>
             지연 발생 노선
           </Text>
         </View>
@@ -140,8 +141,8 @@ export const AlternativeRoutesScreen: React.FC = () => {
     if (loading && alternatives.length === 0) {
       return (
         <View style={styles.centerContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+          <ActivityIndicator size="large" color={semantic.primaryNormal} />
+          <Text style={[styles.loadingText, { color: semantic.labelAlt }]}>
             대체 경로를 계산하고 있습니다...
           </Text>
         </View>
@@ -151,12 +152,12 @@ export const AlternativeRoutesScreen: React.FC = () => {
     if (error) {
       return (
         <View style={styles.centerContainer}>
-          <AlertTriangle size={48} color={colors.error} />
-          <Text style={[styles.errorText, { color: colors.error }]}>
+          <AlertTriangle size={48} color={semantic.statusNegative} />
+          <Text style={[styles.errorText, { color: semantic.statusNegative }]}>
             {error}
           </Text>
           <TouchableOpacity
-            style={[styles.retryButton, { backgroundColor: colors.primary }]}
+            style={[styles.retryButton, { backgroundColor: semantic.primaryNormal }]}
             onPress={handleRefresh}
           >
             <RefreshCw size={16} color="#FFFFFF" />
@@ -179,11 +180,11 @@ export const AlternativeRoutesScreen: React.FC = () => {
     if (!hasAffectedRoute) {
       return (
         <View style={styles.centerContainer}>
-          <Map size={48} color={colors.success} />
-          <Text style={[styles.noDelayTitle, { color: colors.textPrimary }]}>
+          <Map size={48} color={semantic.statusPositive} />
+          <Text style={[styles.noDelayTitle, { color: semantic.labelStrong }]}>
             현재 경로에 지연이 없습니다
           </Text>
-          <Text style={[styles.noDelaySubtitle, { color: colors.textSecondary }]}>
+          <Text style={[styles.noDelaySubtitle, { color: semantic.labelAlt }]}>
             {fromStationName} → {toStationName} 경로는{'\n'}
             정상 운행 중입니다
           </Text>
@@ -191,13 +192,13 @@ export const AlternativeRoutesScreen: React.FC = () => {
             <View
               style={[
                 styles.originalRouteInfo,
-                { backgroundColor: isDark ? colors.surface : colors.background },
+                { backgroundColor: semantic.bgBase },
               ]}
             >
-              <Text style={[styles.originalRouteLabel, { color: colors.textSecondary }]}>
+              <Text style={[styles.originalRouteLabel, { color: semantic.labelAlt }]}>
                 예상 소요 시간
               </Text>
-              <Text style={[styles.originalRouteTime, { color: colors.textPrimary }]}>
+              <Text style={[styles.originalRouteTime, { color: semantic.labelStrong }]}>
                 {originalRoute.totalMinutes}분
               </Text>
             </View>
@@ -209,11 +210,11 @@ export const AlternativeRoutesScreen: React.FC = () => {
     if (alternatives.length === 0) {
       return (
         <View style={styles.centerContainer}>
-          <AlertTriangle size={48} color={colors.warning} />
-          <Text style={[styles.noAlternativeTitle, { color: colors.textPrimary }]}>
+          <AlertTriangle size={48} color={semantic.statusCautionary} />
+          <Text style={[styles.noAlternativeTitle, { color: semantic.labelStrong }]}>
             대체 경로를 찾을 수 없습니다
           </Text>
-          <Text style={[styles.noAlternativeSubtitle, { color: colors.textSecondary }]}>
+          <Text style={[styles.noAlternativeSubtitle, { color: semantic.labelAlt }]}>
             지연된 노선을 제외한 경로가 없거나{'\n'}
             너무 많은 시간이 소요됩니다
           </Text>
@@ -229,13 +230,13 @@ export const AlternativeRoutesScreen: React.FC = () => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={handleRefresh}
-            tintColor={colors.primary}
+            tintColor={semantic.primaryNormal}
           />
         }
       >
         {renderAffectedLines()}
 
-        <Text style={[styles.sectionTitle, { color: colors.textPrimary }]}>
+        <Text style={[styles.sectionTitle, { color: semantic.labelStrong }]}>
           추천 대체 경로
         </Text>
 
@@ -254,22 +255,22 @@ export const AlternativeRoutesScreen: React.FC = () => {
 
   return (
     <SafeAreaView
-      style={[styles.container, { backgroundColor: colors.background }]}
+      style={[styles.container, { backgroundColor: semantic.bgSubtlePage }]}
     >
       {/* Header */}
-      <View style={[styles.header, { borderBottomColor: colors.borderMedium }]}>
+      <View style={[styles.header, { borderBottomColor: semantic.lineNormal }]}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={handleBackPress}
         >
-          <ArrowLeft size={24} color={colors.textPrimary} />
+          <ArrowLeft size={24} color={semantic.labelStrong} />
         </TouchableOpacity>
         <View style={styles.headerTitleContainer}>
-          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
+          <Text style={[styles.headerTitle, { color: semantic.labelStrong }]}>
             {showComparison ? '경로 비교' : '대체 경로'}
           </Text>
           {fromStationName && toStationName && (
-            <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
+            <Text style={[styles.headerSubtitle, { color: semantic.labelAlt }]}>
               {fromStationName} → {toStationName}
             </Text>
           )}
@@ -281,7 +282,7 @@ export const AlternativeRoutesScreen: React.FC = () => {
         >
           <RefreshCw
             size={20}
-            color={loading ? colors.textSecondary : colors.textPrimary}
+            color={loading ? semantic.labelAlt : semantic.labelStrong}
           />
         </TouchableOpacity>
       </View>
@@ -303,27 +304,28 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
+    paddingHorizontal: WANTED_TOKENS.spacing.s3,
+    paddingVertical: WANTED_TOKENS.spacing.s2,
     borderBottomWidth: 1,
   },
   backButton: {
-    padding: SPACING.xs,
-    marginRight: SPACING.sm,
+    padding: WANTED_TOKENS.spacing.s1,
+    marginRight: WANTED_TOKENS.spacing.s2,
   },
   headerTitleContainer: {
     flex: 1,
   },
   headerTitle: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: TYPOGRAPHY.fontWeight.bold as '700',
+    fontSize: WANTED_TOKENS.type.heading2.size,
+    fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
   },
   headerSubtitle: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontSize: WANTED_TOKENS.type.caption1.size,
     marginTop: 2,
   },
   refreshButton: {
-    padding: SPACING.xs,
+    padding: WANTED_TOKENS.spacing.s1,
   },
   content: {
     flex: 1,
@@ -332,107 +334,114 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: SPACING.md,
+    padding: WANTED_TOKENS.spacing.s3,
   },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: SPACING.xl,
+    padding: WANTED_TOKENS.spacing.s5,
   },
   loadingText: {
-    marginTop: SPACING.md,
-    fontSize: TYPOGRAPHY.fontSize.base,
+    marginTop: WANTED_TOKENS.spacing.s3,
+    fontSize: WANTED_TOKENS.type.body1.size,
   },
   errorText: {
-    marginTop: SPACING.md,
-    fontSize: TYPOGRAPHY.fontSize.base,
+    marginTop: WANTED_TOKENS.spacing.s3,
+    fontSize: WANTED_TOKENS.type.body1.size,
     textAlign: 'center',
   },
   retryButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.xs,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.md,
-    marginTop: SPACING.lg,
+    gap: WANTED_TOKENS.spacing.s1,
+    paddingHorizontal: WANTED_TOKENS.spacing.s3,
+    paddingVertical: WANTED_TOKENS.spacing.s2,
+    borderRadius: WANTED_TOKENS.radius.r4,
+    marginTop: WANTED_TOKENS.spacing.s4,
   },
   retryButtonText: {
     color: '#FFFFFF',
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold as '600',
+    fontSize: WANTED_TOKENS.type.body1.size,
+    fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
   },
   noDelayTitle: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: TYPOGRAPHY.fontWeight.bold as '700',
-    marginTop: SPACING.md,
+    fontSize: WANTED_TOKENS.type.heading2.size,
+    fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
+    marginTop: WANTED_TOKENS.spacing.s3,
     textAlign: 'center',
   },
   noDelaySubtitle: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    marginTop: SPACING.xs,
+    fontSize: WANTED_TOKENS.type.body1.size,
+    marginTop: WANTED_TOKENS.spacing.s1,
     textAlign: 'center',
     lineHeight: 22,
   },
   originalRouteInfo: {
-    marginTop: SPACING.lg,
-    padding: SPACING.md,
-    borderRadius: RADIUS.md,
+    marginTop: WANTED_TOKENS.spacing.s4,
+    padding: WANTED_TOKENS.spacing.s3,
+    borderRadius: WANTED_TOKENS.radius.r4,
     alignItems: 'center',
   },
   originalRouteLabel: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontSize: WANTED_TOKENS.type.caption1.size,
   },
   originalRouteTime: {
-    fontSize: TYPOGRAPHY.fontSize['2xl'],
-    fontWeight: TYPOGRAPHY.fontWeight.bold as '700',
-    marginTop: SPACING.xs,
+    fontSize: WANTED_TOKENS.type.title3.size,
+    fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
+    marginTop: WANTED_TOKENS.spacing.s1,
   },
   noAlternativeTitle: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: TYPOGRAPHY.fontWeight.bold as '700',
-    marginTop: SPACING.md,
+    fontSize: WANTED_TOKENS.type.heading2.size,
+    fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
+    marginTop: WANTED_TOKENS.spacing.s3,
     textAlign: 'center',
   },
   noAlternativeSubtitle: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    marginTop: SPACING.xs,
+    fontSize: WANTED_TOKENS.type.body1.size,
+    marginTop: WANTED_TOKENS.spacing.s1,
     textAlign: 'center',
     lineHeight: 22,
   },
   affectedContainer: {
-    marginBottom: SPACING.md,
+    marginBottom: WANTED_TOKENS.spacing.s3,
   },
   affectedHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.xs,
-    marginBottom: SPACING.xs,
+    gap: WANTED_TOKENS.spacing.s1,
+    marginBottom: WANTED_TOKENS.spacing.s1,
   },
   affectedTitle: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold as '600',
+    fontSize: WANTED_TOKENS.type.caption1.size,
+    fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
   },
   affectedLines: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: SPACING.xs,
+    gap: WANTED_TOKENS.spacing.s1,
   },
   affectedLineChip: {
-    paddingHorizontal: SPACING.sm,
+    paddingHorizontal: WANTED_TOKENS.spacing.s2,
     paddingVertical: 4,
-    borderRadius: RADIUS.sm,
+    borderRadius: WANTED_TOKENS.radius.r2,
   },
   affectedLineText: {
     color: '#FFFFFF',
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.medium as '500',
+    fontSize: WANTED_TOKENS.type.caption1.size,
+    fontWeight: '500',
+    fontFamily: weightToFontFamily('500'),
   },
   sectionTitle: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold as '600',
-    marginBottom: SPACING.sm,
+    fontSize: WANTED_TOKENS.type.body1.size,
+    fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
+    marginBottom: WANTED_TOKENS.spacing.s2,
   },
 });
 

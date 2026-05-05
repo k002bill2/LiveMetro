@@ -3,7 +3,7 @@
  * Displays user commute statistics with charts and insights
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,6 +14,8 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '@/services/auth/AuthContext';
+import { useTheme } from '@/services/theme';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { statisticsService, StatsSummary, WeeklyStats } from '@/services/statistics/statisticsService';
 import { commuteLogService } from '@/services/pattern';
 import { CommuteLog } from '@/models/pattern';
@@ -35,6 +37,9 @@ export type TimeRange = 'week' | 'month' | 'all';
 
 const StatisticsDashboardScreen: React.FC = () => {
   const { user } = useAuth();
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const styles = useMemo(() => createStyles(semantic), [semantic]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [logs, setLogs] = useState<readonly CommuteLog[]>([]);
@@ -88,7 +93,7 @@ const StatisticsDashboardScreen: React.FC = () => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#007AFF" />
+          <ActivityIndicator size="large" color={semantic.primaryNormal} />
           <Text style={styles.loadingText}>통계 로딩 중...</Text>
         </View>
       </SafeAreaView>
@@ -126,7 +131,7 @@ const StatisticsDashboardScreen: React.FC = () => {
       >
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.title}>📊 통계 대시보드</Text>
+          <Text style={styles.title}>통계 대시보드</Text>
           <Text style={styles.subtitle}>
             {summary.memberSince} 이후 기록
           </Text>
@@ -137,27 +142,27 @@ const StatisticsDashboardScreen: React.FC = () => {
 
         {/* Weekly On-Time Rate Chart */}
         <View style={styles.chartSection}>
-          <Text style={styles.sectionTitle}>📈 주간 정시율 추이</Text>
+          <Text style={styles.sectionTitle}>주간 정시율 추이</Text>
           <WeeklyStatsChart data={weeklyTrendData} />
         </View>
 
         {/* Delay by Day Chart */}
         <View style={styles.chartSection}>
-          <Text style={styles.sectionTitle}>📅 요일별 평균 지연</Text>
+          <Text style={styles.sectionTitle}>요일별 평균 지연</Text>
           <DelayStatsChart data={delayByDayData} />
         </View>
 
         {/* Line Usage Pie Chart */}
         {lineUsageData.length > 0 && (
           <View style={styles.chartSection}>
-            <Text style={styles.sectionTitle}>🚇 노선별 이용 현황</Text>
+            <Text style={styles.sectionTitle}>노선별 이용 현황</Text>
             <LineUsagePieChart data={lineUsageData} />
           </View>
         )}
 
         {/* Delay Distribution */}
         <View style={styles.chartSection}>
-          <Text style={styles.sectionTitle}>⏱️ 지연 시간 분포</Text>
+          <Text style={styles.sectionTitle}>지연 시간 분포</Text>
           <View style={styles.distributionContainer}>
             {delayDistribution.map((item, index) => (
               <View key={index} style={styles.distributionItem}>
@@ -181,7 +186,7 @@ const StatisticsDashboardScreen: React.FC = () => {
         {/* This Week Summary */}
         {weeklyStats && (
           <View style={styles.chartSection}>
-            <Text style={styles.sectionTitle}>📆 이번 주 요약</Text>
+            <Text style={styles.sectionTitle}>이번 주 요약</Text>
             <View style={styles.weekSummary}>
               <View style={styles.weekSummaryItem}>
                 <Text style={styles.weekSummaryValue}>
@@ -207,7 +212,7 @@ const StatisticsDashboardScreen: React.FC = () => {
 
         {/* Insights */}
         <View style={styles.insightsSection}>
-          <Text style={styles.sectionTitle}>💡 인사이트</Text>
+          <Text style={styles.sectionTitle}>인사이트</Text>
           <View style={styles.insightCard}>
             {summary.mostUsedLine && (
               <Text style={styles.insightText}>
@@ -242,147 +247,158 @@ const StatisticsDashboardScreen: React.FC = () => {
 // Styles
 // ============================================================================
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 16,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: '#666',
-  },
-  emptyContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 40,
-  },
-  emptyIcon: {
-    fontSize: 64,
-    marginBottom: 16,
-  },
-  emptyTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 8,
-  },
-  emptyDescription: {
-    fontSize: 14,
-    color: '#666',
-    textAlign: 'center',
-  },
-  header: {
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
-  chartSection: {
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 16,
-  },
-  distributionContainer: {
-    gap: 12,
-  },
-  distributionItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  distributionBar: {
-    flex: 1,
-    height: 24,
-    backgroundColor: '#E0E0E0',
-    borderRadius: 12,
-    overflow: 'hidden',
-    marginRight: 12,
-  },
-  distributionFill: {
-    height: '100%',
-    backgroundColor: '#007AFF',
-    borderRadius: 12,
-  },
-  distributionLabel: {
-    width: 60,
-    fontSize: 13,
-    color: '#666',
-  },
-  distributionValue: {
-    width: 80,
-    fontSize: 13,
-    color: '#333',
-    textAlign: 'right',
-  },
-  weekSummary: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-  },
-  weekSummaryItem: {
-    alignItems: 'center',
-  },
-  weekSummaryValue: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#007AFF',
-  },
-  weekSummaryLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginTop: 4,
-  },
-  insightsSection: {
-    marginBottom: 16,
-  },
-  insightCard: {
-    backgroundColor: '#FFF',
-    borderRadius: 12,
-    padding: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  insightText: {
-    fontSize: 14,
-    color: '#333',
-    lineHeight: 24,
-  },
-  footer: {
-    height: 40,
-  },
-});
+const createStyles = (semantic: WantedSemanticTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: semantic.bgSubtlePage,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    scrollContent: {
+      padding: 16,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    loadingText: {
+      marginTop: 12,
+      fontSize: 16,
+      color: semantic.labelAlt,
+    },
+    emptyContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: 40,
+    },
+    emptyIcon: {
+      fontSize: 64,
+      marginBottom: 16,
+    },
+    emptyTitle: {
+      fontSize: 20,
+      fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelStrong,
+      marginBottom: 8,
+    },
+    emptyDescription: {
+      fontSize: 14,
+      color: semantic.labelAlt,
+      textAlign: 'center',
+    },
+    header: {
+      marginBottom: 20,
+    },
+    title: {
+      fontSize: 28,
+      fontWeight: '800',
+      fontFamily: weightToFontFamily('800'),
+      color: semantic.labelStrong,
+      letterSpacing: -0.6,
+    },
+    subtitle: {
+      fontSize: 14,
+      color: semantic.labelAlt,
+      marginTop: 4,
+    },
+    chartSection: {
+      backgroundColor: semantic.bgBase,
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 16,
+      borderWidth: 1,
+      borderColor: semantic.lineSubtle,
+      shadowColor: '#171717',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.06,
+      shadowRadius: 2,
+      elevation: 1,
+    },
+    sectionTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
+      color: semantic.labelStrong,
+      marginBottom: 16,
+    },
+    distributionContainer: {
+      gap: 12,
+    },
+    distributionItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    distributionBar: {
+      flex: 1,
+      height: 24,
+      backgroundColor: 'rgba(112,115,124,0.14)',
+      borderRadius: 12,
+      overflow: 'hidden',
+      marginRight: 12,
+    },
+    distributionFill: {
+      height: '100%',
+      backgroundColor: semantic.primaryNormal,
+      borderRadius: 12,
+    },
+    distributionLabel: {
+      width: 60,
+      fontSize: 13,
+      color: semantic.labelAlt,
+    },
+    distributionValue: {
+      width: 80,
+      fontSize: 13,
+      color: semantic.labelNormal,
+      textAlign: 'right',
+    },
+    weekSummary: {
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+    },
+    weekSummaryItem: {
+      alignItems: 'center',
+    },
+    weekSummaryValue: {
+      fontSize: 32,
+      fontWeight: '800',
+      fontFamily: weightToFontFamily('800'),
+      color: semantic.primaryNormal,
+      letterSpacing: -0.4,
+    },
+    weekSummaryLabel: {
+      fontSize: 14,
+      color: semantic.labelAlt,
+      marginTop: 4,
+    },
+    insightsSection: {
+      marginBottom: 16,
+    },
+    insightCard: {
+      backgroundColor: semantic.bgBase,
+      borderRadius: 16,
+      padding: 16,
+      borderWidth: 1,
+      borderColor: semantic.lineSubtle,
+      shadowColor: '#171717',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.06,
+      shadowRadius: 2,
+      elevation: 1,
+    },
+    insightText: {
+      fontSize: 14,
+      color: semantic.labelNormal,
+      lineHeight: 24,
+    },
+    footer: {
+      height: 40,
+    },
+  });
 
 export default StatisticsDashboardScreen;

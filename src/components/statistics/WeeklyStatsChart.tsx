@@ -6,6 +6,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Dimensions } from 'react-native';
 import { ChartDataPoint } from '@/services/statistics/statisticsService';
+import { weightToFontFamily } from '@/styles/modernTheme';
 
 // ============================================================================
 // Types
@@ -174,6 +175,7 @@ const styles = StyleSheet.create({
   barValue: {
     fontSize: 9,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     color: '#FFF',
   },
   xAxis: {
@@ -188,6 +190,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: '#666',
     fontWeight: '500',
+    fontFamily: weightToFontFamily('500'),
   },
   xAxisSubLabel: {
     fontSize: 9,

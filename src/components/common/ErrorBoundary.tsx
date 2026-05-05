@@ -6,7 +6,7 @@
 import React, { Component, ReactNode } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { performanceMonitor } from '../../utils/performanceUtils';
-import { COLORS } from '../../styles/modernTheme';
+import { COLORS, weightToFontFamily } from '../../styles/modernTheme';
 
 interface ErrorBoundaryProps {
   children: ReactNode;
@@ -172,6 +172,7 @@ const styles = StyleSheet.create({
   errorTitle: {
     fontSize: 20,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     color: COLORS.text.primary,
     textAlign: 'center',
     marginBottom: 12,
@@ -194,6 +195,7 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 16,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
   },
   debugInfo: {
     backgroundColor: COLORS.secondary.redLight,
@@ -206,6 +208,7 @@ const styles = StyleSheet.create({
   debugTitle: {
     fontSize: 14,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     color: COLORS.semantic.error,
     marginBottom: 8,
   },

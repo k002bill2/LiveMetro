@@ -16,7 +16,7 @@ jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
 jest.mock('lucide-react-native', () => ({
   MessageSquare: 'MessageSquare',
   ThumbsUp: 'ThumbsUp',
-  Plus: 'Plus',
+  Megaphone: 'Megaphone',
   Clock: 'Clock',
   CheckCircle: 'CheckCircle',
 }));
@@ -186,8 +186,8 @@ describe('DelayFeedScreen', () => {
 
     it('renders add report button', () => {
       const { UNSAFE_root } = render(<DelayFeedScreen />);
-      // Component uses Pressable/View with accessible prop, find Plus icon
-      const plusIcons = UNSAFE_root.findAllByType('Plus');
+      // Component uses Pressable/View with accessible prop, find Megaphone icon
+      const plusIcons = UNSAFE_root.findAllByType('Megaphone');
       expect(plusIcons.length).toBeGreaterThan(0);
     });
 
@@ -571,8 +571,8 @@ describe('DelayFeedScreen', () => {
     it('opens report modal when add button is pressed', async () => {
       const { UNSAFE_root } = render(<DelayFeedScreen />);
 
-      // Find the Plus icon's parent (accessible View acts as button)
-      const plusIcons = UNSAFE_root.findAllByType('Plus');
+      // Find the Megaphone icon's parent (accessible View acts as button)
+      const plusIcons = UNSAFE_root.findAllByType('Megaphone');
       expect(plusIcons.length).toBeGreaterThan(0);
       fireEvent.press(plusIcons[0]);
 
@@ -586,7 +586,7 @@ describe('DelayFeedScreen', () => {
     it('closes modal on successful submit', async () => {
       const { UNSAFE_root, queryByTestId } = render(<DelayFeedScreen />);
 
-      const plusIcons = UNSAFE_root.findAllByType('Plus');
+      const plusIcons = UNSAFE_root.findAllByType('Megaphone');
       fireEvent.press(plusIcons[0]);
 
       await waitFor(() => {
@@ -600,7 +600,7 @@ describe('DelayFeedScreen', () => {
     it('closes modal on cancel', async () => {
       const { UNSAFE_root } = render(<DelayFeedScreen />);
 
-      const plusIcons = UNSAFE_root.findAllByType('Plus');
+      const plusIcons = UNSAFE_root.findAllByType('Megaphone');
       fireEvent.press(plusIcons[0]);
 
       // Modal should render after pressing add

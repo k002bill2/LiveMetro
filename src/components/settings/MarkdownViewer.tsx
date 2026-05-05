@@ -1,12 +1,21 @@
 /**
  * Markdown Viewer Component
- * Display markdown content with custom styling
+ * Display markdown content with custom styling.
+ *
+ * Phase 45 — Wanted Design System migration. Markdown style object
+ * is theme-aware via useMemo (the underlying library expects a flat
+ * object, so we don't go through StyleSheet.create + createStyles).
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { Alert, Linking } from 'react-native';
 import Markdown from 'react-native-markdown-display';
-import { COLORS, TYPOGRAPHY, SPACING, RADIUS } from '@/styles/modernTheme';
+import {
+  WANTED_TOKENS,
+  weightToFontFamily,
+  type WantedSemanticTheme,
+} from '@/styles/modernTheme';
+import { useTheme } from '@/services/theme';
 
 interface MarkdownViewerProps {
   content: string;
@@ -17,6 +26,10 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({
   content,
   onLinkPress,
 }) => {
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const markdownStyles = useMemo(() => buildStyles(semantic), [semantic]);
+
   const handleLinkPress = (url: string): boolean => {
     if (onLinkPress) {
       onLinkPress(url);
@@ -57,155 +70,163 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({
   );
 };
 
-const markdownStyles = {
+// Body line height: 14 * 1.6 = 22.4 (relaxed reading rhythm).
+const BODY_FONT_SIZE = 14;
+const BODY_LINE_HEIGHT = BODY_FONT_SIZE * 1.6;
+
+const buildStyles = (semantic: WantedSemanticTheme) => ({
   body: {
-    color: COLORS.text.primary,
-    fontSize: TYPOGRAPHY.fontSize.base,
-    lineHeight: TYPOGRAPHY.lineHeight.relaxed * TYPOGRAPHY.fontSize.base,
+    color: semantic.labelStrong,
+    fontSize: BODY_FONT_SIZE,
+    fontFamily: weightToFontFamily('500'),
+    lineHeight: BODY_LINE_HEIGHT,
   },
   heading1: {
-    fontSize: TYPOGRAPHY.fontSize['3xl'],
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.text.primary,
-    marginTop: SPACING.xl,
-    marginBottom: SPACING.lg,
+    fontSize: 32,
+    fontFamily: weightToFontFamily('700'),
+    color: semantic.labelStrong,
+    marginTop: WANTED_TOKENS.spacing.s5,
+    marginBottom: WANTED_TOKENS.spacing.s4,
   },
   heading2: {
-    fontSize: TYPOGRAPHY.fontSize['2xl'],
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.text.primary,
-    marginTop: SPACING.lg,
-    marginBottom: SPACING.md,
+    fontSize: 24,
+    fontFamily: weightToFontFamily('700'),
+    color: semantic.labelStrong,
+    marginTop: WANTED_TOKENS.spacing.s4,
+    marginBottom: WANTED_TOKENS.spacing.s3,
   },
   heading3: {
-    fontSize: TYPOGRAPHY.fontSize.xl,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
-    marginTop: SPACING.lg,
-    marginBottom: SPACING.md,
+    fontSize: 20,
+    fontFamily: weightToFontFamily('600'),
+    color: semantic.labelStrong,
+    marginTop: WANTED_TOKENS.spacing.s4,
+    marginBottom: WANTED_TOKENS.spacing.s3,
   },
   heading4: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
-    marginTop: SPACING.md,
-    marginBottom: SPACING.sm,
+    fontSize: 16,
+    fontFamily: weightToFontFamily('600'),
+    color: semantic.labelStrong,
+    marginTop: WANTED_TOKENS.spacing.s3,
+    marginBottom: WANTED_TOKENS.spacing.s2,
   },
   heading5: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
-    marginTop: SPACING.md,
-    marginBottom: SPACING.sm,
+    fontSize: 14,
+    fontFamily: weightToFontFamily('600'),
+    color: semantic.labelStrong,
+    marginTop: WANTED_TOKENS.spacing.s3,
+    marginBottom: WANTED_TOKENS.spacing.s2,
   },
   heading6: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.secondary,
-    marginTop: SPACING.md,
-    marginBottom: SPACING.sm,
+    fontSize: 13,
+    fontFamily: weightToFontFamily('600'),
+    color: semantic.labelNeutral,
+    marginTop: WANTED_TOKENS.spacing.s3,
+    marginBottom: WANTED_TOKENS.spacing.s2,
   },
   paragraph: {
     marginTop: 0,
-    marginBottom: SPACING.md,
-    lineHeight: TYPOGRAPHY.lineHeight.relaxed * TYPOGRAPHY.fontSize.base,
+    marginBottom: WANTED_TOKENS.spacing.s3,
+    lineHeight: BODY_LINE_HEIGHT,
   },
   link: {
-    color: COLORS.text.link,
+    color: WANTED_TOKENS.blue[500],
     textDecorationLine: 'underline' as const,
   },
   bullet_list: {
-    marginBottom: SPACING.md,
+    marginBottom: WANTED_TOKENS.spacing.s3,
   },
   ordered_list: {
-    marginBottom: SPACING.md,
+    marginBottom: WANTED_TOKENS.spacing.s3,
   },
   list_item: {
-    marginTop: SPACING.sm,
-    marginBottom: SPACING.sm,
+    marginTop: WANTED_TOKENS.spacing.s2,
+    marginBottom: WANTED_TOKENS.spacing.s2,
   },
   bullet_list_icon: {
-    color: COLORS.black,
-    fontSize: TYPOGRAPHY.fontSize.lg,
+    color: semantic.labelStrong,
+    fontSize: 16,
     marginLeft: 0,
-    marginRight: SPACING.sm,
+    marginRight: WANTED_TOKENS.spacing.s2,
   },
   code_inline: {
-    backgroundColor: COLORS.surface.card,
-    color: COLORS.text.primary,
-    fontFamily: 'monospace',
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    paddingHorizontal: SPACING.xs,
+    backgroundColor: semantic.bgSubtle,
+    color: semantic.labelStrong,
+    fontFamily: WANTED_TOKENS.fontFamily.mono,
+    fontSize: 13,
+    paddingHorizontal: WANTED_TOKENS.spacing.s1,
     paddingVertical: 2,
-    borderRadius: RADIUS.sm,
+    borderRadius: WANTED_TOKENS.radius.r2,
     borderWidth: 1,
-    borderColor: COLORS.border.light,
+    borderColor: semantic.lineSubtle,
   },
   code_block: {
-    backgroundColor: COLORS.surface.card,
-    color: COLORS.text.primary,
-    fontFamily: 'monospace',
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    padding: SPACING.md,
-    borderRadius: RADIUS.base,
+    backgroundColor: semantic.bgSubtle,
+    color: semantic.labelStrong,
+    fontFamily: WANTED_TOKENS.fontFamily.mono,
+    fontSize: 13,
+    padding: WANTED_TOKENS.spacing.s3,
+    borderRadius: WANTED_TOKENS.radius.r4,
     borderWidth: 1,
-    borderColor: COLORS.border.light,
-    marginBottom: SPACING.md,
+    borderColor: semantic.lineSubtle,
+    marginBottom: WANTED_TOKENS.spacing.s3,
   },
   fence: {
-    backgroundColor: COLORS.surface.card,
-    color: COLORS.text.primary,
-    fontFamily: 'monospace',
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    padding: SPACING.md,
-    borderRadius: RADIUS.base,
+    backgroundColor: semantic.bgSubtle,
+    color: semantic.labelStrong,
+    fontFamily: WANTED_TOKENS.fontFamily.mono,
+    fontSize: 13,
+    padding: WANTED_TOKENS.spacing.s3,
+    borderRadius: WANTED_TOKENS.radius.r4,
     borderWidth: 1,
-    borderColor: COLORS.border.light,
-    marginBottom: SPACING.md,
+    borderColor: semantic.lineSubtle,
+    marginBottom: WANTED_TOKENS.spacing.s3,
   },
   blockquote: {
-    backgroundColor: COLORS.primary.light,
-    borderLeftColor: COLORS.black,
+    // Translucent blue tint works in both light and dark themes — the
+    // hardcoded blue[50] (#EAF2FE) regressed in dark mode (Gemini cross-
+    // review Phase 45). Same pattern as CommuteRouteCard's origin node.
+    backgroundColor: 'rgba(0,102,255,0.10)',
+    borderLeftColor: WANTED_TOKENS.blue[500],
     borderLeftWidth: 3,
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    marginBottom: SPACING.md,
+    paddingHorizontal: WANTED_TOKENS.spacing.s3,
+    paddingVertical: WANTED_TOKENS.spacing.s2,
+    marginBottom: WANTED_TOKENS.spacing.s3,
   },
   hr: {
-    backgroundColor: COLORS.border.medium,
+    backgroundColor: semantic.lineNormal,
     height: 1,
-    marginVertical: SPACING.lg,
+    marginVertical: WANTED_TOKENS.spacing.s4,
   },
   table: {
     borderWidth: 1,
-    borderColor: COLORS.border.medium,
-    borderRadius: RADIUS.base,
-    marginBottom: SPACING.md,
+    borderColor: semantic.lineNormal,
+    borderRadius: WANTED_TOKENS.radius.r4,
+    marginBottom: WANTED_TOKENS.spacing.s3,
   },
   thead: {
-    backgroundColor: COLORS.surface.card,
+    backgroundColor: semantic.bgSubtle,
   },
   th: {
-    padding: SPACING.sm,
+    padding: WANTED_TOKENS.spacing.s2,
     borderWidth: 1,
-    borderColor: COLORS.border.light,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    borderColor: semantic.lineSubtle,
+    fontFamily: weightToFontFamily('700'),
   },
   tr: {
     borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.light,
+    borderBottomColor: semantic.lineSubtle,
   },
   td: {
-    padding: SPACING.sm,
+    padding: WANTED_TOKENS.spacing.s2,
     borderWidth: 1,
-    borderColor: COLORS.border.light,
+    borderColor: semantic.lineSubtle,
   },
   strong: {
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    fontFamily: weightToFontFamily('700'),
   },
   em: {
-    fontStyle: 'italic',
+    fontStyle: 'italic' as const,
   },
-};
+});
 
 export default MarkdownViewer;

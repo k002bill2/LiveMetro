@@ -10,13 +10,17 @@ import { Home, Heart, Bell, Settings, CircleHelp, Map as MapIcon } from 'lucide-
 
 import { useAuth } from '../services/auth/AuthContext';
 import { useTheme } from '../services/theme';
-import { WANTED_TOKENS } from '../styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily } from '../styles/modernTheme';
 import { LoadingScreen } from '../components/common/LoadingScreen';
 import { OnboardingProvider, useOnboarding } from '../contexts/OnboardingContext';
 
 // Import screens
 import { WelcomeScreen } from '../screens/auth/WelcomeScreen';
 import { AuthScreen } from '../screens/auth/AuthScreen';
+import { EmailLoginScreen } from '../screens/auth/EmailLoginScreen';
+import { SignUpScreen } from '../screens/auth/SignUpScreen';
+import { SignupStep1Screen } from '../screens/auth/SignupStep1Screen';
+import { SignupStep3Screen } from '../screens/auth/SignupStep3Screen';
 import { HomeScreen } from '../screens/home/HomeScreen';
 import { SubwayMapScreen } from '../screens/map/SubwayMapScreen';
 import { FavoritesScreen } from '../screens/favorites/FavoritesScreen';
@@ -33,9 +37,22 @@ import { AlternativeRoutesScreen } from '../screens/route/AlternativeRoutesScree
 const DEBUG_FORCE_ONBOARDING = __DEV__ && false;
 
 // Navigation types
+//
+// NOTE: This `RootStackParamList` describes the OUTER (root) navigator —
+// Welcome, Auth, Onboarding, Main, plus the modal stack (StationDetail,
+// DelayCertificate, AlternativeRoutes, EmailLogin, SignUp). The INNER
+// authenticated stack (MainTabs, etc.) lives in `./types.ts` as
+// `AppStackParamList`. The two stacks have overlapping but non-identical
+// route sets (e.g. this file uses `Main`, types.ts uses `MainTabs`), so
+// they intentionally remain separate.
 export type RootStackParamList = {
   Welcome: undefined;
   Auth: undefined;
+  EmailLogin: undefined;
+  SignupStep1: undefined;
+  SignUp: undefined;
+  SignupStep3: undefined;
+  EmailLink: undefined;
   Main: undefined;
   Onboarding: undefined;
   StationNavigator: {
@@ -113,6 +130,7 @@ const MainTabNavigator: React.FC = () => {
           // '600' matches WANTED_TOKENS.type.caption2 weight; '700' was a
           // mismatch noted in cross-review.
           fontWeight: '600',
+          fontFamily: weightToFontFamily('600'),
           letterSpacing: 0,
         },
         headerStyle: {
@@ -123,6 +141,7 @@ const MainTabNavigator: React.FC = () => {
         headerTintColor: semantic.labelOnColor,
         headerTitleStyle: {
           fontWeight: '700',
+          fontFamily: weightToFontFamily('700'),
         },
       })}
     >
@@ -176,6 +195,7 @@ const RootNavigatorContent: React.FC = () => {
   const { user, loading } = useAuth();
   const {
     hasCompletedOnboarding,
+    hasSeenSignupCelebration,
     isCheckingStatus,
     completeOnboarding,
     skipOnboarding,
@@ -191,14 +211,45 @@ const RootNavigatorContent: React.FC = () => {
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Welcome" component={WelcomeScreen} />
         <Stack.Screen name="Auth" component={AuthScreen} />
+        <Stack.Screen name="EmailLogin" component={EmailLoginScreen} />
+        <Stack.Screen name="SignupStep1" component={SignupStep1Screen} />
+        <Stack.Screen name="SignUp" component={SignUpScreen} />
       </Stack.Navigator>
     );
   }
 
-  // Authenticated but hasn't completed onboarding (or DEBUG mode)
+  // Authenticated but hasn't completed onboarding (or DEBUG mode).
+  //
+  // Three possible first screens, in priority order:
+  //   1. EmailLink — phone-only user (Step1 OTP succeeded, no email yet).
+  //      Forces email + password collection via SignUpScreen in 'link' mode.
+  //   2. SignupStep3 — fresh signup celebration (shown once per user via
+  //      `hasSeenSignupCelebration` AsyncStorage flag).
+  //   3. Onboarding — returning user who hasn't completed onboarding.
+  //
+  // We use `initialRouteName` rather than `navigation.navigate` from the
+  // unauth stack to avoid the race where the unauth stack unmounts before
+  // a navigate call lands.
   if (!hasCompletedOnboarding || DEBUG_FORCE_ONBOARDING) {
+    // phone-only signal: authenticated, not anonymous, but no email attached.
+    // Anonymous users (signInAnonymously) should NOT be routed to EmailLink —
+    // they have a different (browse-only) flow.
+    const phoneOnly = !user.isAnonymous && (user.email == null || user.email === '');
+    const showCelebration = hasSeenSignupCelebration === false;
+    const initial: 'EmailLink' | 'SignupStep3' | 'Onboarding' = phoneOnly
+      ? 'EmailLink'
+      : showCelebration
+        ? 'SignupStep3'
+        : 'Onboarding';
     return (
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Navigator
+        screenOptions={{ headerShown: false }}
+        initialRouteName={initial}
+      >
+        <Stack.Screen name="EmailLink">
+          {() => <SignUpScreen mode="link" />}
+        </Stack.Screen>
+        <Stack.Screen name="SignupStep3" component={SignupStep3Screen} />
         <Stack.Screen name="Onboarding">
           {() => (
             <OnboardingNavigator

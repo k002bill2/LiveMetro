@@ -35,7 +35,7 @@ import {
   getReportTypeEmoji,
 } from '@/models/delayReport';
 import { getSubwayLineColor } from '@/utils/colorUtils';
-import { SPACING, RADIUS, TYPOGRAPHY } from '@/styles/modernTheme';
+import { SPACING, RADIUS, TYPOGRAPHY, weightToFontFamily } from '@/styles/modernTheme';
 
 interface DelayReportFormProps {
   /** Pre-selected line ID */
@@ -343,6 +343,7 @@ const createStyles = (colors: ThemeColors) =>
     title: {
       fontSize: TYPOGRAPHY.fontSize.xl,
       fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
       color: colors.textPrimary,
     },
     closeButton: {
@@ -356,6 +357,7 @@ const createStyles = (colors: ThemeColors) =>
     sectionTitle: {
       fontSize: TYPOGRAPHY.fontSize.sm,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
       color: colors.textSecondary,
       marginBottom: SPACING.sm,
     },
@@ -372,6 +374,7 @@ const createStyles = (colors: ThemeColors) =>
     lineButtonText: {
       fontSize: TYPOGRAPHY.fontSize.sm,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
     },
     textInput: {
       backgroundColor: colors.surface,
@@ -421,10 +424,12 @@ const createStyles = (colors: ThemeColors) =>
       fontSize: TYPOGRAPHY.fontSize.xs,
       color: colors.textSecondary,
       fontWeight: '500',
+      fontFamily: weightToFontFamily('500'),
     },
     typeLabelSelected: {
       color: colors.primary,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
     },
     submitButton: {
       flexDirection: 'row',
@@ -443,6 +448,7 @@ const createStyles = (colors: ThemeColors) =>
     submitButtonText: {
       fontSize: TYPOGRAPHY.fontSize.base,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
       color: '#FFFFFF',
     },
     infoText: {

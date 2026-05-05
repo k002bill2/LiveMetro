@@ -2,7 +2,6 @@ import {
   StationSelection,
   TransferStation,
   CommuteNotifications,
-  CommuteType,
 } from '@/models/commute';
 
 export type AppTabParamList = {
@@ -36,29 +35,20 @@ export interface OnboardingRouteData {
 }
 
 export type OnboardingStackParamList = {
-  CommuteTime: {
-    commuteType: CommuteType;
-    initialTime?: string;
-    morningRoute?: OnboardingRouteData;
-    onTimeSet: (time: string) => void;
-    onSkip?: () => void;
+  // Redefined onboarding flow:
+  //   1/4 Welcome (brand + value props, no params)
+  //   2/4 CommuteRoute (route picker, no params — defaults departureTime)
+  //   3/4 NotificationPermission (OS prompt + alert toggles)
+  //   4/4 FavoritesOnboarding (commit + onComplete)
+  WelcomeOnboarding: undefined;
+  CommuteRoute: undefined;
+  NotificationPermission: {
+    route: OnboardingRouteData;
   };
-  CommuteRoute: {
-    commuteType: CommuteType;
-    departureTime: string;
-    morningRoute?: OnboardingRouteData;
-  };
-  CommuteNotification: {
-    commuteType: CommuteType;
-    departureTime: string;
-    departureStation: StationSelection;
-    arrivalStation: StationSelection;
-    transferStations: TransferStation[];
-    morningRoute?: OnboardingRouteData;
-  };
-  CommuteComplete: {
-    morningRoute: OnboardingRouteData;
-    eveningRoute: OnboardingRouteData;
+  FavoritesOnboarding: {
+    route: OnboardingRouteData;
+    notificationGranted: boolean;
+    notifications: CommuteNotifications;
   };
 };
 
@@ -97,10 +87,23 @@ export type AppStackParamList = {
   // Unauthenticated screens
   Welcome: undefined;
   Auth: undefined;
+  EmailLogin: undefined;
+  SignupStep1: undefined;
+  SignUp: undefined;
+  SignupStep3: undefined;
+  // Post-auth/!hasCompletedOnboarding stack — shown when a phone-only user
+  // (created by Step1 OTP verification) needs to attach email + password.
+  EmailLink: undefined;
 
   // Onboarding screens
   Onboarding: undefined;
 };
 
-// Type alias for consistency across codebase
+// Type alias for code that historically imported `RootStackParamList` from
+// here. The OUTER navigator's true definition lives in
+// `./RootNavigator.tsx` (it has different route names like `Main` vs the
+// `MainTabs` route that lives in `AppStackParamList`). When adding new
+// outer-stack routes (Welcome, Auth, EmailLogin, SignUp, Onboarding,
+// modals), update both this `AppStackParamList` AND
+// `RootNavigator.tsx#RootStackParamList` to keep the two in sync.
 export type RootStackParamList = AppStackParamList;

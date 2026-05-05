@@ -14,10 +14,6 @@ import { soundService } from '@/services/sound/soundService';
 // Import actual React Testing Library utilities after mocks
 import { fireEvent, waitFor } from '@testing-library/react-native';
 
-jest.mock('@expo/vector-icons', () => ({
-  Ionicons: 'Ionicons',
-}));
-
 jest.mock('lucide-react-native', () => ({
   Clock: 'Clock',
 }));

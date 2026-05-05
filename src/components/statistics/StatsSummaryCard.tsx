@@ -6,6 +6,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { StatsSummary } from '@/services/statistics/statisticsService';
+import { weightToFontFamily } from '@/styles/modernTheme';
 
 // ============================================================================
 // Types
@@ -153,6 +154,7 @@ const styles = StyleSheet.create({
   mainStatValue: {
     fontSize: 36,
     fontWeight: 'bold',
+    fontFamily: weightToFontFamily('bold'),
     color: '#007AFF',
   },
   mainStatLabel: {
@@ -192,6 +194,7 @@ const styles = StyleSheet.create({
   secondaryStatValue: {
     fontSize: 15,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     color: '#333',
   },
   lastTrip: {

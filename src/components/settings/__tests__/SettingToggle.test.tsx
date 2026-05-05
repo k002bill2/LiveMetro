@@ -3,8 +3,11 @@ import { render, fireEvent } from '@testing-library/react-native';
 import { Switch } from 'react-native';
 import { SettingToggle } from '../SettingToggle';
 
-jest.mock('@expo/vector-icons', () => ({
-  Ionicons: 'Ionicons',
+// Phase 45 — component now consumes useTheme().isDark to pick the
+// Wanted Design System semantic theme (light/dark variants of
+// WANTED_TOKENS). Force light in tests for stable assertions.
+jest.mock('@/services/theme', () => ({
+  useTheme: () => ({ isDark: false }),
 }));
 
 describe('SettingToggle', () => {

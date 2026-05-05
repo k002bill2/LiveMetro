@@ -1,9 +1,13 @@
 /**
  * Delay Notification Settings Screen
- * Configure delay alerts and thresholds
+ * Configure delay alerts and thresholds.
+ *
+ * Phase 46 — migrated from legacy COLORS/SPACING/RADIUS/TYPOGRAPHY API
+ * to Wanted Design System tokens (WANTED_TOKENS + weightToFontFamily +
+ * isDark-driven semantic theme). Atom layer migrated in Phase 45.
  */
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -13,8 +17,14 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
-import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
+import {
+  WANTED_TOKENS,
+  weightToFontFamily,
+  type WantedSemanticTheme,
+} from '@/styles/modernTheme';
+import { ArrowRightLeft, Bell, Clock, Megaphone, Train, Users, XCircle } from 'lucide-react-native';
 import { useAuth } from '@/services/auth/AuthContext';
+import { useTheme } from '@/services/theme';
 import { useNotifications } from '@/hooks/useNotifications';
 import SettingSection from '@/components/settings/SettingSection';
 import SettingToggle from '@/components/settings/SettingToggle';
@@ -23,6 +33,9 @@ import SettingSlider from '@/components/settings/SettingSlider';
 export const DelayNotificationScreen: React.FC = () => {
   const { user, updateUserProfile } = useAuth();
   const { sendTestNotification } = useNotifications();
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const styles = useMemo(() => createStyles(semantic), [semantic]);
   const [saving, setSaving] = useState(false);
 
   const notificationSettings = user?.preferences.notificationSettings;
@@ -116,7 +129,7 @@ export const DelayNotificationScreen: React.FC = () => {
         {/* Basic Settings */}
         <SettingSection title="기본 설정">
           <SettingToggle
-            icon="notifications"
+            icon={Bell}
             label="지연 알림 받기"
             subtitle="열차 지연 시 알림을 보냅니다"
             value={notificationSettings?.enabled || false}
@@ -128,7 +141,7 @@ export const DelayNotificationScreen: React.FC = () => {
         {/* Delay Threshold */}
         <SettingSection title="지연 기준">
           <SettingSlider
-            icon="time"
+            icon={Clock}
             label="알림 기준 시간"
             subtitle={`${notificationSettings?.delayThresholdMinutes || 5}분 이상 지연 시 알림`}
             value={notificationSettings?.delayThresholdMinutes || 5}
@@ -143,7 +156,7 @@ export const DelayNotificationScreen: React.FC = () => {
         {/* Alert Types */}
         <SettingSection title="알림 종류">
           <SettingToggle
-            icon="train"
+            icon={Train}
             label="열차 지연"
             subtitle="정상 운행 시간보다 지연될 때"
             value={notificationSettings?.alertTypes.delays || false}
@@ -151,7 +164,7 @@ export const DelayNotificationScreen: React.FC = () => {
             disabled={saving}
           />
           <SettingToggle
-            icon="close-circle"
+            icon={XCircle}
             label="운행 중단"
             subtitle="열차 운행이 일시 중단될 때"
             value={notificationSettings?.alertTypes.suspensions || false}
@@ -159,7 +172,7 @@ export const DelayNotificationScreen: React.FC = () => {
             disabled={saving}
           />
           <SettingToggle
-            icon="people"
+            icon={Users}
             label="혼잡도 경고"
             subtitle="열차 혼잡도가 높을 때"
             value={notificationSettings?.alertTypes.congestion || false}
@@ -167,7 +180,7 @@ export const DelayNotificationScreen: React.FC = () => {
             disabled={saving}
           />
           <SettingToggle
-            icon="swap-horizontal"
+            icon={ArrowRightLeft}
             label="대체 경로"
             subtitle="지연 시 대체 경로 추천"
             value={notificationSettings?.alertTypes.alternativeRoutes || false}
@@ -177,7 +190,7 @@ export const DelayNotificationScreen: React.FC = () => {
             disabled={saving}
           />
           <SettingToggle
-            icon="megaphone"
+            icon={Megaphone}
             label="서비스 업데이트"
             subtitle="노선 변경 및 공지사항"
             value={notificationSettings?.alertTypes.serviceUpdates || false}
@@ -210,44 +223,52 @@ export const DelayNotificationScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.white,
-  },
-  content: {
-    flex: 1,
-  },
-  section: {
-    marginBottom: SPACING.xl,
-    paddingHorizontal: SPACING.lg,
-  },
-  testButton: {
-    backgroundColor: COLORS.black,
-    paddingVertical: SPACING.lg,
-    borderRadius: RADIUS.lg,
-    alignItems: 'center',
-  },
-  testButtonText: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.white,
-  },
-  infoBox: {
-    backgroundColor: COLORS.primary.light,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.lg,
-    marginHorizontal: SPACING.lg,
-    marginBottom: SPACING.xl,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: COLORS.border.medium,
-  },
-  infoText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.secondary,
-    lineHeight: TYPOGRAPHY.lineHeight.relaxed * TYPOGRAPHY.fontSize.sm,
-  },
-});
+// Body line height: 13 * 1.6 = 20.8 (relaxed reading rhythm).
+const INFO_FONT_SIZE = 13;
+const INFO_LINE_HEIGHT = INFO_FONT_SIZE * 1.6;
+
+const createStyles = (semantic: WantedSemanticTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: semantic.bgBase,
+    },
+    content: {
+      flex: 1,
+    },
+    section: {
+      marginBottom: WANTED_TOKENS.spacing.s5,
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+    },
+    testButton: {
+      backgroundColor: WANTED_TOKENS.blue[500],
+      paddingVertical: WANTED_TOKENS.spacing.s4,
+      borderRadius: WANTED_TOKENS.radius.r8,
+      alignItems: 'center',
+    },
+    testButtonText: {
+      fontSize: 14,
+      fontFamily: weightToFontFamily('700'),
+      color: '#FFFFFF',
+    },
+    infoBox: {
+      // Translucent blue tint adapts to both light and dark themes
+      // (Phase 45.1 — same pattern as MarkdownViewer.blockquote).
+      backgroundColor: 'rgba(0,102,255,0.10)',
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s4,
+      marginHorizontal: WANTED_TOKENS.spacing.s4,
+      marginBottom: WANTED_TOKENS.spacing.s5,
+      borderRadius: WANTED_TOKENS.radius.r8,
+      borderWidth: 1,
+      borderColor: semantic.lineSubtle,
+    },
+    infoText: {
+      fontSize: INFO_FONT_SIZE,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelNeutral,
+      lineHeight: INFO_LINE_HEIGHT,
+    },
+  });
 
 export default DelayNotificationScreen;

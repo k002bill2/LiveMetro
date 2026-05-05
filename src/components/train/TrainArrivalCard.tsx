@@ -38,6 +38,7 @@ import {
   getLineTextColor,
 } from '@/utils/colorUtils';
 import { useTheme, ThemeColors } from '@/services/theme';
+import { weightToFontFamily } from '@/styles/modernTheme';
 
 export interface TrainArrivalCardProps {
   /** Train data to display */
@@ -370,6 +371,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   lineText: {
     fontSize: 14,
     fontWeight: 'bold',
+    fontFamily: weightToFontFamily('bold'),
     textAlign: 'center',
   },
   content: {
@@ -395,6 +397,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   directionText: {
     fontSize: 13,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     marginLeft: 4,
   },
   statusBadge: {
@@ -407,6 +410,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   statusText: {
     fontSize: 11,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     color: colors.textInverse,
     marginLeft: 4,
   },
@@ -416,6 +420,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   arrivalTime: {
     fontSize: 24,
     fontWeight: 'bold',
+    fontFamily: weightToFontFamily('bold'),
     color: colors.textPrimary,
     marginBottom: 4,
   },
@@ -430,6 +435,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   delayText: {
     fontSize: 13,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     marginLeft: 4,
   },
   stationName: {

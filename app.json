@@ -98,6 +98,14 @@
           "color": "#1976d2",
           "mode": "production"
         }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static"
+          }
+        }
       ]
     ],
     "hooks": {

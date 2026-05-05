@@ -9,10 +9,6 @@ import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { LanguageSettingsScreen } from '../LanguageSettingsScreen';
 import { useI18n } from '@/services/i18n';
 
-jest.mock('@expo/vector-icons', () => ({
-  Ionicons: 'Ionicons',
-}));
-
 jest.mock('@/services/i18n', () => ({
   useI18n: jest.fn(() => ({
     language: 'ko',
@@ -63,6 +59,7 @@ jest.mock('@/components/settings/SettingSection', () => {
 });
 
 jest.mock('@/styles/modernTheme', () => ({
+  ...jest.requireActual('@/styles/modernTheme'),
   SPACING: { sm: 8, md: 12, lg: 16, xl: 20 },
   TYPOGRAPHY: {
     fontSize: { sm: 12, base: 16, lg: 18 },

@@ -15,7 +15,7 @@ import React, { memo } from 'react';
 import { Pressable, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { GripVertical } from 'lucide-react-native';
 import { useTheme } from '@/services/theme';
-import { WANTED_TOKENS } from '@/styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { LineBadge, type LineId } from './LineBadge';
 import { Pill } from './Pill';
 import { CONG_TONE, type CongestionLevel } from './congestion';
@@ -114,7 +114,7 @@ const FavoriteRowImpl: React.FC<FavoriteRowProps> = ({
             <>
               <Text style={[styles.subText, { color: semantic.labelAlt }]}> · </Text>
               <View style={[styles.congDot, { backgroundColor: tone.color }]} />
-              <Text style={[styles.subText, { color: tone.color, fontWeight: '700' }]}>
+              <Text style={[styles.subText, { color: tone.color, fontFamily: weightToFontFamily('700') }]}>
                 {tone.label}
               </Text>
             </>
@@ -163,7 +163,7 @@ const styles = StyleSheet.create({
   },
   stationName: {
     fontSize: 16,
-    fontWeight: '800',
+    fontFamily: weightToFontFamily('800'),
     letterSpacing: -0.2,
   },
   subRow: {
@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
   },
   subText: {
     fontSize: 12,
-    fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
   },
   congDot: {
     width: 6,
@@ -186,12 +186,12 @@ const styles = StyleSheet.create({
   },
   minutes: {
     fontSize: 22,
-    fontWeight: '800',
+    fontFamily: weightToFontFamily('800'),
     letterSpacing: -0.4,
     fontVariant: ['tabular-nums'],
   },
   minutesUnit: {
     fontSize: 12,
-    fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
   },
 });

@@ -35,8 +35,8 @@ import { DraggableFavoriteItem } from '../../components/favorites/DraggableFavor
 import { StationSearchModal } from '../../components/commute/StationSearchModal';
 import { StationSelection } from '../../models/commute';
 import { Station } from '../../models/train';
-import { SPACING, RADIUS, TYPOGRAPHY, WANTED_TOKENS } from '../../styles/modernTheme';
-import { useTheme, ThemeColors } from '../../services/theme';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '../../styles/modernTheme';
+import { useTheme } from '../../services/theme';
 
 type NavigationProp = NativeStackNavigationProp<AppStackParamList>;
 
@@ -47,8 +47,9 @@ export const FavoritesScreen: React.FC = () => {
   // re-fetching realtime arrivals while the user was elsewhere.
   const isFocused = useIsFocused();
   const { user } = useAuth();
-  const { colors, isDark } = useTheme();
-  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const styles = useMemo(() => createStyles(semantic), [semantic]);
   const {
     favoritesWithDetails,
     loading,
@@ -259,7 +260,7 @@ export const FavoritesScreen: React.FC = () => {
    */
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
-      <Heart size={64} color={colors.textTertiary} />
+      <Heart size={64} color={semantic.labelAlt} />
       <Text style={styles.emptyTitle}>즐겨찾기가 없습니다</Text>
       <Text style={styles.emptySubtitle}>
         자주 이용하는 역을 즐겨찾기에 추가해보세요
@@ -278,7 +279,7 @@ export const FavoritesScreen: React.FC = () => {
    */
   const renderNoResults = () => (
     <View style={styles.emptyState}>
-      <Search size={64} color={colors.textTertiary} />
+      <Search size={64} color={semantic.labelAlt} />
       <Text style={styles.emptyTitle}>검색 결과가 없습니다</Text>
       <Text style={styles.emptySubtitle}>
         다른 검색어나 필터를 시도해보세요
@@ -313,7 +314,7 @@ export const FavoritesScreen: React.FC = () => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.textPrimary} />
+          <ActivityIndicator size="large" color={semantic.labelStrong} />
           <Text style={styles.loadingText}>즐겨찾기를 불러오는 중...</Text>
         </View>
       </SafeAreaView>
@@ -325,7 +326,7 @@ export const FavoritesScreen: React.FC = () => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
-          <AlertCircle size={64} color={colors.textTertiary} />
+          <AlertCircle size={64} color={semantic.labelAlt} />
           <Text style={styles.errorTitle}>{error}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={refresh}>
             <Text style={styles.retryButtonText}>다시 시도</Text>
@@ -340,7 +341,7 @@ export const FavoritesScreen: React.FC = () => {
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.emptyState}>
-          <LogIn size={64} color={colors.textTertiary} />
+          <LogIn size={64} color={semantic.labelAlt} />
           <Text style={styles.emptyTitle}>로그인이 필요합니다</Text>
           <Text style={styles.emptySubtitle}>
             즐겨찾기를 사용하려면 로그인해주세요
@@ -411,7 +412,7 @@ export const FavoritesScreen: React.FC = () => {
           <RefreshControl
             refreshing={loading}
             onRefresh={refresh}
-            tintColor={colors.textPrimary}
+            tintColor={semantic.labelStrong}
           />
         }
       >
@@ -440,219 +441,228 @@ export const FavoritesScreen: React.FC = () => {
   );
 };
 
-const createStyles = (colors: ThemeColors, isDark: boolean) => {
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
-  return StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: semantic.bgSubtlePage,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 8,
-    paddingBottom: 4,
-    backgroundColor: 'transparent',
-  },
-  headerActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  sortButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 9999,
-    backgroundColor: semantic.bgBase,
-    borderWidth: 1,
-    borderColor: semantic.lineSubtle,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  addButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 9999,
-    backgroundColor: semantic.primaryNormal,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: semantic.labelStrong,
-    letterSpacing: -0.6,
-  },
-  content: {
-    flex: 1,
-  },
-  contentContainer: {
-    flexGrow: 1,
-  },
-  listContainer: {
-    padding: SPACING.lg,
-  },
-  favoriteItemContainer: {
-    marginBottom: SPACING.xl,
-  },
-  aliasContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING.sm,
-    paddingHorizontal: SPACING.xs,
-  },
-  aliasText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: colors.textSecondary,
-    marginLeft: SPACING.xs,
-  },
-  cardWrapper: {
-    position: 'relative',
-  },
-  removeButton: {
-    position: 'absolute',
-    top: SPACING.sm,
-    right: SPACING.sm,
-    backgroundColor: colors.surface,
-    borderRadius: RADIUS.full,
-    padding: SPACING.xs,
-  },
-  metadataRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: SPACING.sm,
-    paddingHorizontal: SPACING.xs,
-    gap: SPACING.sm,
-  },
-  metadataItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  metadataText: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: colors.textSecondary,
-  },
-  commuteIndicator: {
-    backgroundColor: colors.backgroundSecondary,
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 2,
-    borderRadius: RADIUS.sm,
-    borderWidth: 1,
-    borderColor: colors.borderMedium,
-  },
-  commuteText: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: colors.textPrimary,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-  },
-  errorCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: colors.backgroundSecondary,
-    padding: SPACING.lg,
-    borderRadius: RADIUS.lg,
-    marginBottom: SPACING.md,
-    borderWidth: 1,
-    borderColor: colors.borderMedium,
-  },
-  errorContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    gap: SPACING.sm,
-  },
-  errorTextContainer: {
-    flex: 1,
-  },
-  errorText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: colors.textSecondary,
-    marginBottom: 2,
-  },
-  errorSubtext: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: colors.textTertiary,
-  },
-  deleteButton: {
-    padding: SPACING.xs,
-  },
-  deleteIconButton: {
-    padding: SPACING.xs,
-    marginLeft: SPACING.sm,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: SPACING['2xl'],
-    gap: SPACING.lg,
-  },
-  loadingText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: colors.textTertiary,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: SPACING['2xl'],
-    gap: SPACING.lg,
-  },
-  errorTitle: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: colors.textSecondary,
-    textAlign: 'center',
-  },
-  retryButton: {
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.md,
-    backgroundColor: colors.textPrimary,
-    borderRadius: RADIUS.base,
-  },
-  retryButtonText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: colors.textInverse,
-  },
-  emptyState: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: SPACING['2xl'],
-    gap: SPACING.md,
-  },
-  emptyTitle: {
-    fontSize: TYPOGRAPHY.fontSize.xl,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: colors.textPrimary,
-  },
-  emptySubtitle: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: colors.textTertiary,
-    textAlign: 'center',
-    lineHeight: TYPOGRAPHY.lineHeight.relaxed * TYPOGRAPHY.fontSize.sm,
-  },
-  emptyButton: {
-    marginTop: SPACING.lg,
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.md,
-    backgroundColor: colors.textPrimary,
-    borderRadius: RADIUS.base,
-  },
-  emptyButtonText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: colors.textInverse,
-  },
+const createStyles = (semantic: WantedSemanticTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: semantic.bgSubtlePage,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: WANTED_TOKENS.spacing.s5,
+      paddingTop: WANTED_TOKENS.spacing.s2,
+      paddingBottom: WANTED_TOKENS.spacing.s1,
+      backgroundColor: 'transparent',
+    },
+    headerActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
+    sortButton: {
+      width: 36,
+      height: 36,
+      borderRadius: WANTED_TOKENS.radius.pill,
+      backgroundColor: semantic.bgBase,
+      borderWidth: 1,
+      borderColor: semantic.lineSubtle,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    addButton: {
+      width: 36,
+      height: 36,
+      borderRadius: WANTED_TOKENS.radius.pill,
+      backgroundColor: semantic.primaryNormal,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    headerTitle: {
+      fontSize: WANTED_TOKENS.type.title2.size,
+      lineHeight: WANTED_TOKENS.type.title2.lh,
+      fontWeight: '800',
+      fontFamily: weightToFontFamily('800'),
+      color: semantic.labelStrong,
+      letterSpacing:
+        WANTED_TOKENS.type.title2.size * WANTED_TOKENS.type.title2.tracking,
+    },
+    content: {
+      flex: 1,
+    },
+    contentContainer: {
+      flexGrow: 1,
+    },
+    listContainer: {
+      padding: WANTED_TOKENS.spacing.s4,
+    },
+    favoriteItemContainer: {
+      marginBottom: WANTED_TOKENS.spacing.s5,
+    },
+    aliasContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: WANTED_TOKENS.spacing.s2,
+      paddingHorizontal: WANTED_TOKENS.spacing.s1,
+    },
+    aliasText: {
+      fontSize: WANTED_TOKENS.type.caption1.size,
+      fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelAlt,
+      marginLeft: WANTED_TOKENS.spacing.s1,
+    },
+    cardWrapper: {
+      position: 'relative',
+    },
+    removeButton: {
+      position: 'absolute',
+      top: WANTED_TOKENS.spacing.s2,
+      right: WANTED_TOKENS.spacing.s2,
+      backgroundColor: semantic.bgBase,
+      borderRadius: WANTED_TOKENS.radius.pill,
+      padding: WANTED_TOKENS.spacing.s1,
+    },
+    metadataRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: WANTED_TOKENS.spacing.s2,
+      paddingHorizontal: WANTED_TOKENS.spacing.s1,
+      gap: WANTED_TOKENS.spacing.s2,
+    },
+    metadataItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    metadataText: {
+      fontSize: WANTED_TOKENS.type.caption1.size,
+      color: semantic.labelAlt,
+    },
+    commuteIndicator: {
+      backgroundColor: semantic.bgSubtle,
+      paddingHorizontal: WANTED_TOKENS.spacing.s2,
+      paddingVertical: 2,
+      borderRadius: WANTED_TOKENS.radius.r2,
+      borderWidth: 1,
+      borderColor: semantic.lineSubtle,
+    },
+    commuteText: {
+      fontSize: WANTED_TOKENS.type.caption1.size,
+      color: semantic.labelStrong,
+      fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
+    },
+    errorCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: semantic.bgSubtle,
+      padding: WANTED_TOKENS.spacing.s4,
+      borderRadius: WANTED_TOKENS.radius.r6,
+      marginBottom: WANTED_TOKENS.spacing.s3,
+      borderWidth: 1,
+      borderColor: semantic.lineSubtle,
+    },
+    errorContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+      gap: WANTED_TOKENS.spacing.s2,
+    },
+    errorTextContainer: {
+      flex: 1,
+    },
+    errorText: {
+      fontSize: WANTED_TOKENS.type.caption1.size,
+      fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelAlt,
+      marginBottom: 2,
+    },
+    errorSubtext: {
+      fontSize: WANTED_TOKENS.type.caption1.size,
+      color: semantic.labelAlt,
+    },
+    deleteButton: {
+      padding: WANTED_TOKENS.spacing.s1,
+    },
+    deleteIconButton: {
+      padding: WANTED_TOKENS.spacing.s1,
+      marginLeft: WANTED_TOKENS.spacing.s2,
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: WANTED_TOKENS.spacing.s10,
+      gap: WANTED_TOKENS.spacing.s4,
+    },
+    loadingText: {
+      fontSize: WANTED_TOKENS.type.caption1.size,
+      color: semantic.labelAlt,
+    },
+    errorContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: WANTED_TOKENS.spacing.s10,
+      gap: WANTED_TOKENS.spacing.s4,
+    },
+    errorTitle: {
+      fontSize: WANTED_TOKENS.type.body1.size,
+      fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelAlt,
+      textAlign: 'center',
+    },
+    retryButton: {
+      paddingHorizontal: WANTED_TOKENS.spacing.s5,
+      paddingVertical: WANTED_TOKENS.spacing.s3,
+      backgroundColor: semantic.primaryNormal,
+      borderRadius: WANTED_TOKENS.radius.r5,
+    },
+    retryButtonText: {
+      fontSize: WANTED_TOKENS.type.label1.size,
+      fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
+      color: '#FFFFFF',
+    },
+    emptyState: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: WANTED_TOKENS.spacing.s10,
+      gap: WANTED_TOKENS.spacing.s3,
+    },
+    emptyTitle: {
+      fontSize: WANTED_TOKENS.type.heading2.size,
+      lineHeight: WANTED_TOKENS.type.heading2.lh,
+      fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
+      color: semantic.labelStrong,
+    },
+    emptySubtitle: {
+      fontSize: WANTED_TOKENS.type.body2.size,
+      color: semantic.labelAlt,
+      textAlign: 'center',
+      lineHeight: WANTED_TOKENS.type.body2.lh,
+    },
+    emptyButton: {
+      marginTop: WANTED_TOKENS.spacing.s4,
+      paddingHorizontal: WANTED_TOKENS.spacing.s5,
+      paddingVertical: WANTED_TOKENS.spacing.s3,
+      backgroundColor: semantic.primaryNormal,
+      borderRadius: WANTED_TOKENS.radius.r5,
+    },
+    emptyButtonText: {
+      fontSize: WANTED_TOKENS.type.label1.size,
+      fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
+      color: '#FFFFFF',
+    },
   });
-};
 
 // Memoize to prevent unnecessary re-renders
 export default memo(FavoritesScreen);

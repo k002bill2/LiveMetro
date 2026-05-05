@@ -2,6 +2,7 @@
  * High Contrast Theme
  * Accessibility-focused theme with enhanced contrast ratios
  */
+import { weightToFontFamily } from '@/styles/modernTheme';
 
 // ============================================================================
 // Types
@@ -60,6 +61,7 @@ export interface ThemeTypography {
 interface TextStyle {
   fontSize: number;
   fontWeight: 'normal' | 'bold' | '500' | '600' | '700';
+  fontFamily: string;
   lineHeight: number;
 }
 
@@ -131,13 +133,13 @@ export const standardLightTheme: Theme = {
     xxl: 48,
   },
   typography: {
-    h1: { fontSize: 32, fontWeight: 'bold', lineHeight: 40 },
-    h2: { fontSize: 24, fontWeight: 'bold', lineHeight: 32 },
-    h3: { fontSize: 20, fontWeight: '600', lineHeight: 28 },
-    body: { fontSize: 16, fontWeight: 'normal', lineHeight: 24 },
-    bodyLarge: { fontSize: 18, fontWeight: 'normal', lineHeight: 26 },
-    caption: { fontSize: 14, fontWeight: 'normal', lineHeight: 20 },
-    button: { fontSize: 16, fontWeight: '600', lineHeight: 24 },
+    h1: { fontSize: 32, fontWeight: 'bold', fontFamily: weightToFontFamily('bold'), lineHeight: 40 },
+    h2: { fontSize: 24, fontWeight: 'bold', fontFamily: weightToFontFamily('bold'), lineHeight: 32 },
+    h3: { fontSize: 20, fontWeight: '600', fontFamily: weightToFontFamily('600'), lineHeight: 28 },
+    body: { fontSize: 16, fontWeight: 'normal', fontFamily: weightToFontFamily('normal'), lineHeight: 24 },
+    bodyLarge: { fontSize: 18, fontWeight: 'normal', fontFamily: weightToFontFamily('normal'), lineHeight: 26 },
+    caption: { fontSize: 14, fontWeight: 'normal', fontFamily: weightToFontFamily('normal'), lineHeight: 20 },
+    button: { fontSize: 16, fontWeight: '600', fontFamily: weightToFontFamily('600'), lineHeight: 24 },
   },
   borderRadius: {
     sm: 4,
@@ -213,13 +215,13 @@ export const highContrastLightTheme: Theme = {
     xxl: 52,
   },
   typography: {
-    h1: { fontSize: 36, fontWeight: 'bold', lineHeight: 44 },
-    h2: { fontSize: 28, fontWeight: 'bold', lineHeight: 36 },
-    h3: { fontSize: 22, fontWeight: '700', lineHeight: 30 },
-    body: { fontSize: 18, fontWeight: 'normal', lineHeight: 28 },
-    bodyLarge: { fontSize: 20, fontWeight: 'normal', lineHeight: 30 },
-    caption: { fontSize: 16, fontWeight: 'normal', lineHeight: 24 },
-    button: { fontSize: 18, fontWeight: '700', lineHeight: 26 },
+    h1: { fontSize: 36, fontWeight: 'bold', fontFamily: weightToFontFamily('bold'), lineHeight: 44 },
+    h2: { fontSize: 28, fontWeight: 'bold', fontFamily: weightToFontFamily('bold'), lineHeight: 36 },
+    h3: { fontSize: 22, fontWeight: '700', fontFamily: weightToFontFamily('700'), lineHeight: 30 },
+    body: { fontSize: 18, fontWeight: 'normal', fontFamily: weightToFontFamily('normal'), lineHeight: 28 },
+    bodyLarge: { fontSize: 20, fontWeight: 'normal', fontFamily: weightToFontFamily('normal'), lineHeight: 30 },
+    caption: { fontSize: 16, fontWeight: 'normal', fontFamily: weightToFontFamily('normal'), lineHeight: 24 },
+    button: { fontSize: 18, fontWeight: '700', fontFamily: weightToFontFamily('700'), lineHeight: 26 },
   },
   borderRadius: {
     sm: 4,

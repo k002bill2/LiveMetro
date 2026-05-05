@@ -9,15 +9,17 @@ import { Alert } from 'react-native';
 import { NotificationTimeScreen } from '../NotificationTimeScreen';
 import { useAuth } from '@/services/auth/AuthContext';
 
-jest.mock('@expo/vector-icons', () => ({
-  Ionicons: 'Ionicons',
-}));
-
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({
     navigate: jest.fn(),
     goBack: jest.fn(),
   }),
+}));
+
+// Phase 46 — screen now calls useTheme().isDark to drive WANTED_TOKENS
+// semantic selection. Force light variant for stable assertions.
+jest.mock('@/services/theme', () => ({
+  useTheme: () => ({ isDark: false }),
 }));
 
 jest.mock('@/services/auth/AuthContext', () => ({

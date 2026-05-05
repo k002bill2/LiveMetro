@@ -12,9 +12,9 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { CheckCircle, Moon, Smartphone, Sun, type LucideIcon } from 'lucide-react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { useTheme, ThemeMode } from '@/services/theme';
 import { useI18n } from '@/services/i18n';
 import { SettingsStackParamList } from '@/navigation/types';
@@ -24,7 +24,7 @@ type Props = NativeStackScreenProps<SettingsStackParamList, 'ThemeSettings'>;
 
 interface ThemeOptionData {
   id: ThemeMode;
-  icon: keyof typeof Ionicons.glyphMap;
+  icon: LucideIcon;
   titleKo: string;
   titleEn: string;
   descKo: string;
@@ -34,7 +34,7 @@ interface ThemeOptionData {
 const themeOptions: ThemeOptionData[] = [
   {
     id: 'system',
-    icon: 'phone-portrait',
+    icon: Smartphone,
     titleKo: '시스템 설정 따름',
     titleEn: 'Follow System',
     descKo: '기기의 테마 설정을 따릅니다',
@@ -42,7 +42,7 @@ const themeOptions: ThemeOptionData[] = [
   },
   {
     id: 'light',
-    icon: 'sunny',
+    icon: Sun,
     titleKo: '라이트 모드',
     titleEn: 'Light Mode',
     descKo: '밝은 화면으로 표시합니다',
@@ -50,7 +50,7 @@ const themeOptions: ThemeOptionData[] = [
   },
   {
     id: 'dark',
-    icon: 'moon',
+    icon: Moon,
     titleKo: '다크 모드',
     titleEn: 'Dark Mode',
     descKo: '어두운 화면으로 표시합니다',
@@ -59,7 +59,8 @@ const themeOptions: ThemeOptionData[] = [
 ];
 
 export const ThemeSettingsScreen: React.FC<Props> = ({ navigation }) => {
-  const { themeMode, setThemeMode, colors, isDark } = useTheme();
+  const { themeMode, setThemeMode, isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
   const { language, t } = useI18n();
 
   const handleThemeChange = async (theme: ThemeMode): Promise<void> => {
@@ -67,24 +68,24 @@ export const ThemeSettingsScreen: React.FC<Props> = ({ navigation }) => {
     navigation.goBack();
   };
 
-  const styles = createStyles(colors);
+  const styles = createStyles(semantic);
 
   const ThemeOptionItem: React.FC<{
-    icon: keyof typeof Ionicons.glyphMap;
+    icon: LucideIcon;
     title: string;
     description: string;
     value: ThemeMode;
     isSelected: boolean;
-  }> = ({ icon, title, description, value, isSelected }) => (
+  }> = ({ icon: IconComponent, title, description, value, isSelected }) => (
     <TouchableOpacity
       style={[styles.themeOption, isSelected && styles.themeOptionSelected]}
       onPress={() => handleThemeChange(value)}
     >
       <View style={styles.themeIconContainer}>
-        <Ionicons
-          name={icon}
+        <IconComponent
           size={32}
-          color={isSelected ? colors.primary : colors.textTertiary}
+          color={isSelected ? semantic.primaryNormal : semantic.labelAlt}
+          strokeWidth={2}
         />
       </View>
       <View style={styles.themeContent}>
@@ -93,7 +94,7 @@ export const ThemeSettingsScreen: React.FC<Props> = ({ navigation }) => {
             {title}
           </Text>
           {isSelected && (
-            <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+            <CheckCircle size={24} color={semantic.primaryNormal} strokeWidth={2} />
           )}
         </View>
         <Text style={styles.themeDescription}>{description}</Text>
@@ -130,11 +131,11 @@ export const ThemeSettingsScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const createStyles = (colors: any) =>
+const createStyles = (semantic: WantedSemanticTheme) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background,
+      backgroundColor: semantic.bgSubtlePage,
     },
     content: {
       flex: 1,
@@ -142,26 +143,26 @@ const createStyles = (colors: any) =>
     themeOption: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingHorizontal: SPACING.lg,
-      paddingVertical: SPACING.lg,
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s4,
       borderBottomWidth: 1,
-      borderBottomColor: colors.borderLight,
+      borderBottomColor: semantic.lineSubtle,
       borderLeftWidth: 3,
       borderLeftColor: 'transparent',
-      backgroundColor: colors.surface,
+      backgroundColor: semantic.bgBase,
     },
     themeOptionSelected: {
-      borderLeftColor: colors.primary,
-      backgroundColor: colors.primaryLight,
+      borderLeftColor: semantic.primaryNormal,
+      backgroundColor: semantic.primaryBg,
     },
     themeIconContainer: {
       width: 56,
       height: 56,
-      backgroundColor: colors.backgroundSecondary,
-      borderRadius: RADIUS.lg,
+      backgroundColor: semantic.bgSubtle,
+      borderRadius: WANTED_TOKENS.radius.r6,
       justifyContent: 'center',
       alignItems: 'center',
-      marginRight: SPACING.lg,
+      marginRight: WANTED_TOKENS.spacing.s4,
     },
     themeContent: {
       flex: 1,
@@ -173,33 +174,34 @@ const createStyles = (colors: any) =>
       marginBottom: 4,
     },
     themeTitle: {
-      fontSize: TYPOGRAPHY.fontSize.base,
-      fontWeight: TYPOGRAPHY.fontWeight.bold,
-      color: colors.textPrimary,
+      fontSize: WANTED_TOKENS.type.body1.size,
+      fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
+      color: semantic.labelStrong,
       flex: 1,
     },
     selectedText: {
-      color: colors.primary,
+      color: semantic.primaryNormal,
     },
     themeDescription: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      color: colors.textTertiary,
+      fontSize: WANTED_TOKENS.type.label2.size,
+      color: semantic.labelAlt,
     },
     infoBox: {
-      backgroundColor: colors.primaryLight,
-      paddingHorizontal: SPACING.lg,
-      paddingVertical: SPACING.lg,
-      marginHorizontal: SPACING.lg,
-      marginTop: SPACING.xl,
-      marginBottom: SPACING.xl,
-      borderRadius: RADIUS.lg,
+      backgroundColor: semantic.primaryBg,
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s4,
+      marginHorizontal: WANTED_TOKENS.spacing.s4,
+      marginTop: WANTED_TOKENS.spacing.s5,
+      marginBottom: WANTED_TOKENS.spacing.s5,
+      borderRadius: WANTED_TOKENS.radius.r6,
       borderWidth: 1,
-      borderColor: colors.borderMedium,
+      borderColor: semantic.lineNormal,
     },
     infoText: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      color: colors.textSecondary,
-      lineHeight: TYPOGRAPHY.lineHeight.relaxed * TYPOGRAPHY.fontSize.sm,
+      fontSize: WANTED_TOKENS.type.body2.size,
+      color: semantic.labelAlt,
+      lineHeight: WANTED_TOKENS.type.body2.lh,
     },
   });
 

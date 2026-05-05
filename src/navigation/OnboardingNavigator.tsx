@@ -6,10 +6,10 @@
 import React, { createContext, useContext, useCallback } from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from './types';
-import { CommuteTimeScreen } from '@/screens/onboarding/CommuteTimeScreen';
+import { WelcomeOnboardingScreen } from '@/screens/onboarding/WelcomeOnboardingScreen';
 import { CommuteRouteScreen } from '@/screens/onboarding/CommuteRouteScreen';
-import { CommuteNotificationScreen } from '@/screens/onboarding/CommuteNotificationScreen';
-import { CommuteCompleteScreen } from '@/screens/onboarding/CommuteCompleteScreen';
+import { NotificationPermissionScreen } from '@/screens/onboarding/NotificationPermissionScreen';
+import { FavoritesOnboardingScreen } from '@/screens/onboarding/FavoritesOnboardingScreen';
 import { COLORS } from '@/styles/modernTheme';
 
 const Stack = createNativeStackNavigator<OnboardingStackParamList>();
@@ -40,23 +40,12 @@ export const OnboardingNavigator: React.FC<OnboardingNavigatorProps> = ({
   onComplete,
   onSkip,
 }) => {
-  // Handle time set for morning commute
-  const handleMorningTimeSet = useCallback(() => {
-    // Time is already passed via route params
-  }, []);
-
-  // Handle skip onboarding
   const handleSkipOnboarding = useCallback(() => {
-    if (onSkip) {
-      onSkip();
-    }
+    if (onSkip) onSkip();
   }, [onSkip]);
 
-  // Handle complete onboarding
   const handleComplete = useCallback(() => {
-    if (onComplete) {
-      onComplete();
-    }
+    if (onComplete) onComplete();
   }, [onComplete]);
 
   const contextValue: OnboardingContextType = {
@@ -72,23 +61,12 @@ export const OnboardingNavigator: React.FC<OnboardingNavigatorProps> = ({
           contentStyle: { backgroundColor: COLORS.white },
           animation: 'slide_from_right',
         }}
-        initialRouteName="CommuteTime"
+        initialRouteName="WelcomeOnboarding"
       >
-        <Stack.Screen
-          name="CommuteTime"
-          component={CommuteTimeScreen}
-          initialParams={{
-            commuteType: 'morning',
-            onTimeSet: handleMorningTimeSet,
-            onSkip: handleSkipOnboarding,
-          }}
-        />
+        <Stack.Screen name="WelcomeOnboarding" component={WelcomeOnboardingScreen} />
         <Stack.Screen name="CommuteRoute" component={CommuteRouteScreen} />
-        <Stack.Screen
-          name="CommuteNotification"
-          component={CommuteNotificationScreen}
-        />
-        <Stack.Screen name="CommuteComplete" component={CommuteCompleteScreen} />
+        <Stack.Screen name="NotificationPermission" component={NotificationPermissionScreen} />
+        <Stack.Screen name="FavoritesOnboarding" component={FavoritesOnboardingScreen} />
       </Stack.Navigator>
     </OnboardingContext.Provider>
   );

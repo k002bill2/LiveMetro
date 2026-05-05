@@ -134,3 +134,8 @@ apps/
 
 # Serena MCP
 .serena/
+
+# docs/design — Wanted Design hand-off bundle
+# Track design material (HTML + JSX) but exclude bundled React runtime (npm-derivable)
+docs/design/wanted-bundle/33122b9e-*.js
+docs/design/wanted-bundle/93aa0060-*.js

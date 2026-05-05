@@ -3,7 +3,7 @@
  * Exports all onboarding-related screens
  */
 
-export { CommuteTimeScreen } from './CommuteTimeScreen';
+export { WelcomeOnboardingScreen } from './WelcomeOnboardingScreen';
 export { CommuteRouteScreen } from './CommuteRouteScreen';
-export { CommuteNotificationScreen } from './CommuteNotificationScreen';
-export { CommuteCompleteScreen } from './CommuteCompleteScreen';
+export { NotificationPermissionScreen } from './NotificationPermissionScreen';
+export { FavoritesOnboardingScreen } from './FavoritesOnboardingScreen';

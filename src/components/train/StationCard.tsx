@@ -27,9 +27,24 @@ import { Animated, StyleSheet, Text, TouchableOpacity, View, Pressable, GestureR
 import { useRealtimeTrains } from '../../hooks/useRealtimeTrains';
 import { Station } from '../../models/train';
 import { useAuth } from '../../services/auth/AuthContext';
-import { RADIUS, SPACING, TRANSITIONS, TYPOGRAPHY } from '../../styles/modernTheme';
-import { useTheme, ThemeColors } from '../../services/theme';
+import { RADIUS, SPACING, TRANSITIONS, TYPOGRAPHY, WANTED_TOKENS, type WantedSemanticTheme } from '../../styles/modernTheme';
+import { useTheme } from '../../services/theme';
 import { getSubwayLineColor } from '../../utils/colorUtils';
+import { LineBadge } from '../design';
+
+/**
+ * Internal — typed shape for the realtime arrival preview rows.
+ * Replaces the previous untyped `any` used in the JSX map.
+ */
+interface UpcomingArrival {
+  /** Stable train identifier — used as React key. */
+  id: string;
+  direction: '상행' | '하행';
+  /** Pre-formatted "N분 후" or "도착" label. */
+  time: string;
+  isImmediate: boolean;
+  destination: string;
+}
 
 interface StationCardProps {
   station: Station;
@@ -70,8 +85,9 @@ export const StationCard: React.FC<StationCardProps> = memo(
     animationDelay = 0,
   }) => {
     // ============ HOOKS ============
-    const { colors } = useTheme();
-    const styles = createStyles(colors);
+    const { isDark } = useTheme();
+    const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+    const styles = useMemo(() => createStyles(semantic), [semantic]);
     const { user, updateUserProfile } = useAuth();
 
     // Animation values
@@ -89,6 +105,16 @@ export const StationCard: React.FC<StationCardProps> = memo(
       refetchInterval: 30000, // 30 seconds
       staleTime: 60000, // 1 minute
     });
+
+    // Tick to refresh "N분 후" text every 30s even when the realtime stream
+    // is silent (Seoul API polling only updates trains[]). Without this the
+    // displayed minutes drift between fetches (Gemini cross-review).
+    const [arrivalTick, setArrivalTick] = useState(0);
+    useEffect(() => {
+      if (!showArrivals || !arrivalsEnabled) return;
+      const id = setInterval(() => setArrivalTick(t => t + 1), 30_000);
+      return () => clearInterval(id);
+    }, [showArrivals, arrivalsEnabled]);
 
     // ============ ANIMATIONS ============
     // Entrance animation on mount
@@ -202,8 +228,11 @@ export const StationCard: React.FC<StationCardProps> = memo(
       return `${distance.toFixed(1)}km`;
     }, [distance, showDistance]);
 
-    // Process arrival preview data (show up to 2 upcoming trains)
-    const upcomingArrivals = useMemo(() => {
+    // Process arrival preview data (show up to 2 upcoming trains).
+    // Typed shape — Gemini cross-review flagged the previous `any` usage in
+    // the JSX map. Including train.id gives a stable React key that survives
+    // list reorder/removal in the realtime stream.
+    const upcomingArrivals = useMemo<UpcomingArrival[]>(() => {
       if (!showArrivals || !trains || trains.length === 0) return [];
 
       return trains
@@ -213,7 +242,7 @@ export const StationCard: React.FC<StationCardProps> = memo(
           return new Date(a.arrivalTime).getTime() - new Date(b.arrivalTime).getTime();
         })
         .slice(0, 2)
-        .map(train => {
+        .map((train): UpcomingArrival | null => {
           if (!train.arrivalTime) return null;
 
           const now = new Date();
@@ -231,14 +260,18 @@ export const StationCard: React.FC<StationCardProps> = memo(
           }
 
           return {
+            id: train.id,
             direction: train.direction === 'up' ? '상행' : '하행',
             time: displayText,
             isImmediate: diffMinutes <= 1,
             destination: train.finalDestination,
           };
         })
-        .filter(Boolean);
-    }, [trains, showArrivals]);
+        .filter((a): a is UpcomingArrival => a !== null);
+      // arrivalTick is intentional in deps — recompute "N분 후" every 30s so
+      // text doesn't drift between trains[] fetches.
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [trains, showArrivals, arrivalTick]);
 
     return (
       <Animated.View
@@ -270,7 +303,7 @@ export const StationCard: React.FC<StationCardProps> = memo(
                 <Text style={[styles.stationName, isSelected && styles.selectedText]}>{station.name}</Text>
                 {isFavorite && (
                   <View style={styles.favoriteBadge}>
-                    <Star size={12} fill={colors.textPrimary} color={colors.textPrimary} />
+                    <Star size={12} fill={semantic.labelStrong} color={semantic.labelStrong} />
                   </View>
                 )}
               </View>
@@ -294,8 +327,8 @@ export const StationCard: React.FC<StationCardProps> = memo(
                   >
                     <Heart
                       size={22}
-                      color={isFavorite ? colors.textPrimary : colors.textTertiary}
-                      fill={isFavorite ? colors.textPrimary : 'transparent'}
+                      color={isFavorite ? semantic.statusNegative : semantic.labelAlt}
+                      fill={isFavorite ? semantic.statusNegative : 'transparent'}
                     />
                   </Pressable>
                 </Animated.View>
@@ -303,16 +336,16 @@ export const StationCard: React.FC<StationCardProps> = memo(
             </View>
           </View>
 
-          {/* Line Info */}
+          {/* Line Info — Phase 8: design system LineBadge로 시각 일관성 */}
           <View style={styles.lineInfo}>
-            <View style={[styles.lineIndicator, { backgroundColor: lineColor }]} />
+            <LineBadge line={station.lineId} size={20} />
             <Text style={styles.lineText}>{station.lineId}호선</Text>
           </View>
 
           {/* Transfer Info */}
           {station.transfers && station.transfers.length > 0 && (
             <View style={styles.transfersContainer}>
-              <Shuffle size={14} color={colors.textSecondary} />
+              <Shuffle size={14} color={semantic.labelAlt} />
               <Text style={styles.transfersText}>
                 환승: {station.transfers.map(lineId => `${lineId}호선`).join(', ')}
               </Text>
@@ -323,11 +356,11 @@ export const StationCard: React.FC<StationCardProps> = memo(
           {showArrivals && upcomingArrivals.length > 0 && (
             <View style={styles.arrivalsContainer}>
               <View style={styles.arrivalsHeader}>
-                <TrainFront size={14} color={colors.textSecondary} />
+                <TrainFront size={14} color={semantic.labelAlt} />
                 <Text style={styles.arrivalsHeaderText}>실시간 도착 정보</Text>
               </View>
-              {upcomingArrivals.map((arrival: any, index: number) => (
-                <View key={index} style={styles.arrivalItem}>
+              {upcomingArrivals.map((arrival) => (
+                <View key={arrival.id} style={styles.arrivalItem}>
                   <View style={styles.arrivalDirection}>
                     {arrival.direction === '상행' ? (
                        <ArrowUp size={12} color={lineColor} />
@@ -361,7 +394,7 @@ export const StationCard: React.FC<StationCardProps> = memo(
               }}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <MapPin size={14} color={colors.textInverse} />
+              <MapPin size={14} color={semantic.labelOnColor} />
               <Text style={styles.actionButtonText}>출발</Text>
             </Pressable>
             <Pressable
@@ -372,7 +405,7 @@ export const StationCard: React.FC<StationCardProps> = memo(
               }}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Navigation size={14} color={colors.textInverse} />
+              <Navigation size={14} color={semantic.labelOnColor} />
               <Text style={styles.actionButtonText}>도착</Text>
             </Pressable>
           </View>
@@ -380,7 +413,7 @@ export const StationCard: React.FC<StationCardProps> = memo(
           {/* Selection Indicator */}
           {isSelected && (
             <View style={styles.selectedIndicator}>
-              <CheckCircle size={20} color={colors.textPrimary} />
+              <CheckCircle size={20} color={semantic.primaryNormal} />
             </View>
           )}
         </TouchableOpacity>
@@ -392,202 +425,212 @@ export const StationCard: React.FC<StationCardProps> = memo(
 // Set display name for debugging
 StationCard.displayName = 'StationCard';
 
-const createStyles = (colors: ThemeColors) => StyleSheet.create({
-  container: {
-    backgroundColor: colors.surface,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.lg,
-    marginRight: SPACING.md,
-    minWidth: 240,
-    minHeight: 120,
-    borderWidth: 1,
-    borderColor: colors.borderLight,
-    overflow: 'hidden',
-  },
-  selectedContainer: {
-    borderColor: colors.primary,
-    backgroundColor: colors.surface,
-    borderWidth: 2,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  accentBar: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: 3,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: SPACING.sm,
-    marginTop: SPACING.xs,
-  },
-  stationInfo: {
-    flex: 1,
-  },
-  stationNameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING.xs,
-  },
-  stationName: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: colors.textPrimary,
-    letterSpacing: TYPOGRAPHY.letterSpacing.tight,
-  },
-  selectedText: {
-    color: colors.primary,
-  },
-  favoriteBadge: {
-    marginLeft: SPACING.xs,
-    backgroundColor: colors.surface,
-    borderRadius: RADIUS.full,
-    width: 20,
-    height: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.borderMedium,
-  },
-  stationNameEn: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: colors.textTertiary,
-    marginBottom: 4,
-  },
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-  },
-  distance: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: colors.textSecondary,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-  },
-  favoriteButton: {
-    padding: 4,
-  },
-  lineInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING.xs,
-  },
-  lineIndicator: {
-    width: 14,
-    height: 14,
-    borderRadius: RADIUS.full,
-    marginRight: SPACING.xs,
-  },
-  lineText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: colors.textSecondary,
-    fontWeight: TYPOGRAPHY.fontWeight.medium,
-  },
-  transfersContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: SPACING.xs,
-    marginBottom: SPACING.sm,
-  },
-  transfersText: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: colors.textSecondary,
-    marginLeft: 4,
-  },
-  // Arrivals Section
-  arrivalsContainer: {
-    marginTop: SPACING.sm,
-    marginBottom: SPACING.sm,
-    paddingTop: SPACING.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.borderLight,
-  },
-  arrivalsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING.xs,
-  },
-  arrivalsHeaderText: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: colors.textSecondary,
-    marginLeft: 4,
-    fontWeight: TYPOGRAPHY.fontWeight.medium,
-  },
-  arrivalItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 4,
-    gap: SPACING.sm,
-  },
-  arrivalDirection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    minWidth: 45,
-  },
-  arrivalDirectionText: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    marginLeft: 2,
-  },
-  arrivalTime: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: colors.textPrimary,
-    minWidth: 60,
-  },
-  arrivalTimeImmediate: {
-    color: colors.error,
-  },
-  arrivalDestination: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: colors.textTertiary,
-    flex: 1,
-  },
-  arrivalsLoading: {
-    paddingVertical: SPACING.sm,
-    alignItems: 'center',
-  },
-  arrivalsLoadingText: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: colors.textTertiary,
-    fontStyle: 'italic',
-  },
-  // Action Buttons
-  actionButtons: {
-    flexDirection: 'row',
-    marginTop: SPACING.sm,
-    gap: SPACING.sm,
-  },
-  actionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.base,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-  },
-  startButton: {
-    backgroundColor: colors.info,
-  },
-  endButton: {
-    backgroundColor: colors.primary,
-  },
-  actionButtonText: {
-    color: colors.textInverse,
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-  },
-  selectedIndicator: {
-    position: 'absolute',
-    top: SPACING.sm,
-    right: SPACING.sm,
-  },
-});
+const createStyles = (semantic: WantedSemanticTheme) =>
+  StyleSheet.create({
+    container: {
+      backgroundColor: semantic.bgBase,
+      // Wanted radius-8 = 16. Use token for design-system maintainability.
+      borderRadius: RADIUS.lg,
+      padding: SPACING.lg,
+      marginRight: SPACING.md,
+      minWidth: 240,
+      minHeight: 120,
+      borderWidth: 1,
+      borderColor: semantic.lineSubtle,
+      overflow: 'hidden',
+    },
+    selectedContainer: {
+      borderColor: semantic.primaryNormal,
+      backgroundColor: semantic.bgBase,
+      borderWidth: 2,
+      shadowColor: semantic.primaryNormal,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.12,
+      shadowRadius: 12,
+      elevation: 4,
+    },
+    accentBar: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      height: 3,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      marginBottom: SPACING.sm,
+      marginTop: SPACING.xs,
+    },
+    stationInfo: {
+      flex: 1,
+    },
+    stationNameRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: SPACING.xs,
+    },
+    stationName: {
+      // 700 (bold) instead of 800 — Android 시스템 폰트는 numeric weight를
+      // 400/700만 보장. 800은 일부 디바이스에서 700으로 fallback돼 시각
+      // 일관성 손상. iOS는 800을 정확히 표현하지만 cross-platform 안정성
+      // 우선 (Gemini cross-review).
+      fontSize: TYPOGRAPHY.fontSize.lg,
+      fontWeight: TYPOGRAPHY.fontWeight.bold,
+      color: semantic.labelStrong,
+      letterSpacing: -0.3,
+    },
+    selectedText: {
+      color: semantic.primaryNormal,
+    },
+    favoriteBadge: {
+      marginLeft: SPACING.xs,
+      backgroundColor: semantic.bgBase,
+      borderRadius: RADIUS.full,
+      width: 20,
+      height: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: semantic.lineNormal,
+    },
+    stationNameEn: {
+      fontSize: TYPOGRAPHY.fontSize.xs,
+      color: semantic.labelAlt,
+      marginBottom: 4,
+      fontWeight: TYPOGRAPHY.fontWeight.medium,
+    },
+    headerRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.sm,
+    },
+    distance: {
+      fontSize: TYPOGRAPHY.fontSize.sm,
+      color: semantic.labelNeutral,
+      fontWeight: TYPOGRAPHY.fontWeight.bold,
+    },
+    favoriteButton: {
+      padding: 4,
+    },
+    lineInfo: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.xs / 1,  // 4px
+      marginBottom: SPACING.xs,
+    },
+    lineText: {
+      fontSize: TYPOGRAPHY.fontSize.sm,
+      color: semantic.labelNeutral,
+      fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    },
+    transfersContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: SPACING.xs,
+      marginBottom: SPACING.sm,
+    },
+    transfersText: {
+      fontSize: TYPOGRAPHY.fontSize.xs,
+      color: semantic.labelAlt,
+      marginLeft: 4,
+      fontWeight: TYPOGRAPHY.fontWeight.medium,
+    },
+    // Arrivals Section
+    arrivalsContainer: {
+      marginTop: SPACING.sm,
+      marginBottom: SPACING.sm,
+      paddingTop: SPACING.sm,
+      borderTopWidth: 1,
+      borderTopColor: semantic.lineSubtle,
+    },
+    arrivalsHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: SPACING.xs,
+    },
+    arrivalsHeaderText: {
+      fontSize: TYPOGRAPHY.fontSize.xs,
+      color: semantic.labelAlt,
+      marginLeft: 4,
+      fontWeight: TYPOGRAPHY.fontWeight.bold,
+      letterSpacing: 0.3,
+    },
+    arrivalItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 4,
+      gap: SPACING.sm,
+    },
+    arrivalDirection: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      minWidth: 45,
+    },
+    arrivalDirectionText: {
+      fontSize: TYPOGRAPHY.fontSize.xs,
+      fontWeight: TYPOGRAPHY.fontWeight.bold,
+      marginLeft: 2,
+    },
+    arrivalTime: {
+      fontSize: TYPOGRAPHY.fontSize.base,
+      // 700 instead of 800 (cross-platform consistency — see stationName).
+      fontWeight: TYPOGRAPHY.fontWeight.bold,
+      color: semantic.labelStrong,
+      minWidth: 60,
+      // Tabular-nums prevents the countdown digits from shifting horizontally
+      // on each tick — Gemini cross-review confirmed this is the right call.
+      fontVariant: ['tabular-nums'],
+    },
+    arrivalTimeImmediate: {
+      color: semantic.statusNegative,
+    },
+    arrivalDestination: {
+      fontSize: TYPOGRAPHY.fontSize.xs,
+      color: semantic.labelAlt,
+      flex: 1,
+    },
+    arrivalsLoading: {
+      paddingVertical: SPACING.sm,
+      alignItems: 'center',
+    },
+    arrivalsLoadingText: {
+      fontSize: TYPOGRAPHY.fontSize.xs,
+      color: semantic.labelAlt,
+      fontStyle: 'italic',
+    },
+    // Action Buttons
+    actionButtons: {
+      flexDirection: 'row',
+      marginTop: SPACING.sm,
+      gap: SPACING.sm,
+    },
+    actionButton: {
+      flex: 1,
+      flexDirection: 'row',
+      paddingVertical: SPACING.sm,
+      borderRadius: RADIUS.base,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 4,
+    },
+    // 'startButton' (출발) — info cyan tint
+    startButton: {
+      backgroundColor: semantic.statusInfo,
+    },
+    // 'endButton' (도착) — primary blue
+    endButton: {
+      backgroundColor: semantic.primaryNormal,
+    },
+    actionButtonText: {
+      color: semantic.labelOnColor,
+      fontSize: TYPOGRAPHY.fontSize.xs,
+      fontWeight: TYPOGRAPHY.fontWeight.bold,
+    },
+    selectedIndicator: {
+      position: 'absolute',
+      top: SPACING.sm,
+      right: SPACING.sm,
+    },
+  });

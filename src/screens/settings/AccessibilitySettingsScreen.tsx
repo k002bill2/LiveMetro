@@ -15,6 +15,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Slider from '@react-native-community/slider';
 import { useAccessibility } from '@/contexts/AccessibilityContext';
+import { weightToFontFamily } from '@/styles/modernTheme';
 
 // ============================================================================
 // Component
@@ -351,6 +352,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
+    fontFamily: weightToFontFamily('bold'),
     color: '#333',
   },
   subtitle: {
@@ -367,6 +369,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     color: '#666',
     marginBottom: 12,
     textTransform: 'uppercase',
@@ -388,6 +391,7 @@ const styles = StyleSheet.create({
   statusActive: {
     color: '#4CAF50',
     fontWeight: '500',
+    fontFamily: weightToFontFamily('500'),
   },
   row: {
     flexDirection: 'row',
@@ -404,6 +408,7 @@ const styles = StyleSheet.create({
   rowTitle: {
     fontSize: 16,
     fontWeight: '500',
+    fontFamily: weightToFontFamily('500'),
     color: '#333',
   },
   rowDescription: {
@@ -428,6 +433,7 @@ const styles = StyleSheet.create({
   sliderValue: {
     fontSize: 16,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     color: '#007AFF',
   },
   sliderLabels: {
@@ -451,6 +457,7 @@ const styles = StyleSheet.create({
   currentThemeValue: {
     fontSize: 14,
     fontWeight: '500',
+    fontFamily: weightToFontFamily('500'),
     color: '#333',
   },
   previewCard: {
@@ -485,6 +492,7 @@ const styles = StyleSheet.create({
     color: '#F44336',
     fontSize: 16,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
   },
   infoSection: {
     margin: 16,
@@ -495,6 +503,7 @@ const styles = StyleSheet.create({
   infoTitle: {
     fontSize: 15,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     color: '#333',
     marginBottom: 8,
   },

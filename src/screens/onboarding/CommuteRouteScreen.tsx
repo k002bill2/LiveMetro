@@ -3,7 +3,7 @@
  * Screen for setting departure, transfer, and arrival stations during onboarding
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -22,11 +22,14 @@ import {
   ArrowRight
 } from 'lucide-react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { COLORS, SPACING, TYPOGRAPHY, RADIUS, SHADOWS } from '@/styles/modernTheme';
+import { COLORS, SPACING, TYPOGRAPHY, RADIUS, SHADOWS, WANTED_TOKENS, type WantedSemanticTheme } from '@/styles/modernTheme';
+import { useTheme } from '@/services/theme';
 import { OnboardingStackParamList } from '@/navigation/types';
 import { StationSearchModal } from '@/components/commute/StationSearchModal';
 import { TransferStationList } from '@/components/commute/TransferStationList';
 import { RoutePreview } from '@/components/commute/RoutePreview';
+import { OnbHeader } from '@/components/onboarding/OnbHeader';
+import { useOnboardingCallbacks } from '@/navigation/OnboardingNavigator';
 import {
   StationSelection,
   TransferStation,
@@ -38,8 +41,16 @@ type Props = NativeStackScreenProps<OnboardingStackParamList, 'CommuteRoute'>;
 
 type StationSelectionType = 'departure' | 'arrival' | 'transfer';
 
-export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { commuteType, departureTime } = route.params;
+// Default departure time — the dedicated CommuteTime step was removed in
+// Chunk 5; users adjust this later from the SettingsCommute screen.
+const DEFAULT_DEPARTURE_TIME = '08:00';
+
+export const CommuteRouteScreen: React.FC<Props> = ({ navigation }) => {
+  const departureTime = DEFAULT_DEPARTURE_TIME;
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const styles = useMemo(() => createStyles(semantic), [semantic]);
+  const { onSkip } = useOnboardingCallbacks();
 
   // Station states
   const [departureStation, setDepartureStation] = useState<StationSelection | null>(null);
@@ -50,7 +61,12 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [selectionType, setSelectionType] = useState<StationSelectionType>('departure');
 
-  const isMorning = commuteType === 'morning';
+  // Morning/evening branching is retained as a no-op until Chunk 5 simplifies
+  // the OnboardingStackParamList to single-route. The onboarding flow is now
+  // single-route per chat3 redefinition; the existing param shape is bridged
+  // until then.
+  // (commuteType + departureTime are still in route.params but unused for
+  // copy decisions — single-label "출퇴근 경로 설정" is shown.)
 
   // Get excluded station IDs (can't select same station twice)
   const getExcludedStationIds = useCallback((): string[] => {
@@ -116,17 +132,19 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
   // Validation
   const isValid = departureStation && arrivalStation;
 
-  // Handle next
+  // Handle next — single-route flow forwards to NotificationPermission with
+  // a packaged OnboardingRouteData. departureTime carries forward from the
+  // bridge param shape (Chunk 5 will drop it from ParamList entirely).
   const handleNext = () => {
     if (!isValid || !departureStation || !arrivalStation) return;
 
-    navigation.navigate('CommuteNotification', {
-      commuteType,
-      departureTime,
-      departureStation,
-      arrivalStation,
-      transferStations,
-      morningRoute: route.params.morningRoute,
+    navigation.navigate('NotificationPermission', {
+      route: {
+        departureTime,
+        departureStation,
+        arrivalStation,
+        transferStations,
+      },
     });
   };
 
@@ -144,6 +162,11 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
 
   return (
     <SafeAreaView style={styles.container}>
+      <OnbHeader
+        currentStep={2}
+        onBack={() => navigation.canGoBack() && navigation.goBack()}
+        onSkip={onSkip}
+      />
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
@@ -153,16 +176,12 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
           <View style={styles.iconContainer}>
             <GitBranch
               size={48}
-              color={COLORS.primary.main}
+              color={semantic.primaryNormal}
             />
           </View>
-          <Text style={styles.title}>
-            {isMorning ? '출근 경로 설정' : '퇴근 경로 설정'}
-          </Text>
+          <Text style={styles.title}>출퇴근 경로 설정</Text>
           <Text style={styles.subtitle}>
-            {isMorning
-              ? '출근할 때 이용하는 경로를 알려주세요'
-              : '퇴근할 때 이용하는 경로를 알려주세요'}
+            출발역과 도착역을 알려주세요
           </Text>
         </View>
 
@@ -183,7 +202,7 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
                   <View style={styles.stationIconContainer}>
                     <MapPin
                       size={20}
-                      color={COLORS.primary.main}
+                      color={semantic.primaryNormal}
                     />
                   </View>
                   <View style={styles.stationInfo}>
@@ -196,14 +215,14 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
                   </View>
                   <ChevronRight
                     size={20}
-                    color={COLORS.gray[400]}
+                    color={semantic.labelAlt}
                   />
                 </View>
               ) : (
                 <View style={styles.placeholderContent}>
                   <Search
                     size={20}
-                    color={COLORS.gray[400]}
+                    color={semantic.labelAlt}
                   />
                   <Text style={styles.placeholderText}>승차역을 검색하세요</Text>
                 </View>
@@ -241,7 +260,7 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
                   >
                     <Flag
                       size={20}
-                      color={COLORS.semantic.error}
+                      color={semantic.statusNegative}
                     />
                   </View>
                   <View style={styles.stationInfo}>
@@ -254,14 +273,14 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
                   </View>
                   <ChevronRight
                     size={20}
-                    color={COLORS.gray[400]}
+                    color={semantic.labelAlt}
                   />
                 </View>
               ) : (
                 <View style={styles.placeholderContent}>
                   <Search
                     size={20}
-                    color={COLORS.gray[400]}
+                    color={semantic.labelAlt}
                   />
                   <Text style={styles.placeholderText}>도착역을 검색하세요</Text>
                 </View>
@@ -285,7 +304,7 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <ArrowLeft size={20} color={COLORS.text.secondary} />
+          <ArrowLeft size={20} color={semantic.labelNeutral} />
           <Text style={styles.backButtonText}>이전</Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -320,162 +339,163 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.white,
-  },
-  content: {
-    flexGrow: 1,
-    paddingHorizontal: SPACING.xl,
-    paddingTop: SPACING['2xl'],
-    paddingBottom: SPACING.xl,
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: SPACING['2xl'],
-  },
-  iconContainer: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    backgroundColor: COLORS.surface.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.lg,
-  },
-  title: {
-    fontSize: TYPOGRAPHY.fontSize['3xl'],
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.text.primary,
-    marginBottom: SPACING.sm,
-  },
-  subtitle: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    color: COLORS.text.tertiary,
-    textAlign: 'center',
-  },
-  stationSection: {
-    marginBottom: SPACING.xl,
-  },
-  stationGroup: {
-    marginBottom: SPACING.lg,
-  },
-  stationLabel: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.secondary,
-    marginBottom: SPACING.sm,
-    marginLeft: SPACING.xs,
-  },
-  stationButton: {
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: COLORS.border.medium,
-    padding: SPACING.lg,
-    ...SHADOWS.sm,
-  },
-  stationButtonSelected: {
-    borderColor: COLORS.primary.main,
-    backgroundColor: COLORS.primary.light,
-  },
-  selectedStation: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  stationIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.primary.light,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SPACING.md,
-  },
-  arrivalIconContainer: {
-    backgroundColor: COLORS.secondary.redLight,
-  },
-  stationInfo: {
-    flex: 1,
-  },
-  stationName: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
-  },
-  stationLine: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.tertiary,
-    marginTop: 2,
-  },
-  placeholderContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  placeholderText: {
-    marginLeft: SPACING.sm,
-    fontSize: TYPOGRAPHY.fontSize.base,
-    color: COLORS.gray[400],
-  },
-  transferSection: {
-    marginBottom: SPACING.lg,
-  },
-  previewSection: {
-    marginTop: SPACING.md,
-  },
-  previewLabel: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.secondary,
-    marginBottom: SPACING.sm,
-    marginLeft: SPACING.xs,
-  },
-  bottomContainer: {
-    flexDirection: 'row',
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.lg,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border.light,
-    gap: SPACING.md,
-  },
-  backButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: SPACING.lg,
-    paddingHorizontal: SPACING.xl,
-    borderRadius: RADIUS.base,
-    borderWidth: 1,
-    borderColor: COLORS.border.medium,
-    gap: SPACING.xs,
-  },
-  backButtonText: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.medium,
-    color: COLORS.text.secondary,
-  },
-  nextButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.black,
-    paddingVertical: SPACING.lg,
-    borderRadius: RADIUS.base,
-    gap: SPACING.sm,
-  },
-  nextButtonDisabled: {
-    backgroundColor: COLORS.gray[200],
-  },
-  nextButtonText: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.white,
-  },
-  nextButtonTextDisabled: {
-    color: COLORS.gray[400],
-  },
-});
+const createStyles = (semantic: WantedSemanticTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: semantic.bgBase,
+    },
+    content: {
+      flexGrow: 1,
+      paddingHorizontal: SPACING.xl,
+      paddingTop: SPACING['2xl'],
+      paddingBottom: SPACING.xl,
+    },
+    header: {
+      alignItems: 'center',
+      marginBottom: SPACING['2xl'],
+    },
+    iconContainer: {
+      width: 96,
+      height: 96,
+      borderRadius: 48,
+      backgroundColor: semantic.bgSubtlePage,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: SPACING.lg,
+    },
+    title: {
+      fontSize: TYPOGRAPHY.fontSize['3xl'],
+      fontWeight: TYPOGRAPHY.fontWeight.bold,
+      color: semantic.labelStrong,
+      marginBottom: SPACING.sm,
+    },
+    subtitle: {
+      fontSize: TYPOGRAPHY.fontSize.base,
+      color: semantic.labelAlt,
+      textAlign: 'center',
+    },
+    stationSection: {
+      marginBottom: SPACING.xl,
+    },
+    stationGroup: {
+      marginBottom: SPACING.lg,
+    },
+    stationLabel: {
+      fontSize: TYPOGRAPHY.fontSize.sm,
+      fontWeight: TYPOGRAPHY.fontWeight.semibold,
+      color: semantic.labelNeutral,
+      marginBottom: SPACING.sm,
+      marginLeft: SPACING.xs,
+    },
+    stationButton: {
+      backgroundColor: semantic.bgBase,
+      borderRadius: RADIUS.lg,
+      borderWidth: 1,
+      borderColor: semantic.lineNormal,
+      padding: SPACING.lg,
+      ...SHADOWS.sm,
+    },
+    stationButtonSelected: {
+      borderColor: semantic.primaryNormal,
+      backgroundColor: semantic.primaryBg,
+    },
+    selectedStation: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    stationIconContainer: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: semantic.primaryBg,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: SPACING.md,
+    },
+    arrivalIconContainer: {
+      backgroundColor: COLORS.secondary.redLight,
+    },
+    stationInfo: {
+      flex: 1,
+    },
+    stationName: {
+      fontSize: TYPOGRAPHY.fontSize.lg,
+      fontWeight: TYPOGRAPHY.fontWeight.semibold,
+      color: semantic.labelStrong,
+    },
+    stationLine: {
+      fontSize: TYPOGRAPHY.fontSize.sm,
+      color: semantic.labelAlt,
+      marginTop: 2,
+    },
+    placeholderContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    placeholderText: {
+      marginLeft: SPACING.sm,
+      fontSize: TYPOGRAPHY.fontSize.base,
+      color: semantic.labelAlt,
+    },
+    transferSection: {
+      marginBottom: SPACING.lg,
+    },
+    previewSection: {
+      marginTop: SPACING.md,
+    },
+    previewLabel: {
+      fontSize: TYPOGRAPHY.fontSize.sm,
+      fontWeight: TYPOGRAPHY.fontWeight.semibold,
+      color: semantic.labelNeutral,
+      marginBottom: SPACING.sm,
+      marginLeft: SPACING.xs,
+    },
+    bottomContainer: {
+      flexDirection: 'row',
+      paddingHorizontal: SPACING.xl,
+      paddingVertical: SPACING.lg,
+      borderTopWidth: 1,
+      borderTopColor: semantic.lineSubtle,
+      gap: SPACING.md,
+    },
+    backButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: SPACING.lg,
+      paddingHorizontal: SPACING.xl,
+      borderRadius: RADIUS.base,
+      borderWidth: 1,
+      borderColor: semantic.lineNormal,
+      gap: SPACING.xs,
+    },
+    backButtonText: {
+      fontSize: TYPOGRAPHY.fontSize.base,
+      fontWeight: TYPOGRAPHY.fontWeight.medium,
+      color: semantic.labelNeutral,
+    },
+    nextButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: semantic.primaryNormal,
+      paddingVertical: SPACING.lg,
+      borderRadius: RADIUS.base,
+      gap: SPACING.sm,
+    },
+    nextButtonDisabled: {
+      backgroundColor: 'rgba(112,115,124,0.14)',
+    },
+    nextButtonText: {
+      fontSize: TYPOGRAPHY.fontSize.lg,
+      fontWeight: TYPOGRAPHY.fontWeight.semibold,
+      color: semantic.labelOnColor,
+    },
+    nextButtonTextDisabled: {
+      color: semantic.labelDisabled,
+    },
+  });
 
 export default CommuteRouteScreen;

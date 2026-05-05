@@ -17,13 +17,13 @@ import {
 import {
   MessageSquare,
   ThumbsUp,
-  Plus,
+  Megaphone,
   Clock,
   CheckCircle,
 } from 'lucide-react-native';
 
 import { useAuth } from '@/services/auth/AuthContext';
-import { useTheme, ThemeColors } from '@/services/theme';
+import { useTheme } from '@/services/theme';
 import { delayReportService } from '@/services/delay/delayReportService';
 import {
   DelayReport,
@@ -35,15 +35,16 @@ import {
 } from '@/models/delayReport';
 import { DelayReportForm } from '@/components/delays/DelayReportForm';
 import { getSubwayLineColor } from '@/utils/colorUtils';
-import { SPACING, RADIUS, TYPOGRAPHY, WANTED_TOKENS } from '@/styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 
 const LINES = ['전체', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
 export const DelayFeedScreen: React.FC = () => {
   const { user } = useAuth();
-  const { colors, isDark } = useTheme();
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
   // Memoize styles — feed re-renders on report stream updates (cross-review).
-  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+  const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   const [reports, setReports] = useState<DelayReport[]>([]);
   const [_loading, setLoading] = useState(true);
@@ -155,7 +156,7 @@ export const DelayFeedScreen: React.FC = () => {
             </Text>
             {report.estimatedDelayMinutes && (
               <View style={styles.delayBadge}>
-                <Clock size={12} color={colors.error} />
+                <Clock size={12} color={semantic.statusNegative} />
                 <Text style={styles.delayText}>
                   +{report.estimatedDelayMinutes}분
                 </Text>
@@ -177,7 +178,7 @@ export const DelayFeedScreen: React.FC = () => {
                 {report.userDisplayName}
               </Text>
               {report.verified && (
-                <CheckCircle size={14} color={colors.success} />
+                <CheckCircle size={14} color={semantic.statusPositive} />
               )}
             </View>
 
@@ -199,8 +200,8 @@ export const DelayFeedScreen: React.FC = () => {
               >
                 <ThumbsUp
                   size={16}
-                  color={hasUpvoted ? colors.primary : colors.textSecondary}
-                  fill={hasUpvoted ? colors.primary : 'transparent'}
+                  color={hasUpvoted ? semantic.primaryNormal : semantic.labelAlt}
+                  fill={hasUpvoted ? semantic.primaryNormal : 'transparent'}
                 />
                 <Text
                   style={[
@@ -220,7 +221,7 @@ export const DelayFeedScreen: React.FC = () => {
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
-      <MessageSquare size={64} color={colors.textTertiary} />
+      <MessageSquare size={64} color={semantic.labelAlt} />
       <Text style={styles.emptyTitle}>제보가 없습니다</Text>
       <Text style={styles.emptySubtitle}>
         {selectedLine === '전체'
@@ -251,7 +252,7 @@ export const DelayFeedScreen: React.FC = () => {
           testID="delay-feed-add-button"
           onPress={() => setShowReportModal(true)}
         >
-          <Plus size={20} color="#FFFFFF" strokeWidth={2.4} />
+          <Megaphone size={18} color={WANTED_TOKENS.light.labelOnColor} strokeWidth={2.2} />
         </TouchableOpacity>
       </View>
 
@@ -266,7 +267,7 @@ export const DelayFeedScreen: React.FC = () => {
           renderItem={({ item: line }) => {
             const isSelected = selectedLine === line;
             const lineColor =
-              line === '전체' ? colors.textPrimary : getSubwayLineColor(line);
+              line === '전체' ? semantic.labelStrong : getSubwayLineColor(line);
 
             return (
               <TouchableOpacity
@@ -293,7 +294,7 @@ export const DelayFeedScreen: React.FC = () => {
 
       {/* Report Count */}
       <View style={styles.countBar}>
-        <MessageSquare size={14} color={colors.textSecondary} />
+        <MessageSquare size={14} color={semantic.labelAlt} />
         <Text style={styles.countText}>
           {filteredReports.length}개의 활성 제보
         </Text>
@@ -310,7 +311,7 @@ export const DelayFeedScreen: React.FC = () => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={colors.textPrimary}
+            tintColor={semantic.labelStrong}
           />
         }
       />
@@ -331,9 +332,8 @@ export const DelayFeedScreen: React.FC = () => {
   );
 };
 
-const createStyles = (colors: ThemeColors, isDark: boolean) => {
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
-  return StyleSheet.create({
+const createStyles = (semantic: WantedSemanticTheme) =>
+  StyleSheet.create({
     container: {
       flex: 1,
       backgroundColor: semantic.bgSubtlePage,
@@ -352,6 +352,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => {
     headerTitle: {
       fontSize: 28,
       fontWeight: '800',
+      fontFamily: weightToFontFamily('800'),
       color: semantic.labelStrong,
       letterSpacing: -0.6,
     },
@@ -359,6 +360,7 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => {
       fontSize: 13,
       color: semantic.labelAlt,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
       marginTop: 2,
     },
     addButton: {
@@ -368,197 +370,210 @@ const createStyles = (colors: ThemeColors, isDark: boolean) => {
       backgroundColor: semantic.primaryNormal,
       alignItems: 'center',
       justifyContent: 'center',
+      shadowColor: semantic.primaryNormal,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.25,
+      shadowRadius: 10,
+      elevation: 4,
     },
     filterContainer: {
-      backgroundColor: colors.surface,
-      paddingVertical: SPACING.sm,
+      backgroundColor: semantic.bgBase,
+      paddingVertical: WANTED_TOKENS.spacing.s2,
       borderBottomWidth: 1,
-      borderBottomColor: colors.borderLight,
+      borderBottomColor: semantic.lineSubtle,
     },
     filterList: {
-      paddingHorizontal: SPACING.md,
-      gap: SPACING.sm,
+      paddingHorizontal: WANTED_TOKENS.spacing.s3,
+      gap: WANTED_TOKENS.spacing.s2,
     },
     filterButton: {
-      paddingHorizontal: SPACING.md,
-      paddingVertical: SPACING.xs,
-      borderRadius: RADIUS.full,
+      paddingHorizontal: WANTED_TOKENS.spacing.s3,
+      paddingVertical: WANTED_TOKENS.spacing.s1,
+      borderRadius: WANTED_TOKENS.radius.pill,
       borderWidth: 1,
-      borderColor: colors.borderLight,
-      marginRight: SPACING.sm,
+      borderColor: semantic.lineSubtle,
+      marginRight: WANTED_TOKENS.spacing.s2,
     },
     filterText: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
+      fontSize: WANTED_TOKENS.type.label2.size,
       fontWeight: '500',
+      fontFamily: weightToFontFamily('500'),
     },
     filterTextSelected: {
-      color: '#FFFFFF',
+      color: semantic.labelOnColor,
     },
     countBar: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingHorizontal: SPACING.lg,
-      paddingVertical: SPACING.sm,
-      gap: SPACING.xs,
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s2,
+      gap: WANTED_TOKENS.spacing.s1,
     },
     countText: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      color: colors.textSecondary,
+      fontSize: WANTED_TOKENS.type.label2.size,
+      color: semantic.labelAlt,
     },
     listContent: {
-      padding: SPACING.md,
+      padding: WANTED_TOKENS.spacing.s3,
     },
     reportCard: {
-      backgroundColor: colors.surface,
-      borderRadius: RADIUS.lg,
-      marginBottom: SPACING.md,
+      backgroundColor: semantic.bgBase,
+      borderRadius: WANTED_TOKENS.radius.r6,
+      marginBottom: WANTED_TOKENS.spacing.s3,
       overflow: 'hidden',
       flexDirection: 'row',
+      borderWidth: 1,
+      borderColor: semantic.lineSubtle,
     },
     reportCardHighlighted: {
       borderWidth: 1,
-      borderColor: colors.warning,
+      borderColor: semantic.statusCautionary,
     },
     lineAccent: {
       width: 4,
     },
     cardContent: {
       flex: 1,
-      padding: SPACING.md,
+      padding: WANTED_TOKENS.spacing.s3,
     },
     reportHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: SPACING.sm,
+      marginBottom: WANTED_TOKENS.spacing.s2,
     },
     reportMeta: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: SPACING.sm,
+      gap: WANTED_TOKENS.spacing.s2,
     },
     lineBadge: {
-      paddingHorizontal: SPACING.sm,
+      paddingHorizontal: WANTED_TOKENS.spacing.s2,
       paddingVertical: 2,
-      borderRadius: RADIUS.sm,
+      borderRadius: WANTED_TOKENS.radius.r2,
     },
     lineBadgeText: {
-      fontSize: TYPOGRAPHY.fontSize.xs,
-      color: '#FFFFFF',
+      fontSize: WANTED_TOKENS.type.caption1.size,
+      color: semantic.labelOnColor,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
     },
     stationText: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
+      fontSize: WANTED_TOKENS.type.label2.size,
       fontWeight: '500',
-      color: colors.textPrimary,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelStrong,
     },
     timeText: {
-      fontSize: TYPOGRAPHY.fontSize.xs,
-      color: colors.textTertiary,
+      fontSize: WANTED_TOKENS.type.caption1.size,
+      color: semantic.labelAlt,
     },
     reportTypeRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: SPACING.sm,
-      marginBottom: SPACING.sm,
+      gap: WANTED_TOKENS.spacing.s2,
+      marginBottom: WANTED_TOKENS.spacing.s2,
     },
     reportEmoji: {
       fontSize: 20,
     },
     reportType: {
-      fontSize: TYPOGRAPHY.fontSize.base,
+      fontSize: WANTED_TOKENS.type.body1.size,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
     },
     delayBadge: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: colors.error + '20',
-      paddingHorizontal: SPACING.sm,
+      backgroundColor: semantic.statusNegative + '20',
+      paddingHorizontal: WANTED_TOKENS.spacing.s2,
       paddingVertical: 2,
-      borderRadius: RADIUS.sm,
+      borderRadius: WANTED_TOKENS.radius.r2,
       gap: 4,
     },
     delayText: {
-      fontSize: TYPOGRAPHY.fontSize.xs,
-      color: colors.error,
+      fontSize: WANTED_TOKENS.type.caption1.size,
+      color: semantic.statusNegative,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
     },
     description: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      color: colors.textSecondary,
-      marginBottom: SPACING.sm,
+      fontSize: WANTED_TOKENS.type.label2.size,
+      color: semantic.labelAlt,
+      marginBottom: WANTED_TOKENS.spacing.s2,
       lineHeight: 20,
     },
     reportFooter: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      paddingTop: SPACING.sm,
+      paddingTop: WANTED_TOKENS.spacing.s2,
       borderTopWidth: 1,
-      borderTopColor: colors.borderLight,
+      borderTopColor: semantic.lineSubtle,
     },
     reporterInfo: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: SPACING.xs,
+      gap: WANTED_TOKENS.spacing.s1,
     },
     reporterName: {
-      fontSize: TYPOGRAPHY.fontSize.xs,
-      color: colors.textTertiary,
+      fontSize: WANTED_TOKENS.type.caption1.size,
+      color: semantic.labelAlt,
     },
     reportActions: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: SPACING.md,
+      gap: WANTED_TOKENS.spacing.s3,
     },
     credibilityBadge: {
-      backgroundColor: colors.backgroundSecondary,
-      paddingHorizontal: SPACING.sm,
+      backgroundColor: semantic.bgSubtle,
+      paddingHorizontal: WANTED_TOKENS.spacing.s2,
       paddingVertical: 2,
-      borderRadius: RADIUS.sm,
+      borderRadius: WANTED_TOKENS.radius.r2,
     },
     credibilityText: {
-      fontSize: TYPOGRAPHY.fontSize.xs,
-      color: colors.textSecondary,
+      fontSize: WANTED_TOKENS.type.caption1.size,
+      color: semantic.labelAlt,
     },
     upvoteButton: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 4,
-      paddingVertical: SPACING.xs,
-      paddingHorizontal: SPACING.sm,
+      paddingVertical: WANTED_TOKENS.spacing.s1,
+      paddingHorizontal: WANTED_TOKENS.spacing.s2,
     },
     upvoteButtonActive: {
-      backgroundColor: colors.primary + '20',
-      borderRadius: RADIUS.sm,
+      backgroundColor: semantic.primaryNormal + '20',
+      borderRadius: WANTED_TOKENS.radius.r2,
     },
     upvoteCount: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      color: colors.textSecondary,
+      fontSize: WANTED_TOKENS.type.label2.size,
+      color: semantic.labelAlt,
       fontWeight: '500',
+      fontFamily: weightToFontFamily('500'),
     },
     upvoteCountActive: {
-      color: colors.primary,
+      color: semantic.primaryNormal,
     },
     emptyState: {
       alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: SPACING['3xl'],
+      paddingVertical: WANTED_TOKENS.spacing.s12,
     },
     emptyTitle: {
-      fontSize: TYPOGRAPHY.fontSize.lg,
+      fontSize: WANTED_TOKENS.type.heading2.size,
       fontWeight: '600',
-      color: colors.textPrimary,
-      marginTop: SPACING.lg,
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelStrong,
+      marginTop: WANTED_TOKENS.spacing.s4,
     },
     emptySubtitle: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      color: colors.textSecondary,
+      fontSize: WANTED_TOKENS.type.label2.size,
+      color: semantic.labelAlt,
       textAlign: 'center',
-      marginTop: SPACING.sm,
+      marginTop: WANTED_TOKENS.spacing.s2,
       lineHeight: 20,
     },
   });
-};
 
 export default DelayFeedScreen;

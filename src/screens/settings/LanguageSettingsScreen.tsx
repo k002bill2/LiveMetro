@@ -12,9 +12,9 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { CheckCircle } from 'lucide-react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { useI18n, Language } from '@/services/i18n';
 import { useTheme } from '@/services/theme';
 import { SettingsStackParamList } from '@/navigation/types';
@@ -36,7 +36,8 @@ const languageOptions: LanguageOptionData[] = [
 
 export const LanguageSettingsScreen: React.FC<Props> = ({ navigation }) => {
   const { language, setLanguage, t } = useI18n();
-  const { colors } = useTheme();
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
 
   const handleLanguageChange = async (lang: Language): Promise<void> => {
     if (lang !== language) {
@@ -45,7 +46,7 @@ export const LanguageSettingsScreen: React.FC<Props> = ({ navigation }) => {
     navigation.goBack();
   };
 
-  const styles = createStyles(colors);
+  const styles = createStyles(semantic);
 
   const LanguageOption: React.FC<{
     flag: string;
@@ -68,7 +69,7 @@ export const LanguageSettingsScreen: React.FC<Props> = ({ navigation }) => {
         <Text style={styles.languageSubtitle}>{subtitle}</Text>
       </View>
       {isSelected && (
-        <Ionicons name="checkmark-circle" size={24} color={colors.primary} />
+        <CheckCircle size={24} color={semantic.primaryNormal} strokeWidth={2} />
       )}
     </TouchableOpacity>
   );
@@ -102,11 +103,11 @@ export const LanguageSettingsScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const createStyles = (colors: any) =>
+const createStyles = (semantic: WantedSemanticTheme) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background,
+      backgroundColor: semantic.bgSubtlePage,
     },
     content: {
       flex: 1,
@@ -114,26 +115,26 @@ const createStyles = (colors: any) =>
     languageOption: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingHorizontal: SPACING.lg,
-      paddingVertical: SPACING.lg,
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s4,
       borderBottomWidth: 1,
-      borderBottomColor: colors.borderLight,
+      borderBottomColor: semantic.lineSubtle,
       borderLeftWidth: 3,
       borderLeftColor: 'transparent',
-      backgroundColor: colors.surface,
+      backgroundColor: semantic.bgBase,
     },
     languageOptionSelected: {
-      borderLeftColor: colors.primary,
-      backgroundColor: colors.primaryLight,
+      borderLeftColor: semantic.primaryNormal,
+      backgroundColor: semantic.primaryBg,
     },
     languageFlagContainer: {
       width: 56,
       height: 56,
-      backgroundColor: colors.backgroundSecondary,
-      borderRadius: RADIUS.lg,
+      backgroundColor: semantic.bgSubtle,
+      borderRadius: WANTED_TOKENS.radius.r6,
       justifyContent: 'center',
       alignItems: 'center',
-      marginRight: SPACING.lg,
+      marginRight: WANTED_TOKENS.spacing.s4,
     },
     languageFlag: {
       fontSize: 32,
@@ -142,33 +143,34 @@ const createStyles = (colors: any) =>
       flex: 1,
     },
     languageTitle: {
-      fontSize: TYPOGRAPHY.fontSize.base,
-      fontWeight: TYPOGRAPHY.fontWeight.bold,
-      color: colors.textPrimary,
+      fontSize: WANTED_TOKENS.type.body1.size,
+      fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
+      color: semantic.labelStrong,
       marginBottom: 4,
     },
     selectedText: {
-      color: colors.primary,
+      color: semantic.primaryNormal,
     },
     languageSubtitle: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      color: colors.textTertiary,
+      fontSize: WANTED_TOKENS.type.label2.size,
+      color: semantic.labelAlt,
     },
     infoBox: {
-      backgroundColor: colors.primaryLight,
-      paddingHorizontal: SPACING.lg,
-      paddingVertical: SPACING.lg,
-      marginHorizontal: SPACING.lg,
-      marginTop: SPACING.xl,
-      marginBottom: SPACING.xl,
-      borderRadius: RADIUS.lg,
+      backgroundColor: semantic.primaryBg,
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s4,
+      marginHorizontal: WANTED_TOKENS.spacing.s4,
+      marginTop: WANTED_TOKENS.spacing.s5,
+      marginBottom: WANTED_TOKENS.spacing.s5,
+      borderRadius: WANTED_TOKENS.radius.r6,
       borderWidth: 1,
-      borderColor: colors.borderMedium,
+      borderColor: semantic.lineNormal,
     },
     infoText: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      color: colors.textSecondary,
-      lineHeight: TYPOGRAPHY.lineHeight.relaxed * TYPOGRAPHY.fontSize.sm,
+      fontSize: WANTED_TOKENS.type.body2.size,
+      color: semantic.labelAlt,
+      lineHeight: WANTED_TOKENS.type.body2.lh,
     },
   });
 

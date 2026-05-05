@@ -7,12 +7,16 @@ import { render, fireEvent } from '@testing-library/react-native';
 import { SettingPicker } from '../SettingPicker';
 import type { PickerOption } from '../SettingPicker';
 
+import { Languages } from 'lucide-react-native';
+
 jest.mock('lucide-react-native', () =>
   new Proxy({}, { get: (_, name) => name })
 );
 
-jest.mock('@expo/vector-icons', () => ({
-  Ionicons: 'Ionicons',
+// Phase 45 — Wanted DS migration: useTheme().isDark drives the semantic
+// theme. Mock light variant for deterministic snapshots.
+jest.mock('@/services/theme', () => ({
+  useTheme: () => ({ isDark: false }),
 }));
 
 const options: PickerOption[] = [
@@ -41,7 +45,7 @@ describe('SettingPicker', () => {
 
   it('renders with icon', () => {
     const { getByText } = render(
-      <SettingPicker {...defaultProps} icon="language-outline" />
+      <SettingPicker {...defaultProps} icon={Languages} />
     );
     expect(getByText('언어 설정')).toBeTruthy();
   });

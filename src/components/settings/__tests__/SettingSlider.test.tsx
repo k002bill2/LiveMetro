@@ -2,10 +2,6 @@ import React from 'react';
 import { render } from '@testing-library/react-native';
 import { SettingSlider } from '../SettingSlider';
 
-jest.mock('@expo/vector-icons', () => ({
-  Ionicons: 'Ionicons',
-}));
-
 jest.mock('@react-native-community/slider', () => {
   const React = require('react');
   const { View } = require('react-native');
@@ -15,6 +11,12 @@ jest.mock('@react-native-community/slider', () => {
       React.createElement(View, { testID: 'slider', ...props }),
   };
 });
+
+// Phase 45 — Wanted DS migration: useTheme().isDark drives the semantic
+// theme. Mock light variant for deterministic snapshots.
+jest.mock('@/services/theme', () => ({
+  useTheme: () => ({ isDark: false }),
+}));
 
 describe('SettingSlider', () => {
   const defaultProps = {

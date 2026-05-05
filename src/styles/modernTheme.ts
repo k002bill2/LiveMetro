@@ -448,16 +448,67 @@ export const WANTED_TOKENS = {
     durationSlow: 400,
   },
 
-  /* Font family — set once Pretendard fonts are loaded via expo-font */
+  /* Font family — Pretendard 9 weights are loaded in App.tsx via useFonts.
+     Each weight is a separate face (no PostScript "Pretendard" alias), so
+     consumers must reference the suffixed name matching the desired weight. */
   fontFamily: {
-    sans: 'Pretendard',                 // Pretendard-Regular/Medium/SemiBold/Bold
+    sans: 'Pretendard-Regular',
     sansMedium: 'Pretendard-Medium',
     sansSemibold: 'Pretendard-SemiBold',
     sansBold: 'Pretendard-Bold',
-    display: 'WantedSans',              // optional, falls back to Pretendard
+    sansExtraBold: 'Pretendard-ExtraBold',
+    sansBlack: 'Pretendard-Black',
+    sansLight: 'Pretendard-Light',
+    sansThin: 'Pretendard-Thin',
+    display: 'Pretendard-Bold',         // headline/display tier
     mono: 'Menlo',
   },
 } as const;
 
-export type WantedSemanticTheme = typeof WANTED_TOKENS.light;
+export type WantedSemanticTheme = typeof WANTED_TOKENS.light | typeof WANTED_TOKENS.dark;
 export type CongestionLevel = keyof typeof WANTED_TOKENS.congestion;
+
+type WantedFontWeight =
+  | '100' | '200' | '300' | '400' | '500' | '600' | '700' | '800' | '900'
+  | 'normal' | 'bold';
+
+type WantedTypeKey = keyof typeof WANTED_TOKENS.type;
+
+type WantedTextStyle = {
+  fontSize: number;
+  lineHeight: number;
+  letterSpacing: number;
+  fontFamily: string;
+};
+
+const WEIGHT_TO_FONT_FAMILY: Record<WantedFontWeight, string> = {
+  '100': 'Pretendard-Thin',
+  '200': 'Pretendard-Thin',
+  '300': 'Pretendard-Light',
+  '400': 'Pretendard-Regular',
+  '500': 'Pretendard-Medium',
+  '600': 'Pretendard-SemiBold',
+  '700': 'Pretendard-Bold',
+  '800': 'Pretendard-ExtraBold',
+  '900': 'Pretendard-Black',
+  normal: 'Pretendard-Regular',
+  bold: 'Pretendard-Bold',
+};
+
+export function weightToFontFamily(weight: WantedFontWeight): string {
+  return WEIGHT_TO_FONT_FAMILY[weight];
+}
+
+export function typeStyle(
+  key: WantedTypeKey,
+  weightOverride?: WantedFontWeight,
+): WantedTextStyle {
+  const t = WANTED_TOKENS.type[key];
+  const weight: WantedFontWeight = weightOverride ?? t.weight;
+  return {
+    fontSize: t.size,
+    lineHeight: t.lh,
+    letterSpacing: t.size * t.tracking,
+    fontFamily: WEIGHT_TO_FONT_FAMILY[weight],
+  };
+}

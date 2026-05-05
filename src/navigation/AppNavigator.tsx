@@ -22,6 +22,7 @@ import { WeeklyPredictionScreen } from '@screens/prediction';
 import { WelcomeScreen } from '../screens/auth/WelcomeScreen';
 import { AuthScreen } from '../screens/auth/AuthScreen';
 import { AppTabParamList, AppStackParamList } from './types';
+import { weightToFontFamily } from '@/styles/modernTheme';
 
 const Tab = createBottomTabNavigator<AppTabParamList>();
 const Stack = createNativeStackNavigator<AppStackParamList>();
@@ -57,6 +58,7 @@ const MainTabs: React.FC = () => {
         tabBarLabelStyle: {
           fontSize: 12,
           fontWeight: '600',
+          fontFamily: weightToFontFamily('600'),
         },
         headerStyle: {
           backgroundColor: colors.surface,
@@ -68,6 +70,7 @@ const MainTabs: React.FC = () => {
         headerTitleStyle: {
           fontSize: 18,
           fontWeight: 'bold',
+          fontFamily: weightToFontFamily('bold'),
           color: colors.textPrimary,
         },
       })}
@@ -138,6 +141,7 @@ const AppNavigator: React.FC = () => {
               headerTitleStyle: {
                 fontSize: 18,
                 fontWeight: 'bold',
+                fontFamily: weightToFontFamily('bold'),
                 color: colors.textPrimary,
               },
             })}
@@ -154,6 +158,7 @@ const AppNavigator: React.FC = () => {
               headerTitleStyle: {
                 fontSize: 18,
                 fontWeight: 'bold',
+                fontFamily: weightToFontFamily('bold'),
                 color: colors.textPrimary,
               },
             }}

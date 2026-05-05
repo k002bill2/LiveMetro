@@ -1,9 +1,12 @@
 /**
  * Sound Settings Screen
- * Configure notification sound and vibration preferences
+ * Configure notification sound and vibration preferences.
+ *
+ * Phase 46 — migrated from legacy COLORS/SPACING/RADIUS/TYPOGRAPHY API
+ * to Wanted Design System tokens.
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,8 +16,14 @@ import {
   TouchableOpacity,
   Alert,
 } from 'react-native';
-import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
+import {
+  WANTED_TOKENS,
+  weightToFontFamily,
+  type WantedSemanticTheme,
+} from '@/styles/modernTheme';
+import { Activity, Bell, Mail, Music, Smartphone, Volume1, Volume2 } from 'lucide-react-native';
 import { useAuth } from '@/services/auth/AuthContext';
+import { useTheme } from '@/services/theme';
 import { useNotifications } from '@/hooks/useNotifications';
 import SettingSection from '@/components/settings/SettingSection';
 import SettingToggle from '@/components/settings/SettingToggle';
@@ -45,6 +54,9 @@ const DEFAULT_SOUND_SETTINGS: SoundPreferences = {
 export const SoundSettingsScreen: React.FC = () => {
   const { user, updateUserProfile } = useAuth();
   const { sendTestNotification } = useNotifications();
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const styles = useMemo(() => createStyles(semantic), [semantic]);
   const [saving, setSaving] = useState(false);
   const [sendingTestEmail, setSendingTestEmail] = useState(false);
 
@@ -203,7 +215,7 @@ export const SoundSettingsScreen: React.FC = () => {
         {/* Notification Methods */}
         <SettingSection title="알림 방식">
           <SettingToggle
-            icon="notifications"
+            icon={Bell}
             label="푸시 알림"
             subtitle="앱이 꺼져있어도 알림 받기"
             value={notificationSettings?.pushNotifications || false}
@@ -211,7 +223,7 @@ export const SoundSettingsScreen: React.FC = () => {
             disabled={saving}
           />
           <SettingToggle
-            icon="mail"
+            icon={Mail}
             label="이메일 알림"
             subtitle={canEnableEmail ? "중요 업데이트 이메일로 수신" : "이메일 로그인 필요"}
             value={notificationSettings?.emailNotifications || false}
@@ -234,7 +246,7 @@ export const SoundSettingsScreen: React.FC = () => {
         {/* Sound Settings */}
         <SettingSection title="알림 효과">
           <SettingToggle
-            icon="volume-high"
+            icon={Volume2}
             label="알림음"
             subtitle="알림 수신 시 소리 재생"
             value={soundSettings.soundEnabled}
@@ -245,7 +257,7 @@ export const SoundSettingsScreen: React.FC = () => {
           {soundSettings.soundEnabled && (
             <>
               <SoundPicker
-                icon="musical-notes"
+                icon={Music}
                 label="알림음 선택"
                 options={NOTIFICATION_SOUNDS}
                 value={soundSettings.soundId}
@@ -255,7 +267,7 @@ export const SoundSettingsScreen: React.FC = () => {
               />
 
               <SettingSlider
-                icon="volume-medium"
+                icon={Volume1}
                 label="볼륨"
                 subtitle="알림음 볼륨 조절"
                 value={soundSettings.volume}
@@ -269,7 +281,7 @@ export const SoundSettingsScreen: React.FC = () => {
           )}
 
           <SettingToggle
-            icon="phone-portrait"
+            icon={Smartphone}
             label="진동"
             subtitle="알림 수신 시 진동"
             value={soundSettings.vibrationEnabled}
@@ -279,7 +291,7 @@ export const SoundSettingsScreen: React.FC = () => {
 
           {soundSettings.vibrationEnabled && (
             <VibrationPicker
-              icon="pulse"
+              icon={Activity}
               label="진동 패턴"
               options={VIBRATION_PATTERNS}
               value={soundSettings.vibrationPattern}
@@ -311,61 +323,66 @@ export const SoundSettingsScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.white,
-  },
-  content: {
-    flex: 1,
-  },
-  section: {
-    marginBottom: SPACING.xl,
-    paddingHorizontal: SPACING.lg,
-  },
-  testButton: {
-    backgroundColor: COLORS.black,
-    paddingVertical: SPACING.lg,
-    borderRadius: RADIUS.lg,
-    alignItems: 'center',
-  },
-  testButtonText: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.white,
-  },
-  testEmailButton: {
-    backgroundColor: COLORS.primary.main,
-    paddingVertical: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    borderRadius: RADIUS.md,
-    marginTop: SPACING.sm,
-    marginHorizontal: SPACING.lg,
-    alignItems: 'center',
-  },
-  testEmailButtonDisabled: {
-    opacity: 0.6,
-  },
-  testEmailButtonText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.medium,
-    color: COLORS.white,
-  },
-  infoBox: {
-    backgroundColor: COLORS.primary.light,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.lg,
-    marginHorizontal: SPACING.lg,
-    marginBottom: SPACING.xl,
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    borderColor: COLORS.border.medium,
-  },
-  infoText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.secondary,
-    lineHeight: TYPOGRAPHY.lineHeight.relaxed * TYPOGRAPHY.fontSize.sm,
-  },
-});
+const INFO_FONT_SIZE = 13;
+const INFO_LINE_HEIGHT = INFO_FONT_SIZE * 1.6;
+
+const createStyles = (semantic: WantedSemanticTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: semantic.bgBase,
+    },
+    content: {
+      flex: 1,
+    },
+    section: {
+      marginBottom: WANTED_TOKENS.spacing.s5,
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+    },
+    testButton: {
+      backgroundColor: WANTED_TOKENS.blue[500],
+      paddingVertical: WANTED_TOKENS.spacing.s4,
+      borderRadius: WANTED_TOKENS.radius.r8,
+      alignItems: 'center',
+    },
+    testButtonText: {
+      fontSize: 14,
+      fontFamily: weightToFontFamily('700'),
+      color: '#FFFFFF',
+    },
+    testEmailButton: {
+      backgroundColor: WANTED_TOKENS.blue[500],
+      paddingVertical: WANTED_TOKENS.spacing.s3,
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      borderRadius: WANTED_TOKENS.radius.r6,
+      marginTop: WANTED_TOKENS.spacing.s2,
+      marginHorizontal: WANTED_TOKENS.spacing.s4,
+      alignItems: 'center',
+    },
+    testEmailButtonDisabled: {
+      opacity: 0.6,
+    },
+    testEmailButtonText: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: '#FFFFFF',
+    },
+    infoBox: {
+      backgroundColor: 'rgba(0,102,255,0.10)',
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s4,
+      marginHorizontal: WANTED_TOKENS.spacing.s4,
+      marginBottom: WANTED_TOKENS.spacing.s5,
+      borderRadius: WANTED_TOKENS.radius.r8,
+      borderWidth: 1,
+      borderColor: semantic.lineSubtle,
+    },
+    infoText: {
+      fontSize: INFO_FONT_SIZE,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelNeutral,
+      lineHeight: INFO_LINE_HEIGHT,
+    },
+  });
 
 export default SoundSettingsScreen;

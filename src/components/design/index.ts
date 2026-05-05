@@ -19,10 +19,23 @@ export { CONG_TONE, congFromPct } from './congestion';
 export type { CongestionLevel } from './congestion';
 
 /* Phase 2 — HomeScreen building blocks */
-export { MLHeroCard } from './MLHeroCard';
+export { MLHeroCard, MLHeroCardPlaceholder } from './MLHeroCard';
 export { HomeTopBar } from './HomeTopBar';
 export { QuickActionsGrid } from './QuickActionsGrid';
 export type { QuickAction } from './QuickActionsGrid';
 
 /* Phase 3B — list row primitive */
 export { FavoriteRow } from './FavoriteRow';
+
+/* Phase 9 — section divider/title with optional action */
+export { SectionHeader } from './SectionHeader';
+
+/* Phase 33 — community/system delay preview card for HomeScreen "실시간 제보" slot */
+export { CommunityDelayCard } from './CommunityDelayCard';
+
+/* Phase 35 — multi-leg journey visual strip for RoutesScreen */
+export { JourneyStrip } from './JourneyStrip';
+export type { JourneyStripLeg } from './JourneyStrip';
+
+/* Phase 44 — HomeScreen "오늘의 출근 경로" timeline card (May 2026 bundle refresh) */
+export { CommuteRouteCard } from './CommuteRouteCard';

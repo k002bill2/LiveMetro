@@ -55,6 +55,21 @@ jest.mock('@/hooks/useAlerts', () => ({
   })),
 }));
 
+// AlertsScreen now consumes i18n; provide a static mock translation tree.
+jest.mock('@/services/i18n', () => ({
+  useTranslation: jest.fn(() => ({
+    alerts: {
+      title: '알림',
+      noAlerts: '알림 없음',
+      emptyDescription: '새로운 알림이 도착하면 여기에 표시됩니다',
+      unreadCountText: (count: number) => `새 알림 ${count}개`,
+      delay: '지연',
+      suspension: '운행 중단',
+      serviceUpdate: '서비스 업데이트',
+    },
+  })),
+}));
+
 jest.mock('@/utils/notificationTestHelper', () => ({
   addTestNotifications: jest.fn(),
   addRandomNotification: jest.fn(),
@@ -583,8 +598,16 @@ describe('AlertsScreen', () => {
         refresh: mockRefresh,
       });
 
-      const { UNSAFE_getByType } = render(<AlertsScreen />);
-      const scrollView = UNSAFE_getByType('RCTScrollView' as unknown as React.ComponentType<unknown>);
+      const { UNSAFE_getAllByType } = render(<AlertsScreen />);
+      // Phase 41 added a horizontal filter-chip FlatList alongside the main
+      // notifications list, so there are now multiple RCTScrollView nodes.
+      // Pick the one wired with refreshControl (the main list).
+      const scrollViews = UNSAFE_getAllByType(
+        'RCTScrollView' as unknown as React.ComponentType<unknown>
+      );
+      const scrollView = scrollViews.find(
+        (sv) => sv.props && sv.props.refreshControl
+      );
 
       if (scrollView && scrollView.props && scrollView.props.refreshControl) {
         const { onRefresh } = scrollView.props.refreshControl.props;
@@ -882,7 +905,7 @@ describe('AlertsScreen', () => {
           {
             id: 'notif1',
             type: 'ARRIVAL',
-            title: '도착',
+            title: '도착 안내',
             body: '열차 도착',
             createdAt: new Date().toISOString(),
             isRead: false,
@@ -900,7 +923,8 @@ describe('AlertsScreen', () => {
       });
 
       const { getByText } = render(<AlertsScreen />);
-      expect(getByText('도착')).toBeTruthy();
+      // Suffix avoids collision with the Phase 41 filter chip labelled '도착'.
+      expect(getByText('도착 안내')).toBeTruthy();
     });
 
     it('renders DELAY notification type', () => {
@@ -909,7 +933,7 @@ describe('AlertsScreen', () => {
           {
             id: 'notif1',
             type: 'DELAY',
-            title: '지연',
+            title: '지연 발생',
             body: '10분 지연',
             createdAt: new Date().toISOString(),
             isRead: false,
@@ -927,7 +951,8 @@ describe('AlertsScreen', () => {
       });
 
       const { getByText } = render(<AlertsScreen />);
-      expect(getByText('지연')).toBeTruthy();
+      // Suffix avoids collision with the Phase 41 filter chip labelled '지연'.
+      expect(getByText('지연 발생')).toBeTruthy();
     });
 
     it('renders DISRUPTION notification type', () => {
@@ -1039,7 +1064,7 @@ describe('AlertsScreen', () => {
           {
             id: 'notif1',
             type: 'ARRIVAL',
-            title: '도착',
+            title: '도착 안내',
             body: '도착함',
             createdAt: new Date().toISOString(),
             isRead: false,
@@ -1086,7 +1111,7 @@ describe('AlertsScreen', () => {
           {
             id: 'notif1',
             type: 'ARRIVAL',
-            title: '도착',
+            title: '도착 안내',
             body: '도착함',
             createdAt: new Date().toISOString(),
             isRead: false,

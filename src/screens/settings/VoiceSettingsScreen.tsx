@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Slider from '@react-native-community/slider';
 import { ttsService, TTSSettings, VoiceOption } from '@/services/speech/ttsService';
+import { weightToFontFamily } from '@/styles/modernTheme';
 
 // ============================================================================
 // Component
@@ -291,6 +292,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: 'bold',
+    fontFamily: weightToFontFamily('bold'),
     color: '#333',
   },
   subtitle: {
@@ -307,6 +309,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 14,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     color: '#666',
     marginBottom: 12,
     textTransform: 'uppercase',
@@ -324,6 +327,7 @@ const styles = StyleSheet.create({
   rowTitle: {
     fontSize: 16,
     fontWeight: '500',
+    fontFamily: weightToFontFamily('500'),
     color: '#333',
   },
   rowDescription: {
@@ -352,6 +356,7 @@ const styles = StyleSheet.create({
   voiceName: {
     fontSize: 15,
     fontWeight: '500',
+    fontFamily: weightToFontFamily('500'),
     color: '#333',
   },
   voiceLanguage: {
@@ -363,6 +368,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#007AFF',
     fontWeight: 'bold',
+    fontFamily: weightToFontFamily('bold'),
   },
   sliderRow: {
     flexDirection: 'row',
@@ -403,6 +409,7 @@ const styles = StyleSheet.create({
     color: '#FFF',
     fontSize: 16,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
   },
   testButtonTextSecondary: {
     color: '#007AFF',
@@ -416,6 +423,7 @@ const styles = StyleSheet.create({
   infoTitle: {
     fontSize: 15,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     color: '#333',
     marginBottom: 8,
   },

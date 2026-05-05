@@ -36,14 +36,24 @@ import { StationCard } from '../../components/train/StationCard';
 import { TrainArrivalList } from '../../components/train/TrainArrivalList';
 import { DelayAlertBanner } from '../../components/delays';
 import { CommutePredictionCard } from '../../components/prediction';
-import { HomeTopBar, MLHeroCard, QuickActionsGrid } from '../../components/design';
+import {
+  CommunityDelayCard,
+  CommuteRouteCard,
+  HomeTopBar,
+  MLHeroCard,
+  MLHeroCardPlaceholder,
+  QuickActionsGrid,
+  SectionHeader,
+} from '../../components/design';
+import type { LineId } from '../../components/design';
 import { LocationDebugPanel } from '../../components/debug';
 import { useToast } from '../../components/common/Toast';
 import { useDelayDetection } from '../../hooks/useDelayDetection';
 import { useIntegratedAlerts } from '../../hooks/useIntegratedAlerts';
 import { useMLPrediction } from '../../hooks/useMLPrediction';
-import { SPACING, RADIUS, TYPOGRAPHY, WANTED_TOKENS } from '../../styles/modernTheme';
-import { useTheme, ThemeColors } from '../../services/theme';
+import { useCommuteRouteSummary } from '../../hooks/useCommuteRouteSummary';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '../../styles/modernTheme';
+import { useTheme } from '../../services/theme';
 
 import { Station } from '../../models/train';
 import { AppStackParamList } from '../../navigation/types';
@@ -72,6 +82,23 @@ const minutesBetween = (departure?: string, arrival?: string): number | null => 
 };
 
 /**
+ * Format an absolute timestamp into a relative Korean label
+ * ("방금 전" / "12분 전" / "3시간 전"). Returns null for invalid input.
+ * Used by CommunityDelayCard meta line.
+ */
+const formatRelativeKorean = (ts?: Date, now: Date = new Date()): string | null => {
+  if (!ts) return null;
+  const diffSec = Math.max(0, Math.floor((now.getTime() - ts.getTime()) / 1000));
+  if (diffSec < 60) return '방금 전';
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}분 전`;
+  const diffHr = Math.floor(diffMin / 60);
+  if (diffHr < 24) return `${diffHr}시간 전`;
+  const diffDay = Math.floor(diffHr / 24);
+  return `${diffDay}일 전`;
+};
+
+/**
  * Format the current date as "2026.05.03 (수) · 오전 8:32" for the top bar.
  */
 const formatDateTimeLabel = (now: Date = new Date()): string => {
@@ -91,8 +118,9 @@ export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<AppStackParamList>>();
   const isFocused = useIsFocused();
   const { user } = useAuth();
-  const { colors, isDark } = useTheme();
-  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const styles = useMemo(() => createStyles(semantic), [semantic]);
   const { showError, showSuccess, showInfo, ToastComponent } = useToast();
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -137,10 +165,59 @@ export const HomeScreen: React.FC = () => {
   });
 
   // ML 예측 — Hero 카드 데이터 소스
-  const { prediction: mlPrediction } = useMLPrediction();
+  const { prediction: mlPrediction, baselineMinutes } = useMLPrediction();
+
+  // Origin/destination 이름 lookup — commuteSchedule.weekdays.morningCommute의
+  // stationId/destinationStationId를 station 이름으로 변환. async라 useMemo
+  // 안에서 못 함, 별도 effect로 fetch 후 state에 보관.
+  const morningCommute = user?.preferences.commuteSchedule?.weekdays?.morningCommute;
+
+  // 출퇴근 경로 카드 fact grid 데이터 — routeService + fareService
+  // (Phase 44.1). morningCommute 미설정 시 자동으로 ready=false → 팩트 grid hide.
+  const routeSummary = useCommuteRouteSummary(
+    morningCommute?.stationId,
+    morningCommute?.destinationStationId,
+  );
+
+  const [commuteStationNames, setCommuteStationNames] = useState<{
+    origin?: string;
+    destination?: string;
+    originLineId?: string;
+  }>({});
+
+  useEffect(() => {
+    if (!morningCommute) {
+      setCommuteStationNames({});
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const [origin, dest] = await Promise.all([
+          trainService.getStation(morningCommute.stationId).catch(() => null),
+          trainService.getStation(morningCommute.destinationStationId).catch(() => null),
+        ]);
+        if (cancelled) return;
+        setCommuteStationNames({
+          origin: origin?.name,
+          destination: dest?.name,
+          // origin.lineId feeds CommuteRouteCard's LineBadge ride leg.
+          // Phase 44 (May 2026 bundle "오늘의 출근 경로" card).
+          originLineId: origin?.lineId,
+        });
+      } catch {
+        // 실패 시 빈 객체 유지 — MLHeroCard는 origin/destination이 없으면
+        // route 라인 자체를 생략 (optional UI).
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [morningCommute]);
 
   // Hero 카드 props 도출 — prediction이 있고 정상 계산 가능할 때만 표시.
-  // origin/destination 이름은 stationId 기반으로 조회 필요(다음 sub-phase에서 추가).
+  // deltaMinutes: 예측 시간과 사용자 평소 평균(baseline)의 차이.
+  // 음수 = 평소보다 빠름 → MLHeroCard의 delta pill에 "평소보다 -N분" 표시.
   const heroProps = useMemo(() => {
     if (!mlPrediction) return null;
     const minutes = minutesBetween(
@@ -148,12 +225,17 @@ export const HomeScreen: React.FC = () => {
       mlPrediction.predictedArrivalTime,
     );
     if (minutes === null) return null;
+    const delta =
+      baselineMinutes !== null ? minutes - baselineMinutes : undefined;
     return {
       predictedMinutes: minutes,
+      deltaMinutes: delta,
       arrivalTime: mlPrediction.predictedArrivalTime,
       confidence: mlPrediction.confidence,
+      origin: commuteStationNames.origin,
+      destination: commuteStationNames.destination,
     };
-  }, [mlPrediction]);
+  }, [mlPrediction, baselineMinutes, commuteStationNames]);
 
   // 상단 바에 표시할 날짜/시간 — 1분마다 갱신 (분 단위까지만 표시하므로 충분).
   const [dateTimeLabel, setDateTimeLabel] = useState(() => formatDateTimeLabel(new Date()));
@@ -268,6 +350,13 @@ export const HomeScreen: React.FC = () => {
 
   // 주간 예측 보기 핸들러
   const handleViewPredictions = (): void => {
+    // commute 미설정 시 onboarding으로 안내. 설정된 후에 ML hero detail이
+    // 의미 있는 데이터를 보여줄 수 있음.
+    if (!morningCommute) {
+      navigation.navigate('Onboarding' as never);
+      showInfo('출퇴근 경로를 먼저 설정해 주세요');
+      return;
+    }
     navigation.navigate('WeeklyPrediction' as never);
   };
 
@@ -355,7 +444,7 @@ export const HomeScreen: React.FC = () => {
         <RefreshControl
           refreshing={refreshing}
           onRefresh={onRefresh}
-          tintColor={colors.textPrimary}
+          tintColor={semantic.labelStrong}
         />
       }
       accessible={false}
@@ -370,23 +459,63 @@ export const HomeScreen: React.FC = () => {
         onBellPress={() => navigation.navigate('Alerts' as never)}
       />
 
-      {/* ML hero — gradient teaser when prediction is ready, otherwise fall
-          back to the rich CommutePredictionCard (covers training/empty states). */}
+      {/* ML hero — three states:
+          1. heroProps available → gradient MLHeroCard with real prediction
+          2. commute set but prediction unavailable → CommutePredictionCard
+             (handles training / empty / loading / error)
+          3. commute unset → MLHeroCardPlaceholder with explicit setup CTA
+             (avoids misleading "데이터 학습 필요" copy when the real issue
+             is no commute exists yet) */}
       <View style={styles.heroWrap}>
         {heroProps ? (
           <MLHeroCard
+            origin={heroProps.origin}
+            destination={heroProps.destination}
             predictedMinutes={heroProps.predictedMinutes}
+            deltaMinutes={heroProps.deltaMinutes}
             arrivalTime={heroProps.arrivalTime}
             confidence={heroProps.confidence}
             onPress={handleViewPredictions}
           />
-        ) : (
+        ) : morningCommute ? (
           <CommutePredictionCard
             onScheduleAlert={handleScheduleAlert}
             onViewDetails={handleViewPredictions}
           />
+        ) : (
+          <MLHeroCardPlaceholder onPress={handleViewPredictions} />
         )}
       </View>
+
+      {/* Phase 44 — "오늘의 출근 경로" timeline card.
+          Renders only when we have both endpoint names and a prediction
+          (departure/arrival times). lineId is best-effort from origin
+          station's primary line; route service-derived fields (transfer/
+          stop count/fare) are intentionally omitted on HomeScreen — the
+          fact grid hides automatically when all three are absent. The
+          full route detail lives in AlternativeRoutes; this card is a
+          summary + entry point to settings. */}
+      {heroProps &&
+        commuteStationNames.origin &&
+        commuteStationNames.destination && (
+          <View style={styles.routeCardWrap}>
+            <CommuteRouteCard
+              origin={commuteStationNames.origin}
+              destination={commuteStationNames.destination}
+              lineId={commuteStationNames.originLineId as LineId | undefined}
+              departureTime={mlPrediction?.predictedDepartureTime}
+              arrivalTime={heroProps.arrivalTime}
+              rideMinutes={heroProps.predictedMinutes}
+              transferCount={routeSummary.transferCount}
+              stationCount={routeSummary.stationCount}
+              fareKrw={routeSummary.fareKrw}
+              onPressEdit={() =>
+                navigation.navigate('CommuteSettings' as never)
+              }
+              testID="home-commute-route-card"
+            />
+          </View>
+        )}
 
       {/* Quick actions — 4-button grid */}
       <View style={styles.quickActionsWrap}>
@@ -440,7 +569,7 @@ export const HomeScreen: React.FC = () => {
           accessibilityRole="text"
           accessibilityLabel="현재 오프라인 상태입니다. 캐시된 정보가 표시됩니다"
         >
-          <CloudOff size={20} color={colors.textSecondary} />
+          <CloudOff size={20} color={semantic.labelAlt} />
           <Text style={styles.offlineText}>
             오프라인 상태 - 캐시된 정보가 표시됩니다
           </Text>
@@ -478,25 +607,25 @@ export const HomeScreen: React.FC = () => {
           accessibilityLabel="위치 권한 허용하기"
           accessibilityHint="주변 지하철역 정보를 받기 위해 위치 권한을 허용하세요"
         >
-          <MapPin size={24} color={colors.textPrimary} />
+          <MapPin size={24} color={semantic.labelStrong} />
           <View style={styles.permissionText}>
             <Text style={styles.permissionTitle}>위치 권한 허용</Text>
             <Text style={styles.permissionSubtitle}>
               주변 역 정보를 보려면 위치 권한이 필요합니다
             </Text>
           </View>
-          <ChevronRight size={20} color={colors.textTertiary} />
+          <ChevronRight size={20} color={semantic.labelAlt} />
         </TouchableOpacity>
       )}
 
       {/* Station Selection */}
       <View style={styles.section}>
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>
-            {locationPermission ? '주변 역' : '즐겨찾기'}
-          </Text>
-        </View>
-        
+        <SectionHeader
+          title={locationPermission ? '주변 역' : '즐겨찾기'}
+          subtitle={locationPermission ? 'GPS 기반 자동 갱신' : undefined}
+          testID="home-stations-section"
+        />
+
         {nearbyStations.length === 0 ? (
           <View
             style={styles.emptyState}
@@ -507,7 +636,7 @@ export const HomeScreen: React.FC = () => {
               : '즐겨찾기에 추가된 역이 없습니다. 설정에서 자주 이용하는 역을 추가해보세요'
             }
           >
-            <TrainFront size={48} color={colors.textTertiary} />
+            <TrainFront size={48} color={semantic.labelAlt} />
             <Text style={styles.emptyText}>
               {locationPermission
                 ? '주변에 지하철역이 없습니다'
@@ -522,26 +651,57 @@ export const HomeScreen: React.FC = () => {
             </Text>
           </View>
         ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.stationList}>
+          // Phase 33-C1: vertical stack to mirror the design handoff's
+          // 즐겨찾는 역 / 주변 역 column layout. StationCard retains its own
+          // realtime polling; the wrapper neutralizes its horizontal-list
+          // marginRight via flex-column gap.
+          <View style={styles.stationListVertical}>
             {nearbyStations.map((station) => {
               const callbacks = stationCallbacks.get(station.id);
               return (
-                <StationCard
-                  key={station.id}
-                  station={station}
-                  isSelected={selectedStation?.id === station.id}
-                  onPress={callbacks?.onPress}
-                  onSetStart={callbacks?.onSetStart}
-                  onSetEnd={handleSetEnd}
-                  showDistance={locationPermission && 'distance' in station}
-                  distance={'distance' in station ? (station as { distance: number }).distance / 1000 : undefined}
-                  arrivalsEnabled={isFocused}
-                />
+                <View key={station.id} style={styles.stationRowWrap}>
+                  <StationCard
+                    station={station}
+                    isSelected={selectedStation?.id === station.id}
+                    onPress={callbacks?.onPress}
+                    onSetStart={callbacks?.onSetStart}
+                    onSetEnd={handleSetEnd}
+                    showDistance={locationPermission && 'distance' in station}
+                    distance={'distance' in station ? (station as { distance: number }).distance / 1000 : undefined}
+                    arrivalsEnabled={isFocused}
+                  />
+                </View>
               );
             })}
-          </ScrollView>
+          </View>
         )}
       </View>
+
+      {/* Community delays preview — single-card representation of the most
+          recent active delay, mirroring the design handoff's "실시간 제보" slot.
+          The DelayAlertBanner above remains as the dismissible alert affordance;
+          this card is the always-on feed preview that links to DelayFeed. */}
+      {activeDelays.length > 0 && (
+        <View style={styles.section}>
+          <SectionHeader title="실시간 제보" subtitle="근처 노선" />
+          <View style={styles.communityCardWrap}>
+            <CommunityDelayCard
+              line={activeDelays[0]!.lineId as LineId}
+              title={`${activeDelays[0]!.lineName ?? `${activeDelays[0]!.lineId}호선`}${
+                activeDelays[0]!.reason ? ` ${activeDelays[0]!.reason}` : ' 지연 발생'
+              }`}
+              description={
+                activeDelays[0]!.delayMinutes > 0
+                  ? `약 ${activeDelays[0]!.delayMinutes}분 지연 중`
+                  : undefined
+              }
+              timestampLabel={formatRelativeKorean(activeDelays[0]!.timestamp) ?? undefined}
+              onPress={() => navigation.navigate('DelayFeed' as never)}
+              testID="home-community-delay-card"
+            />
+          </View>
+        </View>
+      )}
 
       {/* Real-time Train Information */}
       {selectedStation && (
@@ -565,7 +725,7 @@ export const HomeScreen: React.FC = () => {
                 accessibilityLabel={`${selectedStation.name} 역 상세 정보 보기`}
               >
                 <Text style={styles.detailButtonText}>상세보기</Text>
-                <ChevronRight size={18} color={colors.textPrimary} />
+                <ChevronRight size={18} color={semantic.labelStrong} />
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={onRefresh}
@@ -591,7 +751,7 @@ export const HomeScreen: React.FC = () => {
                 >
                   <RefreshCw
                     size={24}
-                    color={refreshing ? colors.textTertiary : colors.textPrimary}
+                    color={refreshing ? semantic.labelAlt : semantic.labelStrong}
                   />
                 </Animated.View>
               </TouchableOpacity>
@@ -615,133 +775,160 @@ export const HomeScreen: React.FC = () => {
   );
 };
 
-const createStyles = (colors: ThemeColors, isDark: boolean) => StyleSheet.create({
+const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: isDark
-      ? WANTED_TOKENS.dark.bgSubtlePage
-      : WANTED_TOKENS.light.bgSubtlePage,
+    backgroundColor: semantic.bgSubtlePage,
   },
   heroWrap: {
-    paddingHorizontal: 20,
-    paddingBottom: 16,
+    paddingHorizontal: WANTED_TOKENS.spacing.s5,
+    paddingBottom: WANTED_TOKENS.spacing.s4,
+  },
+  routeCardWrap: {
+    paddingHorizontal: WANTED_TOKENS.spacing.s5,
+    paddingBottom: WANTED_TOKENS.spacing.s4,
   },
   quickActionsWrap: {
-    paddingBottom: 8,
+    paddingBottom: WANTED_TOKENS.spacing.s2,
+  },
+  communityCardWrap: {
+    paddingHorizontal: WANTED_TOKENS.spacing.s5,
+    paddingBottom: WANTED_TOKENS.spacing.s4,
   },
   permissionBanner: {
-    backgroundColor: colors.backgroundSecondary,
+    backgroundColor: semantic.bgBase,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: SPACING.lg,
-    marginHorizontal: SPACING.lg,
-    marginBottom: SPACING.sm,
-    borderRadius: RADIUS.lg,
+    padding: WANTED_TOKENS.spacing.s4,
+    marginHorizontal: WANTED_TOKENS.spacing.s4,
+    marginBottom: WANTED_TOKENS.spacing.s2,
+    borderRadius: WANTED_TOKENS.radius.r6,
     borderWidth: 1,
-    borderColor: colors.borderMedium,
+    borderColor: semantic.lineSubtle,
   },
   permissionText: {
     flex: 1,
-    marginLeft: SPACING.md,
+    marginLeft: WANTED_TOKENS.spacing.s3,
   },
   permissionTitle: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: colors.textPrimary,
+    fontSize: WANTED_TOKENS.type.body1.size,
+    lineHeight: WANTED_TOKENS.type.body1.lh,
+    fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
+    color: semantic.labelStrong,
     marginBottom: 2,
   },
   permissionSubtitle: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: colors.textSecondary,
+    fontSize: WANTED_TOKENS.type.caption1.size,
+    lineHeight: WANTED_TOKENS.type.caption1.lh,
+    fontWeight: '500',
+    fontFamily: weightToFontFamily('500'),
+    color: semantic.labelAlt,
   },
   offlineBanner: {
-    backgroundColor: colors.backgroundSecondary,
+    backgroundColor: semantic.bgBase,
     flexDirection: 'row',
     alignItems: 'center',
-    padding: SPACING.lg,
-    marginHorizontal: SPACING.lg,
-    marginBottom: SPACING.sm,
-    borderRadius: RADIUS.lg,
+    padding: WANTED_TOKENS.spacing.s4,
+    marginHorizontal: WANTED_TOKENS.spacing.s4,
+    marginBottom: WANTED_TOKENS.spacing.s2,
+    borderRadius: WANTED_TOKENS.radius.r6,
     borderWidth: 1,
-    borderColor: colors.borderMedium,
+    borderColor: semantic.lineSubtle,
   },
   offlineText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: colors.textSecondary,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    marginLeft: SPACING.sm,
+    fontSize: WANTED_TOKENS.type.caption1.size,
+    lineHeight: WANTED_TOKENS.type.caption1.lh,
+    color: semantic.labelAlt,
+    fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
+    marginLeft: WANTED_TOKENS.spacing.s2,
     flex: 1,
   },
   section: {
-    backgroundColor: colors.surface,
-    marginBottom: SPACING.sm,
-    paddingVertical: SPACING.lg,
+    backgroundColor: semantic.bgBase,
+    marginBottom: WANTED_TOKENS.spacing.s2,
+    paddingBottom: WANTED_TOKENS.spacing.s4,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.lg,
+    paddingHorizontal: WANTED_TOKENS.spacing.s5,
+    paddingTop: WANTED_TOKENS.spacing.s4,
+    paddingBottom: WANTED_TOKENS.spacing.s3,
   },
   sectionHeaderActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    columnGap: SPACING.md,
+    columnGap: WANTED_TOKENS.spacing.s3,
   },
   sectionTitle: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: colors.textPrimary,
+    fontSize: WANTED_TOKENS.type.heading2.size,
+    lineHeight: WANTED_TOKENS.type.heading2.lh,
+    fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
+    color: semantic.labelStrong,
     flex: 1,
-    letterSpacing: TYPOGRAPHY.letterSpacing.tight,
+    letterSpacing:
+      WANTED_TOKENS.type.heading2.size * WANTED_TOKENS.type.heading2.tracking,
   },
   detailButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.full,
+    paddingHorizontal: WANTED_TOKENS.spacing.s3,
+    paddingVertical: WANTED_TOKENS.spacing.s2,
+    borderRadius: WANTED_TOKENS.radius.pill,
     borderWidth: 1,
-    borderColor: colors.borderMedium,
-    backgroundColor: colors.backgroundSecondary,
+    borderColor: semantic.lineSubtle,
+    backgroundColor: semantic.bgSubtle,
   },
   detailButtonText: {
-    color: colors.textPrimary,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
+    color: semantic.labelStrong,
+    fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     marginRight: 4,
-    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontSize: WANTED_TOKENS.type.label1.size,
   },
   refreshButton: {
-    padding: SPACING.sm,
-    borderRadius: RADIUS.full,
-    backgroundColor: colors.backgroundSecondary,
+    padding: WANTED_TOKENS.spacing.s2,
+    borderRadius: WANTED_TOKENS.radius.pill,
+    backgroundColor: semantic.bgSubtle,
     width: 40,
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
   },
   stationList: {
-    paddingLeft: SPACING.lg,
+    paddingLeft: WANTED_TOKENS.spacing.s4,
+  },
+  stationListVertical: {
+    paddingHorizontal: WANTED_TOKENS.spacing.s5,
+    rowGap: WANTED_TOKENS.spacing.s2,
+  },
+  stationRowWrap: {
+    width: '100%',
   },
   emptyState: {
     alignItems: 'center',
-    paddingVertical: SPACING['2xl'],
-    paddingHorizontal: SPACING.lg,
+    paddingVertical: WANTED_TOKENS.spacing.s10,
+    paddingHorizontal: WANTED_TOKENS.spacing.s4,
   },
   emptyText: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: colors.textSecondary,
-    marginTop: SPACING.lg,
+    fontSize: WANTED_TOKENS.type.body1.size,
+    lineHeight: WANTED_TOKENS.type.body1.lh,
+    fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
+    color: semantic.labelAlt,
+    marginTop: WANTED_TOKENS.spacing.s4,
     textAlign: 'center',
   },
   emptySubtext: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: colors.textTertiary,
-    marginTop: SPACING.sm,
+    fontSize: WANTED_TOKENS.type.caption1.size,
+    lineHeight: WANTED_TOKENS.type.caption1.lh * 1.4,
+    color: semantic.labelAlt,
+    marginTop: WANTED_TOKENS.spacing.s2,
     textAlign: 'center',
-    lineHeight: TYPOGRAPHY.lineHeight.relaxed * TYPOGRAPHY.fontSize.sm,
   },
 });
 
