@@ -35,7 +35,7 @@ import { DraggableFavoriteItem } from '../../components/favorites/DraggableFavor
 import { StationSearchModal } from '../../components/commute/StationSearchModal';
 import { StationSelection } from '../../models/commute';
 import { Station } from '../../models/train';
-import { WANTED_TOKENS, type WantedSemanticTheme } from '../../styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '../../styles/modernTheme';
 import { useTheme } from '../../services/theme';
 
 type NavigationProp = NativeStackNavigationProp<AppStackParamList>;
@@ -483,6 +483,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       fontSize: WANTED_TOKENS.type.title2.size,
       lineHeight: WANTED_TOKENS.type.title2.lh,
       fontWeight: '800',
+      fontFamily: weightToFontFamily('800'),
       color: semantic.labelStrong,
       letterSpacing:
         WANTED_TOKENS.type.title2.size * WANTED_TOKENS.type.title2.tracking,
@@ -508,6 +509,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     aliasText: {
       fontSize: WANTED_TOKENS.type.caption1.size,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
       color: semantic.labelAlt,
       marginLeft: WANTED_TOKENS.spacing.s1,
     },
@@ -550,6 +552,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       fontSize: WANTED_TOKENS.type.caption1.size,
       color: semantic.labelStrong,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
     },
     errorCard: {
       flexDirection: 'row',
@@ -574,6 +577,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     errorText: {
       fontSize: WANTED_TOKENS.type.caption1.size,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
       color: semantic.labelAlt,
       marginBottom: 2,
     },
@@ -609,6 +613,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     errorTitle: {
       fontSize: WANTED_TOKENS.type.body1.size,
       fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
       color: semantic.labelAlt,
       textAlign: 'center',
     },
@@ -621,6 +626,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     retryButtonText: {
       fontSize: WANTED_TOKENS.type.label1.size,
       fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
       color: '#FFFFFF',
     },
     emptyState: {
@@ -634,6 +640,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       fontSize: WANTED_TOKENS.type.heading2.size,
       lineHeight: WANTED_TOKENS.type.heading2.lh,
       fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
       color: semantic.labelStrong,
     },
     emptySubtitle: {
@@ -652,6 +659,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     emptyButtonText: {
       fontSize: WANTED_TOKENS.type.label1.size,
       fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
       color: '#FFFFFF',
     },
   });

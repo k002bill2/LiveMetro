@@ -38,17 +38,22 @@ const WINDOW = 15;
  *   Phase 26: screens/prediction/
  *   Phase 27: services/theme/
  *   Phase 28: screens/map/, components/alerts/, components/delays/
+ *   Phase 29: screens/route/, screens/favorites/, components/train/, components/favorites/
  */
 const HARD_PREFIXES = [
   'src/components/alerts/',
   'src/components/delays/',
   'src/components/design/',
+  'src/components/favorites/',
   'src/components/station/',
   'src/components/statistics/',
+  'src/components/train/',
   'src/screens/auth/',
   'src/screens/delays/',
+  'src/screens/favorites/',
   'src/screens/map/',
   'src/screens/prediction/',
+  'src/screens/route/',
   'src/screens/settings/',
   'src/screens/statistics/',
   'src/services/theme/',

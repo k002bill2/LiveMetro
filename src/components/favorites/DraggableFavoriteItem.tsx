@@ -11,7 +11,7 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { AlertCircle, Trash2, Tag, Pencil, XCircle, GripVertical, ArrowUp, ArrowDown, Briefcase } from 'lucide-react-native';
-import { SPACING, RADIUS, TYPOGRAPHY, WANTED_TOKENS, WantedSemanticTheme } from '../../styles/modernTheme';
+import { SPACING, RADIUS, TYPOGRAPHY, WANTED_TOKENS, WantedSemanticTheme, weightToFontFamily } from '../../styles/modernTheme';
 import { useTheme, ThemeColors } from '../../services/theme';
 import { FavoriteWithDetails } from '../../hooks/useFavorites';
 import { StationCard } from '../train/StationCard';
@@ -227,11 +227,13 @@ const createStyles = (colors: ThemeColors, semantic: WantedSemanticTheme) => {
   pillText: {
     fontSize: 11,
     fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
     color: semantic.primaryPress,
   },
   commuteTextPill: {
     fontSize: 11,
     fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
     color: semantic.labelNeutral,
   },
   dragHandle: {

@@ -23,7 +23,7 @@ import {
   Map,
 } from 'lucide-react-native';
 import { useTheme } from '@/services/theme';
-import { WANTED_TOKENS } from '@/styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { getSubwayLineColor } from '@/utils/colorUtils';
 import { AlternativeRouteCard } from '@/components/route/AlternativeRouteCard';
 import { RouteComparisonView } from '@/components/route/RouteComparisonView';
@@ -318,6 +318,7 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: WANTED_TOKENS.type.heading2.size,
     fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
   },
   headerSubtitle: {
     fontSize: WANTED_TOKENS.type.caption1.size,
@@ -363,10 +364,12 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: WANTED_TOKENS.type.body1.size,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
   },
   noDelayTitle: {
     fontSize: WANTED_TOKENS.type.heading2.size,
     fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
     marginTop: WANTED_TOKENS.spacing.s3,
     textAlign: 'center',
   },
@@ -388,11 +391,13 @@ const styles = StyleSheet.create({
   originalRouteTime: {
     fontSize: WANTED_TOKENS.type.title3.size,
     fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
     marginTop: WANTED_TOKENS.spacing.s1,
   },
   noAlternativeTitle: {
     fontSize: WANTED_TOKENS.type.heading2.size,
     fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
     marginTop: WANTED_TOKENS.spacing.s3,
     textAlign: 'center',
   },
@@ -414,6 +419,7 @@ const styles = StyleSheet.create({
   affectedTitle: {
     fontSize: WANTED_TOKENS.type.caption1.size,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
   },
   affectedLines: {
     flexDirection: 'row',
@@ -429,10 +435,12 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: WANTED_TOKENS.type.caption1.size,
     fontWeight: '500',
+    fontFamily: weightToFontFamily('500'),
   },
   sectionTitle: {
     fontSize: WANTED_TOKENS.type.body1.size,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     marginBottom: WANTED_TOKENS.spacing.s2,
   },
 });
