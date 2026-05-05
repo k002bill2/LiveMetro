@@ -181,7 +181,7 @@ MP2 high severity 가정 **틀림** — vertical timeline은 정확히 구현되
 
 ---
 
-## AlertsScreen (번들 ee09cc40, 코드 src/screens/alerts/AlertsScreen.tsx) — 🟨 부분 검증
+## AlertsScreen (번들 ee09cc40, 코드 src/screens/alerts/AlertsScreen.tsx) — ✅ 검증 완료
 
 ### ✅ 일치 (검증됨)
 - useAlerts hook + StoredNotification 모델 ✓
@@ -191,13 +191,13 @@ MP2 high severity 가정 **틀림** — vertical timeline은 정확히 구현되
 ### 검증 결과 — gap 확정
 | # | 원래 가정 | 실제 코드 | 정정 severity |
 |---|---|---|---|
-| AL1 | "모두 읽음" blue 텍스트 | markAllAsRead handler 존재, 시각 표현 별도 검증 필요 | **L** |
-| AL2 | filter chips `전체/읽지않음 N/도착/지연/제보` | 코드의 render 영역 미독해 — filter UI 존재 여부 미확정 | **M** (확인 필요) |
+| AL1 | "모두 읽음" blue 텍스트 | ✅ Phase 40 검증 — header에 CheckCheck 아이콘 + handleMarkAllAsRead 버튼 (텍스트 대신 아이콘 사용) | **L** (UX 결정) |
+| AL2 | filter chips `전체/읽지않음 N/도착/지연/제보` | ❌ Phase 40 검증 — render에 filter chips 자체 부재 (header + FlatList만). 사용자가 type별 / read별로 알림 분류 불가 | **H** (확정 gap) |
 | AL3 | type-별 차별화 아이콘+색상 | ✅ Phase 37에서 해소 — getNotificationIcon에 ARRIVAL→TrainFront, DELAY→AlertTriangle, SERVICE→BarChart3, FAVORITE→Star, COMMUTE→Clock 매핑 + getNotificationColor 신설 | ~~H~~ → ✅ |
-| AL4 | read=bgBase, unread=blue-50 + blue border | render 영역 미독해 | **M** (확인 필요) |
+| AL4 | read=bgBase, unread=blue-50 + blue border | ✅ Phase 40 검증 — `unreadCard` 스타일(border `primaryNormal` + bg `primaryBg`)로 read/unread 시각 구분 구현됨. 번들의 blue-50 + blue border와 개념적으로 동일 | **L** (구현됨) |
 
 ### 결론
-~~AL3는 확정된 의미 있는 gap~~ → **Phase 37에서 해소 완료**. iconContainer도 20x20→36x36으로 키워 번들의 circle wrapper 매칭. AL2/AL4는 render 영역 미독해라 별도 검증 필요(med 등급 유지).
+~~AL3는 확정된 의미 있는 gap~~ → **Phase 37에서 해소 완료**. AL4는 Phase 40 검증으로 이미 구현 확인 → L. **AL2가 새 high gap으로 부상** — filter chips 자체가 render에 없어 사용자가 type별/read 상태별로 알림 분류 불가. 번들은 5개 chip(`전체 / 읽지않음 N / 도착 / 지연 / 제보`)으로 이를 해결.
 
 ---
 
@@ -221,7 +221,7 @@ ON1은 완전 구현. ON3은 의도적으로 Onboarding에서 제외 (다른 화
 
 ---
 
-## SettingsScreen (번들 ee09cc40, 코드 src/screens/settings/SettingsScreen.tsx) — 🟨 부분 검증
+## SettingsScreen (번들 ee09cc40, 코드 src/screens/settings/SettingsScreen.tsx) — ✅ 검증 완료
 
 ### ✅ 일치 (검증됨)
 - AsyncStorage + SecureStore 기반 자동로그인/생체인증 토글 ✓
@@ -232,13 +232,13 @@ ON1은 완전 구현. ON3은 의도적으로 Onboarding에서 제외 (다른 화
 ### 검증 결과
 | # | 원래 가정 | 실제 코드 | 정정 severity |
 |---|---|---|---|
-| SE1 | gradient avatar + 누적 횟수 | render 영역 미독해 — User profile section 존재하나 디자인 디테일 미확정 | **M** |
-| SE2 | UPPERCASE caption header + rounded card | render 영역 미독해 | **M** |
+| SE1 | gradient avatar(135deg blue) + 이름 + email + 누적 N회 | ❌ Phase 40 검증 — profileIcon 56x56 User lucide 아이콘 + bgSubtle 배경 (gradient 없음). 누적 횟수 부재. Pencil edit 버튼 (chevron 아님) | **M** (gradient 시각 시그니처 부재) |
+| SE2 | UPPERCASE caption header + rounded card + icon+toggle | ✅ Phase 40 검증 — sectionTitle에 `textTransform: 'uppercase'` + `letterSpacing: 0.6` ✓. settingGroup rounded card + iconContainer 36x36 pill ✓ | **L** (구현됨) |
 | SE3 | Custom 44x26 blue toggle | RN `<Switch>` 사용 (OS 표준) — 의도적 결정 | **L** (UX 결정) |
 | SE4 | 출퇴근/알림/화면 접근성 sections | 25개 sub-screen으로 풍부하게 분리 (CommuteSettings/DelayNotification/SoundSettings 등) | **L** (확장된 구현) |
 
 ### 결론
-SettingsScreen은 25개 sub-screen으로 **번들보다 훨씬 풍부**. 중심 screen의 시각 디테일(SE1/SE2)은 render 영역 추가 검증 필요하나, 이미 atom 활용도 높아 큰 gap 없을 가능성. SE3은 OS 표준 Switch 사용으로 합리적 선택.
+SettingsScreen은 25개 sub-screen으로 **번들보다 훨씬 풍부**. SE2는 정확히 매칭(uppercase + rounded card + icon container) → L 강등. **SE1만 잔여 gap** — gradient avatar(135deg blue)와 누적 횟수가 번들의 시각 시그니처인데 코드는 평범한 User 아이콘 + 이름/email만 표시. M 유지 (시각적 차별화 큼).
 
 ---
 
@@ -259,17 +259,21 @@ SettingsScreen은 25개 sub-screen으로 **번들보다 훨씬 풍부**. 중심 
 ### ✅ 새로 식별 + 즉시 해소된 high gap
 1. ~~AlertsScreen AL3~~: Phase 37에서 type-별 icon+color 매핑 구현 (commit 추적용)
 
-### Med (Phase 36 검증 결과)
-- DelayFeed D3 (filter 축 결정 — line vs type)
-- DelayFeed D4 (comment/share 액션 부재)
-- DelayFeed D1 (megaphone vs Plus 아이콘 통일)
-- AlertsScreen AL2 (filter chips render 미독해)
-- AlertsScreen AL4 (read/unread 시각 차이)
+### 🔴 Phase 40 검증으로 새로 확정된 high gap
+1. **AlertsScreen AL2**: filter chips 부재 — sub-item 미독해 가정이 실제로는 H severity gap. 사용자가 알림 type별/read 상태별 분류 불가
+
+### Med (Phase 40 검증 후)
+- DelayFeed D3 (filter 축 결정 — line vs type) — product 결정 필요
+- DelayFeed D4 (comment/share 액션 부재) — 백엔드 의존
+- ~~DelayFeed D1~~ ✅ Phase 38 해소
+- ~~AlertsScreen AL2~~ → 🔴 H로 승격 (위)
+- ~~AlertsScreen AL4~~ ✅ Phase 40 검증으로 L 강등
 - Onboarding ON2 (modal 기반 vs inline dot/chevron)
 - Onboarding ON4 (Days picker 부재)
-- Settings SE1, SE2 (profile card + sectioned list 디테일)
+- Settings SE1 (gradient avatar + 누적 횟수 부재)
+- ~~Settings SE2~~ ✅ Phase 40 검증으로 L 강등
 - HomeScreen H3 부속 디테일 (실시간 제보 카드는 Phase 33-B 신설로 기본 구현됨)
-- StatsScreen ST1-2 (이모지 prefix 제거 + SectionHeader 통일)
+- ~~StatsScreen ST1-2~~ ✅ Phase 39 해소
 
 ### 🟢 Phase 36 검증으로 강등된 가정 (총 5건)
 | 원래 severity | 항목 | 강등 이유 |
@@ -326,16 +330,19 @@ SettingsScreen은 25개 sub-screen으로 **번들보다 훨씬 풍부**. 중심 
 | ✅ 34 | FavoritesScreen FavoriteRow 통합 | `9f453ef` |
 | ✅ 35 | JourneyStrip atom + RoutesScreen R3 | `8986441` |
 | ✅ 36 | LoginScreen/DelayFeed/Alerts/Onboarding/Settings 검증 (audit 정확도 보강) | `a91f1ee` |
-| ✅ 37 | AlertsScreen AL3: type-별 icon+color 매핑 + audit 라벨 정확도 수정 | (this) |
+| ✅ 37 | AlertsScreen AL3: type-별 icon+color 매핑 + audit 라벨 정확도 수정 | `69bcb0b` |
+| ✅ 38 | DelayFeedScreen D1: Plus → Megaphone (D3/D4 이월) | `c0e6537` |
+| ✅ 39 | StatsScreen 이모지 7개 제거 + MapScreen Ionicons 6개 → lucide | `0eac3de` |
+| ✅ 40 | Alerts AL2/AL4 + Settings SE1/SE2 render 검증 (AL2 H 승격, AL4/SE2 L 강등) | (this) |
 
 ### 향후 (Phase 36 검증 후 우선순위 재조정)
 
 | Phase | 핵심 작업 | 추정 작업량 | 영향 |
 |-------|-----------|-----------|------|
-| **38** | DelayFeed 디테일 (filter 축 결정 D3 + comment/share D4 + megaphone D1) | 중 (사용자 결정 D3 우선 필요) | M |
-| **39** | StatsScreen + MapScreen 디테일 정리 (이모지 prefix 제거 + lucide 통일) | 작 | L-M |
-| **40** | AlertsScreen AL2/AL4 + Settings SE1/SE2 render 보강 검증 | 작 (read 영역 추가 검증) | M |
-| **41** | Onboarding ON2/ON4 UX 결정 (modal 유지 vs inline 도입, 요일 커스터마이징 추가) | 중 | M |
+| **41** | AlertsScreen AL2 (filter chips 신설) — 새로 확정된 H gap | 중 (state + chip row + 필터 로직) | H |
+| **42** | SettingsScreen SE1 (gradient avatar + 누적 횟수) | 작 (LinearGradient avatar + 통계 fetch) | M |
+| **43** | Onboarding ON2/ON4 UX 결정 (modal 유지 vs inline 도입, 요일 커스터마이징 추가) | 중 | M |
+| 이월 | D3 (filter 축), D4 (comment/share), MP2 (Modal vs navigate) | — | product 결정 |
 
 ### 작업량 변화 추이
 - 초기 audit: 9 phase 추정
