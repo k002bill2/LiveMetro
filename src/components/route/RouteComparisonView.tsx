@@ -1,9 +1,12 @@
 /**
  * RouteComparisonView Component
- * Shows side-by-side comparison of original and alternative routes
+ * Shows side-by-side comparison of original and alternative routes.
+ *
+ * Phase 49 — migrated to Wanted Design System tokens. Status colors
+ * (success/warning/error) resolve through WANTED_TOKENS.status palette.
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -18,7 +21,11 @@ import {
   CheckCircle,
 } from 'lucide-react-native';
 import { useTheme } from '@/services/theme';
-import { SPACING, RADIUS, TYPOGRAPHY } from '@/styles/modernTheme';
+import {
+  WANTED_TOKENS,
+  weightToFontFamily,
+  type WantedSemanticTheme,
+} from '@/styles/modernTheme';
 import { getSubwayLineColor } from '@/utils/colorUtils';
 import { Route, RouteSegment, getLineName } from '@/models/route';
 
@@ -44,6 +51,7 @@ interface RouteSegmentItemProps {
   isFirst: boolean;
   isLast: boolean;
   isAffected?: boolean;
+  semantic: WantedSemanticTheme;
 }
 
 const RouteSegmentItem: React.FC<RouteSegmentItemProps> = ({
@@ -51,68 +59,68 @@ const RouteSegmentItem: React.FC<RouteSegmentItemProps> = ({
   isFirst,
   isLast,
   isAffected = false,
+  semantic,
 }) => {
-  const { colors } = useTheme();
   const lineColor = getSubwayLineColor(segment.lineId);
 
   return (
-    <View style={styles.segmentContainer}>
+    <View style={sharedStyles.segmentContainer}>
       {/* Line indicator */}
-      <View style={styles.segmentLeft}>
+      <View style={sharedStyles.segmentLeft}>
         <View
           style={[
-            styles.lineIndicator,
+            sharedStyles.lineIndicator,
             { backgroundColor: lineColor },
           ]}
         >
-          <Text style={styles.lineIndicatorText}>{segment.lineId}</Text>
+          <Text style={sharedStyles.lineIndicatorText}>{segment.lineId}</Text>
         </View>
         {!isLast && (
-          <View style={[styles.linePath, { backgroundColor: lineColor }]} />
+          <View style={[sharedStyles.linePath, { backgroundColor: lineColor }]} />
         )}
       </View>
 
       {/* Segment content */}
-      <View style={styles.segmentContent}>
+      <View style={sharedStyles.segmentContent}>
         {isFirst && (
-          <View style={styles.stationRow}>
+          <View style={sharedStyles.stationRow}>
             <View
-              style={[styles.stationDot, { backgroundColor: lineColor }]}
+              style={[sharedStyles.stationDot, { backgroundColor: lineColor }]}
             />
-            <Text style={[styles.stationName, { color: colors.textPrimary }]}>
+            <Text style={[sharedStyles.stationName, { color: semantic.labelStrong }]}>
               {segment.fromStationName}
             </Text>
             {isAffected && (
-              <AlertTriangle size={14} color={colors.error} />
+              <AlertTriangle size={14} color={WANTED_TOKENS.status.red500} />
             )}
           </View>
         )}
 
         {segment.isTransfer ? (
-          <View style={styles.transferRow}>
-            <ArrowRightLeft size={14} color={colors.textSecondary} />
-            <Text style={[styles.transferText, { color: colors.textSecondary }]}>
+          <View style={sharedStyles.transferRow}>
+            <ArrowRightLeft size={14} color={semantic.labelNeutral} />
+            <Text style={[sharedStyles.transferText, { color: semantic.labelNeutral }]}>
               {segment.lineName}으로 환승 ({segment.estimatedMinutes}분)
             </Text>
           </View>
         ) : (
-          <View style={styles.travelRow}>
-            <ArrowDown size={14} color={colors.textSecondary} />
-            <Text style={[styles.travelText, { color: colors.textSecondary }]}>
+          <View style={sharedStyles.travelRow}>
+            <ArrowDown size={14} color={semantic.labelNeutral} />
+            <Text style={[sharedStyles.travelText, { color: semantic.labelNeutral }]}>
               {segment.estimatedMinutes}분
             </Text>
           </View>
         )}
 
-        <View style={styles.stationRow}>
+        <View style={sharedStyles.stationRow}>
           <View
-            style={[styles.stationDot, { backgroundColor: lineColor }]}
+            style={[sharedStyles.stationDot, { backgroundColor: lineColor }]}
           />
-          <Text style={[styles.stationName, { color: colors.textPrimary }]}>
+          <Text style={[sharedStyles.stationName, { color: semantic.labelStrong }]}>
             {segment.toStationName}
           </Text>
           {isAffected && !segment.isTransfer && (
-            <AlertTriangle size={14} color={colors.error} />
+            <AlertTriangle size={14} color={WANTED_TOKENS.status.red500} />
           )}
         </View>
       </View>
@@ -125,6 +133,7 @@ interface RouteSummaryProps {
   label: string;
   variant: 'original' | 'alternative';
   isAffected?: boolean;
+  semantic: WantedSemanticTheme;
 }
 
 const RouteSummary: React.FC<RouteSummaryProps> = ({
@@ -132,63 +141,62 @@ const RouteSummary: React.FC<RouteSummaryProps> = ({
   label,
   variant,
   isAffected = false,
+  semantic,
 }) => {
-  const { colors } = useTheme();
-
   const getBorderColor = (): string => {
     if (variant === 'original' && isAffected) {
-      return colors.error;
+      return WANTED_TOKENS.status.red500;
     }
     if (variant === 'alternative') {
-      return colors.success;
+      return WANTED_TOKENS.status.green500;
     }
-    return colors.borderMedium;
+    return semantic.lineNormal;
   };
 
   return (
     <View
       style={[
-        styles.summaryContainer,
+        sharedStyles.summaryContainer,
         { borderColor: getBorderColor() },
       ]}
     >
-      <View style={styles.summaryHeader}>
-        <Text style={[styles.summaryLabel, { color: colors.textSecondary }]}>
+      <View style={sharedStyles.summaryHeader}>
+        <Text style={[sharedStyles.summaryLabel, { color: semantic.labelNeutral }]}>
           {label}
         </Text>
         {variant === 'alternative' && (
-          <CheckCircle size={16} color={colors.success} />
+          <CheckCircle size={16} color={WANTED_TOKENS.status.green500} />
         )}
         {variant === 'original' && isAffected && (
-          <AlertTriangle size={16} color={colors.error} />
+          <AlertTriangle size={16} color={WANTED_TOKENS.status.red500} />
         )}
       </View>
 
-      <View style={styles.summaryStats}>
-        <View style={styles.summaryStatItem}>
-          <Clock size={16} color={colors.textSecondary} />
-          <Text style={[styles.summaryStatValue, { color: colors.textPrimary }]}>
+      <View style={sharedStyles.summaryStats}>
+        <View style={sharedStyles.summaryStatItem}>
+          <Clock size={16} color={semantic.labelNeutral} />
+          <Text style={[sharedStyles.summaryStatValue, { color: semantic.labelStrong }]}>
             {route.totalMinutes}분
           </Text>
         </View>
-        <View style={styles.summaryStatItem}>
-          <ArrowRightLeft size={16} color={colors.textSecondary} />
-          <Text style={[styles.summaryStatValue, { color: colors.textPrimary }]}>
+        <View style={sharedStyles.summaryStatItem}>
+          <ArrowRightLeft size={16} color={semantic.labelNeutral} />
+          <Text style={[sharedStyles.summaryStatValue, { color: semantic.labelStrong }]}>
             환승 {route.transferCount}회
           </Text>
         </View>
       </View>
 
-      <View style={styles.summaryLines}>
+      <View style={sharedStyles.summaryLines}>
         {route.lineIds.map((lineId, index) => (
           <View
             key={`${lineId}-${index}`}
             style={[
-              styles.summaryLineChip,
+              sharedStyles.summaryLineChip,
               { backgroundColor: getSubwayLineColor(lineId) },
             ]}
           >
-            <Text style={styles.summaryLineText}>{getLineName(lineId)}</Text>
+            <Text style={sharedStyles.summaryLineText}>{getLineName(lineId)}</Text>
           </View>
         ))}
       </View>
@@ -205,7 +213,9 @@ export const RouteComparisonView: React.FC<RouteComparisonViewProps> = ({
   alternativeRoute,
   affectedLineIds = [],
 }) => {
-  const { colors, isDark } = useTheme();
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   // Check if original route is affected
   const originalAffected = originalRoute.lineIds.some(lineId =>
@@ -231,6 +241,7 @@ export const RouteComparisonView: React.FC<RouteComparisonViewProps> = ({
             label="기존 경로"
             variant="original"
             isAffected={originalAffected}
+            semantic={semantic}
           />
         </View>
         <View style={styles.summaryCard}>
@@ -238,23 +249,21 @@ export const RouteComparisonView: React.FC<RouteComparisonViewProps> = ({
             route={alternativeRoute}
             label="대체 경로"
             variant="alternative"
+            semantic={semantic}
           />
         </View>
       </View>
 
       {/* Time Difference */}
-      <View
-        style={[
-          styles.timeDiffContainer,
-          { backgroundColor: isDark ? colors.surface : colors.background },
-        ]}
-      >
+      <View style={styles.timeDiffContainer}>
         <Text
           style={[
             styles.timeDiffText,
             {
               color:
-                timeDiff <= 0 ? colors.success : colors.warning,
+                timeDiff <= 0
+                  ? WANTED_TOKENS.status.green500
+                  : WANTED_TOKENS.status.yellow500,
             },
           ]}
         >
@@ -263,13 +272,8 @@ export const RouteComparisonView: React.FC<RouteComparisonViewProps> = ({
       </View>
 
       {/* Alternative Route Details */}
-      <View
-        style={[
-          styles.routeDetailContainer,
-          { backgroundColor: isDark ? colors.surface : colors.background },
-        ]}
-      >
-        <Text style={[styles.routeDetailTitle, { color: colors.textPrimary }]}>
+      <View style={styles.routeDetailContainer}>
+        <Text style={styles.routeDetailTitle}>
           대체 경로 상세
         </Text>
         <ScrollView style={styles.segmentsList}>
@@ -279,6 +283,7 @@ export const RouteComparisonView: React.FC<RouteComparisonViewProps> = ({
               segment={segment}
               isFirst={index === 0}
               isLast={index === alternativeRoute.segments.length - 1}
+              semantic={semantic}
             />
           ))}
         </ScrollView>
@@ -291,37 +296,26 @@ export const RouteComparisonView: React.FC<RouteComparisonViewProps> = ({
 // Styles
 // ============================================================================
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    gap: SPACING.sm,
-    marginBottom: SPACING.md,
-  },
-  summaryCard: {
-    flex: 1,
-  },
+const sharedStyles = StyleSheet.create({
   summaryContainer: {
     borderWidth: 2,
-    borderRadius: RADIUS.md,
-    padding: SPACING.sm,
+    borderRadius: WANTED_TOKENS.radius.r6,
+    padding: WANTED_TOKENS.spacing.s2,
   },
   summaryHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: SPACING.xs,
+    marginBottom: WANTED_TOKENS.spacing.s1,
   },
   summaryLabel: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.medium as '500',
+    fontSize: 13,
+    fontFamily: weightToFontFamily('500'),
   },
   summaryStats: {
     flexDirection: 'row',
-    gap: SPACING.md,
-    marginBottom: SPACING.xs,
+    gap: WANTED_TOKENS.spacing.s3,
+    marginBottom: WANTED_TOKENS.spacing.s1,
   },
   summaryStatItem: {
     flexDirection: 'row',
@@ -329,8 +323,8 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   summaryStatValue: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold as '600',
+    fontSize: 13,
+    fontFamily: weightToFontFamily('600'),
   },
   summaryLines: {
     flexDirection: 'row',
@@ -338,41 +332,18 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   summaryLineChip: {
-    paddingHorizontal: SPACING.xs,
+    paddingHorizontal: WANTED_TOKENS.spacing.s1,
     paddingVertical: 2,
-    borderRadius: RADIUS.sm,
+    borderRadius: WANTED_TOKENS.radius.r2,
   },
   summaryLineText: {
     color: '#FFFFFF',
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    fontWeight: TYPOGRAPHY.fontWeight.medium as '500',
-  },
-  timeDiffContainer: {
-    padding: SPACING.sm,
-    borderRadius: RADIUS.md,
-    alignItems: 'center',
-    marginBottom: SPACING.md,
-  },
-  timeDiffText: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.bold as '700',
-  },
-  routeDetailContainer: {
-    flex: 1,
-    borderRadius: RADIUS.md,
-    padding: SPACING.md,
-  },
-  routeDetailTitle: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold as '600',
-    marginBottom: SPACING.md,
-  },
-  segmentsList: {
-    flex: 1,
+    fontSize: 12,
+    fontFamily: weightToFontFamily('500'),
   },
   segmentContainer: {
     flexDirection: 'row',
-    marginBottom: SPACING.sm,
+    marginBottom: WANTED_TOKENS.spacing.s2,
   },
   segmentLeft: {
     alignItems: 'center',
@@ -387,8 +358,8 @@ const styles = StyleSheet.create({
   },
   lineIndicatorText: {
     color: '#FFFFFF',
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    fontWeight: TYPOGRAPHY.fontWeight.bold as '700',
+    fontSize: 12,
+    fontFamily: weightToFontFamily('700'),
   },
   linePath: {
     width: 3,
@@ -397,12 +368,12 @@ const styles = StyleSheet.create({
   },
   segmentContent: {
     flex: 1,
-    marginLeft: SPACING.sm,
+    marginLeft: WANTED_TOKENS.spacing.s2,
   },
   stationRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: SPACING.xs,
+    gap: WANTED_TOKENS.spacing.s1,
     paddingVertical: 4,
   },
   stationDot: {
@@ -411,8 +382,8 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   stationName: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.medium as '500',
+    fontSize: 13,
+    fontFamily: weightToFontFamily('500'),
   },
   transferRow: {
     flexDirection: 'row',
@@ -422,7 +393,8 @@ const styles = StyleSheet.create({
     paddingLeft: 12,
   },
   transferText: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
+    fontSize: 12,
+    fontFamily: weightToFontFamily('500'),
   },
   travelRow: {
     flexDirection: 'row',
@@ -432,8 +404,50 @@ const styles = StyleSheet.create({
     paddingLeft: 12,
   },
   travelText: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
+    fontSize: 12,
+    fontFamily: weightToFontFamily('500'),
   },
 });
+
+const createStyles = (semantic: WantedSemanticTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+    },
+    summaryRow: {
+      flexDirection: 'row',
+      gap: WANTED_TOKENS.spacing.s2,
+      marginBottom: WANTED_TOKENS.spacing.s3,
+    },
+    summaryCard: {
+      flex: 1,
+    },
+    timeDiffContainer: {
+      backgroundColor: semantic.bgBase,
+      padding: WANTED_TOKENS.spacing.s2,
+      borderRadius: WANTED_TOKENS.radius.r6,
+      alignItems: 'center',
+      marginBottom: WANTED_TOKENS.spacing.s3,
+    },
+    timeDiffText: {
+      fontSize: 14,
+      fontFamily: weightToFontFamily('700'),
+    },
+    routeDetailContainer: {
+      flex: 1,
+      backgroundColor: semantic.bgBase,
+      borderRadius: WANTED_TOKENS.radius.r6,
+      padding: WANTED_TOKENS.spacing.s3,
+    },
+    routeDetailTitle: {
+      fontSize: 14,
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelStrong,
+      marginBottom: WANTED_TOKENS.spacing.s3,
+    },
+    segmentsList: {
+      flex: 1,
+    },
+  });
 
 export default RouteComparisonView;

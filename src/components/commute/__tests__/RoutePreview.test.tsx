@@ -11,6 +11,11 @@ jest.mock('lucide-react-native', () =>
   new Proxy({}, { get: (_, name) => name })
 );
 
+// Phase 49 — Wanted DS migration: useTheme().isDark drives semantic theme.
+jest.mock('@/services/theme', () => ({
+  useTheme: () => ({ isDark: false }),
+}));
+
 describe('RoutePreview', () => {
   it('renders empty state when no route data', () => {
     const { getByText } = render(<RoutePreview route={{}} />);

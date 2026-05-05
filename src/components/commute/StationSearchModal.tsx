@@ -1,6 +1,9 @@
 /**
  * Station Search Modal Component
- * Full-screen modal for searching and selecting subway stations
+ * Full-screen modal for searching and selecting subway stations.
+ *
+ * Phase 49 — migrated to Wanted Design System tokens. Subway line colors
+ * now resolve through getSubwayLineColor utility.
  */
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
@@ -26,7 +29,13 @@ import {
   XCircle,
   AlertCircle
 } from 'lucide-react-native';
-import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
+import {
+  WANTED_TOKENS,
+  weightToFontFamily,
+  type WantedSemanticTheme,
+} from '@/styles/modernTheme';
+import { useTheme } from '@/services/theme';
+import { getSubwayLineColor } from '@/utils/colorUtils';
 import { StationSelection } from '@/models/commute';
 import {
   getStationsWithLineInfo,
@@ -43,19 +52,6 @@ interface StationSearchModalProps {
   excludeStationIds?: string[];
 }
 
-// Line colors for visual indication
-const LINE_COLORS: Record<string, string> = {
-  '1': '#0052A4',
-  '2': '#00A84D',
-  '3': '#EF7C1C',
-  '4': '#00A5DE',
-  '5': '#996CAC',
-  '6': '#CD7C2F',
-  '7': '#747F00',
-  '8': '#E6186C',
-  '9': '#BDB092',
-};
-
 const LINE_NAMES: Record<string, string> = {
   '1': '1호선',
   '2': '2호선',
@@ -67,6 +63,8 @@ const LINE_NAMES: Record<string, string> = {
   '8': '8호선',
   '9': '9호선',
 };
+
+const LINE_IDS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as const;
 
 // Use StationWithLineInfo from stationsDataService
 // which provides station_cd (seoulStations.json) for consistent ID format
@@ -80,6 +78,9 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
   placeholder = '역 이름을 검색하세요',
   excludeStationIds = [],
 }) => {
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const styles = useMemo(() => createStyles(semantic), [semantic]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLine, setSelectedLine] = useState<string | null>(null);
   const [stations, setStations] = useState<StationWithLine[]>([]);
@@ -109,14 +110,10 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
     setLoading(true);
     setError(null);
     try {
-      // Use seoulStations.json via stationsDataService
-      // This provides station_cd (unique per line) instead of stations.json ID
-      // Transfer stations have different station_cd per line for correct matching
       const localStations = getStationsWithLineInfo();
       setStations(localStations);
     } catch {
       setError('역 정보를 불러오는데 실패했습니다');
-      // Use fallback static data if loading fails
       setStations(FALLBACK_STATIONS);
     } finally {
       setLoading(false);
@@ -127,12 +124,10 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
   const filteredStations = useMemo(() => {
     let result = stations;
 
-    // Filter by line
     if (selectedLine) {
       result = result.filter((s) => s.lineId === selectedLine);
     }
 
-    // Filter by search query
     if (searchQuery.trim()) {
       const query = searchQuery.trim().toLowerCase();
       result = result.filter((s) =>
@@ -140,12 +135,10 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
       );
     }
 
-    // Exclude specified stations
     if (excludeStationIds.length > 0) {
       result = result.filter((s) => !excludeStationIds.includes(s.id));
     }
 
-    // Sort alphabetically
     return result.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
   }, [stations, searchQuery, selectedLine, excludeStationIds]);
 
@@ -170,7 +163,6 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
     onClose();
   }, [onClose]);
 
-  // Handle selecting a commute favorite station
   const handleSelectCommuteFavorite = useCallback(
     (favorite: typeof favoritesWithDetails[0]) => {
       if (!favorite.station) return;
@@ -188,14 +180,13 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
     [onSelect, onClose]
   );
 
-  // Render commute favorites section
   const renderCommuteFavorites = () => {
     if (commuteStations.length === 0) return null;
 
     return (
       <View style={styles.favoritesSection}>
         <View style={styles.favoritesSectionHeader}>
-          <Star size={16} color={COLORS.black} />
+          <Star size={16} color={semantic.labelStrong} />
           <Text style={styles.favoritesSectionTitle}>출퇴근 즐겨찾기</Text>
         </View>
         <ScrollView
@@ -212,7 +203,7 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
               <View
                 style={[
                   styles.favoriteLineIndicator,
-                  { backgroundColor: LINE_COLORS[fav.lineId] || COLORS.gray[400] },
+                  { backgroundColor: getSubwayLineColor(fav.lineId) },
                 ]}
               />
               <View style={styles.favoriteContent}>
@@ -238,7 +229,7 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
       <FlatList
         horizontal
         showsHorizontalScrollIndicator={false}
-        data={Object.keys(LINE_COLORS)}
+        data={LINE_IDS as unknown as string[]}
         keyExtractor={(item) => item}
         contentContainerStyle={styles.lineFilterContent}
         renderItem={({ item }) => (
@@ -246,7 +237,7 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
             style={[
               styles.lineFilterButton,
               selectedLine === item && styles.lineFilterButtonActive,
-              { borderColor: LINE_COLORS[item] },
+              { borderColor: getSubwayLineColor(item) },
             ]}
             onPress={() =>
               setSelectedLine(selectedLine === item ? null : item)
@@ -255,7 +246,7 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
             <View
               style={[
                 styles.lineIndicator,
-                { backgroundColor: LINE_COLORS[item] },
+                { backgroundColor: getSubwayLineColor(item) },
               ]}
             />
             <Text
@@ -280,7 +271,7 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
       <View
         style={[
           styles.stationLineIndicator,
-          { backgroundColor: LINE_COLORS[item.lineId] || COLORS.gray[400] },
+          { backgroundColor: getSubwayLineColor(item.lineId) },
         ]}
       />
       <View style={styles.stationInfo}>
@@ -289,7 +280,7 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
       </View>
       <ChevronRight
         size={20}
-        color={COLORS.gray[400]}
+        color={semantic.labelAlt}
       />
     </TouchableOpacity>
   );
@@ -298,7 +289,7 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
     <View style={styles.emptyState}>
       <Search
         size={48}
-        color={COLORS.gray[300]}
+        color={semantic.lineNormal}
       />
       <Text style={styles.emptyStateText}>
         {searchQuery
@@ -326,13 +317,12 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
               style={styles.closeButton}
               onPress={handleClose}
             >
-              <X size={24} color={COLORS.black} />
+              <X size={24} color={semantic.labelStrong} />
             </TouchableOpacity>
             <Text style={styles.title}>{title}</Text>
             <View style={styles.headerSpacer} />
           </View>
 
-          {/* Commute Favorites Section */}
           {renderCommuteFavorites()}
 
           {/* Search Input */}
@@ -340,13 +330,13 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
             <View style={styles.searchInputContainer}>
               <Search
                 size={20}
-                color={COLORS.gray[400]}
+                color={semantic.labelAlt}
                 style={styles.searchIcon}
               />
               <TextInput
                 style={styles.searchInput}
                 placeholder={placeholder}
-                placeholderTextColor={COLORS.gray[400]}
+                placeholderTextColor={semantic.labelAlt}
                 value={searchQuery}
                 onChangeText={setSearchQuery}
                 autoCapitalize="none"
@@ -360,14 +350,13 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
                 >
                   <XCircle
                     size={20}
-                    color={COLORS.gray[400]}
+                    color={semantic.labelAlt}
                   />
                 </TouchableOpacity>
               )}
             </View>
           </View>
 
-          {/* Line Filter */}
           {renderLineFilter()}
 
           {/* Results Count */}
@@ -382,14 +371,14 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
           {/* Station List */}
           {loading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="large" color={COLORS.primary.main} />
+              <ActivityIndicator size="large" color={WANTED_TOKENS.blue[500]} />
               <Text style={styles.loadingText}>역 정보를 불러오는 중...</Text>
             </View>
           ) : error ? (
             <View style={styles.errorContainer}>
               <AlertCircle
                 size={48}
-                color={COLORS.semantic.error}
+                color={WANTED_TOKENS.status.red500}
               />
               <Text style={styles.errorText}>{error}</Text>
               <TouchableOpacity
@@ -416,7 +405,7 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
   );
 };
 
-// Fallback station data in case API fails (using station_cd from seoulStations.json)
+// Fallback station data in case API fails
 const FALLBACK_STATIONS: StationWithLine[] = [
   { id: '0150', name: '서울역', nameEn: 'Seoul Station', lineId: '1', lineName: '1호선' },
   { id: '0151', name: '시청', nameEn: 'City Hall', lineId: '1', lineName: '1호선' },
@@ -434,243 +423,250 @@ const FALLBACK_STATIONS: StationWithLine[] = [
   { id: '0756', name: '건대입구', nameEn: 'Konkuk Univ.', lineId: '7', lineName: '7호선' },
 ];
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.white,
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.light,
-  },
-  closeButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: TYPOGRAPHY.fontSize.xl,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.text.primary,
-  },
-  headerSpacer: {
-    width: 40,
-  },
-  searchContainer: {
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-  },
-  searchInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.surface.background,
-    borderRadius: RADIUS.md,
-    paddingHorizontal: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.border.medium,
-  },
-  searchIcon: {
-    marginRight: SPACING.sm,
-  },
-  searchInput: {
-    flex: 1,
-    height: 44,
-    fontSize: TYPOGRAPHY.fontSize.base,
-    color: COLORS.text.primary,
-  },
-  clearButton: {
-    padding: SPACING.xs,
-  },
-  lineFilterContainer: {
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.light,
-  },
-  lineFilterContent: {
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    gap: SPACING.sm,
-  },
-  lineFilterButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.full,
-    backgroundColor: COLORS.white,
-    borderWidth: 1.5,
-    marginRight: SPACING.sm,
-  },
-  lineFilterButtonActive: {
-    backgroundColor: COLORS.surface.background,
-  },
-  lineIndicator: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: SPACING.xs,
-  },
-  lineFilterText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.medium,
-    color: COLORS.text.secondary,
-  },
-  lineFilterTextActive: {
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.text.primary,
-  },
-  resultCount: {
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
-    backgroundColor: COLORS.surface.background,
-  },
-  resultCountText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.tertiary,
-  },
-  listContent: {
-    paddingBottom: SPACING['2xl'],
-  },
-  stationItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.light,
-  },
-  stationLineIndicator: {
-    width: 4,
-    height: 32,
-    borderRadius: 2,
-    marginRight: SPACING.md,
-  },
-  stationInfo: {
-    flex: 1,
-  },
-  stationName: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
-    marginBottom: 2,
-  },
-  stationLine: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.tertiary,
-  },
-  emptyState: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: SPACING['4xl'],
-  },
-  emptyStateText: {
-    marginTop: SPACING.md,
-    fontSize: TYPOGRAPHY.fontSize.base,
-    color: COLORS.text.tertiary,
-    textAlign: 'center',
-  },
-  loadingContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingText: {
-    marginTop: SPACING.md,
-    fontSize: TYPOGRAPHY.fontSize.base,
-    color: COLORS.text.tertiary,
-  },
-  errorContainer: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: SPACING.xl,
-  },
-  errorText: {
-    marginTop: SPACING.md,
-    fontSize: TYPOGRAPHY.fontSize.base,
-    color: COLORS.text.secondary,
-    textAlign: 'center',
-  },
-  retryButton: {
-    marginTop: SPACING.lg,
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.md,
-    backgroundColor: COLORS.black,
-    borderRadius: RADIUS.base,
-  },
-  retryButtonText: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.white,
-  },
-  // Commute Favorites Styles
-  favoritesSection: {
-    paddingVertical: SPACING.md,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.light,
-    backgroundColor: COLORS.surface.background,
-  },
-  favoritesSectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.lg,
-    marginBottom: SPACING.sm,
-    gap: SPACING.xs,
-  },
-  favoritesSectionTitle: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
-  },
-  favoritesScrollContent: {
-    paddingHorizontal: SPACING.lg,
-    gap: SPACING.sm,
-  },
-  favoriteCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.md,
-    paddingVertical: SPACING.sm,
-    paddingHorizontal: SPACING.md,
-    borderWidth: 1,
-    borderColor: COLORS.border.medium,
-    marginRight: SPACING.sm,
-    minWidth: 120,
-  },
-  favoriteLineIndicator: {
-    width: 4,
-    height: 36,
-    borderRadius: 2,
-    marginRight: SPACING.sm,
-  },
-  favoriteContent: {
-    flex: 1,
-  },
-  favoriteAlias: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.black,
-    marginBottom: 2,
-  },
-  favoriteStationName: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.medium,
-    color: COLORS.text.primary,
-  },
-  favoriteLineName: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.text.tertiary,
-  },
-});
+const createStyles = (semantic: WantedSemanticTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: semantic.bgBase,
+    },
+    keyboardView: {
+      flex: 1,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s3,
+      borderBottomWidth: 1,
+      borderBottomColor: semantic.lineSubtle,
+    },
+    closeButton: {
+      width: 40,
+      height: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    title: {
+      fontSize: 20,
+      fontFamily: weightToFontFamily('700'),
+      color: semantic.labelStrong,
+    },
+    headerSpacer: {
+      width: 40,
+    },
+    searchContainer: {
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s3,
+    },
+    searchInputContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: semantic.bgSubtle,
+      borderRadius: WANTED_TOKENS.radius.r6,
+      paddingHorizontal: WANTED_TOKENS.spacing.s3,
+      borderWidth: 1,
+      borderColor: semantic.lineNormal,
+    },
+    searchIcon: {
+      marginRight: WANTED_TOKENS.spacing.s2,
+    },
+    searchInput: {
+      flex: 1,
+      height: 44,
+      fontSize: 14,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelStrong,
+    },
+    clearButton: {
+      padding: WANTED_TOKENS.spacing.s1,
+    },
+    lineFilterContainer: {
+      borderBottomWidth: 1,
+      borderBottomColor: semantic.lineSubtle,
+    },
+    lineFilterContent: {
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s3,
+      gap: WANTED_TOKENS.spacing.s2,
+    },
+    lineFilterButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: WANTED_TOKENS.spacing.s3,
+      paddingVertical: WANTED_TOKENS.spacing.s2,
+      borderRadius: WANTED_TOKENS.radius.pill,
+      backgroundColor: semantic.bgBase,
+      borderWidth: 1.5,
+      marginRight: WANTED_TOKENS.spacing.s2,
+    },
+    lineFilterButtonActive: {
+      backgroundColor: semantic.bgSubtle,
+    },
+    lineIndicator: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      marginRight: WANTED_TOKENS.spacing.s1,
+    },
+    lineFilterText: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelNeutral,
+    },
+    lineFilterTextActive: {
+      fontFamily: weightToFontFamily('700'),
+      color: semantic.labelStrong,
+    },
+    resultCount: {
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s2,
+      backgroundColor: semantic.bgSubtlePage,
+    },
+    resultCountText: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+    },
+    listContent: {
+      paddingBottom: WANTED_TOKENS.spacing.s6,
+    },
+    stationItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s4,
+      borderBottomWidth: 1,
+      borderBottomColor: semantic.lineSubtle,
+    },
+    stationLineIndicator: {
+      width: 4,
+      height: 32,
+      borderRadius: 2,
+      marginRight: WANTED_TOKENS.spacing.s3,
+    },
+    stationInfo: {
+      flex: 1,
+    },
+    stationName: {
+      fontSize: 16,
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelStrong,
+      marginBottom: 2,
+    },
+    stationLine: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+    },
+    emptyState: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: WANTED_TOKENS.spacing.s10,
+    },
+    emptyStateText: {
+      marginTop: WANTED_TOKENS.spacing.s3,
+      fontSize: 14,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+      textAlign: 'center',
+    },
+    loadingContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    loadingText: {
+      marginTop: WANTED_TOKENS.spacing.s3,
+      fontSize: 14,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+    },
+    errorContainer: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: WANTED_TOKENS.spacing.s5,
+    },
+    errorText: {
+      marginTop: WANTED_TOKENS.spacing.s3,
+      fontSize: 14,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelNeutral,
+      textAlign: 'center',
+    },
+    retryButton: {
+      marginTop: WANTED_TOKENS.spacing.s4,
+      paddingHorizontal: WANTED_TOKENS.spacing.s5,
+      paddingVertical: WANTED_TOKENS.spacing.s3,
+      backgroundColor: WANTED_TOKENS.blue[500],
+      borderRadius: WANTED_TOKENS.radius.r4,
+    },
+    retryButtonText: {
+      fontSize: 14,
+      fontFamily: weightToFontFamily('600'),
+      color: '#FFFFFF',
+    },
+    favoritesSection: {
+      paddingVertical: WANTED_TOKENS.spacing.s3,
+      borderBottomWidth: 1,
+      borderBottomColor: semantic.lineSubtle,
+      backgroundColor: semantic.bgSubtlePage,
+    },
+    favoritesSectionHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      marginBottom: WANTED_TOKENS.spacing.s2,
+      gap: WANTED_TOKENS.spacing.s1,
+    },
+    favoritesSectionTitle: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelStrong,
+    },
+    favoritesScrollContent: {
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      gap: WANTED_TOKENS.spacing.s2,
+    },
+    favoriteCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: semantic.bgBase,
+      borderRadius: WANTED_TOKENS.radius.r6,
+      paddingVertical: WANTED_TOKENS.spacing.s2,
+      paddingHorizontal: WANTED_TOKENS.spacing.s3,
+      borderWidth: 1,
+      borderColor: semantic.lineNormal,
+      marginRight: WANTED_TOKENS.spacing.s2,
+      minWidth: 120,
+    },
+    favoriteLineIndicator: {
+      width: 4,
+      height: 36,
+      borderRadius: 2,
+      marginRight: WANTED_TOKENS.spacing.s2,
+    },
+    favoriteContent: {
+      flex: 1,
+    },
+    favoriteAlias: {
+      fontSize: 12,
+      fontFamily: weightToFontFamily('700'),
+      color: semantic.labelStrong,
+      marginBottom: 2,
+    },
+    favoriteStationName: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelStrong,
+    },
+    favoriteLineName: {
+      fontSize: 12,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+    },
+  });
 
 export default StationSearchModal;

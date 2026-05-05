@@ -28,6 +28,11 @@ jest.mock('@/hooks/useFavorites', () => ({
   })),
 }));
 
+// Phase 49 — Wanted DS migration: useTheme().isDark drives semantic theme.
+jest.mock('@/services/theme', () => ({
+  useTheme: () => ({ isDark: false }),
+}));
+
 describe('StationSearchModal', () => {
   const mockOnClose = jest.fn();
   const mockOnSelect = jest.fn();

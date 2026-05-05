@@ -1,9 +1,11 @@
 /**
  * AlternativeRouteCard Component
- * Displays an alternative route with comparison to original route
+ * Displays an alternative route with comparison to original route.
+ *
+ * Phase 49 — migrated to Wanted Design System tokens.
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -20,7 +22,11 @@ import {
   Minus,
 } from 'lucide-react-native';
 import { useTheme } from '@/services/theme';
-import { SPACING, RADIUS, TYPOGRAPHY } from '@/styles/modernTheme';
+import {
+  WANTED_TOKENS,
+  weightToFontFamily,
+  type WantedSemanticTheme,
+} from '@/styles/modernTheme';
 import { getSubwayLineColor } from '@/utils/colorUtils';
 import { JourneyStrip, type JourneyStripLeg } from '@/components/design';
 import {
@@ -32,11 +38,6 @@ import {
 
 /**
  * Map a domain Route into the JourneyStrip leg sequence.
- *
- * RouteSegment models train legs only — walking is implicit at start/end
- * and not represented. Transfer markers are derived from line-id changes
- * between consecutive segments rather than the `isTransfer` flag, which
- * tags the *segment* itself rather than the boundary.
  */
 const routeToLegs = (route: Route): JourneyStripLeg[] => {
   const legs: JourneyStripLeg[] = [];
@@ -88,7 +89,7 @@ const LineIndicator: React.FC<LineIndicatorProps> = ({ lineId, size = 'medium' }
   return (
     <View
       style={[
-        styles.lineIndicator,
+        sharedStyles.lineIndicator,
         {
           backgroundColor: lineColor,
           width: dimensions,
@@ -99,7 +100,7 @@ const LineIndicator: React.FC<LineIndicatorProps> = ({ lineId, size = 'medium' }
     >
       <Text
         style={[
-          styles.lineIndicatorText,
+          sharedStyles.lineIndicatorText,
           { fontSize: size === 'small' ? 10 : 12 },
         ]}
       >
@@ -111,21 +112,20 @@ const LineIndicator: React.FC<LineIndicatorProps> = ({ lineId, size = 'medium' }
 
 interface RouteLinePathProps {
   route: Route;
+  semantic: WantedSemanticTheme;
 }
 
-const RouteLinePath: React.FC<RouteLinePathProps> = ({ route }) => {
-  const { colors } = useTheme();
-
+const RouteLinePath: React.FC<RouteLinePathProps> = ({ route, semantic }) => {
   return (
-    <View style={styles.routePath}>
+    <View style={sharedStyles.routePath}>
       {route.lineIds.map((lineId, index) => (
         <React.Fragment key={`${lineId}-${index}`}>
           <LineIndicator lineId={lineId} size="small" />
           {index < route.lineIds.length - 1 && (
             <ArrowRight
               size={12}
-              color={colors.textSecondary}
-              style={styles.routeArrow}
+              color={semantic.labelNeutral}
+              style={sharedStyles.routeArrow}
             />
           )}
         </React.Fragment>
@@ -136,24 +136,25 @@ const RouteLinePath: React.FC<RouteLinePathProps> = ({ route }) => {
 
 interface TimeDifferenceIndicatorProps {
   minutes: number;
+  semantic: WantedSemanticTheme;
 }
 
 const TimeDifferenceIndicator: React.FC<TimeDifferenceIndicatorProps> = ({
   minutes,
+  semantic,
 }) => {
-  const { colors } = useTheme();
   const severity = getTimeDifferenceSeverity(minutes);
 
   const getIndicatorColor = (): string => {
     switch (severity) {
       case 'faster':
-        return colors.success;
+        return WANTED_TOKENS.status.green500;
       case 'same':
-        return colors.textSecondary;
+        return semantic.labelNeutral;
       case 'slower':
-        return colors.warning;
+        return WANTED_TOKENS.status.yellow500;
       case 'much_slower':
-        return colors.error;
+        return WANTED_TOKENS.status.red500;
     }
   };
 
@@ -168,9 +169,9 @@ const TimeDifferenceIndicator: React.FC<TimeDifferenceIndicatorProps> = ({
   };
 
   return (
-    <View style={styles.timeDifferenceContainer}>
+    <View style={sharedStyles.timeDifferenceContainer}>
       {getIcon()}
-      <Text style={[styles.timeDifferenceText, { color: getIndicatorColor() }]}>
+      <Text style={[sharedStyles.timeDifferenceText, { color: getIndicatorColor() }]}>
         {formatTimeDifference(minutes)}
       </Text>
     </View>
@@ -188,7 +189,9 @@ export const AlternativeRouteCard: React.FC<AlternativeRouteCardProps> = ({
   style,
   isRecommended = false,
 }) => {
-  const { colors, isDark } = useTheme();
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const styles = useMemo(() => createStyles(semantic), [semantic]);
   const { alternativeRoute, originalRoute, timeDifference, reason } = alternative;
 
   // Get first and last station names
@@ -216,8 +219,7 @@ export const AlternativeRouteCard: React.FC<AlternativeRouteCardProps> = ({
       style={[
         styles.container,
         {
-          backgroundColor: isDark ? colors.surface : colors.background,
-          borderColor: isRecommended ? colors.primary : colors.borderMedium,
+          borderColor: isRecommended ? WANTED_TOKENS.blue[500] : semantic.lineNormal,
           borderWidth: isRecommended ? 2 : 1,
         },
         style,
@@ -232,28 +234,25 @@ export const AlternativeRouteCard: React.FC<AlternativeRouteCardProps> = ({
             <View
               style={[
                 styles.recommendedBadge,
-                { backgroundColor: colors.primary },
+                { backgroundColor: WANTED_TOKENS.blue[500] },
               ]}
             >
               <Text style={styles.recommendedText}>추천</Text>
             </View>
           )}
-          <Text style={[styles.reasonText, { color: colors.textSecondary }]}>
+          <Text style={styles.reasonText}>
             {getReasonText()}
           </Text>
         </View>
-        <TimeDifferenceIndicator minutes={timeDifference} />
+        <TimeDifferenceIndicator minutes={timeDifference} semantic={semantic} />
       </View>
 
-      {/* Visual journey strip — Phase 35: replaces the simpler LineIndicator
-          chain with the design handoff's per-leg coloured blocks (proportional
-          width, line label + minutes inside). Falls back to RouteLinePath
-          only when route has no segments. */}
+      {/* Visual journey strip */}
       <View style={styles.routePathContainer}>
         {alternativeRoute.segments.length > 0 ? (
           <JourneyStrip legs={routeToLegs(alternativeRoute)} />
         ) : (
-          <RouteLinePath route={alternativeRoute} />
+          <RouteLinePath route={alternativeRoute} semantic={semantic} />
         )}
       </View>
 
@@ -261,11 +260,11 @@ export const AlternativeRouteCard: React.FC<AlternativeRouteCardProps> = ({
       <View style={styles.detailsContainer}>
         {/* Stations */}
         <View style={styles.stationsContainer}>
-          <Text style={[styles.stationText, { color: colors.textPrimary }]}>
+          <Text style={styles.stationText}>
             {fromStation}
           </Text>
-          <ArrowRight size={16} color={colors.textSecondary} />
-          <Text style={[styles.stationText, { color: colors.textPrimary }]}>
+          <ArrowRight size={16} color={semantic.labelNeutral} />
+          <Text style={styles.stationText}>
             {toStation}
           </Text>
         </View>
@@ -273,14 +272,14 @@ export const AlternativeRouteCard: React.FC<AlternativeRouteCardProps> = ({
         {/* Time & Transfers */}
         <View style={styles.statsContainer}>
           <View style={styles.statItem}>
-            <Clock size={14} color={colors.textSecondary} />
-            <Text style={[styles.statText, { color: colors.textPrimary }]}>
+            <Clock size={14} color={semantic.labelNeutral} />
+            <Text style={styles.statText}>
               {alternativeRoute.totalMinutes}분
             </Text>
           </View>
           <View style={styles.statItem}>
-            <ArrowRightLeft size={14} color={colors.textSecondary} />
-            <Text style={[styles.statText, { color: colors.textPrimary }]}>
+            <ArrowRightLeft size={14} color={semantic.labelNeutral} />
+            <Text style={styles.statText}>
               환승 {alternativeRoute.transferCount}회
             </Text>
           </View>
@@ -289,22 +288,17 @@ export const AlternativeRouteCard: React.FC<AlternativeRouteCardProps> = ({
 
       {/* Comparison (Optional) */}
       {showComparison && (
-        <View
-          style={[
-            styles.comparisonContainer,
-            { borderTopColor: colors.borderMedium },
-          ]}
-        >
-          <Text style={[styles.comparisonLabel, { color: colors.textSecondary }]}>
+        <View style={styles.comparisonContainer}>
+          <Text style={styles.comparisonLabel}>
             기존 경로:
           </Text>
           <View style={styles.comparisonContent}>
             {originalRoute.segments.length > 0 ? (
               <JourneyStrip legs={routeToLegs(originalRoute)} />
             ) : (
-              <RouteLinePath route={originalRoute} />
+              <RouteLinePath route={originalRoute} semantic={semantic} />
             )}
-            <Text style={[styles.comparisonTime, { color: colors.textSecondary }]}>
+            <Text style={styles.comparisonTime}>
               {originalRoute.totalMinutes}분
             </Text>
           </View>
@@ -318,54 +312,9 @@ export const AlternativeRouteCard: React.FC<AlternativeRouteCardProps> = ({
 // Styles
 // ============================================================================
 
-const styles = StyleSheet.create({
-  container: {
-    borderRadius: RADIUS.lg,
-    padding: SPACING.md,
-    marginVertical: SPACING.xs,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SPACING.sm,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-  },
-  recommendedBadge: {
-    paddingHorizontal: SPACING.xs,
-    paddingVertical: 2,
-    borderRadius: RADIUS.sm,
-  },
-  recommendedText: {
-    color: '#FFFFFF',
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    fontWeight: TYPOGRAPHY.fontWeight.bold as '700',
-  },
-  reasonText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.medium as '500',
-  },
-  timeDifferenceContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  timeDifferenceText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.bold as '700',
-  },
-  routePathContainer: {
-    marginBottom: SPACING.sm,
-  },
+// Static (non-theme) styles for sub-components — kept outside createStyles
+// because LineIndicator/RouteLinePath are defined at module scope.
+const sharedStyles = StyleSheet.create({
   routePath: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -381,49 +330,106 @@ const styles = StyleSheet.create({
   },
   lineIndicatorText: {
     color: '#FFFFFF',
-    fontWeight: TYPOGRAPHY.fontWeight.bold as '700',
+    fontFamily: weightToFontFamily('700'),
   },
-  detailsContainer: {
-    gap: SPACING.xs,
-  },
-  stationsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-  },
-  stationText: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold as '600',
-  },
-  statsContainer: {
-    flexDirection: 'row',
-    gap: SPACING.md,
-  },
-  statItem: {
+  timeDifferenceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
   },
-  statText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-  },
-  comparisonContainer: {
-    marginTop: SPACING.sm,
-    paddingTop: SPACING.sm,
-    borderTopWidth: 1,
-  },
-  comparisonLabel: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    marginBottom: 4,
-  },
-  comparisonContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  comparisonTime: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
+  timeDifferenceText: {
+    fontSize: 13,
+    fontFamily: weightToFontFamily('700'),
   },
 });
+
+const createStyles = (semantic: WantedSemanticTheme) =>
+  StyleSheet.create({
+    container: {
+      backgroundColor: semantic.bgBase,
+      borderRadius: WANTED_TOKENS.radius.r8,
+      padding: WANTED_TOKENS.spacing.s3,
+      marginVertical: WANTED_TOKENS.spacing.s1,
+      ...WANTED_TOKENS.shadow.flat,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: WANTED_TOKENS.spacing.s2,
+    },
+    headerLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: WANTED_TOKENS.spacing.s1,
+    },
+    recommendedBadge: {
+      paddingHorizontal: WANTED_TOKENS.spacing.s1,
+      paddingVertical: 2,
+      borderRadius: WANTED_TOKENS.radius.r2,
+    },
+    recommendedText: {
+      color: '#FFFFFF',
+      fontSize: 12,
+      fontFamily: weightToFontFamily('700'),
+    },
+    reasonText: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelNeutral,
+    },
+    routePathContainer: {
+      marginBottom: WANTED_TOKENS.spacing.s2,
+    },
+    detailsContainer: {
+      gap: WANTED_TOKENS.spacing.s1,
+    },
+    stationsContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: WANTED_TOKENS.spacing.s1,
+    },
+    stationText: {
+      fontSize: 14,
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelStrong,
+    },
+    statsContainer: {
+      flexDirection: 'row',
+      gap: WANTED_TOKENS.spacing.s3,
+    },
+    statItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    statText: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelStrong,
+    },
+    comparisonContainer: {
+      marginTop: WANTED_TOKENS.spacing.s2,
+      paddingTop: WANTED_TOKENS.spacing.s2,
+      borderTopWidth: 1,
+      borderTopColor: semantic.lineSubtle,
+    },
+    comparisonLabel: {
+      fontSize: 12,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+      marginBottom: 4,
+    },
+    comparisonContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    comparisonTime: {
+      fontSize: 12,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+    },
+  });
 
 export default AlternativeRouteCard;
