@@ -7,7 +7,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { Clock } from 'lucide-react-native';
 import { useTheme } from '@/services/theme';
-import { SPACING, RADIUS, TYPOGRAPHY } from '@/styles/modernTheme';
+import { SPACING, RADIUS, TYPOGRAPHY, weightToFontFamily } from '@/styles/modernTheme';
 
 interface DelayBadgeProps {
   /** Delay time in minutes */
@@ -94,6 +94,7 @@ const styles = StyleSheet.create({
   text: {
     color: '#FFFFFF',
     fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
   },
 });
 

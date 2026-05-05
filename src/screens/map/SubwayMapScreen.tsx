@@ -21,7 +21,7 @@ import { getSubwayLineColor, getLineTextColor } from '@utils/colorUtils';
 import { getLocalStationsByLine } from '@services/data/stationsDataService';
 import { useFavorites } from '@hooks/useFavorites';
 import { useTheme } from '@services/theme';
-import { WANTED_TOKENS, type WantedSemanticTheme } from '@/styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import type { Station } from '@models/train';
 import type { AppStackParamList } from '@/navigation/types';
 
@@ -457,6 +457,7 @@ const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
   lineButtonText: {
     fontSize: 15,
     fontWeight: 'bold',
+    fontFamily: weightToFontFamily('bold'),
   },
   stationList: {
     flex: 1,
@@ -469,6 +470,7 @@ const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
   stationListTitle: {
     fontSize: 20,
     fontWeight: 'bold',
+    fontFamily: weightToFontFamily('bold'),
     color: semantic.labelStrong,
     marginBottom: 4,
   },
@@ -513,6 +515,7 @@ const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
   stationName: {
     fontSize: 16,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     color: semantic.labelStrong,
     marginBottom: 2,
   },
@@ -535,6 +538,7 @@ const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
   transferBadgeText: {
     fontSize: 11,
     fontWeight: 'bold',
+    fontFamily: weightToFontFamily('bold'),
   },
   transferBadgeLarge: {
     paddingHorizontal: 16,
@@ -546,6 +550,7 @@ const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
   transferBadgeTextLarge: {
     fontSize: 14,
     fontWeight: 'bold',
+    fontFamily: weightToFontFamily('bold'),
   },
   modalOverlay: {
     flex: 1,
@@ -568,6 +573,7 @@ const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
   modalStationName: {
     fontSize: 28,
     fontWeight: 'bold',
+    fontFamily: weightToFontFamily('bold'),
     color: semantic.labelStrong,
     marginBottom: 4,
   },
@@ -584,6 +590,7 @@ const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
   modalSectionTitle: {
     fontSize: 16,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     color: semantic.labelNormal,
     marginBottom: 12,
   },
@@ -599,6 +606,7 @@ const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     color: semantic.primaryNormal,
     marginLeft: 12,
   },
@@ -614,6 +622,7 @@ const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
   addFavoriteButtonText: {
     fontSize: 16,
     fontWeight: 'bold',
+    fontFamily: weightToFontFamily('bold'),
     color: semantic.labelOnColor,
   },
   removeFavoriteButton: {

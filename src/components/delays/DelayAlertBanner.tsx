@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import { AlertTriangle, ChevronRight, X, Route } from 'lucide-react-native';
 import { useTheme } from '@/services/theme';
-import { SPACING, RADIUS, TYPOGRAPHY } from '@/styles/modernTheme';
+import { SPACING, RADIUS, TYPOGRAPHY, weightToFontFamily } from '@/styles/modernTheme';
 import { getSubwayLineColor } from '@/utils/colorUtils';
 
 export interface DelayInfo {
@@ -191,6 +191,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: TYPOGRAPHY.fontSize.sm,
     fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
     marginBottom: 2,
   },
   summary: {
@@ -232,6 +233,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: TYPOGRAPHY.fontSize.xs,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
   },
 });
 

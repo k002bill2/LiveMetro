@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import Slider from '@react-native-community/slider';
 import { getSubwayLineColor } from '@utils/colorUtils';
+import { weightToFontFamily } from '@/styles/modernTheme';
 
 interface Station {
   id: string;
@@ -264,6 +265,7 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 18,
     fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
     color: '#000000',
     marginBottom: 4,
   },
@@ -287,6 +289,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     color: '#000000',
   },
   stationCount: {
@@ -317,12 +320,14 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
   },
   stationName: {
     flex: 1,
     fontSize: 15,
     color: '#000000',
     fontWeight: '500',
+    fontFamily: weightToFontFamily('500'),
   },
   removeButton: {
     width: 28,
@@ -336,6 +341,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 20,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     lineHeight: 22,
   },
   emptyState: {
@@ -358,6 +364,7 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 15,
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
   },
   settingItem: {
     marginBottom: 20,
@@ -372,11 +379,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: '#000000',
     fontWeight: '500',
+    fontFamily: weightToFontFamily('500'),
   },
   settingValue: {
     fontSize: 15,
     color: '#2196F3',
     fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
   },
   slider: {
     width: '100%',
@@ -411,6 +420,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666666',
     fontWeight: '500',
+    fontFamily: weightToFontFamily('500'),
   },
   cooldownOptionTextSelected: {
     color: '#FFFFFF',
