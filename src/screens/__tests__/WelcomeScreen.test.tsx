@@ -43,10 +43,6 @@ jest.mock('../../services/theme', () => ({
 }));
 
 // Mock Ionicons
-jest.mock('@expo/vector-icons', () => ({
-  Ionicons: 'Ionicons',
-}));
-
 describe('WelcomeScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();

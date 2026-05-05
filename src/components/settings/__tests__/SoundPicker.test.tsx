@@ -4,11 +4,9 @@ import { SoundPicker } from '../SoundPicker';
 import { NotificationSoundId } from '@/models/user';
 import { SoundOption } from '@/services/sound/soundService';
 
-jest.mock('lucide-react-native', () => new Proxy({}, { get: (_, name) => name }));
+import { Volume2 } from 'lucide-react-native';
 
-jest.mock('@expo/vector-icons', () => ({
-  Ionicons: 'Ionicons',
-}));
+jest.mock('lucide-react-native', () => new Proxy({}, { get: (_, name) => name }));
 
 jest.mock('@/styles/modernTheme', () => ({
   COLORS: {
@@ -86,7 +84,7 @@ describe('SoundPicker', () => {
 
   it('renders with icon when provided', () => {
     const { toJSON } = render(
-      <SoundPicker {...defaultProps} icon="volume-high" />,
+      <SoundPicker {...defaultProps} icon={Volume2} />,
     );
     expect(toJSON()).toBeTruthy();
   });

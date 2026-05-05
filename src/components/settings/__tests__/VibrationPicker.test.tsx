@@ -5,11 +5,9 @@ import { VibrationPicker } from '../VibrationPicker';
 import { VibrationPatternId } from '@/models/user';
 import { VibrationOption } from '@/services/sound/soundService';
 
-jest.mock('lucide-react-native', () => new Proxy({}, { get: (_, name) => name }));
+import { Smartphone } from 'lucide-react-native';
 
-jest.mock('@expo/vector-icons', () => ({
-  Ionicons: 'Ionicons',
-}));
+jest.mock('lucide-react-native', () => new Proxy({}, { get: (_, name) => name }));
 
 jest.mock('@/styles/modernTheme', () => ({
   COLORS: {
@@ -101,7 +99,7 @@ describe('VibrationPicker', () => {
 
   it('renders with icon when provided', () => {
     const { toJSON } = render(
-      <VibrationPicker {...defaultProps} icon="phone-portrait" />,
+      <VibrationPicker {...defaultProps} icon={Smartphone} />,
     );
     expect(toJSON()).toBeTruthy();
   });

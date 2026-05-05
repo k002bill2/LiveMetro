@@ -8,14 +8,14 @@ import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native
 // @ts-ignore - expo-datetimepicker wraps @react-native-community/datetimepicker
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Clock } from 'lucide-react-native';
-import { Ionicons } from '@expo/vector-icons';
+import type { LucideIcon } from 'lucide-react-native';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
 
 interface SettingTimePickerProps {
   label: string;
   value: string; // HH:mm format (e.g., "08:00")
   onValueChange: (time: string) => void;
-  icon?: string;
+  icon?: LucideIcon;
   minTime?: string;
   maxTime?: string;
 }
@@ -24,7 +24,7 @@ export const SettingTimePicker: React.FC<SettingTimePickerProps> = ({
   label,
   value,
   onValueChange,
-  icon,
+  icon: IconComponent,
 }) => {
   const [showPicker, setShowPicker] = useState(false);
 
@@ -78,9 +78,9 @@ export const SettingTimePicker: React.FC<SettingTimePickerProps> = ({
         onPress={() => setShowPicker(true)}
       >
         <View style={styles.leftContent}>
-          {icon && (
+          {IconComponent && (
             <View style={styles.iconContainer}>
-              <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={20} color={COLORS.black} />
+              <IconComponent size={20} color={COLORS.black} strokeWidth={2} />
             </View>
           )}
           <View style={styles.textContainer}>

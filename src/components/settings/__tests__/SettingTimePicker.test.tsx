@@ -3,11 +3,9 @@ import { Platform } from 'react-native';
 import { render, fireEvent } from '@testing-library/react-native';
 import { SettingTimePicker } from '../SettingTimePicker';
 
-jest.mock('lucide-react-native', () => new Proxy({}, { get: (_, name) => name }));
+import { Clock } from 'lucide-react-native';
 
-jest.mock('@expo/vector-icons', () => ({
-  Ionicons: 'Ionicons',
-}));
+jest.mock('lucide-react-native', () => new Proxy({}, { get: (_, name) => name }));
 
 jest.mock('@react-native-community/datetimepicker', () => 'DateTimePicker');
 
@@ -81,7 +79,7 @@ describe('SettingTimePicker', () => {
 
   it('renders icon when provided', () => {
     const { toJSON } = render(
-      <SettingTimePicker {...defaultProps} icon="time-outline" />,
+      <SettingTimePicker {...defaultProps} icon={Clock} />,
     );
     expect(toJSON()).toBeTruthy();
   });

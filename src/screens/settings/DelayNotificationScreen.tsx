@@ -14,6 +14,7 @@ import {
   Alert,
 } from 'react-native';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
+import { ArrowRightLeft, Bell, Clock, Megaphone, Train, Users, XCircle } from 'lucide-react-native';
 import { useAuth } from '@/services/auth/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
 import SettingSection from '@/components/settings/SettingSection';
@@ -116,7 +117,7 @@ export const DelayNotificationScreen: React.FC = () => {
         {/* Basic Settings */}
         <SettingSection title="기본 설정">
           <SettingToggle
-            icon="notifications"
+            icon={Bell}
             label="지연 알림 받기"
             subtitle="열차 지연 시 알림을 보냅니다"
             value={notificationSettings?.enabled || false}
@@ -128,7 +129,7 @@ export const DelayNotificationScreen: React.FC = () => {
         {/* Delay Threshold */}
         <SettingSection title="지연 기준">
           <SettingSlider
-            icon="time"
+            icon={Clock}
             label="알림 기준 시간"
             subtitle={`${notificationSettings?.delayThresholdMinutes || 5}분 이상 지연 시 알림`}
             value={notificationSettings?.delayThresholdMinutes || 5}
@@ -143,7 +144,7 @@ export const DelayNotificationScreen: React.FC = () => {
         {/* Alert Types */}
         <SettingSection title="알림 종류">
           <SettingToggle
-            icon="train"
+            icon={Train}
             label="열차 지연"
             subtitle="정상 운행 시간보다 지연될 때"
             value={notificationSettings?.alertTypes.delays || false}
@@ -151,7 +152,7 @@ export const DelayNotificationScreen: React.FC = () => {
             disabled={saving}
           />
           <SettingToggle
-            icon="close-circle"
+            icon={XCircle}
             label="운행 중단"
             subtitle="열차 운행이 일시 중단될 때"
             value={notificationSettings?.alertTypes.suspensions || false}
@@ -159,7 +160,7 @@ export const DelayNotificationScreen: React.FC = () => {
             disabled={saving}
           />
           <SettingToggle
-            icon="people"
+            icon={Users}
             label="혼잡도 경고"
             subtitle="열차 혼잡도가 높을 때"
             value={notificationSettings?.alertTypes.congestion || false}
@@ -167,7 +168,7 @@ export const DelayNotificationScreen: React.FC = () => {
             disabled={saving}
           />
           <SettingToggle
-            icon="swap-horizontal"
+            icon={ArrowRightLeft}
             label="대체 경로"
             subtitle="지연 시 대체 경로 추천"
             value={notificationSettings?.alertTypes.alternativeRoutes || false}
@@ -177,7 +178,7 @@ export const DelayNotificationScreen: React.FC = () => {
             disabled={saving}
           />
           <SettingToggle
-            icon="megaphone"
+            icon={Megaphone}
             label="서비스 업데이트"
             subtitle="노선 변경 및 공지사항"
             value={notificationSettings?.alertTypes.serviceUpdates || false}

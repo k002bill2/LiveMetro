@@ -6,7 +6,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import Slider from '@react-native-community/slider';
-import { Ionicons } from '@expo/vector-icons';
+import type { LucideIcon } from 'lucide-react-native';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
 
 interface SettingSliderProps {
@@ -18,7 +18,7 @@ interface SettingSliderProps {
   step: number;
   unit: string; // e.g., "분"
   onValueChange: (value: number) => void;
-  icon?: string;
+  icon?: LucideIcon;
 }
 
 export const SettingSlider: React.FC<SettingSliderProps> = ({
@@ -30,14 +30,14 @@ export const SettingSlider: React.FC<SettingSliderProps> = ({
   step,
   unit,
   onValueChange,
-  icon,
+  icon: IconComponent,
 }) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        {icon && (
+        {IconComponent && (
           <View style={styles.iconContainer}>
-            <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={20} color={COLORS.black} />
+            <IconComponent size={20} color={COLORS.black} strokeWidth={2} />
           </View>
         )}
         <View style={styles.textContainer}>

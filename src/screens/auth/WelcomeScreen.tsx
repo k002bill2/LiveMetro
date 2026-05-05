@@ -11,7 +11,7 @@ import {
   TouchableOpacity,
   SafeAreaView,
 } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import { ArrowRight, Bell, Map, MapPin, Train } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { StackNavigationProp } from '@react-navigation/stack';
 
@@ -48,7 +48,7 @@ export const WelcomeScreen: React.FC = () => {
         {/* Logo Section */}
         <View style={styles.logoSection}>
           <View style={styles.logoContainer} testID="welcome-logo">
-            <Ionicons name="train" size={64} color={semantic.primaryNormal} />
+            <Train size={64} color={semantic.primaryNormal} strokeWidth={2} />
           </View>
           <Text style={styles.appName}>LiveMetro</Text>
           <Text style={styles.tagline}>실시간 전철 알림</Text>
@@ -60,17 +60,17 @@ export const WelcomeScreen: React.FC = () => {
         {/* Features Section */}
         <View style={styles.featuresSection}>
           <View style={styles.feature}>
-            <Ionicons name="notifications" size={24} color={semantic.statusPositive} />
+            <Bell size={24} color={semantic.statusPositive} strokeWidth={2} />
             <Text style={styles.featureText}>실시간 지연 알림</Text>
           </View>
 
           <View style={styles.feature}>
-            <Ionicons name="location" size={24} color={semantic.statusNegative} />
+            <MapPin size={24} color={semantic.statusNegative} strokeWidth={2} />
             <Text style={styles.featureText}>주변 역 자동 감지</Text>
           </View>
 
           <View style={styles.feature}>
-            <Ionicons name="map" size={24} color={semantic.primaryNormal} />
+            <Map size={24} color={semantic.primaryNormal} strokeWidth={2} />
             <Text style={styles.featureText}>대체 경로 제안</Text>
           </View>
         </View>
@@ -84,7 +84,7 @@ export const WelcomeScreen: React.FC = () => {
             accessibilityLabel="시작하기"
           >
             <Text style={styles.primaryButtonText}>시작하기</Text>
-            <Ionicons name="arrow-forward" size={20} color={'#FFFFFF'} />
+            <ArrowRight size={20} color={'#FFFFFF'} strokeWidth={2} />
           </TouchableOpacity>
 
           <TouchableOpacity

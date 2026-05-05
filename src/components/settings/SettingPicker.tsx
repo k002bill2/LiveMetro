@@ -14,7 +14,7 @@ import {
   ScrollView,
 } from 'react-native';
 import { ChevronRight, X, Check } from 'lucide-react-native';
-import { Ionicons } from '@expo/vector-icons';
+import type { LucideIcon } from 'lucide-react-native';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
 
 export interface PickerOption {
@@ -28,7 +28,7 @@ interface SettingPickerProps {
   options: PickerOption[];
   value: string;
   onValueChange: (value: string) => void;
-  icon?: string;
+  icon?: LucideIcon;
 }
 
 export const SettingPicker: React.FC<SettingPickerProps> = ({
@@ -36,7 +36,7 @@ export const SettingPicker: React.FC<SettingPickerProps> = ({
   options,
   value,
   onValueChange,
-  icon,
+  icon: IconComponent,
 }) => {
   const [modalVisible, setModalVisible] = useState(false);
 
@@ -54,9 +54,9 @@ export const SettingPicker: React.FC<SettingPickerProps> = ({
         onPress={() => setModalVisible(true)}
       >
         <View style={styles.leftContent}>
-          {icon && (
+          {IconComponent && (
             <View style={styles.iconContainer}>
-              <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={20} color={COLORS.black} />
+              <IconComponent size={20} color={COLORS.black} strokeWidth={2} />
             </View>
           )}
           <View style={styles.textContainer}>

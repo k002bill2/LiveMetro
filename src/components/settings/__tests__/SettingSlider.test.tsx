@@ -2,10 +2,6 @@ import React from 'react';
 import { render } from '@testing-library/react-native';
 import { SettingSlider } from '../SettingSlider';
 
-jest.mock('@expo/vector-icons', () => ({
-  Ionicons: 'Ionicons',
-}));
-
 jest.mock('@react-native-community/slider', () => {
   const React = require('react');
   const { View } = require('react-native');

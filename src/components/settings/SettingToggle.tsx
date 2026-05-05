@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { View, Text, Switch, StyleSheet } from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
+import type { LucideIcon } from 'lucide-react-native';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
 
 interface SettingToggleProps {
@@ -14,7 +14,7 @@ interface SettingToggleProps {
   value: boolean;
   onValueChange: (value: boolean) => void;
   disabled?: boolean;
-  icon?: string;
+  icon?: LucideIcon;
 }
 
 export const SettingToggle: React.FC<SettingToggleProps> = ({
@@ -23,14 +23,14 @@ export const SettingToggle: React.FC<SettingToggleProps> = ({
   value,
   onValueChange,
   disabled = false,
-  icon,
+  icon: IconComponent,
 }) => {
   return (
     <View style={[styles.container, disabled && styles.containerDisabled]}>
       <View style={styles.leftContent}>
-        {icon && (
+        {IconComponent && (
           <View style={styles.iconContainer}>
-            <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={20} color={COLORS.black} />
+            <IconComponent size={20} color={COLORS.black} strokeWidth={2} />
           </View>
         )}
         <View style={styles.textContainer}>

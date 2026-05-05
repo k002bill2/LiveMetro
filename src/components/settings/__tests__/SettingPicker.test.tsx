@@ -7,13 +7,11 @@ import { render, fireEvent } from '@testing-library/react-native';
 import { SettingPicker } from '../SettingPicker';
 import type { PickerOption } from '../SettingPicker';
 
+import { Languages } from 'lucide-react-native';
+
 jest.mock('lucide-react-native', () =>
   new Proxy({}, { get: (_, name) => name })
 );
-
-jest.mock('@expo/vector-icons', () => ({
-  Ionicons: 'Ionicons',
-}));
 
 const options: PickerOption[] = [
   { label: '한국어', value: 'ko', description: 'Korean' },
@@ -41,7 +39,7 @@ describe('SettingPicker', () => {
 
   it('renders with icon', () => {
     const { getByText } = render(
-      <SettingPicker {...defaultProps} icon="language-outline" />
+      <SettingPicker {...defaultProps} icon={Languages} />
     );
     expect(getByText('언어 설정')).toBeTruthy();
   });

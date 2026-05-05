@@ -3,10 +3,6 @@ import { render, fireEvent } from '@testing-library/react-native';
 import { Switch } from 'react-native';
 import { SettingToggle } from '../SettingToggle';
 
-jest.mock('@expo/vector-icons', () => ({
-  Ionicons: 'Ionicons',
-}));
-
 describe('SettingToggle', () => {
   const mockOnValueChange = jest.fn();
 

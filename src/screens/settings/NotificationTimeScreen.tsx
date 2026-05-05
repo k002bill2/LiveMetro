@@ -13,6 +13,7 @@ import {
   Alert,
 } from 'react-native';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
+import { Calendar, Clock, Moon, Sun } from 'lucide-react-native';
 import { useAuth } from '@/services/auth/AuthContext';
 import SettingSection from '@/components/settings/SettingSection';
 import SettingToggle from '@/components/settings/SettingToggle';
@@ -195,7 +196,7 @@ export const NotificationTimeScreen: React.FC = () => {
         {/* Commute Schedule */}
         <SettingSection title="출퇴근 시간">
           <SettingTimePicker
-            icon="sunny"
+            icon={Sun}
             label="아침 출근"
             value={morningTime}
             onValueChange={handleMorningTimeChange}
@@ -209,7 +210,7 @@ export const NotificationTimeScreen: React.FC = () => {
           </View>
 
           <SettingTimePicker
-            icon="moon"
+            icon={Moon}
             label="저녁 퇴근"
             value={eveningTime}
             onValueChange={handleEveningTimeChange}
@@ -226,7 +227,7 @@ export const NotificationTimeScreen: React.FC = () => {
         {/* Quiet Hours */}
         <SettingSection title="방해 금지 모드">
           <SettingToggle
-            icon="moon-outline"
+            icon={Moon}
             label="조용한 시간대 사용"
             subtitle="이 시간에는 알림을 받지 않습니다"
             value={notificationSettings?.quietHours?.enabled || false}
@@ -237,13 +238,13 @@ export const NotificationTimeScreen: React.FC = () => {
           {notificationSettings?.quietHours?.enabled && (
             <>
               <SettingTimePicker
-                icon="time-outline"
+                icon={Clock}
                 label="시작 시간"
                 value={quietHoursStart}
                 onValueChange={handleQuietHoursStartChange}
               />
               <SettingTimePicker
-                icon="time-outline"
+                icon={Clock}
                 label="종료 시간"
                 value={quietHoursEnd}
                 onValueChange={handleQuietHoursEndChange}
@@ -255,7 +256,7 @@ export const NotificationTimeScreen: React.FC = () => {
         {/* Additional Settings */}
         <SettingSection title="추가 설정">
           <SettingToggle
-            icon="calendar"
+            icon={Calendar}
             label="평일만 알림 받기"
             subtitle="주말과 공휴일에는 알림을 받지 않습니다"
             value={notificationSettings?.weekdaysOnly || false}

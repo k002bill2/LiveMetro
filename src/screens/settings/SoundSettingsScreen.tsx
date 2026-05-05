@@ -14,6 +14,7 @@ import {
   Alert,
 } from 'react-native';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
+import { Activity, Bell, Mail, Music, Smartphone, Volume1, Volume2 } from 'lucide-react-native';
 import { useAuth } from '@/services/auth/AuthContext';
 import { useNotifications } from '@/hooks/useNotifications';
 import SettingSection from '@/components/settings/SettingSection';
@@ -203,7 +204,7 @@ export const SoundSettingsScreen: React.FC = () => {
         {/* Notification Methods */}
         <SettingSection title="알림 방식">
           <SettingToggle
-            icon="notifications"
+            icon={Bell}
             label="푸시 알림"
             subtitle="앱이 꺼져있어도 알림 받기"
             value={notificationSettings?.pushNotifications || false}
@@ -211,7 +212,7 @@ export const SoundSettingsScreen: React.FC = () => {
             disabled={saving}
           />
           <SettingToggle
-            icon="mail"
+            icon={Mail}
             label="이메일 알림"
             subtitle={canEnableEmail ? "중요 업데이트 이메일로 수신" : "이메일 로그인 필요"}
             value={notificationSettings?.emailNotifications || false}
@@ -234,7 +235,7 @@ export const SoundSettingsScreen: React.FC = () => {
         {/* Sound Settings */}
         <SettingSection title="알림 효과">
           <SettingToggle
-            icon="volume-high"
+            icon={Volume2}
             label="알림음"
             subtitle="알림 수신 시 소리 재생"
             value={soundSettings.soundEnabled}
@@ -245,7 +246,7 @@ export const SoundSettingsScreen: React.FC = () => {
           {soundSettings.soundEnabled && (
             <>
               <SoundPicker
-                icon="musical-notes"
+                icon={Music}
                 label="알림음 선택"
                 options={NOTIFICATION_SOUNDS}
                 value={soundSettings.soundId}
@@ -255,7 +256,7 @@ export const SoundSettingsScreen: React.FC = () => {
               />
 
               <SettingSlider
-                icon="volume-medium"
+                icon={Volume1}
                 label="볼륨"
                 subtitle="알림음 볼륨 조절"
                 value={soundSettings.volume}
@@ -269,7 +270,7 @@ export const SoundSettingsScreen: React.FC = () => {
           )}
 
           <SettingToggle
-            icon="phone-portrait"
+            icon={Smartphone}
             label="진동"
             subtitle="알림 수신 시 진동"
             value={soundSettings.vibrationEnabled}
@@ -279,7 +280,7 @@ export const SoundSettingsScreen: React.FC = () => {
 
           {soundSettings.vibrationEnabled && (
             <VibrationPicker
-              icon="pulse"
+              icon={Activity}
               label="진동 패턴"
               options={VIBRATION_PATTERNS}
               value={soundSettings.vibrationPattern}
