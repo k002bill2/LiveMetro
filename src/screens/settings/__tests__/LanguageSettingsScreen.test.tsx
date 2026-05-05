@@ -9,10 +9,6 @@ import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { LanguageSettingsScreen } from '../LanguageSettingsScreen';
 import { useI18n } from '@/services/i18n';
 
-jest.mock('@expo/vector-icons', () => ({
-  Ionicons: 'Ionicons',
-}));
-
 jest.mock('@/services/i18n', () => ({
   useI18n: jest.fn(() => ({
     language: 'ko',

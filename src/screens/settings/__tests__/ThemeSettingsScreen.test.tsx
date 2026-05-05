@@ -5,10 +5,6 @@ import { ThemeSettingsScreen } from '../ThemeSettingsScreen';
 import { useTheme } from '@/services/theme';
 import { useI18n } from '@/services/i18n';
 
-jest.mock('@expo/vector-icons', () => ({
-  Ionicons: 'Ionicons',
-}));
-
 jest.mock('@react-navigation/native-stack', () => ({
   NativeStackScreenProps: {},
 }));

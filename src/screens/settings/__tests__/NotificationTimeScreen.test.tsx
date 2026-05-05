@@ -9,10 +9,6 @@ import { Alert } from 'react-native';
 import { NotificationTimeScreen } from '../NotificationTimeScreen';
 import { useAuth } from '@/services/auth/AuthContext';
 
-jest.mock('@expo/vector-icons', () => ({
-  Ionicons: 'Ionicons',
-}));
-
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({
     navigate: jest.fn(),

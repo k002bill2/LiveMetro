@@ -19,10 +19,6 @@ interface NotificationCallArgs {
   };
 }
 
-jest.mock('@expo/vector-icons', () => ({
-  Ionicons: 'Ionicons',
-}));
-
 jest.mock('@/services/auth/AuthContext', () => ({
   useAuth: jest.fn(() => ({
     user: {

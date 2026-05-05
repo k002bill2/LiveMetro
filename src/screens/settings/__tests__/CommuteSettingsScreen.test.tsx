@@ -8,10 +8,6 @@ import { CommuteSettingsScreen } from '../CommuteSettingsScreen';
 import { useAuth } from '@/services/auth/AuthContext';
 import { loadCommuteRoutes } from '@/services/commute/commuteService';
 
-jest.mock('@expo/vector-icons', () => ({
-  Ionicons: 'Ionicons',
-}));
-
 jest.mock('@react-navigation/native', () => ({
   useFocusEffect: (cb: () => void) => {
     const React = require('react');

@@ -9,10 +9,6 @@ import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import { EditProfileScreen } from '../EditProfileScreen';
 
-jest.mock('@expo/vector-icons', () => ({
-  Ionicons: 'Ionicons',
-}));
-
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({
     navigate: jest.fn(),
