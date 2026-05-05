@@ -7,7 +7,7 @@
 import React, { memo, useEffect, useRef, useState } from 'react';
 import { Text, TouchableOpacity, View, StyleSheet, ViewStyle, TextStyle } from 'react-native';
 import { Fingerprint } from 'lucide-react-native';
-import { WANTED_TOKENS } from '@/styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme/themeContext';
 
 export type FaceIDVariant = 'face' | 'touch';
@@ -79,6 +79,7 @@ const FaceIDButtonImpl: React.FC<FaceIDButtonProps> = ({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '800',
+    fontFamily: weightToFontFamily('800'),
     letterSpacing: -0.16,
   };
 

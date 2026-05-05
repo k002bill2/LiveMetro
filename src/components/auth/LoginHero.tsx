@@ -8,7 +8,7 @@ import React, { memo } from 'react';
 import { Text, View, StyleSheet, ViewStyle, TextStyle } from 'react-native';
 import Svg, { Path, Circle, G } from 'react-native-svg';
 import { TrainFront } from 'lucide-react-native';
-import { WANTED_TOKENS } from '@/styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme/themeContext';
 
 interface LoginHeroProps {
@@ -63,6 +63,7 @@ const LoginHeroImpl: React.FC<LoginHeroProps> = ({ testID }) => {
   const wordmarkText: TextStyle = {
     fontSize: 24,
     fontWeight: '800',
+    fontFamily: weightToFontFamily('800'),
     letterSpacing: -0.6,
     color: isDark ? '#FFFFFF' : semantic.labelStrong,
     lineHeight: 24,
@@ -71,6 +72,7 @@ const LoginHeroImpl: React.FC<LoginHeroProps> = ({ testID }) => {
   const taglineText: TextStyle = {
     fontSize: 11,
     fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
     letterSpacing: 0.44,
     color: isDark ? 'rgba(255,255,255,0.6)' : semantic.labelAlt,
     marginTop: 4,

@@ -5,7 +5,7 @@
  */
 import React, { memo } from 'react';
 import { Text, View, StyleSheet, ViewStyle, TextStyle } from 'react-native';
-import { WANTED_TOKENS } from '@/styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme/themeContext';
 
 interface OrDividerProps {
@@ -33,6 +33,7 @@ const OrDividerImpl: React.FC<OrDividerProps> = ({ label = '또는', testID }) =
   const labelStyle: TextStyle = {
     fontSize: 11,
     fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
     letterSpacing: 0.44,
     color: semantic.labelAlt,
   };

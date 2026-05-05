@@ -9,7 +9,7 @@
 import React, { memo } from 'react';
 import { Text, TouchableOpacity, ViewStyle, TextStyle } from 'react-native';
 import { Apple, Globe, MessageCircle, type LucideIcon } from 'lucide-react-native';
-import { WANTED_TOKENS } from '@/styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme/themeContext';
 
 export type SocialProvider = 'apple' | 'google' | 'kakao';
@@ -69,6 +69,7 @@ const SocialButtonImpl: React.FC<SocialButtonProps> = ({
     color: v.fg,
     fontSize: 15,
     fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
     letterSpacing: -0.15,
   };
 

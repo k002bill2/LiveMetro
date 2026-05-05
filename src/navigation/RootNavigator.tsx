@@ -10,7 +10,7 @@ import { Home, Heart, Bell, Settings, CircleHelp, Map as MapIcon } from 'lucide-
 
 import { useAuth } from '../services/auth/AuthContext';
 import { useTheme } from '../services/theme';
-import { WANTED_TOKENS } from '../styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily } from '../styles/modernTheme';
 import { LoadingScreen } from '../components/common/LoadingScreen';
 import { OnboardingProvider, useOnboarding } from '../contexts/OnboardingContext';
 
@@ -130,6 +130,7 @@ const MainTabNavigator: React.FC = () => {
           // '600' matches WANTED_TOKENS.type.caption2 weight; '700' was a
           // mismatch noted in cross-review.
           fontWeight: '600',
+          fontFamily: weightToFontFamily('600'),
           letterSpacing: 0,
         },
         headerStyle: {
@@ -140,6 +141,7 @@ const MainTabNavigator: React.FC = () => {
         headerTintColor: semantic.labelOnColor,
         headerTitleStyle: {
           fontWeight: '700',
+          fontFamily: weightToFontFamily('700'),
         },
       })}
     >

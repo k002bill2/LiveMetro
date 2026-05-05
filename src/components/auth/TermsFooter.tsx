@@ -5,7 +5,7 @@
  */
 import React, { memo } from 'react';
 import { Text, TouchableOpacity, View, StyleSheet, TextStyle } from 'react-native';
-import { WANTED_TOKENS } from '@/styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme/themeContext';
 
 interface TermsFooterProps {
@@ -21,6 +21,7 @@ const TermsFooterImpl: React.FC<TermsFooterProps> = ({ onTermsPress, onPrivacyPr
   const baseText: TextStyle = {
     fontSize: 11,
     fontWeight: '500',
+    fontFamily: weightToFontFamily('500'),
     lineHeight: 17,
     color: semantic.labelAlt,
     textAlign: 'center',
@@ -29,6 +30,7 @@ const TermsFooterImpl: React.FC<TermsFooterProps> = ({ onTermsPress, onPrivacyPr
   const linkText: TextStyle = {
     ...baseText,
     fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
     textDecorationLine: 'underline',
   };
 

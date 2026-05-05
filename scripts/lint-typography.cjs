@@ -40,15 +40,23 @@ const WINDOW = 15;
  *   Phase 28: screens/map/, components/alerts/, components/delays/
  *   Phase 29: screens/route/, screens/favorites/, components/train/, components/favorites/
  *   Phase 30: screens/alerts/, screens/home/, screens/station/
+ *   Phase 31: navigation/, components/auth/, components/common/, components/map/
+ *             — baseline 0 reached. HARD_PREFIXES now covers every directory
+ *             that ships tsx/ts in src/. Follow-up phase: remove the
+ *             HARD_PREFIXES filter and make default mode equal to --all.
  */
 const HARD_PREFIXES = [
   'src/components/alerts/',
+  'src/components/auth/',
+  'src/components/common/',
   'src/components/delays/',
   'src/components/design/',
   'src/components/favorites/',
+  'src/components/map/',
   'src/components/station/',
   'src/components/statistics/',
   'src/components/train/',
+  'src/navigation/',
   'src/screens/alerts/',
   'src/screens/auth/',
   'src/screens/delays/',

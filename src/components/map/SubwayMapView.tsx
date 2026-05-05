@@ -14,6 +14,7 @@ import {
   PanResponderGestureState,
 } from 'react-native';
 import Svg, { G, Line, Circle, Text as SvgText } from 'react-native-svg';
+import { weightToFontFamily } from '@/styles/modernTheme';
 
 // ============================================================================
 // Types
@@ -301,6 +302,7 @@ const styles = StyleSheet.create({
   controlButtonText: {
     fontSize: 24,
     fontWeight: '300',
+    fontFamily: weightToFontFamily('300'),
     color: '#333',
   },
   controlButtonTextSmall: {
