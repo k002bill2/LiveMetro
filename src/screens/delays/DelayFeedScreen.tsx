@@ -17,7 +17,7 @@ import {
 import {
   MessageSquare,
   ThumbsUp,
-  Plus,
+  Megaphone,
   Clock,
   CheckCircle,
 } from 'lucide-react-native';
@@ -252,7 +252,7 @@ export const DelayFeedScreen: React.FC = () => {
           testID="delay-feed-add-button"
           onPress={() => setShowReportModal(true)}
         >
-          <Plus size={20} color={WANTED_TOKENS.light.labelOnColor} strokeWidth={2.4} />
+          <Megaphone size={18} color={WANTED_TOKENS.light.labelOnColor} strokeWidth={2.2} />
         </TouchableOpacity>
       </View>
 
