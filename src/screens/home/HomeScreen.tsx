@@ -38,6 +38,7 @@ import { DelayAlertBanner } from '../../components/delays';
 import { CommutePredictionCard } from '../../components/prediction';
 import {
   CommunityDelayCard,
+  CommuteRouteCard,
   HomeTopBar,
   MLHeroCard,
   MLHeroCardPlaceholder,
@@ -172,6 +173,7 @@ export const HomeScreen: React.FC = () => {
   const [commuteStationNames, setCommuteStationNames] = useState<{
     origin?: string;
     destination?: string;
+    originLineId?: string;
   }>({});
 
   useEffect(() => {
@@ -190,6 +192,9 @@ export const HomeScreen: React.FC = () => {
         setCommuteStationNames({
           origin: origin?.name,
           destination: dest?.name,
+          // origin.lineId feeds CommuteRouteCard's LineBadge ride leg.
+          // Phase 44 (May 2026 bundle "오늘의 출근 경로" card).
+          originLineId: origin?.lineId,
         });
       } catch {
         // 실패 시 빈 객체 유지 — MLHeroCard는 origin/destination이 없으면
@@ -473,6 +478,33 @@ export const HomeScreen: React.FC = () => {
         )}
       </View>
 
+      {/* Phase 44 — "오늘의 출근 경로" timeline card.
+          Renders only when we have both endpoint names and a prediction
+          (departure/arrival times). lineId is best-effort from origin
+          station's primary line; route service-derived fields (transfer/
+          stop count/fare) are intentionally omitted on HomeScreen — the
+          fact grid hides automatically when all three are absent. The
+          full route detail lives in AlternativeRoutes; this card is a
+          summary + entry point to settings. */}
+      {heroProps &&
+        commuteStationNames.origin &&
+        commuteStationNames.destination && (
+          <View style={styles.routeCardWrap}>
+            <CommuteRouteCard
+              origin={commuteStationNames.origin}
+              destination={commuteStationNames.destination}
+              lineId={commuteStationNames.originLineId as LineId | undefined}
+              departureTime={mlPrediction?.predictedDepartureTime}
+              arrivalTime={heroProps.arrivalTime}
+              rideMinutes={heroProps.predictedMinutes}
+              onPressEdit={() =>
+                navigation.navigate('CommuteSettings' as never)
+              }
+              testID="home-commute-route-card"
+            />
+          </View>
+        )}
+
       {/* Quick actions — 4-button grid */}
       <View style={styles.quickActionsWrap}>
         <QuickActionsGrid
@@ -737,6 +769,10 @@ const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
     backgroundColor: semantic.bgSubtlePage,
   },
   heroWrap: {
+    paddingHorizontal: WANTED_TOKENS.spacing.s5,
+    paddingBottom: WANTED_TOKENS.spacing.s4,
+  },
+  routeCardWrap: {
     paddingHorizontal: WANTED_TOKENS.spacing.s5,
     paddingBottom: WANTED_TOKENS.spacing.s4,
   },
