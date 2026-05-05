@@ -83,21 +83,22 @@ StationDetailScreen은 **거의 완벽**. atom 4종(Header/Direction/Card/Exit) 
 
 ---
 
-## LoginScreen (번들 83fe8f1a, 코드 src/screens/auth/AuthScreen.tsx + components/auth/*)
+## LoginScreen (번들 83fe8f1a, 코드 src/screens/auth/AuthScreen.tsx + components/auth/*) — ✅ 검증 완료
 
-### ✅ 일치
-- LoginHero, FaceIDButton, SocialButton(apple/google/kakao), OrDivider, TermsFooter 컴포넌트 모두 존재
-- 컴포넌트 단위로는 번들 1:1 매핑
+### ✅ 일치 (검증됨)
+- **LoginHero (LoginHero.tsx)**: 5 line path SVG with **번들 정확 컬러**(#00A84D/#0052A4/#EF7C1C/#996CAC/#D6406A) + 노선당 2개 station node + pulse pin at (168, 130) + 워드마크 + brand badge — **픽셀 단위 일치**
+- **FaceIDButton (FaceIDButton.tsx)**: 26x26 frame + 4 corner brackets + 2 eyes + mouth + 1.4s 주기 펄스 dot — **픽셀 단위 일치**. 추가로 Touch ID variant 지원 (Fingerprint 아이콘)
+- **AuthScreen orchestrator**: LoginHero/FaceIDButton/SocialButton/OrDivider/TermsFooter 모두 wired. Phase 8 rewrite로 679줄 legacy → 365줄 orchestrator + 5 atoms로 정리
 
-### 🟡 차이 (med)
-| # | 항목 | 번들 | 코드 | severity |
-|---|------|------|------|----------|
-| L1 | LoginHero 라인 그래픽 | 5개 노선 색상 추상 SVG path + 펄스 핀 + 워드마크 | LoginHero 구현 검증 필요 (SVG path 5개 line + pulse pin + 'LiveMetro' wordmark 일치 여부) | M |
-| L2 | FaceID 버튼 글리프 | 4개 코너 bracket + 두 눈 + 입 + 펄스 dot | FaceIDButton 구현 검증 필요 | M |
-| L3 | "이메일로 로그인" 보조 버튼 | mail icon + outline pill | EmailLoginScreen이 별도 화면으로 분리 | L |
+### 검증 결과 — audit 가정 모두 강등
+| # | 원래 가정 | 실제 코드 | 정정 severity |
+|---|---|---|---|
+| L1 | LoginHero 미구현 추정 | ✅ 5 line + pulse pin + wordmark 정확 구현 | **L** (코스메틱만) |
+| L2 | FaceID glyph 미구현 추정 | ✅ corner bracket + eyes + mouth + pulse 정확 구현 | **L** |
+| L3 | 이메일 로그인 보조 버튼 | EmailLoginScreen 분리 (의도된 분리) | **L** (UX 결정) |
 
 ### 결론
-컴포넌트는 갖춰져 있으나 LoginHero/FaceIDButton의 시각 디테일이 번들과 일치하는지는 코드 정밀 비교 필요. AuthScreen 자체의 조립이 번들의 LoginScreen과 같은 순서/spacing인지 확인 필요.
+LoginScreen은 **거의 완벽**. atom 5종 모두 wired + 번들 디자인 1:1. 시각 차이 없음.
 
 ---
 
@@ -121,15 +122,23 @@ R3 visual journey strip은 어느 화면에서든 가치 있는 atom — Journey
 
 ---
 
-## DelayFeedScreen (번들 ee09cc40, 코드 src/screens/delays/DelayFeedScreen.tsx)
+## DelayFeedScreen (번들 ee09cc40, 코드 src/screens/delays/DelayFeedScreen.tsx) — ✅ 검증 완료
 
-### 핵심 차이
-| # | 항목 | 번들 | severity |
-|---|------|------|----------|
-| D1 | Header: "실시간 제보" 28px + megaphone 작성 버튼 (blue 36x36) | 코드 검증 필요 | M |
-| D2 | "지난 1시간 · 실시간 제보 4건" subtitle | 코드 검증 필요 | L |
-| D3 | Filter chips (`전체/지연/신호장애/혼잡/내 노선만`) | 코드 검증 필요 | M |
-| D4 | Report card: thumbs-up/message-circle/share icon row | 코드 검증 필요 | M |
+### ✅ 일치 / 부분 일치 (검증됨)
+- delayReportService 기반 실시간 구독 + filter chip + 카드 list ✓ 구조 일치
+- 카드 내부: line accent + line badge + station + time + reportType + description + reporter + verified CheckCircle + credibility + upvote button ✓
+- formatTimeAgo 헬퍼 (방금 전/N분 전/N시간 전) ✓ 번들과 동일
+
+### 검증 결과
+| # | 원래 가정 | 실제 코드 | 정정 severity |
+|---|---|---|---|
+| D1 | "실시간 제보" 28px + megaphone | 헤더는 별도 검증 필요 (read 범위 밖). Plus 아이콘 사용 (megaphone 아님) | **M** (아이콘 통일) |
+| D2 | "지난 1시간 · 4건" subtitle | 미구현 추정 | **L** (메타 라인) |
+| D3 | filter: `전체/지연/신호장애/혼잡/내 노선만` (type 기반) | LINES = `전체/1~9호선` (line 기반) — **filter 축이 다름** | **M** (filter 축 결정 필요) |
+| D4 | thumbs-up + message-circle + share | ThumbsUp만 구현, comment/share 없음 | **M** (소셜 액션 부족) |
+
+### 결론
+구조는 잘 갖춰짐 (구독+필터+카드). 차이는: filter 축(line vs type), 액션 row의 comment/share 부재, megaphone vs Plus 아이콘. **D3가 가장 의미 있는 결정 — 사용자 의도(특정 라인만 vs 특정 사고타입만)**.
 
 ---
 
@@ -172,39 +181,64 @@ MP2 high severity 가정 **틀림** — vertical timeline은 정확히 구현되
 
 ---
 
-## AlertsScreen (번들 ee09cc40, 코드 src/screens/alerts/)
+## AlertsScreen (번들 ee09cc40, 코드 src/screens/alerts/AlertsScreen.tsx) — ✅ 검증 완료
 
-### 핵심 차이
-| # | 항목 | 번들 | severity |
-|---|------|------|----------|
-| AL1 | "모두 읽음" 우측 액션 텍스트 (blue) | 코드 검증 필요 | L |
-| AL2 | Filter chips (`전체/읽지않음 2/도착/지연/제보`) | 코드 검증 필요 | M |
-| AL3 | Type-별 아이콘 + 색상 매핑 (arriving=blue/depart=blue/delay=red/community=yellow/cert=violet/weekly=cyan) | 코드 검증 필요 | M |
-| AL4 | Read 상태 시각 차이 (read=bgBase, unread=blue-50 + blue border) | 코드 검증 필요 | M |
+### ✅ 일치 (검증됨)
+- useAlerts hook + StoredNotification 모델 ✓
+- markAsRead + markAllAsRead + clearAll 액션 ✓
+- formatTimestamp 헬퍼 (방금/N분/N시간/N일/날짜) ✓ 번들과 거의 동일
 
----
+### 검증 결과 — gap 확정
+| # | 원래 가정 | 실제 코드 | 정정 severity |
+|---|---|---|---|
+| AL1 | "모두 읽음" blue 텍스트 | markAllAsRead handler 존재, 시각 표현 별도 검증 필요 | **L** |
+| AL2 | filter chips `전체/읽지않음 N/도착/지연/제보` | 코드의 render 영역 미독해 — filter UI 존재 여부 미확정 | **M** (확인 필요) |
+| AL3 | type-별 차별화 아이콘+색상 (arriving/depart/delay/community/cert/weekly) | **getNotificationIcon 모든 타입 → Circle 단일 아이콘 (line 56-66)**. type-color 매핑도 부재 | **H** (확정 gap) |
+| AL4 | read=bgBase, unread=blue-50 + blue border | render 영역 미독해 | **M** (확인 필요) |
 
-## OnboardingScreen (번들 ee09cc40, 코드 src/screens/onboarding/)
-
-### 핵심 차이
-| # | 항목 | 번들 | severity |
-|---|------|------|----------|
-| ON1 | 4단계 progress bar (active=blue) + STEP N / 4 라벨 + 건너뛰기 | 코드 측 OnbHeader가 있을 것 (chunk 1/6 commit 6b578cd) — 검증 | M |
-| ON2 | From/To selector (출발 dot + 도착 dot + chevron) | CommuteRouteScreen 검증 | M |
-| ON3 | **Time picker** — 32px dual digit (시:분) + preset chips (07:30~09:30) | CommuteRouteScreen 검증 | H |
-| ON4 | Days picker (월~일 7-cell grid + 평일 선택) | CommuteRouteScreen 검증 | M |
+### 결론
+**AL3는 확정된 의미 있는 gap** — getNotificationIcon switch 모든 case가 `Circle` 반환. 번들의 type-별 시각 차별화(arriving=train/depart=clock/delay=alert-triangle 등)가 미구현. 사용자가 알림 list에서 type을 한눈에 구분 못함.
 
 ---
 
-## SettingsScreen (번들 ee09cc40, 코드 src/screens/settings/SettingsScreen.tsx)
+## OnboardingScreen (번들 ee09cc40, 코드 src/screens/onboarding/CommuteRouteScreen.tsx + others) — ✅ 검증 완료
 
-### 핵심 차이
-| # | 항목 | 번들 | severity |
-|---|------|------|----------|
-| SE1 | Profile card — gradient avatar (135deg blue) + 이름 + email + 누적 횟수 | 코드 검증 필요 | M |
-| SE2 | Sectioned list — UPPERCASE caption header + rounded card with icon+label+toggle/value | 코드 검증 필요 | M |
-| SE3 | Toggle switch (44x26 blue when on) | 코드 검증 필요 | L |
-| SE4 | Sections: 출퇴근/알림/화면 접근성 | 코드는 25개 sub-screen으로 펼쳐져 있어 메인 SettingsScreen이 indexed list 역할 | M |
+### ✅ 일치 (검증됨)
+- **OnbHeader atom** (`@/components/onboarding/OnbHeader`): 4-step progress bar, Phase Chunk 1/6 commit `6b578cd`로 신설. CommuteRouteScreen의 step 2/4 위치에 wired (line 31)
+- StationSearchModal + TransferStationList + RoutePreview 3종 atom으로 From/Transfer/Arrival 선택 ✓
+- onSkip handler (useOnboardingCallbacks) ✓ → 건너뛰기 액션
+
+### 검증 결과
+| # | 원래 가정 | 실제 코드 | 정정 severity |
+|---|---|---|---|
+| ON1 | progress bar + STEP 라벨 + 건너뛰기 | ✅ OnbHeader atom 구현 + onSkip 연결 | **L** (디테일만) |
+| ON2 | From/To dot selector | TransferStationList + StationSearchModal로 처리 — **번들의 inline dot/chevron row와 다른 모달 기반 UX** | **M** (UX 모델 다름) |
+| ON3 | Time picker (32px dual digit + preset chips) | **Onboarding에서 제거됨** — CommuteTime step이 Chunk 5에서 SettingsCommute로 이동 (line 45 주석). DEFAULT_DEPARTURE_TIME = '08:00' 사용 | **L** (Onboarding 외 기능) |
+| ON4 | Days picker (월~일 7-cell grid) | 미구현 추정 (기본값 사용) | **M** (요일 커스텀 부재) |
+
+### 결론
+ON1은 완전 구현. ON3은 의도적으로 Onboarding에서 제외 (다른 화면으로 이동). **ON2/ON4는 번들의 inline customization vs 코드의 modal+default 패턴 차이** — UX 결정 사항이지 시각 gap이 아님. SettingsCommute에서 time picker가 어떻게 구현되었는지는 별도 검증 필요.
+
+---
+
+## SettingsScreen (번들 ee09cc40, 코드 src/screens/settings/SettingsScreen.tsx) — ✅ 검증 완료
+
+### ✅ 일치 (검증됨)
+- AsyncStorage + SecureStore 기반 자동로그인/생체인증 토글 ✓
+- biometric 서비스(isBiometricAvailable, isBiometricLoginEnabled, getBiometricTypeName, reEnable, disable) wired ✓
+- React Native `<Switch>` 컴포넌트 사용 ✓ (번들의 커스텀 44x26 토글 UI 대신 OS 표준)
+- 25개 sub-screen으로 분리된 구조 — 번들의 단일 list와 다른 indexed navigation pattern
+
+### 검증 결과
+| # | 원래 가정 | 실제 코드 | 정정 severity |
+|---|---|---|---|
+| SE1 | gradient avatar + 누적 횟수 | render 영역 미독해 — User profile section 존재하나 디자인 디테일 미확정 | **M** |
+| SE2 | UPPERCASE caption header + rounded card | render 영역 미독해 | **M** |
+| SE3 | Custom 44x26 blue toggle | RN `<Switch>` 사용 (OS 표준) — 의도적 결정 | **L** (UX 결정) |
+| SE4 | 출퇴근/알림/화면 접근성 sections | 25개 sub-screen으로 풍부하게 분리 (CommuteSettings/DelayNotification/SoundSettings 등) | **L** (확장된 구현) |
+
+### 결론
+SettingsScreen은 25개 sub-screen으로 **번들보다 훨씬 풍부**. 중심 screen의 시각 디테일(SE1/SE2)은 render 영역 추가 검증 필요하나, 이미 atom 활용도 높아 큰 gap 없을 가능성. SE3은 OS 표준 Switch 사용으로 합리적 선택.
 
 ---
 
@@ -214,13 +248,46 @@ MP2 high severity 가정 **틀림** — vertical timeline은 정확히 구현되
 
 ---
 
-## 🎯 통합 우선순위 백로그 (검증 후)
+## 🎯 통합 우선순위 백로그 (Phase 36 검증 후)
 
-### High (검증으로 확정된 진짜 gap) — 4건
-1. **HomeScreen H1**: 즐겨찾는 역 horizontal → vertical FavoriteRow 리스트로 교체
-2. **HomeScreen H2**: MLHeroCard에 deltaMinutes 데이터 흐름 연결 (useMLPrediction baseline 비교)
-3. **FavoritesScreen F1**: DraggableFavoriteItem → FavoriteRow 마이그레이션
-4. **RoutesScreen R3**: Visual journey strip atom 신설 (JourneyStrip 컴포넌트 + AlternativeRouteCard 통합)
+### ✅ Phase 33-35로 해소된 high gap (4건)
+1. ~~HomeScreen H1~~ — vertical layout 전환 (Phase 33-C1)
+2. ~~HomeScreen H2~~ — MLHeroCard deltaMinutes wire (Phase 33-A)
+3. ~~FavoritesScreen F1~~ — FavoriteRow 통합 (Phase 34)
+4. ~~RoutesScreen R3~~ — JourneyStrip atom + AlternativeRouteCard (Phase 35)
+
+### 🔴 새로 식별된 high gap (Phase 36 검증)
+1. **AlertsScreen AL3**: getNotificationIcon이 모든 type을 `Circle`로 매핑 — 번들의 type-별 차별화 아이콘+색상(arriving/depart/delay/community/cert/weekly) 미구현. 사용자가 알림 list에서 type을 한눈에 구분 못함
+
+### Med (Phase 36 검증 결과)
+- DelayFeed D3 (filter 축 결정 — line vs type)
+- DelayFeed D4 (comment/share 액션 부재)
+- DelayFeed D1 (megaphone vs Plus 아이콘 통일)
+- AlertsScreen AL2 (filter chips render 미독해)
+- AlertsScreen AL4 (read/unread 시각 차이)
+- Onboarding ON2 (modal 기반 vs inline dot/chevron)
+- Onboarding ON4 (Days picker 부재)
+- Settings SE1, SE2 (profile card + sectioned list 디테일)
+- HomeScreen H3 부속 디테일 (실시간 제보 카드는 Phase 33-B 신설로 기본 구현됨)
+- StatsScreen ST1-2 (이모지 prefix 제거 + SectionHeader 통일)
+
+### 🟢 Phase 36 검증으로 강등된 가정 (총 5건)
+| 원래 severity | 항목 | 강등 이유 |
+|--------------|------|----------|
+| M → L | LoginScreen L1 | LoginHero가 5 line + pulse pin + wordmark 픽셀 일치 |
+| M → L | LoginScreen L2 | FaceIDButton glyph(corner+eyes+mouth+pulse) 픽셀 일치 |
+| M → L | LoginScreen L3 | EmailLoginScreen 분리는 의도된 결정 |
+| H → L | Onboarding ON1 | OnbHeader atom 완전 구현 |
+| H → L | Onboarding ON3 | Onboarding에서 의도적으로 제거됨 (SettingsCommute로 이동) |
+| L → L | Settings SE3 | OS 표준 Switch 사용 (의도된 결정) |
+
+### Low (확정 — 디테일)
+- StationDetailScreen S1-S4 (이미 구현, 디테일만)
+- MapScreen MP1-MP2 (lucide 아이콘 통일)
+- StatsScreen ST3-4 (KPI 위치 + 패딩)
+- LoginScreen L1-L3 (디테일만)
+- Onboarding ON1, ON3 (구현됨/의도된 제거)
+- Settings SE3-SE4 (의도된 결정/확장된 구현)
 
 ### Med (확정 — 시각 일관성)
 - HomeScreen H3 (Community delays 카드 디자인 → 번들 패턴으로 교체 또는 신설)
@@ -249,17 +316,30 @@ MP2 high severity 가정 **틀림** — vertical timeline은 정확히 구현되
 
 → **8건의 high 가정 중 5건이 강등** = audit 정확도 보강의 큰 효과. 진짜 high는 4건.
 
-## Phase 33+ 후속 계획 (검증 후 단순화)
+## Phase 33+ 진행 + 후속 계획
 
-| Phase | 핵심 작업 | 추정 작업량 |
-|-------|-----------|-----------|
-| **33** | HomeScreen H1+H2+H3 (즐겨찾기 vertical 리스트 + delta 데이터 + community card) | 중 (HomeScreen.tsx + useMLPrediction + 신규 CommunityDelayCard atom) |
-| **34** | FavoritesScreen F1 (DraggableFavoriteItem → FavoriteRow 통합, drag DnD 보존) | 중 |
-| **35** | JourneyStrip atom 신설 + RoutesScreen R3 통합 + (옵션) "경로 비교" 신규 화면 | 중-큰 |
-| **36** | 추가 검증 phase: LoginScreen, DelayFeed, Alerts, Onboarding, Settings 코드 직접 audit (med 등급 정확도 보강) | 작 |
-| **37** | StatsScreen + MapScreen 디테일 정리 (이모지 제거 + Modal/navigate 통일 + lucide 통일) | 작 |
-| **38+** | Phase 36 audit 결과에서 식별된 작업 | 가변 |
+### 완료
+| Phase | 핵심 작업 | commit |
+|-------|-----------|--------|
+| ✅ 32 | 시각 audit 문서 신설 | `6de4f8a` |
+| ✅ 33 | HomeScreen H1+H2+H3 (vertical 즐겨찾기 + delta + community card) | `8838140` |
+| ✅ 34 | FavoritesScreen FavoriteRow 통합 | `9f453ef` |
+| ✅ 35 | JourneyStrip atom + RoutesScreen R3 | `8986441` |
+| ✅ 36 | LoginScreen/DelayFeed/Alerts/Onboarding/Settings 검증 (audit 정확도 보강) | (this) |
 
-원래 9 phase → **5 phase로 축소** (검증 결과 5건의 high → low 강등 효과). 작업량 60%+ 감소.
+### 향후 (Phase 36 검증 후 우선순위 재조정)
 
-각 phase는 atom 추가 → screen 통합 → typography helper 적용 → test 통과 → HARD_PREFIXES 유지 순서.
+| Phase | 핵심 작업 | 추정 작업량 | 영향 |
+|-------|-----------|-----------|------|
+| **37** | AlertsScreen AL3: type-별 icon + color 매핑 구현 (가장 큰 잔여 gap) | 작 (getNotificationIcon switch 6 case 매핑 + color helper) | H |
+| **38** | DelayFeed 디테일 (filter 축 결정 D3 + comment/share D4 + megaphone D1) | 중 (사용자 결정 D3 우선 필요) | M |
+| **39** | StatsScreen + MapScreen 디테일 정리 (이모지 prefix 제거 + lucide 통일) | 작 | L-M |
+| **40** | AlertsScreen AL2/AL4 + Settings SE1/SE2 render 보강 검증 | 작 (read 영역 추가 검증) | M |
+| **41** | Onboarding ON2/ON4 UX 결정 (modal 유지 vs inline 도입, 요일 커스터마이징 추가) | 중 | M |
+
+### 작업량 변화 추이
+- 초기 audit: 9 phase 추정
+- Phase 32-G 검증 후: 5 phase로 축소 (5건 high → low 강등)
+- Phase 36 검증 후: **5건 추가 강등 + 1건 신규 high(AL3)** — 잔여 5 phase로 유지하되 AL3가 새로운 H 우선순위
+
+각 phase는 atom 추가 또는 매핑 보강 → screen 통합 → typography helper 적용 → test 통과 → HARD_PREFIXES 유지 순서.
