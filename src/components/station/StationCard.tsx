@@ -1,7 +1,11 @@
 /**
  * StationCard Component
  * Simple, accessible card for displaying station information
- * Used for station search results and selection UI
+ * Used for station search results and selection UI.
+ *
+ * Phase 48 — migrated from legacy COLORS/SPACING/RADIUS/TYPOGRAPHY API
+ * to Wanted Design System (WANTED_TOKENS + weightToFontFamily +
+ * isDark-driven semantic theme).
  */
 
 import React, { memo, useCallback, useMemo } from 'react';
@@ -14,7 +18,11 @@ import {
 } from 'react-native';
 import { useTheme } from '@/services/theme/themeContext';
 import { getSubwayLineColor } from '@/utils/colorUtils';
-import { SPACING, RADIUS, TYPOGRAPHY } from '@/styles/modernTheme';
+import {
+  WANTED_TOKENS,
+  weightToFontFamily,
+  type WantedSemanticTheme,
+} from '@/styles/modernTheme';
 import type { Station } from '@/models/train';
 
 /**
@@ -44,8 +52,9 @@ export interface StationCardProps {
  */
 export const StationCard: React.FC<StationCardProps> = memo(
   ({ station, onPress, isSelected = false, testID, style }) => {
-    const { colors } = useTheme();
-    const styles = useMemo(() => createStyles(colors), [colors]);
+    const { isDark } = useTheme();
+    const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+    const styles = useMemo(() => createStyles(semantic), [semantic]);
 
     // Get line color from utility
     const lineColor = useMemo(
@@ -123,72 +132,64 @@ export const StationCard: React.FC<StationCardProps> = memo(
 
 StationCard.displayName = 'StationCard';
 
-// Type for theme colors (subset of ThemeColors)
-type ThemeColors = {
-  surface: string;
-  borderLight: string;
-  borderMedium: string;
-  primary: string;
-  textPrimary: string;
-  textSecondary: string;
-  textTertiary: string;
-};
-
 /**
  * Create styles with theme colors
  */
-const createStyles = (colors: ThemeColors) =>
+const createStyles = (semantic: WantedSemanticTheme) =>
   StyleSheet.create({
     container: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: colors.surface,
-      borderRadius: RADIUS.lg,
-      padding: SPACING.lg,
+      backgroundColor: semantic.bgBase,
+      borderRadius: WANTED_TOKENS.radius.r8,
+      padding: WANTED_TOKENS.spacing.s4,
       borderWidth: 1,
-      borderColor: colors.borderLight,
+      borderColor: semantic.lineSubtle,
       minHeight: 72,
     },
     selected: {
-      borderColor: colors.primary,
+      borderColor: WANTED_TOKENS.blue[500],
       borderWidth: 2,
     },
     lineIndicator: {
       width: 4,
       height: 48,
-      borderRadius: RADIUS.sm,
-      marginRight: SPACING.md,
+      borderRadius: WANTED_TOKENS.radius.r4,
+      marginRight: WANTED_TOKENS.spacing.s3,
     },
     content: {
       flex: 1,
       justifyContent: 'center',
     },
     stationName: {
-      fontSize: TYPOGRAPHY.fontSize.lg,
-      fontWeight: TYPOGRAPHY.fontWeight.bold,
-      color: colors.textPrimary,
-      marginBottom: SPACING.xs,
+      fontSize: 16,
+      fontFamily: weightToFontFamily('700'),
+      color: semantic.labelStrong,
+      marginBottom: WANTED_TOKENS.spacing.s1,
     },
     stationNameEn: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      color: colors.textSecondary,
-      marginBottom: SPACING.xs,
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelNeutral,
+      marginBottom: WANTED_TOKENS.spacing.s1,
     },
     lineInfo: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      color: colors.textSecondary,
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelNeutral,
     },
     transfers: {
-      fontSize: TYPOGRAPHY.fontSize.xs,
-      color: colors.textTertiary,
-      marginTop: SPACING.xs,
+      fontSize: 12,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+      marginTop: WANTED_TOKENS.spacing.s1,
     },
     selectionDot: {
       width: 8,
       height: 8,
       borderRadius: 4,
-      backgroundColor: colors.primary,
-      marginLeft: SPACING.sm,
+      backgroundColor: WANTED_TOKENS.blue[500],
+      marginLeft: WANTED_TOKENS.spacing.s2,
     },
   });
 

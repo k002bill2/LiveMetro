@@ -1,12 +1,18 @@
 /**
  * ExitInfoSection Component
- * Displays exit information with nearby landmarks for a station
+ * Displays exit information with nearby landmarks for a station.
+ *
+ * Phase 48 — migrated to Wanted Design System tokens.
  */
 
 import React, { memo, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import { useTheme } from '@/services/theme/themeContext';
-import { SPACING, RADIUS, TYPOGRAPHY } from '@/styles/modernTheme';
+import {
+  WANTED_TOKENS,
+  weightToFontFamily,
+  type WantedSemanticTheme,
+} from '@/styles/modernTheme';
 import type { ExitInfo, LandmarkCategory } from '@/models/publicData';
 
 // ============================================================================
@@ -46,11 +52,10 @@ const CATEGORY_ICONS: Record<LandmarkCategory, string> = {
 
 interface ExitCardProps {
   exit: ExitInfo;
+  semantic: WantedSemanticTheme;
 }
 
-const ExitCard: React.FC<ExitCardProps> = memo(({ exit }) => {
-  const { colors } = useTheme();
-
+const ExitCard: React.FC<ExitCardProps> = memo(({ exit, semantic }) => {
   const landmarksByCategory = useMemo(() => {
     const grouped = new Map<LandmarkCategory, string[]>();
     for (const landmark of exit.landmarks) {
@@ -62,8 +67,8 @@ const ExitCard: React.FC<ExitCardProps> = memo(({ exit }) => {
   }, [exit.landmarks]);
 
   return (
-    <View style={[styles.exitCard, { backgroundColor: colors.surface }]}>
-      <View style={[styles.exitBadge, { backgroundColor: colors.primary }]}>
+    <View style={[styles.exitCard, { backgroundColor: semantic.bgBase, borderColor: semantic.lineSubtle }]}>
+      <View style={[styles.exitBadge, { backgroundColor: WANTED_TOKENS.blue[500] }]}>
         <Text style={styles.exitBadgeText}>{exit.exitNumber}</Text>
       </View>
       <View style={styles.exitContent}>
@@ -73,7 +78,7 @@ const ExitCard: React.FC<ExitCardProps> = memo(({ exit }) => {
               {CATEGORY_ICONS[category]}
             </Text>
             <Text
-              style={[styles.landmarkText, { color: colors.textPrimary }]}
+              style={[styles.landmarkText, { color: semantic.labelStrong }]}
               numberOfLines={2}
             >
               {names.join(', ')}
@@ -81,7 +86,7 @@ const ExitCard: React.FC<ExitCardProps> = memo(({ exit }) => {
           </View>
         ))}
         {exit.landmarks.length === 0 && (
-          <Text style={[styles.noDataText, { color: colors.textTertiary }]}>
+          <Text style={[styles.noDataText, { color: semantic.labelAlt }]}>
             주요 장소 정보 없음
           </Text>
         )}
@@ -98,15 +103,16 @@ ExitCard.displayName = 'ExitCard';
 
 export const ExitInfoSection: React.FC<ExitInfoSectionProps> = memo(
   ({ exitInfo, loading = false, testID }) => {
-    const { colors } = useTheme();
+    const { isDark } = useTheme();
+    const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
 
     if (loading) {
       return (
         <View
-          style={[styles.container, { backgroundColor: colors.background }]}
+          style={[styles.container, { backgroundColor: semantic.bgSubtlePage }]}
           testID={testID}
         >
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+          <Text style={[styles.loadingText, { color: semantic.labelNeutral }]}>
             출구 정보 로딩 중...
           </Text>
         </View>
@@ -116,16 +122,16 @@ export const ExitInfoSection: React.FC<ExitInfoSectionProps> = memo(
     if (exitInfo.length === 0) {
       return (
         <View
-          style={[styles.container, { backgroundColor: colors.background }]}
+          style={[styles.container, { backgroundColor: semantic.bgSubtlePage }]}
           testID={testID}
         >
           <View style={styles.header}>
             <Text style={styles.headerIcon}>🚪</Text>
-            <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
+            <Text style={[styles.headerTitle, { color: semantic.labelStrong }]}>
               출구 정보
             </Text>
           </View>
-          <Text style={[styles.noDataText, { color: colors.textTertiary }]}>
+          <Text style={[styles.noDataText, { color: semantic.labelAlt }]}>
             출구 정보가 없습니다
           </Text>
         </View>
@@ -134,17 +140,17 @@ export const ExitInfoSection: React.FC<ExitInfoSectionProps> = memo(
 
     return (
       <View
-        style={[styles.container, { backgroundColor: colors.background }]}
+        style={[styles.container, { backgroundColor: semantic.bgSubtlePage }]}
         testID={testID}
         accessible={true}
         accessibilityLabel="출구별 주요 장소 정보"
       >
         <View style={styles.header}>
           <Text style={styles.headerIcon}>🚪</Text>
-          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
+          <Text style={[styles.headerTitle, { color: semantic.labelStrong }]}>
             출구 정보
           </Text>
-          <Text style={[styles.exitCount, { color: colors.textSecondary }]}>
+          <Text style={[styles.exitCount, { color: semantic.labelNeutral }]}>
             {exitInfo.length}개
           </Text>
         </View>
@@ -155,7 +161,7 @@ export const ExitInfoSection: React.FC<ExitInfoSectionProps> = memo(
           contentContainerStyle={styles.scrollContent}
         >
           {exitInfo.map((exit) => (
-            <ExitCard key={exit.exitNumber} exit={exit} />
+            <ExitCard key={exit.exitNumber} exit={exit} semantic={semantic} />
           ))}
         </ScrollView>
       </View>
@@ -171,34 +177,36 @@ ExitInfoSection.displayName = 'ExitInfoSection';
 
 const styles = StyleSheet.create({
   container: {
-    paddingVertical: SPACING.md,
+    paddingVertical: WANTED_TOKENS.spacing.s3,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: SPACING.md,
-    marginBottom: SPACING.md,
+    paddingHorizontal: WANTED_TOKENS.spacing.s3,
+    marginBottom: WANTED_TOKENS.spacing.s3,
   },
   headerIcon: {
     fontSize: 20,
-    marginRight: SPACING.xs,
+    marginRight: WANTED_TOKENS.spacing.s1,
   },
   headerTitle: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold as '600',
+    fontSize: 16,
+    fontFamily: weightToFontFamily('600'),
     flex: 1,
   },
   exitCount: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontSize: 13,
+    fontFamily: weightToFontFamily('500'),
   },
   scrollContent: {
-    paddingHorizontal: SPACING.md,
-    gap: SPACING.sm,
+    paddingHorizontal: WANTED_TOKENS.spacing.s3,
+    gap: WANTED_TOKENS.spacing.s2,
   },
   exitCard: {
     width: 200,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.md,
+    borderRadius: WANTED_TOKENS.radius.r8,
+    borderWidth: 1,
+    padding: WANTED_TOKENS.spacing.s3,
     flexDirection: 'row',
   },
   exitBadge: {
@@ -207,16 +215,16 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: SPACING.sm,
+    marginRight: WANTED_TOKENS.spacing.s2,
   },
   exitBadgeText: {
     color: '#FFFFFF',
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.bold as '700',
+    fontSize: 14,
+    fontFamily: weightToFontFamily('700'),
   },
   exitContent: {
     flex: 1,
-    gap: SPACING.xs,
+    gap: WANTED_TOKENS.spacing.s1,
   },
   categoryRow: {
     flexDirection: 'row',
@@ -224,23 +232,26 @@ const styles = StyleSheet.create({
   },
   categoryIcon: {
     fontSize: 14,
-    marginRight: SPACING.xs,
+    marginRight: WANTED_TOKENS.spacing.s1,
     width: 20,
   },
   landmarkText: {
     flex: 1,
-    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontSize: 13,
+    fontFamily: weightToFontFamily('500'),
     lineHeight: 18,
   },
   noDataText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
+    fontSize: 13,
+    fontFamily: weightToFontFamily('500'),
     textAlign: 'center',
-    padding: SPACING.md,
+    padding: WANTED_TOKENS.spacing.s3,
   },
   loadingText: {
-    fontSize: TYPOGRAPHY.fontSize.base,
+    fontSize: 14,
+    fontFamily: weightToFontFamily('500'),
     textAlign: 'center',
-    padding: SPACING.md,
+    padding: WANTED_TOKENS.spacing.s3,
   },
 });
 

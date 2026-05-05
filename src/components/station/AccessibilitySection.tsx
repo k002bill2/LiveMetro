@@ -1,14 +1,20 @@
 /**
  * AccessibilitySection Component
- * Displays accessibility facilities information for a station
+ * Displays accessibility facilities information for a station.
+ *
+ * Phase 48 — migrated to Wanted Design System tokens. Status colors
+ * (success/warning/error) now resolve to WANTED_TOKENS.status palette.
  */
 
 import React, { memo, useMemo } from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { useTheme } from '@/services/theme/themeContext';
-import { SPACING, RADIUS, TYPOGRAPHY } from '@/styles/modernTheme';
+import {
+  WANTED_TOKENS,
+  weightToFontFamily,
+  type WantedSemanticTheme,
+} from '@/styles/modernTheme';
 import type { AccessibilityInfo } from '@/models/publicData';
-import type { ThemeColors } from '@/services/theme/themeContext';
 
 // ============================================================================
 // Types
@@ -29,7 +35,7 @@ interface FacilityItemProps {
   available: boolean;
   count?: number;
   status?: 'normal' | 'maintenance' | 'broken';
-  colors: ThemeColors;
+  semantic: WantedSemanticTheme;
 }
 
 // ============================================================================
@@ -37,18 +43,18 @@ interface FacilityItemProps {
 // ============================================================================
 
 const FacilityItem: React.FC<FacilityItemProps> = memo(
-  ({ icon, label, available, count, status, colors }) => {
+  ({ icon, label, available, count, status, semantic }) => {
     const statusColor = useMemo(() => {
-      if (!available) return colors.textTertiary;
+      if (!available) return semantic.labelAlt;
       switch (status) {
         case 'maintenance':
-          return colors.warning;
+          return WANTED_TOKENS.status.yellow500;
         case 'broken':
-          return colors.error;
+          return WANTED_TOKENS.status.red500;
         default:
-          return colors.success;
+          return WANTED_TOKENS.status.green500;
       }
-    }, [available, status, colors]);
+    }, [available, status, semantic]);
 
     return (
       <View style={styles.facilityItem}>
@@ -59,7 +65,7 @@ const FacilityItem: React.FC<FacilityItemProps> = memo(
           <Text
             style={[
               styles.facilityLabel,
-              { color: available ? colors.textPrimary : colors.textTertiary },
+              { color: available ? semantic.labelStrong : semantic.labelAlt },
             ]}
           >
             {label}
@@ -89,15 +95,16 @@ FacilityItem.displayName = 'FacilityItem';
 
 export const AccessibilitySection: React.FC<AccessibilitySectionProps> = memo(
   ({ info, loading = false, testID }) => {
-    const { colors } = useTheme();
+    const { isDark } = useTheme();
+    const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
 
     if (loading) {
       return (
         <View
-          style={[styles.container, { backgroundColor: colors.surface }]}
+          style={[styles.container, { backgroundColor: semantic.bgBase, borderColor: semantic.lineSubtle }]}
           testID={testID}
         >
-          <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
+          <Text style={[styles.loadingText, { color: semantic.labelNeutral }]}>
             교통약자 정보 로딩 중...
           </Text>
         </View>
@@ -110,14 +117,14 @@ export const AccessibilitySection: React.FC<AccessibilitySectionProps> = memo(
 
     return (
       <View
-        style={[styles.container, { backgroundColor: colors.surface }]}
+        style={[styles.container, { backgroundColor: semantic.bgBase, borderColor: semantic.lineSubtle }]}
         testID={testID}
         accessible={true}
         accessibilityLabel="교통약자 편의시설 정보"
       >
         <View style={styles.header}>
           <Text style={styles.headerIcon}>♿</Text>
-          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
+          <Text style={[styles.headerTitle, { color: semantic.labelStrong }]}>
             교통약자 편의시설
           </Text>
         </View>
@@ -129,7 +136,7 @@ export const AccessibilitySection: React.FC<AccessibilitySectionProps> = memo(
             available={info.elevator.available}
             count={info.elevator.count}
             status={info.elevator.status}
-            colors={colors}
+            semantic={semantic}
           />
           <FacilityItem
             icon="📶"
@@ -137,25 +144,25 @@ export const AccessibilitySection: React.FC<AccessibilitySectionProps> = memo(
             available={info.escalator.available}
             count={info.escalator.count}
             status={info.escalator.status}
-            colors={colors}
+            semantic={semantic}
           />
           <FacilityItem
             icon="🦽"
             label="휠체어리프트"
             available={info.wheelchairLift}
-            colors={colors}
+            semantic={semantic}
           />
           <FacilityItem
             icon="⠿"
             label="점자블록"
             available={info.tactilePaving}
-            colors={colors}
+            semantic={semantic}
           />
           <FacilityItem
             icon="🚻"
             label="장애인화장실"
             available={info.accessibleRestroom}
-            colors={colors}
+            semantic={semantic}
           />
         </View>
       </View>
@@ -171,30 +178,31 @@ AccessibilitySection.displayName = 'AccessibilitySection';
 
 const styles = StyleSheet.create({
   container: {
-    borderRadius: RADIUS.lg,
-    padding: SPACING.md,
-    marginVertical: SPACING.sm,
+    borderRadius: WANTED_TOKENS.radius.r8,
+    padding: WANTED_TOKENS.spacing.s3,
+    marginVertical: WANTED_TOKENS.spacing.s2,
+    borderWidth: 1,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: SPACING.md,
+    marginBottom: WANTED_TOKENS.spacing.s3,
   },
   headerIcon: {
     fontSize: 20,
-    marginRight: SPACING.xs,
+    marginRight: WANTED_TOKENS.spacing.s1,
   },
   headerTitle: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold as '600',
+    fontSize: 16,
+    fontFamily: weightToFontFamily('600'),
   },
   facilitiesGrid: {
-    gap: SPACING.sm,
+    gap: WANTED_TOKENS.spacing.s2,
   },
   facilityItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: SPACING.xs,
+    paddingVertical: WANTED_TOKENS.spacing.s1,
   },
   facilityIcon: {
     fontSize: 18,
@@ -205,15 +213,16 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    marginLeft: SPACING.sm,
+    marginLeft: WANTED_TOKENS.spacing.s2,
   },
   facilityLabel: {
-    fontSize: TYPOGRAPHY.fontSize.base,
+    fontSize: 14,
+    fontFamily: weightToFontFamily('500'),
   },
   facilityCount: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    marginLeft: SPACING.xs,
-    fontWeight: TYPOGRAPHY.fontWeight.medium as '500',
+    fontSize: 13,
+    fontFamily: weightToFontFamily('500'),
+    marginLeft: WANTED_TOKENS.spacing.s1,
   },
   statusDot: {
     width: 8,
@@ -221,9 +230,10 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   loadingText: {
-    fontSize: TYPOGRAPHY.fontSize.base,
+    fontSize: 14,
+    fontFamily: weightToFontFamily('500'),
     textAlign: 'center',
-    padding: SPACING.md,
+    padding: WANTED_TOKENS.spacing.s3,
   },
 });
 
