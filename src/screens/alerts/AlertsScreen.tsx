@@ -444,6 +444,7 @@ export const AlertsScreen: React.FC = () => {
       <FlatList
         horizontal
         data={filterChips}
+        extraData={selectedFilter}
         keyExtractor={(item) => item.id}
         showsHorizontalScrollIndicator={false}
         style={styles.filterRow}
@@ -565,7 +566,6 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       paddingVertical: WANTED_TOKENS.spacing.s1,
       borderRadius: WANTED_TOKENS.radius.pill,
       borderWidth: 1,
-      marginRight: WANTED_TOKENS.spacing.s2,
     },
     filterChipText: {
       fontSize: WANTED_TOKENS.type.label2.size,
