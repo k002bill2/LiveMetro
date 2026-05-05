@@ -18,5 +18,6 @@ fi
 # scripts/lint-typography.cjs) use `fontWeight` without a matching
 # `fontFamily` / `typeStyle()` / `weightToFontFamily()`.
 # Currently enforced: src/components/{design,station,statistics}/,
-# src/screens/{auth,delays,prediction,settings,statistics}/, src/styles/.
+# src/screens/{auth,delays,prediction,settings,statistics}/,
+# src/services/theme/, src/styles/.
 npm run --silent lint:typography || exit 1
