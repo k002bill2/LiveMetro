@@ -1,9 +1,13 @@
 /**
  * Transfer Station List Component
- * Manages the list of transfer stations with add/remove functionality
+ * Manages the list of transfer stations with add/remove functionality.
+ *
+ * Phase 49 — migrated to Wanted Design System tokens. Subway line
+ * colors now resolve through getSubwayLineColor utility (consistent
+ * with rest of app).
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,7 +15,13 @@ import {
   StyleSheet,
 } from 'react-native';
 import { ArrowLeftRight, XCircle, PlusCircle, Info } from 'lucide-react-native';
-import { COLORS, SPACING, TYPOGRAPHY, RADIUS } from '@/styles/modernTheme';
+import {
+  WANTED_TOKENS,
+  weightToFontFamily,
+  type WantedSemanticTheme,
+} from '@/styles/modernTheme';
+import { useTheme } from '@/services/theme';
+import { getSubwayLineColor } from '@/utils/colorUtils';
 import { TransferStation, MAX_TRANSFER_STATIONS } from '@/models/commute';
 
 interface TransferStationListProps {
@@ -21,29 +31,15 @@ interface TransferStationListProps {
   maxTransfers?: number;
 }
 
-// Line colors for visual indication
-const LINE_COLORS: Record<string, string> = {
-  '1': '#0052A4',
-  '2': '#00A84D',
-  '3': '#EF7C1C',
-  '4': '#00A5DE',
-  '5': '#996CAC',
-  '6': '#CD7C2F',
-  '7': '#747F00',
-  '8': '#E6186C',
-  '9': '#BDB092',
-};
-
-const getLineColor = (lineId: string): string => {
-  return LINE_COLORS[lineId] || COLORS.gray[400];
-};
-
 export const TransferStationList: React.FC<TransferStationListProps> = ({
   transfers,
   onAddTransfer,
   onRemoveTransfer,
   maxTransfers = MAX_TRANSFER_STATIONS,
 }) => {
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const styles = useMemo(() => createStyles(semantic), [semantic]);
   const canAddMore = transfers.length < maxTransfers;
 
   return (
@@ -51,7 +47,7 @@ export const TransferStationList: React.FC<TransferStationListProps> = ({
       <View style={styles.header}>
         <ArrowLeftRight
           size={18}
-          color={COLORS.text.secondary}
+          color={semantic.labelNeutral}
         />
         <Text style={styles.headerText}>환승역</Text>
         <Text style={styles.countText}>
@@ -66,7 +62,7 @@ export const TransferStationList: React.FC<TransferStationListProps> = ({
             <View
               style={[
                 styles.lineIndicator,
-                { backgroundColor: getLineColor(transfer.lineId) },
+                { backgroundColor: getSubwayLineColor(transfer.lineId) },
               ]}
             />
             <View style={styles.transferInfo}>
@@ -81,7 +77,7 @@ export const TransferStationList: React.FC<TransferStationListProps> = ({
           >
             <XCircle
               size={22}
-              color={COLORS.gray[400]}
+              color={semantic.labelAlt}
             />
           </TouchableOpacity>
         </View>
@@ -107,7 +103,7 @@ export const TransferStationList: React.FC<TransferStationListProps> = ({
         >
           <PlusCircle
             size={20}
-            color={COLORS.secondary.blue}
+            color={WANTED_TOKENS.blue[500]}
           />
           <Text style={styles.addButtonText}>환승역 추가</Text>
         </TouchableOpacity>
@@ -118,7 +114,7 @@ export const TransferStationList: React.FC<TransferStationListProps> = ({
         <View style={styles.maxNotice}>
           <Info
             size={16}
-            color={COLORS.text.tertiary}
+            color={semantic.labelAlt}
           />
           <Text style={styles.maxNoticeText}>
             최대 {maxTransfers}개의 환승역을 추가할 수 있습니다
@@ -129,108 +125,114 @@ export const TransferStationList: React.FC<TransferStationListProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    backgroundColor: COLORS.surface.background,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.lg,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: SPACING.md,
-  },
-  headerText: {
-    marginLeft: SPACING.sm,
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
-    flex: 1,
-  },
-  countText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.tertiary,
-  },
-  transferItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.base,
-    padding: SPACING.md,
-    marginBottom: SPACING.sm,
-    borderWidth: 1,
-    borderColor: COLORS.border.light,
-  },
-  transferContent: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  lineIndicator: {
-    width: 4,
-    height: 28,
-    borderRadius: 2,
-    marginRight: SPACING.md,
-  },
-  transferInfo: {
-    flex: 1,
-  },
-  transferName: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
-  },
-  transferLine: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.tertiary,
-    marginTop: 2,
-  },
-  removeButton: {
-    padding: SPACING.xs,
-  },
-  emptyState: {
-    alignItems: 'center',
-    paddingVertical: SPACING.lg,
-  },
-  emptyText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.tertiary,
-  },
-  emptySubtext: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.text.tertiary,
-    marginTop: SPACING.xs,
-    textAlign: 'center',
-  },
-  addButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: SPACING.md,
-    marginTop: SPACING.sm,
-    borderWidth: 1,
-    borderColor: COLORS.secondary.blue,
-    borderRadius: RADIUS.base,
-    borderStyle: 'dashed',
-  },
-  addButtonText: {
-    marginLeft: SPACING.sm,
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.medium,
-    color: COLORS.secondary.blue,
-  },
-  maxNotice: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: SPACING.sm,
-    marginTop: SPACING.sm,
-  },
-  maxNoticeText: {
-    marginLeft: SPACING.xs,
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.text.tertiary,
-  },
-});
+const createStyles = (semantic: WantedSemanticTheme) =>
+  StyleSheet.create({
+    container: {
+      backgroundColor: semantic.bgSubtlePage,
+      borderRadius: WANTED_TOKENS.radius.r8,
+      padding: WANTED_TOKENS.spacing.s4,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: WANTED_TOKENS.spacing.s3,
+    },
+    headerText: {
+      marginLeft: WANTED_TOKENS.spacing.s2,
+      fontSize: 14,
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelStrong,
+      flex: 1,
+    },
+    countText: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+    },
+    transferItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: semantic.bgBase,
+      borderRadius: WANTED_TOKENS.radius.r4,
+      padding: WANTED_TOKENS.spacing.s3,
+      marginBottom: WANTED_TOKENS.spacing.s2,
+      borderWidth: 1,
+      borderColor: semantic.lineSubtle,
+    },
+    transferContent: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    lineIndicator: {
+      width: 4,
+      height: 28,
+      borderRadius: 2,
+      marginRight: WANTED_TOKENS.spacing.s3,
+    },
+    transferInfo: {
+      flex: 1,
+    },
+    transferName: {
+      fontSize: 14,
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelStrong,
+    },
+    transferLine: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+      marginTop: 2,
+    },
+    removeButton: {
+      padding: WANTED_TOKENS.spacing.s1,
+    },
+    emptyState: {
+      alignItems: 'center',
+      paddingVertical: WANTED_TOKENS.spacing.s4,
+    },
+    emptyText: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+    },
+    emptySubtext: {
+      fontSize: 12,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+      marginTop: WANTED_TOKENS.spacing.s1,
+      textAlign: 'center',
+    },
+    addButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: WANTED_TOKENS.spacing.s3,
+      marginTop: WANTED_TOKENS.spacing.s2,
+      borderWidth: 1,
+      borderColor: WANTED_TOKENS.blue[500],
+      borderRadius: WANTED_TOKENS.radius.r4,
+      borderStyle: 'dashed',
+    },
+    addButtonText: {
+      marginLeft: WANTED_TOKENS.spacing.s2,
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: WANTED_TOKENS.blue[500],
+    },
+    maxNotice: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: WANTED_TOKENS.spacing.s2,
+      marginTop: WANTED_TOKENS.spacing.s2,
+    },
+    maxNoticeText: {
+      marginLeft: WANTED_TOKENS.spacing.s1,
+      fontSize: 12,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+    },
+  });
 
 export default TransferStationList;

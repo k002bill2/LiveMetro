@@ -20,7 +20,12 @@ jest.mock('@/models/commute', () => ({
   MAX_TRANSFER_STATIONS: 3,
 }));
 
+jest.mock('@/services/theme', () => ({
+  useTheme: () => ({ isDark: false, colors: {} }),
+}));
+
 jest.mock('@/styles/modernTheme', () => ({
+  ...jest.requireActual('@/styles/modernTheme'),
   COLORS: {
     white: '#FFFFFF',
     black: '#000000',
