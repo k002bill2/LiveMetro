@@ -21,7 +21,7 @@
     "submit:all": "eas submit --platform all",
     "lint": "eslint . --ext .ts,.tsx --fix",
     "lint:typography": "node scripts/lint-typography.cjs",
-    "lint:typography:audit": "node scripts/lint-typography.cjs --all",
+    "lint:typography:audit": "find src -type f \\( -name '*.ts' -o -name '*.tsx' \\) -print0 | xargs -0 node scripts/lint-typography.cjs",
     "type-check": "tsc --noEmit",
     "test": "jest",
     "test:watch": "jest --watch",

@@ -14,12 +14,8 @@ if git diff --cached --name-only | grep -q "^\.claude/"; then
 fi
 
 # Typography guard — Pretendard wiring regression prevention.
-# Hard-fails when staged files in the enforced paths (HARD_PREFIXES in
-# scripts/lint-typography.cjs) use `fontWeight` without a matching
-# `fontFamily` / `typeStyle()` / `weightToFontFamily()`.
-# Currently enforced: src/components/{alerts,auth,common,delays,design,favorites,map,station,statistics,train}/,
-# src/navigation/,
-# src/screens/{alerts,auth,delays,favorites,home,map,prediction,route,settings,station,statistics}/,
-# src/services/theme/, src/styles/.
-# baseline 0 reached — HARD_PREFIXES covers every src/ directory shipping tsx/ts.
+# Hard-fails when any staged tsx/ts file under src/ uses `fontWeight`
+# without a matching `fontFamily` / `typeStyle()` / `weightToFontFamily()`.
+# Phase 31.1: HARD_PREFIXES filter removed — every src/ directory is
+# enforced from its first commit, including any new directory.
 npm run --silent lint:typography || exit 1

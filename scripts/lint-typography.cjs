@@ -12,9 +12,20 @@
  * "Pretendard" alias). RN's `fontWeight` alone falls back to system fonts.
  * See modernTheme.ts and `project_pretendard_wiring.md` for details.
  *
+ * Enforcement scope (Phase 31.1):
+ *   Default mode scans every staged tsx/ts file under src/. Phase 31
+ *   reached audit baseline 0 across the entire src/ tree, so a per-
+ *   directory allow-list is no longer needed — any new directory is
+ *   automatically enforced from its first commit. Phase history
+ *   (per-directory rollout 21~31) lives in git log.
+ *
  * Usage:
- *   node scripts/lint-typography.cjs                  # scan staged tsx/ts
+ *   node scripts/lint-typography.cjs                  # scan staged tsx/ts under src/
+ *   node scripts/lint-typography.cjs --all            # alias of default (back-compat)
  *   node scripts/lint-typography.cjs <file> [<file>]  # scan given files
+ *
+ * Full-src audit (no git context):
+ *   find src -type f \( -name '*.ts' -o -name '*.tsx' \) | xargs node scripts/lint-typography.cjs
  */
 const { execSync } = require('node:child_process');
 const fs = require('node:fs');
@@ -23,57 +34,7 @@ const WEIGHT_RE = /\bfontWeight:\s*['"`](?:[1-9]00|normal|bold)['"`]/;
 const SIBLING_RE = /\bfontFamily:|\btypeStyle\(|\bweightToFontFamily\(/;
 const WINDOW = 15;
 
-/**
- * Enforcement set — directories where Pretendard wiring is already
- * complete and must stay that way. Files outside these prefixes are
- * scanned only when `--all` is passed (so we can audit, but pre-commit
- * stays surgical).
- *
- * Extend this list whenever a new directory is migrated.
- *   Phase 21: design/, station/, styles/
- *   Phase 22: screens/statistics/, components/statistics/
- *   Phase 23: screens/settings/
- *   Phase 24: screens/auth/
- *   Phase 25: screens/delays/
- *   Phase 26: screens/prediction/
- *   Phase 27: services/theme/
- *   Phase 28: screens/map/, components/alerts/, components/delays/
- *   Phase 29: screens/route/, screens/favorites/, components/train/, components/favorites/
- *   Phase 30: screens/alerts/, screens/home/, screens/station/
- *   Phase 31: navigation/, components/auth/, components/common/, components/map/
- *             — baseline 0 reached. HARD_PREFIXES now covers every directory
- *             that ships tsx/ts in src/. Follow-up phase: remove the
- *             HARD_PREFIXES filter and make default mode equal to --all.
- */
-const HARD_PREFIXES = [
-  'src/components/alerts/',
-  'src/components/auth/',
-  'src/components/common/',
-  'src/components/delays/',
-  'src/components/design/',
-  'src/components/favorites/',
-  'src/components/map/',
-  'src/components/station/',
-  'src/components/statistics/',
-  'src/components/train/',
-  'src/navigation/',
-  'src/screens/alerts/',
-  'src/screens/auth/',
-  'src/screens/delays/',
-  'src/screens/favorites/',
-  'src/screens/home/',
-  'src/screens/map/',
-  'src/screens/prediction/',
-  'src/screens/route/',
-  'src/screens/settings/',
-  'src/screens/station/',
-  'src/screens/statistics/',
-  'src/services/theme/',
-  'src/styles/',
-];
-
 const args = process.argv.slice(2);
-const allMode = args.includes('--all');
 const explicitFiles = args.filter((a) => !a.startsWith('--'));
 
 function listFiles() {
@@ -82,12 +43,10 @@ function listFiles() {
     const out = execSync('git diff --cached --name-only --diff-filter=ACMR', {
       encoding: 'utf8',
     });
-    const staged = out
+    return out
       .split('\n')
       .filter((f) => f.endsWith('.tsx') || f.endsWith('.ts'))
       .filter((f) => f.startsWith('src/'));
-    if (allMode) return staged;
-    return staged.filter((f) => HARD_PREFIXES.some((p) => f.startsWith(p)));
   } catch {
     return [];
   }
