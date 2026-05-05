@@ -1,9 +1,14 @@
 /**
  * Edit Profile Screen
- * Allows users to edit their profile information and change password
+ * Allows users to edit their profile information and change password.
+ *
+ * Phase 47 — migrated from legacy COLORS/SPACING/RADIUS/TYPOGRAPHY API
+ * to Wanted Design System tokens. Two-tone CTA hierarchy: primary
+ * "프로필 저장" → blue[500] solid, secondary "비밀번호 변경" → outlined
+ * semantic.labelStrong (adapts to dark mode).
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -21,13 +26,21 @@ import { Eye, EyeOff, Lock, User } from 'lucide-react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { useAuth } from '@/services/auth/AuthContext';
-import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '@/styles/modernTheme';
+import { useTheme } from '@/services/theme';
+import {
+  WANTED_TOKENS,
+  weightToFontFamily,
+  type WantedSemanticTheme,
+} from '@/styles/modernTheme';
 import { SettingsStackParamList } from '@/navigation/types';
 
 type Props = NativeStackScreenProps<SettingsStackParamList, 'EditProfile'>;
 
 export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
   const { user, updateUserProfile, changePassword } = useAuth();
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   // Profile state
   const [displayName, setDisplayName] = useState(user?.displayName || '');
@@ -138,7 +151,7 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
           {/* Profile Icon */}
           <View style={styles.profileIconSection}>
             <View style={styles.profileIcon}>
-              <User size={48} color={COLORS.black} strokeWidth={2} />
+              <User size={48} color={semantic.labelStrong} strokeWidth={2} />
             </View>
           </View>
 
@@ -153,7 +166,7 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
                 value={displayName}
                 onChangeText={setDisplayName}
                 placeholder="이름을 입력하세요"
-                placeholderTextColor={COLORS.gray[400]}
+                placeholderTextColor={semantic.labelAlt}
                 autoCapitalize="words"
                 autoCorrect={false}
                 maxLength={30}
@@ -167,7 +180,7 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
                 <Text style={styles.readOnlyText}>
                   {user?.email || '이메일 없음'}
                 </Text>
-                <Lock size={16} color={COLORS.gray[400]} strokeWidth={2} />
+                <Lock size={16} color={semantic.labelAlt} strokeWidth={2} />
               </View>
               <Text style={styles.helperText}>
                 이메일은 변경할 수 없습니다.
@@ -184,7 +197,7 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
               disabled={isLoading}
             >
               {isLoading ? (
-                <ActivityIndicator color={COLORS.white} size="small" />
+                <ActivityIndicator color="#FFFFFF" size="small" />
               ) : (
                 <Text style={styles.saveButtonText}>프로필 저장</Text>
               )}
@@ -204,7 +217,7 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
                     value={currentPassword}
                     onChangeText={setCurrentPassword}
                     placeholder="현재 비밀번호"
-                    placeholderTextColor={COLORS.gray[400]}
+                    placeholderTextColor={semantic.labelAlt}
                     secureTextEntry={!showCurrentPassword}
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -215,9 +228,9 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
                     onPress={() => setShowCurrentPassword(!showCurrentPassword)}
                   >
                     {showCurrentPassword ? (
-                      <EyeOff size={20} color={COLORS.gray[400]} strokeWidth={2} />
+                      <EyeOff size={20} color={semantic.labelAlt} strokeWidth={2} />
                     ) : (
-                      <Eye size={20} color={COLORS.gray[400]} strokeWidth={2} />
+                      <Eye size={20} color={semantic.labelAlt} strokeWidth={2} />
                     )}
                   </TouchableOpacity>
                 </View>
@@ -231,7 +244,7 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
                     value={newPassword}
                     onChangeText={setNewPassword}
                     placeholder="새 비밀번호 (6자 이상)"
-                    placeholderTextColor={COLORS.gray[400]}
+                    placeholderTextColor={semantic.labelAlt}
                     secureTextEntry={!showNewPassword}
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -242,9 +255,9 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
                     onPress={() => setShowNewPassword(!showNewPassword)}
                   >
                     {showNewPassword ? (
-                      <EyeOff size={20} color={COLORS.gray[400]} strokeWidth={2} />
+                      <EyeOff size={20} color={semantic.labelAlt} strokeWidth={2} />
                     ) : (
-                      <Eye size={20} color={COLORS.gray[400]} strokeWidth={2} />
+                      <Eye size={20} color={semantic.labelAlt} strokeWidth={2} />
                     )}
                   </TouchableOpacity>
                 </View>
@@ -258,7 +271,7 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
                     value={confirmPassword}
                     onChangeText={setConfirmPassword}
                     placeholder="새 비밀번호 다시 입력"
-                    placeholderTextColor={COLORS.gray[400]}
+                    placeholderTextColor={semantic.labelAlt}
                     secureTextEntry={!showConfirmPassword}
                     autoCapitalize="none"
                     autoCorrect={false}
@@ -269,9 +282,9 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
                     onPress={() => setShowConfirmPassword(!showConfirmPassword)}
                   >
                     {showConfirmPassword ? (
-                      <EyeOff size={20} color={COLORS.gray[400]} strokeWidth={2} />
+                      <EyeOff size={20} color={semantic.labelAlt} strokeWidth={2} />
                     ) : (
-                      <Eye size={20} color={COLORS.gray[400]} strokeWidth={2} />
+                      <Eye size={20} color={semantic.labelAlt} strokeWidth={2} />
                     )}
                   </TouchableOpacity>
                 </View>
@@ -292,7 +305,7 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
                 disabled={isPasswordLoading}
               >
                 {isPasswordLoading ? (
-                  <ActivityIndicator color={COLORS.black} size="small" />
+                  <ActivityIndicator color={semantic.labelStrong} size="small" />
                 ) : (
                   <Text style={styles.changePasswordButtonText}>비밀번호 변경</Text>
                 )}
@@ -305,148 +318,154 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.white,
-  },
-  keyboardView: {
-    flex: 1,
-  },
-  content: {
-    flex: 1,
-  },
-  contentContainer: {
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.xl,
-    paddingBottom: SPACING['3xl'],
-  },
-  profileIconSection: {
-    alignItems: 'center',
-    marginBottom: SPACING['2xl'],
-  },
-  profileIcon: {
-    width: 100,
-    height: 100,
-    backgroundColor: COLORS.surface.card,
-    borderRadius: RADIUS.full,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: COLORS.border.medium,
-  },
-  formSection: {
-    marginBottom: SPACING['2xl'],
-    backgroundColor: COLORS.white,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.lg,
-    borderWidth: 1,
-    borderColor: COLORS.border.light,
-  },
-  sectionTitle: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.text.primary,
-    marginBottom: SPACING.lg,
-  },
-  inputGroup: {
-    marginBottom: SPACING.lg,
-  },
-  label: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.secondary,
-    marginBottom: SPACING.sm,
-    letterSpacing: TYPOGRAPHY.letterSpacing.wide,
-  },
-  input: {
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.border.medium,
-    borderRadius: RADIUS.md,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    fontSize: TYPOGRAPHY.fontSize.base,
-    color: COLORS.text.primary,
-  },
-  readOnlyInput: {
-    backgroundColor: COLORS.surface.card,
-    borderWidth: 1,
-    borderColor: COLORS.border.light,
-    borderRadius: RADIUS.md,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  readOnlyText: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    color: COLORS.text.tertiary,
-    flex: 1,
-  },
-  helperText: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.text.tertiary,
-    marginTop: SPACING.xs,
-  },
-  errorText: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.semantic.error,
-    marginTop: SPACING.xs,
-  },
-  passwordInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    borderWidth: 1,
-    borderColor: COLORS.border.medium,
-    borderRadius: RADIUS.md,
-  },
-  passwordInput: {
-    flex: 1,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    fontSize: TYPOGRAPHY.fontSize.base,
-    color: COLORS.text.primary,
-  },
-  eyeButton: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.md,
-  },
-  saveButton: {
-    backgroundColor: COLORS.black,
-    paddingVertical: SPACING.lg,
-    borderRadius: RADIUS.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 52,
-    marginTop: SPACING.sm,
-  },
-  buttonDisabled: {
-    backgroundColor: COLORS.gray[400],
-  },
-  saveButtonText: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.white,
-  },
-  changePasswordButton: {
-    backgroundColor: COLORS.white,
-    paddingVertical: SPACING.lg,
-    borderRadius: RADIUS.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: 52,
-    marginTop: SPACING.sm,
-    borderWidth: 1,
-    borderColor: COLORS.black,
-  },
-  changePasswordButtonText: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.black,
-  },
-});
+const createStyles = (semantic: WantedSemanticTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: semantic.bgBase,
+    },
+    keyboardView: {
+      flex: 1,
+    },
+    content: {
+      flex: 1,
+    },
+    contentContainer: {
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingTop: WANTED_TOKENS.spacing.s5,
+      paddingBottom: WANTED_TOKENS.spacing.s8,
+    },
+    profileIconSection: {
+      alignItems: 'center',
+      marginBottom: WANTED_TOKENS.spacing.s6,
+    },
+    profileIcon: {
+      width: 100,
+      height: 100,
+      backgroundColor: semantic.bgSubtle,
+      borderRadius: WANTED_TOKENS.radius.pill,
+      justifyContent: 'center',
+      alignItems: 'center',
+      borderWidth: 2,
+      borderColor: semantic.lineNormal,
+    },
+    formSection: {
+      marginBottom: WANTED_TOKENS.spacing.s6,
+      backgroundColor: semantic.bgBase,
+      borderRadius: WANTED_TOKENS.radius.r8,
+      padding: WANTED_TOKENS.spacing.s4,
+      borderWidth: 1,
+      borderColor: semantic.lineSubtle,
+    },
+    sectionTitle: {
+      fontSize: 14,
+      fontFamily: weightToFontFamily('700'),
+      color: semantic.labelStrong,
+      marginBottom: WANTED_TOKENS.spacing.s4,
+    },
+    inputGroup: {
+      marginBottom: WANTED_TOKENS.spacing.s4,
+    },
+    label: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelNeutral,
+      marginBottom: WANTED_TOKENS.spacing.s2,
+      letterSpacing: 0.5,
+    },
+    input: {
+      backgroundColor: semantic.bgBase,
+      borderWidth: 1,
+      borderColor: semantic.lineNormal,
+      borderRadius: WANTED_TOKENS.radius.r6,
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s3,
+      fontSize: 14,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelStrong,
+    },
+    readOnlyInput: {
+      backgroundColor: semantic.bgSubtle,
+      borderWidth: 1,
+      borderColor: semantic.lineSubtle,
+      borderRadius: WANTED_TOKENS.radius.r6,
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s3,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    readOnlyText: {
+      fontSize: 14,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+      flex: 1,
+    },
+    helperText: {
+      fontSize: 12,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+      marginTop: WANTED_TOKENS.spacing.s1,
+    },
+    errorText: {
+      fontSize: 12,
+      fontFamily: weightToFontFamily('500'),
+      color: WANTED_TOKENS.status.red500,
+      marginTop: WANTED_TOKENS.spacing.s1,
+    },
+    passwordInputContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: semantic.bgBase,
+      borderWidth: 1,
+      borderColor: semantic.lineNormal,
+      borderRadius: WANTED_TOKENS.radius.r6,
+    },
+    passwordInput: {
+      flex: 1,
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s3,
+      fontSize: 14,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelStrong,
+    },
+    eyeButton: {
+      paddingHorizontal: WANTED_TOKENS.spacing.s3,
+      paddingVertical: WANTED_TOKENS.spacing.s3,
+    },
+    saveButton: {
+      backgroundColor: WANTED_TOKENS.blue[500],
+      paddingVertical: WANTED_TOKENS.spacing.s4,
+      borderRadius: WANTED_TOKENS.radius.r6,
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: 52,
+      marginTop: WANTED_TOKENS.spacing.s2,
+    },
+    buttonDisabled: {
+      opacity: 0.5,
+    },
+    saveButtonText: {
+      fontSize: 14,
+      fontFamily: weightToFontFamily('700'),
+      color: '#FFFFFF',
+    },
+    changePasswordButton: {
+      backgroundColor: semantic.bgBase,
+      paddingVertical: WANTED_TOKENS.spacing.s4,
+      borderRadius: WANTED_TOKENS.radius.r6,
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: 52,
+      marginTop: WANTED_TOKENS.spacing.s2,
+      borderWidth: 1,
+      borderColor: semantic.labelStrong,
+    },
+    changePasswordButtonText: {
+      fontSize: 14,
+      fontFamily: weightToFontFamily('700'),
+      color: semantic.labelStrong,
+    },
+  });
 
 export default EditProfileScreen;
