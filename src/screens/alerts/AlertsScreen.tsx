@@ -3,7 +3,7 @@
  * Minimal grayscale with black accent
  */
 
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -37,6 +37,51 @@ import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '../
 import { useTheme } from '../../services/theme';
 import { addTestNotifications, addRandomNotification } from '../../utils/notificationTestHelper';
 
+/**
+ * Phase 41 (AL2): top-axis filter for the alerts list, mirroring the
+ * design handoff's `전체 / 읽지않음 N / 도착 / 지연 / 정보` chip row
+ * (bundle ee09cc40 lines 498-509). Bundle's "제보" label maps to the
+ * SERVICE_UPDATE / COMMUTE_REMINDER / FAVORITE group ("정보") here so
+ * the chip stays semantic against the type taxonomy from Phase 37.
+ */
+type FilterId = 'all' | 'unread' | 'arrival' | 'delay' | 'info';
+
+const ARRIVAL_TYPES = new Set(['ARRIVAL', 'arrival_reminder']);
+const DELAY_TYPES = new Set([
+  'DELAY',
+  'DELAY_ALERT',
+  'delay_alert',
+  'DISRUPTION',
+  'EMERGENCY_ALERT',
+  'emergency_alert',
+]);
+const INFO_TYPES = new Set([
+  'SERVICE_CHANGE',
+  'SERVICE_UPDATE',
+  'service_update',
+  'COMMUTE_REMINDER',
+  'commute_reminder',
+  'FAVORITE',
+]);
+
+const matchesFilter = (
+  notification: StoredNotification,
+  filter: FilterId
+): boolean => {
+  switch (filter) {
+    case 'all':
+      return true;
+    case 'unread':
+      return !notification.isRead;
+    case 'arrival':
+      return ARRIVAL_TYPES.has(notification.type);
+    case 'delay':
+      return DELAY_TYPES.has(notification.type);
+    case 'info':
+      return INFO_TYPES.has(notification.type);
+  }
+};
+
 export const AlertsScreen: React.FC = () => {
   const t = useTranslation();
   const { isDark } = useTheme();
@@ -56,6 +101,29 @@ export const AlertsScreen: React.FC = () => {
     clearAll,
     refresh,
   } = useAlerts();
+
+  const [selectedFilter, setSelectedFilter] = useState<FilterId>('all');
+
+  const filteredNotifications = useMemo(
+    () => notifications.filter((n) => matchesFilter(n, selectedFilter)),
+    [notifications, selectedFilter]
+  );
+
+  // Build filter chip definitions inside render so the unread badge picks
+  // up live count changes without extra deps. Order mirrors the bundle.
+  const filterChips: readonly { id: FilterId; label: string }[] = useMemo(
+    () => [
+      { id: 'all', label: '전체' },
+      {
+        id: 'unread',
+        label: unreadCount > 0 ? `읽지않음 ${unreadCount}` : '읽지않음',
+      },
+      { id: 'arrival', label: '도착' },
+      { id: 'delay', label: '지연' },
+      { id: 'info', label: '정보' },
+    ],
+    [unreadCount]
+  );
 
   /**
    * Phase 37 (AL3): map StoredNotification.type to a distinct lucide icon
@@ -370,15 +438,53 @@ export const AlertsScreen: React.FC = () => {
         </View>
       </View>
 
+      {/* Filter Chips — Phase 41 (AL2): bundle's `전체 / 읽지않음 N
+          / 도착 / 지연 / 정보` row. Selected chip uses labelStrong bg
+          + labelOnColor text; idle chips show outline + neutral text. */}
+      <FlatList
+        horizontal
+        data={filterChips}
+        keyExtractor={(item) => item.id}
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterRow}
+        contentContainerStyle={styles.filterRowContent}
+        renderItem={({ item }) => {
+          const isSelected = selectedFilter === item.id;
+          return (
+            <TouchableOpacity
+              style={[
+                styles.filterChip,
+                isSelected
+                  ? { backgroundColor: semantic.labelStrong, borderColor: semantic.labelStrong }
+                  : { borderColor: semantic.lineSubtle, backgroundColor: semantic.bgBase },
+              ]}
+              onPress={() => setSelectedFilter(item.id)}
+              accessibilityRole="button"
+              accessibilityLabel={`알림 필터: ${item.label}`}
+              accessibilityState={{ selected: isSelected }}
+            >
+              <Text
+                style={[
+                  styles.filterChipText,
+                  { color: isSelected ? semantic.labelOnColor : semantic.labelNeutral },
+                ]}
+              >
+                {item.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        }}
+      />
+
       {/* Content */}
       <FlatList
         style={styles.content}
         contentContainerStyle={
-          notifications.length === 0
+          filteredNotifications.length === 0
             ? styles.contentContainer
             : [styles.contentContainer, styles.listContainer]
         }
-        data={notifications}
+        data={filteredNotifications}
         keyExtractor={keyExtractor}
         renderItem={renderNotificationItem}
         ListEmptyComponent={renderEmptyState}
@@ -445,6 +551,26 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       backgroundColor: semantic.bgBase,
       borderWidth: 1,
       borderColor: semantic.lineSubtle,
+    },
+    filterRow: {
+      flexGrow: 0,
+      paddingBottom: WANTED_TOKENS.spacing.s2,
+    },
+    filterRowContent: {
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      gap: WANTED_TOKENS.spacing.s2,
+    },
+    filterChip: {
+      paddingHorizontal: WANTED_TOKENS.spacing.s3,
+      paddingVertical: WANTED_TOKENS.spacing.s1,
+      borderRadius: WANTED_TOKENS.radius.pill,
+      borderWidth: 1,
+      marginRight: WANTED_TOKENS.spacing.s2,
+    },
+    filterChipText: {
+      fontSize: WANTED_TOKENS.type.label2.size,
+      fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
     },
     content: {
       flex: 1,
