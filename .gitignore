@@ -139,3 +139,13 @@ apps/
 # Track design material (HTML + JSX) but exclude bundled React runtime (npm-derivable)
 docs/design/wanted-bundle/33122b9e-*.js
 docs/design/wanted-bundle/93aa0060-*.js
+
+# Transient working files (per-session dumps, never committed)
+#   .tmp/         — design-fetch artifacts (HTML/JSX scaffolds from claude.ai/design)
+#   dev/active/   — in-flight working notes (handoff/context/tasks markdown)
+#   PR_BODY_TMP.md — one-shot PR description draft
+#   /pasted-*.png — accidentally-dropped clipboard images at repo root
+.tmp/
+dev/active/
+PR_BODY_TMP.md
+/pasted-*.png
