@@ -17,8 +17,6 @@ import {
 } from 'react-native';
 import {
   ChevronRight,
-  User,
-  Pencil,
   TrainFront,
   Bell,
   Clock,
@@ -37,6 +35,7 @@ import {
   FileCheck,
   MessageSquare,
 } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 
@@ -56,6 +55,18 @@ import {
   disableBiometricLogin,
   hasStoredCredentials,
 } from '../../services/auth/biometricService';
+import { commuteLogService } from '@/services/pattern/commuteLogService';
+
+/**
+ * Phase 42 (SE1): pick the first grapheme of the user's display name as
+ * the avatar initial. Falls back to '?' for anonymous / blank names.
+ * Korean characters are single graphemes so a single Array.from is enough.
+ */
+const getAvatarInitial = (name?: string | null): string => {
+  if (!name || name.trim().length === 0) return '?';
+  const chars = Array.from(name.trim());
+  return chars[0]!.toUpperCase();
+};
 
 // Storage keys
 const AUTO_LOGIN_ENABLED_KEY = '@livemetro_auto_login_enabled';
@@ -89,6 +100,11 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [biometricTypeName, setBiometricTypeName] = useState('생체인증');
 
+  // Phase 42 (SE1): commute log count for the profile card meta line
+  // ("누적 N회"). null = not yet loaded; failure leaves it null so the
+  // meta line silently omits the trailing fragment.
+  const [commuteCount, setCommuteCount] = useState<number | null>(null);
+
   // Check auto login and biometric status on mount
   useEffect(() => {
     const checkSettings = async (): Promise<void> => {
@@ -115,6 +131,27 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
 
     checkSettings();
   }, []);
+
+  // Phase 42 (SE1): load commute log count once when the user becomes
+  // available. Cancelled flag prevents setState after unmount.
+  useEffect(() => {
+    if (!user?.id) {
+      setCommuteCount(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const logs = await commuteLogService.getCommuteLogs(user.id);
+        if (!cancelled) setCommuteCount(logs.length);
+      } catch {
+        // Failure leaves commuteCount null — meta line gracefully omits "누적 N회".
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.id]);
 
   // Handle auto login toggle
   const handleAutoLoginToggle = useCallback(async (value: boolean): Promise<void> => {
@@ -248,31 +285,37 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.content}>
-        {/* User Profile Section */}
+        {/* User Profile Section — Phase 42 (SE1): gradient avatar + 이니셜
+            + 누적 횟수. 카드 전체 onPress가 EditProfile로 이동하므로
+            별도 Pencil 버튼 대신 chevron-right만 표시 (번들 매칭). */}
         <View style={styles.section}>
           <TouchableOpacity
             style={styles.profileCard}
             onPress={() => navigation.navigate('EditProfile')}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel="프로필 편집"
           >
-            <View style={styles.profileIcon}>
-              <User size={32} color={semantic.labelStrong} />
-            </View>
+            <LinearGradient
+              colors={['#0066FF', '#6FA8FF']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+              style={styles.profileAvatar}
+            >
+              <Text style={styles.profileAvatarInitial}>
+                {getAvatarInitial(user?.displayName)}
+              </Text>
+            </LinearGradient>
             <View style={styles.profileInfo}>
               <Text style={styles.profileName}>
                 {user?.displayName || t.settings.anonymousUser}
               </Text>
               <Text style={styles.profileEmail}>
                 {user?.email || 'anonymous@livemetro.app'}
+                {commuteCount !== null && ` · 누적 ${commuteCount}회`}
               </Text>
             </View>
-            <TouchableOpacity
-              style={styles.editButton}
-              onPress={() => navigation.navigate('EditProfile')}
-              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            >
-              <Pencil size={20} color={semantic.labelAlt} />
-            </TouchableOpacity>
+            <ChevronRight size={18} color={semantic.labelAlt} strokeWidth={2} />
           </TouchableOpacity>
         </View>
 
@@ -507,6 +550,27 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       marginRight: WANTED_TOKENS.spacing.s4,
       borderWidth: 1,
       borderColor: semantic.lineSubtle,
+    },
+    // Phase 42 (SE1): gradient pill avatar replacing the User-icon block.
+    // 52x52 matches the design handoff's profile slot.
+    profileAvatar: {
+      width: 52,
+      height: 52,
+      borderRadius: WANTED_TOKENS.radius.pill,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginRight: WANTED_TOKENS.spacing.s4,
+      shadowColor: '#0066FF',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.18,
+      shadowRadius: 10,
+      elevation: 4,
+    },
+    profileAvatarInitial: {
+      color: '#FFFFFF',
+      fontSize: 22,
+      fontFamily: weightToFontFamily('800'),
+      lineHeight: 26,
     },
     profileInfo: {
       flex: 1,

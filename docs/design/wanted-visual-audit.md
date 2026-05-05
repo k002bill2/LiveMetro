@@ -232,13 +232,13 @@ ON1은 완전 구현. ON3은 의도적으로 Onboarding에서 제외 (다른 화
 ### 검증 결과
 | # | 원래 가정 | 실제 코드 | 정정 severity |
 |---|---|---|---|
-| SE1 | gradient avatar(135deg blue) + 이름 + email + 누적 N회 | ❌ Phase 40 검증 — profileIcon 56x56 User lucide 아이콘 + bgSubtle 배경 (gradient 없음). 누적 횟수 부재. Pencil edit 버튼 (chevron 아님) | **M** (gradient 시각 시그니처 부재) |
+| SE1 | gradient avatar(135deg blue) + 이름 + email + 누적 N회 | ✅ Phase 42에서 해소 — LinearGradient 52x52 pill (#0066FF→#6FA8FF) + 이니셜 + email · 누적 N회 (commuteLogService) + chevron-right (Pencil 제거) | ~~M~~ → ✅ |
 | SE2 | UPPERCASE caption header + rounded card + icon+toggle | ✅ Phase 40 검증 — sectionTitle에 `textTransform: 'uppercase'` + `letterSpacing: 0.6` ✓. settingGroup rounded card + iconContainer 36x36 pill ✓ | **L** (구현됨) |
 | SE3 | Custom 44x26 blue toggle | RN `<Switch>` 사용 (OS 표준) — 의도적 결정 | **L** (UX 결정) |
 | SE4 | 출퇴근/알림/화면 접근성 sections | 25개 sub-screen으로 풍부하게 분리 (CommuteSettings/DelayNotification/SoundSettings 등) | **L** (확장된 구현) |
 
 ### 결론
-SettingsScreen은 25개 sub-screen으로 **번들보다 훨씬 풍부**. SE2는 정확히 매칭(uppercase + rounded card + icon container) → L 강등. **SE1만 잔여 gap** — gradient avatar(135deg blue)와 누적 횟수가 번들의 시각 시그니처인데 코드는 평범한 User 아이콘 + 이름/email만 표시. M 유지 (시각적 차별화 큼).
+모든 sub-item 해소: SE1 (Phase 42), SE2 (Phase 40 L), SE3 (OS Switch L), SE4 (확장 L). SettingsScreen audit 완전 완료. profile card는 이제 번들의 시각 시그니처(gradient avatar + 이니셜 + 누적 횟수)를 그대로 반영.
 
 ---
 
@@ -334,13 +334,13 @@ SettingsScreen은 25개 sub-screen으로 **번들보다 훨씬 풍부**. SE2는 
 | ✅ 38 | DelayFeedScreen D1: Plus → Megaphone (D3/D4 이월) | `c0e6537` |
 | ✅ 39 | StatsScreen 이모지 7개 제거 + MapScreen Ionicons 6개 → lucide | `0eac3de` |
 | ✅ 40 | Alerts AL2/AL4 + Settings SE1/SE2 render 검증 (AL2 H 승격, AL4/SE2 L 강등) | `723897b` |
-| ✅ 41 | AlertsScreen AL2: filter chips 신설 (5 chip + filter 매핑) | (this) |
+| ✅ 41 | AlertsScreen AL2: filter chips 신설 (5 chip + filter 매핑) | `9ef347d` |
+| ✅ 42 | SettingsScreen SE1: gradient avatar + 이니셜 + 누적 횟수 | (this) |
 
 ### 향후 (Phase 36 검증 후 우선순위 재조정)
 
 | Phase | 핵심 작업 | 추정 작업량 | 영향 |
 |-------|-----------|-----------|------|
-| **42** | SettingsScreen SE1 (gradient avatar + 누적 횟수) | 작 (LinearGradient avatar + 통계 fetch) | M |
 | **43** | Onboarding ON2/ON4 UX 결정 (modal 유지 vs inline 도입, 요일 커스터마이징 추가) | 중 | M |
 | 이월 | D3 (filter 축), D4 (comment/share), MP2 (Modal vs navigate) | — | product 결정 |
 
