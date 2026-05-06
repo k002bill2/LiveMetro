@@ -5,38 +5,10 @@ import { PredictedCommute, CommutePattern } from '@/models/pattern';
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: (_, name) => name }));
 
+// Phase 50 — Wanted DS migration. Legacy COLORS/SPACING/RADIUS/TYPOGRAPHY
+// mock removed; component now imports WANTED_TOKENS + weightToFontFamily.
 jest.mock('@/services/theme', () => ({
-  useTheme: () => ({
-    colors: {
-      primary: '#007AFF',
-      primaryLight: '#E3F2FD',
-      background: '#FFFFFF',
-      surface: '#FFFFFF',
-      textPrimary: '#000000',
-      textSecondary: '#8E8E93',
-      textTertiary: '#C7C7CC',
-      borderLight: '#E5E5EA',
-      borderMedium: '#D1D1D6',
-      error: '#FF3B30',
-      errorLight: '#FFEBEE',
-      success: '#34C759',
-      successLight: '#E8F5E9',
-      warning: '#FF9500',
-      warningLight: '#FFF3E0',
-      backgroundSecondary: '#F2F2F7',
-      textInverse: '#FFFFFF',
-    },
-    isDark: false,
-  }),
-}));
-
-jest.mock('@/styles/modernTheme', () => ({
-  SPACING: { xs: 4, sm: 8, md: 12, lg: 16 },
-  RADIUS: { sm: 4, md: 8, lg: 12 },
-  TYPOGRAPHY: {
-    fontSize: { xs: 10, sm: 12, base: 14, lg: 18 },
-    fontWeight: { medium: '500', semibold: '600', bold: '700' },
-  },
+  useTheme: () => ({ isDark: false }),
 }));
 
 jest.mock('@/utils/colorUtils', () => ({

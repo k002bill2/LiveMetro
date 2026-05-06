@@ -4,36 +4,11 @@ import { CommutePredictionCard } from '../CommutePredictionCard';
 
 jest.mock('lucide-react-native', () => new Proxy({}, { get: (_, name) => name }));
 
+// Phase 50 — Wanted DS migration: useTheme().isDark drives the
+// WANTED_TOKENS semantic theme. Legacy COLORS/SPACING/RADIUS/TYPOGRAPHY
+// mock removed because component no longer imports them.
 jest.mock('@/services/theme', () => ({
-  useTheme: () => ({
-    colors: {
-      primary: '#007AFF',
-      background: '#FFFFFF',
-      surface: '#FFFFFF',
-      textPrimary: '#000000',
-      textSecondary: '#8E8E93',
-      textTertiary: '#C7C7CC',
-      borderLight: '#E5E5EA',
-      borderMedium: '#D1D1D6',
-      error: '#FF3B30',
-      success: '#34C759',
-      warning: '#FF9500',
-      backgroundSecondary: '#F2F2F7',
-      textInverse: '#FFFFFF',
-      primaryLight: '#E3F2FD',
-    },
-    isDark: false,
-  }),
-  ThemeColors: {},
-}));
-
-jest.mock('@/styles/modernTheme', () => ({
-  SPACING: { xs: 4, sm: 8, md: 12, lg: 16 },
-  RADIUS: { sm: 4, md: 8, lg: 12, full: 9999 },
-  TYPOGRAPHY: {
-    fontSize: { xs: 10, sm: 12, base: 14, lg: 18 },
-    fontWeight: { medium: '500', semibold: '600', bold: '700' },
-  },
+  useTheme: () => ({ isDark: false }),
 }));
 
 jest.mock('@/models/ml', () => ({

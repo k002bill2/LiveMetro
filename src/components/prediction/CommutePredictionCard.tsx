@@ -1,9 +1,12 @@
 /**
  * Commute Prediction Card Component
- * Displays ML-based commute predictions on the home screen
+ * Displays ML-based commute predictions on the home screen.
+ *
+ * Phase 50 — migrated to Wanted Design System tokens. Delay/confidence
+ * tier colors resolve through WANTED_TOKENS.status palette.
  */
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -22,8 +25,12 @@ import {
 } from 'lucide-react-native';
 
 import { useMLPrediction } from '@/hooks/useMLPrediction';
-import { useTheme, ThemeColors } from '@/services/theme';
-import { SPACING, RADIUS, TYPOGRAPHY } from '@/styles/modernTheme';
+import { useTheme } from '@/services/theme';
+import {
+  WANTED_TOKENS,
+  weightToFontFamily,
+  type WantedSemanticTheme,
+} from '@/styles/modernTheme';
 import { MIN_LOGS_FOR_ML_TRAINING } from '@/models/ml';
 
 // ============================================================================
@@ -51,8 +58,9 @@ export const CommutePredictionCard: React.FC<CommutePredictionCardProps> = ({
   onTrainModel,
   compact = false,
 }) => {
-  const { colors } = useTheme();
-  const styles = createStyles(colors, compact);
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const styles = useMemo(() => createStyles(semantic, compact), [semantic, compact]);
 
   const {
     prediction,
@@ -89,7 +97,7 @@ export const CommutePredictionCard: React.FC<CommutePredictionCardProps> = ({
     return (
       <View style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="small" color={colors.textPrimary} />
+          <ActivityIndicator size="small" color={semantic.labelStrong} />
           <Text style={styles.loadingText}>예측 정보 불러오는 중...</Text>
         </View>
       </View>
@@ -101,7 +109,7 @@ export const CommutePredictionCard: React.FC<CommutePredictionCardProps> = ({
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <Brain size={20} color={colors.textSecondary} />
+          <Brain size={20} color={semantic.labelNeutral} />
           <Text style={styles.title}>출퇴근 패턴 학습</Text>
         </View>
         <View style={styles.emptyContent}>
@@ -129,7 +137,7 @@ export const CommutePredictionCard: React.FC<CommutePredictionCardProps> = ({
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <AlertTriangle size={20} color={colors.error} />
+          <AlertTriangle size={20} color={WANTED_TOKENS.status.red500} />
           <Text style={styles.title}>예측 오류</Text>
         </View>
         <Text style={styles.errorText}>{error}</Text>
@@ -137,7 +145,7 @@ export const CommutePredictionCard: React.FC<CommutePredictionCardProps> = ({
           style={styles.retryButton}
           onPress={() => refreshPrediction()}
         >
-          <RefreshCw size={16} color={colors.textPrimary} />
+          <RefreshCw size={16} color={semantic.labelStrong} />
           <Text style={styles.retryText}>다시 시도</Text>
         </TouchableOpacity>
       </View>
@@ -149,11 +157,11 @@ export const CommutePredictionCard: React.FC<CommutePredictionCardProps> = ({
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <Brain size={20} color={colors.textPrimary} />
+          <Brain size={20} color={semantic.labelStrong} />
           <Text style={styles.title}>모델 학습 중</Text>
         </View>
         <View style={styles.trainingContent}>
-          <ActivityIndicator size="small" color={colors.textPrimary} />
+          <ActivityIndicator size="small" color={semantic.labelStrong} />
           <Text style={styles.trainingText}>
             학습 진행률: {Math.round(trainingProgress * 100)}%
           </Text>
@@ -175,7 +183,7 @@ export const CommutePredictionCard: React.FC<CommutePredictionCardProps> = ({
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Brain size={20} color={colors.textPrimary} />
+        <Brain size={20} color={semantic.labelStrong} />
         <Text style={styles.title}>오늘의 출퇴근 예측</Text>
         {modelMetadata?.isFineTuned && (
           <View style={styles.badge}>
@@ -187,14 +195,14 @@ export const CommutePredictionCard: React.FC<CommutePredictionCardProps> = ({
       <View style={styles.content}>
         {/* Departure Time */}
         <View style={styles.predictionRow}>
-          <Clock size={18} color={colors.textSecondary} />
+          <Clock size={18} color={semantic.labelNeutral} />
           <Text style={styles.label}>예상 출발</Text>
           <Text style={styles.timeValue}>{prediction.predictedDepartureTime}</Text>
         </View>
 
         {/* Arrival Time */}
         <View style={styles.predictionRow}>
-          <TrendingUp size={18} color={colors.textSecondary} />
+          <TrendingUp size={18} color={semantic.labelNeutral} />
           <Text style={styles.label}>예상 도착</Text>
           <Text style={styles.timeValue}>{prediction.predictedArrivalTime}</Text>
         </View>
@@ -204,13 +212,13 @@ export const CommutePredictionCard: React.FC<CommutePredictionCardProps> = ({
           <View style={[styles.predictionRow, styles.delayRow]}>
             <AlertTriangle
               size={18}
-              color={getDelayColor(prediction.delayProbability, colors)}
+              color={getDelayColor(prediction.delayProbability, semantic)}
             />
             <Text style={styles.label}>지연 가능성</Text>
             <Text
               style={[
                 styles.delayValue,
-                { color: getDelayColor(prediction.delayProbability, colors) }
+                { color: getDelayColor(prediction.delayProbability, semantic) }
               ]}
             >
               {Math.round(prediction.delayProbability * 100)}%
@@ -227,7 +235,7 @@ export const CommutePredictionCard: React.FC<CommutePredictionCardProps> = ({
                 styles.confidenceFill,
                 {
                   width: `${prediction.confidence * 100}%`,
-                  backgroundColor: getConfidenceColor(prediction.confidence, colors),
+                  backgroundColor: getConfidenceColor(prediction.confidence),
                 }
               ]}
             />
@@ -248,7 +256,7 @@ export const CommutePredictionCard: React.FC<CommutePredictionCardProps> = ({
               accessibilityRole="button"
               accessibilityLabel="출발 알림 설정"
             >
-              <Bell size={16} color={colors.textPrimary} />
+              <Bell size={16} color={semantic.labelStrong} />
               <Text style={styles.actionText}>알림 설정</Text>
             </TouchableOpacity>
           )}
@@ -260,7 +268,7 @@ export const CommutePredictionCard: React.FC<CommutePredictionCardProps> = ({
               accessibilityRole="button"
               accessibilityLabel="모델 학습하기"
             >
-              <Brain size={16} color={colors.textPrimary} />
+              <Brain size={16} color={semantic.labelStrong} />
               <Text style={styles.actionText}>학습하기</Text>
             </TouchableOpacity>
           )}
@@ -273,7 +281,7 @@ export const CommutePredictionCard: React.FC<CommutePredictionCardProps> = ({
               accessibilityLabel="주간 예측 보기"
             >
               <Text style={styles.actionText}>주간 예측</Text>
-              <ChevronRight size={16} color={colors.textSecondary} />
+              <ChevronRight size={16} color={semantic.labelNeutral} />
             </TouchableOpacity>
           )}
         </View>
@@ -286,203 +294,212 @@ export const CommutePredictionCard: React.FC<CommutePredictionCardProps> = ({
 // Helper Functions
 // ============================================================================
 
-function getDelayColor(probability: number, colors: ThemeColors): string {
-  if (probability >= 0.7) return colors.error;
-  if (probability >= 0.4) return colors.warning;
-  return colors.textSecondary;
+function getDelayColor(probability: number, semantic: WantedSemanticTheme): string {
+  if (probability >= 0.7) return WANTED_TOKENS.status.red500;
+  if (probability >= 0.4) return WANTED_TOKENS.status.yellow500;
+  return semantic.labelNeutral;
 }
 
-function getConfidenceColor(confidence: number, colors: ThemeColors): string {
-  if (confidence >= 0.7) return colors.success;
-  if (confidence >= 0.4) return colors.warning;
-  return colors.error;
+function getConfidenceColor(confidence: number): string {
+  if (confidence >= 0.7) return WANTED_TOKENS.status.green500;
+  if (confidence >= 0.4) return WANTED_TOKENS.status.yellow500;
+  return WANTED_TOKENS.status.red500;
 }
 
 // ============================================================================
 // Styles
 // ============================================================================
 
-const createStyles = (colors: ThemeColors, compact: boolean) =>
+const createStyles = (semantic: WantedSemanticTheme, compact: boolean) =>
   StyleSheet.create({
     container: {
-      backgroundColor: colors.surface,
-      borderRadius: RADIUS.lg,
-      padding: compact ? SPACING.md : SPACING.lg,
-      marginHorizontal: SPACING.lg,
-      marginBottom: SPACING.md,
+      backgroundColor: semantic.bgBase,
+      borderRadius: WANTED_TOKENS.radius.r8,
+      padding: compact ? WANTED_TOKENS.spacing.s3 : WANTED_TOKENS.spacing.s4,
+      marginHorizontal: WANTED_TOKENS.spacing.s4,
+      marginBottom: WANTED_TOKENS.spacing.s3,
       borderWidth: 1,
-      borderColor: colors.borderLight,
+      borderColor: semantic.lineSubtle,
     },
     header: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginBottom: SPACING.md,
+      marginBottom: WANTED_TOKENS.spacing.s3,
     },
     title: {
-      fontSize: TYPOGRAPHY.fontSize.base,
-      fontWeight: TYPOGRAPHY.fontWeight.semibold,
-      color: colors.textPrimary,
-      marginLeft: SPACING.sm,
+      fontSize: 14,
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelStrong,
+      marginLeft: WANTED_TOKENS.spacing.s2,
       flex: 1,
     },
     badge: {
-      backgroundColor: colors.backgroundSecondary,
-      paddingHorizontal: SPACING.sm,
+      backgroundColor: semantic.bgSubtle,
+      paddingHorizontal: WANTED_TOKENS.spacing.s2,
       paddingVertical: 2,
-      borderRadius: RADIUS.full,
+      borderRadius: WANTED_TOKENS.radius.pill,
     },
     badgeText: {
-      fontSize: TYPOGRAPHY.fontSize.xs,
-      fontWeight: TYPOGRAPHY.fontWeight.medium,
-      color: colors.textSecondary,
+      fontSize: 12,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelNeutral,
     },
     content: {
-      gap: SPACING.sm,
+      gap: WANTED_TOKENS.spacing.s2,
     },
     predictionRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingVertical: SPACING.xs,
+      paddingVertical: WANTED_TOKENS.spacing.s1,
     },
     delayRow: {
-      backgroundColor: colors.backgroundSecondary,
-      borderRadius: RADIUS.md,
-      paddingHorizontal: SPACING.sm,
-      marginTop: SPACING.xs,
+      backgroundColor: semantic.bgSubtle,
+      borderRadius: WANTED_TOKENS.radius.r6,
+      paddingHorizontal: WANTED_TOKENS.spacing.s2,
+      marginTop: WANTED_TOKENS.spacing.s1,
     },
     label: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      color: colors.textSecondary,
-      marginLeft: SPACING.sm,
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelNeutral,
+      marginLeft: WANTED_TOKENS.spacing.s2,
       flex: 1,
     },
     timeValue: {
-      fontSize: TYPOGRAPHY.fontSize.lg,
-      fontWeight: TYPOGRAPHY.fontWeight.bold,
-      color: colors.textPrimary,
+      fontSize: 16,
+      fontFamily: weightToFontFamily('700'),
+      color: semantic.labelStrong,
     },
     delayValue: {
-      fontSize: TYPOGRAPHY.fontSize.base,
-      fontWeight: TYPOGRAPHY.fontWeight.bold,
+      fontSize: 14,
+      fontFamily: weightToFontFamily('700'),
     },
     confidenceContainer: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginTop: SPACING.sm,
-      paddingTop: SPACING.sm,
+      marginTop: WANTED_TOKENS.spacing.s2,
+      paddingTop: WANTED_TOKENS.spacing.s2,
       borderTopWidth: 1,
-      borderTopColor: colors.borderLight,
+      borderTopColor: semantic.lineSubtle,
     },
     confidenceLabel: {
-      fontSize: TYPOGRAPHY.fontSize.xs,
-      color: colors.textTertiary,
-      marginRight: SPACING.sm,
+      fontSize: 12,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+      marginRight: WANTED_TOKENS.spacing.s2,
     },
     confidenceBar: {
       flex: 1,
       height: 4,
-      backgroundColor: colors.backgroundSecondary,
-      borderRadius: RADIUS.full,
+      backgroundColor: semantic.bgSubtle,
+      borderRadius: WANTED_TOKENS.radius.pill,
       overflow: 'hidden',
     },
     confidenceFill: {
       height: '100%',
-      borderRadius: RADIUS.full,
+      borderRadius: WANTED_TOKENS.radius.pill,
     },
     confidenceValue: {
-      fontSize: TYPOGRAPHY.fontSize.xs,
-      color: colors.textTertiary,
-      marginLeft: SPACING.sm,
+      fontSize: 12,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+      marginLeft: WANTED_TOKENS.spacing.s2,
       minWidth: 30,
       textAlign: 'right',
     },
     actions: {
       flexDirection: 'row',
-      marginTop: SPACING.lg,
-      paddingTop: SPACING.md,
+      marginTop: WANTED_TOKENS.spacing.s4,
+      paddingTop: WANTED_TOKENS.spacing.s3,
       borderTopWidth: 1,
-      borderTopColor: colors.borderLight,
-      gap: SPACING.sm,
+      borderTopColor: semantic.lineSubtle,
+      gap: WANTED_TOKENS.spacing.s2,
     },
     actionButton: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: colors.backgroundSecondary,
-      paddingHorizontal: SPACING.md,
-      paddingVertical: SPACING.sm,
-      borderRadius: RADIUS.full,
-      gap: SPACING.xs,
+      backgroundColor: semantic.bgSubtle,
+      paddingHorizontal: WANTED_TOKENS.spacing.s3,
+      paddingVertical: WANTED_TOKENS.spacing.s2,
+      borderRadius: WANTED_TOKENS.radius.pill,
+      gap: WANTED_TOKENS.spacing.s1,
     },
     actionText: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      fontWeight: TYPOGRAPHY.fontWeight.medium,
-      color: colors.textPrimary,
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelStrong,
     },
     loadingContainer: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: SPACING.lg,
+      padding: WANTED_TOKENS.spacing.s4,
     },
     loadingText: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      color: colors.textSecondary,
-      marginLeft: SPACING.sm,
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelNeutral,
+      marginLeft: WANTED_TOKENS.spacing.s2,
     },
     emptyContent: {
       alignItems: 'center',
-      paddingVertical: SPACING.md,
+      paddingVertical: WANTED_TOKENS.spacing.s3,
     },
     emptyText: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      color: colors.textSecondary,
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelNeutral,
       textAlign: 'center',
-      marginBottom: SPACING.xs,
+      marginBottom: WANTED_TOKENS.spacing.s1,
     },
     emptySubtext: {
-      fontSize: TYPOGRAPHY.fontSize.xs,
-      color: colors.textTertiary,
-      marginBottom: SPACING.md,
+      fontSize: 12,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+      marginBottom: WANTED_TOKENS.spacing.s3,
     },
     progressBar: {
       width: '100%',
       height: 6,
-      backgroundColor: colors.backgroundSecondary,
-      borderRadius: RADIUS.full,
+      backgroundColor: semantic.bgSubtle,
+      borderRadius: WANTED_TOKENS.radius.pill,
       overflow: 'hidden',
     },
     progressFill: {
       height: '100%',
-      backgroundColor: colors.textPrimary,
-      borderRadius: RADIUS.full,
+      backgroundColor: WANTED_TOKENS.blue[500],
+      borderRadius: WANTED_TOKENS.radius.pill,
     },
     errorText: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      color: colors.error,
-      marginBottom: SPACING.md,
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: WANTED_TOKENS.status.red500,
+      marginBottom: WANTED_TOKENS.spacing.s3,
     },
     retryButton: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.backgroundSecondary,
-      paddingHorizontal: SPACING.md,
-      paddingVertical: SPACING.sm,
-      borderRadius: RADIUS.full,
-      gap: SPACING.xs,
+      backgroundColor: semantic.bgSubtle,
+      paddingHorizontal: WANTED_TOKENS.spacing.s3,
+      paddingVertical: WANTED_TOKENS.spacing.s2,
+      borderRadius: WANTED_TOKENS.radius.pill,
+      gap: WANTED_TOKENS.spacing.s1,
     },
     retryText: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      color: colors.textPrimary,
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelStrong,
     },
     trainingContent: {
       alignItems: 'center',
-      paddingVertical: SPACING.md,
-      gap: SPACING.sm,
+      paddingVertical: WANTED_TOKENS.spacing.s3,
+      gap: WANTED_TOKENS.spacing.s2,
     },
     trainingText: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      color: colors.textSecondary,
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelNeutral,
     },
   });
 

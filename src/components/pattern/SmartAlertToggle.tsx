@@ -1,9 +1,11 @@
 /**
  * SmartAlertToggle Component
- * Toggle for enabling/disabling smart commute alerts
+ * Toggle for enabling/disabling smart commute alerts.
+ *
+ * Phase 50 — migrated to Wanted Design System tokens.
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -14,7 +16,11 @@ import {
 } from 'react-native';
 import { Bell, BellOff, ChevronRight, Sparkles } from 'lucide-react-native';
 import { useTheme } from '@/services/theme';
-import { SPACING, RADIUS, TYPOGRAPHY } from '@/styles/modernTheme';
+import {
+  WANTED_TOKENS,
+  weightToFontFamily,
+  type WantedSemanticTheme,
+} from '@/styles/modernTheme';
 
 // ============================================================================
 // Types
@@ -47,15 +53,16 @@ export const SmartAlertToggle: React.FC<SmartAlertToggleProps> = ({
   loading = false,
   style,
 }) => {
-  const { colors, isDark } = useTheme();
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   return (
     <View
       style={[
         styles.container,
         {
-          backgroundColor: isDark ? colors.surface : colors.background,
-          borderColor: enabled ? colors.primary : colors.borderMedium,
+          borderColor: enabled ? WANTED_TOKENS.blue[500] : semantic.lineNormal,
         },
         style,
       ]}
@@ -65,28 +72,30 @@ export const SmartAlertToggle: React.FC<SmartAlertToggleProps> = ({
           style={[
             styles.iconContainer,
             {
-              backgroundColor: enabled ? colors.primaryLight : colors.borderMedium,
+              backgroundColor: enabled
+                ? 'rgba(0,102,255,0.10)'
+                : semantic.bgSubtle,
             },
           ]}
         >
           {enabled ? (
-            <Bell size={20} color={colors.primary} />
+            <Bell size={20} color={WANTED_TOKENS.blue[500]} />
           ) : (
-            <BellOff size={20} color={colors.textSecondary} />
+            <BellOff size={20} color={semantic.labelNeutral} />
           )}
         </View>
 
         <View style={styles.textContainer}>
           <View style={styles.titleRow}>
-            <Text style={[styles.title, { color: colors.textPrimary }]}>
+            <Text style={styles.title}>
               스마트 출근 알림
             </Text>
-            <View style={[styles.aiBadge, { backgroundColor: colors.primaryLight }]}>
-              <Sparkles size={10} color={colors.primary} />
-              <Text style={[styles.aiBadgeText, { color: colors.primary }]}>AI</Text>
+            <View style={styles.aiBadge}>
+              <Sparkles size={10} color={WANTED_TOKENS.blue[500]} />
+              <Text style={styles.aiBadgeText}>AI</Text>
             </View>
           </View>
-          <Text style={[styles.description, { color: colors.textSecondary }]}>
+          <Text style={styles.description}>
             {enabled
               ? patternCount > 0
                 ? `${patternCount}개 패턴 기반으로 알림 제공`
@@ -99,20 +108,20 @@ export const SmartAlertToggle: React.FC<SmartAlertToggleProps> = ({
           value={enabled}
           onValueChange={onToggle}
           disabled={loading}
-          trackColor={{ false: colors.borderMedium, true: colors.primaryLight }}
-          thumbColor={enabled ? colors.primary : colors.textSecondary}
+          trackColor={{ false: semantic.lineNormal, true: 'rgba(0,102,255,0.30)' }}
+          thumbColor={enabled ? WANTED_TOKENS.blue[500] : '#FFFFFF'}
         />
       </View>
 
       {enabled && onSettingsPress && (
         <TouchableOpacity
-          style={[styles.settingsRow, { borderTopColor: colors.borderMedium }]}
+          style={styles.settingsRow}
           onPress={onSettingsPress}
         >
-          <Text style={[styles.settingsText, { color: colors.textSecondary }]}>
+          <Text style={styles.settingsText}>
             알림 시간 및 설정 변경
           </Text>
-          <ChevronRight size={16} color={colors.textSecondary} />
+          <ChevronRight size={16} color={semantic.labelNeutral} />
         </TouchableOpacity>
       )}
     </View>
@@ -123,64 +132,74 @@ export const SmartAlertToggle: React.FC<SmartAlertToggleProps> = ({
 // Styles
 // ============================================================================
 
-const styles = StyleSheet.create({
-  container: {
-    borderRadius: RADIUS.lg,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  mainRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: SPACING.md,
-    gap: SPACING.sm,
-  },
-  iconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  textContainer: {
-    flex: 1,
-    gap: 2,
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-  },
-  title: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold as '600',
-  },
-  aiBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 2,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: RADIUS.sm,
-  },
-  aiBadgeText: {
-    fontSize: 10,
-    fontWeight: TYPOGRAPHY.fontWeight.bold as '700',
-  },
-  description: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-  },
-  settingsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    borderTopWidth: 1,
-  },
-  settingsText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-  },
-});
+const createStyles = (semantic: WantedSemanticTheme) =>
+  StyleSheet.create({
+    container: {
+      backgroundColor: semantic.bgBase,
+      borderRadius: WANTED_TOKENS.radius.r8,
+      borderWidth: 1,
+      overflow: 'hidden',
+    },
+    mainRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: WANTED_TOKENS.spacing.s3,
+      gap: WANTED_TOKENS.spacing.s2,
+    },
+    iconContainer: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    textContainer: {
+      flex: 1,
+      gap: 2,
+    },
+    titleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: WANTED_TOKENS.spacing.s1,
+    },
+    title: {
+      fontSize: 14,
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelStrong,
+    },
+    aiBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 2,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: WANTED_TOKENS.radius.r2,
+      backgroundColor: 'rgba(0,102,255,0.10)',
+    },
+    aiBadgeText: {
+      fontSize: 10,
+      fontFamily: weightToFontFamily('700'),
+      color: WANTED_TOKENS.blue[500],
+    },
+    description: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelNeutral,
+    },
+    settingsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: WANTED_TOKENS.spacing.s3,
+      paddingVertical: WANTED_TOKENS.spacing.s2,
+      borderTopWidth: 1,
+      borderTopColor: semantic.lineSubtle,
+    },
+    settingsText: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelNeutral,
+    },
+  });
 
 export default SmartAlertToggle;
