@@ -28,6 +28,7 @@ import {
   ViewStyle,
 } from 'react-native';
 import { FirebaseRecaptchaVerifierModal } from 'expo-firebase-recaptcha';
+import { ArrowRight, Calendar, ShieldCheck, Smartphone, User } from 'lucide-react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 
@@ -53,9 +54,9 @@ const CARRIERS: readonly Carrier[] = [
   { id: 'skt', label: 'SKT', isMvno: false },
   { id: 'kt', label: 'KT', isMvno: false },
   { id: 'lgu', label: 'LG U+', isMvno: false },
-  { id: 'mvno-skt', label: '알뜰폰 (SKT)', isMvno: true },
-  { id: 'mvno-kt', label: '알뜰폰 (KT)', isMvno: true },
-  { id: 'mvno-lgu', label: '알뜰폰 (LGU+)', isMvno: true },
+  { id: 'mvno-skt', label: 'SKT 알뜰폰', isMvno: true },
+  { id: 'mvno-kt', label: 'KT 알뜰폰', isMvno: true },
+  { id: 'mvno-lgu', label: 'LG 알뜰폰', isMvno: true },
 ];
 
 const OTP_LENGTH = 6;
@@ -203,8 +204,10 @@ export const SignupStep1Screen: React.FC = () => {
       await confirmPhoneCode(verificationId, otpDigits.join(''));
       // signInWithCredential succeeded inside the handler. The
       // onAuthStateChanged listener will flip user → truthy and the
-      // RootNavigator will route to EmailLink (SignUp form, link mode)
-      // because the new user has no email yet.
+      // RootNavigator will route to SignupStep2 (계정 정보 + 약관 동의)
+      // because phone-only users still need to accept terms (정통망법 +
+      // 개인정보보호법 §22-2). Email/nickname/password are optional in
+      // SignupStep2 — users can add them now or link later from Settings.
     } catch (err) {
       Alert.alert('인증 실패', err instanceof Error ? err.message : '인증번호를 다시 확인해주세요.');
     } finally {
@@ -243,19 +246,25 @@ export const SignupStep1Screen: React.FC = () => {
           {phase === 'input' ? (
             <>
               <Text
+                style={[styles.stepCaption, { color: semantic.primaryNormal, fontFamily: weightToFontFamily('800') }]}
+                testID="signup-step1-step-caption"
+              >
+                STEP 1 / 3
+              </Text>
+              <Text
                 style={[styles.title, { color: semantic.labelStrong, fontFamily: weightToFontFamily('800') }]}
                 testID="signup-step1-title"
               >
                 본인 인증
               </Text>
               <Text style={[styles.subtitle, { color: semantic.labelAlt, fontFamily: weightToFontFamily('500') }]}>
-                휴대폰 번호로 본인을 확인합니다
+                휴대폰 번호로 인증을 진행해요.{'\n'}입력하신 번호는 본인 확인 외 사용되지 않아요.
               </Text>
 
               <Text
-                style={[styles.sectionLabel, { color: semantic.labelNormal, fontFamily: weightToFontFamily('600') }]}
+                style={[styles.sectionLabel, { color: semantic.labelNormal, fontFamily: weightToFontFamily('700') }]}
               >
-                통신사 선택
+                통신사
               </Text>
               <View style={styles.carrierGrid} testID="carrier-grid">
                 {CARRIERS.map((c) => {
@@ -267,103 +276,158 @@ export const SignupStep1Screen: React.FC = () => {
                       accessibilityRole="button"
                       accessibilityLabel={`${c.label} 선택`}
                       onPress={() => setCarrierId(c.id)}
-                      style={[
-                        styles.carrierCard,
-                        {
-                          borderColor: selected ? semantic.primaryNormal : semantic.lineSubtle,
-                          borderWidth: selected ? 2 : 1,
-                          backgroundColor: selected
-                            ? (isDark ? 'rgba(51,133,255,0.14)' : 'rgba(0,102,255,0.06)')
-                            : semantic.bgBase,
-                        },
-                      ]}
+                      style={styles.carrierColumn}
                     >
-                      <Text
+                      <View
                         style={[
-                          styles.carrierLabel,
+                          styles.carrierBox,
                           {
-                            color: selected ? semantic.primaryNormal : semantic.labelStrong,
-                            fontFamily: weightToFontFamily(selected ? '700' : '600'),
+                            borderColor: selected ? semantic.primaryNormal : semantic.lineSubtle,
+                            borderWidth: selected ? 2 : 1,
+                            backgroundColor: selected
+                              ? (isDark ? 'rgba(51,133,255,0.14)' : 'rgba(0,102,255,0.06)')
+                              : semantic.bgSubtle,
                           },
                         ]}
                       >
-                        {c.label}
-                      </Text>
+                        <Text
+                          style={[
+                            styles.carrierLabel,
+                            {
+                              color: selected ? semantic.primaryNormal : semantic.labelStrong,
+                              fontFamily: weightToFontFamily(selected ? '700' : '600'),
+                            },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {c.label}
+                        </Text>
+                      </View>
                     </Pressable>
                   );
                 })}
               </View>
 
               <View style={styles.field}>
-                <Text style={[styles.inputLabel, { color: semantic.labelNormal, fontFamily: weightToFontFamily('600') }]}>
+                <Text style={[styles.inputLabel, { color: semantic.labelNormal, fontFamily: weightToFontFamily('700') }]}>
                   이름
                 </Text>
-                <TextInput
-                  testID="name-input"
-                  value={name}
-                  onChangeText={setName}
-                  placeholder="홍길동"
-                  placeholderTextColor={semantic.labelAlt}
+                <View
                   style={[
-                    styles.input,
-                    {
-                      color: semantic.labelStrong,
-                      borderColor: semantic.lineSubtle,
-                      backgroundColor: semantic.bgBase,
-                    },
+                    styles.inputRow,
+                    { borderColor: semantic.lineSubtle, backgroundColor: semantic.bgBase },
                   ]}
-                  autoCapitalize="words"
-                />
+                >
+                  <User size={18} color={semantic.labelAlt} strokeWidth={2} />
+                  <TextInput
+                    testID="name-input"
+                    value={name}
+                    onChangeText={setName}
+                    placeholder="이지수"
+                    placeholderTextColor={semantic.labelAlt}
+                    style={[styles.inputInside, { color: semantic.labelStrong }]}
+                    autoCapitalize="words"
+                  />
+                </View>
               </View>
 
               <View style={styles.field}>
-                <Text style={[styles.inputLabel, { color: semantic.labelNormal, fontFamily: weightToFontFamily('600') }]}>
-                  휴대폰 번호
-                </Text>
-                <TextInput
-                  testID="phone-input"
-                  value={formatPhone(phone)}
-                  onChangeText={(v) => setPhone(v.replace(/[^0-9]/g, '').slice(0, 11))}
-                  placeholder="010-0000-0000"
-                  placeholderTextColor={semantic.labelAlt}
-                  keyboardType="number-pad"
+                <View style={styles.fieldHeader}>
+                  <Text style={[styles.inputLabel, { color: semantic.labelNormal, fontFamily: weightToFontFamily('700') }]}>
+                    휴대폰 번호
+                  </Text>
+                  <Text style={[styles.fieldHint, { color: semantic.labelAlt, fontFamily: weightToFontFamily('500') }]}>
+                    {"' - ' 없이 입력"}
+                  </Text>
+                </View>
+                <View
                   style={[
-                    styles.input,
-                    {
-                      color: semantic.labelStrong,
-                      borderColor: semantic.lineSubtle,
-                      backgroundColor: semantic.bgBase,
-                    },
+                    styles.inputRow,
+                    { borderColor: semantic.lineSubtle, backgroundColor: semantic.bgBase },
                   ]}
-                />
+                >
+                  <Smartphone size={18} color={semantic.labelAlt} strokeWidth={2} />
+                  <TextInput
+                    testID="phone-input"
+                    value={phone}
+                    onChangeText={(v) => setPhone(v.replace(/[^0-9]/g, '').slice(0, 11))}
+                    placeholder="01012345678"
+                    placeholderTextColor={semantic.labelAlt}
+                    keyboardType="number-pad"
+                    style={[styles.inputInside, { color: semantic.labelStrong }]}
+                  />
+                  <TouchableOpacity
+                    testID="phone-inline-request"
+                    onPress={handleRequestOtp}
+                    disabled={!isInputComplete || requesting}
+                    accessibilityRole="button"
+                    accessibilityLabel="인증 요청 (인라인)"
+                    style={[
+                      styles.inlineButton,
+                      {
+                        backgroundColor: isInputComplete && !requesting
+                          ? semantic.primaryNormal
+                          : semantic.lineSubtle,
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.inlineButtonLabel,
+                        {
+                          color: isInputComplete && !requesting ? semantic.labelOnColor : semantic.labelAlt,
+                          fontFamily: weightToFontFamily('700'),
+                        },
+                      ]}
+                    >
+                      인증 요청
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
 
               <View style={styles.field}>
-                <Text style={[styles.inputLabel, { color: semantic.labelNormal, fontFamily: weightToFontFamily('600') }]}>
-                  생년월일 (YYMMDD)
+                <Text style={[styles.inputLabel, { color: semantic.labelNormal, fontFamily: weightToFontFamily('700') }]}>
+                  생년월일
                 </Text>
-                <TextInput
-                  testID="birth-input"
-                  value={birth}
-                  onChangeText={(v) => setBirth(v.replace(/[^0-9]/g, '').slice(0, 6))}
-                  placeholder="900101"
-                  placeholderTextColor={semantic.labelAlt}
-                  keyboardType="number-pad"
-                  maxLength={6}
+                <View
                   style={[
-                    styles.input,
-                    {
-                      color: semantic.labelStrong,
-                      borderColor: semantic.lineSubtle,
-                      backgroundColor: semantic.bgBase,
-                    },
+                    styles.inputRow,
+                    { borderColor: semantic.lineSubtle, backgroundColor: semantic.bgBase },
                   ]}
-                />
+                >
+                  <Calendar size={18} color={semantic.labelAlt} strokeWidth={2} />
+                  <TextInput
+                    testID="birth-input"
+                    value={birth}
+                    onChangeText={(v) => setBirth(v.replace(/[^0-9]/g, '').slice(0, 6))}
+                    placeholder="950813"
+                    placeholderTextColor={semantic.labelAlt}
+                    keyboardType="number-pad"
+                    maxLength={6}
+                    style={[styles.inputInside, { color: semantic.labelStrong }]}
+                  />
+                </View>
+              </View>
+
+              <View
+                style={[
+                  styles.infoCard,
+                  { backgroundColor: semantic.bgSubtle, borderColor: semantic.lineSubtle },
+                ]}
+                testID="signup-step1-info-card"
+              >
+                <ShieldCheck size={16} color={semantic.labelAlt} strokeWidth={2} />
+                <Text
+                  style={[styles.infoText, { color: semantic.labelAlt, fontFamily: weightToFontFamily('500') }]}
+                >
+                  본인 인증은 NICE 평가정보를 통해 처리되며,{'\n'}입력하신 정보는 LiveMetro에 저장되지 않아요.
+                </Text>
               </View>
 
               <TouchableOpacity
                 testID="request-otp-button"
-                style={primaryStyle(isInputComplete && !requesting)}
+                style={[styles.primaryRow, primaryStyle(isInputComplete && !requesting)]}
                 disabled={!isInputComplete || requesting}
                 onPress={handleRequestOtp}
                 accessibilityRole="button"
@@ -380,11 +444,10 @@ export const SignupStep1Screen: React.FC = () => {
                 >
                   {requesting ? '요청 중…' : '인증 요청'}
                 </Text>
+                {!requesting && isInputComplete && (
+                  <ArrowRight size={18} color={semantic.labelOnColor} strokeWidth={2.4} />
+                )}
               </TouchableOpacity>
-
-              <Text style={[styles.notice, { color: semantic.labelAlt, fontFamily: weightToFontFamily('500') }]}>
-                본인 확인은 NICE 평가정보를 통해 안전하게 처리됩니다
-              </Text>
             </>
           ) : (
             <>
@@ -505,19 +568,86 @@ const styles = StyleSheet.create({
     paddingHorizontal: WANTED_TOKENS.spacing.s6,
     paddingBottom: WANTED_TOKENS.spacing.s8,
   },
-  title: {
-    fontSize: WANTED_TOKENS.type.title3.size,
-    lineHeight: WANTED_TOKENS.type.title3.lh,
+  stepCaption: {
+    marginTop: WANTED_TOKENS.spacing.s4,
+    fontSize: 11,
+    letterSpacing: 0.44,
+    textTransform: 'uppercase',
     fontWeight: '800',
     fontFamily: weightToFontFamily('800'),
-    marginTop: WANTED_TOKENS.spacing.s4,
+  },
+  title: {
+    fontSize: 26,
+    lineHeight: 32,
+    letterSpacing: -0.6,
+    fontWeight: '800',
+    fontFamily: weightToFontFamily('800'),
+    marginTop: WANTED_TOKENS.spacing.s2,
   },
   subtitle: {
     marginTop: WANTED_TOKENS.spacing.s2,
-    fontSize: WANTED_TOKENS.type.body2.size,
-    lineHeight: WANTED_TOKENS.type.body2.lh,
+    fontSize: 14,
+    lineHeight: 21,
     fontWeight: '500',
     fontFamily: weightToFontFamily('500'),
+  },
+  fieldHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: WANTED_TOKENS.spacing.s2,
+  },
+  fieldHint: {
+    fontSize: 11.5,
+    fontWeight: '500',
+    fontFamily: weightToFontFamily('500'),
+  },
+  inputRow: {
+    height: 52,
+    borderRadius: WANTED_TOKENS.radius.r6,
+    borderWidth: 1,
+    paddingHorizontal: WANTED_TOKENS.spacing.s4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: WANTED_TOKENS.spacing.s2,
+  },
+  inputInside: {
+    flex: 1,
+    fontSize: WANTED_TOKENS.type.body1.size,
+    paddingVertical: 0,
+  },
+  inlineButton: {
+    height: 32,
+    paddingHorizontal: WANTED_TOKENS.spacing.s3,
+    borderRadius: WANTED_TOKENS.radius.r4,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  inlineButtonLabel: {
+    fontSize: 12,
+    fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
+  },
+  infoCard: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: WANTED_TOKENS.spacing.s2,
+    marginTop: WANTED_TOKENS.spacing.s5,
+    paddingVertical: WANTED_TOKENS.spacing.s3,
+    paddingHorizontal: WANTED_TOKENS.spacing.s4,
+    borderRadius: WANTED_TOKENS.radius.r6,
+    borderWidth: 1,
+  },
+  infoText: {
+    flex: 1,
+    fontSize: 11.5,
+    lineHeight: 17,
+    fontWeight: '500',
+    fontFamily: weightToFontFamily('500'),
+  },
+  primaryRow: {
+    flexDirection: 'row',
+    gap: WANTED_TOKENS.spacing.s2,
   },
   sectionLabel: {
     marginTop: WANTED_TOKENS.spacing.s6,
@@ -530,16 +660,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginHorizontal: -WANTED_TOKENS.spacing.s1,
+    marginVertical: -WANTED_TOKENS.spacing.s1,
   },
-  carrierCard: {
+  carrierColumn: {
     width: '33.33%',
-    paddingHorizontal: WANTED_TOKENS.spacing.s1,
+    padding: WANTED_TOKENS.spacing.s1,
+  },
+  carrierBox: {
+    height: 56,
+    borderRadius: WANTED_TOKENS.radius.r6,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   carrierLabel: {
-    height: 56,
-    textAlign: 'center',
-    textAlignVertical: 'center',
-    lineHeight: 56,
     fontSize: WANTED_TOKENS.type.label1.size,
     fontWeight: '600',
     fontFamily: weightToFontFamily('600'),
@@ -553,25 +686,10 @@ const styles = StyleSheet.create({
     fontFamily: weightToFontFamily('600'),
     marginBottom: WANTED_TOKENS.spacing.s2,
   },
-  input: {
-    height: 52,
-    borderRadius: WANTED_TOKENS.radius.r6,
-    borderWidth: 1,
-    paddingHorizontal: WANTED_TOKENS.spacing.s4,
-    fontSize: WANTED_TOKENS.type.body1.size,
-  },
   primaryLabel: {
     fontSize: 16,
     fontWeight: '800',
     fontFamily: weightToFontFamily('800'),
-  },
-  notice: {
-    marginTop: WANTED_TOKENS.spacing.s4,
-    textAlign: 'center',
-    fontSize: WANTED_TOKENS.type.caption1.size,
-    lineHeight: WANTED_TOKENS.type.caption1.lh,
-    fontWeight: '500',
-    fontFamily: weightToFontFamily('500'),
   },
   otpRow: {
     flexDirection: 'row',

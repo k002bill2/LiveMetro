@@ -39,3 +39,7 @@ export type { JourneyStripLeg } from './JourneyStrip';
 
 /* Phase 44 — HomeScreen "오늘의 출근 경로" timeline card (May 2026 bundle refresh) */
 export { CommuteRouteCard } from './CommuteRouteCard';
+
+/* Phase 56 — HomeScreen 주변 역 horizontal-scroll card (Wanted bundle 65629bcd) */
+export { NearbyStationCard } from './NearbyStationCard';
+export type { NearbyStationCardProps } from './NearbyStationCard';

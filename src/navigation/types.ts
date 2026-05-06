@@ -4,6 +4,11 @@ import {
   CommuteNotifications,
 } from '@/models/commute';
 
+// LEGACY: AppNavigator (4-tab) is dead code as of Phase 56. The active
+// navigator is RootNavigator with `MainTabParamList` (5 tabs). Kept here
+// only because src/navigation/AppNavigator.tsx still imports it for type
+// inference. Do not add new tabs to this list — update RootNavigator's
+// MainTabParamList instead.
 export type AppTabParamList = {
   Home: undefined;
   Favorites: undefined;
@@ -95,6 +100,10 @@ export type AppStackParamList = {
     fromStationName: string;
     toStationName: string;
   };
+  // Phase 56: top-level routes still navigable via QuickActionsGrid
+  // (노선도) and HomeTopBar (Bell) after their tabs were removed.
+  SubwayMap: undefined;
+  Alerts: undefined;
 
   // ML Prediction screens
   WeeklyPrediction: undefined;
@@ -105,6 +114,7 @@ export type AppStackParamList = {
   EmailLogin: undefined;
   SignupStep1: undefined;
   SignUp: undefined;
+  SignupStep2: undefined;
   SignupStep3: undefined;
   // Post-auth/!hasCompletedOnboarding stack — shown when a phone-only user
   // (created by Step1 OTP verification) needs to attach email + password.

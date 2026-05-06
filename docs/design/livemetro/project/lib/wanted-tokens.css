@@ -1,0 +1,199 @@
+/* =====================================================================
+   Wanted Design System — Tokens
+   Color, typography, spacing, radius, shadow, motion
+   ===================================================================== */
+
+/* -- Pretendard (closest available substitute for Pretendard JP) ------- */
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css');
+@import url('https://cdn.jsdelivr.net/gh/wanteddev/wanted-sans@v1.0.3/packages/wanted-sans/fonts/webfonts/variable/complete/WantedSansVariable.css');
+
+:root {
+  /* ===== Atomic palette ============================================== */
+  /* Neutral (true gray) */
+  --neutral-50:  #FAFAFA;
+  --neutral-100: #F7F7F8;
+  --neutral-200: #F4F4F5;
+  --neutral-300: #DBDCDF;
+  --neutral-400: #C2C4C8;
+  --neutral-500: #AEB0B6;
+  --neutral-600: #989BA2;
+  --neutral-700: #70737C;
+  --neutral-800: #46474C;
+  --neutral-900: #1B1C1E;
+
+  /* Cool Neutral (slightly blue-tinted) */
+  --cool-100: #F7F8FA;
+  --cool-200: #F1F5F8;
+  --cool-300: #DCE0E5;
+  --cool-700: #6B7785;
+  --cool-900: #14191E;
+
+  /* Brand blue */
+  --blue-50:  #EAF2FE;
+  --blue-100: #D4E3FE;
+  --blue-300: #6FA8FF;
+  --blue-400: #3385FF;
+  --blue-500: #0066FF;     /* primary */
+  --blue-600: #005EEB;     /* hover */
+  --blue-700: #0044BB;     /* pressed */
+  --blue-900: #002D7A;
+
+  /* Status */
+  --red-100:    #FEE9E9;
+  --red-500:    #FF4242;
+  --red-700:    #C42727;
+  --green-500:  #00BF40;
+  --green-700:  #008F30;
+  --yellow-500: #FFB400;
+  --yellow-700: #C28800;
+  --violet-500: #9747FF;
+  --violet-700: #6541F2;
+  --cyan-500:   #0098B2;
+
+  /* ===== Semantic — Light ============================================ */
+  --bg-base:        #FFFFFF;
+  --bg-subtle:      rgba(112,115,124,0.08);
+  --bg-elevated:    #FFFFFF;
+  --bg-translucent: rgba(255,255,255,0.6);
+
+  --label-strong:   #000000;
+  --label-normal:   #171719;
+  --label-neutral:  #37383C;          /* "88% black" */
+  --label-alt:      #70737C;
+  --label-disabled: rgba(112,115,124,0.40);
+  --label-on-color: #FFFFFF;
+
+  --line-normal:   rgba(112,115,124,0.22);
+  --line-subtle:   rgba(112,115,124,0.16);
+  --line-strong:   #000000;
+
+  --primary-normal: #0066FF;
+  --primary-hover:  #005EEB;
+  --primary-press:  #0044BB;
+  --primary-bg:     #EAF2FE;
+  --bg-subtle-page: #F7F8FA;
+
+  --status-positive: #00BF40;
+  --status-negative: #FF4242;
+  --status-cautionary: #FFB400;
+  --status-info: #0098B2;
+
+  /* ===== Type scale ================================================== */
+  --font-sans: 'Pretendard JP', 'Pretendard', -apple-system, BlinkMacSystemFont,
+               system-ui, 'Segoe UI', Roboto, 'Apple SD Gothic Neo', 'Noto Sans KR',
+               sans-serif;
+  --font-display: 'Wanted Sans Variable', 'Wanted Sans', var(--font-sans);
+  --font-mono: 'SF Mono', ui-monospace, Menlo, Monaco, monospace;
+
+  /* Display */
+  --t-display2-size: 40px;   --t-display2-lh: 52px;   --t-display2-tracking: -0.0282em; --t-display2-weight: 700;
+  --t-display3-size: 36px;   --t-display3-lh: 48px;   --t-display3-tracking: -0.027em;  --t-display3-weight: 700;
+  /* Title */
+  --t-title1-size: 32px;     --t-title1-lh: 44px;     --t-title1-tracking: -0.0253em;   --t-title1-weight: 700;
+  --t-title2-size: 28px;     --t-title2-lh: 38px;     --t-title2-tracking: -0.0236em;   --t-title2-weight: 700;
+  --t-title3-size: 24px;     --t-title3-lh: 32px;     --t-title3-tracking: -0.023em;    --t-title3-weight: 700;
+  /* Heading */
+  --t-heading1-size: 22px;   --t-heading1-lh: 30px;   --t-heading1-tracking: -0.0194em; --t-heading1-weight: 700;
+  --t-heading2-size: 20px;   --t-heading2-lh: 28px;   --t-heading2-tracking: -0.012em;  --t-heading2-weight: 700;
+  /* Headline */
+  --t-headline1-size: 18px;  --t-headline1-lh: 26px;  --t-headline1-tracking: -0.002em; --t-headline1-weight: 600;
+  --t-headline2-size: 17px;  --t-headline2-lh: 24px;  --t-headline2-tracking: 0em;      --t-headline2-weight: 600;
+  /* Body */
+  --t-body1-size: 16px;      --t-body1-lh: 24px;      --t-body1-tracking: 0.0057em;     --t-body1-weight: 500;
+  --t-body1-reading-lh: 26px;
+  --t-body2-size: 15px;      --t-body2-lh: 22px;      --t-body2-tracking: 0.0096em;     --t-body2-weight: 500;
+  --t-body2-reading-lh: 24px;
+  /* Label */
+  --t-label1-size: 14px;     --t-label1-lh: 20px;     --t-label1-tracking: 0.0145em;    --t-label1-weight: 600;
+  --t-label1-reading-lh: 22px;
+  --t-label2-size: 13px;     --t-label2-lh: 18px;     --t-label2-tracking: 0.0194em;    --t-label2-weight: 600;
+  /* Caption */
+  --t-caption1-size: 12px;   --t-caption1-lh: 16px;   --t-caption1-tracking: 0.0252em;  --t-caption1-weight: 600;
+  --t-caption2-size: 11px;   --t-caption2-lh: 14px;   --t-caption2-tracking: 0.0311em;  --t-caption2-weight: 600;
+
+  /* ===== Spacing (8px base) ========================================== */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+  --space-24: 96px;
+  --space-32: 128px;
+
+  /* ===== Radius ====================================================== */
+  --radius-2: 4px;
+  --radius-4: 8px;       /* chip, small button */
+  --radius-5: 10px;      /* button medium */
+  --radius-6: 12px;      /* input, button large */
+  --radius-8: 16px;      /* card */
+  --radius-10: 20px;     /* card emphasis */
+  --radius-12: 24px;     /* sheet */
+  --radius-16: 32px;     /* panel */
+  --radius-30: 60px;     /* hero container */
+  --radius-pill: 9999px;
+
+  /* ===== Shadow ====================================================== */
+  --shadow-flat:    0 1px 2px rgba(23,23,23,0.06);
+  --shadow-card:    0 4px 8px rgba(23,23,23,0.07), 0 1px 2px rgba(23,23,23,0.06);
+  --shadow-popover: 0 8px 24px rgba(0,0,0,0.08), 0 1px 4px rgba(0,0,0,0.12);
+  --shadow-modal:   0 16px 48px rgba(0,0,0,0.12);
+
+  /* ===== Motion ====================================================== */
+  --ease-out: cubic-bezier(0.2, 0, 0.2, 1);
+  --ease-in:  cubic-bezier(0.4, 0, 0.6, 0.2);
+  --d-fast: 150ms;
+  --d-base: 250ms;
+  --d-slow: 400ms;
+}
+
+/* ===== Dark theme override ============================================ */
+[data-theme="dark"] {
+  --bg-base:    #1B1C1E;
+  --bg-subtle:  rgba(255,255,255,0.06);
+  --bg-subtle-page: #14191E;
+  --bg-elevated: #1B1C1E;
+  --label-strong:  #FFFFFF;
+  --label-normal:  #F4F4F5;
+  --label-neutral: rgba(255,255,255,0.88);
+  --label-alt:     #989BA2;
+  --label-disabled: rgba(255,255,255,0.32);
+  --line-normal: rgba(255,255,255,0.16);
+  --line-subtle: rgba(255,255,255,0.10);
+  --primary-bg: rgba(0,102,255,0.16);
+  --blue-50: rgba(0,102,255,0.14);
+}
+
+/* ===== Base reset ==================================================== */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  font-family: var(--font-sans);
+  color: var(--label-normal);
+  background: var(--bg-base);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* ===== Semantic typography classes =================================== */
+.t-display2 { font-size: var(--t-display2-size); line-height: var(--t-display2-lh); letter-spacing: var(--t-display2-tracking); font-weight: var(--t-display2-weight); }
+.t-display3 { font-size: var(--t-display3-size); line-height: var(--t-display3-lh); letter-spacing: var(--t-display3-tracking); font-weight: var(--t-display3-weight); }
+.t-title1   { font-size: var(--t-title1-size);   line-height: var(--t-title1-lh);   letter-spacing: var(--t-title1-tracking);   font-weight: var(--t-title1-weight); }
+.t-title2   { font-size: var(--t-title2-size);   line-height: var(--t-title2-lh);   letter-spacing: var(--t-title2-tracking);   font-weight: var(--t-title2-weight); }
+.t-title3   { font-size: var(--t-title3-size);   line-height: var(--t-title3-lh);   letter-spacing: var(--t-title3-tracking);   font-weight: var(--t-title3-weight); }
+.t-heading1 { font-size: var(--t-heading1-size); line-height: var(--t-heading1-lh); letter-spacing: var(--t-heading1-tracking); font-weight: var(--t-heading1-weight); }
+.t-heading2 { font-size: var(--t-heading2-size); line-height: var(--t-heading2-lh); letter-spacing: var(--t-heading2-tracking); font-weight: var(--t-heading2-weight); }
+.t-headline1 { font-size: var(--t-headline1-size); line-height: var(--t-headline1-lh); letter-spacing: var(--t-headline1-tracking); font-weight: var(--t-headline1-weight); }
+.t-headline2 { font-size: var(--t-headline2-size); line-height: var(--t-headline2-lh); letter-spacing: var(--t-headline2-tracking); font-weight: var(--t-headline2-weight); }
+.t-body1     { font-size: var(--t-body1-size);     line-height: var(--t-body1-lh);     letter-spacing: var(--t-body1-tracking);     font-weight: 500; }
+.t-body1-r   { font-size: var(--t-body1-size);     line-height: var(--t-body1-reading-lh); letter-spacing: var(--t-body1-tracking); font-weight: 500; }
+.t-body2     { font-size: var(--t-body2-size);     line-height: var(--t-body2-lh);     letter-spacing: var(--t-body2-tracking);     font-weight: 500; }
+.t-label1    { font-size: var(--t-label1-size);    line-height: var(--t-label1-lh);    letter-spacing: var(--t-label1-tracking);    font-weight: 600; }
+.t-label2    { font-size: var(--t-label2-size);    line-height: var(--t-label2-lh);    letter-spacing: var(--t-label2-tracking);    font-weight: 600; }
+.t-caption1  { font-size: var(--t-caption1-size);  line-height: var(--t-caption1-lh);  letter-spacing: var(--t-caption1-tracking);  font-weight: 600; }
+.t-caption2  { font-size: var(--t-caption2-size);  line-height: var(--t-caption2-lh);  letter-spacing: var(--t-caption2-tracking);  font-weight: 600; }

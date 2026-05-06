@@ -33,6 +33,16 @@ interface FavoriteRowProps {
   congestion?: CongestionLevel;
   /** Minutes until next train. Required — the card's primary signal. */
   nextMinutes: number;
+  /**
+   * When true, append the green "곧 도착" badge under `nextMinutes`.
+   * Caller decides the threshold — typical: remaining time ≤ 90s.
+   *
+   * Sub-minute countdowns (e.g. "44초") are intentionally NOT supported:
+   * Seoul Open API polls at ≥30s intervals, so per-second labels are false
+   * precision. If a future screen needs them, build a separate component
+   * with its own data freshness policy rather than re-adding the prop here.
+   */
+  imminent?: boolean;
   /** When true, render the drag handle (grip icon). */
   showDragHandle?: boolean;
   /** Pressable affordance — typically navigates to StationDetail. */
@@ -50,6 +60,7 @@ const FavoriteRowImpl: React.FC<FavoriteRowProps> = ({
   destinationLabel,
   congestion,
   nextMinutes,
+  imminent = false,
   showDragHandle = false,
   onPress,
   onLongPress,
@@ -128,6 +139,14 @@ const FavoriteRowImpl: React.FC<FavoriteRowProps> = ({
           {nextMinutes}
           <Text style={styles.minutesUnit}>분</Text>
         </Text>
+        {imminent && (
+          <View style={styles.imminentWrap}>
+            <View style={[styles.imminentDot, { backgroundColor: '#00A84D' }]} />
+            <Text style={[styles.imminentText, { color: '#008F30' }]}>
+              곧 도착
+            </Text>
+          </View>
+        )}
       </View>
     </Pressable>
   );
@@ -192,6 +211,21 @@ const styles = StyleSheet.create({
   },
   minutesUnit: {
     fontSize: 12,
+    fontFamily: weightToFontFamily('700'),
+  },
+  imminentWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    columnGap: 3,
+    marginTop: 2,
+  },
+  imminentDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 999,
+  },
+  imminentText: {
+    fontSize: 10,
     fontFamily: weightToFontFamily('700'),
   },
 });
