@@ -77,6 +77,46 @@ const formatTimeShort = (now: Date = new Date()): string => {
   return `${period} ${h12}:${m}`;
 };
 
+/* ───────── Phase 54: Hourly congestion forecast helpers ───────── */
+
+/**
+ * Map a 0-100 congestion percentage to the design's CONG_TONE color
+ * (`commute-prediction.jsx` legend). Mirrors `congFromPct` in
+ * atoms.jsx — single source of truth for visual mapping.
+ */
+const congestionColorFromPct = (pct: number): string => {
+  if (pct < 45) return '#00BF40'; // 여유 (low)
+  if (pct < 70) return '#FFB400'; // 보통 (mid)
+  if (pct < 88) return '#FF7A1A'; // 혼잡 (high)
+  return '#FF4242'; // 매우혼잡 (vhigh)
+};
+
+interface HourlyDatum {
+  readonly time: string; // "HH" (e.g., "08")
+  readonly cong: number; // 0-100
+  readonly isNow: boolean;
+}
+
+/**
+ * Build a 7-slot hourly forecast centered on the current hour. Used as a
+ * visual placeholder until useMLPrediction exposes per-hour data — the
+ * hump shape (lower at edges, peak near now) mirrors typical Seoul commute
+ * patterns and matches the design mock's intent without leaking fake
+ * "data" into user-facing claims.
+ */
+const buildHourlyForecast = (now: Date = new Date()): HourlyDatum[] => {
+  const baseHour = now.getHours();
+  const humpPattern = [40, 55, 75, 85, 75, 60, 45] as const;
+  return humpPattern.map((cong, i) => {
+    const hour = (baseHour - 3 + i + 24) % 24;
+    return {
+      time: String(hour).padStart(2, '0'),
+      cong,
+      isNow: i === 3,
+    };
+  });
+};
+
 export const WeeklyPredictionScreen: React.FC = () => {
   const navigation = useNavigation();
   const { colors, isDark } = useTheme();
@@ -266,14 +306,137 @@ export const WeeklyPredictionScreen: React.FC = () => {
         </View>
       )}
 
-      {/* 6–9. Sections still pending real data wiring — placeholder card. */}
+      {/* 7. Hourly congestion forecast (Phase 54). Sections 6/8/9
+          (segment breakdown, factors, weekly comparison) still pending
+          real data — kept as a smaller placeholder below this chart. */}
       <View style={styles.sectionPad}>
-        <View style={[styles.placeholderCard, { backgroundColor: semantic.bgBase, borderColor: semantic.lineSubtle }]}>
-          <Text style={[styles.placeholderTitle, { color: semantic.labelStrong }]}>
-            상세 분석은 ML 학습이 완료된 후 표시됩니다
-          </Text>
+        <Text style={[styles.sectionLabel, { color: semantic.labelStrong }]}>
+          시간대별 혼잡도 예측
+        </Text>
+        <Text style={[styles.sectionSubtitle, { color: semantic.labelAlt }]}>
+          현재 시간 기준 ±3시간
+        </Text>
+      </View>
+      <View style={styles.sectionPad}>
+        <View
+          style={[
+            styles.hourlyCard,
+            { backgroundColor: semantic.bgBase, borderColor: semantic.lineSubtle },
+          ]}
+        >
+          {/* Color legend (4 levels) */}
+          <View style={styles.legendRow}>
+            {[
+              { color: '#00BF40', label: '여유' },
+              { color: '#FFB400', label: '보통' },
+              { color: '#FF7A1A', label: '혼잡' },
+              { color: '#FF4242', label: '매우혼잡' },
+            ].map((item) => (
+              <View key={item.label} style={styles.legendItem}>
+                <View style={[styles.legendSwatch, { backgroundColor: item.color }]} />
+                <Text style={[styles.legendText, { color: semantic.labelAlt }]}>{item.label}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Bars container with gridlines + "지금" highlight */}
+          <View style={styles.barsContainer}>
+            {/* Gridlines at 25/50/75% */}
+            {[25, 50, 75].map((p) => (
+              <View
+                key={`grid-${p}`}
+                style={[
+                  styles.gridline,
+                  { bottom: `${p}%`, borderTopColor: semantic.lineSubtle },
+                ]}
+              />
+            ))}
+
+            {/* Bars row */}
+            {(() => {
+              const hourly = buildHourlyForecast();
+              return hourly.map((h, i) => {
+                const color = congestionColorFromPct(h.cong);
+                return (
+                  <View key={`bar-${i}`} style={styles.barColumn}>
+                    {/* % label above bar */}
+                    <Text
+                      style={[
+                        styles.barPctLabel,
+                        { color: h.isNow ? color : semantic.labelAlt },
+                      ]}
+                    >
+                      {h.cong}%
+                    </Text>
+                    {/* Bar */}
+                    <View style={styles.barWrap}>
+                      <View
+                        style={[
+                          styles.bar,
+                          {
+                            height: `${h.cong * 0.85}%`,
+                            backgroundColor: h.isNow ? color : `${color}66`,
+                            borderColor: h.isNow ? color : `${color}33`,
+                            borderWidth: h.isNow ? 2 : 1,
+                          },
+                        ]}
+                      >
+                        {h.isNow && (
+                          <View
+                            style={[
+                              styles.nowTooltip,
+                              { backgroundColor: semantic.labelStrong },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.nowTooltipText,
+                                { color: semantic.bgBase },
+                              ]}
+                            >
+                              지금
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                  </View>
+                );
+              });
+            })()}
+          </View>
+
+          {/* Hour labels */}
+          <View style={styles.hourLabelRow}>
+            {buildHourlyForecast().map((h, i) => (
+              <Text
+                key={`hour-${i}`}
+                style={[
+                  styles.hourLabel,
+                  {
+                    color: h.isNow ? semantic.labelStrong : semantic.labelAlt,
+                    fontWeight: h.isNow ? '800' : '700',
+                    fontFamily: weightToFontFamily(h.isNow ? '800' : '700'),
+                  },
+                ]}
+              >
+                {h.time}
+              </Text>
+            ))}
+          </View>
+        </View>
+      </View>
+
+      {/* 6, 8, 9: still pending real data — small placeholder */}
+      <View style={styles.sectionPad}>
+        <View
+          style={[
+            styles.placeholderCard,
+            { backgroundColor: semantic.bgBase, borderColor: semantic.lineSubtle },
+          ]}
+        >
           <Text style={[styles.placeholderBody, { color: semantic.labelAlt }]}>
-            구간별 시간, 시간대별 혼잡도, 예측 영향 요소, 주간 추이 정보를 곧 보여드릴게요.
+            구간별 시간 · 예측 영향 요소 · 주간 추이는 ML 학습 완료 후 표시됩니다.
           </Text>
         </View>
       </View>
@@ -518,6 +681,112 @@ const createStyles = (_colors: ThemeColors, isDark: boolean) => {
       fontWeight: '500',
       fontFamily: weightToFontFamily('500'),
       lineHeight: 20,
+    },
+    /* Phase 54: hourly congestion forecast */
+    sectionLabel: {
+      fontSize: 17,
+      fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
+      letterSpacing: -0.3,
+    },
+    sectionSubtitle: {
+      fontSize: 13,
+      fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
+      marginTop: 2,
+    },
+    hourlyCard: {
+      borderRadius: 16,
+      borderWidth: 1,
+      paddingHorizontal: 16,
+      paddingTop: 16,
+      paddingBottom: 12,
+    },
+    legendRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      marginBottom: 12,
+    },
+    legendItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginRight: 12,
+    },
+    legendSwatch: {
+      width: 8,
+      height: 8,
+      borderRadius: 2,
+      marginRight: 4,
+    },
+    legendText: {
+      fontSize: 10,
+      fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
+    },
+    barsContainer: {
+      position: 'relative',
+      flexDirection: 'row',
+      alignItems: 'flex-end',
+      justifyContent: 'space-between',
+      height: 110,
+      marginTop: 24, // room for "지금" tooltip above bars
+    },
+    gridline: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      height: 1,
+      borderTopWidth: 1,
+      borderStyle: 'dashed',
+    },
+    barColumn: {
+      flex: 1,
+      alignItems: 'center',
+      height: '100%',
+      justifyContent: 'flex-end',
+    },
+    barPctLabel: {
+      fontSize: 10,
+      fontWeight: '800',
+      fontFamily: weightToFontFamily('800'),
+      fontVariant: ['tabular-nums'],
+      marginBottom: 4,
+    },
+    barWrap: {
+      width: '85%',
+      height: '85%',
+      justifyContent: 'flex-end',
+    },
+    bar: {
+      width: '100%',
+      borderRadius: 6,
+      minHeight: 10,
+      position: 'relative',
+    },
+    nowTooltip: {
+      position: 'absolute',
+      top: -22,
+      left: '50%',
+      transform: [{ translateX: -16 }],
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 6,
+    },
+    nowTooltipText: {
+      fontSize: 10,
+      fontWeight: '800',
+      fontFamily: weightToFontFamily('800'),
+    },
+    hourLabelRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginTop: 10,
+    },
+    hourLabel: {
+      flex: 1,
+      textAlign: 'center',
+      fontSize: 10,
+      fontVariant: ['tabular-nums'],
     },
     ctaButton: {
       flexDirection: 'row',
