@@ -1,0 +1,47 @@
+/* LiveMetro — Seoul Metro line colors + product tokens
+   Layered on top of Wanted design system tokens. */
+
+:root {
+  /* Seoul Metro official line colors */
+  --line-1:  #0052A4;
+  --line-2:  #00A84D;
+  --line-3:  #EF7C1C;
+  --line-4:  #00A5DE;
+  --line-5:  #996CAC;
+  --line-6:  #CD7C2F;
+  --line-7:  #747F00;
+  --line-8:  #E6186C;
+  --line-9:  #BDB092;
+  --line-bd: #FABE00;  /* 분당 */
+  --line-sb: #D4003B;  /* 신분당 */
+  --line-gj: #77C4A3;  /* 경의중앙 */
+  --line-gx: #C28E78;  /* 공항 */
+
+  /* Congestion semantic */
+  --cong-low:    #00BF40;
+  --cong-mid:    #FFB400;
+  --cong-high:   #FF7A1A;
+  --cong-vhigh:  #FF4242;
+
+  /* Live data accents */
+  --live-pulse: #00BF40;
+
+  /* Direction tints */
+  --dir-up:   #FF4242;  /* 상행 */
+  --dir-down: #0066FF;  /* 하행 */
+}
+
+/* Mute lines when "라인 컬러 강조" off */
+[data-line-emphasis="off"] {
+  --line-1:  #4A5568;
+  --line-2:  #4A5568;
+  --line-3:  #4A5568;
+  --line-4:  #4A5568;
+  --line-5:  #4A5568;
+  --line-6:  #4A5568;
+  --line-7:  #4A5568;
+  --line-8:  #4A5568;
+  --line-9:  #4A5568;
+  --line-bd: #4A5568;
+  --line-sb: #4A5568;
+}

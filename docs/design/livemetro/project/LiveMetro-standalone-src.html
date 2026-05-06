@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LiveMetro — 화면 디자인</title>
+<template id="__bundler_thumbnail" data-bg-color="#0066FF">
+  <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+    <rect width="1200" height="800" fill="#0066FF"/>
+    <g transform="translate(600 400)">
+      <circle r="180" fill="none" stroke="#fff" stroke-width="14" opacity="0.35"/>
+      <circle r="120" fill="none" stroke="#fff" stroke-width="14" opacity="0.55"/>
+      <circle r="60" fill="#fff"/>
+      <text x="0" y="280" text-anchor="middle" fill="#fff" font-family="system-ui, sans-serif" font-size="56" font-weight="800" letter-spacing="-1">LiveMetro</text>
+    </g>
+  </svg>
+</template>
+<link rel="stylesheet" href="lib/wanted-tokens.css" />
+<link rel="stylesheet" href="lib/metro-tokens.css" />
+<style>
+  body { background: var(--bg-subtle-page); font-family: 'Pretendard', system-ui, sans-serif; }
+  [data-theme="dark"] body { background: #0F1115; }
+  .frame-label {
+    font-size: 11px; font-weight: 700; color: #70737C;
+    letter-spacing: 0.04em; text-transform: uppercase;
+  }
+</style>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- Data -->
+<script src="src/data.js"></script>
+
+<!-- Starter components & atoms -->
+<script type="text/babel" src="lib/design-canvas.jsx"></script>
+<script type="text/babel" src="lib/ios-frame.jsx"></script>
+<script type="text/babel" src="lib/android-frame.jsx"></script>
+<script type="text/babel" src="lib/tweaks-panel.jsx"></script>
+<script type="text/babel" src="src/atoms.jsx"></script>
+
+<!-- Screens -->
+<script type="text/babel" src="src/screens/auth.jsx"></script>
+<script type="text/babel" src="src/screens/auth-signup-steps.jsx"></script>
+<script type="text/babel" src="src/screens/commute-prediction.jsx"></script>
+<script type="text/babel" src="src/screens/main.jsx"></script>
+<script type="text/babel" src="src/screens/rest.jsx"></script>
+<script type="text/babel" src="src/screens/settings-detail.jsx"></script>
+<script type="text/babel" src="src/screens/onboarding-steps.jsx"></script>
+<script type="text/babel" src="src/screens/onboarding-station-picker.jsx"></script>
+
+<!-- App -->
+<script type="text/babel" data-presets="env,react">
+const { useState, useEffect } = React;
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "dark": false,
+  "lineEmphasis": true,
+  "density": "loose",
+  "congStyle": "bar"
+}/*EDITMODE-END*/;
+
+function App() {
+  const [tweaks, setTweakRaw] = useTweaks(TWEAK_DEFAULTS);
+  const setTweak = (k, v) => setTweakRaw(k, v);
+
+  // Apply globally to root
+  useEffect(() => {
+    document.documentElement.dataset.theme = tweaks.dark ? 'dark' : 'light';
+    document.documentElement.dataset.lineEmphasis = tweaks.lineEmphasis ? 'on' : 'off';
+  }, [tweaks.dark, tweaks.lineEmphasis]);
+
+  // Wrap any screen in iOS frame
+  const iOS = (Comp, extraProps = {}) => (
+    <IOSDevice width={390} height={844} dark={tweaks.dark}>
+      <Comp density={tweaks.density} congStyle={tweaks.congStyle} {...extraProps} />
+    </IOSDevice>
+  );
+  const And = (Comp) => (
+    <AndroidDevice width={390} height={844} dark={tweaks.dark}>
+      <Comp density={tweaks.density} congStyle={tweaks.congStyle} />
+    </AndroidDevice>
+  );
+
+  return (
+    <>
+      <DesignCanvas
+        title="LiveMetro"
+        subtitle="서울 지하철 실시간 도착 앱 · 11개 화면 · Wanted Design System"
+        theme="light"
+      >
+        <DCSection id="entry" title="진입 — 로그인 & 홈" subtitle="Face ID · 소셜 · 익명(둘러보기) + 실시간 홈 대시보드">
+          <DCArtboard id="login-ios" label="iOS · 로그인" width={420} height={920}>
+            {iOS(LoginScreen, { dark: tweaks.dark })}
+          </DCArtboard>
+          <DCArtboard id="login-and" label="Android · 로그인" width={420} height={920}>
+            {And(LoginScreen)}
+          </DCArtboard>
+          <DCArtboard id="login-flat" label="로그인 (프레임 없이)" width={390} height={900}>
+            <LoginScreen dark={tweaks.dark} />
+          </DCArtboard>
+          <DCArtboard id="signup-1-ios" label="iOS · 회원가입 1/3 (본인 인증)" width={420} height={920}>
+            {iOS(SignupStep1Screen, { dark: tweaks.dark })}
+          </DCArtboard>
+          <DCArtboard id="signup-1-flat" label="회원가입 1/3 (프레임 없이)" width={390} height={1000}>
+            <SignupStep1Screen dark={tweaks.dark} />
+          </DCArtboard>
+          <DCArtboard id="signup-ios" label="iOS · 회원가입 2/3 (계정)" width={420} height={920}>
+            {iOS(SignupScreen, { dark: tweaks.dark })}
+          </DCArtboard>
+          <DCArtboard id="signup-and" label="Android · 회원가입 2/3" width={420} height={920}>
+            {And(SignupScreen)}
+          </DCArtboard>
+          <DCArtboard id="signup-flat" label="회원가입 2/3 (프레임 없이)" width={390} height={1100}>
+            <SignupScreen dark={tweaks.dark} />
+          </DCArtboard>
+          <DCArtboard id="signup-3-ios" label="iOS · 회원가입 3/3 (완료)" width={420} height={920}>
+            {iOS(SignupStep3Screen, { dark: tweaks.dark })}
+          </DCArtboard>
+          <DCArtboard id="signup-3-flat" label="회원가입 3/3 (프레임 없이)" width={390} height={1050}>
+            <SignupStep3Screen dark={tweaks.dark} />
+          </DCArtboard>
+          <DCArtboard id="home-ios-entry" label="iOS · 홈 (로그인 후)" width={420} height={920}>
+            {iOS(HomeScreen)}
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="hero" title="히어로 — ML 출퇴근 예측" subtitle="가장 차별화된 기능. 오늘 몇 분 걸릴지 + 신뢰구간 + 영향 요소.">
+          <DCArtboard id="hero-ios" label="iOS · ML 예측 (메인)" width={390} height={1380}>
+            <CommutePredictionScreen density={tweaks.density} congStyle={tweaks.congStyle} />
+          </DCArtboard>
+          <DCArtboard id="hero-ios-frame" label="iOS 프레임 안" width={420} height={900}>
+            {iOS(CommutePredictionScreen)}
+          </DCArtboard>
+          <DCArtboard id="hero-and-frame" label="Android 프레임 안" width={420} height={920}>
+            {And(CommutePredictionScreen)}
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="core" title="핵심 화면" subtitle="홈 · 즐겨찾기 · 역 상세 · 경로 비교">
+          <DCArtboard id="home" label="홈 (실시간 대시보드)" width={420} height={900}>
+            {iOS(HomeScreen)}
+          </DCArtboard>
+          <DCArtboard id="fav" label="즐겨찾기" width={420} height={900}>
+            {iOS(FavoritesScreen)}
+          </DCArtboard>
+          <DCArtboard id="station" label="역 상세 (강남)" width={420} height={900}>
+            {iOS(StationDetailScreen)}
+          </DCArtboard>
+          <DCArtboard id="routes" label="경로 비교" width={420} height={900}>
+            {iOS(RoutesScreen)}
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="community" title="커뮤니티 · 통계 · 노선도" subtitle="지연 제보 피드 · 통계 대시보드 · 오프라인 노선도">
+          <DCArtboard id="feed" label="지연 제보 피드" width={420} height={900}>
+            {iOS(DelayFeedScreen)}
+          </DCArtboard>
+          <DCArtboard id="stats" label="통계 대시보드" width={420} height={900}>
+            {iOS(StatsScreen)}
+          </DCArtboard>
+          <DCArtboard id="map" label="노선도" width={420} height={900}>
+            {iOS(MapScreen)}
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="utility" title="알림 · 온보딩 · 설정">
+          <DCArtboard id="alerts" label="알림 목록" width={420} height={900}>
+            {iOS(AlertsScreen)}
+          </DCArtboard>
+          <DCArtboard id="onboard-1" label="온보딩 1/4 — 환영" width={420} height={920}>
+            {iOS(OnboardingStep1Screen)}
+          </DCArtboard>
+          <DCArtboard id="onboard" label="온보딩 2/4 — 출퇴근 경로" width={420} height={920}>
+            {iOS(OnboardingScreen)}
+          </DCArtboard>
+          <DCArtboard id="onboard-2-picker" label="온보딩 2/4 — 역 선택 (출발·환승·도착)" width={420} height={1100}>
+            {iOS(OnboardingStationPickerScreen)}
+          </DCArtboard>
+          <DCArtboard id="onboard-2-picker-flat" label="역 선택 (프레임 없이)" width={390} height={1300}>
+            <OnboardingStationPickerScreen />
+          </DCArtboard>
+          <DCArtboard id="onboard-3" label="온보딩 3/4 — 알림 권한" width={420} height={920}>
+            {iOS(OnboardingStep3Screen)}
+          </DCArtboard>
+          <DCArtboard id="onboard-4" label="온보딩 4/4 — 즐겨찾기" width={420} height={920}>
+            {iOS(OnboardingStep4Screen)}
+          </DCArtboard>
+          <DCArtboard id="onboard-1-flat" label="온보딩 1/4 (프레임 없이)" width={390} height={1000}>
+            <OnboardingStep1Screen />
+          </DCArtboard>
+          <DCArtboard id="onboard-3-flat" label="온보딩 3/4 (프레임 없이)" width={390} height={1000}>
+            <OnboardingStep3Screen />
+          </DCArtboard>
+          <DCArtboard id="onboard-4-flat" label="온보딩 4/4 (프레임 없이)" width={390} height={1100}>
+            <OnboardingStep4Screen />
+          </DCArtboard>
+          <DCArtboard id="settings" label="설정" width={420} height={900}>
+            {iOS(SettingsScreen)}
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="settings-detail" title="설정 상세" subtitle="설정 목록에서 진입하는 상세 화면 — 출퇴근 / 알림 / 시간대 / 소리">
+          <DCArtboard id="set-commute" label="출퇴근 설정 (상세)" width={420} height={1200}>
+            {iOS(SettingsCommuteScreen)}
+          </DCArtboard>
+          <DCArtboard id="set-commute-flat" label="출퇴근 설정 (프레임 없이)" width={390} height={1280}>
+            <SettingsCommuteScreen />
+          </DCArtboard>
+          <DCArtboard id="set-alerts" label="지연 알림 (상세)" width={420} height={1100}>
+            {iOS(SettingsAlertsScreen)}
+          </DCArtboard>
+          <DCArtboard id="set-alerts-flat" label="지연 알림 (프레임 없이)" width={390} height={1180}>
+            <SettingsAlertsScreen />
+          </DCArtboard>
+          <DCArtboard id="set-time" label="알림 시간대 (상세)" width={420} height={1100}>
+            {iOS(SettingsAlertTimeScreen)}
+          </DCArtboard>
+          <DCArtboard id="set-time-flat" label="알림 시간대 (프레임 없이)" width={390} height={1180}>
+            <SettingsAlertTimeScreen />
+          </DCArtboard>
+          <DCArtboard id="set-sound" label="소리 설정 (상세)" width={420} height={1180}>
+            {iOS(SettingsSoundScreen)}
+          </DCArtboard>
+          <DCArtboard id="set-sound-flat" label="소리 설정 (프레임 없이)" width={390} height={1240}>
+            <SettingsSoundScreen />
+          </DCArtboard>
+        </DCSection>
+
+        <DCSection id="android" title="Android 비교 — 핵심 화면" subtitle="Material 시스템 차임에서의 동일 디자인">
+          <DCArtboard id="and-home" label="Android · 홈" width={420} height={920}>
+            {And(HomeScreen)}
+          </DCArtboard>
+          <DCArtboard id="and-station" label="Android · 역 상세" width={420} height={920}>
+            {And(StationDetailScreen)}
+          </DCArtboard>
+          <DCArtboard id="and-routes" label="Android · 경로 비교" width={420} height={920}>
+            {And(RoutesScreen)}
+          </DCArtboard>
+        </DCSection>
+      </DesignCanvas>
+
+      <TweaksPanel title="Tweaks">
+        <TweakSection title="모드">
+          <TweakToggle label="다크 모드" value={tweaks.dark} onChange={v => setTweak('dark', v)} />
+          <TweakToggle label="노선 컬러 강조" hint="끄면 모든 노선이 회색으로" value={tweaks.lineEmphasis} onChange={v => setTweak('lineEmphasis', v)} />
+        </TweakSection>
+        <TweakSection title="정보 밀도">
+          <TweakRadio
+            label="레이아웃 밀도"
+            value={tweaks.density}
+            onChange={v => setTweak('density', v)}
+            options={[
+              { value: 'loose', label: '여유' },
+              { value: 'balanced', label: '균형' },
+              { value: 'dense', label: '조밀' },
+            ]}
+          />
+        </TweakSection>
+        <TweakSection title="혼잡도 시각화">
+          <TweakRadio
+            label="스타일"
+            value={tweaks.congStyle}
+            onChange={v => setTweak('congStyle', v)}
+            options={[
+              { value: 'bar', label: '막대' },
+              { value: 'dots', label: '점' },
+              { value: 'heat', label: '히트맵' },
+            ]}
+          />
+        </TweakSection>
+      </TweaksPanel>
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

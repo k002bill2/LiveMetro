@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LiveMetro — 인쇄용</title>
+<link rel="stylesheet" href="lib/wanted-tokens.css" />
+<link rel="stylesheet" href="lib/metro-tokens.css" />
+<style>
+  html, body {
+    background: #fff;
+    font-family: 'Pretendard', system-ui, sans-serif;
+    margin: 0; padding: 0;
+    color: var(--label-strong);
+  }
+  body { padding: 24px; }
+
+  .page {
+    width: 100%;
+    max-width: 1100px;
+    margin: 0 auto 32px;
+    page-break-after: always;
+    break-after: page;
+    background: #fff;
+  }
+  .page:last-child { page-break-after: auto; break-after: auto; }
+
+  .page-header {
+    display: flex; align-items: baseline; justify-content: space-between;
+    border-bottom: 2px solid #111;
+    padding-bottom: 8px; margin-bottom: 18px;
+  }
+  .page-title {
+    font-size: 18px; font-weight: 800; letter-spacing: -0.01em;
+    color: #111;
+  }
+  .page-meta {
+    font-size: 11px; font-weight: 700; color: #70737C; letter-spacing: 0.04em; text-transform: uppercase;
+  }
+  .page-sub {
+    font-size: 12px; color: #70737C; font-weight: 600; margin-top: -10px; margin-bottom: 18px;
+  }
+
+  .frames {
+    display: flex; gap: 28px; flex-wrap: wrap; align-items: flex-start;
+    justify-content: center;
+  }
+  .frame-block {
+    display: flex; flex-direction: column; align-items: center; gap: 10px;
+    break-inside: avoid;
+  }
+  .frame-label {
+    font-size: 11px; font-weight: 700; color: #70737C;
+    letter-spacing: 0.04em; text-transform: uppercase;
+  }
+
+  /* Cover page */
+  .cover {
+    height: 100vh;
+    display: flex; flex-direction: column; justify-content: center; align-items: flex-start;
+    padding: 60px 80px;
+    background: linear-gradient(135deg, #0066FF 0%, #0044BB 100%);
+    color: #fff;
+    page-break-after: always;
+    break-after: page;
+  }
+  .cover-eyebrow { font-size: 12px; font-weight: 800; letter-spacing: 0.16em; opacity: 0.7; }
+  .cover-title { font-size: 72px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.0; margin-top: 14px; }
+  .cover-tagline { font-size: 22px; font-weight: 600; opacity: 0.85; margin-top: 18px; max-width: 720px; line-height: 1.4; }
+  .cover-meta { margin-top: auto; padding-top: 60px; font-size: 13px; font-weight: 700; opacity: 0.7; letter-spacing: 0.04em; }
+
+  /* TOC */
+  .toc-list { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 40px; }
+  .toc-item {
+    display: flex; align-items: baseline; gap: 8px;
+    padding: 10px 0; border-bottom: 1px dotted rgba(0,0,0,0.15);
+    font-size: 14px; font-weight: 600; color: #1F2024;
+  }
+  .toc-num { font-size: 11px; color: #70737C; font-weight: 800; min-width: 26px; }
+  .toc-pad { flex: 1; }
+  .toc-page { font-size: 12px; color: #70737C; font-weight: 700; }
+
+  @page {
+    size: A4 landscape;
+    margin: 14mm;
+  }
+
+  @media print {
+    body { padding: 0; }
+    .page { margin: 0 0 0 0; max-width: 100%; }
+    * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  }
+</style>
+<script src="https://unpkg.com/lucide@latest"></script>
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- Data -->
+<script src="src/data.js"></script>
+
+<!-- Frames & atoms -->
+<script type="text/babel" src="lib/ios-frame.jsx"></script>
+<script type="text/babel" src="lib/android-frame.jsx"></script>
+<script type="text/babel" src="src/atoms.jsx"></script>
+
+<!-- Screens -->
+<script type="text/babel" src="src/screens/auth.jsx"></script>
+<script type="text/babel" src="src/screens/commute-prediction.jsx"></script>
+<script type="text/babel" src="src/screens/main.jsx"></script>
+<script type="text/babel" src="src/screens/rest.jsx"></script>
+
+<script type="text/babel" data-presets="env,react">
+const { useEffect } = React;
+
+function Frame({ Comp, props = {} }) {
+  return (
+    <IOSDevice width={360} height={780} dark={false}>
+      <Comp {...props} />
+    </IOSDevice>
+  );
+}
+
+function AndFrame({ Comp, props = {} }) {
+  return (
+    <AndroidDevice width={360} height={780} dark={false}>
+      <Comp {...props} />
+    </AndroidDevice>
+  );
+}
+
+const PAGES = [
+  { id: 'login',     title: '로그인',                 sub: 'Face ID · 소셜 · 익명(둘러보기)',
+    frames: [{ label: 'iOS', Comp: 'LoginScreen' }, { label: 'Android', Comp: 'LoginScreen', and: true }] },
+  { id: 'signup',    title: '회원가입',               sub: '이메일 · 닉네임 · 비밀번호 · 약관 동의',
+    frames: [{ label: 'iOS', Comp: 'SignupScreen' }, { label: 'Android', Comp: 'SignupScreen', and: true }] },
+  { id: 'home',      title: '홈 — 실시간 대시보드',    sub: 'ML 예측 + 즐겨찾는 역 도착 + 커뮤니티',
+    frames: [{ label: 'iOS', Comp: 'HomeScreen' }, { label: 'Android', Comp: 'HomeScreen', and: true }] },
+  { id: 'predict',   title: 'ML 출퇴근 예측',          sub: '도착 시각 + 신뢰구간 + 영향 요소',
+    frames: [{ label: 'iOS', Comp: 'CommutePredictionScreen' }] },
+  { id: 'fav',       title: '즐겨찾기',                sub: '드래그 정렬 · 필터 · 빠른 검색',
+    frames: [{ label: 'iOS', Comp: 'FavoritesScreen' }] },
+  { id: 'station',   title: '역 상세 — 강남',          sub: '실시간 도착 + 칸별 혼잡도 + 출구 안내',
+    frames: [{ label: 'iOS', Comp: 'StationDetailScreen' }] },
+  { id: 'routes',    title: '경로 비교',              sub: '여러 경로 비교 · 환승 · 도착 시각',
+    frames: [{ label: 'iOS', Comp: 'RoutesScreen' }, { label: 'Android', Comp: 'RoutesScreen', and: true }] },
+  { id: 'feed',      title: '실시간 지연 제보',         sub: '커뮤니티 피드 · 검증 · 필터',
+    frames: [{ label: 'iOS', Comp: 'DelayFeedScreen' }] },
+  { id: 'stats',     title: '통계 대시보드',           sub: '월간 통근 · 지연 시간 · 비용',
+    frames: [{ label: 'iOS', Comp: 'StatsScreen' }] },
+  { id: 'map',       title: '노선도',                  sub: '오프라인 노선도 · 환승역 표시',
+    frames: [{ label: 'iOS', Comp: 'MapScreen' }] },
+  { id: 'alerts',    title: '알림 목록',                sub: '도착 · 지연 · 시스템 알림',
+    frames: [{ label: 'iOS', Comp: 'AlertsScreen' }] },
+  { id: 'onboard',   title: '온보딩 — 출퇴근 설정',     sub: '집/회사 등록 · 시간대 · 노선 선택',
+    frames: [{ label: 'iOS', Comp: 'OnboardingScreen' }] },
+  { id: 'settings',  title: '설정',                     sub: '출퇴근 · 알림 · 지연 정보 · 앱 설정',
+    frames: [{ label: 'iOS', Comp: 'SettingsScreen' }] },
+];
+
+function Page({ idx, total, page }) {
+  return (
+    <div className="page">
+      <div className="page-header">
+        <div className="page-title">{String(idx + 1).padStart(2, '0')}. {page.title}</div>
+        <div className="page-meta">LiveMetro · {idx + 1} / {total}</div>
+      </div>
+      <div className="page-sub">{page.sub}</div>
+      <div className="frames">
+        {page.frames.map((f, i) => {
+          const Comp = window[f.Comp];
+          if (!Comp) return null;
+          return (
+            <div className="frame-block" key={i}>
+              {f.and ? <AndFrame Comp={Comp} /> : <Frame Comp={Comp} />}
+              <div className="frame-label">{f.label}</div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function PrintApp() {
+  useEffect(() => {
+    // Wait for fonts + Babel + lucide, then print
+    const triggerPrint = async () => {
+      try { if (document.fonts && document.fonts.ready) await document.fonts.ready; } catch (e) {}
+      // Re-render lucide icons in case some inserted late
+      try { window.lucide && window.lucide.createIcons(); } catch (e) {}
+      setTimeout(() => { try { window.print(); } catch (e) {} }, 800);
+    };
+    triggerPrint();
+  }, []);
+
+  return (
+    <>
+      {/* Cover */}
+      <div className="cover">
+        <div className="cover-eyebrow">LIVEMETRO · DESIGN DOCUMENT</div>
+        <div className="cover-title">LiveMetro</div>
+        <div className="cover-tagline">서울 지하철 실시간 도착 + ML 출퇴근 예측 앱.<br/>13개 화면 · iOS &amp; Android · Wanted Design System.</div>
+        <div className="cover-meta">2026.05 · 디자인 검토용</div>
+      </div>
+
+      {/* TOC */}
+      <div className="page">
+        <div className="page-header">
+          <div className="page-title">목차</div>
+          <div className="page-meta">CONTENTS</div>
+        </div>
+        <div className="toc-list">
+          {PAGES.map((p, i) => (
+            <div className="toc-item" key={p.id}>
+              <span className="toc-num">{String(i + 1).padStart(2, '0')}</span>
+              <span>{p.title}</span>
+              <span className="toc-pad" />
+              <span className="toc-page">p.{i + 3}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Pages */}
+      {PAGES.map((p, i) => (
+        <Page key={p.id} idx={i} total={PAGES.length} page={p} />
+      ))}
+    </>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<PrintApp />);
+</script>
+</body>
+</html>

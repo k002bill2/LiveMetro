@@ -140,6 +140,13 @@ apps/
 docs/design/wanted-bundle/33122b9e-*.js
 docs/design/wanted-bundle/93aa0060-*.js
 
+# docs/design/livemetro — Offline hand-off mirror of ~/Downloads/livemetro.
+# Track audit essentials (src/ + lib/ + uploads/ + LiveMetro*.html + README).
+# Ignore self-contained standalone exports (~25MB each — content duplicates project/src/)
+# and export/ subtree (also duplicates src/ + lib/).
+docs/design/livemetro/project/LiveMetro standalone.html
+docs/design/livemetro/project/export/
+
 # Transient working files (per-session dumps, never committed)
 #   .tmp/         — design-fetch artifacts (HTML/JSX scaffolds from claude.ai/design)
 #   dev/active/   — in-flight working notes (handoff/context/tasks markdown)

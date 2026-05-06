@@ -45,7 +45,7 @@ Only in .tmp/design-fetch-v5/livemetro/project/uploads: pasted-1777802788702-0.p
 
 가장 가능성 높은 시나리오: claude.ai/design의 핸드오프 export가 시간이 지나며 더 많은 자료를 포함하도록 개선 — 같은 디자인이라도 더 풍부한 번들 발급.
 
-이번 페치 자료는 `docs/design/wanted-bundle/uploads/`에 트래킹하여 미래 audit에서 ground truth로 활용.
+이번 페치 자료는 처음 `docs/design/wanted-bundle/uploads/`에 commit됐다가, 사용자가 직접 다운로드한 offline 핸드오프 미러(`docs/design/livemetro/project/uploads/`)로 단일화됐다 — 후속 commit에서 wanted-bundle/uploads/는 삭제, livemetro/project/uploads/만 single source of truth.
 
 ## 3. PNG ↔ 현재 구현 시각 매핑
 
@@ -101,19 +101,24 @@ docs/design/
 ├── wanted-bundle-v5-delta.md    # 본 문서
 ├── wanted-livemetro-template.html
 ├── wanted-visual-audit.md
-└── wanted-bundle/
-    ├── 33122b9e-….js (런타임)
-    ├── 93aa0060-….js (런타임)
-    ├── 3d77f00f-….js (atoms)
-    ├── 65629bcd-….js (Home/Favorites/StationDetail)
-    ├── 83fe8f1a-….js (Login)
-    ├── 9a7fe457-….js (CommutePrediction)
-    ├── ee09cc40-….js (Routes/Delay/Stats/Map/Alerts/Onboarding/Settings)
-    ├── 69d6b7ba-….js (Android frame)
-    ├── bcda7471-….js (LM_DATA mock)
-    └── uploads/
-        ├── pasted-1777743918147-0.png   # 노선도 v2 ground truth (신규)
-        └── pasted-1777802788702-0.png   # 설정 화면 ground truth (신규)
+├── wanted-bundle/               # decoded JS 시안 (런타임 제외 트래킹)
+│   ├── 3d77f00f-….js (atoms)
+│   ├── 65629bcd-….js (Home/Favorites/StationDetail)
+│   ├── 83fe8f1a-….js (Login)
+│   ├── 9a7fe457-….js (CommutePrediction)
+│   ├── ee09cc40-….js (Routes/Delay/Stats/Map/Alerts/Onboarding/Settings)
+│   ├── 69d6b7ba-….js (Android frame)
+│   └── bcda7471-….js (LM_DATA mock)
+└── livemetro/                   # offline 핸드오프 미러 — single source of truth
+    ├── README.md
+    └── project/
+        ├── LiveMetro.html
+        ├── lib/                 # tokens + frame jsx
+        ├── src/                 # atoms.jsx, data.js, screens/*.jsx (audit ground truth)
+        └── uploads/
+            ├── implementation-status.md
+            ├── pasted-1777743918147-0.png   # 노선도 v2 ground truth
+            └── pasted-1777802788702-0.png   # 설정 화면 ground truth
 ```
 
 미래 audit에서 PNG 자료를 시각 ground truth로 활용. line-level 정밀 비교는 6절 "검증 필요 항목 13건"의 별도 sweep phase에서 수행.
