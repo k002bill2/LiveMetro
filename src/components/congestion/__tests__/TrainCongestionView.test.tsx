@@ -26,14 +26,8 @@ jest.mock('@/services/theme', () => ({
   }),
 }));
 
-jest.mock('@/styles/modernTheme', () => ({
-  SPACING: { xs: 4, sm: 8, md: 12, lg: 16 },
-  RADIUS: { sm: 4, md: 8, lg: 12 },
-  TYPOGRAPHY: {
-    fontSize: { xs: 10, sm: 12, base: 14, lg: 18 },
-    fontWeight: { medium: '500', semibold: '600', bold: '700' },
-  },
-}));
+// Phase 51 — legacy modernTheme mock removed (component uses
+// WANTED_TOKENS + weightToFontFamily directly).
 
 jest.mock('@/models/congestion', () => ({
   CongestionLevel: {

@@ -1,10 +1,12 @@
 /**
  * Location Debug Panel Component
  * Displays real-time GPS coordinates and nearby station info for development debugging
- * Only renders in __DEV__ environment
+ * Only renders in __DEV__ environment.
+ *
+ * Phase 51 — migrated to Wanted Design System tokens.
  */
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -25,11 +27,14 @@ import {
 } from 'lucide-react-native';
 
 import { useLocation } from '@/hooks/useLocation';
-import { useTheme, ThemeColors } from '@/services/theme';
-import { SPACING, RADIUS, TYPOGRAPHY } from '@/styles/modernTheme';
+import { useTheme } from '@/services/theme';
+import {
+  WANTED_TOKENS,
+  weightToFontFamily,
+  type WantedSemanticTheme,
+} from '@/styles/modernTheme';
 import { LocationCoordinates, NearbyStation } from '@/services/location/locationService';
 
-// Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
   UIManager.setLayoutAnimationEnabledExperimental(true);
 }
@@ -40,16 +45,13 @@ interface LocationDelta {
   distance: number;
 }
 
-/**
- * Calculate distance between two coordinates using Haversine formula
- */
 const calculateDistance = (
   lat1: number,
   lng1: number,
   lat2: number,
   lng2: number
 ): number => {
-  const R = 6371000; // Earth's radius in meters
+  const R = 6371000;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLng = ((lng2 - lng1) * Math.PI) / 180;
   const a =
@@ -62,53 +64,28 @@ const calculateDistance = (
   return R * c;
 };
 
-/**
- * Format coordinate delta with sign
- */
 const formatDelta = (value: number): string => {
   const sign = value >= 0 ? '+' : '';
   return `${sign}${value.toFixed(6)}`;
 };
 
-/**
- * Format distance for display
- */
 const formatDistanceDisplay = (meters: number): string => {
-  if (meters < 1) {
-    return '<1m';
-  }
-  if (meters < 1000) {
-    return `~${Math.round(meters)}m`;
-  }
+  if (meters < 1) return '<1m';
+  if (meters < 1000) return `~${Math.round(meters)}m`;
   return `~${(meters / 1000).toFixed(1)}km`;
 };
 
-/**
- * Get tracking status display
- */
 const getTrackingStatus = (
   isTracking: boolean,
   hasPermission: boolean,
   error: string | null
 ): { label: string; color: string } => {
-  if (error) {
-    return { label: '에러', color: '#EB5757' };
-  }
-  if (!hasPermission) {
-    return { label: '권한 없음', color: '#F2C94C' };
-  }
-  if (isTracking) {
-    return { label: '추적 중', color: '#27AE60' };
-  }
-  return { label: '정지', color: '#757575' };
+  if (error) return { label: '에러', color: WANTED_TOKENS.status.red500 };
+  if (!hasPermission) return { label: '권한 없음', color: WANTED_TOKENS.status.yellow500 };
+  if (isTracking) return { label: '추적 중', color: WANTED_TOKENS.status.green500 };
+  return { label: '정지', color: WANTED_TOKENS.neutral[700] };
 };
 
-/**
- * Props supplied by the parent screen — see HomeScreen for the canonical
- * source. Receiving these as props (instead of calling useNearbyStations
- * here) prevents a *second* nearby-stations hook instance in dev, which
- * doubled `Location tracking started` and the 24-line fetch logging.
- */
 interface LocationDebugPanelProps {
   closestStation?: NearbyStation | null;
   lastUpdated?: Date | null;
@@ -120,15 +97,14 @@ export const LocationDebugPanel: React.FC<LocationDebugPanelProps> = ({
   lastUpdated = null,
   stationsLoading = false,
 }) => {
-  // All hooks must be called unconditionally (before any early returns)
-  const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   const [isExpanded, setIsExpanded] = useState(false);
   const previousLocationRef = useRef<LocationCoordinates | null>(null);
   const [delta, setDelta] = useState<LocationDelta | null>(null);
 
-  // Location hook
   const {
     location,
     accuracy,
@@ -138,10 +114,9 @@ export const LocationDebugPanel: React.FC<LocationDebugPanelProps> = ({
     startTracking,
   } = useLocation({
     enableHighAccuracy: true,
-    distanceFilter: 10, // More sensitive for debugging
+    distanceFilter: 10,
   });
 
-  // Calculate delta when location changes
   useEffect(() => {
     if (location && previousLocationRef.current) {
       const prev = previousLocationRef.current;
@@ -158,7 +133,6 @@ export const LocationDebugPanel: React.FC<LocationDebugPanelProps> = ({
     previousLocationRef.current = location;
   }, [location]);
 
-  // Start tracking on mount if permission granted
   useEffect(() => {
     if (hasPermission && !isTracking) {
       startTracking();
@@ -170,21 +144,17 @@ export const LocationDebugPanel: React.FC<LocationDebugPanelProps> = ({
     setIsExpanded(prev => !prev);
   }, []);
 
-  // Only render in development mode (after all hooks are called)
-  if (!__DEV__) {
-    return null;
-  }
+  if (!__DEV__) return null;
 
   const trackingStatus = getTrackingStatus(isTracking, hasPermission, locationError);
   const formattedTime = lastUpdated
     ? lastUpdated.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })
     : '--:--:--';
 
-  // Collapsed view content
   const collapsedContent = location ? (
     <Text style={styles.collapsedCoords}>
       {location.latitude.toFixed(6)}, {location.longitude.toFixed(6)}
-      {accuracy ? ` \u00B1${Math.round(accuracy)}m` : ''}
+      {accuracy ? ` ±${Math.round(accuracy)}m` : ''}
     </Text>
   ) : (
     <Text style={styles.collapsedCoords}>위치 없음</Text>
@@ -192,7 +162,6 @@ export const LocationDebugPanel: React.FC<LocationDebugPanelProps> = ({
 
   return (
     <View style={styles.container}>
-      {/* Header - Always visible */}
       <TouchableOpacity
         style={styles.header}
         onPress={toggleExpanded}
@@ -210,45 +179,34 @@ export const LocationDebugPanel: React.FC<LocationDebugPanelProps> = ({
         </View>
         <View style={styles.headerRight}>
           {isExpanded ? (
-            <ChevronDown size={20} color={colors.textSecondary} />
+            <ChevronDown size={20} color={semantic.labelNeutral} />
           ) : (
-            <ChevronUp size={20} color={colors.textSecondary} />
+            <ChevronUp size={20} color={semantic.labelNeutral} />
           )}
         </View>
       </TouchableOpacity>
 
-      {/* Expanded content */}
       {isExpanded && (
         <View style={styles.content}>
-          {/* GPS Coordinates Section */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Crosshair size={16} color={colors.textSecondary} />
+              <Crosshair size={16} color={semantic.labelNeutral} />
               <Text style={styles.sectionTitle}>GPS 좌표</Text>
             </View>
             <View style={styles.row}>
               <Text style={styles.label}>위도:</Text>
-              <Text style={styles.value}>
-                {location?.latitude.toFixed(6) ?? '-'}
-              </Text>
+              <Text style={styles.value}>{location?.latitude.toFixed(6) ?? '-'}</Text>
               <Text style={styles.label}>경도:</Text>
-              <Text style={styles.value}>
-                {location?.longitude.toFixed(6) ?? '-'}
-              </Text>
+              <Text style={styles.value}>{location?.longitude.toFixed(6) ?? '-'}</Text>
             </View>
             <View style={styles.row}>
               <Text style={styles.label}>정확도:</Text>
               <Text style={styles.value}>
-                {accuracy ? `\u00B1${Math.round(accuracy)}m` : '-'}
+                {accuracy ? `±${Math.round(accuracy)}m` : '-'}
               </Text>
               <Text style={styles.label}>상태:</Text>
               <View style={styles.statusContainer}>
-                <View
-                  style={[
-                    styles.statusDot,
-                    { backgroundColor: trackingStatus.color },
-                  ]}
-                />
+                <View style={[styles.statusDot, { backgroundColor: trackingStatus.color }]} />
                 <Text style={[styles.value, { color: trackingStatus.color }]}>
                   {trackingStatus.label}
                 </Text>
@@ -256,22 +214,17 @@ export const LocationDebugPanel: React.FC<LocationDebugPanelProps> = ({
             </View>
           </View>
 
-          {/* Coordinate Delta Section */}
           <View style={styles.divider} />
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Navigation size={16} color={colors.textSecondary} />
+              <Navigation size={16} color={semantic.labelNeutral} />
               <Text style={styles.sectionTitle}>좌표 변화</Text>
             </View>
             <View style={styles.row}>
-              <Text style={styles.label}>\u0394위도:</Text>
-              <Text style={styles.value}>
-                {delta ? formatDelta(delta.deltaLat) : '-'}
-              </Text>
-              <Text style={styles.label}>\u0394경도:</Text>
-              <Text style={styles.value}>
-                {delta ? formatDelta(delta.deltaLng) : '-'}
-              </Text>
+              <Text style={styles.label}>Δ위도:</Text>
+              <Text style={styles.value}>{delta ? formatDelta(delta.deltaLat) : '-'}</Text>
+              <Text style={styles.label}>Δ경도:</Text>
+              <Text style={styles.value}>{delta ? formatDelta(delta.deltaLng) : '-'}</Text>
             </View>
             <View style={styles.row}>
               <Text style={styles.label}>이동 거리:</Text>
@@ -281,11 +234,10 @@ export const LocationDebugPanel: React.FC<LocationDebugPanelProps> = ({
             </View>
           </View>
 
-          {/* Nearest Station Section */}
           <View style={styles.divider} />
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Train size={16} color={colors.textSecondary} />
+              <Train size={16} color={semantic.labelNeutral} />
               <Text style={styles.sectionTitle}>가장 가까운 역</Text>
             </View>
             {stationsLoading ? (
@@ -293,7 +245,7 @@ export const LocationDebugPanel: React.FC<LocationDebugPanelProps> = ({
             ) : closestStation ? (
               <>
                 <View style={styles.stationRow}>
-                  <MapPin size={14} color={colors.primary} />
+                  <MapPin size={14} color={WANTED_TOKENS.blue[500]} />
                   <Text style={styles.stationName}>
                     {closestStation.name} ({closestStation.lineId}호선)
                   </Text>
@@ -317,10 +269,9 @@ export const LocationDebugPanel: React.FC<LocationDebugPanelProps> = ({
             )}
           </View>
 
-          {/* Last Updated */}
           <View style={styles.divider} />
           <View style={styles.footer}>
-            <Clock size={14} color={colors.textTertiary} />
+            <Clock size={14} color={semantic.labelAlt} />
             <Text style={styles.footerText}>
               마지막 업데이트: {formattedTime}
             </Text>
@@ -331,31 +282,29 @@ export const LocationDebugPanel: React.FC<LocationDebugPanelProps> = ({
   );
 };
 
-const createStyles = (colors: ThemeColors) =>
+const MONO_FONT = Platform.OS === 'ios' ? 'Menlo' : 'monospace';
+
+const createStyles = (semantic: WantedSemanticTheme) =>
   StyleSheet.create({
     container: {
       position: 'absolute',
       bottom: 100,
-      left: SPACING.md,
-      right: SPACING.md,
-      backgroundColor: colors.surface,
-      borderRadius: RADIUS.lg,
+      left: WANTED_TOKENS.spacing.s3,
+      right: WANTED_TOKENS.spacing.s3,
+      backgroundColor: semantic.bgBase,
+      borderRadius: WANTED_TOKENS.radius.r8,
       borderWidth: 1,
-      borderColor: colors.borderMedium,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.15,
-      shadowRadius: 12,
-      elevation: 8,
+      borderColor: semantic.lineNormal,
+      ...WANTED_TOKENS.shadow.popover,
       overflow: 'hidden',
     },
     header: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      paddingVertical: SPACING.md,
-      paddingHorizontal: SPACING.lg,
-      backgroundColor: colors.backgroundSecondary,
+      paddingVertical: WANTED_TOKENS.spacing.s3,
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      backgroundColor: semantic.bgSubtlePage,
     },
     headerLeft: {
       flexDirection: 'row',
@@ -363,62 +312,62 @@ const createStyles = (colors: ThemeColors) =>
       flex: 1,
     },
     headerRight: {
-      marginLeft: SPACING.sm,
+      marginLeft: WANTED_TOKENS.spacing.s2,
     },
     headerIcon: {
       fontSize: 16,
-      marginRight: SPACING.sm,
+      marginRight: WANTED_TOKENS.spacing.s2,
     },
     headerTitle: {
-      fontSize: TYPOGRAPHY.fontSize.base,
-      fontWeight: TYPOGRAPHY.fontWeight.semibold,
-      color: colors.textPrimary,
+      fontSize: 14,
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelStrong,
     },
     collapsedCoords: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-      color: colors.textSecondary,
+      fontSize: 13,
+      fontFamily: MONO_FONT,
+      color: semantic.labelNeutral,
     },
     content: {
-      paddingVertical: SPACING.md,
+      paddingVertical: WANTED_TOKENS.spacing.s3,
     },
     section: {
-      paddingHorizontal: SPACING.lg,
-      paddingVertical: SPACING.sm,
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s2,
     },
     sectionHeader: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginBottom: SPACING.sm,
+      marginBottom: WANTED_TOKENS.spacing.s2,
     },
     sectionTitle: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      fontWeight: TYPOGRAPHY.fontWeight.semibold,
-      color: colors.textSecondary,
-      marginLeft: SPACING.xs,
+      fontSize: 13,
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelNeutral,
+      marginLeft: WANTED_TOKENS.spacing.s1,
     },
     row: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginBottom: SPACING.xs,
+      marginBottom: WANTED_TOKENS.spacing.s1,
       flexWrap: 'wrap',
     },
     label: {
-      fontSize: TYPOGRAPHY.fontSize.xs,
-      color: colors.textTertiary,
-      marginRight: SPACING.xs,
+      fontSize: 12,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+      marginRight: WANTED_TOKENS.spacing.s1,
     },
     value: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-      color: colors.textPrimary,
-      marginRight: SPACING.md,
+      fontSize: 13,
+      fontFamily: MONO_FONT,
+      color: semantic.labelStrong,
+      marginRight: WANTED_TOKENS.spacing.s3,
     },
     valueHighlight: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-      color: colors.primary,
-      fontWeight: TYPOGRAPHY.fontWeight.semibold,
+      fontSize: 13,
+      fontFamily: MONO_FONT,
+      color: WANTED_TOKENS.blue[500],
     },
     statusContainer: {
       flexDirection: 'row',
@@ -428,45 +377,48 @@ const createStyles = (colors: ThemeColors) =>
       width: 8,
       height: 8,
       borderRadius: 4,
-      marginRight: SPACING.xs,
+      marginRight: WANTED_TOKENS.spacing.s1,
     },
     divider: {
       height: 1,
-      backgroundColor: colors.borderLight,
-      marginHorizontal: SPACING.lg,
-      marginVertical: SPACING.xs,
+      backgroundColor: semantic.lineSubtle,
+      marginHorizontal: WANTED_TOKENS.spacing.s4,
+      marginVertical: WANTED_TOKENS.spacing.s1,
     },
     stationRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      marginBottom: SPACING.sm,
+      marginBottom: WANTED_TOKENS.spacing.s2,
     },
     stationName: {
-      fontSize: TYPOGRAPHY.fontSize.base,
-      fontWeight: TYPOGRAPHY.fontWeight.semibold,
-      color: colors.textPrimary,
-      marginLeft: SPACING.xs,
+      fontSize: 14,
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelStrong,
+      marginLeft: WANTED_TOKENS.spacing.s1,
     },
     loadingText: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      color: colors.textTertiary,
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
       fontStyle: 'italic',
     },
     noDataText: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      color: colors.textTertiary,
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
     },
     footer: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      paddingHorizontal: SPACING.lg,
-      paddingTop: SPACING.sm,
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingTop: WANTED_TOKENS.spacing.s2,
     },
     footerText: {
-      fontSize: TYPOGRAPHY.fontSize.xs,
-      color: colors.textTertiary,
-      marginLeft: SPACING.xs,
+      fontSize: 12,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+      marginLeft: WANTED_TOKENS.spacing.s1,
     },
   });
 

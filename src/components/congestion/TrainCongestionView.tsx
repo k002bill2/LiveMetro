@@ -1,9 +1,11 @@
 /**
  * TrainCongestionView Component
- * Shows a visual representation of congestion levels for each train car
+ * Shows a visual representation of congestion levels for each train car.
+ *
+ * Phase 51 — migrated to Wanted Design System tokens.
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
   View,
   Text,
@@ -13,7 +15,11 @@ import {
 } from 'react-native';
 import { Users, AlertTriangle } from 'lucide-react-native';
 import { useTheme } from '@/services/theme';
-import { SPACING, RADIUS, TYPOGRAPHY } from '@/styles/modernTheme';
+import {
+  WANTED_TOKENS,
+  weightToFontFamily,
+  type WantedSemanticTheme,
+} from '@/styles/modernTheme';
 import {
   CongestionLevel,
   CarCongestion,
@@ -24,20 +30,11 @@ import {
   createEmptyCarCongestions,
 } from '@/models/congestion';
 
-// ============================================================================
-// Types
-// ============================================================================
-
 interface TrainCongestionViewProps {
-  /** Congestion summary data */
   congestion: TrainCongestionSummary | null;
-  /** Called when a car is pressed */
   onCarPress?: (carNumber: number) => void;
-  /** Style overrides */
   style?: ViewStyle;
-  /** Show legend */
   showLegend?: boolean;
-  /** Compact mode for smaller displays */
   compact?: boolean;
 }
 
@@ -45,14 +42,10 @@ interface CarIndicatorProps {
   car: CarCongestion;
   onPress?: () => void;
   compact?: boolean;
+  semantic: WantedSemanticTheme;
 }
 
-// ============================================================================
-// Sub-components
-// ============================================================================
-
-const CarIndicator: React.FC<CarIndicatorProps> = ({ car, onPress, compact = false }) => {
-  const { colors } = useTheme();
+const CarIndicator: React.FC<CarIndicatorProps> = ({ car, onPress, compact = false, semantic }) => {
   const congestionColor = getCongestionLevelColor(car.congestionLevel);
   const hasReports = car.reportCount > 0;
   const isReliable = car.reportCount >= MIN_REPORTS_FOR_RELIABILITY;
@@ -60,20 +53,20 @@ const CarIndicator: React.FC<CarIndicatorProps> = ({ car, onPress, compact = fal
   const content = (
     <View
       style={[
-        styles.carContainer,
-        compact && styles.carContainerCompact,
+        sharedStyles.carContainer,
+        compact && sharedStyles.carContainerCompact,
         {
-          backgroundColor: hasReports ? congestionColor : colors.surface,
-          borderColor: hasReports ? congestionColor : colors.borderMedium,
+          backgroundColor: hasReports ? congestionColor : semantic.bgBase,
+          borderColor: hasReports ? congestionColor : semantic.lineNormal,
           opacity: isReliable ? 1 : hasReports ? 0.7 : 0.4,
         },
       ]}
     >
       <Text
         style={[
-          styles.carNumber,
-          compact && styles.carNumberCompact,
-          { color: hasReports ? '#FFFFFF' : colors.textSecondary },
+          sharedStyles.carNumber,
+          compact && sharedStyles.carNumberCompact,
+          { color: hasReports ? '#FFFFFF' : semantic.labelNeutral },
         ]}
       >
         {car.carNumber}
@@ -81,7 +74,7 @@ const CarIndicator: React.FC<CarIndicatorProps> = ({ car, onPress, compact = fal
       {!compact && hasReports && (
         <Text
           style={[
-            styles.reportCount,
+            sharedStyles.reportCount,
             { color: 'rgba(255, 255, 255, 0.8)' },
           ]}
         >
@@ -102,9 +95,7 @@ const CarIndicator: React.FC<CarIndicatorProps> = ({ car, onPress, compact = fal
   return content;
 };
 
-const CongestionLegend: React.FC = () => {
-  const { colors } = useTheme();
-
+const CongestionLegend: React.FC<{ semantic: WantedSemanticTheme }> = ({ semantic }) => {
   const levels = [
     { level: CongestionLevel.LOW, name: getCongestionLevelName(CongestionLevel.LOW) },
     { level: CongestionLevel.MODERATE, name: getCongestionLevelName(CongestionLevel.MODERATE) },
@@ -113,16 +104,16 @@ const CongestionLegend: React.FC = () => {
   ];
 
   return (
-    <View style={styles.legendContainer}>
+    <View style={sharedStyles.legendContainer}>
       {levels.map(({ level, name }) => (
-        <View key={level} style={styles.legendItem}>
+        <View key={level} style={sharedStyles.legendItem}>
           <View
             style={[
-              styles.legendColor,
+              sharedStyles.legendColor,
               { backgroundColor: getCongestionLevelColor(level) },
             ]}
           />
-          <Text style={[styles.legendText, { color: colors.textSecondary }]}>
+          <Text style={[sharedStyles.legendText, { color: semantic.labelNeutral }]}>
             {name}
           </Text>
         </View>
@@ -131,10 +122,6 @@ const CongestionLegend: React.FC = () => {
   );
 };
 
-// ============================================================================
-// Main Component
-// ============================================================================
-
 export const TrainCongestionView: React.FC<TrainCongestionViewProps> = ({
   congestion,
   onCarPress,
@@ -142,9 +129,10 @@ export const TrainCongestionView: React.FC<TrainCongestionViewProps> = ({
   showLegend = true,
   compact = false,
 }) => {
-  const { colors, isDark } = useTheme();
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const styles = useMemo(() => createStyles(semantic), [semantic]);
 
-  // Use empty cars if no congestion data
   const cars = congestion?.cars || createEmptyCarCongestions();
   const overallLevel = congestion?.overallLevel || CongestionLevel.LOW;
   const totalReports = congestion?.reportCount || 0;
@@ -152,17 +140,14 @@ export const TrainCongestionView: React.FC<TrainCongestionViewProps> = ({
 
   return (
     <View style={[styles.container, style]}>
-      {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           {congestion?.overallLevel === CongestionLevel.CROWDED ? (
             <AlertTriangle size={18} color={getCongestionLevelColor(overallLevel)} />
           ) : (
-            <Users size={18} color={colors.textSecondary} />
+            <Users size={18} color={semantic.labelNeutral} />
           )}
-          <Text style={[styles.headerTitle, { color: colors.textPrimary }]}>
-            객차별 혼잡도
-          </Text>
+          <Text style={styles.headerTitle}>객차별 혼잡도</Text>
         </View>
         {hasData && (
           <View
@@ -178,18 +163,9 @@ export const TrainCongestionView: React.FC<TrainCongestionViewProps> = ({
         )}
       </View>
 
-      {/* Train Cars Visualization */}
-      <View
-        style={[
-          styles.trainContainer,
-          { backgroundColor: isDark ? colors.surface : colors.background },
-        ]}
-      >
-        {/* Direction indicators */}
+      <View style={styles.trainContainer}>
         <View style={styles.directionContainer}>
-          <Text style={[styles.directionText, { color: colors.textSecondary }]}>
-            ← 앞
-          </Text>
+          <Text style={styles.directionText}>← 앞</Text>
           <View style={styles.carsWrapper}>
             {cars.map((car) => (
               <CarIndicator
@@ -197,91 +173,36 @@ export const TrainCongestionView: React.FC<TrainCongestionViewProps> = ({
                 car={car}
                 onPress={onCarPress ? () => onCarPress(car.carNumber) : undefined}
                 compact={compact}
+                semantic={semantic}
               />
             ))}
           </View>
-          <Text style={[styles.directionText, { color: colors.textSecondary }]}>
-            뒤 →
-          </Text>
+          <Text style={styles.directionText}>뒤 →</Text>
         </View>
 
-        {/* No data message */}
         {!hasData && (
-          <Text style={[styles.noDataText, { color: colors.textSecondary }]}>
+          <Text style={styles.noDataText}>
             아직 제보된 혼잡도 정보가 없습니다
           </Text>
         )}
 
-        {/* Report count */}
         {hasData && (
-          <Text style={[styles.reportCountText, { color: colors.textSecondary }]}>
+          <Text style={styles.reportCountText}>
             {totalReports}건의 제보 기반
           </Text>
         )}
       </View>
 
-      {/* Legend */}
-      {showLegend && <CongestionLegend />}
+      {showLegend && <CongestionLegend semantic={semantic} />}
     </View>
   );
 };
 
-// ============================================================================
-// Styles
-// ============================================================================
-
-const styles = StyleSheet.create({
-  container: {
-    gap: SPACING.sm,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-  },
-  headerTitle: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold as '600',
-  },
-  overallBadge: {
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 4,
-    borderRadius: RADIUS.sm,
-  },
-  overallText: {
-    color: '#FFFFFF',
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    fontWeight: TYPOGRAPHY.fontWeight.bold as '700',
-  },
-  trainContainer: {
-    padding: SPACING.md,
-    borderRadius: RADIUS.lg,
-    gap: SPACING.sm,
-  },
-  directionContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-  },
-  directionText: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    minWidth: 24,
-  },
-  carsWrapper: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: 4,
-  },
+const sharedStyles = StyleSheet.create({
   carContainer: {
     flex: 1,
     aspectRatio: 0.8,
-    borderRadius: RADIUS.sm,
+    borderRadius: WANTED_TOKENS.radius.r4,
     borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
@@ -294,29 +215,22 @@ const styles = StyleSheet.create({
     maxHeight: 36,
   },
   carNumber: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.bold as '700',
+    fontSize: 13,
+    fontFamily: weightToFontFamily('700'),
   },
   carNumberCompact: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
+    fontSize: 12,
   },
   reportCount: {
     fontSize: 8,
+    fontFamily: weightToFontFamily('500'),
     marginTop: 2,
-  },
-  noDataText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    textAlign: 'center',
-  },
-  reportCountText: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    textAlign: 'center',
   },
   legendContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     flexWrap: 'wrap',
-    gap: SPACING.md,
+    gap: WANTED_TOKENS.spacing.s3,
   },
   legendItem: {
     flexDirection: 'row',
@@ -329,8 +243,76 @@ const styles = StyleSheet.create({
     borderRadius: 2,
   },
   legendText: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
+    fontSize: 12,
+    fontFamily: weightToFontFamily('500'),
   },
 });
+
+const createStyles = (semantic: WantedSemanticTheme) =>
+  StyleSheet.create({
+    container: {
+      gap: WANTED_TOKENS.spacing.s2,
+    },
+    header: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+    },
+    headerLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: WANTED_TOKENS.spacing.s1,
+    },
+    headerTitle: {
+      fontSize: 14,
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelStrong,
+    },
+    overallBadge: {
+      paddingHorizontal: WANTED_TOKENS.spacing.s2,
+      paddingVertical: 4,
+      borderRadius: WANTED_TOKENS.radius.r4,
+    },
+    overallText: {
+      color: '#FFFFFF',
+      fontSize: 12,
+      fontFamily: weightToFontFamily('700'),
+    },
+    trainContainer: {
+      backgroundColor: semantic.bgBase,
+      padding: WANTED_TOKENS.spacing.s3,
+      borderRadius: WANTED_TOKENS.radius.r8,
+      gap: WANTED_TOKENS.spacing.s2,
+    },
+    directionContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: WANTED_TOKENS.spacing.s1,
+    },
+    directionText: {
+      fontSize: 12,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelNeutral,
+      minWidth: 24,
+    },
+    carsWrapper: {
+      flex: 1,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      gap: 4,
+    },
+    noDataText: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelNeutral,
+      textAlign: 'center',
+    },
+    reportCountText: {
+      fontSize: 12,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelNeutral,
+      textAlign: 'center',
+    },
+  });
 
 export default TrainCongestionView;
