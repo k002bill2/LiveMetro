@@ -583,23 +583,23 @@ describe('HomeScreen', () => {
         .mockResolvedValueOnce(null);
     });
 
-    it('onStationSelect navigates to StationNavigator', async () => {
+    it('onStationSelect navigates to StationDetail', async () => {
       const { getByTestId } = render(<HomeScreen />);
       await waitFor(() => expect(getByTestId('station-card-fav-1')).toBeTruthy());
 
       fireEvent.press(getByTestId('station-card-fav-1'));
-      expect(mockNavigate).toHaveBeenCalledWith('StationNavigator', {
-        stationId: 'fav-1', lineId: 'line-2',
+      expect(mockNavigate).toHaveBeenCalledWith('StationDetail', {
+        stationId: 'fav-1', stationName: 'Station A', lineId: 'line-2',
       });
     });
 
-    it('handleSetStart navigates with departure mode', async () => {
+    it('handleSetStart navigates to StationDetail', async () => {
       const { getByTestId } = render(<HomeScreen />);
       await waitFor(() => expect(getByTestId('set-start-fav-1')).toBeTruthy());
 
       fireEvent.press(getByTestId('set-start-fav-1'));
-      expect(mockNavigate).toHaveBeenCalledWith('StationNavigator', {
-        stationId: 'fav-1', lineId: 'line-2', mode: 'departure',
+      expect(mockNavigate).toHaveBeenCalledWith('StationDetail', {
+        stationId: 'fav-1', stationName: 'Station A', lineId: 'line-2',
       });
     });
 

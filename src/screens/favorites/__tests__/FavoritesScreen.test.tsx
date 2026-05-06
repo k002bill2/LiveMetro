@@ -618,14 +618,14 @@ describe('FavoritesScreen', () => {
 
       fireEvent.press(setStartBtn);
 
-      expect(mockNavigate).toHaveBeenCalledWith('StationNavigator', {
+      expect(mockNavigate).toHaveBeenCalledWith('StationDetail', {
         stationId: 'station1',
+        stationName: '강남',
         lineId: '2',
-        mode: 'departure',
       });
     });
 
-    it('navigates to StationNavigator in arrival mode', () => {
+    it('navigates to StationDetail (arrival intent)', () => {
       (useFavorites as jest.Mock).mockReturnValue({
         favoritesWithDetails: [mockFavorite1],
         loading: false,
@@ -641,10 +641,10 @@ describe('FavoritesScreen', () => {
 
       fireEvent.press(setEndBtn);
 
-      expect(mockNavigate).toHaveBeenCalledWith('StationNavigator', {
+      expect(mockNavigate).toHaveBeenCalledWith('StationDetail', {
         stationId: 'station1',
+        stationName: '강남',
         lineId: '2',
-        mode: 'arrival',
       });
     });
 

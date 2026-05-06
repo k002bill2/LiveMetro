@@ -194,28 +194,28 @@ export const FavoritesScreen: React.FC = () => {
   }, [navigation]);
 
   /**
-   * Navigate to StationNavigator with departure mode
+   * Navigate to StationDetail (departure intent)
    */
   const handleSetStart = useCallback((favorite: typeof favoritesWithDetails[0]) => {
     if (!favorite.station) return;
 
-    navigation.navigate('StationNavigator', {
+    navigation.navigate('StationDetail', {
       stationId: favorite.stationId,
+      stationName: favorite.station.name,
       lineId: favorite.lineId,
-      mode: 'departure',
     });
   }, [navigation]);
 
   /**
-   * Navigate to StationNavigator with arrival mode
+   * Navigate to StationDetail (arrival intent)
    */
   const handleSetEnd = useCallback((favorite: typeof favoritesWithDetails[0]) => {
     if (!favorite.station) return;
 
-    navigation.navigate('StationNavigator', {
+    navigation.navigate('StationDetail', {
       stationId: favorite.stationId,
+      stationName: favorite.station.name,
       lineId: favorite.lineId,
-      mode: 'arrival',
     });
   }, [navigation]);
 

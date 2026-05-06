@@ -19,7 +19,6 @@ import SettingsNavigator from '@/navigation/SettingsNavigator';
 import StationDetailScreen from '@screens/station/StationDetailScreen';
 import StationNavigatorScreen from '@screens/station/StationNavigatorScreen';
 import { WeeklyPredictionScreen } from '@screens/prediction';
-import { WelcomeScreen } from '../screens/auth/WelcomeScreen';
 import { AuthScreen } from '../screens/auth/AuthScreen';
 import { AppTabParamList, AppStackParamList } from './types';
 import { weightToFontFamily } from '@/styles/modernTheme';
@@ -175,10 +174,6 @@ const AppNavigator: React.FC = () => {
       ) : (
         // Unauthenticated Stack
         <>
-          <Stack.Screen
-            name="Welcome"
-            component={WelcomeScreen}
-          />
           <Stack.Screen
             name="Auth"
             component={AuthScreen}
