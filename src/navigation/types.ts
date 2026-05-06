@@ -101,7 +101,6 @@ export type AppStackParamList = {
   AlertSettings: undefined;
 
   // Unauthenticated screens
-  Welcome: undefined;
   Auth: undefined;
   EmailLogin: undefined;
   SignupStep1: undefined;

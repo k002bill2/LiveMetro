@@ -15,7 +15,6 @@ import { LoadingScreen } from '../components/common/LoadingScreen';
 import { OnboardingProvider, useOnboarding } from '../contexts/OnboardingContext';
 
 // Import screens
-import { WelcomeScreen } from '../screens/auth/WelcomeScreen';
 import { AuthScreen } from '../screens/auth/AuthScreen';
 import { EmailLoginScreen } from '../screens/auth/EmailLoginScreen';
 import { SignUpScreen } from '../screens/auth/SignUpScreen';
@@ -46,7 +45,6 @@ const DEBUG_FORCE_ONBOARDING = __DEV__ && false;
 // route sets (e.g. this file uses `Main`, types.ts uses `MainTabs`), so
 // they intentionally remain separate.
 export type RootStackParamList = {
-  Welcome: undefined;
   Auth: undefined;
   EmailLogin: undefined;
   SignupStep1: undefined;
@@ -209,7 +207,6 @@ const RootNavigatorContent: React.FC = () => {
   if (!user) {
     return (
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        <Stack.Screen name="Welcome" component={WelcomeScreen} />
         <Stack.Screen name="Auth" component={AuthScreen} />
         <Stack.Screen name="EmailLogin" component={EmailLoginScreen} />
         <Stack.Screen name="SignupStep1" component={SignupStep1Screen} />

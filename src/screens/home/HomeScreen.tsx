@@ -294,22 +294,23 @@ export const HomeScreen: React.FC = () => {
   const onStationSelect = useCallback(
     (station: Station): void => {
       setSelectedStation(station);
-      navigation.navigate('StationNavigator', {
+      navigation.navigate('StationDetail', {
         stationId: station.id,
+        stationName: station.name,
         lineId: station.lineId,
       });
     },
     [navigation]
   );
 
-  // 출발 버튼 핸들러 - StationNavigator로 이동 (출발 모드)
+  // 출발 버튼 핸들러 - StationDetail로 이동
   const handleSetStart = useCallback(
     (station: Station): void => {
       setSelectedStation(station);
-      navigation.navigate('StationNavigator', {
+      navigation.navigate('StationDetail', {
         stationId: station.id,
+        stationName: station.name,
         lineId: station.lineId,
-        mode: 'departure',
       });
     },
     [navigation]
