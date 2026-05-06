@@ -34,14 +34,30 @@ export interface OnboardingRouteData {
   notifications?: CommuteNotifications;
 }
 
+// Phase 52: handoff payload returned from OnboardingStationPicker → CommuteRoute
+// via navigation.navigate(..., { merge: true }). Serializable so React Navigation
+// doesn't warn; consumed once by CommuteRoute's useEffect then cleared.
+export interface PickedStationPayload {
+  selectionType: 'departure' | 'arrival' | 'transfer';
+  station: StationSelection;
+}
+
 export type OnboardingStackParamList = {
   // Redefined onboarding flow:
   //   1/4 Welcome (brand + value props, no params)
   //   2/4 CommuteRoute (route picker, no params — defaults departureTime)
   //   3/4 NotificationPermission (OS prompt + alert toggles)
   //   4/4 FavoritesOnboarding (commit + onComplete)
+  // OnboardingStationPicker: full-screen drill-in from CommuteRoute (Phase 52
+  // — replaces the legacy StationSearchModal pattern with the Wanted handoff
+  // design's in-screen browseMode + recommendations flow).
   WelcomeOnboarding: undefined;
-  CommuteRoute: undefined;
+  CommuteRoute: { pickedStation?: PickedStationPayload } | undefined;
+  OnboardingStationPicker: {
+    selectionType: 'departure' | 'arrival' | 'transfer';
+    excludeStationIds: string[];
+    currentName?: string;
+  };
   NotificationPermission: {
     route: OnboardingRouteData;
   };
