@@ -159,9 +159,15 @@ const ArrivalCardImpl: React.FC<ArrivalCardProps> = ({
         <View
           testID={testID ? `${testID}-congestion-empty` : undefined}
           style={[styles.congestionWrap, { borderTopColor: semantic.lineSubtle }]}
+          accessible
+          accessibilityRole="text"
+          accessibilityLabel="혼잡도 정보 준비 중. 사용자 제보가 쌓이면 표시됩니다."
         >
           <View style={styles.emptyRow}>
-            <Text style={[styles.emptyText, { color: semantic.labelAlt }]}>
+            {/* Primary message uses labelNeutral, hint uses muted labelAlt
+                — clear visual hierarchy between the headline and the
+                secondary explanation. */}
+            <Text style={[styles.emptyText, { color: semantic.labelNeutral }]}>
               혼잡도 정보 준비 중
             </Text>
             <Text style={[styles.emptyHint, { color: semantic.labelAlt }]}>
