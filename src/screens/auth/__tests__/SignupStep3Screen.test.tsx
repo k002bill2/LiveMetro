@@ -32,6 +32,7 @@ jest.mock('@/services/theme/themeContext', () => ({
 jest.mock('@/services/auth/AuthContext', () => ({
   useAuth: jest.fn(() => ({
     user: { id: 'u1', displayName: '홍길동', email: 'gildong@test.com' },
+    firebaseUser: { email: 'gildong@test.com', phoneNumber: '+821012345678' },
   })),
 }));
 
@@ -88,24 +89,41 @@ beforeEach(() => {
 });
 
 describe('SignupStep3Screen', () => {
-  it('renders display name, email, verify badge, checklist, and bonus banner', () => {
+  it('renders header, greeting, avatar initial, email, verify badge, checklist, and bonus banner', () => {
     const { getByTestId, getByText } = render(<SignupStep3Screen />);
 
-    expect(getByTestId('signup-step3-title')).toBeTruthy();
-    expect(getByText('홍길동님, LiveMetro에 오신 것을 환영합니다')).toBeTruthy();
+    expect(getByTestId('signup-step3-header')).toBeTruthy();
+    expect(getByTestId('signup-step3-title').props.children).toContain('환영해요, ');
+    expect(getByText('환영해요, 홍길동님')).toBeTruthy();
+    expect(getByTestId('signup-step3-subtitle')).toBeTruthy();
+    expect(getByText(/가입이 완료되었어요/)).toBeTruthy();
+    expect(getByTestId('signup-step3-avatar-initial').props.children).toBe('홍');
     expect(getByText('gildong@test.com')).toBeTruthy();
     expect(getByTestId('signup-step3-verify-badge')).toBeTruthy();
+    expect(getByTestId('signup-step3-checklist-label').props.children).toBe('다음 단계 · 1분이면 끝나요');
     expect(getByTestId('checklist-commute')).toBeTruthy();
     expect(getByTestId('checklist-alerts')).toBeTruthy();
     expect(getByTestId('checklist-favorites')).toBeTruthy();
     expect(getByTestId('signup-step3-bonus')).toBeTruthy();
+    expect(getByTestId('signup-step3-cta-secondary')).toBeTruthy();
   });
 
-  it('marks celebration seen and navigates to Onboarding when CTA pressed', async () => {
+  it('marks celebration seen and navigates to Onboarding when primary CTA pressed', async () => {
     // No pending credentials → biometric prompt path is skipped silently.
     const { getByTestId } = render(<SignupStep3Screen />);
 
     fireEvent.press(getByTestId('signup-step3-cta'));
+
+    await waitFor(() => {
+      expect(mockMarkCelebrationSeen).toHaveBeenCalledTimes(1);
+      expect(mockNavigate).toHaveBeenCalledWith('Onboarding');
+    });
+  });
+
+  it('also routes to Onboarding when the secondary "나중에 할게요" CTA is pressed', async () => {
+    const { getByTestId } = render(<SignupStep3Screen />);
+
+    fireEvent.press(getByTestId('signup-step3-cta-secondary'));
 
     await waitFor(() => {
       expect(mockMarkCelebrationSeen).toHaveBeenCalledTimes(1);
@@ -179,6 +197,55 @@ describe('SignupStep3Screen', () => {
     unmount();
 
     expect(consumePendingBiometricCredentials()).toBeNull();
+  });
+
+  it('substitutes "신규 사용자" when AuthContext leaves the legacy "익명 사용자" fallback', () => {
+    // Phone-only users who skip SignupStep2 nickname input get
+    // displayName === '익명 사용자' from AuthContext.createOrGetUser-
+    // Document. The celebration screen treats that as "no name set" and
+    // shows the friendlier '신규 사용자' instead.
+    const { useAuth } = require('@/services/auth/AuthContext');
+    (useAuth as jest.Mock).mockReturnValueOnce({
+      user: { id: 'u1', displayName: '익명 사용자', email: '' },
+      firebaseUser: { email: null, phoneNumber: '+821011112222' },
+    });
+
+    const { getByTestId, queryByText } = render(<SignupStep3Screen />);
+
+    expect(getByTestId('signup-step3-title').props.children).toEqual([
+      '환영해요, ',
+      '신규 사용자',
+      '님',
+    ]);
+    expect(queryByText('환영해요, 익명 사용자님')).toBeNull();
+  });
+
+  it('falls back to a masked phone number when the user has no email (phone-only)', () => {
+    const { useAuth } = require('@/services/auth/AuthContext');
+    (useAuth as jest.Mock).mockReturnValueOnce({
+      user: { id: 'u1', displayName: '신규 사용자', email: '' },
+      firebaseUser: { email: null, phoneNumber: '+821098765432' },
+    });
+
+    const { getByTestId, queryByText } = render(<SignupStep3Screen />);
+
+    // Email is absent → contact label should show masked phone (010-****-XXXX).
+    const contactRow = getByTestId('signup-step3-contact');
+    expect(contactRow.props.children).toBe('010-****-5432');
+    // No raw phone or full email leakage.
+    expect(queryByText('+821098765432')).toBeNull();
+    expect(queryByText('gildong@test.com')).toBeNull();
+  });
+
+  it('renders no contact row at all when both email and phoneNumber are absent', () => {
+    const { useAuth } = require('@/services/auth/AuthContext');
+    (useAuth as jest.Mock).mockReturnValueOnce({
+      user: { id: 'u1', displayName: '신규 사용자', email: '' },
+      firebaseUser: { email: null, phoneNumber: null },
+    });
+
+    const { queryByTestId } = render(<SignupStep3Screen />);
+    expect(queryByTestId('signup-step3-contact')).toBeNull();
   });
 
   it('ignores rapid double-taps on the CTA — markCelebrationSeen runs once', async () => {

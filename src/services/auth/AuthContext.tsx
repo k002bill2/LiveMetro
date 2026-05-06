@@ -21,6 +21,7 @@ import {
   signInWithCredential,
   linkWithCredential,
   signInWithPhoneNumber,
+  deleteUser,
 } from 'firebase/auth';
 import { doc, setDoc, getDoc } from 'firebase/firestore';
 
@@ -54,6 +55,12 @@ interface AuthContextType {
     password: string,
     displayName?: string
   ) => Promise<void>;
+  // Permanently deletes the currently signed-in Firebase user. Caller is
+  // responsible for clearing local data (SecureStore credentials,
+  // AsyncStorage flags) since deleteUser only touches the Auth record.
+  // Throws a Korean user-facing message — including a "최근 로그인 필요"
+  // hint when Firebase rejects with `auth/requires-recent-login`.
+  deleteCurrentUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -242,6 +249,25 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, []);
 
+  const handleDeleteCurrentUser = useCallback(async (): Promise<void> => {
+    const current = auth.currentUser;
+    if (!current) {
+      throw new Error('삭제할 계정이 없습니다. 로그인 상태를 확인해주세요.');
+    }
+    try {
+      await deleteUser(current);
+    } catch (error: unknown) {
+      console.error('Delete user error:', error);
+      const firebaseError = error as { code?: string };
+      if (firebaseError.code === 'auth/requires-recent-login') {
+        throw new Error(
+          '보안을 위해 최근 인증이 필요합니다. 로그아웃 후 다시 로그인한 뒤 시도해주세요.',
+        );
+      }
+      throw new Error('계정 삭제에 실패했습니다.');
+    }
+  }, []);
+
   const handleUpdateUserProfile = useCallback(async (updates: Partial<User>): Promise<void> => {
     if (!firebaseUser || !user) {
       throw new Error('사용자가 로그인되어 있지 않습니다.');
@@ -335,6 +361,20 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (displayName) {
         await updateProfile(current, { displayName });
       }
+      // CRITICAL: updateProfile() does NOT fire onAuthStateChanged. Without
+      // this manual refresh, AuthContext's React state still holds the
+      // pre-link snapshot (typically displayName === '익명 사용자' for a
+      // phone-only user) and SignupStep3 celebration shows the wrong name.
+      // We patch local user state from the now-mutated currentUser.
+      setUser((prev) =>
+        prev
+          ? {
+              ...prev,
+              displayName: displayName || prev.displayName,
+              email: current.email || prev.email,
+            }
+          : prev,
+      );
     } catch (error: unknown) {
       console.error('Link email credential error:', error);
       const firebaseError = error as { code?: string };
@@ -397,6 +437,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     requestPhoneVerification: handleRequestPhoneVerification,
     confirmPhoneCode: handleConfirmPhoneCode,
     linkEmailToCurrentUser: handleLinkEmailToCurrentUser,
+    deleteCurrentUser: handleDeleteCurrentUser,
   }), [
     user,
     firebaseUser,
@@ -411,6 +452,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     handleRequestPhoneVerification,
     handleConfirmPhoneCode,
     handleLinkEmailToCurrentUser,
+    handleDeleteCurrentUser,
   ]);
 
   return (

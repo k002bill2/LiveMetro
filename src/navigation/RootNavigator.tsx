@@ -26,6 +26,7 @@ import { AuthScreen } from '../screens/auth/AuthScreen';
 import { EmailLoginScreen } from '../screens/auth/EmailLoginScreen';
 import { SignUpScreen } from '../screens/auth/SignUpScreen';
 import { SignupStep1Screen } from '../screens/auth/SignupStep1Screen';
+import { SignupStep2Screen } from '../screens/auth/SignupStep2Screen';
 import { SignupStep3Screen } from '../screens/auth/SignupStep3Screen';
 import { HomeScreen } from '../screens/home/HomeScreen';
 import { SubwayMapScreen } from '../screens/map/SubwayMapScreen';
@@ -57,6 +58,7 @@ export type RootStackParamList = {
   EmailLogin: undefined;
   SignupStep1: undefined;
   SignUp: undefined;
+  SignupStep2: undefined;
   SignupStep3: undefined;
   EmailLink: undefined;
   Main: undefined;
@@ -211,6 +213,7 @@ const RootNavigatorContent: React.FC = () => {
   const {
     hasCompletedOnboarding,
     hasSeenSignupCelebration,
+    hasAgreedToTerms,
     isCheckingStatus,
     completeOnboarding,
     skipOnboarding,
@@ -234,22 +237,27 @@ const RootNavigatorContent: React.FC = () => {
 
   // Authenticated but hasn't completed onboarding (or DEBUG mode).
   //
-  // Two possible first screens, in priority order:
-  //   1. SignupStep3 — fresh signup celebration (shown once per user via
-  //      `hasSeenSignupCelebration` AsyncStorage flag). Phone-only users
-  //      land here directly after OTP success — no separate email/password
-  //      collection step. Email can be linked later from Settings via the
-  //      EmailLink route, which stays registered below for that path.
-  //   2. Onboarding — returning user who hasn't completed onboarding.
+  // Three possible first screens, in priority order:
+  //   1. SignupStep2 — phone-only user who hasn't accepted terms yet.
+  //      Required by 정보통신망법 (Terms of Service) + 개인정보보호법
+  //      §22-2 (만 14세 이상 확인). Email signup users skip this because
+  //      they collect agreements inline in SignUpScreen 'create' mode.
+  //   2. SignupStep3 — fresh signup celebration (once per user, gated by
+  //      `hasSeenSignupCelebration`).
+  //   3. Onboarding — returning user who hasn't completed onboarding.
   //
   // We use `initialRouteName` rather than `navigation.navigate` from the
   // unauth stack to avoid the race where the unauth stack unmounts before
   // a navigate call lands.
   if (!hasCompletedOnboarding || DEBUG_FORCE_ONBOARDING) {
+    const phoneOnly = !user.isAnonymous && (user.email == null || user.email === '');
+    const needsTerms = phoneOnly && hasAgreedToTerms === false;
     const showCelebration = hasSeenSignupCelebration === false;
-    const initial: 'SignupStep3' | 'Onboarding' = showCelebration
-      ? 'SignupStep3'
-      : 'Onboarding';
+    const initial: 'SignupStep2' | 'SignupStep3' | 'Onboarding' = needsTerms
+      ? 'SignupStep2'
+      : showCelebration
+        ? 'SignupStep3'
+        : 'Onboarding';
     return (
       <Stack.Navigator
         screenOptions={{ headerShown: false }}
@@ -258,6 +266,7 @@ const RootNavigatorContent: React.FC = () => {
         <Stack.Screen name="EmailLink">
           {() => <SignUpScreen mode="link" />}
         </Stack.Screen>
+        <Stack.Screen name="SignupStep2" component={SignupStep2Screen} />
         <Stack.Screen name="SignupStep3" component={SignupStep3Screen} />
         <Stack.Screen name="Onboarding">
           {() => (

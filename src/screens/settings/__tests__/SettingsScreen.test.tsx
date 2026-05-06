@@ -33,6 +33,8 @@ jest.mock('lucide-react-native', () => ({
   LogOut: 'LogOut',
   FileCheck: 'FileCheck',
   MessageSquare: 'MessageSquare',
+  Wrench: 'Wrench',
+  Trash2: 'Trash2',
 }));
 
 const mockNavigate = jest.fn();
@@ -76,6 +78,7 @@ jest.mock('@/services/auth/AuthContext', () => ({
     updateUserProfile: jest.fn(),
     resetPassword: jest.fn(),
     changePassword: jest.fn(),
+    deleteCurrentUser: jest.fn(() => Promise.resolve()),
   })),
 }));
 
@@ -143,6 +146,21 @@ jest.mock('@/services/theme', () => ({
       warning: '#FF9500',
       white: '#FFFFFF',
     },
+  })),
+}));
+
+jest.mock('@/contexts/OnboardingContext', () => ({
+  useOnboarding: jest.fn(() => ({
+    hasCompletedOnboarding: true,
+    hasSeenSignupCelebration: true,
+    hasAgreedToTerms: true,
+    isCheckingStatus: false,
+    completeOnboarding: jest.fn(() => Promise.resolve()),
+    skipOnboarding: jest.fn(() => Promise.resolve()),
+    resetOnboarding: jest.fn(() => Promise.resolve()),
+    resetSignupFlow: jest.fn(() => Promise.resolve()),
+    markCelebrationSeen: jest.fn(() => Promise.resolve()),
+    markTermsAgreed: jest.fn(() => Promise.resolve()),
   })),
 }));
 
@@ -821,6 +839,39 @@ describe('SettingsScreen', () => {
       const { getByText } = render(<SettingsScreen {...defaultProps} />);
 
       expect(getByText('시스템 설정 따름')).toBeTruthy();
+    });
+  });
+
+  describe('Dev Tools (__DEV__ only)', () => {
+    // jest sets __DEV__ to true by default via the jest-react-native setup,
+    // so the dev section must render. We assert presence + Alert wiring;
+    // the actual delete chain is exercised in AuthContext + OnboardingContext
+    // unit tests separately.
+    it('renders the dev tools section with both reset and nuke buttons', () => {
+      const { getByTestId, getByText } = render(<SettingsScreen {...defaultProps} />);
+
+      expect(getByTestId('dev-tools-section')).toBeTruthy();
+      expect(getByTestId('dev-reset-signup-flow')).toBeTruthy();
+      expect(getByTestId('dev-nuke-account')).toBeTruthy();
+      expect(getByText('온보딩 상태 리셋')).toBeTruthy();
+      expect(getByText('회원 정보 모두 삭제')).toBeTruthy();
+    });
+
+    it('opens a destructive confirmation Alert when "회원 정보 모두 삭제" is pressed', () => {
+      const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+      const { getByTestId } = render(<SettingsScreen {...defaultProps} />);
+
+      fireEvent.press(getByTestId('dev-nuke-account'));
+
+      expect(alertSpy).toHaveBeenCalledWith(
+        expect.stringContaining('회원 정보 모두 삭제'),
+        expect.stringContaining('Firebase 계정'),
+        expect.arrayContaining([
+          expect.objectContaining({ text: '취소' }),
+          expect.objectContaining({ text: '모두 삭제', style: 'destructive' }),
+        ]),
+      );
+      alertSpy.mockRestore();
     });
   });
 });

@@ -1,10 +1,10 @@
 /**
  * SignupHeader — shared progress indicator across signup wizard steps 1/3 → 3/3.
  *
- * Renders a left ChevronLeft (when onBack provided), a centered 3-dot gauge
- * highlighting the current step, and a right "{current}/{total}" caption.
- * Aligned with the Wanted Design System hand-off (chat3 — "SignupHeader as
- * shared component").
+ * Renders an optional ChevronLeft (in a soft circular tap target), a
+ * 3-segment horizontal progress bar highlighting filled steps, and a
+ * "{current}/{total}" caption on the right. Aligned with the Wanted v6
+ * hand-off (auth-signup-steps.jsx SignupHeader): segment bars, not dots.
  */
 import React from 'react';
 import { StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
@@ -33,11 +33,11 @@ export const SignupHeader: React.FC<SignupHeaderProps> = ({
   const { isDark } = useTheme();
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
 
-  const dots = Array.from({ length: totalSteps }, (_, i) => i + 1);
+  const segments = Array.from({ length: totalSteps }, (_, i) => i + 1);
 
   return (
     <View style={styles.container} testID={testID}>
-      <View style={styles.side}>
+      <View style={styles.backSlot}>
         {onBack ? (
           <TouchableOpacity
             testID={`${testID}-back`}
@@ -45,35 +45,50 @@ export const SignupHeader: React.FC<SignupHeaderProps> = ({
             accessibilityRole="button"
             accessibilityLabel="뒤로 가기"
             hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+            style={[
+              styles.backButton,
+              {
+                backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(112,115,124,0.08)',
+              },
+            ]}
           >
-            <ChevronLeft size={26} color={semantic.labelNeutral} strokeWidth={2} />
+            <ChevronLeft size={22} color={semantic.labelStrong} strokeWidth={2.2} />
           </TouchableOpacity>
         ) : null}
       </View>
 
-      <View style={styles.gauge} accessibilityRole="progressbar" accessibilityLabel={`회원가입 ${currentStep}단계, 전체 ${totalSteps}단계`}>
-        {dots.map((step) => {
-          const isActive = step <= currentStep;
-          const dotStyle: ViewStyle = {
-            width: step === currentStep ? 22 : 8,
-            height: 8,
-            borderRadius: WANTED_TOKENS.radius.pill,
-            backgroundColor: isActive ? semantic.primaryNormal : semantic.lineSubtle,
-            marginHorizontal: 3,
+      <View
+        style={styles.gauge}
+        accessibilityRole="progressbar"
+        accessibilityLabel={`회원가입 ${currentStep}단계, 전체 ${totalSteps}단계`}
+        testID={`${testID}-gauge`}
+      >
+        {segments.map((step) => {
+          const isFilled = step <= currentStep;
+          const segStyle: ViewStyle = {
+            flex: 1,
+            height: 4,
+            borderRadius: 2,
+            backgroundColor: isFilled
+              ? semantic.primaryNormal
+              : isDark
+                ? 'rgba(255,255,255,0.12)'
+                : 'rgba(112,115,124,0.18)',
+            marginHorizontal: 2,
           };
-          return <View key={step} style={dotStyle} />;
+          return <View key={step} style={segStyle} testID={`${testID}-segment-${step}`} />;
         })}
       </View>
 
-      <View style={[styles.side, styles.sideRight]}>
+      <View style={styles.counterSlot}>
         <Text
           style={[
             styles.counter,
-            { color: semantic.labelAlt, fontFamily: weightToFontFamily('600') },
+            { color: semantic.labelAlt, fontFamily: weightToFontFamily('800') },
           ]}
           testID={`${testID}-counter`}
         >
-          {currentStep}/{totalSteps}
+          {currentStep} / {totalSteps}
         </Text>
       </View>
     </View>
@@ -85,29 +100,38 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingTop: WANTED_TOKENS.spacing.s2,
-    paddingHorizontal: WANTED_TOKENS.spacing.s5,
-    paddingBottom: WANTED_TOKENS.spacing.s2,
-    height: 48,
+    paddingHorizontal: WANTED_TOKENS.spacing.s4,
+    paddingBottom: WANTED_TOKENS.spacing.s1,
+    height: 52,
+    gap: WANTED_TOKENS.spacing.s3,
   },
-  side: {
-    width: 48,
+  backSlot: {
+    width: 36,
+    height: 36,
     justifyContent: 'center',
-    alignItems: 'flex-start',
+    alignItems: 'center',
   },
-  sideRight: {
-    alignItems: 'flex-end',
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   gauge: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+  },
+  counterSlot: {
+    minWidth: 36,
+    alignItems: 'flex-end',
   },
   counter: {
-    fontSize: WANTED_TOKENS.type.caption1.size,
-    fontWeight: '600',
-    fontFamily: weightToFontFamily('600'),
-    letterSpacing: 0.2,
+    fontSize: 11,
+    fontWeight: '800',
+    fontFamily: weightToFontFamily('800'),
+    letterSpacing: 0.22,
   },
 });
 
