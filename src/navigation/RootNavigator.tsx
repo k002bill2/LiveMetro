@@ -6,7 +6,14 @@
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Home, Heart, Bell, Settings, CircleHelp, Map as MapIcon } from 'lucide-react-native';
+import {
+  Home,
+  Star,
+  Route as RouteIcon,
+  Megaphone,
+  User,
+  CircleHelp,
+} from 'lucide-react-native';
 
 import { useAuth } from '../services/auth/AuthContext';
 import { useTheme } from '../services/theme';
@@ -31,6 +38,7 @@ import StationDetailScreen from '../screens/station/StationDetailScreen';
 import { DelayCertificateScreen } from '../screens/delays/DelayCertificateScreen';
 import { DelayFeedScreen } from '../screens/delays/DelayFeedScreen';
 import { AlternativeRoutesScreen } from '../screens/route/AlternativeRoutesScreen';
+import { RoutesTabScreen } from '../screens/route/RoutesTabScreen';
 
 // DEBUG: Set to true to always show onboarding screen during development
 const DEBUG_FORCE_ONBOARDING = __DEV__ && false;
@@ -73,14 +81,23 @@ export type RootStackParamList = {
     fromStationName: string;
     toStationName: string;
   };
+  // Phase 56 — moved out of MainTabs (TabBar v3 = 5 tabs without Map/Alerts).
+  // QuickActionsGrid '노선도' button + HomeTopBar Bell still navigate here,
+  // so they must remain reachable through the outer Stack.
+  SubwayMap: undefined;
+  Alerts: undefined;
 };
 
+// Phase 56 — TabBar v3 alignment with Wanted bundle (`main.jsx` HomeScreen
+// + `atoms.jsx` TabBar). Replaces (Home/Map/Favorites/Alerts/Settings) with
+// the design's 5-tab layout. Map and Alerts remain reachable as outer-stack
+// routes (see RootStackParamList).
 export type MainTabParamList = {
   Home: undefined;
-  Map: undefined;
   Favorites: undefined;
-  Alerts: undefined;
-  Settings: undefined;
+  Routes: undefined;
+  DelayFeed: undefined;
+  Profile: undefined;
 };
 
 const Stack = createStackNavigator<RootStackParamList>();
@@ -100,14 +117,14 @@ const MainTabNavigator: React.FC = () => {
           switch (route.name) {
             case 'Home':
               return <Home size={size} color={color} strokeWidth={strokeWidth} fill="none" />;
-            case 'Map':
-              return <MapIcon size={size} color={color} strokeWidth={strokeWidth} fill="none" />;
             case 'Favorites':
-              return <Heart size={size} color={color} strokeWidth={strokeWidth} fill="none" />;
-            case 'Alerts':
-              return <Bell size={size} color={color} strokeWidth={strokeWidth} fill="none" />;
-            case 'Settings':
-              return <Settings size={size} color={color} strokeWidth={strokeWidth} fill="none" />;
+              return <Star size={size} color={color} strokeWidth={strokeWidth} fill="none" />;
+            case 'Routes':
+              return <RouteIcon size={size} color={color} strokeWidth={strokeWidth} fill="none" />;
+            case 'DelayFeed':
+              return <Megaphone size={size} color={color} strokeWidth={strokeWidth} fill="none" />;
+            case 'Profile':
+              return <User size={size} color={color} strokeWidth={strokeWidth} fill="none" />;
             default:
               return <CircleHelp size={size} color={color} strokeWidth={strokeWidth} fill="none" />;
           }
@@ -152,14 +169,6 @@ const MainTabNavigator: React.FC = () => {
         }}
       />
       <Tab.Screen
-        name="Map"
-        component={SubwayMapScreen}
-        options={{
-          title: '노선도',
-          tabBarLabel: '노선도',
-        }}
-      />
-      <Tab.Screen
         name="Favorites"
         component={FavoritesScreen}
         options={{
@@ -167,20 +176,28 @@ const MainTabNavigator: React.FC = () => {
           tabBarLabel: '즐겨찾기',
         }}
       />
-      <Tab.Screen 
-        name="Alerts" 
-        component={AlertsScreen}
+      <Tab.Screen
+        name="Routes"
+        component={RoutesTabScreen}
         options={{
-          title: '알림',
-          tabBarLabel: '알림',
+          title: '경로',
+          tabBarLabel: '경로',
         }}
       />
       <Tab.Screen
-        name="Settings"
+        name="DelayFeed"
+        component={DelayFeedScreen}
+        options={{
+          title: '제보',
+          tabBarLabel: '제보',
+        }}
+      />
+      <Tab.Screen
+        name="Profile"
         component={SettingsNavigator}
         options={{
-          title: '설정',
-          tabBarLabel: '설정',
+          title: '나',
+          tabBarLabel: '나',
           headerShown: false, // SettingsNavigator has its own header
         }}
       />
@@ -217,27 +234,22 @@ const RootNavigatorContent: React.FC = () => {
 
   // Authenticated but hasn't completed onboarding (or DEBUG mode).
   //
-  // Three possible first screens, in priority order:
-  //   1. EmailLink — phone-only user (Step1 OTP succeeded, no email yet).
-  //      Forces email + password collection via SignUpScreen in 'link' mode.
-  //   2. SignupStep3 — fresh signup celebration (shown once per user via
-  //      `hasSeenSignupCelebration` AsyncStorage flag).
-  //   3. Onboarding — returning user who hasn't completed onboarding.
+  // Two possible first screens, in priority order:
+  //   1. SignupStep3 — fresh signup celebration (shown once per user via
+  //      `hasSeenSignupCelebration` AsyncStorage flag). Phone-only users
+  //      land here directly after OTP success — no separate email/password
+  //      collection step. Email can be linked later from Settings via the
+  //      EmailLink route, which stays registered below for that path.
+  //   2. Onboarding — returning user who hasn't completed onboarding.
   //
   // We use `initialRouteName` rather than `navigation.navigate` from the
   // unauth stack to avoid the race where the unauth stack unmounts before
   // a navigate call lands.
   if (!hasCompletedOnboarding || DEBUG_FORCE_ONBOARDING) {
-    // phone-only signal: authenticated, not anonymous, but no email attached.
-    // Anonymous users (signInAnonymously) should NOT be routed to EmailLink —
-    // they have a different (browse-only) flow.
-    const phoneOnly = !user.isAnonymous && (user.email == null || user.email === '');
     const showCelebration = hasSeenSignupCelebration === false;
-    const initial: 'EmailLink' | 'SignupStep3' | 'Onboarding' = phoneOnly
-      ? 'EmailLink'
-      : showCelebration
-        ? 'SignupStep3'
-        : 'Onboarding';
+    const initial: 'SignupStep3' | 'Onboarding' = showCelebration
+      ? 'SignupStep3'
+      : 'Onboarding';
     return (
       <Stack.Navigator
         screenOptions={{ headerShown: false }}
@@ -299,6 +311,24 @@ const RootNavigatorContent: React.FC = () => {
         component={AlternativeRoutesScreen}
         options={{
           headerShown: false,
+        }}
+      />
+      {/* Phase 56 — moved out of MainTabs but still reachable from
+          QuickActionsGrid '노선도' (HomeScreen) and HomeTopBar Bell. */}
+      <Stack.Screen
+        name="SubwayMap"
+        component={SubwayMapScreen}
+        options={{
+          headerShown: true,
+          title: '노선도',
+        }}
+      />
+      <Stack.Screen
+        name="Alerts"
+        component={AlertsScreen}
+        options={{
+          headerShown: true,
+          title: '알림',
         }}
       />
     </Stack.Navigator>

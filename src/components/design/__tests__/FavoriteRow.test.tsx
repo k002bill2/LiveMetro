@@ -78,6 +78,20 @@ describe('FavoriteRow', () => {
     expect(getAllByLabelText(/드래그 핸들|^강남역/).length).toBeGreaterThan(0);
   });
 
+  it('renders the "곧 도착" badge when imminent is true', () => {
+    const { getByText } = wrap(
+      <FavoriteRow lines={['2']} stationName="강남" nextMinutes={1} imminent />,
+    );
+    expect(getByText('곧 도착')).toBeTruthy();
+  });
+
+  it('omits the imminent badge by default', () => {
+    const { queryByText } = wrap(
+      <FavoriteRow lines={['2']} stationName="강남" nextMinutes={3} />,
+    );
+    expect(queryByText('곧 도착')).toBeNull();
+  });
+
   it('fires onPress when tapped', () => {
     const onPress = jest.fn();
     const { getByTestId } = wrap(
