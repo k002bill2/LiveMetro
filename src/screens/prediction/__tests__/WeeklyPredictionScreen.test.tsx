@@ -150,10 +150,15 @@ describe('WeeklyPredictionScreen', () => {
     expect(getByText('출발 시간에 알려드릴게요 (09:15)')).toBeTruthy();
   });
 
-  it('renders placeholder card describing pending ML state', () => {
+  it('renders hourly congestion forecast section + remaining placeholder', () => {
     const { getByText } = render(<WeeklyPredictionScreen />);
+    // Phase 54: hourly chart replaced the broad placeholder. Remaining
+    // unbuilt sections (segment/factors/weekly) live in a smaller
+    // placeholder beneath the chart.
+    expect(getByText('시간대별 혼잡도 예측')).toBeTruthy();
+    expect(getByText('지금')).toBeTruthy();
     expect(
-      getByText('상세 분석은 ML 학습이 완료된 후 표시됩니다'),
+      getByText('구간별 시간 · 예측 영향 요소 · 주간 추이는 ML 학습 완료 후 표시됩니다.'),
     ).toBeTruthy();
   });
 
