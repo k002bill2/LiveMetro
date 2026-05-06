@@ -222,60 +222,64 @@ const ArrivalCardImpl: React.FC<ArrivalCardProps> = ({
           testID={testID ? `${testID}-congestion` : undefined}
           style={[styles.congestionWrap, { borderTopColor: semantic.lineSubtle }]}
         >
+          {/* Header row: swaps to tooltip when a bar is long-pressed.
+              Avoids absolute positioning + overlap/clipping risk that an
+              overlay above the bars would have. */}
           <View style={styles.congestionHeader}>
-            <Text style={[styles.congestionLabel, { color: semantic.labelAlt }]}>
-              칸별 혼잡도
-            </Text>
-            <Text style={[styles.congestionAxis, { color: semantic.labelAlt }]}>
-              ← 전 / 후 →
-            </Text>
-          </View>
-          {/* Bars row + absolute tooltip overlay (anchored above the bars) */}
-          <View style={styles.barRowWrap}>
             {tooltipContent ? (
-              <View
+              <Text
                 testID={testID ? `${testID}-car-tooltip` : undefined}
-                style={[styles.tooltip, { backgroundColor: semantic.labelStrong }]}
-                pointerEvents="none"
+                style={[styles.tooltipText, { color: semantic.primaryNormal }]}
+                numberOfLines={1}
               >
-                <Text style={[styles.tooltipText, { color: semantic.bgBase }]}>
-                  {tooltipContent}
+                {tooltipContent}
+              </Text>
+            ) : (
+              <>
+                <Text style={[styles.congestionLabel, { color: semantic.labelAlt }]}>
+                  칸별 혼잡도
                 </Text>
-              </View>
-            ) : null}
-            <View style={styles.barRow}>
-              {carCongestion.map((pct, idx) => {
-                const tone = congFromPct(pct);
-                const color = CONG_TONE[tone].color;
-                const clamped = Math.max(0, Math.min(100, pct));
-                return (
-                  <TouchableOpacity
-                    key={`${idx}-${pct}`}
-                    testID={testID ? `${testID}-car-bar-${idx + 1}` : undefined}
-                    style={styles.barColumn}
-                    onLongPress={() => showTooltip(idx)}
-                    delayLongPress={350}
-                    activeOpacity={0.7}
-                    accessible
-                    accessibilityRole="button"
-                    accessibilityLabel={`${idx + 1}호차, ${CONG_TONE[tone].label}, ${Math.round(pct)}퍼센트`}
-                    accessibilityHint="길게 눌러 상세 정보 보기"
-                  >
-                    <View style={[styles.barTrack, { backgroundColor: semantic.bgSubtle }]}>
-                      <View
-                        style={[
-                          styles.barFill,
-                          { backgroundColor: color, height: `${clamped}%` },
-                        ]}
-                      />
-                    </View>
-                    <Text style={[styles.barNum, { color: semantic.labelAlt }]}>
-                      {idx + 1}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
+                <Text style={[styles.congestionAxis, { color: semantic.labelAlt }]}>
+                  ← 전 / 후 →
+                </Text>
+              </>
+            )}
+          </View>
+          <View style={styles.barRow}>
+            {carCongestion.map((pct, idx) => {
+              const tone = congFromPct(pct);
+              const color = CONG_TONE[tone].color;
+              const clamped = Math.max(0, Math.min(100, pct));
+              return (
+                <TouchableOpacity
+                  // Stable identity by car position — pct changes every
+                  // 30s polling cycle and a pct-keyed remount would
+                  // interrupt an in-flight longPress (Gemini review).
+                  key={idx}
+                  testID={testID ? `${testID}-car-bar-${idx + 1}` : undefined}
+                  style={styles.barColumn}
+                  onLongPress={() => showTooltip(idx)}
+                  delayLongPress={350}
+                  activeOpacity={0.7}
+                  accessible
+                  accessibilityRole="button"
+                  accessibilityLabel={`${idx + 1}호차, ${CONG_TONE[tone].label}, ${Math.round(pct)}퍼센트`}
+                  accessibilityHint="길게 눌러 상세 정보 보기"
+                >
+                  <View style={[styles.barTrack, { backgroundColor: semantic.bgSubtle }]}>
+                    <View
+                      style={[
+                        styles.barFill,
+                        { backgroundColor: color, height: `${clamped}%` },
+                      ]}
+                    />
+                  </View>
+                  <Text style={[styles.barNum, { color: semantic.labelAlt }]}>
+                    {idx + 1}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
       ) : null}
@@ -323,32 +327,18 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: weightToFontFamily('600'),
   },
-  /** Wrapper anchors the absolute tooltip overlay above the bar row. */
-  barRowWrap: {
-    position: 'relative',
-  },
   barRow: {
     flexDirection: 'row',
     gap: 3,
     alignItems: 'flex-end',
   },
-  /* Phase 53b: long-press tooltip overlay */
-  tooltip: {
-    position: 'absolute',
-    top: -28,
-    left: 0,
-    right: 0,
-    paddingHorizontal: WANTED_TOKENS.spacing.s2,
-    paddingVertical: 4,
-    borderRadius: WANTED_TOKENS.radius.r4,
-    zIndex: 10,
-    alignItems: 'center',
-  },
+  /* Phase 53b: tooltip text rendered IN the header row when active —
+     no absolute positioning, no overlap/clipping risk. */
   tooltipText: {
     fontSize: 11,
     fontWeight: '700',
     fontFamily: weightToFontFamily('700'),
-    textAlign: 'center',
+    flex: 1,
   },
   barColumn: {
     flex: 1,
