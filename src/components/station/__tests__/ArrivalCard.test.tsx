@@ -68,4 +68,36 @@ describe('ArrivalCard', () => {
     const { getByText } = render(<ArrivalCard {...base} delayMinutes={3} />);
     expect(getByText(/지연 3분/)).toBeTruthy();
   });
+
+  describe('empty congestion placeholder (Phase 55)', () => {
+    it('hides placeholder by default when carCongestion is omitted', () => {
+      const { queryByTestId } = render(<ArrivalCard {...base} testID="arr" />);
+      expect(queryByTestId('arr-congestion')).toBeNull();
+      expect(queryByTestId('arr-congestion-empty')).toBeNull();
+    });
+
+    it('shows empty placeholder when showEmptyCongestion is true and no data', () => {
+      const { getByTestId, getByText, queryByTestId } = render(
+        <ArrivalCard {...base} showEmptyCongestion testID="arr" />
+      );
+      expect(getByTestId('arr-congestion-empty')).toBeTruthy();
+      expect(getByText('혼잡도 정보 준비 중')).toBeTruthy();
+      expect(getByText('사용자 제보가 쌓이면 표시돼요')).toBeTruthy();
+      // Bars section should NOT render in empty state
+      expect(queryByTestId('arr-congestion')).toBeNull();
+    });
+
+    it('shows bars (not placeholder) when carCongestion is provided', () => {
+      const { getByTestId, queryByTestId } = render(
+        <ArrivalCard
+          {...base}
+          showEmptyCongestion
+          carCongestion={[10, 30, 50, 70, 90, 60, 40, 20, 80, 95]}
+          testID="arr"
+        />
+      );
+      expect(getByTestId('arr-congestion')).toBeTruthy();
+      expect(queryByTestId('arr-congestion-empty')).toBeNull();
+    });
+  });
 });

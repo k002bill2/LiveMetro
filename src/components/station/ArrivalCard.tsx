@@ -31,6 +31,13 @@ export interface ArrivalCardProps {
   delayMinutes?: number;
   /** Per-car congestion percentages (0–100). Length = car count. */
   carCongestion?: readonly number[];
+  /**
+   * Phase 55: when true, render a friendly empty-state row instead of
+   * wholesale-hiding the congestion section when `carCongestion` is
+   * absent. Defaults to false to preserve existing call-sites that
+   * intentionally suppress the strip (e.g., non-first arrivals).
+   */
+  showEmptyCongestion?: boolean;
   testID?: string;
 }
 
@@ -42,6 +49,7 @@ const ArrivalCardImpl: React.FC<ArrivalCardProps> = ({
   isFirst = false,
   delayMinutes = 0,
   carCongestion,
+  showEmptyCongestion = false,
   testID,
 }) => {
   const { isDark } = useTheme();
@@ -142,6 +150,32 @@ const ArrivalCardImpl: React.FC<ArrivalCardProps> = ({
           )}
         </View>
       </View>
+
+      {/* Phase 55: empty state when caller explicitly opts in
+          (`showEmptyCongestion`) and no per-car data is available.
+          Renders a small placeholder row so users see clear messaging
+          instead of a mysteriously empty card. */}
+      {!(carCongestion && carCongestion.length > 0) && showEmptyCongestion ? (
+        <View
+          testID={testID ? `${testID}-congestion-empty` : undefined}
+          style={[styles.congestionWrap, { borderTopColor: semantic.lineSubtle }]}
+          accessible
+          accessibilityRole="text"
+          accessibilityLabel="혼잡도 정보 준비 중. 사용자 제보가 쌓이면 표시됩니다."
+        >
+          <View style={styles.emptyRow}>
+            {/* Primary message uses labelNeutral, hint uses muted labelAlt
+                — clear visual hierarchy between the headline and the
+                secondary explanation. */}
+            <Text style={[styles.emptyText, { color: semantic.labelNeutral }]}>
+              혼잡도 정보 준비 중
+            </Text>
+            <Text style={[styles.emptyHint, { color: semantic.labelAlt }]}>
+              사용자 제보가 쌓이면 표시돼요
+            </Text>
+          </View>
+        </View>
+      ) : null}
 
       {carCongestion && carCongestion.length > 0 ? (
         <View
@@ -251,6 +285,22 @@ const styles = StyleSheet.create({
   barNum: {
     fontSize: 9,
     fontFamily: weightToFontFamily('700'),
+  },
+  /* Phase 55: empty state row */
+  emptyRow: {
+    paddingVertical: 4,
+    alignItems: 'center',
+  },
+  emptyText: {
+    fontSize: 12,
+    fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
+  },
+  emptyHint: {
+    fontSize: 10,
+    fontWeight: '500',
+    fontFamily: weightToFontFamily('500'),
+    marginTop: 2,
   },
 });
 

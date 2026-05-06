@@ -263,6 +263,10 @@ const StationDetailScreen: React.FC = () => {
               delayMinutes={arrival.delayMinutes}
               isFirst={idx === 0}
               carCongestion={idx === 0 ? carCongestionPct : undefined}
+              // Phase 55: surface a friendly placeholder on the focused
+              // (first) arrival when congestion data hasn't loaded yet —
+              // avoids the prior "blank space" UX when subscribe fails.
+              showEmptyCongestion={idx === 0}
               testID={`station-detail-arrival-${idx}`}
             />
           ))
