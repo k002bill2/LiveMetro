@@ -27,7 +27,7 @@ jest.mock('lucide-react-native', () => ({
   ScanFace: 'ScanFace',
   Fingerprint: 'Fingerprint',
   HelpCircle: 'HelpCircle',
-  FileText: 'FileText',
+  Shield: 'Shield',
   ShieldCheck: 'ShieldCheck',
   Info: 'Info',
   LogOut: 'LogOut',

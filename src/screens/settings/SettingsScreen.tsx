@@ -28,7 +28,7 @@ import {
   ScanFace,
   Fingerprint,
   HelpCircle,
-  FileText,
+  Shield,
   ShieldCheck,
   Info,
   LogOut,
@@ -393,6 +393,12 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
               subtitle={t.settings.locationPermissionDesc}
               onPress={() => navigation.navigate('LocationPermission')}
             />
+            <SettingItem
+              Icon={Shield}
+              title={t.settings.privacyPolicy}
+              subtitle={language === 'ko' ? '데이터 사용 및 권한 관리' : 'Data usage and permissions'}
+              onPress={() => navigation.navigate('PrivacyPolicy')}
+            />
           </View>
         </View>
 
@@ -472,11 +478,6 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
               title={t.settings.help}
               subtitle={t.settings.helpDesc}
               onPress={() => navigation.navigate('Help')}
-            />
-            <SettingItem
-              Icon={FileText}
-              title={t.settings.privacyPolicy}
-              onPress={() => navigation.navigate('PrivacyPolicy')}
             />
             <SettingItem
               Icon={ShieldCheck}
