@@ -246,7 +246,7 @@ describe('DelayFeedScreen', () => {
       const { getByText } = render(<DelayFeedScreen />);
 
       await waitFor(() => {
-        expect(getByText('강남역')).toBeTruthy();
+        expect(getByText('강남')).toBeTruthy();
       });
       expect(getByText('승객A')).toBeTruthy();
       expect(getByText('3개의 활성 제보')).toBeTruthy();
@@ -263,7 +263,7 @@ describe('DelayFeedScreen', () => {
       const { getByText } = render(<DelayFeedScreen />);
 
       await waitFor(() => {
-        expect(getByText('강남역')).toBeTruthy();
+        expect(getByText('강남')).toBeTruthy();
         expect(getByText('승객A')).toBeTruthy();
         expect(getByText(/\+10분/)).toBeTruthy();
         expect(getByText('3')).toBeTruthy(); // upvote count
@@ -293,12 +293,10 @@ describe('DelayFeedScreen', () => {
         }
       );
 
-      const { UNSAFE_root } = render(<DelayFeedScreen />);
+      const { findAllByText } = render(<DelayFeedScreen />);
 
-      await waitFor(() => {
-        const checkCircles = UNSAFE_root.findAllByType('CheckCircle');
-        expect(checkCircles.length).toBeGreaterThan(0);
-      });
+      const verifiedBadges = await findAllByText('검증됨');
+      expect(verifiedBadges.length).toBeGreaterThan(0);
     });
 
     it('renders multiple reports correctly', async () => {
@@ -312,9 +310,9 @@ describe('DelayFeedScreen', () => {
       const { getByText } = render(<DelayFeedScreen />);
 
       await waitFor(() => {
-        expect(getByText('강남역')).toBeTruthy();
+        expect(getByText('강남')).toBeTruthy();
         expect(getByText(/서울역/)).toBeTruthy();
-        expect(getByText('종로3가역')).toBeTruthy();
+        expect(getByText('종로3가')).toBeTruthy();
       });
     });
   });
@@ -356,7 +354,7 @@ describe('DelayFeedScreen', () => {
 
         await waitFor(() => {
           expect(getByText('1개의 활성 제보')).toBeTruthy();
-          expect(getByText('강남역')).toBeTruthy();
+          expect(getByText('강남')).toBeTruthy();
         });
       }
     });
@@ -395,7 +393,7 @@ describe('DelayFeedScreen', () => {
       const { getByText } = render(<DelayFeedScreen />);
 
       await waitFor(() => {
-        expect(getByText('강남역')).toBeTruthy();
+        expect(getByText('강남')).toBeTruthy();
       });
 
       // Upvote count "3" is inside an accessible View (acts as button)
@@ -457,7 +455,7 @@ describe('DelayFeedScreen', () => {
       const { getByText } = render(<DelayFeedScreen />);
 
       await waitFor(() => {
-        expect(getByText('강남역')).toBeTruthy();
+        expect(getByText('강남')).toBeTruthy();
       });
 
       expect(delayReportService.upvoteReport).not.toHaveBeenCalled();
@@ -477,11 +475,11 @@ describe('DelayFeedScreen', () => {
       const { getByText } = render(<DelayFeedScreen />);
 
       await waitFor(() => {
-        expect(getByText('강남역')).toBeTruthy();
+        expect(getByText('강남')).toBeTruthy();
       });
 
       // Component should still render without crashing
-      expect(getByText('강남역')).toBeTruthy();
+      expect(getByText('강남')).toBeTruthy();
     });
   });
 

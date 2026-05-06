@@ -19,8 +19,8 @@ import {
   ThumbsUp,
   Megaphone,
   Clock,
-  CheckCircle,
 } from 'lucide-react-native';
+import { Pill } from '@/components/design/Pill';
 
 import { useAuth } from '@/services/auth/AuthContext';
 import { useTheme } from '@/services/theme';
@@ -139,7 +139,7 @@ export const DelayFeedScreen: React.FC = () => {
               <View style={[styles.lineBadge, { backgroundColor: lineColor }]}>
                 <Text style={styles.lineBadgeText}>{report.lineId}호선</Text>
               </View>
-              <Text style={styles.stationText}>{report.stationName}역</Text>
+              <Text style={styles.stationText}>{report.stationName}</Text>
             </View>
             <Text style={styles.timeText}>
               {formatTimeAgo(new Date(report.timestamp))}
@@ -178,7 +178,7 @@ export const DelayFeedScreen: React.FC = () => {
                 {report.userDisplayName}
               </Text>
               {report.verified && (
-                <CheckCircle size={14} color={semantic.statusPositive} />
+                <Pill tone="warn" size="sm">검증됨</Pill>
               )}
             </View>
 
