@@ -49,6 +49,7 @@ import { useMLPrediction } from '@/hooks/useMLPrediction';
 import { useTheme, ThemeColors } from '@/services/theme';
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { Pill } from '@/components/design';
+import { CONG_TONE, congFromPct } from '@/components/design/congestion';
 
 /**
  * Compute commute minutes from "HH:mm" departure → arrival strings, wrapping
@@ -80,16 +81,13 @@ const formatTimeShort = (now: Date = new Date()): string => {
 /* ───────── Phase 54: Hourly congestion forecast helpers ───────── */
 
 /**
- * Map a 0-100 congestion percentage to the design's CONG_TONE color
- * (`commute-prediction.jsx` legend). Mirrors `congFromPct` in
- * atoms.jsx — single source of truth for visual mapping.
+ * Map a 0-100 congestion percentage to the central design system color.
+ * Single source of truth: `src/components/design/congestion.ts` (which
+ * itself re-exports `WANTED_TOKENS.congestion`). Brand-color changes
+ * propagate without touching this screen.
  */
-const congestionColorFromPct = (pct: number): string => {
-  if (pct < 45) return '#00BF40'; // 여유 (low)
-  if (pct < 70) return '#FFB400'; // 보통 (mid)
-  if (pct < 88) return '#FF7A1A'; // 혼잡 (high)
-  return '#FF4242'; // 매우혼잡 (vhigh)
-};
+const congestionColorFromPct = (pct: number): string =>
+  CONG_TONE[congFromPct(pct)].color;
 
 interface HourlyDatum {
   readonly time: string; // "HH" (e.g., "08")
@@ -170,6 +168,11 @@ export const WeeklyPredictionScreen: React.FC = () => {
   const confidencePct = prediction ? Math.round(prediction.confidence * 100) : 87;
   const arrivalTime = prediction?.predictedArrivalTime ?? '';
   const nowLabel = useMemo(() => formatTimeShort(new Date()), []);
+  // Phase 54: hourly forecast — pure derived data, memoized once per
+  // mount. Avoids 7×{array+object} re-allocation on every counter-anim
+  // re-render (900ms ease-out sets state ~60Hz). Will key on a real
+  // updated-at timestamp once useMLPrediction exposes hourly data.
+  const hourlyForecast = useMemo(() => buildHourlyForecast(new Date()), []);
 
   // Animated count-up for the big number — 900ms ease-out cubic.
   const animatedValue = useRef(new Animated.Value(0)).current;
@@ -354,8 +357,7 @@ export const WeeklyPredictionScreen: React.FC = () => {
 
             {/* Bars row */}
             {(() => {
-              const hourly = buildHourlyForecast();
-              return hourly.map((h, i) => {
+              return hourlyForecast.map((h, i) => {
                 const color = congestionColorFromPct(h.cong);
                 return (
                   <View key={`bar-${i}`} style={styles.barColumn}>
@@ -408,7 +410,7 @@ export const WeeklyPredictionScreen: React.FC = () => {
 
           {/* Hour labels */}
           <View style={styles.hourLabelRow}>
-            {buildHourlyForecast().map((h, i) => (
+            {hourlyForecast.map((h, i) => (
               <Text
                 key={`hour-${i}`}
                 style={[
