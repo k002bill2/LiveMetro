@@ -10,10 +10,10 @@
 |------|------|
 | **디자인 토큰 (Wanted)** | ✅ 적용 완료 — 33개 화면 전수 `WANTED_TOKENS`/`weightToFontFamily` 사용 (Phase 21~49) |
 | **디자인 atoms (LineBadge/Pill/CongestionBar 등)** | ✅ `src/components/design/` 11개 컴포넌트로 추출 완료 |
-| **풀 화면 매핑 (24 아트보드)** | ✅ 22개 직접 대응, ⚠️ 2개 부분 (Map v2, OnboardingStationPicker) |
-| **세부 패턴 갭** | 화면별 0~3개 식별 (아래 표 참조) |
+| **풀 화면 매핑 (24 아트보드)** | ✅ 24개 모두 대응 (P0 3건 main 머지 확인 — 2026-05-06 재검증) |
+| **세부 패턴 갭** | 화면별 0~3개 식별 (아래 표 참조). P0 갭 0건 |
 
-핵심 결론: **이 프로젝트는 시안과의 96% 정렬을 이미 달성**했습니다. 남은 갭은 마이크로 패턴 (24h 타임라인 시각화, 노선도 v2 스타일, 통신사 6칸 그리드 등) 수준이며, 각 갭은 개별 phase에서 surgical하게 처리 가능합니다.
+핵심 결론: **이 프로젝트는 시안 P0 3건을 모두 main에 머지한 상태**입니다 (24h 타임라인 = `356a80f`, MapScreen v2 = 기존 `SubwayMapScreen.tsx:177-322`, StationPicker = `c6b0e0c`). 잔존 갭은 마이크로 시각 텍스처 수준(stripes, padding 미세 조정 등)이며 ROI가 낮습니다. **2026-05-06 재검증 노트**: 본 문서 5절 초안의 "Phase 50/51/52 추천"은 작성 시점의 grep 키워드(`LineChipRow` 등)와 실제 코드 명명(`lineSelector` 등) 어긋남으로 인한 false negative였음.
 
 ---
 
@@ -167,19 +167,19 @@
 
 ---
 
-## 5. 추천 다음 phase 후보
+## 5. 추천 다음 phase 후보 (2026-05-06 재검증 결과)
 
-기존 phase 진행 패턴(`project_wanted_token_migration_pattern.md`)을 따라:
+| 우선 | Phase 후보 | 시안 갭 ID | 상태 | 검증 결과 |
+|------|-----------|-----------|------|----------|
+| 1 | SettingsAlertTime 24h 타임라인 시각화 | P0-2 | ✅ **완료** | commit `356a80f` Phase 50. `NotificationTimeScreen.tsx:240-319`에 24h 타임라인 카드(eyebrow + title + 출퇴근 솔리드 밴드 + 일반 라이트 밴드 + 방해금지 muted 밴드 + hour ticks 0/6/12/18/24 + legend 3종) 매핑 |
+| 2 | MapScreen v2 (호선 칩 + 수직 타임라인) | P0-1 | ✅ **완료** | `SubwayMapScreen.tsx:177-322` (Phase 8/28/31 누적). 호선 칩 ScrollView (활성=컬러 채움 + box-shadow / 비활성=2px border) + "{이름} 역 목록 · 총 N개" + lineVisualization 수직 타임라인 + 환승 노드(`ArrowRightLeft size=14 strokeWidth=2.6` — 시안과 정확히 동일) + chevron-right 18 모두 일치 |
+| 3 | OnboardingStationPickerScreen 독립 화면 | P0-3 | ✅ **완료** | commit `c6b0e0c` Phase 52 + follow-up `8fc9b62` 테스트. `OnboardingStationPickerScreen.tsx` 독립 화면 존재 |
+| 4 | StationDetail 칸별 혼잡도 막대 | P1-6 | ✅ **완료** | PR #14→#16 redirect (commit `35f7cc3`) Phase 53b ArrivalCard car-bar tooltip + PR #17 (commit `3b2bdbd`) Phase 55 empty-state placeholder |
+| 5 | CommutePredictionScreen 시간대별 차트 | P1-4 | ✅ **완료** | PR #15 (commit `a8ab59a`) Phase 54 WeeklyPrediction hourly congestion forecast chart |
 
-| 우선 | Phase 후보 | 시안 갭 ID | 예상 변경 파일 수 |
-|------|-----------|-----------|------------------|
-| 1 | Phase 50: SettingsAlertTime 24h 타임라인 시각화 | P0-2 | 1~2 (NotificationTimeScreen + 새 atom?) |
-| 2 | Phase 51: MapScreen v2 (호선 칩 + 수직 타임라인) | P0-1 | 2~3 (SubwayMapScreen + LineChip + StationTimelineRow) |
-| 3 | Phase 52: OnboardingStationPickerScreen 독립 화면 | P0-3 | 3~4 (새 screen + browseMode + ParamList) |
-| 4 | Phase 53: StationDetail 칸별 혼잡도 막대 (`TrainCongestionView` 진행 중 작업과 정렬) | P1-6 | 2 (TrainCongestionView + CarCongestionBar atom) |
-| 5 | Phase 54: CommutePredictionScreen 시간대별 차트 + 영향 요소 | P1-4 | 1~2 |
+**P0 갭 0건, P1 갭 0건** — 시안 핵심 화면 모두 main 머지 상태.
 
-각 phase는 메모리의 5단계 surgical 레시피 적용 — import/destructure/inline icon/createStyles/deps.
+남은 작업은 P2 마이크로 텍스처 (24h stripes 패턴 / Pill tone 정밀 매핑 등)이며, 각각 ROI가 낮습니다. 본 문서 6절 "검증 필요 항목" 13건은 line-level 정렬도 audit 대상으로 별도 sweep 가능.
 
 ---
 
