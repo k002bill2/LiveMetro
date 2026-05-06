@@ -1,6 +1,11 @@
 /**
- * Station Navigator Screen - Modern Design
- * Minimal grayscale design with black accent
+ * Station Navigator Screen — Modern Design.
+ *
+ * Phase 52 — migrated from legacy COLORS/SPACING/RADIUS/TYPOGRAPHY API
+ * to Wanted Design System tokens. Strong-contrast emphasis (current
+ * station card / active direction / current chip) maps to
+ * `semantic.labelStrong` so the inversion works in both light and dark
+ * modes. Inverse text on those surfaces uses `semantic.bgBase`.
  */
 
 import React, { useCallback, useState, useMemo } from 'react';
@@ -30,12 +35,20 @@ import { AppStackParamList } from '../../navigation/types';
 import { useStationNavigation } from '../../hooks/useStationNavigation';
 import { useRealtimeTrains } from '../../hooks/useRealtimeTrains';
 import { TrainArrivalList } from '../../components/train/TrainArrivalList';
-import { COLORS, SPACING, RADIUS, TYPOGRAPHY } from '../../styles/modernTheme';
+import {
+  WANTED_TOKENS,
+  weightToFontFamily,
+  type WantedSemanticTheme,
+} from '../../styles/modernTheme';
+import { useTheme } from '../../services/theme';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'StationNavigator'>;
 
 export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) => {
   const { stationId, lineId, mode } = route.params;
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   // 방향 선택 상태 (출발 모드에서 사용)
   const [selectedDirection, setSelectedDirection] = useState<'up' | 'down'>('down');
@@ -75,15 +88,12 @@ export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) =
     }
 
     if (selectedDirection === 'up') {
-      // 상행: 현재역 이전 역들 (인덱스 감소 방향), 최대 4개
       return allStations.slice(0, currentIndex).reverse().slice(0, MAX_UPCOMING_STATIONS);
     } else {
-      // 하행: 현재역 이후 역들 (인덱스 증가 방향), 최대 4개
       return allStations.slice(currentIndex + 1, currentIndex + 1 + MAX_UPCOMING_STATIONS);
     }
   }, [allStations, currentIndex, selectedDirection]);
 
-  // 전체 남은 역 수 계산
   const totalRemainingStations = useMemo(() => {
     if (!allStations || allStations.length === 0 || currentIndex < 0) {
       return 0;
@@ -95,7 +105,6 @@ export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) =
     }
   }, [allStations, currentIndex, selectedDirection]);
 
-  // 종착역 표시
   const terminalStation = useMemo(() => {
     if (selectedDirection === 'up') {
       return allStations[0];
@@ -125,10 +134,7 @@ export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) =
     if (!station) {
       return (
         <View style={[styles.stationCard, styles.emptyCard]}>
-          <Minus
-            size={20}
-            color={COLORS.gray[300]}
-          />
+          <Minus size={20} color={semantic.lineNormal} />
           <Text style={styles.emptyText}>
             {type === 'previous' ? '첫 번째 역' : '마지막 역'}
           </Text>
@@ -168,16 +174,20 @@ export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) =
               {station.name}
             </Text>
             {station.nameEn && (
-              <Text style={styles.stationNameEn}>{station.nameEn}</Text>
+              <Text style={[styles.stationNameEn, isCurrent && styles.currentStationNameEn]}>
+                {station.nameEn}
+              </Text>
             )}
             {station.transfers && station.transfers.length > 0 && (
-              <View style={styles.transferBadge}>
-                <Text style={styles.transferText}>환승</Text>
+              <View style={[styles.transferBadge, isCurrent && styles.currentTransferBadge]}>
+                <Text style={[styles.transferText, isCurrent && styles.currentTransferText]}>
+                  환승
+                </Text>
               </View>
             )}
           </View>
           {isCurrent && (
-            <ChevronRight size={20} color={COLORS.gray[400]} />
+            <ChevronRight size={20} color={semantic.bgBase} />
           )}
         </View>
       </TouchableOpacity>
@@ -188,7 +198,7 @@ export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) =
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.black} />
+          <ActivityIndicator size="large" color={WANTED_TOKENS.blue[500]} />
           <Text style={styles.loadingText}>역 정보 로딩중</Text>
         </View>
       </SafeAreaView>
@@ -200,7 +210,7 @@ export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) =
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>
           <View style={styles.errorIcon}>
-            <AlertCircle size={48} color={COLORS.gray[400]} />
+            <AlertCircle size={48} color={semantic.labelAlt} />
           </View>
           <Text style={styles.errorTitle}>{error || '역 정보를 찾을 수 없습니다'}</Text>
           <TouchableOpacity style={styles.retryButton} onPress={handleRefresh}>
@@ -216,7 +226,7 @@ export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) =
       {/* Modern Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.headerButton}>
-          <ArrowLeft size={24} color={COLORS.black} />
+          <ArrowLeft size={24} color={semantic.labelStrong} />
         </TouchableOpacity>
         <View style={styles.headerCenter}>
           <Text style={styles.headerTitle}>Line {currentStation.lineId}</Text>
@@ -225,7 +235,7 @@ export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) =
           </Text>
         </View>
         <TouchableOpacity onPress={handleRefresh} style={styles.headerButton}>
-          <RefreshCw size={24} color={COLORS.black} />
+          <RefreshCw size={24} color={semantic.labelStrong} />
         </TouchableOpacity>
       </View>
 
@@ -241,7 +251,7 @@ export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) =
           >
             <ArrowUp
               size={16}
-              color={selectedDirection === 'up' ? COLORS.white : COLORS.black}
+              color={selectedDirection === 'up' ? semantic.bgBase : semantic.labelStrong}
             />
             <Text
               style={[
@@ -261,7 +271,7 @@ export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) =
           >
             <ArrowDown
               size={16}
-              color={selectedDirection === 'down' ? COLORS.white : COLORS.black}
+              color={selectedDirection === 'down' ? semantic.bgBase : semantic.labelStrong}
             />
             <Text
               style={[
@@ -282,7 +292,7 @@ export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) =
           <RefreshControl
             refreshing={loading || trainsLoading}
             onRefresh={handleRefresh}
-            tintColor={COLORS.black}
+            tintColor={semantic.labelStrong}
           />
         }
         showsVerticalScrollIndicator={false}
@@ -299,7 +309,7 @@ export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) =
             </Text>
             {terminalStation && (
               <View style={styles.terminalInfo}>
-                <Flag size={14} color={COLORS.text.secondary} />
+                <Flag size={14} color={semantic.labelNeutral} />
                 <Text style={styles.terminalText}>
                   종착: {terminalStation.name}
                 </Text>
@@ -361,7 +371,7 @@ export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) =
             </Text>
             {terminalStation && (
               <View style={styles.terminalInfo}>
-                <Flag size={14} color={COLORS.text.secondary} />
+                <Flag size={14} color={semantic.labelNeutral} />
                 <Text style={styles.terminalText}>
                   종착: {terminalStation.name}
                 </Text>
@@ -421,330 +431,348 @@ export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) =
           </View>
         </View>
 
-        <View style={{ height: SPACING['3xl'] }} />
+        <View style={{ height: WANTED_TOKENS.spacing.s8 }} />
       </ScrollView>
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.white,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.lg,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.light,
-  },
-  headerButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerCenter: {
-    flex: 1,
-    alignItems: 'center',
-  },
-  headerTitle: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
-    letterSpacing: TYPOGRAPHY.letterSpacing.tight,
-  },
-  headerSubtitle: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.text.tertiary,
-    marginTop: 2,
-    letterSpacing: TYPOGRAPHY.letterSpacing.wide,
-  },
-  // 방향 선택 스타일
-  directionSelector: {
-    flexDirection: 'row',
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.md,
-    gap: SPACING.sm,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border.light,
-  },
-  directionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: SPACING.xs,
-    paddingVertical: SPACING.md,
-    backgroundColor: COLORS.surface.card,
-    borderRadius: RADIUS.base,
-    borderWidth: 1,
-    borderColor: COLORS.border.medium,
-  },
-  directionButtonActive: {
-    backgroundColor: COLORS.black,
-    borderColor: COLORS.black,
-  },
-  directionButtonText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.medium,
-    color: COLORS.text.primary,
-  },
-  directionButtonTextActive: {
-    color: COLORS.white,
-  },
-  // 앞으로 지나갈 역 목록 스타일
-  terminalInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.xs,
-    marginBottom: SPACING.md,
-  },
-  terminalText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.secondary,
-  },
-  upcomingStationsList: {
-    backgroundColor: COLORS.surface.card,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.lg,
-    borderWidth: 1,
-    borderColor: COLORS.border.light,
-  },
-  upcomingStationItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: SPACING.sm,
-    position: 'relative',
-  },
-  stationDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: COLORS.black,
-    marginRight: SPACING.md,
-  },
-  stationLine: {
-    position: 'absolute',
-    left: 4,
-    top: 24,
-    width: 2,
-    height: 24,
-    backgroundColor: COLORS.gray[300],
-  },
-  upcomingStationName: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    color: COLORS.text.primary,
-    flex: 1,
-  },
-  transferBadgeSmall: {
-    backgroundColor: COLORS.gray[100],
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 2,
-    borderRadius: RADIUS.sm,
-  },
-  transferTextSmall: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.text.secondary,
-  },
-  noStationsText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.tertiary,
-    textAlign: 'center',
-    paddingVertical: SPACING.lg,
-  },
-  content: {
-    flex: 1,
-  },
-  contentContainer: {
-    padding: SPACING.lg,
-  },
-  section: {
-    marginBottom: SPACING['2xl'],
-  },
-  currentSection: {
-    marginBottom: SPACING['3xl'],
-  },
-  sectionLabel: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    fontWeight: TYPOGRAPHY.fontWeight.medium,
-    color: COLORS.text.tertiary,
-    marginBottom: SPACING.sm,
-    letterSpacing: TYPOGRAPHY.letterSpacing.wide,
-    textTransform: 'uppercase',
-  },
-  currentLabel: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
-    marginBottom: SPACING.md,
-    letterSpacing: TYPOGRAPHY.letterSpacing.tight,
-  },
-  stationCard: {
-    backgroundColor: COLORS.surface.card,
-    borderRadius: RADIUS.lg,
-    padding: SPACING.lg,
-    borderWidth: 1,
-    borderColor: COLORS.border.light,
-  },
-  currentStationCard: {
-    backgroundColor: COLORS.black,
-    borderColor: COLORS.black,
-  },
-  emptyCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: SPACING.xl,
-    gap: SPACING.sm,
-  },
-  emptyText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.tertiary,
-  },
-  stationCardContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.md,
-  },
-  directionIndicator: {
-    width: 24,
-    height: 24,
-    borderRadius: RADIUS.full,
-    backgroundColor: COLORS.gray[100],
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  directionText: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    color: COLORS.text.secondary,
-  },
-  stationInfo: {
-    flex: 1,
-  },
-  stationName: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
-    letterSpacing: TYPOGRAPHY.letterSpacing.tight,
-  },
-  currentStationName: {
-    fontSize: TYPOGRAPHY.fontSize['2xl'],
-    color: COLORS.white,
-  },
-  stationNameEn: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.text.tertiary,
-    marginTop: 2,
-    letterSpacing: TYPOGRAPHY.letterSpacing.normal,
-  },
-  transferBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: COLORS.gray[100],
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 2,
-    borderRadius: RADIUS.sm,
-    marginTop: SPACING.xs,
-  },
-  transferText: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    fontWeight: TYPOGRAPHY.fontWeight.medium,
-    color: COLORS.text.secondary,
-  },
-  arrivalsContainer: {
-    marginTop: SPACING.xl,
-  },
-  arrivalsHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.sm,
-    marginBottom: SPACING.md,
-  },
-  arrivalsTitle: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
-  },
-  liveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: RADIUS.full,
-    backgroundColor: COLORS.black,
-  },
-  stationList: {
-    marginTop: SPACING['2xl'],
-  },
-  listTitle: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.primary,
-    marginBottom: SPACING.md,
-  },
-  stationChips: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.sm,
-  },
-  stationChip: {
-    paddingHorizontal: SPACING.md,
-    paddingVertical: SPACING.sm,
-    backgroundColor: COLORS.surface.card,
-    borderRadius: RADIUS.base,
-    borderWidth: 1,
-    borderColor: COLORS.border.medium,
-  },
-  currentChip: {
-    backgroundColor: COLORS.black,
-    borderColor: COLORS.black,
-  },
-  chipText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.secondary,
-  },
-  currentChipText: {
-    color: COLORS.white,
-    fontWeight: TYPOGRAPHY.fontWeight.medium,
-  },
-  loadingContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: SPACING.lg,
-  },
-  loadingText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    color: COLORS.text.tertiary,
-  },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: SPACING['2xl'],
-  },
-  errorIcon: {
-    marginBottom: SPACING.lg,
-  },
-  errorTitle: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.medium,
-    color: COLORS.text.secondary,
-    textAlign: 'center',
-    marginBottom: SPACING.xl,
-  },
-  retryButton: {
-    paddingHorizontal: SPACING.xl,
-    paddingVertical: SPACING.md,
-    backgroundColor: COLORS.black,
-    borderRadius: RADIUS.base,
-  },
-  retryButtonText: {
-    fontSize: TYPOGRAPHY.fontSize.sm,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.white,
-  },
-});
+const createStyles = (semantic: WantedSemanticTheme) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: semantic.bgBase,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s4,
+      borderBottomWidth: 1,
+      borderBottomColor: semantic.lineSubtle,
+    },
+    headerButton: {
+      width: 40,
+      height: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    headerCenter: {
+      flex: 1,
+      alignItems: 'center',
+    },
+    headerTitle: {
+      fontSize: 16,
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelStrong,
+      letterSpacing: -0.3,
+    },
+    headerSubtitle: {
+      fontSize: 12,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+      marginTop: 2,
+      letterSpacing: 0.5,
+    },
+    directionSelector: {
+      flexDirection: 'row',
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s3,
+      gap: WANTED_TOKENS.spacing.s2,
+      borderBottomWidth: 1,
+      borderBottomColor: semantic.lineSubtle,
+    },
+    directionButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: WANTED_TOKENS.spacing.s1,
+      paddingVertical: WANTED_TOKENS.spacing.s3,
+      backgroundColor: semantic.bgSubtle,
+      borderRadius: WANTED_TOKENS.radius.r4,
+      borderWidth: 1,
+      borderColor: semantic.lineNormal,
+    },
+    directionButtonActive: {
+      backgroundColor: semantic.labelStrong,
+      borderColor: semantic.labelStrong,
+    },
+    directionButtonText: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelStrong,
+    },
+    directionButtonTextActive: {
+      color: semantic.bgBase,
+    },
+    terminalInfo: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: WANTED_TOKENS.spacing.s1,
+      marginBottom: WANTED_TOKENS.spacing.s3,
+    },
+    terminalText: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelNeutral,
+    },
+    upcomingStationsList: {
+      backgroundColor: semantic.bgSubtle,
+      borderRadius: WANTED_TOKENS.radius.r8,
+      padding: WANTED_TOKENS.spacing.s4,
+      borderWidth: 1,
+      borderColor: semantic.lineSubtle,
+    },
+    upcomingStationItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: WANTED_TOKENS.spacing.s2,
+      position: 'relative',
+    },
+    stationDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: semantic.labelStrong,
+      marginRight: WANTED_TOKENS.spacing.s3,
+    },
+    stationLine: {
+      position: 'absolute',
+      left: 4,
+      top: 24,
+      width: 2,
+      height: 24,
+      backgroundColor: semantic.lineNormal,
+    },
+    upcomingStationName: {
+      fontSize: 14,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelStrong,
+      flex: 1,
+    },
+    transferBadgeSmall: {
+      backgroundColor: semantic.bgSubtle,
+      paddingHorizontal: WANTED_TOKENS.spacing.s2,
+      paddingVertical: 2,
+      borderRadius: WANTED_TOKENS.radius.r2,
+    },
+    transferTextSmall: {
+      fontSize: 12,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelNeutral,
+    },
+    noStationsText: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+      textAlign: 'center',
+      paddingVertical: WANTED_TOKENS.spacing.s4,
+    },
+    content: {
+      flex: 1,
+    },
+    contentContainer: {
+      padding: WANTED_TOKENS.spacing.s4,
+    },
+    section: {
+      marginBottom: WANTED_TOKENS.spacing.s6,
+    },
+    currentSection: {
+      marginBottom: WANTED_TOKENS.spacing.s8,
+    },
+    sectionLabel: {
+      fontSize: 12,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+      marginBottom: WANTED_TOKENS.spacing.s2,
+      letterSpacing: 0.5,
+      textTransform: 'uppercase',
+    },
+    currentLabel: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelStrong,
+      marginBottom: WANTED_TOKENS.spacing.s3,
+      letterSpacing: -0.2,
+    },
+    stationCard: {
+      backgroundColor: semantic.bgSubtle,
+      borderRadius: WANTED_TOKENS.radius.r8,
+      padding: WANTED_TOKENS.spacing.s4,
+      borderWidth: 1,
+      borderColor: semantic.lineSubtle,
+    },
+    currentStationCard: {
+      backgroundColor: semantic.labelStrong,
+      borderColor: semantic.labelStrong,
+    },
+    emptyCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: WANTED_TOKENS.spacing.s5,
+      gap: WANTED_TOKENS.spacing.s2,
+    },
+    emptyText: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+    },
+    stationCardContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: WANTED_TOKENS.spacing.s3,
+    },
+    directionIndicator: {
+      width: 24,
+      height: 24,
+      borderRadius: WANTED_TOKENS.radius.pill,
+      backgroundColor: semantic.bgBase,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    directionText: {
+      fontSize: 14,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelNeutral,
+    },
+    stationInfo: {
+      flex: 1,
+    },
+    stationName: {
+      fontSize: 16,
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelStrong,
+      letterSpacing: -0.3,
+    },
+    currentStationName: {
+      fontSize: 24,
+      fontFamily: weightToFontFamily('700'),
+      color: semantic.bgBase,
+    },
+    stationNameEn: {
+      fontSize: 12,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+      marginTop: 2,
+    },
+    currentStationNameEn: {
+      color: 'rgba(255,255,255,0.7)',
+    },
+    transferBadge: {
+      alignSelf: 'flex-start',
+      backgroundColor: semantic.bgBase,
+      paddingHorizontal: WANTED_TOKENS.spacing.s2,
+      paddingVertical: 2,
+      borderRadius: WANTED_TOKENS.radius.r2,
+      marginTop: WANTED_TOKENS.spacing.s1,
+    },
+    currentTransferBadge: {
+      backgroundColor: 'rgba(255,255,255,0.2)',
+    },
+    transferText: {
+      fontSize: 12,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelNeutral,
+    },
+    currentTransferText: {
+      color: semantic.bgBase,
+    },
+    arrivalsContainer: {
+      marginTop: WANTED_TOKENS.spacing.s5,
+    },
+    arrivalsHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: WANTED_TOKENS.spacing.s2,
+      marginBottom: WANTED_TOKENS.spacing.s3,
+    },
+    arrivalsTitle: {
+      fontSize: 14,
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelStrong,
+    },
+    liveDot: {
+      width: 6,
+      height: 6,
+      borderRadius: WANTED_TOKENS.radius.pill,
+      backgroundColor: WANTED_TOKENS.status.green500,
+    },
+    stationList: {
+      marginTop: WANTED_TOKENS.spacing.s6,
+    },
+    listTitle: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelStrong,
+      marginBottom: WANTED_TOKENS.spacing.s3,
+    },
+    stationChips: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: WANTED_TOKENS.spacing.s2,
+    },
+    stationChip: {
+      paddingHorizontal: WANTED_TOKENS.spacing.s3,
+      paddingVertical: WANTED_TOKENS.spacing.s2,
+      backgroundColor: semantic.bgSubtle,
+      borderRadius: WANTED_TOKENS.radius.r4,
+      borderWidth: 1,
+      borderColor: semantic.lineNormal,
+    },
+    currentChip: {
+      backgroundColor: semantic.labelStrong,
+      borderColor: semantic.labelStrong,
+    },
+    chipText: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelNeutral,
+    },
+    currentChipText: {
+      color: semantic.bgBase,
+      fontFamily: weightToFontFamily('500'),
+    },
+    loadingContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      gap: WANTED_TOKENS.spacing.s4,
+    },
+    loadingText: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+    },
+    errorContainer: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      padding: WANTED_TOKENS.spacing.s6,
+    },
+    errorIcon: {
+      marginBottom: WANTED_TOKENS.spacing.s4,
+    },
+    errorTitle: {
+      fontSize: 14,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelNeutral,
+      textAlign: 'center',
+      marginBottom: WANTED_TOKENS.spacing.s5,
+    },
+    retryButton: {
+      paddingHorizontal: WANTED_TOKENS.spacing.s5,
+      paddingVertical: WANTED_TOKENS.spacing.s3,
+      backgroundColor: WANTED_TOKENS.blue[500],
+      borderRadius: WANTED_TOKENS.radius.r4,
+    },
+    retryButtonText: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('600'),
+      color: '#FFFFFF',
+    },
+  });
 
 export default StationNavigatorScreen;

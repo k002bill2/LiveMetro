@@ -20,6 +20,11 @@ jest.mock('lucide-react-native', () => ({
   ArrowDown: 'ArrowDown',
   Flag: 'Flag',
 }));
+// Phase 52 — Wanted DS migration: useTheme().isDark drives semantic theme.
+jest.mock('@/services/theme', () => ({
+  useTheme: () => ({ isDark: false }),
+}));
+
 jest.mock('@react-navigation/native', () => ({
   useIsFocused: jest.fn(() => true),
   useNavigation: jest.fn(() => ({
