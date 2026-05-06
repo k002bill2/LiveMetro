@@ -34,15 +34,19 @@ interface FavoriteRowProps {
   /** Minutes until next train. Required — the card's primary signal. */
   nextMinutes: number;
   /**
-   * When true, append the green "곧 도착" badge under `nextMinutes`.
-   * Caller decides the threshold — typical: remaining time ≤ 90s.
+   * Optional total seconds remaining. When supplied, takes precedence over
+   * `nextMinutes` and drives two UX branches:
+   *   - `secondsLeft < 60` → renders "곧 도착" in primary tone (replaces
+   *     the numeric block; "분"/"초" units are dropped)
+   *   - `secondsLeft >= 60` → renders "M분 S초" with M as the dominant
+   *     numeral (e.g. "1분 58초")
    *
-   * Sub-minute countdowns (e.g. "44초") are intentionally NOT supported:
-   * Seoul Open API polls at ≥30s intervals, so per-second labels are false
-   * precision. If a future screen needs them, build a separate component
-   * with its own data freshness policy rather than re-adding the prop here.
+   * Caller policy: only opt in for rows where the data freshness justifies
+   * sub-minute precision and the row is willing to tick at 1Hz. For the rest
+   * (e.g. non-focused favorites), pass only `nextMinutes` and the component
+   * falls back to the simpler "M분" treatment.
    */
-  imminent?: boolean;
+  secondsLeft?: number;
   /** When true, render the drag handle (grip icon). */
   showDragHandle?: boolean;
   /** Pressable affordance — typically navigates to StationDetail. */
@@ -60,7 +64,7 @@ const FavoriteRowImpl: React.FC<FavoriteRowProps> = ({
   destinationLabel,
   congestion,
   nextMinutes,
-  imminent = false,
+  secondsLeft,
   showDragHandle = false,
   onPress,
   onLongPress,
@@ -71,13 +75,21 @@ const FavoriteRowImpl: React.FC<FavoriteRowProps> = ({
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
   const tone = congestion ? CONG_TONE[congestion] : null;
 
+  const arrivalA11y = (() => {
+    if (secondsLeft !== undefined && secondsLeft < 60) return '곧 도착';
+    if (secondsLeft !== undefined && secondsLeft >= 60) {
+      return `${Math.floor(secondsLeft / 60)}분 ${secondsLeft % 60}초 후 도착`;
+    }
+    return `${nextMinutes}분 후 도착`;
+  })();
+
   return (
     <Pressable
       testID={testID ?? `favorite-row-${stationName}`}
       onPress={onPress}
       onLongPress={onLongPress}
       accessibilityRole={onPress ? 'button' : undefined}
-      accessibilityLabel={`${stationName}역 즐겨찾기, ${nextMinutes}분 후 도착`}
+      accessibilityLabel={`${stationName}역 즐겨찾기, ${arrivalA11y}`}
       style={({ pressed }) => [
         styles.row,
         {
@@ -96,36 +108,53 @@ const FavoriteRowImpl: React.FC<FavoriteRowProps> = ({
         />
       )}
 
-      {/* Line badges — stack vertically when 2 lines, single inline when 1 */}
-      <View style={styles.badgeStack}>
-        {lines.slice(0, 2).map((l) => (
-          <LineBadge key={String(l)} line={l} size={22} />
-        ))}
-      </View>
-
-      {/* Center: name + direction/congestion line */}
-      <View style={styles.center}>
-        <View style={styles.nameRow}>
+      {/* Left column: 상단 가로 배지 row → 하단 [역명 · 별칭 · 방향 · 혼잡]
+          한 줄. 시안 image #2/#3 정합 — 이전 vertical badge stack + 2-row 이름
+          블록을 가로 한 줄 inline 패턴으로 교체. */}
+      <View style={styles.leftCol}>
+        <View style={styles.badgesRow}>
+          {lines.slice(0, 2).map((l) => (
+            <LineBadge key={String(l)} line={l} size={22} />
+          ))}
+        </View>
+        <View style={styles.metaRow}>
+          <Text
+            style={[styles.stationName, { color: semantic.labelStrong }]}
+            numberOfLines={1}
+          >
+            {stationName}
+          </Text>
           {nickname && (
             <Pill tone="primary" size="sm">
               {nickname}
             </Pill>
           )}
-          <Text style={[styles.stationName, { color: semantic.labelStrong }]} numberOfLines={1}>
-            {stationName}
-          </Text>
-        </View>
-        <View style={styles.subRow}>
           {destinationLabel && (
-            <Text style={[styles.subText, { color: semantic.labelAlt }]} numberOfLines={1}>
+            <Text
+              style={[
+                styles.subText,
+                styles.subTextLead,
+                { color: semantic.labelAlt },
+              ]}
+              numberOfLines={1}
+            >
               {destinationLabel}
             </Text>
           )}
           {tone && (
             <>
-              <Text style={[styles.subText, { color: semantic.labelAlt }]}> · </Text>
-              <View style={[styles.congDot, { backgroundColor: tone.color }]} />
-              <Text style={[styles.subText, { color: tone.color, fontFamily: weightToFontFamily('700') }]}>
+              <Text style={[styles.subDot, { color: semantic.labelAlt }]}>
+                ·
+              </Text>
+              <Text
+                style={[
+                  styles.subText,
+                  {
+                    color: tone.color,
+                    fontFamily: weightToFontFamily('700'),
+                  },
+                ]}
+              >
                 {tone.label}
               </Text>
             </>
@@ -133,19 +162,23 @@ const FavoriteRowImpl: React.FC<FavoriteRowProps> = ({
         </View>
       </View>
 
-      {/* Right: minutes — primary signal */}
+      {/* Right: minutes — primary signal. Sub-minute precision is opt-in via
+          `secondsLeft`; under 60s collapses to a "곧 도착" inline label. */}
       <View style={styles.right}>
-        <Text style={[styles.minutes, { color: semantic.primaryNormal }]}>
-          {nextMinutes}
-          <Text style={styles.minutesUnit}>분</Text>
-        </Text>
-        {imminent && (
-          <View style={styles.imminentWrap}>
-            <View style={[styles.imminentDot, { backgroundColor: '#00A84D' }]} />
-            <Text style={[styles.imminentText, { color: '#008F30' }]}>
-              곧 도착
+        {secondsLeft !== undefined && secondsLeft < 60 ? (
+          <Text style={[styles.arriving, { color: semantic.primaryNormal }]}>
+            곧 도착
+          </Text>
+        ) : (
+          <Text style={[styles.minutes, { color: semantic.primaryNormal }]}>
+            {secondsLeft !== undefined ? Math.floor(secondsLeft / 60) : nextMinutes}
+            <Text style={styles.minutesUnit}>
+              분
+              {secondsLeft !== undefined && secondsLeft >= 60
+                ? ` ${secondsLeft % 60}초`
+                : ''}
             </Text>
-          </View>
+          </Text>
         )}
       </View>
     </Pressable>
@@ -166,39 +199,38 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
   },
-  badgeStack: {
-    flexDirection: 'column',
-    gap: 4,
-    minWidth: 22,
-  },
-  center: {
+  leftCol: {
     flex: 1,
     minWidth: 0,
+    gap: 8,
   },
-  nameRow: {
+  badgesRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 1,
   },
   stationName: {
     fontSize: 16,
     fontFamily: weightToFontFamily('800'),
     letterSpacing: -0.2,
   },
-  subRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 3,
-  },
   subText: {
     fontSize: 12,
     fontFamily: weightToFontFamily('600'),
   },
-  congDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 999,
-    marginRight: 3,
+  subTextLead: {
+    marginLeft: 4,
+  },
+  subDot: {
+    fontSize: 12,
+    fontFamily: weightToFontFamily('600'),
+    marginHorizontal: -2,
   },
   right: {
     alignItems: 'flex-end',
@@ -213,19 +245,9 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: weightToFontFamily('700'),
   },
-  imminentWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    columnGap: 3,
-    marginTop: 2,
-  },
-  imminentDot: {
-    width: 5,
-    height: 5,
-    borderRadius: 999,
-  },
-  imminentText: {
-    fontSize: 10,
-    fontFamily: weightToFontFamily('700'),
+  arriving: {
+    fontSize: 16,
+    fontFamily: weightToFontFamily('800'),
+    letterSpacing: -0.2,
   },
 });

@@ -179,12 +179,13 @@ const DEV_SAMPLE_NEARBY: readonly SampleNearby[] | null =
 
 /**
  * Dev-only sample favorites — mirrors the design handoff image (2026-05-06):
- *   ① 강남 (2 + 신분당, 회사, 잠실 방면, 혼잡, 1분 44초 · 곧 도착)
+ *   ① 강남 (2 + 신분당, 회사, 잠실 방면, 혼잡, 1분 58초)
  *   ② 홍대입구 (2 + 경의, 집, 시청 방면, 보통, 4분)
  *   ③ 잠실 (2 + 8, 모란 방면, 여유, 7분)
  *
  * Each sample item carries its own `secondsLeft` so the topmost row can
- * render the "곧 도착" overlay without hitting useRealtimeTrains.
+ * render sub-minute precision without hitting useRealtimeTrains. Under 60s
+ * collapses to "곧 도착" inside FavoriteRow.
  */
 type SampleFavorite = {
   readonly id: string;
@@ -208,7 +209,7 @@ const DEV_SAMPLE_FAVORITES: readonly SampleFavorite[] | null =
           destinationLabel: '잠실 방면',
           congestion: 'high',
           nextMinutes: 1,
-          secondsLeft: 104, // 1분 44초
+          secondsLeft: 118, // 1분 58초
         },
         {
           id: 'sample-fav-hongdae',
@@ -301,8 +302,11 @@ const HomeFavoriteRow: React.FC<HomeFavoriteRowProps> = memo(
       ? `${next.finalDestination} 방면`
       : undefined;
 
-    const imminent =
-      isFirst && totalSecondsLeft > 0 && totalSecondsLeft <= 90;
+    // Sub-minute precision is opt-in for the topmost focused row only — that
+    // row owns the 1Hz tick, so passing secondsLeft is safe. Other rows fall
+    // back to the simpler "M분" rendering inside FavoriteRow.
+    const secondsLeftProp =
+      isFirst && isFocused && next?.arrivalTime ? totalSecondsLeft : undefined;
 
     return (
       <FavoriteRow
@@ -311,7 +315,7 @@ const HomeFavoriteRow: React.FC<HomeFavoriteRowProps> = memo(
         nickname={alias ?? null}
         destinationLabel={destLabel}
         nextMinutes={nextMinutes}
-        imminent={imminent}
+        secondsLeft={secondsLeftProp}
         onPress={onPress}
         testID={testID}
       />
@@ -805,8 +809,12 @@ export const HomeScreen: React.FC = () => {
             {useSampleFavorites
               ? DEV_SAMPLE_FAVORITES!.map((s, idx) => {
                   const isFirst = idx === 0;
-                  const showImminent =
-                    isFirst && typeof s.secondsLeft === 'number';
+                  // Only the topmost row opts into sub-minute precision —
+                  // FavoriteRow internally collapses <60s to "곧 도착".
+                  const secondsLeftProp =
+                    isFirst && typeof s.secondsLeft === 'number'
+                      ? s.secondsLeft
+                      : undefined;
                   return (
                     <FavoriteRow
                       key={s.id}
@@ -816,7 +824,7 @@ export const HomeScreen: React.FC = () => {
                       destinationLabel={s.destinationLabel}
                       congestion={s.congestion}
                       nextMinutes={s.nextMinutes}
-                      imminent={showImminent}
+                      secondsLeft={secondsLeftProp}
                       testID={`home-favorite-${s.id}`}
                     />
                   );

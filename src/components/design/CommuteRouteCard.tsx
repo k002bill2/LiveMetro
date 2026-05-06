@@ -25,8 +25,15 @@
  * Caller wires data from user.commuteSchedule + ML prediction. See
  * HomeScreen for the canonical mapping.
  */
-import React, { memo } from 'react';
-import { Pressable, StyleSheet, Text, View, ViewStyle } from 'react-native';
+import React, { memo, useState } from 'react';
+import {
+  LayoutChangeEvent,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+  ViewStyle,
+} from 'react-native';
 import {
   Building2,
   ChevronRight,
@@ -70,6 +77,33 @@ interface CommuteRouteCardProps {
 }
 
 const formatKrw = (n: number): string => n.toLocaleString('ko-KR');
+
+// Walk-leg dotted line. RN's `borderStyle: 'dotted'` renders inconsistently
+// (iOS often promotes it to solid; Android draws dashes), so we lay out
+// individual dot Views in a flex row with `space-between` and let onLayout
+// pick the dot count for the available width. Density stays visually
+// consistent across screen sizes.
+const DOT_SIZE = 2;
+const DOT_TARGET_GAP = 1;
+
+const DottedLine: React.FC<{ color: string }> = memo(({ color }) => {
+  const [width, setWidth] = useState(0);
+  const handleLayout = (e: LayoutChangeEvent): void => {
+    const next = e.nativeEvent.layout.width;
+    if (next !== width) setWidth(next);
+  };
+  const dotCount =
+    width > 0 ? Math.max(2, Math.floor(width / (DOT_SIZE + DOT_TARGET_GAP))) : 0;
+
+  return (
+    <View style={styles.dottedLine} onLayout={handleLayout}>
+      {Array.from({ length: dotCount }, (_, i) => (
+        <View key={i} style={[styles.dot, { backgroundColor: color }]} />
+      ))}
+    </View>
+  );
+});
+DottedLine.displayName = 'DottedLine';
 
 const CommuteRouteCardImpl: React.FC<CommuteRouteCardProps> = ({
   origin,
@@ -193,13 +227,9 @@ const CommuteRouteCardImpl: React.FC<CommuteRouteCardProps> = ({
         {/* Walk leg */}
         <View style={styles.leg}>
           <View style={styles.legLineRow}>
-            <View
-              style={[styles.dottedLine, { borderColor: semantic.labelAlt }]}
-            />
+            <DottedLine color={semantic.labelAlt} />
             <Footprints size={13} color={semantic.labelAlt} strokeWidth={2} />
-            <View
-              style={[styles.dottedLine, { borderColor: semantic.labelAlt }]}
-            />
+            <DottedLine color={semantic.labelAlt} />
           </View>
           {walkMinutes !== undefined && (
             <Text style={[styles.legSubLabel, { color: semantic.labelAlt }]}>
@@ -425,10 +455,15 @@ const styles = StyleSheet.create({
   },
   dottedLine: {
     flex: 1,
-    height: 0,
-    borderTopWidth: 2,
-    borderStyle: 'dotted',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     opacity: 0.5,
+  },
+  dot: {
+    width: DOT_SIZE,
+    height: DOT_SIZE,
+    borderRadius: DOT_SIZE / 2,
   },
   solidLine: {
     flex: 1,

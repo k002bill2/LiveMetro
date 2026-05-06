@@ -78,14 +78,35 @@ describe('FavoriteRow', () => {
     expect(getAllByLabelText(/드래그 핸들|^강남역/).length).toBeGreaterThan(0);
   });
 
-  it('renders the "곧 도착" badge when imminent is true', () => {
-    const { getByText } = wrap(
-      <FavoriteRow lines={['2']} stationName="강남" nextMinutes={1} imminent />,
+  it('renders "곧 도착" inline when secondsLeft is under 60', () => {
+    const { getByText, queryByText } = wrap(
+      <FavoriteRow
+        lines={['2']}
+        stationName="강남"
+        nextMinutes={0}
+        secondsLeft={30}
+      />,
     );
     expect(getByText('곧 도착')).toBeTruthy();
+    // Numeric "분" block should be replaced, not appended
+    expect(queryByText('0')).toBeNull();
   });
 
-  it('omits the imminent badge by default', () => {
+  it('renders "M분 S초" when secondsLeft is at least 60', () => {
+    const { getByText } = wrap(
+      <FavoriteRow
+        lines={['2']}
+        stationName="강남"
+        nextMinutes={1}
+        secondsLeft={118}
+      />,
+    );
+    // Top-level Text concatenates "1" + "분 58초"; match the seconds suffix
+    expect(getByText(/1/)).toBeTruthy();
+    expect(getByText(/분\s*58초/)).toBeTruthy();
+  });
+
+  it('omits "곧 도착" by default (no secondsLeft passed)', () => {
     const { queryByText } = wrap(
       <FavoriteRow lines={['2']} stationName="강남" nextMinutes={3} />,
     );
