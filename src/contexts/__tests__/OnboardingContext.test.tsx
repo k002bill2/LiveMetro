@@ -139,6 +139,58 @@ describe('OnboardingContext', () => {
     );
   });
 
+  it('should mark terms agreed and persist the flag', async () => {
+    (AsyncStorage.getItem as jest.Mock).mockResolvedValue(null);
+
+    const { result } = renderHook(() => useOnboarding(), {
+      wrapper: createWrapper('user123'),
+    });
+
+    await waitFor(() => {
+      expect(result.current.hasAgreedToTerms).toBe(false);
+    });
+
+    await act(async () => {
+      await result.current.markTermsAgreed();
+    });
+
+    expect(result.current.hasAgreedToTerms).toBe(true);
+    expect(AsyncStorage.setItem).toHaveBeenCalledWith(
+      '@livemetro/signup_terms_agreed_user123',
+      'true',
+    );
+  });
+
+  it('should reset both onboarding completion AND celebration flags via resetSignupFlow', async () => {
+    (AsyncStorage.getItem as jest.Mock).mockResolvedValue('true');
+
+    const { result } = renderHook(() => useOnboarding(), {
+      wrapper: createWrapper('user123'),
+    });
+
+    await waitFor(() => {
+      expect(result.current.hasCompletedOnboarding).toBe(true);
+      expect(result.current.hasSeenSignupCelebration).toBe(true);
+    });
+
+    await act(async () => {
+      await result.current.resetSignupFlow();
+    });
+
+    expect(result.current.hasCompletedOnboarding).toBe(false);
+    expect(result.current.hasSeenSignupCelebration).toBe(false);
+    expect(result.current.hasAgreedToTerms).toBe(false);
+    expect(AsyncStorage.removeItem).toHaveBeenCalledWith(
+      '@livemetro/onboarding_complete_user123',
+    );
+    expect(AsyncStorage.removeItem).toHaveBeenCalledWith(
+      '@livemetro/signup_celebration_seen_user123',
+    );
+    expect(AsyncStorage.removeItem).toHaveBeenCalledWith(
+      '@livemetro/signup_terms_agreed_user123',
+    );
+  });
+
   it('should not call storage methods without userId', async () => {
     const { result } = renderHook(() => useOnboarding(), {
       wrapper: createWrapper(undefined),

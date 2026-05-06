@@ -1,17 +1,23 @@
 /**
- * SignUpScreen — 회원가입 2/3 (계정 만들기).
+ * SignupStep2Screen — 회원가입 2/3 (계정 정보 + 약관 동의 하이브리드).
  *
- * Wanted v6 hand-off (auth.jsx:324) — full signup form: email + nickname
- * (2~10자) + password (8자 이상 · 영문/숫자/기호) + password confirm + terms
- * box (전체 동의 + 4행). Mirrors SignupStep1's prefix-icon input row pattern.
+ * Wanted v6 hand-off (auth-signup-steps.jsx Step 2 + auth.jsx 폼):
+ *   상단 입력 폼 (이메일 + 닉네임 + 비밀번호 + 비밀번호 확인 + 4-bar 강도 미터)
+ *   + 하단 약관 박스 (전체동의 + 필수3 + 선택1).
  *
- * Two modes:
- * - 'create' (default): plain signup via createUserWithEmailAndPassword.
- * - 'link': legacy mode for attaching email + password to a phone-only
- *   Firebase user via linkWithCredential. As of the v6 flow, phone-only
- *   users skip this screen and go straight to SignupStep3 celebration.
- *   The `EmailLink` route stays registered in RootNavigator so future
- *   "add email" entry points (e.g., Settings) can navigate here.
+ * Pre-fill 정책:
+ *   - email / nickname: firebaseUser.email / displayName이 있으면 채움
+ *     (한 번 link한 적 있는 phone-only 사용자가 다시 들어왔을 때).
+ *   - password / passwordConfirm: 항상 빈칸 (보안 — 절대 영속 저장 안 함).
+ *
+ * 제출 모드:
+ *   A) 이메일 + 비밀번호 입력 → linkEmailToCurrentUser (phone user에 email
+ *      credential 부착) + markTermsAgreed + navigate('SignupStep3').
+ *   B) 입력 모두 비움 → markTermsAgreed만 (phone-only로 진행)
+ *      + navigate('SignupStep3'). 이메일은 향후 Settings에서 추가 가능.
+ *
+ * 필수 약관 3종은 두 모드 모두에서 정통망법/개인정보보호법 §22-2 충족 위해
+ * 강제. 미동의 시 CTA 비활성.
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import {
@@ -37,7 +43,7 @@ import {
   EyeOff,
   Lock,
   Mail,
-  User,
+  User as UserIcon,
 } from 'lucide-react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
@@ -45,16 +51,18 @@ import { useNavigation } from '@react-navigation/native';
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme/themeContext';
 import { useAuth } from '@/services/auth/AuthContext';
-import { analyzeAuthError, printFirebaseDebugInfo } from '@/utils/firebaseDebug';
-import { AppStackParamList } from '@/navigation/types';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 import { SignupHeader } from '@/components/auth/SignupHeader';
-import { setPendingBiometricCredentials } from '@/services/auth/pendingBiometricSetup';
+import { RootStackParamList } from '@/navigation/RootNavigator';
 
-const isValidEmail = (value: string): boolean => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+type Nav = NativeStackNavigationProp<RootStackParamList>;
 
 const NICKNAME_MIN = 2;
 const NICKNAME_MAX = 10;
 const PASSWORD_MIN = 8;
+
+const isValidEmail = (value: string): boolean =>
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
 interface PasswordStrength {
   score: 0 | 1 | 2 | 3 | 4;
@@ -67,20 +75,23 @@ const evalPasswordStrength = (pw: string): PasswordStrength => {
   const hasLetter = /[A-Za-z]/.test(pw);
   const hasNumber = /[0-9]/.test(pw);
   const hasSymbol = /[^A-Za-z0-9]/.test(pw);
-  const met = [longEnough, hasLetter, hasNumber, hasSymbol].filter(Boolean).length as 0 | 1 | 2 | 3 | 4;
+  const met = [longEnough, hasLetter, hasNumber, hasSymbol].filter(Boolean).length as
+    | 0 | 1 | 2 | 3 | 4;
   const labels: Record<0 | 1 | 2 | 3 | 4, PasswordStrength['label']> = {
     0: '', 1: '약함', 2: '보통', 3: '양호', 4: '안전',
   };
   return { score: met, label: labels[met] };
 };
 
-type Nav = NativeStackNavigationProp<AppStackParamList>;
-
-export type SignUpMode = 'create' | 'link';
-
-interface SignUpScreenProps {
-  mode?: SignUpMode;
-}
+const strengthColor = (score: number, primary: string): string => {
+  switch (score) {
+    case 1: return '#E04A3F';
+    case 2: return '#F2A53A';
+    case 3: return '#1FB05A';
+    case 4: return primary;
+    default: return primary;
+  }
+};
 
 interface Agreements {
   terms: boolean;
@@ -90,10 +101,7 @@ interface Agreements {
 }
 
 const AGREEMENT_INITIAL: Agreements = {
-  terms: false,
-  privacy: false,
-  age: false,
-  marketing: false,
+  terms: false, privacy: false, age: false, marketing: false,
 };
 
 interface AgreementRow {
@@ -109,34 +117,43 @@ const AGREEMENT_ROWS: readonly AgreementRow[] = [
   { id: 'marketing', label: '마케팅 정보 수신', required: false },
 ];
 
-export const SignUpScreen: React.FC<SignUpScreenProps> = ({ mode = 'create' }) => {
+export const SignupStep2Screen: React.FC = () => {
   const { isDark } = useTheme();
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
   const navigation = useNavigation<Nav>();
-  const { signUpWithEmail, linkEmailToCurrentUser } = useAuth();
-  const isLinkMode = mode === 'link';
+  const { firebaseUser, linkEmailToCurrentUser } = useAuth();
+  const { markTermsAgreed } = useOnboarding();
 
-  const [email, setEmail] = useState('');
-  const [nickname, setNickname] = useState('');
+  // Pre-fill from Firebase user only — never from a stash, never from
+  // password storage. Phone-only users with a previously linked email
+  // see their address pre-filled here; fresh users get empty fields.
+  const [email, setEmail] = useState(firebaseUser?.email ?? '');
+  const [nickname, setNickname] = useState(firebaseUser?.displayName ?? '');
   const [password, setPassword] = useState('');
   const [passwordConfirm, setPasswordConfirm] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [agreements, setAgreements] = useState<Agreements>(AGREEMENT_INITIAL);
-  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
 
   const strength = useMemo(() => evalPasswordStrength(password), [password]);
   const passwordsMatch = password.length > 0 && password === passwordConfirm;
   const requiredAgreed = agreements.terms && agreements.privacy && agreements.age;
   const allAgreed =
     agreements.terms && agreements.privacy && agreements.age && agreements.marketing;
-  const nicknameValid = nickname.trim().length >= NICKNAME_MIN && nickname.trim().length <= NICKNAME_MAX;
-  const canSubmit =
+
+  // Mode detection: if user typed ANY email/password char they're opting
+  // into the email-link mode and must complete the form fully. Otherwise
+  // (all empty) they proceed phone-only.
+  const wantsEmailLink = email.trim().length > 0 || password.length > 0;
+  const emailFormValid =
     isValidEmail(email.trim()) &&
-    nicknameValid &&
+    nickname.trim().length >= NICKNAME_MIN &&
+    nickname.trim().length <= NICKNAME_MAX &&
     strength.score === 4 &&
-    passwordsMatch &&
-    requiredAgreed &&
-    !loading;
+    passwordsMatch;
+
+  const canSubmit =
+    requiredAgreed && !submitting && (!wantsEmailLink || emailFormValid);
 
   const toggleAll = useCallback(() => {
     setAgreements((prev) => {
@@ -150,85 +167,57 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ mode = 'create' }) =
   }, []);
 
   const handleSubmit = useCallback(async () => {
-    if (!email.trim()) {
-      Alert.alert('오류', '이메일을 입력해주세요.');
-      return;
-    }
-    if (!isValidEmail(email.trim())) {
-      Alert.alert('오류', '올바른 이메일 형식을 입력해주세요.');
-      return;
-    }
-    if (!nicknameValid) {
-      Alert.alert('오류', `닉네임은 ${NICKNAME_MIN}~${NICKNAME_MAX}자로 입력해주세요.`);
-      return;
-    }
-    if (strength.score < 4) {
-      Alert.alert('오류', '비밀번호는 8자 이상이며 영문·숫자·기호를 모두 포함해야 합니다.');
-      return;
-    }
-    if (!passwordsMatch) {
-      Alert.alert('오류', '비밀번호 확인이 일치하지 않습니다.');
-      return;
-    }
+    if (submitting) return;
     if (!requiredAgreed) {
       Alert.alert('오류', '필수 약관에 모두 동의해주세요.');
       return;
     }
+    if (wantsEmailLink && !emailFormValid) {
+      Alert.alert(
+        '오류',
+        '입력하신 이메일/비밀번호가 형식에 맞지 않습니다. 비워두면 휴대폰 인증만으로 진행할 수 있어요.',
+      );
+      return;
+    }
 
-    setLoading(true);
+    setSubmitting(true);
     try {
-      const trimmedNickname = nickname.trim();
-      if (isLinkMode) {
-        await linkEmailToCurrentUser(email.trim(), password, trimmedNickname);
-      } else {
-        await signUpWithEmail(email.trim(), password, trimmedNickname);
+      if (wantsEmailLink) {
+        await linkEmailToCurrentUser(email.trim(), password, nickname.trim());
       }
-      // Stash credentials so SignupStep3 can offer a biometric setup prompt
-      // when the user taps the celebration CTA. The pending module clears
-      // them after a single consume.
-      setPendingBiometricCredentials({ email: email.trim(), password });
-      // Auth state transition + SignupStep3 celebration handle the rest.
+      await markTermsAgreed();
+      navigation.navigate('SignupStep3');
     } catch (err) {
-      console.error('Signup error:', err);
-      const debugInfo = analyzeAuthError(err);
-      printFirebaseDebugInfo(debugInfo);
-      const message =
-        debugInfo.errorType === 'EMAIL_IN_USE'
-          ? '이미 사용 중인 이메일입니다.'
-          : err instanceof Error
-            ? err.message
-            : '계정 생성에 실패했습니다.';
-      Alert.alert('계정 생성 실패', message);
+      console.error('SignupStep2 submit error:', err);
+      const message = err instanceof Error ? err.message : '진행 중 오류가 발생했습니다.';
+      Alert.alert('오류', message);
     } finally {
-      setLoading(false);
+      setSubmitting(false);
     }
   }, [
+    submitting,
+    requiredAgreed,
+    wantsEmailLink,
+    emailFormValid,
     email,
     nickname,
-    nicknameValid,
     password,
-    passwordsMatch,
-    requiredAgreed,
-    strength.score,
-    signUpWithEmail,
     linkEmailToCurrentUser,
-    isLinkMode,
+    markTermsAgreed,
+    navigation,
   ]);
 
-  const inputRowStyle = useCallback(
-    (focusOn: boolean): ViewStyle => ({
-      height: 52,
-      borderRadius: WANTED_TOKENS.radius.r6,
-      borderWidth: 1,
-      borderColor: focusOn ? semantic.primaryNormal : semantic.lineSubtle,
-      paddingHorizontal: WANTED_TOKENS.spacing.s4,
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: WANTED_TOKENS.spacing.s2,
-      backgroundColor: semantic.bgBase,
-    }),
-    [semantic.primaryNormal, semantic.lineSubtle, semantic.bgBase],
-  );
+  const inputRowStyle: ViewStyle = {
+    height: 52,
+    borderRadius: WANTED_TOKENS.radius.r6,
+    borderWidth: 1,
+    borderColor: semantic.lineSubtle,
+    paddingHorizontal: WANTED_TOKENS.spacing.s4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: WANTED_TOKENS.spacing.s2,
+    backgroundColor: semantic.bgBase,
+  };
 
   const inputInside: TextStyle = {
     flex: 1,
@@ -257,15 +246,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ mode = 'create' }) =
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.flex}
       >
-        <SignupHeader
-          currentStep={2}
-          onBack={
-            isLinkMode
-              ? undefined
-              : () => navigation.canGoBack() && navigation.goBack()
-          }
-          testID="signup-step2-header"
-        />
+        <SignupHeader currentStep={2} testID="signup-step2-header" />
         <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
           <Text
             style={[styles.title, { color: semantic.labelStrong, fontFamily: weightToFontFamily('800') }]}
@@ -280,10 +261,10 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ mode = 'create' }) =
             이메일로 가입하면 출퇴근 패턴 학습과{'\n'}기기 간 동기화를 사용할 수 있어요.
           </Text>
 
-          {/* Email */}
+          {/* Email — optional */}
           <View style={styles.field}>
             <Text style={[labelStyle, styles.fieldLabelSpacing]}>이메일</Text>
-            <View style={inputRowStyle(false)}>
+            <View style={inputRowStyle}>
               <Mail size={18} color={semantic.labelAlt} strokeWidth={2} />
               <TextInput
                 style={inputInside}
@@ -307,8 +288,8 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ mode = 'create' }) =
               <Text style={labelStyle}>닉네임</Text>
               <Text style={hintStyle}>{NICKNAME_MIN}~{NICKNAME_MAX}자</Text>
             </View>
-            <View style={inputRowStyle(false)}>
-              <User size={18} color={semantic.labelAlt} strokeWidth={2} />
+            <View style={inputRowStyle}>
+              <UserIcon size={18} color={semantic.labelAlt} strokeWidth={2} />
               <TextInput
                 style={inputInside}
                 value={nickname}
@@ -329,7 +310,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ mode = 'create' }) =
               <Text style={labelStyle}>비밀번호</Text>
               <Text style={hintStyle}>8자 이상 · 영문/숫자/기호</Text>
             </View>
-            <View style={inputRowStyle(false)}>
+            <View style={inputRowStyle}>
               <Lock size={18} color={semantic.labelAlt} strokeWidth={2} />
               <TextInput
                 style={inputInside}
@@ -397,7 +378,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ mode = 'create' }) =
           {/* Password confirm */}
           <View style={styles.field}>
             <Text style={[labelStyle, styles.fieldLabelSpacing]}>비밀번호 확인</Text>
-            <View style={inputRowStyle(false)}>
+            <View style={inputRowStyle}>
               <Lock size={18} color={semantic.labelAlt} strokeWidth={2} />
               <TextInput
                 style={inputInside}
@@ -476,7 +457,7 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ mode = 'create' }) =
                     >
                       <Text
                         style={{
-                          color: row.required ? semantic.labelAlt : semantic.labelAlt,
+                          color: semantic.labelAlt,
                           fontFamily: weightToFontFamily('600'),
                         }}
                       >
@@ -502,17 +483,15 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ mode = 'create' }) =
 
           {/* Submit */}
           <TouchableOpacity
-            testID="submit-button"
+            testID="signup-step2-cta"
             style={[
               styles.primary,
-              {
-                backgroundColor: canSubmit ? semantic.primaryNormal : semantic.lineSubtle,
-              },
+              { backgroundColor: canSubmit ? semantic.primaryNormal : semantic.lineSubtle },
             ]}
             onPress={handleSubmit}
             disabled={!canSubmit}
             accessibilityRole="button"
-            accessibilityLabel="가입하고 시작하기"
+            accessibilityLabel="동의하고 계속하기"
           >
             <Text
               style={[
@@ -523,46 +502,16 @@ export const SignUpScreen: React.FC<SignUpScreenProps> = ({ mode = 'create' }) =
                 },
               ]}
             >
-              {loading ? '처리중…' : '가입하고 시작하기'}
+              {submitting ? '처리중…' : '동의하고 계속하기'}
             </Text>
-            {!loading && canSubmit && (
+            {!submitting && canSubmit && (
               <ArrowRight size={18} color={semantic.labelOnColor} strokeWidth={2.4} />
             )}
           </TouchableOpacity>
-
-          {!isLinkMode ? (
-            <TouchableOpacity
-              testID="goto-login"
-              style={styles.linkRow}
-              onPress={() => navigation.canGoBack() && navigation.goBack()}
-            >
-              <Text style={[styles.linkText, { color: semantic.labelAlt, fontFamily: weightToFontFamily('600') }]}>
-                이미 계정이 있으신가요?{' '}
-                <Text style={{ color: semantic.primaryNormal, fontFamily: weightToFontFamily('700') }}>
-                  로그인
-                </Text>
-              </Text>
-            </TouchableOpacity>
-          ) : null}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
-};
-
-const strengthColor = (score: number, primary: string): string => {
-  switch (score) {
-    case 1:
-      return '#E04A3F';
-    case 2:
-      return '#F2A53A';
-    case 3:
-      return '#1FB05A';
-    case 4:
-      return primary;
-    default:
-      return primary;
-  }
 };
 
 interface CheckBoxProps {
@@ -587,12 +536,8 @@ const CheckBox: React.FC<CheckBoxProps> = ({ checked, primary, subtle }) => (
 
 const checkBoxStyles = StyleSheet.create({
   box: {
-    width: 20,
-    height: 20,
-    borderRadius: 6,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 20, height: 20, borderRadius: 6, borderWidth: 1.5,
+    alignItems: 'center', justifyContent: 'center',
   },
 });
 
@@ -605,123 +550,67 @@ const styles = StyleSheet.create({
     paddingBottom: WANTED_TOKENS.spacing.s8,
   },
   title: {
-    fontSize: 26,
-    lineHeight: 32,
-    letterSpacing: -0.6,
-    fontWeight: '800',
-    fontFamily: weightToFontFamily('800'),
+    fontSize: 26, lineHeight: 32, letterSpacing: -0.6,
+    fontWeight: '800', fontFamily: weightToFontFamily('800'),
   },
   subtitle: {
     marginTop: WANTED_TOKENS.spacing.s2,
-    fontSize: 14,
-    lineHeight: 21,
-    fontWeight: '500',
-    fontFamily: weightToFontFamily('500'),
+    fontSize: 14, lineHeight: 21,
+    fontWeight: '500', fontFamily: weightToFontFamily('500'),
   },
-  field: {
-    marginTop: WANTED_TOKENS.spacing.s5,
-  },
+  field: { marginTop: WANTED_TOKENS.spacing.s5 },
   fieldHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
     marginBottom: WANTED_TOKENS.spacing.s2,
   },
-  fieldLabelSpacing: {
-    marginBottom: WANTED_TOKENS.spacing.s2,
-  },
+  fieldLabelSpacing: { marginBottom: WANTED_TOKENS.spacing.s2 },
   strengthRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: WANTED_TOKENS.spacing.s2,
-    marginTop: WANTED_TOKENS.spacing.s2,
+    flexDirection: 'row', alignItems: 'center',
+    gap: WANTED_TOKENS.spacing.s2, marginTop: WANTED_TOKENS.spacing.s2,
   },
-  strengthBars: {
-    flex: 1,
-    flexDirection: 'row',
-    gap: 4,
-  },
-  strengthBar: {
-    flex: 1,
-    height: 4,
-    borderRadius: 2,
-  },
+  strengthBars: { flex: 1, flexDirection: 'row', gap: 4 },
+  strengthBar: { flex: 1, height: 4, borderRadius: 2 },
   strengthLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    fontFamily: weightToFontFamily('700'),
-    minWidth: 30,
-    textAlign: 'right',
+    fontSize: 11, fontWeight: '700', fontFamily: weightToFontFamily('700'),
+    minWidth: 30, textAlign: 'right',
   },
   matchBadge: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    alignItems: 'center',
-    justifyContent: 'center',
+    width: 18, height: 18, borderRadius: 9,
+    alignItems: 'center', justifyContent: 'center',
   },
   agreementBox: {
     marginTop: WANTED_TOKENS.spacing.s5,
     paddingVertical: WANTED_TOKENS.spacing.s3,
     paddingHorizontal: WANTED_TOKENS.spacing.s4,
-    borderRadius: WANTED_TOKENS.radius.r6,
-    borderWidth: 1,
+    borderRadius: WANTED_TOKENS.radius.r6, borderWidth: 1,
   },
   agreementHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: WANTED_TOKENS.spacing.s3,
-    paddingVertical: WANTED_TOKENS.spacing.s2,
+    flexDirection: 'row', alignItems: 'center',
+    gap: WANTED_TOKENS.spacing.s3, paddingVertical: WANTED_TOKENS.spacing.s2,
   },
   agreementHeaderLabel: {
-    fontSize: 14,
-    fontWeight: '800',
-    fontFamily: weightToFontFamily('800'),
+    fontSize: 14, fontWeight: '800', fontFamily: weightToFontFamily('800'),
   },
-  agreementDivider: {
-    height: 1,
-    marginVertical: WANTED_TOKENS.spacing.s2,
-  },
+  agreementDivider: { height: 1, marginVertical: WANTED_TOKENS.spacing.s2 },
   agreementRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: 'row', alignItems: 'center',
     paddingVertical: WANTED_TOKENS.spacing.s2,
   },
   agreementCheckArea: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flex: 1, flexDirection: 'row', alignItems: 'center',
     gap: WANTED_TOKENS.spacing.s3,
   },
   agreementLabel: {
-    fontSize: 13.5,
-    fontWeight: '600',
-    fontFamily: weightToFontFamily('600'),
+    fontSize: 13.5, fontWeight: '600', fontFamily: weightToFontFamily('600'),
   },
   primary: {
-    flexDirection: 'row',
-    height: 56,
-    borderRadius: WANTED_TOKENS.radius.r8,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: WANTED_TOKENS.spacing.s2,
-    marginTop: WANTED_TOKENS.spacing.s6,
+    flexDirection: 'row', height: 56, borderRadius: WANTED_TOKENS.radius.r8,
+    alignItems: 'center', justifyContent: 'center',
+    gap: WANTED_TOKENS.spacing.s2, marginTop: WANTED_TOKENS.spacing.s6,
   },
   primaryLabel: {
-    fontSize: 16,
-    fontWeight: '800',
-    fontFamily: weightToFontFamily('800'),
-  },
-  linkRow: {
-    marginTop: WANTED_TOKENS.spacing.s4,
-    alignItems: 'center',
-    paddingVertical: WANTED_TOKENS.spacing.s3,
-  },
-  linkText: {
-    fontSize: 14,
-    fontWeight: '600',
-    fontFamily: weightToFontFamily('600'),
+    fontSize: 16, fontWeight: '800', fontFamily: weightToFontFamily('800'),
   },
 });
 
-export default SignUpScreen;
+export default SignupStep2Screen;

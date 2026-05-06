@@ -2,11 +2,14 @@
  * SignupStep3Screen — 회원가입 3/3 (가입 완료 celebration).
  *
  * Lives in the post-auth/!hasCompletedOnboarding stack as `initialRoute`
- * when `hasSeenSignupCelebration === false`. CTA marks the celebration
- * seen (AsyncStorage) and routes to OnboardingNavigator.
+ * when `hasSeenSignupCelebration === false`. Both the primary CTA and the
+ * secondary "나중에 할게요" button mark the celebration seen and route to
+ * OnboardingNavigator — copy differs but the destination is identical to
+ * stay compatible with the RootNavigator gate.
  *
- * Pulse hero animates 3 staggered concentric rings; the rest is a static
- * summary card + 3-item next-steps checklist + bonus banner.
+ * Synced with the Wanted v6 hand-off (auth-signup-steps.jsx:236): SignupHeader
+ * (no back chevron), nested-ring hero with single outer pulse, avatar-first
+ * summary card, grouped icon checklist, dashed gradient bonus banner.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -21,7 +24,17 @@ import {
   View,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { CheckCircle2, ChevronRight, Sparkles } from 'lucide-react-native';
+import {
+  ArrowRight,
+  BadgeCheck,
+  Bell,
+  Check,
+  ChevronRight,
+  Gift,
+  Star,
+  TrainFront,
+} from 'lucide-react-native';
+import type { LucideIcon } from 'lucide-react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 
@@ -30,6 +43,7 @@ import { useTheme } from '@/services/theme/themeContext';
 import { useAuth } from '@/services/auth/AuthContext';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { RootStackParamList } from '@/navigation/RootNavigator';
+import { SignupHeader } from '@/components/auth/SignupHeader';
 import {
   enableBiometricLogin,
   getBiometricTypeName,
@@ -40,82 +54,71 @@ import { consumePendingBiometricCredentials } from '@/services/auth/pendingBiome
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
+type ChecklistTone = 'next' | 'todo';
+
 interface ChecklistItem {
   id: string;
   label: string;
-  active: boolean;
+  sub: string;
+  icon: LucideIcon;
+  tone: ChecklistTone;
 }
 
 const CHECKLIST: readonly ChecklistItem[] = [
-  { id: 'commute', label: '출퇴근 경로 설정', active: true },
-  { id: 'alerts', label: '알림 시간 설정', active: false },
-  { id: 'favorites', label: '즐겨찾기 역 추가', active: false },
+  { id: 'commute', label: '출퇴근 경로 등록', sub: '집·회사 역만 골라주세요', icon: TrainFront, tone: 'next' },
+  { id: 'alerts', label: '알림 시간 설정', sub: '평소 출발 시간 기준', icon: Bell, tone: 'todo' },
+  { id: 'favorites', label: '자주 가는 역 추가', sub: '즐겨찾기로 빠르게 확인', icon: Star, tone: 'todo' },
 ];
 
-const RING_COUNT = 3;
-const RING_DURATION_MS = 1800;
-const RING_STAGGER_MS = 600;
+const PULSE_DURATION_MS = 1200;
+const HERO_SIZE = 160;
+const RING_INSET_MID = 18;
+const RING_INSET_CORE = 36;
+const AVATAR_SIZE = 44;
 
 export const SignupStep3Screen: React.FC = () => {
   const { isDark } = useTheme();
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
   const navigation = useNavigation<Nav>();
-  const { user } = useAuth();
+  const { user, firebaseUser } = useAuth();
   const { markCelebrationSeen } = useOnboarding();
 
   const [submitting, setSubmitting] = useState(false);
 
-  const ringValues = useRef(
-    Array.from({ length: RING_COUNT }, () => new Animated.Value(0)),
-  ).current;
+  const pulseValue = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const animations = ringValues.map((v, i) =>
-      Animated.loop(
-        Animated.sequence([
-          Animated.delay(i * RING_STAGGER_MS),
-          Animated.timing(v, {
-            toValue: 1,
-            duration: RING_DURATION_MS,
-            easing: Easing.out(Easing.ease),
-            useNativeDriver: true,
-          }),
-          Animated.timing(v, {
-            toValue: 0,
-            duration: 0,
-            useNativeDriver: true,
-          }),
-        ]),
-      ),
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseValue, {
+          toValue: 1,
+          duration: PULSE_DURATION_MS,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseValue, {
+          toValue: 0,
+          duration: PULSE_DURATION_MS,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]),
     );
-    animations.forEach((a) => a.start());
-    return () => {
-      animations.forEach((a) => a.stop());
-    };
-  }, [ringValues]);
+    loop.start();
+    return () => loop.stop();
+  }, [pulseValue]);
 
   // Drop any stashed biometric credentials if the user leaves this screen
-  // without tapping the CTA (back gesture, deep-link redirect, etc.).
-  // handleCta consumes them on the happy path, making this a no-op then.
+  // without tapping a CTA. handleCta consumes them on the happy path.
   useEffect(() => {
     return () => {
       consumePendingBiometricCredentials();
     };
   }, []);
 
-  /**
-   * Offer biometric login setup if the device supports it and the user has
-   * not already enabled it. Mirrors EmailLoginScreen's promptBiometricSetup
-   * but reads credentials from `pendingBiometricSetup` (the password is not
-   * in scope on this screen — it was entered in SignUpScreen step 2/3).
-   *
-   * Resolves a Promise once the user responds to the Alert (or immediately
-   * if no prompt is shown), so the caller can serialize this with the rest
-   * of the CTA flow (markCelebrationSeen → Onboarding navigation).
-   */
   const promptBiometricSetup = useCallback(async (): Promise<void> => {
     const creds = consumePendingBiometricCredentials();
-    if (!creds) return; // password not available — skip silently
+    if (!creds) return;
     try {
       const available = await isBiometricAvailable();
       if (!available) return;
@@ -133,9 +136,6 @@ export const SignupStep3Screen: React.FC = () => {
               onPress: async () => {
                 const success = await enableBiometricLogin(creds.email, creds.password);
                 if (success) {
-                  // Await the success Alert dismissal too — otherwise the
-                  // outer flow continues to navigate('Onboarding') while the
-                  // success notification is still on screen.
                   await new Promise<void>((doneResolve) => {
                     Alert.alert(
                       '완료',
@@ -154,15 +154,10 @@ export const SignupStep3Screen: React.FC = () => {
       });
     } catch (err) {
       console.error('Biometric setup prompt error:', err);
-      // Non-fatal — never block the celebration → onboarding flow.
     }
   }, []);
 
   const handleCta = useCallback(async () => {
-    // Guard against double-taps. Without this, a second tap would race
-    // through promptBiometricSetup (consume already returned null on the
-    // first tap) and reach markCelebrationSeen + navigate while the first
-    // tap's Alert is still on screen.
     if (submitting) return;
     setSubmitting(true);
     try {
@@ -174,50 +169,78 @@ export const SignupStep3Screen: React.FC = () => {
     }
   }, [submitting, promptBiometricSetup, markCelebrationSeen, navigation]);
 
-  const displayName = user?.displayName ?? '신규 사용자';
+  // Defensive fallback: '익명 사용자' is the AuthContext default for a
+  // phone-only Firebase user with no displayName set yet (createOrGetUser-
+  // Document line 137/150). On the celebration screen that label feels
+  // unwelcoming, so we treat it as "no name set" and substitute '신규
+  // 사용자'. When the user has actually set a nickname via SignupStep2's
+  // linkEmailToCurrentUser, displayName holds their real name and this
+  // branch is skipped.
+  const rawName = user?.displayName ?? '';
+  const displayName =
+    rawName && rawName !== '익명 사용자' ? rawName : '신규 사용자';
   const email = user?.email ?? '';
+  const phoneNumber = firebaseUser?.phoneNumber ?? '';
+  // Phone-only users land here without an email. Fall back to a masked
+  // phone (010-****-XXXX) so the summary card has a meaningful identifier
+  // rather than an empty row. Korean E.164 (+82) is normalized to 010-…
+  // before masking.
+  const maskedPhone = phoneNumber
+    ? phoneNumber.replace(/^\+82/, '0').replace(/^(\d{3})\d{4}(\d{4}).*$/, '$1-****-$2')
+    : '';
+  const contactLabel = email || maskedPhone;
+  const avatarInitial = displayName.charAt(0) || '?';
+
+  const pulseScale = pulseValue.interpolate({ inputRange: [0, 1], outputRange: [1, 1.08] });
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: semantic.bgBase }]} testID="signup-step3">
+      <SignupHeader currentStep={3} testID="signup-step3-header" />
+
       <ScrollView contentContainerStyle={styles.body}>
-        {/* Pulse hero */}
-        <View style={styles.hero} testID="signup-step3-hero">
-          {ringValues.map((v, i) => {
-            const scale = v.interpolate({ inputRange: [0, 1], outputRange: [1, 1.6] });
-            const opacity = v.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0] });
-            return (
-              <Animated.View
-                key={i}
-                pointerEvents="none"
-                style={[
-                  styles.ring,
-                  {
-                    backgroundColor: semantic.primaryNormal,
-                    transform: [{ scale }],
-                    opacity,
-                  },
-                ]}
-              />
-            );
-          })}
-          <View style={[styles.ringCore, { backgroundColor: semantic.primaryNormal }]}>
-            <CheckCircle2 size={56} color={semantic.labelOnColor} strokeWidth={2.4} />
+        {/* Hero — nested rings + animated outer pulse + check core */}
+        <View style={styles.heroWrap} testID="signup-step3-hero">
+          <View style={styles.hero}>
+            <Animated.View
+              pointerEvents="none"
+              style={[
+                styles.ringOuter,
+                {
+                  backgroundColor: isDark ? 'rgba(51,133,255,0.10)' : 'rgba(0,102,255,0.06)',
+                  transform: [{ scale: pulseScale }],
+                },
+              ]}
+            />
+            <View
+              pointerEvents="none"
+              style={[
+                styles.ringMid,
+                {
+                  backgroundColor: isDark ? 'rgba(51,133,255,0.18)' : 'rgba(0,102,255,0.12)',
+                },
+              ]}
+            />
+            <View style={[styles.ringCore, { backgroundColor: semantic.primaryNormal }]}>
+              <Check size={48} color={semantic.labelOnColor} strokeWidth={3} />
+            </View>
           </View>
         </View>
 
+        {/* Greeting */}
         <Text
           style={[styles.title, { color: semantic.labelStrong, fontFamily: weightToFontFamily('800') }]}
           testID="signup-step3-title"
         >
-          가입이 완료되었어요!
+          환영해요, {displayName}님
         </Text>
         <Text
           style={[styles.subtitle, { color: semantic.labelAlt, fontFamily: weightToFontFamily('500') }]}
+          testID="signup-step3-subtitle"
         >
-          {displayName}님, LiveMetro에 오신 것을 환영합니다
+          가입이 완료되었어요.{'\n'}출퇴근을 더 똑똑하게 만들 준비가 끝났어요.
         </Text>
 
-        {/* Account summary card */}
+        {/* Account summary card — avatar + name/email + verify pill */}
         <View
           style={[
             styles.summaryCard,
@@ -225,121 +248,160 @@ export const SignupStep3Screen: React.FC = () => {
           ]}
           testID="signup-step3-summary"
         >
-          <View style={styles.summaryRow}>
-            <Text style={[styles.summaryLabel, { color: semantic.labelAlt, fontFamily: weightToFontFamily('500') }]}>
-              이름
+          <LinearGradient
+            colors={['#0066FF', '#6FA8FF']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.avatar}
+          >
+            <Text
+              style={[styles.avatarLabel, { fontFamily: weightToFontFamily('800') }]}
+              testID="signup-step3-avatar-initial"
+            >
+              {avatarInitial}
             </Text>
-            <Text style={[styles.summaryValue, { color: semantic.labelStrong, fontFamily: weightToFontFamily('700') }]}>
+          </LinearGradient>
+          <View style={styles.summaryText}>
+            <Text
+              style={[styles.summaryName, { color: semantic.labelStrong, fontFamily: weightToFontFamily('800') }]}
+              numberOfLines={1}
+            >
               {displayName}
             </Text>
-          </View>
-          {email ? (
-            <View style={styles.summaryRow}>
-              <Text style={[styles.summaryLabel, { color: semantic.labelAlt, fontFamily: weightToFontFamily('500') }]}>
-                이메일
-              </Text>
+            {contactLabel ? (
               <Text
-                style={[styles.summaryValue, { color: semantic.labelStrong, fontFamily: weightToFontFamily('600') }]}
+                style={[styles.summaryEmail, { color: semantic.labelAlt, fontFamily: weightToFontFamily('600') }]}
                 numberOfLines={1}
+                testID="signup-step3-contact"
               >
-                {email}
+                {contactLabel}
               </Text>
-            </View>
-          ) : null}
+            ) : null}
+          </View>
           <View
             style={[
-              styles.verifyBadge,
-              {
-                backgroundColor: isDark ? 'rgba(0,191,64,0.16)' : 'rgba(0,191,64,0.10)',
-              },
+              styles.verifyPill,
+              { backgroundColor: isDark ? 'rgba(0,191,64,0.18)' : 'rgba(0,191,64,0.10)' },
             ]}
             testID="signup-step3-verify-badge"
           >
-            <CheckCircle2 size={14} color={semantic.statusPositive} strokeWidth={2.4} />
+            <BadgeCheck size={11} color={semantic.statusPositive} strokeWidth={2.4} />
             <Text
               style={[styles.verifyText, { color: semantic.statusPositive, fontFamily: weightToFontFamily('700') }]}
             >
-              본인 인증 완료
+              인증 완료
             </Text>
           </View>
         </View>
 
-        {/* Next steps checklist */}
+        {/* Next-up checklist */}
         <Text
-          style={[styles.sectionLabel, { color: semantic.labelNormal, fontFamily: weightToFontFamily('700') }]}
+          style={[styles.sectionLabel, { color: semantic.labelAlt, fontFamily: weightToFontFamily('800') }]}
+          testID="signup-step3-checklist-label"
         >
-          다음 단계
+          다음 단계 · 1분이면 끝나요
         </Text>
-        <View style={styles.checklist} testID="signup-step3-checklist">
-          {CHECKLIST.map((item) => (
-            <View
-              key={item.id}
-              style={[
-                styles.checklistItem,
-                {
-                  backgroundColor: semantic.bgBase,
-                  borderColor: item.active ? semantic.primaryNormal : semantic.lineSubtle,
-                  borderWidth: item.active ? 1.5 : 1,
-                },
-              ]}
-              testID={`checklist-${item.id}`}
-            >
+        <View
+          style={[
+            styles.checklistCard,
+            { backgroundColor: semantic.bgBase, borderColor: semantic.lineSubtle },
+          ]}
+          testID="signup-step3-checklist"
+        >
+          {CHECKLIST.map((item, i) => {
+            const Icon = item.icon;
+            const isLast = i === CHECKLIST.length - 1;
+            const isNext = item.tone === 'next';
+            return (
               <View
+                key={item.id}
                 style={[
-                  styles.checklistDot,
-                  {
-                    backgroundColor: item.active ? semantic.primaryNormal : 'transparent',
-                    borderColor: item.active ? semantic.primaryNormal : semantic.lineNormal,
-                  },
+                  styles.checklistRow,
+                  !isLast && { borderBottomColor: semantic.lineSubtle, borderBottomWidth: StyleSheet.hairlineWidth },
                 ]}
-              />
-              <Text
-                style={[
-                  styles.checklistLabel,
-                  {
-                    color: item.active ? semantic.labelStrong : semantic.labelAlt,
-                    fontFamily: weightToFontFamily(item.active ? '700' : '500'),
-                  },
-                ]}
+                testID={`checklist-${item.id}`}
               >
-                {item.label}
-              </Text>
-              {item.active ? (
-                <ChevronRight size={18} color={semantic.primaryNormal} strokeWidth={2.2} />
-              ) : (
-                <Text
-                  style={[styles.checklistTodo, { color: semantic.labelAlt, fontFamily: weightToFontFamily('600') }]}
+                <View
+                  style={[
+                    styles.checklistIcon,
+                    { backgroundColor: isNext ? semantic.primaryNormal : semantic.bgSubtle },
+                  ]}
                 >
-                  나중에
-                </Text>
-              )}
-            </View>
-          ))}
+                  <Icon
+                    size={18}
+                    color={isNext ? semantic.labelOnColor : semantic.labelNeutral}
+                    strokeWidth={2}
+                  />
+                </View>
+                <View style={styles.checklistText}>
+                  <Text
+                    style={[
+                      styles.checklistLabel,
+                      { color: semantic.labelStrong, fontFamily: weightToFontFamily('800') },
+                    ]}
+                  >
+                    {item.label}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.checklistSub,
+                      { color: semantic.labelAlt, fontFamily: weightToFontFamily('600') },
+                    ]}
+                  >
+                    {item.sub}
+                  </Text>
+                </View>
+                {isNext ? (
+                  <View style={[styles.nowPill, { backgroundColor: semantic.primaryNormal }]}>
+                    <Text
+                      style={[
+                        styles.nowPillLabel,
+                        { color: semantic.labelOnColor, fontFamily: weightToFontFamily('700') },
+                      ]}
+                    >
+                      지금
+                    </Text>
+                  </View>
+                ) : (
+                  <ChevronRight size={16} color={semantic.labelAlt} strokeWidth={2} />
+                )}
+              </View>
+            );
+          })}
         </View>
 
-        {/* Bonus banner */}
-        <View style={styles.bonusWrap} testID="signup-step3-bonus">
+        {/* Welcome bonus — dashed gradient banner */}
+        <View
+          style={[
+            styles.bonusFrame,
+            { borderColor: isDark ? 'rgba(51,133,255,0.45)' : 'rgba(0,102,255,0.30)' },
+          ]}
+          testID="signup-step3-bonus"
+        >
           <LinearGradient
-            colors={['#0066FF', '#0044BB']}
+            colors={
+              isDark
+                ? ['rgba(51,133,255,0.18)', 'rgba(124,58,237,0.14)']
+                : ['rgba(0,102,255,0.10)', 'rgba(124,58,237,0.08)']
+            }
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
-            style={styles.bonus}
+            style={styles.bonusInner}
           >
-            <View style={styles.bonusTagRow}>
-              <Sparkles size={14} color="#FFFFFF" strokeWidth={2.4} />
-              <Text style={[styles.bonusTag, { fontFamily: weightToFontFamily('700') }]}>
-                신규 가입 혜택
-              </Text>
-            </View>
-            <Text style={[styles.bonusTitle, { fontFamily: weightToFontFamily('800') }]}>
-              30일 ML 예측 무제한
-            </Text>
-            <Text style={[styles.bonusSub, { fontFamily: weightToFontFamily('500') }]}>
-              출퇴근 경로 설정 후 바로 사용할 수 있어요
+            <Gift size={18} color={semantic.primaryNormal} strokeWidth={2.2} />
+            <Text
+              style={[styles.bonusText, { color: semantic.labelStrong, fontFamily: weightToFontFamily('700') }]}
+            >
+              첫 가입 보너스{' '}
+              <Text style={{ color: semantic.primaryNormal, fontFamily: weightToFontFamily('800') }}>
+                30일 ML 예측 무제한
+              </Text>{' '}
+              활성화됨
             </Text>
           </LinearGradient>
         </View>
 
+        {/* CTAs — primary + ghost. Both proceed to Onboarding (gate-safe). */}
         <TouchableOpacity
           testID="signup-step3-cta"
           style={[
@@ -356,176 +418,245 @@ export const SignupStep3Screen: React.FC = () => {
           >
             {submitting ? '진행 중…' : '출퇴근 설정하러 가기'}
           </Text>
+          {!submitting && (
+            <ArrowRight size={18} color={semantic.labelOnColor} strokeWidth={2.4} />
+          )}
+        </TouchableOpacity>
+        <TouchableOpacity
+          testID="signup-step3-cta-secondary"
+          style={styles.secondary}
+          onPress={handleCta}
+          disabled={submitting}
+          accessibilityRole="button"
+          accessibilityLabel="나중에 할게요, 홈으로 이동"
+        >
+          <Text
+            style={[styles.secondaryLabel, { color: semantic.labelAlt, fontFamily: weightToFontFamily('700') }]}
+          >
+            나중에 할게요 · 홈으로
+          </Text>
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
 };
 
-const RING_SIZE = 96;
-
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   body: {
     paddingHorizontal: WANTED_TOKENS.spacing.s6,
-    paddingTop: WANTED_TOKENS.spacing.s6,
+    paddingTop: WANTED_TOKENS.spacing.s4,
     paddingBottom: WANTED_TOKENS.spacing.s8,
   },
+  heroWrap: {
+    alignItems: 'center',
+    paddingVertical: WANTED_TOKENS.spacing.s4,
+  },
   hero: {
-    height: 200,
+    width: HERO_SIZE,
+    height: HERO_SIZE,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  ring: {
+  ringOuter: {
     position: 'absolute',
-    width: RING_SIZE,
-    height: RING_SIZE,
-    borderRadius: RING_SIZE / 2,
+    width: HERO_SIZE,
+    height: HERO_SIZE,
+    borderRadius: HERO_SIZE / 2,
+  },
+  ringMid: {
+    position: 'absolute',
+    top: RING_INSET_MID,
+    left: RING_INSET_MID,
+    right: RING_INSET_MID,
+    bottom: RING_INSET_MID,
+    borderRadius: (HERO_SIZE - RING_INSET_MID * 2) / 2,
   },
   ringCore: {
-    width: RING_SIZE,
-    height: RING_SIZE,
-    borderRadius: RING_SIZE / 2,
+    position: 'absolute',
+    top: RING_INSET_CORE,
+    left: RING_INSET_CORE,
+    right: RING_INSET_CORE,
+    bottom: RING_INSET_CORE,
+    borderRadius: (HERO_SIZE - RING_INSET_CORE * 2) / 2,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#0066FF',
+    shadowOffset: { width: 0, height: 12 },
+    shadowOpacity: 0.35,
+    shadowRadius: 28,
+    elevation: 12,
   },
   title: {
     marginTop: WANTED_TOKENS.spacing.s4,
     textAlign: 'center',
-    fontSize: WANTED_TOKENS.type.title3.size,
-    lineHeight: WANTED_TOKENS.type.title3.lh,
+    fontSize: 26,
+    lineHeight: 32,
+    letterSpacing: -0.6,
     fontWeight: '800',
     fontFamily: weightToFontFamily('800'),
   },
   subtitle: {
     marginTop: WANTED_TOKENS.spacing.s2,
     textAlign: 'center',
-    fontSize: WANTED_TOKENS.type.body2.size,
-    lineHeight: WANTED_TOKENS.type.body2.lh,
+    fontSize: 14,
+    lineHeight: 21,
     fontWeight: '500',
     fontFamily: weightToFontFamily('500'),
   },
   summaryCard: {
-    marginTop: WANTED_TOKENS.spacing.s6,
-    padding: WANTED_TOKENS.spacing.s5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: WANTED_TOKENS.spacing.s5,
+    padding: WANTED_TOKENS.spacing.s4,
     borderRadius: WANTED_TOKENS.radius.r8,
     borderWidth: 1,
+    gap: WANTED_TOKENS.spacing.s3,
   },
-  summaryRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  avatar: {
+    width: AVATAR_SIZE,
+    height: AVATAR_SIZE,
+    borderRadius: AVATAR_SIZE / 2,
     alignItems: 'center',
-    marginBottom: WANTED_TOKENS.spacing.s3,
+    justifyContent: 'center',
   },
-  summaryLabel: {
-    fontSize: WANTED_TOKENS.type.label1.size,
-    fontWeight: '500',
-    fontFamily: weightToFontFamily('500'),
+  avatarLabel: {
+    color: '#FFFFFF',
+    fontSize: 18,
+    fontWeight: '800',
+    fontFamily: weightToFontFamily('800'),
   },
-  summaryValue: {
+  summaryText: {
     flex: 1,
-    marginLeft: WANTED_TOKENS.spacing.s4,
-    textAlign: 'right',
-    fontSize: WANTED_TOKENS.type.label1.size,
-    fontWeight: '700',
-    fontFamily: weightToFontFamily('700'),
+    minWidth: 0,
   },
-  verifyBadge: {
+  summaryName: {
+    fontSize: 14,
+    fontWeight: '800',
+    fontFamily: weightToFontFamily('800'),
+  },
+  summaryEmail: {
+    marginTop: 2,
+    fontSize: 11.5,
+    fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
+  },
+  verifyPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    alignSelf: 'flex-start',
-    gap: 6,
-    paddingHorizontal: WANTED_TOKENS.spacing.s3,
-    paddingVertical: 6,
+    gap: 4,
+    paddingHorizontal: WANTED_TOKENS.spacing.s2,
+    paddingVertical: 4,
     borderRadius: WANTED_TOKENS.radius.pill,
-    marginTop: WANTED_TOKENS.spacing.s2,
   },
   verifyText: {
-    fontSize: WANTED_TOKENS.type.caption1.size,
+    fontSize: 11,
     fontWeight: '700',
     fontFamily: weightToFontFamily('700'),
   },
   sectionLabel: {
     marginTop: WANTED_TOKENS.spacing.s6,
     marginBottom: WANTED_TOKENS.spacing.s3,
-    fontSize: WANTED_TOKENS.type.label1.size,
-    fontWeight: '700',
-    fontFamily: weightToFontFamily('700'),
-  },
-  checklist: {
-    gap: WANTED_TOKENS.spacing.s2,
-  },
-  checklistItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: WANTED_TOKENS.spacing.s4,
-    paddingHorizontal: WANTED_TOKENS.spacing.s4,
-    borderRadius: WANTED_TOKENS.radius.r6,
-  },
-  checklistDot: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 1.5,
-    marginRight: WANTED_TOKENS.spacing.s3,
-  },
-  checklistLabel: {
-    flex: 1,
-    fontSize: WANTED_TOKENS.type.body2.size,
-    fontWeight: '500',
-    fontFamily: weightToFontFamily('500'),
-  },
-  checklistTodo: {
-    fontSize: WANTED_TOKENS.type.caption1.size,
-    fontWeight: '600',
-    fontFamily: weightToFontFamily('600'),
-  },
-  bonusWrap: {
-    marginTop: WANTED_TOKENS.spacing.s6,
-  },
-  bonus: {
-    padding: WANTED_TOKENS.spacing.s5,
-    borderRadius: WANTED_TOKENS.radius.r8,
-  },
-  bonusTagRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  bonusTag: {
-    color: '#FFFFFF',
-    fontSize: WANTED_TOKENS.type.caption1.size,
-    letterSpacing: 0.4,
-    fontWeight: '700',
-    fontFamily: weightToFontFamily('700'),
-  },
-  bonusTitle: {
-    marginTop: WANTED_TOKENS.spacing.s2,
-    color: '#FFFFFF',
-    fontSize: 22,
-    lineHeight: 28,
+    fontSize: 12,
+    letterSpacing: 0.48,
+    textTransform: 'uppercase',
     fontWeight: '800',
     fontFamily: weightToFontFamily('800'),
   },
-  bonusSub: {
-    marginTop: 6,
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: WANTED_TOKENS.type.body2.size,
-    lineHeight: WANTED_TOKENS.type.body2.lh,
-    fontWeight: '500',
-    fontFamily: weightToFontFamily('500'),
+  checklistCard: {
+    borderRadius: WANTED_TOKENS.radius.r8,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  checklistRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: WANTED_TOKENS.spacing.s3,
+    paddingHorizontal: WANTED_TOKENS.spacing.s4,
+    gap: WANTED_TOKENS.spacing.s3,
+  },
+  checklistIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: WANTED_TOKENS.radius.r5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  checklistText: {
+    flex: 1,
+  },
+  checklistLabel: {
+    fontSize: 14,
+    fontWeight: '800',
+    fontFamily: weightToFontFamily('800'),
+  },
+  checklistSub: {
+    marginTop: 1,
+    fontSize: 11.5,
+    fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
+  },
+  nowPill: {
+    paddingHorizontal: WANTED_TOKENS.spacing.s2,
+    paddingVertical: 4,
+    borderRadius: WANTED_TOKENS.radius.pill,
+  },
+  nowPillLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
+  },
+  bonusFrame: {
+    marginTop: WANTED_TOKENS.spacing.s4,
+    borderRadius: WANTED_TOKENS.radius.r6,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    overflow: 'hidden',
+  },
+  bonusInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: WANTED_TOKENS.spacing.s2,
+    paddingVertical: WANTED_TOKENS.spacing.s3,
+    paddingHorizontal: WANTED_TOKENS.spacing.s4,
+  },
+  bonusText: {
+    flex: 1,
+    fontSize: 12.5,
+    lineHeight: 18,
+    fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
   },
   primary: {
+    flexDirection: 'row',
     height: 56,
     borderRadius: WANTED_TOKENS.radius.r8,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: WANTED_TOKENS.spacing.s8,
+    gap: WANTED_TOKENS.spacing.s2,
+    marginTop: WANTED_TOKENS.spacing.s6,
+    shadowColor: '#0066FF',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.30,
+    shadowRadius: 20,
+    elevation: 8,
   },
   primaryLabel: {
     fontSize: 16,
+    letterSpacing: -0.16,
     fontWeight: '800',
     fontFamily: weightToFontFamily('800'),
+  },
+  secondary: {
+    height: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: WANTED_TOKENS.spacing.s2,
+  },
+  secondaryLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
   },
 });
 

@@ -34,12 +34,15 @@ import {
   LogOut,
   FileCheck,
   MessageSquare,
+  Wrench,
+  Trash2,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useNavigation, NavigationProp } from '@react-navigation/native';
 
 import { useAuth } from '../../services/auth/AuthContext';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 import { AppStackParamList } from '@/navigation/types';
 import { useI18n } from '../../services/i18n';
 import { useTheme } from '../../services/theme';
@@ -76,7 +79,8 @@ const AUTO_LOGIN_PASSWORD_KEY = 'livemetro_auto_login_password';
 type Props = NativeStackScreenProps<SettingsStackParamList, 'SettingsHome'>;
 
 export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
-  const { user, signOut } = useAuth();
+  const { user, signOut, deleteCurrentUser } = useAuth();
+  const { resetSignupFlow } = useOnboarding();
   const { language, t } = useI18n();
   const { themeMode, isDark } = useTheme();
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
@@ -232,6 +236,88 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
       );
     }
   }, [biometricTypeName]);
+
+  const handleNukeAccount = useCallback((): void => {
+    Alert.alert(
+      '⚠️ 회원 정보 모두 삭제',
+      [
+        '다음 데이터를 영구 삭제합니다 (개발용):',
+        '',
+        '• Firebase 계정 (휴대폰 인증 기록 포함)',
+        '• 생체 인증 자격증명 (SecureStore)',
+        '• 자동 로그인 정보',
+        '• 온보딩 / 가입 축하 표시 플래그',
+        '',
+        '이 작업은 되돌릴 수 없습니다.',
+      ].join('\n'),
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '모두 삭제',
+          style: 'destructive',
+          onPress: async () => {
+            // Order matters: Firebase user deletion FIRST, then local
+            // cleanup only on success. If Firebase delete fails (e.g.
+            // `auth/requires-recent-login`) we abort with local data
+            // intact — otherwise the user would be stuck signed in but
+            // forced through the entire signup/onboarding flow again.
+            try {
+              await deleteCurrentUser();
+            } catch (err) {
+              const message = err instanceof Error ? err.message : '계정 삭제에 실패했습니다.';
+              Alert.alert('계정 삭제 오류', message);
+              return;
+            }
+            // Firebase delete succeeded → wipe local in parallel. Each
+            // step is non-fatal (logged, never thrown) so a single
+            // SecureStore hiccup can't strand the user with a deleted
+            // Firebase account but lingering local credentials.
+            try {
+              await disableBiometricLogin();
+            } catch (e) {
+              console.error('Biometric cleanup failed (non-fatal):', e);
+            }
+            try {
+              await AsyncStorage.removeItem(AUTO_LOGIN_ENABLED_KEY);
+              await SecureStore.deleteItemAsync(AUTO_LOGIN_EMAIL_KEY);
+            } catch (e) {
+              console.error('Auto-login cleanup failed (non-fatal):', e);
+            }
+            try {
+              await resetSignupFlow();
+            } catch (e) {
+              console.error('Onboarding reset failed (non-fatal):', e);
+            }
+            Alert.alert(
+              '삭제 완료',
+              '모든 데이터가 삭제되었습니다.\n앱을 재시작하면 처음부터 가입 흐름이 시작됩니다.',
+            );
+          },
+        },
+      ],
+    );
+  }, [deleteCurrentUser, resetSignupFlow]);
+
+  const handleResetSignupFlow = useCallback((): void => {
+    Alert.alert(
+      '온보딩 상태 리셋',
+      '저장된 온보딩 완료 / 가입 축하 표시 플래그를 모두 지웁니다.\n\n다음 앱 실행 시 가입 축하 → 온보딩 흐름이 처음부터 다시 표시돼요. (개발용)',
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '리셋',
+          style: 'destructive',
+          onPress: async () => {
+            await resetSignupFlow();
+            Alert.alert(
+              '리셋 완료',
+              '앱을 재시작하면 가입 축하 화면이 다시 표시됩니다.',
+            );
+          },
+        },
+      ],
+    );
+  }, [resetSignupFlow]);
 
   const handleSignOut = async (): Promise<void> => {
     Alert.alert(
@@ -495,6 +581,38 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
           </View>
         </View>
 
+        {/* Dev Tools — visible only in __DEV__ builds. Reset onboarding +
+            celebration flags so the next launch re-runs the post-auth
+            wizard for testing. Excluded from production binaries entirely
+            because Metro inlines `__DEV__` as a literal `false` then. */}
+        {__DEV__ ? (
+          <View style={styles.section} testID="dev-tools-section">
+            <Text style={styles.devSectionLabel}>개발자 도구</Text>
+            <TouchableOpacity
+              style={styles.devButton}
+              onPress={handleResetSignupFlow}
+              testID="dev-reset-signup-flow"
+              accessibilityRole="button"
+              accessibilityLabel="온보딩 상태 리셋"
+            >
+              <Wrench size={20} color={semantic.labelAlt} />
+              <Text style={styles.devButtonText}>온보딩 상태 리셋</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.devButton, styles.devButtonDanger]}
+              onPress={handleNukeAccount}
+              testID="dev-nuke-account"
+              accessibilityRole="button"
+              accessibilityLabel="회원 정보 모두 삭제"
+            >
+              <Trash2 size={20} color="#E04A3F" />
+              <Text style={[styles.devButtonText, styles.devButtonTextDanger]}>
+                회원 정보 모두 삭제
+              </Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
         {/* Sign Out */}
         <View style={styles.section}>
           <TouchableOpacity style={styles.signOutButton} onPress={handleSignOut}>
@@ -661,6 +779,42 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       fontFamily: weightToFontFamily('600'),
       color: semantic.labelAlt,
       marginLeft: WANTED_TOKENS.spacing.s2,
+    },
+    devSectionLabel: {
+      fontSize: 11,
+      letterSpacing: 0.44,
+      textTransform: 'uppercase',
+      fontWeight: '800',
+      fontFamily: weightToFontFamily('800'),
+      color: semantic.labelAlt,
+      marginHorizontal: WANTED_TOKENS.spacing.s4,
+      marginBottom: WANTED_TOKENS.spacing.s2,
+    },
+    devButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: semantic.bgBase,
+      marginHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s4,
+      borderRadius: WANTED_TOKENS.radius.r6,
+      borderWidth: 1,
+      borderStyle: 'dashed',
+      borderColor: semantic.lineNormal,
+    },
+    devButtonDanger: {
+      marginTop: WANTED_TOKENS.spacing.s2,
+      borderColor: 'rgba(224,74,63,0.55)',
+    },
+    devButtonText: {
+      fontSize: WANTED_TOKENS.type.body1.size,
+      fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelAlt,
+      marginLeft: WANTED_TOKENS.spacing.s2,
+    },
+    devButtonTextDanger: {
+      color: '#E04A3F',
     },
   });
 
