@@ -75,6 +75,11 @@ const LINE_NAMES: Record<string, string> = {
   'GTX-A': 'GTX-A',
 };
 
+const formatTransferBadgeLabel = (lineId: string): string => {
+  const label = LINE_NAMES[lineId] ?? lineId;
+  return label.replace(/호선$/, '');
+};
+
 /**
  * Build transfer map: station name → set of lineIds it appears on
  */
@@ -305,7 +310,7 @@ export const SubwayMapScreen: React.FC = () => {
                                   { color: transferTextColor },
                                 ]}
                               >
-                                {transferLine}
+                                {formatTransferBadgeLabel(transferLine)}
                               </Text>
                             </View>
                           );
