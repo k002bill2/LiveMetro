@@ -2,7 +2,7 @@
  * ArrivalCard Tests — Wanted Design System single arrival card.
  */
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { fireEvent, render, act } from '@testing-library/react-native';
 import { ArrivalCard } from '../ArrivalCard';
 
 jest.mock('@/services/theme/themeContext', () => ({
@@ -98,6 +98,63 @@ describe('ArrivalCard', () => {
       );
       expect(getByTestId('arr-congestion')).toBeTruthy();
       expect(queryByTestId('arr-congestion-empty')).toBeNull();
+    });
+  });
+
+  describe('long-press tooltip (Phase 53b)', () => {
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('shows tooltip with car number, level, and percentage on long-press', () => {
+      // Bar 9 has pct=80 → "혼잡" band per congFromPct (<88 high)
+      const { getByTestId, queryByTestId, getByText } = render(
+        <ArrivalCard
+          {...base}
+          carCongestion={[10, 30, 50, 70, 90, 60, 40, 20, 80, 95]}
+          testID="arr"
+        />
+      );
+      // Tooltip not visible before interaction
+      expect(queryByTestId('arr-car-tooltip')).toBeNull();
+      fireEvent(getByTestId('arr-car-bar-9'), 'longPress');
+      expect(getByTestId('arr-car-tooltip')).toBeTruthy();
+      expect(getByText('9호차 · 혼잡 · 80%')).toBeTruthy();
+    });
+
+    it('auto-dismisses tooltip after 2.5s', () => {
+      const { getByTestId, queryByTestId } = render(
+        <ArrivalCard
+          {...base}
+          carCongestion={[10, 20, 30, 40, 50, 60, 70, 80, 90, 95]}
+          testID="arr"
+        />
+      );
+      fireEvent(getByTestId('arr-car-bar-1'), 'longPress');
+      expect(queryByTestId('arr-car-tooltip')).toBeTruthy();
+      // Advance past TOOLTIP_DISMISS_MS (2500ms)
+      act(() => {
+        jest.advanceTimersByTime(2600);
+      });
+      expect(queryByTestId('arr-car-tooltip')).toBeNull();
+    });
+
+    it('replaces tooltip when another bar is long-pressed (re-trigger resets timer)', () => {
+      const { getByTestId, getByText } = render(
+        <ArrivalCard
+          {...base}
+          carCongestion={[10, 20, 30, 40, 50, 60, 70, 80, 90, 95]}
+          testID="arr"
+        />
+      );
+      fireEvent(getByTestId('arr-car-bar-1'), 'longPress');
+      expect(getByText('1호차 · 여유 · 10%')).toBeTruthy();
+      fireEvent(getByTestId('arr-car-bar-10'), 'longPress');
+      // pct=95 → vhigh "매우혼잡"
+      expect(getByText('10호차 · 매우혼잡 · 95%')).toBeTruthy();
     });
   });
 });

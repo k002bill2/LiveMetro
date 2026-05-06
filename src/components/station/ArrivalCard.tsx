@@ -12,11 +12,22 @@
  * The first arrival in a list is rendered with a primary border + glow shadow
  * via the `isFirst` prop. Per-car congestion is optional.
  */
-import React, { memo, useMemo } from 'react';
-import { Text, View, StyleSheet, ViewStyle, TextStyle } from 'react-native';
+import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Text,
+  TouchableOpacity,
+  View,
+  StyleSheet,
+  ViewStyle,
+  TextStyle,
+} from 'react-native';
 import { WANTED_TOKENS, typeStyle, weightToFontFamily } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme/themeContext';
 import { LineBadge, Pill, congFromPct, CONG_TONE, type LineId } from '@/components/design';
+
+/** Tooltip auto-dismiss delay (ms). Long enough to read, short enough not
+ *  to block subsequent interactions. */
+const TOOLTIP_DISMISS_MS = 2500;
 
 export interface ArrivalCardProps {
   line: LineId;
@@ -57,6 +68,35 @@ const ArrivalCardImpl: React.FC<ArrivalCardProps> = ({
 
   const totalSeconds = Math.max(0, Math.floor(minutes) * 60 + Math.max(0, Math.floor(seconds)));
   const showImminentOnly = totalSeconds === 0;
+
+  // Phase 53b: long-press tooltip on each car bar. Surfaces the level
+  // name + percentage (data ArrivalCard already has) without needing the
+  // parent to wire reportCount/reliability through. Auto-dismisses on a
+  // timer; cleaned up on unmount + on every re-trigger so the timer
+  // never leaks.
+  const [tooltipIdx, setTooltipIdx] = useState<number | null>(null);
+  const tooltipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showTooltip = (idx: number): void => {
+    if (tooltipTimerRef.current) clearTimeout(tooltipTimerRef.current);
+    setTooltipIdx(idx);
+    tooltipTimerRef.current = setTimeout(() => {
+      setTooltipIdx(null);
+      tooltipTimerRef.current = null;
+    }, TOOLTIP_DISMISS_MS);
+  };
+  useEffect(() => {
+    return () => {
+      if (tooltipTimerRef.current) clearTimeout(tooltipTimerRef.current);
+    };
+  }, []);
+
+  const tooltipContent = useMemo(() => {
+    if (tooltipIdx === null || !carCongestion) return null;
+    const pct = carCongestion[tooltipIdx];
+    if (pct === undefined) return null;
+    const tone = congFromPct(pct);
+    return `${tooltipIdx + 1}호차 · ${CONG_TONE[tone].label} · ${Math.round(pct)}%`;
+  }, [tooltipIdx, carCongestion]);
 
   const cardStyle = useMemo<ViewStyle>(() => {
     const base: ViewStyle = {
@@ -182,13 +222,28 @@ const ArrivalCardImpl: React.FC<ArrivalCardProps> = ({
           testID={testID ? `${testID}-congestion` : undefined}
           style={[styles.congestionWrap, { borderTopColor: semantic.lineSubtle }]}
         >
+          {/* Header row: swaps to tooltip when a bar is long-pressed.
+              Avoids absolute positioning + overlap/clipping risk that an
+              overlay above the bars would have. */}
           <View style={styles.congestionHeader}>
-            <Text style={[styles.congestionLabel, { color: semantic.labelAlt }]}>
-              칸별 혼잡도
-            </Text>
-            <Text style={[styles.congestionAxis, { color: semantic.labelAlt }]}>
-              ← 전 / 후 →
-            </Text>
+            {tooltipContent ? (
+              <Text
+                testID={testID ? `${testID}-car-tooltip` : undefined}
+                style={[styles.tooltipText, { color: semantic.primaryNormal }]}
+                numberOfLines={1}
+              >
+                {tooltipContent}
+              </Text>
+            ) : (
+              <>
+                <Text style={[styles.congestionLabel, { color: semantic.labelAlt }]}>
+                  칸별 혼잡도
+                </Text>
+                <Text style={[styles.congestionAxis, { color: semantic.labelAlt }]}>
+                  ← 전 / 후 →
+                </Text>
+              </>
+            )}
           </View>
           <View style={styles.barRow}>
             {carCongestion.map((pct, idx) => {
@@ -196,10 +251,20 @@ const ArrivalCardImpl: React.FC<ArrivalCardProps> = ({
               const color = CONG_TONE[tone].color;
               const clamped = Math.max(0, Math.min(100, pct));
               return (
-                <View
-                  key={`${idx}-${pct}`}
+                <TouchableOpacity
+                  // Stable identity by car position — pct changes every
+                  // 30s polling cycle and a pct-keyed remount would
+                  // interrupt an in-flight longPress (Gemini review).
+                  key={idx}
                   testID={testID ? `${testID}-car-bar-${idx + 1}` : undefined}
                   style={styles.barColumn}
+                  onLongPress={() => showTooltip(idx)}
+                  delayLongPress={350}
+                  activeOpacity={0.7}
+                  accessible
+                  accessibilityRole="button"
+                  accessibilityLabel={`${idx + 1}호차, ${CONG_TONE[tone].label}, ${Math.round(pct)}퍼센트`}
+                  accessibilityHint="길게 눌러 상세 정보 보기"
                 >
                   <View style={[styles.barTrack, { backgroundColor: semantic.bgSubtle }]}>
                     <View
@@ -212,7 +277,7 @@ const ArrivalCardImpl: React.FC<ArrivalCardProps> = ({
                   <Text style={[styles.barNum, { color: semantic.labelAlt }]}>
                     {idx + 1}
                   </Text>
-                </View>
+                </TouchableOpacity>
               );
             })}
           </View>
@@ -266,6 +331,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 3,
     alignItems: 'flex-end',
+  },
+  /* Phase 53b: tooltip text rendered IN the header row when active —
+     no absolute positioning, no overlap/clipping risk. */
+  tooltipText: {
+    fontSize: 11,
+    fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
+    flex: 1,
   },
   barColumn: {
     flex: 1,
