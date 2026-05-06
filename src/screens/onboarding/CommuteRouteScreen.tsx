@@ -3,7 +3,7 @@
  * Screen for setting departure, transfer, and arrival stations during onboarding
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   View,
   Text,
@@ -25,7 +25,6 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { COLORS, SPACING, TYPOGRAPHY, RADIUS, SHADOWS, WANTED_TOKENS, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme';
 import { OnboardingStackParamList } from '@/navigation/types';
-import { StationSearchModal } from '@/components/commute/StationSearchModal';
 import { TransferStationList } from '@/components/commute/TransferStationList';
 import { RoutePreview } from '@/components/commute/RoutePreview';
 import { OnbHeader } from '@/components/onboarding/OnbHeader';
@@ -45,7 +44,7 @@ type StationSelectionType = 'departure' | 'arrival' | 'transfer';
 // Chunk 5; users adjust this later from the SettingsCommute screen.
 const DEFAULT_DEPARTURE_TIME = '08:00';
 
-export const CommuteRouteScreen: React.FC<Props> = ({ navigation }) => {
+export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
   const departureTime = DEFAULT_DEPARTURE_TIME;
   const { isDark } = useTheme();
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
@@ -57,9 +56,33 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation }) => {
   const [arrivalStation, setArrivalStation] = useState<StationSelection | null>(null);
   const [transferStations, setTransferStations] = useState<TransferStation[]>([]);
 
-  // Modal state
-  const [modalVisible, setModalVisible] = useState(false);
-  const [selectionType, setSelectionType] = useState<StationSelectionType>('departure');
+  // Phase 52: consume picker return param. The picker writes back via
+  // `navigation.navigate('CommuteRoute', { pickedStation }, { merge: true })`;
+  // we apply once then clear the param so back-navigation doesn't replay it.
+  useEffect(() => {
+    const picked = route.params?.pickedStation;
+    if (!picked) return;
+    const { selectionType: pickedType, station } = picked;
+    if (pickedType === 'departure') {
+      setDepartureStation(station);
+    } else if (pickedType === 'arrival') {
+      setArrivalStation(station);
+    } else if (pickedType === 'transfer') {
+      if (transferStations.length < MAX_TRANSFER_STATIONS) {
+        setTransferStations((prev) => [
+          ...prev,
+          {
+            stationId: station.stationId,
+            stationName: station.stationName,
+            lineId: station.lineId,
+            lineName: station.lineName,
+            order: prev.length,
+          },
+        ]);
+      }
+    }
+    navigation.setParams({ pickedStation: undefined });
+  }, [route.params?.pickedStation, transferStations.length, navigation]);
 
   // Morning/evening branching is retained as a no-op until Chunk 5 simplifies
   // the OnboardingStackParamList to single-route. The onboarding flow is now
@@ -77,37 +100,24 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation }) => {
     return ids;
   }, [departureStation, arrivalStation, transferStations]);
 
-  // Open modal for station selection
-  const openStationModal = useCallback((type: StationSelectionType) => {
-    setSelectionType(type);
-    setModalVisible(true);
-  }, []);
-
-  // Handle station selection from modal
-  const handleStationSelect = useCallback(
-    (station: StationSelection) => {
-      switch (selectionType) {
-        case 'departure':
-          setDepartureStation(station);
-          break;
-        case 'arrival':
-          setArrivalStation(station);
-          break;
-        case 'transfer':
-          if (transferStations.length < MAX_TRANSFER_STATIONS) {
-            const newTransfer: TransferStation = {
-              stationId: station.stationId,
-              stationName: station.stationName,
-              lineId: station.lineId,
-              lineName: station.lineName,
-              order: transferStations.length,
-            };
-            setTransferStations((prev) => [...prev, newTransfer]);
-          }
-          break;
-      }
+  // Phase 52: drill into the dedicated picker screen for station selection.
+  // The picker returns its choice via `pickedStation` route param (see
+  // useEffect above) — no callback prop needed.
+  const openStationPicker = useCallback(
+    (type: StationSelectionType) => {
+      const currentName =
+        type === 'departure'
+          ? departureStation?.stationName
+          : type === 'arrival'
+            ? arrivalStation?.stationName
+            : undefined;
+      navigation.navigate('OnboardingStationPicker', {
+        selectionType: type,
+        excludeStationIds: getExcludedStationIds(),
+        currentName,
+      });
     },
-    [selectionType, transferStations.length]
+    [navigation, departureStation, arrivalStation, getExcludedStationIds],
   );
 
   // Remove transfer station
@@ -148,18 +158,6 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation }) => {
     });
   };
 
-  // Get modal title based on selection type
-  const getModalTitle = (): string => {
-    switch (selectionType) {
-      case 'departure':
-        return '승차역 선택';
-      case 'arrival':
-        return '도착역 선택';
-      case 'transfer':
-        return '환승역 선택';
-    }
-  };
-
   return (
     <SafeAreaView style={styles.container}>
       <OnbHeader
@@ -195,7 +193,7 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation }) => {
                 styles.stationButton,
                 departureStation && styles.stationButtonSelected,
               ]}
-              onPress={() => openStationModal('departure')}
+              onPress={() => openStationPicker('departure')}
             >
               {departureStation ? (
                 <View style={styles.selectedStation}>
@@ -234,7 +232,7 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.transferSection}>
             <TransferStationList
               transfers={transferStations}
-              onAddTransfer={() => openStationModal('transfer')}
+              onAddTransfer={() => openStationPicker('transfer')}
               onRemoveTransfer={handleRemoveTransfer}
               maxTransfers={MAX_TRANSFER_STATIONS}
             />
@@ -248,7 +246,7 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation }) => {
                 styles.stationButton,
                 arrivalStation && styles.stationButtonSelected,
               ]}
-              onPress={() => openStationModal('arrival')}
+              onPress={() => openStationPicker('arrival')}
             >
               {arrivalStation ? (
                 <View style={styles.selectedStation}>
@@ -327,14 +325,6 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation }) => {
         </TouchableOpacity>
       </View>
 
-      {/* Station Search Modal */}
-      <StationSearchModal
-        visible={modalVisible}
-        onClose={() => setModalVisible(false)}
-        onSelect={handleStationSelect}
-        title={getModalTitle()}
-        excludeStationIds={getExcludedStationIds()}
-      />
     </SafeAreaView>
   );
 };
