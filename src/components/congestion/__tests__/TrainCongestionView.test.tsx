@@ -88,7 +88,7 @@ describe('TrainCongestionView', () => {
     const { getByText } = render(
       <TrainCongestionView congestion={null} />,
     );
-    expect(getByText('객차별 혼잡도')).toBeTruthy();
+    expect(getByText('칸별 혼잡도')).toBeTruthy();
   });
 
   it('shows no data message when congestion is null', () => {
@@ -108,12 +108,14 @@ describe('TrainCongestionView', () => {
     expect(getAllByText('10').length).toBeGreaterThanOrEqual(1);
   });
 
-  it('shows report count when data exists', () => {
+  it('shows report count + long-press hint when data exists', () => {
     const summary = makeCongestionSummary({ reportCount: 42 });
     const { getByText } = render(
       <TrainCongestionView congestion={summary} />,
     );
-    expect(getByText('42건의 제보 기반')).toBeTruthy();
+    // Phase 53: report count line now includes the long-press affordance
+    // hint so users discover the tooltip surface.
+    expect(getByText('42건의 제보 기반 · 칸 길게 눌러 상세 보기')).toBeTruthy();
   });
 
   it('shows overall level badge when data exists', () => {

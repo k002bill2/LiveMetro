@@ -2,10 +2,14 @@
  * TrainCongestionView Component
  * Shows a visual representation of congestion levels for each train car.
  *
- * Phase 51 — migrated to Wanted Design System tokens.
+ * Phase 53 — adopted Wanted handoff design's vertical bar visualization
+ * (bottom-aligned fill, height = mapped percentage). Hybrid approach:
+ * report count + reliability are preserved via long-press tooltip rather
+ * than discarded — the design's purely-visual intent is kept while
+ * LiveMetro's richer crowdsourced data remains accessible on demand.
  */
 
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -38,61 +42,99 @@ interface TrainCongestionViewProps {
   compact?: boolean;
 }
 
-interface CarIndicatorProps {
+interface CarBarProps {
   car: CarCongestion;
   onPress?: () => void;
+  onLongPress?: () => void;
   compact?: boolean;
   semantic: WantedSemanticTheme;
 }
 
-const CarIndicator: React.FC<CarIndicatorProps> = ({ car, onPress, compact = false, semantic }) => {
+/**
+ * Map a 4-step CongestionLevel enum to a percentage matching the Wanted
+ * handoff's CONG_TONE.pct values. Pure visual mapping — no data shape
+ * change. Used to set the bar fill height.
+ */
+const CONGESTION_PCT: Record<CongestionLevel, number> = {
+  [CongestionLevel.LOW]: 30,
+  [CongestionLevel.MODERATE]: 55,
+  [CongestionLevel.HIGH]: 80,
+  [CongestionLevel.CROWDED]: 95,
+};
+
+const CarBar: React.FC<CarBarProps> = ({
+  car,
+  onPress,
+  onLongPress,
+  compact = false,
+  semantic,
+}) => {
   const congestionColor = getCongestionLevelColor(car.congestionLevel);
   const hasReports = car.reportCount > 0;
   const isReliable = car.reportCount >= MIN_REPORTS_FOR_RELIABILITY;
+  // Reliability still surfaces visually via opacity: 1.0 reliable, 0.7
+  // some-reports, 0.4 no-reports. Matches prior CarIndicator semantics so
+  // the design switch doesn't lose at-a-glance data quality cues.
+  const opacity = isReliable ? 1 : hasReports ? 0.7 : 0.4;
+  const fillPct = hasReports ? CONGESTION_PCT[car.congestionLevel] : 0;
 
-  const content = (
-    <View
-      style={[
-        sharedStyles.carContainer,
-        compact && sharedStyles.carContainerCompact,
-        {
-          backgroundColor: hasReports ? congestionColor : semantic.bgBase,
-          borderColor: hasReports ? congestionColor : semantic.lineNormal,
-          opacity: isReliable ? 1 : hasReports ? 0.7 : 0.4,
-        },
-      ]}
-    >
+  const trackHeight = compact ? 24 : 32;
+
+  const inner = (
+    <View style={sharedStyles.carColumn}>
+      <View
+        style={[
+          sharedStyles.barTrack,
+          {
+            height: trackHeight,
+            backgroundColor: semantic.bgSubtle,
+            borderColor: semantic.lineSubtle,
+            opacity,
+          },
+        ]}
+      >
+        {hasReports && (
+          <View
+            style={[
+              sharedStyles.barFill,
+              {
+                height: `${fillPct}%`,
+                backgroundColor: congestionColor,
+              },
+            ]}
+          />
+        )}
+      </View>
       <Text
         style={[
           sharedStyles.carNumber,
           compact && sharedStyles.carNumberCompact,
-          { color: hasReports ? '#FFFFFF' : semantic.labelNeutral },
+          { color: semantic.labelAlt },
         ]}
       >
         {car.carNumber}
       </Text>
-      {!compact && hasReports && (
-        <Text
-          style={[
-            sharedStyles.reportCount,
-            { color: 'rgba(255, 255, 255, 0.8)' },
-          ]}
-        >
-          {car.reportCount}
-        </Text>
-      )}
     </View>
   );
 
-  if (onPress) {
+  if (onPress || onLongPress) {
     return (
-      <TouchableOpacity onPress={onPress} activeOpacity={0.7}>
-        {content}
+      <TouchableOpacity
+        onPress={onPress}
+        onLongPress={onLongPress}
+        activeOpacity={0.7}
+        style={sharedStyles.carTouch}
+        accessible
+        accessibilityRole="button"
+        accessibilityLabel={`${car.carNumber}호차, ${getCongestionLevelName(car.congestionLevel)}, 제보 ${car.reportCount}건`}
+        accessibilityHint="길게 눌러 상세 정보 보기"
+      >
+        {inner}
       </TouchableOpacity>
     );
   }
 
-  return content;
+  return <View style={sharedStyles.carTouch}>{inner}</View>;
 };
 
 const CongestionLegend: React.FC<{ semantic: WantedSemanticTheme }> = ({ semantic }) => {
@@ -122,6 +164,10 @@ const CongestionLegend: React.FC<{ semantic: WantedSemanticTheme }> = ({ semanti
   );
 };
 
+/** Tooltip auto-dismiss delay (ms). Long enough to read, short enough to
+ *  not block subsequent interactions. */
+const TOOLTIP_DISMISS_MS = 2500;
+
 export const TrainCongestionView: React.FC<TrainCongestionViewProps> = ({
   congestion,
   onCarPress,
@@ -138,6 +184,35 @@ export const TrainCongestionView: React.FC<TrainCongestionViewProps> = ({
   const totalReports = congestion?.reportCount || 0;
   const hasData = totalReports > 0;
 
+  // Phase 53: long-press tooltip preserving the rich crowdsourced metadata
+  // (reportCount, reliability) that the design's pure-bar visual would
+  // otherwise hide. Auto-dismisses on a timer; cleaned up on unmount and
+  // on every re-trigger so the timer never leaks.
+  const [tooltipCar, setTooltipCar] = useState<number | null>(null);
+  const tooltipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showTooltip = (carNumber: number): void => {
+    if (tooltipTimerRef.current) clearTimeout(tooltipTimerRef.current);
+    setTooltipCar(carNumber);
+    tooltipTimerRef.current = setTimeout(() => {
+      setTooltipCar(null);
+      tooltipTimerRef.current = null;
+    }, TOOLTIP_DISMISS_MS);
+  };
+  useEffect(() => {
+    return () => {
+      if (tooltipTimerRef.current) clearTimeout(tooltipTimerRef.current);
+    };
+  }, []);
+
+  const tooltipCarData =
+    tooltipCar !== null ? cars.find((c) => c.carNumber === tooltipCar) : null;
+  const tooltipReliability =
+    tooltipCarData && tooltipCarData.reportCount >= MIN_REPORTS_FOR_RELIABILITY
+      ? '신뢰도 높음'
+      : tooltipCarData && tooltipCarData.reportCount > 0
+        ? '제보 부족'
+        : '제보 없음';
+
   return (
     <View style={[styles.container, style]}>
       <View style={styles.header}>
@@ -147,7 +222,7 @@ export const TrainCongestionView: React.FC<TrainCongestionViewProps> = ({
           ) : (
             <Users size={18} color={semantic.labelNeutral} />
           )}
-          <Text style={styles.headerTitle}>객차별 혼잡도</Text>
+          <Text style={styles.headerTitle}>칸별 혼잡도</Text>
         </View>
         {hasData && (
           <View
@@ -164,20 +239,31 @@ export const TrainCongestionView: React.FC<TrainCongestionViewProps> = ({
       </View>
 
       <View style={styles.trainContainer}>
-        <View style={styles.directionContainer}>
-          <Text style={styles.directionText}>← 앞</Text>
-          <View style={styles.carsWrapper}>
-            {cars.map((car) => (
-              <CarIndicator
-                key={car.carNumber}
-                car={car}
-                onPress={onCarPress ? () => onCarPress(car.carNumber) : undefined}
-                compact={compact}
-                semantic={semantic}
-              />
-            ))}
+        {/* Tooltip overlay — only when a car is selected by long-press */}
+        {tooltipCarData && (
+          <View style={styles.tooltip} pointerEvents="none">
+            <Text style={styles.tooltipText}>
+              {tooltipCarData.carNumber}호차 · {getCongestionLevelName(tooltipCarData.congestionLevel)} · 제보 {tooltipCarData.reportCount}건 · {tooltipReliability}
+            </Text>
           </View>
-          <Text style={styles.directionText}>뒤 →</Text>
+        )}
+
+        {/* Direction labels match the Wanted handoff wording */}
+        <View style={styles.directionLabelRow}>
+          <Text style={styles.directionLabelText}>← 전 / 후 →</Text>
+        </View>
+
+        <View style={styles.carsWrapper}>
+          {cars.map((car) => (
+            <CarBar
+              key={car.carNumber}
+              car={car}
+              onPress={onCarPress ? () => onCarPress(car.carNumber) : undefined}
+              onLongPress={() => showTooltip(car.carNumber)}
+              compact={compact}
+              semantic={semantic}
+            />
+          ))}
         </View>
 
         {!hasData && (
@@ -188,7 +274,7 @@ export const TrainCongestionView: React.FC<TrainCongestionViewProps> = ({
 
         {hasData && (
           <Text style={styles.reportCountText}>
-            {totalReports}건의 제보 기반
+            {totalReports}건의 제보 기반 · 칸 길게 눌러 상세 보기
           </Text>
         )}
       </View>
@@ -199,32 +285,31 @@ export const TrainCongestionView: React.FC<TrainCongestionViewProps> = ({
 };
 
 const sharedStyles = StyleSheet.create({
-  carContainer: {
+  /* Phase 53: vertical-bar visualization (Wanted handoff design pattern) */
+  carTouch: {
     flex: 1,
-    aspectRatio: 0.8,
+  },
+  carColumn: {
+    alignItems: 'center',
+    gap: 3,
+  },
+  barTrack: {
+    width: '100%',
     borderRadius: WANTED_TOKENS.radius.r4,
     borderWidth: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    minHeight: 40,
-    maxHeight: 56,
+    overflow: 'hidden',
+    justifyContent: 'flex-end',
   },
-  carContainerCompact: {
-    aspectRatio: 1,
-    minHeight: 28,
-    maxHeight: 36,
+  barFill: {
+    width: '100%',
   },
   carNumber: {
-    fontSize: 13,
+    fontSize: 9,
+    fontWeight: '700',
     fontFamily: weightToFontFamily('700'),
   },
   carNumberCompact: {
-    fontSize: 12,
-  },
-  reportCount: {
     fontSize: 8,
-    fontFamily: weightToFontFamily('500'),
-    marginTop: 2,
   },
   legendContainer: {
     flexDirection: 'row',
@@ -283,23 +368,25 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       padding: WANTED_TOKENS.spacing.s3,
       borderRadius: WANTED_TOKENS.radius.r8,
       gap: WANTED_TOKENS.spacing.s2,
+      // Relative positioning anchors the absolute tooltip overlay
+      position: 'relative',
     },
-    directionContainer: {
+    /* Direction label row sits above the bars (matches design layout) */
+    directionLabelRow: {
       flexDirection: 'row',
-      alignItems: 'center',
-      gap: WANTED_TOKENS.spacing.s1,
+      justifyContent: 'flex-end',
     },
-    directionText: {
-      fontSize: 12,
-      fontFamily: weightToFontFamily('500'),
-      color: semantic.labelNeutral,
-      minWidth: 24,
+    directionLabelText: {
+      fontSize: 10,
+      fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelAlt,
     },
     carsWrapper: {
-      flex: 1,
       flexDirection: 'row',
       justifyContent: 'space-between',
-      gap: 4,
+      alignItems: 'flex-end',
+      gap: 3,
     },
     noDataText: {
       fontSize: 13,
@@ -308,9 +395,30 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       textAlign: 'center',
     },
     reportCountText: {
-      fontSize: 12,
+      fontSize: 11,
+      fontWeight: '500',
       fontFamily: weightToFontFamily('500'),
-      color: semantic.labelNeutral,
+      color: semantic.labelAlt,
+      textAlign: 'center',
+    },
+    /* Phase 53: long-press tooltip — preserves rich crowdsourced metadata
+       (reportCount, reliability) while keeping the bars visually clean */
+    tooltip: {
+      position: 'absolute',
+      top: WANTED_TOKENS.spacing.s2,
+      left: WANTED_TOKENS.spacing.s3,
+      right: WANTED_TOKENS.spacing.s3,
+      backgroundColor: semantic.labelStrong,
+      paddingHorizontal: WANTED_TOKENS.spacing.s3,
+      paddingVertical: WANTED_TOKENS.spacing.s2,
+      borderRadius: WANTED_TOKENS.radius.r4,
+      zIndex: 10,
+    },
+    tooltipText: {
+      fontSize: 11,
+      fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
+      color: semantic.bgBase,
       textAlign: 'center',
     },
   });
