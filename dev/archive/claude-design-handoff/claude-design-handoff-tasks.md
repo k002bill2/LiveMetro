@@ -1,6 +1,10 @@
 # Claude Design Hand-off — Tasks
 
-## Last Updated: 2026-05-05 KST (signup wizard + phone auth commits 반영)
+## Last Updated: 2026-05-07 KST — **CLOSED**
+
+> All phases complete. PR #6 + post-merge phases (49 → 56) + Phase B follow-up branch (`refactor/transfer-label-helper`) cover the entire scope. `lint:typography:audit` = 0. See bottom "Final Closeout (2026-05-07)" section for the deltas applied after the 2026-05-05 freeze below.
+
+## (Original) Last Updated: 2026-05-05 KST (signup wizard + phone auth commits 반영)
 
 ## Branch Snapshot
 
@@ -165,24 +169,62 @@ Phase 23/24/25 (commit `0aedffd`, 통합 commit "Phase 23 — Auth/Delays/Settin
 - [x] Settings test mock requireActual spread → settings 20 suites / 351 tests pass
 - [x] 회귀 없음 — 글로벌 jest 실행은 별도 phase commit에서 검증 (다음 phase 시작 전 `/verify-app` 권장)
 
-## Session Wrap Tasks (다음 `/session-wrap` 단계가 자동 채움)
-- [ ] 메모리 갱신: typography centralization 패턴 (weightToFontFamily + typeStyle 시그니처)
-- [ ] 메모리 갱신: Android faux-bold 회피 정책
-- [ ] 메모리 갱신: typography lint enforcement 4-layer 패턴 (script + npm + husky + rule)
-- [ ] 메모리 갱신: sandbox watchman 우회 (`--watchman=false`)
-- [ ] 메모리 갱신: Pretendard wiring 패턴 (직전 세션, 미수행)
-- [ ] 메모리 갱신: husky hook 자기-abort 버그 + fix (commit `a267151`, 직전 세션)
-- [ ] 메모리 갱신: 자동 commit staging 가로채기 workflow tip (직전 세션)
-- [ ] 패턴 추출: 14-file phase fix 워크플로우
-- [ ] 패턴 추출: 점진적 lint enforcement (whitelist + audit 분리)
-- [ ] Follow-up todo: manual QA 5종, Phase 26~31 점진 정리, StationCard ↔ FavoriteRow 통합 (보류)
+## Session Wrap Tasks — 2026-05-07 verification (all covered in MEMORY.md)
+
+7건 미체크 항목을 grep 검증 결과 모두 적립 완료. 매핑:
+
+- [x] typography centralization 패턴 → `project_typography_helpers.md` (Pattern A 인라인 / Pattern B spread)
+- [x] Android faux-bold 회피 정책 → 위 같은 파일에 통합 ("fontWeight 미반환으로 Android faux-bold 회피")
+- [x] typography 4-layer lint enforcement → `project_typography_lint_enforcement.md`
+- [x] sandbox watchman 우회 → `feedback_jest_watchman_sandbox.md`
+- [x] Pretendard wiring 패턴 → `project_pretendard_wiring.md` (commit `65ece74`)
+- [x] husky hook 자기-abort 버그 + fix → `feedback_husky_self_abort.md` (commit `a267151`)
+- [x] 자동 commit staging 가로채기 → `feedback_auto_commit_race.md` + `feedback_husky_lint_staged_autostage.md`
+- [x] 패턴 추출: 14-file phase fix 워크플로우 → `project_wanted_token_migration_pattern.md` (5단계 surgical 레시피 + 매핑표)
+- [x] 패턴 추출: 점진적 lint enforcement → `project_audit_as_gap_metric.md` + `project_typography_lint_enforcement.md`
 - [x] docs/design/ 트래킹 결정 (commit `e9d0740`)
 - [x] Phase 22.1 + 23.1 test mock fix 완료
+- [~] Follow-up todo: manual QA 5종 (별도 체크리스트), StationCard ↔ FavoriteRow 통합은 `project_stationcard_favoriterow_integration.md` 보유 (별도 phase)
 
-### 이번 /resume 세션 신규 추가
-- [ ] 메모리 갱신: Phase 1 inventory 결과 (audit 분포 = 객관적 design contract gap 척도)
-- [ ] 메모리 갱신: lint:typography enforcement 점진 확장 패턴 (HARD_PREFIXES 한 디렉토리씩 추가)
-- [ ] 메모리 갱신: Gemini wording false-flag 패턴 (whitelist vs enforcement set 용어 충돌 한 케이스)
-- [ ] 메모리 갱신: `git stash --include-untracked -- <paths>` 부분 stash로 pre-existing 회귀 검증 패턴
-- [ ] 패턴 추출: bundle inventory ↔ RN screen 매핑표 (handoff/RN 1:1)
-- [ ] 패턴 추출: phase별 surgical workflow (5-file batch + import-once-per-file)
+### 이번 /resume 세션 신규 추가 — 2026-05-07 verification
+
+- [x] Phase 1 inventory 결과 → `project_audit_as_gap_metric.md` (audit 디렉토리 분포 = 객관적 척도)
+- [x] lint:typography enforcement 점진 확장 → 위 같은 파일에 통합
+- [~] Gemini wording false-flag → `feedback_gemini_review_severity_triage.md`에 부분 커버 (whitelist↔enforcement set 용어 충돌 자체는 fix와 함께 commit 메시지에 영속화. 별도 메모리 가치 낮음)
+- [x] `git stash --include-untracked -- <paths>` 부분 stash → `project_partial_stash_baseline_verify.md`
+- [~] bundle inventory ↔ RN screen 매핑표 → `project_wanted_token_migration_pattern.md`에 매핑표 포함됨. 별도 분리 가치 낮음
+- [x] phase별 surgical workflow → 위 같은 파일
+
+---
+
+## Final Closeout (2026-05-07)
+
+이 섹션은 2026-05-05 freeze 시점 이후 main에 안착한 후속 phase + 별도 follow-up를 한눈에 모은 closeout 인덱스입니다. 상세 diff는 git log 참조 (모두 `refactor(ui): apply Wanted Design System — Phase NN ...` 형식).
+
+### Audit 0 도달 (PR #6)
+- Phase 26 (Prediction) → Phase 31 (Nav+Auth+Common+Map): typography 118 → 0 violations across 6 phases
+- Phase 31.1: lint default mode = full src/ (HARD_PREFIXES filter retired)
+- Phase 32~36 (visual audit + bundle alignment): Home/Favorites/Routes audit closure
+- Phase 37 (Alerts AL3) + 41 (filter chips) + 41.1 (FlatList extraData fix) + 42 (gradient avatar)
+- Phase 38 (DelayFeed Megaphone) + 39 (Stats emoji + Map lucide)
+- Phase 44 / 44.1 / 44.2 / 44.3: Ionicons → lucide closure across settings/ + WelcomeScreen + 6 settings atoms + dependency removal
+- Phase 45 / 45.1 / 46 / 47: settings foundation atoms + MarkdownViewer dark-mode fix + 4 detail screens + PrivacyPolicy + EditProfile
+- Phase 48 (3 station atoms) — committed parallel after merge, cherry-picked to main
+- Phase 49 (TransferStationList) — parallel session work recovered via `git fsck --unreachable` + `cat-file -p`
+
+### Post-PR-#6 시안 sync stream (별도 PR)
+- **Phase 50** (`356a80f`): NotificationTime 24h timeline
+- **Phase 52** (`c6b0e0c`): OnboardingStationPicker
+- **Phase 54** (`a8ab59a` PR #15): WeeklyPrediction hourly congestion forecast chart
+- **Phase 56** (`65563fb` → PR #18 머지 `8449840`): signup wizard 시안 sync + 약관 동의 게이트 + dev tools
+- `dbe7b25` / `9a4b99d`: delays verified badge + station name 정렬 (cherry-pick recovery 사례 → memory `feedback_check_branch_before_commit.md`)
+- `3d59fa5`: 즐겨찾기 및 경로 카드 UI 개선
+- `0347680`: docs/design/livemetro/ offline handoff bundle mirror
+
+### Phase B follow-up (Transfer badge 한글 lineId)
+- v5 delta 문서 §4가 명시한 Phase B 후보 — **이미 closed**: visual gap은 `96bfa74`에서 short label 매핑으로 정렬, RN flex 레이아웃(`flexWrap: 'wrap'` + content-aware width)이 잘림 위험 자체를 차단
+- **회귀 net** (branch `refactor/transfer-label-helper`, commit `ceeee32`): `LINE_NAMES` + `formatTransferBadgeLabel`을 `src/utils/transferLabel.ts`로 추출 → 13-case unit test (numeric/한글/fallback/coverage invariant). mock-free 테스트 가능
+
+### 추적 가능한 follow-up (이번 세션 산출 아님)
+- Manual QA 5종은 별도 체크리스트로 분리 (실기기 필요)
+- StationCard ↔ FavoriteRow 통합 — 메모리 `project_stationcard_favoriterow_integration.md` 보유, 진행 시 `useRealtimeTrains` 외부화 prerequisite
