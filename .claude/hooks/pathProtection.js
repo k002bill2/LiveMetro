@@ -26,10 +26,35 @@ function loadConfig() {
   }
 }
 
+/**
+ * Segment-based path matching. Avoids substring false positives like
+ * `apartment-events.tsx` matching `.env`.
+ *
+ * Three pattern modes:
+ *   1. Trailing '/' → directory: any segment must equal `pattern` minus '/'.
+ *      e.g. 'secrets/' matches 'secrets/key.txt' but not 'mysecrets.json'.
+ *   2. No '/' and looks like a file (contains '.') → exact segment match.
+ *      e.g. '.env' matches '.env' or 'app/.env' but not 'apartment-events.tsx'.
+ *   3. No '/' and no '.' → prefix match on the last segment only.
+ *      e.g. 'serviceAccount' matches 'serviceAccountKey.json' (filename),
+ *           but not 'serviceAccountUtils/foo.ts' (directory).
+ */
 function isBlocked(filePath, patterns) {
   if (!filePath || typeof filePath !== 'string') return null;
+  const normalized = filePath.replace(/\\/g, '/');
+  const segments = normalized.split('/').filter(Boolean);
+  if (segments.length === 0) return null;
+
   for (const pattern of patterns) {
-    if (filePath.includes(pattern)) return pattern;
+    if (pattern.endsWith('/')) {
+      const dir = pattern.slice(0, -1);
+      if (segments.includes(dir)) return pattern;
+    } else if (pattern.includes('.')) {
+      if (segments.includes(pattern)) return pattern;
+    } else {
+      const last = segments[segments.length - 1];
+      if (last === pattern || last.startsWith(pattern)) return pattern;
+    }
   }
   return null;
 }

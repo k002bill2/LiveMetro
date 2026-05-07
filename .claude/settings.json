@@ -15,6 +15,12 @@
             "command": "node .claude/hooks/fileLock.js acquire",
             "timeout": 5,
             "statusMessage": "File lock acquire..."
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/ethicalValidator.js",
+            "timeout": 5,
+            "statusMessage": "코드 시크릿/하드코딩 검사..."
           }
         ]
       },
@@ -66,7 +72,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "jq -r '.message' | xargs -I{} osascript -e 'display notification \"{}\" with title \"Claude Code\"'",
+            "command": "node .claude/hooks/notify.js 2>/dev/null || true",
             "timeout": 5,
             "statusMessage": "Notifying..."
           }
