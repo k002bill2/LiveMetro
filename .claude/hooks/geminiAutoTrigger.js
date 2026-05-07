@@ -54,12 +54,16 @@ function main() {
       return;
     }
 
-    // Write trigger timestamp (debounce marker)
+    // Write trigger timestamp (debounce marker) atomically:
+    // tmp + rename guarantees readers never observe a partial JSON write
+    // when multiple PostToolUse hooks fire concurrently.
     const now = Date.now();
-    fs.writeFileSync(TRIGGER_FILE, JSON.stringify({
+    const tmpPath = `${TRIGGER_FILE}.${process.pid}.${now}.tmp`;
+    fs.writeFileSync(tmpPath, JSON.stringify({
       timestamp: now,
       debounceUntil: now + DEBOUNCE_MS
     }));
+    fs.renameSync(tmpPath, TRIGGER_FILE);
 
     // Spawn detached debounce checker
     // This process will wait DEBOUNCE_MS and then check if we're still the latest trigger
