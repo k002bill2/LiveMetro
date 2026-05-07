@@ -67,21 +67,30 @@ State: AuthContext + Custom Hooks (no Redux)
 
 ## Claude Code System Architecture
 
-Claude Code 네이티브 기능(Agent 툴, Skill 툴, Hook)만 사용합니다. 커스텀 오케스트레이션 계층은 두지 않습니다.
+Claude Code 네이티브 이벤트(UserPromptSubmit / PreToolUse / PostToolUse / Notification)만 사용합니다. 외부 데몬·서비스 없이 self-contained Node.js 훅으로 모든 자동화를 구현하며, Gemini 크로스 리뷰·registry 동기화 등 부수 로직도 동일 훅 안에서 동작합니다.
 
 ### Hook System (자동화 파이프라인)
 
-보안·생산성을 위한 최소 훅만 유지합니다.
+`.claude/settings.json`에 wire된 훅 (전역):
 
 | 훅 | 이벤트 | 기능 |
 |----|--------|------|
+| `pathProtection.js` | PreToolUse/Edit\|Write | `.env*`, `google-services.json`, `.ssh/`, 키 파일 등 민감 경로 편집 차단 |
+| `fileLock.js acquire` | PreToolUse/Edit\|Write | 동일 파일 다중 에이전트 편집 advisory lock (60초 TTL) |
 | `ethicalValidator.js` | PreToolUse/Bash | 위험 명령 차단 (rm -rf, force push, 하드코딩 키, Seoul API 30초 폴링 검증) |
-| `geminiAutoTrigger.js` | PostToolUse/Edit\|Write | 30초 debounce 후 Gemini 크로스 리뷰 큐잉 |
+| `fileLock.js release` | PostToolUse/Edit\|Write | acquire 짝 해제 |
+| `geminiAutoTrigger.js` | PostToolUse/Edit\|Write | 30초 debounce 후 Gemini 크로스 리뷰 큐잉 (atomic trigger write) |
+| `outputSecretFilter.js` | PostToolUse/Bash | Bash 출력의 API키/토큰/시크릿 사후 감지 및 stderr 경고 (마스킹은 미수행) |
 | `userPromptSubmit.js` | UserPromptSubmit | 스킬/에이전트 자동 활성화, Gemini 리뷰 결과 주입 |
-| `outputSecretFilter.sh` | PostToolUse/Bash | Bash 출력에서 API키/토큰/시크릿 자동 마스킹 |
-| TypeScript 체크 | PostToolUse/Edit\|Write | .ts/.tsx 편집 시 자동 `npx tsc --noEmit` |
+| Notification | Notification | macOS `osascript` 알림 (jq → display notification) |
 
-**설정**: `.claude/settings.json`, `.claude/settings.local.json`
+`.claude/settings.local.json`에 wire되는 선택 훅:
+
+| 훅 | 이벤트 | 기능 |
+|----|--------|------|
+| `typeCheckHook.sh` | PostToolUse/Edit\|Write | .ts/.tsx 편집 후 자동 `npx tsc --noEmit` (개인 환경에서만 활성) |
+
+**설정**: `.claude/settings.json` (팀 공유), `.claude/settings.local.json` (개인, gitignore됨)
 
 ### Gemini CLI Integration (크로스 검증)
 
@@ -251,7 +260,7 @@ Claude Code 네이티브 Agent 툴로 서브에이전트를 스폰합니다. 커
 | `/sync-registry` | 레지스트리 동기화 |
 | `/run-workflow` | 워크플로우 실행 |
 
-### Skills (`.claude/skills/`) — 18개, 컨텍스트 기반 on-demand 로드
+### Skills (`.claude/skills/`) — 17개, 컨텍스트 기반 on-demand 로드
 
 구현 전 반드시 해당 스킬을 Skill 도구로 호출할 것:
 
