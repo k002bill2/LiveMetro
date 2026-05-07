@@ -24,6 +24,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { getSubwayLineColor, getLineTextColor } from '@utils/colorUtils';
+import { LINE_NAMES, formatTransferBadgeLabel } from '@utils/transferLabel';
 import { getLocalStationsByLine } from '@services/data/stationsDataService';
 import { useFavorites } from '@hooks/useFavorites';
 import { useTheme } from '@services/theme';
@@ -53,32 +54,6 @@ const LINE_IDS = [
   '경강선', '서해선', '인천선', '인천2', '용인경전철',
   '의정부경전철', '우이신설경전철', '김포도시철도', '신림선', 'GTX-A',
 ] as const;
-
-const LINE_NAMES: Record<string, string> = {
-  '1': '1호선', '2': '2호선', '3': '3호선',
-  '4': '4호선', '5': '5호선', '6': '6호선',
-  '7': '7호선', '8': '8호선', '9': '9호선',
-  '공항철도': '공항',
-  '경의선': '경의중앙',
-  '경춘선': '경춘',
-  '수인분당선': '수인분당',
-  '신분당선': '신분당',
-  '경강선': '경강',
-  '서해선': '서해',
-  '인천선': '인천1',
-  '인천2': '인천2',
-  '용인경전철': '에버라인',
-  '의정부경전철': '의정부',
-  '우이신설경전철': '우이신설',
-  '김포도시철도': '김포골드',
-  '신림선': '신림',
-  'GTX-A': 'GTX-A',
-};
-
-const formatTransferBadgeLabel = (lineId: string): string => {
-  const label = LINE_NAMES[lineId] ?? lineId;
-  return label.replace(/호선$/, '');
-};
 
 /**
  * Build transfer map: station name → set of lineIds it appears on
