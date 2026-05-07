@@ -25,6 +25,13 @@ ios/
 .env.local
 .env.*.local
 
+# Firebase config (contains API keys; inject at build time via EAS/CI secrets)
+google-services.json
+GoogleService-Info.plist
+
+# Claude Code local settings (may contain MCP tokens or session-specific config)
+.claude/settings.local.json
+
 # IDE
 # .vscode/ is committed for team consistency
 # Individual settings can go in .vscode/settings.local.json (not tracked)
