@@ -21,7 +21,9 @@ FILE=$(printf '%s' "$INPUT" | jq -r '.tool_input.file_path // empty' 2>/dev/null
 echo "$FILE" | grep -qE '\.tsx?$' || exit 0
 echo "$FILE" | grep -qE '\.(test|spec)\.' && exit 0
 
-cd /Users/younghwankang/Work/LiveMetro || exit 0
+ROOT=$(git rev-parse --show-toplevel 2>/dev/null)
+[ -z "$ROOT" ] && exit 0
+cd "$ROOT" || exit 0
 
 OUT=$(npx tsc --noEmit --pretty 2>&1)
 COUNT=$(echo "$OUT" | grep -cE 'error TS' || true)
