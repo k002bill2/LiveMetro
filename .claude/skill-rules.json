@@ -417,5 +417,216 @@
         "(new|custom).*?agent"
       ]
     }
+  },
+  "api-integration": {
+    "type": "skill",
+    "enforcement": "suggest",
+    "priority": "normal",
+    "description": "Seoul Open Data API integration for real-time subway arrival data and timetables",
+    "skillFile": ".claude/skills/api-integration/SKILL.md",
+    "promptTriggers": {
+      "keywords": [
+        "seoul api",
+        "openapi",
+        "open data",
+        "지하철 api",
+        "공공데이터"
+      ],
+      "intentPatterns": [
+        "(call|fetch|integrate).*?(seoul|metro|subway).*?api"
+      ]
+    },
+    "fileTriggers": {
+      "pathPatterns": [
+        "**/services/seoul*/**",
+        "**/services/api/**"
+      ]
+    }
+  },
+  "audio-accessibility": {
+    "type": "skill",
+    "enforcement": "suggest",
+    "priority": "normal",
+    "description": "TTS, 알림음, 진동, 접근성(VoiceOver/TalkBack) 통합",
+    "skillFile": ".claude/skills/audio-accessibility/SKILL.md",
+    "promptTriggers": {
+      "keywords": [
+        "tts",
+        "음성 합성",
+        "voiceover",
+        "talkback",
+        "screen reader",
+        "화면읽기",
+        "진동",
+        "vibration",
+        "사운드",
+        "접근성"
+      ],
+      "intentPatterns": [
+        "(add|implement).*?(voice|tts|sound|haptic)",
+        "(접근성|accessibility).*?(개선|구현|추가)"
+      ]
+    }
+  },
+  "crowdsourced-congestion": {
+    "type": "skill",
+    "enforcement": "suggest",
+    "priority": "normal",
+    "description": "혼잡도 크라우드소싱: Firebase 리포팅, 히트맵, 데이터 품질 검증",
+    "skillFile": ".claude/skills/crowdsourced-congestion/SKILL.md",
+    "promptTriggers": {
+      "keywords": [
+        "혼잡도",
+        "congestion",
+        "히트맵",
+        "heatmap",
+        "밀집도",
+        "crowdsourc"
+      ],
+      "intentPatterns": [
+        "(report|submit|track).*?(congestion|crowd)",
+        "(혼잡도|히트맵).*?(구현|표시|수집)"
+      ]
+    }
+  },
+  "monitoring-observability": {
+    "type": "skill",
+    "enforcement": "suggest",
+    "priority": "normal",
+    "description": "성능 모니터링, 헬스체크, 크래시 리포팅, 메트릭 수집",
+    "skillFile": ".claude/skills/monitoring-observability/SKILL.md",
+    "promptTriggers": {
+      "keywords": [
+        "performance",
+        "monitoring",
+        "health check",
+        "crash report",
+        "metrics",
+        "성능 측정",
+        "모니터링",
+        "헬스체크",
+        "크래시"
+      ],
+      "intentPatterns": [
+        "(monitor|measure|track).*?(performance|metric|crash)",
+        "(성능|메트릭).*?(측정|수집|분석)"
+      ]
+    }
+  },
+  "route-fare-calculation": {
+    "type": "skill",
+    "enforcement": "suggest",
+    "priority": "normal",
+    "description": "지하철 경로 탐색(A*, K-Shortest) 및 요금/환승 계산",
+    "skillFile": ".claude/skills/route-fare-calculation/SKILL.md",
+    "promptTriggers": {
+      "keywords": [
+        "route",
+        "fare",
+        "shortest path",
+        "환승",
+        "transfer",
+        "최단경로",
+        "경로 탐색",
+        "요금 계산"
+      ],
+      "intentPatterns": [
+        "(find|calculate|compute).*?(route|fare|path|transfer)",
+        "(경로|환승|요금).*?(계산|탐색|구현)"
+      ]
+    }
+  },
+  "station-info": {
+    "type": "skill",
+    "enforcement": "suggest",
+    "priority": "normal",
+    "description": "역정보 조회: 검색, 상세, 주변역, 노선별 목록, 도착정보, 시간표",
+    "skillFile": ".claude/skills/station-info/SKILL.md",
+    "promptTriggers": {
+      "keywords": [
+        "station info",
+        "getstation",
+        "역정보",
+        "역 검색",
+        "주변역",
+        "도착정보",
+        "시간표"
+      ],
+      "intentPatterns": [
+        "(get|fetch|search).*?station",
+        "(역|station).*?(조회|검색|상세)"
+      ]
+    }
+  },
+  "statistics-analytics": {
+    "type": "skill",
+    "enforcement": "suggest",
+    "priority": "normal",
+    "description": "이용 통계 집계, 차트 컴포넌트, 분석 대시보드",
+    "skillFile": ".claude/skills/statistics-analytics/SKILL.md",
+    "promptTriggers": {
+      "keywords": [
+        "statistics",
+        "analytics",
+        "chart",
+        "통계",
+        "차트",
+        "분석",
+        "대시보드",
+        "집계"
+      ],
+      "intentPatterns": [
+        "(aggregate|chart|visualize).*?(stat|metric|usage)",
+        "(통계|분석).*?(차트|대시보드|구현)"
+      ]
+    }
+  },
+  "theme-i18n-system": {
+    "type": "skill",
+    "enforcement": "suggest",
+    "priority": "normal",
+    "description": "테마(다크/라이트/고대비) 및 다국어(한/영) 시스템",
+    "skillFile": ".claude/skills/theme-i18n-system/SKILL.md",
+    "promptTriggers": {
+      "keywords": [
+        "theme",
+        "dark mode",
+        "다크모드",
+        "테마",
+        "i18n",
+        "번역",
+        "translation",
+        "다국어",
+        "고대비",
+        "high contrast"
+      ],
+      "intentPatterns": [
+        "(switch|toggle|implement).*?(theme|dark mode|i18n|translation)",
+        "(테마|다국어|고대비).*?(전환|구현|적용)"
+      ]
+    }
+  },
+  "user-trust-reputation": {
+    "type": "skill",
+    "enforcement": "suggest",
+    "priority": "normal",
+    "description": "사용자 신뢰도/평판/뱃지/사기 탐지 시스템",
+    "skillFile": ".claude/skills/user-trust-reputation/SKILL.md",
+    "promptTriggers": {
+      "keywords": [
+        "신뢰도",
+        "trust score",
+        "평판",
+        "reputation",
+        "뱃지",
+        "badge",
+        "사기탐지",
+        "fraud"
+      ],
+      "intentPatterns": [
+        "(calculate|update).*?(trust|reputation|badge)",
+        "(신뢰도|평판|뱃지).*?(계산|부여|표시)"
+      ]
+    }
   }
 }
