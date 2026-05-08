@@ -13,9 +13,10 @@ jest.mock('@/services/theme/themeContext', () => ({
 }));
 
 jest.mock('lucide-react-native', () => ({
-  Bell: 'Bell',
+  BellRing: 'BellRing',
   ChevronLeft: 'ChevronLeft',
   MapPin: 'MapPin',
+  ShieldCheck: 'ShieldCheck',
   Sparkles: 'Sparkles',
 }));
 
