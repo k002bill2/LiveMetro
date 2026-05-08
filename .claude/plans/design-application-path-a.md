@@ -10,13 +10,13 @@ LiveMetro `docs/design/livemetro/project/` 핸드오프 번들을 화면 단위(
 
 | Phase | 화면 | 상태 |
 |-------|------|------|
-| 57.0 | ThemeContext + density/congStyle/lineEmphasis | ✅ 완료 (27 tests pass, 3549 regression-free) |
-| 57.1 | AuthScreen LoginHero SVG (radial gradient + multi-ring pulse) | 🔄 진행 중 |
-| 57.2 | WeeklyPredictionScreen 96px ease-out | ⏳ 대기 |
-| 57.3 | WelcomeOnboardingScreen 3-ring 펄스 | ⏳ 대기 |
-| 57.4 | Settings 화면군 DetailHeader sticky | ⏳ 대기 |
-| 57.5 | atoms/token closeout | ⏳ 대기 |
-| 58 (deferred) | SettingsThemeScreen 토글 UI | ⏳ 별개 결정 |
+| 57.0 | ThemeContext + density/congStyle/lineEmphasis | ✅ 완료 |
+| 57.1 | AuthScreen LoginHero SVG (radial gradient + multi-ring pulse) | ✅ 완료 |
+| 57.2 | WeeklyPredictionScreen 96px ease-out | ✅ no-op (이미 1:1 일치) |
+| 57.3 | WelcomeOnboardingScreen 3-ring 펄스 | ✅ no-op (RN 패턴 충실) |
+| 57.4 | Settings 화면군 DetailHeader sticky | ✅ 완료 (commit `d9d12a0`) |
+| 57.5 | atoms/token closeout | ✅ no-op (#11/#8), #7는 별도 phase 후보 |
+| 58 | SettingsThemeScreen 토글 UI | 🔄 진행 중 |
 
 ## Phase 57.1 범위 (현재)
 

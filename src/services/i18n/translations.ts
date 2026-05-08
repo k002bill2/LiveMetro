@@ -81,6 +81,28 @@ export interface Translations {
     lightDesc: string;
     dark: string;
     darkDesc: string;
+    // Information density section
+    densityTitle: string;
+    densityLoose: string;
+    densityLooseDesc: string;
+    densityBalanced: string;
+    densityBalancedDesc: string;
+    densityDense: string;
+    densityDenseDesc: string;
+    // Congestion style section
+    congStyleTitle: string;
+    congStyleBar: string;
+    congStyleBarDesc: string;
+    congStyleDots: string;
+    congStyleDotsDesc: string;
+    congStyleHeat: string;
+    congStyleHeatDesc: string;
+    // Line color emphasis section
+    lineEmphasisTitle: string;
+    lineEmphasisOn: string;
+    lineEmphasisOnDesc: string;
+    lineEmphasisOff: string;
+    lineEmphasisOffDesc: string;
   };
   // Home
   home: {
@@ -195,6 +217,25 @@ export const translations: Record<Language, Translations> = {
       lightDesc: '밝은 배경의 화면',
       dark: '다크 모드',
       darkDesc: '어두운 배경의 화면',
+      densityTitle: '정보 밀도',
+      densityLoose: '여유',
+      densityLooseDesc: '큰 여백, 시원한 레이아웃',
+      densityBalanced: '균형',
+      densityBalancedDesc: '기본 권장 설정',
+      densityDense: '조밀',
+      densityDenseDesc: '많은 정보를 한눈에',
+      congStyleTitle: '혼잡도 시각화',
+      congStyleBar: '막대 그래프',
+      congStyleBarDesc: '비율을 가로 막대로 표시',
+      congStyleDots: '점 그래프',
+      congStyleDotsDesc: '4개의 점으로 단계 표시',
+      congStyleHeat: '히트맵',
+      congStyleHeatDesc: '색상 강도로 표시',
+      lineEmphasisTitle: '노선 컬러 강조',
+      lineEmphasisOn: '컬러 강조 켜기',
+      lineEmphasisOnDesc: '노선별 고유 색상으로 표시',
+      lineEmphasisOff: '컬러 강조 끄기',
+      lineEmphasisOffDesc: '회색 톤으로 통일',
     },
     home: {
       title: '홈',
@@ -300,6 +341,25 @@ export const translations: Record<Language, Translations> = {
       lightDesc: 'Light background theme',
       dark: 'Dark Mode',
       darkDesc: 'Dark background theme',
+      densityTitle: 'Information Density',
+      densityLoose: 'Loose',
+      densityLooseDesc: 'Spacious, airy layout',
+      densityBalanced: 'Balanced',
+      densityBalancedDesc: 'Recommended default',
+      densityDense: 'Dense',
+      densityDenseDesc: 'See more at a glance',
+      congStyleTitle: 'Congestion Style',
+      congStyleBar: 'Bar',
+      congStyleBarDesc: 'Horizontal bar showing ratio',
+      congStyleDots: 'Dots',
+      congStyleDotsDesc: 'Four dots showing level',
+      congStyleHeat: 'Heatmap',
+      congStyleHeatDesc: 'Color intensity',
+      lineEmphasisTitle: 'Line Color Emphasis',
+      lineEmphasisOn: 'Emphasis On',
+      lineEmphasisOnDesc: 'Distinct color per subway line',
+      lineEmphasisOff: 'Emphasis Off',
+      lineEmphasisOffDesc: 'Unified gray tone',
     },
     home: {
       title: 'Home',
