@@ -359,8 +359,8 @@ export const getPendingReports = functions
           const trustData = trustDoc.exists ? trustDoc.data() : null;
 
           return {
-            id: doc.id,
             ...report,
+            id: doc.id,
             user: userData
               ? { displayName: userData.displayName, email: userData.email }
               : null,

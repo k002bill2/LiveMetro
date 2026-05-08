@@ -81,6 +81,12 @@ const NOTIFICATION_CHANNELS = {
 // Service
 // ============================================================================
 
+/**
+ * Common FCM message shape before a routing key (`token`/`topic`/`condition`/`tokens`)
+ * is attached. Each `sendToX` method spreads this base and appends its own key.
+ */
+type FcmBaseMessage = Omit<admin.messaging.MulticastMessage, 'tokens'>;
+
 class PushNotificationService {
   private messaging: admin.messaging.Messaging;
 
@@ -314,9 +320,7 @@ class PushNotificationService {
   /**
    * Build FCM message
    */
-  private buildMessage(
-    payload: PushNotificationPayload
-  ): admin.messaging.Message | admin.messaging.MulticastMessage {
+  private buildMessage(payload: PushNotificationPayload): FcmBaseMessage {
     const notification: admin.messaging.Notification = {
       title: payload.title,
       body: payload.body,
@@ -359,7 +363,7 @@ class PushNotificationService {
    */
   private async sendToToken(
     token: string,
-    message: admin.messaging.Message
+    message: FcmBaseMessage
   ): Promise<SendResult> {
     const fullMessage = { ...message, token };
     const response = await this.messaging.send(fullMessage);
@@ -375,7 +379,7 @@ class PushNotificationService {
    */
   private async sendToTokens(
     tokens: string[],
-    message: admin.messaging.Message
+    message: FcmBaseMessage
   ): Promise<SendResult> {
     if (tokens.length === 0) {
       return { success: false, error: 'No tokens provided' };
@@ -422,7 +426,7 @@ class PushNotificationService {
    */
   private async sendToTopic(
     topic: string,
-    message: admin.messaging.Message
+    message: FcmBaseMessage
   ): Promise<SendResult> {
     const fullMessage = { ...message, topic };
     const response = await this.messaging.send(fullMessage);
@@ -438,7 +442,7 @@ class PushNotificationService {
    */
   private async sendToCondition(
     condition: string,
-    message: admin.messaging.Message
+    message: FcmBaseMessage
   ): Promise<SendResult> {
     const fullMessage = { ...message, condition };
     const response = await this.messaging.send(fullMessage);

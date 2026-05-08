@@ -21,6 +21,24 @@
             "command": "node .claude/hooks/ethicalValidator.js",
             "timeout": 5,
             "statusMessage": "코드 시크릿/하드코딩 검사..."
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/hardGateGuard.js",
+            "timeout": 3,
+            "statusMessage": "HARD-GATE check..."
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/tddGuard.js",
+            "timeout": 3,
+            "statusMessage": "TDD check..."
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/skillGateGuard.js",
+            "timeout": 3,
+            "statusMessage": "Skill gate check..."
           }
         ]
       },
@@ -64,6 +82,28 @@
             "statusMessage": "Secret filtering..."
           }
         ]
+      },
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/skillGateGuard.js",
+            "timeout": 3,
+            "statusMessage": "Recording skill invocation..."
+          }
+        ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/verificationGuard.js",
+            "timeout": 20,
+            "statusMessage": "Verification check..."
+          }
+        ]
       }
     ],
     "Notification": [
@@ -88,6 +128,63 @@
             "command": "node .claude/hooks/userPromptSubmit.js 2>/dev/null || true",
             "timeout": 5,
             "statusMessage": "Context activation..."
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/docEnforcer.js 2>/dev/null || true",
+            "timeout": 3,
+            "statusMessage": "Doc enforcement..."
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/agentLearnings.js 2>/dev/null || true",
+            "timeout": 5,
+            "statusMessage": "Saving learnings..."
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/evalCleanup.js 2>/dev/null || true",
+            "timeout": 5,
+            "statusMessage": "Eval cleanup..."
+          },
+          {
+            "type": "command",
+            "command": "node -e \"const fs=require('fs');['/tmp/claude-hard-gate-livemetro','/tmp/claude-tdd-guard-livemetro','/tmp/claude-skill-gate-livemetro','/tmp/claude-skill-gate-cooldown-livemetro'].forEach(d=>{try{fs.rmSync(d,{recursive:true})}catch{}});\"",
+            "timeout": 3,
+            "statusMessage": "Resetting session state..."
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .claude/hooks/evalCleanup.js 2>/dev/null || true",
+            "timeout": 5,
+            "statusMessage": "Eval cleanup..."
+          },
+          {
+            "type": "command",
+            "command": "node .claude/hooks/evalArtifactCleanup.js 2>/dev/null || true",
+            "timeout": 30,
+            "statusMessage": "Cleaning eval artifacts..."
           }
         ]
       }

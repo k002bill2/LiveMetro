@@ -163,3 +163,7 @@ docs/design/livemetro/project/export/
 dev/active/
 PR_BODY_TMP.md
 /pasted-*.png
+
+# Harness fork backups (created during chore/fork-aos-harness; safe to remove after verification)
+/.claude.bak.*/
+/.github/workflows.bak.*/

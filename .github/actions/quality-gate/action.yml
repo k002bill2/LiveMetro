@@ -1,0 +1,73 @@
+name: Quality Gate
+description: |
+  Reusable quality gate for LiveMetro PRs and deploys.
+  Mirrors the local verificationGuard.js chain so CI and local hooks share one source of truth.
+  Steps: type-check (root + functions/) → lint → jest --coverage → secret scan → expo-doctor.
+
+inputs:
+  node-version:
+    description: Node.js version
+    required: false
+    default: '18'
+  run-expo-doctor:
+    description: Whether to run expo-doctor (skip on hotfix branches if needed)
+    required: false
+    default: 'true'
+  run-functions-build:
+    description: Whether to build the Firebase Functions sub-workspace
+    required: false
+    default: 'true'
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: 'npm'
+
+    - name: Install root dependencies
+      shell: bash
+      run: npm ci
+
+    - name: Type check (root RN app)
+      shell: bash
+      run: npm run type-check
+
+    - name: Lint (root)
+      shell: bash
+      run: npm run lint
+
+    - name: Unit tests with coverage
+      shell: bash
+      run: npm test -- --coverage --ci
+
+    - name: Install Functions dependencies
+      if: ${{ inputs.run-functions-build == 'true' }}
+      shell: bash
+      working-directory: functions
+      run: npm ci
+
+    - name: Type check (Firebase Functions)
+      if: ${{ inputs.run-functions-build == 'true' }}
+      shell: bash
+      working-directory: functions
+      run: npx tsc --noEmit
+
+    - name: Build Functions
+      if: ${{ inputs.run-functions-build == 'true' }}
+      shell: bash
+      working-directory: functions
+      run: npm run build
+
+    - name: Secret scan (gitleaks)
+      uses: gitleaks/gitleaks-action@v2
+      env:
+        GITHUB_TOKEN: ${{ github.token }}
+        GITLEAKS_ENABLE_UPLOAD_ARTIFACT: false
+
+    - name: Expo doctor
+      if: ${{ inputs.run-expo-doctor == 'true' }}
+      shell: bash
+      run: npx --yes expo-doctor || (echo "::warning::expo-doctor reported issues" && exit 0)
