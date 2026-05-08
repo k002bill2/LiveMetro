@@ -8,9 +8,18 @@ import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const THEME_STORAGE_KEY = '@livemetro_theme';
+const DENSITY_STORAGE_KEY = '@livemetro_density';
+const CONG_STYLE_STORAGE_KEY = '@livemetro_cong_style';
+const LINE_EMPHASIS_STORAGE_KEY = '@livemetro_line_emphasis';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 export type ResolvedTheme = 'light' | 'dark';
+export type Density = 'loose' | 'balanced' | 'dense';
+export type CongStyle = 'bar' | 'dots' | 'heat';
+
+const DEFAULT_DENSITY: Density = 'loose';
+const DEFAULT_CONG_STYLE: CongStyle = 'bar';
+const DEFAULT_LINE_EMPHASIS = true;
 
 // Light theme colors (Updated based on designStyle.json)
 const lightColors = {
@@ -134,6 +143,12 @@ interface ThemeContextType {
   colors: ThemeColors;
   isDark: boolean;
   setThemeMode: (mode: ThemeMode) => Promise<void>;
+  density: Density;
+  setDensity: (density: Density) => Promise<void>;
+  congStyle: CongStyle;
+  setCongStyle: (style: CongStyle) => Promise<void>;
+  lineEmphasis: boolean;
+  setLineEmphasis: (emphasis: boolean) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -146,24 +161,41 @@ interface ThemeProviderProps {
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const systemColorScheme = useColorScheme();
   const [themeMode, setThemeModeState] = useState<ThemeMode>('system');
+  const [density, setDensityState] = useState<Density>(DEFAULT_DENSITY);
+  const [congStyle, setCongStyleState] = useState<CongStyle>(DEFAULT_CONG_STYLE);
+  const [lineEmphasis, setLineEmphasisState] = useState<boolean>(DEFAULT_LINE_EMPHASIS);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load saved theme on mount
+  // Load saved preferences on mount (parallel for fast cold-start)
   useEffect(() => {
-    const loadTheme = async (): Promise<void> => {
+    const loadPreferences = async (): Promise<void> => {
       try {
-        const savedTheme = await AsyncStorage.getItem(THEME_STORAGE_KEY);
-        if (savedTheme && (savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'system')) {
+        const [savedTheme, savedDensity, savedCongStyle, savedLineEmphasis] = await Promise.all([
+          AsyncStorage.getItem(THEME_STORAGE_KEY),
+          AsyncStorage.getItem(DENSITY_STORAGE_KEY),
+          AsyncStorage.getItem(CONG_STYLE_STORAGE_KEY),
+          AsyncStorage.getItem(LINE_EMPHASIS_STORAGE_KEY),
+        ]);
+        if (savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'system') {
           setThemeModeState(savedTheme);
         }
+        if (savedDensity === 'loose' || savedDensity === 'balanced' || savedDensity === 'dense') {
+          setDensityState(savedDensity);
+        }
+        if (savedCongStyle === 'bar' || savedCongStyle === 'dots' || savedCongStyle === 'heat') {
+          setCongStyleState(savedCongStyle);
+        }
+        if (savedLineEmphasis === 'true' || savedLineEmphasis === 'false') {
+          setLineEmphasisState(savedLineEmphasis === 'true');
+        }
       } catch (error) {
-        console.error('Error loading theme preference:', error);
+        console.error('Error loading theme preferences:', error);
       } finally {
         setIsLoading(false);
       }
     };
 
-    loadTheme();
+    loadPreferences();
   }, []);
 
   // Resolve theme based on mode and system preference
@@ -188,14 +220,63 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     }
   }, []);
 
+  const setDensity = useCallback(async (next: Density): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(DENSITY_STORAGE_KEY, next);
+      setDensityState(next);
+    } catch (error) {
+      console.error('Error saving density preference:', error);
+      throw error;
+    }
+  }, []);
+
+  const setCongStyle = useCallback(async (next: CongStyle): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(CONG_STYLE_STORAGE_KEY, next);
+      setCongStyleState(next);
+    } catch (error) {
+      console.error('Error saving congestion style preference:', error);
+      throw error;
+    }
+  }, []);
+
+  const setLineEmphasis = useCallback(async (next: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(LINE_EMPHASIS_STORAGE_KEY, String(next));
+      setLineEmphasisState(next);
+    } catch (error) {
+      console.error('Error saving line emphasis preference:', error);
+      throw error;
+    }
+  }, []);
+
   const value = useMemo<ThemeContextType>(() => ({
     themeMode,
     resolvedTheme,
     colors,
     isDark,
     setThemeMode,
+    density,
+    setDensity,
+    congStyle,
+    setCongStyle,
+    lineEmphasis,
+    setLineEmphasis,
     isLoading,
-  }), [themeMode, resolvedTheme, colors, isDark, setThemeMode, isLoading]);
+  }), [
+    themeMode,
+    resolvedTheme,
+    colors,
+    isDark,
+    setThemeMode,
+    density,
+    setDensity,
+    congStyle,
+    setCongStyle,
+    lineEmphasis,
+    setLineEmphasis,
+    isLoading,
+  ]);
 
   return (
     <ThemeContext.Provider value={value}>

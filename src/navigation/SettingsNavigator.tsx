@@ -7,7 +7,8 @@ import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 
 import { SettingsStackParamList } from './types';
-import { COLORS, TYPOGRAPHY } from '@/styles/modernTheme';
+import { weightToFontFamily } from '@/styles/modernTheme';
+import { useTheme } from '@/services/theme/themeContext';
 
 // Import screens
 import SettingsScreen from '@/screens/settings/SettingsScreen';
@@ -25,20 +26,25 @@ import PrivacyPolicyScreen from '@/screens/settings/PrivacyPolicyScreen';
 const SettingsStack = createNativeStackNavigator<SettingsStackParamList>();
 
 export const SettingsNavigator: React.FC = () => {
+  const { colors } = useTheme();
+
   return (
     <SettingsStack.Navigator
       screenOptions={{
         headerShown: true,
+        // Wanted spec: 17px / 700, sticky bg-subtle-page, chevron-only back
         headerStyle: {
-          backgroundColor: COLORS.white,
+          backgroundColor: colors.backgroundSecondary,
         },
         headerTitleStyle: {
-          fontSize: TYPOGRAPHY.fontSize.lg,
-          fontWeight: TYPOGRAPHY.fontWeight.bold,
-          color: COLORS.text.primary,
+          fontSize: 17,
+          fontWeight: '700',
+          fontFamily: weightToFontFamily('700'),
+          color: colors.textPrimary,
         },
-        headerBackTitle: '뒤로',
-        headerTintColor: COLORS.black,
+        headerTitleAlign: 'center',
+        headerBackTitle: '',
+        headerTintColor: colors.textPrimary,
       }}
     >
       <SettingsStack.Screen

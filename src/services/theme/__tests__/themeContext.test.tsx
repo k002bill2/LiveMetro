@@ -183,4 +183,220 @@ describe('themeContext', () => {
       expect(result.current.error).toBeDefined();
     });
   });
+
+  describe('density preference', () => {
+    it('should default to loose when no value stored', async () => {
+      const { result } = renderHook(() => useTheme(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.density).toBe('loose');
+    });
+
+    it('should load saved density from storage', async () => {
+      (AsyncStorage.getItem as jest.Mock).mockImplementation((key: string) =>
+        Promise.resolve(key === '@livemetro_density' ? 'dense' : null)
+      );
+
+      const { result } = renderHook(() => useTheme(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.density).toBe('dense');
+    });
+
+    it('should ignore invalid saved density', async () => {
+      (AsyncStorage.getItem as jest.Mock).mockImplementation((key: string) =>
+        Promise.resolve(key === '@livemetro_density' ? 'huge' : null)
+      );
+
+      const { result } = renderHook(() => useTheme(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.density).toBe('loose');
+    });
+
+    it('should persist density via setDensity', async () => {
+      const { result } = renderHook(() => useTheme(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      await act(async () => {
+        await result.current.setDensity('balanced');
+      });
+
+      expect(result.current.density).toBe('balanced');
+      expect(AsyncStorage.setItem).toHaveBeenCalledWith('@livemetro_density', 'balanced');
+    });
+
+    it('should throw on storage error when setting density', async () => {
+      (AsyncStorage.setItem as jest.Mock).mockRejectedValue(new Error('Write error'));
+      const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      const { result } = renderHook(() => useTheme(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      await expect(
+        act(async () => {
+          await result.current.setDensity('dense');
+        })
+      ).rejects.toThrow('Write error');
+
+      consoleSpy.mockRestore();
+    });
+  });
+
+  describe('congStyle preference', () => {
+    it('should default to bar when no value stored', async () => {
+      const { result } = renderHook(() => useTheme(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.congStyle).toBe('bar');
+    });
+
+    it('should load saved congStyle from storage', async () => {
+      (AsyncStorage.getItem as jest.Mock).mockImplementation((key: string) =>
+        Promise.resolve(key === '@livemetro_cong_style' ? 'heat' : null)
+      );
+
+      const { result } = renderHook(() => useTheme(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.congStyle).toBe('heat');
+    });
+
+    it('should ignore invalid saved congStyle', async () => {
+      (AsyncStorage.getItem as jest.Mock).mockImplementation((key: string) =>
+        Promise.resolve(key === '@livemetro_cong_style' ? 'rainbow' : null)
+      );
+
+      const { result } = renderHook(() => useTheme(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.congStyle).toBe('bar');
+    });
+
+    it('should persist congStyle via setCongStyle', async () => {
+      const { result } = renderHook(() => useTheme(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      await act(async () => {
+        await result.current.setCongStyle('dots');
+      });
+
+      expect(result.current.congStyle).toBe('dots');
+      expect(AsyncStorage.setItem).toHaveBeenCalledWith('@livemetro_cong_style', 'dots');
+    });
+  });
+
+  describe('lineEmphasis preference', () => {
+    it('should default to true when no value stored', async () => {
+      const { result } = renderHook(() => useTheme(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.lineEmphasis).toBe(true);
+    });
+
+    it('should load saved lineEmphasis=true from storage', async () => {
+      (AsyncStorage.getItem as jest.Mock).mockImplementation((key: string) =>
+        Promise.resolve(key === '@livemetro_line_emphasis' ? 'true' : null)
+      );
+
+      const { result } = renderHook(() => useTheme(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.lineEmphasis).toBe(true);
+    });
+
+    it('should load saved lineEmphasis=false from storage', async () => {
+      (AsyncStorage.getItem as jest.Mock).mockImplementation((key: string) =>
+        Promise.resolve(key === '@livemetro_line_emphasis' ? 'false' : null)
+      );
+
+      const { result } = renderHook(() => useTheme(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.lineEmphasis).toBe(false);
+    });
+
+    it('should ignore invalid saved lineEmphasis', async () => {
+      (AsyncStorage.getItem as jest.Mock).mockImplementation((key: string) =>
+        Promise.resolve(key === '@livemetro_line_emphasis' ? 'maybe' : null)
+      );
+
+      const { result } = renderHook(() => useTheme(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.lineEmphasis).toBe(true);
+    });
+
+    it('should persist lineEmphasis via setLineEmphasis', async () => {
+      const { result } = renderHook(() => useTheme(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      await act(async () => {
+        await result.current.setLineEmphasis(false);
+      });
+
+      expect(result.current.lineEmphasis).toBe(false);
+      expect(AsyncStorage.setItem).toHaveBeenCalledWith('@livemetro_line_emphasis', 'false');
+    });
+
+    it('should round-trip lineEmphasis true via setLineEmphasis', async () => {
+      const { result } = renderHook(() => useTheme(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      await act(async () => {
+        await result.current.setLineEmphasis(false);
+      });
+      await act(async () => {
+        await result.current.setLineEmphasis(true);
+      });
+
+      expect(result.current.lineEmphasis).toBe(true);
+      expect(AsyncStorage.setItem).toHaveBeenLastCalledWith('@livemetro_line_emphasis', 'true');
+    });
+  });
 });

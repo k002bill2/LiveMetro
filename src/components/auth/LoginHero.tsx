@@ -6,7 +6,7 @@
  */
 import React, { memo } from 'react';
 import { Text, View, StyleSheet, ViewStyle, TextStyle } from 'react-native';
-import Svg, { Path, Circle, G } from 'react-native-svg';
+import Svg, { Path, Circle, G, Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
 import { TrainFront } from 'lucide-react-native';
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme/themeContext';
@@ -34,8 +34,14 @@ const LoginHeroImpl: React.FC<LoginHeroProps> = ({ testID }) => {
     height: HERO_HEIGHT,
     width: '100%',
     overflow: 'hidden',
+    // Fallback solid color while SVG gradient mounts (cold-start safety).
     backgroundColor: isDark ? '#0B0E18' : '#EAF2FF',
   };
+
+  // Wanted handoff radial gradient stops (light vs dark)
+  const gradientStops = isDark
+    ? { inner: '#1B2540', outer: '#0B0E18' }
+    : { inner: '#EAF2FF', outer: '#F7FAFF' };
 
   const wordmarkContainer: ViewStyle = {
     position: 'absolute',
@@ -78,24 +84,27 @@ const LoginHeroImpl: React.FC<LoginHeroProps> = ({ testID }) => {
     marginTop: 4,
   };
 
-  const pulsePinOuter: ViewStyle = {
-    position: 'absolute',
-    left: 168,
-    top: 130,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: WANTED_TOKENS.blue[500],
-    shadowColor: WANTED_TOKENS.blue[500],
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 14,
-    elevation: 6,
-  };
+  // Pulse pin position (preserved from Wanted handoff; viewBox coords)
+  const PIN_CX = 177;
+  const PIN_CY = 139;
 
   return (
     <View testID={testID} style={heroStyle}>
       <Svg viewBox="0 0 390 300" width="100%" height="100%" style={StyleSheet.absoluteFill}>
+        <Defs>
+          <RadialGradient
+            id="hero-bg"
+            cx="30%"
+            cy="20%"
+            r="100%"
+            fx="30%"
+            fy="20%"
+          >
+            <Stop offset="0%" stopColor={gradientStops.inner} stopOpacity={1} />
+            <Stop offset="70%" stopColor={gradientStops.outer} stopOpacity={1} />
+          </RadialGradient>
+        </Defs>
+        <Rect x={0} y={0} width={390} height={300} fill="url(#hero-bg)" />
         {LINE_DATA.map((l, i) => (
           <G key={`${l.color}-${i}`}>
             <Path
@@ -124,8 +133,11 @@ const LoginHeroImpl: React.FC<LoginHeroProps> = ({ testID }) => {
             />
           </G>
         ))}
+        {/* Pulse pin: outer ring + mid ring + solid inner (Wanted multi-shadow recreated) */}
+        <Circle cx={PIN_CX} cy={PIN_CY} r={23} fill={WANTED_TOKENS.blue[500]} fillOpacity={0.08} />
+        <Circle cx={PIN_CX} cy={PIN_CY} r={15} fill={WANTED_TOKENS.blue[500]} fillOpacity={0.18} />
+        <Circle cx={PIN_CX} cy={PIN_CY} r={9} fill={WANTED_TOKENS.blue[500]} />
       </Svg>
-      <View style={pulsePinOuter} />
       <View style={wordmarkContainer}>
         <View style={brandBadge}>
           <TrainFront size={20} color="#FFFFFF" strokeWidth={2.2} />
