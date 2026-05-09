@@ -45,12 +45,35 @@ export interface NotificationSettings {
   readonly soundSettings: SoundPreferences;
   readonly lineFilter?: readonly string[];        // optional: filter delay alerts by selected line ids ('1'..'9'). undefined/empty = all lines.
   readonly alertSources?: AlertSourcePreferences; // optional: source-based alert toggles (official/community/urgent).
+  readonly perEventSound?: PerEventSoundOverrides; // optional: per-event delivery gates for the Wanted handoff "이벤트별" section
 }
 
 export interface AlertSourcePreferences {
   readonly official: boolean;   // 공식 운영기관 발표 (Seoul Metro / Korail)
   readonly community: boolean;  // 실시간 제보 (community-sourced reports)
   readonly urgent: boolean;     // 긴급 푸시 (severity-gated push for severe delays)
+}
+
+/**
+ * Per-event delivery gates for the Wanted handoff "이벤트별" section.
+ * Each flag mutes a specific event category. The `Sound` suffix in the
+ * interface name is historical — these are full delivery gates (alert is
+ * suppressed entirely when off), not just sound mute.
+ *
+ * Field-to-NotificationType mapping (notificationService.shouldSendNotification):
+ * - trainArrival    → NotificationType.ARRIVAL_REMINDER (열차 도착, 3분 전)
+ * - delayDetected   → NotificationType.DELAY_ALERT (지연 발생, 실시간 지연).
+ *   Note the naming difference from `alertTypes.delays`: `delayDetected` is
+ *   a per-event override that gates BEFORE `alertTypes.delays`. Both must
+ *   be true to deliver.
+ * - communityReport → No NotificationType yet (community reports do not flow
+ *   through notificationService). Full community disable is via
+ *   `AlertSourcePreferences.community` (PR #40) once that lands.
+ */
+export interface PerEventSoundOverrides {
+  readonly trainArrival: boolean;
+  readonly delayDetected: boolean;
+  readonly communityReport: boolean;
 }
 
 // Sound settings types

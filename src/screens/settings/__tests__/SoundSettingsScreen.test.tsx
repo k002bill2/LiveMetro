@@ -14,9 +14,21 @@ import { soundService } from '@/services/sound/soundService';
 // Import actual React Testing Library utilities after mocks
 import { fireEvent, waitFor } from '@testing-library/react-native';
 
-jest.mock('lucide-react-native', () => ({
-  Clock: 'Clock',
-}));
+// Proxy stubs every lucide icon name → its own string component. Post Wanted
+// handoff redesign, ALERT_MODES uses dynamic mode.Icon (BellRing / BellOff /
+// Volume2 / Smartphone) so an explicit-only mock would render undefined.
+jest.mock('lucide-react-native', () =>
+  new Proxy(
+    {},
+    {
+      get: (_target: object, prop: string | symbol) => {
+        if (prop === '__esModule') return true;
+        if (typeof prop !== 'string') return undefined;
+        return prop;
+      },
+    },
+  ),
+);
 
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({

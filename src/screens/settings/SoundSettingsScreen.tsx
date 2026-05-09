@@ -21,7 +21,21 @@ import {
   weightToFontFamily,
   type WantedSemanticTheme,
 } from '@/styles/modernTheme';
-import { Activity, Bell, Mail, Music, Smartphone, Volume1, Volume2 } from 'lucide-react-native';
+import {
+  Activity,
+  AlertTriangle,
+  Bell,
+  BellOff,
+  BellRing,
+  Mail,
+  MessageCircle,
+  Music,
+  Smartphone,
+  Train,
+  Volume1,
+  Volume2,
+  type LucideIcon,
+} from 'lucide-react-native';
 import { useAuth } from '@/services/auth/AuthContext';
 import { useTheme } from '@/services/theme';
 import { useNotifications } from '@/hooks/useNotifications';
@@ -39,8 +53,33 @@ import {
   NotificationSoundId,
   VibrationPatternId,
   SoundPreferences,
+  type PerEventSoundOverrides,
 } from '@/models/user';
 import { emailNotificationService } from '@/services/email/emailService';
+
+type AlertModeId = 'soundAndVibration' | 'soundOnly' | 'vibrationOnly' | 'silent';
+
+interface AlertMode {
+  readonly id: AlertModeId;
+  readonly label: string;
+  readonly subtitle: string;
+  readonly Icon: LucideIcon;
+  readonly sound: boolean;
+  readonly vibration: boolean;
+}
+
+const ALERT_MODES: readonly AlertMode[] = [
+  { id: 'soundAndVibration', label: '소리 + 진동', subtitle: '모든 채널', Icon: BellRing,    sound: true,  vibration: true  },
+  { id: 'soundOnly',         label: '소리만',     subtitle: '진동 없음', Icon: Volume2,      sound: true,  vibration: false },
+  { id: 'vibrationOnly',     label: '진동만',     subtitle: '무음',     Icon: Smartphone,    sound: false, vibration: true  },
+  { id: 'silent',            label: '무음',       subtitle: '배지만',   Icon: BellOff,       sound: false, vibration: false },
+];
+
+const DEFAULT_PER_EVENT_SOUND: PerEventSoundOverrides = {
+  trainArrival: true,
+  delayDetected: true,
+  communityReport: false,
+};
 
 // Default sound settings for fallback
 const DEFAULT_SOUND_SETTINGS: SoundPreferences = {
@@ -65,6 +104,16 @@ export const SoundSettingsScreen: React.FC = () => {
 
   const notificationSettings = user?.preferences.notificationSettings;
   const soundSettings = notificationSettings?.soundSettings || DEFAULT_SOUND_SETTINGS;
+  const perEventSound = notificationSettings?.perEventSound ?? DEFAULT_PER_EVENT_SOUND;
+
+  // Derive current alert mode from sound/vibration combo (4 modes from 2 booleans).
+  const currentAlertMode: AlertModeId = soundSettings.soundEnabled && soundSettings.vibrationEnabled
+    ? 'soundAndVibration'
+    : soundSettings.soundEnabled
+    ? 'soundOnly'
+    : soundSettings.vibrationEnabled
+    ? 'vibrationOnly'
+    : 'silent';
 
   // Initialize sound service
   useEffect(() => {
@@ -148,6 +197,41 @@ export const SoundSettingsScreen: React.FC = () => {
     }
   };
 
+  // Alert mode 4-grid handler — derives sound/vibration toggles atomically.
+  const handleAlertModeChange = useCallback(
+    (modeId: AlertModeId): void => {
+      const mode = ALERT_MODES.find((m) => m.id === modeId);
+      if (!mode) return;
+      updateSoundSettings({ soundEnabled: mode.sound, vibrationEnabled: mode.vibration });
+    },
+    [updateSoundSettings],
+  );
+
+  // Per-event sound override handler — toggles a single event's sound flag.
+  const handleTogglePerEvent = useCallback(
+    async (key: keyof PerEventSoundOverrides, value: boolean): Promise<void> => {
+      if (!user) return;
+      try {
+        setSaving(true);
+        await updateUserProfile({
+          preferences: {
+            ...user.preferences,
+            notificationSettings: {
+              ...user.preferences.notificationSettings,
+              perEventSound: { ...perEventSound, [key]: value },
+            },
+          },
+        });
+      } catch (error) {
+        console.error(`Error updating per-event sound ${key}:`, error);
+        Alert.alert('오류', '설정 저장에 실패했습니다.');
+      } finally {
+        setSaving(false);
+      }
+    },
+    [user, perEventSound, updateUserProfile],
+  );
+
   // Sound settings handlers
   const handleSoundEnabledChange = (value: boolean): void => {
     updateSoundSettings({ soundEnabled: value });
@@ -212,8 +296,45 @@ export const SoundSettingsScreen: React.FC = () => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.content}>
-        {/* Notification Methods */}
+        {/* Alert Mode 4-grid — sound + vibration combo per Wanted handoff */}
         <SettingSection title="알림 방식">
+          <View style={styles.alertModeGrid}>
+            {ALERT_MODES.map((mode) => {
+              const selected = currentAlertMode === mode.id;
+              return (
+                <TouchableOpacity
+                  key={mode.id}
+                  onPress={() => handleAlertModeChange(mode.id)}
+                  disabled={saving}
+                  accessibilityRole="button"
+                  accessibilityLabel={mode.label}
+                  accessibilityState={{ selected }}
+                  style={[
+                    styles.alertModeCard,
+                    selected
+                      ? { borderColor: WANTED_TOKENS.blue[500], backgroundColor: `${WANTED_TOKENS.blue[500]}0F` }
+                      : { borderColor: semantic.lineSubtle, backgroundColor: semantic.bgBase },
+                  ]}
+                >
+                  <mode.Icon
+                    size={22}
+                    color={selected ? WANTED_TOKENS.blue[500] : semantic.labelAlt}
+                    strokeWidth={2.2}
+                  />
+                  <Text style={[styles.alertModeLabel, { color: selected ? WANTED_TOKENS.blue[500] : semantic.labelStrong }]}>
+                    {mode.label}
+                  </Text>
+                  <Text style={[styles.alertModeSubtitle, { color: semantic.labelAlt }]}>
+                    {mode.subtitle}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+        </SettingSection>
+
+        {/* Notification Channels (renamed from "알림 방식" to avoid collision) */}
+        <SettingSection title="알림 채널">
           <SettingToggle
             icon={Bell}
             label="푸시 알림"
@@ -301,6 +422,34 @@ export const SoundSettingsScreen: React.FC = () => {
           )}
         </SettingSection>
 
+        {/* Per-Event Sound Overrides — Wanted handoff "이벤트별" */}
+        <SettingSection title="이벤트별">
+          <SettingToggle
+            icon={Train}
+            label="열차 도착"
+            subtitle="3분 전 알림"
+            value={perEventSound.trainArrival}
+            onValueChange={(v) => handleTogglePerEvent('trainArrival', v)}
+            disabled={saving}
+          />
+          <SettingToggle
+            icon={AlertTriangle}
+            label="지연 발생"
+            subtitle="실시간 지연"
+            value={perEventSound.delayDetected}
+            onValueChange={(v) => handleTogglePerEvent('delayDetected', v)}
+            disabled={saving}
+          />
+          <SettingToggle
+            icon={MessageCircle}
+            label="실시간 제보"
+            subtitle="검증된 제보 도착 시"
+            value={perEventSound.communityReport}
+            onValueChange={(v) => handleTogglePerEvent('communityReport', v)}
+            disabled={saving}
+          />
+        </SettingSection>
+
         {/* Test Notification */}
         <View style={styles.section}>
           <TouchableOpacity
@@ -382,6 +531,31 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       fontFamily: weightToFontFamily('500'),
       color: semantic.labelNeutral,
       lineHeight: INFO_LINE_HEIGHT,
+    },
+    alertModeGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s3,
+      gap: 8,
+    },
+    alertModeCard: {
+      width: '47%',
+      paddingVertical: WANTED_TOKENS.spacing.s4,
+      paddingHorizontal: WANTED_TOKENS.spacing.s3,
+      borderRadius: WANTED_TOKENS.radius.r6,
+      borderWidth: 1.5,
+      alignItems: 'flex-start',
+      gap: 6,
+    },
+    alertModeLabel: {
+      fontSize: 14,
+      fontFamily: weightToFontFamily('800'),
+      letterSpacing: -0.14,
+    },
+    alertModeSubtitle: {
+      fontSize: 11,
+      fontFamily: weightToFontFamily('600'),
     },
   });
 
