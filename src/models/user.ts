@@ -45,12 +45,19 @@ export interface NotificationSettings {
   readonly soundSettings: SoundPreferences;
   readonly lineFilter?: readonly string[];        // optional: filter delay alerts by selected line ids ('1'..'9'). undefined/empty = all lines.
   readonly alertSources?: AlertSourcePreferences; // optional: source-based alert toggles (official/community/urgent).
+  readonly perEventSound?: PerEventSoundOverrides; // optional: per-event delivery gates for the Wanted handoff "이벤트별" section
 }
 
 export interface AlertSourcePreferences {
   readonly official: boolean;   // 공식 운영기관 발표 (Seoul Metro / Korail)
   readonly community: boolean;  // 실시간 제보 (community-sourced reports)
   readonly urgent: boolean;     // 긴급 푸시 (severity-gated push for severe delays)
+}
+
+export interface PerEventSoundOverrides {
+  readonly trainArrival: boolean;     // 열차 도착 알림 (3분 전 알림)
+  readonly delayDetected: boolean;    // 지연 발생 알림 (실시간 지연)
+  readonly communityReport: boolean;  // 실시간 제보 도착 알림 (reserved — full disable via alertSources.community)
 }
 
 // Sound settings types
