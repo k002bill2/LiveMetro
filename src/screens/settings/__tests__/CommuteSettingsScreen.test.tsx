@@ -70,7 +70,12 @@ const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const mockLoadCommuteRoutes = loadCommuteRoutes as jest.MockedFunction<typeof loadCommuteRoutes>;
 
 const createProps = (): any => ({
-  navigation: { navigate: jest.fn(), goBack: jest.fn() },
+  navigation: {
+    navigate: jest.fn(),
+    goBack: jest.fn(),
+    canGoBack: jest.fn(() => true),
+    setOptions: jest.fn(),
+  },
   route: { params: {}, key: 'CommuteSettings', name: 'CommuteSettings' as const },
 });
 

@@ -66,6 +66,9 @@ export const SettingToggle: React.FC<SettingToggleProps> = ({
         }}
         thumbColor="#FFFFFF"
         ios_backgroundColor={semantic.lineNormal}
+        // Wanted handoff renders smaller toggles than RN's iOS default
+        // (51×31). Scale 0.85 → ~43×26, matching the design's track width.
+        style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }}
       />
     </View>
   );
