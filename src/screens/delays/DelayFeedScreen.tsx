@@ -19,7 +19,6 @@ import {
   ThumbsUp,
   Megaphone,
   Clock,
-  CheckCircle,
 } from 'lucide-react-native';
 
 import { useAuth } from '@/services/auth/AuthContext';
@@ -36,6 +35,7 @@ import {
 import { DelayReportForm } from '@/components/delays/DelayReportForm';
 import { getSubwayLineColor } from '@/utils/colorUtils';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
+import { LineBadge, Pill, type LineId } from '@/components/design';
 
 const LINES = ['전체', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
@@ -133,13 +133,13 @@ export const DelayFeedScreen: React.FC = () => {
         <View style={[styles.lineAccent, { backgroundColor: lineColor }]} />
 
         <View style={styles.cardContent}>
-          {/* Header */}
+          {/* Header — design handoff: LineBadge atom + 역명 (no auto suffix
+              per [역명 double-suffix 금지]) + 검증됨 Pill (warn tone) inline */}
           <View style={styles.reportHeader}>
             <View style={styles.reportMeta}>
-              <View style={[styles.lineBadge, { backgroundColor: lineColor }]}>
-                <Text style={styles.lineBadgeText}>{report.lineId}호선</Text>
-              </View>
-              <Text style={styles.stationText}>{report.stationName}역</Text>
+              <LineBadge line={report.lineId as LineId} size={22} />
+              <Text style={styles.stationText}>{report.stationName}</Text>
+              {report.verified && <Pill tone="warn" size="sm">검증됨</Pill>}
             </View>
             <Text style={styles.timeText}>
               {formatTimeAgo(new Date(report.timestamp))}
@@ -177,9 +177,9 @@ export const DelayFeedScreen: React.FC = () => {
               <Text style={styles.reporterName}>
                 {report.userDisplayName}
               </Text>
-              {report.verified && (
-                <CheckCircle size={14} color={semantic.statusPositive} />
-              )}
+              {/* `검증됨` indicator now lives in the header next to the
+                  station — see design handoff. Removing here to avoid
+                  duplication. */}
             </View>
 
             <View style={styles.reportActions}>
@@ -446,17 +446,6 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: WANTED_TOKENS.spacing.s2,
-    },
-    lineBadge: {
-      paddingHorizontal: WANTED_TOKENS.spacing.s2,
-      paddingVertical: 2,
-      borderRadius: WANTED_TOKENS.radius.r2,
-    },
-    lineBadgeText: {
-      fontSize: WANTED_TOKENS.type.caption1.size,
-      color: semantic.labelOnColor,
-      fontWeight: '600',
-      fontFamily: weightToFontFamily('600'),
     },
     stationText: {
       fontSize: WANTED_TOKENS.type.label2.size,
