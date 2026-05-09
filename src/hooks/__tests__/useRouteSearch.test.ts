@@ -30,13 +30,23 @@ describe('useRouteSearch', () => {
     ]);
   });
 
-  it('returns idle when fromId or toId missing', () => {
-    const { result } = renderHook(() =>
-      useRouteSearch({ fromId: undefined, toId: 'b', departureTime: null, departureMode: 'now' })
-    );
-    expect(result.current.routes).toEqual([]);
-    expect(result.current.loading).toBe(false);
-    expect(mockGetDiverseRoutes).not.toHaveBeenCalled();
+  it('returns idle when fromId or toId missing', async () => {
+    jest.useFakeTimers();
+    try {
+      const { result } = renderHook(() =>
+        useRouteSearch({ fromId: undefined, toId: 'b', departureTime: null, departureMode: 'now' })
+      );
+      // Advance past the 300ms debounce so the idle guard actually executes.
+      await act(async () => {
+        jest.advanceTimersByTime(300);
+        await Promise.resolve();
+      });
+      expect(result.current.routes).toEqual([]);
+      expect(result.current.loading).toBe(false);
+      expect(mockGetDiverseRoutes).not.toHaveBeenCalled();
+    } finally {
+      jest.useRealTimers();
+    }
   });
 
   it('fetches routes when both ids provided', async () => {
@@ -54,9 +64,39 @@ describe('useRouteSearch', () => {
     await waitFor(() => expect(result.current.routes.length).toBeGreaterThan(0));
     const route = result.current.routes[0]!;
     expect(route.etaMinutes).toBe(25);
-    expect(route.etaConfidenceMinutes).toBeGreaterThanOrEqual(2);
-    expect(route.etaConfidenceMinutes).toBeLessThanOrEqual(8);
+    // 0 transfer + 0 delay → baseline 2 (formula: 2 + transferCount + delayLines * 2, clamped [2,8])
+    expect(route.etaConfidenceMinutes).toBe(2);
     expect(Array.isArray(route.delayRiskLineIds)).toBe(true);
+  });
+
+  it('eta confidence reflects transfer count and delay risk', async () => {
+    mockUseDelayDetection.mockReturnValue({
+      delays: [{ lineId: '2', lineName: '2호선', delayMinutes: 5, timestamp: new Date() }],
+      loading: false,
+    });
+    mockGetDiverseRoutes.mockReturnValue([
+      {
+        segments: [
+          {
+            fromStationId: 'a',
+            toStationId: 'b',
+            lineId: '2',
+            isTransfer: false,
+            fromStationName: '강남',
+            toStationName: '잠실',
+          },
+        ],
+        totalMinutes: 25,
+        transferCount: 1,
+        lineIds: ['2'],
+      },
+    ]);
+    const { result } = renderHook(() =>
+      useRouteSearch({ fromId: 'a', toId: 'b', departureTime: null, departureMode: 'now' })
+    );
+    await waitFor(() => expect(result.current.routes.length).toBeGreaterThan(0));
+    // Formula: 2 (baseline) + 1 (transfer) + 2 (1 delay line × 2) = 5
+    expect(result.current.routes[0]!.etaConfidenceMinutes).toBe(5);
   });
 
   it('marks delayRiskLineIds when route uses delayed line', async () => {
@@ -71,7 +111,10 @@ describe('useRouteSearch', () => {
     expect(result.current.routes[0]!.delayRiskLineIds).toEqual(['2']);
   });
 
-  it('returns same routes on identical cacheKey within 60s', async () => {
+  // Hook-level: stable rerender should not trigger a second fetch.
+  // True cacheKey hit semantics (same key within 60s after intentional invalidation)
+  // are exercised at the integration layer in RoutesTabScreen tests (Task 6).
+  it('does not refetch when props unchanged on rerender', async () => {
     const { result, rerender } = renderHook(
       (props: { fromId: string; toId: string }) =>
         useRouteSearch({ fromId: props.fromId, toId: props.toId, departureTime: null, departureMode: 'now' }),

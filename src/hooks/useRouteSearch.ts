@@ -44,13 +44,14 @@ function buildCacheKey(input: UseRouteSearchInput): string {
   return `${input.fromId ?? ''}|${input.toId ?? ''}|${input.departureMode}|${timeBucket(input.departureTime)}`;
 }
 
+// Heuristic: 2-min baseline (signal/walking variance) + 1min per transfer + 2min per delayed line, clamped to [2, 8].
 function calcEtaConfidence(transferCount: number, delayLineCount: number): number {
   const raw = 2 + transferCount + delayLineCount * 2;
   return Math.min(8, Math.max(2, raw));
 }
 
 function enrichRoute(route: Route, index: number, delayedLineIds: Set<string>): RouteWithMLMeta {
-  const delayRiskLineIds = (route.lineIds as string[]).filter(id => delayedLineIds.has(id));
+  const delayRiskLineIds = route.lineIds.filter(id => delayedLineIds.has(id));
   return {
     ...route,
     id: `route-${index}-${route.lineIds.join('-')}`,
@@ -71,6 +72,9 @@ export function useRouteSearch(input: UseRouteSearchInput): UseRouteSearchResult
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Cache hit semantics (skip service when cacheKey hits within CACHE_TTL_MS)
+  // are exercised at the integration layer in RoutesTabScreen tests (Task 6).
+  // The hook-level test here verifies that no double-fetch occurs on stable rerenders.
   const cacheRef = useRef<Map<string, CacheEntry>>(new Map());
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const requestIdRef = useRef(0);
