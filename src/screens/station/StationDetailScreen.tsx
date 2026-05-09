@@ -15,7 +15,7 @@
  *   - LiveClock + manual refresh + GPS chip in the header
  *   - 시간표 tab (TrainSchedule hook)
  */
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -43,6 +43,7 @@ import { ExitInfoGrid } from '@/components/station/ExitInfoGrid';
 import { CongestionLevel } from '@/models/congestion';
 import type { Station, Train } from '@/models/train';
 import type { LineId } from '@/components/design';
+import { mapCacheService, type CachedStation } from '@/services/map/mapCacheService';
 
 type StationDetailRouteProp = RouteProp<AppStackParamList, 'StationDetail'>;
 type StationDetailNavProp = NativeStackNavigationProp<AppStackParamList>;
@@ -93,6 +94,28 @@ const StationDetailScreen: React.FC = () => {
   } = route.params || {};
 
   const [direction, setDirection] = useState<'up' | 'down'>('up');
+  const [stationMeta, setStationMeta] = useState<CachedStation | null>(null);
+
+  // Fetch station meta (nameEn, stationCode, transfer line ids) for the
+  // header subtitle + multi-line badges. Reset when the station changes so
+  // the previous station's badges don't briefly flash on navigation.
+  useEffect(() => {
+    let cancelled = false;
+    setStationMeta(null);
+    (async () => {
+      try {
+        const matches = await mapCacheService.searchStations(stationName);
+        if (cancelled) return;
+        const exact = matches.find((s) => s.name === stationName) ?? null;
+        setStationMeta(exact);
+      } catch {
+        if (!cancelled) setStationMeta(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [stationName]);
 
   const isFocused = useIsFocused();
   const {
@@ -142,6 +165,24 @@ const StationDetailScreen: React.FC = () => {
     const now = Date.now();
     return list.map((t) => trainToArrival(t, now));
   }, [direction, trainsByDirection]);
+
+  // Header subtitle mirrors the design handoff (`Gangnam · 222 · ...`).
+  // Cross-line station codes (e.g. "신분당 D07") aren't in CachedTransfer,
+  // so this falls back to a 2-part `${nameEn} · ${stationCode}` form when
+  // available.
+  const headerSubtitle = useMemo<string | undefined>(() => {
+    if (!stationMeta) return undefined;
+    const nameEn = stationMeta.nameEn?.trim();
+    const code = stationMeta.id?.trim();
+    if (nameEn && code) return `${nameEn} · ${code}`;
+    return nameEn || code || undefined;
+  }, [stationMeta]);
+
+  const headerLines = useMemo<readonly LineId[]>(() => {
+    const ids = stationMeta?.lineIds;
+    if (ids && ids.length > 0) return ids as readonly LineId[];
+    return [lineId as LineId];
+  }, [stationMeta, lineId]);
 
   const upLabel = useMemo(
     () => `상행${trainsByDirection.up[0] ? ` (${trainsByDirection.up[0].finalDestination})` : ''}`,
@@ -195,7 +236,8 @@ const StationDetailScreen: React.FC = () => {
     >
       <StationDetailHeader
         stationName={stationName}
-        lines={[lineId as LineId]}
+        subtitle={headerSubtitle}
+        lines={headerLines}
         isFavorite={isCurrentlyFavorite}
         onBack={handleBack}
         onShare={handleShare}

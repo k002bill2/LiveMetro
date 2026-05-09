@@ -11,6 +11,7 @@ import StationDetailScreen from '../StationDetailScreen';
 import { useRealtimeTrains } from '@/hooks/useRealtimeTrains';
 import { useFavorites } from '@/hooks/useFavorites';
 import { usePublicDataForStation } from '@/hooks/usePublicData';
+import { mapCacheService } from '@/services/map/mapCacheService';
 
 jest.mock('@react-navigation/native', () => ({
   useIsFocused: jest.fn(() => true),
@@ -62,6 +63,12 @@ jest.mock('@/hooks/useFavorites', () => ({
   })),
 }));
 
+jest.mock('@/services/map/mapCacheService', () => ({
+  mapCacheService: {
+    searchStations: jest.fn(),
+  },
+}));
+
 jest.mock('@/components/common/AlertBanner', () => {
   const { View } = jest.requireActual('react-native');
   return {
@@ -72,6 +79,7 @@ jest.mock('@/components/common/AlertBanner', () => {
 const mockedUseRealtimeTrains = useRealtimeTrains as jest.Mock;
 const mockedUseFavorites = useFavorites as jest.Mock;
 const mockedUsePublicData = usePublicDataForStation as jest.Mock;
+const mockedSearchStations = mapCacheService.searchStations as jest.Mock;
 
 const buildTrain = (overrides: Partial<{ id: string; finalDestination: string; minutesAway: number; direction: 'up' | 'down'; lineId: string }> = {}) => {
   const minutesAway = overrides.minutesAway ?? 2;
@@ -108,6 +116,9 @@ describe('StationDetailScreen', () => {
       alerts: [],
       loading: false,
     });
+    // Default: never resolves so existing tests don't see a state update
+    // from the meta useEffect. Per-test overrides use mockResolvedValueOnce.
+    mockedSearchStations.mockImplementation(() => new Promise(() => {}));
   });
 
   it('renders the station hero', () => {
@@ -238,5 +249,34 @@ describe('StationDetailScreen', () => {
     });
     const { queryByTestId } = render(<StationDetailScreen />);
     expect(queryByTestId('station-detail-alerts')).toBeTruthy();
+  });
+
+  it('wires the header subtitle from station meta (`nameEn · stationCode`)', async () => {
+    mockedSearchStations.mockResolvedValueOnce([
+      {
+        id: '222',
+        name: '강남',
+        nameEn: 'Gangnam',
+        lineIds: ['2'],
+        coordinates: { x: 0, y: 0 },
+      },
+    ]);
+    const { findByText } = render(<StationDetailScreen />);
+    expect(await findByText('Gangnam · 222')).toBeTruthy();
+  });
+
+  it('wires multiple LineBadges when station meta exposes transfer lineIds', async () => {
+    mockedSearchStations.mockResolvedValueOnce([
+      {
+        id: '222',
+        name: '강남',
+        nameEn: 'Gangnam',
+        lineIds: ['2', 'sb'],
+        coordinates: { x: 0, y: 0 },
+      },
+    ]);
+    const { findByTestId } = render(<StationDetailScreen />);
+    expect(await findByTestId('station-detail-header-line-0')).toBeTruthy();
+    expect(await findByTestId('station-detail-header-line-1')).toBeTruthy();
   });
 });
