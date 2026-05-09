@@ -35,7 +35,13 @@ export interface EmailNotificationResponse {
   error?: string;
 }
 
-// User data structure from Firestore
+// User data structure from Firestore.
+//
+// Mirrors the subset of `src/models/user.ts` that Cloud Functions
+// read/write. New fields added by the Wanted handoff settings PRs
+// (#38–#43) are typed as optional here so existing user documents
+// without those keys remain valid; AuthContext.getDefaultPreferences
+// seeds them on signup.
 export interface UserData {
   id: string;
   email: string;
@@ -52,6 +58,33 @@ export interface UserData {
         congestion: boolean;
         alternativeRoutes: boolean;
         serviceUpdates: boolean;
+      };
+      quietHours?: {
+        enabled: boolean;
+        startTime: string;
+        endTime: string;
+        weekendsAlwaysSilent?: boolean;
+      };
+      lineFilter?: readonly string[];
+      alertSources?: {
+        official: boolean;
+        community: boolean;
+        urgent: boolean;
+      };
+      perEventSound?: {
+        trainArrival: boolean;
+        delayDetected: boolean;
+        communityReport: boolean;
+      };
+    };
+    commuteSchedule?: {
+      autoDetect: boolean;
+      alertEnabled?: boolean;
+      activeDays?: readonly boolean[];
+      smartFeatures?: {
+        mlPredictionEnabled: boolean;
+        autoAlternativeRoutes: boolean;
+        autoDepartureDetection: 'always' | 'sometimes' | 'never';
       };
     };
   };
