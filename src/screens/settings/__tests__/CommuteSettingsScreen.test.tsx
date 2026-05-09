@@ -78,9 +78,12 @@ describe('CommuteSettingsScreen', () => {
   it('renders empty route state when no routes exist', async () => {
     mockLoadCommuteRoutes.mockResolvedValue(null);
     const { getByText } = render(<CommuteSettingsScreen {...createProps()} />);
+    // The in-body title was removed (SettingsNavigator header now owns it,
+    // post Wanted handoff cascade). The Hero ETA card's eyebrow is the
+    // post-redesign always-rendered sentinel.
     await waitFor(() => {
-      expect(getByText('출퇴근 설정')).toBeTruthy();
-    }, { timeout: 15000 });
+      expect(getByText('오늘 출근 예측')).toBeTruthy();
+    });
   });
 
   it('renders route data when routes are loaded', async () => {
@@ -108,14 +111,17 @@ describe('CommuteSettingsScreen', () => {
       updatedAt: null,
     });
 
-    const { getByText, getAllByText } = render(<CommuteSettingsScreen {...createProps()} />);
+    const { getAllByText } = render(<CommuteSettingsScreen {...createProps()} />);
     // RouteWithTransfer renders bare station names (no '역' suffix); the
     // legacy '{station}역' string disappeared with the Topic 2 redesign.
+    // Post Wanted-handoff redesign, the Hero card also surfaces the morning
+    // route's departure/arrival names, so '강남'/'시청' appear twice — assert
+    // presence via getAllByText rather than the multi-match-failing getByText.
     await waitFor(() => {
-      expect(getByText('강남')).toBeTruthy();
+      expect(getAllByText('강남').length).toBeGreaterThan(0);
     });
-    expect(getByText('시청')).toBeTruthy();
-    expect(getByText('08:00')).toBeTruthy();
+    expect(getAllByText('시청').length).toBeGreaterThan(0);
+    expect(getAllByText('08:00').length).toBeGreaterThan(0);
     expect(getAllByText('수정하기').length).toBe(1);
   });
 
@@ -135,7 +141,7 @@ describe('CommuteSettingsScreen', () => {
 
     const { getByText } = render(<CommuteSettingsScreen {...createProps()} />);
     await waitFor(() => {
-      expect(getByText('출퇴근 설정')).toBeTruthy();
+      expect(getByText('오늘 출근 예측')).toBeTruthy();
     });
   });
 
@@ -143,7 +149,7 @@ describe('CommuteSettingsScreen', () => {
     mockLoadCommuteRoutes.mockRejectedValue(new Error('Network error'));
     const { getByText } = render(<CommuteSettingsScreen {...createProps()} />);
     await waitFor(() => {
-      expect(getByText('출퇴근 설정')).toBeTruthy();
+      expect(getByText('오늘 출근 예측')).toBeTruthy();
     });
   });
 

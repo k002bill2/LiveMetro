@@ -88,6 +88,15 @@ export interface CommuteSchedule {
   readonly weekdays: DailySchedule;
   readonly weekends: DailySchedule | null;
   readonly autoDetect: boolean;
+  readonly alertEnabled?: boolean;          // optional: master switch for "출퇴근 알림 사용". Defaults to true (existing behavior).
+  readonly activeDays?: readonly boolean[]; // optional: 7-element [Mon..Sun] toggles. Defaults to [t,t,t,t,t,f,f] (weekday-only).
+  readonly smartFeatures?: SmartFeatures;   // optional: ML/auto-route/auto-departure toggles.
+}
+
+export interface SmartFeatures {
+  readonly mlPredictionEnabled: boolean;
+  readonly autoAlternativeRoutes: boolean;
+  readonly autoDepartureDetection: 'always' | 'sometimes' | 'never';
 }
 
 export interface DailySchedule {
