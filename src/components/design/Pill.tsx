@@ -6,7 +6,7 @@
  */
 import React, { memo, ReactNode } from 'react';
 import { Text, View, ViewStyle, TextStyle } from 'react-native';
-import { weightToFontFamily } from '@/styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 
 export type PillTone = 'neutral' | 'primary' | 'pos' | 'neg' | 'warn' | 'cool';
 export type PillSize = 'sm' | 'md' | 'lg';
@@ -19,13 +19,24 @@ interface PillProps {
   testID?: string;
 }
 
+// Hex-alpha suffixes used to derive tint backgrounds from the canonical
+// status colors: 1A ≈ 10%, 29 ≈ 16%. Pill stays theme-agnostic so we read
+// from the root `WANTED_TOKENS` palettes (not the light/dark semantic
+// scopes) — the tones are intentionally consistent across backgrounds.
+const TINT_10 = '1A';
+const TINT_16 = '29';
+const { status, blue } = WANTED_TOKENS;
+
 const TONES: Record<PillTone, { bg: string; fg: string }> = {
-  neutral: { bg: 'rgba(112,115,124,0.10)', fg: '#37383C' },
-  primary: { bg: '#EAF2FE',                 fg: '#0044BB' },
-  pos:     { bg: 'rgba(0,191,64,0.10)',     fg: '#008F30' },
-  neg:     { bg: 'rgba(255,66,66,0.10)',    fg: '#C42727' },
-  warn:    { bg: 'rgba(255,180,0,0.16)',    fg: '#A06A00' },
-  cool:    { bg: 'rgba(0,152,178,0.10)',    fg: '#0098B2' },
+  // Neutral tint has no canonical token equivalent: design uses labelAlt
+  // grayscale at 10%, but `WANTED_TOKENS.light.bgSubtle` is 8% and
+  // theme-scoped. Keep raw rgba documenting the source.
+  neutral: { bg: 'rgba(112,115,124,0.10)',          fg: WANTED_TOKENS.light.labelNeutral },
+  primary: { bg: blue[50],                          fg: blue[700] },
+  pos:     { bg: `${status.green500}${TINT_10}`,    fg: status.green700 },
+  neg:     { bg: `${status.red500}${TINT_10}`,      fg: status.red700 },
+  warn:    { bg: `${status.yellow500}${TINT_16}`,   fg: status.amber700 },
+  cool:    { bg: `${status.cyan500}${TINT_10}`,     fg: status.cyan500 },
 };
 
 const SIZES: Record<PillSize, { paddingV: number; paddingH: number; fontSize: number; height: number }> = {

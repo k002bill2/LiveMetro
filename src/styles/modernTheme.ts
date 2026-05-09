@@ -281,6 +281,8 @@ export const WANTED_TOKENS = {
     green700:  '#008F30',
     yellow500: '#FFB400',
     yellow700: '#C28800',
+    amber700:  '#A06A00', // Wanted amber-700 — used for warn-tone Pill foreground
+
     violet500: '#9747FF',
     violet700: '#6541F2',
     cyan500:   '#0098B2',
