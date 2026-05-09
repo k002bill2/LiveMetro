@@ -46,12 +46,16 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       marginBottom: WANTED_TOKENS.spacing.s5,
     },
     sectionTitle: {
-      fontSize: 13,
-      fontFamily: weightToFontFamily('600'),
+      // Wanted handoff (settings-detail.jsx:25-37 GroupLabel): 12/800/0.04em
+      // labelAlt uppercase eyebrow. Stronger weight + smaller size widens the
+      // hierarchy gap with the 14/600 row labels inside the card.
+      fontSize: WANTED_TOKENS.type.caption1.size,
+      fontWeight: '800',
+      fontFamily: weightToFontFamily('800'),
       color: semantic.labelAlt,
-      marginBottom: WANTED_TOKENS.spacing.s3,
+      marginBottom: WANTED_TOKENS.spacing.s2,
       marginHorizontal: WANTED_TOKENS.spacing.s4,
-      letterSpacing: 0.6,
+      letterSpacing: WANTED_TOKENS.type.caption1.size * 0.04,
       textTransform: 'uppercase',
     },
     sectionContent: {

@@ -42,7 +42,7 @@ export const SettingToggle: React.FC<SettingToggleProps> = ({
       <View style={styles.leftContent}>
         {IconComponent && (
           <View style={styles.iconContainer}>
-            <IconComponent size={20} color={semantic.labelStrong} strokeWidth={2} />
+            <IconComponent size={16} color={semantic.labelStrong} strokeWidth={2} />
           </View>
         )}
         <View style={styles.textContainer}>
@@ -92,10 +92,13 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       marginRight: WANTED_TOKENS.spacing.s3,
     },
     iconContainer: {
-      width: 36,
-      height: 36,
+      // Wanted handoff (settings-detail.jsx:80-86 Row.icon): 32×32 rounded-square
+      // (radius.r4 = 8px) with 16px icon, replacing the prior 36×36 r-pill / 20px
+      // form. Cascades to every SettingToggle consumer.
+      width: 32,
+      height: 32,
       backgroundColor: semantic.bgSubtle,
-      borderRadius: WANTED_TOKENS.radius.pill,
+      borderRadius: WANTED_TOKENS.radius.r4,
       justifyContent: 'center',
       alignItems: 'center',
       marginRight: WANTED_TOKENS.spacing.s3,
@@ -112,8 +115,12 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       color: semantic.labelDisabled,
     },
     subtitle: {
-      fontSize: 13,
+      // Wanted handoff (settings-detail.jsx:90 Row.sub): 11.5/500 with lineHeight
+      // ≈ 1.4. Mapped to caption2 (11) — closest token — so multi-line subtitles
+      // breathe; the prior 13/500 was too dense against a 14/600 label.
+      fontSize: WANTED_TOKENS.type.caption2.size,
       fontFamily: weightToFontFamily('500'),
+      lineHeight: Math.round(WANTED_TOKENS.type.caption2.size * 1.4),
       color: semantic.labelAlt,
       marginTop: 2,
     },
