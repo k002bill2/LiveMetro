@@ -32,7 +32,16 @@ import SettingSection from '@/components/settings/SettingSection';
 import SettingToggle from '@/components/settings/SettingToggle';
 import SettingSlider from '@/components/settings/SettingSlider';
 
-const LINE_IDS: readonly string[] = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+// Includes numbered subway lines + major Seoul metro lines that the Wanted
+// design references (신분당/경의중앙/공항철도/수인분당). LINE_LABELS aliases
+// for these were registered in PR #34 (commit f906021).
+const LINE_IDS: readonly string[] = [
+  '1', '2', '3', '4', '5', '6', '7', '8', '9',
+  '신분당선', '경의중앙선', '공항철도', '수인분당선',
+];
+
+const formatLineLabel = (lineId: string): string =>
+  /선$|철도$/.test(lineId) ? lineId : `${lineId}호선`;
 const DEFAULT_ALERT_SOURCES: AlertSourcePreferences = {
   official: true,
   community: true,
@@ -222,9 +231,11 @@ export const DelayNotificationScreen: React.FC = () => {
                 <TouchableOpacity
                   key={lineId}
                   onPress={() => handleToggleLine(lineId)}
-                  disabled={saving}
+                  // Intentionally not gated by `saving` — chips are optimistic
+                  // multi-select. Each tap derives `next` from the latest
+                  // lineFilter snapshot; rapid toggles remain responsive.
                   accessibilityRole="button"
-                  accessibilityLabel={`${lineId}호선`}
+                  accessibilityLabel={formatLineLabel(lineId)}
                   accessibilityState={{ selected }}
                   style={[
                     styles.linePill,
@@ -239,7 +250,7 @@ export const DelayNotificationScreen: React.FC = () => {
                       { color: selected ? '#fff' : semantic.labelAlt },
                     ]}
                   >
-                    {lineId}호선
+                    {formatLineLabel(lineId)}
                   </Text>
                   {selected ? <Check size={12} color="#fff" strokeWidth={3} /> : null}
                 </TouchableOpacity>
@@ -283,6 +294,9 @@ export const DelayNotificationScreen: React.FC = () => {
 
         {/* Detailed Alert Types — preserved legacy 5-toggle for fine-grained control */}
         <SettingSection title="상세 알림 종류">
+          <Text style={styles.sectionDisclaimer}>
+            상세 알림 종류는 위 알림 종류 안에서 다시 한번 필터링됩니다. 알림 종류가 OFF면 해당 출처의 모든 알림이 차단됩니다.
+          </Text>
           <SettingToggle
             icon={Train}
             label="열차 지연"
@@ -424,6 +438,15 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       fontSize: 11,
       fontFamily: weightToFontFamily('600'),
       color: semantic.labelAlt,
+    },
+    sectionDisclaimer: {
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingTop: WANTED_TOKENS.spacing.s3,
+      paddingBottom: WANTED_TOKENS.spacing.s2,
+      fontSize: 11,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+      lineHeight: 16,
     },
   });
 
