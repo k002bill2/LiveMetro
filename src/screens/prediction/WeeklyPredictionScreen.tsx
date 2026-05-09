@@ -44,6 +44,7 @@ import {
   TrendingDown,
 } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
+import { LinearGradient } from 'expo-linear-gradient';
 
 import { useMLPrediction } from '@/hooks/useMLPrediction';
 import { useTheme, ThemeColors } from '@/services/theme';
@@ -191,11 +192,17 @@ export const WeeklyPredictionScreen: React.FC = () => {
     return () => animatedValue.removeListener(id);
   }, [animatedValue, predictedMinutes]);
 
-  // Range bar geometry — predicted marker position within [min, max].
-  const rangeWidthSpan = rangeMin[1] - rangeMin[0];
-  const markerLeftPct = rangeWidthSpan > 0
-    ? Math.max(0, Math.min(100, ((predictedMinutes - rangeMin[0]) / rangeWidthSpan) * 100))
-    : 50;
+  // Range bar geometry — track represents a 20-min window centered on the
+  // prediction; fill spans only [최단, 최장] within that, marker sits at the
+  // predicted minute. Mirrors the design handoff (commute-prediction.jsx
+  // line 92-108) so the fill visibly shows "this is the predicted band
+  // within a wider possible range" instead of filling the whole track.
+  const TRACK_SPAN_MIN = 20;
+  const trackMin = predictedMinutes - TRACK_SPAN_MIN / 2;
+  const clampPct = (n: number): number => Math.max(0, Math.min(100, n));
+  const fillLeftPct = clampPct(((rangeMin[0] - trackMin) / TRACK_SPAN_MIN) * 100);
+  const fillWidthPct = clampPct(((rangeMin[1] - rangeMin[0]) / TRACK_SPAN_MIN) * 100);
+  const markerLeftPct = clampPct(((predictedMinutes - trackMin) / TRACK_SPAN_MIN) * 100);
 
   return (
     <ScrollView
@@ -265,7 +272,19 @@ export const WeeklyPredictionScreen: React.FC = () => {
               <Text style={[styles.rangeLabelSide, { color: semantic.labelAlt }]}>최장 {rangeMin[1]}분</Text>
             </View>
             <View style={styles.rangeTrack}>
-              <View style={[styles.rangeFill, { backgroundColor: semantic.primaryNormal, opacity: 0.45 }]} />
+              <LinearGradient
+                colors={[
+                  'rgba(0,102,255,0.25)',
+                  'rgba(0,102,255,0.55)',
+                  'rgba(0,102,255,0.25)',
+                ]}
+                start={{ x: 0, y: 0.5 }}
+                end={{ x: 1, y: 0.5 }}
+                style={[
+                  styles.rangeFill,
+                  { left: `${fillLeftPct}%`, width: `${fillWidthPct}%` },
+                ]}
+              />
               <View
                 style={[
                   styles.rangeMarker,
@@ -370,20 +389,27 @@ export const WeeklyPredictionScreen: React.FC = () => {
                     >
                       {h.cong}%
                     </Text>
-                    {/* Bar */}
+                    {/* Bar — isNow gets a vertical gradient + glow shadow
+                        so the highlighted column reads as the focal point.
+                        Non-now bars stay flat translucent for visual
+                        separation. */}
                     <View style={styles.barWrap}>
-                      <View
-                        style={[
-                          styles.bar,
-                          {
-                            height: `${h.cong * 0.85}%`,
-                            backgroundColor: h.isNow ? color : `${color}66`,
-                            borderColor: h.isNow ? color : `${color}33`,
-                            borderWidth: h.isNow ? 2 : 1,
-                          },
-                        ]}
-                      >
-                        {h.isNow && (
+                      {h.isNow ? (
+                        <LinearGradient
+                          colors={[color, `${color}DD`]}
+                          start={{ x: 0.5, y: 0 }}
+                          end={{ x: 0.5, y: 1 }}
+                          style={[
+                            styles.bar,
+                            styles.barIsNowShadow,
+                            {
+                              height: `${h.cong * 0.85}%`,
+                              borderColor: color,
+                              borderWidth: 2,
+                              shadowColor: color,
+                            },
+                          ]}
+                        >
                           <View
                             style={[
                               styles.nowTooltip,
@@ -398,9 +424,27 @@ export const WeeklyPredictionScreen: React.FC = () => {
                             >
                               지금
                             </Text>
+                            <View
+                              style={[
+                                styles.nowTooltipArrow,
+                                { backgroundColor: semantic.labelStrong },
+                              ]}
+                            />
                           </View>
-                        )}
-                      </View>
+                        </LinearGradient>
+                      ) : (
+                        <View
+                          style={[
+                            styles.bar,
+                            {
+                              height: `${h.cong * 0.85}%`,
+                              backgroundColor: `${color}66`,
+                              borderColor: `${color}33`,
+                              borderWidth: 1,
+                            },
+                          ]}
+                        />
+                      )}
                     </View>
                   </View>
                 );
@@ -601,8 +645,6 @@ const createStyles = (_colors: ThemeColors, isDark: boolean) => {
     },
     rangeFill: {
       position: 'absolute',
-      left: 0,
-      right: 0,
       top: 0,
       bottom: 0,
       borderRadius: 999,
@@ -615,6 +657,11 @@ const createStyles = (_colors: ThemeColors, isDark: boolean) => {
       borderRadius: 9999,
       borderWidth: 3,
       marginLeft: -7,
+      shadowColor: '#0066FF',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.3,
+      shadowRadius: 4,
+      elevation: 4,
     },
     confidenceRow: {
       marginTop: 14,
@@ -765,6 +812,14 @@ const createStyles = (_colors: ThemeColors, isDark: boolean) => {
       minHeight: 10,
       position: 'relative',
     },
+    barIsNowShadow: {
+      // shadowColor is set inline per-bar from the congestion tone so the
+      // glow tints with the active column's color.
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.25,
+      shadowRadius: 10,
+      elevation: 6,
+    },
     nowTooltip: {
       position: 'absolute',
       top: -22,
@@ -778,6 +833,17 @@ const createStyles = (_colors: ThemeColors, isDark: boolean) => {
       fontSize: 10,
       fontWeight: '800',
       fontFamily: weightToFontFamily('800'),
+    },
+    nowTooltipArrow: {
+      // 6×6 square rotated 45° peeks out as the tooltip's downward tip.
+      // Positioned just below the rounded body so the diagonal corner
+      // points at the bar's top edge.
+      position: 'absolute',
+      bottom: -3,
+      left: '50%',
+      width: 6,
+      height: 6,
+      transform: [{ translateX: -3 }, { rotate: '45deg' }],
     },
     hourLabelRow: {
       flexDirection: 'row',
