@@ -43,7 +43,7 @@ export interface NotificationSettings {
   readonly pushNotifications: boolean;
   readonly emailNotifications: boolean;
   readonly soundSettings: SoundPreferences;
-  readonly lineFilter?: readonly string[];        // optional: filter delay alerts by selected line ids ('1'..'9'). undefined/empty = all lines.
+  readonly lineFilter?: readonly string[];        // optional: filter delay alerts by selected line ids. Accepts numeric short codes ('1'..'9') AND full Korean line names ('신분당선', '경의중앙선', '공항철도', '수인분당선', etc) registered in LINE_LABELS aliases (PR #34). undefined/empty = all lines.
   readonly alertSources?: AlertSourcePreferences; // optional: source-based alert toggles (official/community/urgent).
   readonly perEventSound?: PerEventSoundOverrides; // optional: per-event delivery gates for the Wanted handoff "이벤트별" section
 }
