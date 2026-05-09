@@ -74,6 +74,7 @@ export interface QuietHours {
   readonly enabled: boolean;
   readonly startTime: string; // HH:mm format
   readonly endTime: string;   // HH:mm format
+  readonly weekendsAlwaysSilent?: boolean; // optional: when true, weekends are silent all day regardless of startTime/endTime
 }
 
 export interface NotificationAlertTypes {
