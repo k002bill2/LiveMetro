@@ -20,21 +20,21 @@ describe('StationSearchBar', () => {
   beforeEach(() => jest.clearAllMocks());
 
   it('renders empty placeholders when no stations selected', () => {
-    const { getByTestId } = render(<StationSearchBar {...defaultProps} />);
-    expect(getByTestId('search-bar-from-row')).toHaveTextContent(/출발역/);
-    expect(getByTestId('search-bar-to-row')).toHaveTextContent(/도착역/);
+    const { getByText } = render(<StationSearchBar {...defaultProps} />);
+    expect(getByText('출발역을 입력하세요')).toBeTruthy();
+    expect(getByText('도착역을 입력하세요')).toBeTruthy();
   });
 
   it('renders station names when provided', () => {
-    const { getByTestId } = render(
+    const { getByText } = render(
       <StationSearchBar
         {...defaultProps}
         fromStation={mockStation('a', '강남')}
         toStation={mockStation('b', '잠실')}
       />
     );
-    expect(getByTestId('search-bar-from-row')).toHaveTextContent('강남');
-    expect(getByTestId('search-bar-to-row')).toHaveTextContent('잠실');
+    expect(getByText('강남')).toBeTruthy();
+    expect(getByText('잠실')).toBeTruthy();
   });
 
   it('calls onPressFrom when from row tapped', () => {
