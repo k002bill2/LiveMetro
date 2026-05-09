@@ -19,7 +19,6 @@ import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/s
 import { statisticsService, StatsSummary, WeeklyStats } from '@/services/statistics/statisticsService';
 import { commuteLogService } from '@/services/pattern';
 import { CommuteLog } from '@/models/pattern';
-import StatsSummaryCard from '@/components/statistics/StatsSummaryCard';
 import WeeklyStatsChart from '@/components/statistics/WeeklyStatsChart';
 import DelayStatsChart from '@/components/statistics/DelayStatsChart';
 import LineUsagePieChart from '@/components/statistics/LineUsagePieChart';
@@ -129,16 +128,69 @@ const StatisticsDashboardScreen: React.FC = () => {
         }
         showsVerticalScrollIndicator={false}
       >
-        {/* Header */}
+        {/* Header — design handoff (rest.jsx 215-223): "나의 통계" title +
+            period subtitle ("YYYY년 M월 · 이번 주"). The Korean date is
+            built locally (Intl narrow locale isn't guaranteed on Android). */}
         <View style={styles.header}>
-          <Text style={styles.title}>통계 대시보드</Text>
-          <Text style={styles.subtitle}>
-            {summary.memberSince} 이후 기록
+          <Text style={styles.title}>나의 통계</Text>
+          <Text style={styles.periodSubtitle}>
+            {(() => {
+              const now = new Date();
+              return `${now.getFullYear()}년 ${now.getMonth() + 1}월 · 이번 주`;
+            })()}
           </Text>
         </View>
 
-        {/* Summary Card */}
-        <StatsSummaryCard summary={summary} />
+        {/* KPI grid — 2×2 cards (rest.jsx 226-245). Replaces the previous
+            StatsSummaryCard: same data, denser layout that matches the
+            Wanted handoff. Tone-driven color emphasizes good (green) vs
+            problem (red) signals. */}
+        <View style={styles.kpiGrid}>
+          {[
+            {
+              label: '정시 운행률',
+              value: Math.round(summary.onTimeRate),
+              unit: '%',
+              tone: 'pos' as const,
+            },
+            {
+              label: '평균 지연',
+              value: Number(summary.avgDelayMinutes.toFixed(1)),
+              unit: '분',
+              tone: 'neutral' as const,
+            },
+            {
+              label: '이용 횟수',
+              value: weeklyStats?.totalTrips ?? summary.totalTrips,
+              unit: '회',
+              tone: 'neutral' as const,
+            },
+            {
+              label: '총 지연',
+              value: Math.round(summary.totalDelayMinutes),
+              unit: '분',
+              tone: summary.totalDelayMinutes > 0 ? ('neg' as const) : ('neutral' as const),
+            },
+          ].map((kpi) => {
+            const valueColor =
+              kpi.tone === 'pos'
+                ? WANTED_TOKENS.status.green500
+                : kpi.tone === 'neg'
+                ? WANTED_TOKENS.status.red500
+                : semantic.labelStrong;
+            return (
+              <View key={kpi.label} style={styles.kpiCard}>
+                <Text style={styles.kpiLabel}>{kpi.label}</Text>
+                <View style={styles.kpiValueRow}>
+                  <Text style={[styles.kpiValue, { color: valueColor }]}>
+                    {kpi.value}
+                  </Text>
+                  <Text style={styles.kpiUnit}>{kpi.unit}</Text>
+                </View>
+              </View>
+            );
+          })}
+        </View>
 
         {/* Weekly On-Time Rate Chart */}
         <View style={styles.chartSection}>
@@ -305,6 +357,54 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       fontSize: 14,
       color: semantic.labelAlt,
       marginTop: 4,
+    },
+    periodSubtitle: {
+      fontSize: 12,
+      fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
+      color: semantic.labelAlt,
+      marginTop: 6,
+    },
+    kpiGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: 10,
+      marginBottom: 16,
+    },
+    kpiCard: {
+      // Two cards per row: 50% minus half the gap.
+      flexBasis: '48%',
+      flexGrow: 1,
+      backgroundColor: semantic.bgBase,
+      borderRadius: 14,
+      padding: 14,
+      borderWidth: 1,
+      borderColor: semantic.lineSubtle,
+    },
+    kpiLabel: {
+      fontSize: 12,
+      fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
+      color: semantic.labelAlt,
+    },
+    kpiValueRow: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      gap: 3,
+      marginTop: 6,
+    },
+    kpiValue: {
+      fontSize: 26,
+      fontWeight: '800',
+      fontFamily: weightToFontFamily('800'),
+      letterSpacing: -0.52,
+      fontVariant: ['tabular-nums'],
+    },
+    kpiUnit: {
+      fontSize: 12,
+      fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
+      color: semantic.labelNeutral,
     },
     chartSection: {
       backgroundColor: semantic.bgBase,
