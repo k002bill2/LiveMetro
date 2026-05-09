@@ -43,6 +43,29 @@ jest.mock('@/services/commute/commuteService', () => ({
   loadCommuteRoutes: jest.fn(),
 }));
 
+// Hero ETA wires up useMLPrediction. Stub it to a "no data yet" state so
+// tests don't pull in TF-disabled paths or async firestore subscriptions.
+jest.mock('@/hooks/useMLPrediction', () => ({
+  useMLPrediction: () => ({
+    prediction: null,
+    baselineMinutes: null,
+    loading: false,
+    error: null,
+    modelMetadata: null,
+    isModelReady: false,
+    isTensorFlowReady: false,
+    trainingProgress: 0,
+    isTraining: false,
+    logCount: 0,
+    hasEnoughData: false,
+    refreshPrediction: jest.fn(),
+    trainModel: jest.fn(),
+    getWeekPredictions: jest.fn(),
+    clearCache: jest.fn(),
+    checkReliability: jest.fn(() => false),
+  }),
+}));
+
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const mockLoadCommuteRoutes = loadCommuteRoutes as jest.MockedFunction<typeof loadCommuteRoutes>;
 
@@ -82,7 +105,11 @@ describe('CommuteSettingsScreen', () => {
     // post Wanted handoff cascade). The Hero ETA card's eyebrow is the
     // post-redesign always-rendered sentinel.
     await waitFor(() => {
-      expect(getByText('오늘 출근 예측')).toBeTruthy();
+      // Hero eyebrow shows "예측 준비 중" when useMLPrediction has no
+      // baseline yet (mocked default), falls back to "오늘 출근 예측"
+      // when baseline is available. Either is acceptable as a render
+      // sentinel post-Hero-ETA wiring.
+      expect(getByText('예측 준비 중')).toBeTruthy();
     });
   });
 
@@ -141,7 +168,11 @@ describe('CommuteSettingsScreen', () => {
 
     const { getByText } = render(<CommuteSettingsScreen {...createProps()} />);
     await waitFor(() => {
-      expect(getByText('오늘 출근 예측')).toBeTruthy();
+      // Hero eyebrow shows "예측 준비 중" when useMLPrediction has no
+      // baseline yet (mocked default), falls back to "오늘 출근 예측"
+      // when baseline is available. Either is acceptable as a render
+      // sentinel post-Hero-ETA wiring.
+      expect(getByText('예측 준비 중')).toBeTruthy();
     });
   });
 
@@ -149,7 +180,11 @@ describe('CommuteSettingsScreen', () => {
     mockLoadCommuteRoutes.mockRejectedValue(new Error('Network error'));
     const { getByText } = render(<CommuteSettingsScreen {...createProps()} />);
     await waitFor(() => {
-      expect(getByText('오늘 출근 예측')).toBeTruthy();
+      // Hero eyebrow shows "예측 준비 중" when useMLPrediction has no
+      // baseline yet (mocked default), falls back to "오늘 출근 예측"
+      // when baseline is available. Either is acceptable as a render
+      // sentinel post-Hero-ETA wiring.
+      expect(getByText('예측 준비 중')).toBeTruthy();
     });
   });
 
