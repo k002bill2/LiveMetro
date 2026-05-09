@@ -17,20 +17,20 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Switch,
 } from 'react-native';
 import {
   ArrowRight,
   BellRing,
-  ChevronRight,
+  ChevronDown,
+  Clock,
   MapPin,
-  Moon,
   PlusCircle,
   Route as RouteIcon,
   Sparkles,
-  Sun,
   TrainFront,
-  type LucideIcon,
 } from 'lucide-react-native';
+import { Pill } from '@/components/design/Pill';
 import { LinearGradient } from 'expo-linear-gradient';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
@@ -46,12 +46,8 @@ import { useAuth } from '@/services/auth/AuthContext';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { loadCommuteRoutes } from '@/services/commute/commuteService';
 import { useMLPrediction } from '@/hooks/useMLPrediction';
-import { CommuteRoute, TransferStation } from '@/models/commute';
+import { CommuteRoute } from '@/models/commute';
 import type { SmartFeatures } from '@/models/user';
-import {
-  RouteWithTransfer,
-  TransferOption,
-} from '@/components/commute/RouteWithTransfer';
 import SettingSection from '@/components/settings/SettingSection';
 import SettingToggle from '@/components/settings/SettingToggle';
 import { SettingPicker, type PickerOption } from '@/components/settings/SettingPicker';
@@ -76,37 +72,6 @@ interface CommuteRouteData {
     lineId: string;
   }[];
 }
-
-// Static recommended transfer alternatives for the 출근 / 퇴근 cards.
-// chat3 design hand-off referenced 합정(직행, 추천) / 신도림 / 사당 / 교대.
-// Replacing this with `useAlternativeRoutes` lookup is a follow-up phase.
-const STATIC_TRANSFER_ALTERNATIVES: readonly TransferOption[] = [
-  {
-    id: 'direct',
-    transfer: null,
-    etaMinutes: 28,
-    reason: '환승 없음, 가장 빠름',
-    recommended: true,
-  },
-  {
-    id: 'sindorim',
-    transfer: { stationId: 'stn-sindorim', stationName: '신도림', lineId: '2', lineName: '2호선', order: 0 },
-    etaMinutes: 33,
-    reason: '1·2호선 환승',
-  },
-  {
-    id: 'sadang',
-    transfer: { stationId: 'stn-sadang', stationName: '사당', lineId: '4', lineName: '4호선', order: 0 },
-    etaMinutes: 35,
-    reason: '2·4호선 환승',
-  },
-  {
-    id: 'gyodae',
-    transfer: { stationId: 'stn-gyodae', stationName: '교대', lineId: '3', lineName: '3호선', order: 0 },
-    etaMinutes: 32,
-    reason: '2·3호선 환승',
-  },
-];
 
 const DAY_LABELS: readonly string[] = ['월', '화', '수', '목', '금', '토', '일'];
 const DEFAULT_ACTIVE_DAYS: readonly boolean[] = [true, true, true, true, true, false, false];
@@ -139,6 +104,18 @@ const confidenceToMinutes = (confidence: number): number => {
   return Math.max(1, Math.round((1 - clamped) * 9 + 1));
 };
 
+// "08:30" + 32 → "09:02". Returns null on parse failure so callers can
+// fall back to hiding the arrival hint.
+const addMinutesToTime = (hhmm: string, minutes: number): string | null => {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim());
+  if (!m) return null;
+  const total = parseInt(m[1]!, 10) * 60 + parseInt(m[2]!, 10) + minutes;
+  const wrapped = ((total % (24 * 60)) + 24 * 60) % (24 * 60);
+  const hh = Math.floor(wrapped / 60);
+  const mm = wrapped % 60;
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+};
+
 export const CommuteSettingsScreen: React.FC<Props> = ({ navigation: _navigation }) => {
   const { user, updateUserProfile } = useAuth();
   const { resetOnboarding } = useOnboarding();
@@ -163,13 +140,6 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation: _navigation
   const [eveningRoute, setEveningRoute] = useState<CommuteRouteData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-
-  // Per-route transfer editing state. The "out" suffix maps to the 출근 card,
-  // "in" to the 퇴근 card, mirroring chat3 nomenclature.
-  const [outTransfer, setOutTransfer] = useState<TransferStation | null>(null);
-  const [inTransfer, setInTransfer] = useState<TransferStation | null>(null);
-  const [outExpanded, setOutExpanded] = useState(false);
-  const [inExpanded, setInExpanded] = useState(false);
 
   // Derived prefs from user.preferences.commuteSchedule (with fallbacks for
   // existing user data that pre-dates these fields).
@@ -264,21 +234,11 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation: _navigation
       if (settings) {
         setMorningRoute(convertToRouteData(settings.morningRoute));
         setEveningRoute(convertToRouteData(settings.eveningRoute));
-        // Initialize the transfer-edit state from the first transfer station
-        // of the loaded route. Multi-transfer routes show only the first
-        // transfer in this UI; full multi-transfer editing is out of scope
-        // for the Topic 2 surgical addition.
-        const morningFirst = settings.morningRoute?.transferStations?.[0];
-        const eveningFirst = settings.eveningRoute?.transferStations?.[0];
-        setOutTransfer(morningFirst ? { ...morningFirst } : null);
-        setInTransfer(eveningFirst ? { ...eveningFirst } : null);
         console.log('Commute settings loaded from Firebase');
       } else {
         console.log('No commute settings found in Firebase');
         setMorningRoute(null);
         setEveningRoute(null);
-        setOutTransfer(null);
-        setInTransfer(null);
       }
     } catch (error) {
       console.error('Error loading commute settings:', error);
@@ -312,58 +272,99 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation: _navigation
   };
 
   const RouteCard: React.FC<{
-    title: string;
-    icon: LucideIcon;
+    kind: 'morning' | 'evening';
     route: CommuteRouteData | null;
     onEdit: () => void;
-    transfer: TransferStation | null;
-    onTransferChange: (next: TransferStation | null) => void;
-    expanded: boolean;
-    onToggleExpanded: () => void;
-  }> = ({ title, icon: IconComponent, route, onEdit, transfer, onTransferChange, expanded, onToggleExpanded }) => (
-    <View style={styles.routeCard}>
-      <View style={styles.routeHeader}>
-        <View style={styles.routeIconContainer}>
-          <IconComponent size={24} color={semantic.labelStrong} strokeWidth={2} />
-        </View>
-        <Text style={styles.routeTitle}>{title}</Text>
-      </View>
+    enabled?: boolean;
+    onToggleEnabled?: (v: boolean) => void;
+    arrivalEtaMinutes?: number | null;
+  }> = ({ kind, route, onEdit, enabled, onToggleEnabled, arrivalEtaMinutes }) => {
+    const isMorning = kind === 'morning';
+    const arrivalTime = isMorning && route && arrivalEtaMinutes != null
+      ? addMinutesToTime(route.departureTime, arrivalEtaMinutes)
+      : null;
+    const transferCount = route?.transferStations.length ?? 0;
+    const dimmed = !isMorning && enabled === false;
 
-      {route ? (
-        <View style={styles.routeContent}>
-          <View style={styles.routeRow}>
-            <Text style={styles.routeLabel}>출발 시간</Text>
-            <Text style={styles.routeValue}>{route.departureTime}</Text>
+    return (
+      <View style={styles.routeCard}>
+        {/* Header — Pill + "평일 매일" + 편집 link / Toggle */}
+        <View style={styles.routeHeaderRow}>
+          <Pill tone={isMorning ? 'primary' : 'neutral'} size="sm">
+            {isMorning ? '출근' : '퇴근'}
+          </Pill>
+          <Text style={styles.routeWeekdayText}>평일 매일</Text>
+          <View style={{ flex: 1 }} />
+          {isMorning ? (
+            <TouchableOpacity onPress={onEdit} accessibilityRole="button" accessibilityLabel="경로 편집">
+              <Text style={styles.routeEditLink}>편집</Text>
+            </TouchableOpacity>
+          ) : (
+            <Switch
+              value={enabled ?? false}
+              onValueChange={onToggleEnabled}
+              accessibilityRole="switch"
+              accessibilityLabel="퇴근 경로 사용"
+              trackColor={{ false: semantic.lineNormal, true: WANTED_TOKENS.blue[500] }}
+              thumbColor="#fff"
+            />
+          )}
+        </View>
+
+        {route ? (
+          <>
+            <View style={[styles.routeBody, dimmed && { opacity: 0.45 }]}>
+              {/* 출발 row */}
+              <View style={styles.routeBodyRow}>
+                <View style={[styles.routeDot, { backgroundColor: semantic.labelStrong }]} />
+                <Text style={styles.routeStationText}>{route.departureStation.stationName}</Text>
+                <View style={{ flex: 1 }} />
+                <Text style={styles.routeRoleText}>출발</Text>
+              </View>
+              <View style={styles.routeConnectorDotted} />
+              {/* 환승 row */}
+              <View style={styles.routeBodyRow}>
+                <View style={[styles.routeDot, { backgroundColor: WANTED_TOKENS.status.green500 }]} />
+                <Text style={styles.routeMidText}>
+                  {transferCount === 0 ? '직행 · 환승 없음' : `환승 ${transferCount}회`}
+                </Text>
+                <View style={{ flex: 1 }} />
+                <TouchableOpacity onPress={onEdit} style={styles.routeAddTransferRow} accessibilityRole="button" accessibilityLabel="환승 추가">
+                  <Text style={styles.routeAddTransferText}>환승 추가</Text>
+                  <ChevronDown size={14} color={WANTED_TOKENS.blue[500]} strokeWidth={2} />
+                </TouchableOpacity>
+              </View>
+              <View style={styles.routeConnectorDotted} />
+              {/* 도착 row */}
+              <View style={styles.routeBodyRow}>
+                <View style={[styles.routeDot, { backgroundColor: WANTED_TOKENS.blue[500] }]} />
+                <Text style={styles.routeStationText}>{route.arrivalStation.stationName}</Text>
+                <View style={{ flex: 1 }} />
+                <Text style={styles.routeRoleText}>도착</Text>
+              </View>
+            </View>
+
+            {/* Footer — clock + departure (+ arrival ETA for morning) */}
+            <View style={[styles.routeFooterRow, dimmed && { opacity: 0.45 }]}>
+              <Clock size={13} color={semantic.labelAlt} strokeWidth={2} />
+              <Text style={styles.routeFooterText}>{route.departureTime} 출발</Text>
+              {arrivalTime ? (
+                <Text style={styles.routeFooterTextSubtle}> · 도착 ~{arrivalTime}</Text>
+              ) : null}
+            </View>
+          </>
+        ) : (
+          <View style={styles.emptyContent}>
+            <PlusCircle size={48} color={semantic.lineNormal} strokeWidth={1.5} />
+            <Text style={styles.emptyText}>설정된 경로가 없습니다</Text>
+            <TouchableOpacity onPress={onEdit} style={styles.emptyCta} accessibilityRole="button">
+              <Text style={styles.emptyCtaText}>경로 설정하기</Text>
+            </TouchableOpacity>
           </View>
-          {/* Editable origin → transfer → destination diagram (Topic 2). */}
-          <RouteWithTransfer
-            origin={route.departureStation}
-            destination={route.arrivalStation}
-            transfer={transfer}
-            alternatives={STATIC_TRANSFER_ALTERNATIVES}
-            onTransferChange={(next) => {
-              onTransferChange(next);
-              onToggleExpanded();
-            }}
-            expanded={expanded}
-            onToggleExpanded={onToggleExpanded}
-          />
-        </View>
-      ) : (
-        <View style={styles.emptyContent}>
-          <PlusCircle size={48} color={semantic.lineNormal} strokeWidth={1.5} />
-          <Text style={styles.emptyText}>설정된 경로가 없습니다</Text>
-        </View>
-      )}
-
-      <TouchableOpacity style={styles.editButton} onPress={onEdit}>
-        <Text style={styles.editButtonText}>
-          {route ? '수정하기' : '설정하기'}
-        </Text>
-        <ChevronRight size={16} color={WANTED_TOKENS.blue[500]} strokeWidth={2} />
-      </TouchableOpacity>
-    </View>
-  );
+        )}
+      </View>
+    );
+  };
 
   if (loading) {
     return (
@@ -431,24 +432,21 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation: _navigation
         {/* 2. Routes — preserved from prior phase, wrapped under "경로" SettingSection for visual consistency */}
         <SettingSection title="경로">
           <RouteCard
-            title="출근"
-            icon={Sun}
+            kind="morning"
             route={morningRoute}
             onEdit={handleSetupCommute}
-            transfer={outTransfer}
-            onTransferChange={setOutTransfer}
-            expanded={outExpanded}
-            onToggleExpanded={() => setOutExpanded((v) => !v)}
+            arrivalEtaMinutes={baselineMinutes !== null ? Math.round(baselineMinutes) : null}
           />
           <RouteCard
-            title="퇴근"
-            icon={Moon}
+            kind="evening"
             route={eveningRoute}
             onEdit={handleSetupCommute}
-            transfer={inTransfer}
-            onTransferChange={setInTransfer}
-            expanded={inExpanded}
-            onToggleExpanded={() => setInExpanded((v) => !v)}
+            enabled={eveningRoute !== null}
+            onToggleEnabled={() => {
+              // Toggle is informational for now; full enable/disable wiring
+              // (e.g. clearing eveningCommute on Firestore) is a follow-up.
+              Alert.alert('알림', '퇴근 경로 사용 토글은 다음 단계에서 동작합니다.');
+            }}
           />
         </SettingSection>
 
@@ -748,6 +746,106 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       fontFamily: weightToFontFamily('500'),
       color: semantic.labelAlt,
       lineHeight: 18,
+    },
+    routeHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      paddingHorizontal: 16,
+      paddingTop: 14,
+      paddingBottom: 10,
+    },
+    routeWeekdayText: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('700'),
+      color: semantic.labelStrong,
+    },
+    routeEditLink: {
+      fontSize: 12,
+      fontFamily: weightToFontFamily('700'),
+      color: WANTED_TOKENS.blue[500],
+    },
+    routeBody: {
+      backgroundColor: semantic.bgSubtlePage,
+      borderRadius: 12,
+      marginHorizontal: 16,
+      paddingVertical: 12,
+      paddingHorizontal: 14,
+    },
+    routeBodyRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      minHeight: 24,
+    },
+    routeDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+    },
+    routeStationText: {
+      fontSize: 15,
+      fontFamily: weightToFontFamily('700'),
+      color: semantic.labelStrong,
+      letterSpacing: -0.15,
+    },
+    routeMidText: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelNeutral,
+    },
+    routeRoleText: {
+      fontSize: 12,
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelAlt,
+    },
+    routeAddTransferRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 2,
+    },
+    routeAddTransferText: {
+      fontSize: 12,
+      fontFamily: weightToFontFamily('700'),
+      color: WANTED_TOKENS.blue[500],
+    },
+    routeConnectorDotted: {
+      width: 0,
+      borderLeftWidth: 1,
+      borderLeftColor: 'rgba(112,115,124,0.30)',
+      borderStyle: 'dashed',
+      height: 8,
+      marginLeft: 3,
+    },
+    routeFooterRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 16,
+      paddingTop: 10,
+      paddingBottom: 14,
+    },
+    routeFooterText: {
+      fontSize: 12,
+      fontFamily: weightToFontFamily('700'),
+      color: semantic.labelNeutral,
+    },
+    routeFooterTextSubtle: {
+      fontSize: 12,
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelAlt,
+    },
+    emptyCta: {
+      marginTop: WANTED_TOKENS.spacing.s3,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 9999,
+      backgroundColor: WANTED_TOKENS.blue[500],
+    },
+    emptyCtaText: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('700'),
+      color: '#fff',
     },
   });
 

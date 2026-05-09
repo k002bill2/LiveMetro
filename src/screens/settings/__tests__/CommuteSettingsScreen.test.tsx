@@ -148,8 +148,12 @@ describe('CommuteSettingsScreen', () => {
       expect(getAllByText('강남').length).toBeGreaterThan(0);
     });
     expect(getAllByText('시청').length).toBeGreaterThan(0);
-    expect(getAllByText('08:00').length).toBeGreaterThan(0);
-    expect(getAllByText('수정하기').length).toBe(1);
+    // Footer text post-redesign concatenates time + " 출발", so '08:00'
+    // is no longer a standalone Text node. Match the concatenated form.
+    expect(getAllByText('08:00 출발').length).toBeGreaterThan(0);
+    // Legacy "수정하기" button replaced with the "편집" link in the
+    // morning RouteCard header (Wanted handoff).
+    expect(getAllByText('편집').length).toBe(1);
   });
 
   it('handles no user gracefully', async () => {
@@ -216,10 +220,12 @@ describe('CommuteSettingsScreen', () => {
     });
 
     const { getByText } = render(<CommuteSettingsScreen {...createProps()} />);
-    // The transfer station now appears in the RouteWithTransfer atom or
-    // the recommended-routes panel; the legacy "역" suffix is gone.
+    // Post Wanted-handoff redesign, the RouteCard body shows transfer
+    // count rather than the transfer station name inline. Assert the
+    // count text instead of '신도림' (which now lives only in
+    // expand/edit flows reached via "환승 추가").
     await waitFor(() => {
-      expect(getByText('신도림')).toBeTruthy();
+      expect(getByText('환승 1회')).toBeTruthy();
     });
   });
 });
