@@ -31,6 +31,24 @@ const LINE_LABELS: Record<string, LineLabel> = {
   'bd': { label: '분당',   color: SUBWAY_LINE_COLORS['bd'] },
   'gj': { label: '경의',   color: SUBWAY_LINE_COLORS['gj'] },
   'gx': { label: '공항',   color: SUBWAY_LINE_COLORS['gx'] },
+  // Full Korean names — emitted by stationsDataService for transfer lines.
+  // Without these, LINE_LABELS lookup returns undefined and the badge
+  // silently no-renders (regression flagged by cross-review on the
+  // MapScreen Wanted handoff).
+  //
+  // Note: getSubwayLineColor's substring matching runs on a normalized
+  // (ASCII-only) string, so it can't recognize pure Korean names. That's
+  // why we hard-code each here rather than rely on the fallback path.
+  '신분당선':       { label: '신분당',   color: SUBWAY_LINE_COLORS['sb'] },
+  '수인분당선':     { label: '수인분당', color: SUBWAY_LINE_COLORS['bd'] },
+  '경의선':         { label: '경의',     color: SUBWAY_LINE_COLORS['gj'] },
+  '경의중앙선':     { label: '경의중앙', color: SUBWAY_LINE_COLORS['gj'] },
+  '공항철도':       { label: '공항',     color: SUBWAY_LINE_COLORS['gx'] },
+  '경춘선':         { label: '경춘',     color: SUBWAY_LINE_COLORS.gyeongchun },
+  '경강선':         { label: '경강',     color: SUBWAY_LINE_COLORS.gyeonggang },
+  '서해선':         { label: '서해',     color: SUBWAY_LINE_COLORS.seohae },
+  '김포도시철도':   { label: '김포',     color: SUBWAY_LINE_COLORS.gimpo },
+  '우이신설경전철': { label: '우이신설', color: SUBWAY_LINE_COLORS.wooyisinseol },
 };
 
 interface LineBadgeProps {
