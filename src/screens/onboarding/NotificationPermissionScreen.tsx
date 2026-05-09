@@ -27,7 +27,15 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Bell } from 'lucide-react-native';
+import {
+  AlertTriangle,
+  ArrowLeftRight,
+  ArrowRight,
+  Megaphone,
+  TrainFront,
+  type LucideIcon,
+} from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
@@ -46,6 +54,11 @@ interface ToggleSpec {
   id: ToggleId;
   label: string;
   hint: string;
+  icon: LucideIcon;
+  // Wanted handoff: each toggle has a colored 40×40 icon container.
+  // Tints encode notification severity (blue=routine, red=delay, amber=incident).
+  accentFg: string;
+  accentBg: string;
   recommended?: boolean;
 }
 
@@ -54,9 +67,31 @@ interface ToggleSpec {
 // committed downstream in step 4, with these three values overlaid on
 // DEFAULT_COMMUTE_NOTIFICATIONS.
 const TOGGLES: readonly ToggleSpec[] = [
-  { id: 'transferAlert', label: '환승 알림', hint: '환승역 도착 전 미리 알림' },
-  { id: 'delayAlert', label: '지연 알림', hint: '내가 자주 타는 노선의 지연·운행 변동', recommended: true },
-  { id: 'incidentAlert', label: '사고·운행 중단 알림', hint: '사고나 점검으로 인한 운행 중단 안내' },
+  {
+    id: 'transferAlert',
+    label: '환승 알림',
+    hint: '환승역 도착 전 미리 알림',
+    icon: ArrowLeftRight,
+    accentFg: WANTED_TOKENS.blue[500],
+    accentBg: 'rgba(0,102,255,0.12)',
+  },
+  {
+    id: 'delayAlert',
+    label: '지연 알림',
+    hint: '내가 자주 타는 노선의 지연·운행 변동',
+    icon: AlertTriangle,
+    accentFg: WANTED_TOKENS.status.red500,
+    accentBg: 'rgba(255,66,66,0.10)',
+    recommended: true,
+  },
+  {
+    id: 'incidentAlert',
+    label: '사고·운행 중단 알림',
+    hint: '사고나 점검으로 인한 운행 중단 안내',
+    icon: Megaphone,
+    accentFg: WANTED_TOKENS.status.amber700,
+    accentBg: 'rgba(255,180,0,0.16)',
+  },
 ];
 
 export const NotificationPermissionScreen: React.FC<Props> = ({ navigation, route }) => {
@@ -136,49 +171,98 @@ export const NotificationPermissionScreen: React.FC<Props> = ({ navigation, rout
           style={[styles.title, { color: semantic.labelStrong, fontFamily: weightToFontFamily('800') }]}
           testID="notification-title"
         >
-          알림을 켜둘까요?
+          {'어떤 알림을\n받고 싶으세요?'}
         </Text>
         <Text
           style={[styles.subtitle, { color: semantic.labelAlt, fontFamily: weightToFontFamily('500') }]}
         >
-          출퇴근 시각·지연·실시간 제보를 잠금화면에서 바로 받아볼 수 있어요
+          {'출퇴근 시간대에만 조용히 알려드려요\n언제든 끌 수 있어요'}
         </Text>
 
-        {/* Lock-screen notification preview (static visual) */}
-        <View
+        {/* Lock-screen notification preview — Wanted handoff:
+            outer primary-tinted gradient wrapper with eyebrow label,
+            inner notification card with shadow nested inside. */}
+        <LinearGradient
+          colors={[
+            isDark ? 'rgba(51,133,255,0.10)' : 'rgba(0,102,255,0.06)',
+            isDark ? 'rgba(51,133,255,0.04)' : 'rgba(0,102,255,0.02)',
+          ]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 0, y: 1 }}
           style={[
             styles.preview,
-            { backgroundColor: semantic.bgSubtle, borderColor: semantic.lineSubtle },
+            {
+              borderColor: isDark ? 'rgba(51,133,255,0.30)' : 'rgba(0,102,255,0.20)',
+            },
           ]}
           testID="notification-preview"
         >
-          <View style={styles.previewHeader}>
+          <Text
+            style={[
+              styles.previewEyebrow,
+              { color: semantic.labelAlt, fontFamily: weightToFontFamily('800') },
+            ]}
+          >
+            미리보기 · 잠금 화면
+          </Text>
+          <View
+            style={[
+              styles.previewInner,
+              {
+                backgroundColor: semantic.bgBase,
+                borderColor: semantic.lineSubtle,
+              },
+            ]}
+          >
             <View style={[styles.previewIcon, { backgroundColor: semantic.primaryNormal }]}>
-              <Bell size={14} color={semantic.labelOnColor} strokeWidth={2.4} />
+              <TrainFront size={16} color={semantic.labelOnColor} strokeWidth={2.4} />
             </View>
-            <Text
-              style={[styles.previewApp, { color: semantic.labelAlt, fontFamily: weightToFontFamily('600') }]}
-            >
-              LiveMetro · 지금
-            </Text>
+            <View style={styles.previewBodyCol}>
+              <View style={styles.previewBodyHeader}>
+                <Text
+                  style={[
+                    styles.previewApp,
+                    { color: semantic.labelStrong, fontFamily: weightToFontFamily('800') },
+                  ]}
+                >
+                  LiveMetro
+                </Text>
+                <Text
+                  style={[
+                    styles.previewWhen,
+                    { color: semantic.labelAlt, fontFamily: weightToFontFamily('600') },
+                  ]}
+                >
+                  지금
+                </Text>
+              </View>
+              <Text
+                style={[
+                  styles.previewTitle,
+                  { color: semantic.labelStrong, fontFamily: weightToFontFamily('700') },
+                ]}
+              >
+                홍대입구 → 강남, 오늘은{' '}
+                <Text style={{ color: semantic.primaryNormal }}>32분</Text> 예상
+              </Text>
+              <Text
+                style={[
+                  styles.previewBody,
+                  { color: semantic.labelAlt, fontFamily: weightToFontFamily('500') },
+                ]}
+              >
+                평소보다 4분 빠름 · 08:30 출발 권장
+              </Text>
+            </View>
           </View>
-          <Text
-            style={[styles.previewTitle, { color: semantic.labelStrong, fontFamily: weightToFontFamily('700') }]}
-          >
-            지연이 감지되었어요
-          </Text>
-          <Text
-            style={[styles.previewBody, { color: semantic.labelNormal, fontFamily: weightToFontFamily('500') }]}
-          >
-            2호선 강남행, 평소보다 4분 지연. 5분 일찍 출발을 추천합니다.
-          </Text>
-        </View>
+        </LinearGradient>
 
-        {/* Toggle cards */}
+        {/* Toggle cards — Wanted handoff: 40×40 colored icon + active bg/2px swap */}
         <View style={styles.toggles} testID="notification-toggles">
           {TOGGLES.map((t) => {
             const value = toggleValues[t.id];
             const setter = toggleSetters[t.id];
+            const ToggleIcon = t.icon;
             return (
               <View
                 key={t.id}
@@ -186,18 +270,21 @@ export const NotificationPermissionScreen: React.FC<Props> = ({ navigation, rout
                 style={[
                   styles.toggle,
                   {
-                    backgroundColor: semantic.bgBase,
+                    backgroundColor: value ? semantic.bgBase : semantic.bgSubtlePage,
                     borderColor: value ? semantic.primaryNormal : semantic.lineSubtle,
-                    borderWidth: value ? 1.5 : 1,
+                    borderWidth: value ? 2 : 1,
                   },
                 ]}
               >
+                <View style={[styles.toggleIcon, { backgroundColor: t.accentBg }]}>
+                  <ToggleIcon size={20} color={t.accentFg} strokeWidth={2.2} />
+                </View>
                 <View style={styles.toggleBody}>
                   <View style={styles.toggleHeader}>
                     <Text
                       style={[
                         styles.toggleLabel,
-                        { color: semantic.labelStrong, fontFamily: weightToFontFamily('700') },
+                        { color: semantic.labelStrong, fontFamily: weightToFontFamily('800') },
                       ]}
                     >
                       {t.label}
@@ -222,7 +309,7 @@ export const NotificationPermissionScreen: React.FC<Props> = ({ navigation, rout
                   <Text
                     style={[
                       styles.toggleHint,
-                      { color: semantic.labelAlt, fontFamily: weightToFontFamily('500') },
+                      { color: semantic.labelAlt, fontFamily: weightToFontFamily('600') },
                     ]}
                   >
                     {t.hint}
@@ -243,12 +330,15 @@ export const NotificationPermissionScreen: React.FC<Props> = ({ navigation, rout
           testID="notification-allow"
           style={[
             styles.primary,
-            { backgroundColor: requesting ? semantic.primaryHover : semantic.primaryNormal },
+            {
+              backgroundColor: requesting ? semantic.primaryHover : semantic.primaryNormal,
+              shadowColor: semantic.primaryNormal,
+            },
           ]}
           onPress={handleAllow}
           disabled={requesting}
           accessibilityRole="button"
-          accessibilityLabel="알림 받기"
+          accessibilityLabel="허용하고 다음"
         >
           <Text
             style={[
@@ -256,8 +346,11 @@ export const NotificationPermissionScreen: React.FC<Props> = ({ navigation, rout
               { color: semantic.labelOnColor, fontFamily: weightToFontFamily('800') },
             ]}
           >
-            {requesting ? '요청 중…' : '알림 받기'}
+            {requesting ? '요청 중…' : '허용하고 다음'}
           </Text>
+          {!requesting ? (
+            <ArrowRight size={18} color={semantic.labelOnColor} strokeWidth={2.4} />
+          ) : null}
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -289,67 +382,109 @@ const styles = StyleSheet.create({
     paddingBottom: WANTED_TOKENS.spacing.s8,
   },
   title: {
-    fontSize: WANTED_TOKENS.type.title3.size,
-    lineHeight: WANTED_TOKENS.type.title3.lh,
+    fontSize: 28,
+    lineHeight: 34,
+    letterSpacing: -0.7,
     fontWeight: '800',
     fontFamily: weightToFontFamily('800'),
   },
   subtitle: {
     marginTop: WANTED_TOKENS.spacing.s2,
-    fontSize: WANTED_TOKENS.type.body2.size,
-    lineHeight: WANTED_TOKENS.type.body2.lh,
+    fontSize: 14,
+    lineHeight: 21,
     fontWeight: '500',
     fontFamily: weightToFontFamily('500'),
   },
   preview: {
     marginTop: WANTED_TOKENS.spacing.s6,
     padding: WANTED_TOKENS.spacing.s4,
-    borderRadius: WANTED_TOKENS.radius.r6,
+    borderRadius: 18,
     borderWidth: 1,
   },
-  previewHeader: {
+  previewEyebrow: {
+    fontSize: 11,
+    letterSpacing: 0.44,
+    textTransform: 'uppercase',
+    fontWeight: '800',
+    marginBottom: 10,
+  },
+  previewInner: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: WANTED_TOKENS.spacing.s2,
+    alignItems: 'flex-start',
+    gap: 10,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderWidth: 1,
+    // Inner card shadow per design (`0 4px 12px rgba(0,0,0,0.06)`).
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.06,
+    shadowRadius: 12,
+    elevation: 2,
   },
   previewIcon: {
-    width: 22,
-    height: 22,
-    borderRadius: 6,
+    width: 32,
+    height: 32,
+    borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  previewBodyCol: {
+    flex: 1,
+    minWidth: 0,
+  },
+  previewBodyHeader: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 8,
+  },
   previewApp: {
-    fontSize: WANTED_TOKENS.type.caption2.size,
+    fontSize: 12,
+    fontWeight: '800',
+    fontFamily: weightToFontFamily('800'),
+  },
+  previewWhen: {
+    fontSize: 10,
     fontWeight: '600',
     fontFamily: weightToFontFamily('600'),
+    marginLeft: 'auto',
   },
   previewTitle: {
-    fontSize: WANTED_TOKENS.type.label1.size,
+    marginTop: 2,
+    fontSize: 13,
+    lineHeight: 18,
     fontWeight: '700',
     fontFamily: weightToFontFamily('700'),
   },
   previewBody: {
     marginTop: 2,
-    fontSize: WANTED_TOKENS.type.caption1.size,
-    lineHeight: WANTED_TOKENS.type.caption1.lh,
+    fontSize: 11.5,
+    lineHeight: 16,
     fontWeight: '500',
     fontFamily: weightToFontFamily('500'),
   },
   toggles: {
     marginTop: WANTED_TOKENS.spacing.s6,
-    gap: WANTED_TOKENS.spacing.s2,
+    gap: WANTED_TOKENS.spacing.s2 + 2,
   },
   toggle: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: WANTED_TOKENS.spacing.s4,
-    borderRadius: WANTED_TOKENS.radius.r6,
+    paddingVertical: 14,
+    paddingHorizontal: WANTED_TOKENS.spacing.s4,
+    borderRadius: 14,
+    gap: 12,
+  },
+  toggleIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   toggleBody: {
     flex: 1,
-    paddingRight: WANTED_TOKENS.spacing.s3,
   },
   toggleHeader: {
     flexDirection: 'row',
@@ -358,8 +493,8 @@ const styles = StyleSheet.create({
   },
   toggleLabel: {
     fontSize: WANTED_TOKENS.type.label1.size,
-    fontWeight: '700',
-    fontFamily: weightToFontFamily('700'),
+    fontWeight: '800',
+    fontFamily: weightToFontFamily('800'),
   },
   recommendedTag: {
     fontSize: WANTED_TOKENS.type.caption2.size,
@@ -371,20 +506,29 @@ const styles = StyleSheet.create({
   },
   toggleHint: {
     marginTop: 2,
-    fontSize: WANTED_TOKENS.type.caption1.size,
-    lineHeight: WANTED_TOKENS.type.caption1.lh,
-    fontWeight: '500',
-    fontFamily: weightToFontFamily('500'),
+    fontSize: 12,
+    lineHeight: 16,
+    fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
   },
   primary: {
+    flexDirection: 'row',
     height: 56,
-    borderRadius: WANTED_TOKENS.radius.r8,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
     marginTop: WANTED_TOKENS.spacing.s6,
+    // Primary CTA shadow per design (`0 8px 20px rgba(0,102,255,0.30)`).
+    // shadowColor is dynamically set to semantic.primaryNormal at the call site.
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 6,
   },
   primaryLabel: {
     fontSize: 16,
+    letterSpacing: -0.16,
     fontWeight: '800',
     fontFamily: weightToFontFamily('800'),
   },

@@ -167,3 +167,6 @@ PR_BODY_TMP.md
 # Harness fork backups (created during chore/fork-aos-harness; safe to remove after verification)
 /.claude.bak.*/
 /.github/workflows.bak.*/
+
+# Superpowers brainstorm visual companion sessions
+/.superpowers/

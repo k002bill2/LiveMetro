@@ -16,9 +16,22 @@ jest.mock('@/services/theme/themeContext', () => ({
 }));
 
 jest.mock('lucide-react-native', () => ({
-  Bell: 'Bell',
+  AlertTriangle: 'AlertTriangle',
+  ArrowLeftRight: 'ArrowLeftRight',
+  ArrowRight: 'ArrowRight',
   ChevronLeft: 'ChevronLeft',
+  Megaphone: 'Megaphone',
+  TrainFront: 'TrainFront',
 }));
+
+jest.mock('expo-linear-gradient', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  return {
+    LinearGradient: ({ children, style, testID }: { children?: React.ReactNode; style?: unknown; testID?: string }) =>
+      React.createElement(View, { style, testID }, children),
+  };
+});
 
 jest.mock('@/navigation/OnboardingNavigator', () => ({
   useOnboardingCallbacks: jest.fn(() => ({

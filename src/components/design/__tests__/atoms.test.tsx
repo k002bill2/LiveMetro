@@ -54,6 +54,25 @@ describe('design atoms — Phase 1 foundation', () => {
       expect(queryByTestId('line-badge-nonsense')).toBeNull();
     });
 
+    it('renders full Korean line names via curated alias', () => {
+      // Aliases registered in LINE_LABELS so MapScreen's transferLines
+      // (which carry full names like '신분당선' / '수인분당선') don't
+      // silently no-render — regression from cross-review on the map
+      // Wanted handoff.
+      const { getByText: getSb } = render(<LineBadge line="신분당선" size={20} />);
+      expect(getSb('신분당')).toBeTruthy();
+      const { getByText: getSuin } = render(<LineBadge line="수인분당선" size={24} />);
+      expect(getSuin('수인분당')).toBeTruthy();
+    });
+
+    it('renders curated alias for less-common Seoul Metro lines', () => {
+      // 경춘선 / 경강선 / 서해선 / 김포 / 우이신설 — all hand-registered
+      // because getSubwayLineColor's substring matching runs on a
+      // normalized (ASCII-only) string and can't recognize pure Korean.
+      const { getByText } = render(<LineBadge line="경춘선" size={20} />);
+      expect(getByText('경춘')).toBeTruthy();
+    });
+
     it('uses updated line-1 color (Wanted #0052A4, not legacy #0d3692)', () => {
       expect(SUBWAY_LINE_COLORS['1']).toBe('#0052A4');
       expect(SUBWAY_LINE_COLORS['4']).toBe('#00A5DE');
