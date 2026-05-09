@@ -54,17 +54,17 @@ interface RecommendedStation {
   id: string;
   name: string;
   nameEn: string;
-  lineId: string;
+  lineIds: string[];
   reason?: string; // "출발역", "도착역", or topical reason
 }
 
 const RECOMMENDATIONS: readonly RecommendedStation[] = [
-  { id: 'stn-hongik', name: '홍대입구', nameEn: 'Hongik Univ.', lineId: '2', reason: '인기 역' },
-  { id: 'stn-gangnam', name: '강남', nameEn: 'Gangnam', lineId: '2', reason: '인기 역' },
-  { id: 'stn-jamsil', name: '잠실', nameEn: 'Jamsil', lineId: '2', reason: '환승 거점' },
-  { id: 'stn-seoul', name: '서울역', nameEn: 'Seoul Station', lineId: '1', reason: '주요 환승' },
-  { id: 'stn-sinchon', name: '신촌', nameEn: 'Sinchon', lineId: '2', reason: '인기 역' },
-  { id: 'stn-hapjeong', name: '합정', nameEn: 'Hapjeong', lineId: '2', reason: '환승 거점' },
+  { id: 'stn-hongik', name: '홍대입구', nameEn: 'Hongik Univ.', lineIds: ['2', '6', '경의선'], reason: '인기 역' },
+  { id: 'stn-gangnam', name: '강남', nameEn: 'Gangnam', lineIds: ['2', '신분당선'], reason: '인기 역' },
+  { id: 'stn-jamsil', name: '잠실', nameEn: 'Jamsil', lineIds: ['2', '8'], reason: '환승 거점' },
+  { id: 'stn-seoul', name: '서울역', nameEn: 'Seoul Station', lineIds: ['1', '4', '경의선'], reason: '주요 환승' },
+  { id: 'stn-sinchon', name: '신촌', nameEn: 'Sinchon', lineIds: ['2'], reason: '인기 역' },
+  { id: 'stn-hapjeong', name: '합정', nameEn: 'Hapjeong', lineIds: ['2', '6'], reason: '환승 거점' },
 ];
 
 const toCommuteRoute = (
@@ -87,11 +87,12 @@ const toStationModel = (rec: RecommendedStation | { stationId: string; stationNa
   const id = 'id' in rec ? rec.id : rec.stationId;
   const name = 'name' in rec ? rec.name : rec.stationName;
   const nameEn = 'nameEn' in rec ? rec.nameEn : '';
+  const lineId = 'lineIds' in rec ? (rec.lineIds[0] ?? '') : rec.lineId;
   return {
     id,
     name,
     nameEn,
-    lineId: rec.lineId,
+    lineId,
     coordinates: { latitude: 0, longitude: 0 },
     transfers: [],
   };
@@ -108,8 +109,8 @@ export const FavoritesOnboardingScreen: React.FC<Props> = ({ navigation, route }
     const dep = route.params.route.departureStation;
     const arr = route.params.route.arrivalStation;
     const fromRoute: RecommendedStation[] = [
-      { id: dep.stationId, name: dep.stationName, nameEn: '', lineId: dep.lineId, reason: '출발역' },
-      { id: arr.stationId, name: arr.stationName, nameEn: '', lineId: arr.lineId, reason: '도착역' },
+      { id: dep.stationId, name: dep.stationName, nameEn: '', lineIds: [dep.lineId], reason: '출발역' },
+      { id: arr.stationId, name: arr.stationName, nameEn: '', lineIds: [arr.lineId], reason: '도착역' },
     ];
     // Drop any recommendation that duplicates a route station, then prepend
     // the route stations.
@@ -340,7 +341,9 @@ export const FavoritesOnboardingScreen: React.FC<Props> = ({ navigation, route }
                     ) : null}
                   </View>
                   <View style={styles.rowMetaRow}>
-                    <LineBadge line={s.lineId} size={16} />
+                    {s.lineIds.map((id) => (
+                      <LineBadge key={id} line={id} size={16} />
+                    ))}
                     {s.reason ? (
                       <Text
                         style={[
@@ -525,7 +528,7 @@ const styles = StyleSheet.create({
   checkbox: {
     width: 24,
     height: 24,
-    borderRadius: 12,
+    borderRadius: 9999,
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
