@@ -19,6 +19,9 @@ jest.mock('@/services/theme/themeContext', () => ({
 jest.mock('lucide-react-native', () => ({
   Search: 'Search',
   ChevronLeft: 'ChevronLeft',
+  Star: 'Star',
+  Check: 'Check',
+  ArrowRight: 'ArrowRight',
 }));
 
 jest.mock('@/services/auth/AuthContext', () => ({
