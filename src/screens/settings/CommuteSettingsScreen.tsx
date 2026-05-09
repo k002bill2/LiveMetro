@@ -45,6 +45,7 @@ import { SettingsStackParamList } from '@/navigation/types';
 import { useAuth } from '@/services/auth/AuthContext';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { loadCommuteRoutes } from '@/services/commute/commuteService';
+import { useMLPrediction } from '@/hooks/useMLPrediction';
 import { CommuteRoute, TransferStation } from '@/models/commute';
 import type { SmartFeatures } from '@/models/user';
 import {
@@ -113,9 +114,20 @@ const DEFAULT_SMART_FEATURES: SmartFeatures = {
   autoAlternativeRoutes: true,
   autoDepartureDetection: 'sometimes',
 };
-// Hero ETA placeholder — real wiring via useMLPrediction is a follow-up phase.
+// Hero ETA fallbacks. When useMLPrediction has no baseline data yet
+// (new user, no commute logs), the card surfaces these placeholder values
+// instead of hiding the section — matches the Wanted handoff "예측 준비 중"
+// intent without leaving an empty hero.
 const HERO_ETA_PLACEHOLDER_MIN = 32;
 const HERO_ETA_CONFIDENCE_MIN = 3;
+
+// Map ML confidence (0-1) to a ±N-minute interval. Higher confidence ↔
+// tighter interval. Tuned on the assumption that a confidence of 1.0
+// yields ±1 minute and 0.0 yields ±10 minutes.
+const confidenceToMinutes = (confidence: number): number => {
+  const clamped = Math.max(0, Math.min(1, confidence));
+  return Math.max(1, Math.round((1 - clamped) * 9 + 1));
+};
 
 export const CommuteSettingsScreen: React.FC<Props> = ({ navigation: _navigation }) => {
   const { user, updateUserProfile } = useAuth();
@@ -123,6 +135,19 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation: _navigation
   const { isDark } = useTheme();
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
   const styles = useMemo(() => createStyles(semantic), [semantic]);
+
+  // ML prediction wiring for the Hero ETA card. baselineMinutes is the
+  // average of the user's actual past commute durations; prediction.confidence
+  // (when available) tightens the ±N-minute interval. Both fall back to the
+  // hardcoded placeholders when there is no data yet.
+  const { baselineMinutes, prediction } = useMLPrediction();
+  const heroEtaMinutes = baselineMinutes !== null
+    ? Math.round(baselineMinutes)
+    : HERO_ETA_PLACEHOLDER_MIN;
+  const heroConfidenceMinutes = prediction
+    ? confidenceToMinutes(prediction.confidence)
+    : HERO_ETA_CONFIDENCE_MIN;
+  const heroIsPlaceholder = baselineMinutes === null;
 
   const [morningRoute, setMorningRoute] = useState<CommuteRouteData | null>(null);
   const [eveningRoute, setEveningRoute] = useState<CommuteRouteData | null>(null);
@@ -353,13 +378,15 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation: _navigation
         >
           <View style={styles.heroEyebrow}>
             <TrainFront size={14} color="#fff" strokeWidth={2.4} />
-            <Text style={styles.heroEyebrowText}>오늘 출근 예측</Text>
+            <Text style={styles.heroEyebrowText}>
+              {heroIsPlaceholder ? '예측 준비 중' : '오늘 출근 예측'}
+            </Text>
           </View>
           <View style={styles.heroEtaRow}>
-            <Text style={styles.heroEtaValue}>{HERO_ETA_PLACEHOLDER_MIN}</Text>
+            <Text style={styles.heroEtaValue}>{heroEtaMinutes}</Text>
             <Text style={styles.heroEtaUnit}>분</Text>
             <View style={styles.heroEtaPill}>
-              <Text style={styles.heroEtaPillText}>±{HERO_ETA_CONFIDENCE_MIN}분</Text>
+              <Text style={styles.heroEtaPillText}>±{heroConfidenceMinutes}분</Text>
             </View>
           </View>
           {morningRoute ? (
