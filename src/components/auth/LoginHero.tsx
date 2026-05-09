@@ -6,7 +6,7 @@
  */
 import React, { memo } from 'react';
 import { Text, View, StyleSheet, ViewStyle, TextStyle } from 'react-native';
-import Svg, { Path, Circle, G } from 'react-native-svg';
+import Svg, { Path, Circle, G, Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
 import { TrainFront } from 'lucide-react-native';
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme/themeContext';
@@ -34,8 +34,11 @@ const LoginHeroImpl: React.FC<LoginHeroProps> = ({ testID }) => {
     height: HERO_HEIGHT,
     width: '100%',
     overflow: 'hidden',
-    backgroundColor: isDark ? '#0B0E18' : '#EAF2FF',
   };
+
+  const gradientStops = isDark
+    ? { inner: '#1B2540', outer: '#0B0E18' }
+    : { inner: '#EAF2FF', outer: '#F7FAFF' };
 
   const wordmarkContainer: ViewStyle = {
     position: 'absolute',
@@ -78,24 +81,61 @@ const LoginHeroImpl: React.FC<LoginHeroProps> = ({ testID }) => {
     marginTop: 4,
   };
 
-  const pulsePinOuter: ViewStyle = {
+  const PULSE_LEFT = 168;
+  const PULSE_TOP = 130;
+  const PULSE_CORE = 18;
+  const RING1_INSET = 6;
+  const RING2_INSET = 14;
+
+  const pulseRing2: ViewStyle = {
     position: 'absolute',
-    left: 168,
-    top: 130,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+    left: PULSE_LEFT - RING2_INSET,
+    top: PULSE_TOP - RING2_INSET,
+    width: PULSE_CORE + RING2_INSET * 2,
+    height: PULSE_CORE + RING2_INSET * 2,
+    borderRadius: (PULSE_CORE + RING2_INSET * 2) / 2,
+    backgroundColor: 'rgba(0,102,255,0.08)',
+  };
+
+  const pulseRing1: ViewStyle = {
+    position: 'absolute',
+    left: PULSE_LEFT - RING1_INSET,
+    top: PULSE_TOP - RING1_INSET,
+    width: PULSE_CORE + RING1_INSET * 2,
+    height: PULSE_CORE + RING1_INSET * 2,
+    borderRadius: (PULSE_CORE + RING1_INSET * 2) / 2,
+    backgroundColor: 'rgba(0,102,255,0.18)',
+  };
+
+  const pulseCore: ViewStyle = {
+    position: 'absolute',
+    left: PULSE_LEFT,
+    top: PULSE_TOP,
+    width: PULSE_CORE,
+    height: PULSE_CORE,
+    borderRadius: PULSE_CORE / 2,
     backgroundColor: WANTED_TOKENS.blue[500],
-    shadowColor: WANTED_TOKENS.blue[500],
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.4,
-    shadowRadius: 14,
-    elevation: 6,
   };
 
   return (
     <View testID={testID} style={heroStyle}>
       <Svg viewBox="0 0 390 300" width="100%" height="100%" style={StyleSheet.absoluteFill}>
+        <Defs>
+          <RadialGradient
+            id="heroBg"
+            cx={117}
+            cy={60}
+            rx={468}
+            ry={240}
+            fx={117}
+            fy={60}
+            gradientUnits="userSpaceOnUse"
+          >
+            <Stop offset="0" stopColor={gradientStops.inner} stopOpacity="1" />
+            <Stop offset="0.7" stopColor={gradientStops.outer} stopOpacity="1" />
+          </RadialGradient>
+        </Defs>
+        <Rect x={0} y={0} width={390} height={300} fill="url(#heroBg)" />
         {LINE_DATA.map((l, i) => (
           <G key={`${l.color}-${i}`}>
             <Path
@@ -125,7 +165,9 @@ const LoginHeroImpl: React.FC<LoginHeroProps> = ({ testID }) => {
           </G>
         ))}
       </Svg>
-      <View style={pulsePinOuter} />
+      <View style={pulseRing2} />
+      <View style={pulseRing1} />
+      <View style={pulseCore} />
       <View style={wordmarkContainer}>
         <View style={brandBadge}>
           <TrainFront size={20} color="#FFFFFF" strokeWidth={2.2} />

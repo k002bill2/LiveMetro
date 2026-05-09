@@ -4,8 +4,8 @@
  * Mirrors the Wanted handoff: blue-500 bg, white fg, custom Face ID glyph,
  * pulse indicator on the right edge that toggles every 1.4s.
  */
-import React, { memo, useEffect, useRef, useState } from 'react';
-import { Text, TouchableOpacity, View, StyleSheet, ViewStyle, TextStyle } from 'react-native';
+import React, { memo, useEffect, useRef } from 'react';
+import { Animated, Easing, Text, TouchableOpacity, View, StyleSheet, ViewStyle, TextStyle } from 'react-native';
 import { Fingerprint } from 'lucide-react-native';
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme/themeContext';
@@ -43,20 +43,32 @@ const FaceIDButtonImpl: React.FC<FaceIDButtonProps> = ({
 }) => {
   const { isDark } = useTheme();
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
-  const [pulse, setPulse] = useState(false);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pulseAnim = useRef(new Animated.Value(0.4)).current;
+  const animationRef = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
-    intervalRef.current = setInterval(() => {
-      setPulse((prev) => !prev);
-    }, PULSE_PERIOD_MS);
+    animationRef.current = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: PULSE_PERIOD_MS / 2,
+          easing: Easing.ease,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 0.4,
+          duration: PULSE_PERIOD_MS / 2,
+          easing: Easing.ease,
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    animationRef.current.start();
     return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
+      animationRef.current?.stop();
+      animationRef.current = null;
     };
-  }, []);
+  }, [pulseAnim]);
 
   const buttonStyle: ViewStyle = {
     height: 56,
@@ -103,11 +115,11 @@ const FaceIDButtonImpl: React.FC<FaceIDButtonProps> = ({
       <Text style={labelStyle} numberOfLines={1}>
         {label}
       </Text>
-      <View
+      <Animated.View
         testID={testID ? `${testID}-pulse` : undefined}
         style={[
           styles.pulse,
-          { opacity: pulse ? 1 : 0.4 },
+          { opacity: pulseAnim },
         ]}
       />
     </TouchableOpacity>
