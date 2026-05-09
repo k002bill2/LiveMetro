@@ -31,7 +31,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Search } from 'lucide-react-native';
+import { ArrowRight, Check, Search, Star } from 'lucide-react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
@@ -39,6 +39,7 @@ import { useTheme } from '@/services/theme/themeContext';
 import { useAuth } from '@/services/auth/AuthContext';
 import { OnbHeader } from '@/components/onboarding/OnbHeader';
 import { LineBadge } from '@/components/design/LineBadge';
+import { Pill } from '@/components/design/Pill';
 import { useOnboardingCallbacks } from '@/navigation/OnboardingNavigator';
 import { OnboardingStackParamList } from '@/navigation/types';
 import { saveCommuteRoutes } from '@/services/commute/commuteService';
@@ -53,17 +54,17 @@ interface RecommendedStation {
   id: string;
   name: string;
   nameEn: string;
-  lineId: string;
+  lineIds: string[];
   reason?: string; // "출발역", "도착역", or topical reason
 }
 
 const RECOMMENDATIONS: readonly RecommendedStation[] = [
-  { id: 'stn-hongik', name: '홍대입구', nameEn: 'Hongik Univ.', lineId: '2', reason: '인기 역' },
-  { id: 'stn-gangnam', name: '강남', nameEn: 'Gangnam', lineId: '2', reason: '인기 역' },
-  { id: 'stn-jamsil', name: '잠실', nameEn: 'Jamsil', lineId: '2', reason: '환승 거점' },
-  { id: 'stn-seoul', name: '서울역', nameEn: 'Seoul Station', lineId: '1', reason: '주요 환승' },
-  { id: 'stn-sinchon', name: '신촌', nameEn: 'Sinchon', lineId: '2', reason: '인기 역' },
-  { id: 'stn-hapjeong', name: '합정', nameEn: 'Hapjeong', lineId: '2', reason: '환승 거점' },
+  { id: 'stn-hongik', name: '홍대입구', nameEn: 'Hongik Univ.', lineIds: ['2', '6', '경의선'], reason: '인기 역' },
+  { id: 'stn-gangnam', name: '강남', nameEn: 'Gangnam', lineIds: ['2', '신분당선'], reason: '인기 역' },
+  { id: 'stn-jamsil', name: '잠실', nameEn: 'Jamsil', lineIds: ['2', '8'], reason: '환승 거점' },
+  { id: 'stn-seoul', name: '서울역', nameEn: 'Seoul Station', lineIds: ['1', '4', '경의선'], reason: '주요 환승' },
+  { id: 'stn-sinchon', name: '신촌', nameEn: 'Sinchon', lineIds: ['2'], reason: '인기 역' },
+  { id: 'stn-hapjeong', name: '합정', nameEn: 'Hapjeong', lineIds: ['2', '6'], reason: '환승 거점' },
 ];
 
 const toCommuteRoute = (
@@ -86,11 +87,12 @@ const toStationModel = (rec: RecommendedStation | { stationId: string; stationNa
   const id = 'id' in rec ? rec.id : rec.stationId;
   const name = 'name' in rec ? rec.name : rec.stationName;
   const nameEn = 'nameEn' in rec ? rec.nameEn : '';
+  const lineId = 'lineIds' in rec ? (rec.lineIds[0] ?? '') : rec.lineId;
   return {
     id,
     name,
     nameEn,
-    lineId: rec.lineId,
+    lineId,
     coordinates: { latitude: 0, longitude: 0 },
     transfers: [],
   };
@@ -107,8 +109,8 @@ export const FavoritesOnboardingScreen: React.FC<Props> = ({ navigation, route }
     const dep = route.params.route.departureStation;
     const arr = route.params.route.arrivalStation;
     const fromRoute: RecommendedStation[] = [
-      { id: dep.stationId, name: dep.stationName, nameEn: '', lineId: dep.lineId, reason: '출발역' },
-      { id: arr.stationId, name: arr.stationName, nameEn: '', lineId: arr.lineId, reason: '도착역' },
+      { id: dep.stationId, name: dep.stationName, nameEn: '', lineIds: [dep.lineId], reason: '출발역' },
+      { id: arr.stationId, name: arr.stationName, nameEn: '', lineIds: [arr.lineId], reason: '도착역' },
     ];
     // Drop any recommendation that duplicates a route station, then prepend
     // the route stations.
@@ -150,6 +152,9 @@ export const FavoritesOnboardingScreen: React.FC<Props> = ({ navigation, route }
 
   const selectedCount = selectedIds.size;
   const canSubmit = selectedCount > 0 && !submitting;
+  const depId = route.params.route.departureStation.stationId;
+  const arrId = route.params.route.arrivalStation.stationId;
+  const isRecommended = (id: string): boolean => id === depId || id === arrId;
 
   const handleComplete = useCallback(async () => {
     if (!canSubmit) return;
@@ -221,37 +226,68 @@ export const FavoritesOnboardingScreen: React.FC<Props> = ({ navigation, route }
       />
       <ScrollView contentContainerStyle={styles.body} keyboardShouldPersistTaps="handled">
         <Text
+          style={[styles.stepEyebrow, { color: semantic.primaryNormal }]}
+          testID="favorites-eyebrow"
+          accessibilityRole="text"
+        >
+          STEP 4 / 4
+        </Text>
+        <Text
           style={[styles.title, { color: semantic.labelStrong, fontFamily: weightToFontFamily('800') }]}
           testID="favorites-title"
         >
-          자주 가는 역을 골라주세요
+          자주 가는 역을{'\n'}골라주세요
         </Text>
         <Text
           style={[styles.subtitle, { color: semantic.labelAlt, fontFamily: weightToFontFamily('500') }]}
         >
-          홈 화면에서 바로 도착 정보를 확인할 수 있어요. 나중에도 변경 가능합니다.
+          홈 화면 상단에 빠르게 확인할 수 있어요.{'\n'}최소 1개 이상 선택해주세요.
         </Text>
 
         <View
           style={[
             styles.searchRow,
-            { backgroundColor: semantic.bgSubtle, borderColor: semantic.lineSubtle },
+            { backgroundColor: semantic.bgSubtlePage, borderColor: semantic.lineSubtle },
           ]}
         >
-          <Search size={18} color={semantic.labelAlt} strokeWidth={2} />
+          <Search size={16} color={semantic.labelAlt} strokeWidth={2} />
           <TextInput
             testID="favorites-search"
             value={query}
             onChangeText={setQuery}
             placeholder="역 이름 검색"
             placeholderTextColor={semantic.labelAlt}
-            style={[styles.searchInput, { color: semantic.labelStrong }]}
+            style={[
+              styles.searchInput,
+              { color: semantic.labelStrong, fontFamily: weightToFontFamily('600') },
+            ]}
           />
+        </View>
+
+        <View style={styles.sectionRow}>
+          <Text
+            style={[
+              styles.sectionLabel,
+              { color: semantic.labelAlt, fontFamily: weightToFontFamily('800') },
+            ]}
+          >
+            추천
+          </Text>
+          <Text
+            style={[
+              styles.sectionCount,
+              { color: semantic.labelAlt, fontFamily: weightToFontFamily('700') },
+            ]}
+            testID="favorites-selected-count"
+          >
+            {selectedCount}개 선택됨
+          </Text>
         </View>
 
         <View style={styles.list} testID="favorites-list">
           {visible.map((s) => {
             const selected = selectedIds.has(s.id);
+            const recommended = isRecommended(s.id);
             return (
               <TouchableOpacity
                 key={s.id}
@@ -262,51 +298,75 @@ export const FavoritesOnboardingScreen: React.FC<Props> = ({ navigation, route }
                 style={[
                   styles.row,
                   {
-                    backgroundColor: semantic.bgBase,
+                    backgroundColor: selected
+                      ? `${semantic.primaryNormal}0F`
+                      : semantic.bgBase,
                     borderColor: selected ? semantic.primaryNormal : semantic.lineSubtle,
-                    borderWidth: selected ? 1.5 : 1,
+                    borderWidth: selected ? 2 : 1,
                   },
                 ]}
               >
-                <LineBadge line={s.lineId} size={28} />
-                <View style={styles.rowBody}>
-                  <Text
-                    style={[
-                      styles.rowName,
-                      { color: semantic.labelStrong, fontFamily: weightToFontFamily('700') },
-                    ]}
-                  >
-                    {s.name}
-                  </Text>
-                  {s.reason ? (
-                    <Text
-                      style={[
-                        styles.rowReason,
-                        { color: semantic.labelAlt, fontFamily: weightToFontFamily('500') },
-                      ]}
-                    >
-                      {s.reason}
-                    </Text>
-                  ) : null}
-                </View>
                 <View
                   style={[
-                    styles.checkbox,
+                    styles.starContainer,
                     {
-                      borderColor: selected ? semantic.primaryNormal : semantic.lineNormal,
-                      backgroundColor: selected ? semantic.primaryNormal : 'transparent',
+                      backgroundColor: selected
+                        ? semantic.primaryNormal
+                        : 'rgba(112,115,124,0.10)',
                     },
                   ]}
                 >
-                  {selected ? (
+                  <Star
+                    size={16}
+                    color={selected ? semantic.labelOnColor : semantic.labelAlt}
+                    strokeWidth={2.2}
+                    fill={selected ? semantic.labelOnColor : 'transparent'}
+                  />
+                </View>
+
+                <View style={styles.rowBody}>
+                  <View style={styles.rowNameRow}>
                     <Text
                       style={[
-                        styles.checkmark,
-                        { color: semantic.labelOnColor, fontFamily: weightToFontFamily('800') },
+                        styles.rowName,
+                        { color: semantic.labelStrong, fontFamily: weightToFontFamily('800') },
                       ]}
                     >
-                      ✓
+                      {s.name}
                     </Text>
+                    {recommended ? (
+                      <Pill tone="primary" size="sm">
+                        추천
+                      </Pill>
+                    ) : null}
+                  </View>
+                  <View style={styles.rowMetaRow}>
+                    {s.lineIds.map((id) => (
+                      <LineBadge key={id} line={id} size={16} />
+                    ))}
+                    {s.reason ? (
+                      <Text
+                        style={[
+                          styles.rowReason,
+                          { color: semantic.labelAlt, fontFamily: weightToFontFamily('600') },
+                        ]}
+                      >
+                        {s.reason}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+
+                <View
+                  style={[
+                    styles.checkbox,
+                    selected
+                      ? { backgroundColor: semantic.primaryNormal, borderWidth: 0 }
+                      : { backgroundColor: 'transparent', borderColor: 'rgba(112,115,124,0.28)', borderWidth: 2 },
+                  ]}
+                >
+                  {selected ? (
+                    <Check size={14} color={semantic.labelOnColor} strokeWidth={3} />
                   ) : null}
                 </View>
               </TouchableOpacity>
@@ -318,9 +378,16 @@ export const FavoritesOnboardingScreen: React.FC<Props> = ({ navigation, route }
           testID="favorites-cta"
           style={[
             styles.primary,
-            {
-              backgroundColor: canSubmit ? semantic.primaryNormal : semantic.lineSubtle,
-            },
+            canSubmit
+              ? {
+                  backgroundColor: semantic.primaryNormal,
+                  shadowColor: semantic.primaryNormal,
+                  shadowOffset: { width: 0, height: 8 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 20,
+                  elevation: 6,
+                }
+              : { backgroundColor: 'rgba(112,115,124,0.30)' },
           ]}
           onPress={handleComplete}
           disabled={!canSubmit}
@@ -331,13 +398,20 @@ export const FavoritesOnboardingScreen: React.FC<Props> = ({ navigation, route }
             style={[
               styles.primaryLabel,
               {
-                color: canSubmit ? semantic.labelOnColor : semantic.labelAlt,
+                color: semantic.labelOnColor,
                 fontFamily: weightToFontFamily('800'),
               },
             ]}
           >
-            {submitting ? '저장 중…' : `완료 (${selectedCount})`}
+            {submitting
+              ? '저장 중…'
+              : canSubmit
+              ? `${selectedCount}개 추가하고 시작하기`
+              : '역을 선택해주세요'}
           </Text>
+          {canSubmit && !submitting ? (
+            <ArrowRight size={18} color={semantic.labelOnColor} strokeWidth={2.4} />
+          ) : null}
         </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
@@ -351,16 +425,24 @@ const styles = StyleSheet.create({
     paddingTop: WANTED_TOKENS.spacing.s4,
     paddingBottom: WANTED_TOKENS.spacing.s8,
   },
+  stepEyebrow: {
+    fontSize: 11,
+    fontWeight: '800',
+    fontFamily: weightToFontFamily('800'),
+    letterSpacing: 0.55,
+  },
   title: {
-    fontSize: WANTED_TOKENS.type.title3.size,
-    lineHeight: WANTED_TOKENS.type.title3.lh,
+    marginTop: 6,
+    fontSize: 28,
+    lineHeight: 34,
+    letterSpacing: -0.7,
     fontWeight: '800',
     fontFamily: weightToFontFamily('800'),
   },
   subtitle: {
     marginTop: WANTED_TOKENS.spacing.s2,
-    fontSize: WANTED_TOKENS.type.body2.size,
-    lineHeight: WANTED_TOKENS.type.body2.lh,
+    fontSize: 14,
+    lineHeight: 21,
     fontWeight: '500',
     fontFamily: weightToFontFamily('500'),
   },
@@ -368,65 +450,103 @@ const styles = StyleSheet.create({
     marginTop: WANTED_TOKENS.spacing.s5,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: WANTED_TOKENS.spacing.s4,
-    height: 48,
+    paddingHorizontal: 14,
+    height: 44,
     borderRadius: WANTED_TOKENS.radius.r6,
     borderWidth: 1,
-    gap: 8,
+    gap: 10,
   },
   searchInput: {
     flex: 1,
-    fontSize: WANTED_TOKENS.type.body2.size,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  sectionRow: {
+    marginTop: WANTED_TOKENS.spacing.s4,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'baseline',
+    paddingBottom: WANTED_TOKENS.spacing.s2,
+  },
+  sectionLabel: {
+    fontSize: 12,
+    fontWeight: '800',
+    fontFamily: weightToFontFamily('800'),
+    letterSpacing: 0.5,
+    textTransform: 'uppercase',
+  },
+  sectionCount: {
+    fontSize: 11,
+    fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
   },
   list: {
-    marginTop: WANTED_TOKENS.spacing.s4,
     gap: WANTED_TOKENS.spacing.s2,
   },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: WANTED_TOKENS.spacing.s4,
-    borderRadius: WANTED_TOKENS.radius.r6,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 14,
     gap: WANTED_TOKENS.spacing.s3,
+  },
+  starContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 9999,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
   },
   rowBody: {
     flex: 1,
+    minWidth: 0,
+  },
+  rowNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   rowName: {
-    fontSize: WANTED_TOKENS.type.label1.size,
-    fontWeight: '700',
-    fontFamily: weightToFontFamily('700'),
-  },
-  rowReason: {
-    marginTop: 2,
-    fontSize: WANTED_TOKENS.type.caption1.size,
-    fontWeight: '500',
-    fontFamily: weightToFontFamily('500'),
-  },
-  checkbox: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkmark: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '800',
     fontFamily: weightToFontFamily('800'),
   },
-  primary: {
-    height: 56,
-    borderRadius: WANTED_TOKENS.radius.r8,
+  rowMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+  },
+  rowReason: {
+    fontSize: 11,
+    fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
+    marginLeft: 4,
+  },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderRadius: 9999,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
+  },
+  primary: {
+    height: 56,
+    borderRadius: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
     marginTop: WANTED_TOKENS.spacing.s6,
   },
   primaryLabel: {
     fontSize: 16,
     fontWeight: '800',
     fontFamily: weightToFontFamily('800'),
+    letterSpacing: -0.16,
   },
 });
 
