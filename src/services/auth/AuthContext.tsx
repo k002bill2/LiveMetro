@@ -92,6 +92,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         enabled: false,
         startTime: '22:00',
         endTime: '07:00',
+        weekendsAlwaysSilent: false,
       },
       weekdaysOnly: false,
       alertTypes: {
@@ -110,6 +111,17 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         vibrationEnabled: true,
         vibrationPattern: 'default',
       },
+      lineFilter: [],
+      alertSources: {
+        official: true,
+        community: true,
+        urgent: true,
+      },
+      perEventSound: {
+        trainArrival: true,
+        delayDetected: true,
+        communityReport: false,
+      },
     },
     commuteSchedule: {
       weekdays: {
@@ -118,6 +130,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       },
       weekends: null,
       autoDetect: false,
+      alertEnabled: true,
+      activeDays: [true, true, true, true, true, false, false],
+      smartFeatures: {
+        mlPredictionEnabled: true,
+        autoAlternativeRoutes: true,
+        autoDepartureDetection: 'sometimes',
+      },
     },
     language: 'ko',
     theme: 'system',
