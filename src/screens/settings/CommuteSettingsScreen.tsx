@@ -54,6 +54,7 @@ import {
 } from '@/components/commute/RouteWithTransfer';
 import SettingSection from '@/components/settings/SettingSection';
 import SettingToggle from '@/components/settings/SettingToggle';
+import { SettingPicker, type PickerOption } from '@/components/settings/SettingPicker';
 
 type Props = NativeStackScreenProps<SettingsStackParamList, 'CommuteSettings'>;
 
@@ -114,6 +115,15 @@ const DEFAULT_SMART_FEATURES: SmartFeatures = {
   autoAlternativeRoutes: true,
   autoDepartureDetection: 'sometimes',
 };
+// Auto departure detection options — 3-state enum picker. Replaces the
+// previous boolean toggle that conflated 'sometimes' with 'always'. Each
+// label maps to a SmartFeatures.autoDepartureDetection enum value.
+const AUTO_DEPARTURE_OPTIONS: PickerOption[] = [
+  { label: '항상',     value: 'always',    description: '집/회사 근처 진입 시 매번 알림' },
+  { label: '일부 시간', value: 'sometimes', description: '출퇴근 시간대(07~10시, 17~21시)에만' },
+  { label: '꺼짐',     value: 'never',     description: '자동 감지 사용 안 함' },
+];
+
 // Hero ETA fallbacks. When useMLPrediction has no baseline data yet
 // (new user, no commute logs), the card surfaces these placeholder values
 // instead of hiding the section — matches the Wanted handoff "예측 준비 중"
@@ -489,26 +499,19 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation: _navigation
             onValueChange={(v) => handleToggleSmartFeature('autoAlternativeRoutes', v)}
             disabled={saving}
           />
-          <SettingToggle
+          <SettingPicker
             icon={MapPin}
             label="자동 출발 감지"
-            subtitle={
-              smartFeatures.autoDepartureDetection === 'always'
-                ? '항상'
-                : smartFeatures.autoDepartureDetection === 'sometimes'
-                ? '일부 시간'
-                : '꺼짐'
-            }
-            value={smartFeatures.autoDepartureDetection !== 'never'}
+            options={AUTO_DEPARTURE_OPTIONS}
+            value={smartFeatures.autoDepartureDetection}
             onValueChange={(v) =>
               updateCommuteSchedule({
                 smartFeatures: {
                   ...smartFeatures,
-                  autoDepartureDetection: v ? 'sometimes' : 'never',
+                  autoDepartureDetection: v as 'always' | 'sometimes' | 'never',
                 },
               })
             }
-            disabled={saving}
           />
           <Text style={styles.smartFooter}>
             머신러닝이 평소 이용 패턴을 학습해 더 정확한 예측을 제공해요. 데이터는 기기에만 저장됩니다.
