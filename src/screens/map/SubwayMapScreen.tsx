@@ -24,11 +24,12 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { getSubwayLineColor, getLineTextColor } from '@utils/colorUtils';
-import { LINE_NAMES, formatTransferBadgeLabel } from '@utils/transferLabel';
+import { LINE_NAMES } from '@utils/transferLabel';
 import { getLocalStationsByLine } from '@services/data/stationsDataService';
 import { useFavorites } from '@hooks/useFavorites';
 import { useTheme } from '@services/theme';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
+import { LineBadge, type LineId } from '@/components/design';
 import type { Station } from '@models/train';
 import type { AppStackParamList } from '@/navigation/types';
 
@@ -218,85 +219,78 @@ export const SubwayMapScreen: React.FC = () => {
             </Text>
           </View>
 
-          {/* Visual Line with Stations */}
+          {/* Vertical timeline — design handoff (rest.jsx 405-471): a
+              grid-equivalent layout where the left rail column hosts
+              absolutely-positioned tracks (top half + bottom half) so the
+              line color flows continuously between station nodes.
+              Transfer nodes are 30px outlined circles with an icon;
+              normal nodes are 18px solid dots. */}
           <View style={styles.lineVisualization}>
             {selectedLineData.stations.map((station, index) => {
               const lineColor = getSubwayLineColor(selectedLineData.id);
+              const isFirst = index === 0;
               const isLast = index === selectedLineData.stations.length - 1;
 
               return (
-                <View key={station.id} style={styles.stationItem}>
-                  {/* Station Circle and Line */}
-                  <View style={styles.stationMarkerContainer}>
-                    <TouchableOpacity
-                      style={[
-                        styles.stationCircle,
-                        {
-                          backgroundColor: station.isTransfer ? semantic.bgBase : lineColor,
-                          borderColor: lineColor,
-                          borderWidth: station.isTransfer ? 4 : 0,
-                        },
-                      ]}
-                      onPress={() => handleStationPress(station)}
-                      accessible
-                      accessibilityRole="button"
-                      accessibilityLabel={`${station.name}역${station.isTransfer ? ', 환승역' : ''}`}
+                <TouchableOpacity
+                  key={station.id}
+                  style={styles.stationItem}
+                  onPress={() => handleStationPress(station)}
+                  accessible
+                  accessibilityRole="button"
+                  accessibilityLabel={`${station.name}${station.isTransfer ? ', 환승역' : ''}`}
+                  activeOpacity={0.7}
+                >
+                  {/* Rail column — 64 wide, hosts both tracks + node */}
+                  <View style={styles.railColumn}>
+                    {!isFirst && (
+                      <View
+                        style={[styles.railTrackTop, { backgroundColor: lineColor }]}
+                      />
+                    )}
+                    {!isLast && (
+                      <View
+                        style={[styles.railTrackBottom, { backgroundColor: lineColor }]}
+                      />
+                    )}
+                    <View
+                      style={
+                        station.isTransfer
+                          ? [
+                              styles.nodeTransfer,
+                              { backgroundColor: semantic.bgBase, borderColor: lineColor },
+                            ]
+                          : [styles.nodeNormal, { backgroundColor: lineColor }]
+                      }
                     >
                       {station.isTransfer && (
                         <ArrowRightLeft size={14} color={lineColor} strokeWidth={2.6} />
                       )}
-                    </TouchableOpacity>
+                    </View>
+                  </View>
 
-                    {!isLast && (
-                      <View
-                        style={[
-                          styles.stationConnector,
-                          { backgroundColor: lineColor },
-                        ]}
-                      />
+                  {/* Station info — flex 1 */}
+                  <View style={styles.stationInfo}>
+                    <Text style={styles.stationName}>{station.name}</Text>
+                    <Text style={styles.stationNameEn}>{station.nameEn}</Text>
+                    {station.isTransfer && station.transferLines.length > 0 && (
+                      <View style={styles.transferBadges}>
+                        {station.transferLines.map((transferLine) => (
+                          <LineBadge
+                            key={transferLine}
+                            line={transferLine as LineId}
+                            size={20}
+                          />
+                        ))}
+                      </View>
                     )}
                   </View>
 
-                  {/* Station Info */}
-                  <TouchableOpacity
-                    style={styles.stationInfo}
-                    onPress={() => handleStationPress(station)}
-                  >
-                    <Text style={styles.stationName}>{station.name}</Text>
-                    <Text style={styles.stationNameEn}>{station.nameEn}</Text>
-
-                    {station.isTransfer && station.transferLines && (
-                      <View style={styles.transferBadges}>
-                        {station.transferLines.map((transferLine) => {
-                          const transferColor = getSubwayLineColor(transferLine);
-                          const transferTextColor = getLineTextColor(transferLine);
-
-                          return (
-                            <View
-                              key={transferLine}
-                              style={[
-                                styles.transferBadge,
-                                { backgroundColor: transferColor },
-                              ]}
-                            >
-                              <Text
-                                style={[
-                                  styles.transferBadgeText,
-                                  { color: transferTextColor },
-                                ]}
-                              >
-                                {formatTransferBadgeLabel(transferLine)}
-                              </Text>
-                            </View>
-                          );
-                        })}
-                      </View>
-                    )}
-                  </TouchableOpacity>
-
-                  {/* Chevron */}
-                  <ChevronRight size={18} color={semantic.labelAlt} strokeWidth={2} />
-                </View>
+                  {/* Chevron — 24 wide */}
+                  <View style={styles.chevronColumn}>
+                    <ChevronRight size={18} color={semantic.labelAlt} strokeWidth={2} />
+                  </View>
+                </TouchableOpacity>
               );
             })}
           </View>
@@ -434,93 +428,129 @@ const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
     gap: 8,
   },
   lineButton: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
-    marginRight: 8,
-    minWidth: 80,
+    height: 48,
+    minWidth: 84,
+    paddingHorizontal: 18,
+    borderRadius: 9999,
+    marginRight: 10,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   lineButtonText: {
-    fontSize: 15,
-    fontWeight: 'bold',
-    fontFamily: weightToFontFamily('bold'),
+    fontSize: 16,
+    fontWeight: '800',
+    fontFamily: weightToFontFamily('800'),
+    letterSpacing: -0.16,
   },
   stationList: {
     flex: 1,
   },
   stationListHeader: {
-    padding: 20,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 12,
     backgroundColor: semantic.bgBase,
-    marginBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: semantic.lineSubtle,
   },
   stationListTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    fontFamily: weightToFontFamily('bold'),
+    fontSize: 22,
+    fontWeight: '800',
+    fontFamily: weightToFontFamily('800'),
     color: semantic.labelStrong,
-    marginBottom: 4,
+    letterSpacing: -0.44,
   },
   stationListSubtitle: {
-    fontSize: 14,
+    fontSize: 13,
+    fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
     color: semantic.labelAlt,
+    marginTop: 2,
   },
   lineVisualization: {
     backgroundColor: semantic.bgBase,
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingTop: 8,
+    paddingBottom: 24,
   },
+  // Grid 3-col equivalent: 64 rail | flex 1 info | 24 chevron column.
+  // alignItems 'stretch' lets the rail tracks span the full row height
+  // for continuous line coloring.
   stationItem: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
+    alignItems: 'stretch',
+    minHeight: 76,
   },
-  stationMarkerContainer: {
-    alignItems: 'center',
-    marginRight: 16,
-  },
-  stationCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  railColumn: {
+    width: 64,
+    position: 'relative',
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
   },
-  stationConnector: {
+  // Top half of the rail line — drawn only when a station above exists.
+  railTrackTop: {
+    position: 'absolute',
+    top: 0,
+    bottom: '50%',
+    left: '50%',
     width: 4,
-    height: 40,
-    marginTop: 2,
+    marginLeft: -2,
+  },
+  // Bottom half — drawn only when a station below exists.
+  railTrackBottom: {
+    position: 'absolute',
+    top: '50%',
+    bottom: 0,
+    left: '50%',
+    width: 4,
+    marginLeft: -2,
+  },
+  nodeTransfer: {
+    width: 30,
+    height: 30,
+    borderRadius: 9999,
+    borderWidth: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 1,
+  },
+  nodeNormal: {
+    width: 18,
+    height: 18,
+    borderRadius: 9999,
+    zIndex: 1,
   },
   stationInfo: {
     flex: 1,
+    justifyContent: 'center',
+    paddingVertical: 16,
+    paddingLeft: 8,
+    paddingRight: 4,
   },
   stationName: {
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: weightToFontFamily('600'),
+    fontSize: 17,
+    fontWeight: '800',
+    fontFamily: weightToFontFamily('800'),
     color: semantic.labelStrong,
-    marginBottom: 2,
+    letterSpacing: -0.17,
   },
   stationNameEn: {
     fontSize: 13,
+    fontWeight: '500',
+    fontFamily: weightToFontFamily('500'),
     color: semantic.labelAlt,
-    marginBottom: 4,
+    marginTop: 2,
   },
   transferBadges: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 4,
+    gap: 4,
+    marginTop: 8,
   },
-  transferBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 10,
+  chevronColumn: {
+    width: 40,
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    paddingRight: 16,
   },
   transferBadgeText: {
     fontSize: 11,
