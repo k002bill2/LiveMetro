@@ -212,6 +212,31 @@ export const NotificationTimeScreen: React.FC = () => {
     }
   };
 
+  const handleToggleWeekendsAlwaysSilent = async (value: boolean): Promise<void> => {
+    if (!user) return;
+
+    try {
+      setSaving(true);
+      await updateUserProfile({
+        preferences: {
+          ...user.preferences,
+          notificationSettings: {
+            ...user.preferences.notificationSettings,
+            quietHours: {
+              ...user.preferences.notificationSettings.quietHours,
+              weekendsAlwaysSilent: value,
+            },
+          },
+        },
+      });
+    } catch (error) {
+      console.error('Error updating weekends always silent:', error);
+      Alert.alert('오류', '설정 저장에 실패했습니다.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const handleToggleWeekdaysOnly = async (value: boolean): Promise<void> => {
     if (!user) return;
 
@@ -373,6 +398,14 @@ export const NotificationTimeScreen: React.FC = () => {
                 label="종료 시간"
                 value={quietHoursEnd}
                 onValueChange={handleQuietHoursEndChange}
+              />
+              <SettingToggle
+                icon={Calendar}
+                label="주말은 종일 무음"
+                subtitle="토 · 일"
+                value={notificationSettings?.quietHours?.weekendsAlwaysSilent ?? false}
+                onValueChange={handleToggleWeekendsAlwaysSilent}
+                disabled={saving}
               />
             </>
           )}
