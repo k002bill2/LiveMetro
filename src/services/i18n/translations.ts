@@ -104,6 +104,8 @@ export interface Translations {
     emptyDescription: string;
     /** "새 알림 N개" / "N new" — pluralization differs per locale */
     unreadCountText: (count: number) => string;
+    /** Header-right text-link to mark all notifications as read */
+    markAllRead: string;
     delay: string;
     suspension: string;
     serviceUpdate: string;
@@ -213,6 +215,7 @@ export const translations: Record<Language, Translations> = {
       noAlerts: '알림 없음',
       emptyDescription: '새로운 알림이 도착하면 여기에 표시됩니다',
       unreadCountText: (count: number) => `새 알림 ${count}개`,
+      markAllRead: '모두 읽음',
       delay: '지연',
       suspension: '운행 중단',
       serviceUpdate: '서비스 업데이트',
@@ -318,6 +321,7 @@ export const translations: Record<Language, Translations> = {
       noAlerts: 'No alerts',
       emptyDescription: 'New notifications will appear here',
       unreadCountText: (count: number) => `${count} new`,
+      markAllRead: 'Mark all read',
       delay: 'Delay',
       suspension: 'Suspension',
       serviceUpdate: 'Service Update',

@@ -21,7 +21,6 @@ import {
   AlertTriangle,
   BarChart3,
   Bell,
-  CheckCheck,
   Clock,
   Plus,
   Star,
@@ -36,6 +35,15 @@ import { StoredNotification } from '../../services/notification/notificationStor
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '../../styles/modernTheme';
 import { useTheme } from '../../services/theme';
 import { addTestNotifications, addRandomNotification } from '../../utils/notificationTestHelper';
+import { LineBadge, type LineId } from '@/components/design';
+
+/** Pull `lineId` out of the notification's untyped `data` bag for the
+ *  inline LineBadge render. Returns undefined when the field is missing
+ *  or not a string — graceful skip per the design's optional badge. */
+const extractLineId = (data: StoredNotification['data']): LineId | undefined => {
+  const v = data?.lineId;
+  return typeof v === 'string' && v.length > 0 ? (v as LineId) : undefined;
+};
 
 /**
  * Phase 41 (AL2): top-axis filter for the alerts list, mirroring the
@@ -319,6 +327,7 @@ export const AlertsScreen: React.FC = () => {
     ({ item: notification }) => {
       const IconComponent = getNotificationIcon(notification.type);
       const iconColor = getNotificationColor(notification.type);
+      const lineId = extractLineId(notification.data);
 
       return (
         <TouchableOpacity
@@ -339,10 +348,14 @@ export const AlertsScreen: React.FC = () => {
             </View>
 
             <View style={styles.textContainer}>
+              {/* Header row: optional LineBadge → title → unread dot →
+                  timestamp. Mirrors design handoff (rest.jsx 528-533). */}
               <View style={styles.headerRow}>
+                {lineId && <LineBadge line={lineId} size={18} />}
                 <Text style={styles.notificationTitle} numberOfLines={1}>
                   {notification.title}
                 </Text>
+                {!notification.isRead && <View style={styles.unreadDot} />}
                 <Text style={styles.timestamp}>
                   {formatTimestamp(notification.createdAt)}
                 </Text>
@@ -421,10 +434,12 @@ export const AlertsScreen: React.FC = () => {
           )}
           {unreadCount > 0 && (
             <TouchableOpacity
-              style={styles.headerButton}
+              accessibilityRole="button"
+              accessibilityLabel={t.alerts.markAllRead}
               onPress={handleMarkAllAsRead}
+              hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
             >
-              <CheckCheck size={20} color={semantic.labelStrong} />
+              <Text style={styles.markAllText}>{t.alerts.markAllRead}</Text>
             </TouchableOpacity>
           )}
           {notifications.length > 0 && (
@@ -584,7 +599,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     },
     notificationCard: {
       backgroundColor: semantic.bgBase,
-      borderRadius: WANTED_TOKENS.radius.r6,
+      borderRadius: WANTED_TOKENS.radius.r8,
       borderWidth: 1,
       borderColor: semantic.lineSubtle,
       overflow: 'hidden',
@@ -615,20 +630,33 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     headerRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
+      gap: 6,
       marginBottom: 4,
     },
     notificationTitle: {
       fontSize: WANTED_TOKENS.type.body1.size,
-      fontWeight: '600',
-      fontFamily: weightToFontFamily('600'),
+      fontWeight: '800',
+      fontFamily: weightToFontFamily('800'),
       color: semantic.labelStrong,
       flex: 1,
-      marginRight: WANTED_TOKENS.spacing.s2,
+    },
+    unreadDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 999,
+      backgroundColor: semantic.primaryNormal,
     },
     timestamp: {
       fontSize: WANTED_TOKENS.type.caption1.size,
+      fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
       color: semantic.labelAlt,
+    },
+    markAllText: {
+      fontSize: 13,
+      fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
+      color: semantic.primaryNormal,
     },
     notificationBody: {
       fontSize: WANTED_TOKENS.type.body2.size,
