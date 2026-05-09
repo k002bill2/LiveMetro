@@ -26,7 +26,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { Bell, MapPin, Sparkles, LucideIcon } from 'lucide-react-native';
+import { BellRing, MapPin, ShieldCheck, Sparkles, LucideIcon } from 'lucide-react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
@@ -39,6 +39,8 @@ type Props = NativeStackScreenProps<OnboardingStackParamList, 'WelcomeOnboarding
 interface ValueProp {
   id: string;
   icon: LucideIcon;
+  iconBg: string;
+  iconFg: string;
   title: string;
   body: string;
 }
@@ -47,18 +49,24 @@ const VALUE_PROPS: readonly ValueProp[] = [
   {
     id: 'nearby',
     icon: MapPin,
+    iconBg: 'rgba(0,102,255,0.12)',
+    iconFg: '#0066FF',
     title: '주변 역 자동 인식',
     body: 'GPS로 가까운 역의 실시간 도착 정보를 한눈에 확인합니다',
   },
   {
     id: 'ml',
     icon: Sparkles,
+    iconBg: 'rgba(124,58,237,0.12)',
+    iconFg: '#7C3AED',
     title: 'ML 출퇴근 예측',
     body: '오늘 몇 분 걸릴지 신뢰구간과 함께 알려드립니다',
   },
   {
     id: 'alerts',
-    icon: Bell,
+    icon: BellRing,
+    iconBg: 'rgba(255,180,0,0.16)',
+    iconFg: '#A06A00',
     title: '지연·운행 정보 알림',
     body: '내가 자주 타는 노선의 변동 사항을 즉시 받아봅니다',
   },
@@ -139,6 +147,13 @@ export const WelcomeOnboardingScreen: React.FC<Props> = ({ navigation }) => {
         </View>
 
         <Text
+          style={[styles.stepEyebrow, { color: semantic.primaryNormal }]}
+          testID="welcome-eyebrow"
+          accessibilityRole="text"
+        >
+          STEP 1 / 4
+        </Text>
+        <Text
           style={[styles.title, { color: semantic.labelStrong, fontFamily: weightToFontFamily('800') }]}
           testID="welcome-title"
         >
@@ -163,9 +178,9 @@ export const WelcomeOnboardingScreen: React.FC<Props> = ({ navigation }) => {
                 testID={`welcome-card-${p.id}`}
               >
                 <View
-                  style={[styles.cardIcon, { backgroundColor: semantic.bgBase, borderColor: semantic.lineSubtle }]}
+                  style={[styles.cardIcon, { backgroundColor: p.iconBg }]}
                 >
-                  <Icon size={20} color={semantic.primaryNormal} strokeWidth={2.2} />
+                  <Icon size={20} color={p.iconFg} strokeWidth={2.2} />
                 </View>
                 <View style={styles.cardBody}>
                   <Text
@@ -190,11 +205,17 @@ export const WelcomeOnboardingScreen: React.FC<Props> = ({ navigation }) => {
           })}
         </View>
 
-        <Text
-          style={[styles.privacy, { color: semantic.labelAlt, fontFamily: weightToFontFamily('500') }]}
+        <View
+          style={[styles.privacyBox, { backgroundColor: semantic.bgSubtle, borderColor: semantic.lineSubtle }]}
+          testID="welcome-privacy"
         >
-          위치, 알림 등 권한은 다음 단계에서 안내합니다.
-        </Text>
+          <ShieldCheck size={14} color={semantic.labelAlt} strokeWidth={2.2} />
+          <Text
+            style={[styles.privacyText, { color: semantic.labelAlt, fontFamily: weightToFontFamily('500') }]}
+          >
+            위치, 알림 등 권한은 다음 단계에서 안내합니다.
+          </Text>
+        </View>
 
         <TouchableOpacity
           testID="welcome-cta"
@@ -242,8 +263,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  title: {
+  stepEyebrow: {
     marginTop: WANTED_TOKENS.spacing.s4,
+    textAlign: 'center',
+    fontSize: 11,
+    fontWeight: '800',
+    fontFamily: weightToFontFamily('800'),
+    letterSpacing: 0.55,
+  },
+  title: {
+    marginTop: 6,
     textAlign: 'center',
     fontSize: WANTED_TOKENS.type.title3.size,
     lineHeight: WANTED_TOKENS.type.title3.lh,
@@ -272,10 +301,9 @@ const styles = StyleSheet.create({
   cardIcon: {
     width: 40,
     height: 40,
-    borderRadius: 20,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
     marginRight: WANTED_TOKENS.spacing.s3,
   },
   cardBody: {
@@ -293,10 +321,20 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     fontFamily: weightToFontFamily('500'),
   },
-  privacy: {
+  privacyBox: {
     marginTop: WANTED_TOKENS.spacing.s6,
-    textAlign: 'center',
-    fontSize: WANTED_TOKENS.type.caption1.size,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  privacyText: {
+    flex: 1,
+    fontSize: 11.5,
+    lineHeight: 11.5 * 1.5,
     fontWeight: '500',
     fontFamily: weightToFontFamily('500'),
   },
@@ -306,6 +344,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: WANTED_TOKENS.spacing.s5,
+    shadowColor: '#0066FF',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 8,
   },
   primaryLabel: {
     fontSize: 16,
