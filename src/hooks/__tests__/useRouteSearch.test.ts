@@ -106,4 +106,14 @@ describe('useRouteSearch', () => {
     await waitFor(() => expect(result.current.error).not.toBeNull());
     expect(result.current.error).toContain('경로');
   });
+
+  it('sets same-id error and skips service call when fromId === toId', async () => {
+    const { result } = renderHook(() =>
+      useRouteSearch({ fromId: 'a', toId: 'a', departureTime: null, departureMode: 'now' })
+    );
+    await waitFor(() => expect(result.current.error).not.toBeNull());
+    expect(result.current.error).toContain('같습니다');
+    expect(result.current.routes).toEqual([]);
+    expect(mockGetDiverseRoutes).not.toHaveBeenCalled();
+  });
 });

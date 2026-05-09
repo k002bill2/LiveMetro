@@ -20,6 +20,7 @@ import {
 } from '@models/route';
 import { PriorityQueue } from '@/utils/priorityQueue';
 import { fareService, type FareResult } from './fareService';
+import { getDiverseRoutes } from './kShortestPath';
 
 // ============================================================================
 // Types
@@ -716,6 +717,7 @@ export const routeService = {
   routeUsesLine,
   getStationInfo,
   getLineColor,
+  getDiverseRoutes,
 };
 
 export default routeService;

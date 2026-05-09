@@ -60,11 +60,6 @@ function enrichRoute(route: Route, index: number, delayedLineIds: Set<string>): 
   };
 }
 
-// Extend routeService type to include getDiverseRoutes for this hook
-type RouteServiceWithDiverseRoutes = typeof routeService & {
-  getDiverseRoutes: (fromId: string, toId: string) => Route[];
-};
-
 export function useRouteSearch(input: UseRouteSearchInput): UseRouteSearchResult {
   const { delays } = useDelayDetection();
   const delayedLineIds = useMemo(
@@ -111,8 +106,7 @@ export function useRouteSearch(input: UseRouteSearchInput): UseRouteSearchResult
       setError(null);
 
       try {
-        const service = routeService as RouteServiceWithDiverseRoutes;
-        const baseRoutes = service.getDiverseRoutes(input.fromId, input.toId);
+        const baseRoutes = routeService.getDiverseRoutes(input.fromId, input.toId);
         if (myRequestId !== requestIdRef.current) return;
 
         const enriched = baseRoutes.map((route, idx) => enrichRoute(route, idx, delayedLineIds));
