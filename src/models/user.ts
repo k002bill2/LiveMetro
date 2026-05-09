@@ -54,10 +54,26 @@ export interface AlertSourcePreferences {
   readonly urgent: boolean;     // 긴급 푸시 (severity-gated push for severe delays)
 }
 
+/**
+ * Per-event delivery gates for the Wanted handoff "이벤트별" section.
+ * Each flag mutes a specific event category. The `Sound` suffix in the
+ * interface name is historical — these are full delivery gates (alert is
+ * suppressed entirely when off), not just sound mute.
+ *
+ * Field-to-NotificationType mapping (notificationService.shouldSendNotification):
+ * - trainArrival    → NotificationType.ARRIVAL_REMINDER (열차 도착, 3분 전)
+ * - delayDetected   → NotificationType.DELAY_ALERT (지연 발생, 실시간 지연).
+ *   Note the naming difference from `alertTypes.delays`: `delayDetected` is
+ *   a per-event override that gates BEFORE `alertTypes.delays`. Both must
+ *   be true to deliver.
+ * - communityReport → No NotificationType yet (community reports do not flow
+ *   through notificationService). Full community disable is via
+ *   `AlertSourcePreferences.community` (PR #40) once that lands.
+ */
 export interface PerEventSoundOverrides {
-  readonly trainArrival: boolean;     // 열차 도착 알림 (3분 전 알림)
-  readonly delayDetected: boolean;    // 지연 발생 알림 (실시간 지연)
-  readonly communityReport: boolean;  // 실시간 제보 도착 알림 (reserved — full disable via alertSources.community)
+  readonly trainArrival: boolean;
+  readonly delayDetected: boolean;
+  readonly communityReport: boolean;
 }
 
 // Sound settings types

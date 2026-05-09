@@ -374,6 +374,23 @@ class NotificationService {
       }
     }
 
+    // Per-event override gates (Wanted handoff "이벤트별" toggles). These let
+    // users silence specific event categories without flipping alertTypes
+    // globally. Mappings:
+    //   - ARRIVAL_REMINDER ↔ perEventSound.trainArrival (열차 도착)
+    //   - DELAY_ALERT      ↔ perEventSound.delayDetected (지연 발생)
+    // perEventSound.communityReport has no NotificationType yet (community
+    // reports do not flow through this service); reserved for a future
+    // notification path.
+    if (settings.perEventSound) {
+      if (type === NotificationType.ARRIVAL_REMINDER && !settings.perEventSound.trainArrival) {
+        return false;
+      }
+      if (type === NotificationType.DELAY_ALERT && !settings.perEventSound.delayDetected) {
+        return false;
+      }
+    }
+
     // Check specific alert type settings
     switch (type) {
       case NotificationType.DELAY_ALERT:
