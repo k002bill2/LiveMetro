@@ -521,8 +521,11 @@ describe('DelayNotificationScreen', () => {
       const { UNSAFE_getAllByType } = render(<DelayNotificationScreen />);
       const switches = UNSAFE_getAllByType(Switch);
 
-      // Second switch should be delays toggle
-      fireEvent(switches[1], 'valueChange', false);
+      // Index map after Wanted handoff redesign:
+      // [0]=enabled, [1]=alertSources.official, [2]=community, [3]=urgent,
+      // [4]=alertTypes.delays, [5]=suspensions, [6]=congestion,
+      // [7]=alternativeRoutes, [8]=serviceUpdates.
+      fireEvent(switches[4], 'valueChange', false);
 
       await waitFor(() => {
         expect(mockUpdateUserProfile).toHaveBeenCalled();
@@ -566,7 +569,7 @@ describe('DelayNotificationScreen', () => {
       const switches = UNSAFE_getAllByType(Switch);
 
       // Third switch should be suspensions toggle
-      fireEvent(switches[2], 'valueChange', true);
+      fireEvent(switches[5], 'valueChange', true);
 
       await waitFor(() => {
         expect(mockUpdateUserProfile).toHaveBeenCalled();
@@ -610,7 +613,7 @@ describe('DelayNotificationScreen', () => {
       const switches = UNSAFE_getAllByType(Switch);
 
       // Fourth switch should be congestion toggle
-      fireEvent(switches[3], 'valueChange', true);
+      fireEvent(switches[6], 'valueChange', true);
 
       await waitFor(() => {
         expect(mockUpdateUserProfile).toHaveBeenCalled();
@@ -654,7 +657,7 @@ describe('DelayNotificationScreen', () => {
       const switches = UNSAFE_getAllByType(Switch);
 
       // Fifth switch should be alternativeRoutes toggle
-      fireEvent(switches[4], 'valueChange', true);
+      fireEvent(switches[7], 'valueChange', true);
 
       await waitFor(() => {
         expect(mockUpdateUserProfile).toHaveBeenCalled();
@@ -698,7 +701,7 @@ describe('DelayNotificationScreen', () => {
       const switches = UNSAFE_getAllByType(Switch);
 
       // Sixth switch should be serviceUpdates toggle
-      fireEvent(switches[5], 'valueChange', true);
+      fireEvent(switches[8], 'valueChange', true);
 
       await waitFor(() => {
         expect(mockUpdateUserProfile).toHaveBeenCalled();
