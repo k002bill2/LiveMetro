@@ -7,7 +7,7 @@
  * commit 1dd3af1) and ChevronRight icon already follow Wanted tokens.
  */
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useLayoutEffect } from 'react';
 import {
   View,
   Text,
@@ -116,7 +116,7 @@ const addMinutesToTime = (hhmm: string, minutes: number): string | null => {
   return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
 };
 
-export const CommuteSettingsScreen: React.FC<Props> = ({ navigation: _navigation }) => {
+export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
   const { user, updateUserProfile } = useAuth();
   const { resetOnboarding } = useOnboarding();
   const { isDark } = useTheme();
@@ -135,6 +135,29 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation: _navigation
     ? confidenceToMinutes(prediction.confidence)
     : HERO_ETA_CONFIDENCE_MIN;
   const heroIsPlaceholder = baselineMinutes === null;
+
+  // "저장" header link per Wanted handoff. Settings persist optimistically
+  // on each toggle/picker change, so this button is largely confirmation +
+  // navigation back to Settings index. Visual parity with the design.
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={() => navigation.canGoBack() && navigation.goBack()}
+          accessibilityRole="button"
+          accessibilityLabel="저장하고 돌아가기"
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        >
+          <Text style={{
+            color: WANTED_TOKENS.blue[500],
+            fontSize: 17,
+            fontFamily: weightToFontFamily('700'),
+            paddingRight: 4,
+          }}>저장</Text>
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation]);
 
   const [morningRoute, setMorningRoute] = useState<CommuteRouteData | null>(null);
   const [eveningRoute, setEveningRoute] = useState<CommuteRouteData | null>(null);
@@ -307,6 +330,9 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation: _navigation
               accessibilityLabel="퇴근 경로 사용"
               trackColor={{ false: semantic.lineNormal, true: WANTED_TOKENS.blue[500] }}
               thumbColor="#fff"
+              ios_backgroundColor={semantic.lineNormal}
+              // Match SettingToggle's scale 0.85 for visual parity.
+              style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }}
             />
           )}
         </View>
@@ -321,7 +347,11 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation: _navigation
                 <View style={{ flex: 1 }} />
                 <Text style={styles.routeRoleText}>출발</Text>
               </View>
-              <View style={styles.routeConnectorDotted} />
+              <View style={styles.routeConnector}>
+                <View style={styles.routeConnectorDot} />
+                <View style={styles.routeConnectorDot} />
+                <View style={styles.routeConnectorDot} />
+              </View>
               {/* 환승 row */}
               <View style={styles.routeBodyRow}>
                 <View style={[styles.routeDot, { backgroundColor: WANTED_TOKENS.status.green500 }]} />
@@ -334,7 +364,11 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation: _navigation
                   <ChevronDown size={14} color={WANTED_TOKENS.blue[500]} strokeWidth={2} />
                 </TouchableOpacity>
               </View>
-              <View style={styles.routeConnectorDotted} />
+              <View style={styles.routeConnector}>
+                <View style={styles.routeConnectorDot} />
+                <View style={styles.routeConnectorDot} />
+                <View style={styles.routeConnectorDot} />
+              </View>
               {/* 도착 row */}
               <View style={styles.routeBodyRow}>
                 <View style={[styles.routeDot, { backgroundColor: WANTED_TOKENS.blue[500] }]} />
@@ -524,7 +558,9 @@ const createStyles = (semantic: WantedSemanticTheme) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: semantic.bgBase,
+      // Page background uses bgSubtlePage so the white SettingSection
+      // cards and Hero card stand out (Wanted handoff body backdrop).
+      backgroundColor: semantic.bgSubtlePage,
     },
     content: {
       flex: 1,
@@ -809,13 +845,20 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       fontFamily: weightToFontFamily('700'),
       color: WANTED_TOKENS.blue[500],
     },
-    routeConnectorDotted: {
-      width: 0,
-      borderLeftWidth: 1,
-      borderLeftColor: 'rgba(112,115,124,0.30)',
-      borderStyle: 'dashed',
-      height: 8,
+    routeConnector: {
+      // Replaces RN's flaky `borderStyle: 'dashed'` (iOS often renders
+      // it as solid). Stack three small dots vertically next to the
+      // station bullet (left edge, ~3px in to align under dot center).
       marginLeft: 3,
+      paddingVertical: 2,
+      gap: 2,
+      alignItems: 'flex-start',
+    },
+    routeConnectorDot: {
+      width: 2,
+      height: 2,
+      borderRadius: 1,
+      backgroundColor: 'rgba(112,115,124,0.40)',
     },
     routeFooterRow: {
       flexDirection: 'row',
