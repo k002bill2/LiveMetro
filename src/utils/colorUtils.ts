@@ -99,23 +99,28 @@ export const THEME_COLORS = {
  * Get subway line color by line ID
  */
 export const getSubwayLineColor = (lineId: string): string => {
-  // Normalize line ID
-  const normalizedId = lineId.toLowerCase().replace(/[^a-z0-9]/g, '');
-  
+  // Normalize line ID. Strips spaces and punctuation but PRESERVES Korean
+  // characters (가-힣) so the Korean-substring fallbacks below match
+  // inputs like '신분당선' or '경의중앙선'. The previous `[^a-z0-9]` strip
+  // zeroed out Korean inputs and made every Korean line render with the
+  // gray fallback (Gemini critical, post PR #40).
+  const normalizedId = lineId.toLowerCase().replace(/[^a-z0-9가-힣]/g, '');
+
   // Check exact matches first
   if (normalizedId in SUBWAY_LINE_COLORS) {
     return SUBWAY_LINE_COLORS[normalizedId as keyof typeof SUBWAY_LINE_COLORS];
   }
-  
-  // Check for partial matches
+
+  // Check for partial matches. Order matters: more-specific tokens first,
+  // because '신분당' contains '분당' and would otherwise resolve to bundang.
   if (normalizedId.includes('경의') || normalizedId.includes('중앙')) {
     return SUBWAY_LINE_COLORS.gyeongui;
   }
-  if (normalizedId.includes('분당')) {
-    return SUBWAY_LINE_COLORS.bundang;
-  }
   if (normalizedId.includes('신분당')) {
     return SUBWAY_LINE_COLORS.sinbundang;
+  }
+  if (normalizedId.includes('분당')) {
+    return SUBWAY_LINE_COLORS.bundang;
   }
   if (normalizedId.includes('경춘')) {
     return SUBWAY_LINE_COLORS.gyeongchun;
