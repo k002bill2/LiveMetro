@@ -355,7 +355,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
     <TouchableOpacity style={styles.settingItem} onPress={onPress}>
       <View style={styles.settingItemLeft}>
         <View style={styles.iconContainer}>
-          <Icon size={20} color={semantic.labelStrong} />
+          <Icon size={16} color={semantic.labelStrong} strokeWidth={2} />
         </View>
         <View style={styles.textContainer}>
           <Text style={styles.settingTitle}>{title}</Text>
@@ -496,7 +496,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
             <View style={styles.settingItem}>
               <View style={styles.settingItemLeft}>
                 <View style={styles.iconContainer}>
-                  <LogIn size={20} color={semantic.labelStrong} />
+                  <LogIn size={16} color={semantic.labelStrong} strokeWidth={2} />
                 </View>
                 <View style={styles.textContainer}>
                   <Text style={styles.settingTitle}>
@@ -520,12 +520,14 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
                 <View style={styles.iconContainer}>
                   {biometricTypeName === 'Face ID' ? (
                     <ScanFace
-                      size={20}
+                      size={16}
+                      strokeWidth={2}
                       color={biometricAvailable ? semantic.labelStrong : semantic.labelDisabled}
                     />
                   ) : (
                     <Fingerprint
-                      size={20}
+                      size={16}
+                      strokeWidth={2}
                       color={biometricAvailable ? semantic.labelStrong : semantic.labelDisabled}
                     />
                   )}
@@ -640,13 +642,15 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       marginBottom: WANTED_TOKENS.spacing.s5,
     },
     sectionTitle: {
-      fontSize: WANTED_TOKENS.type.label2.size,
-      fontWeight: '600',
-      fontFamily: weightToFontFamily('600'),
+      // Wanted handoff (rest.jsx:649): 12/800 labelAlt 0.04em uppercase eyebrow.
+      // Stronger weight + smaller size builds the hierarchy gap with item title (14/600).
+      fontSize: WANTED_TOKENS.type.caption1.size,
+      fontWeight: '800',
+      fontFamily: weightToFontFamily('800'),
       color: semantic.labelAlt,
-      marginBottom: WANTED_TOKENS.spacing.s3,
+      marginBottom: WANTED_TOKENS.spacing.s2,
       marginHorizontal: WANTED_TOKENS.spacing.s4,
-      letterSpacing: 0.6,
+      letterSpacing: WANTED_TOKENS.type.caption1.size * 0.04,
       textTransform: 'uppercase',
     },
     profileCard: {
@@ -695,14 +699,14 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       flex: 1,
     },
     profileName: {
-      fontSize: WANTED_TOKENS.type.heading2.size,
-      lineHeight: WANTED_TOKENS.type.heading2.lh,
-      fontWeight: '700',
-      fontFamily: weightToFontFamily('700'),
+      // Wanted handoff (rest.jsx:693): 16/800 labelStrong. Smaller and stronger than
+      // the previous heading2 (20/700) to fit the dense profile-card hierarchy.
+      fontSize: WANTED_TOKENS.type.body1.size,
+      lineHeight: WANTED_TOKENS.type.body1.lh,
+      fontWeight: '800',
+      fontFamily: weightToFontFamily('800'),
       color: semantic.labelStrong,
-      marginBottom: 4,
-      letterSpacing:
-        WANTED_TOKENS.type.heading2.size * WANTED_TOKENS.type.heading2.tracking,
+      marginBottom: 2,
     },
     profileEmail: {
       fontSize: WANTED_TOKENS.type.caption1.size,
@@ -740,10 +744,12 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       flex: 1,
     },
     iconContainer: {
-      width: 36,
-      height: 36,
+      // Wanted handoff (rest.jsx:658): 32×32 rounded-square (r8 CSS = r4 token = 8px)
+      // with 16px icon. Replaces the prior 36×36 r-pill / icon-20 form factor.
+      width: 32,
+      height: 32,
       backgroundColor: semantic.bgSubtle,
-      borderRadius: WANTED_TOKENS.radius.pill,
+      borderRadius: WANTED_TOKENS.radius.r4,
       justifyContent: 'center',
       alignItems: 'center',
       marginRight: WANTED_TOKENS.spacing.s3,
@@ -752,15 +758,19 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       flex: 1,
     },
     settingTitle: {
-      fontSize: WANTED_TOKENS.type.body1.size,
+      // Wanted handoff (rest.jsx:662): 14/600 labelStrong (label1 token).
+      fontSize: WANTED_TOKENS.type.label1.size,
       fontWeight: '600',
       fontFamily: weightToFontFamily('600'),
       color: semantic.labelStrong,
     },
     settingSubtitle: {
-      fontSize: WANTED_TOKENS.type.body2.size,
+      // Wanted handoff (rest.jsx:663): 11/600 labelAlt with 1px tighter top inset.
+      fontSize: WANTED_TOKENS.type.caption2.size,
+      fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
       color: semantic.labelAlt,
-      marginTop: 2,
+      marginTop: 1,
     },
     signOutButton: {
       flexDirection: 'row',
