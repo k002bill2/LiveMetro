@@ -27,7 +27,8 @@ import {
   Search,
   X,
   XCircle,
-  AlertCircle
+  AlertCircle,
+  Check,
 } from 'lucide-react-native';
 import {
   WANTED_TOKENS,
@@ -98,6 +99,13 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
       !excludeStationIds.includes(fav.stationId)
     );
   }, [favoritesWithDetails, excludeStationIds]);
+
+  // Set of stationIds already favorited — drives the "추가됨" badge below.
+  // Reads from useFavorites' cached list so the modal reflects the latest
+  // state without a separate fetch.
+  const favoriteStationIds = useMemo(() => {
+    return new Set(favoritesWithDetails.map((fav) => fav.stationId));
+  }, [favoritesWithDetails]);
 
   // Load all stations on mount
   useEffect(() => {
@@ -263,27 +271,38 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
     </View>
   );
 
-  const renderStationItem = ({ item }: { item: StationWithLine }) => (
-    <TouchableOpacity
-      style={styles.stationItem}
-      onPress={() => handleSelectStation(item)}
-    >
-      <View
-        style={[
-          styles.stationLineIndicator,
-          { backgroundColor: getSubwayLineColor(item.lineId) },
-        ]}
-      />
-      <View style={styles.stationInfo}>
-        <Text style={styles.stationName}>{item.name}</Text>
-        <Text style={styles.stationLine}>{item.lineName}</Text>
-      </View>
-      <ChevronRight
-        size={20}
-        color={semantic.labelAlt}
-      />
-    </TouchableOpacity>
-  );
+  const renderStationItem = ({ item }: { item: StationWithLine }) => {
+    const isAlreadyFavorite = favoriteStationIds.has(item.id);
+    return (
+      <TouchableOpacity
+        style={styles.stationItem}
+        onPress={() => handleSelectStation(item)}
+        accessibilityState={{ selected: isAlreadyFavorite }}
+      >
+        <View
+          style={[
+            styles.stationLineIndicator,
+            { backgroundColor: getSubwayLineColor(item.lineId) },
+          ]}
+        />
+        <View style={styles.stationInfo}>
+          <Text style={styles.stationName}>{item.name}</Text>
+          <Text style={styles.stationLine}>{item.lineName}</Text>
+        </View>
+        {isAlreadyFavorite ? (
+          <View
+            style={styles.alreadyAddedBadge}
+            accessibilityLabel="이미 즐겨찾기에 추가된 역"
+          >
+            <Check size={14} color={semantic.primaryNormal} />
+            <Text style={styles.alreadyAddedText}>추가됨</Text>
+          </View>
+        ) : (
+          <ChevronRight size={20} color={semantic.labelAlt} />
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
@@ -558,6 +577,20 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       fontSize: 13,
       fontFamily: weightToFontFamily('500'),
       color: semantic.labelAlt,
+    },
+    alreadyAddedBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      paddingHorizontal: 10,
+      paddingVertical: 5,
+      borderRadius: WANTED_TOKENS.radius.pill,
+      backgroundColor: semantic.primaryBg,
+    },
+    alreadyAddedText: {
+      fontSize: 12,
+      fontFamily: weightToFontFamily('700'),
+      color: semantic.primaryNormal,
     },
     emptyState: {
       flex: 1,
