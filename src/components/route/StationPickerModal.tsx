@@ -28,7 +28,7 @@ interface Props {
   onClose: () => void;
   onSelect: (station: StationLite) => void;
   /** This phase: parent passes empty array; persistence is out of scope (see spec §2). */
-  recentStations?: ReadonlyArray<StationLite>;
+  recentStations?: readonly StationLite[];
 }
 
 export const StationPickerModal: React.FC<Props> = ({

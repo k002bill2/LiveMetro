@@ -18,7 +18,7 @@ jest.mock('@/components/design/LineBadge', () => {
 jest.mock('@/components/design/JourneyStrip', () => {
   const { Text: RNText } = jest.requireActual('react-native');
   return {
-    JourneyStrip: ({ legs }: { legs: ReadonlyArray<unknown> }) => (
+    JourneyStrip: ({ legs }: { legs: readonly unknown[] }) => (
       <RNText testID="journey-strip">{`legs:${legs.length}`}</RNText>
     ),
   };

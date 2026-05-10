@@ -13,7 +13,7 @@ import type { Route, RouteCategory, RouteSegment } from '@/models/route';
  * Tags shown in the top-left of each card. Two tags per category mirrors the
  * Wanted handoff: a "why this card" label + a softer descriptor.
  */
-const CATEGORY_TAGS: Record<RouteCategory, ReadonlyArray<string>> = {
+const CATEGORY_TAGS: Record<RouteCategory, readonly string[]> = {
   'fastest': ['추천', '최단'],
   'min-transfer': ['환승최소', '빠른길'],
 };
@@ -59,7 +59,7 @@ function routeToLegs(route: Route): JourneyStripLeg[] {
  * Boarding / transfer(s) / alight — the only stations the user must act on.
  * Returns an ordered list with a label and station name per row.
  */
-function routeToKeyPoints(route: Route): ReadonlyArray<{ label: string; station: string }> {
+function routeToKeyPoints(route: Route): readonly { label: string; station: string }[] {
   if (route.segments.length === 0) return [];
   const points: { label: string; station: string }[] = [];
   const first = route.segments[0]!;
@@ -100,7 +100,7 @@ export const RouteCard: React.FC<Props> = ({ route, expanded, onToggleExpand, re
   const styles = createStyles(semantic);
 
   const legs = routeToLegs(route);
-  const tags: ReadonlyArray<string> = route.category
+  const tags: readonly string[] = route.category
     ? CATEGORY_TAGS[route.category]
     : recommended
       ? ['추천']
