@@ -44,13 +44,19 @@ import { useTheme } from '@/services/theme';
 import { SettingsStackParamList } from '@/navigation/types';
 import { useAuth } from '@/services/auth/AuthContext';
 import { useOnboarding } from '@/contexts/OnboardingContext';
-import { loadCommuteRoutes } from '@/services/commute/commuteService';
+import { loadCommuteRoutes, saveCommuteRoutes } from '@/services/commute/commuteService';
 import { useMLPrediction } from '@/hooks/useMLPrediction';
-import { CommuteRoute } from '@/models/commute';
+import {
+  CommuteRoute,
+  DEFAULT_COMMUTE_NOTIFICATIONS,
+  DEFAULT_BUFFER_MINUTES,
+  StationSelection,
+} from '@/models/commute';
 import type { SmartFeatures } from '@/models/user';
 import SettingSection from '@/components/settings/SettingSection';
 import SettingToggle from '@/components/settings/SettingToggle';
 import { SettingPicker, type PickerOption } from '@/components/settings/SettingPicker';
+import { StationSearchModal } from '@/components/commute/StationSearchModal';
 
 type Props = NativeStackScreenProps<SettingsStackParamList, 'CommuteSettings'>;
 
@@ -163,6 +169,106 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
   const [eveningRoute, setEveningRoute] = useState<CommuteRouteData | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // Transfer-station picker state. `kind` selects which route gets the
+  // newly chosen station; `null` means the modal is closed.
+  const [transferModalKind, setTransferModalKind] = useState<'morning' | 'evening' | null>(null);
+
+  // Convert local CommuteRouteData (UI shape) into CommuteRoute (Firestore
+  // shape). Adds default notifications + bufferMinutes; transferStations
+  // get a synthesized lineName + order.
+  const routeDataToCommuteRoute = useCallback(
+    (data: CommuteRouteData): CommuteRoute => ({
+      departureTime: data.departureTime,
+      departureStationId: data.departureStation.stationId,
+      departureStationName: data.departureStation.stationName,
+      departureLineId: data.departureStation.lineId,
+      arrivalStationId: data.arrivalStation.stationId,
+      arrivalStationName: data.arrivalStation.stationName,
+      arrivalLineId: data.arrivalStation.lineId,
+      transferStations: data.transferStations.map((t, i) => ({
+        stationId: t.stationId,
+        stationName: t.stationName,
+        lineId: t.lineId,
+        lineName: '',
+        order: i + 1,
+      })),
+      notifications: DEFAULT_COMMUTE_NOTIFICATIONS,
+      bufferMinutes: DEFAULT_BUFFER_MINUTES,
+    }),
+    [],
+  );
+
+  const handleAddTransfer = useCallback((kind: 'morning' | 'evening') => {
+    setTransferModalKind(kind);
+  }, []);
+
+  const handleCloseTransferModal = useCallback(() => {
+    setTransferModalKind(null);
+  }, []);
+
+  const handleSelectTransferStation = useCallback(
+    async (selection: StationSelection): Promise<void> => {
+      if (!user || !transferModalKind) return;
+      const targetRoute = transferModalKind === 'morning' ? morningRoute : eveningRoute;
+      if (!targetRoute) {
+        setTransferModalKind(null);
+        return;
+      }
+      const nextRoute: CommuteRouteData = {
+        ...targetRoute,
+        transferStations: [
+          ...targetRoute.transferStations,
+          {
+            stationId: selection.stationId,
+            stationName: selection.stationName,
+            lineId: selection.lineId,
+          },
+        ],
+      };
+
+      try {
+        setSaving(true);
+        const morningForSave = transferModalKind === 'morning' ? nextRoute : morningRoute;
+        const eveningForSave = transferModalKind === 'evening' ? nextRoute : eveningRoute;
+        // saveCommuteRoutes requires both legs; degenerate to morning when
+        // evening is missing (matches FavoritesOnboarding pattern).
+        const result = await saveCommuteRoutes(
+          user.id,
+          routeDataToCommuteRoute(morningForSave ?? nextRoute),
+          routeDataToCommuteRoute(eveningForSave ?? morningForSave ?? nextRoute),
+        );
+        if (!result.success) {
+          Alert.alert('저장 실패', result.error ?? '환승역 저장에 실패했습니다.');
+          return;
+        }
+        if (transferModalKind === 'morning') {
+          setMorningRoute(nextRoute);
+        } else {
+          setEveningRoute(nextRoute);
+        }
+      } catch (error) {
+        console.error('Error saving transfer station:', error);
+        Alert.alert('오류', '환승역 저장 중 오류가 발생했습니다.');
+      } finally {
+        setSaving(false);
+        setTransferModalKind(null);
+      }
+    },
+    [user, transferModalKind, morningRoute, eveningRoute, routeDataToCommuteRoute],
+  );
+
+  // Stations to exclude from the picker — never let the user pick the
+  // route's own departure/arrival or an already-listed transfer station.
+  const transferExcludeIds = useMemo(() => {
+    const target = transferModalKind === 'morning' ? morningRoute : eveningRoute;
+    if (!target) return [];
+    return [
+      target.departureStation.stationId,
+      target.arrivalStation.stationId,
+      ...target.transferStations.map((t) => t.stationId),
+    ];
+  }, [transferModalKind, morningRoute, eveningRoute]);
 
   // Derived prefs from user.preferences.commuteSchedule (with fallbacks for
   // existing user data that pre-dates these fields).
@@ -298,10 +404,11 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
     kind: 'morning' | 'evening';
     route: CommuteRouteData | null;
     onEdit: () => void;
+    onAddTransfer: () => void;
     enabled?: boolean;
     onToggleEnabled?: (v: boolean) => void;
     arrivalEtaMinutes?: number | null;
-  }> = ({ kind, route, onEdit, enabled, onToggleEnabled, arrivalEtaMinutes }) => {
+  }> = ({ kind, route, onEdit, onAddTransfer, enabled, onToggleEnabled, arrivalEtaMinutes }) => {
     const isMorning = kind === 'morning';
     const arrivalTime = isMorning && route && arrivalEtaMinutes != null
       ? addMinutesToTime(route.departureTime, arrivalEtaMinutes)
@@ -359,7 +466,7 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
                   {transferCount === 0 ? '직행 · 환승 없음' : `환승 ${transferCount}회`}
                 </Text>
                 <View style={{ flex: 1 }} />
-                <TouchableOpacity onPress={onEdit} style={styles.routeAddTransferRow} accessibilityRole="button" accessibilityLabel="환승 추가">
+                <TouchableOpacity onPress={onAddTransfer} style={styles.routeAddTransferRow} accessibilityRole="button" accessibilityLabel="환승 추가">
                   <Text style={styles.routeAddTransferText}>환승 추가</Text>
                   <ChevronDown size={14} color={WANTED_TOKENS.blue[500]} strokeWidth={2} />
                 </TouchableOpacity>
@@ -469,6 +576,7 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
             kind="morning"
             route={morningRoute}
             onEdit={handleSetupCommute}
+            onAddTransfer={() => handleAddTransfer('morning')}
             arrivalEtaMinutes={baselineMinutes !== null ? Math.round(baselineMinutes) : null}
           />
           <View style={styles.routeDivider} />
@@ -476,6 +584,7 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
             kind="evening"
             route={eveningRoute}
             onEdit={handleSetupCommute}
+            onAddTransfer={() => handleAddTransfer('evening')}
             enabled={eveningRoute !== null}
             onToggleEnabled={() => {
               // Toggle is informational for now; full enable/disable wiring
@@ -551,6 +660,15 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
           </Text>
         </SettingSection>
       </ScrollView>
+
+      <StationSearchModal
+        visible={transferModalKind !== null}
+        onClose={handleCloseTransferModal}
+        onSelect={handleSelectTransferStation}
+        title="환승역 선택"
+        placeholder="환승할 역을 검색하세요"
+        excludeStationIds={transferExcludeIds}
+      />
     </SafeAreaView>
   );
 };
