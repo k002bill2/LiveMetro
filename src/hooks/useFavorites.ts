@@ -40,6 +40,26 @@ export const useFavorites = () => {
   // Track if migration has been performed to avoid duplicate updates
   const migrationPerformedRef = useRef<string | null>(null);
 
+  // Per-key in-flight guard. Blocks double-tap from firing the same mutation
+  // twice before the first request completes. Synchronous (useRef, not state)
+  // so the second tap sees the first tap's lock without waiting for a render.
+  const inFlightRef = useRef<Set<string>>(new Set());
+
+  const runExclusive = useCallback(
+    async (key: string, task: () => Promise<void>): Promise<void> => {
+      if (inFlightRef.current.has(key)) {
+        return;
+      }
+      inFlightRef.current.add(key);
+      try {
+        await task();
+      } finally {
+        inFlightRef.current.delete(key);
+      }
+    },
+    [],
+  );
+
   /**
    * Load favorites from Firestore
    */
@@ -128,23 +148,25 @@ export const useFavorites = () => {
         throw new Error('로그인이 필요합니다.');
       }
 
-      try {
-        const params: AddFavoriteParams = {
-          userId: user.id,
-          station,
-          alias: options?.alias,
-          direction: options?.direction,
-          isCommuteStation: options?.isCommuteStation,
-        };
+      await runExclusive(`station:${station.id}`, async () => {
+        try {
+          const params: AddFavoriteParams = {
+            userId: user.id,
+            station,
+            alias: options?.alias,
+            direction: options?.direction,
+            isCommuteStation: options?.isCommuteStation,
+          };
 
-        await favoritesService.addFavorite(params);
-        await loadFavorites();
-      } catch (error) {
-        console.error('Error adding favorite:', error);
-        throw error;
-      }
+          await favoritesService.addFavorite(params);
+          await loadFavorites();
+        } catch (error) {
+          console.error('Error adding favorite:', error);
+          throw error;
+        }
+      });
     },
-    [user, loadFavorites]
+    [user, loadFavorites, runExclusive]
   );
 
   /**
@@ -156,15 +178,27 @@ export const useFavorites = () => {
         throw new Error('로그인이 필요합니다.');
       }
 
-      try {
-        await favoritesService.removeFavorite(user.id, favoriteId);
-        await loadFavorites();
-      } catch (error) {
-        console.error('Error removing favorite:', error);
-        throw error;
-      }
+      // Resolve stationId from cache so this lock key matches the one used
+      // by addFavorite/removeFavoriteByStationId. Without this, a UI that
+      // races removeFavorite(favoriteId) against removeFavoriteByStationId
+      // (or toggleFavorite) for the same record would slip through both
+      // guards under different namespaces. Falls back to favoriteId when
+      // the cache hasn't loaded yet (acceptable: the only caller paths
+      // that hit that branch don't cross the toggle path).
+      const cached = state.favorites.find((f) => f.id === favoriteId);
+      const lockKey = cached ? `station:${cached.stationId}` : `favorite:${favoriteId}`;
+
+      await runExclusive(lockKey, async () => {
+        try {
+          await favoritesService.removeFavorite(user.id, favoriteId);
+          await loadFavorites();
+        } catch (error) {
+          console.error('Error removing favorite:', error);
+          throw error;
+        }
+      });
     },
-    [user, loadFavorites]
+    [user, loadFavorites, runExclusive, state.favorites]
   );
 
   /**
@@ -176,18 +210,20 @@ export const useFavorites = () => {
         throw new Error('로그인이 필요합니다.');
       }
 
-      try {
-        const favorite = await favoritesService.getFavoriteByStationId(user.id, stationId);
-        if (favorite) {
-          await favoritesService.removeFavorite(user.id, favorite.id);
-          await loadFavorites();
+      await runExclusive(`station:${stationId}`, async () => {
+        try {
+          const favorite = await favoritesService.getFavoriteByStationId(user.id, stationId);
+          if (favorite) {
+            await favoritesService.removeFavorite(user.id, favorite.id);
+            await loadFavorites();
+          }
+        } catch (error) {
+          console.error('Error removing favorite:', error);
+          throw error;
         }
-      } catch (error) {
-        console.error('Error removing favorite:', error);
-        throw error;
-      }
+      });
     },
-    [user, loadFavorites]
+    [user, loadFavorites, runExclusive]
   );
 
   /**
@@ -219,6 +255,35 @@ export const useFavorites = () => {
       }
     },
     [user, loadFavorites]
+  );
+
+  /**
+   * Toggle per-favorite notification flag with in-flight protection.
+   * Uses the same station-keyed lock as add/remove so a swipe-to-mute
+   * cannot race the same record's removal.
+   */
+  const setNotificationEnabled = useCallback(
+    async (favoriteId: string, enabled: boolean): Promise<void> => {
+      if (!user) {
+        throw new Error('로그인이 필요합니다.');
+      }
+
+      const cached = state.favorites.find((f) => f.id === favoriteId);
+      const lockKey = cached
+        ? `station:${cached.stationId}`
+        : `favorite:${favoriteId}`;
+
+      await runExclusive(lockKey, async () => {
+        try {
+          await favoritesService.setNotificationEnabled(user.id, favoriteId, enabled);
+          await loadFavorites();
+        } catch (error) {
+          console.error('Error toggling favorite notification:', error);
+          throw error;
+        }
+      });
+    },
+    [user, loadFavorites, runExclusive, state.favorites],
   );
 
   /**
@@ -292,6 +357,7 @@ export const useFavorites = () => {
     removeFavorite,
     removeFavoriteByStationId,
     updateFavorite,
+    setNotificationEnabled,
     isFavorite,
     toggleFavorite,
     reorderFavorites,

@@ -27,6 +27,14 @@ export interface UpdateFavoriteParams {
   alias?: string;
   direction?: 'up' | 'down' | 'both';
   isCommuteStation?: boolean;
+  notificationEnabled?: boolean;
+}
+
+export class DuplicateFavoriteError extends Error {
+  constructor(message = '이미 즐겨찾기에 등록된 역입니다.') {
+    super(message);
+    this.name = 'DuplicateFavoriteError';
+  }
 }
 
 class FavoritesService {
@@ -56,10 +64,16 @@ class FavoritesService {
   async addFavorite(params: AddFavoriteParams): Promise<FavoriteStation> {
     const { userId, station, alias = null, direction = 'both', isCommuteStation = false } = params;
 
+    // Reject duplicates against fresh Firestore state so cached/state-stale
+    // callers and parallel taps cannot insert two records for the same station.
+    const existing = await this.getFavorites(userId);
+    if (existing.some(fav => fav.stationId === station.id)) {
+      throw new DuplicateFavoriteError();
+    }
+
     try {
       const userRef = doc(firestore, 'users', userId);
 
-      // Create new favorite station
       const newFavorite: FavoriteStation = {
         id: `fav_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         stationId: station.id,
@@ -70,7 +84,6 @@ class FavoritesService {
         addedAt: new Date(),
       };
 
-      // Add to Firestore array
       await updateDoc(userRef, {
         'preferences.favoriteStations': arrayUnion(newFavorite),
         lastActiveAt: new Date(),
@@ -111,7 +124,7 @@ class FavoritesService {
    * Update favorite station properties
    */
   async updateFavorite(params: UpdateFavoriteParams): Promise<void> {
-    const { userId, favoriteId, alias, direction, isCommuteStation } = params;
+    const { userId, favoriteId, alias, direction, isCommuteStation, notificationEnabled } = params;
 
     try {
       const userRef = doc(firestore, 'users', userId);
@@ -133,6 +146,10 @@ class FavoritesService {
         direction: direction !== undefined ? direction : currentFavorite.direction,
         isCommuteStation: isCommuteStation !== undefined ? isCommuteStation : currentFavorite.isCommuteStation,
         addedAt: currentFavorite.addedAt,
+        notificationEnabled:
+          notificationEnabled !== undefined
+            ? notificationEnabled
+            : currentFavorite.notificationEnabled,
       };
 
       // Replace entire array with updated version
@@ -147,6 +164,25 @@ class FavoritesService {
       console.error('Error updating favorite:', error);
       throw new Error('즐겨찾기 업데이트에 실패했습니다.');
     }
+  }
+
+  /**
+   * Toggle the per-favorite notification flag. Thin wrapper over
+   * `updateFavorite` — exists so callers express intent ("mute this
+   * station") instead of constructing an UpdateFavoriteParams object,
+   * and so the swipe action site doesn't depend on the broader update
+   * surface area.
+   */
+  async setNotificationEnabled(
+    userId: string,
+    favoriteId: string,
+    enabled: boolean,
+  ): Promise<void> {
+    await this.updateFavorite({
+      userId,
+      favoriteId,
+      notificationEnabled: enabled,
+    });
   }
 
   /**
