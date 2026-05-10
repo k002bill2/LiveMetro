@@ -16,6 +16,12 @@ export interface TransferStation {
 
 /**
  * Commute-specific notification settings
+ *
+ * `departureTimeAlert` and `communityAlert` were added to back the redefined
+ * onboarding step 3 (출근 시간 / 지연 / 실시간 제보). They are optional so
+ * existing CommuteSettingsScreen + Settings consumers that pre-date the
+ * onboarding redesign continue to type-check; readers should fall back via
+ * `?? <default>`.
  */
 export interface CommuteNotifications {
   readonly transferAlert: boolean; // Alert before transfer station
@@ -23,6 +29,8 @@ export interface CommuteNotifications {
   readonly delayAlert: boolean; // Alert on delays
   readonly incidentAlert: boolean; // Alert on incidents/accidents
   readonly alertMinutesBefore: number; // Minutes before to send alert (1-10)
+  readonly departureTimeAlert?: boolean; // Onboarding: alert N min before usual departure
+  readonly communityAlert?: boolean; // Onboarding: verified crowdsourced report alerts
 }
 
 /**
@@ -115,6 +123,8 @@ export const DEFAULT_COMMUTE_NOTIFICATIONS: CommuteNotifications = {
   delayAlert: true,
   incidentAlert: true,
   alertMinutesBefore: 5,
+  departureTimeAlert: true,
+  communityAlert: false,
 };
 
 /**

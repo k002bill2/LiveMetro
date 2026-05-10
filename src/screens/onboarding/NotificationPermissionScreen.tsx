@@ -29,8 +29,8 @@ import {
 } from 'react-native';
 import {
   AlertTriangle,
-  ArrowLeftRight,
   ArrowRight,
+  Clock,
   Megaphone,
   TrainFront,
   type LucideIcon,
@@ -48,7 +48,7 @@ import { CommuteNotifications, DEFAULT_COMMUTE_NOTIFICATIONS } from '@/models/co
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'NotificationPermission'>;
 
-type ToggleId = 'transferAlert' | 'delayAlert' | 'incidentAlert';
+type ToggleId = 'departureTimeAlert' | 'delayAlert' | 'communityAlert';
 
 interface ToggleSpec {
   id: ToggleId;
@@ -56,41 +56,45 @@ interface ToggleSpec {
   hint: string;
   icon: LucideIcon;
   // Wanted handoff: each toggle has a colored 40×40 icon container.
-  // Tints encode notification severity (blue=routine, red=delay, amber=incident).
+  // Tints encode notification semantics (blue=routine, red=delay, amber=user-report).
   accentFg: string;
   accentBg: string;
   recommended?: boolean;
+  defaultOn: boolean;
 }
 
 // Onboarding step 3 surfaces three of the most user-visible alert types
-// (transfer / delay / incident). The full CommuteNotifications shape is
-// committed downstream in step 4, with these three values overlaid on
-// DEFAULT_COMMUTE_NOTIFICATIONS.
+// per the Wanted handoff: 출근 시간 / 지연(추천) / 실시간 제보. The full
+// CommuteNotifications shape is committed downstream in step 4, with these
+// three values overlaid on DEFAULT_COMMUTE_NOTIFICATIONS.
 const TOGGLES: readonly ToggleSpec[] = [
   {
-    id: 'transferAlert',
-    label: '환승 알림',
-    hint: '환승역 도착 전 미리 알림',
-    icon: ArrowLeftRight,
+    id: 'departureTimeAlert',
+    label: '출근 시간 알림',
+    hint: '평소 출발 5분 전',
+    icon: Clock,
     accentFg: WANTED_TOKENS.blue[500],
     accentBg: 'rgba(0,102,255,0.12)',
+    defaultOn: true,
   },
   {
     id: 'delayAlert',
     label: '지연 알림',
-    hint: '내가 자주 타는 노선의 지연·운행 변동',
+    hint: '5분 이상 지연 시 즉시',
     icon: AlertTriangle,
     accentFg: WANTED_TOKENS.status.red500,
     accentBg: 'rgba(255,66,66,0.10)',
     recommended: true,
+    defaultOn: true,
   },
   {
-    id: 'incidentAlert',
-    label: '사고·운행 중단 알림',
-    hint: '사고나 점검으로 인한 운행 중단 안내',
+    id: 'communityAlert',
+    label: '실시간 제보 알림',
+    hint: '검증된 제보 도착 시',
     icon: Megaphone,
     accentFg: WANTED_TOKENS.status.amber700,
     accentBg: 'rgba(255,180,0,0.16)',
+    defaultOn: false,
   },
 ];
 
@@ -101,28 +105,33 @@ export const NotificationPermissionScreen: React.FC<Props> = ({ navigation, rout
 
   // Local toggle state. The values flow forward through navigation to the
   // Favorites step which commits them with the route.
-  const [transferAlert, setTransferAlert] = useState(true);
+  const [departureTimeAlert, setDepartureTimeAlert] = useState(true);
   const [delayAlert, setDelayAlert] = useState(true);
-  const [incidentAlert, setIncidentAlert] = useState(true);
+  const [communityAlert, setCommunityAlert] = useState(false);
   const [requesting, setRequesting] = useState(false);
 
   const toggleValues: Record<ToggleId, boolean> = {
-    transferAlert,
+    departureTimeAlert,
     delayAlert,
-    incidentAlert,
+    communityAlert,
   };
   const toggleSetters: Record<ToggleId, (v: boolean) => void> = {
-    transferAlert: setTransferAlert,
+    departureTimeAlert: setDepartureTimeAlert,
     delayAlert: setDelayAlert,
-    incidentAlert: setIncidentAlert,
+    communityAlert: setCommunityAlert,
   };
 
+  // Wanted handoff dropped the dedicated transfer/incident toggles from
+  // step 3, but the underlying CommuteNotifications model still carries
+  // them. We seed the new keys from the user's choices and leave the
+  // legacy keys at their defaults so existing settings consumers keep
+  // working unchanged.
   const buildNotifications = useCallback((): CommuteNotifications => ({
     ...DEFAULT_COMMUTE_NOTIFICATIONS,
-    transferAlert,
     delayAlert,
-    incidentAlert,
-  }), [transferAlert, delayAlert, incidentAlert]);
+    departureTimeAlert,
+    communityAlert,
+  }), [delayAlert, departureTimeAlert, communityAlert]);
 
   const proceed = useCallback(
     (notificationGranted: boolean) => {
@@ -162,7 +171,8 @@ export const NotificationPermissionScreen: React.FC<Props> = ({ navigation, rout
       testID="notification-permission"
     >
       <OnbHeader
-        currentStep={3}
+        currentStep={4}
+        totalSteps={5}
         onBack={() => navigation.canGoBack() && navigation.goBack()}
         onSkip={onSkip}
       />
@@ -320,6 +330,11 @@ export const NotificationPermissionScreen: React.FC<Props> = ({ navigation, rout
                   value={value}
                   onValueChange={setter}
                   trackColor={{ true: semantic.primaryNormal, false: semantic.lineNormal }}
+                  // Wanted handoff (image 16): toggles render slightly more
+                  // compact than the platform default. RN's Switch can't be
+                  // sized via props on iOS, so we scale the rendered control
+                  // — the touch target stays full-size for accessibility.
+                  style={styles.toggleSwitch}
                 />
               </View>
             );
@@ -510,6 +525,9 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     fontWeight: '600',
     fontFamily: weightToFontFamily('600'),
+  },
+  toggleSwitch: {
+    transform: [{ scaleX: 0.88 }, { scaleY: 0.88 }],
   },
   primary: {
     flexDirection: 'row',
