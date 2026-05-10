@@ -22,6 +22,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme/themeContext';
 import { LineBadge } from '@/components/design/LineBadge';
+import { Radio } from '@/components/design/Radio';
 import { TransferStation } from '@/models/commute';
 
 export interface RouteEndpoint {
@@ -189,18 +190,8 @@ export const RouteWithTransfer: React.FC<Props> = ({
                   },
                 ]}
               >
-                <View
-                  style={[
-                    styles.radio,
-                    {
-                      borderColor: isSelected ? semantic.primaryNormal : semantic.lineNormal,
-                    },
-                  ]}
-                >
-                  {isSelected ? (
-                    <View style={[styles.radioInner, { backgroundColor: semantic.primaryNormal }]} />
-                  ) : null}
-                </View>
+                <Radio selected={isSelected} size="sm" />
+
                 <View style={styles.optionBody}>
                   <View style={styles.optionHeader}>
                     <Text
@@ -369,20 +360,6 @@ const styles = StyleSheet.create({
     padding: WANTED_TOKENS.spacing.s3,
     borderRadius: WANTED_TOKENS.radius.r5,
     gap: WANTED_TOKENS.spacing.s3,
-  },
-  radio: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 1.5,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 2,
-  },
-  radioInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
   },
   optionBody: {
     flex: 1,

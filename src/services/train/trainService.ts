@@ -28,6 +28,7 @@ import {
 } from '../../models/train';
 import { seoulSubwayApi, SeoulTimetableRow } from '../api/seoulSubwayApi';
 import { getLocalStation, getLocalStationsByLine, searchLocalStations } from '../data/stationsDataService';
+import { locationService } from '../location/locationService';
 
 let allStationsCache: Promise<Station[]> | null = null;
 
@@ -35,7 +36,6 @@ let allStationsCache: Promise<Station[]> | null = null;
 export const __resetStationsCacheForTesting = (): void => {
   allStationsCache = null;
 };
-import { locationService } from '../location/locationService';
 
 class TrainService {
   private unsubscribeCallbacks: Map<string, Unsubscribe> = new Map();

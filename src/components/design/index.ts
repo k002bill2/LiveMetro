@@ -43,3 +43,9 @@ export { CommuteRouteCard } from './CommuteRouteCard';
 /* Phase 56 — HomeScreen 주변 역 horizontal-scroll card (Wanted bundle 65629bcd) */
 export { NearbyStationCard } from './NearbyStationCard';
 export type { NearbyStationCardProps } from './NearbyStationCard';
+
+/* Compact radio dot atom — used by inline option pickers
+   (transfer-route option, delay-report alternative routes, etc.).
+   Default size 'sm' (18×18) replaces the previously inline 22×22 radios. */
+export { Radio } from './Radio';
+export type { RadioSize } from './Radio';

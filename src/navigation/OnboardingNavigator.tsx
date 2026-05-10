@@ -9,6 +9,7 @@ import { OnboardingStackParamList } from './types';
 import { WelcomeOnboardingScreen } from '@/screens/onboarding/WelcomeOnboardingScreen';
 import { CommuteRouteScreen } from '@/screens/onboarding/CommuteRouteScreen';
 import { OnboardingStationPickerScreen } from '@/screens/onboarding/OnboardingStationPickerScreen';
+import { CommuteTimeScreen } from '@/screens/onboarding/CommuteTimeScreen';
 import { NotificationPermissionScreen } from '@/screens/onboarding/NotificationPermissionScreen';
 import { FavoritesOnboardingScreen } from '@/screens/onboarding/FavoritesOnboardingScreen';
 import { COLORS } from '@/styles/modernTheme';
@@ -67,6 +68,7 @@ export const OnboardingNavigator: React.FC<OnboardingNavigatorProps> = ({
         <Stack.Screen name="WelcomeOnboarding" component={WelcomeOnboardingScreen} />
         <Stack.Screen name="CommuteRoute" component={CommuteRouteScreen} />
         <Stack.Screen name="OnboardingStationPicker" component={OnboardingStationPickerScreen} />
+        <Stack.Screen name="CommuteTime" component={CommuteTimeScreen} />
         <Stack.Screen name="NotificationPermission" component={NotificationPermissionScreen} />
         <Stack.Screen name="FavoritesOnboarding" component={FavoritesOnboardingScreen} />
       </Stack.Navigator>
