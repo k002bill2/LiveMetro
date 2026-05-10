@@ -44,16 +44,7 @@ export const StationSearchBar: React.FC<Props> = ({
         >
           {fromStation ? fromStation.name : '출발역을 입력하세요'}
         </Text>
-        <Pressable
-          onPress={onSwap}
-          hitSlop={8}
-          style={styles.swap}
-          testID="search-bar-swap"
-          accessibilityRole="button"
-          accessibilityLabel="출발역과 도착역 바꾸기"
-        >
-          <ArrowUpDown size={16} color={semantic.labelAlt} strokeWidth={1.7} />
-        </Pressable>
+        <Text style={styles.endpointLabel}>출발</Text>
       </Pressable>
 
       <View style={[styles.divider, { backgroundColor: semantic.lineSubtle }]} />
@@ -72,6 +63,17 @@ export const StationSearchBar: React.FC<Props> = ({
         >
           {toStation ? toStation.name : '도착역을 입력하세요'}
         </Text>
+        <Text style={styles.endpointLabel}>도착</Text>
+        <Pressable
+          onPress={onSwap}
+          hitSlop={8}
+          style={styles.swap}
+          testID="search-bar-swap"
+          accessibilityRole="button"
+          accessibilityLabel="출발역과 도착역 바꾸기"
+        >
+          <ArrowUpDown size={16} color={semantic.labelAlt} strokeWidth={1.7} />
+        </Pressable>
       </Pressable>
     </View>
   );
@@ -104,6 +106,12 @@ const createStyles = (semantic: WantedSemanticTheme): ReturnType<typeof StyleShe
       lineHeight: WANTED_TOKENS.type.body1.lh,
       fontFamily: weightToFontFamily('500'),
       color: semantic.labelStrong,
+    },
+    endpointLabel: {
+      fontSize: WANTED_TOKENS.type.caption1.size,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+      marginRight: WANTED_TOKENS.spacing.s2,
     },
     swap: {
       width: 32,

@@ -22,7 +22,7 @@ import { ArrowRight, Footprints } from 'lucide-react-native';
 import { useTheme } from '@/services/theme';
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { getSubwayLineColor } from '@/utils/colorUtils';
-import type { LineId } from './LineBadge';
+import { getLineShortLabel, type LineId } from './LineBadge';
 
 /** Discriminated union for the strip's leg shapes. */
 export type JourneyStripLeg =
@@ -61,7 +61,11 @@ const weightToFlex = (weight: number): number => Math.max(1, weight);
 
 const labelFor = (leg: Extract<JourneyStripLeg, { type: 'train' }>): string => {
   if (leg.label) return leg.label;
-  // Digit lines render as the digit; named lines (신분당 등) take first char.
+  // Prefer the registered short Korean label (LineBadge SoT) so graph slugs
+  // like 'airport'/'gyeongui'/'bundang' render as '공항'/'경의'/'분당'
+  // instead of the first ASCII character.
+  const short = getLineShortLabel(leg.lineId);
+  if (short) return short;
   return /^\d+$/.test(leg.lineId) ? leg.lineId : leg.lineId.charAt(0);
 };
 

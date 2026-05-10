@@ -63,7 +63,7 @@ function buildGraph(excludeNodeKeys?: Set<string>, excludeEdges?: Set<string>): 
       const stationId = stationIds[i];
       if (!stationId) continue;
 
-      const nodeKey = `${stationId}_${lineId}`;
+      const nodeKey = `${stationId}#${lineId}`;
       if (excludeNodeKeys?.has(nodeKey)) continue;
 
       if (!graph.has(nodeKey)) {
@@ -74,7 +74,7 @@ function buildGraph(excludeNodeKeys?: Set<string>, excludeEdges?: Set<string>): 
       if (i < stationIds.length - 1) {
         const nextStationId = stationIds[i + 1];
         if (nextStationId) {
-          const nextKey = `${nextStationId}_${lineId}`;
+          const nextKey = `${nextStationId}#${lineId}`;
           if (!excludeNodeKeys?.has(nextKey)) {
             const edgeKey = `${nodeKey}->${nextKey}`;
             if (!excludeEdges?.has(edgeKey)) {
@@ -93,7 +93,7 @@ function buildGraph(excludeNodeKeys?: Set<string>, excludeEdges?: Set<string>): 
       if (i > 0) {
         const prevStationId = stationIds[i - 1];
         if (prevStationId) {
-          const prevKey = `${prevStationId}_${lineId}`;
+          const prevKey = `${prevStationId}#${lineId}`;
           if (!excludeNodeKeys?.has(prevKey)) {
             const edgeKey = `${nodeKey}->${prevKey}`;
             if (!excludeEdges?.has(edgeKey)) {
@@ -150,8 +150,8 @@ function buildGraph(excludeNodeKeys?: Set<string>, excludeEdges?: Set<string>): 
         const line2 = stationLines[j];
         if (!line1 || !line2) continue;
 
-        const key1 = `${station.id}_${line1}`;
-        const key2 = `${station.id}_${line2}`;
+        const key1 = `${station.id}#${line1}`;
+        const key2 = `${station.id}#${line2}`;
 
         if (excludeNodeKeys?.has(key1) || excludeNodeKeys?.has(key2)) continue;
 
@@ -188,7 +188,7 @@ function getStationNodeKeys(stationId: string): string[] {
 
   return station.lines
     .filter(lineId => LINE_STATIONS[lineId])
-    .map(lineId => `${stationId}_${lineId}`);
+    .map(lineId => `${stationId}#${lineId}`);
 }
 
 // ============================================================================
@@ -405,8 +405,8 @@ function calculatePathCost(nodes: string[]): number {
     const next = nodes[i + 1];
     if (!current || !next) continue;
 
-    const [currentStationId, currentLineId] = current.split('_');
-    const [nextStationId, nextLineId] = next.split('_');
+    const [currentStationId, currentLineId] = current.split('#');
+    const [nextStationId, nextLineId] = next.split('#');
 
     if (currentStationId === nextStationId && currentLineId !== nextLineId) {
       cost += AVG_TRANSFER_TIME;
@@ -429,8 +429,8 @@ function convertToRoute(internalPath: InternalPath): Route {
     const nextKey = internalPath.nodes[i + 1];
     if (!currentKey || !nextKey) continue;
 
-    const [currentStationId, currentLineId] = currentKey.split('_');
-    const [nextStationId, nextLineId] = nextKey.split('_');
+    const [currentStationId, currentLineId] = currentKey.split('#');
+    const [nextStationId, nextLineId] = nextKey.split('#');
     if (!currentStationId || !currentLineId || !nextStationId || !nextLineId) continue;
 
     const currentStation = STATIONS[currentStationId];
@@ -455,52 +455,77 @@ function convertToRoute(internalPath: InternalPath): Route {
 }
 
 /**
- * Get diverse routes (avoid similar paths)
+ * Hard cap on transfers for any suggested route. Empirically routes in
+ * 수도권 cover all reasonable origin-destination pairs with ≤2 transfers;
+ * 3+ transfers almost always indicate a detour the user would not pick.
+ */
+const MAX_ROUTE_TRANSFERS = 2;
+
+/**
+ * Pick the fastest route and the fewest-transfer route from the K-shortest
+ * candidates. Replaces the old Jaccard-similarity-based diversity selection,
+ * which kept high-transfer detours just because their segments differed.
+ *
+ * Returns 1 or 2 routes:
+ *  - `category: 'fastest'`     — minimum totalMinutes (Yen output is asc-sorted)
+ *  - `category: 'min-transfer'` — minimum transferCount, tie-broken by time
+ *
+ * If both selections converge on the same path (e.g. only one route exists,
+ * or the fastest route already has the minimum transferCount), only one card
+ * is returned. Routes with > MAX_ROUTE_TRANSFERS transfers are filtered out
+ * unless no candidate qualifies (in which case we fall back to the K-shortest
+ * #1 so the UI shows something).
  */
 export function getDiverseRoutes(
   fromStationId: string,
-  toStationId: string,
-  minDiversity: number = 0.3
+  toStationId: string
 ): Route[] {
   const result = findKShortestPaths(fromStationId, toStationId, 10);
-  const diverseRoutes: Route[] = [];
+  if (result.paths.length === 0) return [];
 
-  for (const route of result.paths) {
-    // Check diversity against already selected routes
-    let isDiverse = true;
-
-    for (const selected of diverseRoutes) {
-      const similarity = calculateRouteSimilarity(route, selected);
-      if (similarity > 1 - minDiversity) {
-        isDiverse = false;
-        break;
-      }
-    }
-
-    if (isDiverse) {
-      diverseRoutes.push(route);
-    }
-
-    if (diverseRoutes.length >= 3) break;
+  const candidates = result.paths.filter(r => r.transferCount <= MAX_ROUTE_TRANSFERS);
+  if (candidates.length === 0) {
+    // Fallback: cap is too strict for this OD pair; show the K-shortest #1
+    // labelled as 'fastest' so the user still gets a result + a clear category.
+    return [{ ...result.paths[0]!, category: 'fastest' }];
   }
 
-  return diverseRoutes;
+  const fastest: Route = { ...candidates[0]!, category: 'fastest' };
+
+  // Pick the candidate with fewest transfers; tie-break by shortest time.
+  const minTransfer = candidates.slice(1).reduce<Route | null>((best, r) => {
+    if (!best) return r;
+    if (r.transferCount < best.transferCount) return r;
+    if (r.transferCount === best.transferCount && r.totalMinutes < best.totalMinutes) {
+      return r;
+    }
+    return best;
+  }, null);
+
+  if (minTransfer && !isSamePath(fastest, minTransfer)) {
+    return [fastest, { ...minTransfer, category: 'min-transfer' }];
+  }
+  return [fastest];
 }
 
 /**
- * Calculate similarity between two routes
+ * Two routes are the same path if every segment matches by from/to/line.
+ * Used to drop the 'min-transfer' card when it would duplicate 'fastest'.
  */
-function calculateRouteSimilarity(route1: Route, route2: Route): number {
-  const segments1 = new Set(route1.segments.map(s => `${s.fromStationId}-${s.toStationId}`));
-  const segments2 = new Set(route2.segments.map(s => `${s.fromStationId}-${s.toStationId}`));
-
-  let common = 0;
-  for (const seg of segments1) {
-    if (segments2.has(seg)) common++;
+function isSamePath(a: Route, b: Route): boolean {
+  if (a.segments.length !== b.segments.length) return false;
+  for (let i = 0; i < a.segments.length; i++) {
+    const sa = a.segments[i]!;
+    const sb = b.segments[i]!;
+    if (
+      sa.fromStationId !== sb.fromStationId ||
+      sa.toStationId !== sb.toStationId ||
+      sa.lineId !== sb.lineId
+    ) {
+      return false;
+    }
   }
-
-  const total = segments1.size + segments2.size - common;
-  return total > 0 ? common / total : 0;
+  return true;
 }
 
 export default { findKShortestPaths, getDiverseRoutes };

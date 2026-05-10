@@ -16,7 +16,9 @@ interface Props {
 function formatHm(d: Date): string {
   const h = d.getHours();
   const m = d.getMinutes().toString().padStart(2, '0');
-  return `${h}:${m}`;
+  const period = h < 12 ? '오전' : '오후';
+  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
+  return `${period} ${h12}:${m}`;
 }
 
 export const TimeChipRow: React.FC<Props> = ({ mode, time, onChangeMode, onChangeTime }) => {

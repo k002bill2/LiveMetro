@@ -7,11 +7,12 @@ jest.mock('@/services/theme', () => ({
   useTheme: () => ({ isDark: false }),
 }));
 
-// Memory: feedback_pill_atom_mock_text_wrap.md — Pill mock requires Text wrap
-jest.mock('@/components/design/Pill', () => {
-  const { Text: RNText } = jest.requireActual('react-native');
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return { Pill: ({ children }: { children: React.ReactNode }) => <RNText>{children}</RNText> };
+jest.mock('@/components/design/LineBadge', () => {
+  const { View: RNView } = jest.requireActual('react-native');
+  return {
+    LineBadge: ({ line }: { line: string }) => <RNView testID={`line-badge-${line}`} />,
+    getLineShortLabel: (line: string) => line,
+  };
 });
 
 jest.mock('@/components/design/JourneyStrip', () => {
@@ -46,11 +47,18 @@ const baseRoute: RouteWithMLMeta = {
 };
 
 describe('RouteCard', () => {
-  it('renders ETA with confidence interval', () => {
+  it('renders ETA minutes as the big number', () => {
     const { getByText } = render(
       <RouteCard route={baseRoute} expanded={false} onToggleExpand={() => {}} />
     );
-    expect(getByText('25분 ±3분')).toBeTruthy();
+    expect(getByText('25')).toBeTruthy();
+  });
+
+  it('renders the meta sub-line with transfer / walk / fare', () => {
+    const { getByText } = render(
+      <RouteCard route={baseRoute} expanded={false} onToggleExpand={() => {}} />
+    );
+    expect(getByText(/환승 0.*도보.*분.*원/)).toBeTruthy();
   });
 
   it('renders journey strip', () => {
@@ -58,21 +66,6 @@ describe('RouteCard', () => {
       <RouteCard route={baseRoute} expanded={false} onToggleExpand={() => {}} />
     );
     expect(getByTestId('journey-strip')).toBeTruthy();
-  });
-
-  it('shows delay risk pill when delayRiskLineIds non-empty', () => {
-    const route = { ...baseRoute, delayRiskLineIds: ['2'] };
-    const { getByText } = render(
-      <RouteCard route={route} expanded={false} onToggleExpand={() => {}} />
-    );
-    expect(getByText('2호선 지연 위험')).toBeTruthy();
-  });
-
-  it('shows positive pill when no delay risk', () => {
-    const { getByText } = render(
-      <RouteCard route={baseRoute} expanded={false} onToggleExpand={() => {}} />
-    );
-    expect(getByText('정시 운행')).toBeTruthy();
   });
 
   it('calls onToggleExpand when tapped', () => {
@@ -89,5 +82,23 @@ describe('RouteCard', () => {
       <RouteCard route={baseRoute} expanded={true} onToggleExpand={() => {}} />
     );
     expect(getByTestId('route-card-details')).toBeTruthy();
+  });
+
+  it('shows "추천" + "최단" tags when route.category is "fastest"', () => {
+    const fastestRoute: RouteWithMLMeta = { ...baseRoute, category: 'fastest' };
+    const { getByText } = render(
+      <RouteCard route={fastestRoute} expanded={false} onToggleExpand={() => {}} />
+    );
+    expect(getByText('추천')).toBeTruthy();
+    expect(getByText('최단')).toBeTruthy();
+  });
+
+  it('shows "환승최소" + "빠른길" tags when route.category is "min-transfer"', () => {
+    const minTransferRoute: RouteWithMLMeta = { ...baseRoute, category: 'min-transfer' };
+    const { getByText } = render(
+      <RouteCard route={minTransferRoute} expanded={false} onToggleExpand={() => {}} />
+    );
+    expect(getByText('환승최소')).toBeTruthy();
+    expect(getByText('빠른길')).toBeTruthy();
   });
 });

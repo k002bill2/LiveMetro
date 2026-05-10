@@ -49,6 +49,37 @@ const LINE_LABELS: Record<string, LineLabel> = {
   '서해선':         { label: '서해',     color: SUBWAY_LINE_COLORS.seohae },
   '김포도시철도':   { label: '김포',     color: SUBWAY_LINE_COLORS.gimpo },
   '우이신설경전철': { label: '우이신설', color: SUBWAY_LINE_COLORS.wooyisinseol },
+  // Graph-data slugs from src/data/stations.json `lines` field. routeService
+  // and StationPickerModal feed these directly into LineBadge, so they need
+  // explicit entries — the substring fallback in getSubwayLineColor is not
+  // consulted by LineBadge.
+  'airport':        { label: '공항',     color: SUBWAY_LINE_COLORS.airport },
+  'bundang':        { label: '분당',     color: SUBWAY_LINE_COLORS.bundang },
+  'sinbundang':     { label: '신분당',   color: SUBWAY_LINE_COLORS.sinbundang },
+  'gyeongchun':     { label: '경춘',     color: SUBWAY_LINE_COLORS.gyeongchun },
+  'gyeongui':       { label: '경의',     color: SUBWAY_LINE_COLORS.gyeongui },
+  'seohaeline':     { label: '서해',     color: SUBWAY_LINE_COLORS.seohae },
+  // Wide-area lines added with the full graph regen (24 lines total).
+  'gyeonggang':     { label: '경강',     color: SUBWAY_LINE_COLORS.gyeonggang },
+  'incheon1':       { label: '인천1',    color: SUBWAY_LINE_COLORS.incheon1 },
+  'incheon2':       { label: '인천2',    color: SUBWAY_LINE_COLORS.incheon2 },
+  'uijeongbu':      { label: '의정부',   color: SUBWAY_LINE_COLORS.uijeongbu },
+  'yongin':         { label: '용인',     color: SUBWAY_LINE_COLORS.ever },
+  'wooyisinseol':   { label: '우이신설', color: SUBWAY_LINE_COLORS.wooyisinseol },
+  'gimpo':          { label: '김포',     color: SUBWAY_LINE_COLORS.gimpo },
+  'sillim':         { label: '신림',     color: SUBWAY_LINE_COLORS.sillim },
+  'gtx_a':          { label: 'GTX-A',   color: SUBWAY_LINE_COLORS.gtx_a },
+};
+
+/**
+ * Look up the short Korean label for a line id (graph slug, digit, or alias).
+ * Returns null when the id has no registered alias — callers decide how to
+ * fall back (e.g. JourneyStrip uses the digit itself for numeric ids and the
+ * first char as a last resort).
+ */
+export const getLineShortLabel = (line: LineId): string | null => {
+  const meta = LINE_LABELS[String(line)];
+  return meta ? meta.label : null;
 };
 
 interface LineBadgeProps {

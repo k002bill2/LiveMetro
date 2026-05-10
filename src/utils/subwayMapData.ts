@@ -80,6 +80,49 @@ export const LINE_COLORS: Record<string, string> = linesData.colors;
  */
 export const LINE_STATIONS: Record<string, string[]> = linesData.stations;
 
+/**
+ * Set of station ids that actually appear in any line's `stations` order in
+ * lines.json. routeService's Dijkstra walks edges built from those orderings,
+ * so a station declared in stations.json but missing from every line list
+ * cannot be reached. We use this set to filter search results and seed
+ * candidates so the user never picks a non-routable station.
+ *
+ * As of the current data snapshot, ~41 declared (station,line) pairs are
+ * unwired (mostly line 7 + transfer lines `bundang`/`airport`/`gyeongui`/etc.
+ * whose station order is not yet present in lines.json). Backfilling
+ * lines.json is the long-term fix; this filter is the user-facing guard.
+ */
+export const ROUTABLE_STATION_IDS: ReadonlySet<string> = new Set(
+  Object.values(LINE_STATIONS).flat()
+);
+
+export const isRoutableStation = (stationId: string): boolean =>
+  ROUTABLE_STATION_IDS.has(stationId);
+
+/**
+ * Search stations in the routing graph by Korean or English name.
+ *
+ * Returns StationData whose `id` is the slug used by routeService /
+ * kShortestPath (e.g. "seolleung", "gangnam_gu_office"). Filters out
+ * stations not wired into any line's order in lines.json — those would
+ * always produce "no route found" if selected.
+ */
+export const searchGraphStations = (query: string, limit: number = 20): StationData[] => {
+  const q = query.toLowerCase().trim();
+  if (!q) return [];
+  const results: StationData[] = [];
+  for (const station of Object.values(STATIONS)) {
+    if (!ROUTABLE_STATION_IDS.has(station.id)) continue;
+    const nameMatch = station.name.toLowerCase().includes(q);
+    const nameEnMatch = station.nameEn?.toLowerCase().includes(q) ?? false;
+    if (nameMatch || nameEnMatch) {
+      results.push(station);
+      if (results.length >= limit) break;
+    }
+  }
+  return results;
+};
+
 // ============================================================================
 // Map Dimensions
 // ============================================================================

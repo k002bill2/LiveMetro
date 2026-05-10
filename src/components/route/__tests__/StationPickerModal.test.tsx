@@ -2,6 +2,15 @@ import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { StationPickerModal } from '../StationPickerModal';
 
+jest.mock('react-native-safe-area-context', () => ({
+  SafeAreaView: ({ children, ...props }: Record<string, unknown>) => {
+    const ReactLib = require('react');
+    const { View } = require('react-native');
+    return ReactLib.createElement(View, props, children as React.ReactNode);
+  },
+  SafeAreaProvider: ({ children }: Record<string, unknown>) => children,
+}));
+
 jest.mock('@/services/theme', () => ({
   useTheme: () => ({ isDark: false }),
 }));

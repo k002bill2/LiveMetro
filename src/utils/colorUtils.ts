@@ -41,6 +41,10 @@ export const SUBWAY_LINE_COLORS = {
   'wooyisinseol': '#B0CE18',
   'airport': '#0090D2',
   'gyeonggang': '#0054A6',
+  'incheon1': '#7CA8D5',
+  'incheon2': '#ED8B00',
+  'sillim': '#6789CA',
+  'gtx_a': '#9E0E40',
 } as const;
 
 /**

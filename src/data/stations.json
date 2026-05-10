@@ -8,8 +8,8 @@
     "lines": [
       "1",
       "4",
-      "airport",
-      "gyeongui"
+      "gyeongui",
+      "airport"
     ]
   },
   "city_hall_1": {
@@ -76,7 +76,8 @@
     "lines": [
       "1",
       "gyeongui",
-      "gyeongchun"
+      "gyeongchun",
+      "bundang"
     ]
   },
   "yongsan": {
@@ -129,7 +130,8 @@
     "x": 708,
     "y": 2809,
     "lines": [
-      "1"
+      "1",
+      "bundang"
     ]
   },
   "euljiro3ga": {
@@ -186,8 +188,8 @@
     "lines": [
       "2",
       "5",
-      "bundang",
-      "gyeongui"
+      "gyeongui",
+      "bundang"
     ]
   },
   "seongsu": {
@@ -338,8 +340,8 @@
     "y": 1625,
     "lines": [
       "2",
-      "airport",
-      "gyeongui"
+      "gyeongui",
+      "airport"
     ]
   },
   "sinchon": {
@@ -349,7 +351,8 @@
     "x": 770,
     "y": 784,
     "lines": [
-      "2"
+      "2",
+      "gyeongui"
     ]
   },
   "ewha": {
@@ -401,7 +404,9 @@
     "y": 873,
     "lines": [
       "3",
-      "gyeongui"
+      "gtx_a",
+      "gyeongui",
+      "seohaeline"
     ]
   },
   "yeonsinnae": {
@@ -412,7 +417,8 @@
     "y": 889,
     "lines": [
       "3",
-      "6"
+      "6",
+      "gtx_a"
     ]
   },
   "bulgwang": {
@@ -496,7 +502,8 @@
     "x": 2723,
     "y": 2190,
     "lines": [
-      "3"
+      "3",
+      "sinbundang"
     ]
   },
   "express_terminal_9": {
@@ -541,6 +548,7 @@
     "y": 2682,
     "lines": [
       "3",
+      "gtx_a",
       "bundang"
     ]
   },
@@ -553,16 +561,6 @@
     "lines": [
       "3",
       "5"
-    ]
-  },
-  "danggogae": {
-    "id": "danggogae",
-    "name": "당고개",
-    "nameEn": "Danggogae",
-    "x": 1362,
-    "y": 248,
-    "lines": [
-      "4"
     ]
   },
   "nowon": {
@@ -583,8 +581,8 @@
     "x": 3490,
     "y": 836,
     "lines": [
-      "4",
-      "1"
+      "1",
+      "4"
     ]
   },
   "mia_samgeori": {
@@ -667,8 +665,7 @@
     "x": 938,
     "y": 1200,
     "lines": [
-      "4",
-      "7"
+      "4"
     ]
   },
   "namtaeryeong": {
@@ -688,8 +685,8 @@
     "x": 1814,
     "y": 2741,
     "lines": [
-      "4",
-      "1"
+      "1",
+      "4"
     ]
   },
   "sanbon": {
@@ -710,8 +707,7 @@
     "y": 3333,
     "lines": [
       "4",
-      "bundang",
-      "seohaeline"
+      "bundang"
     ]
   },
   "banghwa": {
@@ -731,8 +727,8 @@
     "x": 490,
     "y": 1010,
     "lines": [
-      "5",
-      "2"
+      "2",
+      "5"
     ]
   },
   "yeongdeungpo_market": {
@@ -754,8 +750,8 @@
     "lines": [
       "5",
       "6",
-      "airport",
-      "gyeongui"
+      "gyeongui",
+      "airport"
     ]
   },
   "gwanghwamun": {
@@ -899,8 +895,8 @@
     "y": 1430,
     "lines": [
       "6",
-      "airport",
-      "gyeongui"
+      "gyeongui",
+      "airport"
     ]
   },
   "sangsu": {
@@ -953,16 +949,6 @@
       "6"
     ]
   },
-  "hankuk_univ": {
-    "id": "hankuk_univ",
-    "name": "한국외대앞",
-    "nameEn": "Hankuk Univ. of Foreign Studies",
-    "x": 1362,
-    "y": 680,
-    "lines": [
-      "6"
-    ]
-  },
   "seokgye": {
     "id": "seokgye",
     "name": "석계",
@@ -970,8 +956,8 @@
     "x": 3490,
     "y": 1185,
     "lines": [
-      "6",
-      "1"
+      "1",
+      "6"
     ]
   },
   "taereung": {
@@ -1023,8 +1009,8 @@
     "x": 3297,
     "y": 727,
     "lines": [
-      "7",
-      "1"
+      "1",
+      "7"
     ]
   },
   "suraksan": {
@@ -1084,7 +1070,6 @@
     "x": 3809,
     "y": 766,
     "lines": [
-      "7",
       "4"
     ]
   },
@@ -1126,7 +1111,8 @@
     "x": 2856,
     "y": 2190,
     "lines": [
-      "7"
+      "7",
+      "sinbundang"
     ]
   },
   "sinnonhyeon_9": {
@@ -1136,8 +1122,8 @@
     "x": 2856,
     "y": 2308,
     "lines": [
-      "7",
-      "9"
+      "9",
+      "sinbundang"
     ]
   },
   "isu": {
@@ -1147,8 +1133,7 @@
     "x": 2450,
     "y": 2327,
     "lines": [
-      "7",
-      "4"
+      "7"
     ]
   },
   "namseong": {
@@ -1168,7 +1153,8 @@
     "x": 1903,
     "y": 2327,
     "lines": [
-      "7"
+      "7",
+      "sillim"
     ]
   },
   "daelim": {
@@ -1178,8 +1164,8 @@
     "x": 1699,
     "y": 2327,
     "lines": [
-      "7",
-      "2"
+      "2",
+      "7"
     ]
   },
   "gasan_digital": {
@@ -1189,8 +1175,8 @@
     "x": 1537,
     "y": 2327,
     "lines": [
-      "7",
-      "1"
+      "1",
+      "7"
     ]
   },
   "cheolsan": {
@@ -1221,7 +1207,7 @@
     "y": 2024,
     "lines": [
       "7",
-      "1"
+      "incheon1"
     ]
   },
   "amsa": {
@@ -1282,8 +1268,8 @@
     "x": 3523,
     "y": 2496,
     "lines": [
-      "8",
-      "3"
+      "3",
+      "8"
     ]
   },
   "moran": {
@@ -1313,16 +1299,6 @@
     "nameEn": "Yeomchang",
     "x": 1525,
     "y": 1700,
-    "lines": [
-      "9"
-    ]
-  },
-  "samilgyo": {
-    "id": "samilgyo",
-    "name": "삼일교",
-    "nameEn": "Samilgyo",
-    "x": 866,
-    "y": 1010,
     "lines": [
       "9"
     ]
@@ -1364,6 +1340,7 @@
     "x": 3795,
     "y": 2243,
     "lines": [
+      "5",
       "9"
     ]
   },
@@ -1382,2169 +1359,5041 @@
     "name": "인천논현",
     "x": 1126,
     "y": 3108,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_eab2bdec": {
     "id": "s_eab2bdec",
     "name": "경전철의정부",
     "x": 3003,
     "y": 643,
-    "lines": []
+    "lines": [
+      "uijeongbu"
+    ]
   },
   "s_ec9d98ec": {
     "id": "s_ec9d98ec",
     "name": "의정부시청",
     "x": 2913,
     "y": 643,
-    "lines": []
+    "lines": [
+      "uijeongbu"
+    ]
   },
   "s_ec8ba0eb": {
     "id": "s_ec8ba0eb",
     "name": "신둔도예촌",
     "x": 3919,
     "y": 3083,
-    "lines": []
-  },
-  "s_ec9790eb": {
-    "id": "s_ec9790eb",
-    "name": "에버라인",
-    "x": 4321,
-    "y": 3196,
-    "lines": []
-  },
-  "s_38ed98b8": {
-    "id": "s_38ed98b8",
-    "name": "8호선",
-    "x": 3610,
-    "y": 2985,
-    "lines": []
-  },
-  "s_39ed98b8": {
-    "id": "s_39ed98b8",
-    "name": "9호선",
-    "x": 4090,
-    "y": 2244,
-    "lines": []
+    "lines": [
+      "gyeonggang"
+    ]
   },
   "s_ec8898ec": {
     "id": "s_ec8898ec",
     "name": "수원시청",
     "x": 2370,
     "y": 3110,
-    "lines": []
-  },
-  "s_31ed98b8": {
-    "id": "s_31ed98b8",
-    "name": "1호선",
-    "x": 4421,
-    "y": 3313,
-    "lines": []
-  },
-  "s_33ed98b8": {
-    "id": "s_33ed98b8",
-    "name": "3호선",
-    "x": 617,
-    "y": 859,
-    "lines": []
-  },
-  "s_36ed98b8": {
-    "id": "s_36ed98b8",
-    "name": "6호선",
-    "x": 3876,
-    "y": 1334,
-    "lines": []
-  },
-  "s_32ed98b8": {
-    "id": "s_32ed98b8",
-    "name": "2호선",
-    "x": 3203,
-    "y": 1691,
-    "lines": []
-  },
-  "s_35ed98b8": {
-    "id": "s_35ed98b8",
-    "name": "5호선",
-    "x": 4096,
-    "y": 2541,
-    "lines": []
-  },
-  "s_37ed98b8": {
-    "id": "s_37ed98b8",
-    "name": "7호선",
-    "x": 3297,
-    "y": 831,
-    "lines": []
-  },
-  "s_34ed98b8": {
-    "id": "s_34ed98b8",
-    "name": "4호선",
-    "x": 1269,
-    "y": 3312,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_eab2bdea": {
     "id": "s_eab2bdea",
     "name": "경기광주",
     "x": 3619,
     "y": 3083,
-    "lines": []
+    "lines": [
+      "gyeonggang"
+    ]
   },
   "s_ec9ab0ec": {
     "id": "s_ec9ab0ec",
     "name": "우장산",
     "x": 1279,
     "y": 1613,
-    "lines": []
+    "lines": [
+      "5"
+    ]
   },
   "s_eab3b5ed": {
     "id": "s_eab3b5ed",
     "name": "공항화물청사",
     "x": 566,
     "y": 2581,
-    "lines": []
+    "lines": [
+      "airport"
+    ]
   },
   "s_ec849ced": {
     "id": "s_ec849ced",
     "name": "서현",
     "x": 3339,
     "y": 2966,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_eab980ed": {
     "id": "s_eab980ed",
     "name": "김포공항",
     "x": 1078,
     "y": 1356,
-    "lines": []
-  },
-  "s_47545841": {
-    "id": "s_47545841",
-    "name": "GTXA",
-    "x": 501,
-    "y": 907,
-    "lines": []
+    "lines": [
+      "5",
+      "9",
+      "airport",
+      "gimpo",
+      "seohaeline"
+    ]
   },
   "s_eab280ec": {
     "id": "s_eab280ec",
     "name": "검암",
     "x": 689,
     "y": 1386,
-    "lines": []
+    "lines": [
+      "airport",
+      "incheon2"
+    ]
   },
   "s_eca3bcec": {
     "id": "s_eca3bcec",
     "name": "주안국가산단",
     "x": 689,
     "y": 2257,
-    "lines": []
+    "lines": [
+      "incheon2"
+    ]
   },
   "s_ec9b90ec": {
     "id": "s_ec9b90ec",
     "name": "원종",
     "x": 1151,
     "y": 1686,
-    "lines": []
+    "lines": [
+      "seohaeline"
+    ]
   },
   "s_ebb680ed": {
     "id": "s_ebb680ed",
     "name": "부평삼거리",
     "x": 945,
     "y": 2317,
-    "lines": []
+    "lines": [
+      "incheon1"
+    ]
   },
   "s_ec98a8ec": {
     "id": "s_ec98a8ec",
     "name": "온양온천",
     "x": 4319,
     "y": 3313,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_ec868cec": {
     "id": "s_ec868cec",
     "name": "소새울",
     "x": 1191,
     "y": 2426,
-    "lines": []
+    "lines": [
+      "seohaeline"
+    ]
   },
   "s_ebb680ec": {
     "id": "s_ebb680ec",
     "name": "부천시청",
     "x": 1120,
     "y": 1847,
-    "lines": ["7"]
+    "lines": [
+      "7"
+    ]
   },
   "s_eab888ec": {
     "id": "s_eab888ec",
     "name": "금촌",
     "x": 1425,
     "y": 583,
-    "lines": []
+    "lines": [
+      "gyeongui"
+    ]
   },
   "s_ebb391ec": {
     "id": "s_ebb391ec",
     "name": "병점",
     "x": 2590,
     "y": 3313,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_eab384ec": {
     "id": "s_eab384ec",
     "name": "계산",
     "x": 835,
     "y": 1714,
-    "lines": []
+    "lines": [
+      "incheon1"
+    ]
   },
   "s_eb8aa5ea": {
     "id": "s_eb8aa5ea",
     "name": "능곡",
     "x": 1160,
     "y": 1026,
-    "lines": []
+    "lines": [
+      "gyeongui",
+      "seohaeline"
+    ]
   },
   "s_eab3a1ec": {
     "id": "s_eab3a1ec",
     "name": "곡산",
     "x": 1011,
     "y": 730,
-    "lines": []
+    "lines": [
+      "gyeongui",
+      "seohaeline"
+    ]
   },
   "s_ebb0b1eb": {
     "id": "s_ebb0b1eb",
     "name": "백마",
     "x": 1011,
     "y": 670,
-    "lines": []
+    "lines": [
+      "gyeongui",
+      "seohaeline"
+    ]
   },
   "s_ed928dec": {
     "id": "s_ed928dec",
     "name": "풍산",
     "x": 1011,
     "y": 609,
-    "lines": []
+    "lines": [
+      "gyeongui",
+      "seohaeline"
+    ]
   },
   "s_ec9dbcec": {
     "id": "s_ec9dbcec",
     "name": "일원",
     "x": 3340,
     "y": 2610,
-    "lines": []
+    "lines": [
+      "3"
+    ]
   },
   "s_ed9a8ceb": {
     "id": "s_ed9a8ceb",
     "name": "회룡",
     "x": 3126,
     "y": 727,
-    "lines": []
+    "lines": [
+      "1",
+      "uijeongbu"
+    ]
   },
   "s_eab491ec": {
     "id": "s_eab491ec",
     "name": "광운대",
     "x": 3490,
     "y": 1043,
-    "lines": []
+    "lines": [
+      "1",
+      "gyeongchun"
+    ]
   },
   "s_eab590eb": {
     "id": "s_eab590eb",
     "name": "교대",
     "x": 2723,
     "y": 2473,
-    "lines": []
+    "lines": [
+      "2",
+      "3"
+    ]
   },
   "s_ed8c90ea": {
     "id": "s_ed8c90ea",
     "name": "판교",
     "x": 3090,
     "y": 2840,
-    "lines": []
+    "lines": [
+      "gyeonggang",
+      "sinbundang"
+    ]
   },
   "s_ec9db4eb": {
     "id": "s_ec9db4eb",
     "name": "이매",
     "x": 3429,
     "y": 2967,
-    "lines": []
+    "lines": [
+      "gyeonggang",
+      "bundang"
+    ]
   },
   "s_ec84b1eb": {
     "id": "s_ec84b1eb",
     "name": "성복",
     "x": 2729,
     "y": 2793,
-    "lines": []
+    "lines": [
+      "sinbundang"
+    ]
   },
   "s_ec84a0ec": {
     "id": "s_ec84a0ec",
     "name": "선유도",
     "x": 1630,
     "y": 1806,
-    "lines": []
+    "lines": [
+      "9"
+    ]
   },
   "s_ec839bea": {
     "id": "s_ec839bea",
     "name": "샛강",
     "x": 2048,
     "y": 2153,
-    "lines": []
+    "lines": [
+      "9",
+      "sillim"
+    ]
   },
   "s_eb8c80eb": {
     "id": "s_eb8c80eb",
     "name": "대모산입구",
     "x": 3331,
     "y": 2679,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_eab8b0ed": {
     "id": "s_eab8b0ed",
     "name": "기흥",
     "x": 2686,
     "y": 2967,
-    "lines": []
+    "lines": [
+      "bundang",
+      "yongin"
+    ]
   },
   "s_ec849deb": {
     "id": "s_ec849deb",
     "name": "석바위시장",
     "x": 868,
     "y": 2457,
-    "lines": []
+    "lines": [
+      "incheon2"
+    ]
   },
   "s_eab080ec": {
     "id": "s_eab080ec",
     "name": "가천대",
     "x": 3697,
     "y": 2784,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_ed9aa8ec": {
     "id": "s_ed9aa8ec",
     "name": "효자",
     "x": 2373,
     "y": 643,
-    "lines": []
+    "lines": [
+      "uijeongbu"
+    ]
   },
   "s_ec8ba0ea": {
     "id": "s_ec8ba0ea",
     "name": "신갈",
     "x": 2740,
     "y": 2966,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_ed9a8cea": {
     "id": "s_ed9a8cea",
     "name": "회기",
     "x": 3360,
     "y": 1372,
-    "lines": []
+    "lines": [
+      "1",
+      "gyeongui",
+      "gyeongchun"
+    ]
   },
   "s_ec8381eb": {
     "id": "s_ec8381eb",
     "name": "상동",
     "x": 1040,
     "y": 1867,
-    "lines": ["7"]
+    "lines": [
+      "7"
+    ]
   },
   "s_eca491eb": {
     "id": "s_eca491eb",
     "name": "중동",
     "x": 1037,
     "y": 2200,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_eba79dec": {
     "id": "s_eba79dec",
     "name": "망원",
     "x": 1632,
     "y": 1645,
-    "lines": []
+    "lines": [
+      "6"
+    ]
   },
   "s_ebb3b5ec": {
     "id": "s_ebb3b5ec",
     "name": "복정",
     "x": 3697,
     "y": 2698,
-    "lines": []
+    "lines": [
+      "8",
+      "bundang"
+    ]
   },
   "s_eca095ec": {
     "id": "s_eca095ec",
     "name": "정왕",
     "x": 1378,
     "y": 3333,
-    "lines": []
+    "lines": [
+      "4",
+      "bundang"
+    ]
   },
   "s_ebafb8ea": {
     "id": "s_ebafb8ea",
     "name": "미금",
     "x": 3100,
     "y": 2968,
-    "lines": []
+    "lines": [
+      "bundang",
+      "sinbundang"
+    ]
   },
   "s_eab5acec": {
     "id": "s_eab5acec",
     "name": "구산",
     "x": 1570,
     "y": 982,
-    "lines": []
+    "lines": [
+      "6"
+    ]
   },
   "s_ec84b1ec": {
     "id": "s_ec84b1ec",
     "name": "성신여대입구",
     "x": 2711,
     "y": 1123,
-    "lines": []
+    "lines": [
+      "4",
+      "wooyisinseol"
+    ]
   },
   "s_ebb3b4eb": {
     "id": "s_ebb3b4eb",
     "name": "보라매공원",
     "x": 1936,
     "y": 2362,
-    "lines": []
+    "lines": [
+      "sillim"
+    ]
   },
   "s_ec8ba0ec": {
     "id": "s_ec8ba0ec",
     "name": "신천",
     "x": 1392,
     "y": 2627,
-    "lines": []
+    "lines": [
+      "seohaeline"
+    ]
   },
   "s_eba788ea": {
     "id": "s_eba788ea",
     "name": "마곡",
     "x": 1166,
     "y": 1500,
-    "lines": []
+    "lines": [
+      "5"
+    ]
   },
   "s_eab5aceb": {
     "id": "s_eab5aceb",
     "name": "구룡",
     "x": 3080,
     "y": 2679,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_ebb384eb": {
     "id": "s_ebb384eb",
     "name": "별내별가람",
     "x": 4029,
     "y": 766,
-    "lines": []
+    "lines": [
+      "4"
+    ]
   },
   "s_ecb488ec": {
     "id": "s_ecb488ec",
     "name": "초월",
     "x": 3719,
     "y": 3083,
-    "lines": []
+    "lines": [
+      "gyeonggang"
+    ]
   },
   "s_ec9588ec": {
     "id": "s_ec9588ec",
     "name": "안암",
     "x": 2907,
     "y": 1207,
-    "lines": []
+    "lines": [
+      "6"
+    ]
   },
   "s_eab3a0ec": {
     "id": "s_eab3a0ec",
     "name": "고색",
     "x": 2245,
     "y": 3313,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_eca491ec": {
     "id": "s_eca491ec",
     "name": "중앙",
     "x": 1694,
     "y": 3172,
-    "lines": []
+    "lines": [
+      "4",
+      "bundang"
+    ]
   },
   "s_ed959ceb": {
     "id": "s_ed959ceb",
     "name": "한남",
     "x": 2585,
     "y": 2003,
-    "lines": []
+    "lines": [
+      "gyeongui"
+    ]
   },
   "s_eca084eb": {
     "id": "s_eca084eb",
     "name": "전대.에버랜드",
     "x": 4321,
     "y": 3196,
-    "lines": []
+    "lines": [
+      "yongin"
+    ]
   },
   "s_eab280eb": {
     "id": "s_eab280eb",
     "name": "검바위",
     "x": 689,
     "y": 1457,
-    "lines": []
+    "lines": [
+      "incheon2"
+    ]
   },
   "s_ec9ab4ec": {
     "id": "s_ec9ab4ec",
     "name": "운천",
     "x": 1635,
     "y": 526,
-    "lines": []
+    "lines": [
+      "gyeongui"
+    ]
   },
   "s_eab480ec": {
     "id": "s_eab480ec",
     "name": "관악",
     "x": 1648,
     "y": 2575,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_eab491eb": {
     "id": "s_eab491eb",
     "name": "광명",
     "x": 1537,
     "y": 2575,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_ec849ceb": {
     "id": "s_ec849ceb",
     "name": "서빙고",
     "x": 2448,
     "y": 2003,
-    "lines": []
+    "lines": [
+      "gyeongui"
+    ]
   },
   "s_ec97b0ec": {
     "id": "s_ec97b0ec",
     "name": "연수",
     "x": 885,
     "y": 2987,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_eca784ec": {
     "id": "s_eca784ec",
     "name": "진위",
     "x": 2974,
     "y": 3313,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_ec86a1eb": {
     "id": "s_ec86a1eb",
     "name": "송도",
     "x": 825,
     "y": 2987,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_ec9e84ec": {
     "id": "s_ec9e84ec",
     "name": "임진강",
     "x": 1635,
     "y": 469,
-    "lines": []
+    "lines": [
+      "gyeongui"
+    ]
   },
   "s_eca780ed": {
     "id": "s_eca780ed",
     "name": "지행",
     "x": 2568,
     "y": 727,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_ed8391ec": {
     "id": "s_ed8391ec",
     "name": "탑석",
     "x": 2017,
     "y": 643,
-    "lines": []
+    "lines": [
+      "uijeongbu"
+    ]
   },
   "s_ebb09cea": {
     "id": "s_ebb09cea",
     "name": "발곡",
     "x": 3126,
     "y": 831,
-    "lines": []
+    "lines": [
+      "uijeongbu"
+    ]
   },
   "s_ecb698ec": {
     "id": "s_ecb698ec",
     "name": "춘의",
     "x": 1297,
     "y": 1922,
-    "lines": ["7"]
+    "lines": [
+      "7"
+    ]
   },
   "s_eab491ea": {
     "id": "s_eab491ea",
     "name": "광교중앙",
     "x": 2569,
     "y": 2793,
-    "lines": []
+    "lines": [
+      "sinbundang"
+    ]
   },
   "s_eb8f99ed": {
     "id": "s_eb8f99ed",
     "name": "동탄",
     "x": 2589,
     "y": 3047,
-    "lines": []
+    "lines": [
+      "gtx_a"
+    ]
   },
   "s_ec97acec": {
     "id": "s_ec97acec",
     "name": "여의나루",
     "x": 2002,
     "y": 2064,
-    "lines": []
+    "lines": [
+      "5"
+    ]
   },
   "s_ebb681ed": {
     "id": "s_ebb681ed",
     "name": "북한산보국문",
     "x": 2607,
     "y": 989,
-    "lines": []
+    "lines": [
+      "wooyisinseol"
+    ]
   },
   "s_eca095eb": {
     "id": "s_eca095eb",
     "name": "정부과천청사",
     "x": 2149,
     "y": 2712,
-    "lines": []
+    "lines": [
+      "4"
+    ]
   },
   "s_ec8694ec": {
     "id": "s_ec8694ec",
     "name": "솔샘",
     "x": 2607,
     "y": 941,
-    "lines": []
+    "lines": [
+      "wooyisinseol"
+    ]
   },
   "s_ec82bcec": {
     "id": "s_ec82bcec",
     "name": "삼전",
     "x": 3280,
     "y": 2477,
-    "lines": []
+    "lines": [
+      "9"
+    ]
   },
   "s_ed9994ea": {
     "id": "s_ed9994ea",
     "name": "화곡",
     "x": 1335,
     "y": 1669,
-    "lines": []
-  },
-  "s_342e3139": {
-    "id": "s_342e3139",
-    "name": "4.19민주묘지",
-    "x": 2954,
-    "y": 923,
-    "lines": []
+    "lines": [
+      "5"
+    ]
   },
   "s_ec8694eb": {
     "id": "s_ec8694eb",
     "name": "솔밭공원",
     "x": 3029,
     "y": 923,
-    "lines": []
+    "lines": [
+      "wooyisinseol"
+    ]
   },
   "s_eab084ec": {
     "id": "s_eab084ec",
     "name": "간석오거리",
     "x": 952,
     "y": 2385,
-    "lines": []
+    "lines": [
+      "incheon1"
+    ]
   },
   "s_ec9995ea": {
     "id": "s_ec9995ea",
     "name": "왕길",
     "x": 482,
     "y": 1216,
-    "lines": []
+    "lines": [
+      "incheon2"
+    ]
   },
   "s_eba788ec": {
     "id": "s_eba788ec",
     "name": "마석",
     "x": 4416,
     "y": 1077,
-    "lines": []
+    "lines": [
+      "gyeongchun"
+    ]
   },
   "s_ec9984ec": {
     "id": "s_ec9984ec",
     "name": "완정",
     "x": 689,
     "y": 1263,
-    "lines": []
+    "lines": [
+      "incheon2"
+    ]
   },
   "s_eb8f85ec": {
     "id": "s_eb8f85ec",
     "name": "독산",
     "x": 1537,
     "y": 2410,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_ec9584ec": {
     "id": "s_ec9584ec",
     "name": "아신",
     "x": 4191,
     "y": 1803,
-    "lines": []
+    "lines": [
+      "gyeongui"
+    ]
   },
   "s_ec849cea": {
     "id": "s_ec849cea",
     "name": "서강대",
     "x": 1845,
     "y": 1686,
-    "lines": []
+    "lines": [
+      "gyeongui"
+    ]
   },
   "s_ec8b9ceb": {
     "id": "s_ec8b9ceb",
     "name": "시민공원",
     "x": 788,
     "y": 2457,
-    "lines": []
+    "lines": [
+      "incheon2"
+    ]
   },
   "s_ec849dec": {
     "id": "s_ec849dec",
     "name": "석촌고분",
     "x": 3338,
     "y": 2420,
-    "lines": []
+    "lines": [
+      "9"
+    ]
   },
   "s_ebaaa8eb": {
     "id": "s_ebaaa8eb",
     "name": "모래내시장",
     "x": 1175,
     "y": 2582,
-    "lines": []
+    "lines": [
+      "incheon2"
+    ]
   },
   "s_eba78cec": {
     "id": "s_eba78cec",
     "name": "만수",
     "x": 1235,
     "y": 2641,
-    "lines": []
+    "lines": [
+      "incheon2"
+    ]
   },
   "s_eb82a8eb": {
     "id": "s_eb82a8eb",
     "name": "남동인더스파크",
     "x": 1066,
     "y": 2987,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_eb8f99ec": {
     "id": "s_eb8f99ec",
     "name": "동천",
     "x": 2863,
     "y": 2908,
-    "lines": []
+    "lines": [
+      "sinbundang"
+    ]
   },
   "s_eb8f84ec": {
     "id": "s_eb8f84ec",
     "name": "도심",
     "x": 3846,
     "y": 1772,
-    "lines": []
+    "lines": [
+      "gyeongui"
+    ]
   },
   "s_eca09ceb": {
     "id": "s_eca09ceb",
     "name": "제물포",
     "x": 708,
     "y": 2597,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_eb8f84ed": {
     "id": "s_eb8f84ed",
     "name": "도화",
     "x": 708,
     "y": 2527,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_ebb0b1ec": {
     "id": "s_ebb0b1ec",
     "name": "백양리",
     "x": 4335,
     "y": 643,
-    "lines": []
+    "lines": [
+      "gyeongchun"
+    ]
   },
   "s_ebb680ea": {
     "id": "s_ebb680ea",
     "name": "부개",
     "x": 907,
     "y": 2200,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_ec97adea": {
     "id": "s_ec97adea",
     "name": "역곡",
     "x": 1232,
     "y": 2200,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_ec98a4eb": {
     "id": "s_ec98a4eb",
     "name": "오목천",
     "x": 2125,
     "y": 3282,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_eab09ceb": {
     "id": "s_eab09ceb",
     "name": "개롱",
     "x": 3967,
     "y": 2412,
-    "lines": []
+    "lines": [
+      "5"
+    ]
   },
   "s_ec9881eb": {
     "id": "s_ec9881eb",
     "name": "영등포",
     "x": 1775,
     "y": 2200,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_ebaa85ed": {
     "id": "s_ebaa85ed",
     "name": "명학",
     "x": 1754,
     "y": 2681,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_eab5b0ed": {
     "id": "s_eab5b0ed",
     "name": "군포",
     "x": 1897,
     "y": 2824,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_eb8bb9ec": {
     "id": "s_eb8bb9ec",
     "name": "당정",
     "x": 1990,
     "y": 2917,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_ec84b1ea": {
     "id": "s_ec84b1ea",
     "name": "성균관대",
     "x": 2177,
     "y": 3104,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_ed9994ec": {
     "id": "s_ed9994ec",
     "name": "화정",
     "x": 1126,
     "y": 889,
-    "lines": []
+    "lines": [
+      "3"
+    ]
   },
   "s_ec84b8eb": {
     "id": "s_ec84b8eb",
     "name": "세마",
     "x": 2689,
     "y": 3313,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_ec98a4ec": {
     "id": "s_ec98a4ec",
     "name": "오산",
     "x": 2879,
     "y": 3313,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_ec86a1ed": {
     "id": "s_ec86a1ed",
     "name": "송파나루",
     "x": 3480,
     "y": 2244,
-    "lines": []
+    "lines": [
+      "9"
+    ]
   },
   "s_ec849cec": {
     "id": "s_ec849cec",
     "name": "서울숲",
     "x": 3012,
     "y": 1767,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_ed8f89ed": {
     "id": "s_ed8f89ed",
     "name": "평택",
     "x": 3354,
     "y": 3313,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_ec84b1ed": {
     "id": "s_ec84b1ed",
     "name": "성환",
     "x": 3449,
     "y": 3313,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_eca781ec": {
     "id": "s_eca781ec",
     "name": "직산",
     "x": 3544,
     "y": 3313,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_eb9190ec": {
     "id": "s_eb9190ec",
     "name": "두정",
     "x": 3639,
     "y": 3313,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_ecb29cec": {
     "id": "s_ecb29cec",
     "name": "천왕",
     "x": 1297,
     "y": 2289,
-    "lines": ["7"]
+    "lines": [
+      "7"
+    ]
   },
   "s_ebb489eb": {
     "id": "s_ebb489eb",
     "name": "봉명",
     "x": 3829,
     "y": 3313,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_ec8c8dec": {
     "id": "s_ec8c8dec",
     "name": "쌍용",
     "x": 3924,
     "y": 3313,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_ed8395ec": {
     "id": "s_ed8395ec",
     "name": "탕정",
     "x": 4119,
     "y": 3313,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_ebb0b0eb": {
     "id": "s_ebb0b0eb",
     "name": "배방",
     "x": 4219,
     "y": 3313,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_eb82a8ec": {
     "id": "s_eb82a8ec",
     "name": "남춘천",
     "x": 4038,
     "y": 643,
-    "lines": []
+    "lines": [
+      "gyeongchun"
+    ]
   },
   "s_eca285ea": {
     "id": "s_eca285ea",
     "name": "종각",
     "x": 2177,
     "y": 1434,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_eca09cea": {
     "id": "s_eca09cea",
     "name": "제기동",
     "x": 3095,
     "y": 1367,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_ec99b8eb": {
     "id": "s_ec99b8eb",
     "name": "외대앞",
     "x": 3435,
     "y": 1367,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_ec9b94ea": {
     "id": "s_ec9b94ea",
     "name": "월곶",
     "x": 1126,
     "y": 3248,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_eb85b9ec": {
     "id": "s_eb85b9ec",
     "name": "녹양",
     "x": 2888,
     "y": 727,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_ebb0a9ed": {
     "id": "s_ebb0a9ed",
     "name": "방학",
     "x": 3490,
     "y": 764,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_eb8f84eb": {
     "id": "s_eb8f84eb",
     "name": "도농",
     "x": 3846,
     "y": 1562,
-    "lines": []
+    "lines": [
+      "gyeongui"
+    ]
   },
   "s_eab080eb": {
     "id": "s_eab080eb",
     "name": "가능",
     "x": 2968,
     "y": 727,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_ec9691ec": {
     "id": "s_ec9691ec",
     "name": "양재시민의숲",
     "x": 2933,
     "y": 2684,
-    "lines": []
+    "lines": [
+      "sinbundang"
+    ]
   },
   "s_eb8d95ea": {
     "id": "s_eb8d95ea",
     "name": "덕계",
     "x": 2728,
     "y": 727,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_eb8d95ec": {
     "id": "s_eb8d95ec",
     "name": "덕소",
     "x": 3846,
     "y": 1702,
-    "lines": []
+    "lines": [
+      "gyeongui"
+    ]
   },
   "s_eb8f99eb": {
     "id": "s_eb8f99eb",
     "name": "동백",
     "x": 3070,
     "y": 3196,
-    "lines": []
+    "lines": [
+      "yongin"
+    ]
   },
   "s_ebb3b4ec": {
     "id": "s_ebb3b4ec",
     "name": "보정",
     "x": 2879,
     "y": 2966,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_ecb2adec": {
     "id": "s_ecb2adec",
     "name": "청산",
     "x": 2124,
     "y": 727,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_eca084ea": {
     "id": "s_eca084ea",
     "name": "전곡",
     "x": 2021,
     "y": 727,
-    "lines": []
+    "lines": [
+      "1"
+    ]
   },
   "s_ec9584ed": {
     "id": "s_ec9584ed",
     "name": "아현",
     "x": 1954,
     "y": 1527,
-    "lines": []
+    "lines": [
+      "2"
+    ]
   },
   "s_ec9d84ec": {
     "id": "s_ec9d84ec",
     "name": "을지로입구",
     "x": 2256,
     "y": 1527,
-    "lines": []
+    "lines": [
+      "2"
+    ]
   },
   "s_ec8381ec": {
     "id": "s_ec8381ec",
     "name": "상천",
     "x": 4416,
     "y": 867,
-    "lines": []
+    "lines": [
+      "gyeongchun"
+    ]
   },
   "s_ed959cec": {
     "id": "s_ed959cec",
     "name": "한성백제",
     "x": 3635,
     "y": 2244,
-    "lines": []
+    "lines": [
+      "9"
+    ]
   },
   "s_eb9a9dec": {
     "id": "s_eb9a9dec",
     "name": "뚝섬",
     "x": 3151,
     "y": 1621,
-    "lines": []
+    "lines": [
+      "2"
+    ]
   },
   "s_eab095eb": {
     "id": "s_eab095eb",
     "name": "강남대",
     "x": 2722,
     "y": 3087,
-    "lines": []
+    "lines": [
+      "yongin"
+    ]
   },
   "s_ec9ea0ec": {
     "id": "s_ec9ea0ec",
     "name": "잠원",
     "x": 2723,
     "y": 2245,
-    "lines": []
+    "lines": [
+      "3"
+    ]
   },
   "s_ec97adec": {
     "id": "s_ec97adec",
     "name": "역촌",
     "x": 1651,
     "y": 993,
-    "lines": []
+    "lines": [
+      "6"
+    ]
   },
   "s_ebb0a9eb": {
     "id": "s_ebb0a9eb",
     "name": "방배",
     "x": 2542,
     "y": 2473,
-    "lines": []
+    "lines": [
+      "2"
+    ]
   },
   "s_eb8299ec": {
     "id": "s_eb8299ec",
     "name": "낙성대",
     "x": 2367,
     "y": 2473,
-    "lines": []
+    "lines": [
+      "2"
+    ]
   },
   "s_ebb489ec": {
     "id": "s_ebb489ec",
     "name": "봉천",
     "x": 2146,
     "y": 2473,
-    "lines": []
+    "lines": [
+      "2"
+    ]
   },
   "s_eb8bb9ea": {
     "id": "s_eb8bb9ea",
     "name": "당곡",
     "x": 2011,
     "y": 2433,
-    "lines": []
+    "lines": [
+      "sillim"
+    ]
   },
   "s_ebacb8eb": {
     "id": "s_ebacb8eb",
     "name": "문래",
     "x": 1697,
     "y": 2105,
-    "lines": []
+    "lines": [
+      "2"
+    ]
   },
   "s_ec9aa9eb": {
     "id": "s_ec9aa9eb",
     "name": "용문",
     "x": 4326,
     "y": 1561,
-    "lines": []
+    "lines": [
+      "gyeongui"
+    ]
   },
   "s_eba788eb": {
     "id": "s_eba788eb",
     "name": "마두",
     "x": 858,
     "y": 859,
-    "lines": []
+    "lines": [
+      "3"
+    ]
   },
   "s_ec9b90eb": {
     "id": "s_ec9b90eb",
     "name": "원덕",
     "x": 4326,
     "y": 1631,
-    "lines": []
+    "lines": [
+      "gyeongui"
+    ]
   },
   "s_ec9b90ed": {
     "id": "s_ec9b90ed",
     "name": "원흥",
     "x": 1272,
     "y": 889,
-    "lines": []
+    "lines": [
+      "3"
+    ]
   },
   "s_eca780ec": {
     "id": "s_eca780ec",
     "name": "지석",
     "x": 2812,
     "y": 3177,
-    "lines": []
+    "lines": [
+      "yongin"
+    ]
   },
   "s_eab5aced": {
     "id": "s_eab5aced",
     "name": "구파발",
     "x": 1491,
     "y": 889,
-    "lines": []
+    "lines": [
+      "3"
+    ]
   },
   "s_eb85b9eb": {
     "id": "s_eb85b9eb",
     "name": "녹번",
     "x": 1825,
     "y": 979,
-    "lines": []
+    "lines": [
+      "3"
+    ]
   },
   "s_ed998dec": {
     "id": "s_ed998dec",
     "name": "홍제",
     "x": 1900,
     "y": 1053,
-    "lines": []
+    "lines": [
+      "3"
+    ]
   },
   "s_ebacb4ec": {
     "id": "s_ebacb4ec",
     "name": "무악재",
     "x": 1984,
     "y": 1083,
-    "lines": []
+    "lines": [
+      "3"
+    ]
   },
   "s_eb8f85eb": {
     "id": "s_eb8f85eb",
     "name": "독바위",
     "x": 1649,
     "y": 803,
-    "lines": []
+    "lines": [
+      "6"
+    ]
   },
   "s_eab888ed": {
     "id": "s_eab888ed",
     "name": "금호",
     "x": 2723,
     "y": 1926,
-    "lines": []
+    "lines": [
+      "3"
+    ]
   },
   "s_eba7a4eb": {
     "id": "s_eba7a4eb",
     "name": "매봉",
     "x": 2936,
     "y": 2607,
-    "lines": []
+    "lines": [
+      "3"
+    ]
   },
   "s_eb8c80ec": {
     "id": "s_eb8c80ec",
     "name": "대성리",
     "x": 4416,
     "y": 1007,
-    "lines": []
+    "lines": [
+      "gyeongchun"
+    ]
   },
   "s_ed9599ec": {
     "id": "s_ed9599ec",
     "name": "학여울",
     "x": 3189,
     "y": 2607,
-    "lines": []
+    "lines": [
+      "3"
+    ]
   },
   "s_ebb098ec": {
     "id": "s_ebb098ec",
     "name": "반월",
     "x": 1697,
     "y": 2952,
-    "lines": []
+    "lines": [
+      "4"
+    ]
   },
   "s_ec8898eb": {
     "id": "s_ec8898eb",
     "name": "수내",
     "x": 3249,
     "y": 2966,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_ebb294ea": {
     "id": "s_ebb294ea",
     "name": "범골",
     "x": 3091,
     "y": 643,
-    "lines": []
+    "lines": [
+      "uijeongbu"
+    ]
   },
   "s_ed8f89ec": {
     "id": "s_ed8f89ec",
     "name": "평촌",
     "x": 1979,
     "y": 2712,
-    "lines": []
+    "lines": [
+      "4"
+    ]
   },
   "s_ec9db8eb": {
     "id": "s_ec9db8eb",
     "name": "인덕원",
     "x": 2064,
     "y": 2712,
-    "lines": []
+    "lines": [
+      "4"
+    ]
   },
   "s_eab3bcec": {
     "id": "s_eab3bcec",
     "name": "과천",
     "x": 2234,
     "y": 2712,
-    "lines": []
+    "lines": [
+      "4"
+    ]
   },
   "s_eb8c80ea": {
     "id": "s_eb8c80ea",
     "name": "대공원",
     "x": 2319,
     "y": 2712,
-    "lines": []
+    "lines": [
+      "4"
+    ]
   },
   "s_eab2bdeb": {
     "id": "s_eab2bdeb",
     "name": "경마공원",
     "x": 2404,
     "y": 2712,
-    "lines": []
+    "lines": [
+      "4"
+    ]
   },
   "s_ec84a0eb": {
     "id": "s_ec84a0eb",
     "name": "선부",
     "x": 1496,
     "y": 3246,
-    "lines": []
+    "lines": [
+      "seohaeline"
+    ]
   },
   "s_ec8899eb": {
     "id": "s_ec8899eb",
     "name": "숙대입구",
     "x": 2197,
     "y": 1777,
-    "lines": []
+    "lines": [
+      "4"
+    ]
   },
   "s_eab8b8ec": {
     "id": "s_eab8b8ec",
     "name": "길음",
     "x": 2851,
     "y": 1112,
-    "lines": []
+    "lines": [
+      "4"
+    ]
   },
   "s_ebafb8ec": {
     "id": "s_ebafb8ec",
     "name": "미사",
     "x": 4543,
     "y": 2174,
-    "lines": []
+    "lines": [
+      "5"
+    ]
   },
   "s_ec8c8deb": {
     "id": "s_ec8c8deb",
     "name": "쌍문",
     "x": 3383,
     "y": 942,
-    "lines": []
+    "lines": [
+      "4"
+    ]
   },
   "s_ebb688ec": {
     "id": "s_ebb688ec",
     "name": "불암산",
     "x": 3922,
     "y": 766,
-    "lines": []
+    "lines": [
+      "4"
+    ]
   },
   "s_eab09ced": {
     "id": "s_eab09ced",
     "name": "개포동",
     "x": 3201,
     "y": 2679,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_ec86a1ec": {
     "id": "s_ec86a1ec",
     "name": "송산",
     "x": 2103,
     "y": 643,
-    "lines": []
+    "lines": [
+      "uijeongbu"
+    ]
   },
   "s_ebb09cec": {
     "id": "s_ebb09cec",
     "name": "발산",
     "x": 1222,
     "y": 1557,
-    "lines": []
+    "lines": [
+      "5"
+    ]
   },
   "s_eca69deb": {
     "id": "s_eca69deb",
     "name": "증미",
     "x": 1419,
     "y": 1594,
-    "lines": []
+    "lines": [
+      "9"
+    ]
   },
   "s_eb93b1ec": {
     "id": "s_eb93b1ec",
     "name": "등촌",
     "x": 1472,
     "y": 1647,
-    "lines": []
+    "lines": [
+      "9"
+    ]
   },
   "s_eab5aded": {
     "id": "s_eab5aded",
     "name": "국회의사당",
     "x": 1826,
     "y": 2002,
-    "lines": []
+    "lines": [
+      "9"
+    ]
   },
   "s_ebaaa9eb": {
     "id": "s_ebaaa9eb",
     "name": "목동",
     "x": 1515,
     "y": 1849,
-    "lines": []
-  },
-  "s_ec9691ed": {
-    "id": "s_ec9691ed",
-    "name": "양평:경의중앙선",
-    "x": 4290,
-    "y": 1704,
-    "lines": []
+    "lines": [
+      "5"
+    ]
   },
   "s_eba788ed": {
     "id": "s_eba788ed",
     "name": "마포구청",
     "x": 1577,
     "y": 1588,
-    "lines": []
+    "lines": [
+      "6"
+    ]
   },
   "s_ec95a0ec": {
     "id": "s_ec95a0ec",
     "name": "애오개",
     "x": 2017,
     "y": 1679,
-    "lines": []
+    "lines": [
+      "5"
+    ]
   },
   "s_eb8bb5ec": {
     "id": "s_eb8bb5ec",
     "name": "답십리",
     "x": 3278,
     "y": 1508,
-    "lines": []
+    "lines": [
+      "5"
+    ]
   },
   "s_ec9ea5ed": {
     "id": "s_ec9ea5ed",
     "name": "장한평",
     "x": 3371,
     "y": 1508,
-    "lines": []
+    "lines": [
+      "5"
+    ]
   },
   "s_eb9194ec": {
     "id": "s_eb9194ec",
     "name": "둔촌오륜",
     "x": 3972,
     "y": 2244,
-    "lines": []
+    "lines": [
+      "9"
+    ]
   },
   "s_ebb0a9ec": {
     "id": "s_ebb0a9ec",
     "name": "방이",
     "x": 3851,
     "y": 2296,
-    "lines": []
+    "lines": [
+      "5"
+    ]
   },
   "s_eab1b0ec": {
     "id": "s_eab1b0ec",
     "name": "거여",
     "x": 4027,
     "y": 2472,
-    "lines": []
+    "lines": [
+      "5"
+    ]
   },
   "s_eca69dec": {
     "id": "s_eca69dec",
     "name": "증산",
     "x": 1570,
     "y": 1274,
-    "lines": []
+    "lines": [
+      "6"
+    ]
   },
   "s_ec9b94eb": {
     "id": "s_ec9b94eb",
     "name": "월롱",
     "x": 1498,
     "y": 583,
-    "lines": []
+    "lines": [
+      "gyeongui"
+    ]
   },
   "s_eab491ed": {
     "id": "s_eab491ed",
     "name": "광흥창",
     "x": 1822,
     "y": 1834,
-    "lines": []
+    "lines": [
+      "6"
+    ]
   },
   "s_eb8c80ed": {
     "id": "s_eb8c80ed",
     "name": "대흥",
     "x": 1922,
     "y": 1847,
-    "lines": []
+    "lines": [
+      "6"
+    ]
   },
   "s_ecb0bdec": {
     "id": "s_ecb0bdec",
     "name": "창신",
     "x": 2770,
     "y": 1279,
-    "lines": []
+    "lines": [
+      "6"
+    ]
   },
   "s_eab3a0eb": {
     "id": "s_eab3a0eb",
     "name": "고덕",
     "x": 4198,
     "y": 2127,
-    "lines": []
+    "lines": [
+      "5"
+    ]
   },
   "s_eb8f8cea": {
     "id": "s_eb8f8cea",
     "name": "돌곶이",
     "x": 3387,
     "y": 1207,
-    "lines": []
+    "lines": [
+      "6"
+    ]
   },
   "s_ed9994eb": {
     "id": "s_ed9994eb",
     "name": "화랑대",
     "x": 3804,
     "y": 1033,
-    "lines": []
+    "lines": [
+      "6"
+    ]
   },
   "s_eba8b9ea": {
     "id": "s_eba8b9ea",
     "name": "먹골",
     "x": 3683,
     "y": 1135,
-    "lines": ["7"]
+    "lines": [
+      "7"
+    ]
   },
   "s_eca491ed": {
     "id": "s_eca491ed",
     "name": "중화",
     "x": 3683,
     "y": 1225,
-    "lines": ["7"]
+    "lines": [
+      "7"
+    ]
   },
   "s_eba9b4eb": {
     "id": "s_eba9b4eb",
     "name": "면목",
     "x": 3640,
     "y": 1405,
-    "lines": ["7"]
+    "lines": [
+      "7"
+    ]
   },
   "s_ec82acea": {
     "id": "s_ec82acea",
     "name": "사가정",
     "x": 3584,
     "y": 1462,
-    "lines": ["7"]
+    "lines": [
+      "7"
+    ]
   },
   "s_eca491ea": {
     "id": "s_eca491ea",
     "name": "중곡",
     "x": 3470,
     "y": 1575,
-    "lines": ["7"]
+    "lines": [
+      "7"
+    ]
   },
   "s_ec96b4eb": {
     "id": "s_ec96b4eb",
     "name": "어룡",
     "x": 2193,
     "y": 643,
-    "lines": []
+    "lines": [
+      "uijeongbu"
+    ]
   },
   "s_ec9e90ec": {
     "id": "s_ec9e90ec",
     "name": "자양",
     "x": 3137,
     "y": 1908,
-    "lines": []
+    "lines": [
+      "7"
+    ]
   },
   "s_ebb098ed": {
     "id": "s_ebb098ed",
     "name": "반포",
     "x": 2792,
     "y": 2253,
-    "lines": ["7"]
+    "lines": [
+      "7"
+    ]
   },
   "s_eb82b4eb": {
     "id": "s_eb82b4eb",
     "name": "내방",
     "x": 2565,
     "y": 2327,
-    "lines": ["7"]
+    "lines": [
+      "7"
+    ]
   },
   "s_ec88adec": {
     "id": "s_ec88adec",
     "name": "숭의",
     "x": 708,
     "y": 2920,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_ec9ea5ec": {
     "id": "s_ec9ea5ec",
     "name": "장지",
     "x": 3648,
     "y": 2622,
-    "lines": []
+    "lines": [
+      "8"
+    ]
   },
   "s_ec8ba0ed": {
     "id": "s_ec8ba0ed",
     "name": "신현",
     "x": 1469,
     "y": 2765,
-    "lines": []
+    "lines": [
+      "seohaeline"
+    ]
   },
   "s_eb82a8ea": {
     "id": "s_eb82a8ea",
     "name": "남구로",
     "x": 1609,
     "y": 2327,
-    "lines": ["7"]
+    "lines": [
+      "7"
+    ]
   },
   "s_eab98cec": {
     "id": "s_eab98cec",
     "name": "까치울",
     "x": 1297,
     "y": 2102,
-    "lines": ["7"]
+    "lines": [
+      "7"
+    ]
   },
   "s_eab5b4ed": {
     "id": "s_eab5b4ed",
     "name": "굴포천",
     "x": 917,
     "y": 1990,
-    "lines": ["7"]
+    "lines": [
+      "7"
+    ]
   },
   "s_ec82b0ea": {
     "id": "s_ec82b0ea",
     "name": "산곡",
     "x": 784,
     "y": 1947,
-    "lines": ["7"]
+    "lines": [
+      "7"
+    ]
   },
   "s_eab5bdec": {
     "id": "s_eab5bdec",
     "name": "굽은다리",
     "x": 3953,
     "y": 2127,
-    "lines": []
+    "lines": [
+      "5"
+    ]
   },
   "s_ebaa85ec": {
     "id": "s_ebaa85ec",
     "name": "명지대",
     "x": 3570,
     "y": 3196,
-    "lines": []
+    "lines": [
+      "yongin"
+    ]
   },
   "s_eab095ec": {
     "id": "s_eab095ec",
     "name": "강촌",
     "x": 4237,
     "y": 643,
-    "lines": []
+    "lines": [
+      "gyeongchun"
+    ]
   },
   "s_ed9598eb": {
     "id": "s_ed9598eb",
     "name": "하남시청",
     "x": 4543,
     "y": 2382,
-    "lines": []
+    "lines": [
+      "5"
+    ]
   },
   "s_ec9594ec": {
     "id": "s_ec9594ec",
     "name": "암사역사공원",
     "x": 3769,
     "y": 1966,
-    "lines": []
+    "lines": [
+      "8"
+    ]
   },
   "s_eb8f99ea": {
     "id": "s_eb8f99ea",
     "name": "동구릉",
     "x": 3955,
     "y": 1421,
-    "lines": []
+    "lines": [
+      "8"
+    ]
   },
   "s_eb8ba4ec": {
     "id": "s_eb8ba4ec",
     "name": "다산",
     "x": 4025,
     "y": 1385,
-    "lines": []
+    "lines": [
+      "8"
+    ]
   },
   "s_ebacb8ec": {
     "id": "s_ebacb8ec",
     "name": "문산",
     "x": 1635,
     "y": 582,
-    "lines": []
+    "lines": [
+      "gyeongui"
+    ]
   },
   "s_ec82b0ec": {
     "id": "s_ec82b0ec",
     "name": "산성",
     "x": 3889,
     "y": 2680,
-    "lines": []
+    "lines": [
+      "8"
+    ]
   },
   "s_eb82a8ed": {
     "id": "s_eb82a8ed",
     "name": "남한산성입구",
     "x": 3977,
     "y": 2749,
-    "lines": []
+    "lines": [
+      "8"
+    ]
   },
   "s_eb8ba8eb": {
     "id": "s_eb8ba8eb",
     "name": "단대오거리",
     "x": 3977,
     "y": 2839,
-    "lines": []
+    "lines": [
+      "8"
+    ]
   },
   "s_eb85b8eb": {
     "id": "s_eb85b8eb",
     "name": "노들",
     "x": 2261,
     "y": 2153,
-    "lines": []
+    "lines": [
+      "9"
+    ]
   },
   "s_ed9d91ec": {
     "id": "s_ed9d91ec",
     "name": "흑석",
     "x": 2356,
     "y": 2153,
-    "lines": []
+    "lines": [
+      "9"
+    ]
   },
   "s_ec82aced": {
     "id": "s_ec82aced",
     "name": "사평",
     "x": 2794,
     "y": 2308,
-    "lines": []
+    "lines": [
+      "9"
+    ]
   },
   "s_ec96b8ec": {
     "id": "s_ec96b8ec",
     "name": "언주",
     "x": 2936,
     "y": 2308,
-    "lines": []
+    "lines": [
+      "9"
+    ]
   },
   "s_ecb2adeb": {
     "id": "s_ecb2adeb",
     "name": "청명",
     "x": 2555,
     "y": 2966,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_eab7a4ed": {
     "id": "s_eab7a4ed",
     "name": "귤현",
     "x": 835,
     "y": 1474,
-    "lines": []
+    "lines": [
+      "incheon1"
+    ]
   },
   "s_ec9584eb": {
     "id": "s_ec9584eb",
     "name": "아라",
     "x": 835,
     "y": 1293,
-    "lines": []
+    "lines": [
+      "incheon1"
+    ]
   },
   "s_ebb095ec": {
     "id": "s_ebb095ec",
     "name": "박촌",
     "x": 835,
     "y": 1554,
-    "lines": []
+    "lines": [
+      "incheon1"
+    ]
   },
   "s_ec9e84ed": {
     "id": "s_ec9e84ed",
     "name": "임학",
     "x": 835,
     "y": 1634,
-    "lines": []
+    "lines": [
+      "incheon1"
+    ]
   },
   "s_ec9e91ec": {
     "id": "s_ec9e91ec",
     "name": "작전",
     "x": 835,
     "y": 1874,
-    "lines": []
+    "lines": [
+      "incheon1"
+    ]
   },
   "s_eab088ec": {
     "id": "s_eab088ec",
     "name": "갈산",
     "x": 835,
     "y": 1954,
-    "lines": []
+    "lines": [
+      "incheon1"
+    ]
   },
   "s_ec9888ec": {
     "id": "s_ec9888ec",
     "name": "예술회관",
     "x": 952,
     "y": 2536,
-    "lines": []
+    "lines": [
+      "incheon1"
+    ]
   },
   "s_ebacb8ed": {
     "id": "s_ebacb8ed",
     "name": "문학경기장",
     "x": 952,
     "y": 2706,
-    "lines": []
+    "lines": [
+      "incheon1"
+    ]
   },
   "s_ec84a0ed": {
     "id": "s_ec84a0ed",
     "name": "선학",
     "x": 952,
     "y": 2795,
-    "lines": []
+    "lines": [
+      "incheon1"
+    ]
   },
   "s_ecbaa0ed": {
     "id": "s_ecbaa0ed",
     "name": "캠퍼스타운",
     "x": 952,
     "y": 3194,
-    "lines": []
+    "lines": [
+      "incheon1"
+    ]
   },
   "s_ed858ced": {
     "id": "s_ed858ced",
     "name": "테크노파크",
     "x": 952,
     "y": 3252,
-    "lines": []
+    "lines": [
+      "incheon1"
+    ]
   },
   "s_ec84bced": {
     "id": "s_ec84bced",
     "name": "센트럴파크",
     "x": 911,
     "y": 3423,
-    "lines": []
+    "lines": [
+      "incheon1"
+    ]
   },
   "s_ec9db8ed": {
     "id": "s_ec9db8ed",
     "name": "인하대",
     "x": 727,
     "y": 2970,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_ed98b8ea": {
     "id": "s_ed98b8ea",
     "name": "호구포",
     "x": 1126,
     "y": 3038,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_ec868ceb": {
     "id": "s_ec868ceb",
     "name": "소래포구",
     "x": 1126,
     "y": 3178,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_eb8bacec": {
     "id": "s_eb8bacec",
     "name": "달월",
     "x": 1184,
     "y": 3331,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_ed8c8cec": {
     "id": "s_ed8c8cec",
     "name": "파주",
     "x": 1568,
     "y": 583,
-    "lines": []
+    "lines": [
+      "gyeongui"
+    ]
   },
   "s_eab888eb": {
     "id": "s_eab888eb",
     "name": "금릉",
     "x": 1352,
     "y": 583,
-    "lines": []
+    "lines": [
+      "gyeongui"
+    ]
   },
   "s_ec95bceb": {
     "id": "s_ec95bceb",
     "name": "야목",
     "x": 1964,
     "y": 3122,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_ed8384ed": {
     "id": "s_ed8384ed",
     "name": "탄현",
     "x": 1133,
     "y": 583,
-    "lines": []
+    "lines": [
+      "gyeongui"
+    ]
   },
   "s_ed9689ec": {
     "id": "s_ed9689ec",
     "name": "행신",
     "x": 1242,
     "y": 1082,
-    "lines": []
+    "lines": [
+      "gyeongui"
+    ]
   },
   "s_ed959cea": {
     "id": "s_ed959cea",
     "name": "한국항공대",
     "x": 1399,
     "y": 1239,
-    "lines": []
+    "lines": [
+      "gyeongui"
+    ]
   },
   "s_ec9d91eb": {
     "id": "s_ec9d91eb",
     "name": "응봉",
     "x": 2888,
     "y": 1901,
-    "lines": []
+    "lines": [
+      "gyeongui"
+    ]
   },
   "s_ed8c94eb": {
     "id": "s_ed8c94eb",
     "name": "팔당",
     "x": 3869,
     "y": 1836,
-    "lines": []
+    "lines": [
+      "gyeongui"
+    ]
   },
   "s_ec9ab4ea": {
     "id": "s_ec9ab4ea",
     "name": "운길산",
     "x": 3934,
     "y": 1836,
-    "lines": []
+    "lines": [
+      "gyeongui"
+    ]
   },
   "s_eab5adec": {
     "id": "s_eab5adec",
     "name": "국제업무지구",
     "x": 830,
     "y": 3423,
-    "lines": []
+    "lines": [
+      "incheon1"
+    ]
   },
   "s_eab3a4ec": {
     "id": "s_eab3a4ec",
     "name": "곤지암",
     "x": 3819,
     "y": 3083,
-    "lines": []
+    "lines": [
+      "gyeonggang"
+    ]
   },
   "s_ec8388eb": {
     "id": "s_ec8388eb",
     "name": "새말",
     "x": 2553,
     "y": 643,
-    "lines": []
+    "lines": [
+      "uijeongbu"
+    ]
   },
   "s_ed9da5ec": {
     "id": "s_ed9da5ec",
     "name": "흥선",
     "x": 2823,
     "y": 643,
-    "lines": []
+    "lines": [
+      "uijeongbu"
+    ]
   },
   "s_eab980ec": {
     "id": "s_eab980ec",
     "name": "김유정",
     "x": 4137,
     "y": 643,
-    "lines": []
+    "lines": [
+      "gyeongchun"
+    ]
   },
   "s_eab5b4eb": {
     "id": "s_eab5b4eb",
     "name": "굴봉산",
     "x": 4416,
     "y": 727,
-    "lines": []
+    "lines": [
+      "gyeongchun"
+    ]
   },
   "s_eab080ed": {
     "id": "s_eab080ed",
     "name": "가평",
     "x": 4416,
     "y": 797,
-    "lines": []
+    "lines": [
+      "gyeongchun"
+    ]
   },
   "s_ecb2aded": {
     "id": "s_ecb2aded",
     "name": "청평",
     "x": 4416,
     "y": 937,
-    "lines": []
+    "lines": [
+      "gyeongchun"
+    ]
   },
   "s_ecb29ceb": {
     "id": "s_ecb29ceb",
     "name": "천마산",
     "x": 4416,
     "y": 1147,
-    "lines": []
+    "lines": [
+      "gyeongchun"
+    ]
   },
   "s_ed8f89eb": {
     "id": "s_ed8f89eb",
     "name": "평내호평",
     "x": 4374,
     "y": 1209,
-    "lines": []
+    "lines": [
+      "gyeongchun"
+    ]
   },
   "s_eab888ea": {
     "id": "s_eab888ea",
     "name": "금곡",
     "x": 4327,
     "y": 1256,
-    "lines": []
+    "lines": [
+      "gyeongchun"
+    ]
   },
   "s_ec82aceb": {
     "id": "s_ec82aceb",
     "name": "사리",
     "x": 1834,
     "y": 3085,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_ed87b4ea": {
     "id": "s_ed87b4ea",
     "name": "퇴계원",
     "x": 4182,
     "y": 1334,
-    "lines": []
+    "lines": [
+      "gyeongchun"
+    ]
   },
   "s_eab088eb": {
     "id": "s_eab088eb",
     "name": "갈매",
     "x": 3976,
     "y": 1334,
-    "lines": []
+    "lines": [
+      "gyeongchun"
+    ]
   },
   "s_ec8381ed": {
     "id": "s_ec8381ed",
     "name": "상현",
     "x": 2649,
     "y": 2793,
-    "lines": []
+    "lines": [
+      "sinbundang"
+    ]
   },
   "s_ecb2adea": {
     "id": "s_ecb2adea",
     "name": "청계산입구",
     "x": 3011,
     "y": 2762,
-    "lines": []
+    "lines": [
+      "sinbundang"
+    ]
   },
   "s_ec9595ea": {
     "id": "s_ec9595ea",
     "name": "압구정로데오",
     "x": 3012,
     "y": 1943,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_ed959ced": {
     "id": "s_ed959ced",
     "name": "한티",
     "x": 3012,
     "y": 2538,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_ed839ced": {
     "id": "s_ed839ced",
     "name": "태평",
     "x": 3697,
     "y": 2874,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_ec95bced": {
     "id": "s_ec95bced",
     "name": "야탑",
     "x": 3519,
     "y": 2966,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_ec82bceb": {
     "id": "s_ec82bceb",
     "name": "삼동",
     "x": 3520,
     "y": 3058,
-    "lines": []
+    "lines": [
+      "gyeonggang"
+    ]
   },
   "s_ec9db4ec": {
     "id": "s_ec9db4ec",
     "name": "이천",
     "x": 4019,
     "y": 3083,
-    "lines": []
+    "lines": [
+      "gyeonggang"
+    ]
   },
   "s_ebb680eb": {
     "id": "s_ebb680eb",
     "name": "부발",
     "x": 4119,
     "y": 3083,
-    "lines": []
+    "lines": [
+      "gyeonggang"
+    ]
   },
   "s_ec84b8ec": {
     "id": "s_ec84b8ec",
     "name": "세종대왕릉",
     "x": 4219,
     "y": 3083,
-    "lines": []
+    "lines": [
+      "gyeonggang"
+    ]
   },
   "s_eca3bdec": {
     "id": "s_eca3bdec",
     "name": "죽전",
     "x": 2949,
     "y": 2966,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_ec8381ea": {
     "id": "s_ec8381ea",
     "name": "상갈",
     "x": 2624,
     "y": 2966,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_ec9881ed": {
     "id": "s_ec9881ed",
     "name": "영통",
     "x": 2485,
     "y": 2966,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_eba79ded": {
     "id": "s_eba79ded",
     "name": "망포",
     "x": 2415,
     "y": 2966,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_eba7a4ed": {
     "id": "s_eba7a4ed",
     "name": "매탄권선",
     "x": 2370,
     "y": 3040,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_eba7a4ea": {
     "id": "s_eba7a4ea",
     "name": "매교",
     "x": 2370,
     "y": 3180,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_ebb3b4ed": {
     "id": "s_ebb3b4ed",
     "name": "보평",
     "x": 4070,
     "y": 3196,
-    "lines": []
+    "lines": [
+      "yongin"
+    ]
   },
   "s_ec9aa9ec": {
     "id": "s_ec9aa9ec",
     "name": "용인중앙시장",
     "x": 3820,
     "y": 3196,
-    "lines": []
+    "lines": [
+      "yongin"
+    ]
   },
   "s_eab980eb": {
     "id": "s_eab980eb",
     "name": "김량장",
     "x": 3695,
     "y": 3196,
-    "lines": []
+    "lines": [
+      "yongin"
+    ]
   },
   "s_ec8b9cec": {
     "id": "s_ec8b9cec",
     "name": "시우",
     "x": 1753,
     "y": 3296,
-    "lines": []
+    "lines": [
+      "seohaeline"
+    ]
   },
   "s_ec82bcea": {
     "id": "s_ec82bcea",
     "name": "삼가",
     "x": 3320,
     "y": 3196,
-    "lines": []
+    "lines": [
+      "yongin"
+    ]
   },
   "s_ecb488eb": {
     "id": "s_ecb488eb",
     "name": "초당",
     "x": 3195,
     "y": 3196,
-    "lines": []
+    "lines": [
+      "yongin"
+    ]
   },
   "s_ec96b4ec": {
     "id": "s_ec96b4ec",
     "name": "어천",
     "x": 2044,
     "y": 3202,
-    "lines": []
+    "lines": [
+      "bundang"
+    ]
   },
   "s_ec9881ec": {
     "id": "s_ec9881ec",
     "name": "영종",
     "x": 566,
     "y": 2420,
-    "lines": []
+    "lines": [
+      "airport"
+    ]
   },
   "s_eb8baceb": {
     "id": "s_eb8baceb",
     "name": "달미",
     "x": 1469,
     "y": 3132,
-    "lines": []
+    "lines": [
+      "seohaeline"
+    ]
   },
   "s_ec8b9ced": {
     "id": "s_ec8b9ced",
     "name": "시흥대야",
     "x": 1307,
     "y": 2544,
-    "lines": []
+    "lines": [
+      "seohaeline"
+    ]
+  },
+  "s_1723": {
+    "id": "s_1723",
+    "name": "평택지제",
+    "nameEn": "PyeongtaekJije",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1722": {
+    "id": "s_1722",
+    "name": "서정리",
+    "nameEn": "Seojeong-ri",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1721": {
+    "id": "s_1721",
+    "name": "송탄",
+    "nameEn": "Songtan",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1718": {
+    "id": "s_1718",
+    "name": "오산대",
+    "nameEn": "Osan College",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1715": {
+    "id": "s_1715",
+    "name": "세류",
+    "nameEn": "Seryu",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1713": {
+    "id": "s_1713",
+    "name": "수원",
+    "nameEn": "Suwon",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1",
+      "bundang"
+    ]
+  },
+  "s_1712": {
+    "id": "s_1712",
+    "name": "화서",
+    "nameEn": "Hwaseo",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1710": {
+    "id": "s_1710",
+    "name": "의왕",
+    "nameEn": "Uiwang",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1706": {
+    "id": "s_1706",
+    "name": "안양",
+    "nameEn": "Anyang",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1704": {
+    "id": "s_1704",
+    "name": "석수",
+    "nameEn": "Seoksu",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1703": {
+    "id": "s_1703",
+    "name": "금천구청",
+    "nameEn": "Geumcheon-Gu Office",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1408": {
+    "id": "s_1408",
+    "name": "신창",
+    "nameEn": "Sinchang",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1403": {
+    "id": "s_1403",
+    "name": "아산",
+    "nameEn": "Asan",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_0156": {
+    "id": "s_0156",
+    "name": "신설동",
+    "nameEn": "Sinseol-dong",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1",
+      "2",
+      "wooyisinseol"
+    ]
+  },
+  "s_1749": {
+    "id": "s_1749",
+    "name": "서동탄",
+    "nameEn": "Seodongtan",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1916": {
+    "id": "s_1916",
+    "name": "소요산",
+    "nameEn": "Soyosan",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1002": {
+    "id": "s_1002",
+    "name": "남영",
+    "nameEn": "Namyeong",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1005": {
+    "id": "s_1005",
+    "name": "대방",
+    "nameEn": "Daebang",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1",
+      "sillim"
+    ]
+  },
+  "s_1913": {
+    "id": "s_1913",
+    "name": "동두천중앙",
+    "nameEn": "Dongducheon  jungang",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1017": {
+    "id": "s_1017",
+    "name": "신이문",
+    "nameEn": "Sinimun",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1020": {
+    "id": "s_1020",
+    "name": "월계",
+    "nameEn": "Wolgye",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1021": {
+    "id": "s_1021",
+    "name": "녹천",
+    "nameEn": "Nokcheon",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1919": {
+    "id": "s_1919",
+    "name": "연천",
+    "nameEn": "Yeoncheon",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1915": {
+    "id": "s_1915",
+    "name": "동두천",
+    "nameEn": "Dongducheon",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1914": {
+    "id": "s_1914",
+    "name": "보산",
+    "nameEn": "Bosan",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1032": {
+    "id": "s_1032",
+    "name": "신길",
+    "nameEn": "Singil",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1",
+      "5"
+    ]
+  },
+  "s_1911": {
+    "id": "s_1911",
+    "name": "덕정",
+    "nameEn": "Deokjeong",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1909": {
+    "id": "s_1909",
+    "name": "양주",
+    "nameEn": "Yangju",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1906": {
+    "id": "s_1906",
+    "name": "의정부",
+    "nameEn": "Uijeongbu",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1904": {
+    "id": "s_1904",
+    "name": "망월사",
+    "nameEn": "Mangwolsa",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1902": {
+    "id": "s_1902",
+    "name": "도봉",
+    "nameEn": "Dobong",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1813": {
+    "id": "s_1813",
+    "name": "구일",
+    "nameEn": "Guil",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1805": {
+    "id": "s_1805",
+    "name": "송내",
+    "nameEn": "Songnae",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1821": {
+    "id": "s_1821",
+    "name": "온수",
+    "nameEn": "Onsu",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1",
+      "7"
+    ]
+  },
+  "s_1817": {
+    "id": "s_1817",
+    "name": "도원",
+    "nameEn": "Dowon",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1816": {
+    "id": "s_1816",
+    "name": "간석",
+    "nameEn": "Ganseok",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1814": {
+    "id": "s_1814",
+    "name": "소사",
+    "nameEn": "Sosa",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1",
+      "seohaeline"
+    ]
+  },
+  "s_1811": {
+    "id": "s_1811",
+    "name": "동인천",
+    "nameEn": "Dongincheon",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1809": {
+    "id": "s_1809",
+    "name": "주안",
+    "nameEn": "Juan",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1",
+      "incheon2"
+    ]
+  },
+  "s_1808": {
+    "id": "s_1808",
+    "name": "동암",
+    "nameEn": "Dongam",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1807": {
+    "id": "s_1807",
+    "name": "백운",
+    "nameEn": "Baegun",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1806": {
+    "id": "s_1806",
+    "name": "부평",
+    "nameEn": "Bupyeong",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1",
+      "incheon1"
+    ]
+  },
+  "s_1804": {
+    "id": "s_1804",
+    "name": "부천",
+    "nameEn": "Bucheon",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1802": {
+    "id": "s_1802",
+    "name": "오류동",
+    "nameEn": "Oryu-dong",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1801": {
+    "id": "s_1801",
+    "name": "개봉",
+    "nameEn": "Gaebong",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_1728": {
+    "id": "s_1728",
+    "name": "천안",
+    "nameEn": "Cheonan",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "1"
+    ]
+  },
+  "s_0230": {
+    "id": "s_0230",
+    "name": "신림",
+    "nameEn": "Sillim",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "2",
+      "sillim"
+    ]
+  },
+  "s_0207": {
+    "id": "s_0207",
+    "name": "상왕십리",
+    "nameEn": "Sangwangsimni",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "2"
+    ]
+  },
+  "s_0209": {
+    "id": "s_0209",
+    "name": "한양대",
+    "nameEn": "Hanyang Univ.",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "2"
+    ]
+  },
+  "s_0214": {
+    "id": "s_0214",
+    "name": "강변",
+    "nameEn": "Gangbyeon",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "2"
+    ]
+  },
+  "s_0215": {
+    "id": "s_0215",
+    "name": "잠실나루",
+    "nameEn": "Jamsillaru",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "2"
+    ]
+  },
+  "s_0217": {
+    "id": "s_0217",
+    "name": "잠실새내",
+    "nameEn": "Jamsilsaenae",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "2"
+    ]
+  },
+  "s_0221": {
+    "id": "s_0221",
+    "name": "역삼",
+    "nameEn": "Yeoksam",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "2"
+    ]
+  },
+  "s_0245": {
+    "id": "s_0245",
+    "name": "신답",
+    "nameEn": "Sindap",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "2"
+    ]
+  },
+  "s_0248": {
+    "id": "s_0248",
+    "name": "양천구청",
+    "nameEn": "Yangcheon-gu Office",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "2"
+    ]
+  },
+  "s_0231": {
+    "id": "s_0231",
+    "name": "신대방",
+    "nameEn": "Sindaebang",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "2"
+    ]
+  },
+  "s_0249": {
+    "id": "s_0249",
+    "name": "신정네거리",
+    "nameEn": "Sinjeongnegeori",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "2"
+    ]
+  },
+  "s_0247": {
+    "id": "s_0247",
+    "name": "도림천",
+    "nameEn": "Dorimcheon",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "2"
+    ]
+  },
+  "s_0250": {
+    "id": "s_0250",
+    "name": "용두",
+    "nameEn": "Yongdu",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "2"
+    ]
+  },
+  "s_0232": {
+    "id": "s_0232",
+    "name": "구로디지털단지",
+    "nameEn": "Guro Digital Complex",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "2"
+    ]
+  },
+  "s_0244": {
+    "id": "s_0244",
+    "name": "용답",
+    "nameEn": "Yongdap",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "2"
+    ]
+  },
+  "s_0213": {
+    "id": "s_0213",
+    "name": "구의",
+    "nameEn": "Guui",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "2"
+    ]
+  },
+  "s_0228": {
+    "id": "s_0228",
+    "name": "서울대입구",
+    "nameEn": "Seoul Nat`l Univ.",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "2"
+    ]
+  },
+  "s_0316": {
+    "id": "s_0316",
+    "name": "독립문",
+    "nameEn": "Dongnimmun",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "3"
+    ]
+  },
+  "s_1956": {
+    "id": "s_1956",
+    "name": "정발산",
+    "nameEn": "Jeongbalsan",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "3"
+    ]
+  },
+  "s_1954": {
+    "id": "s_1954",
+    "name": "백석",
+    "nameEn": "Baekseok",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "3"
+    ]
+  },
+  "s_0309": {
+    "id": "s_0309",
+    "name": "지축",
+    "nameEn": "Jichuk",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "3"
+    ]
+  },
+  "s_1951": {
+    "id": "s_1951",
+    "name": "원당",
+    "nameEn": "Wondang",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "3"
+    ]
+  },
+  "s_1950": {
+    "id": "s_1950",
+    "name": "삼송",
+    "nameEn": "Samsong",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "3"
+    ]
+  },
+  "s_0322": {
+    "id": "s_0322",
+    "name": "동대입구",
+    "nameEn": "Dongguk Univ.",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "3"
+    ]
+  },
+  "s_0331": {
+    "id": "s_0331",
+    "name": "남부터미널",
+    "nameEn": "Nambu Bus Terminal",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "3"
+    ]
+  },
+  "s_0335": {
+    "id": "s_0335",
+    "name": "대치",
+    "nameEn": "Daechi",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "3"
+    ]
+  },
+  "s_0337": {
+    "id": "s_0337",
+    "name": "대청",
+    "nameEn": "Daecheong",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "3"
+    ]
+  },
+  "s_0341": {
+    "id": "s_0341",
+    "name": "경찰병원",
+    "nameEn": "National Police Hospital",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "3"
+    ]
+  },
+  "s_0405": {
+    "id": "s_0405",
+    "name": "진접",
+    "nameEn": "Jinjeop",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "4"
+    ]
+  },
+  "s_0406": {
+    "id": "s_0406",
+    "name": "오남",
+    "nameEn": "Onam",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "4"
+    ]
+  },
+  "s_0414": {
+    "id": "s_0414",
+    "name": "수유",
+    "nameEn": "Suyu",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "4"
+    ]
+  },
+  "s_0415": {
+    "id": "s_0415",
+    "name": "미아",
+    "nameEn": "Mia",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "4"
+    ]
+  },
+  "s_0419": {
+    "id": "s_0419",
+    "name": "한성대입구",
+    "nameEn": "Hansung Univ.",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "4"
+    ]
+  },
+  "s_0429": {
+    "id": "s_0429",
+    "name": "신용산",
+    "nameEn": "Sinyongsan",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "4"
+    ]
+  },
+  "s_1450": {
+    "id": "s_1450",
+    "name": "선바위",
+    "nameEn": "Seonbawi",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "4"
+    ]
+  },
+  "s_1457": {
+    "id": "s_1457",
+    "name": "범계",
+    "nameEn": "Beomgye",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "4"
+    ]
+  },
+  "s_1752": {
+    "id": "s_1752",
+    "name": "대야미",
+    "nameEn": "Daeyami",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "4"
+    ]
+  },
+  "s_1754": {
+    "id": "s_1754",
+    "name": "상록수",
+    "nameEn": "Sangnoksu",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "4"
+    ]
+  },
+  "s_1755": {
+    "id": "s_1755",
+    "name": "한대앞",
+    "nameEn": "Hanyang Univ. at Ansan",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "4",
+      "bundang"
+    ]
+  },
+  "s_1757": {
+    "id": "s_1757",
+    "name": "고잔",
+    "nameEn": "Gojan",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "4",
+      "bundang"
+    ]
+  },
+  "s_1758": {
+    "id": "s_1758",
+    "name": "초지",
+    "nameEn": "Choji",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "4",
+      "seohaeline",
+      "bundang"
+    ]
+  },
+  "s_1759": {
+    "id": "s_1759",
+    "name": "안산",
+    "nameEn": "Ansan",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "4",
+      "bundang"
+    ]
+  },
+  "s_1760": {
+    "id": "s_1760",
+    "name": "신길온천",
+    "nameEn": "Neunggil",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "4",
+      "bundang"
+    ]
+  },
+  "s_1763": {
+    "id": "s_1763",
+    "name": "수리산",
+    "nameEn": "Surisan",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "4"
+    ]
+  },
+  "s_2562": {
+    "id": "s_2562",
+    "name": "강일",
+    "nameEn": "Gangil",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "5"
+    ]
+  },
+  "s_2546": {
+    "id": "s_2546",
+    "name": "아차산",
+    "nameEn": "Achasan",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "5"
+    ]
+  },
+  "s_2564": {
+    "id": "s_2564",
+    "name": "하남풍산",
+    "nameEn": "Hanam Pungsan",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "5"
+    ]
+  },
+  "s_2539": {
+    "id": "s_2539",
+    "name": "신금호",
+    "nameEn": "Singeumho",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "5"
+    ]
+  },
+  "s_2533": {
+    "id": "s_2533",
+    "name": "서대문",
+    "nameEn": "Seodaemun",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "5"
+    ]
+  },
+  "s_2520": {
+    "id": "s_2520",
+    "name": "신정",
+    "nameEn": "Sinjeong",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "5"
+    ]
+  },
+  "s_2529": {
+    "id": "s_2529",
+    "name": "마포",
+    "nameEn": "Mapo",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "5"
+    ]
+  },
+  "s_2523": {
+    "id": "s_2523",
+    "name": "양평",
+    "nameEn": "Yangpyeong",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "5",
+      "gyeongui"
+    ]
+  },
+  "s_2522": {
+    "id": "s_2522",
+    "name": "오목교",
+    "nameEn": "Omokgyo",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "5"
+    ]
+  },
+  "s_2514": {
+    "id": "s_2514",
+    "name": "송정",
+    "nameEn": "Songjeong",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "5"
+    ]
+  },
+  "s_2512": {
+    "id": "s_2512",
+    "name": "개화산",
+    "nameEn": "Gaehwasan",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "5"
+    ]
+  },
+  "s_2555": {
+    "id": "s_2555",
+    "name": "둔촌동",
+    "nameEn": "Dunchon-dong",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "5"
+    ]
+  },
+  "s_2554": {
+    "id": "s_2554",
+    "name": "상일동",
+    "nameEn": "Sangil-dong",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "5"
+    ]
+  },
+  "s_2552": {
+    "id": "s_2552",
+    "name": "명일",
+    "nameEn": "Myeongil",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "5"
+    ]
+  },
+  "s_2641": {
+    "id": "s_2641",
+    "name": "고려대",
+    "nameEn": "Korea Univ.",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "6"
+    ]
+  },
+  "s_2639": {
+    "id": "s_2639",
+    "name": "보문",
+    "nameEn": "Bomun",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "6",
+      "wooyisinseol"
+    ]
+  },
+  "s_2628": {
+    "id": "s_2628",
+    "name": "효창공원앞",
+    "nameEn": "Hyochang park",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "6",
+      "gyeongui"
+    ]
+  },
+  "s_2620": {
+    "id": "s_2620",
+    "name": "월드컵경기장",
+    "nameEn": "World Cup Stadium",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "6"
+    ]
+  },
+  "s_2643": {
+    "id": "s_2643",
+    "name": "상월곡",
+    "nameEn": "Sangwolgok",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "6"
+    ]
+  },
+  "s_2642": {
+    "id": "s_2642",
+    "name": "월곡",
+    "nameEn": "Wolgok",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "6"
+    ]
+  },
+  "s_3763": {
+    "id": "s_3763",
+    "name": "석남",
+    "nameEn": "Seongnam",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "7",
+      "incheon2"
+    ]
+  },
+  "s_3759": {
+    "id": "s_3759",
+    "name": "삼산체육관",
+    "nameEn": "Samsan Gymnasium",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "7"
+    ]
+  },
+  "s_3756": {
+    "id": "s_3756",
+    "name": "신중동",
+    "nameEn": "Sinjung-dong",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "7"
+    ]
+  },
+  "s_3754": {
+    "id": "s_3754",
+    "name": "부천종합운동장",
+    "nameEn": "Bucheon Stadium",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "7",
+      "seohaeline"
+    ]
+  },
+  "s_2745": {
+    "id": "s_2745",
+    "name": "신풍",
+    "nameEn": "Sinpung",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "7"
+    ]
+  },
+  "s_2743": {
+    "id": "s_2743",
+    "name": "신대방삼거리",
+    "nameEn": "Sindaebang  samgeori",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "7"
+    ]
+  },
+  "s_2742": {
+    "id": "s_2742",
+    "name": "장승배기",
+    "nameEn": "Jangseungbaegi",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "7"
+    ]
+  },
+  "s_2741": {
+    "id": "s_2741",
+    "name": "상도",
+    "nameEn": "Sangdo",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "7"
+    ]
+  },
+  "s_2740": {
+    "id": "s_2740",
+    "name": "숭실대입구",
+    "nameEn": "Soongsil Univ.",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "7"
+    ]
+  },
+  "s_2728": {
+    "id": "s_2728",
+    "name": "어린이대공원",
+    "nameEn": "Children`s  Grand Park",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "7"
+    ]
+  },
+  "s_2725": {
+    "id": "s_2725",
+    "name": "용마산",
+    "nameEn": "Yongmasan",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "7"
+    ]
+  },
+  "s_2722": {
+    "id": "s_2722",
+    "name": "상봉",
+    "nameEn": "Sangbong",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "7",
+      "gyeongui",
+      "gyeongchun"
+    ]
+  },
+  "s_2819": {
+    "id": "s_2819",
+    "name": "문정",
+    "nameEn": "Munjeong",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "8"
+    ]
+  },
+  "s_2825": {
+    "id": "s_2825",
+    "name": "신흥",
+    "nameEn": "Sinheung",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "8"
+    ]
+  },
+  "s_2826": {
+    "id": "s_2826",
+    "name": "수진",
+    "nameEn": "Sujin",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "8"
+    ]
+  },
+  "s_2828": {
+    "id": "s_2828",
+    "name": "남위례",
+    "nameEn": "Namwirye",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "8"
+    ]
+  },
+  "s_2808": {
+    "id": "s_2808",
+    "name": "구리",
+    "nameEn": "Guri",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "8",
+      "gyeongui"
+    ]
+  },
+  "s_2809": {
+    "id": "s_2809",
+    "name": "장자호수공원",
+    "nameEn": "Jangja Lake Park",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "8"
+    ]
+  },
+  "s_2805": {
+    "id": "s_2805",
+    "name": "별내",
+    "nameEn": "Byeollae",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "8",
+      "gyeongchun"
+    ]
+  },
+  "s_4127": {
+    "id": "s_4127",
+    "name": "선정릉",
+    "nameEn": "Seonjeongneung",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "9",
+      "bundang"
+    ]
+  },
+  "s_4103": {
+    "id": "s_4103",
+    "name": "공항시장",
+    "nameEn": "Airport Market",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "9"
+    ]
+  },
+  "s_4104": {
+    "id": "s_4104",
+    "name": "신방화",
+    "nameEn": "Sinbanghwa",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "9"
+    ]
+  },
+  "s_4105": {
+    "id": "s_4105",
+    "name": "마곡나루",
+    "nameEn": "Magongnaru",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "9",
+      "airport"
+    ]
+  },
+  "s_4106": {
+    "id": "s_4106",
+    "name": "양천향교",
+    "nameEn": "Yangcheon Hyanggyo",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "9"
+    ]
+  },
+  "s_4107": {
+    "id": "s_4107",
+    "name": "가양",
+    "nameEn": "Gayang",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "9"
+    ]
+  },
+  "s_4111": {
+    "id": "s_4111",
+    "name": "신목동",
+    "nameEn": "Sinmokdong",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "9"
+    ]
+  },
+  "s_4122": {
+    "id": "s_4122",
+    "name": "신반포",
+    "nameEn": "Sinbanpo",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "9"
+    ]
+  },
+  "s_9005": {
+    "id": "s_9005",
+    "name": "서울",
+    "nameEn": "Seoul",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "gtx_a"
+    ]
+  },
+  "s_0009": {
+    "id": "s_0009",
+    "name": "성남",
+    "nameEn": "Seongnam",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "gtx_a",
+      "gyeonggang"
+    ]
+  },
+  "s_0010": {
+    "id": "s_0010",
+    "name": "구성",
+    "nameEn": "Guseong",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "gtx_a",
+      "bundang"
+    ]
+  },
+  "s_9000": {
+    "id": "s_9000",
+    "name": "운정중앙",
+    "nameEn": "Unjeongjungang",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "gtx_a"
+    ]
+  },
+  "s_9001": {
+    "id": "s_9001",
+    "name": "킨텍스",
+    "nameEn": "Kintex",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "gtx_a"
+    ]
+  },
+  "s_1511": {
+    "id": "s_1511",
+    "name": "여주",
+    "nameEn": "Yeoju",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "gyeonggang"
+    ]
+  },
+  "s_1213": {
+    "id": "s_1213",
+    "name": "신원",
+    "nameEn": "Sinwon",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "gyeongui"
+    ]
+  },
+  "s_1275": {
+    "id": "s_1275",
+    "name": "일산",
+    "nameEn": "Ilsan",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "gyeongui",
+      "seohaeline"
+    ]
+  },
+  "s_1277": {
+    "id": "s_1277",
+    "name": "야당",
+    "nameEn": "Yadang",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "gyeongui"
+    ]
+  },
+  "s_1278": {
+    "id": "s_1278",
+    "name": "운정",
+    "nameEn": "Unjeong",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "gyeongui"
+    ]
+  },
+  "s_1201": {
+    "id": "s_1201",
+    "name": "중랑",
+    "nameEn": "Jungnang",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "gyeongui",
+      "gyeongchun"
+    ]
+  },
+  "s_1203": {
+    "id": "s_1203",
+    "name": "망우",
+    "nameEn": "Mangu",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "gyeongui",
+      "gyeongchun"
+    ]
+  },
+  "s_1204": {
+    "id": "s_1204",
+    "name": "양원",
+    "nameEn": "Yangwon",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "gyeongui"
+    ]
+  },
+  "s_1207": {
+    "id": "s_1207",
+    "name": "양정",
+    "nameEn": "Yangjeong",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "gyeongui"
+    ]
+  },
+  "s_1214": {
+    "id": "s_1214",
+    "name": "국수",
+    "nameEn": "Guksu",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "gyeongui"
+    ]
+  },
+  "s_1216": {
+    "id": "s_1216",
+    "name": "오빈",
+    "nameEn": "Obin",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "gyeongui"
+    ]
+  },
+  "s_1212": {
+    "id": "s_1212",
+    "name": "양수",
+    "nameEn": "Yangsu",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "gyeongui"
+    ]
+  },
+  "s_1220": {
+    "id": "s_1220",
+    "name": "지평",
+    "nameEn": "Jipyeong",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "gyeongui"
+    ]
+  },
+  "s_1267": {
+    "id": "s_1267",
+    "name": "수색",
+    "nameEn": "Susaek",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "gyeongui"
+    ]
+  },
+  "s_1269": {
+    "id": "s_1269",
+    "name": "강매",
+    "nameEn": "Gangmae",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "gyeongui"
+    ]
+  },
+  "s_1265": {
+    "id": "s_1265",
+    "name": "가좌",
+    "nameEn": "Gajwa",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "gyeongui"
+    ]
+  },
+  "s_1315": {
+    "id": "s_1315",
+    "name": "사릉",
+    "nameEn": "Sareung",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "gyeongchun"
+    ]
+  },
+  "s_1329": {
+    "id": "s_1329",
+    "name": "춘천",
+    "nameEn": "Chuncheon",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "gyeongchun"
+    ]
+  },
+  "s_4215": {
+    "id": "s_4215",
+    "name": "인천공항2터미널",
+    "nameEn": "Incheon Int’l Airport Terminal 2",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "airport"
+    ]
+  },
+  "s_4213": {
+    "id": "s_4213",
+    "name": "인천공항1터미널",
+    "nameEn": "Incheon Int’l Airport Terminal 1",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "airport"
+    ]
+  },
+  "s_4211": {
+    "id": "s_4211",
+    "name": "운서",
+    "nameEn": "Unseo",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "airport"
+    ]
+  },
+  "s_4210": {
+    "id": "s_4210",
+    "name": "청라국제도시",
+    "nameEn": "Cheongna Int’l City Station",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "airport"
+    ]
+  },
+  "s_4208": {
+    "id": "s_4208",
+    "name": "계양",
+    "nameEn": "Gyeyang",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "airport",
+      "incheon1"
+    ]
+  },
+  "s_4928": {
+    "id": "s_4928",
+    "name": "고촌",
+    "nameEn": "Gochon",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "gimpo"
+    ]
+  },
+  "s_4927": {
+    "id": "s_4927",
+    "name": "풍무",
+    "nameEn": "Pungmu",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "gimpo"
+    ]
+  },
+  "s_4926": {
+    "id": "s_4926",
+    "name": "사우",
+    "nameEn": "Sau",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "gimpo"
+    ]
+  },
+  "s_4920": {
+    "id": "s_4920",
+    "name": "양촌",
+    "nameEn": "Yangchon",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "gimpo"
+    ]
+  },
+  "s_4921": {
+    "id": "s_4921",
+    "name": "구래",
+    "nameEn": "Gurae",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "gimpo"
+    ]
+  },
+  "s_4925": {
+    "id": "s_4925",
+    "name": "걸포북변",
+    "nameEn": "Geolpo Bukbyeon",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "gimpo"
+    ]
+  },
+  "s_4924": {
+    "id": "s_4924",
+    "name": "운양",
+    "nameEn": "Unyang",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "gimpo"
+    ]
+  },
+  "s_4923": {
+    "id": "s_4923",
+    "name": "장기",
+    "nameEn": "Janggi",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "gimpo"
+    ]
+  },
+  "s_4922": {
+    "id": "s_4922",
+    "name": "마산",
+    "nameEn": "Masan",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "gimpo"
+    ]
+  },
+  "s_4809": {
+    "id": "s_4809",
+    "name": "시흥시청",
+    "nameEn": "Siheung City Hall",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "seohaeline"
+    ]
+  },
+  "s_4810": {
+    "id": "s_4810",
+    "name": "시흥능곡",
+    "nameEn": "Siheung Neunggok",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "seohaeline"
+    ]
+  },
+  "s_4815": {
+    "id": "s_4815",
+    "name": "원시",
+    "nameEn": "Wonsi",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "seohaeline"
+    ]
+  },
+  "s_1890": {
+    "id": "s_1890",
+    "name": "신포",
+    "nameEn": "Sinpo",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "bundang"
+    ]
+  },
+  "s_1884": {
+    "id": "s_1884",
+    "name": "원인재",
+    "nameEn": "Woninjae",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "bundang",
+      "incheon1"
+    ]
+  },
+  "s_1859": {
+    "id": "s_1859",
+    "name": "오리",
+    "nameEn": "Ori",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "bundang"
+    ]
+  },
+  "s_1857": {
+    "id": "s_1857",
+    "name": "정자",
+    "nameEn": "Jeongja",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "bundang",
+      "sinbundang"
+    ]
+  },
+  "s_4403": {
+    "id": "s_4403",
+    "name": "서울지방병무청",
+    "nameEn": "Seoul Regional Office of Military Manpower",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "sillim"
+    ]
+  },
+  "s_4411": {
+    "id": "s_4411",
+    "name": "관악산",
+    "nameEn": "Gwanaksan",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "sillim"
+    ]
+  },
+  "s_4410": {
+    "id": "s_4410",
+    "name": "서울대벤처타운",
+    "nameEn": "Seoul National Univ. Venture Town",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "sillim"
+    ]
+  },
+  "s_4409": {
+    "id": "s_4409",
+    "name": "서원",
+    "nameEn": "Sutgogae",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "sillim"
+    ]
+  },
+  "s_4406": {
+    "id": "s_4406",
+    "name": "보라매병원",
+    "nameEn": "Boramae MedicalCenter",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "sillim"
+    ]
+  },
+  "s_4319": {
+    "id": "s_4319",
+    "name": "광교",
+    "nameEn": "Gwanggyo",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "sinbundang"
+    ]
+  },
+  "s_4315": {
+    "id": "s_4315",
+    "name": "수지구청",
+    "nameEn": "Suji-gu office",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "sinbundang"
+    ]
+  },
+  "s_4509": {
+    "id": "s_4509",
+    "name": "시청.용인대",
+    "nameEn": "City Hall, Yongin Univ.",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "yongin"
+    ]
+  },
+  "s_4504": {
+    "id": "s_4504",
+    "name": "어정",
+    "nameEn": "Eojeong",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "yongin"
+    ]
+  },
+  "s_4515": {
+    "id": "s_4515",
+    "name": "둔전",
+    "nameEn": "Dunjeon",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "yongin"
+    ]
+  },
+  "s_4513": {
+    "id": "s_4513",
+    "name": "고진",
+    "nameEn": "Gojin",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "yongin"
+    ]
+  },
+  "s_4707": {
+    "id": "s_4707",
+    "name": "삼양사거리",
+    "nameEn": "Samyang Sageori",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "wooyisinseol"
+    ]
+  },
+  "s_4701": {
+    "id": "s_4701",
+    "name": "북한산우이",
+    "nameEn": "Bukhansan Ui",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "wooyisinseol"
+    ]
+  },
+  "s_4710": {
+    "id": "s_4710",
+    "name": "정릉",
+    "nameEn": "Jeongneung",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "wooyisinseol"
+    ]
+  },
+  "s_4703": {
+    "id": "s_4703",
+    "name": "4·19민주묘지",
+    "nameEn": "April 19th National Cemetery",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "wooyisinseol"
+    ]
+  },
+  "s_4704": {
+    "id": "s_4704",
+    "name": "가오리",
+    "nameEn": "Gaori",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "wooyisinseol"
+    ]
+  },
+  "s_4705": {
+    "id": "s_4705",
+    "name": "화계",
+    "nameEn": "Hwagye",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "wooyisinseol"
+    ]
+  },
+  "s_4706": {
+    "id": "s_4706",
+    "name": "삼양",
+    "nameEn": "Samyang",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "wooyisinseol"
+    ]
+  },
+  "s_4608": {
+    "id": "s_4608",
+    "name": "동오",
+    "nameEn": "Dong-o",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "uijeongbu"
+    ]
+  },
+  "s_4612": {
+    "id": "s_4612",
+    "name": "곤제",
+    "nameEn": "gonjae",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "uijeongbu"
+    ]
+  },
+  "s_4610": {
+    "id": "s_4610",
+    "name": "경기도청북부청사",
+    "nameEn": "Gyeonggi Provincial Government Northern Office",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "uijeongbu"
+    ]
+  },
+  "s_4607": {
+    "id": "s_4607",
+    "name": "의정부중앙",
+    "nameEn": "Uijeongbu Jung-ang",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "uijeongbu"
+    ]
+  },
+  "s_3226": {
+    "id": "s_3226",
+    "name": "인천대공원",
+    "nameEn": "Incheon Grand Park",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "incheon2"
+    ]
+  },
+  "s_3225": {
+    "id": "s_3225",
+    "name": "남동구청",
+    "nameEn": "Namdong-gu Office",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "incheon2"
+    ]
+  },
+  "s_3221": {
+    "id": "s_3221",
+    "name": "인천시청",
+    "nameEn": "Inchon City Hall",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "incheon2",
+      "incheon1"
+    ]
+  },
+  "s_3215": {
+    "id": "s_3215",
+    "name": "인천가좌",
+    "nameEn": "Incheon Gajwa",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "incheon2"
+    ]
+  },
+  "s_3216": {
+    "id": "s_3216",
+    "name": "가재울",
+    "nameEn": "Gajaeul",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "incheon2"
+    ]
+  },
+  "s_3214": {
+    "id": "s_3214",
+    "name": "서부여성회관",
+    "nameEn": "West Woman's Community Center",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "incheon2"
+    ]
+  },
+  "s_3227": {
+    "id": "s_3227",
+    "name": "운연",
+    "nameEn": "Unyeon",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "incheon2"
+    ]
+  },
+  "s_3212": {
+    "id": "s_3212",
+    "name": "가정중앙시장",
+    "nameEn": "Gajeong Jungang Market",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "incheon2"
+    ]
+  },
+  "s_3211": {
+    "id": "s_3211",
+    "name": "가정",
+    "nameEn": "Gajeong",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "incheon2"
+    ]
+  },
+  "s_3210": {
+    "id": "s_3210",
+    "name": "서구청",
+    "nameEn": "Seo-gu Office",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "incheon2"
+    ]
+  },
+  "s_3209": {
+    "id": "s_3209",
+    "name": "아시아드경기장",
+    "nameEn": "Asiad Stadium",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "incheon2"
+    ]
+  },
+  "s_3206": {
+    "id": "s_3206",
+    "name": "독정",
+    "nameEn": "Dokjeong",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "incheon2"
+    ]
+  },
+  "s_3204": {
+    "id": "s_3204",
+    "name": "마전",
+    "nameEn": "Majeon",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "incheon2"
+    ]
+  },
+  "s_3203": {
+    "id": "s_3203",
+    "name": "검단사거리",
+    "nameEn": "Geomdan Sageori",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "incheon2"
+    ]
+  },
+  "s_3201": {
+    "id": "s_3201",
+    "name": "검단오류",
+    "nameEn": "Geomdan Oryu",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "incheon2"
+    ]
+  },
+  "s_3222": {
+    "id": "s_3222",
+    "name": "석천사거리",
+    "nameEn": "Seokcheon Sageori",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "incheon2"
+    ]
+  },
+  "s_3132": {
+    "id": "s_3132",
+    "name": "동막",
+    "nameEn": "Dongmak",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "incheon1"
+    ]
+  },
+  "s_3131": {
+    "id": "s_3131",
+    "name": "동춘",
+    "nameEn": "Dongchun",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "incheon1"
+    ]
+  },
+  "s_3129": {
+    "id": "s_3129",
+    "name": "신연수",
+    "nameEn": "Sinyeonsu",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "incheon1"
+    ]
+  },
+  "s_3126": {
+    "id": "s_3126",
+    "name": "인천터미널",
+    "nameEn": "Incheon Bus Terminal",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "incheon1"
+    ]
+  },
+  "s_3108": {
+    "id": "s_3108",
+    "name": "신검단중앙",
+    "nameEn": "Singeomdanjungang",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "incheon1"
+    ]
+  },
+  "s_3107": {
+    "id": "s_3107",
+    "name": "검단호수공원",
+    "nameEn": "Geomdan Lake Park",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "incheon1"
+    ]
+  },
+  "s_3121": {
+    "id": "s_3121",
+    "name": "동수",
+    "nameEn": "Dongsu",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "incheon1"
+    ]
+  },
+  "s_3119": {
+    "id": "s_3119",
+    "name": "부평시장",
+    "nameEn": "Bupyeong Market",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "incheon1"
+    ]
+  },
+  "s_3115": {
+    "id": "s_3115",
+    "name": "경인교대입구",
+    "nameEn": "Gyeong-in Nat`l Univ. of Education",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "incheon1"
+    ]
+  },
+  "s_3139": {
+    "id": "s_3139",
+    "name": "송도달빛축제공원",
+    "nameEn": "Songdo Moonlight Festival Park",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "incheon1"
+    ]
+  },
+  "s_3136": {
+    "id": "s_3136",
+    "name": "인천대입구",
+    "nameEn": "Incheon Nat'l Univ.",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "incheon1"
+    ]
+  },
+  "s_3135": {
+    "id": "s_3135",
+    "name": "지식정보단지",
+    "nameEn": "BIT Zone",
+    "x": 0,
+    "y": 0,
+    "lines": [
+      "incheon1"
+    ]
   }
 }

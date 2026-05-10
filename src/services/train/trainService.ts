@@ -28,6 +28,13 @@ import {
 } from '../../models/train';
 import { seoulSubwayApi, SeoulTimetableRow } from '../api/seoulSubwayApi';
 import { getLocalStation, getLocalStationsByLine, searchLocalStations } from '../data/stationsDataService';
+
+let allStationsCache: Promise<Station[]> | null = null;
+
+/** Test-only: clear in-memory stations cache between specs. */
+export const __resetStationsCacheForTesting = (): void => {
+  allStationsCache = null;
+};
 import { locationService } from '../location/locationService';
 
 class TrainService {
@@ -240,32 +247,46 @@ class TrainService {
    */
   async searchStations(searchTerm: string): Promise<Station[]> {
     try {
-      // Firebase doesn't support full-text search, so we'll implement a simple approach
-      // In production, consider using Algolia or similar service for better search
-      const stationsSnapshot = await getDocs(collection(firestore, 'stations'));
-
-      const allStations: Station[] = stationsSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      } as Station));
-
-      // If Firebase has data, filter and return
+      const allStations = await this.getAllStationsCached();
       if (allStations.length > 0) {
-        const filteredStations = allStations.filter(station =>
-          station.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          station.nameEn.toLowerCase().includes(searchTerm.toLowerCase())
-        );
-        return filteredStations.slice(0, 20);
+        return this.filterStations(allStations, searchTerm);
       }
-
-      // Firebase has no data - fall back to local
       console.warn('No stations in Firebase, using local data for search');
       return searchLocalStations(searchTerm);
     } catch (error) {
-      // Firebase error - fall back to local data
       console.error('Firebase error searching stations, falling back to local:', error);
       return searchLocalStations(searchTerm);
     }
+  }
+
+  private filterStations(stations: Station[], searchTerm: string): Station[] {
+    const term = searchTerm.toLowerCase();
+    return stations
+      .filter(s => s.name.toLowerCase().includes(term) || s.nameEn.toLowerCase().includes(term))
+      .slice(0, 20);
+  }
+
+  /**
+   * Module-level cache of the entire `stations` collection.
+   *
+   * Why: searchStations was downloading all stations on every keystroke.
+   * Station metadata is effectively static within a session, so we cache the
+   * in-flight Promise so concurrent callers share one network round-trip and
+   * later calls return synchronously from memory. Cleared on failure so the
+   * next caller can retry.
+   */
+  private getAllStationsCached(): Promise<Station[]> {
+    if (allStationsCache) return allStationsCache;
+    allStationsCache = (async (): Promise<Station[]> => {
+      try {
+        const snapshot = await getDocs(collection(firestore, 'stations'));
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Station));
+      } catch (err) {
+        allStationsCache = null;
+        throw err;
+      }
+    })();
+    return allStationsCache;
   }
 
   /**

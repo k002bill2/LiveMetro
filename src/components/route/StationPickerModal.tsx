@@ -9,14 +9,17 @@ import {
   FlatList,
   ActivityIndicator,
 } from 'react-native';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { X, Search } from 'lucide-react-native';
 import { useTheme } from '@/services/theme';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
-import { trainService } from '@/services/train/trainService';
+import { searchGraphStations } from '@/utils/subwayMapData';
+import { LineBadge } from '@/components/design/LineBadge';
 
 interface StationLite {
   id: string;
   name: string;
+  lineId?: string;
 }
 
 interface Props {
@@ -51,32 +54,21 @@ export const StationPickerModal: React.FC<Props> = ({
   }, [visible, initialQuery]);
 
   useEffect(() => {
-    let cancelled = false;
-    if (query.trim().length === 0) {
+    const trimmed = query.trim();
+    if (trimmed.length === 0) {
       setResults([]);
       setLoading(false);
       return;
     }
-
-    setLoading(true);
-    trainService
-      .searchStations(query.trim())
-      .then((res) => {
-        if (cancelled) return;
-        const lite: StationLite[] = res.map((s) => ({ id: s.id, name: s.name }));
-        setResults(lite);
-      })
-      .catch(() => {
-        if (cancelled) return;
-        setResults([]);
-      })
-      .finally(() => {
-        if (cancelled) return;
-        setLoading(false);
-      });
-    return (): void => {
-      cancelled = true;
-    };
+    // Search the routing graph (stations.json slug ids), not Firestore or
+    // seoulStations.json. routeService.getDiverseRoutes consumes graph slug
+    // ids — using any other id source breaks route lookup. Synchronous, so
+    // no debounce or SWR is needed.
+    const found = searchGraphStations(trimmed);
+    setResults(
+      found.map((s) => ({ id: s.id, name: s.name, lineId: s.lines[0] }))
+    );
+    setLoading(false);
   }, [query]);
 
   const handleSelect = useCallback(
@@ -90,8 +82,13 @@ export const StationPickerModal: React.FC<Props> = ({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View style={styles.container} testID="station-picker-modal">
-        <View style={styles.header}>
+      {/* Inner SafeAreaProvider is intentional: iOS Modal mounts a new UIWindow
+          that breaks native inset propagation from the root provider. Each
+          provider measures its own native frame independently, so this does
+          not double-count padding. */}
+      <SafeAreaProvider>
+        <SafeAreaView style={styles.container} edges={['top', 'left', 'right', 'bottom']} testID="station-picker-modal">
+          <View style={styles.header}>
           <View style={styles.searchBox}>
             <Search size={18} color={semantic.labelAlt} strokeWidth={1.7} />
             <TextInput
@@ -134,11 +131,13 @@ export const StationPickerModal: React.FC<Props> = ({
               accessibilityRole="button"
               accessibilityLabel={`${item.name} 선택`}
             >
+              {item.lineId ? <LineBadge line={item.lineId} size={22} /> : null}
               <Text style={styles.resultText}>{item.name}</Text>
             </Pressable>
           )}
         />
-      </View>
+        </SafeAreaView>
+      </SafeAreaProvider>
     </Modal>
   );
 };
@@ -180,6 +179,9 @@ const createStyles = (semantic: WantedSemanticTheme): ReturnType<typeof StyleShe
       marginTop: WANTED_TOKENS.spacing.s4,
     },
     resultRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: WANTED_TOKENS.spacing.s3,
       paddingHorizontal: WANTED_TOKENS.spacing.s4,
       paddingVertical: WANTED_TOKENS.spacing.s3,
       borderBottomWidth: StyleSheet.hairlineWidth,

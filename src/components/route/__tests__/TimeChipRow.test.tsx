@@ -49,6 +49,6 @@ describe('TimeChipRow', () => {
   it('shows formatted time on depart chip when time provided', () => {
     const time = new Date('2026-05-09T08:32:00');
     const { getByText } = render(<TimeChipRow {...defaultProps} mode="depart" time={time} />);
-    expect(getByText('8:32')).toBeTruthy();
+    expect(getByText('오전 8:32')).toBeTruthy();
   });
 });

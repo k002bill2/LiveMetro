@@ -96,23 +96,29 @@ describe('findKShortestPaths', () => {
 });
 
 describe('getDiverseRoutes', () => {
-  it('should return diverse routes', () => {
-    const routes = getDiverseRoutes('222', '226', 0.3);
+  it('returns at most 2 routes (fastest + min-transfer)', () => {
+    const routes = getDiverseRoutes('222', '226');
 
-    expect(routes.length).toBeLessThanOrEqual(3);
+    expect(routes.length).toBeLessThanOrEqual(2);
   });
 
-  it('should respect minimum diversity threshold', () => {
-    const routes = getDiverseRoutes('222', '226', 0.5);
+  it('labels the first route as "fastest"', () => {
+    const routes = getDiverseRoutes('222', '226');
 
-    // With high diversity threshold, should return fewer routes
-    expect(routes.length).toBeLessThanOrEqual(3);
+    if (routes.length > 0) {
+      expect(routes[0]?.category).toBe('fastest');
+    }
   });
 
-  it('should return at most 3 routes', () => {
-    const routes = getDiverseRoutes('222', '226', 0.1);
+  it('rejects routes exceeding the transfer cap unless none qualify', () => {
+    const routes = getDiverseRoutes('222', '226');
 
-    expect(routes.length).toBeLessThanOrEqual(3);
+    // All returned candidates should be ≤2 transfers (the hard cap), with the
+    // single fallback exception when no candidate qualifies — in which case we
+    // still return exactly 1 route labelled 'fastest'.
+    if (routes.length > 1) {
+      for (const r of routes) expect(r.transferCount).toBeLessThanOrEqual(2);
+    }
   });
 });
 

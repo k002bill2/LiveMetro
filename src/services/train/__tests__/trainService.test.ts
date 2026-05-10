@@ -3,7 +3,7 @@
  * Tests for Firebase-based train service functionality
  */
 
-import { trainService } from '../trainService';
+import { trainService, __resetStationsCacheForTesting } from '../trainService';
 import { Train, Station, SubwayLine, TrainDelay, TrainStatus, DelaySeverity } from '../../../models/train';
 
 import { seoulSubwayApi } from '../../api/seoulSubwayApi';
@@ -105,6 +105,7 @@ describe('TrainService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    __resetStationsCacheForTesting();
     mockCollection.mockReturnValue('mockCollection');
     mockQuery.mockReturnValue('mockQuery');
     mockWhere.mockReturnValue('mockWhere');

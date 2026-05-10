@@ -25,6 +25,7 @@ import { useTheme } from '@/services/theme';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { useNearbyStations } from '@/hooks/useNearbyStations';
 import { useRouteSearch, type DepartureMode } from '@/hooks/useRouteSearch';
+import { STATIONS as GRAPH_STATIONS, isRoutableStation } from '@/utils/subwayMapData';
 import { StationSearchBar } from '@/components/route/StationSearchBar';
 import { TimeChipRow } from '@/components/route/TimeChipRow';
 import { StationPickerModal } from '@/components/route/StationPickerModal';
@@ -57,9 +58,21 @@ export const RoutesTabScreen: React.FC = () => {
 
   // Seed closest station to fromStation when it first becomes available.
   // Only seeds while fromStation is null — user explicit clears stick.
+  // closestStation.id comes from trainService (Firestore/station_cd), but
+  // useRouteSearch needs the routing graph's slug id, so we resolve by name.
+  // If the closest station isn't in the graph, skip seeding rather than
+  // populating a non-routable id.
   useEffect(() => {
     if (!fromStation && closestStation) {
-      setFromStation({ id: closestStation.id, name: closestStation.name });
+      const graphMatch = Object.values(GRAPH_STATIONS).find(
+        (s) => s.name === closestStation.name
+      );
+      // Only seed when the matched station is also wired into a line's order
+      // — otherwise routeService cannot reach any neighbor from it and the
+      // user gets a stale "no route" until they manually pick another station.
+      if (graphMatch && isRoutableStation(graphMatch.id)) {
+        setFromStation({ id: graphMatch.id, name: graphMatch.name });
+      }
     }
   }, [closestStation, fromStation]);
 
@@ -160,37 +173,53 @@ export const RoutesTabScreen: React.FC = () => {
     );
   };
 
+  const hasRoutes = routes.length > 0 && !loading && !error;
+
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={styles.content}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={handleRefresh}
-          tintColor={semantic.primaryNormal}
+    <View style={styles.container}>
+      <ScrollView
+        contentContainerStyle={[styles.content, hasRoutes && styles.contentWithCta]}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={semantic.primaryNormal}
+          />
+        }
+        testID="routes-tab-screen"
+      >
+        <Text style={styles.title}>경로 검색</Text>
+
+        <StationSearchBar
+          fromStation={fromStation}
+          toStation={toStation}
+          onPressFrom={handlePressFrom}
+          onPressTo={handlePressTo}
+          onSwap={handleSwap}
         />
-      }
-      testID="routes-tab-screen"
-    >
-      <Text style={styles.title}>경로 검색</Text>
 
-      <StationSearchBar
-        fromStation={fromStation}
-        toStation={toStation}
-        onPressFrom={handlePressFrom}
-        onPressTo={handlePressTo}
-        onSwap={handleSwap}
-      />
+        <TimeChipRow
+          mode={departureMode}
+          time={departureTime}
+          onChangeMode={setDepartureMode}
+          onChangeTime={setDepartureTime}
+        />
 
-      <TimeChipRow
-        mode={departureMode}
-        time={departureTime}
-        onChangeMode={setDepartureMode}
-        onChangeTime={setDepartureTime}
-      />
+        {renderContent()}
+      </ScrollView>
 
-      {renderContent()}
+      {hasRoutes && (
+        <View style={[styles.ctaBar, { backgroundColor: semantic.bgBase, borderTopColor: semantic.lineSubtle }]}>
+          <Pressable
+            style={[styles.ctaButton, { backgroundColor: semantic.primaryNormal }]}
+            accessibilityRole="button"
+            accessibilityLabel="선택한 경로로 길안내 시작"
+            testID="route-start-cta"
+          >
+            <Text style={styles.ctaText}>이 경로로 길안내 시작</Text>
+          </Pressable>
+        </View>
+      )}
 
       <StationPickerModal
         visible={pickerSlot !== null}
@@ -198,7 +227,7 @@ export const RoutesTabScreen: React.FC = () => {
         onSelect={handleSelect}
         recentStations={[]}
       />
-    </ScrollView>
+    </View>
   );
 };
 
@@ -208,6 +237,27 @@ const createStyles = (semantic: WantedSemanticTheme): ReturnType<typeof StyleShe
   StyleSheet.create({
     container: { flex: 1, backgroundColor: semantic.bgSubtlePage },
     content: { padding: WANTED_TOKENS.spacing.s4 },
+    contentWithCta: { paddingBottom: 96 },
+    ctaBar: {
+      position: 'absolute',
+      left: 0,
+      right: 0,
+      bottom: 0,
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingTop: WANTED_TOKENS.spacing.s3,
+      paddingBottom: WANTED_TOKENS.spacing.s5,
+      borderTopWidth: 1,
+    },
+    ctaButton: {
+      paddingVertical: WANTED_TOKENS.spacing.s4,
+      borderRadius: WANTED_TOKENS.radius.r4,
+      alignItems: 'center',
+    },
+    ctaText: {
+      color: '#FFFFFF',
+      fontSize: WANTED_TOKENS.type.body1.size,
+      fontFamily: weightToFontFamily('700'),
+    },
     title: {
       fontSize: WANTED_TOKENS.type.heading1.size,
       lineHeight: WANTED_TOKENS.type.heading1.lh,

@@ -29,7 +29,7 @@ import { getDiverseRoutes } from './kShortestPath';
 interface GraphNode {
   stationId: string;
   lineId: string;
-  key: string; // `${stationId}_${lineId}` for unique identification
+  key: string; // `${stationId}#${lineId}` for unique identification
 }
 
 interface GraphEdge {
@@ -91,7 +91,7 @@ const buildGraph = (excludeLineIds: readonly string[] = []): Graph => {
     if (excludeLineIds.includes(lineId)) return;
 
     stationIds.forEach((stationId, index) => {
-      const key = `${stationId}_${lineId}`;
+      const key = `${stationId}#${lineId}`;
       const node: GraphNode = { stationId, lineId, key };
       nodes.set(key, node);
 
@@ -104,7 +104,7 @@ const buildGraph = (excludeLineIds: readonly string[] = []): Graph => {
       if (index < stationIds.length - 1) {
         const nextStationId = stationIds[index + 1];
         if (nextStationId) {
-          const nextKey = `${nextStationId}_${lineId}`;
+          const nextKey = `${nextStationId}#${lineId}`;
           const edgeList = edges.get(key) || [];
           edgeList.push({
             to: { stationId: nextStationId, lineId, key: nextKey },
@@ -119,7 +119,7 @@ const buildGraph = (excludeLineIds: readonly string[] = []): Graph => {
       if (index > 0) {
         const prevStationId = stationIds[index - 1];
         if (prevStationId) {
-          const prevKey = `${prevStationId}_${lineId}`;
+          const prevKey = `${prevStationId}#${lineId}`;
           const edgeList = edges.get(key) || [];
           edgeList.push({
             to: { stationId: prevStationId, lineId, key: prevKey },
@@ -174,8 +174,8 @@ const buildGraph = (excludeLineIds: readonly string[] = []): Graph => {
         const line2 = stationLines[j];
         if (!line1 || !line2) continue;
 
-        const key1 = `${station.id}_${line1}`;
-        const key2 = `${station.id}_${line2}`;
+        const key1 = `${station.id}#${line1}`;
+        const key2 = `${station.id}#${line2}`;
 
         // Only add if both nodes exist
         if (nodes.has(key1) && nodes.has(key2)) {
@@ -217,7 +217,7 @@ const heuristic = (
   endKeys: string[],
   stationPositions: Map<string, number>
 ): number => {
-  const currentStationId = currentKey.split('_')[0];
+  const currentStationId = currentKey.split('#')[0];
   if (!currentStationId) return 0;
 
   const currentPos = stationPositions.get(currentStationId) ?? 0;
@@ -225,7 +225,7 @@ const heuristic = (
   // Find closest end station
   let minDistance = Infinity;
   for (const endKey of endKeys) {
-    const endStationId = endKey.split('_')[0];
+    const endStationId = endKey.split('#')[0];
     if (!endStationId) continue;
     const endPos = stationPositions.get(endStationId) ?? 0;
     const distance = Math.abs(endPos - currentPos);
@@ -381,8 +381,8 @@ const pathToSegments = (path: string[]): RouteSegment[] => {
     const nextKey = path[i + 1];
     if (!currentKey || !nextKey) continue;
 
-    const [currentStationId, currentLineId] = currentKey.split('_');
-    const [nextStationId, nextLineId] = nextKey.split('_');
+    const [currentStationId, currentLineId] = currentKey.split('#');
+    const [nextStationId, nextLineId] = nextKey.split('#');
     if (!currentStationId || !currentLineId || !nextStationId || !nextLineId) continue;
 
     const currentStation = STATIONS[currentStationId];
@@ -419,7 +419,7 @@ const getStationKeys = (
 
   return station.lines
     .filter(lineId => !excludeLineIds.includes(lineId) && LINE_STATIONS[lineId])
-    .map(lineId => `${stationId}_${lineId}`);
+    .map(lineId => `${stationId}#${lineId}`);
 };
 
 /**

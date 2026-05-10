@@ -23,6 +23,12 @@ export interface RouteSegment {
 }
 
 /**
+ * Why a route was suggested. Set by `getDiverseRoutes` when picking the
+ * fastest and the fewest-transfer routes from the K-shortest candidates.
+ */
+export type RouteCategory = 'fastest' | 'min-transfer';
+
+/**
  * Complete route from origin to destination
  */
 export interface Route {
@@ -30,6 +36,7 @@ export interface Route {
   readonly totalMinutes: number;
   readonly transferCount: number;
   readonly lineIds: readonly string[];
+  readonly category?: RouteCategory;
 }
 
 /**
