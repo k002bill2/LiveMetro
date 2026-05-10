@@ -13,12 +13,29 @@ jest.mock('@/services/theme/themeContext', () => ({
 }));
 
 jest.mock('lucide-react-native', () => ({
+  ArrowRight: 'ArrowRight',
   BellRing: 'BellRing',
   ChevronLeft: 'ChevronLeft',
   MapPin: 'MapPin',
   ShieldCheck: 'ShieldCheck',
   Sparkles: 'Sparkles',
+  TrainFront: 'TrainFront',
 }));
+
+// WelcomeHero uses react-native-svg for the abstract weave graphic; the
+// SVG primitives are mocked to plain Views so RNTL doesn't try to render
+// the native module under the test renderer.
+jest.mock('react-native-svg', () => {
+  const React = require('react');
+  const { View } = require('react-native');
+  const passthrough = ({ children, ...rest }: { children?: React.ReactNode }) =>
+    React.createElement(View, rest, children);
+  return {
+    __esModule: true,
+    default: passthrough,
+    Path: passthrough,
+  };
+});
 
 const baseNavigation = {
   navigate: mockNavigate,

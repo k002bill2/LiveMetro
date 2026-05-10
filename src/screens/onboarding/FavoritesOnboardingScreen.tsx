@@ -58,20 +58,30 @@ interface RecommendedStation {
   reason?: string; // "출발역", "도착역", or topical reason
 }
 
+// Wanted handoff captions: each non-route station carries a short
+// signal-rich reason ("주변 역", "환승 빈도 높음", "KTX/공항"). Route
+// stations are annotated dynamically below with "집 근처 · 출발역" and
+// "회사 근처 · 도착역".
 const RECOMMENDATIONS: readonly RecommendedStation[] = [
-  { id: 'stn-hongik', name: '홍대입구', nameEn: 'Hongik Univ.', lineIds: ['2', '6', '경의선'], reason: '인기 역' },
-  { id: 'stn-gangnam', name: '강남', nameEn: 'Gangnam', lineIds: ['2', '신분당선'], reason: '인기 역' },
-  { id: 'stn-jamsil', name: '잠실', nameEn: 'Jamsil', lineIds: ['2', '8'], reason: '환승 거점' },
-  { id: 'stn-seoul', name: '서울역', nameEn: 'Seoul Station', lineIds: ['1', '4', '경의선'], reason: '주요 환승' },
-  { id: 'stn-sinchon', name: '신촌', nameEn: 'Sinchon', lineIds: ['2'], reason: '인기 역' },
-  { id: 'stn-hapjeong', name: '합정', nameEn: 'Hapjeong', lineIds: ['2', '6'], reason: '환승 거점' },
+  { id: 'stn-sadang',   name: '사당',   nameEn: 'Sadang',   lineIds: ['2', '4'],          reason: '환승 빈도 높음' },
+  { id: 'stn-seoul',    name: '서울역', nameEn: 'Seoul Station', lineIds: ['1', '4', '경의선'], reason: 'KTX/공항' },
+  { id: 'stn-yongsan',  name: '용산',   nameEn: 'Yongsan',  lineIds: ['1'],               reason: '주변 역' },
+  { id: 'stn-jamsil',   name: '잠실',   nameEn: 'Jamsil',   lineIds: ['2', '8'],          reason: '주변 역' },
+  { id: 'stn-hongik',   name: '홍대입구', nameEn: 'Hongik Univ.', lineIds: ['2', '6', '경의선'], reason: '주변 역' },
+  { id: 'stn-gangnam',  name: '강남',   nameEn: 'Gangnam',  lineIds: ['2', '신분당선'],   reason: '주변 역' },
 ];
 
+// `time` overrides data.departureTime so the same OnboardingRouteData can
+// produce both the morning leg (with data.departureTime) and the evening
+// leg (with data.eveningDepartureTime). Stations remain identical because
+// onboarding doesn't model evening reversal yet — that's a follow-up.
+const FALLBACK_EVENING_TIME = '18:30';
 const toCommuteRoute = (
   data: OnboardingRouteData,
   notifications: CommuteRoute['notifications'],
+  time: string = data.departureTime,
 ): CommuteRoute => ({
-  departureTime: data.departureTime,
+  departureTime: time,
   departureStationId: data.departureStation.stationId,
   departureStationName: data.departureStation.stationName,
   departureLineId: data.departureStation.lineId,
@@ -109,8 +119,8 @@ export const FavoritesOnboardingScreen: React.FC<Props> = ({ navigation, route }
     const dep = route.params.route.departureStation;
     const arr = route.params.route.arrivalStation;
     const fromRoute: RecommendedStation[] = [
-      { id: dep.stationId, name: dep.stationName, nameEn: '', lineIds: [dep.lineId], reason: '출발역' },
-      { id: arr.stationId, name: arr.stationName, nameEn: '', lineIds: [arr.lineId], reason: '도착역' },
+      { id: dep.stationId, name: dep.stationName, nameEn: '', lineIds: [dep.lineId], reason: '집 근처 · 출발역' },
+      { id: arr.stationId, name: arr.stationName, nameEn: '', lineIds: [arr.lineId], reason: '회사 근처 · 도착역' },
     ];
     // Drop any recommendation that duplicates a route station, then prepend
     // the route stations.
@@ -166,10 +176,21 @@ export const FavoritesOnboardingScreen: React.FC<Props> = ({ navigation, route }
         return;
       }
 
-      // 1. Save commute route (degenerate — same route as morning + evening
-      //    until a future phase reintroduces dedicated evening flow).
-      const fullRoute = toCommuteRoute(route.params.route, route.params.notifications);
-      const saveResult = await saveCommuteRoutes(uid, fullRoute, fullRoute);
+      // 1. Save commute route — morning + evening legs share stations
+      // (no reversal modelling yet) but carry distinct times when the user
+      // configured them in CommuteTime. eveningDepartureTime falls back
+      // to FALLBACK_EVENING_TIME for legacy callers that skipped that step.
+      const morningRoute = toCommuteRoute(
+        route.params.route,
+        route.params.notifications,
+        route.params.route.departureTime,
+      );
+      const eveningRoute = toCommuteRoute(
+        route.params.route,
+        route.params.notifications,
+        route.params.route.eveningDepartureTime ?? FALLBACK_EVENING_TIME,
+      );
+      const saveResult = await saveCommuteRoutes(uid, morningRoute, eveningRoute);
       if (!saveResult.success) {
         Alert.alert('저장 실패', saveResult.error ?? '경로 저장에 실패했습니다.');
         return;
@@ -220,7 +241,8 @@ export const FavoritesOnboardingScreen: React.FC<Props> = ({ navigation, route }
       testID="favorites-onboarding"
     >
       <OnbHeader
-        currentStep={4}
+        currentStep={5}
+        totalSteps={5}
         onBack={() => navigation.canGoBack() && navigation.goBack()}
         onSkip={onSkip}
       />
@@ -230,7 +252,7 @@ export const FavoritesOnboardingScreen: React.FC<Props> = ({ navigation, route }
           testID="favorites-eyebrow"
           accessibilityRole="text"
         >
-          STEP 4 / 4
+          STEP 5 / 5
         </Text>
         <Text
           style={[styles.title, { color: semantic.labelStrong, fontFamily: weightToFontFamily('800') }]}

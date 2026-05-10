@@ -17,9 +17,9 @@ jest.mock('@/services/theme/themeContext', () => ({
 
 jest.mock('lucide-react-native', () => ({
   AlertTriangle: 'AlertTriangle',
-  ArrowLeftRight: 'ArrowLeftRight',
   ArrowRight: 'ArrowRight',
   ChevronLeft: 'ChevronLeft',
+  Clock: 'Clock',
   Megaphone: 'Megaphone',
   TrainFront: 'TrainFront',
 }));
@@ -53,6 +53,8 @@ jest.mock('@/models/commute', () => ({
     delayAlert: true,
     incidentAlert: true,
     alertMinutesBefore: 5,
+    departureTimeAlert: true,
+    communityAlert: false,
   },
 }));
 
@@ -83,18 +85,19 @@ beforeEach(() => {
 });
 
 describe('NotificationPermissionScreen (step 3/4)', () => {
-  it('renders the OnbHeader, preview card, and 3 toggle cards (default on)', () => {
+  it('renders the OnbHeader, preview card, and 3 toggle cards with Wanted defaults', () => {
     const { getByTestId } = render(
       <NotificationPermissionScreen navigation={baseNavigation} route={baseRoute} />,
     );
     expect(getByTestId('onb-header')).toBeTruthy();
     expect(getByTestId('notification-preview')).toBeTruthy();
-    expect(getByTestId('toggle-transferAlert')).toBeTruthy();
+    expect(getByTestId('toggle-departureTimeAlert')).toBeTruthy();
     expect(getByTestId('toggle-delayAlert')).toBeTruthy();
-    expect(getByTestId('toggle-incidentAlert')).toBeTruthy();
-    expect(getByTestId('switch-transferAlert').props.value).toBe(true);
+    expect(getByTestId('toggle-communityAlert')).toBeTruthy();
+    expect(getByTestId('switch-departureTimeAlert').props.value).toBe(true);
     expect(getByTestId('switch-delayAlert').props.value).toBe(true);
-    expect(getByTestId('switch-incidentAlert').props.value).toBe(true);
+    // 실시간 제보 알림은 디자인 기본값 OFF
+    expect(getByTestId('switch-communityAlert').props.value).toBe(false);
   });
 
   it('"알림 받기" requests permissions and navigates with the granted result', async () => {
@@ -151,8 +154,9 @@ describe('NotificationPermissionScreen (step 3/4)', () => {
     const { getByTestId } = render(
       <NotificationPermissionScreen navigation={baseNavigation} route={baseRoute} />,
     );
-    const incidentSwitch = getByTestId('switch-incidentAlert');
-    fireEvent(incidentSwitch, 'valueChange', false);
-    expect(incidentSwitch.props.value).toBe(false);
+    const communitySwitch = getByTestId('switch-communityAlert');
+    expect(communitySwitch.props.value).toBe(false);
+    fireEvent(communitySwitch, 'valueChange', true);
+    expect(communitySwitch.props.value).toBe(true);
   });
 });

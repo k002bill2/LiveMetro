@@ -19,11 +19,12 @@ describe('OnbHeader', () => {
     expect(getByTestId('onb-header')).toBeTruthy();
   });
 
-  it('hides back + skip on step 1 and shows the {n}/4 counter instead', () => {
+  it('hides back + skip on step 1 and shows the {n}/5 counter instead', () => {
     const { queryByTestId, getByTestId } = render(<OnbHeader currentStep={1} />);
     expect(queryByTestId('onb-header-back')).toBeNull();
     expect(queryByTestId('onb-header-skip')).toBeNull();
-    expect(getByTestId('onb-header-counter').props.children).toEqual([1, '/', 4]);
+    // Default totalSteps was bumped to 5 with the CommuteTime step.
+    expect(getByTestId('onb-header-counter').props.children).toEqual([1, '/', 5]);
   });
 
   it('renders back when onBack provided and fires the callback', () => {
@@ -41,8 +42,8 @@ describe('OnbHeader', () => {
   });
 
   it('shows the counter (not skip) when onSkip is undefined', () => {
-    const { queryByTestId, getByTestId } = render(<OnbHeader currentStep={4} />);
+    const { queryByTestId, getByTestId } = render(<OnbHeader currentStep={5} />);
     expect(queryByTestId('onb-header-skip')).toBeNull();
-    expect(getByTestId('onb-header-counter').props.children).toEqual([4, '/', 4]);
+    expect(getByTestId('onb-header-counter').props.children).toEqual([5, '/', 5]);
   });
 });

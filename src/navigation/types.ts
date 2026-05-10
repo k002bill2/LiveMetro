@@ -30,9 +30,15 @@ export type SettingsStackParamList = {
   PrivacyPolicy: undefined;
 };
 
-// Route data passed between onboarding screens
+// Route data passed between onboarding screens.
+//
+// `departureTime` carries the morning leg time. `eveningDepartureTime` is
+// optional so the type stays backward-compatible with callers that only
+// configure morning; FavoritesOnboarding falls back to a default ('18:30')
+// when committing the evening leg if it's missing.
 export interface OnboardingRouteData {
   departureTime: string;
+  eveningDepartureTime?: string;
   departureStation: StationSelection;
   arrivalStation: StationSelection;
   transferStations: TransferStation[];
@@ -48,20 +54,23 @@ export interface PickedStationPayload {
 }
 
 export type OnboardingStackParamList = {
-  // Redefined onboarding flow:
-  //   1/4 Welcome (brand + value props, no params)
-  //   2/4 CommuteRoute (route picker, no params — defaults departureTime)
-  //   3/4 NotificationPermission (OS prompt + alert toggles)
-  //   4/4 FavoritesOnboarding (commit + onComplete)
-  // OnboardingStationPicker: full-screen drill-in from CommuteRoute (Phase 52
-  // — replaces the legacy StationSearchModal pattern with the Wanted handoff
-  // design's in-screen browseMode + recommendations flow).
+  // 5-step onboarding flow (image 17 reintroduces the dedicated time step):
+  //   1/5 Welcome (brand + value props, no params)
+  //   2/5 CommuteRoute (route picker — defaults departureTime to '08:00')
+  //   3/5 CommuteTime (chip-based departure time picker, finalises route data)
+  //   4/5 NotificationPermission (OS prompt + alert toggles)
+  //   5/5 FavoritesOnboarding (commit + onComplete)
+  // OnboardingStationPicker: full-screen drill-in from CommuteRoute — not a
+  // numbered step (returns to CommuteRoute via merged params).
   WelcomeOnboarding: undefined;
   CommuteRoute: { pickedStation?: PickedStationPayload } | undefined;
   OnboardingStationPicker: {
     selectionType: 'departure' | 'arrival' | 'transfer';
     excludeStationIds: string[];
     currentName?: string;
+  };
+  CommuteTime: {
+    route: OnboardingRouteData;
   };
   NotificationPermission: {
     route: OnboardingRouteData;

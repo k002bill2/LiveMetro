@@ -1,10 +1,9 @@
 /**
- * CommuteRouteScreen Test Suite — single-route flow.
+ * CommuteRouteScreen Test Suite — Wanted handoff redesign.
  *
- * Tests the simplified onboarding step 2/4: OnbHeader presence, station
- * selection placeholders, navigation guards. The morning/evening text
- * branching was removed when the wizard was redefined as
- * Welcome → CommuteRoute → NotificationPermission → Favorites.
+ * Validates the redesigned step 2/4: stacked station card with departure/
+ * arrival rows, transfer recommendation list (radio), and footer summary.
+ * The legacy "이전" button + transfer-add modal pattern was retired.
  */
 
 import React from 'react';
@@ -13,14 +12,14 @@ import { CommuteRouteScreen } from '../CommuteRouteScreen';
 
 jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
 jest.mock('lucide-react-native', () => ({
-  GitBranch: 'GitBranch',
-  MapPin: 'MapPin',
-  Flag: 'Flag',
-  ChevronRight: 'ChevronRight',
-  Search: 'Search',
-  ArrowLeft: 'ArrowLeft',
   ArrowRight: 'ArrowRight',
+  Building2: 'Building2',
   ChevronLeft: 'ChevronLeft',
+  ChevronRight: 'ChevronRight',
+  Home: 'Home',
+  Repeat: 'Repeat',
+  Search: 'Search',
+  Zap: 'Zap',
 }));
 
 jest.mock('@react-navigation/native', () => ({
@@ -31,20 +30,21 @@ jest.mock('@react-navigation/native', () => ({
   useRoute: jest.fn(() => ({ params: {} })),
 }));
 
+jest.mock('@/services/theme', () => ({
+  useTheme: jest.fn(() => ({ isDark: false })),
+}));
+
+// OnbHeader imports useTheme from the themeContext path directly — mocking
+// only the index alias above would still bubble up ThemeProvider errors.
 jest.mock('@/services/theme/themeContext', () => ({
   useTheme: jest.fn(() => ({ isDark: false })),
 }));
 
-jest.mock('@/components/commute/StationSearchModal', () => ({
-  StationSearchModal: 'StationSearchModal',
-}));
-
-jest.mock('@/components/commute/TransferStationList', () => ({
-  TransferStationList: 'TransferStationList',
-}));
-
-jest.mock('@/components/commute/RoutePreview', () => ({
-  RoutePreview: 'RoutePreview',
+// LineBadge is exercised heavily by other tests; for this screen we just
+// stub it so the recommendation list renders without pulling the real
+// design-system barrel (atom cascade trap — see feedback memory).
+jest.mock('@/components/design/LineBadge', () => ({
+  LineBadge: 'LineBadge',
 }));
 
 const mockOnSkip = jest.fn();
@@ -55,18 +55,19 @@ jest.mock('@/navigation/OnboardingNavigator', () => ({
   })),
 }));
 
-jest.mock('@/models/commute', () => ({
-  MAX_TRANSFER_STATIONS: 3,
-}));
+// Keep the model module live so DEFAULT_COMMUTE_NOTIFICATIONS / TransferStation
+// type-check at compile time. Importing for real is fine — it has no native deps.
 
 const mockGoBack = jest.fn();
 const mockNavigate = jest.fn();
+const mockSetParams = jest.fn();
 const mockCanGoBack = jest.fn(() => true);
 
 const mockNavigation = {
   navigate: mockNavigate,
   goBack: mockGoBack,
   canGoBack: mockCanGoBack,
+  setParams: mockSetParams,
 } as unknown;
 
 const mockRoute = {
@@ -79,12 +80,13 @@ const mockRoute = {
 beforeEach(() => {
   mockNavigate.mockClear();
   mockGoBack.mockClear();
+  mockSetParams.mockClear();
   mockCanGoBack.mockClear();
   mockCanGoBack.mockReturnValue(true);
   mockOnSkip.mockClear();
 });
 
-describe('CommuteRouteScreen (step 2/4)', () => {
+describe('CommuteRouteScreen (step 2/4 redesign)', () => {
   it('renders the OnbHeader with back + skip controls', () => {
     const { getByTestId } = render(
       <CommuteRouteScreen
@@ -97,28 +99,29 @@ describe('CommuteRouteScreen (step 2/4)', () => {
     expect(getByTestId('onb-header-skip')).toBeTruthy();
   });
 
-  it('renders the single-route title (no morning/evening branch)', () => {
-    const { getByText, queryByText } = render(
+  it('renders Wanted handoff eyebrow + 2-line title', () => {
+    const { getByTestId } = render(
       <CommuteRouteScreen
         navigation={mockNavigation as never}
         route={mockRoute as never}
       />,
     );
-    expect(getByText('출퇴근 경로 설정')).toBeTruthy();
-    expect(queryByText('출근 경로 설정')).toBeNull();
-    expect(queryByText('퇴근 경로 설정')).toBeNull();
+    expect(getByTestId('commute-eyebrow').props.children).toContain('STEP 2');
+    expect(getByTestId('commute-title').props.children).toContain('어디서 어디까지');
   });
 
-  it('shows station placeholders + labels', () => {
-    const { getByText } = render(
+  it('shows departure + arrival station rows with placeholders', () => {
+    const { getByText, getByTestId } = render(
       <CommuteRouteScreen
         navigation={mockNavigation as never}
         route={mockRoute as never}
       />,
     );
-    expect(getByText('승차역')).toBeTruthy();
+    expect(getByTestId('station-row-departure')).toBeTruthy();
+    expect(getByTestId('station-row-arrival')).toBeTruthy();
+    expect(getByText('출발역')).toBeTruthy();
     expect(getByText('도착역')).toBeTruthy();
-    expect(getByText('승차역을 검색하세요')).toBeTruthy();
+    expect(getByText('출발역을 검색하세요')).toBeTruthy();
     expect(getByText('도착역을 검색하세요')).toBeTruthy();
   });
 
@@ -144,25 +147,28 @@ describe('CommuteRouteScreen (step 2/4)', () => {
     expect(mockOnSkip).toHaveBeenCalledTimes(1);
   });
 
-  it('does not navigate forward while stations are unselected', () => {
-    const { getByText } = render(
+  it('does not navigate forward while stations are unselected (CTA disabled)', () => {
+    const { getByTestId } = render(
       <CommuteRouteScreen
         navigation={mockNavigation as never}
         route={mockRoute as never}
       />,
     );
-    fireEvent.press(getByText('다음'));
+    fireEvent.press(getByTestId('commute-next'));
     expect(mockNavigate).not.toHaveBeenCalled();
   });
 
-  it('legacy 이전 button still calls goBack', () => {
-    const { getByText } = render(
+  it('opens the OnboardingStationPicker when a station row is pressed', () => {
+    const { getByTestId } = render(
       <CommuteRouteScreen
         navigation={mockNavigation as never}
         route={mockRoute as never}
       />,
     );
-    fireEvent.press(getByText('이전'));
-    expect(mockGoBack).toHaveBeenCalled();
+    fireEvent.press(getByTestId('station-row-departure'));
+    expect(mockNavigate).toHaveBeenCalledWith(
+      'OnboardingStationPicker',
+      expect.objectContaining({ selectionType: 'departure' }),
+    );
   });
 });

@@ -57,6 +57,7 @@ import SettingSection from '@/components/settings/SettingSection';
 import SettingToggle from '@/components/settings/SettingToggle';
 import { SettingPicker, type PickerOption } from '@/components/settings/SettingPicker';
 import { StationSearchModal } from '@/components/commute/StationSearchModal';
+import { TimePickerCard } from '@/components/settings/TimePickerCard';
 
 type Props = NativeStackScreenProps<SettingsStackParamList, 'CommuteSettings'>;
 
@@ -81,6 +82,15 @@ interface CommuteRouteData {
 
 const DAY_LABELS: readonly string[] = ['월', '화', '수', '목', '금', '토', '일'];
 const DEFAULT_ACTIVE_DAYS: readonly boolean[] = [true, true, true, true, true, false, false];
+
+// Wanted handoff (image 17): 30-minute increments around the typical
+// commute window. Mornings cluster around 7–9시, evenings around 17–21시.
+const MORNING_TIME_OPTIONS: readonly string[] = [
+  '07:00', '07:30', '08:00', '08:30', '09:00', '09:30', '10:00',
+];
+const EVENING_TIME_OPTIONS: readonly string[] = [
+  '17:00', '17:30', '18:00', '18:30', '19:00', '19:30', '20:00',
+];
 const DEFAULT_SMART_FEATURES: SmartFeatures = {
   mlPredictionEnabled: true,
   autoAlternativeRoutes: true,
@@ -322,6 +332,55 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
       });
     },
     [smartFeatures, updateCommuteSchedule],
+  );
+
+  /**
+   * Persist a new departureTime for the morning or evening leg.
+   *
+   * `saveCommuteRoutes` requires both legs, so when only one leg exists we
+   * mirror the updated leg into the other slot — same pattern as
+   * `handleSelectTransferStation` and the FavoritesOnboarding finaliser.
+   * The local state updates optimistically; on Firestore failure we revert
+   * and surface the error.
+   */
+  const handleChangeDepartureTime = useCallback(
+    async (kind: 'morning' | 'evening', newTime: string): Promise<void> => {
+      if (!user) return;
+      const target = kind === 'morning' ? morningRoute : eveningRoute;
+      if (!target) return;
+      const next: CommuteRouteData = { ...target, departureTime: newTime };
+
+      // Optimistic update
+      const prevMorning = morningRoute;
+      const prevEvening = eveningRoute;
+      if (kind === 'morning') setMorningRoute(next);
+      else setEveningRoute(next);
+
+      try {
+        setSaving(true);
+        const morningForSave = kind === 'morning' ? next : morningRoute;
+        const eveningForSave = kind === 'evening' ? next : eveningRoute;
+        const result = await saveCommuteRoutes(
+          user.id,
+          routeDataToCommuteRoute(morningForSave ?? next),
+          routeDataToCommuteRoute(eveningForSave ?? morningForSave ?? next),
+        );
+        if (!result.success) {
+          // Revert
+          setMorningRoute(prevMorning);
+          setEveningRoute(prevEvening);
+          Alert.alert('저장 실패', result.error ?? '시간 저장에 실패했습니다.');
+        }
+      } catch (error) {
+        setMorningRoute(prevMorning);
+        setEveningRoute(prevEvening);
+        console.error('Error saving departure time:', error);
+        Alert.alert('오류', '시간 저장 중 오류가 발생했습니다.');
+      } finally {
+        setSaving(false);
+      }
+    },
+    [user, morningRoute, eveningRoute, routeDataToCommuteRoute],
   );
 
   // Convert Firebase CommuteRoute to local CommuteRouteData format
@@ -594,7 +653,33 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
           />
         </SettingSection>
 
-        {/* 3. Day picker — 출근하는 요일 */}
+        {/* 3. Departure time — 출근 시간 (image 17) */}
+        {morningRoute ? (
+          <TimePickerCard
+            testID="morning-time-picker"
+            title="출근 시간"
+            subtitle="평일 기준"
+            value={morningRoute.departureTime}
+            options={MORNING_TIME_OPTIONS}
+            onChange={(t) => handleChangeDepartureTime('morning', t)}
+            disabled={saving}
+          />
+        ) : null}
+
+        {/* 4. Departure time — 퇴근 시간. Only when evening route is configured. */}
+        {eveningRoute ? (
+          <TimePickerCard
+            testID="evening-time-picker"
+            title="퇴근 시간"
+            subtitle="평일 기준"
+            value={eveningRoute.departureTime}
+            options={EVENING_TIME_OPTIONS}
+            onChange={(t) => handleChangeDepartureTime('evening', t)}
+            disabled={saving}
+          />
+        ) : null}
+
+        {/* 5. Day picker — 출근하는 요일 */}
         <SettingSection title="출근하는 요일">
           <View style={styles.daysRow}>
             {DAY_LABELS.map((label, i) => {

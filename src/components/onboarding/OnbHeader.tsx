@@ -14,17 +14,20 @@ import { ChevronLeft } from 'lucide-react-native';
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme/themeContext';
 
-export type OnbStep = 1 | 2 | 3 | 4;
+export type OnbStep = 1 | 2 | 3 | 4 | 5;
 
 interface OnbHeaderProps {
   currentStep: OnbStep;
-  totalSteps?: 4;
+  totalSteps?: 4 | 5;
   onBack?: () => void;
   onSkip?: () => void;
   testID?: string;
 }
 
-const TOTAL_DEFAULT: 4 = 4;
+// 5-step flow (Welcome → Route → Time → Notification → Favorites). The
+// dedicated CommuteTime step was reintroduced for explicit time setup
+// during initial onboarding (image 17 layout).
+const TOTAL_DEFAULT: 5 = 5;
 
 export const OnbHeader: React.FC<OnbHeaderProps> = ({
   currentStep,
