@@ -23,7 +23,10 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { Heart, Search, AlertCircle, LogIn, Plus, ArrowUpDown } from 'lucide-react-native';
+import DraggableFlatList, {
+  type RenderItemParams,
+} from 'react-native-draggable-flatlist';
+import { Heart, Search, AlertCircle, LogIn, Plus } from 'lucide-react-native';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -31,6 +34,7 @@ import { useFavorites } from '../../hooks/useFavorites';
 import { useAuth } from '../../services/auth/AuthContext';
 import { AppStackParamList } from '../../navigation/types';
 import { FavoritesSearchBar } from '../../components/favorites/FavoritesSearchBar';
+import { FavoritesLineChips } from '../../components/favorites/FavoritesLineChips';
 import { DraggableFavoriteItem } from '../../components/favorites/DraggableFavoriteItem';
 import { StationSearchModal } from '../../components/commute/StationSearchModal';
 import { StationSelection } from '../../models/commute';
@@ -57,6 +61,8 @@ export const FavoritesScreen: React.FC = () => {
     removeFavorite,
     updateFavorite,
     addFavorite,
+    setNotificationEnabled,
+    reorderFavorites,
     refresh,
   } = useFavorites();
 
@@ -73,6 +79,33 @@ export const FavoritesScreen: React.FC = () => {
 
   // Edit state
   const [editingFavoriteId, setEditingFavoriteId] = useState<string | null>(null);
+
+  /**
+   * Unique lineIds present in the user's favorites — drives the line filter
+   * chip row. Empty when the user has no favorites yet, so the chips
+   * gracefully disappear with the empty state instead of showing a static
+   * full-network list.
+   */
+  const availableLineIds = useMemo(() => {
+    const seen = new Set<string>();
+    for (const fav of favoritesWithDetails) {
+      if (fav.lineId) seen.add(fav.lineId);
+    }
+    return Array.from(seen);
+  }, [favoritesWithDetails]);
+
+  const handleLineFilter = useCallback(
+    (lineId: string | undefined) => {
+      setActiveFilters((prev) => {
+        if (lineId === undefined) {
+          const { lineId: _drop, ...rest } = prev;
+          return rest;
+        }
+        return { ...prev, lineId };
+      });
+    },
+    [],
+  );
 
   /**
    * Filter favorites based on search query and active filters
@@ -288,26 +321,70 @@ export const FavoritesScreen: React.FC = () => {
   );
 
   /**
-   * Render favorite item
+   * Reorder is meaningful only when the user is looking at the full
+   * list — otherwise the drag would shuffle the *filtered subset* into
+   * the global array, scrambling the underlying order. We disable the
+   * drag handle when any filter is active.
    */
-  const renderFavoriteItem = (favorite: typeof favoritesWithDetails[0], index: number) => {
-    return (
+  const isReorderable = useMemo(
+    () =>
+      searchQuery.length === 0 &&
+      activeFilters.lineId === undefined &&
+      activeFilters.direction === undefined &&
+      !activeFilters.commuteOnly,
+    [searchQuery, activeFilters],
+  );
+
+  const handleDragEnd = useCallback(
+    ({ data }: { data: typeof favoritesWithDetails }) => {
+      if (!isReorderable) return;
+      // Strip FavoriteWithDetails → FavoriteStation. The `station` lookup
+      // is hydrated client-side and must not be persisted to Firestore.
+      const reordered = data.map(({ station: _station, ...fav }) => fav);
+      void reorderFavorites(reordered);
+    },
+    [isReorderable, reorderFavorites],
+  );
+
+  const renderFavoriteItem = useCallback(
+    ({ item, drag, isActive }: RenderItemParams<typeof favoritesWithDetails[0]>) => (
       <DraggableFavoriteItem
-        key={favorite.id}
-        favorite={favorite}
-        index={index}
-        isEditing={editingFavoriteId === favorite.id}
-        onEditToggle={() => handleEditToggle(favorite.id)}
-        onRemove={() => handleRemoveFavorite(favorite.id, favorite.station?.name || '알 수 없는 역')}
-        onPress={() => handleStationPress(favorite)}
-        onSetStart={() => handleSetStart(favorite)}
-        onSetEnd={() => handleSetEnd(favorite)}
-        onSaveEdit={(updates) => handleSaveEdit(favorite.id, updates)}
-        isDragEnabled={false} // Will be enabled in Phase 3
+        key={item.id}
+        favorite={item}
+        index={0}
+        isEditing={editingFavoriteId === item.id}
+        onEditToggle={() => handleEditToggle(item.id)}
+        onRemove={() => handleRemoveFavorite(item.id, item.station?.name || '알 수 없는 역')}
+        onPress={() => handleStationPress(item)}
+        onSetStart={() => handleSetStart(item)}
+        onSetEnd={() => handleSetEnd(item)}
+        onSaveEdit={(updates) => handleSaveEdit(item.id, updates)}
+        onMuteToggle={async () => {
+          const nextEnabled = item.notificationEnabled === false;
+          try {
+            await setNotificationEnabled(item.id, nextEnabled);
+          } catch {
+            Alert.alert('오류', '알림 설정을 변경할 수 없습니다.');
+          }
+        }}
+        drag={isReorderable ? drag : undefined}
+        isActive={isActive}
         arrivalsEnabled={isFocused}
       />
-    );
-  };
+    ),
+    [
+      editingFavoriteId,
+      handleEditToggle,
+      handleRemoveFavorite,
+      handleStationPress,
+      handleSetStart,
+      handleSetEnd,
+      handleSaveEdit,
+      setNotificationEnabled,
+      isReorderable,
+      isFocused,
+    ],
+  );
 
   // Show loading state
   if (loading && favoritesWithDetails.length === 0) {
@@ -367,19 +444,18 @@ export const FavoritesScreen: React.FC = () => {
         </Text>
         <View style={styles.headerActions}>
           <TouchableOpacity
-            style={styles.sortButton}
-            accessibilityLabel="정렬 변경"
+            style={styles.editButton}
+            accessibilityLabel="편집"
             accessibilityRole="button"
-            testID="favorites-sort-button"
+            testID="favorites-edit-button"
             onPress={() => {
-              // TODO Phase 3B: open reorder mode for DraggableFavoriteItem
-              Alert.alert('정렬', '정렬 기능은 곧 제공될 예정입니다.');
+              // Phase B will wire this to a global edit/reorder mode that
+              // exposes drag handles + bulk delete. For now the button is
+              // present so the header layout matches the design contract.
+              Alert.alert('편집', '편집 모드는 곧 제공될 예정입니다.');
             }}
           >
-            <ArrowUpDown
-              size={16}
-              color={(isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light).labelNeutral}
-            />
+            <Text style={styles.editButtonText}>편집</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={styles.addButton}
@@ -404,30 +480,68 @@ export const FavoritesScreen: React.FC = () => {
         />
       )}
 
+      {/* Line filter chips — derived from the user's own favorites so the
+          row is empty (and naturally hidden) when there are no favorites. */}
+      {availableLineIds.length > 0 && (
+        <FavoritesLineChips
+          lineIds={availableLineIds}
+          selectedLineId={activeFilters.lineId}
+          onSelect={handleLineFilter}
+          semantic={semantic}
+          testID="favorites-line-chips"
+        />
+      )}
+
       {/* Content */}
-      <ScrollView
-        style={styles.content}
-        contentContainerStyle={styles.contentContainer}
-        refreshControl={
-          <RefreshControl
-            refreshing={loading}
-            onRefresh={refresh}
-            tintColor={semantic.labelStrong}
-          />
-        }
-      >
-        {hasNoFavorites ? (
-          renderEmptyState()
-        ) : hasNoResults ? (
-          renderNoResults()
-        ) : (
-          <View style={styles.listContainer}>
-            {filteredFavorites.map((favorite, index) =>
-              renderFavoriteItem(favorite, index)
-            )}
-          </View>
-        )}
-      </ScrollView>
+      {hasNoFavorites ? (
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={styles.contentContainer}
+          refreshControl={
+            <RefreshControl
+              refreshing={loading}
+              onRefresh={refresh}
+              tintColor={semantic.labelStrong}
+            />
+          }
+        >
+          {renderEmptyState()}
+        </ScrollView>
+      ) : hasNoResults ? (
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={styles.contentContainer}
+          refreshControl={
+            <RefreshControl
+              refreshing={loading}
+              onRefresh={refresh}
+              tintColor={semantic.labelStrong}
+            />
+          }
+        >
+          {renderNoResults()}
+        </ScrollView>
+      ) : (
+        <DraggableFlatList
+          data={filteredFavorites}
+          keyExtractor={(item) => item.id}
+          renderItem={renderFavoriteItem}
+          onDragEnd={handleDragEnd}
+          containerStyle={styles.content}
+          contentContainerStyle={styles.listContainer}
+          refreshControl={
+            <RefreshControl
+              refreshing={loading}
+              onRefresh={refresh}
+              tintColor={semantic.labelStrong}
+            />
+          }
+          // Match Swipeable's drag activation: the long-press is owned by
+          // each row's invisible handle overlay (DraggableFavoriteItem's
+          // dragHandleArea). DraggableFlatList itself only animates.
+          activationDistance={20}
+        />
+      )}
 
       {/* Station Search Modal */}
       <StationSearchModal
@@ -461,8 +575,8 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       alignItems: 'center',
       gap: 6,
     },
-    sortButton: {
-      width: 36,
+    editButton: {
+      paddingHorizontal: 16,
       height: 36,
       borderRadius: WANTED_TOKENS.radius.pill,
       backgroundColor: semantic.bgBase,
@@ -470,6 +584,12 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       borderColor: semantic.lineSubtle,
       justifyContent: 'center',
       alignItems: 'center',
+    },
+    editButtonText: {
+      fontSize: 14,
+      lineHeight: 20,
+      color: semantic.labelNeutral,
+      fontFamily: weightToFontFamily('600'),
     },
     addButton: {
       width: 36,

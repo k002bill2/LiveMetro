@@ -3,14 +3,15 @@
  * Wraps StationCard with edit and drag functionality
  */
 
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
-import { AlertCircle, Trash2, Pencil, XCircle, Briefcase } from 'lucide-react-native';
+import { AlertCircle, Trash2, Bell, BellOff, Briefcase } from 'lucide-react-native';
+import { Swipeable } from 'react-native-gesture-handler';
 import { SPACING, RADIUS, TYPOGRAPHY, WANTED_TOKENS, WantedSemanticTheme, weightToFontFamily } from '../../styles/modernTheme';
 import { useTheme, ThemeColors } from '../../services/theme';
 import { FavoriteWithDetails } from '../../hooks/useFavorites';
@@ -32,7 +33,23 @@ interface DraggableFavoriteItemProps {
     direction?: 'up' | 'down' | 'both';
     isCommuteStation?: boolean;
   }) => Promise<void>;
-  isDragEnabled?: boolean; // For future drag implementation
+  /**
+   * Phase B placeholder: invoked when the user taps the swipe-out
+   * "알림 끄기" action. Phase C will wire this to a per-favorite
+   * notificationEnabled field; for now it can be any side-effect (e.g.
+   * an Alert) supplied by the caller.
+   */
+  onMuteToggle?: () => void;
+  /**
+   * Phase D drag-and-drop reorder. Provided by react-native-draggable-flatlist's
+   * `renderItem`. When defined, long-pressing the ⋮⋮ handle area starts
+   * the drag gesture. Undefined when reorder is disabled (search/filter
+   * active) so the row falls back to a static card.
+   */
+  drag?: () => void;
+  /** Whether this card is currently being dragged (drives elevation/opacity). */
+  isActive?: boolean;
+  isDragEnabled?: boolean; // legacy — kept for callers that still pass it
   /**
    * Forwarded to StationCard so favorites stop polling Seoul API when the
    * Favorites screen is unfocused (e.g. user navigates to SubwayMap).
@@ -65,9 +82,25 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
   onSetStart: _onSetStart,
   onSetEnd: _onSetEnd,
   onSaveEdit,
-  isDragEnabled = false,
+  onMuteToggle,
+  drag,
+  isActive = false,
+  isDragEnabled: _isDragEnabled = false,
   arrivalsEnabled = true,
 }) => {
+  // Imperatively close the swipe drawer after an action so the row snaps
+  // back to its resting position once the user has decided.
+  const swipeableRef = useRef<Swipeable>(null);
+
+  const handleMute = useCallback(() => {
+    swipeableRef.current?.close();
+    onMuteToggle?.();
+  }, [onMuteToggle]);
+
+  const handleDelete = useCallback(() => {
+    swipeableRef.current?.close();
+    onRemove();
+  }, [onRemove]);
   const { colors, isDark } = useTheme();
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
   const styles = useMemo(() => createStyles(colors, semantic), [colors, semantic]);
@@ -137,52 +170,89 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
     );
   }
 
+  // Phase C: notification flag drives whether the swipe action mutes or
+  // unmutes. `notificationEnabled === undefined` is treated as ON, so
+  // pre-existing favorites without the field default to "알림 끄기".
+  const isNotificationOn = favorite.notificationEnabled !== false;
+  const muteLabel = isNotificationOn ? '알림 끄기' : '알림 켜기';
+  const MuteIcon = isNotificationOn ? BellOff : Bell;
+
+  // Phase B: right-side swipe drawer with [알림 끄기/켜기] [삭제]. The
+  // drawer mounts only while the user is dragging — Swipeable handles
+  // its own visibility, so this function just describes layout.
+  const renderRightActions = () => (
+    <View style={styles.swipeActions}>
+      <TouchableOpacity
+        activeOpacity={0.7}
+        style={[styles.swipeAction, styles.swipeActionMute]}
+        onPress={handleMute}
+        accessibilityLabel={`${station.name}역 ${muteLabel}`}
+        accessibilityRole="button"
+        testID="favorite-swipe-mute"
+      >
+        <MuteIcon size={20} color={semantic.labelStrong} />
+        <Text style={styles.swipeActionMuteLabel}>{muteLabel}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        activeOpacity={0.7}
+        style={[styles.swipeAction, styles.swipeActionDelete]}
+        onPress={handleDelete}
+        accessibilityLabel={`${station.name}역 즐겨찾기 삭제`}
+        accessibilityRole="button"
+        testID="favorite-swipe-delete"
+      >
+        <Trash2 size={20} color="#FFFFFF" />
+        <Text style={styles.swipeActionDeleteLabel}>삭제</Text>
+      </TouchableOpacity>
+    </View>
+  );
+
   return (
-    <View style={styles.container}>
-      {/* Phase 34: FavoriteRow atom replaces StationCard for the bundle's
-          dense vertical row. Edit/Delete buttons remain as a small overlay
-          at the row's top-right; they sit above the minutes label and
-          surface most clearly during the brief edit interaction. */}
-      <View style={styles.cardWrapper}>
-        <FavoriteRow
-          lines={linesForRow}
-          stationName={station.name}
-          nickname={favorite.alias ?? undefined}
-          destinationLabel={directionToLabel(favorite.direction)}
-          nextMinutes={nextMinutes}
-          showDragHandle={isDragEnabled}
-          onPress={onPress}
-        />
-
-        {/* Action Buttons Overlay (top-right). Smaller than the StationCard
-            era because the row's right edge is occupied by the minutes
-            label — a 24px chip is enough to remain tappable. */}
-        <View style={styles.actionButtons}>
-          <TouchableOpacity
-            style={[styles.actionButton, isEditing && styles.actionButtonActive]}
-            onPress={onEditToggle}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityRole="button"
-            accessibilityLabel={isEditing ? '편집 완료' : '편집'}
-          >
-            <Pencil
-              size={14}
-              color={isEditing ? colors.textPrimary : colors.textSecondary}
+    <View style={[styles.container, isActive && styles.containerDragActive]}>
+      <Swipeable
+        ref={swipeableRef}
+        renderRightActions={renderRightActions}
+        rightThreshold={40}
+        friction={1.6}
+        overshootRight={false}
+        containerStyle={styles.swipeableContainer}
+        // Disable swipe while a drag is in flight so the two gestures don't
+        // fight over the same touch — users almost never want to mute and
+        // reorder simultaneously.
+        enabled={!isActive}
+      >
+        <View style={styles.cardInner}>
+          <FavoriteRow
+            lines={linesForRow}
+            stationName={station.name}
+            nickname={favorite.alias ?? undefined}
+            destinationLabel={directionToLabel(favorite.direction)}
+            nextMinutes={nextMinutes}
+            showDragHandle
+            onPress={onPress}
+          />
+          {drag && (
+            <TouchableOpacity
+              style={styles.dragHandleArea}
+              onLongPress={drag}
+              // Short tap on the handle area should still navigate the
+              // user to StationDetail — without forwarding onPress here
+              // the overlay would silently swallow taps on the card's
+              // left edge (Gemini cross-review catch).
+              onPress={onPress}
+              delayLongPress={150}
+              accessibilityRole="button"
+              accessibilityLabel={`${station.name}역 순서 이동 (꾹 누르고 드래그)`}
+              testID="favorite-drag-handle"
             />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.actionButton}
-            onPress={onRemove}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-            accessibilityRole="button"
-            accessibilityLabel="즐겨찾기 삭제"
-          >
-            <XCircle size={16} color={colors.textSecondary} />
-          </TouchableOpacity>
+          )}
         </View>
-      </View>
+      </Swipeable>
 
-      {/* Edit Form */}
+      {/* Edit Form — entered via the upcoming global "편집" mode (Phase B+).
+          Hidden by default; isEditing is currently never true post-overlay
+          removal but we keep the integration point so the per-favorite
+          edit UI doesn't have to be re-plumbed when the global mode lands. */}
       <FavoriteEditForm
         favorite={favorite}
         isExpanded={isEditing}
@@ -190,9 +260,6 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
         onCancel={onEditToggle}
       />
 
-      {/* Commute pill — alias + direction are now rendered inside FavoriteRow,
-          so the metadata row only carries the commute marker. Hidden during
-          edit to keep the form focused. */}
       {!isEditing && favorite.isCommuteStation && (
         <View style={styles.metadataRow}>
           <Pill tone="neutral" size="sm" testID="favorite-commute-pill">
@@ -212,6 +279,31 @@ const createStyles = (colors: ThemeColors, semantic: WantedSemanticTheme) => {
   container: {
     marginBottom: SPACING.xl,
   },
+  containerDragActive: {
+    // Lift the card while it's being reordered. Both shadow and elevation
+    // are set so iOS and Android show consistent depth.
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    elevation: 8,
+    transform: [{ scale: 1.02 }],
+  },
+  cardInner: {
+    position: 'relative',
+  },
+  dragHandleArea: {
+    // Invisible touch overlay sized to FavoriteRow's left padding (16) +
+    // GripVertical icon (16) + a few pixels of breathing room. Lives
+    // above the row so long-press triggers drag instead of card press.
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 40,
+    backgroundColor: 'transparent',
+    zIndex: 2,
+  },
   aliasContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -227,26 +319,38 @@ const createStyles = (colors: ThemeColors, semantic: WantedSemanticTheme) => {
   cardWrapper: {
     position: 'relative',
   },
-  actionButtons: {
-    position: 'absolute',
-    top: SPACING.sm,
-    right: SPACING.sm,
-    flexDirection: 'row',
-    gap: 6,
+  swipeableContainer: {
+    // Match FavoriteRow's outer radius so swipe-revealed actions align
+    // with the card's corners instead of bleeding past them.
+    borderRadius: 16,
+    overflow: 'hidden',
   },
-  actionButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 9999,
-    backgroundColor: semantic.bgBase,
-    borderWidth: 1,
-    borderColor: semantic.lineSubtle,
+  swipeActions: {
+    flexDirection: 'row',
+    height: '100%',
+  },
+  swipeAction: {
+    width: 80,
+    height: '100%',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 4,
   },
-  actionButtonActive: {
-    backgroundColor: semantic.primaryBg,
-    borderColor: semantic.primaryNormal,
+  swipeActionMute: {
+    backgroundColor: semantic.bgSubtle,
+  },
+  swipeActionMuteLabel: {
+    fontSize: 12,
+    color: semantic.labelStrong,
+    fontFamily: weightToFontFamily('700'),
+  },
+  swipeActionDelete: {
+    backgroundColor: '#FF3B30',
+  },
+  swipeActionDeleteLabel: {
+    fontSize: 12,
+    color: '#FFFFFF',
+    fontFamily: weightToFontFamily('700'),
   },
   pillContent: {
     flexDirection: 'row',

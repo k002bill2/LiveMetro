@@ -3,7 +3,7 @@
  * Tests for user favorites management
  */
 
-import { favoritesService, migrateFavoritesToNewFormat } from '../favoritesService';
+import { favoritesService, migrateFavoritesToNewFormat, DuplicateFavoriteError } from '../favoritesService';
 import { Station } from '../../../models/train';
 import { FavoriteStation } from '../../../models/user';
 
@@ -159,6 +159,46 @@ describe('FavoritesService', () => {
         })
       ).rejects.toThrow('즐겨찾기 추가에 실패했습니다.');
     });
+
+    it('should reject duplicate stationId without writing', async () => {
+      mockGetDoc.mockResolvedValue({
+        exists: () => true,
+        data: () => ({
+          preferences: {
+            favoriteStations: [mockFavorite],
+          },
+        }),
+      });
+
+      await expect(
+        favoritesService.addFavorite({
+          userId: 'user-123',
+          station: mockStation, // same stationId 'gangnam' as mockFavorite
+        })
+      ).rejects.toBeInstanceOf(DuplicateFavoriteError);
+
+      expect(mockUpdateDoc).not.toHaveBeenCalled();
+    });
+
+    it('should allow adding a different station when others exist', async () => {
+      mockGetDoc.mockResolvedValue({
+        exists: () => true,
+        data: () => ({
+          preferences: {
+            favoriteStations: [mockFavorite], // gangnam
+          },
+        }),
+      });
+      mockUpdateDoc.mockResolvedValue(undefined);
+
+      const result = await favoritesService.addFavorite({
+        userId: 'user-123',
+        station: { ...mockStation, id: 'seolleung', name: '선릉역' },
+      });
+
+      expect(result.stationId).toBe('seolleung');
+      expect(mockUpdateDoc).toHaveBeenCalled();
+    });
   });
 
   describe('removeFavorite', () => {
@@ -233,6 +273,79 @@ describe('FavoritesService', () => {
           alias: 'Test',
         })
       ).rejects.toThrow('즐겨찾기 업데이트에 실패했습니다.');
+    });
+
+    it('should persist notificationEnabled flag', async () => {
+      mockGetDoc.mockResolvedValue({
+        exists: () => true,
+        data: () => ({
+          preferences: {
+            favoriteStations: [mockFavorite],
+          },
+        }),
+      });
+      mockUpdateDoc.mockResolvedValue(undefined);
+
+      await favoritesService.updateFavorite({
+        userId: 'user-123',
+        favoriteId: 'fav_123',
+        notificationEnabled: false,
+      });
+
+      const writePayload = mockUpdateDoc.mock.calls[0]?.[1] as
+        | { 'preferences.favoriteStations': FavoriteStation[] }
+        | undefined;
+      expect(writePayload?.['preferences.favoriteStations']?.[0]?.notificationEnabled).toBe(false);
+    });
+  });
+
+  describe('setNotificationEnabled', () => {
+    it('should write the flipped flag through updateFavorite', async () => {
+      mockGetDoc.mockResolvedValue({
+        exists: () => true,
+        data: () => ({
+          preferences: {
+            favoriteStations: [mockFavorite],
+          },
+        }),
+      });
+      mockUpdateDoc.mockResolvedValue(undefined);
+
+      await favoritesService.setNotificationEnabled('user-123', 'fav_123', false);
+
+      const writePayload = mockUpdateDoc.mock.calls[0]?.[1] as
+        | { 'preferences.favoriteStations': FavoriteStation[] }
+        | undefined;
+      expect(writePayload?.['preferences.favoriteStations']?.[0]?.notificationEnabled).toBe(false);
+    });
+
+    it('should preserve other fields when toggling notification', async () => {
+      const detailedFavorite: FavoriteStation = {
+        ...mockFavorite,
+        alias: '회사',
+        direction: 'up',
+        isCommuteStation: true,
+      };
+      mockGetDoc.mockResolvedValue({
+        exists: () => true,
+        data: () => ({
+          preferences: {
+            favoriteStations: [detailedFavorite],
+          },
+        }),
+      });
+      mockUpdateDoc.mockResolvedValue(undefined);
+
+      await favoritesService.setNotificationEnabled('user-123', 'fav_123', false);
+
+      const writePayload = mockUpdateDoc.mock.calls[0]?.[1] as
+        | { 'preferences.favoriteStations': FavoriteStation[] }
+        | undefined;
+      const updated = writePayload?.['preferences.favoriteStations']?.[0];
+      expect(updated?.alias).toBe('회사');
+      expect(updated?.direction).toBe('up');
+      expect(updated?.isCommuteStation).toBe(true);
+      expect(updated?.notificationEnabled).toBe(false);
     });
   });
 

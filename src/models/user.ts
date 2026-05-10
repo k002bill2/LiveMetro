@@ -32,6 +32,13 @@ export interface FavoriteStation {
   readonly direction: 'up' | 'down' | 'both';
   readonly isCommuteStation: boolean;
   readonly addedAt: Date;
+  /**
+   * Per-favorite arrival/disruption notification toggle. Optional for
+   * backward-compat with existing Firestore documents — `undefined` is
+   * interpreted as ON. UI consumers should read this with the
+   * `notificationEnabled !== false` pattern.
+   */
+  readonly notificationEnabled?: boolean;
 }
 
 export interface NotificationSettings {

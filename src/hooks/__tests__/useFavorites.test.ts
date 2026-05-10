@@ -20,6 +20,7 @@ jest.mock('../../services/favorites/favoritesService', () => ({
     updateFavorite: jest.fn(),
     reorderFavorites: jest.fn(),
     getFavoriteByStationId: jest.fn(),
+    setNotificationEnabled: jest.fn(),
   },
   migrateFavoritesToNewFormat: jest.fn(() => ({ migrated: [], hasChanges: false })),
 }));
@@ -259,6 +260,147 @@ describe('useFavorites', () => {
 
       expect(mockFavoritesService.getFavoriteByStationId).toHaveBeenCalledWith(mockUser.id, 'station-1');
       expect(mockFavoritesService.removeFavorite).toHaveBeenCalledWith(mockUser.id, 'fav-1');
+    });
+  });
+
+  describe('Notification toggle', () => {
+    it('setNotificationEnabled forwards to service with correct args', async () => {
+      const mockFavorite = createMockFavorite('fav-1', 'station-1');
+      mockFavoritesService.getFavorites.mockResolvedValue([mockFavorite]);
+      mockFavoritesService.setNotificationEnabled.mockResolvedValue(undefined);
+
+      const { result } = renderHook(() => useFavorites());
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      await act(async () => {
+        await result.current.setNotificationEnabled('fav-1', false);
+      });
+
+      expect(mockFavoritesService.setNotificationEnabled).toHaveBeenCalledWith(
+        mockUser.id,
+        'fav-1',
+        false,
+      );
+    });
+
+    it('setNotificationEnabled reloads favorites after success', async () => {
+      const mockFavorite = createMockFavorite('fav-1', 'station-1');
+      mockFavoritesService.getFavorites.mockResolvedValue([mockFavorite]);
+      mockFavoritesService.setNotificationEnabled.mockResolvedValue(undefined);
+
+      const { result } = renderHook(() => useFavorites());
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      mockFavoritesService.getFavorites.mockClear();
+
+      await act(async () => {
+        await result.current.setNotificationEnabled('fav-1', true);
+      });
+
+      expect(mockFavoritesService.getFavorites).toHaveBeenCalled();
+    });
+
+    it('setNotificationEnabled throws without user', async () => {
+      mockUseAuth.mockReturnValue({
+        user: null,
+        firebaseUser: null,
+        loading: false,
+      } as any);
+
+      const { result } = renderHook(() => useFavorites());
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      await expect(
+        act(async () => {
+          await result.current.setNotificationEnabled('fav-1', false);
+        }),
+      ).rejects.toThrow('로그인이 필요합니다.');
+    });
+  });
+
+  describe('Double-tap guard', () => {
+    it('blocks concurrent addFavorite for same stationId', async () => {
+      const station = createMockStation('station-1', '강남역');
+      let resolveFirst!: (v: FavoriteStation) => void;
+      mockFavoritesService.addFavorite.mockImplementation(
+        () => new Promise<FavoriteStation>((resolve) => {
+          resolveFirst = resolve;
+        }),
+      );
+
+      const { result } = renderHook(() => useFavorites());
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let p1!: Promise<void>;
+      let p2!: Promise<void>;
+      await act(async () => {
+        p1 = result.current.addFavorite(station);
+        p2 = result.current.addFavorite(station);
+        await p2; // second call resolves immediately (silent skip)
+      });
+
+      expect(mockFavoritesService.addFavorite).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        resolveFirst(createMockFavorite('fav-1', 'station-1'));
+        await p1;
+      });
+    });
+
+    it('allows addFavorite again after first completes (lock released)', async () => {
+      const station = createMockStation('station-1', '강남역');
+      mockFavoritesService.addFavorite.mockResolvedValue(createMockFavorite('fav-1', 'station-1'));
+
+      const { result } = renderHook(() => useFavorites());
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      await act(async () => {
+        await result.current.addFavorite(station);
+      });
+      await act(async () => {
+        await result.current.addFavorite(station);
+      });
+
+      expect(mockFavoritesService.addFavorite).toHaveBeenCalledTimes(2);
+    });
+
+    it('blocks concurrent removeFavoriteByStationId for same stationId', async () => {
+      let resolveLookup!: (v: FavoriteStation | null) => void;
+      mockFavoritesService.getFavoriteByStationId.mockImplementation(
+        () => new Promise<FavoriteStation | null>((resolve) => {
+          resolveLookup = resolve;
+        }),
+      );
+
+      const { result } = renderHook(() => useFavorites());
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      let p1!: Promise<void>;
+      let p2!: Promise<void>;
+      await act(async () => {
+        p1 = result.current.removeFavoriteByStationId('station-1');
+        p2 = result.current.removeFavoriteByStationId('station-1');
+        await p2;
+      });
+
+      expect(mockFavoritesService.getFavoriteByStationId).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        resolveLookup(null);
+        await p1;
+      });
     });
   });
 

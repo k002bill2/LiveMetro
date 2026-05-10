@@ -263,11 +263,11 @@ describe('FavoritesScreen', () => {
       expect(getByText('즐겨찾기')).toBeTruthy();
     });
 
-    it('displays header with title and add/sort buttons (Phase 3 redesign)', () => {
+    it('displays header with title and add/edit buttons (Phase A redesign)', () => {
       const { getByText, getByTestId } = render(<FavoritesScreen />);
       expect(getByText('즐겨찾기')).toBeTruthy();
       expect(getByTestId('favorites-add-button')).toBeTruthy();
-      expect(getByTestId('favorites-sort-button')).toBeTruthy();
+      expect(getByTestId('favorites-edit-button')).toBeTruthy();
     });
 
     it('shows empty state when no favorites', () => {
