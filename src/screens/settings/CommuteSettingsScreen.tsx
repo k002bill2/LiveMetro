@@ -471,6 +471,7 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
             onEdit={handleSetupCommute}
             arrivalEtaMinutes={baselineMinutes !== null ? Math.round(baselineMinutes) : null}
           />
+          <View style={styles.routeDivider} />
           <RouteCard
             kind="evening"
             route={eveningRoute}
@@ -564,7 +565,10 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     },
     content: {
       flex: 1,
-      padding: WANTED_TOKENS.spacing.s4,
+      // Vertical padding only — horizontal inset is delegated to each
+      // child (heroCard.marginHorizontal + SettingSection.sectionContent.
+      // marginHorizontal) so all sections sit at the same 16px inset.
+      paddingVertical: WANTED_TOKENS.spacing.s4,
     },
     loadingContainer: {
       flex: 1,
@@ -592,12 +596,17 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       color: semantic.labelNeutral,
     },
     routeCard: {
+      // Outer card chrome lives on the parent SettingSection's
+      // sectionContent (border + radius + overflow:hidden). RouteCard
+      // is now an in-card row that pairs with a sibling routeDivider so
+      // morning + evening share one card divided by a single hairline,
+      // matching Image #9.
       backgroundColor: semantic.bgBase,
-      borderRadius: WANTED_TOKENS.radius.r8,
-      borderWidth: 1,
-      borderColor: semantic.lineSubtle,
-      marginBottom: WANTED_TOKENS.spacing.s4,
-      overflow: 'hidden',
+    },
+    routeDivider: {
+      height: 1,
+      backgroundColor: semantic.lineSubtle,
+      marginHorizontal: 16,
     },
     routeHeader: {
       flexDirection: 'row',
@@ -689,6 +698,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       borderRadius: 20,
       paddingVertical: 18,
       paddingHorizontal: 20,
+      marginHorizontal: WANTED_TOKENS.spacing.s4,
       marginBottom: WANTED_TOKENS.spacing.s4,
       shadowColor: WANTED_TOKENS.blue[500],
       shadowOffset: { width: 0, height: 8 },
