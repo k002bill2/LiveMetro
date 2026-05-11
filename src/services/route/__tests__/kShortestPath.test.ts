@@ -97,6 +97,10 @@ describe('findKShortestPaths', () => {
 });
 
 describe('getDiverseRoutes', () => {
+  it('returns [] for invalid station IDs', () => {
+    expect(getDiverseRoutes('invalid', 'also_invalid')).toEqual([]);
+  });
+
   it('returns at most DEFAULT_MAX_ROUTES (5) routes adaptively', () => {
     const routes = getDiverseRoutes('222', '226');
 

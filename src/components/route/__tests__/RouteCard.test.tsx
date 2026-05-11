@@ -101,4 +101,16 @@ describe('RouteCard', () => {
     expect(getByText('환승최소')).toBeTruthy();
     expect(getByText('빠른길')).toBeTruthy();
   });
+
+  it('renders via-station tags when route.category is "via-station"', () => {
+    const viaStationRoute: RouteWithMLMeta = {
+      ...baseRoute,
+      category: 'via-station',
+      viaTags: ['강남구청 경유'],
+    };
+    const { getByText } = render(
+      <RouteCard route={viaStationRoute} expanded={false} onToggleExpand={() => {}} />
+    );
+    expect(getByText('강남구청 경유')).toBeTruthy();
+  });
 });
