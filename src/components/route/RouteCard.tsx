@@ -12,10 +12,15 @@ import type { Route, RouteCategory, RouteSegment } from '@/models/route';
 /**
  * Tags shown in the top-left of each card. Two tags per category mirrors the
  * Wanted handoff: a "why this card" label + a softer descriptor.
+ *
+ * `via-station` is intentionally empty — the dynamic tag comes from
+ * `route.viaTags` (e.g. ['강남구청 경유']) set by `labelViaStation` in
+ * kShortestPath.ts (Task 3).
  */
 const CATEGORY_TAGS: Record<RouteCategory, readonly string[]> = {
   'fastest': ['추천', '최단'],
   'min-transfer': ['환승최소', '빠른길'],
+  'via-station': [],
 };
 
 interface Props {
@@ -100,11 +105,16 @@ export const RouteCard: React.FC<Props> = ({ route, expanded, onToggleExpand, re
   const styles = createStyles(semantic);
 
   const legs = routeToLegs(route);
-  const tags: readonly string[] = route.category
-    ? CATEGORY_TAGS[route.category]
-    : recommended
-      ? ['추천']
-      : [];
+  // via-station은 동적 viaTags 우선, 그 외 카테고리는 정적 매핑.
+  // viaTags가 비어 있는 비정상 케이스는 빈 배열로 안전 fallback.
+  const tags: readonly string[] =
+    route.category === 'via-station' && route.viaTags && route.viaTags.length > 0
+      ? route.viaTags
+      : route.category
+        ? CATEGORY_TAGS[route.category]
+        : recommended
+          ? ['추천']
+          : [];
   const summary = singleLegSummary(route);
 
   return (
