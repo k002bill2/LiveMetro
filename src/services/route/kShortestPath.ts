@@ -455,6 +455,30 @@ function convertToRoute(internalPath: InternalPath): Route {
 }
 
 /**
+ * Build a stable signature representing the *set of transfer stations* a
+ * route visits. Used by `getDiverseRoutes` to cluster K-shortest candidates
+ * by transfer-station identity — routes sharing the same transfer set are
+ * variants of the same idea and collapse into one card.
+ *
+ * Signature rules:
+ *  - Direct routes (no transfer) → '' (empty string)
+ *  - Single transfer at 강남구청 → '강남구청'
+ *  - Two transfers in any order → '강남구청|부평구청' (alphabetical sort)
+ *
+ * Station NAME is used (not ID) because the resulting signature also drives
+ * the user-facing 'via-station' label. ID-based signature would require a
+ * second lookup at label time.
+ */
+export function buildTransferSignature(route: Route): string {
+  const names = route.segments
+    .filter((s) => s.isTransfer)
+    .map((s) => s.fromStationName)
+    .filter((n): n is string => typeof n === 'string' && n.length > 0)
+    .sort();
+  return names.join('|');
+}
+
+/**
  * Hard cap on transfers for any suggested route. Empirically routes in
  * 수도권 cover all reasonable origin-destination pairs with ≤2 transfers;
  * 3+ transfers almost always indicate a detour the user would not pick.

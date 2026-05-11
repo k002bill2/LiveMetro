@@ -2,7 +2,8 @@
  * K-Shortest Path Tests
  */
 
-import { findKShortestPaths, getDiverseRoutes } from '../kShortestPath';
+import { findKShortestPaths, getDiverseRoutes, buildTransferSignature } from '../kShortestPath';
+import type { Route, RouteSegment } from '@/models/route';
 
 // Mock the dependencies
 jest.mock('@/utils/priorityQueue', () => ({
@@ -179,5 +180,75 @@ describe('edge cases', () => {
 
     // Should not exceed available paths
     expect(result.paths.length).toBeLessThanOrEqual(10);
+  });
+});
+
+describe('buildTransferSignature', () => {
+  // Test helper: build a minimal Route
+  const seg = (
+    from: string,
+    to: string,
+    lineId: string,
+    isTransfer: boolean,
+  ): RouteSegment => ({
+    fromStationId: from,
+    fromStationName: from,
+    toStationId: to,
+    toStationName: to,
+    lineId,
+    lineName: `${lineId}호선`,
+    estimatedMinutes: 2,
+    isTransfer,
+  });
+
+  const route = (
+    segs: RouteSegment[],
+    totalMinutes = 10,
+    transferCount = 0,
+  ): Route => ({
+    segments: segs,
+    totalMinutes,
+    transferCount,
+    lineIds: Array.from(new Set(segs.map((s) => s.lineId))),
+  });
+
+  it('직행 경로는 빈 signature를 반환', () => {
+    const r = route([seg('A', 'B', '2', false)]);
+    expect(buildTransferSignature(r)).toBe('');
+  });
+
+  it('단일 환승 경로는 환승역 이름을 signature로 반환', () => {
+    const r = route([
+      seg('A', '강남구청', '7', false),
+      seg('강남구청', '강남구청', '수인분당', true),
+      seg('강남구청', '선릉', '수인분당', false),
+    ]);
+    expect(buildTransferSignature(r)).toBe('강남구청');
+  });
+
+  it('환승역 순서가 달라도 같은 signature (정렬 보장)', () => {
+    const r1 = route([
+      seg('A', '신도림', '1', false),
+      seg('신도림', '신도림', '2', true),
+      seg('신도림', '선릉', '2', false),
+    ]);
+    const r2 = route([
+      seg('A', '신도림', '1', false),
+      seg('신도림', '신도림', '2', true),
+      seg('신도림', '선릉', '2', false),
+    ]);
+    expect(buildTransferSignature(r1)).toBe(buildTransferSignature(r2));
+  });
+
+  it('두 개 환승역은 가나다 정렬되어 join', () => {
+    const r = route([
+      seg('A', '부평구청', '인천1', false),
+      seg('부평구청', '부평구청', '7', true),
+      seg('부평구청', '강남구청', '7', false),
+      seg('강남구청', '강남구청', '수인분당', true),
+      seg('강남구청', '선릉', '수인분당', false),
+    ]);
+    // sorted: ['강남구청', '부평구청']
+    expect(buildTransferSignature(r)).toBe('강남구청|부평구청');
   });
 });
