@@ -120,6 +120,23 @@ describe('getDiverseRoutes', () => {
       for (const r of routes) expect(r.transferCount).toBeLessThanOrEqual(2);
     }
   });
+
+  it('min-transfer 카드는 fastest보다 환승이 실제로 적을 때만 노출', () => {
+    // semantic invariant: "환승최소" 라벨이 붙은 카드는 반드시 fastest 카드
+    // 보다 transferCount가 작아야 한다. 이전 코드는 candidates.slice(1)에서
+    // min-transfer를 찾아 fastest가 이미 환승 최소인 경우 차선의 더 나쁜
+    // 경로를 잘못 라벨링했음. 이 invariant로 회귀 방지.
+    const routes = getDiverseRoutes('222', '226');
+    if (routes.length === 2) {
+      const fastest = routes.find((r) => r.category === 'fastest');
+      const minTransfer = routes.find((r) => r.category === 'min-transfer');
+      expect(fastest).toBeDefined();
+      expect(minTransfer).toBeDefined();
+      if (fastest && minTransfer) {
+        expect(minTransfer.transferCount).toBeLessThan(fastest.transferCount);
+      }
+    }
+  });
 });
 
 describe('KShortestPathResult', () => {
