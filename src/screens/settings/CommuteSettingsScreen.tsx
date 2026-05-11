@@ -134,7 +134,7 @@ const addMinutesToTime = (hhmm: string, minutes: number): string | null => {
 
 export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
   const { user, updateUserProfile } = useAuth();
-  const { resetOnboarding } = useOnboarding();
+  const { resetOnboarding, markTermsAgreed, markCelebrationSeen } = useOnboarding();
   const { isDark } = useTheme();
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
   const styles = useMemo(() => createStyles(semantic), [semantic]);
@@ -444,14 +444,19 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
 
   const handleSetupCommute = (): void => {
     Alert.alert(
-      '출퇴근 설정',
-      '출퇴근 경로를 설정하시겠습니까?\n온보딩 화면으로 이동합니다.',
+      '출퇴근 경로 재설정',
+      '경로 설정 화면으로 이동합니다.\n기존 즐겨찾기와 알림 설정은 유지됩니다.',
       [
         { text: '취소', style: 'cancel' },
         {
-          text: '설정하기',
+          text: '계속',
           onPress: async () => {
-            // Reset onboarding status to trigger onboarding flow
+            // CommuteSettings에 도달한 사용자는 이미 약관/축하 단계를 통과한 인증
+            // 사용자이므로, RootNavigator가 SignupStep2/SignupStep3로 분기하지
+            // 않도록 보장한 뒤 onboarding(Welcome → CommuteRoute)으로 진입한다.
+            // 이는 phoneOnly + hasAgreedToTerms===false 조합에서 약관 동의
+            // 페이지로 잘못 라우팅되는 결함의 surgical fix.
+            await Promise.all([markTermsAgreed(), markCelebrationSeen()]);
             await resetOnboarding();
           },
         },
