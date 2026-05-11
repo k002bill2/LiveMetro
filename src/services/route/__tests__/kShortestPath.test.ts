@@ -197,16 +197,26 @@ describe('getDiverseRoutes', () => {
 
   it('짧은 OD pair (인접역)는 카드 1장만 반환', () => {
     // 222(강남) → 223(역삼)은 1정거장 직행. 환승 옵션 없음.
+    // segment 구조도 검증: hardcoded placeholder가 아닌 실제 경로인지 확인.
     const routes = getDiverseRoutes('222', '223', 5);
     expect(routes.length).toBe(1);
     expect(routes[0]?.category).toBe('fastest');
     expect(routes[0]?.transferCount).toBe(0);
+    const segs = routes[0]?.segments ?? [];
+    expect(segs.length).toBeGreaterThan(0);
+    expect(segs[0]?.fromStationId).toBe('222');
+    expect(segs[segs.length - 1]?.toStationId).toBe('223');
   });
 
   it('maxRoutes 기본값은 5', () => {
-    // 인자 생략 시 DEFAULT_MAX_ROUTES 적용
-    const routes = getDiverseRoutes('222', '226');
-    expect(routes.length).toBeLessThanOrEqual(5);
+    // 인자 생략 시 DEFAULT_MAX_ROUTES(5) 적용.
+    // 더 큰 값을 명시한 호출 결과와 비교해 cap이 default에서 실제로 동작함을 검증.
+    const defaultRoutes = getDiverseRoutes('222', '226');
+    const largerRoutes = getDiverseRoutes('222', '226', 10);
+    expect(defaultRoutes.length).toBeLessThanOrEqual(5);
+    // 다양성이 충분하면 maxRoutes=10에서 더 많이 반환되어야 하지만,
+    // 다양성이 부족하면 동일할 수 있음. cap이 default를 초과하지 않음만 보장.
+    expect(largerRoutes.length).toBeGreaterThanOrEqual(defaultRoutes.length);
   });
 });
 
