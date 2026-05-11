@@ -97,10 +97,10 @@ describe('findKShortestPaths', () => {
 });
 
 describe('getDiverseRoutes', () => {
-  it('returns at most 2 routes (fastest + min-transfer)', () => {
+  it('returns at most DEFAULT_MAX_ROUTES (5) routes adaptively', () => {
     const routes = getDiverseRoutes('222', '226');
 
-    expect(routes.length).toBeLessThanOrEqual(2);
+    expect(routes.length).toBeLessThanOrEqual(5);
   });
 
   it('labels the first route as "fastest"', () => {
@@ -176,6 +176,37 @@ describe('getDiverseRoutes', () => {
         expect(r.totalMinutes).toBeLessThanOrEqual(threshold);
       }
     }
+  });
+
+  it('회귀: min-transfer 카드의 transferCount는 항상 fastest보다 작음 (PR #55)', () => {
+    // semantic invariant — Task 3 재작성 후에도 유지돼야 함.
+    const routes = getDiverseRoutes('222', '226', 5);
+    const fastest = routes.find((r) => r.category === 'fastest');
+    const minTransfer = routes.find((r) => r.category === 'min-transfer');
+    if (fastest && minTransfer) {
+      expect(minTransfer.transferCount).toBeLessThan(fastest.transferCount);
+    }
+  });
+
+  it('회귀: 첫 카드는 항상 fastest 카테고리', () => {
+    const routes = getDiverseRoutes('222', '226', 5);
+    if (routes.length > 0) {
+      expect(routes[0]?.category).toBe('fastest');
+    }
+  });
+
+  it('짧은 OD pair (인접역)는 카드 1장만 반환', () => {
+    // 222(강남) → 223(역삼)은 1정거장 직행. 환승 옵션 없음.
+    const routes = getDiverseRoutes('222', '223', 5);
+    expect(routes.length).toBe(1);
+    expect(routes[0]?.category).toBe('fastest');
+    expect(routes[0]?.transferCount).toBe(0);
+  });
+
+  it('maxRoutes 기본값은 5', () => {
+    // 인자 생략 시 DEFAULT_MAX_ROUTES 적용
+    const routes = getDiverseRoutes('222', '226');
+    expect(routes.length).toBeLessThanOrEqual(5);
   });
 });
 
