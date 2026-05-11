@@ -63,6 +63,12 @@ jest.mock('@/hooks/useFavorites', () => ({
   })),
 }));
 
+// useAutoCommuteLog는 useAuth/useFavorites 의존성이 있어 별도 provider 셋업이
+// 필요. 본 화면 테스트는 commute 로깅과 무관하므로 no-op으로 mock.
+jest.mock('@/hooks/useAutoCommuteLog', () => ({
+  useAutoCommuteLog: jest.fn(),
+}));
+
 jest.mock('@/services/map/mapCacheService', () => ({
   mapCacheService: {
     searchStations: jest.fn(),
