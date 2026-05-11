@@ -260,9 +260,9 @@ Claude Code 네이티브 Agent 툴로 서브에이전트를 스폰합니다. 커
 | `/sync-registry` | 레지스트리 동기화 |
 | `/run-workflow` | 워크플로우 실행 |
 
-### Skills (`.claude/skills/`) — 17개, 컨텍스트 기반 on-demand 로드
+### Skills (`.claude/skills/`) — 22개, 컨텍스트 기반 on-demand 로드
 
-구현 전 반드시 해당 스킬을 Skill 도구로 호출할 것:
+구현 전 반드시 해당 스킬을 Skill 도구로 호출할 것. 모든 스킬은 Skills 2.0 progressive disclosure 구조(`SKILL.md` ≤500줄 + `references/<topic>.md`)를 따른다.
 
 | 작업 유형 | 스킬 |
 |-----------|------|
@@ -283,6 +283,11 @@ Claude Code 네이티브 Agent 툴로 서브에이전트를 스폰합니다. 커
 | TTS/사운드/진동/접근성 | `audio-accessibility` |
 | 신뢰도/평판/뱃지/사기탐지 | `user-trust-reputation` |
 | 성능 모니터링/헬스체크/크래시 | `monitoring-observability` |
+| 에이전트 실패 진단/개선 | `agent-improvement` |
+| 에이전트 트레이싱/메트릭 | `agent-observability` |
+| AOS Dashboard (React 웹) 구현 | `react-web-development-aos` |
+| Git worktree 머지 자동화 | `merge-worktree` |
+| 에이전트 평가 실행 (pass@k) | `run-eval` |
 
 ### Rules (`.claude/rules/`) — 7개, 항상 로드
 
