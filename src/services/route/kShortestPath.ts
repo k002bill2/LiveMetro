@@ -486,78 +486,126 @@ export function buildTransferSignature(route: Route): string {
 const MAX_ROUTE_TRANSFERS = 2;
 
 /**
- * Pick the fastest route and the fewest-transfer route from the K-shortest
- * candidates. Replaces the old Jaccard-similarity-based diversity selection,
- * which kept high-transfer detours just because their segments differed.
+ * Default and max number of cards exposed by `getDiverseRoutes`. Adaptive —
+ * fewer than this is fine when diversity is limited (e.g. only 1 signature
+ * group exists, or short OD pairs).
+ */
+const DEFAULT_MAX_ROUTES = 5;
+
+/**
+ * Routes whose totalMinutes exceed `fastest.totalMinutes * UNREALISTIC_TIME_FACTOR`
+ * are filtered out — they're typically valid graph paths but not realistic
+ * commute options.
+ */
+const UNREALISTIC_TIME_FACTOR = 1.5;
+
+/**
+ * Pick a diverse set of 1–5 routes from the K-shortest candidates by
+ * grouping on transfer-station signature. Returns up to `maxRoutes` cards
+ * with the following category invariants:
  *
- * Returns 1 or 2 routes:
- *  - `category: 'fastest'`     — minimum totalMinutes (Yen output is asc-sorted)
- *  - `category: 'min-transfer'` — minimum transferCount, tie-broken by time
+ *  - First card: `category: 'fastest'` (minimum totalMinutes overall)
+ *  - Optional second card: `category: 'min-transfer'` ONLY when
+ *    `minTransfer.transferCount < fastest.transferCount` (PR #55 invariant).
+ *  - Remaining cards: `category: 'via-station'` with `viaTags: ['{역} 경유']`
+ *    sorted by totalMinutes ascending.
  *
- * If both selections converge on the same path (e.g. only one route exists,
- * or the fastest route already has the minimum transferCount), only one card
- * is returned. Routes with > MAX_ROUTE_TRANSFERS transfers are filtered out
- * unless no candidate qualifies (in which case we fall back to the K-shortest
- * #1 so the UI shows something).
+ * `via-station` label uses the *last* transfer station along the route
+ * (closest to destination) because that's the more memorable hop for users
+ * planning the trip.
+ *
+ * Routes with > MAX_ROUTE_TRANSFERS transfers are filtered out unless no
+ * candidate qualifies (in which case we fall back to the K-shortest #1 so
+ * the UI shows something).
  */
 export function getDiverseRoutes(
   fromStationId: string,
-  toStationId: string
+  toStationId: string,
+  maxRoutes: number = DEFAULT_MAX_ROUTES,
 ): Route[] {
-  const result = findKShortestPaths(fromStationId, toStationId, 10);
+  const result = findKShortestPaths(fromStationId, toStationId, 15);
   if (result.paths.length === 0) return [];
 
-  const candidates = result.paths.filter(r => r.transferCount <= MAX_ROUTE_TRANSFERS);
-  if (candidates.length === 0) {
-    // Fallback: cap is too strict for this OD pair; show the K-shortest #1
-    // labelled as 'fastest' so the user still gets a result + a clear category.
-    return [{ ...result.paths[0]!, category: 'fastest' }];
+  const filtered = result.paths.filter((r) => r.transferCount <= MAX_ROUTE_TRANSFERS);
+  const candidates = filtered.length > 0 ? filtered : [result.paths[0]!];
+
+  // 1. Group by transfer signature, keep cost-min representative per group
+  const groupMap = new Map<string, Route>();
+  for (const c of candidates) {
+    const sig = buildTransferSignature(c);
+    const prev = groupMap.get(sig);
+    if (!prev || c.totalMinutes < prev.totalMinutes) {
+      groupMap.set(sig, c);
+    }
   }
+  const representatives = [...groupMap.values()].sort(
+    (a, b) => a.totalMinutes - b.totalMinutes,
+  );
 
-  const fastest: Route = { ...candidates[0]!, category: 'fastest' };
+  // 2. Identify fastest (already first after sort)
+  const fastest = representatives[0]!;
 
-  // Pick the candidate with the fewest transfers across ALL candidates
-  // (fastest 포함). 이전 코드는 `candidates.slice(1)`로 fastest를 제외하고
-  // min-transfer를 찾았는데, fastest가 이미 환승 최소면 나머지 중 환승이 더
-  // 많은 경로가 잘못 "환승최소"로 표시되는 결함이 있었음. tie-break by time.
-  const minTransfer = candidates.reduce<Route>((best, r) => {
+  // 3. Apply 1.5x time-gap cap relative to fastest
+  const timeThreshold = fastest.totalMinutes * UNREALISTIC_TIME_FACTOR;
+  const reachableReps = representatives.filter(
+    (r) => r.totalMinutes <= timeThreshold,
+  );
+
+  // 4. Identify min-transfer ONLY if strictly better than fastest
+  // (PR #55 invariant — preserved). Pick from reachable, not fastest itself.
+  const minTransfer = reachableReps.reduce<Route | null>((best, r) => {
+    if (r === fastest) return best;
+    if (r.transferCount >= fastest.transferCount) return best;
+    if (!best) return r;
     if (r.transferCount < best.transferCount) return r;
     if (r.transferCount === best.transferCount && r.totalMinutes < best.totalMinutes) {
       return r;
     }
     return best;
-  }, candidates[0]!);
+  }, null);
 
-  // min-transfer 카드는 fastest보다 환승이 *실제로 적을 때*만 노출.
-  // 동률이면 fastest 한 장만 보여서 "환승최소가 fastest보다 환승 많다"는
-  // 모순 상황을 원천 차단.
-  if (
-    minTransfer.transferCount < fastest.transferCount &&
-    !isSamePath(fastest, minTransfer)
-  ) {
-    return [fastest, { ...minTransfer, category: 'min-transfer' }];
+  // 5. Adaptive selection up to maxRoutes
+  const selected: Route[] = [labelFastest(fastest)];
+  if (minTransfer) {
+    selected.push(labelMinTransfer(minTransfer));
   }
-  return [fastest];
+
+  const remaining = reachableReps.filter(
+    (r) => r !== fastest && r !== minTransfer,
+  );
+  for (const r of remaining) {
+    if (selected.length >= maxRoutes) break;
+    selected.push(labelViaStation(r));
+  }
+
+  return selected;
+}
+
+function labelFastest(route: Route): Route {
+  return { ...route, category: 'fastest' };
+}
+
+function labelMinTransfer(route: Route): Route {
+  return { ...route, category: 'min-transfer' };
 }
 
 /**
- * Two routes are the same path if every segment matches by from/to/line.
- * Used to drop the 'min-transfer' card when it would duplicate 'fastest'.
+ * Label a route as 'via-station' using the last transfer station along
+ * the route as the user-facing tag. Empty viaTags would be a contract
+ * violation — we fall back to '환승 경유' (generic) if the route has no
+ * transfers (which shouldn't reach this path, but defensive).
  */
-function isSamePath(a: Route, b: Route): boolean {
-  if (a.segments.length !== b.segments.length) return false;
-  for (let i = 0; i < a.segments.length; i++) {
-    const sa = a.segments[i]!;
-    const sb = b.segments[i]!;
-    if (
-      sa.fromStationId !== sb.fromStationId ||
-      sa.toStationId !== sb.toStationId ||
-      sa.lineId !== sb.lineId
-    ) {
-      return false;
-    }
-  }
-  return true;
+function labelViaStation(route: Route): Route {
+  const transfers = route.segments
+    .filter((s) => s.isTransfer)
+    .map((s) => s.fromStationName);
+  const lastTransfer = transfers[transfers.length - 1];
+  const tag = lastTransfer ? `${lastTransfer} 경유` : '환승 경유';
+  return {
+    ...route,
+    category: 'via-station',
+    viaTags: [tag],
+  };
 }
 
 export default { findKShortestPaths, getDiverseRoutes };

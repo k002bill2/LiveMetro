@@ -138,6 +138,45 @@ describe('getDiverseRoutes', () => {
       }
     }
   });
+
+  it('서로 다른 환승역 그룹은 각각 1장씩 카드로 노출', () => {
+    // 222(강남) → 226(종합운동장)은 mock data에서 2호선 직행 + 일부 환승
+    // 변형이 있으므로 그룹화가 1개 이상의 카테고리 생성을 보장.
+    const routes = getDiverseRoutes('222', '226', 5);
+    // 같은 시그니처를 두 번 반환하지 않음
+    const signatures = routes.map((r) => buildTransferSignature(r));
+    expect(new Set(signatures).size).toBe(signatures.length);
+  });
+
+  it('via-station 카드는 viaTags에 환승역 이름을 포함', () => {
+    const routes = getDiverseRoutes('222', '226', 5);
+    const viaCards = routes.filter((r) => r.category === 'via-station');
+    for (const card of viaCards) {
+      expect(card.viaTags).toBeDefined();
+      expect(card.viaTags!.length).toBeGreaterThan(0);
+      // 라벨은 "○○ 경유" 형식
+      expect(card.viaTags![0]).toMatch(/경유$/);
+    }
+  });
+
+  it('maxRoutes 인자로 노출 수 제한', () => {
+    const r3 = getDiverseRoutes('222', '226', 3);
+    const r5 = getDiverseRoutes('222', '226', 5);
+    expect(r3.length).toBeLessThanOrEqual(3);
+    expect(r5.length).toBeLessThanOrEqual(5);
+    expect(r5.length).toBeGreaterThanOrEqual(r3.length);
+  });
+
+  it('1.5x 시간 격차 cap: fastest 대비 50% 초과 경로는 제외', () => {
+    const routes = getDiverseRoutes('222', '226', 5);
+    if (routes.length > 1) {
+      const fastest = routes[0]!;
+      const threshold = fastest.totalMinutes * 1.5;
+      for (const r of routes) {
+        expect(r.totalMinutes).toBeLessThanOrEqual(threshold);
+      }
+    }
+  });
 });
 
 describe('KShortestPathResult', () => {
