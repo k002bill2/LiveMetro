@@ -3,361 +3,112 @@ name: test-automation
 description: Generate comprehensive Jest tests for LiveMetro React Native components, hooks, and services. Use when writing tests, improving coverage, or test-driven development.
 ---
 
-# Test Automation Skill (LiveMetro)
+# Test Automation (LiveMetro)
 
-## Purpose
-Create comprehensive unit and integration tests for LiveMetro React Native components, hooks, and services using **Jest** and **React Native Testing Library**.
-
-## Checklists
-
-테스트 작성 시 다음 체크리스트를 참조하세요:
-- `.claude/checklists/testing.md` - 단위/통합 테스트, 커버리지, 모킹, 엣지 케이스
+Jest + React Native Testing Library 기반 단위·통합 테스트 작성 가이드.
 
 ## When to Use
-- Writing tests for new components or features
-- Improving test coverage (target: 75% statements, 70% functions)
-- Implementing test-driven development (TDD)
-- Debugging failing tests
-- Creating mock data and fixtures
+- 새 컴포넌트/훅/서비스 테스트 작성
+- 커버리지 개선 (목표: stmt 75% / fn 70% / branch 60%)
+- TDD 워크플로우
+- 실패 테스트 디버깅 / 픽스처 생성
 
-## Testing Standards
+## Standards
 
-### Coverage Requirements
-- **Statements**: 75% minimum
-- **Lines**: 75% minimum
-- **Functions**: 70% minimum
-- **Branches**: 60% minimum
+| 항목 | 값 |
+|------|-----|
+| Statements 최소 | 75% |
+| Functions 최소 | 70% |
+| Branches 최소 | 60% |
+| Test 위치 | source 옆 `__tests__/` |
+| 파일명 | `*.test.ts` / `*.test.tsx` |
+| 서브타이틀 | `describe(componentName)` |
 
-### Test Location
-- Co-located with source files in `__tests__/` directories
-- Example: `src/components/station/__tests__/StationCard.test.tsx`
+체크리스트: `.claude/checklists/testing.md`
 
-### Naming Conventions
-- Test files: `*.test.ts` or `*.test.tsx`
-- Test suites: `describe('ComponentName', () => {})`
-- Test cases: `it('should do something', () => {})`
+## 작업 흐름
 
-## Instructions
+1. **Analyze**: 대상 코드의 props, 외부 의존성(Firebase, Seoul API, AsyncStorage), 분기 식별.
+2. **Scenarios**: Happy / Edge(null·undefined·loading) / Error(API fail·timeout) 3종 의무.
+3. **Skeleton 작성**:
+   ```typescript
+   import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
+   import { ComponentName } from '../ComponentName';
 
-### 1. Analyze the Code
-- Read the component/hook/service implementation
-- Identify all functions, props, and edge cases
-- Note external dependencies (Firebase, Seoul API, AsyncStorage)
+   jest.mock('@/services/trainService', () => ({
+     getRealtimeArrivals: jest.fn(),
+   }));
 
-### 2. Identify Test Scenarios
-**Happy Path**: Normal usage with valid inputs
-**Edge Cases**: Empty data, null values, undefined, loading states
-**Error Cases**: API failures, Firebase errors, network timeouts
+   describe('ComponentName', () => {
+     beforeEach(() => jest.clearAllMocks());
+     // tests...
+   });
+   ```
+4. **Mock dependencies**: Firebase/AsyncStorage/Navigation/Seoul API 패턴 → [references/mocking-patterns.md](references/mocking-patterns.md)
+5. **Write tests**: Component / Hook / Service 템플릿 → [references/test-examples.md](references/test-examples.md)
+6. **Verify**: `npm test -- --coverage` 통과 + 임계값 충족.
 
-### 3. Create Test File
-```typescript
-import { render, screen, fireEvent, waitFor } from '@testing-library/react-native';
-import { ComponentName } from '../ComponentName';
+## Known Pitfalls (MEMORY 기반)
 
-// Mock external dependencies BEFORE imports
-jest.mock('@/services/trainService', () => ({
-  getRealtimeArrivals: jest.fn(),
-}));
+| 증상 | 원인 / 해결 |
+|------|------------|
+| "Found multiple elements with text" | `getByText` 대신 `getByTestId` |
+| "Can't access .root on unmounted test renderer" | `useAuth` mock이 전체 `AuthContextType` 반환해야 함 |
+| testID 미작동 | 컴포넌트 소스에서 실제 testID 확인 |
+| `isAutoLoggingIn` 로딩 잔존 | `await waitFor(() => getByTestId('email-input'))` |
+| Pill atom mock에 children만 반환 | `<Text>` 로 wrap 필수 |
+| Atom barrel cascade 폭발 | direct path import 사용 |
 
-describe('ComponentName', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
+## BANNED Patterns
 
-  // Tests here
-});
-```
-
-### 4. Mock External Dependencies
-
-**Firebase**:
-```typescript
-jest.mock('@/config/firebase', () => ({
-  auth: {
-    currentUser: { uid: 'test-uid', email: 'test@test.com' },
-    onAuthStateChanged: jest.fn((callback) => {
-      callback({ uid: 'test-uid', email: 'test@test.com' });
-      return jest.fn(); // unsubscribe
-    }),
-  },
-  db: {},
-}));
-
-jest.mock('firebase/firestore', () => ({
-  collection: jest.fn(),
-  doc: jest.fn(),
-  getDoc: jest.fn(),
-  getDocs: jest.fn(),
-  onSnapshot: jest.fn((_, callback) => {
-    callback({ docs: [] });
-    return jest.fn(); // unsubscribe
-  }),
-}));
-```
-
-**AsyncStorage**:
-```typescript
-jest.mock('@react-native-async-storage/async-storage', () => ({
-  getItem: jest.fn(),
-  setItem: jest.fn(),
-  removeItem: jest.fn(),
-  clear: jest.fn(),
-}));
-```
-
-**React Navigation**:
-```typescript
-const mockNavigate = jest.fn();
-const mockGoBack = jest.fn();
-
-jest.mock('@react-navigation/native', () => ({
-  ...jest.requireActual('@react-navigation/native'),
-  useNavigation: () => ({
-    navigate: mockNavigate,
-    goBack: mockGoBack,
-  }),
-  useRoute: () => ({
-    params: { stationId: 'test-station' },
-  }),
-}));
-```
-
-**Seoul API**:
-```typescript
-jest.mock('@/services/trainService', () => ({
-  getRealtimeArrivals: jest.fn().mockResolvedValue([
-    { trainLineNm: '2호선', arvlMsg2: '3분 후 도착', statnNm: '강남' },
-  ]),
-}));
-```
-
-### 5. Write Tests
-
-**Component Tests**:
-```typescript
-describe('StationCard', () => {
-  const mockStation = {
-    stationId: 'ST001',
-    stationName: '강남',
-    lineId: '2',
-  };
-
-  it('renders station name correctly', () => {
-    render(<StationCard station={mockStation} />);
-    expect(screen.getByText('강남')).toBeTruthy();
-  });
-
-  it('handles press event', () => {
-    const onPress = jest.fn();
-    render(<StationCard station={mockStation} onPress={onPress} />);
-
-    fireEvent.press(screen.getByTestId('station-card'));
-    expect(onPress).toHaveBeenCalledWith(mockStation);
-  });
-
-  it('shows loading state', () => {
-    render(<StationCard station={mockStation} loading={true} />);
-    expect(screen.getByTestId('loading-indicator')).toBeTruthy();
-  });
-});
-```
-
-**Hook Tests**:
-```typescript
-import { renderHook, act, waitFor } from '@testing-library/react-native';
-import { useTrainData } from '../useTrainData';
-
-describe('useTrainData', () => {
-  it('fetches train data on mount', async () => {
-    const { result } = renderHook(() => useTrainData('ST001'));
-
-    expect(result.current.loading).toBe(true);
-
-    await waitFor(() => {
-      expect(result.current.loading).toBe(false);
-    });
-
-    expect(result.current.arrivals).toBeDefined();
-  });
-
-  it('handles errors gracefully', async () => {
-    const mockError = new Error('API Error');
-    (getRealtimeArrivals as jest.Mock).mockRejectedValueOnce(mockError);
-
-    const { result } = renderHook(() => useTrainData('invalid'));
-
-    await waitFor(() => {
-      expect(result.current.error).toBeTruthy();
-      expect(result.current.arrivals).toEqual([]);
-    });
-  });
-});
-```
-
-**Service Tests**:
-```typescript
-describe('dataManager', () => {
-  beforeEach(() => {
-    jest.clearAllMocks();
-  });
-
-  it('fetches from Seoul API first', async () => {
-    const data = await dataManager.getTrainArrivals('ST001');
-    expect(seoulApi.fetchArrivals).toHaveBeenCalledWith('ST001');
-    expect(data).toBeDefined();
-  });
-
-  it('falls back to Firebase on API failure', async () => {
-    (seoulApi.fetchArrivals as jest.Mock).mockRejectedValue(new Error('API Error'));
-
-    const data = await dataManager.getTrainArrivals('ST001');
-    expect(trainService.getTrainsByStation).toHaveBeenCalledWith('ST001');
-  });
-
-  it('uses cache when available and fresh', async () => {
-    (AsyncStorage.getItem as jest.Mock).mockResolvedValue(
-      JSON.stringify({ data: mockData, timestamp: Date.now() })
-    );
-
-    const data = await dataManager.getTrainArrivals('ST001');
-    expect(seoulApi.fetchArrivals).not.toHaveBeenCalled();
-    expect(data).toEqual(mockData);
-  });
-});
-```
-
-### 6. Verify Coverage
-```bash
-npm test -- --coverage
-```
-
-## Common Patterns
-
-### Testing Async Operations
-```typescript
-it('fetches data asynchronously', async () => {
-  render(<Component />);
-
-  await waitFor(() => {
-    expect(screen.getByText('Loaded Data')).toBeTruthy();
-  });
-});
-```
-
-### Testing Navigation
-```typescript
-it('navigates to station detail', () => {
-  render(<StationCard station={mockStation} />);
-  fireEvent.press(screen.getByTestId('station-card'));
-
-  expect(mockNavigate).toHaveBeenCalledWith('StationDetail', {
-    stationId: 'ST001',
-    stationName: '강남',
-    lineId: '2',
-  });
-});
-```
-
-### Testing Firebase Subscriptions Cleanup
-```typescript
-it('subscribes to Firestore and cleans up on unmount', () => {
-  const unsubscribe = jest.fn();
-  (onSnapshot as jest.Mock).mockReturnValue(unsubscribe);
-
-  const { unmount } = render(<RealtimeComponent stationId="ST001" />);
-
-  expect(onSnapshot).toHaveBeenCalled();
-
-  unmount();
-  expect(unsubscribe).toHaveBeenCalled();
-});
-```
-
-## Known Test Pitfalls (from MEMORY.md)
-
-1. **"Found multiple elements with text"** - Use `getByTestId` when text appears in both title and button
-2. **"Can't access .root on unmounted test renderer"** - `useAuth` mock must return full `AuthContextType`
-3. **Missing testID** - Check actual component source before writing tests
-4. **`isAutoLoggingIn` state** - AuthScreen starts with loading; wait for `getByTestId('email-input')`
-5. **useAuth mock shape**: Must include ALL fields: `user, firebaseUser, loading, signInAnonymously, signInWithEmail, signUpWithEmail, signOut, updateUserProfile, resetPassword, changePassword`
-
-## Test Configuration
-
-LiveMetro uses **Jest** with React Native Testing Library:
-
-```javascript
-// jest.config.js
-module.exports = {
-  preset: 'jest-expo',
-  setupFilesAfterSetup: ['./jest.setup.js'],
-  coverageThreshold: {
-    global: {
-      statements: 75,
-      lines: 75,
-      functions: 70,
-      branches: 60,
-    },
-  },
-  moduleNameMapper: {
-    '^@/(.*)$': '<rootDir>/src/$1',
-    '^@components/(.*)$': '<rootDir>/src/components/$1',
-    '^@services/(.*)$': '<rootDir>/src/services/$1',
-  },
-};
-```
-
-## BANNED Patterns (Hard Failures)
-
-테스트 코드에서 아래 패턴은 즉시 수정 대상입니다.
-
-### Mock Patterns
-| BANNED | USE INSTEAD | WHY |
-|--------|-------------|-----|
-| `jest.fn()` 외부 선언 → `jest.mock()` 내부 참조 | `jest.mock()` factory 내부에 inline 정의 | jest.mock 호이스팅으로 undefined 됨 |
-| `as any`로 mock 타입 우회 | 올바른 mock 타입 또는 `as jest.Mock` | 타입 안전성 무력화 |
-| `getByText('로그인')` (중복 텍스트) | `getByTestId('login-button')` | "Found multiple elements" 에러 |
-| `expect(component).toBeTruthy()` (존재만 확인) | 구체적 assertion (`toHaveTextContent`, `toBeVisible`) | 의미 없는 테스트 |
-| 실제 API 호출 (`fetch` unmocked) | `jest.mock` 또는 MSW | 테스트 불안정 + API 부하 |
-| `act()` 없이 상태 업데이트 | `await act(async () => {...})` | "act() warning" 발생 |
-
-### Structure Patterns
+### Mock
 | BANNED | USE INSTEAD |
 |--------|-------------|
-| 한 `it` 블록에 5+ assertion | 시나리오별 분리 |
-| `beforeAll`에서 mutable 상태 공유 | `beforeEach`에서 초기화 |
-| 구현 세부사항 테스트 (내부 state 직접 검사) | 사용자 행동 기반 테스트 |
-| snapshot만으로 충분하다고 판단 | snapshot + 행동 테스트 병행 |
-| cleanup 없는 타이머 mock | `jest.useFakeTimers()` + `jest.useRealTimers()` in afterEach |
+| `jest.fn()` 외부 → `jest.mock` 내부 참조 | factory 내부 inline 정의 |
+| `as any` mock 타입 우회 | `as jest.Mock` |
+| `getByText` (중복 텍스트) | `getByTestId` |
+| `expect(x).toBeTruthy()` 존재만 확인 | `toHaveTextContent` / `toBeVisible` |
+| unmocked `fetch` 실제 호출 | `jest.mock` 또는 MSW |
+| `act()` 없는 상태 업데이트 | `await act(async () => {...})` |
 
-### Output Patterns (LLM Laziness 방지)
+### Structure
+| BANNED | USE INSTEAD |
+|--------|-------------|
+| 한 `it`에 5+ assertion | 시나리오별 분리 |
+| `beforeAll` mutable 공유 | `beforeEach` 초기화 |
+| 내부 state 직접 검사 | 사용자 행동 기반 |
+| snapshot만 작성 | snapshot + 행동 테스트 |
+| timer mock cleanup 누락 | `afterEach`에 `useRealTimers` |
+
+### LLM Laziness 방지
 | BANNED | REQUIRED |
 |--------|----------|
-| `// ... similar tests for other cases` | 모든 케이스를 명시적으로 작성 |
-| `// Add more tests as needed` | 필요한 테스트를 모두 작성 |
-| Happy path만 테스트 | Happy + Error + Edge 전부 |
+| `// ... similar tests` 생략 | 모든 케이스 명시 작성 |
+| `// Add more tests as needed` | 필요한 테스트 전부 작성 |
+| Happy path만 | Happy + Error + Edge 의무 |
 
 ## Pre-Output Checklist
 
-테스트 코드 출력 전 반드시 확인:
-- [ ] 모든 외부 의존성이 mock되었는가?
-- [ ] `beforeEach`에서 `jest.clearAllMocks()` 호출하는가?
-- [ ] Error 케이스 테스트가 포함되었는가?
-- [ ] Edge 케이스 (null, undefined, 빈 배열) 테스트가 포함되었는가?
-- [ ] 비동기 테스트에 `waitFor` 또는 `act`가 사용되었는가?
-- [ ] Firebase/타이머 구독의 cleanup 테스트가 있는가?
-- [ ] mock 변수가 `jest.mock()` factory 내부에 inline 정의되었는가?
+- [ ] 외부 의존성 전부 mock 처리
+- [ ] `beforeEach`에서 `jest.clearAllMocks()`
+- [ ] Error 케이스 1개 이상
+- [ ] Edge 케이스 (null, undefined, 빈 배열)
+- [ ] 비동기에 `waitFor` 또는 `act` 사용
+- [ ] Firebase/타이머 cleanup 테스트
+- [ ] mock 변수가 factory 내부 inline
 
-## Running Tests
+## Running
 
 ```bash
-npm test                                          # Run all tests
-npm test -- --watch                               # Watch mode
-npm test -- --coverage                            # Coverage report
-npm test -- src/components/__tests__/StationCard   # Specific file
-npm test -- -t "renders correctly"                # Specific test name
+npm test                                            # 전체
+npm test -- --watch                                 # watch
+npm test -- --coverage                              # 커버리지 리포트
+npm test -- src/components/__tests__/StationCard    # 특정 파일
+npm test -- -t "renders correctly"                  # 특정 케이스
 ```
 
 ## Resources
-- [React Native Testing Library](https://callstack.github.io/react-native-testing-library/)
-- [Jest Documentation](https://jestjs.io/docs/getting-started)
+
+- [RNTL 공식 문서](https://callstack.github.io/react-native-testing-library/)
+- [Jest 공식 문서](https://jestjs.io/docs/getting-started)
 - [Testing Hooks](https://callstack.github.io/react-native-testing-library/docs/api#renderhook)

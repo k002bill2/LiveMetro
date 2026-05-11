@@ -6,312 +6,152 @@ description: Creates phase-based feature plans with quality gates and incrementa
 # Feature Planner
 
 ## Purpose
-Generate structured, phase-based plans where:
-- Each phase delivers complete, runnable functionality
-- Quality gates enforce validation before proceeding
-- User approves plan before any work begins
-- Progress tracked via markdown checkboxes
-- Each phase is 1-4 hours maximum
+
+Phase-based 기능 계획 생성. 각 phase가:
+- 완전 동작하는 runnable functionality 제공
+- Quality gate로 다음 phase 진입 검증
+- 사용자 승인 후 작업 시작
+- 마크다운 체크박스로 진척 추적
+- 1-4시간 분량 (그 이상이면 더 분할)
 
 ## Planning Workflow
 
-### Step 1: Requirements Analysis
-1. Read relevant files to understand codebase architecture
-2. Identify dependencies and integration points
-3. Assess complexity and risks
-4. Determine appropriate scope (small/medium/large)
+### Step 1 — Requirements Analysis
+1. 관련 파일 읽어 아키텍처 파악
+2. 의존성·통합 지점 식별
+3. 복잡도·리스크 평가
+4. 범위 결정 (small / medium / large)
 
-### Step 2: Phase Breakdown with TDD Integration
-Break feature into 3-7 phases where each phase:
-- **Test-First**: Write tests BEFORE implementation
-- Delivers working, testable functionality
-- Takes 1-4 hours maximum
-- Follows Red-Green-Refactor cycle
-- Has measurable test coverage requirements
-- Can be rolled back independently
-- Has clear success criteria
+### Step 2 — Phase Breakdown (TDD 통합)
+기능을 3-7 phase로. 각 phase는:
+- **Test-First**: 구현 전 테스트 작성
+- 1-4시간 이내
+- Red-Green-Refactor 사이클
+- 측정 가능한 커버리지 목표
+- 독립 롤백 가능
+- 명확한 성공 기준
 
-**Phase Structure**:
-- Phase Name: Clear deliverable
-- Goal: What working functionality this produces
-- **Test Strategy**: What test types, coverage target, test scenarios
-- Tasks (ordered by TDD workflow):
-  1. **RED Tasks**: Write failing tests first
-  2. **GREEN Tasks**: Implement minimal code to make tests pass
-  3. **REFACTOR Tasks**: Improve code quality while tests stay green
-- Quality Gate: TDD compliance + validation criteria
-- Dependencies: What must exist before starting
-- **Coverage Target**: Specific percentage or checklist for this phase
+Phase 구조:
+- Phase Name (deliverable 명시)
+- Goal
+- **Test Strategy**: 종류·커버리지·시나리오
+- Tasks: ① RED ② GREEN ③ REFACTOR
+- Quality Gate
+- Dependencies
+- Coverage Target
 
-### Step 3: Plan Document Creation
-Use plan-template.md to generate: `docs/plans/PLAN_<feature-name>.md`
+TDD 절차 디테일: [references/tdd-and-testing.md](references/tdd-and-testing.md)
 
-Include:
-- Overview and objectives
-- Architecture decisions with rationale
-- Complete phase breakdown with checkboxes
+### Step 3 — Plan Document
+`plan-template.md` 기반으로 `docs/plans/PLAN_<feature-name>.md` 생성:
+- Overview & objectives
+- Architecture decisions + rationale
+- Phase breakdown (checkbox 포함)
 - Quality gate checklists
 - Risk assessment table
 - Rollback strategy per phase
 - Progress tracking section
-- Notes & learnings area
+- Notes & learnings
 
-### Step 4: User Approval
-**CRITICAL**: Use AskUserQuestion to get explicit approval before proceeding.
+### Step 4 — User Approval (CRITICAL)
+`AskUserQuestion`으로 명시적 승인. 미승인 시 plan document 생성 금지.
 
-Ask:
-- "Does this phase breakdown make sense for your project?"
-- "Any concerns about the proposed approach?"
-- "Should I proceed with creating the plan document?"
+질문:
+- "이 phase breakdown이 프로젝트에 적합한가?"
+- "제안된 접근에 우려가 있는가?"
+- "plan document를 생성해도 좋은가?"
 
-Only create plan document after user confirms approval.
-
-### Step 5: Document Generation
-1. Create `docs/plans/` directory if not exists
-2. Generate plan document with all checkboxes unchecked
-3. Add clear instructions in header about quality gates
-4. Inform user of plan location and next steps
+### Step 5 — Document Generation
+1. `docs/plans/` 디렉토리 없으면 생성
+2. 모든 체크박스 미체크 상태로 plan 생성
+3. 헤더에 quality gate 안내 명시
+4. 사용자에게 plan 위치·다음 스텝 안내
 
 ## Quality Gate Standards
 
-Each phase MUST validate these items before proceeding to next phase:
+각 phase 통과 전 검증 항목:
 
-**Build & Compilation**:
-- [ ] Project builds/compiles without errors
-- [ ] No syntax errors
+**Build & Compilation**
+- [ ] 빌드/컴파일 에러 0
+- [ ] 문법 에러 0
 
-**Test-Driven Development (TDD)**:
-- [ ] Tests written BEFORE production code
-- [ ] Red-Green-Refactor cycle followed
-- [ ] Unit tests: ≥80% coverage for business logic
-- [ ] Integration tests: Critical user flows validated
-- [ ] Test suite runs in acceptable time (<5 minutes)
+**TDD**
+- [ ] 테스트가 production 코드보다 먼저 작성됨
+- [ ] Red-Green-Refactor 사이클 준수
+- [ ] Unit test: 비즈니스 로직 ≥80%
+- [ ] Integration test: 핵심 user flow 검증
+- [ ] 테스트 suite <5분 실행
 
-**Testing**:
-- [ ] All existing tests pass
-- [ ] New tests added for new functionality
-- [ ] Test coverage maintained or improved
+**Testing**
+- [ ] 기존 테스트 전부 통과
+- [ ] 새 기능에 테스트 추가
+- [ ] 커버리지 유지/향상
 
-**Code Quality**:
-- [ ] Linting passes with no errors
-- [ ] Type checking passes (if applicable)
-- [ ] Code formatting consistent
+**Code Quality**
+- [ ] 린트 에러 0
+- [ ] 타입체크 통과
+- [ ] 포매팅 일관
 
-**Functionality**:
-- [ ] Manual testing confirms feature works
-- [ ] No regressions in existing functionality
-- [ ] Edge cases tested
+**Functionality**
+- [ ] 수동 테스트로 기능 동작 확인
+- [ ] 기존 기능 회귀 없음
+- [ ] 엣지 케이스 테스트됨
 
-**Security & Performance**:
-- [ ] No new security vulnerabilities
-- [ ] No performance degradation
-- [ ] Resource usage acceptable
+**Security & Performance**
+- [ ] 새 보안 취약점 없음
+- [ ] 성능 저하 없음
+- [ ] 자원 사용량 허용 범위
 
-**Documentation**:
-- [ ] Code comments updated
-- [ ] Documentation reflects changes
+**Documentation**
+- [ ] 코드 주석 업데이트
+- [ ] 문서 변경 반영
 
 ## Progress Tracking Protocol
 
-Add this to plan document header:
+Plan document 헤더에 삽입:
 
 ```markdown
-**CRITICAL INSTRUCTIONS**: After completing each phase:
-1. ✅ Check off completed task checkboxes
-2. 🧪 Run all quality gate validation commands
-3. ⚠️ Verify ALL quality gate items pass
-4. 📅 Update "Last Updated" date
-5. 📝 Document learnings in Notes section
-6. ➡️ Only then proceed to next phase
+**CRITICAL INSTRUCTIONS**: Phase 완료마다:
+1. 완료 체크박스 표시
+2. Quality gate 검증 명령 실행
+3. 모든 gate 항목 통과 확인
+4. "Last Updated" 갱신
+5. Notes 섹션에 학습 기록
+6. 그 후에만 다음 phase 진행
 
-⛔ DO NOT skip quality gates or proceed with failing checks
+DO NOT skip quality gates or proceed with failing checks
 ```
 
-## Phase Sizing Guidelines
+## Phase Sizing
 
-**Small Scope** (2-3 phases, 3-6 hours total):
-- Single component or simple feature
-- Minimal dependencies
-- Clear requirements
-- Example: Add dark mode toggle, create new form component
-
-**Medium Scope** (4-5 phases, 8-15 hours total):
-- Multiple components or moderate feature
-- Some integration complexity
-- Database changes or API work
-- Example: User authentication system, search functionality
-
-**Large Scope** (6-7 phases, 15-25 hours total):
-- Complex feature spanning multiple areas
-- Significant architectural impact
-- Multiple integrations
-- Example: AI-powered search with embeddings, real-time collaboration
+| 규모 | Phase 수 | 시간 | 예 |
+|------|---------|------|-----|
+| Small | 2-3 | 3-6h | 다크모드 토글, 폼 컴포넌트 |
+| Medium | 4-5 | 8-15h | 인증 시스템, 검색 기능 |
+| Large | 6-7 | 15-25h | AI 검색+embedding, 실시간 협업 |
 
 ## Risk Assessment
 
-Identify and document:
-- **Technical Risks**: API changes, performance issues, data migration
-- **Dependency Risks**: External library updates, third-party service availability
-- **Timeline Risks**: Complexity unknowns, blocking dependencies
-- **Quality Risks**: Test coverage gaps, regression potential
+리스크 종류:
+- **Technical**: API 변경, 성능 이슈, 데이터 마이그레이션
+- **Dependency**: 외부 라이브러리 업데이트, 서드파티 가용성
+- **Timeline**: 복잡도 unknown, 블로킹 의존성
+- **Quality**: 테스트 커버리지 갭, 회귀 가능성
 
-For each risk, specify:
-- Probability: Low/Medium/High
-- Impact: Low/Medium/High
-- Mitigation Strategy: Specific action steps
+각 리스크별:
+- Probability: Low / Medium / High
+- Impact: Low / Medium / High
+- Mitigation: 구체적 행동 단계
 
 ## Rollback Strategy
 
-For each phase, document how to revert changes if issues arise.
-Consider:
-- What code changes need to be undone
-- Database migrations to reverse (if applicable)
-- Configuration changes to restore
-- Dependencies to remove
+Phase별 롤백 절차 명시:
+- 어떤 코드 변경을 되돌릴지
+- 마이그레이션을 어떻게 reverse 할지
+- 설정 변경을 어떻게 복원할지
+- 어떤 의존성을 제거할지
 
-## Test Specification Guidelines
+## 추가 참고
 
-### Test-First Development Workflow
-
-**For Each Feature Component**:
-1. **Specify Test Cases** (before writing ANY code)
-   - What inputs will be tested?
-   - What outputs are expected?
-   - What edge cases must be handled?
-   - What error conditions should be tested?
-
-2. **Write Tests** (Red Phase)
-   - Write tests that WILL fail
-   - Verify tests fail for the right reason
-   - Run tests to confirm failure
-   - Commit failing tests to track TDD compliance
-
-3. **Implement Code** (Green Phase)
-   - Write minimal code to make tests pass
-   - Run tests frequently (every 2-5 minutes)
-   - Stop when all tests pass
-   - No additional functionality beyond tests
-
-4. **Refactor** (Blue Phase)
-   - Improve code quality while tests remain green
-   - Extract duplicated logic
-   - Improve naming and structure
-   - Run tests after each refactoring step
-   - Commit when refactoring complete
-
-### Test Types
-
-**Unit Tests**:
-- **Target**: Individual functions, methods, classes
-- **Dependencies**: None or mocked/stubbed
-- **Speed**: Fast (<100ms per test)
-- **Isolation**: Complete isolation from external systems
-- **Coverage**: ≥80% of business logic
-
-**Integration Tests**:
-- **Target**: Interaction between components/modules
-- **Dependencies**: May use real dependencies
-- **Speed**: Moderate (<1s per test)
-- **Isolation**: Tests component boundaries
-- **Coverage**: Critical integration points
-
-**End-to-End (E2E) Tests**:
-- **Target**: Complete user workflows
-- **Dependencies**: Real or near-real environment
-- **Speed**: Slow (seconds to minutes)
-- **Isolation**: Full system integration
-- **Coverage**: Critical user journeys
-
-### Test Coverage Calculation
-
-**Coverage Thresholds** (adjust for your project):
-- **Business Logic**: ≥90% (critical code paths)
-- **Data Access Layer**: ≥80% (repositories, DAOs)
-- **API/Controller Layer**: ≥70% (endpoints)
-- **UI/Presentation**: Integration tests preferred over coverage
-
-**Coverage Commands by Ecosystem**:
-```bash
-# JavaScript/TypeScript
-jest --coverage
-nyc report --reporter=html
-
-# Python
-pytest --cov=src --cov-report=html
-coverage report
-
-# Java
-mvn jacoco:report
-gradle jacocoTestReport
-
-# Go
-go test -cover ./...
-go tool cover -html=coverage.out
-
-# .NET
-dotnet test /p:CollectCoverage=true /p:CoverageReporter=html
-reportgenerator -reports:coverage.xml -targetdir:coverage
-
-# Ruby
-bundle exec rspec --coverage
-open coverage/index.html
-
-# PHP
-phpunit --coverage-html coverage
-```
-
-### Common Test Patterns
-
-**Arrange-Act-Assert (AAA) Pattern**:
-```
-test 'description of behavior':
-  // Arrange: Set up test data and dependencies
-  input = createTestData()
-
-  // Act: Execute the behavior being tested
-  result = systemUnderTest.method(input)
-
-  // Assert: Verify expected outcome
-  assert result == expectedOutput
-```
-
-**Given-When-Then (BDD Style)**:
-```
-test 'feature should behave in specific way':
-  // Given: Initial context/state
-  given userIsLoggedIn()
-
-  // When: Action occurs
-  when userClicksButton()
-
-  // Then: Observable outcome
-  then shouldSeeConfirmation()
-```
-
-**Mocking/Stubbing Dependencies**:
-```
-test 'component should call dependency':
-  // Create mock/stub
-  mockService = createMock(ExternalService)
-  component = new Component(mockService)
-
-  // Configure mock behavior
-  when(mockService.method()).thenReturn(expectedData)
-
-  // Execute and verify
-  component.execute()
-  verify(mockService.method()).calledOnce()
-```
-
-### Test Documentation in Plan
-
-**In each phase, specify**:
-1. **Test File Location**: Exact path where tests will be written
-2. **Test Scenarios**: List of specific test cases
-3. **Expected Failures**: What error should tests show initially?
-4. **Coverage Target**: Percentage for this phase
-5. **Dependencies to Mock**: What needs mocking/stubbing?
-6. **Test Data**: What fixtures/factories are needed?
-
-## Supporting Files Reference
-- [plan-template.md](plan-template.md) - Complete plan document template
+- TDD 워크플로우·테스트 유형·커버리지 명령: [references/tdd-and-testing.md](references/tdd-and-testing.md)
+- Plan 템플릿: [plan-template.md](plan-template.md)
