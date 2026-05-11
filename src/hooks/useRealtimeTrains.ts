@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect, useLayoutEffect, useCallback, useRef } from 'react';
+import { AppState, AppStateStatus } from 'react-native';
 import { dataManager, RealtimeTrainData } from '../services/data/dataManager';
 import { Train } from '../models/train';
 
@@ -166,6 +167,26 @@ export const useRealtimeTrains = (
       unsubscribe();
     };
   }, [unsubscribe]);
+
+  // AppState 복귀 시 강제 refresh — 백그라운드에 오래 있다가 돌아오면 폴링 타이머가
+  // 죽거나 데이터가 stale 상태로 남아있어 도착 정보가 갱신되지 않는 증상을 해소.
+  // background/inactive → active 전환에서만 refetch 트리거.
+  useEffect(() => {
+    if (!enabled) return;
+
+    const appStateRef = { current: AppState.currentState };
+    const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
+      const prev = appStateRef.current;
+      appStateRef.current = nextState;
+      if ((prev === 'background' || prev === 'inactive') && nextState === 'active') {
+        refetch();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [enabled, refetch]);
 
   return {
     ...state,
