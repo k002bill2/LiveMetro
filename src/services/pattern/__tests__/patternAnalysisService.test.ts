@@ -284,6 +284,99 @@ describe('PatternAnalysisService', () => {
       expect(result?.predictedMinutesRange).toEqual([27, 33]);
       expect(result?.direction).toBe('up');
     });
+
+    it('returns base fields with transit/total/range undefined when calculateRoute returns null', async () => {
+      jest.spyOn(patternAnalysisService, 'getPatternForDay').mockResolvedValueOnce({
+        userId: 'u1',
+        dayOfWeek: 2 as const,
+        avgDepartureTime: '08:00',
+        stdDevMinutes: 3,
+        frequentRoute: {
+          departureStationId: 'unknown-from',
+          departureStationName: 'X',
+          arrivalStationId: 'unknown-to',
+          arrivalStationName: 'Y',
+          lineIds: [],
+        },
+        confidence: 0.8,
+        sampleCount: 10,
+        lastUpdated: new Date(),
+      });
+      mockedCalculateRoute.mockReturnValueOnce(null);
+
+      const result = await patternAnalysisService.predictCommute('u1', new Date('2026-05-12'));
+
+      expect(result).not.toBeNull();
+      expect(result?.transitSegments).toBeUndefined();
+      expect(result?.predictedMinutes).toBeUndefined();
+      expect(result?.predictedArrivalTime).toBeUndefined();
+      expect(result?.predictedMinutesRange).toBeUndefined();
+      expect(result?.direction).toBeUndefined();
+      expect(result?.walkToStationMinutes).toBe(DEFAULT_WALK_TO_STATION_MIN);
+      expect(result?.waitMinutes).toBe(DEFAULT_WAIT_MIN);
+      expect(result?.walkToDestinationMinutes).toBe(DEFAULT_WALK_TO_DEST_MIN);
+      expect(result?.predictedDepartureTime).toBe('08:00');
+      expect(result?.confidence).toBe(0.8);
+    });
+
+    it('soft-fails to base when calculateRoute throws', async () => {
+      jest.spyOn(patternAnalysisService, 'getPatternForDay').mockResolvedValueOnce({
+        userId: 'u1',
+        dayOfWeek: 2 as const,
+        avgDepartureTime: '08:00',
+        stdDevMinutes: 3,
+        frequentRoute: {
+          departureStationId: 'a', departureStationName: 'A',
+          arrivalStationId: 'b', arrivalStationName: 'B',
+          lineIds: ['1'],
+        },
+        confidence: 0.8,
+        sampleCount: 10,
+        lastUpdated: new Date(),
+      });
+      mockedCalculateRoute.mockImplementationOnce(() => {
+        throw new Error('boom');
+      });
+
+      const result = await patternAnalysisService.predictCommute('u1', new Date('2026-05-12'));
+
+      expect(result).not.toBeNull();
+      expect(result?.transitSegments).toBeUndefined();
+      expect(result?.predictedMinutes).toBeUndefined();
+    });
+
+    it('returns predictedMinutesRange undefined when stdDevMinutes is 0', async () => {
+      jest.spyOn(patternAnalysisService, 'getPatternForDay').mockResolvedValueOnce({
+        userId: 'u1',
+        dayOfWeek: 2 as const,
+        avgDepartureTime: '08:00',
+        stdDevMinutes: 0,
+        frequentRoute: {
+          departureStationId: '0150', departureStationName: '서울역',
+          arrivalStationId: '0151', arrivalStationName: '시청',
+          lineIds: ['1'],
+        },
+        confidence: 0.8,
+        sampleCount: 10,
+        lastUpdated: new Date(),
+      });
+      mockedCalculateRoute.mockReturnValueOnce({
+        segments: [{
+          fromStationId: '0150', fromStationName: '서울역',
+          toStationId: '0151', toStationName: '시청',
+          lineId: '1', lineName: '1호선',
+          estimatedMinutes: 10, isTransfer: false,
+        }],
+        totalMinutes: 10,
+        transferCount: 0,
+        lineIds: ['1'],
+      });
+
+      const result = await patternAnalysisService.predictCommute('u1', new Date('2026-05-12'));
+
+      expect(result?.predictedMinutes).toBe(20);
+      expect(result?.predictedMinutesRange).toBeUndefined();
+    });
   });
 
   describe('getWeekPredictions', () => {
