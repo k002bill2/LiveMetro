@@ -421,8 +421,15 @@ export function computeArrivalTime(
 /**
  * Sum walk + wait + walk + transit segments. Returns 0 if all undefined.
  */
-export function sumPredictedMinutes(_p: PredictedCommute): number {
-  throw new Error('not implemented');
+export function sumPredictedMinutes(p: PredictedCommute): number {
+  const walk1 = p.walkToStationMinutes ?? 0;
+  const wait = p.waitMinutes ?? 0;
+  const walk2 = p.walkToDestinationMinutes ?? 0;
+  const transit = (p.transitSegments ?? []).reduce(
+    (sum, seg) => sum + seg.estimatedMinutes,
+    0,
+  );
+  return walk1 + wait + walk2 + transit;
 }
 
 /**
