@@ -24,9 +24,14 @@ export interface RouteSegment {
 
 /**
  * Why a route was suggested. Set by `getDiverseRoutes` when picking the
- * fastest and the fewest-transfer routes from the K-shortest candidates.
+ * fastest, fewest-transfer, and via-station differentiated routes from
+ * the K-shortest candidates.
+ *
+ * - 'fastest': 최단 시간 (Yen output 첫 번째)
+ * - 'min-transfer': 환승 최소 (fastest보다 환승 적을 때만)
+ * - 'via-station': 특정 환승역 경유 (viaTags에 라벨 텍스트)
  */
-export type RouteCategory = 'fastest' | 'min-transfer';
+export type RouteCategory = 'fastest' | 'min-transfer' | 'via-station';
 
 /**
  * Complete route from origin to destination
@@ -37,6 +42,12 @@ export interface Route {
   readonly transferCount: number;
   readonly lineIds: readonly string[];
   readonly category?: RouteCategory;
+  /**
+   * Dynamic display tags for `category: 'via-station'` cards. Caller
+   * (RouteCard) prefers `viaTags` over the static CATEGORY_TAGS mapping
+   * when category === 'via-station'. Example: ['강남구청 경유'].
+   */
+  readonly viaTags?: readonly string[];
 }
 
 /**

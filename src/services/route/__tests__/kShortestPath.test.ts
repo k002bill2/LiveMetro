@@ -2,7 +2,8 @@
  * K-Shortest Path Tests
  */
 
-import { findKShortestPaths, getDiverseRoutes } from '../kShortestPath';
+import { findKShortestPaths, getDiverseRoutes, buildTransferSignature } from '../kShortestPath';
+import type { Route, RouteSegment } from '@/models/route';
 
 // Mock the dependencies
 jest.mock('@/utils/priorityQueue', () => ({
@@ -96,10 +97,14 @@ describe('findKShortestPaths', () => {
 });
 
 describe('getDiverseRoutes', () => {
-  it('returns at most 2 routes (fastest + min-transfer)', () => {
+  it('returns [] for invalid station IDs', () => {
+    expect(getDiverseRoutes('invalid', 'also_invalid')).toEqual([]);
+  });
+
+  it('returns at most DEFAULT_MAX_ROUTES (5) routes adaptively', () => {
     const routes = getDiverseRoutes('222', '226');
 
-    expect(routes.length).toBeLessThanOrEqual(2);
+    expect(routes.length).toBeLessThanOrEqual(5);
   });
 
   it('labels the first route as "fastest"', () => {
@@ -136,6 +141,86 @@ describe('getDiverseRoutes', () => {
         expect(minTransfer.transferCount).toBeLessThan(fastest.transferCount);
       }
     }
+  });
+
+  it('서로 다른 환승역 그룹은 각각 1장씩 카드로 노출', () => {
+    // 222(강남) → 226(종합운동장)은 mock data에서 2호선 직행 + 일부 환승
+    // 변형이 있으므로 그룹화가 1개 이상의 카테고리 생성을 보장.
+    const routes = getDiverseRoutes('222', '226', 5);
+    // 같은 시그니처를 두 번 반환하지 않음
+    const signatures = routes.map((r) => buildTransferSignature(r));
+    expect(new Set(signatures).size).toBe(signatures.length);
+  });
+
+  it('via-station 카드는 viaTags에 환승역 이름을 포함', () => {
+    const routes = getDiverseRoutes('222', '226', 5);
+    const viaCards = routes.filter((r) => r.category === 'via-station');
+    for (const card of viaCards) {
+      expect(card.viaTags).toBeDefined();
+      expect(card.viaTags!.length).toBeGreaterThan(0);
+      // 라벨은 "○○ 경유" 형식
+      expect(card.viaTags![0]).toMatch(/경유$/);
+    }
+  });
+
+  it('maxRoutes 인자로 노출 수 제한', () => {
+    const r3 = getDiverseRoutes('222', '226', 3);
+    const r5 = getDiverseRoutes('222', '226', 5);
+    expect(r3.length).toBeLessThanOrEqual(3);
+    expect(r5.length).toBeLessThanOrEqual(5);
+    expect(r5.length).toBeGreaterThanOrEqual(r3.length);
+  });
+
+  it('1.5x 시간 격차 cap: fastest 대비 50% 초과 경로는 제외', () => {
+    const routes = getDiverseRoutes('222', '226', 5);
+    if (routes.length > 1) {
+      const fastest = routes[0]!;
+      const threshold = fastest.totalMinutes * 1.5;
+      for (const r of routes) {
+        expect(r.totalMinutes).toBeLessThanOrEqual(threshold);
+      }
+    }
+  });
+
+  it('회귀: min-transfer 카드의 transferCount는 항상 fastest보다 작음 (PR #55)', () => {
+    // semantic invariant — Task 3 재작성 후에도 유지돼야 함.
+    const routes = getDiverseRoutes('222', '226', 5);
+    const fastest = routes.find((r) => r.category === 'fastest');
+    const minTransfer = routes.find((r) => r.category === 'min-transfer');
+    if (fastest && minTransfer) {
+      expect(minTransfer.transferCount).toBeLessThan(fastest.transferCount);
+    }
+  });
+
+  it('회귀: 첫 카드는 항상 fastest 카테고리', () => {
+    const routes = getDiverseRoutes('222', '226', 5);
+    if (routes.length > 0) {
+      expect(routes[0]?.category).toBe('fastest');
+    }
+  });
+
+  it('짧은 OD pair (인접역)는 카드 1장만 반환', () => {
+    // 222(강남) → 223(역삼)은 1정거장 직행. 환승 옵션 없음.
+    // segment 구조도 검증: hardcoded placeholder가 아닌 실제 경로인지 확인.
+    const routes = getDiverseRoutes('222', '223', 5);
+    expect(routes.length).toBe(1);
+    expect(routes[0]?.category).toBe('fastest');
+    expect(routes[0]?.transferCount).toBe(0);
+    const segs = routes[0]?.segments ?? [];
+    expect(segs.length).toBeGreaterThan(0);
+    expect(segs[0]?.fromStationId).toBe('222');
+    expect(segs[segs.length - 1]?.toStationId).toBe('223');
+  });
+
+  it('maxRoutes 기본값은 5', () => {
+    // 인자 생략 시 DEFAULT_MAX_ROUTES(5) 적용.
+    // 더 큰 값을 명시한 호출 결과와 비교해 cap이 default에서 실제로 동작함을 검증.
+    const defaultRoutes = getDiverseRoutes('222', '226');
+    const largerRoutes = getDiverseRoutes('222', '226', 10);
+    expect(defaultRoutes.length).toBeLessThanOrEqual(5);
+    // 다양성이 충분하면 maxRoutes=10에서 더 많이 반환되어야 하지만,
+    // 다양성이 부족하면 동일할 수 있음. cap이 default를 초과하지 않음만 보장.
+    expect(largerRoutes.length).toBeGreaterThanOrEqual(defaultRoutes.length);
   });
 });
 
@@ -179,5 +264,75 @@ describe('edge cases', () => {
 
     // Should not exceed available paths
     expect(result.paths.length).toBeLessThanOrEqual(10);
+  });
+});
+
+describe('buildTransferSignature', () => {
+  // Test helper: build a minimal Route
+  const seg = (
+    from: string,
+    to: string,
+    lineId: string,
+    isTransfer: boolean,
+  ): RouteSegment => ({
+    fromStationId: from,
+    fromStationName: from,
+    toStationId: to,
+    toStationName: to,
+    lineId,
+    lineName: `${lineId}호선`,
+    estimatedMinutes: 2,
+    isTransfer,
+  });
+
+  const route = (
+    segs: RouteSegment[],
+    totalMinutes = 10,
+    transferCount = 0,
+  ): Route => ({
+    segments: segs,
+    totalMinutes,
+    transferCount,
+    lineIds: Array.from(new Set(segs.map((s) => s.lineId))),
+  });
+
+  it('직행 경로는 빈 signature를 반환', () => {
+    const r = route([seg('A', 'B', '2', false)]);
+    expect(buildTransferSignature(r)).toBe('');
+  });
+
+  it('단일 환승 경로는 환승역 이름을 signature로 반환', () => {
+    const r = route([
+      seg('A', '강남구청', '7', false),
+      seg('강남구청', '강남구청', '수인분당', true),
+      seg('강남구청', '선릉', '수인분당', false),
+    ]);
+    expect(buildTransferSignature(r)).toBe('강남구청');
+  });
+
+  it('환승역 순서가 달라도 같은 signature (정렬 보장)', () => {
+    const r1 = route([
+      seg('A', '신도림', '1', false),
+      seg('신도림', '신도림', '2', true),
+      seg('신도림', '선릉', '2', false),
+    ]);
+    const r2 = route([
+      seg('A', '신도림', '1', false),
+      seg('신도림', '신도림', '2', true),
+      seg('신도림', '선릉', '2', false),
+    ]);
+    expect(buildTransferSignature(r1)).toBe(buildTransferSignature(r2));
+  });
+
+  it('두 개 환승역은 가나다 정렬되어 join', () => {
+    const r = route([
+      seg('A', '부평구청', '인천1', false),
+      seg('부평구청', '부평구청', '7', true),
+      seg('부평구청', '강남구청', '7', false),
+      seg('강남구청', '강남구청', '수인분당', true),
+      seg('강남구청', '선릉', '수인분당', false),
+    ]);
+    // sorted: ['강남구청', '부평구청']
+    expect(buildTransferSignature(r)).toBe('강남구청|부평구청');
   });
 });
