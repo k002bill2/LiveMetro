@@ -36,6 +36,7 @@ import { useCongestion } from '@/hooks/useCongestion';
 import { usePublicDataForStation } from '@/hooks/usePublicData';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useAutoCommuteLog } from '@/hooks/useAutoCommuteLog';
+import { useWeatherAlert } from '@/hooks/useWeatherAlert';
 import { AlertBanner } from '@/components/common/AlertBanner';
 import { StationDetailHeader } from '@/components/station/StationDetailHeader';
 import { DirectionSegment } from '@/components/station/DirectionSegment';
@@ -142,6 +143,14 @@ const StationDetailScreen: React.FC = () => {
     lineId,
     enabled: isFocused,
   });
+
+  // 악천후(moderate/severe) 시 weather SubwayAlert을 생성하여 기존 alerts와 합침.
+  // 호출자 화면별로 enabled 가드 — 비활성 화면에서 30분 interval 폴링 방지.
+  const weatherAlert = useWeatherAlert({ enabled: isFocused });
+  const combinedAlerts = useMemo(
+    () => (weatherAlert ? [weatherAlert, ...alerts] : alerts),
+    [weatherAlert, alerts],
+  );
 
   // Split trains by direction once and reuse across views.
   const trainsByDirection = useMemo(() => {
@@ -253,9 +262,9 @@ const StationDetailScreen: React.FC = () => {
         testID="station-detail-header"
       />
 
-      {alerts.length > 0 ? (
+      {combinedAlerts.length > 0 ? (
         <View style={styles.alertWrap}>
-          <AlertBanner alerts={alerts} testID="station-detail-alerts" />
+          <AlertBanner alerts={combinedAlerts} testID="station-detail-alerts" />
         </View>
       ) : null}
 
