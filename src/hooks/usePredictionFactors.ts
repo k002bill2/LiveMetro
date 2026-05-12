@@ -39,6 +39,7 @@ import { CongestionLevel } from '@/models/train';
 import type { TrainCongestionSummary } from '@/models/congestion';
 import type { DayOfWeek } from '@/models/pattern';
 import { DAY_NAMES_KO } from '@/models/pattern';
+import type { Direction } from '@/models/route';
 
 export type FactorImpact = 'negative' | 'positive' | 'neutral';
 
@@ -54,7 +55,7 @@ export interface PredictionFactor {
 
 export interface UsePredictionFactorsParams {
   readonly lineId: string;
-  readonly direction: 'up' | 'down';
+  readonly direction: Direction;
   readonly dayOfWeek: DayOfWeek;
 }
 
@@ -84,12 +85,12 @@ const WEATHER_SNOW_MIN_DELAY_MIN = 2;
 
 interface ConditionalSummary {
   readonly overallLevel: CongestionLevel;
-  readonly direction: 'up' | 'down';
+  readonly direction: Direction;
 }
 
 function averageCongestionPercent(
   summaries: readonly ConditionalSummary[],
-  direction: 'up' | 'down'
+  direction: Direction
 ): number | null {
   const filtered = summaries.filter(s => s.direction === direction);
   const pool = filtered.length > 0 ? filtered : summaries;
@@ -140,7 +141,7 @@ function buildWeatherFactor(
 
 function buildCongestionFactor(
   result: PromiseSettledResult<readonly TrainCongestionSummary[]>,
-  direction: 'up' | 'down'
+  direction: Direction
 ): PredictionFactor {
   if (result.status !== 'fulfilled') {
     return {

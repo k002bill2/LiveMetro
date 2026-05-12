@@ -65,6 +65,7 @@ import {
   type HourlySlot,
 } from '@/services/congestion/congestionService';
 import type { DayOfWeek, PredictedCommute } from '@/models/pattern';
+import { directionToDisplay, type Direction } from '@/models/route';
 
 /**
  * Compute commute minutes from "HH:mm" departure → arrival strings, wrapping
@@ -281,8 +282,10 @@ export const WeeklyPredictionScreen: React.FC = () => {
   );
   // Direction default mirrors usePredictionFactors above. Once
   // PredictedCommute exposes travel direction, both call sites should
-  // switch together.
-  const directionForService: 'up' | 'down' = 'up';
+  // switch together. `directionForChart` is the localized display label
+  // passed to HourlyCongestionChart (e.g. '내선' / '상행' depending on line).
+  const directionForService: Direction = 'up';
+  const directionForChart = directionToDisplay(directionForService, factorsLineId);
   const { factors } = usePredictionFactors({
     lineId: factorsLineId,
     direction: directionForService,
@@ -472,7 +475,7 @@ export const WeeklyPredictionScreen: React.FC = () => {
       <View style={styles.sectionPad}>
         <HourlyCongestionChart
           lineId={factorsLineId}
-          direction={directionForService}
+          direction={directionForChart}
           currentTime={hourlyChartTime}
           slots={hourlySlots}
         />
