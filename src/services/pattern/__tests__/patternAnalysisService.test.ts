@@ -343,6 +343,14 @@ describe('PatternAnalysisService', () => {
       expect(result).not.toBeNull();
       expect(result?.transitSegments).toBeUndefined();
       expect(result?.predictedMinutes).toBeUndefined();
+      expect(result?.predictedArrivalTime).toBeUndefined();
+      expect(result?.predictedMinutesRange).toBeUndefined();
+      expect(result?.direction).toBeUndefined();
+      expect(result?.walkToStationMinutes).toBe(DEFAULT_WALK_TO_STATION_MIN);
+      expect(result?.waitMinutes).toBe(DEFAULT_WAIT_MIN);
+      expect(result?.walkToDestinationMinutes).toBe(DEFAULT_WALK_TO_DEST_MIN);
+      expect(result?.predictedDepartureTime).toBe('08:00');
+      expect(result?.confidence).toBe(0.8);
     });
 
     it('returns predictedMinutesRange undefined when stdDevMinutes is 0', async () => {
@@ -376,6 +384,13 @@ describe('PatternAnalysisService', () => {
 
       expect(result?.predictedMinutes).toBe(20);
       expect(result?.predictedMinutesRange).toBeUndefined();
+      expect(result?.transitSegments).toHaveLength(1);
+      expect(result?.predictedArrivalTime).toBe('08:20'); // 08:00 + 20 min
+      expect(result?.direction).toBe('up'); // 0150 < 0151 on line 1
+      expect(result?.walkToStationMinutes).toBe(DEFAULT_WALK_TO_STATION_MIN);
+      expect(result?.waitMinutes).toBe(DEFAULT_WAIT_MIN);
+      expect(result?.walkToDestinationMinutes).toBe(DEFAULT_WALK_TO_DEST_MIN);
+      expect(result?.deltaMinutes).toBeUndefined();
     });
   });
 
