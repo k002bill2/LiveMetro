@@ -520,6 +520,10 @@ export const HomeScreen: React.FC = () => {
     navigation.navigate('WeeklyPrediction');
   }, [morningCommute, navigation, showInfo]);
 
+  const handleOpenPrediction = useCallback((): void => {
+    navigation.navigate('WeeklyPrediction');
+  }, [navigation]);
+
   const requestLocationPermission = useCallback(async (): Promise<void> => {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status === 'granted') {
@@ -649,10 +653,10 @@ export const HomeScreen: React.FC = () => {
             deltaMinutes={effectiveHero.deltaMinutes}
             arrivalTime={effectiveHero.arrivalTime}
             confidence={effectiveHero.confidence}
-            onPress={handleViewPredictions}
+            onPress={handleOpenPrediction}
           />
         ) : morningCommute ? (
-          <CommutePredictionCard onViewDetails={handleViewPredictions} />
+          <CommutePredictionCard onViewDetails={handleOpenPrediction} />
         ) : (
           <MLHeroCardPlaceholder onPress={handleViewPredictions} />
         )}

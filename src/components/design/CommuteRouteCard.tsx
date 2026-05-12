@@ -193,13 +193,23 @@ const CommuteRouteCardImpl: React.FC<CommuteRouteCardProps> = ({
         {/* Walk leg */}
         <View style={styles.leg}>
           <View style={styles.legLineRow}>
-            <View
-              style={[styles.dottedLine, { borderColor: semantic.labelAlt }]}
-            />
+            <View style={styles.dottedLine}>
+              {Array.from({ length: 6 }).map((_, i) => (
+                <View
+                  key={i}
+                  style={[styles.dottedLineDot, { backgroundColor: semantic.labelAlt }]}
+                />
+              ))}
+            </View>
             <Footprints size={13} color={semantic.labelAlt} strokeWidth={2} />
-            <View
-              style={[styles.dottedLine, { borderColor: semantic.labelAlt }]}
-            />
+            <View style={styles.dottedLine}>
+              {Array.from({ length: 6 }).map((_, i) => (
+                <View
+                  key={i}
+                  style={[styles.dottedLineDot, { backgroundColor: semantic.labelAlt }]}
+                />
+              ))}
+            </View>
           </View>
           {walkMinutes !== undefined && (
             <Text style={[styles.legSubLabel, { color: semantic.labelAlt }]}>
@@ -424,11 +434,22 @@ const styles = StyleSheet.create({
     gap: 4,
   },
   dottedLine: {
+    /* RN iOS does not support borderStyle: 'dotted' on plain Views (renders
+       as solid + emits "Unsupported dashed / dotted border style" warning).
+       Replaced with a flex row of small dot views — same visual intent,
+       no warning, design fidelity preserved. Mirrors the pattern in
+       CommuteSettingsScreen `routeConnector` (rotated 90deg). */
     flex: 1,
-    height: 0,
-    borderTopWidth: 2,
-    borderStyle: 'dotted',
-    opacity: 0.5,
+    height: 4,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    opacity: 0.6,
+  },
+  dottedLineDot: {
+    width: 2,
+    height: 2,
+    borderRadius: 1,
   },
   solidLine: {
     flex: 1,
