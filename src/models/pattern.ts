@@ -202,6 +202,11 @@ export const DEFAULT_WAIT_MIN = 3;
 /** Default walk minutes from alighting station to destination. */
 export const DEFAULT_WALK_TO_DEST_MIN = 3;
 
+/** Minimum half-width (minutes) when computing predictedMinutesRange from stdDev. */
+export const RANGE_HALF_MIN_FLOOR = 1;
+/** Maximum half-width (minutes) when computing predictedMinutesRange from stdDev. */
+export const RANGE_HALF_MIN_CAP = 10;
+
 /** Day names in Korean */
 export const DAY_NAMES_KO: Record<DayOfWeek, string> = {
   0: '일요일',

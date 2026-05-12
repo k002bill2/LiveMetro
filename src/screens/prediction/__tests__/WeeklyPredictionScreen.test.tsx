@@ -155,6 +155,21 @@ jest.mock('@/services/congestion/congestionService', () => {
 describe('WeeklyPredictionScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    // Reset useCommutePattern to its default no-prediction stub.
+    // Some tests below use mockReturnValue (persistent) to keep the
+    // hook output stable across re-renders triggered by async state
+    // updates (Section 7 hourly slots). Re-apply the default here so
+    // each test starts from a clean baseline.
+    (useCommutePattern as jest.Mock).mockReturnValue({
+      todayPrediction: null,
+      patterns: [],
+      weekPredictions: [],
+      recentLogs: [],
+      notificationSettings: null,
+      todayNotification: null,
+      loading: false,
+      error: null,
+    });
   });
 
   it('renders the screen container with stable testID', () => {
@@ -237,9 +252,55 @@ describe('WeeklyPredictionScreen', () => {
     // title renders synchronously; the "지금" current-slot marker only
     // appears after the async getHourlyForecast resolves and slots are
     // committed via useState — hence findByText.
+    // Final-review fix: the hourly chart is now gated on a known
+    // direction (producer returns undefined for loop/branched lines —
+    // see deriveDirection in pattern.ts and spec §7.1). Provide a
+    // prediction with a concrete direction so the chart renders.
+    // Use mockReturnValue (not Once) because the screen re-renders on
+    // async slot state updates and each render re-reads the hook.
+    (useCommutePattern as jest.Mock).mockReturnValue({
+      todayPrediction: {
+        date: '2026-05-12',
+        dayOfWeek: 2,
+        predictedDepartureTime: '08:30',
+        predictedArrivalTime: '09:15',
+        predictedMinutes: 45,
+        predictedMinutesRange: [43, 47] as const,
+        direction: 'up' as const,
+        route: {
+          departureStationId: '0150',
+          departureStationName: '서울역',
+          arrivalStationId: '0220',
+          arrivalStationName: '강남역',
+          lineIds: ['1'],
+        },
+        confidence: 0.9,
+        suggestedAlertTime: '08:15',
+      },
+      patterns: [],
+      weekPredictions: [],
+      recentLogs: [],
+      notificationSettings: null,
+      todayNotification: null,
+      loading: false,
+      error: null,
+    });
     const { getByText, findByText } = render(<WeeklyPredictionScreen />);
     expect(getByText('시간대별 혼잡도 예측')).toBeTruthy();
     expect(await findByText('지금')).toBeTruthy();
+    expect(getByText('예측에 반영된 요소')).toBeTruthy();
+  });
+
+  it('hides hourly congestion forecast section when direction is undefined', () => {
+    // Final-review fix: when the producer signals "unknown direction"
+    // (loop line 2, Bundang, Shinbundang, branched lines), the
+    // direction-keyed chart subtitle "<line>호선 <direction> 방면" has
+    // no honest neutral form, so the entire section is hidden rather
+    // than papering over with a fake 'up'. Default mock returns
+    // todayPrediction: null, which propagates to direction undefined.
+    const { queryByText, getByText } = render(<WeeklyPredictionScreen />);
+    expect(queryByText('시간대별 혼잡도 예측')).toBeNull();
+    // Other direction-independent sections still render.
     expect(getByText('예측에 반영된 요소')).toBeTruthy();
   });
 

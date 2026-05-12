@@ -1,4 +1,10 @@
 /**
+ * useMLPrediction — separate prediction pipeline from useCommutePattern.
+ * HomeScreen consumes this hook (MLPrediction shape); WeeklyPredictionScreen
+ * consumes useCommutePattern (PredictedCommute shape, extended in
+ * docs/superpowers/specs/2026-05-12-predicted-commute-model-extension-design.md §7.1).
+ */
+/**
  * useMLPrediction Hook
  * Provides statistics-based commute predictions
  * TensorFlow is disabled - uses fallback predictions

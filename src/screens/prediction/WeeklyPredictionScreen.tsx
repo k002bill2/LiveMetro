@@ -260,8 +260,15 @@ export const WeeklyPredictionScreen: React.FC = () => {
   );
   // `directionForChart` is the localized display label passed to
   // HourlyCongestionChart (e.g. '내선' / '상행' depending on line).
-  const directionForService: Direction = todayPrediction?.direction ?? 'up';
-  const directionForChart = directionToDisplay(directionForService, factorsLineId);
+  // Producer signals `undefined` when direction is not determinable (loop
+  // line 2, Bundang/Shinbundang, etc. — see deriveDirection in pattern.ts
+  // and spec §7.1). Consumer respects that signal: direction-dependent UI
+  // is hidden or neutralized rather than rendering a wrong indicator.
+  const directionForService: Direction | undefined = todayPrediction?.direction;
+  const directionForChart =
+    directionForService !== undefined
+      ? directionToDisplay(directionForService, factorsLineId)
+      : undefined;
   const { factors } = usePredictionFactors({
     lineId: factorsLineId,
     direction: directionForService,
@@ -276,6 +283,12 @@ export const WeeklyPredictionScreen: React.FC = () => {
   const hourlyChartTime = useMemo(() => new Date(), []);
   const [hourlySlots, setHourlySlots] = useState<readonly HourlySlot[]>([]);
   useEffect(() => {
+    // Skip the direction-keyed fetch when direction is unknown — surfaces
+    // empty slots and the hourly chart section is hidden below.
+    if (directionForService === undefined) {
+      setHourlySlots([]);
+      return;
+    }
     let cancelled = false;
     congestionService
       .getHourlyForecast(factorsLineId, directionForService, hourlyChartTime)
@@ -447,15 +460,21 @@ export const WeeklyPredictionScreen: React.FC = () => {
       {/* 7. Hourly congestion forecast (Task 10) — wires
           HourlyCongestionChart (Task 9) backed by
           congestionService.getHourlyForecast (Task 8). Replaces the
-          earlier Phase 54 visual placeholder with real Firestore data. */}
-      <View style={styles.sectionPad}>
-        <HourlyCongestionChart
-          lineId={factorsLineId}
-          direction={directionForChart}
-          currentTime={hourlyChartTime}
-          slots={hourlySlots}
-        />
-      </View>
+          earlier Phase 54 visual placeholder with real Firestore data.
+          Hidden when direction is unknown (loop/branched lines) — the
+          chart subtitle is "<line>호선 <direction> 방면" and there is no
+          honest neutral label that fits the design. */}
+      {directionForChart !== undefined && (
+        <View style={styles.sectionPad}>
+          <HourlyCongestionChart
+            lineId={factorsLineId}
+            direction={directionForChart}
+            currentTime={hourlyChartTime}
+            slots={hourlySlots}
+          />
+        </View>
+      )}
+
 
       {/* 6. Segment breakdown */}
       <View style={styles.sectionPad}>

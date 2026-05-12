@@ -356,6 +356,7 @@ export const HomeScreen: React.FC = () => {
     enabled: isFocused,
   });
 
+  // HomeScreen uses MLPrediction (not the PredictedCommute model extended in spec 2026-05-12 §7.1)
   const { prediction: mlPrediction, baselineMinutes } = useMLPrediction();
 
   const morningCommute = user?.preferences.commuteSchedule?.weekdays?.morningCommute;

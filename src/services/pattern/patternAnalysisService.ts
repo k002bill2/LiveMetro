@@ -24,6 +24,8 @@ import {
   DEFAULT_WALK_TO_STATION_MIN,
   DEFAULT_WAIT_MIN,
   DEFAULT_WALK_TO_DEST_MIN,
+  RANGE_HALF_MIN_FLOOR,
+  RANGE_HALF_MIN_CAP,
   calculateAverageTime,
   calculateTimeStdDev,
   calculateConfidence,
@@ -161,7 +163,7 @@ class PatternAnalysisService {
 
     let predictedMinutesRange: readonly [number, number] | undefined;
     if (predictedMinutes !== undefined && pattern.stdDevMinutes > 0) {
-      const half = Math.min(10, Math.max(1, Math.round(pattern.stdDevMinutes)));
+      const half = Math.min(RANGE_HALF_MIN_CAP, Math.max(RANGE_HALF_MIN_FLOOR, Math.round(pattern.stdDevMinutes)));
       predictedMinutesRange = [predictedMinutes - half, predictedMinutes + half];
     }
 
