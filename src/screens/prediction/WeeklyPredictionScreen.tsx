@@ -519,6 +519,10 @@ export const WeeklyPredictionScreen: React.FC = () => {
           ]}
           testID="commute-prediction-cta"
           onPress={async () => {
+            if (!user?.id) {
+              Alert.alert('알림 설정 실패', '로그인이 필요합니다.');
+              return;
+            }
             const alert = await scheduleDepartureAlert();
             if (alert) {
               Alert.alert(
@@ -528,7 +532,14 @@ export const WeeklyPredictionScreen: React.FC = () => {
                   : '출발 시간에 알려드릴게요',
               );
             } else {
-              Alert.alert('알림 설정 실패', '로그인 상태를 확인해주세요.');
+              // user is signed in but scheduleDepartureAlert returned null
+              // (commute pattern not yet learned, or service-level failure).
+              // Hook's setError holds the precise reason but state hasn't
+              // flushed yet — surface a likely-cause hint instead.
+              Alert.alert(
+                '알림 설정 실패',
+                '출퇴근 패턴이 충분히 학습되지 않았거나 일시적 오류입니다. 잠시 후 다시 시도해주세요.',
+              );
             }
           }}
         >
