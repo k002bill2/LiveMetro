@@ -48,6 +48,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useMLPrediction } from '@/hooks/useMLPrediction';
 import { useCommutePattern } from '@/hooks/useCommutePattern';
 import { usePredictionFactors } from '@/hooks/usePredictionFactors';
+import { routeService } from '@/services/route';
 import { useTheme, ThemeColors } from '@/services/theme';
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { Pill } from '@/components/design';
@@ -216,11 +217,39 @@ export const WeeklyPredictionScreen: React.FC = () => {
   // replaced with real fields once `PredictedCommute` is extended (tracked
   // alongside Task 7 — hourly factor data).
   const { todayPrediction, weekPredictions } = useCommutePattern();
+
+  // Task #11 (P1.3): Replace the residual `(predictedMinutes - walk - wait - walk)`
+  // substitution for ride duration with real `RouteSegment.estimatedMinutes` from
+  // `routeService.calculateRoute`. Sums non-transfer segments so multi-line routes
+  // with a transfer report the correct ride time. Synchronous call — falls back
+  // to the residual subtraction below if the call returns null or throws.
+  const routeRideDurationMin: number | null = useMemo(() => {
+    const fr = todayPrediction?.route;
+    if (!fr) return null;
+    try {
+      const result = routeService.calculateRoute(
+        fr.departureStationId,
+        fr.arrivalStationId,
+      );
+      if (!result || result.segments.length === 0) return null;
+      const totalRide = result.segments
+        .filter((s) => !s.isTransfer)
+        .reduce((sum, s) => sum + s.estimatedMinutes, 0);
+      return totalRide > 0 ? totalRide : null;
+    } catch {
+      return null;
+    }
+  }, [todayPrediction?.route?.departureStationId, todayPrediction?.route?.arrivalStationId]);
+
   const segmentRoute: PredictedRoute | null = useMemo(() => {
     if (!todayPrediction) return null;
     const fr = todayPrediction.route;
     const firstLineId = fr.lineIds[0] ?? '2';
     const { walkToStationMin, waitMin, walkToDestMin } = SEGMENT_DEFAULTS;
+    const residualRideMin = Math.max(
+      0,
+      predictedMinutes - walkToStationMin - waitMin - walkToDestMin,
+    );
     return {
       walkToStation: { durationMin: walkToStationMin },
       wait: {
@@ -232,15 +261,12 @@ export const WeeklyPredictionScreen: React.FC = () => {
         fromStation: fr.departureStationName,
         toStation: fr.arrivalStationName,
         stopsCount: 0,
-        durationMin: Math.max(
-          0,
-          predictedMinutes - walkToStationMin - waitMin - walkToDestMin,
-        ),
+        durationMin: routeRideDurationMin ?? residualRideMin,
         // congestionLevel intentionally omitted — not in PredictedCommute yet.
       },
       walkToDestination: { durationMin: walkToDestMin },
     };
-  }, [todayPrediction, predictedMinutes]);
+  }, [todayPrediction, predictedMinutes, routeRideDurationMin]);
   const segmentOrigin = useMemo(
     () => ({
       name: '집',
