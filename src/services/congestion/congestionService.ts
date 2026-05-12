@@ -75,11 +75,18 @@ function mapPercentToLevel(percent: number): CongestionLevel {
   return CongestionLevel.CROWDED;
 }
 
-/** Format a Date as 'HH:mm' in local time (no date-fns dependency). */
+// LiveMetro = Seoul-only domain. Pin formatter to KST so output is identical
+// across runtime TZs (dev = KST, CI = UTC). en-GB locale guarantees 'HH:mm'.
+const HHMM_FORMATTER_KST = new Intl.DateTimeFormat('en-GB', {
+  timeZone: 'Asia/Seoul',
+  hour: '2-digit',
+  minute: '2-digit',
+  hour12: false,
+});
+
+/** Format a Date as 'HH:mm' in Asia/Seoul time, independent of host TZ. */
 function formatHHMM(d: Date): string {
-  const h = String(d.getHours()).padStart(2, '0');
-  const m = String(d.getMinutes()).padStart(2, '0');
-  return `${h}:${m}`;
+  return HHMM_FORMATTER_KST.format(d);
 }
 
 /** Return new Date with `minutes` added (immutable; original not mutated). */

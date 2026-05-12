@@ -2,6 +2,12 @@
  * Jest Configuration for LiveMetro React Native App
  */
 
+// LiveMetro is a Seoul-only app. Pin TZ so date/time-formatting tests are
+// deterministic across local (often KST) and CI (UTC) environments.
+// Why: regression on PR #60 — TZ-naive formatHHMM produced '08:00' locally
+// but '23:00' in UTC, breaking congestionService.getHourlyForecast tests.
+process.env.TZ = 'Asia/Seoul';
+
 module.exports = {
   // Use jest-expo preset for React Native
   preset: 'jest-expo',
