@@ -4,6 +4,37 @@
  */
 
 /**
+ * Canonical travel direction used for storage, queries, and ML pipelines.
+ *
+ * Convention (mirrors `src/services/api/seoulSubwayApi.ts:641`):
+ *   - 'up'   = 상행 (or 내선 on Line 2 circular)
+ *   - 'down' = 하행 (or 외선 on Line 2 circular)
+ *
+ * UI surfaces should localize via {@link directionToDisplay} rather than
+ * reading the canonical token directly.
+ */
+export type Direction = 'up' | 'down';
+
+/**
+ * Map a canonical {@link Direction} to a localized display label, given the
+ * line context.
+ *
+ * - Line `'2'` (circular): `'up' → '내선'`, `'down' → '외선'`
+ * - Other known lines: `'up' → '상행'`, `'down' → '하행'`
+ * - Unknown lines: same `'상행' | '하행'` fallback (safe default for the
+ *   non-circular Korean subway network).
+ *
+ * @param direction Canonical direction token
+ * @param lineId    Subway line id (e.g. `'1'`, `'2'`)
+ */
+export const directionToDisplay = (direction: Direction, lineId: string): string => {
+  if (lineId === '2') {
+    return direction === 'up' ? '내선' : '외선';
+  }
+  return direction === 'up' ? '상행' : '하행';
+};
+
+/**
  * Reason for suggesting an alternative route
  */
 export type AlternativeReason = 'DELAY' | 'SUSPENSION' | 'CONGESTION';

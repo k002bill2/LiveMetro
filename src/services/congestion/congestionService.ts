@@ -34,6 +34,7 @@ import {
   CongestionReportDoc,
   CongestionSummaryDoc,
 } from '@/models/congestion';
+import type { Direction } from '@/models/route';
 
 const REPORTS_COLLECTION = 'congestionReports';
 const SUMMARY_COLLECTION = 'congestionSummary';
@@ -508,7 +509,7 @@ class CongestionService {
    */
   async getHourlyForecast(
     lineId: string,
-    direction: 'up' | 'down',
+    direction: Direction,
     currentTime: Date
   ): Promise<readonly HourlySlot[]> {
     const snapped = snapToSlotBoundary(currentTime, SLOT_MINUTES);
@@ -548,7 +549,7 @@ class CongestionService {
   private async fetchSlotAverage(
     slotStart: Date,
     lineId: string,
-    direction: 'up' | 'down'
+    direction: Direction
   ): Promise<number | null> {
     const slotEnd = addMinutes(slotStart, SLOT_MINUTES);
     const dayOfWeek = slotStart.getDay();
