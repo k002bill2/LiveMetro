@@ -3,6 +3,9 @@
  * Represents user commute patterns and ML-based predictions
  */
 
+import { CongestionLevel } from './train';
+import { RouteSegment } from './route';
+
 // ============================================================================
 // Core Types
 // ============================================================================
@@ -59,16 +62,53 @@ export interface FrequentRoute {
 }
 
 /**
- * Predicted commute for a specific date
+ * Predicted commute for a specific date.
+ *
+ * The first block of fields is the base prediction (computed from pattern alone).
+ * The remaining optional fields are derived values populated by
+ * `patternAnalysisService.predictCommute` when source data is available;
+ * consumers MUST handle each as potentially undefined.
  */
 export interface PredictedCommute {
-  readonly date: string; // YYYY-MM-DD
+  // existing — unchanged
+  readonly date: string;                       // YYYY-MM-DD
   readonly dayOfWeek: DayOfWeek;
-  readonly predictedDepartureTime: string; // HH:mm
+  readonly predictedDepartureTime: string;     // HH:mm
   readonly route: FrequentRoute;
-  readonly confidence: number; // 0-1
-  readonly suggestedAlertTime: string; // HH:mm (usually 15-30 mins before departure)
+  readonly confidence: number;                 // 0-1
+  readonly suggestedAlertTime: string;         // HH:mm
   readonly basedOnPatternId?: string;
+
+  // Coupled: predictedMinutes and predictedArrivalTime are set together or both undefined.
+  readonly predictedMinutes?: number;
+  readonly predictedArrivalTime?: string;      // HH:mm
+  /** [lower, upper] minutes — replaces ±2/±4 heuristic in consumers. */
+  readonly predictedMinutesRange?: readonly [number, number];
+
+  /** Minutes vs typical (signed; + = slower). 1st cut: always undefined (no baseline yet). */
+  readonly deltaMinutes?: number;
+
+  /** Travel direction on the predicted line(s). */
+  readonly direction?: 'up' | 'down';
+
+  /** Walk from origin to boarding station. */
+  readonly walkToStationMinutes?: number;
+  /** Wait at platform. */
+  readonly waitMinutes?: number;
+  /** Walk from alighting station to destination. */
+  readonly walkToDestinationMinutes?: number;
+
+  /** Transit (ride + transfer) segments. Reuses RouteSegment, adds congestion slot. */
+  readonly transitSegments?: readonly PredictedTransitSegment[];
+}
+
+/**
+ * RouteSegment + optional congestion forecast slot.
+ * `congestionForecast` is populated by the congestion ingestion pipeline
+ * (Phase d); always undefined until that phase ships.
+ */
+export interface PredictedTransitSegment extends RouteSegment {
+  readonly congestionForecast?: CongestionLevel;
 }
 
 /**
@@ -154,6 +194,13 @@ export const MAX_LOG_AGE_DAYS = 30;
 
 /** Default alert time before departure (minutes) */
 export const DEFAULT_ALERT_MINUTES_BEFORE = 15;
+
+/** Default walk minutes from origin to boarding station. */
+export const DEFAULT_WALK_TO_STATION_MIN = 4;
+/** Default wait minutes at platform. */
+export const DEFAULT_WAIT_MIN = 3;
+/** Default walk minutes from alighting station to destination. */
+export const DEFAULT_WALK_TO_DEST_MIN = 3;
 
 /** Day names in Korean */
 export const DAY_NAMES_KO: Record<DayOfWeek, string> = {
@@ -352,4 +399,36 @@ export function createDefaultSmartNotificationSettings(): SmartNotificationSetti
     includeWeekends: false,
     customAlertTimes: [],
   };
+}
+
+// ============================================================================
+// Derived-prediction helpers (implemented in A.2 / A.3 / A.4)
+// ============================================================================
+
+/**
+ * Compute arrival time from departure (HH:mm) + total minutes.
+ * Handles 24h wrap: ('23:50', 30) → '00:20'.
+ */
+export function computeArrivalTime(
+  _departureHHmm: string,
+  _totalMinutes: number,
+): string {
+  throw new Error('not implemented');
+}
+
+/**
+ * Sum walk + wait + walk + transit segments. Returns 0 if all undefined.
+ */
+export function sumPredictedMinutes(_p: PredictedCommute): number {
+  throw new Error('not implemented');
+}
+
+/**
+ * Derive travel direction from the first transit segment.
+ * Returns undefined when input is missing or line direction model is unknown.
+ */
+export function deriveDirection(
+  _firstSegment: RouteSegment | undefined,
+): 'up' | 'down' | undefined {
+  throw new Error('not implemented');
 }
