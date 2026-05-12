@@ -392,6 +392,84 @@ describe('PatternAnalysisService', () => {
       expect(result?.walkToDestinationMinutes).toBe(DEFAULT_WALK_TO_DEST_MIN);
       expect(result?.deltaMinutes).toBeUndefined();
     });
+
+    it('always sets deltaMinutes to undefined in 1st cut (no historical baseline)', async () => {
+      jest.spyOn(patternAnalysisService, 'getPatternForDay').mockResolvedValueOnce({
+        userId: 'u1', dayOfWeek: 2 as const,
+        avgDepartureTime: '08:00', stdDevMinutes: 3,
+        frequentRoute: {
+          departureStationId: '0150', departureStationName: '서울역',
+          arrivalStationId: '0151', arrivalStationName: '시청',
+          lineIds: ['1'],
+        },
+        confidence: 0.8, sampleCount: 10, lastUpdated: new Date(),
+      });
+      mockedCalculateRoute.mockReturnValueOnce({
+        segments: [{
+          fromStationId: '0150', fromStationName: '서울역',
+          toStationId: '0151', toStationName: '시청',
+          lineId: '1', lineName: '1호선',
+          estimatedMinutes: 10, isTransfer: false,
+        }],
+        totalMinutes: 10, transferCount: 0, lineIds: ['1'],
+      });
+
+      const result = await patternAnalysisService.predictCommute('u1', new Date('2026-05-12'));
+
+      // Primary contract: deltaMinutes must be undefined (1st cut, no baseline)
+      expect(result?.deltaMinutes).toBeUndefined();
+
+      // Adjacent fields are populated (so the test exercises a fully-resolved
+      // happy path, not a degraded one — proves the deltaMinutes=undefined is
+      // intentional rather than a side effect of soft-fail).
+      expect(result?.predictedMinutes).toBe(20); // 4+3+3+10
+      expect(result?.predictedArrivalTime).toBe('08:20');
+      expect(result?.predictedMinutesRange).toEqual([17, 23]); // ±3 from stdDev
+      expect(result?.transitSegments).toHaveLength(1);
+      expect(result?.direction).toBe('up');
+    });
+
+    it('always sets transitSegments[*].congestionForecast to undefined (filled by Phase d)', async () => {
+      jest.spyOn(patternAnalysisService, 'getPatternForDay').mockResolvedValueOnce({
+        userId: 'u1', dayOfWeek: 2 as const,
+        avgDepartureTime: '08:00', stdDevMinutes: 3,
+        frequentRoute: {
+          departureStationId: '0150', departureStationName: '서울역',
+          arrivalStationId: '0152', arrivalStationName: '종각',
+          lineIds: ['1'],
+        },
+        confidence: 0.8, sampleCount: 10, lastUpdated: new Date(),
+      });
+      mockedCalculateRoute.mockReturnValueOnce({
+        segments: [
+          {
+            fromStationId: '0150', fromStationName: '서울역',
+            toStationId: '0151', toStationName: '시청',
+            lineId: '1', lineName: '1호선',
+            estimatedMinutes: 2, isTransfer: false,
+          },
+          {
+            fromStationId: '0151', fromStationName: '시청',
+            toStationId: '0152', toStationName: '종각',
+            lineId: '1', lineName: '1호선',
+            estimatedMinutes: 2, isTransfer: false,
+          },
+        ],
+        totalMinutes: 4, transferCount: 0, lineIds: ['1'],
+      });
+
+      const result = await patternAnalysisService.predictCommute('u1', new Date('2026-05-12'));
+
+      // Primary contract: every segment's congestionForecast is undefined
+      expect(result?.transitSegments).toHaveLength(2);
+      expect(result?.transitSegments?.every((s) => s.congestionForecast === undefined)).toBe(true);
+
+      // Sibling fields are populated (proves congestionForecast=undefined is
+      // intentional, not a soft-fail side effect).
+      expect(result?.predictedMinutes).toBe(14); // 4+3+3 + (2+2)
+      expect(result?.transitSegments?.[0]?.estimatedMinutes).toBe(2);
+      expect(result?.transitSegments?.[1]?.estimatedMinutes).toBe(2);
+    });
   });
 
   describe('getWeekPredictions', () => {
