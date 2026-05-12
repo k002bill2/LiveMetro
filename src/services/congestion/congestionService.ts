@@ -37,6 +37,64 @@ import {
 
 const REPORTS_COLLECTION = 'congestionReports';
 const SUMMARY_COLLECTION = 'congestionSummary';
+const HISTORY_COLLECTION = 'congestionData';
+
+// ---------------------------------------------------------------------------
+// Hourly forecast (Phase 2 of ML prediction Sections 6-9, spec 2026-05-12)
+// ---------------------------------------------------------------------------
+
+/** Minutes per forecast slot (15-min granularity matches Seoul Metro reporting) */
+const SLOT_MINUTES = 15;
+/** Total slots returned (covers ±~1h around currentTime) */
+const SLOT_COUNT = 7;
+/** Slots before currentTime (rest are at/after) */
+const SLOTS_BEFORE_NOW = 2;
+/** Max history docs aggregated per slot to bound query cost */
+const SLOT_QUERY_LIMIT = 50;
+/** Percent thresholds mapped onto CongestionLevel buckets */
+const PERCENT_THRESHOLD_LOW = 50;
+const PERCENT_THRESHOLD_MODERATE = 70;
+const PERCENT_THRESHOLD_HIGH = 85;
+
+/**
+ * Single hourly forecast slot returned by {@link CongestionService.getHourlyForecast}.
+ * `level: 'unknown'` when no historical data exists for that slot.
+ */
+export interface HourlySlot {
+  readonly slotTime: string; // 'HH:mm' in caller's local time
+  readonly congestionPercent: number; // 0-100, rounded
+  readonly level: CongestionLevel | 'unknown';
+}
+
+/** Map a 0-100 congestion percent to a {@link CongestionLevel} bucket. */
+function mapPercentToLevel(percent: number): CongestionLevel {
+  if (percent < PERCENT_THRESHOLD_LOW) return CongestionLevel.LOW;
+  if (percent < PERCENT_THRESHOLD_MODERATE) return CongestionLevel.MODERATE;
+  if (percent < PERCENT_THRESHOLD_HIGH) return CongestionLevel.HIGH;
+  return CongestionLevel.CROWDED;
+}
+
+/** Format a Date as 'HH:mm' in local time (no date-fns dependency). */
+function formatHHMM(d: Date): string {
+  const h = String(d.getHours()).padStart(2, '0');
+  const m = String(d.getMinutes()).padStart(2, '0');
+  return `${h}:${m}`;
+}
+
+/** Return new Date with `minutes` added (immutable; original not mutated). */
+function addMinutes(d: Date, minutes: number): Date {
+  return new Date(d.getTime() + minutes * 60_000);
+}
+
+/**
+ * Snap a Date down to the nearest `slotMinutes` boundary, zeroing seconds/ms.
+ * Returns a NEW Date — input is not mutated.
+ */
+function snapToSlotBoundary(d: Date, slotMinutes: number): Date {
+  const snapped = new Date(d);
+  snapped.setMinutes(Math.floor(d.getMinutes() / slotMinutes) * slotMinutes, 0, 0);
+  return snapped;
+}
 
 /**
  * Congestion Service
@@ -420,6 +478,113 @@ class CongestionService {
     }
 
     return carData;
+  }
+
+  // -------------------------------------------------------------------------
+  // Hourly forecast (Phase 2 of ML prediction Sections 6-9, spec 2026-05-12)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Return a 7-slot hourly congestion forecast surrounding `currentTime`.
+   *
+   * Each slot is `SLOT_MINUTES` (15 min) wide. The window starts
+   * `SLOTS_BEFORE_NOW` slots before the snapped boundary of `currentTime` and
+   * extends forward, yielding `SLOT_COUNT` slots total. Per-slot averages are
+   * sourced from historical congestion data matching the same dayOfWeek and
+   * time window. Slots without history return `level: 'unknown'`.
+   *
+   * Notes:
+   * - Date arithmetic uses immutable helpers — `currentTime` is never mutated.
+   * - Slot averages are fetched in parallel with `Promise.all`. Each request
+   *   targets a distinct (dayOfWeek, hour, minute) tuple so there is no
+   *   inter-dependency. Slots may cross midnight; `dayOfWeek` is computed per
+   *   slot inside {@link fetchSlotAverage}, so the day boundary (and DST
+   *   transitions) are handled correctly without special casing.
+   *
+   * @param lineId    Subway line id (e.g. '2')
+   * @param direction 'up' | 'down'
+   * @param currentTime Reference time (typically `new Date()` from the caller)
+   * @returns Readonly array of {@link HourlySlot}, length = `SLOT_COUNT`
+   */
+  async getHourlyForecast(
+    lineId: string,
+    direction: 'up' | 'down',
+    currentTime: Date
+  ): Promise<readonly HourlySlot[]> {
+    const snapped = snapToSlotBoundary(currentTime, SLOT_MINUTES);
+    const startSlot = addMinutes(snapped, -SLOTS_BEFORE_NOW * SLOT_MINUTES);
+
+    const slotStarts: Date[] = [];
+    for (let i = 0; i < SLOT_COUNT; i++) {
+      slotStarts.push(addMinutes(startSlot, i * SLOT_MINUTES));
+    }
+    const averages = await Promise.all(
+      slotStarts.map((s) => this.fetchSlotAverage(s, lineId, direction))
+    );
+    return slotStarts.map((slotStart, i) => {
+      const average = averages[i];
+      if (average === null || average === undefined) {
+        return {
+          slotTime: formatHHMM(slotStart),
+          congestionPercent: 0,
+          level: 'unknown' as const,
+        };
+      }
+      return {
+        slotTime: formatHHMM(slotStart),
+        congestionPercent: Math.round(average),
+        level: mapPercentToLevel(average),
+      };
+    });
+  }
+
+  /**
+   * Fetch the average congestion percent for a single slot window from
+   * historical Firestore data. Returns `null` when no documents match.
+   *
+   * Marked `private` to discourage external callers, but jest.spyOn can still
+   * stub it in unit tests of {@link getHourlyForecast}.
+   */
+  private async fetchSlotAverage(
+    slotStart: Date,
+    lineId: string,
+    direction: 'up' | 'down'
+  ): Promise<number | null> {
+    const slotEnd = addMinutes(slotStart, SLOT_MINUTES);
+    const dayOfWeek = slotStart.getDay();
+    // When slotEnd lands exactly on the next hour, its minute is 0 — but the
+    // exclusive upper bound for the *current* hour query must be 60 so the
+    // last minute in the slot is included. Anywhere else, slotEnd.getMinutes()
+    // is the correct exclusive upper bound.
+    const endMinuteExclusive =
+      slotEnd.getMinutes() === 0 ? 60 : slotEnd.getMinutes();
+    try {
+      const q = query(
+        collection(db, HISTORY_COLLECTION),
+        where('lineId', '==', lineId),
+        where('direction', '==', direction),
+        where('dayOfWeek', '==', dayOfWeek),
+        where('reportedHour', '==', slotStart.getHours()),
+        where('reportedMinute', '>=', slotStart.getMinutes()),
+        where('reportedMinute', '<', endMinuteExclusive),
+        limit(SLOT_QUERY_LIMIT)
+      );
+      const snapshot = await getDocs(q);
+      if (snapshot.empty) return null;
+      let sum = 0;
+      let count = 0;
+      snapshot.forEach((docSnap) => {
+        const data = docSnap.data() as { congestionPercent?: number };
+        if (typeof data.congestionPercent === 'number') {
+          sum += data.congestionPercent;
+          count++;
+        }
+      });
+      return count === 0 ? null : sum / count;
+    } catch (error) {
+      console.error('fetchSlotAverage failed:', error);
+      return null;
+    }
   }
 }
 
