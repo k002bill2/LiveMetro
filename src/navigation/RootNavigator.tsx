@@ -40,6 +40,7 @@ import { DelayCertificateScreen } from '../screens/delays/DelayCertificateScreen
 import { DelayFeedScreen } from '../screens/delays/DelayFeedScreen';
 import { AlternativeRoutesScreen } from '../screens/route/AlternativeRoutesScreen';
 import { RoutesTabScreen } from '../screens/route/RoutesTabScreen';
+import { WeeklyPredictionScreen } from '../screens/prediction';
 
 // DEBUG: Set to true to always show onboarding screen during development
 const DEBUG_FORCE_ONBOARDING = __DEV__ && false;
@@ -88,6 +89,7 @@ export type RootStackParamList = {
   // so they must remain reachable through the outer Stack.
   SubwayMap: undefined;
   Alerts: undefined;
+  WeeklyPrediction: undefined;
 };
 
 // Phase 56 — TabBar v3 alignment with Wanted bundle (`main.jsx` HomeScreen
@@ -338,6 +340,14 @@ const RootNavigatorContent: React.FC = () => {
         options={{
           headerShown: true,
           title: '알림',
+        }}
+      />
+      <Stack.Screen
+        name="WeeklyPrediction"
+        component={WeeklyPredictionScreen}
+        options={{
+          headerShown: false,
+          title: '주간 예측',
         }}
       />
     </Stack.Navigator>

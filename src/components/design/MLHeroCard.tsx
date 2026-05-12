@@ -185,7 +185,14 @@ MLHeroCardPlaceholder.displayName = 'MLHeroCardPlaceholder';
 
 const styles = StyleSheet.create({
   wrap: {
-    /* Wrapper to anchor shadow on the rounded gradient */
+    /* Wrapper to anchor shadow on the rounded gradient.
+       backgroundColor is required for iOS shadow fast-path: without an
+       opaque background the rasterizer derives the shadow path from the
+       child LinearGradient's alpha each frame, triggering the
+       "cannot calculate shadow efficiently" advice. The gradient covers
+       this base color, so the value is invisible — only used by the
+       shadow rasterizer. Matches the gradient's darker stop. */
+    backgroundColor: '#0044BB',
     shadowColor: '#0044BB',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.20,
