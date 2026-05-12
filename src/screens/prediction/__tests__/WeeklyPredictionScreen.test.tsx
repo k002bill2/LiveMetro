@@ -81,6 +81,22 @@ jest.mock('@/hooks/useMLPrediction', () => ({
   })),
 }));
 
+// Task 20 / Section 6 wiring: SegmentBreakdownSection consumes
+// useCommutePattern. The real hook fetches from Firestore on mount, so a
+// minimal stub keeps the test offline.
+jest.mock('@/hooks/useCommutePattern', () => ({
+  useCommutePattern: jest.fn(() => ({
+    todayPrediction: null,
+    patterns: [],
+    weekPredictions: [],
+    recentLogs: [],
+    notificationSettings: null,
+    todayNotification: null,
+    loading: false,
+    error: null,
+  })),
+}));
+
 jest.mock('@/services/train/trainService', () => ({
   trainService: {
     getStation: jest.fn(() => Promise.resolve(null)),

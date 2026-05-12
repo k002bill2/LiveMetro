@@ -47,10 +47,12 @@ import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { useMLPrediction } from '@/hooks/useMLPrediction';
+import { useCommutePattern } from '@/hooks/useCommutePattern';
 import { useTheme, ThemeColors } from '@/services/theme';
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { Pill } from '@/components/design';
 import { CONG_TONE, congFromPct } from '@/components/design/congestion';
+import { SegmentBreakdownSection, type PredictedRoute } from '@/components/prediction';
 
 /**
  * Compute commute minutes from "HH:mm" departure → arrival strings, wrapping
@@ -174,6 +176,54 @@ export const WeeklyPredictionScreen: React.FC = () => {
   // re-render (900ms ease-out sets state ~60Hz). Will key on a real
   // updated-at timestamp once useMLPrediction exposes hourly data.
   const hourlyForecast = useMemo(() => buildHourlyForecast(new Date()), []);
+
+  // Section 6: Segment breakdown.
+  // `PredictedCommute` (src/models/pattern.ts) currently only exposes
+  // `route: FrequentRoute` (departure/arrival station names + lineIds) and a
+  // `predictedDepartureTime`. The fine-grained walk/wait/ride durations and
+  // the per-stop count don't yet exist in the data model, so we substitute
+  // sensible defaults consistent with the design mock. These should be
+  // replaced with real fields once `PredictedCommute` is extended (tracked
+  // alongside Task 7 — hourly factor data).
+  const { todayPrediction } = useCommutePattern();
+  const segmentRoute: PredictedRoute | null = useMemo(() => {
+    if (!todayPrediction) return null;
+    const fr = todayPrediction.route;
+    const firstLineId = fr.lineIds[0] ?? '2';
+    return {
+      walkToStation: { durationMin: 4 },
+      wait: {
+        lineId: firstLineId,
+        direction: fr.arrivalStationName, // direction = terminus per design copy
+        durationMin: 3,
+      },
+      ride: {
+        fromStation: fr.departureStationName,
+        toStation: fr.arrivalStationName,
+        stopsCount: 0,
+        durationMin: Math.max(0, predictedMinutes - 4 - 3 - 3),
+        // congestionLevel intentionally omitted — not in PredictedCommute yet.
+      },
+      walkToDestination: { durationMin: 3 },
+    };
+  }, [todayPrediction, predictedMinutes]);
+  const segmentOrigin = useMemo(
+    () => ({
+      name: '집',
+      exit: todayPrediction?.route.departureStationName ?? routeNames.origin ?? '출발역',
+    }),
+    [todayPrediction, routeNames.origin],
+  );
+  // Destination row reads as `${name} → ${exit}` (station → office), inverse
+  // of the origin row (home → station). Naming reflects template position,
+  // not literal "exit number" — see note above.
+  const segmentDestination = useMemo(
+    () => ({
+      name: todayPrediction?.route.arrivalStationName ?? routeNames.destination ?? '도착역',
+      exit: '회사',
+    }),
+    [todayPrediction, routeNames.destination],
+  );
 
   // Animated count-up for the big number — 900ms ease-out cubic.
   const animatedValue = useRef(new Animated.Value(0)).current;
@@ -473,7 +523,18 @@ export const WeeklyPredictionScreen: React.FC = () => {
         </View>
       </View>
 
-      {/* 6, 8, 9: still pending real data — small placeholder */}
+      {/* 6. Segment breakdown */}
+      <View style={styles.sectionPad}>
+        <SegmentBreakdownSection
+          route={segmentRoute}
+          origin={segmentOrigin}
+          destination={segmentDestination}
+        />
+      </View>
+
+      {/* 8, 9: still pending real data — small placeholder.
+          Section 6 (구간별 시간) is now wired above; copy retained until
+          Tasks 7 (factors) and 4 (weekly) replace these too. */}
       <View style={styles.sectionPad}>
         <View
           style={[
