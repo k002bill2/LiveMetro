@@ -21,3 +21,6 @@ export type {
 
 export { PredictionFactorsSection } from './PredictionFactorsSection';
 export type { PredictionFactorsSectionProps } from './PredictionFactorsSection';
+
+export { HourlyCongestionChart } from './HourlyCongestionChart';
+export type { HourlyCongestionChartProps } from './HourlyCongestionChart';
