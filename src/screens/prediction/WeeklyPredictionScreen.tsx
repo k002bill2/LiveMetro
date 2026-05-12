@@ -15,12 +15,9 @@
  *   4. Route summary — origin → destination row
  *   5. CTA button — schedule departure alert
  *
- * Sections still to implement (visual placeholders for now, real-data wiring
- * once useMLPrediction exposes segment/hourly/factor data):
- *   7. Hourly congestion forecast bar chart with "지금" highlight
- *
  * Wired sections (real data):
  *   6. Segment breakdown (Task 2)
+ *   7. Hourly congestion forecast (Task 10 — congestionService.getHourlyForecast)
  *   8. "예측에 반영된 요소" factors list (Task 7 — usePredictionFactors)
  *   9. Weekly comparison bar chart (Task 4)
  */
@@ -54,15 +51,19 @@ import { usePredictionFactors } from '@/hooks/usePredictionFactors';
 import { useTheme, ThemeColors } from '@/services/theme';
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { Pill } from '@/components/design';
-import { CONG_TONE, congFromPct } from '@/components/design/congestion';
 import {
   SegmentBreakdownSection,
   WeeklyTrendChart,
   PredictionFactorsSection,
+  HourlyCongestionChart,
   type PredictedRoute,
   type DayBarData,
   type WeekdayLabel,
 } from '@/components/prediction';
+import {
+  congestionService,
+  type HourlySlot,
+} from '@/services/congestion/congestionService';
 import type { DayOfWeek, PredictedCommute } from '@/models/pattern';
 
 /**
@@ -90,43 +91,6 @@ const formatTimeShort = (now: Date = new Date()): string => {
   const period = h < 12 ? '오전' : '오후';
   const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
   return `${period} ${h12}:${m}`;
-};
-
-/* ───────── Phase 54: Hourly congestion forecast helpers ───────── */
-
-/**
- * Map a 0-100 congestion percentage to the central design system color.
- * Single source of truth: `src/components/design/congestion.ts` (which
- * itself re-exports `WANTED_TOKENS.congestion`). Brand-color changes
- * propagate without touching this screen.
- */
-const congestionColorFromPct = (pct: number): string =>
-  CONG_TONE[congFromPct(pct)].color;
-
-interface HourlyDatum {
-  readonly time: string; // "HH" (e.g., "08")
-  readonly cong: number; // 0-100
-  readonly isNow: boolean;
-}
-
-/**
- * Build a 7-slot hourly forecast centered on the current hour. Used as a
- * visual placeholder until useMLPrediction exposes per-hour data — the
- * hump shape (lower at edges, peak near now) mirrors typical Seoul commute
- * patterns and matches the design mock's intent without leaking fake
- * "data" into user-facing claims.
- */
-const buildHourlyForecast = (now: Date = new Date()): HourlyDatum[] => {
-  const baseHour = now.getHours();
-  const humpPattern = [40, 55, 75, 85, 75, 60, 45] as const;
-  return humpPattern.map((cong, i) => {
-    const hour = (baseHour - 3 + i + 24) % 24;
-    return {
-      time: String(hour).padStart(2, '0'),
-      cong,
-      isNow: i === 3,
-    };
-  });
 };
 
 /* ───────── Task 4: Section 9 weekly trend helpers ───────── */
@@ -231,12 +195,6 @@ export const WeeklyPredictionScreen: React.FC = () => {
   const confidencePct = prediction ? Math.round(prediction.confidence * 100) : 87;
   const arrivalTime = prediction?.predictedArrivalTime ?? '';
   const nowLabel = useMemo(() => formatTimeShort(new Date()), []);
-  // Phase 54: hourly forecast — pure derived data, memoized once per
-  // mount. Avoids 7×{array+object} re-allocation on every counter-anim
-  // re-render (900ms ease-out sets state ~60Hz). Will key on a real
-  // updated-at timestamp once useMLPrediction exposes hourly data.
-  const hourlyForecast = useMemo(() => buildHourlyForecast(new Date()), []);
-
   // Section 6: Segment breakdown.
   // `PredictedCommute` (src/models/pattern.ts) currently only exposes
   // `route: FrequentRoute` (departure/arrival station names + lineIds) and a
@@ -303,11 +261,38 @@ export const WeeklyPredictionScreen: React.FC = () => {
   // `direction: 'up'` is a temporary default until PredictedCommute exposes
   // travel direction (consistent with the segment defaults above).
   const factorsLineId = todayPrediction?.route.lineIds[0] ?? '2';
+  // Direction default mirrors usePredictionFactors above. Once
+  // PredictedCommute exposes travel direction, both call sites should
+  // switch together.
+  const directionForService: 'up' | 'down' = 'up';
   const { factors } = usePredictionFactors({
     lineId: factorsLineId,
-    direction: 'up',
+    direction: directionForService,
     dayOfWeek: todayDow,
   });
+
+  // Section 7: hourly congestion forecast — 7 slots (±45 min around now)
+  // sourced from historical Firestore docs via congestionService. The
+  // reference time is captured once per mount so the "지금" highlight is
+  // stable across re-renders; refresh on next mount is acceptable for a
+  // commute screen.
+  const hourlyChartTime = useMemo(() => new Date(), []);
+  const [hourlySlots, setHourlySlots] = useState<readonly HourlySlot[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    congestionService
+      .getHourlyForecast(factorsLineId, directionForService, hourlyChartTime)
+      .then((slots) => {
+        if (!cancelled) setHourlySlots(slots);
+      })
+      .catch(() => {
+        // graceful fallback — empty slots → chart renders empty bars.
+        if (!cancelled) setHourlySlots([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [factorsLineId, directionForService, hourlyChartTime]);
 
   // Animated count-up for the big number — 900ms ease-out cubic.
   const animatedValue = useRef(new Animated.Value(0)).current;
@@ -462,149 +447,17 @@ export const WeeklyPredictionScreen: React.FC = () => {
         </View>
       )}
 
-      {/* 7. Hourly congestion forecast (Phase 54). Sections 6/8/9
-          (segment breakdown, factors, weekly comparison) still pending
-          real data — kept as a smaller placeholder below this chart. */}
+      {/* 7. Hourly congestion forecast (Task 10) — wires
+          HourlyCongestionChart (Task 9) backed by
+          congestionService.getHourlyForecast (Task 8). Replaces the
+          earlier Phase 54 visual placeholder with real Firestore data. */}
       <View style={styles.sectionPad}>
-        <Text style={[styles.sectionLabel, { color: semantic.labelStrong }]}>
-          시간대별 혼잡도 예측
-        </Text>
-        <Text style={[styles.sectionSubtitle, { color: semantic.labelAlt }]}>
-          현재 시간 기준 ±3시간
-        </Text>
-      </View>
-      <View style={styles.sectionPad}>
-        <View
-          style={[
-            styles.hourlyCard,
-            { backgroundColor: semantic.bgBase, borderColor: semantic.lineSubtle },
-          ]}
-        >
-          {/* Color legend (4 levels) */}
-          <View style={styles.legendRow}>
-            {[
-              { color: '#00BF40', label: '여유' },
-              { color: '#FFB400', label: '보통' },
-              { color: '#FF7A1A', label: '혼잡' },
-              { color: '#FF4242', label: '매우혼잡' },
-            ].map((item) => (
-              <View key={item.label} style={styles.legendItem}>
-                <View style={[styles.legendSwatch, { backgroundColor: item.color }]} />
-                <Text style={[styles.legendText, { color: semantic.labelAlt }]}>{item.label}</Text>
-              </View>
-            ))}
-          </View>
-
-          {/* Bars container with gridlines + "지금" highlight */}
-          <View style={styles.barsContainer}>
-            {/* Gridlines at 25/50/75% */}
-            {[25, 50, 75].map((p) => (
-              <View
-                key={`grid-${p}`}
-                style={[
-                  styles.gridline,
-                  { bottom: `${p}%`, borderTopColor: semantic.lineSubtle },
-                ]}
-              />
-            ))}
-
-            {/* Bars row */}
-            {(() => {
-              return hourlyForecast.map((h, i) => {
-                const color = congestionColorFromPct(h.cong);
-                return (
-                  <View key={`bar-${i}`} style={styles.barColumn}>
-                    {/* % label above bar */}
-                    <Text
-                      style={[
-                        styles.barPctLabel,
-                        { color: h.isNow ? color : semantic.labelAlt },
-                      ]}
-                    >
-                      {h.cong}%
-                    </Text>
-                    {/* Bar — isNow gets a vertical gradient + glow shadow
-                        so the highlighted column reads as the focal point.
-                        Non-now bars stay flat translucent for visual
-                        separation. */}
-                    <View style={styles.barWrap}>
-                      {h.isNow ? (
-                        <LinearGradient
-                          colors={[color, `${color}DD`]}
-                          start={{ x: 0.5, y: 0 }}
-                          end={{ x: 0.5, y: 1 }}
-                          style={[
-                            styles.bar,
-                            styles.barIsNowShadow,
-                            {
-                              height: `${h.cong * 0.85}%`,
-                              borderColor: color,
-                              borderWidth: 2,
-                              shadowColor: color,
-                            },
-                          ]}
-                        >
-                          <View
-                            style={[
-                              styles.nowTooltip,
-                              { backgroundColor: semantic.labelStrong },
-                            ]}
-                          >
-                            <Text
-                              style={[
-                                styles.nowTooltipText,
-                                { color: semantic.bgBase },
-                              ]}
-                            >
-                              지금
-                            </Text>
-                            <View
-                              style={[
-                                styles.nowTooltipArrow,
-                                { backgroundColor: semantic.labelStrong },
-                              ]}
-                            />
-                          </View>
-                        </LinearGradient>
-                      ) : (
-                        <View
-                          style={[
-                            styles.bar,
-                            {
-                              height: `${h.cong * 0.85}%`,
-                              backgroundColor: `${color}66`,
-                              borderColor: `${color}33`,
-                              borderWidth: 1,
-                            },
-                          ]}
-                        />
-                      )}
-                    </View>
-                  </View>
-                );
-              });
-            })()}
-          </View>
-
-          {/* Hour labels */}
-          <View style={styles.hourLabelRow}>
-            {hourlyForecast.map((h, i) => (
-              <Text
-                key={`hour-${i}`}
-                style={[
-                  styles.hourLabel,
-                  {
-                    color: h.isNow ? semantic.labelStrong : semantic.labelAlt,
-                    fontWeight: h.isNow ? '800' : '700',
-                    fontFamily: weightToFontFamily(h.isNow ? '800' : '700'),
-                  },
-                ]}
-              >
-                {h.time}
-              </Text>
-            ))}
-          </View>
-        </View>
+        <HourlyCongestionChart
+          lineId={factorsLineId}
+          direction={directionForService}
+          currentTime={hourlyChartTime}
+          slots={hourlySlots}
+        />
       </View>
 
       {/* 6. Segment breakdown */}
@@ -856,148 +709,6 @@ const createStyles = (_colors: ThemeColors, isDark: boolean) => {
       fontSize: 12,
       fontWeight: '600',
       fontFamily: weightToFontFamily('600'),
-    },
-    placeholderCard: {
-      borderRadius: 16,
-      borderWidth: 1,
-      padding: 20,
-      gap: 8,
-    },
-    placeholderTitle: {
-      fontSize: 14,
-      fontWeight: '700',
-      fontFamily: weightToFontFamily('700'),
-    },
-    placeholderBody: {
-      fontSize: 13,
-      fontWeight: '500',
-      fontFamily: weightToFontFamily('500'),
-      lineHeight: 20,
-    },
-    /* Phase 54: hourly congestion forecast */
-    sectionLabel: {
-      fontSize: 17,
-      fontWeight: '700',
-      fontFamily: weightToFontFamily('700'),
-      letterSpacing: -0.3,
-    },
-    sectionSubtitle: {
-      fontSize: 13,
-      fontWeight: '600',
-      fontFamily: weightToFontFamily('600'),
-      marginTop: 2,
-    },
-    hourlyCard: {
-      borderRadius: 16,
-      borderWidth: 1,
-      paddingHorizontal: 16,
-      paddingTop: 16,
-      paddingBottom: 12,
-    },
-    legendRow: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      marginBottom: 12,
-    },
-    legendItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginRight: 12,
-    },
-    legendSwatch: {
-      width: 8,
-      height: 8,
-      borderRadius: 2,
-      marginRight: 4,
-    },
-    legendText: {
-      fontSize: 10,
-      fontWeight: '700',
-      fontFamily: weightToFontFamily('700'),
-    },
-    barsContainer: {
-      position: 'relative',
-      flexDirection: 'row',
-      alignItems: 'flex-end',
-      justifyContent: 'space-between',
-      height: 110,
-      marginTop: 24, // room for "지금" tooltip above bars
-    },
-    gridline: {
-      position: 'absolute',
-      left: 0,
-      right: 0,
-      height: 1,
-      borderTopWidth: 1,
-      borderStyle: 'dashed',
-    },
-    barColumn: {
-      flex: 1,
-      alignItems: 'center',
-      height: '100%',
-      justifyContent: 'flex-end',
-    },
-    barPctLabel: {
-      fontSize: 10,
-      fontWeight: '800',
-      fontFamily: weightToFontFamily('800'),
-      fontVariant: ['tabular-nums'],
-      marginBottom: 4,
-    },
-    barWrap: {
-      width: '85%',
-      height: '85%',
-      justifyContent: 'flex-end',
-    },
-    bar: {
-      width: '100%',
-      borderRadius: 6,
-      minHeight: 10,
-      position: 'relative',
-    },
-    barIsNowShadow: {
-      // shadowColor is set inline per-bar from the congestion tone so the
-      // glow tints with the active column's color.
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.25,
-      shadowRadius: 10,
-      elevation: 6,
-    },
-    nowTooltip: {
-      position: 'absolute',
-      top: -22,
-      left: '50%',
-      transform: [{ translateX: -16 }],
-      paddingHorizontal: 8,
-      paddingVertical: 3,
-      borderRadius: 6,
-    },
-    nowTooltipText: {
-      fontSize: 10,
-      fontWeight: '800',
-      fontFamily: weightToFontFamily('800'),
-    },
-    nowTooltipArrow: {
-      // 6×6 square rotated 45° peeks out as the tooltip's downward tip.
-      // Positioned just below the rounded body so the diagonal corner
-      // points at the bar's top edge.
-      position: 'absolute',
-      bottom: -3,
-      left: '50%',
-      width: 6,
-      height: 6,
-      transform: [{ translateX: -3 }, { rotate: '45deg' }],
-    },
-    hourLabelRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      marginTop: 10,
-    },
-    hourLabel: {
-      flex: 1,
-      textAlign: 'center',
-      fontSize: 10,
-      fontVariant: ['tabular-nums'],
     },
     ctaButton: {
       flexDirection: 'row',
