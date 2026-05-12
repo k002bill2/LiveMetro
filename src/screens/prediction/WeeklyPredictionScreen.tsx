@@ -93,6 +93,17 @@ const formatTimeShort = (now: Date = new Date()): string => {
   return `${period} ${h12}:${m}`;
 };
 
+/**
+ * Default walk/wait/walk durations (minutes) used by Section 6 (segment
+ * breakdown) until `PredictedCommute` exposes real per-segment durations.
+ * Centralized here so the substitution is easy to remove in a single edit.
+ */
+const SEGMENT_DEFAULTS = {
+  walkToStationMin: 4,
+  waitMin: 3,
+  walkToDestMin: 3,
+} as const;
+
 /* ───────── Task 4: Section 9 weekly trend helpers ───────── */
 
 const WEEKDAY_LABELS: readonly WeekdayLabel[] = ['월', '화', '수', '목', '금'];
@@ -208,21 +219,25 @@ export const WeeklyPredictionScreen: React.FC = () => {
     if (!todayPrediction) return null;
     const fr = todayPrediction.route;
     const firstLineId = fr.lineIds[0] ?? '2';
+    const { walkToStationMin, waitMin, walkToDestMin } = SEGMENT_DEFAULTS;
     return {
-      walkToStation: { durationMin: 4 },
+      walkToStation: { durationMin: walkToStationMin },
       wait: {
         lineId: firstLineId,
         direction: fr.arrivalStationName, // direction = terminus per design copy
-        durationMin: 3,
+        durationMin: waitMin,
       },
       ride: {
         fromStation: fr.departureStationName,
         toStation: fr.arrivalStationName,
         stopsCount: 0,
-        durationMin: Math.max(0, predictedMinutes - 4 - 3 - 3),
+        durationMin: Math.max(
+          0,
+          predictedMinutes - walkToStationMin - waitMin - walkToDestMin,
+        ),
         // congestionLevel intentionally omitted — not in PredictedCommute yet.
       },
-      walkToDestination: { durationMin: 3 },
+      walkToDestination: { durationMin: walkToDestMin },
     };
   }, [todayPrediction, predictedMinutes]);
   const segmentOrigin = useMemo(
@@ -244,10 +259,10 @@ export const WeeklyPredictionScreen: React.FC = () => {
   );
 
   // Section 9: weekly trend — Mon-Fri bars with today highlighted.
-  // `now` is captured once per mount to keep the today highlight stable
-  // across re-renders; refresh on next mount is acceptable for a daily
-  // commute screen.
-  const { days: weeklyDays, todayIndex: weeklyTodayIndex, averageMin: weeklyAverageMin } = useMemo(
+  // `now` is captured per `weekPredictions` change so the today highlight
+  // refreshes whenever the underlying predictions update; refresh on next
+  // mount is acceptable for a daily commute screen.
+  const { days: weeklyDays, todayIndex: weeklyTodayIndex } = useMemo(
     () => buildWeeklyDays(weekPredictions, new Date()),
     [weekPredictions],
   );
@@ -260,7 +275,10 @@ export const WeeklyPredictionScreen: React.FC = () => {
   const todayDow = useMemo<DayOfWeek>(() => new Date().getDay() as DayOfWeek, []);
   // `direction: 'up'` is a temporary default until PredictedCommute exposes
   // travel direction (consistent with the segment defaults above).
-  const factorsLineId = todayPrediction?.route.lineIds[0] ?? '2';
+  const factorsLineId = useMemo(
+    () => todayPrediction?.route.lineIds[0] ?? '2',
+    [todayPrediction],
+  );
   // Direction default mirrors usePredictionFactors above. Once
   // PredictedCommute exposes travel direction, both call sites should
   // switch together.
@@ -474,7 +492,6 @@ export const WeeklyPredictionScreen: React.FC = () => {
         <WeeklyTrendChart
           days={weeklyDays}
           todayIndex={weeklyTodayIndex}
-          averageMin={weeklyAverageMin}
         />
       </View>
 

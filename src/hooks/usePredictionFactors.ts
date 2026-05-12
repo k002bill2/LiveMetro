@@ -27,11 +27,16 @@ import {
   AlertTriangle,
   type LucideIcon,
 } from 'lucide-react-native';
-import { weatherService } from '@/services/weather/weatherService';
+import { weatherService, type WeatherData } from '@/services/weather/weatherService';
 import { congestionService } from '@/services/congestion/congestionService';
-import { officialDelayService } from '@/services/delay/officialDelayService';
+import {
+  officialDelayService,
+  type OfficialDelay,
+} from '@/services/delay/officialDelayService';
 import { useCommutePattern } from '@/hooks/useCommutePattern';
+import type { CommutePattern } from '@/models/pattern';
 import { CongestionLevel } from '@/models/train';
+import type { TrainCongestionSummary } from '@/models/congestion';
 import type { DayOfWeek } from '@/models/pattern';
 import { DAY_NAMES_KO } from '@/models/pattern';
 
@@ -70,6 +75,12 @@ const LEVEL_TO_PERCENT: Record<CongestionLevel, number> = {
 };
 
 const CONGESTION_BASELINE_PERCENT = 50; // MODERATE midpoint = "normal day"
+/** Min deviation (percentage points) from baseline to flag as positive/negative. */
+const CONGESTION_DEVIATION_THRESHOLD_PP = 5;
+
+/** Weather impact tuning: rain adds 1 min per N mm; snow uses a floor. */
+const WEATHER_RAIN_MM_PER_MIN = 2;
+const WEATHER_SNOW_MIN_DELAY_MIN = 2;
 
 interface ConditionalSummary {
   readonly overallLevel: CongestionLevel;
@@ -88,7 +99,7 @@ function averageCongestionPercent(
 }
 
 function buildWeatherFactor(
-  result: PromiseSettledResult<{ condition: string; precipitation: number } | null>
+  result: PromiseSettledResult<WeatherData | null>
 ): PredictionFactor {
   if (result.status !== 'fulfilled' || result.value == null) {
     return {
@@ -104,8 +115,8 @@ function buildWeatherFactor(
     return { id: 'weather', icon: Sun, label: '맑음', value: '맑음', impact: 'neutral' };
   }
   if (w.condition === 'rain') {
-    // +1분 per 2mm precipitation, floor 1.
-    const delayMin = Math.max(1, Math.round(w.precipitation / 2));
+    // +1분 per WEATHER_RAIN_MM_PER_MIN of precipitation, floor 1.
+    const delayMin = Math.max(1, Math.round(w.precipitation / WEATHER_RAIN_MM_PER_MIN));
     return {
       id: 'weather',
       icon: CloudRain,
@@ -115,7 +126,7 @@ function buildWeatherFactor(
     };
   }
   if (w.condition === 'snow') {
-    const delayMin = Math.max(2, Math.round(w.precipitation));
+    const delayMin = Math.max(WEATHER_SNOW_MIN_DELAY_MIN, Math.round(w.precipitation));
     return {
       id: 'weather',
       icon: CloudSnow,
@@ -128,7 +139,7 @@ function buildWeatherFactor(
 }
 
 function buildCongestionFactor(
-  result: PromiseSettledResult<readonly ConditionalSummary[]>,
+  result: PromiseSettledResult<readonly TrainCongestionSummary[]>,
   direction: 'up' | 'down'
 ): PredictionFactor {
   if (result.status !== 'fulfilled') {
@@ -151,14 +162,19 @@ function buildCongestionFactor(
     };
   }
   const diff = Math.round(avg - CONGESTION_BASELINE_PERCENT);
-  const impact: FactorImpact = diff > 5 ? 'negative' : diff < -5 ? 'positive' : 'neutral';
+  const impact: FactorImpact =
+    diff > CONGESTION_DEVIATION_THRESHOLD_PP
+      ? 'negative'
+      : diff < -CONGESTION_DEVIATION_THRESHOLD_PP
+        ? 'positive'
+        : 'neutral';
   const arrow = diff > 0 ? '↑' : diff < 0 ? '↓' : '';
   const value = diff === 0 ? '평소와 같음' : `평소보다 ${Math.abs(diff)}%p ${arrow}`.trim();
   return { id: 'congestion', icon: Users, label: '평균 혼잡도', value, impact };
 }
 
 function buildDelayFactor(
-  result: PromiseSettledResult<readonly { lineId: string }[]>,
+  result: PromiseSettledResult<readonly OfficialDelay[]>,
   lineId: string
 ): PredictionFactor {
   if (result.status !== 'fulfilled') {
@@ -190,14 +206,8 @@ function buildDelayFactor(
   };
 }
 
-interface PatternLike {
-  readonly dayOfWeek: DayOfWeek;
-  readonly stdDevMinutes: number;
-  readonly sampleCount: number;
-}
-
 function buildPatternFactor(
-  patterns: readonly PatternLike[] | undefined,
+  patterns: readonly CommutePattern[] | undefined,
   dayOfWeek: DayOfWeek
 ): PredictionFactor {
   const dayLabel = DAY_NAMES_KO[dayOfWeek] ?? '오늘';
@@ -244,24 +254,12 @@ export function usePredictionFactors(
         officialDelayService.getActiveDelays(),
       ]);
 
-      // Narrow to the minimal shape our builders need (services return richer
-      // types; we only read the documented fields).
+      // Builders accept the real service types directly — no casts needed.
       const next: readonly PredictionFactor[] = [
-        buildWeatherFactor(
-          weatherResult as PromiseSettledResult<{
-            condition: string;
-            precipitation: number;
-          } | null>
-        ),
-        buildCongestionFactor(
-          congestionResult as PromiseSettledResult<readonly ConditionalSummary[]>,
-          params.direction
-        ),
-        buildDelayFactor(
-          delayResult as PromiseSettledResult<readonly { lineId: string }[]>,
-          params.lineId
-        ),
-        buildPatternFactor(patterns as readonly PatternLike[] | undefined, params.dayOfWeek),
+        buildWeatherFactor(weatherResult),
+        buildCongestionFactor(congestionResult, params.direction),
+        buildDelayFactor(delayResult, params.lineId),
+        buildPatternFactor(patterns, params.dayOfWeek),
       ];
 
       if (!cancelled) {

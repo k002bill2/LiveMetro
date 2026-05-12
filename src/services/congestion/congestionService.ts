@@ -495,8 +495,11 @@ class CongestionService {
    *
    * Notes:
    * - Date arithmetic uses immutable helpers — `currentTime` is never mutated.
-   * - Slot averages are awaited sequentially to keep Firestore read pressure
-   *   bounded. Switch to `Promise.all` if profiling shows latency issues.
+   * - Slot averages are fetched in parallel with `Promise.all`. Each request
+   *   targets a distinct (dayOfWeek, hour, minute) tuple so there is no
+   *   inter-dependency. Slots may cross midnight; `dayOfWeek` is computed per
+   *   slot inside {@link fetchSlotAverage}, so the day boundary (and DST
+   *   transitions) are handled correctly without special casing.
    *
    * @param lineId    Subway line id (e.g. '2')
    * @param direction 'up' | 'down'
@@ -511,25 +514,28 @@ class CongestionService {
     const snapped = snapToSlotBoundary(currentTime, SLOT_MINUTES);
     const startSlot = addMinutes(snapped, -SLOTS_BEFORE_NOW * SLOT_MINUTES);
 
-    const slots: HourlySlot[] = [];
+    const slotStarts: Date[] = [];
     for (let i = 0; i < SLOT_COUNT; i++) {
-      const slotStart = addMinutes(startSlot, i * SLOT_MINUTES);
-      const average = await this.fetchSlotAverage(slotStart, lineId, direction);
-      if (average === null) {
-        slots.push({
+      slotStarts.push(addMinutes(startSlot, i * SLOT_MINUTES));
+    }
+    const averages = await Promise.all(
+      slotStarts.map((s) => this.fetchSlotAverage(s, lineId, direction))
+    );
+    return slotStarts.map((slotStart, i) => {
+      const average = averages[i];
+      if (average === null || average === undefined) {
+        return {
           slotTime: formatHHMM(slotStart),
           congestionPercent: 0,
-          level: 'unknown',
-        });
-      } else {
-        slots.push({
-          slotTime: formatHHMM(slotStart),
-          congestionPercent: Math.round(average),
-          level: mapPercentToLevel(average),
-        });
+          level: 'unknown' as const,
+        };
       }
-    }
-    return slots;
+      return {
+        slotTime: formatHHMM(slotStart),
+        congestionPercent: Math.round(average),
+        level: mapPercentToLevel(average),
+      };
+    });
   }
 
   /**
@@ -546,6 +552,12 @@ class CongestionService {
   ): Promise<number | null> {
     const slotEnd = addMinutes(slotStart, SLOT_MINUTES);
     const dayOfWeek = slotStart.getDay();
+    // When slotEnd lands exactly on the next hour, its minute is 0 — but the
+    // exclusive upper bound for the *current* hour query must be 60 so the
+    // last minute in the slot is included. Anywhere else, slotEnd.getMinutes()
+    // is the correct exclusive upper bound.
+    const endMinuteExclusive =
+      slotEnd.getMinutes() === 0 ? 60 : slotEnd.getMinutes();
     try {
       const q = query(
         collection(db, HISTORY_COLLECTION),
@@ -554,7 +566,7 @@ class CongestionService {
         where('dayOfWeek', '==', dayOfWeek),
         where('reportedHour', '==', slotStart.getHours()),
         where('reportedMinute', '>=', slotStart.getMinutes()),
-        where('reportedMinute', '<', slotEnd.getMinutes() === 0 ? 60 : slotEnd.getMinutes()),
+        where('reportedMinute', '<', endMinuteExclusive),
         limit(SLOT_QUERY_LIMIT)
       );
       const snapshot = await getDocs(q);

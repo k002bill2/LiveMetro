@@ -43,10 +43,13 @@ jest.mock('@/hooks/useCommutePattern', () => ({
   useCommutePattern: jest.fn(),
 }));
 
+// Imports must follow jest.mock() above so the mock factories are in place.
+/* eslint-disable import/first */
 import { weatherService } from '@/services/weather/weatherService';
 import { congestionService } from '@/services/congestion/congestionService';
 import { officialDelayService } from '@/services/delay/officialDelayService';
 import { useCommutePattern } from '@/hooks/useCommutePattern';
+/* eslint-enable import/first */
 
 const WEDNESDAY = 3 as const;
 
@@ -159,7 +162,8 @@ describe('usePredictionFactors', () => {
 
     const congestion = result.current.factors.find(f => f.id === 'congestion');
     expect(congestion?.impact).toBe('negative');
-    expect(congestion?.value).toMatch(/↑|증가|상승/);
+    // Implementation produces only the ↑ arrow; tighten regex to match.
+    expect(congestion?.value).toMatch(/↑/);
   });
 
   it('reports delay as positive "정시 운행" when no active delays', async () => {

@@ -31,7 +31,7 @@ const mockDays = [
 describe('WeeklyTrendChart', () => {
   it('renders 5 day bars', () => {
     const { getByTestId } = render(
-      <WeeklyTrendChart days={mockDays} todayIndex={2} averageMin={30.8} />
+      <WeeklyTrendChart days={mockDays} todayIndex={2} />
     );
     for (let i = 0; i < 5; i++) {
       expect(getByTestId(`weekly-bar-${i}`)).toBeTruthy();
@@ -45,7 +45,7 @@ describe('WeeklyTrendChart', () => {
     // callers can target the highlighted column. RN's `testID` is a single
     // string per element, so these are intentionally separate nodes.
     const { getByTestId } = render(
-      <WeeklyTrendChart days={mockDays} todayIndex={2} averageMin={30.8} />
+      <WeeklyTrendChart days={mockDays} todayIndex={2} />
     );
     expect(getByTestId('weekly-today-bar')).toBeTruthy();
     expect(getByTestId('weekly-bar-2')).toBeTruthy();
@@ -53,7 +53,7 @@ describe('WeeklyTrendChart', () => {
 
   it('shows subtitle "평균 대비 오늘 -3분" when today is below avg', () => {
     const { getByTestId } = render(
-      <WeeklyTrendChart days={mockDays} todayIndex={2} averageMin={30.8} />
+      <WeeklyTrendChart days={mockDays} todayIndex={2} />
     );
     expect(getByTestId('weekly-trend-subtitle')).toHaveTextContent(/-3분/);
   });
@@ -61,7 +61,7 @@ describe('WeeklyTrendChart', () => {
   it('shows "+N분" when today is above avg', () => {
     const days = mockDays.map((d) => ({ ...d, isToday: d.dayLabel === '월' }));
     const { getByTestId } = render(
-      <WeeklyTrendChart days={days} todayIndex={0} averageMin={30.5} />
+      <WeeklyTrendChart days={days} todayIndex={0} />
     );
     expect(getByTestId('weekly-trend-subtitle')).toHaveTextContent(/\+/);
   });
@@ -75,7 +75,7 @@ describe('WeeklyTrendChart', () => {
       { dayLabel: '금' as const, durationMin: 30, isToday: false },
     ];
     const { getByTestId } = render(
-      <WeeklyTrendChart days={days} todayIndex={2} averageMin={30} />
+      <WeeklyTrendChart days={days} todayIndex={2} />
     );
     expect(getByTestId('weekly-trend-subtitle')).toHaveTextContent('평소와 같음');
   });
@@ -83,7 +83,7 @@ describe('WeeklyTrendChart', () => {
   it('renders without crashing when todayIndex is -1', () => {
     const days = mockDays.map((d) => ({ ...d, isToday: false }));
     const { getByTestId, queryByTestId } = render(
-      <WeeklyTrendChart days={days} todayIndex={-1} averageMin={30.8} />
+      <WeeklyTrendChart days={days} todayIndex={-1} />
     );
     expect(getByTestId('weekly-bar-0')).toBeTruthy();
     expect(queryByTestId('weekly-today-bar')).toBeNull();
@@ -92,7 +92,7 @@ describe('WeeklyTrendChart', () => {
 
   it('renders empty state when days is empty', () => {
     const { getByText } = render(
-      <WeeklyTrendChart days={[]} todayIndex={-1} averageMin={0} />
+      <WeeklyTrendChart days={[]} todayIndex={-1} />
     );
     expect(getByText('이번 주 데이터 부족')).toBeTruthy();
   });

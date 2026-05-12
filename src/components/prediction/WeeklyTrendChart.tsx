@@ -36,8 +36,6 @@ export interface WeeklyTrendChartProps {
   readonly days: readonly DayBarData[];
   /** Index of "today" within `days`, or -1 when today is not a weekday. */
   readonly todayIndex: number;
-  /** Average across all visible days; reserved for future use. */
-  readonly averageMin: number;
 }
 
 // ============================================================================
@@ -95,7 +93,9 @@ const WeeklyTrendChartComponent: React.FC<WeeklyTrendChartProps> = ({
       <View style={styles.barsRow}>
         {days.map((day, i) => {
           const heightRatio = day.durationMin / maxDuration;
-          const isToday = day.isToday && i === todayIndex;
+          // Trust todayIndex as the single source of truth. The caller derives
+          // `day.isToday` from the same index, so checking both was redundant.
+          const isToday = i === todayIndex;
           return (
             <View
               key={day.dayLabel}

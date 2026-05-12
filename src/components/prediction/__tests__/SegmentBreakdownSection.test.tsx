@@ -55,8 +55,10 @@ const mockRoute = {
   walkToDestination: { durationMin: 3 },
 };
 
+// Symmetric origin/destination fixtures: both follow `{ name: place, exit: station+exit }`.
+// The component renders sublabels as `${name} → ${exit}` consistently for both rows.
 const mockOrigin = { name: '집', exit: '홍대입구역 9번출구' };
-const mockDestination = { name: '강남역 11번출구', exit: '회사' };
+const mockDestination = { name: '회사', exit: '강남역 11번출구' };
 
 describe('SegmentBreakdownSection', () => {
   it('renders all 4 segment rows', () => {

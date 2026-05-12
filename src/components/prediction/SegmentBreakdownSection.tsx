@@ -11,7 +11,7 @@
  */
 
 import React, { memo, useMemo } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, type ViewStyle, type TextStyle } from 'react-native';
 import { Footprints, Clock, Train, type LucideIcon } from 'lucide-react-native';
 
 import { useTheme } from '@/services/theme';
@@ -71,8 +71,12 @@ const toDesignCongestion = (level: CongestionLevel): DesignCongestionLevel => {
       return 'high';
     case CongestionLevel.CROWDED:
       return 'vhigh';
-    default:
+    default: {
+      // Exhaustiveness: adding a new CongestionLevel member will fail here.
+      const _exhaustive: never = level;
+      void _exhaustive;
       return 'low';
+    }
   }
 };
 
@@ -188,8 +192,8 @@ const SegmentBreakdownSectionComponent: React.FC<SegmentBreakdownSectionProps> =
 // ============================================================================
 
 const createStyles = (semantic: WantedSemanticTheme): {
-  container: object;
-  emptyText: object;
+  container: ViewStyle;
+  emptyText: TextStyle;
 } =>
   StyleSheet.create({
     container: {
@@ -209,15 +213,15 @@ const createStyles = (semantic: WantedSemanticTheme): {
   });
 
 const createRowStyles = (semantic: WantedSemanticTheme): {
-  row: object;
-  iconCircle: object;
-  middle: object;
-  labelRow: object;
-  label: object;
-  sublabel: object;
-  duration: object;
-  durationNumber: object;
-  durationUnit: object;
+  row: ViewStyle;
+  iconCircle: ViewStyle;
+  middle: ViewStyle;
+  labelRow: ViewStyle;
+  label: TextStyle;
+  sublabel: TextStyle;
+  duration: TextStyle;
+  durationNumber: TextStyle;
+  durationUnit: TextStyle;
 } =>
   StyleSheet.create({
     row: {
