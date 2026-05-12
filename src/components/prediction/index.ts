@@ -11,3 +11,10 @@ export type {
   SegmentBreakdownSectionProps,
   PredictedRoute,
 } from './SegmentBreakdownSection';
+
+export { WeeklyTrendChart } from './WeeklyTrendChart';
+export type {
+  WeeklyTrendChartProps,
+  DayBarData,
+  WeekdayLabel,
+} from './WeeklyTrendChart';
