@@ -327,6 +327,22 @@ describe('sumPredictedMinutes'):
 | 7 | 커버리지 임계 유지 | `npm test -- --coverage` |
 | 8 | (d) phase가 모델·consumer touch 없이 congestion 채울 수 있음 | spec 검토 — `transitSegments[i].congestionForecast` 슬롯 존재 확인 |
 
+## 7.1. Addendum (2026-05-12): C.2 closeout — HomeScreen MLHero unchanged
+
+**Finding during execution:** This spec assumed `HomeScreen.tsx` consumes `PredictedCommute` via `useCommutePattern` and synthesizes `deltaMinutes` + `predictedArrivalTime`. Execution revealed `HomeScreen` actually uses `useMLPrediction` → `MLPrediction` (a separate prediction pipeline). The MLHero card on HomeScreen is fed from `MLPrediction` (`src/models/ml.ts`), not `PredictedCommute` (`src/models/pattern.ts`).
+
+**Consequence for §4.3 "HomeScreen / MLHeroCard / CommutePredictionCard" cleanup:**
+- Task C.2 as-written is a **no-op** for this phase. There are no `PredictedCommute` fields to forward on a screen that doesn't consume `PredictedCommute`.
+- `HomeScreen`'s current synthesis (`predictedMinutes = minutesBetween(dep, arr)`, `deltaMinutes = minutes - baselineMinutes`) derives from `MLPrediction`'s shape, not from any model gap this spec addresses.
+- `mlPrediction.predictedArrivalTime` is already used directly in HomeScreen (no synthesis on that path).
+
+**Acceptance Criterion #5 amended:** Instead of "HomeScreen synthesis removal," the criterion is now "HomeScreen MLHero pipeline confirmed independent of `PredictedCommute` — no change required in this phase." The grep that would have proved synthesis removal is replaced by a grep that proves HomeScreen doesn't import `useCommutePattern` or `PredictedCommute`.
+
+**Follow-up phase candidate (out of scope):**
+Switching `HomeScreen` from `useMLPrediction` to `useCommutePattern` is a larger refactor (cascading effects on `baselineMinutes`, `refreshPrediction`, gating, `effectiveDepartureTime`). If the team decides that all prediction surfaces should converge on `PredictedCommute`, that work belongs in a separate phase with its own spec — not in this model-extension phase.
+
+**True consumer cleanup achieved in this phase:** `WeeklyPredictionScreen` (Task C.1, commit `44132e7`) — the only screen that genuinely consumes `PredictedCommute`. File shrunk 879 → 729 lines; 7 TODO blocks removed; 2 regression tests added.
+
 ## 8. Next-Phase Hooks
 
 `(d) congestionData ingestion + index`가 이 spec 위에서 할 일:
