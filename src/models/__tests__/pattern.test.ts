@@ -1,4 +1,5 @@
-import { computeArrivalTime, sumPredictedMinutes, type PredictedCommute } from '@/models/pattern';
+import { computeArrivalTime, sumPredictedMinutes, deriveDirection, type PredictedCommute } from '@/models/pattern';
+import type { RouteSegment } from '@/models/route';
 
 describe('computeArrivalTime', () => {
   it('adds minutes within the same day', () => {
@@ -82,5 +83,43 @@ describe('sumPredictedMinutes', () => {
       waitMinutes: 3,
     };
     expect(sumPredictedMinutes(p)).toBe(3);
+  });
+});
+
+const makeSeg = (overrides: Partial<RouteSegment>): RouteSegment => ({
+  fromStationId: '0150',
+  fromStationName: '서울역',
+  toStationId: '0151',
+  toStationName: '시청',
+  lineId: '1',
+  lineName: '1호선',
+  estimatedMinutes: 2,
+  isTransfer: false,
+  ...overrides,
+});
+
+describe('deriveDirection', () => {
+  it('returns undefined for undefined input', () => {
+    expect(deriveDirection(undefined)).toBeUndefined();
+  });
+
+  it('returns "up" when fromStationId < toStationId on a linear line', () => {
+    expect(deriveDirection(makeSeg({ lineId: '1' }))).toBe('up');
+  });
+
+  it('returns "down" when fromStationId > toStationId on a linear line', () => {
+    expect(deriveDirection(makeSeg({
+      lineId: '1',
+      fromStationId: '0151',
+      toStationId: '0150',
+    }))).toBe('down');
+  });
+
+  it('returns undefined for line 2 (loop line, direction model deferred)', () => {
+    expect(deriveDirection(makeSeg({ lineId: '2' }))).toBeUndefined();
+  });
+
+  it('returns undefined for unknown line ids', () => {
+    expect(deriveDirection(makeSeg({ lineId: 'KK' }))).toBeUndefined();
   });
 });

@@ -432,12 +432,18 @@ export function sumPredictedMinutes(p: PredictedCommute): number {
   return walk1 + wait + walk2 + transit;
 }
 
+const LINEAR_LINE_IDS: ReadonlySet<string> = new Set([
+  '1', '3', '4', '5', '6', '7', '8', '9',
+]);
+
 /**
  * Derive travel direction from the first transit segment.
  * Returns undefined when input is missing or line direction model is unknown.
  */
 export function deriveDirection(
-  _firstSegment: RouteSegment | undefined,
+  firstSegment: RouteSegment | undefined,
 ): 'up' | 'down' | undefined {
-  throw new Error('not implemented');
+  if (!firstSegment) return undefined;
+  if (!LINEAR_LINE_IDS.has(firstSegment.lineId)) return undefined;
+  return firstSegment.fromStationId < firstSegment.toStationId ? 'up' : 'down';
 }
