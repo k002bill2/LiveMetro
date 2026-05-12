@@ -174,7 +174,7 @@ describe('WeeklyPredictionScreen', () => {
     expect(getByText('시간대별 혼잡도 예측')).toBeTruthy();
     expect(getByText('지금')).toBeTruthy();
     expect(
-      getByText('구간별 시간 · 예측 영향 요소 · 주간 추이는 ML 학습 완료 후 표시됩니다.'),
+      getByText('예측 영향 요소는 ML 학습 완료 후 표시됩니다.'),
     ).toBeTruthy();
   });
 

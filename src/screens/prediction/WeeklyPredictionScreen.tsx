@@ -52,7 +52,14 @@ import { useTheme, ThemeColors } from '@/services/theme';
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { Pill } from '@/components/design';
 import { CONG_TONE, congFromPct } from '@/components/design/congestion';
-import { SegmentBreakdownSection, type PredictedRoute } from '@/components/prediction';
+import {
+  SegmentBreakdownSection,
+  WeeklyTrendChart,
+  type PredictedRoute,
+  type DayBarData,
+  type WeekdayLabel,
+} from '@/components/prediction';
+import type { PredictedCommute } from '@/models/pattern';
 
 /**
  * Compute commute minutes from "HH:mm" departure → arrival strings, wrapping
@@ -116,6 +123,55 @@ const buildHourlyForecast = (now: Date = new Date()): HourlyDatum[] => {
       isNow: i === 3,
     };
   });
+};
+
+/* ───────── Task 4: Section 9 weekly trend helpers ───────── */
+
+const WEEKDAY_LABELS: readonly WeekdayLabel[] = ['월', '화', '수', '목', '금'];
+// PredictedCommute.dayOfWeek is the numeric `DayOfWeek` type (Sun=0..Sat=6),
+// so Mon-Fri map to [1,2,3,4,5].
+const WEEKDAY_KEYS = [1, 2, 3, 4, 5] as const;
+
+/**
+ * Build the Mon-Fri DayBarData[] consumed by WeeklyTrendChart from the
+ * raw `useCommutePattern.weekPredictions` list.
+ *
+ * `PredictedCommute` (src/models/pattern.ts) does not yet expose an
+ * `estimatedDurationMin` field — only `predictedDepartureTime` (HH:mm)
+ * and a `route` without a paired arrival time. Until the model is
+ * extended, we substitute a default 30-min duration for any day that
+ * has a prediction, mirroring the SegmentBreakdownSection (Section 6)
+ * default-substitution policy. This will be replaced with a real value
+ * once `PredictedCommute` exposes duration or paired arrival time.
+ *
+ * `isToday` is the single source of truth; `todayIndex` is derived
+ * from `findIndex(d => d.isToday)` to keep them consistent.
+ */
+const DEFAULT_DURATION_MIN = 30;
+const buildWeeklyDays = (
+  weekPredictions: readonly PredictedCommute[],
+  now: Date,
+): { days: DayBarData[]; todayIndex: number; averageMin: number } => {
+  // JS getDay() returns Sun=0..Sat=6, matching `DayOfWeek`. todayKey is
+  // null on weekends so `isToday` is uniformly false across Mon-Fri.
+  const today = now.getDay();
+  const todayKey = today >= 1 && today <= 5 ? today : null;
+
+  const days: DayBarData[] = WEEKDAY_KEYS.map((key, i) => {
+    const pred = weekPredictions.find((p) => p.dayOfWeek === key);
+    return {
+      dayLabel: WEEKDAY_LABELS[i]!,
+      durationMin: pred ? DEFAULT_DURATION_MIN : 0,
+      isToday: key === todayKey,
+    };
+  }).filter((d) => d.durationMin > 0);
+
+  const todayIndex = days.findIndex((d) => d.isToday);
+  const averageMin =
+    days.length > 0
+      ? days.reduce((sum, d) => sum + d.durationMin, 0) / days.length
+      : 0;
+  return { days, todayIndex, averageMin };
 };
 
 export const WeeklyPredictionScreen: React.FC = () => {
@@ -185,7 +241,7 @@ export const WeeklyPredictionScreen: React.FC = () => {
   // sensible defaults consistent with the design mock. These should be
   // replaced with real fields once `PredictedCommute` is extended (tracked
   // alongside Task 7 — hourly factor data).
-  const { todayPrediction } = useCommutePattern();
+  const { todayPrediction, weekPredictions } = useCommutePattern();
   const segmentRoute: PredictedRoute | null = useMemo(() => {
     if (!todayPrediction) return null;
     const fr = todayPrediction.route;
@@ -223,6 +279,15 @@ export const WeeklyPredictionScreen: React.FC = () => {
       exit: '회사',
     }),
     [todayPrediction, routeNames.destination],
+  );
+
+  // Section 9: weekly trend — Mon-Fri bars with today highlighted.
+  // `now` is captured once per mount to keep the today highlight stable
+  // across re-renders; refresh on next mount is acceptable for a daily
+  // commute screen.
+  const { days: weeklyDays, todayIndex: weeklyTodayIndex, averageMin: weeklyAverageMin } = useMemo(
+    () => buildWeeklyDays(weekPredictions, new Date()),
+    [weekPredictions],
   );
 
   // Animated count-up for the big number — 900ms ease-out cubic.
@@ -532,9 +597,18 @@ export const WeeklyPredictionScreen: React.FC = () => {
         />
       </View>
 
-      {/* 8, 9: still pending real data — small placeholder.
-          Section 6 (구간별 시간) is now wired above; copy retained until
-          Tasks 7 (factors) and 4 (weekly) replace these too. */}
+      {/* 9. Weekly trend (Section 9 — wired in Task 4). */}
+      <View style={styles.sectionPad}>
+        <WeeklyTrendChart
+          days={weeklyDays}
+          todayIndex={weeklyTodayIndex}
+          averageMin={weeklyAverageMin}
+        />
+      </View>
+
+      {/* 8: still pending real data — small placeholder.
+          Sections 6/9 are now wired above; copy retained until
+          Task 7 (factors) replaces this too. */}
       <View style={styles.sectionPad}>
         <View
           style={[
@@ -543,7 +617,7 @@ export const WeeklyPredictionScreen: React.FC = () => {
           ]}
         >
           <Text style={[styles.placeholderBody, { color: semantic.labelAlt }]}>
-            구간별 시간 · 예측 영향 요소 · 주간 추이는 ML 학습 완료 후 표시됩니다.
+            예측 영향 요소는 ML 학습 완료 후 표시됩니다.
           </Text>
         </View>
       </View>
