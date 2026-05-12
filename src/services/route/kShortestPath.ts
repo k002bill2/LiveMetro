@@ -492,17 +492,25 @@ export function getDiverseRoutes(
 
   const fastest: Route = { ...candidates[0]!, category: 'fastest' };
 
-  // Pick the candidate with fewest transfers; tie-break by shortest time.
-  const minTransfer = candidates.slice(1).reduce<Route | null>((best, r) => {
-    if (!best) return r;
+  // Pick the candidate with the fewest transfers across ALL candidates
+  // (fastest 포함). 이전 코드는 `candidates.slice(1)`로 fastest를 제외하고
+  // min-transfer를 찾았는데, fastest가 이미 환승 최소면 나머지 중 환승이 더
+  // 많은 경로가 잘못 "환승최소"로 표시되는 결함이 있었음. tie-break by time.
+  const minTransfer = candidates.reduce<Route>((best, r) => {
     if (r.transferCount < best.transferCount) return r;
     if (r.transferCount === best.transferCount && r.totalMinutes < best.totalMinutes) {
       return r;
     }
     return best;
-  }, null);
+  }, candidates[0]!);
 
-  if (minTransfer && !isSamePath(fastest, minTransfer)) {
+  // min-transfer 카드는 fastest보다 환승이 *실제로 적을 때*만 노출.
+  // 동률이면 fastest 한 장만 보여서 "환승최소가 fastest보다 환승 많다"는
+  // 모순 상황을 원천 차단.
+  if (
+    minTransfer.transferCount < fastest.transferCount &&
+    !isSamePath(fastest, minTransfer)
+  ) {
     return [fastest, { ...minTransfer, category: 'min-transfer' }];
   }
   return [fastest];

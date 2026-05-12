@@ -35,6 +35,7 @@ import { useRealtimeTrains } from '@/hooks/useRealtimeTrains';
 import { useCongestion } from '@/hooks/useCongestion';
 import { usePublicDataForStation } from '@/hooks/usePublicData';
 import { useFavorites } from '@/hooks/useFavorites';
+import { useAutoCommuteLog } from '@/hooks/useAutoCommuteLog';
 import { AlertBanner } from '@/components/common/AlertBanner';
 import { StationDetailHeader } from '@/components/station/StationDetailHeader';
 import { DirectionSegment } from '@/components/station/DirectionSegment';
@@ -134,6 +135,13 @@ const StationDetailScreen: React.FC = () => {
   });
 
   const { isFavorite, toggleFavorite } = useFavorites();
+
+  useAutoCommuteLog({
+    stationId,
+    stationName,
+    lineId,
+    enabled: isFocused,
+  });
 
   // Split trains by direction once and reuse across views.
   const trainsByDirection = useMemo(() => {

@@ -36,7 +36,7 @@ interface UseNearbyStationsOptions {
  */
 export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
   const {
-    radius = 1000, // 1km default
+    radius = 600, // 600m default — 도심 환경에서 도보 7-8분 거리
     maxStations = 10,
     minStations = 3, // Adaptive radius: expand until this many found
     autoUpdate = true,
@@ -77,8 +77,8 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
   // Use mockLocation in test mode, otherwise use real GPS
   // Skip onLocationUpdate when external location is provided (parent handles tracking)
   const { location: gpsLocation, loading: locationLoading, error: locationError, getCurrentLocation } = useLocation({
-    enableHighAccuracy: false,
-    distanceFilter: 50, // Update when user moves 50m
+    enableHighAccuracy: true,
+    distanceFilter: 20, // 600m 반경에서 50m 오차는 8% — 20m로 줄여 정확도 유지
     onLocationUpdate: autoUpdate && !mockLocation && !externalLocation ? handleLocationUpdate : undefined,
   });
 

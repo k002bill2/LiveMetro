@@ -24,7 +24,7 @@ export interface AdaptiveRadiusResult {
 }
 
 /** Adaptive radius configuration */
-const ADAPTIVE_RADIUS_STEPS: readonly number[] = [1000, 1500, 2000] as const;
+const ADAPTIVE_RADIUS_STEPS: readonly number[] = [600, 1000, 1500] as const;
 const ADAPTIVE_MIN_STATIONS = 3;
 
 export interface GeofenceRegion {

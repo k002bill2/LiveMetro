@@ -145,8 +145,46 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
     return all.slice(0, 2) as LineId[];
   }, [station]);
 
+  // Phase C: notification flag drives whether the swipe action mutes or
+  // unmutes. 모든 훅은 early return 위에서 호출돼야 React Hook 순서 invariant 유지.
+  const isNotificationOn = favorite.notificationEnabled !== false;
+  const muteLabel = isNotificationOn ? '알림 끄기' : '알림 켜기';
+  const MuteIcon = isNotificationOn ? BellOff : Bell;
+  const stationDisplayName = station?.name ?? '';
+
+  // Phase B: right-side swipe drawer with [알림 끄기/켜기] [삭제].
+  // useCallback로 안정화: Swipeable이 매 렌더마다 새 함수 reference로 인해
+  // 내부 Animated 상태를 churn하면 좌측 스와이프 시 jank 발생.
+  const renderRightActions = useCallback(() => (
+    <View style={styles.swipeActions}>
+      <TouchableOpacity
+        activeOpacity={0.7}
+        style={[styles.swipeAction, styles.swipeActionMute]}
+        onPress={handleMute}
+        accessibilityLabel={`${stationDisplayName}역 ${muteLabel}`}
+        accessibilityRole="button"
+        testID="favorite-swipe-mute"
+      >
+        <MuteIcon size={20} color={semantic.labelStrong} />
+        <Text style={styles.swipeActionMuteLabel}>{muteLabel}</Text>
+      </TouchableOpacity>
+      <TouchableOpacity
+        activeOpacity={0.7}
+        style={[styles.swipeAction, styles.swipeActionDelete]}
+        onPress={handleDelete}
+        accessibilityLabel={`${stationDisplayName}역 즐겨찾기 삭제`}
+        accessibilityRole="button"
+        testID="favorite-swipe-delete"
+      >
+        <Trash2 size={20} color="#FFFFFF" />
+        <Text style={styles.swipeActionDeleteLabel}>삭제</Text>
+      </TouchableOpacity>
+    </View>
+  ), [styles, handleMute, handleDelete, stationDisplayName, muteLabel, MuteIcon, semantic.labelStrong]);
+
   /**
-   * Render error card if station data is missing
+   * Render error card if station data is missing.
+   * Early return AFTER all hooks above to preserve hook call order.
    */
   if (!station) {
     return (
@@ -170,50 +208,13 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
     );
   }
 
-  // Phase C: notification flag drives whether the swipe action mutes or
-  // unmutes. `notificationEnabled === undefined` is treated as ON, so
-  // pre-existing favorites without the field default to "알림 끄기".
-  const isNotificationOn = favorite.notificationEnabled !== false;
-  const muteLabel = isNotificationOn ? '알림 끄기' : '알림 켜기';
-  const MuteIcon = isNotificationOn ? BellOff : Bell;
-
-  // Phase B: right-side swipe drawer with [알림 끄기/켜기] [삭제]. The
-  // drawer mounts only while the user is dragging — Swipeable handles
-  // its own visibility, so this function just describes layout.
-  const renderRightActions = () => (
-    <View style={styles.swipeActions}>
-      <TouchableOpacity
-        activeOpacity={0.7}
-        style={[styles.swipeAction, styles.swipeActionMute]}
-        onPress={handleMute}
-        accessibilityLabel={`${station.name}역 ${muteLabel}`}
-        accessibilityRole="button"
-        testID="favorite-swipe-mute"
-      >
-        <MuteIcon size={20} color={semantic.labelStrong} />
-        <Text style={styles.swipeActionMuteLabel}>{muteLabel}</Text>
-      </TouchableOpacity>
-      <TouchableOpacity
-        activeOpacity={0.7}
-        style={[styles.swipeAction, styles.swipeActionDelete]}
-        onPress={handleDelete}
-        accessibilityLabel={`${station.name}역 즐겨찾기 삭제`}
-        accessibilityRole="button"
-        testID="favorite-swipe-delete"
-      >
-        <Trash2 size={20} color="#FFFFFF" />
-        <Text style={styles.swipeActionDeleteLabel}>삭제</Text>
-      </TouchableOpacity>
-    </View>
-  );
-
   return (
     <View style={[styles.container, isActive && styles.containerDragActive]}>
       <Swipeable
         ref={swipeableRef}
         renderRightActions={renderRightActions}
         rightThreshold={40}
-        friction={1.6}
+        friction={1}
         overshootRight={false}
         containerStyle={styles.swipeableContainer}
         // Disable swipe while a drag is in flight so the two gestures don't
