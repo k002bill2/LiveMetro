@@ -17,10 +17,12 @@
  *
  * Sections still to implement (visual placeholders for now, real-data wiring
  * once useMLPrediction exposes segment/hourly/factor data):
- *   6. Segment breakdown (도보/대기/승차 + LineBadge + CongestionDots)
  *   7. Hourly congestion forecast bar chart with "지금" highlight
- *   8. "예측에 반영된 요소" factors list
- *   9. Weekly comparison bar chart (오늘 강조)
+ *
+ * Wired sections (real data):
+ *   6. Segment breakdown (Task 2)
+ *   8. "예측에 반영된 요소" factors list (Task 7 — usePredictionFactors)
+ *   9. Weekly comparison bar chart (Task 4)
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/services/auth/AuthContext';
@@ -48,6 +50,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 
 import { useMLPrediction } from '@/hooks/useMLPrediction';
 import { useCommutePattern } from '@/hooks/useCommutePattern';
+import { usePredictionFactors } from '@/hooks/usePredictionFactors';
 import { useTheme, ThemeColors } from '@/services/theme';
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { Pill } from '@/components/design';
@@ -55,11 +58,12 @@ import { CONG_TONE, congFromPct } from '@/components/design/congestion';
 import {
   SegmentBreakdownSection,
   WeeklyTrendChart,
+  PredictionFactorsSection,
   type PredictedRoute,
   type DayBarData,
   type WeekdayLabel,
 } from '@/components/prediction';
-import type { PredictedCommute } from '@/models/pattern';
+import type { DayOfWeek, PredictedCommute } from '@/models/pattern';
 
 /**
  * Compute commute minutes from "HH:mm" departure → arrival strings, wrapping
@@ -289,6 +293,21 @@ export const WeeklyPredictionScreen: React.FC = () => {
     () => buildWeeklyDays(weekPredictions, new Date()),
     [weekPredictions],
   );
+
+  // Section 8: prediction factors (weather/congestion/delay/pattern).
+  // Task 5 made `DayOfWeek` numeric (0=Sun..6=Sat) — same convention as
+  // `buildWeeklyDays` above. The cast is justified because JS `getDay()`
+  // is typed `number` but its runtime range matches `DayOfWeek` exactly.
+  // `todayDow` is captured once per mount for parity with weekly trend.
+  const todayDow = useMemo<DayOfWeek>(() => new Date().getDay() as DayOfWeek, []);
+  // `direction: 'up'` is a temporary default until PredictedCommute exposes
+  // travel direction (consistent with the segment defaults above).
+  const factorsLineId = todayPrediction?.route.lineIds[0] ?? '2';
+  const { factors } = usePredictionFactors({
+    lineId: factorsLineId,
+    direction: 'up',
+    dayOfWeek: todayDow,
+  });
 
   // Animated count-up for the big number — 900ms ease-out cubic.
   const animatedValue = useRef(new Animated.Value(0)).current;
@@ -606,20 +625,9 @@ export const WeeklyPredictionScreen: React.FC = () => {
         />
       </View>
 
-      {/* 8: still pending real data — small placeholder.
-          Sections 6/9 are now wired above; copy retained until
-          Task 7 (factors) replaces this too. */}
+      {/* 8. Prediction factors (Section 8 — wired in Task 7). */}
       <View style={styles.sectionPad}>
-        <View
-          style={[
-            styles.placeholderCard,
-            { backgroundColor: semantic.bgBase, borderColor: semantic.lineSubtle },
-          ]}
-        >
-          <Text style={[styles.placeholderBody, { color: semantic.labelAlt }]}>
-            예측 영향 요소는 ML 학습 완료 후 표시됩니다.
-          </Text>
-        </View>
+        <PredictionFactorsSection factors={factors} />
       </View>
 
       {/* 5. CTA */}

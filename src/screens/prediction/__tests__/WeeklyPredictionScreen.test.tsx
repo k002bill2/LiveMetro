@@ -103,6 +103,14 @@ jest.mock('@/services/train/trainService', () => ({
   },
 }));
 
+// Task 7 / Section 8 wiring: usePredictionFactors fires off weather/
+// congestion/delay service requests on mount. Keep the test offline by
+// returning a stable empty-factors snapshot (component still renders the
+// section title, which is the assertion this suite cares about).
+jest.mock('@/hooks/usePredictionFactors', () => ({
+  usePredictionFactors: jest.fn(() => ({ factors: [], loading: false })),
+}));
+
 describe('WeeklyPredictionScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -166,16 +174,14 @@ describe('WeeklyPredictionScreen', () => {
     expect(getByText('출발 시간에 알려드릴게요 (09:15)')).toBeTruthy();
   });
 
-  it('renders hourly congestion forecast section + remaining placeholder', () => {
+  it('renders hourly congestion forecast and prediction factors sections', () => {
     const { getByText } = render(<WeeklyPredictionScreen />);
-    // Phase 54: hourly chart replaced the broad placeholder. Remaining
-    // unbuilt sections (segment/factors/weekly) live in a smaller
-    // placeholder beneath the chart.
+    // Phase 54: hourly chart replaced the broad placeholder. Task 7
+    // (2026-05-12) replaced the remaining factors placeholder with
+    // PredictionFactorsSection — assert on its stable section title.
     expect(getByText('시간대별 혼잡도 예측')).toBeTruthy();
     expect(getByText('지금')).toBeTruthy();
-    expect(
-      getByText('예측 영향 요소는 ML 학습 완료 후 표시됩니다.'),
-    ).toBeTruthy();
+    expect(getByText('예측에 반영된 요소')).toBeTruthy();
   });
 
   it('renders CTA pressable with departure-alert label', () => {
