@@ -25,6 +25,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/services/auth/AuthContext';
 import { trainService } from '@/services/train/trainService';
 import {
+  Alert,
   Animated,
   Easing,
   Pressable,
@@ -48,6 +49,11 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useMLPrediction } from '@/hooks/useMLPrediction';
 import { useCommutePattern } from '@/hooks/useCommutePattern';
 import { usePredictionFactors } from '@/hooks/usePredictionFactors';
+<<<<<<< HEAD
+=======
+import { useIntegratedAlerts } from '@/hooks/useIntegratedAlerts';
+import { routeService } from '@/services/route';
+>>>>>>> 532f877 (fix(prediction): wire CTA to useIntegratedAlerts.scheduleDepartureAlert)
 import { useTheme, ThemeColors } from '@/services/theme';
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { Pill } from '@/components/design';
@@ -158,6 +164,7 @@ export const WeeklyPredictionScreen: React.FC = () => {
   }, [morningCommute]);
 
   const { todayPrediction, weekPredictions } = useCommutePattern();
+  const { scheduleDepartureAlert } = useIntegratedAlerts();
 
   // Sum of `transitSegments[].estimatedMinutes` from the model; falls back
   // to a 10-min default when the producer hasn't populated segments.
@@ -511,9 +518,18 @@ export const WeeklyPredictionScreen: React.FC = () => {
             },
           ]}
           testID="commute-prediction-cta"
-          onPress={() => {
-            // TODO: integrate with useIntegratedAlerts.scheduleDepartureAlert
-            // when this screen is reachable from HomeScreen ML hero card.
+          onPress={async () => {
+            const alert = await scheduleDepartureAlert();
+            if (alert) {
+              Alert.alert(
+                '알림 설정 완료',
+                arrivalTime
+                  ? `출발 시간에 알려드릴게요 (${arrivalTime} 도착 예정)`
+                  : '출발 시간에 알려드릴게요',
+              );
+            } else {
+              Alert.alert('알림 설정 실패', '로그인 상태를 확인해주세요.');
+            }
           }}
         >
           <Bell size={18} color="#FFFFFF" strokeWidth={2.2} />
