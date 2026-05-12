@@ -69,6 +69,13 @@ jest.mock('@/hooks/useAutoCommuteLog', () => ({
   useAutoCommuteLog: jest.fn(),
 }));
 
+// useWeatherAlert는 weatherService/useLocation 의존성. 본 화면 테스트는
+// weather alert 자체를 검증하지 않으므로 null 반환으로 mock — 기존 alerts
+// 배열 흐름이 변하지 않음을 보장.
+jest.mock('@/hooks/useWeatherAlert', () => ({
+  useWeatherAlert: jest.fn(() => null),
+}));
+
 jest.mock('@/services/map/mapCacheService', () => ({
   mapCacheService: {
     searchStations: jest.fn(),
