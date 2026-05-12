@@ -10,6 +10,8 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 import { WeeklyPredictionScreen } from '../WeeklyPredictionScreen';
+import type { PredictedCommute } from '@/models/pattern';
+import { useCommutePattern } from '@/hooks/useCommutePattern';
 
 jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
 
@@ -184,29 +186,45 @@ describe('WeeklyPredictionScreen', () => {
     expect(getByText('예측 신뢰도')).toBeTruthy();
   });
 
-  // 26/28/32 are the screen's explicit warming-up fallback constants
-  // (WeeklyPredictionScreen.tsx:116, 125). Asserting them is intentional —
-  // a change in fallbacks is a design-contract change that must be reviewed.
+  // With no PredictedCommute, the screen falls back to the model's
+  // walk/wait/walk defaults (4+3+3) plus a 10-min ride default = 20 min,
+  // with a ±2 range band. Asserting the constants is intentional — a
+  // change in fallbacks is a design-contract change that must be reviewed.
   it('renders range labels using fallback when prediction is unavailable', () => {
     const { getByText } = render(<WeeklyPredictionScreen />);
-    expect(getByText('최단 26분')).toBeTruthy();
-    expect(getByText('최장 32분')).toBeTruthy();
-    expect(getByText('예상 28분')).toBeTruthy();
+    expect(getByText('최단 18분')).toBeTruthy();
+    expect(getByText('최장 22분')).toBeTruthy();
+    expect(getByText('예상 20분')).toBeTruthy();
   });
 
   it('reflects prediction values in range labels and CTA when data is loaded', () => {
-    const { useMLPrediction } = require('@/hooks/useMLPrediction');
-    (useMLPrediction as jest.Mock).mockReturnValueOnce({
-      prediction: {
+    (useCommutePattern as jest.Mock).mockReturnValueOnce({
+      todayPrediction: {
+        date: '2026-05-12',
+        dayOfWeek: 2,
         predictedDepartureTime: '08:30',
         predictedArrivalTime: '09:15',
+        predictedMinutes: 45,
+        predictedMinutesRange: [43, 47] as const,
+        direction: 'up' as const,
+        route: {
+          departureStationId: '0150', departureStationName: '서울역',
+          arrivalStationId: '0220', arrivalStationName: '강남역',
+          lineIds: ['1'],
+        },
         confidence: 0.9,
-        delayProbability: 0.1,
+        suggestedAlertTime: '08:15',
       },
+      patterns: [],
+      weekPredictions: [],
+      recentLogs: [],
+      notificationSettings: null,
+      todayNotification: null,
+      loading: false,
+      error: null,
     });
 
     const { getByText } = render(<WeeklyPredictionScreen />);
-    // 45 min commute, confidence ≥0.7 ⇒ ±2 spread ⇒ [43, 47]
     expect(getByText('최단 43분')).toBeTruthy();
     expect(getByText('예상 45분')).toBeTruthy();
     expect(getByText('최장 47분')).toBeTruthy();
@@ -235,5 +253,60 @@ describe('WeeklyPredictionScreen', () => {
     const { getByTestId } = render(<WeeklyPredictionScreen />);
     fireEvent.press(getByTestId('commute-prediction-back'));
     expect(mockGoBack).toHaveBeenCalled();
+  });
+});
+
+describe('WeeklyPredictionScreen — model field consumption', () => {
+  const richPrediction: PredictedCommute = {
+    date: '2026-05-12',
+    dayOfWeek: 2,
+    predictedDepartureTime: '08:00',
+    predictedArrivalTime: '08:30',
+    predictedMinutes: 30,
+    predictedMinutesRange: [27, 33],
+    direction: 'up',
+    walkToStationMinutes: 4,
+    waitMinutes: 3,
+    walkToDestinationMinutes: 3,
+    transitSegments: [{
+      fromStationId: '0150', fromStationName: '서울역',
+      toStationId: '0220', toStationName: '강남역',
+      lineId: '1', lineName: '1호선',
+      estimatedMinutes: 20, isTransfer: false,
+    }],
+    route: {
+      departureStationId: '0150', departureStationName: '서울역',
+      arrivalStationId: '0220', arrivalStationName: '강남역',
+      lineIds: ['1'],
+    },
+    confidence: 0.8,
+    suggestedAlertTime: '07:45',
+  };
+
+  const mockHookWithPrediction = (): void => {
+    (useCommutePattern as jest.Mock).mockReturnValueOnce({
+      todayPrediction: richPrediction,
+      patterns: [],
+      weekPredictions: [richPrediction],
+      recentLogs: [],
+      notificationSettings: null,
+      todayNotification: null,
+      loading: false,
+      error: null,
+    });
+  };
+
+  it('renders predictedMinutes from model, not heuristic', () => {
+    mockHookWithPrediction();
+    const { getByText } = render(<WeeklyPredictionScreen />);
+    expect(getByText(/예상 30분/)).toBeTruthy();
+  });
+
+  it('renders predictedMinutesRange from model, not ±2/±4 heuristic', () => {
+    mockHookWithPrediction();
+    const { getByText } = render(<WeeklyPredictionScreen />);
+    // Range UI text should show 27/33 (model range), not 28/32 (±2 heuristic).
+    expect(getByText('최단 27분')).toBeTruthy();
+    expect(getByText('최장 33분')).toBeTruthy();
   });
 });
