@@ -18,3 +18,6 @@ export type {
   DayBarData,
   WeekdayLabel,
 } from './WeeklyTrendChart';
+
+export { PredictionFactorsSection } from './PredictionFactorsSection';
+export type { PredictionFactorsSectionProps } from './PredictionFactorsSection';
