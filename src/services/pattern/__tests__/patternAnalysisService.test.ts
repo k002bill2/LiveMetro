@@ -3,9 +3,20 @@
  */
 
 import { patternAnalysisService } from '../patternAnalysisService';
-import { DayOfWeek } from '@/models/pattern';
+import {
+  DayOfWeek,
+  DEFAULT_WALK_TO_STATION_MIN,
+  DEFAULT_WAIT_MIN,
+  DEFAULT_WALK_TO_DEST_MIN,
+} from '@/models/pattern';
+import * as routeService from '@/services/route/routeService';
 
 import { commuteLogService } from '../commuteLogService';
+
+jest.mock('@/services/route/routeService');
+const mockedCalculateRoute = routeService.calculateRoute as jest.MockedFunction<
+  typeof routeService.calculateRoute
+>;
 
 // Mock Firebase
 jest.mock('@/services/firebase/config', () => ({
@@ -28,28 +39,35 @@ jest.mock('firebase/firestore', () => ({
   },
 }));
 
-// Mock pattern model
-jest.mock('@/models/pattern', () => ({
-  DayOfWeek: 0,
-  MIN_LOGS_FOR_PATTERN: 3,
-  getDayOfWeek: jest.fn(() => 1),
-  formatDateString: jest.fn((date) => date.toISOString().split('T')[0]),
-  isWeekday: jest.fn((day) => day >= 1 && day <= 5),
-  calculateAverageTime: jest.fn(() => '08:30'),
-  calculateTimeStdDev: jest.fn(() => 10),
-  calculateConfidence: jest.fn(() => 0.8),
-  calculateAlertTime: jest.fn(() => '08:00'),
-  fromCommutePatternDoc: jest.fn((userId, data) => ({
-    userId,
-    dayOfWeek: data.dayOfWeek,
-    avgDepartureTime: data.avgDepartureTime,
-    stdDevMinutes: data.stdDevMinutes,
-    frequentRoute: data.frequentRoute,
-    confidence: data.confidence,
-    sampleCount: data.sampleCount,
-    lastUpdated: data.lastUpdated?.toDate() || new Date(),
-  })),
-}));
+// Mock pattern model — partial mock: keep real constants & derived helpers
+// (DEFAULT_*_MIN, computeArrivalTime, deriveDirection) via requireActual so
+// producer logic uses canonical values, but override unit-level helpers we
+// stub for test ergonomics.
+jest.mock('@/models/pattern', () => {
+  const actual = jest.requireActual('@/models/pattern');
+  return {
+    ...actual,
+    DayOfWeek: 0,
+    MIN_LOGS_FOR_PATTERN: 3,
+    getDayOfWeek: jest.fn(() => 1),
+    formatDateString: jest.fn((date) => date.toISOString().split('T')[0]),
+    isWeekday: jest.fn((day: number) => day >= 1 && day <= 5),
+    calculateAverageTime: jest.fn(() => '08:30'),
+    calculateTimeStdDev: jest.fn(() => 10),
+    calculateConfidence: jest.fn(() => 0.8),
+    calculateAlertTime: jest.fn(() => '08:00'),
+    fromCommutePatternDoc: jest.fn((userId: string, data: any) => ({
+      userId,
+      dayOfWeek: data.dayOfWeek,
+      avgDepartureTime: data.avgDepartureTime,
+      stdDevMinutes: data.stdDevMinutes,
+      frequentRoute: data.frequentRoute,
+      confidence: data.confidence,
+      sampleCount: data.sampleCount,
+      lastUpdated: data.lastUpdated?.toDate() || new Date(),
+    })),
+  };
+});
 
 // Mock commuteLogService
 jest.mock('../commuteLogService', () => ({
@@ -207,6 +225,64 @@ describe('PatternAnalysisService', () => {
       const result = await patternAnalysisService.predictCommute('user-123');
 
       expect(result).toBeNull();
+    });
+  });
+
+  describe('predictCommute — derived fields on route success', () => {
+    beforeEach(() => {
+      jest.clearAllMocks();
+    });
+
+    it('populates transitSegments, walk/wait scalars, predictedMinutes, predictedArrivalTime, range, direction', async () => {
+      const stubPattern = {
+        userId: 'u1',
+        dayOfWeek: 2 as DayOfWeek,
+        avgDepartureTime: '08:00',
+        stdDevMinutes: 3,
+        frequentRoute: {
+          departureStationId: '0150',
+          departureStationName: '서울역',
+          arrivalStationId: '0220',
+          arrivalStationName: '강남역',
+          lineIds: ['1'],
+        },
+        confidence: 0.8,
+        sampleCount: 10,
+        lastUpdated: new Date('2026-05-12'),
+      };
+      jest
+        .spyOn(patternAnalysisService, 'getPatternForDay')
+        .mockResolvedValueOnce(stubPattern);
+
+      mockedCalculateRoute.mockReturnValueOnce({
+        segments: [
+          {
+            fromStationId: '0150', fromStationName: '서울역',
+            toStationId: '0151', toStationName: '시청',
+            lineId: '1', lineName: '1호선',
+            estimatedMinutes: 20, isTransfer: false,
+          },
+        ],
+        totalMinutes: 20,
+        transferCount: 0,
+        lineIds: ['1'],
+      });
+
+      const result = await patternAnalysisService.predictCommute(
+        'u1',
+        new Date('2026-05-12'),
+      );
+
+      expect(result).not.toBeNull();
+      expect(result?.transitSegments).toHaveLength(1);
+      expect(result?.transitSegments?.[0]?.congestionForecast).toBeUndefined();
+      expect(result?.walkToStationMinutes).toBe(DEFAULT_WALK_TO_STATION_MIN);
+      expect(result?.waitMinutes).toBe(DEFAULT_WAIT_MIN);
+      expect(result?.walkToDestinationMinutes).toBe(DEFAULT_WALK_TO_DEST_MIN);
+      expect(result?.predictedMinutes).toBe(4 + 3 + 3 + 20); // 30
+      expect(result?.predictedArrivalTime).toBe('08:30');
+      expect(result?.predictedMinutesRange).toEqual([27, 33]);
+      expect(result?.direction).toBe('up');
     });
   });
 
