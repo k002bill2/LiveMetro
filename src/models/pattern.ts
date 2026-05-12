@@ -410,10 +410,12 @@ export function createDefaultSmartNotificationSettings(): SmartNotificationSetti
  * Handles 24h wrap: ('23:50', 30) → '00:20'.
  */
 export function computeArrivalTime(
-  _departureHHmm: string,
-  _totalMinutes: number,
+  departureHHmm: string,
+  totalMinutes: number,
 ): string {
-  throw new Error('not implemented');
+  const departureMinutes = parseTimeToMinutes(departureHHmm);
+  const arrivalMinutes = (departureMinutes + totalMinutes) % (24 * 60);
+  return formatMinutesToTime(arrivalMinutes);
 }
 
 /**
