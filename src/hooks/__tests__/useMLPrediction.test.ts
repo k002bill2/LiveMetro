@@ -6,6 +6,8 @@ import { renderHook, act, waitFor } from '@testing-library/react-native';
 import { useAuth } from '@/services/auth/AuthContext';
 import { modelService, trainingService } from '@/services/ml';
 import { commuteLogService } from '@/services/pattern/commuteLogService';
+import { weatherService } from '@/services/weather/weatherService';
+import { useLocation } from '@/hooks/useLocation';
 import { isPredictionReliable } from '@/models/ml';
 import { useMLPrediction } from '../useMLPrediction';
 
@@ -29,6 +31,17 @@ jest.mock('@/services/pattern/commuteLogService', () => ({
   commuteLogService: {
     getRecentLogsForAnalysis: jest.fn(),
   },
+}));
+
+jest.mock('@/services/weather/weatherService', () => ({
+  weatherService: {
+    initialize: jest.fn().mockResolvedValue(undefined),
+    getCurrentWeather: jest.fn().mockResolvedValue(null),
+  },
+}));
+
+jest.mock('@/hooks/useLocation', () => ({
+  useLocation: jest.fn(() => ({ location: null })),
 }));
 
 jest.mock('@/models/ml', () => ({
@@ -151,6 +164,96 @@ describe('useMLPrediction', () => {
       });
 
       expect(result.current.error).toBe('Predict failed');
+    });
+
+    it('자동 weather 주입: 위치가 있으면 weatherService.getCurrentWeather 호출 후 currentWeather를 modelService.predict에 전달', async () => {
+      // 위치 mock: 서울 시청 좌표
+      (useLocation as jest.Mock).mockReturnValue({
+        location: { latitude: 37.5665, longitude: 126.978 },
+      });
+      // weatherService가 'rain' 조건 반환
+      (weatherService.getCurrentWeather as jest.Mock).mockResolvedValue({
+        condition: 'rain',
+        temperature: 18,
+        humidity: 80,
+        precipitation: 5,
+        description: '비',
+        icon: 'cloud-rain',
+        timestamp: new Date(),
+        location: '서울',
+      });
+
+      const { result } = renderHook(() => useMLPrediction());
+
+      await waitFor(() => expect(result.current.isModelReady).toBe(true));
+      // weather fetch는 mount 시 비동기로 진행됨 — getCurrentWeather가 호출될 때까지 대기
+      await waitFor(() =>
+        expect(weatherService.getCurrentWeather).toHaveBeenCalledWith({
+          latitude: 37.5665,
+          longitude: 126.978,
+        }),
+      );
+
+      await act(async () => {
+        await result.current.refreshPrediction();
+      });
+
+      // modelService.predict가 weather='rain'으로 호출됐는지 확인
+      expect(modelService.predict).toHaveBeenCalledWith(
+        expect.any(Array),
+        'monday',
+        expect.objectContaining({ weather: 'rain' }),
+      );
+    });
+
+    it('호출자가 명시한 options.weather가 자동 주입보다 우선 (override)', async () => {
+      (useLocation as jest.Mock).mockReturnValue({
+        location: { latitude: 37.5665, longitude: 126.978 },
+      });
+      (weatherService.getCurrentWeather as jest.Mock).mockResolvedValue({
+        condition: 'rain',
+        temperature: 18,
+        humidity: 80,
+        precipitation: 5,
+        description: '비',
+        icon: 'cloud-rain',
+        timestamp: new Date(),
+        location: '서울',
+      });
+
+      const { result } = renderHook(() => useMLPrediction());
+      await waitFor(() => expect(result.current.isModelReady).toBe(true));
+      await waitFor(() => expect(weatherService.getCurrentWeather).toHaveBeenCalled());
+
+      await act(async () => {
+        // 명시적으로 'snow' override
+        await result.current.refreshPrediction(undefined, { weather: 'snow' });
+      });
+
+      expect(modelService.predict).toHaveBeenCalledWith(
+        expect.any(Array),
+        'monday',
+        expect.objectContaining({ weather: 'snow' }),
+      );
+    });
+
+    it('위치 권한 없거나 weather fetch 실패 시 weather 미주입 (graceful degrade)', async () => {
+      // 위치 null 유지 (mock 기본값) + weatherService null 반환
+      (useLocation as jest.Mock).mockReturnValue({ location: null });
+      (weatherService.getCurrentWeather as jest.Mock).mockResolvedValue(null);
+
+      const { result } = renderHook(() => useMLPrediction());
+      await waitFor(() => expect(result.current.isModelReady).toBe(true));
+
+      await act(async () => {
+        await result.current.refreshPrediction();
+      });
+
+      // modelService.predict의 3번째 인자(options)에 weather 키가 없어야 함.
+      // (modelService 내부에서 'clear' 기본값으로 fallback)
+      const lastCall = (modelService.predict as jest.Mock).mock.calls.at(-1);
+      const opts = lastCall?.[2] ?? {};
+      expect(opts.weather).toBeUndefined();
     });
   });
 

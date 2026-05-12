@@ -8,6 +8,8 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useAuth } from '@/services/auth/AuthContext';
 import { modelService, trainingService } from '@/services/ml';
 import { commuteLogService } from '@/services/pattern/commuteLogService';
+import { weatherService } from '@/services/weather/weatherService';
+import { useLocation } from '@/hooks/useLocation';
 import {
   MLPrediction,
   ModelMetadata,
@@ -89,8 +91,17 @@ export function useMLPrediction(): UseMLPredictionReturn {
   const [isTraining, setIsTraining] = useState(false);
   const [logCount, setLogCount] = useState(0);
   const [logs, setLogs] = useState<CommuteLog[]>([]);
+  // 자동 주입 weather. weatherService가 30분 캐싱하므로 mount + 위치 변경 시
+  // 1회 호출이면 충분. 호출자가 PredictionOptions.weather를 명시하면 그 값을
+  // 우선하여 override 가능.
+  const [currentWeather, setCurrentWeather] = useState<WeatherCondition | null>(null);
 
   const unsubscribeRef = useRef<(() => void) | null>(null);
+
+  // useLocation은 위치 권한이 없거나 미허용이면 location=null. 그 경우
+  // weatherService.getWeatherCondition()이 null 반환 → 자동 주입 안 됨,
+  // ML은 modelService의 weather 기본값 'clear'로 동작 (graceful degrade).
+  const { location } = useLocation();
 
   // Baseline = simple average of past actual commute durations (HH:mm pairs).
   // Wraps midnight to handle late-night commutes (23:55 → 00:20 = 25min).
@@ -165,6 +176,34 @@ export function useMLPrediction(): UseMLPredictionReturn {
     loadLogs();
   }, [user?.id]);
 
+  // Auto-fetch weather condition for ML feature injection. weatherService는
+  // 30분 internal cache + AsyncStorage 영속 캐시를 사용하므로 위치 변경 시
+  // 호출해도 실제 네트워크 요청은 드물다. mount 시 한 번 initialize()로
+  // 캐시 복원 후 location 기반으로 fetch.
+  useEffect(() => {
+    let cancelled = false;
+    const fetchWeather = async (): Promise<void> => {
+      try {
+        await weatherService.initialize();
+        const coords = location
+          ? { latitude: location.latitude, longitude: location.longitude }
+          : undefined;
+        const data = await weatherService.getCurrentWeather(coords);
+        if (!cancelled) {
+          setCurrentWeather(data?.condition ?? null);
+        }
+      } catch {
+        if (!cancelled) {
+          setCurrentWeather(null);
+        }
+      }
+    };
+    fetchWeather();
+    return () => {
+      cancelled = true;
+    };
+  }, [location?.latitude, location?.longitude]);
+
   // Refresh prediction
   const refreshPrediction = useCallback(
     async (dayOfWeek?: DayOfWeek, options: PredictionOptions = {}): Promise<void> => {
@@ -183,7 +222,15 @@ export function useMLPrediction(): UseMLPredictionReturn {
 
       try {
         const targetDay = dayOfWeek ?? getDayOfWeek(new Date());
-        const result = await modelService.predict(logs, targetDay, options);
+        // 자동 weather 주입: 호출자가 options.weather를 명시했으면 그 값을
+        // 우선하고, 아니면 currentWeather를 사용. modelService.predict는
+        // weather 미제공 시 'clear'로 fallback하므로 currentWeather=null이어도
+        // 안전 (graceful degrade).
+        const mergedOptions: PredictionOptions = {
+          ...(currentWeather !== null ? { weather: currentWeather } : {}),
+          ...options,
+        };
+        const result = await modelService.predict(logs, targetDay, mergedOptions);
         setPrediction(result);
       } catch (err) {
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';
@@ -192,7 +239,7 @@ export function useMLPrediction(): UseMLPredictionReturn {
         setLoading(false);
       }
     },
-    [user?.id, isModelReady, logs]
+    [user?.id, isModelReady, logs, currentWeather]
   );
 
   // Train model (disabled - returns error)
@@ -234,6 +281,10 @@ export function useMLPrediction(): UseMLPredictionReturn {
   const getWeekPredictions = useCallback(async (): Promise<(MLPrediction | null)[]> => {
     const predictions: (MLPrediction | null)[] = [];
     const today = new Date();
+    // 주간 예측 전체에 동일한 현재 weather 주입. 7일 후 날씨는 다를 수 있지만
+    // weatherService.getForecast()로 일별 예측을 받는 건 별도 phase.
+    // 현재는 "오늘 날씨가 이렇다는 가정 하의 주간 baseline" 의미.
+    const weatherOptions = currentWeather !== null ? { weather: currentWeather } : undefined;
 
     for (let i = 0; i < 7; i++) {
       const date = new Date(today);
@@ -241,7 +292,7 @@ export function useMLPrediction(): UseMLPredictionReturn {
       const dayOfWeek = getDayOfWeek(date);
 
       try {
-        const pred = await modelService.predict(logs, dayOfWeek);
+        const pred = await modelService.predict(logs, dayOfWeek, weatherOptions);
         predictions.push(pred);
       } catch {
         predictions.push(null);
@@ -249,7 +300,7 @@ export function useMLPrediction(): UseMLPredictionReturn {
     }
 
     return predictions;
-  }, [logs]);
+  }, [logs, currentWeather]);
 
   // Clear cache
   const clearCache = useCallback((): void => {
