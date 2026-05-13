@@ -66,7 +66,9 @@ export const StationPickerModal: React.FC<Props> = ({
     // no debounce or SWR is needed.
     const found = searchGraphStations(trimmed);
     setResults(
-      found.map((s) => ({ id: s.id, name: s.name, lineId: s.lines[0] }))
+      found.flatMap((s) =>
+        s.lines.map((lineId) => ({ id: s.id, name: s.name, lineId }))
+      )
     );
     setLoading(false);
   }, [query]);
@@ -116,7 +118,7 @@ export const StationPickerModal: React.FC<Props> = ({
 
         <FlatList
           data={displayList as StationLite[]}
-          keyExtractor={(item): string => item.id}
+          keyExtractor={(item): string => `${item.id}-${item.lineId ?? 'none'}`}
           ListEmptyComponent={
             !loading ? (
               <Text style={styles.empty}>

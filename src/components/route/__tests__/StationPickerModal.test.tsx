@@ -47,17 +47,18 @@ describe('StationPickerModal', () => {
   });
 
   it('shows search results after typing', async () => {
-    const { getByTestId, getByText } = render(<StationPickerModal {...defaultProps} />);
+    const { getByTestId, getAllByText } = render(<StationPickerModal {...defaultProps} />);
     fireEvent.changeText(getByTestId('station-picker-search-input'), '강남');
-    await waitFor(() => expect(getByText('강남')).toBeTruthy());
-    expect(getByText('강남구청')).toBeTruthy();
+    // 강남 is a transfer station (2호선·신분당선) so it renders one row per line.
+    await waitFor(() => expect(getAllByText('강남').length).toBeGreaterThanOrEqual(2));
+    expect(getAllByText('강남구청').length).toBeGreaterThanOrEqual(1);
   });
 
   it('calls onSelect with station when result tapped', async () => {
-    const { getByTestId, getByText } = render(<StationPickerModal {...defaultProps} />);
+    const { getByTestId, getAllByText } = render(<StationPickerModal {...defaultProps} />);
     fireEvent.changeText(getByTestId('station-picker-search-input'), '강남');
-    await waitFor(() => expect(getByText('강남')).toBeTruthy());
-    fireEvent.press(getByText('강남'));
+    await waitFor(() => expect(getAllByText('강남').length).toBeGreaterThanOrEqual(1));
+    fireEvent.press(getAllByText('강남')[0]);
     expect(defaultProps.onSelect).toHaveBeenCalledWith(
       expect.objectContaining({ id: 'gangnam', name: '강남' })
     );
