@@ -105,56 +105,59 @@ const buildGraph = (
     baseWeight * (congestionMultipliers?.get(destLineId) ?? 1.0);
 
   // Create nodes for each station-line combination
-  Object.entries(LINE_STATIONS).forEach(([lineId, stationIds]) => {
+  Object.entries(LINE_STATIONS).forEach(([lineId, segments]) => {
     if (excludeLineIds.includes(lineId)) return;
 
-    stationIds.forEach((stationId, index) => {
-      const key = `${stationId}#${lineId}`;
-      const node: GraphNode = { stationId, lineId, key };
-      nodes.set(key, node);
+    segments.forEach(stationIds => {
+      stationIds.forEach((stationId, index) => {
+        const key = `${stationId}#${lineId}`;
+        const node: GraphNode = { stationId, lineId, key };
+        nodes.set(key, node);
 
-      // Initialize edges array
-      if (!edges.has(key)) {
-        edges.set(key, []);
-      }
-
-      // Add edge to next station on same line
-      if (index < stationIds.length - 1) {
-        const nextStationId = stationIds[index + 1];
-        if (nextStationId) {
-          const nextKey = `${nextStationId}#${lineId}`;
-          const edgeList = edges.get(key) || [];
-          edgeList.push({
-            to: { stationId: nextStationId, lineId, key: nextKey },
-            weight: adjustWeight(AVG_STATION_TRAVEL_TIME, lineId),
-            isTransfer: false,
-          });
-          edges.set(key, edgeList);
+        // Initialize edges array
+        if (!edges.has(key)) {
+          edges.set(key, []);
         }
-      }
 
-      // Add edge to previous station on same line (bidirectional)
-      if (index > 0) {
-        const prevStationId = stationIds[index - 1];
-        if (prevStationId) {
-          const prevKey = `${prevStationId}#${lineId}`;
-          const edgeList = edges.get(key) || [];
-          edgeList.push({
-            to: { stationId: prevStationId, lineId, key: prevKey },
-            weight: adjustWeight(AVG_STATION_TRAVEL_TIME, lineId),
-            isTransfer: false,
-          });
-          edges.set(key, edgeList);
+        // Add edge to next station on same subarray
+        if (index < stationIds.length - 1) {
+          const nextStationId = stationIds[index + 1];
+          if (nextStationId) {
+            const nextKey = `${nextStationId}#${lineId}`;
+            const edgeList = edges.get(key) || [];
+            edgeList.push({
+              to: { stationId: nextStationId, lineId, key: nextKey },
+              weight: adjustWeight(AVG_STATION_TRAVEL_TIME, lineId),
+              isTransfer: false,
+            });
+            edges.set(key, edgeList);
+          }
         }
-      }
+
+        // Add edge to previous station on same subarray (bidirectional)
+        if (index > 0) {
+          const prevStationId = stationIds[index - 1];
+          if (prevStationId) {
+            const prevKey = `${prevStationId}#${lineId}`;
+            const edgeList = edges.get(key) || [];
+            edgeList.push({
+              to: { stationId: prevStationId, lineId, key: prevKey },
+              weight: adjustWeight(AVG_STATION_TRAVEL_TIME, lineId),
+              isTransfer: false,
+            });
+            edges.set(key, edgeList);
+          }
+        }
+      });
     });
   });
 
-  // Handle circular line 2 (connect last to first)
-  const line2Stations = LINE_STATIONS['2'];
-  if (line2Stations && line2Stations.length > 1 && !excludeLineIds.includes('2')) {
-    const firstStation = line2Stations[0];
-    const lastStation = line2Stations[line2Stations.length - 1];
+  // Handle circular line 2 — trunk subarray only.
+  // Underscore key format preserved (existing silent no-op).
+  const line2Trunk = LINE_STATIONS['2']?.[0];
+  if (line2Trunk && line2Trunk.length > 1 && !excludeLineIds.includes('2')) {
+    const firstStation = line2Trunk[0];
+    const lastStation = line2Trunk[line2Trunk.length - 1];
     if (firstStation && lastStation) {
       const firstKey = `${firstStation}_2`;
       const lastKey = `${lastStation}_2`;
@@ -182,7 +185,7 @@ const buildGraph = (
   // Add transfer edges between same station on different lines
   Object.values(STATIONS).forEach((station: StationData) => {
     const stationLines = station.lines.filter(
-      lineId => !excludeLineIds.includes(lineId) && LINE_STATIONS[lineId]
+      lineId => !excludeLineIds.includes(lineId) && (LINE_STATIONS[lineId]?.length ?? 0) > 0
     );
 
     // For each pair of lines at this station, add transfer edges
@@ -263,12 +266,14 @@ const buildStationPositions = (): Map<string, number> => {
   const positions = new Map<string, number>();
   let counter = 0;
 
-  Object.entries(LINE_STATIONS).forEach(([_lineId, stationIds]) => {
-    stationIds.forEach(stationId => {
-      if (!positions.has(stationId)) {
-        positions.set(stationId, counter);
-        counter++;
-      }
+  Object.entries(LINE_STATIONS).forEach(([_lineId, segments]) => {
+    segments.forEach(stationIds => {
+      stationIds.forEach(stationId => {
+        if (!positions.has(stationId)) {
+          positions.set(stationId, counter);
+          counter++;
+        }
+      });
     });
   });
 
@@ -436,7 +441,7 @@ const getStationKeys = (
   if (!station) return [];
 
   return station.lines
-    .filter(lineId => !excludeLineIds.includes(lineId) && LINE_STATIONS[lineId])
+    .filter(lineId => !excludeLineIds.includes(lineId) && (LINE_STATIONS[lineId]?.length ?? 0) > 0)
     .map(lineId => `${stationId}#${lineId}`);
 };
 
