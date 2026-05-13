@@ -82,7 +82,10 @@ export interface DelayInfo {
 /**
  * Build graph from station and line data
  */
-const buildGraph = (excludeLineIds: readonly string[] = []): Graph => {
+const buildGraph = (
+  excludeLineIds: readonly string[] = [],
+  congestionMultipliers?: ReadonlyMap<string, number>,
+): Graph => {
   const nodes = new Map<string, GraphNode>();
   const edges = new Map<string, GraphEdge[]>();
 
@@ -200,6 +203,20 @@ const buildGraph = (excludeLineIds: readonly string[] = []): Graph => {
       }
     }
   });
+
+  // Phase A: Apply congestion multipliers post-graph-construction.
+  // Edge multiplier is keyed by destination lineId (the line you're on after traversal).
+  if (congestionMultipliers && congestionMultipliers.size > 0) {
+    edges.forEach((edgeList, key) => {
+      edges.set(
+        key,
+        edgeList.map(edge => {
+          const m = congestionMultipliers.get(edge.to.lineId) ?? 1.0;
+          return m === 1.0 ? edge : { ...edge, weight: edge.weight * m };
+        }),
+      );
+    });
+  }
 
   return { nodes, edges };
 };
@@ -428,10 +445,11 @@ const getStationKeys = (
 export const calculateRoute = (
   fromStationId: string,
   toStationId: string,
-  excludeLineIds: readonly string[] = []
+  excludeLineIds: readonly string[] = [],
+  congestionMultipliers?: ReadonlyMap<string, number>,
 ): Route | null => {
   // Build graph
-  const graph = buildGraph(excludeLineIds);
+  const graph = buildGraph(excludeLineIds, congestionMultipliers);
 
   // Get start and end keys
   const startKeys = getStationKeys(fromStationId, excludeLineIds);
