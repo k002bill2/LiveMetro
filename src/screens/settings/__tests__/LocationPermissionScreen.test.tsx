@@ -740,7 +740,7 @@ describe('LocationPermissionScreen', () => {
       });
 
       const alertCalls = (Alert.alert as jest.Mock).mock.calls;
-      const buttons = alertCalls[0][2] as any[];
+      const buttons = (alertCalls[0]?.[2] ?? []) as any[];
       const cancelButton = buttons.find((btn) => btn.text === '취소');
       if (cancelButton?.onPress) {
         cancelButton.onPress();
