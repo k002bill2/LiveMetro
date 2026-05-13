@@ -8,7 +8,7 @@ const androidConfig: Options.Testrunner = {
   capabilities: [
     {
       'platformName': 'Android',
-      'appium:platformVersion': '16',
+      'appium:platformVersion': '13.0',
       'appium:deviceName': 'Pixel 6',
       'appium:automationName': 'UiAutomator2',
       'appium:app': join(process.cwd(), 'apps/android/app-debug.apk'),
