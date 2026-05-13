@@ -54,8 +54,18 @@ interface Edge {
 /**
  * Build adjacency list graph
  */
-function buildGraph(excludeNodeKeys?: Set<string>, excludeEdges?: Set<string>): Map<string, Edge[]> {
+function buildGraph(
+  excludeNodeKeys?: Set<string>,
+  excludeEdges?: Set<string>,
+  congestionMultipliers?: ReadonlyMap<string, number>,
+): Map<string, Edge[]> {
   const graph = new Map<string, Edge[]>();
+
+  // Phase A: inline congestion-multiplier helper. Applied at edge-creation
+  // time so the hot inner loop of Yen's algorithm doesn't pay an extra
+  // O(V+E) post-pass + per-edge object allocation on every spur call.
+  const adjustWeight = (baseWeight: number, lineId: string): number =>
+    baseWeight * (congestionMultipliers?.get(lineId) ?? 1.0);
 
   // Add edges for each line
   Object.entries(LINE_STATIONS).forEach(([lineId, stationIds]) => {
@@ -80,7 +90,7 @@ function buildGraph(excludeNodeKeys?: Set<string>, excludeEdges?: Set<string>): 
             if (!excludeEdges?.has(edgeKey)) {
               graph.get(nodeKey)?.push({
                 to: nextKey,
-                weight: AVG_STATION_TRAVEL_TIME,
+                weight: adjustWeight(AVG_STATION_TRAVEL_TIME, lineId),
                 isTransfer: false,
                 lineId,
               });
@@ -99,7 +109,7 @@ function buildGraph(excludeNodeKeys?: Set<string>, excludeEdges?: Set<string>): 
             if (!excludeEdges?.has(edgeKey)) {
               graph.get(nodeKey)?.push({
                 to: prevKey,
-                weight: AVG_STATION_TRAVEL_TIME,
+                weight: adjustWeight(AVG_STATION_TRAVEL_TIME, lineId),
                 isTransfer: false,
                 lineId,
               });
@@ -123,7 +133,7 @@ function buildGraph(excludeNodeKeys?: Set<string>, excludeEdges?: Set<string>): 
         if (!excludeEdges?.has(`${lastKey}->${firstKey}`)) {
           graph.get(lastKey)?.push({
             to: firstKey,
-            weight: AVG_STATION_TRAVEL_TIME,
+            weight: adjustWeight(AVG_STATION_TRAVEL_TIME, '2'),
             isTransfer: false,
             lineId: '2',
           });
@@ -131,7 +141,7 @@ function buildGraph(excludeNodeKeys?: Set<string>, excludeEdges?: Set<string>): 
         if (!excludeEdges?.has(`${firstKey}->${lastKey}`)) {
           graph.get(firstKey)?.push({
             to: lastKey,
-            weight: AVG_STATION_TRAVEL_TIME,
+            weight: adjustWeight(AVG_STATION_TRAVEL_TIME, '2'),
             isTransfer: false,
             lineId: '2',
           });
@@ -158,7 +168,7 @@ function buildGraph(excludeNodeKeys?: Set<string>, excludeEdges?: Set<string>): 
         if (graph.has(key1) && !excludeEdges?.has(`${key1}->${key2}`)) {
           graph.get(key1)?.push({
             to: key2,
-            weight: AVG_TRANSFER_TIME,
+            weight: adjustWeight(AVG_TRANSFER_TIME, line2),
             isTransfer: true,
             lineId: line2,
           });
@@ -167,7 +177,7 @@ function buildGraph(excludeNodeKeys?: Set<string>, excludeEdges?: Set<string>): 
         if (graph.has(key2) && !excludeEdges?.has(`${key2}->${key1}`)) {
           graph.get(key2)?.push({
             to: key1,
-            weight: AVG_TRANSFER_TIME,
+            weight: adjustWeight(AVG_TRANSFER_TIME, line1),
             isTransfer: true,
             lineId: line1,
           });
@@ -175,6 +185,7 @@ function buildGraph(excludeNodeKeys?: Set<string>, excludeEdges?: Set<string>): 
       }
     }
   });
+
 
   return graph;
 }
@@ -271,7 +282,8 @@ function dijkstra(
 export function findKShortestPaths(
   fromStationId: string,
   toStationId: string,
-  k: number = 3
+  k: number = 3,
+  congestionMultipliers?: ReadonlyMap<string, number>,
 ): KShortestPathResult {
   const startTime = Date.now();
 
@@ -292,7 +304,7 @@ export function findKShortestPaths(
   const B = new PriorityQueue<InternalPath>(); // Candidate paths
 
   // Find the first shortest path
-  const graph = buildGraph();
+  const graph = buildGraph(undefined, undefined, congestionMultipliers);
   const firstPath = dijkstra(graph, startKeys, endKeys);
 
   if (!firstPath) {
@@ -338,7 +350,7 @@ export function findKShortestPaths(
       const excludeNodes = new Set<string>(rootPath.slice(0, -1));
 
       // Find spur path
-      const spurGraph = buildGraph(excludeNodes, excludeEdges);
+      const spurGraph = buildGraph(excludeNodes, excludeEdges, congestionMultipliers);
       const spurPath = dijkstra(spurGraph, [spurNode], endKeys);
 
       if (spurPath && spurPath.nodes.length > 1) {
@@ -539,8 +551,14 @@ export function getDiverseRoutes(
   fromStationId: string,
   toStationId: string,
   maxRoutes: number = DEFAULT_MAX_ROUTES,
+  congestionMultipliers?: ReadonlyMap<string, number>,
 ): Route[] {
-  const result = findKShortestPaths(fromStationId, toStationId, K_SHORTEST_CANDIDATES);
+  const result = findKShortestPaths(
+    fromStationId,
+    toStationId,
+    K_SHORTEST_CANDIDATES,
+    congestionMultipliers,
+  );
   if (result.paths.length === 0) return [];
 
   const filtered = result.paths.filter((r) => r.transferCount <= MAX_ROUTE_TRANSFERS);

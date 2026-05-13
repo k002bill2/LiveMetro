@@ -82,9 +82,21 @@ export interface DelayInfo {
 /**
  * Build graph from station and line data
  */
-const buildGraph = (excludeLineIds: readonly string[] = []): Graph => {
+const buildGraph = (
+  excludeLineIds: readonly string[] = [],
+  congestionMultipliers?: ReadonlyMap<string, number>,
+): Graph => {
   const nodes = new Map<string, GraphNode>();
   const edges = new Map<string, GraphEdge[]>();
+
+  // Phase A: compute edge weight with optional congestion multiplier
+  // applied inline at edge creation. Multiplier keyed by destination
+  // lineId — the line you're on after traversing the edge. Avoids the
+  // extra O(E) post-pass and per-edge object allocation that a
+  // post-construction pass would incur (this function is called many
+  // times by Yen's k-shortest-paths algorithm).
+  const adjustWeight = (baseWeight: number, destLineId: string): number =>
+    baseWeight * (congestionMultipliers?.get(destLineId) ?? 1.0);
 
   // Create nodes for each station-line combination
   Object.entries(LINE_STATIONS).forEach(([lineId, stationIds]) => {
@@ -108,7 +120,7 @@ const buildGraph = (excludeLineIds: readonly string[] = []): Graph => {
           const edgeList = edges.get(key) || [];
           edgeList.push({
             to: { stationId: nextStationId, lineId, key: nextKey },
-            weight: AVG_STATION_TRAVEL_TIME,
+            weight: adjustWeight(AVG_STATION_TRAVEL_TIME, lineId),
             isTransfer: false,
           });
           edges.set(key, edgeList);
@@ -123,7 +135,7 @@ const buildGraph = (excludeLineIds: readonly string[] = []): Graph => {
           const edgeList = edges.get(key) || [];
           edgeList.push({
             to: { stationId: prevStationId, lineId, key: prevKey },
-            weight: AVG_STATION_TRAVEL_TIME,
+            weight: adjustWeight(AVG_STATION_TRAVEL_TIME, lineId),
             isTransfer: false,
           });
           edges.set(key, edgeList);
@@ -145,7 +157,7 @@ const buildGraph = (excludeLineIds: readonly string[] = []): Graph => {
       const lastEdges = edges.get(lastKey) || [];
       lastEdges.push({
         to: { stationId: firstStation, lineId: '2', key: firstKey },
-        weight: AVG_STATION_TRAVEL_TIME,
+        weight: adjustWeight(AVG_STATION_TRAVEL_TIME, '2'),
         isTransfer: false,
       });
       edges.set(lastKey, lastEdges);
@@ -154,7 +166,7 @@ const buildGraph = (excludeLineIds: readonly string[] = []): Graph => {
       const firstEdges = edges.get(firstKey) || [];
       firstEdges.push({
         to: { stationId: lastStation, lineId: '2', key: lastKey },
-        weight: AVG_STATION_TRAVEL_TIME,
+        weight: adjustWeight(AVG_STATION_TRAVEL_TIME, '2'),
         isTransfer: false,
       });
       edges.set(firstKey, firstEdges);
@@ -183,7 +195,7 @@ const buildGraph = (excludeLineIds: readonly string[] = []): Graph => {
           const edges1 = edges.get(key1) || [];
           edges1.push({
             to: { stationId: station.id, lineId: line2, key: key2 },
-            weight: AVG_TRANSFER_TIME,
+            weight: adjustWeight(AVG_TRANSFER_TIME, line2),
             isTransfer: true,
           });
           edges.set(key1, edges1);
@@ -192,7 +204,7 @@ const buildGraph = (excludeLineIds: readonly string[] = []): Graph => {
           const edges2 = edges.get(key2) || [];
           edges2.push({
             to: { stationId: station.id, lineId: line1, key: key1 },
-            weight: AVG_TRANSFER_TIME,
+            weight: adjustWeight(AVG_TRANSFER_TIME, line1),
             isTransfer: true,
           });
           edges.set(key2, edges2);
@@ -428,10 +440,11 @@ const getStationKeys = (
 export const calculateRoute = (
   fromStationId: string,
   toStationId: string,
-  excludeLineIds: readonly string[] = []
+  excludeLineIds: readonly string[] = [],
+  congestionMultipliers?: ReadonlyMap<string, number>,
 ): Route | null => {
   // Build graph
-  const graph = buildGraph(excludeLineIds);
+  const graph = buildGraph(excludeLineIds, congestionMultipliers);
 
   // Get start and end keys
   const startKeys = getStationKeys(fromStationId, excludeLineIds);
