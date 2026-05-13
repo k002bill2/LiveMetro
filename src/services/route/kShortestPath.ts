@@ -330,6 +330,22 @@ export function findKShortestPaths(
 
   A.push(firstPath);
 
+  // Track transfer signatures of accepted paths. Each K slot in A must
+  // correspond to a topologically distinct transfer set — otherwise
+  // signature-duplicate variants (same transfer stations, slightly different
+  // segment timing) consume K slots and squeeze out distinct routes.
+  //
+  // Background (memory [pr79-pending-followups] Priority 1):
+  //   PR #79 gyeongui 4-subarray reshape shifted Yen's exploration order
+  //   such that 산곡→선릉 via 강남구청 (a topologically distinct path)
+  //   landed past K=30. Empirical K=40/50/60 all RED — signature-duplicate
+  //   variants of nearer routes (e.g. `석남,검암,공덕,용산,청량리` repeated
+  //   with minor variations) filled K slots before distinct paths could
+  //   enter. Fix: signature-dedupe IN Yen's main loop (this block), not
+  //   post-hoc in getDiverseRoutes groupMap.
+  const acceptedSignatures = new Set<string>();
+  acceptedSignatures.add(buildNodePathSignature(firstPath.nodes));
+
   // Find k-1 more paths
   for (let i = 1; i < k; i++) {
     const prevPath = A[i - 1];
@@ -381,24 +397,36 @@ export function findKShortestPaths(
       }
     }
 
-    // Add lowest cost candidate to A
-    if (B.isEmpty()) break;
-
-    const nextPath = B.dequeue();
-    if (nextPath) {
-      // Remove duplicates from B
-      const pathKey = nextPath.nodes.join(',');
-      while (!B.isEmpty()) {
-        const candidate = B.peek();
-        if (candidate && candidate.nodes.join(',') === pathKey) {
-          B.dequeue();
-        } else {
-          break;
-        }
+    // Pick the lowest-cost candidate whose transfer signature is NEW (not
+    // already represented in A). Skip signature-duplicates. This is the
+    // in-loop dedupe described above.
+    let nextPath: InternalPath | undefined;
+    while (!B.isEmpty()) {
+      const candidate = B.dequeue();
+      if (!candidate) break;
+      const sig = buildNodePathSignature(candidate.nodes);
+      if (acceptedSignatures.has(sig)) {
+        continue; // signature-duplicate variant — skip
       }
-
-      A.push(nextPath);
+      acceptedSignatures.add(sig);
+      nextPath = candidate;
+      break;
     }
+
+    if (!nextPath) break; // B exhausted (or all remaining are signature-duplicates)
+
+    // Remove exact-path duplicates from B (existing optimization, still valid).
+    const pathKey = nextPath.nodes.join(',');
+    while (!B.isEmpty()) {
+      const candidate = B.peek();
+      if (candidate && candidate.nodes.join(',') === pathKey) {
+        B.dequeue();
+      } else {
+        break;
+      }
+    }
+
+    A.push(nextPath);
   }
 
   // Convert internal paths to Route objects
@@ -478,6 +506,42 @@ function convertToRoute(internalPath: InternalPath): Route {
 }
 
 /**
+ * Compute transfer signature from a raw node path (faster than building a
+ * full Route first). Used by Yen's K-shortest in-loop dedupe — each K slot
+ * in A must correspond to a topologically distinct transfer signature.
+ *
+ * Node format: `${stationId}#${lineId}`. A transfer occurs when consecutive
+ * nodes share `stationId` but differ in `lineId`.
+ *
+ * Returns the same format as `buildTransferSignature`: '|'-joined sorted
+ * station NAMEs (not IDs). Names are used so the signature aligns 1:1 with
+ * `buildTransferSignature(route)` later — a route's node-path signature
+ * and its converted Route signature must be identical strings.
+ */
+function buildNodePathSignature(nodes: string[]): string {
+  const transfers = new Set<string>();
+  for (let i = 0; i < nodes.length - 1; i++) {
+    const cur = nodes[i];
+    const next = nodes[i + 1];
+    if (!cur || !next) continue;
+    const [stationA, lineA] = cur.split('#');
+    const [stationB, lineB] = next.split('#');
+    if (
+      stationA &&
+      stationB &&
+      lineA &&
+      lineB &&
+      stationA === stationB &&
+      lineA !== lineB
+    ) {
+      const name = STATIONS[stationA]?.name;
+      if (name) transfers.add(name);
+    }
+  }
+  return [...transfers].sort().join('|');
+}
+
+/**
  * Build a stable signature representing the *set of transfer stations* a
  * route visits. Used by `getDiverseRoutes` to cluster K-shortest candidates
  * by transfer-station identity — routes sharing the same transfer set are
@@ -535,7 +599,12 @@ const UNREALISTIC_TIME_FACTOR = 1.5;
  *
  * History:
  *   - PR #58: 10 → 15 (initial transfer-grouping diversity)
- *   - This commit: 15 → 30 (산곡→선릉 강남구청 경유)
+ *   - PR #68: 15 → 30 (산곡→선릉 강남구청 경유)
+ *   - Priority 1 fix (memory [pr79-pending-followups]): in-loop signature
+ *     dedupe added in `findKShortestPaths` (each K slot now corresponds to
+ *     a distinct transfer signature, not just a distinct node path). K=30
+ *     retained — with dedupe, K-slots are far more diverse, but raising
+ *     bumps the worst-case cost by another ~2x for limited gain.
  */
 const K_SHORTEST_CANDIDATES = 30;
 
