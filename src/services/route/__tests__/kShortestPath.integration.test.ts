@@ -363,7 +363,7 @@ describe('gyeongui — 분기 schema 적용 후 회귀 (PR-1)', () => {
    * 가좌 → DMC: 본선 trunk 인접. 현재 array에서도 가좌(36)↔DMC(37) 인접.
    * BASELINE — reshape 전후 모두 환승 0회 1 hop ≤5분 직행이어야 함.
    */
-  it('가좌→DMC는 환변 0회 직행 1 hop (본선 trunk 인접 보존)', () => {
+  it('가좌→DMC는 환승 0회 직행 1 hop (본선 trunk 인접 보존)', () => {
     const routes = getDiverseRoutes('s_1265', 'dmc');
     expect(routes.length).toBeGreaterThan(0);
     const fastest = routes[0]!;
