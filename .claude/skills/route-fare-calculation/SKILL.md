@@ -100,14 +100,17 @@ import { findKShortestPaths, getDiverseRoutes } from '@services/route';
 const result = findKShortestPaths('gangnam', 'hongdae', 3);
 // → KShortestPathResult { paths: Route[], k, executionTimeMs }
 
-// 다양성 필터링 (Jaccard 유사도 < 0.7)
-const diverse = getDiverseRoutes('gangnam', 'hongdae', 0.3);
-// → Route[] (최대 3개, 서로 30%+ 다른 경로)
+// 다양성 카드 (환승역 signature 그룹화, maxRoutes 1-5)
+const diverse = getDiverseRoutes('gangnam', 'hongdae', 5);
+// → Route[] (최대 5개, fastest + min-transfer + via-station 카드)
+//   내부: findKShortestPaths(K_SHORTEST_CANDIDATES=30) 후 buildTransferSignature 로 그룹화
 ```
 
-### Route Similarity
+### Route Diversity
 
-Jaccard 유사도: `|A ∩ B| / |A ∪ B|` (segment 기준).
+`buildTransferSignature(route)` 가 환승역 이름 sorted-join을 stable key로 만들어
+K-shortest 후보를 그룹화한다. 같은 환승역 set은 한 카드로 collapse. 직행은 빈
+signature. (PR #58에서 Jaccard 유사도 방식을 대체함)
 
 ## Fare Calculation
 
