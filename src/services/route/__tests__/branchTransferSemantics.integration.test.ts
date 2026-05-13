@@ -44,7 +44,7 @@ describe('Branch-line transfer semantics (RED until Sub-PR #2)', () => {
      *   신정지선 열차는 까치산↔신도림 셔틀. 본선 순환 열차는 별도 운행.
      *   승객은 신도림에서 본선 열차로 환승 필수.
      */
-    it.skip('까치산 → 선릉: 신도림 환승 1회 [RED — Sub-PR #2 sub-line encoding 필요]', () => {
+    it('까치산 → 선릉: 신도림 환승 1회 [RED — Sub-PR #2 sub-line encoding 필요]', () => {
       const routes = getDiverseRoutes('kkachisan', 'seolleung');
       expect(routes.length).toBeGreaterThan(0);
       const fastest = routes[0]!;
@@ -64,7 +64,7 @@ describe('Branch-line transfer semantics (RED until Sub-PR #2)', () => {
      *
      * 성수지선은 성수↔신설동 셔틀. 성수에서 본선 환승 필수.
      */
-    it.skip('신답 → 강남: 성수 환승 1회 [RED — Sub-PR #2 sub-line encoding 필요]', () => {
+    it('신답 → 강남: 성수 환승 1회 [RED — Sub-PR #2 sub-line encoding 필요]', () => {
       const routes = getDiverseRoutes('s_0245', 'gangnam');
       expect(routes.length).toBeGreaterThan(0);
       const fastest = routes[0]!;
@@ -85,7 +85,7 @@ describe('Branch-line transfer semantics (RED until Sub-PR #2)', () => {
      *
      * 마천지선 열차는 강동↔마천 셔틀. 강동에서 본선 환승 필수.
      */
-    it.skip('마천 → 하남검단산: 강동 환승 1회 [RED — Sub-PR #2 sub-line encoding 필요]', () => {
+    it('마천 → 하남검단산: 강동 환승 1회 [RED — Sub-PR #2 sub-line encoding 필요]', () => {
       const routes = getDiverseRoutes('macheon', 'hanam_geomdan');
       expect(routes.length).toBeGreaterThan(0);
       const fastest = routes[0]!;
@@ -109,7 +109,7 @@ describe('Branch-line transfer semantics (RED until Sub-PR #2)', () => {
      * Note: 광운대는 1호선/gyeongchun 환승역. 본 OD는 gyeongchun 망우선
      * 출발을 명시하기 위해 망우선[1]의 station id `s_eab491ec` 사용.
      */
-    it.skip('광운대(gyeongchun) → 청량리: 상봉 환승 1회 [RED — Sub-PR #2 sub-line encoding 필요]', () => {
+    it('광운대(gyeongchun) → 청량리: 상봉 환승 1회 [RED — Sub-PR #2 sub-line encoding 필요]', () => {
       const routes = getDiverseRoutes('s_eab491ec', 'cheongnyangni');
       expect(routes.length).toBeGreaterThan(0);
       const fastest = routes[0]!;
@@ -135,7 +135,7 @@ describe('Branch-line transfer semantics (RED until Sub-PR #2)', () => {
      * 본 테스트는 회귀 net — sub-line encoding이 의도치 않게 분리 운행
      * 노선을 합치지 않는지 확인.
      */
-    it.skip('운정중앙 → 동탄: 다른 노선 경유 (transferCount >= 2) [RED — Sub-PR #2 회귀 net]', () => {
+    it('운정중앙 → 동탄: 다른 노선 경유 (transferCount >= 2) [RED — Sub-PR #2 회귀 net]', () => {
       const routes = getDiverseRoutes('s_9000', 's_eb8f99ed');
       expect(routes.length).toBeGreaterThan(0);
       const fastest = routes[0]!;
