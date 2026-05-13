@@ -512,11 +512,11 @@
       "s_4208",
       "s_eab280ec",
       "s_4210",
+      "s_ec9881ec",
       "s_4211",
       "s_eab3b5ed",
       "s_4213",
-      "s_4215",
-      "s_ec9881ec"
+      "s_4215"
     ],
     "bundang": [
       "cheongnyangni",
@@ -635,6 +635,7 @@
     ],
     "gyeonggang": [
       "s_ed8c90ea",
+      "s_0009",
       "s_ec9db4eb",
       "s_ec82bceb",
       "s_eab2bdea",
@@ -644,8 +645,7 @@
       "s_ec9db4ec",
       "s_ebb680eb",
       "s_ec84b8ec",
-      "s_1511",
-      "s_0009"
+      "s_1511"
     ],
     "gyeongui": [
       "daegok",

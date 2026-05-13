@@ -250,3 +250,46 @@ describe('Line 8 운행 순서 회귀 (2026-05-13 남위례 위치 교정)', () 
     expect(fastest.totalMinutes).toBeGreaterThan(10);
   });
 });
+
+describe('외곽선 운행 순서 회귀 (2026-05-13 batch 교정)', () => {
+  /**
+   * gyeonggang (경강선): 성남(s_0009)이 array 끝(#12)에 위치한 single
+   * misplacement. Wikipedia 운행 순서: 판교 → 성남 → 이매 → ... → 여주.
+   * 잘못된 인접 edge `여주(11) ↔ 성남(12)` 제거.
+   */
+  it('판교→성남(경강)은 환승 0회 직행 1 hop (실제 인접)', () => {
+    const routes = getDiverseRoutes('s_ed8c90ea', 's_0009');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+    expect(fastest.totalMinutes).toBeLessThanOrEqual(5);
+  });
+
+  it('여주→성남(경강)은 거리가 있어 fastest > 15분 (잘못된 인접 edge 가드)', () => {
+    const routes = getDiverseRoutes('s_1511', 's_0009');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.totalMinutes).toBeGreaterThan(15);
+  });
+
+  /**
+   * airport (공항철도): 영종(s_ec9881ec)이 array 끝(#14)에 위치한 single
+   * misplacement. Wikipedia 운행 순서: ... 청라국제도시 → 영종 → 운서 →
+   * 공항화물청사 → 인천공항1터미널 → 인천공항2터미널.
+   */
+  it('청라국제도시→영종은 환승 0회 직행 1 hop (실제 인접)', () => {
+    const routes = getDiverseRoutes('s_4210', 's_ec9881ec');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+    expect(fastest.totalMinutes).toBeLessThanOrEqual(5);
+  });
+
+  it('인천공항2터미널→영종은 거리가 있어 fastest > 5분 (잘못된 인접 edge 가드)', () => {
+    const routes = getDiverseRoutes('s_4215', 's_ec9881ec');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.totalMinutes).toBeGreaterThan(5);
+  });
+
+});
