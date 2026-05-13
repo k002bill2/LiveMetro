@@ -199,3 +199,54 @@ describe('Line 4 운행 순서 회귀 (2026-05-13 수리산 위치 교정)', () 
     expect(fastest.totalMinutes).toBeGreaterThan(15);
   });
 });
+
+describe('Line 8 운행 순서 회귀 (2026-05-13 남위례 위치 교정)', () => {
+  /**
+   * 회귀 원인:
+   *  - 기존 lines.json `8`에서 남위례(s_2828)가 array 끝(#24)에 위치
+   *  - 실제 운행 순서는 복정(17) → 남위례 → 산성(이후) → ... → 모란
+   *  - 잘못된 인접 edge `모란(23) ↔ 남위례(24)` 2.5분 직행이 그래프에 존재
+   *  - 실제 모란↔남위례는 약 6 hops(~15분) 거리 — 잘못된 edge로 라우팅 오염
+   *  - Wikipedia ground truth: 별내 → 다산 → ... → 복정 → 남위례 → 산성 →
+   *    남한산성입구 → 단대오거리 → 신흥 → 수진 → 모란 (24 stations 본선+
+   *    별내선 연장, 단일 운행선, 분기 없음)
+   *  - Line 4 수리산과 동일한 single misplacement 패턴 (2021.12 신설역 누락)
+   */
+
+  /**
+   * 복정→남위례: Wikipedia 운행 순서로 1 hop 인접. 환승 0회, ≤5분.
+   */
+  it('복정→남위례는 환승 0회 직행 1 hop (실제 인접)', () => {
+    const routes = getDiverseRoutes('s_ebb3b5ec', 's_2828');
+
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+    expect(fastest.totalMinutes).toBeLessThanOrEqual(5);
+  });
+
+  /**
+   * 남위례→산성: Wikipedia 순서로 남위례(18) → 산성(19) 인접. 1 hop ≤5분.
+   */
+  it('남위례→산성은 환승 0회 직행 1 hop (실제 인접)', () => {
+    const routes = getDiverseRoutes('s_2828', 's_ec82b0ec');
+
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+    expect(fastest.totalMinutes).toBeLessThanOrEqual(5);
+  });
+
+  /**
+   * 모란→남위례: 잘못된 array 끝 인접 edge 회귀 가드. 정상 동작 시
+   * 단일 노선 직행 약 6 hops(약 15분). fastest > 10분.
+   * 잘못된 edge면 1 hop 2.5분 직행이 fastest로 잘못 등장.
+   */
+  it('모란→남위례는 거리가 있어 fastest > 10분 (잘못된 인접 edge 가드)', () => {
+    const routes = getDiverseRoutes('moran', 's_2828');
+
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.totalMinutes).toBeGreaterThan(10);
+  });
+});
