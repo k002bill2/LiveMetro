@@ -102,6 +102,8 @@ export type AppStackParamList = {
   DelayFeed: {
     lineId?: string;
   } | undefined;
+  ReportDetail: { reportId: string };
+  ReportFeedback: { reportId: string };
 
   // Route screens
   AlternativeRoutes: {
