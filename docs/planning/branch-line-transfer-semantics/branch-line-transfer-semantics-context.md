@@ -82,6 +82,45 @@ LINE_STATIONS의 각 [lineId, segments]에서:
 | #3 | `src/services/route/kShortestPath.ts` | signature-dedupe in-loop |
 | #3 | `src/services/route/__tests__/kShortestPath.integration.test.ts` | .skip 해제 + 회귀 net 확장 |
 
+## RED Evidence — 2026-05-14 (Sub-PR #1 작성 직후 캡처)
+
+Sub-PR #1의 `branchTransferSemantics.integration.test.ts`에서 `.skip`을 일시 해제하고 `npx jest --no-cache` 실행한 fresh 결과. 그 후 `git checkout --`로 복원해 `.skip` 상태로 commit `d2d5ae9`에 머무름.
+
+```
+FAIL src/services/route/__tests__/branchTransferSemantics.integration.test.ts
+
+  Branch-line transfer semantics (RED until Sub-PR #2)
+    Line 2 — 신정지선 ↔ 본선
+      ✕ 까치산 → 선릉: 신도림 환승 1회 (499 ms)
+        Expected: 1 / Received: 0
+    Line 2 — 성수지선 ↔ 본선
+      ✕ 신답 → 강남: 성수 환승 1회 (356 ms)
+        Expected: 1 / Received: 0
+    Line 5 — 마천지선 ↔ 본선
+      ✕ 마천 → 하남검단산: 강동 환승 1회 (742 ms)
+        Expected: 1 / Received: 0
+    gyeongchun — 망우선 ↔ 본선
+      ✕ 광운대(gyeongchun) → 청량리: 상봉 환승 1회 (236 ms)
+        Expected: 1 / Received: 0
+    gtx_a — 분리 운행 (junction 없음, 회귀 net)
+      ✓ 운정중앙 → 동탄: 다른 노선 경유 (transferCount >= 2) (1313 ms)
+
+Tests: 4 failed, 1 passed, 5 total
+```
+
+**해석**:
+- 4개 fail 모두 동일 시그니처 `Expected 1 / Received 0` — 본선↔지선 환승이 그래프에 없다는 단일 root cause 증거. 4건이 같은 메커니즘으로 깨진다는 건 fix도 한 곳(노드 키 인코딩)에서 통합 해결 가능 신호.
+- gtx_a PASS는 회귀 net — 분리 운행은 sub-line encoding 이후에도 결과 동일해야 함. Sub-PR #2 머지 전 필수 회귀 게이트.
+- 메모리 `verification.md` Red-Green TDD step 2 ("수정 안 된 상태에서 fail 확인") 완료. step 3는 Sub-PR #2 머지 시 5/5 PASS로 입증.
+
+## Sub-PR #2 acceptance criteria (RED evidence 기반)
+
+1. 위 4개 RED → GREEN (`transferCount=1`, 환승역 정확)
+2. gtx_a 1건은 PASS 유지 (회귀 net)
+3. 기존 `kShortestPath.integration.test.ts` 17건 모두 PASS 유지
+4. `npm run type-check` + `npm run lint` 0 errors
+5. 디바이스 manual: 까치산→선릉 라우팅에서 "신도림 환승 1회" 표시
+
 ## External references
 
 - 위키피디아 2호선 신정지선: [서울 지하철 2호선 신정지선](https://ko.wikipedia.org/wiki/서울_지하철_2호선#신정지선) — 까치산↔신도림 셔틀 운행체계 확인
