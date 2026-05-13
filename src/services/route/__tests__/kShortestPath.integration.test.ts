@@ -293,3 +293,94 @@ describe('외곽선 운행 순서 회귀 (2026-05-13 batch 교정)', () => {
   });
 
 });
+
+describe('gyeongui — 분기 schema 적용 후 회귀 (PR-1)', () => {
+  /**
+   * 회귀 원인:
+   *  - 현재 lines.json `gyeongui` array는 본선이 array 중간에서 잘려있고
+   *    분기 선구(서울역 지선, 임진강·운천 연장)가 인접 chain으로 연결됨.
+   *  - graph builder가 array[i]↔array[i+1]을 인접 edge로 만들어
+   *    실제로는 인접하지 않는 station 사이에 잘못된 1-hop edge가 생성됨.
+   *  - 잘못된 인접 사례 (current array idx):
+   *      0-1: 대곡 ↔ 이촌 (실제 ~30 hops 떨어짐)
+   *      29-30: 지평 ↔ 서울역 (실제 본선 + 지선 환승 필요)
+   *      31-32: 신촌 ↔ 효창공원앞 (실제 신촌은 가좌-서울역 지선)
+   *  - Wikipedia ground truth (.cache/gyeongui-ground-truth.md):
+   *      본선(52) + 서울역 지선(가좌↔신촌↔서울역) + 임진강·운천 연장(문산↔임진강↔운천)
+   *      + 지평 연장(용문↔지평). 분기점 가좌·문산·용문.
+   *
+   * Task 9에서 LINE_STATIONS.gyeongui를 nested 4-subarray로 reshape하면
+   * RED 테스트가 GREEN으로 전환됨. BASELINE 테스트는 reshape 전후 모두 PASS.
+   */
+
+  /**
+   * 대곡(현재 array idx 0) ↔ 이촌(idx 1)은 잘못된 인접 edge.
+   * 실제 본선 순서: 대곡 → 능곡 → ... → 가좌 → 홍대입구 → ... → 용산 → 이촌
+   * (약 14 hops). 환승 없이 본선 직행이지만 거리 충분.
+   *
+   * 잘못된 1-hop edge가 살아있으면 fastest는 transferCount=0 + 매우 짧은 시간.
+   * 정상 시 fastest는 본선 직행 ≥30분.
+   */
+  it('대곡→이촌 fastest는 거리가 있어 > 20분 (잘못된 인접 edge 가드)', () => {
+    const routes = getDiverseRoutes('daegok', 'ichon');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.totalMinutes).toBeGreaterThan(20);
+  });
+
+  /**
+   * 지평(idx 29) ↔ 서울역(idx 30)은 잘못된 인접 edge.
+   * 실제: 지평 → 용문 → ... → 청량리 환승 → 서울역, 또는 본선 → 가좌 →
+   * 신촌 지선. 어느 경우든 거리/환승 필요.
+   *
+   * 잘못된 1-hop edge가 살아있으면 fastest는 ~5분 직행으로 잘못 등장.
+   * 정상 시 fastest > 60분 (~50 hops 본선 + 지선 환승).
+   */
+  it('지평→서울역 fastest는 거리가 있어 > 60분 (잘못된 인접 edge 가드)', () => {
+    const routes = getDiverseRoutes('s_1220', 'seoul');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.totalMinutes).toBeGreaterThan(60);
+  });
+
+  /**
+   * 가좌 → 서울역: 본선 분기점 가좌에서 서울역 지선(가좌 ↔ 신촌 ↔ 서울역)
+   * 으로 분기. 환승 0회 + 2 hops 직행이 정상.
+   *
+   * BASELINE: 현재 array에서도 가좌(36) ← idx 36→35→...→31→30 chain으로
+   * 가좌→서울역 직행 path가 존재할 가능성 있으나 본선 우회를 거치므로 길 수 있음.
+   * 분기 schema 적용 후에는 가좌→신촌→서울역 2 hops가 정확하게 fastest로 등장.
+   * 회귀 가드: fastest는 환승 0회. 시간은 reshape 전후 모두 검증 가능.
+   */
+  it('가좌→서울역 fastest는 환승 0회 직행 (분기 양방향 edge 검증)', () => {
+    const routes = getDiverseRoutes('s_1265', 'seoul');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+  });
+
+  /**
+   * 가좌 → DMC: 본선 trunk 인접. 현재 array에서도 가좌(36)↔DMC(37) 인접.
+   * BASELINE — reshape 전후 모두 환승 0회 1 hop ≤5분 직행이어야 함.
+   */
+  it('가좌→DMC는 환변 0회 직행 1 hop (본선 trunk 인접 보존)', () => {
+    const routes = getDiverseRoutes('s_1265', 'dmc');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+    expect(fastest.totalMinutes).toBeLessThanOrEqual(5);
+  });
+
+  /**
+   * 용산 → 용문: 본선 trunk의 긴 OD pair. 용산(idx 3) → 이촌(1) → 서빙고(2) →
+   * 한남(4) → ... → 용문(28). 현재 array는 용산(3)↔한남(4) 인접 + 본선 chain
+   * 일부 보존돼 있으나 reshape 후 정확한 본선 직행이 fastest로 등장.
+   * BASELINE — reshape 전후 모두 환승 0회 직행 존재.
+   */
+  it('용산→용문 fastest는 본선 직행 환승 0회 (본선 trunk 무회귀)', () => {
+    const routes = getDiverseRoutes('yongsan', 's_ec9aa9eb');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+  });
+});
