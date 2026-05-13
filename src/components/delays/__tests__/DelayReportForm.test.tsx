@@ -13,6 +13,14 @@ jest.mock('lucide-react-native', () => ({
   HelpCircle: 'HelpCircle',
   Send: 'Send',
   X: 'X',
+  Minus: 'Minus',
+  Plus: 'Plus',
+  MapPin: 'MapPin',
+  Bookmark: 'Bookmark',
+  Image: 'Image',
+  Camera: 'Camera',
+  Mic: 'Mic',
+  Info: 'Info',
 }));
 
 jest.mock('@/services/theme', () => ({
@@ -53,6 +61,7 @@ jest.mock('@/services/delay/delayReportService', () => ({
 }));
 
 jest.mock('@/utils/colorUtils', () => ({
+  ...jest.requireActual('@/utils/colorUtils'),
   getSubwayLineColor: jest.fn((lineId: string) => {
     const colors: Record<string, string> = {
       '1': '#0052A4',
@@ -75,7 +84,12 @@ describe('DelayReportForm', () => {
 
   it('renders the form title', () => {
     const { getByText } = render(<DelayReportForm />);
-    expect(getByText('지연 제보하기')).toBeTruthy();
+    expect(getByText('지연 제보')).toBeTruthy();
+  });
+
+  it('renders draft save button', () => {
+    const { getByTestId } = render(<DelayReportForm />);
+    expect(getByTestId('draft-save-button')).toBeTruthy();
   });
 
   it('renders all line selection buttons', () => {
@@ -97,8 +111,8 @@ describe('DelayReportForm', () => {
 
   it('renders the submit button as disabled initially', () => {
     const { getByText } = render(<DelayReportForm />);
-    // Submit button text is "제보하기"
-    expect(getByText('제보하기')).toBeTruthy();
+    // Submit button text is "제보 등록"
+    expect(getByText('제보 등록')).toBeTruthy();
   });
 
   it('renders station name input', () => {
@@ -147,20 +161,43 @@ describe('DelayReportForm', () => {
     expect(getByDisplayValue('강남')).toBeTruthy();
   });
 
-  it('renders info text about reporting', () => {
-    const { getByText } = render(<DelayReportForm />);
-    expect(getByText(/제보는 다른 승객들의 판단에 도움이 됩니다/)).toBeTruthy();
+  it('renders anonymous toggle', () => {
+    const { getByTestId } = render(<DelayReportForm />);
+    expect(getByTestId('anonymous-toggle')).toBeTruthy();
   });
 
-  it('shows alert when submitting without line selected', async () => {
+  it('renders recommended station chips', () => {
+    const { getByTestId } = render(<DelayReportForm />);
+    expect(getByTestId('station-recommend-강남')).toBeTruthy();
+    expect(getByTestId('station-recommend-홍대입구')).toBeTruthy();
+    expect(getByTestId('station-recommend-여의도')).toBeTruthy();
+  });
+
+  it('fills station name when a recommended chip is pressed', () => {
+    const { getByTestId, getByDisplayValue } = render(<DelayReportForm />);
+    fireEvent.press(getByTestId('station-recommend-잠실'));
+    expect(getByDisplayValue('잠실')).toBeTruthy();
+  });
+
+  it('renders bookmark toggle in sticky footer', () => {
+    const { getByTestId } = render(<DelayReportForm />);
+    expect(getByTestId('bookmark-toggle')).toBeTruthy();
+  });
+
+  it('shows GPS info card when station name is filled', () => {
+    const { getByTestId, queryByTestId } = render(<DelayReportForm />);
+    expect(queryByTestId('gps-info-card')).toBeNull();
+
+    fireEvent.press(getByTestId('station-recommend-강남'));
+    expect(getByTestId('gps-info-card')).toBeTruthy();
+  });
+
+  it('keeps submit button disabled when line is not selected', () => {
     const { getByText } = render(
       <DelayReportForm onSubmitSuccess={mockOnSubmitSuccess} />,
     );
-    // Select a report type but not a line
     fireEvent.press(getByText(ReportTypeLabels.delay));
-    // The submit button should be disabled since no line is selected
-    // Verify that the button exists but is disabled
-    const submitButton = getByText('제보하기');
+    const submitButton = getByText('제보 등록');
     expect(submitButton).toBeTruthy();
   });
 
