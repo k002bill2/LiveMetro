@@ -393,3 +393,101 @@ describe('gyeongui — 분기 schema 적용 후 회귀 (PR-1)', () => {
     expect(fastest.totalMinutes).toBeLessThanOrEqual(70);
   });
 });
+
+describe('Line 2 — 분기 schema 적용 후 회귀 (PR-6)', () => {
+  /**
+   * 회귀 원인:
+   *  - 기존 lines.json `2`는 본선 ring(43) + 성수지선(5) + 신정지선(5)을
+   *    하나의 flat array로 mash. graph builder가 array[i]↔array[i+1] 단순
+   *    인접 edge를 만들어 다음 잘못된 edge가 생성:
+   *      까치산↔시청, 충정로↔용답, 신답↔신설동, 신설동↔도림천, 신정네거리↔용두
+   *  - Wikipedia ground truth: 본선 순환 43역, 성수지선 성수→용답→신답→
+   *    용두→신설동, 신정지선 신도림→도림천→양천구청→신정네거리→까치산.
+   *  - PR-1 nested-array schema (string[][]) 적용으로 분기 표현. 본선 ring
+   *    closure(시청↔충정로)는 routeService/kShortestPath의 line2 wrap 코드가
+   *    담당 (현재 underscore-key bug로 silent no-op, 별도 phase 처리 예정).
+   */
+
+  /**
+   * 충정로→시청: 잘못된 인접 edge 회귀 가드. 잘못된 mash array에선
+   * 까치산→시청 phantom edge로 까치산 경유가 fastest일 수 있었음.
+   * 정상 동작 시 본선 trunk 인접 (충정로→시청은 ring closure로 별도 wrap
+   * 필요하지만, 충정로→아현→...→사당→...→교대→...→대림→신도림→...→
+   * 시청 같은 trunk 내부 경로 존재). 회귀 가드는 까치산 경유가 fastest가
+   * 아닐 것.
+   */
+  it('충정로→시청 fastest는 까치산 경유가 아니다 (잘못된 phantom edge 제거)', () => {
+    const routes = getDiverseRoutes('chungjeongno', 'city_hall_1');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    const passesKkachisan = fastest.segments.some((seg) =>
+      seg.fromStationName === '까치산' || seg.toStationName === '까치산',
+    );
+    expect(passesKkachisan).toBe(false);
+  });
+
+  /**
+   * 성수지선 trunk 인접 검증. 성수→용답→신답→용두→신설동 5역 운행 순서.
+   * 성수→용답은 1 hop 직행 환승 0회.
+   */
+  it('성수→용답은 환승 0회 직행 1 hop (성수지선 trunk 인접)', () => {
+    const routes = getDiverseRoutes('seongsu', 's_0244');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+    expect(fastest.totalMinutes).toBeLessThanOrEqual(5);
+  });
+
+  /**
+   * 신답↔용두 인접 회귀. 잘못된 mash array에선 신답→신설동(1 hop)이었지만
+   * 실제 운행 순서는 신답→용두→신설동 (2 hops). reshape 후 신답→용두는
+   * 1 hop, 신답→신설동은 2 hops가 정상.
+   */
+  it('신답→용두는 환승 0회 직행 1 hop (성수지선 운행 순서 교정)', () => {
+    const routes = getDiverseRoutes('s_0245', 's_0250');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+    expect(fastest.totalMinutes).toBeLessThanOrEqual(5);
+  });
+
+  /**
+   * 신정지선 trunk 인접 검증. 신도림→도림천→양천구청→신정네거리→까치산.
+   * 신도림→도림천 1 hop 직행.
+   */
+  it('신도림→도림천은 환승 0회 직행 1 hop (신정지선 trunk 인접)', () => {
+    const routes = getDiverseRoutes('sindorim', 's_0247');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+    expect(fastest.totalMinutes).toBeLessThanOrEqual(5);
+  });
+
+  /**
+   * 신정네거리↔용두 phantom edge 제거 회귀 가드. 잘못된 mash array에선
+   * 신정네거리→용두가 직접 1 hop edge였음 (서로 다른 지선). reshape 후
+   * 두 역을 잇는 최단 경로는 까치산↔본선 ring↔성수지선 같은 우회 경로.
+   * 회귀 가드: 1 hop 환승 0회 직행이 사라졌을 것.
+   */
+  it('신정네거리→용두 fastest는 1-hop 환승 0회 직행이 아니다 (phantom edge 제거)', () => {
+    const routes = getDiverseRoutes('s_0249', 's_0250');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    // Was 1-hop 2.5min direct under mash. After reshape, must include a transfer
+    // or go around the ring (≫ 5min).
+    const isOneHopDirect = fastest.transferCount === 0 && fastest.totalMinutes <= 5;
+    expect(isOneHopDirect).toBe(false);
+  });
+
+  /**
+   * 본선 ring trunk 무회귀 baseline. 시청→을지로입구는 본선 trunk 인접
+   * 1 hop 직행으로 매우 짧다. reshape 전후 모두 PASS여야 함.
+   */
+  it('시청→을지로입구는 환승 0회 직행 1 hop (본선 trunk 인접 보존)', () => {
+    const routes = getDiverseRoutes('city_hall_1', 's_ec9d84ec');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+    expect(fastest.totalMinutes).toBeLessThanOrEqual(5);
+  });
+});
