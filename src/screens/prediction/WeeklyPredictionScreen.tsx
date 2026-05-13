@@ -49,11 +49,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useMLPrediction } from '@/hooks/useMLPrediction';
 import { useCommutePattern } from '@/hooks/useCommutePattern';
 import { usePredictionFactors } from '@/hooks/usePredictionFactors';
-<<<<<<< HEAD
-=======
 import { useIntegratedAlerts } from '@/hooks/useIntegratedAlerts';
-import { routeService } from '@/services/route';
->>>>>>> 532f877 (fix(prediction): wire CTA to useIntegratedAlerts.scheduleDepartureAlert)
 import { useTheme, ThemeColors } from '@/services/theme';
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { Pill } from '@/components/design';
