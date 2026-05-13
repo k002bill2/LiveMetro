@@ -394,6 +394,96 @@ describe('gyeongui — 분기 schema 적용 후 회귀 (PR-1)', () => {
   });
 });
 
+describe('Line 6 — 분기 schema 적용 후 회귀 (PR-3)', () => {
+  /**
+   * 회귀 원인:
+   *  - 현재 lines.json `6` array는 응암 순환(idx 0-5)이 본선(idx 6-38) 앞에
+   *    inline되어 있어 구산(idx 5)과 새절(idx 6)이 잘못 인접 chain으로 연결됨.
+   *  - graph builder가 array[i]↔array[i+1]을 인접 edge로 만들어
+   *    실제로는 인접하지 않는 station 사이에 잘못된 1-hop edge가 생성됨.
+   *  - 잘못된 인접 사례 (current array idx):
+   *      5-6: 구산 ↔ 새절 (실제 응암 경유 2 hops 필요)
+   *  - Wikipedia ground truth (.cache/line6-ground-truth.md):
+   *      본선 34역 (응암→새절→...→신내), 응암 순환 7 entries
+   *      (응암→역촌→불광→독바위→연신내→구산→응암, 응암 두 번). 분기점 응암.
+   *
+   * PR-3에서 LINE_STATIONS.6를 nested 2-subarray로 reshape하면 RED 테스트가
+   * GREEN으로 전환됨. BASELINE 테스트는 reshape 전후 모두 PASS.
+   *
+   * Ring representation 주의: 응암 ring은 single subarray로 표현하되
+   * 응암 id(`eungam`)가 시작·끝에 두 번 등장
+   * (`[eungam, ..., 구산, eungam]`). graph builder의 inner i/i+1 loop가
+   * 자연스럽게 ring 양 인접 edge(응암↔역촌 + 응암↔구산)를 생성한다.
+   * Line 2 circular wrap 같은 별도 코드 불필요.
+   */
+
+  /**
+   * 구산 → 새절: 응암 순환 끝과 본선 시작이 잘못 인접.
+   * 실제: 구산 → 응암(ring close) → 새절 (2 hops, 같은 6호선, 환승 0회)
+   *
+   * 잘못된 1-hop edge가 살아있으면 fastest는 ~3분 직행으로 잘못 등장.
+   * 정상 시 fastest > 4분 (2 hops 우회).
+   */
+  it('구산→새절 fastest는 거리가 있어 > 4분 (잘못된 인접 edge 가드)', () => {
+    const routes = getDiverseRoutes('s_eab5acec', 'saejeol');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.totalMinutes).toBeGreaterThan(4);
+  });
+
+  /**
+   * 응암 → 역촌: ring 시작 인접. 환승 0회 1 hop ≤5분 직행.
+   * Ring subarray의 첫 i/i+1 인접 edge가 정상 생성되는지 검증.
+   */
+  it('응암→역촌은 환승 0회 직행 1 hop (ring 시작 인접 보존)', () => {
+    const routes = getDiverseRoutes('eungam', 's_ec97adec');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+    expect(fastest.totalMinutes).toBeLessThanOrEqual(5);
+  });
+
+  /**
+   * 응암 → 구산: ring 끝(close) 인접. 환승 0회 1 hop ≤5분 직행.
+   * Ring subarray의 마지막 인덱스에 응암이 다시 등장 (`[..., 구산, 응암]`)
+   * 하므로 graph builder가 i=N-1에서 prev edge(응암→구산)와
+   * i=N-2(구산)에서 next edge(구산→응암)를 모두 생성한다.
+   * 이 두 edge가 ring close를 형성하는지 검증.
+   */
+  it('응암→구산은 환승 0회 직행 1 hop (ring close 인접 보존)', () => {
+    const routes = getDiverseRoutes('eungam', 's_eab5acec');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+    expect(fastest.totalMinutes).toBeLessThanOrEqual(5);
+  });
+
+  /**
+   * 응암 → 새절: 본선 trunk 시작 인접. 환승 0회 1 hop ≤5분 직행.
+   * Trunk subarray가 응암으로 시작하면 응암↔새절 인접이 보존된다.
+   * BASELINE — reshape 전후 모두 PASS.
+   */
+  it('응암→새절은 환승 0회 직행 1 hop (본선 trunk 시작 인접 보존)', () => {
+    const routes = getDiverseRoutes('eungam', 'saejeol');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+    expect(fastest.totalMinutes).toBeLessThanOrEqual(5);
+  });
+
+  /**
+   * 새절 → 증산: 본선 trunk 인접 (분기점 응암 다음 역). 환승 0회 1 hop ≤5분.
+   * BASELINE — reshape 전후 모두 PASS.
+   */
+  it('새절→증산은 환승 0회 직행 1 hop (본선 trunk 인접 보존)', () => {
+    const routes = getDiverseRoutes('saejeol', 's_eca69dec');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+    expect(fastest.totalMinutes).toBeLessThanOrEqual(5);
+  });
+});
+
 describe('Line 5 — 분기 schema 적용 후 회귀 (PR-2)', () => {
   /**
    * 회귀 원인:
