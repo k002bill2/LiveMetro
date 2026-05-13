@@ -39,8 +39,10 @@ export function validateStationMapping(): ValidationSummary {
 
   console.log('🔍 서울 지하철 데이터 검증 시작...\n');
 
-  // 각 노선별로 검증
-  Object.entries(LINE_STATIONS).forEach(([lineId, stationIds]) => {
+  // 각 노선별로 검증. LINE_STATIONS는 string[][] (operational segments).
+  // 검증 목적은 ID 멤버십/중복/좌표 점검이므로 인접성 불필요 → flat 처리.
+  Object.entries(LINE_STATIONS).forEach(([lineId, segments]) => {
+    const stationIds = segments.flat();
     const missingStations: string[] = [];
     const duplicateStations: string[] = [];
     const invalidCoordinates: string[] = [];
@@ -215,8 +217,8 @@ export function printValidationReport(summary: ValidationSummary): void {
 export function findOrphanedStations(): string[] {
   const stationsInLines = new Set<string>();
 
-  Object.values(LINE_STATIONS).forEach(stationIds => {
-    stationIds.forEach(id => stationsInLines.add(id));
+  Object.values(LINE_STATIONS).forEach(segments => {
+    segments.flat().forEach(id => stationsInLines.add(id));
   });
 
   const orphanedStations = Object.keys(STATIONS).filter(

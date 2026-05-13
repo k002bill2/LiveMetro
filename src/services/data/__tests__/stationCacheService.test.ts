@@ -117,7 +117,7 @@ describe('StationCacheService', () => {
     it('should save lines to cache', async () => {
       const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
       const colors = { '2': '#00a84d' };
-      const stations = { '2': ['221', '222'] };
+      const stations = { '2': [['221', '222']] };
 
       await stationCacheService.setLines(colors, stations);
 

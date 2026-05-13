@@ -63,11 +63,15 @@ export const generateMapLayout = (lines?: SimpleSubwayLine[]): MapData => {
   const edges: MapEdge[] = [];
   const addedStations = new Set<string>();
 
-  // If custom lines provided, use them; otherwise use predefined data
-  const lineData = lines || Object.entries(LINE_STATIONS).map(([id, stations]) => ({
+  // If custom lines provided, use them; otherwise use predefined data.
+  // mapLayout uses station-level membership to render nodes; subarray
+  // structure of branched lines is irrelevant here (visual chain edges
+  // are built per `lineData` entry below). Flatten to preserve prior
+  // single-trunk behavior for the 18 normalized single-segment lines.
+  const lineData = lines || Object.entries(LINE_STATIONS).map(([id, segments]) => ({
     id,
     color: LINE_COLORS[id] || '#888888',
-    stations,
+    stations: segments.flat(),
   }));
 
   lineData.forEach(line => {

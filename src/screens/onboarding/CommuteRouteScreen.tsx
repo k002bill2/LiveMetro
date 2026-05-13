@@ -121,26 +121,36 @@ const buildDirectFallback = (): TransferRouteOptionData => ({
 
 /**
  * Compute the shortest direct ride between two stations on a single line.
- * Returns minutes if both stations sit on the line, undefined otherwise.
+ * Returns minutes if both stations sit on the same operational subarray of
+ * the line, undefined otherwise.
  *
- * Uses index distance on `LINE_STATIONS[line]` (no graph search). Handles
- * line 2 as a circular line — the shorter arc between two endpoints is
- * `min(forward, backward)` around the loop.
+ * Uses index distance on `LINE_STATIONS[line]` (no graph search). For
+ * branched lines the dataset is `string[][]` — each subarray is one
+ * operational segment. Cross-subarray pairs (e.g. main line ↔ branch)
+ * cannot be measured by index alone and return undefined; callers fall
+ * back to graph search or membership-only logic.
+ *
+ * Handles line 2 as a circular line — the shorter arc between two
+ * endpoints is `min(forward, backward)` around the loop, scoped to the
+ * containing subarray.
  */
 const directMinutesOnLine = (
   lineId: string,
   fromId: string,
   toId: string,
 ): number | undefined => {
-  const stations = LINE_STATIONS[lineId];
-  if (!stations) return undefined;
-  const i = stations.indexOf(fromId);
-  const j = stations.indexOf(toId);
-  if (i < 0 || j < 0) return undefined;
-  const linear = Math.abs(i - j);
-  const dist =
-    lineId === '2' ? Math.min(linear, stations.length - linear) : linear;
-  return dist * AVG_STATION_TRAVEL_TIME;
+  const segments = LINE_STATIONS[lineId];
+  if (!segments) return undefined;
+  for (const stations of segments) {
+    const i = stations.indexOf(fromId);
+    const j = stations.indexOf(toId);
+    if (i < 0 || j < 0) continue;
+    const linear = Math.abs(i - j);
+    const dist =
+      lineId === '2' ? Math.min(linear, stations.length - linear) : linear;
+    return dist * AVG_STATION_TRAVEL_TIME;
+  }
+  return undefined;
 };
 
 /**

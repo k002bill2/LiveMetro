@@ -37,15 +37,20 @@ export const getRouteDirection = (route: Route): string | null => {
   if (route.transferCount > 0 || route.segments.length === 0) return null;
   const firstTrain = route.segments.find(s => !s.isTransfer);
   if (!firstTrain) return null;
-  const lineStations = LINE_STATIONS[firstTrain.lineId];
-  if (!lineStations || lineStations.length === 0) return null;
-  const fromIdx = lineStations.indexOf(firstTrain.fromStationId);
-  const toIdx = lineStations.indexOf(firstTrain.toStationId);
-  if (fromIdx === -1 || toIdx === -1) return null;
-  const endpointId =
-    toIdx > fromIdx
-      ? lineStations[lineStations.length - 1]
-      : lineStations[0];
-  if (!endpointId) return null;
-  return STATIONS[endpointId]?.name ?? null;
+  const segments = LINE_STATIONS[firstTrain.lineId];
+  if (!segments || segments.length === 0) return null;
+  // Find the subarray containing both endpoints — direction is meaningful
+  // only within a single operational segment of the line. Branched lines
+  // have multiple subarrays; cross-subarray legs would imply a transfer
+  // (already filtered above by transferCount === 0 guard).
+  for (const stations of segments) {
+    const fromIdx = stations.indexOf(firstTrain.fromStationId);
+    const toIdx = stations.indexOf(firstTrain.toStationId);
+    if (fromIdx === -1 || toIdx === -1) continue;
+    const endpointId =
+      toIdx > fromIdx ? stations[stations.length - 1] : stations[0];
+    if (!endpointId) return null;
+    return STATIONS[endpointId]?.name ?? null;
+  }
+  return null;
 };
