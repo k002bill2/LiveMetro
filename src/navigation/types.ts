@@ -27,6 +27,7 @@ export type SettingsStackParamList = {
   ThemeSettings: undefined;
   LocationPermission: undefined;
   Help: undefined;
+  Feedback: undefined;
   PrivacyPolicy: undefined;
 };
 
