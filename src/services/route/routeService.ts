@@ -21,6 +21,10 @@ import {
 import { PriorityQueue } from '@/utils/priorityQueue';
 import { fareService, type FareResult } from './fareService';
 import { getDiverseRoutes } from './kShortestPath';
+import {
+  getNextTrainWaitMinutes,
+  type RealtimeArrival,
+} from './realtimeWeightOverride';
 
 // ============================================================================
 // Types
@@ -442,6 +446,7 @@ export const calculateRoute = (
   toStationId: string,
   excludeLineIds: readonly string[] = [],
   congestionMultipliers?: ReadonlyMap<string, number>,
+  realtimeArrivals?: readonly RealtimeArrival[],
 ): Route | null => {
   // Build graph
   const graph = buildGraph(excludeLineIds, congestionMultipliers);
@@ -462,7 +467,21 @@ export const calculateRoute = (
   const segments = pathToSegments(result.path);
   if (segments.length === 0) return null;
 
-  return createRoute(segments);
+  // Phase C: add next-train wait time to first segment if realtime data available.
+  // Graceful fallback when no data / non-matching line / wait=0.
+  const adjustedSegments = (() => {
+    if (!realtimeArrivals || realtimeArrivals.length === 0) return segments;
+    const first = segments[0];
+    if (!first) return segments;
+    const wait = getNextTrainWaitMinutes(realtimeArrivals, first.lineId);
+    if (wait === null || wait === 0) return segments;
+    return [
+      { ...first, estimatedMinutes: first.estimatedMinutes + wait },
+      ...segments.slice(1),
+    ];
+  })();
+
+  return createRoute(adjustedSegments);
 };
 
 /**
