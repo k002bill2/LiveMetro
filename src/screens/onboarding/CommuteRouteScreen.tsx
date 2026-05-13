@@ -146,6 +146,10 @@ const directMinutesOnLine = (
     const j = stations.indexOf(toId);
     if (i < 0 || j < 0) continue;
     const linear = Math.abs(i - j);
+    // Note: this circular wrap-around assumes Line 2 is a single-subarray
+    // trunk. When PR-6 reshapes Line 2 to trunk + 성수지선 + 신정지선,
+    // this math must be revisited (current behavior wraps each subarray
+    // as if circular, which would be wrong for branch subarrays).
     const dist =
       lineId === '2' ? Math.min(linear, stations.length - linear) : linear;
     return dist * AVG_STATION_TRAVEL_TIME;
