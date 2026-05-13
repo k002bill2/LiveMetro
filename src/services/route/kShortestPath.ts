@@ -500,6 +500,23 @@ const DEFAULT_MAX_ROUTES = 5;
 const UNREALISTIC_TIME_FACTOR = 1.5;
 
 /**
+ * Number of K-shortest candidates explored before signature grouping. Higher
+ * values surface topologically distinct transfer paths that Yen's algorithm
+ * does not reach with small K (e.g. 산곡→선릉 via 강남구청 환승 ranks ~#25 in
+ * Yen's natural exploration order — K must be ≥25 to even consider it).
+ *
+ * Each increment roughly doubles the per-query cost; 30 was chosen as the
+ * empirical break-even where realistic 수도권 OD pairs include all major
+ * transfer-station alternatives. Increase further only if user reports a
+ * specific missing alternative (and document the OD pair).
+ *
+ * History:
+ *   - PR #58: 10 → 15 (initial transfer-grouping diversity)
+ *   - This commit: 15 → 30 (산곡→선릉 강남구청 경유)
+ */
+const K_SHORTEST_CANDIDATES = 30;
+
+/**
  * Pick a diverse set of 1–5 routes from the K-shortest candidates by
  * grouping on transfer-station signature. Returns up to `maxRoutes` cards
  * with the following category invariants:
@@ -523,7 +540,7 @@ export function getDiverseRoutes(
   toStationId: string,
   maxRoutes: number = DEFAULT_MAX_ROUTES,
 ): Route[] {
-  const result = findKShortestPaths(fromStationId, toStationId, 15);
+  const result = findKShortestPaths(fromStationId, toStationId, K_SHORTEST_CANDIDATES);
   if (result.paths.length === 0) return [];
 
   const filtered = result.paths.filter((r) => r.transferCount <= MAX_ROUTE_TRANSFERS);
