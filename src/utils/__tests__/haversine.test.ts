@@ -9,7 +9,7 @@
  *  - 장거리 (~100km): ±1km
  */
 
-import { haversineDistanceKm } from '../haversine';
+import { haversineDistanceKm, sumHaversineDistanceKm } from '../haversine';
 
 // 실제 Seoul Metro 좌표 (stationCoordinates.json에서 가져옴)
 const seoulStation = { latitude: 37.554648, longitude: 126.972559 }; // 서울역 (0150)
@@ -57,5 +57,36 @@ describe('haversineDistanceKm', () => {
     const a = { latitude: 37.0, longitude: 126.0 };
     const b = { latitude: -37.0, longitude: -126.0 };
     expect(haversineDistanceKm(a, b)).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('sumHaversineDistanceKm', () => {
+  it('empty array → 0', () => {
+    expect(sumHaversineDistanceKm([])).toBe(0);
+  });
+
+  it('single point → 0 (no segments)', () => {
+    expect(sumHaversineDistanceKm([seoulStation])).toBe(0);
+  });
+
+  it('two points → same as haversineDistanceKm(a, b)', () => {
+    const direct = haversineDistanceKm(seoulStation, cityHall);
+    const summed = sumHaversineDistanceKm([seoulStation, cityHall]);
+    expect(summed).toBe(direct);
+  });
+
+  it('three points (서울역 → 시청 → 종각) → 1.3 + 0.65 ≈ 1.95 km', () => {
+    const total = sumHaversineDistanceKm([seoulStation, cityHall, jonggak]);
+    expect(total).toBeGreaterThan(1.85);
+    expect(total).toBeLessThan(2.05);
+  });
+
+  it('result equals sum of adjacent pairs', () => {
+    const points = [seoulStation, cityHall, jonggak];
+    const total = sumHaversineDistanceKm(points);
+    const manual =
+      haversineDistanceKm(points[0]!, points[1]!) +
+      haversineDistanceKm(points[1]!, points[2]!);
+    expect(total).toBe(manual);
   });
 });

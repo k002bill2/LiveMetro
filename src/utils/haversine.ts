@@ -35,3 +35,17 @@ export function haversineDistanceKm(a: LatLng, b: LatLng): number {
 
   return EARTH_RADIUS_KM * c;
 }
+
+/**
+ * 인접 좌표 쌍의 Haversine 거리를 누적 합산.
+ * 0~1개 좌표는 0을 반환 (segment 없음).
+ *
+ * 용례: 경로 [from, via1, via2, to]의 GPS 총 거리.
+ */
+export function sumHaversineDistanceKm(coords: readonly LatLng[]): number {
+  let total = 0;
+  for (let i = 1; i < coords.length; i++) {
+    total += haversineDistanceKm(coords[i - 1]!, coords[i]!);
+  }
+  return total;
+}
