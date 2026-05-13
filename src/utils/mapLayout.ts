@@ -74,8 +74,9 @@ export const generateMapLayout = (lines?: SimpleSubwayLine[]): MapData => {
   // across subarrays so color/membership lookups (createLinePaths,
   // getLineEdges) keep working unchanged.
   const lineData = lines || Object.entries(LINE_STATIONS).flatMap(([id, segments]) =>
-    segments.map(stations => ({
+    segments.map((stations, segIdx) => ({
       id,
+      segIdx,
       color: LINE_COLORS[id] || '#888888',
       stations: [...stations],
     })),
@@ -138,7 +139,7 @@ export const generateMapLayout = (lines?: SimpleSubwayLine[]): MapData => {
 
       if (curr && next) {
         edges.push({
-          id: `edge-${line.id}-${i}`,
+          id: `edge-${line.id}-${'segIdx' in line ? line.segIdx : 0}-${i}`,
           x1: curr.x,
           y1: curr.y,
           x2: next.x,
