@@ -187,10 +187,12 @@ export const generateLinePathData = (): LinePathData[] => {
     // Close loop for Line 2 trunk subarray (segments[0]) only.
     // Branch subarrays (성수지선, 신정지선) are not circular.
     if (lineId === '2' && segments[0] && segments[0].length > 1) {
-      const trunk = segments[0];
-      const firstStation = STATIONS[trunk[0]!];
-      if (firstStation) {
-        allSegments.push({ type: 'L', points: [firstStation.x, firstStation.y] });
+      const trunkFirstId = segments[0][0];
+      if (trunkFirstId) {
+        const firstStation = STATIONS[trunkFirstId];
+        if (firstStation) {
+          allSegments.push({ type: 'L', points: [firstStation.x, firstStation.y] });
+        }
       }
     }
 
