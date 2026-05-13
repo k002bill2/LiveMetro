@@ -6404,5 +6404,15 @@
     "lines": [
       "incheon1"
     ]
+  },
+  "dorasan": {
+    "id": "dorasan",
+    "name": "도라산",
+    "nameEn": "Dorasan",
+    "x": 1635,
+    "y": 377,
+    "lines": [
+      "gyeongui"
+    ]
   }
 }
