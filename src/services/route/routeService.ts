@@ -13,7 +13,6 @@ import {
   AlternativeRouteOptions,
   DEFAULT_ALTERNATIVE_OPTIONS,
   AVG_STATION_TRAVEL_TIME,
-  AVG_TRANSFER_TIME,
   createRoute,
   createAlternativeRoute,
   getLineName,
@@ -27,6 +26,7 @@ import {
   getNextTrainWaitMinutes,
   type RealtimeArrival,
 } from './realtimeWeightOverride';
+import { getTransferTime } from './transferTime';
 
 // ============================================================================
 // Types
@@ -201,7 +201,7 @@ const buildGraph = (
           const edges1 = edges.get(key1) || [];
           edges1.push({
             to: { stationId: station.id, lineId: line2, key: key2 },
-            weight: adjustWeight(AVG_TRANSFER_TIME, line2),
+            weight: adjustWeight(getTransferTime(station.id), line2),
             isTransfer: true,
           });
           edges.set(key1, edges1);
@@ -210,7 +210,7 @@ const buildGraph = (
           const edges2 = edges.get(key2) || [];
           edges2.push({
             to: { stationId: station.id, lineId: line1, key: key1 },
-            weight: adjustWeight(AVG_TRANSFER_TIME, line1),
+            weight: adjustWeight(getTransferTime(station.id), line1),
             isTransfer: true,
           });
           edges.set(key2, edges2);
@@ -417,7 +417,7 @@ const pathToSegments = (path: string[]): RouteSegment[] => {
       toStationName: nextStation.name,
       lineId: isTransfer ? nextLineId : currentLineId,
       lineName: getLineName(isTransfer ? nextLineId : currentLineId),
-      estimatedMinutes: isTransfer ? AVG_TRANSFER_TIME : AVG_STATION_TRAVEL_TIME,
+      estimatedMinutes: isTransfer ? getTransferTime(currentStationId) : AVG_STATION_TRAVEL_TIME,
       isTransfer,
     });
   }

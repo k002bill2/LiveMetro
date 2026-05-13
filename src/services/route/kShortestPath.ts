@@ -11,8 +11,8 @@ import {
   createRoute,
   getLineName,
   AVG_STATION_TRAVEL_TIME,
-  AVG_TRANSFER_TIME,
 } from '@models/route';
+import { getTransferTime } from './transferTime';
 
 // ============================================================================
 // Types
@@ -168,7 +168,7 @@ function buildGraph(
         if (graph.has(key1) && !excludeEdges?.has(`${key1}->${key2}`)) {
           graph.get(key1)?.push({
             to: key2,
-            weight: adjustWeight(AVG_TRANSFER_TIME, line2),
+            weight: adjustWeight(getTransferTime(station.id), line2),
             isTransfer: true,
             lineId: line2,
           });
@@ -177,7 +177,7 @@ function buildGraph(
         if (graph.has(key2) && !excludeEdges?.has(`${key2}->${key1}`)) {
           graph.get(key2)?.push({
             to: key1,
-            weight: adjustWeight(AVG_TRANSFER_TIME, line1),
+            weight: adjustWeight(getTransferTime(station.id), line1),
             isTransfer: true,
             lineId: line1,
           });
@@ -420,8 +420,8 @@ function calculatePathCost(nodes: string[]): number {
     const [currentStationId, currentLineId] = current.split('#');
     const [nextStationId, nextLineId] = next.split('#');
 
-    if (currentStationId === nextStationId && currentLineId !== nextLineId) {
-      cost += AVG_TRANSFER_TIME;
+    if (currentStationId === nextStationId && currentLineId !== nextLineId && currentStationId) {
+      cost += getTransferTime(currentStationId);
     } else {
       cost += AVG_STATION_TRAVEL_TIME;
     }
@@ -458,7 +458,7 @@ function convertToRoute(internalPath: InternalPath): Route {
       toStationName: nextStation.name,
       lineId: isTransfer ? nextLineId : currentLineId,
       lineName: getLineName(isTransfer ? nextLineId : currentLineId),
-      estimatedMinutes: isTransfer ? AVG_TRANSFER_TIME : AVG_STATION_TRAVEL_TIME,
+      estimatedMinutes: isTransfer ? getTransferTime(currentStationId) : AVG_STATION_TRAVEL_TIME,
       isTransfer,
     });
   }
