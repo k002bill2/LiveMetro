@@ -95,3 +95,58 @@ describe('getDiverseRoutes — 실제 데이터 회귀 (lines.json order + K-sho
     expect(fastest.totalMinutes).toBeLessThanOrEqual(50);
   });
 });
+
+describe('Line 3 운행 순서 회귀 (2026-05-13 hybrid 순서 교정)', () => {
+  /**
+   * 회귀 원인:
+   *  - 기존 lines.json `3`은 1-34(지축→오금) + 35-44(원흥→대화) hybrid 구성.
+   *  - graph builder가 `array[i] ↔ array[i+1]` 단순 인접 edge를 만들므로
+   *    `오금(34) ↔ 원흥(35)` 잘못된 직접 edge 2.5분이 생성.
+   *  - 실제 오금↔원흥은 약 35 hops(약 87분) 거리. 잘못된 edge로 라우팅이
+   *    오염되어 사용자에게 비현실적 직행이 제공될 수 있었음.
+   *  - Wikipedia ground truth: 대화 → 주엽 → 정발산 → ... → 원당 → 원흥 →
+   *    삼송 → 지축 → ... → 오금 (44 stations, 단일 운행선, 분기 없음).
+   */
+
+  /**
+   * 오금→원흥: 잘못된 edge 회귀 가드. 정상 동작 시 단일 노선 직행으로
+   * 약 35 hops × 2.5 = 87.5분. 환승 없이도 충분히 길어야 함.
+   * 잘못된 edge면 1 hop 2.5분 직행이 fastest로 잘못 등장.
+   */
+  it('오금→원흥은 단일 노선 직행이지만 거리가 길어 fastest > 30분', () => {
+    const routes = getDiverseRoutes('ogeum', 's_ec9b90ed');
+
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.totalMinutes).toBeGreaterThan(30);
+  });
+
+  /**
+   * 원흥↔삼송 순서 회귀 가드. Wikipedia 운행 순서는
+   * "원당(8) → 원흥(9) → 삼송(10) → 지축(11)". 두 역은 실제로 인접하므로
+   * fastest는 환승 0회 1 hop 직행.
+   */
+  it('원흥→삼송은 환승 0회 직행으로 매우 짧다 (실제 인접)', () => {
+    const routes = getDiverseRoutes('s_ec9b90ed', 's_1950');
+
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+    // 1 hop × 2.5 = 2.5분. 회귀 경계 5분.
+    expect(fastest.totalMinutes).toBeLessThanOrEqual(5);
+  });
+
+  /**
+   * 양재→교대: Line 3 내부 짧은 OD. 양재(34) → 남부터미널(33) → 교대(32)
+   * 운행 순서로 2 hops 직행. fastest는 환승 0회 5분 내외.
+   */
+  it('양재→교대는 Line 3 직행 2 hops로 짧다', () => {
+    const routes = getDiverseRoutes('yangjae', 's_eab590eb');
+
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+    // 2 hops × 2.5 = 5분. 회귀 경계 8분.
+    expect(fastest.totalMinutes).toBeLessThanOrEqual(8);
+  });
+});
