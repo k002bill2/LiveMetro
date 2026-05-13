@@ -412,16 +412,22 @@ const pathToSegments = (path: string[]): RouteSegment[] => {
     const nextStation = STATIONS[nextStationId];
     if (!currentStation || !nextStation) continue;
 
+    // lineId here may carry a `::${subIdx}` suffix from sub-line encoding
+    // (kShortestPath.ts `trunkLineId`). The suffix is essential for the
+    // `currentLineId !== nextLineId` transfer comparison (sub-line shuttle
+    // change is a real user transfer), but must NOT leak to the UI segment
+    // where LINE_LABELS lookup expects the trunk id (e.g. "2", not "2::2").
     const isTransfer =
       currentStationId === nextStationId && currentLineId !== nextLineId;
+    const displayLineId = (isTransfer ? nextLineId : currentLineId).split('::')[0] ?? (isTransfer ? nextLineId : currentLineId);
 
     segments.push({
       fromStationId: currentStationId,
       fromStationName: currentStation.name,
       toStationId: nextStationId,
       toStationName: nextStation.name,
-      lineId: isTransfer ? nextLineId : currentLineId,
-      lineName: getLineName(isTransfer ? nextLineId : currentLineId),
+      lineId: displayLineId,
+      lineName: getLineName(displayLineId),
       estimatedMinutes: isTransfer ? getTransferTime(currentStationId) : AVG_STATION_TRAVEL_TIME,
       isTransfer,
     });
