@@ -394,6 +394,304 @@ describe('gyeongui — 분기 schema 적용 후 회귀 (PR-1)', () => {
   });
 });
 
+describe('Line 6 — 분기 schema 적용 후 회귀 (PR-3)', () => {
+  /**
+   * 회귀 원인:
+   *  - 현재 lines.json `6` array는 응암 순환(idx 0-5)이 본선(idx 6-38) 앞에
+   *    inline되어 있어 구산(idx 5)과 새절(idx 6)이 잘못 인접 chain으로 연결됨.
+   *  - graph builder가 array[i]↔array[i+1]을 인접 edge로 만들어
+   *    실제로는 인접하지 않는 station 사이에 잘못된 1-hop edge가 생성됨.
+   *  - 잘못된 인접 사례 (current array idx):
+   *      5-6: 구산 ↔ 새절 (실제 응암 경유 2 hops 필요)
+   *  - Wikipedia ground truth (.cache/line6-ground-truth.md):
+   *      본선 34역 (응암→새절→...→신내), 응암 순환 7 entries
+   *      (응암→역촌→불광→독바위→연신내→구산→응암, 응암 두 번). 분기점 응암.
+   *
+   * PR-3에서 LINE_STATIONS.6를 nested 2-subarray로 reshape하면 RED 테스트가
+   * GREEN으로 전환됨. BASELINE 테스트는 reshape 전후 모두 PASS.
+   *
+   * Ring representation 주의: 응암 ring은 single subarray로 표현하되
+   * 응암 id(`eungam`)가 시작·끝에 두 번 등장
+   * (`[eungam, ..., 구산, eungam]`). graph builder의 inner i/i+1 loop가
+   * 자연스럽게 ring 양 인접 edge(응암↔역촌 + 응암↔구산)를 생성한다.
+   * Line 2 circular wrap 같은 별도 코드 불필요.
+   */
+
+  /**
+   * 구산 → 새절: 응암 순환 끝과 본선 시작이 잘못 인접.
+   * 실제: 구산 → 응암(ring close) → 새절 (2 hops, 같은 6호선, 환승 0회)
+   *
+   * 잘못된 1-hop edge가 살아있으면 fastest는 ~3분 직행으로 잘못 등장.
+   * 정상 시 fastest > 4분 (2 hops 우회).
+   */
+  it('구산→새절 fastest는 거리가 있어 > 4분 (잘못된 인접 edge 가드)', () => {
+    const routes = getDiverseRoutes('s_eab5acec', 'saejeol');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.totalMinutes).toBeGreaterThan(4);
+  });
+
+  /**
+   * 응암 → 역촌: ring 시작 인접. 환승 0회 1 hop ≤5분 직행.
+   * Ring subarray의 첫 i/i+1 인접 edge가 정상 생성되는지 검증.
+   */
+  it('응암→역촌은 환승 0회 직행 1 hop (ring 시작 인접 보존)', () => {
+    const routes = getDiverseRoutes('eungam', 's_ec97adec');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+    expect(fastest.totalMinutes).toBeLessThanOrEqual(5);
+  });
+
+  /**
+   * 응암 → 구산: ring 끝(close) 인접. 환승 0회 1 hop ≤5분 직행.
+   * Ring subarray의 마지막 인덱스에 응암이 다시 등장 (`[..., 구산, 응암]`)
+   * 하므로 graph builder가 i=N-1에서 prev edge(응암→구산)와
+   * i=N-2(구산)에서 next edge(구산→응암)를 모두 생성한다.
+   * 이 두 edge가 ring close를 형성하는지 검증.
+   */
+  it('응암→구산은 환승 0회 직행 1 hop (ring close 인접 보존)', () => {
+    const routes = getDiverseRoutes('eungam', 's_eab5acec');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+    expect(fastest.totalMinutes).toBeLessThanOrEqual(5);
+  });
+
+  /**
+   * 응암 → 새절: 본선 trunk 시작 인접. 환승 0회 1 hop ≤5분 직행.
+   * Trunk subarray가 응암으로 시작하면 응암↔새절 인접이 보존된다.
+   * BASELINE — reshape 전후 모두 PASS.
+   */
+  it('응암→새절은 환승 0회 직행 1 hop (본선 trunk 시작 인접 보존)', () => {
+    const routes = getDiverseRoutes('eungam', 'saejeol');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+    expect(fastest.totalMinutes).toBeLessThanOrEqual(5);
+  });
+
+  /**
+   * 새절 → 증산: 본선 trunk 인접 (분기점 응암 다음 역). 환승 0회 1 hop ≤5분.
+   * BASELINE — reshape 전후 모두 PASS.
+   */
+  it('새절→증산은 환승 0회 직행 1 hop (본선 trunk 인접 보존)', () => {
+    const routes = getDiverseRoutes('saejeol', 's_eca69dec');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+    expect(fastest.totalMinutes).toBeLessThanOrEqual(5);
+  });
+});
+
+describe('Line 5 — 분기 schema 적용 후 회귀 (PR-2)', () => {
+  /**
+   * 회귀 원인:
+   *  - 현재 lines.json `5` array는 본선이 끝나는 상일동(idx 43)에서 곧바로
+   *    마천지선 첫 역 둔촌동(idx 44)으로 인접 chain이 연결됨.
+   *  - 마찬가지로 마천지선 끝 마천(idx 50)에서 본선의 강일(idx 51)로
+   *    잘못된 인접 edge가 생성됨.
+   *  - graph builder가 array[i]↔array[i+1]을 인접 edge로 만들어
+   *    실제로는 인접하지 않는 station 사이에 잘못된 1-hop edge가 생성됨.
+   *  - 잘못된 인접 사례 (current array idx):
+   *      43-44: 상일동 ↔ 둔촌동 (실제 강동 경유 6 hops 필요)
+   *      50-51: 마천 ↔ 강일 (실제 강동 경유 13+ hops 필요)
+   *  - Wikipedia ground truth (.cache/line5-ground-truth.md):
+   *      본선 49역 (방화→...→강동→길동→...→상일동→강일→...→하남검단산)
+   *      마천지선 8역 (강동→둔촌동→...→마천). 분기점 강동.
+   *
+   * PR-2에서 LINE_STATIONS.5를 nested 2-subarray로 reshape하면 RED 테스트가
+   * GREEN으로 전환됨. BASELINE 테스트는 reshape 전후 모두 PASS.
+   */
+
+  /**
+   * 상일동 → 둔촌동: 본선 끝과 마천지선 시작이 잘못 인접.
+   * 실제: 상일동 → 고덕 → 명일 → 굽은다리 → 길동 → 강동 → 둔촌동 (6 hops, 같은 5호선)
+   *
+   * 잘못된 1-hop edge가 살아있으면 fastest는 ~3분 직행으로 잘못 등장.
+   * 정상 시 fastest > 10분 (6 hops 우회).
+   */
+  it('상일동→둔촌동 fastest는 거리가 있어 > 10분 (잘못된 인접 edge 가드)', () => {
+    const routes = getDiverseRoutes('s_2554', 's_2555');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.totalMinutes).toBeGreaterThan(10);
+  });
+
+  /**
+   * 마천 → 강일: 마천지선 끝과 본선이 잘못 인접.
+   * 실제: 마천 → 거여 → 개롱 → 오금 → 방이 → 올림픽공원 → 둔촌동 → 강동 →
+   *         길동 → 굽은다리 → 명일 → 고덕 → 상일동 → 강일 (13 hops, 같은 5호선)
+   *
+   * 잘못된 1-hop edge가 살아있으면 fastest는 ~3분 직행으로 잘못 등장.
+   * 정상 시 fastest > 25분 (13 hops 우회).
+   */
+  it('마천→강일 fastest는 거리가 있어 > 25분 (잘못된 인접 edge 가드)', () => {
+    const routes = getDiverseRoutes('macheon', 's_2562');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.totalMinutes).toBeGreaterThan(25);
+  });
+
+  /**
+   * 강동 → 굽은다리: 본선 trunk 인접 (강동(38) → 길동(39) → 굽은다리(40)).
+   * BASELINE — reshape 전후 모두 환승 0회, 2 hops ≤10분 직행이어야 함.
+   * 분기점 강동이 본선과 지선 양쪽 subarray 모두에 등장해도 본선 trunk
+   * 인접성이 보존되는지 검증.
+   */
+  it('강동→굽은다리는 환승 0회 직행 (본선 trunk 인접 보존)', () => {
+    const routes = getDiverseRoutes('gangdong', 's_eab5bdec');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+    expect(fastest.totalMinutes).toBeLessThanOrEqual(10);
+  });
+});
+
+describe('gyeongui — 도라산역 (Dorasan, K338) 추가 회귀', () => {
+  /**
+   * 도라산역은 경의선 종착역 (K338). Wikipedia 기준 임진강(K337) 다음.
+   * PR #79 (PR-1) ground truth research에서 stations.json 누락 발견.
+   *
+   * 데이터 모델: 도라산은 임진강에서 분기하는 별도 운행 계통(셔틀 전동열차)으로
+   * lines.json gyeongui의 새 subarray `[s_ec9e84ec(임진강), dorasan]`로 추가됨.
+   * 이는 임진강↔도라산 1-hop edge만 생성하고 운천 등 다른 인접 edge에는
+   * 영향을 주지 않음.
+   */
+  it('임진강 → 도라산 직결 (환승 0회 1 hop)', () => {
+    const routes = getDiverseRoutes('s_ec9e84ec', 'dorasan');
+    expect(routes.length).toBeGreaterThan(0);
+    const direct = routes.find(r => r.transferCount === 0);
+    expect(direct).toBeDefined();
+  });
+});
+
+describe('gyeongchun — 분기 schema 적용 후 회귀 (PR-4)', () => {
+  /**
+   * 회귀 원인:
+   *  - 현재 lines.json `gyeongchun` array는 광운대(idx 0)에서 곧바로
+   *    청량리(idx 1)로 인접 chain이 연결됨.
+   *  - 광운대는 망우선 지선(광운대↔상봉)의 시작점, 청량리는 본선 시작점.
+   *  - graph builder가 array[i]↔array[i+1]을 인접 edge로 만들어
+   *    잘못된 광운대↔청량리 1-hop edge가 생성됨.
+   *  - 잘못된 인접 사례 (current array idx):
+   *      0-1: 광운대 ↔ 청량리 (실제 다른 노선 환승 필요, 직접 인접 아님)
+   *  - Wikipedia ground truth (.cache/gyeongchun-ground-truth.md):
+   *      본선 24역 (청량리→회기→중랑→상봉→망우→...→남춘천→춘천)
+   *      망우선 지선 2역 (광운대→상봉, 평일 출퇴근 일부 운행).
+   *      분기점/합류점: 상봉.
+   *
+   * PR-4에서 LINE_STATIONS.gyeongchun을 nested 2-subarray로 reshape하면
+   * RED 테스트가 GREEN으로 전환됨. BASELINE 테스트는 reshape 전후 모두 PASS.
+   */
+
+  /**
+   * 광운대 → 청량리: 망우선 지선 시작점과 본선 시작점이 잘못 인접.
+   * 실제 경춘선 그래프상으로는 광운대 → 상봉 → 중랑 → 회기 → 청량리 (4 hops, 같은 경춘선).
+   *
+   * 잘못된 1-hop edge가 살아있으면 fastest는 ~3분 직행으로 잘못 등장.
+   * 정상 시 fastest > 5분 (4 hops 우회 또는 다른 노선 환승).
+   */
+  it('광운대→청량리 fastest는 거리가 있어 > 5분 (잘못된 인접 edge 가드)', () => {
+    const routes = getDiverseRoutes('s_eab491ec', 'cheongnyangni');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.totalMinutes).toBeGreaterThan(5);
+  });
+
+  /**
+   * 청량리 → 회기: 본선 trunk 인접 (청량리(0) → 회기(1)).
+   * BASELINE — reshape 전후 모두 환승 0회, 1 hop ≤5분 직행이어야 함.
+   * 본선 trunk 인접성이 보존되는지 검증.
+   */
+  it('청량리→회기는 환승 0회 직행 1 hop (본선 trunk 인접 보존)', () => {
+    const routes = getDiverseRoutes('cheongnyangni', 's_ed9a8cea');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+    expect(fastest.totalMinutes).toBeLessThanOrEqual(5);
+  });
+
+  /**
+   * 광운대 → 상봉: 망우선 지선 내 인접. Wikipedia 망우선 거리표에 따르면
+   * 광운대(4.9km)와 상봉(0.6km) 사이에 영업역 없음 (이문역은 2004년 폐역).
+   * 따라서 환승 0회, 1 hop 직행이 fastest.
+   * 분기점 상봉이 본선과 지선 양쪽 subarray에 등장해도 지선 trunk 인접
+   * edge가 보존되는지 검증.
+   */
+  it('광운대→상봉은 환승 0회 직행 1 hop (망우선 지선 인접 보존)', () => {
+    const routes = getDiverseRoutes('s_eab491ec', 's_2722');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+    expect(fastest.totalMinutes).toBeLessThanOrEqual(5);
+  });
+
+  /**
+   * 상봉 → 망우: 본선 trunk 인접 (상봉(3) → 망우(4)).
+   * BASELINE — reshape 전후 모두 환승 0회 1 hop ≤5분 직행이어야 함.
+   * 분기점 상봉이 본선과 지선 양쪽 subarray에 등장해도 본선 trunk
+   * 인접성이 보존되는지 검증.
+   */
+  it('상봉→망우는 환승 0회 직행 (본선 trunk 인접 보존)', () => {
+    const routes = getDiverseRoutes('s_2722', 's_1203');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+    expect(fastest.totalMinutes).toBeLessThanOrEqual(5);
+  });
+});
+
+describe('gtx_a — 분기 schema 적용 후 회귀 (PR-5, 2단계 분리 운행)', () => {
+  /**
+   * GTX-A는 2026.5 현재 두 개의 분리된 운행 구간:
+   *   - 운정중앙↔서울 (5역, 2024.12 개통)
+   *   - 수서↔동탄 (4역, 2024.3 개통)
+   * 두 구간은 약 80km 거리. 직결은 2026.8 예정.
+   *
+   * 잘못된 인접 edge: `동탄(s_eb8f99ed) ↔ 운정중앙(s_9000)` — 분리 운행이
+   * 직결로 표현돼 있음.
+   *
+   * Task에서 LINE_STATIONS.gtx_a를 nested 2-subarray로 reshape하면 RED
+   * 테스트가 GREEN으로 전환됨. BASELINE 테스트는 reshape 전후 모두 PASS.
+   */
+
+  /**
+   * 동탄과 운정중앙은 물리적으로 분리. gtx_a 직결 hop은 절대 없어야 함.
+   * 잘못된 인접 edge가 살아있으면 fastest는 transferCount=0 (gtx_a 직결).
+   * 정상 시 다른 line 환승 필요 (transferCount ≥ 1).
+   */
+  it('동탄→운정중앙: gtx_a 직결 0-transfer 없음 (분리 운행 가드)', () => {
+    const routes = getDiverseRoutes('s_eb8f99ed', 's_9000');
+    expect(routes.length).toBeGreaterThan(0);
+    routes.forEach((route) => {
+      expect(route.transferCount).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  /**
+   * 운정 구간 본선 무회귀: 운정중앙→서울은 환승 0회 직행.
+   * BASELINE — reshape 전후 모두 PASS 기대.
+   */
+  it('운정중앙→서울 fastest는 환승 0회 직행 (운정 구간 보존)', () => {
+    const routes = getDiverseRoutes('s_9000', 's_9005');
+    expect(routes.length).toBeGreaterThan(0);
+    const direct = routes.find((r) => r.transferCount === 0);
+    expect(direct).toBeDefined();
+  });
+
+  /**
+   * 수서 구간 본선 무회귀: 수서→동탄은 환승 0회 직행.
+   * BASELINE — reshape 전후 모두 PASS 기대.
+   */
+  it('수서→동탄 fastest는 환승 0회 직행 (수서 구간 보존)', () => {
+    const routes = getDiverseRoutes('suseo', 's_eb8f99ed');
+    expect(routes.length).toBeGreaterThan(0);
+    const direct = routes.find((r) => r.transferCount === 0);
+    expect(direct).toBeDefined();
+  });
+});
+
 describe('Line 2 — 분기 schema 적용 후 회귀 (PR-6)', () => {
   /**
    * 회귀 원인:
