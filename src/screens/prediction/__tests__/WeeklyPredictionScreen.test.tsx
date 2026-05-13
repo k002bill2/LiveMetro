@@ -113,6 +113,15 @@ jest.mock('@/hooks/usePredictionFactors', () => ({
   usePredictionFactors: jest.fn(() => ({ factors: [], loading: false })),
 }));
 
+// CTA wire-up: useIntegratedAlerts internally consumes useAuth + subscribes
+// to delay/notification services. Stub with a resolved-null scheduleDepartureAlert
+// so the CTA press path stays offline and deterministic.
+jest.mock('@/hooks/useIntegratedAlerts', () => ({
+  useIntegratedAlerts: jest.fn(() => ({
+    scheduleDepartureAlert: jest.fn(() => Promise.resolve(null)),
+  })),
+}));
+
 // Task 10 / Section 7 wiring: congestionService.getHourlyForecast queries
 // Firestore historical congestion docs. Stub it with a deterministic
 // 7-slot snapshot whose 4th slotTime matches the current rounded HH:MM
