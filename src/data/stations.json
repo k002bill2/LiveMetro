@@ -5043,7 +5043,16 @@
     "x": 0,
     "y": 0,
     "lines": [
-      "5",
+      "5"
+    ]
+  },
+  "yangpyeong_gyeongui": {
+    "id": "yangpyeong_gyeongui",
+    "name": "양평",
+    "nameEn": "Yangpyeong",
+    "x": 4281,
+    "y": 1688,
+    "lines": [
       "gyeongui"
     ]
   },
