@@ -56,6 +56,8 @@ export interface Translations {
     info: string;
     help: string;
     helpDesc: string;
+    feedback: string;
+    feedbackDesc: string;
     privacyPolicy: string;
     termsOfService: string;
     appInfo: string;
@@ -175,6 +177,8 @@ export const translations: Record<Language, Translations> = {
       info: '정보',
       help: '도움말',
       helpDesc: '앱 사용법 및 FAQ',
+      feedback: '의견 보내기',
+      feedbackDesc: '버그·기능 제안·정보 오류 신고',
       privacyPolicy: '개인정보처리방침',
       termsOfService: '서비스 이용약관',
       appInfo: '앱 정보',
@@ -281,6 +285,8 @@ export const translations: Record<Language, Translations> = {
       info: 'Information',
       help: 'Help',
       helpDesc: 'How to use & FAQ',
+      feedback: 'Send Feedback',
+      feedbackDesc: 'Report bugs, request features, or flag info errors',
       privacyPolicy: 'Privacy Policy',
       termsOfService: 'Terms of Service',
       appInfo: 'App Info',

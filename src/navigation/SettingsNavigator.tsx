@@ -21,6 +21,7 @@ import LanguageSettingsScreen from '@/screens/settings/LanguageSettingsScreen';
 import ThemeSettingsScreen from '@/screens/settings/ThemeSettingsScreen';
 import LocationPermissionScreen from '@/screens/settings/LocationPermissionScreen';
 import HelpScreen from '@/screens/settings/HelpScreen';
+import { FeedbackScreen } from '@/screens/feedback/FeedbackScreen';
 import PrivacyPolicyScreen from '@/screens/settings/PrivacyPolicyScreen';
 
 const SettingsStack = createNativeStackNavigator<SettingsStackParamList>();
@@ -96,6 +97,11 @@ export const SettingsNavigator: React.FC = () => {
         name="Help"
         component={HelpScreen}
         options={{ title: '도움말' }}
+      />
+      <SettingsStack.Screen
+        name="Feedback"
+        component={FeedbackScreen}
+        options={{ headerShown: false }}
       />
       <SettingsStack.Screen
         name="PrivacyPolicy"

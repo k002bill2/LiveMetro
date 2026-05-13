@@ -568,6 +568,12 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
               onPress={() => navigation.navigate('Help')}
             />
             <SettingItem
+              Icon={MessageSquare}
+              title={t.settings.feedback}
+              subtitle={t.settings.feedbackDesc}
+              onPress={() => navigation.navigate('Feedback')}
+            />
+            <SettingItem
               Icon={ShieldCheck}
               title={t.settings.termsOfService}
               onPress={() => {}}
