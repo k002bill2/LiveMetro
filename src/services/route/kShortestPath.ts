@@ -67,64 +67,73 @@ function buildGraph(
   const adjustWeight = (baseWeight: number, lineId: string): number =>
     baseWeight * (congestionMultipliers?.get(lineId) ?? 1.0);
 
-  // Add edges for each line
-  Object.entries(LINE_STATIONS).forEach(([lineId, stationIds]) => {
-    for (let i = 0; i < stationIds.length; i++) {
-      const stationId = stationIds[i];
-      if (!stationId) continue;
+  // Add edges for each line. Branched lines have multiple subarrays —
+  // a station appearing in two subarrays accumulates edges from both,
+  // which is exactly the branch-point semantics we want.
+  Object.entries(LINE_STATIONS).forEach(([lineId, segments]) => {
+    segments.forEach(stationIds => {
+      for (let i = 0; i < stationIds.length; i++) {
+        const stationId = stationIds[i];
+        if (!stationId) continue;
 
-      const nodeKey = `${stationId}#${lineId}`;
-      if (excludeNodeKeys?.has(nodeKey)) continue;
+        const nodeKey = `${stationId}#${lineId}`;
+        if (excludeNodeKeys?.has(nodeKey)) continue;
 
-      if (!graph.has(nodeKey)) {
-        graph.set(nodeKey, []);
-      }
+        if (!graph.has(nodeKey)) {
+          graph.set(nodeKey, []);
+        }
 
-      // Add edge to next station
-      if (i < stationIds.length - 1) {
-        const nextStationId = stationIds[i + 1];
-        if (nextStationId) {
-          const nextKey = `${nextStationId}#${lineId}`;
-          if (!excludeNodeKeys?.has(nextKey)) {
-            const edgeKey = `${nodeKey}->${nextKey}`;
-            if (!excludeEdges?.has(edgeKey)) {
-              graph.get(nodeKey)?.push({
-                to: nextKey,
-                weight: adjustWeight(AVG_STATION_TRAVEL_TIME, lineId),
-                isTransfer: false,
-                lineId,
-              });
+        // Add edge to next station
+        if (i < stationIds.length - 1) {
+          const nextStationId = stationIds[i + 1];
+          if (nextStationId) {
+            const nextKey = `${nextStationId}#${lineId}`;
+            if (!excludeNodeKeys?.has(nextKey)) {
+              const edgeKey = `${nodeKey}->${nextKey}`;
+              if (!excludeEdges?.has(edgeKey)) {
+                graph.get(nodeKey)?.push({
+                  to: nextKey,
+                  weight: adjustWeight(AVG_STATION_TRAVEL_TIME, lineId),
+                  isTransfer: false,
+                  lineId,
+                });
+              }
+            }
+          }
+        }
+
+        // Add edge to previous station
+        if (i > 0) {
+          const prevStationId = stationIds[i - 1];
+          if (prevStationId) {
+            const prevKey = `${prevStationId}#${lineId}`;
+            if (!excludeNodeKeys?.has(prevKey)) {
+              const edgeKey = `${nodeKey}->${prevKey}`;
+              if (!excludeEdges?.has(edgeKey)) {
+                graph.get(nodeKey)?.push({
+                  to: prevKey,
+                  weight: adjustWeight(AVG_STATION_TRAVEL_TIME, lineId),
+                  isTransfer: false,
+                  lineId,
+                });
+              }
             }
           }
         }
       }
-
-      // Add edge to previous station
-      if (i > 0) {
-        const prevStationId = stationIds[i - 1];
-        if (prevStationId) {
-          const prevKey = `${prevStationId}#${lineId}`;
-          if (!excludeNodeKeys?.has(prevKey)) {
-            const edgeKey = `${nodeKey}->${prevKey}`;
-            if (!excludeEdges?.has(edgeKey)) {
-              graph.get(nodeKey)?.push({
-                to: prevKey,
-                weight: adjustWeight(AVG_STATION_TRAVEL_TIME, lineId),
-                isTransfer: false,
-                lineId,
-              });
-            }
-          }
-        }
-      }
-    }
+    });
   });
 
-  // Handle circular line 2
-  const line2Stations = LINE_STATIONS['2'];
-  if (line2Stations && line2Stations.length > 1) {
-    const first = line2Stations[0];
-    const last = line2Stations[line2Stations.length - 1];
+  // Handle circular line 2 — only on trunk subarray (segments[0]).
+  // Branch subarrays (성수지선, 신정지선) are linear, not circular.
+  // NOTE: existing key format `${first}_2` (underscore) does not match
+  // node keys (`${id}#${lineId}`), so this code is currently a silent
+  // no-op. Preserved verbatim per surgical-changes scope; fix in
+  // separate phase if Line 2 wrap is needed.
+  const line2Trunk = LINE_STATIONS['2']?.[0];
+  if (line2Trunk && line2Trunk.length > 1) {
+    const first = line2Trunk[0];
+    const last = line2Trunk[line2Trunk.length - 1];
     if (first && last) {
       const firstKey = `${first}_2`;
       const lastKey = `${last}_2`;
@@ -152,7 +161,9 @@ function buildGraph(
 
   // Add transfer edges
   Object.values(STATIONS).forEach(station => {
-    const stationLines = station.lines.filter(lineId => LINE_STATIONS[lineId]);
+    const stationLines = station.lines.filter(
+      lineId => (LINE_STATIONS[lineId]?.length ?? 0) > 0
+    );
 
     for (let i = 0; i < stationLines.length; i++) {
       for (let j = i + 1; j < stationLines.length; j++) {
@@ -198,7 +209,7 @@ function getStationNodeKeys(stationId: string): string[] {
   if (!station) return [];
 
   return station.lines
-    .filter(lineId => LINE_STATIONS[lineId])
+    .filter(lineId => (LINE_STATIONS[lineId]?.length ?? 0) > 0)
     .map(lineId => `${stationId}#${lineId}`);
 }
 

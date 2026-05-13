@@ -33,11 +33,13 @@ jest.mock('@utils/subwayMapData', () => ({
     '226': { id: '226', name: '종합운동장', lines: ['2', '9'] },
     '201': { id: '201', name: '시청', lines: ['1', '2'] },
   },
+  // Nested array shape (Task 3+ contract: Record<string, readonly string[][]>).
+  // Each top-level array is a list of segments; single-segment lines wrap once.
   LINE_STATIONS: {
-    '2': ['222', '223', '224', '225', '226'],
-    '분당': ['224', '227', '228'],
-    '9': ['226', '229', '230'],
-    '1': ['201', '202', '203'],
+    '2': [['222', '223', '224', '225', '226']],
+    '분당': [['224', '227', '228']],
+    '9': [['226', '229', '230']],
+    '1': [['201', '202', '203']],
   },
 }));
 
