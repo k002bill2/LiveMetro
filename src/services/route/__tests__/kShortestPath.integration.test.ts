@@ -393,3 +393,21 @@ describe('gyeongui — 분기 schema 적용 후 회귀 (PR-1)', () => {
     expect(fastest.totalMinutes).toBeLessThanOrEqual(70);
   });
 });
+
+describe('gyeongui — 도라산역 (Dorasan, K338) 추가 회귀', () => {
+  /**
+   * 도라산역은 경의선 종착역 (K338). Wikipedia 기준 임진강(K337) 다음.
+   * PR #79 (PR-1) ground truth research에서 stations.json 누락 발견.
+   *
+   * 데이터 모델: 도라산은 임진강에서 분기하는 별도 운행 계통(셔틀 전동열차)으로
+   * lines.json gyeongui의 새 subarray `[s_ec9e84ec(임진강), dorasan]`로 추가됨.
+   * 이는 임진강↔도라산 1-hop edge만 생성하고 운천 등 다른 인접 edge에는
+   * 영향을 주지 않음.
+   */
+  it('임진강 → 도라산 직결 (환승 0회 1 hop)', () => {
+    const routes = getDiverseRoutes('s_ec9e84ec', 'dorasan');
+    expect(routes.length).toBeGreaterThan(0);
+    const direct = routes.find(r => r.transferCount === 0);
+    expect(direct).toBeDefined();
+  });
+});
