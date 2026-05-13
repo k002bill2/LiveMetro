@@ -16,10 +16,12 @@ import {
 } from 'react-native';
 import { MessageSquare, Megaphone } from 'lucide-react-native';
 
+import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '@/services/auth/AuthContext';
 import { useTheme } from '@/services/theme';
 import { useFavorites } from '@/hooks/useFavorites';
 import { delayReportService } from '@/services/delay/delayReportService';
+import { stashReport } from '@/services/delay/reportNavCache';
 import { DelayReport } from '@/models/delayReport';
 import { DelayReportForm } from '@/components/delays/DelayReportForm';
 import { ReportCard } from '@/components/delays/ReportCard';
@@ -28,6 +30,7 @@ import { ReportFilterBar, type FilterCategory } from '@/components/delays/Report
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 
 export const DelayFeedScreen: React.FC = () => {
+  const navigation = useNavigation<any>();
   const { user } = useAuth();
   const { isDark } = useTheme();
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
@@ -100,8 +103,21 @@ export const DelayFeedScreen: React.FC = () => {
     [reports, category, onlyMyLines, myLineIds],
   );
 
+  const handleOpenDetail = useCallback(
+    (report: DelayReport) => {
+      stashReport(report);
+      navigation.navigate('ReportDetail', { reportId: report.id });
+    },
+    [navigation],
+  );
+
   const renderReportItem = ({ item: report }: { item: DelayReport }) => (
-    <ReportCard report={report} currentUserId={user?.id} onUpvote={handleUpvote} />
+    <ReportCard
+      report={report}
+      currentUserId={user?.id}
+      onUpvote={handleUpvote}
+      onOpen={handleOpenDetail}
+    />
   );
 
   const renderEmptyState = () => {

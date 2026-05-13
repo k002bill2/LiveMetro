@@ -38,6 +38,8 @@ import StationNavigatorScreen from '../screens/station/StationNavigatorScreen';
 import StationDetailScreen from '../screens/station/StationDetailScreen';
 import { DelayCertificateScreen } from '../screens/delays/DelayCertificateScreen';
 import { DelayFeedScreen } from '../screens/delays/DelayFeedScreen';
+import { ReportDetailScreenAdapter } from '../screens/delays/ReportDetailScreenAdapter';
+import { ReportFeedbackScreenAdapter } from '../screens/delays/ReportFeedbackScreenAdapter';
 import { AlternativeRoutesScreen } from '../screens/route/AlternativeRoutesScreen';
 import { RoutesTabScreen } from '../screens/route/RoutesTabScreen';
 import { WeeklyPredictionScreen } from '../screens/prediction';
@@ -78,6 +80,8 @@ export type RootStackParamList = {
   DelayFeed: {
     lineId?: string;
   } | undefined;
+  ReportDetail: { reportId: string };
+  ReportFeedback: { reportId: string };
   AlternativeRoutes: {
     fromStationId: string;
     toStationId: string;
@@ -316,6 +320,16 @@ const RootNavigatorContent: React.FC = () => {
           headerShown: true,
           title: '실시간 제보',
         }}
+      />
+      <Stack.Screen
+        name="ReportDetail"
+        component={ReportDetailScreenAdapter}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="ReportFeedback"
+        component={ReportFeedbackScreenAdapter}
+        options={{ headerShown: false }}
       />
       <Stack.Screen
         name="AlternativeRoutes"

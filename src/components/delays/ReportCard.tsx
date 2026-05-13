@@ -25,6 +25,8 @@ interface ReportCardProps {
   report: DelayReport;
   currentUserId?: string;
   onUpvote: (report: DelayReport) => void;
+  /** Optional — when provided, tapping the card body opens detail view. */
+  onOpen?: (report: DelayReport) => void;
 }
 
 const formatTimeAgo = (date: Date): string => {
@@ -41,7 +43,7 @@ const formatTimeAgo = (date: Date): string => {
   return '1일 이상 전';
 };
 
-export const ReportCard: React.FC<ReportCardProps> = ({ report, currentUserId, onUpvote }) => {
+export const ReportCard: React.FC<ReportCardProps> = ({ report, currentUserId, onUpvote, onOpen }) => {
   const { isDark } = useTheme();
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
   const styles = useMemo(() => createStyles(semantic), [semantic]);
@@ -51,8 +53,26 @@ export const ReportCard: React.FC<ReportCardProps> = ({ report, currentUserId, o
   const isHighlighted = shouldHighlightReport(report);
   const hasUpvoted = currentUserId ? report.upvotedBy.includes(currentUserId) : false;
 
+  const handleCardPress = onOpen ? () => onOpen(report) : undefined;
+  const CardWrapper: React.ComponentType<{ children: React.ReactNode }> = onOpen
+    ? ({ children }) => (
+        <TouchableOpacity
+          testID="report-card-open"
+          activeOpacity={0.85}
+          onPress={handleCardPress}
+          accessibilityRole="button"
+          accessibilityLabel={`${report.stationName} ${ReportTypeLabels[report.reportType]} 상세 보기`}
+          style={[styles.reportCard, isHighlighted && styles.reportCardHighlighted]}
+        >
+          {children}
+        </TouchableOpacity>
+      )
+    : ({ children }) => (
+        <View style={[styles.reportCard, isHighlighted && styles.reportCardHighlighted]}>{children}</View>
+      );
+
   return (
-    <View style={[styles.reportCard, isHighlighted && styles.reportCardHighlighted]}>
+    <CardWrapper>
       {/* Line Accent */}
       <View style={[styles.lineAccent, { backgroundColor: lineColor }]} />
 
@@ -130,7 +150,7 @@ export const ReportCard: React.FC<ReportCardProps> = ({ report, currentUserId, o
           </View>
         </View>
       </View>
-    </View>
+    </CardWrapper>
   );
 };
 

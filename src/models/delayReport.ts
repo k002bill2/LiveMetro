@@ -53,6 +53,44 @@ export enum ReportSeverity {
 }
 
 /**
+ * Reaction kinds — 시안 #5 제보 피드백의 4-bucket bar.
+ *  - helped:    "도움됨"      (제보가 도움이 됐다)
+ *  - same:      "저도 그래요" (같은 상황을 겪었다)
+ *  - recovered: "복구 확인"   (운행이 정상화됐다)
+ *  - differ:    "사실과 달라요" (제보 내용이 부정확하다)
+ */
+export type ReactionKind = 'helped' | 'same' | 'recovered' | 'differ';
+
+export const REACTION_KINDS: ReactionKind[] = ['helped', 'same', 'recovered', 'differ'];
+
+export const ReactionLabels: Record<ReactionKind, string> = {
+  helped: '도움됨',
+  same: '저도 그래요',
+  recovered: '복구 확인',
+  differ: '사실과 달라요',
+};
+
+export interface ReactionCounts {
+  helped: number;
+  same: number;
+  recovered: number;
+  differ: number;
+}
+
+export const emptyReactionCounts = (): ReactionCounts => ({
+  helped: 0,
+  same: 0,
+  recovered: 0,
+  differ: 0,
+});
+
+/**
+ * Sum total reactions — used for bar chart normalization.
+ */
+export const totalReactions = (counts: ReactionCounts): number =>
+  counts.helped + counts.same + counts.recovered + counts.differ;
+
+/**
  * Delay report interface
  */
 export interface DelayReport {
@@ -90,6 +128,19 @@ export interface DelayReport {
   resolvedAt?: Date;
   /** Last updated timestamp */
   updatedAt: Date;
+  /**
+   * Per-kind reaction counts (denormalized for fast read on detail/feedback
+   * screens). Phase C/D adds this; older docs missing the field should be
+   * treated as `emptyReactionCounts()` by callers.
+   */
+  reactions?: ReactionCounts;
+  /**
+   * Per-user reaction map. Each user can hold at most one reaction kind;
+   * switching kinds is a single transaction in the service layer.
+   */
+  reactedBy?: Record<string, ReactionKind>;
+  /** Cumulative comment count — incremented when comments are added. */
+  commentCount?: number;
 }
 
 /**

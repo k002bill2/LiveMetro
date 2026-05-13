@@ -27,6 +27,7 @@ import {
   ReportSummary,
   ReportType,
   ReportSeverity,
+  ReactionKind,
 } from '@/models/delayReport';
 
 const COLLECTION_NAME = 'delayReports';
@@ -184,6 +185,40 @@ class DelayReportService {
   }
 
   /**
+   * Set or change a user's reaction on a report. Atomically decrements the
+   * previous kind (if any) and increments the new one — implemented as two
+   * updateDoc calls. Pass `previousKind = null` for first reaction.
+   */
+  async setReaction(reportId: string, userId: string, previousKind: ReactionKind | null, nextKind: ReactionKind): Promise<void> {
+    const reportRef = doc(db, COLLECTION_NAME, reportId);
+    const updates: Record<string, unknown> = {
+      [`reactions.${nextKind}`]: increment(1),
+      [`reactedBy.${userId}`]: nextKind,
+      updatedAt: Timestamp.fromDate(new Date()),
+    };
+    if (previousKind && previousKind !== nextKind) {
+      updates[`reactions.${previousKind}`] = increment(-1);
+    } else if (previousKind === nextKind) {
+      // No-op toggle: previously this kind, now this kind → caller should
+      // have used clearReaction instead. Treat as idempotent set.
+      return;
+    }
+    await updateDoc(reportRef, updates);
+  }
+
+  /**
+   * Remove a user's existing reaction.
+   */
+  async clearReaction(reportId: string, userId: string, previousKind: ReactionKind): Promise<void> {
+    const reportRef = doc(db, COLLECTION_NAME, reportId);
+    await updateDoc(reportRef, {
+      [`reactions.${previousKind}`]: increment(-1),
+      [`reactedBy.${userId}`]: null,
+      updatedAt: Timestamp.fromDate(new Date()),
+    });
+  }
+
+  /**
    * Mark a report as resolved
    */
   async resolveReport(reportId: string): Promise<void> {
@@ -308,6 +343,9 @@ class DelayReportService {
       active: data.active ?? true,
       resolvedAt: data.resolvedAt?.toDate(),
       updatedAt: data.updatedAt?.toDate() || new Date(),
+      reactions: data.reactions,
+      reactedBy: data.reactedBy,
+      commentCount: data.commentCount,
     };
   }
 }
