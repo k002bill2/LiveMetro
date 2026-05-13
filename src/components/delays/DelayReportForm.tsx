@@ -13,6 +13,8 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Switch,
+  SafeAreaView,
 } from 'react-native';
 import {
   Clock,
@@ -23,6 +25,11 @@ import {
   HelpCircle,
   Send,
   X,
+  Bookmark,
+  Image as ImageIcon,
+  Camera,
+  Mic,
+  Info,
 } from 'lucide-react-native';
 
 import { useAuth } from '@/services/auth/AuthContext';
@@ -36,6 +43,8 @@ import {
 } from '@/models/delayReport';
 import { getSubwayLineColor } from '@/utils/colorUtils';
 import { SPACING, RADIUS, TYPOGRAPHY, weightToFontFamily } from '@/styles/modernTheme';
+import { DelayDurationStepper } from './DelayDurationStepper';
+import { LineStationBanner } from './LineStationBanner';
 
 interface DelayReportFormProps {
   /** Pre-selected line ID */
@@ -50,6 +59,7 @@ interface DelayReportFormProps {
 }
 
 const LINES = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+const RECOMMENDED_STATIONS = ['강남', '홍대입구', '잠실', '서울역', '사당', '신도림', '여의도', '왕십리'];
 
 const REPORT_TYPES: { type: ReportType; icon: any }[] = [
   { type: ReportType.DELAY, icon: Clock },
@@ -75,8 +85,20 @@ export const DelayReportForm: React.FC<DelayReportFormProps> = ({
   const [stationName, setStationName] = useState(initialStationName || '');
   const [reportType, setReportType] = useState<ReportType | null>(null);
   const [description, setDescription] = useState('');
-  const [estimatedDelay, setEstimatedDelay] = useState('');
+  const [estimatedDelay, setEstimatedDelay] = useState<number>(5);
+  const [anonymous, setAnonymous] = useState<boolean>(true);
+  const [bookmarked, setBookmarked] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState(false);
+
+  const handleDraftSave = useCallback(() => {
+    // Stub: AsyncStorage draft persistence is wired in Phase B.
+    Alert.alert('임시저장', '곧 지원될 기능이에요.');
+  }, []);
+
+  const handleAttachment = useCallback((kind: 'image' | 'camera' | 'voice') => {
+    const label = { image: '사진', camera: '카메라', voice: '음성' }[kind];
+    Alert.alert(label, '곧 지원될 기능이에요.');
+  }, []);
 
   const handleSubmit = useCallback(async () => {
     if (!user) {
@@ -121,9 +143,10 @@ export const DelayReportForm: React.FC<DelayReportFormProps> = ({
         reportType,
         severity: getSeverityFromType(reportType),
         description: description.trim() || undefined,
-        estimatedDelayMinutes: estimatedDelay
-          ? parseInt(estimatedDelay, 10)
-          : undefined,
+        estimatedDelayMinutes:
+          reportType === ReportType.DELAY || reportType === ReportType.STOPPED
+            ? estimatedDelay
+            : undefined,
       });
 
       Alert.alert('제보 완료', '소중한 제보 감사합니다!');
@@ -161,20 +184,44 @@ export const DelayReportForm: React.FC<DelayReportFormProps> = ({
   };
 
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Header */}
+    <SafeAreaView style={styles.container}>
+      {/* Header — design handoff: X · 지연 제보 · 임시저장 */}
       <View style={styles.header}>
-        <Text style={styles.title}>지연 제보하기</Text>
-        {onCancel && (
-          <TouchableOpacity
-            testID="close-button"
-            onPress={onCancel}
-            style={styles.closeButton}
-          >
-            <X size={24} color={colors.textSecondary} />
-          </TouchableOpacity>
-        )}
+        <View style={styles.headerLeading}>
+          {onCancel ? (
+            <TouchableOpacity
+              testID="close-button"
+              onPress={onCancel}
+              style={styles.closeButton}
+              accessibilityRole="button"
+              accessibilityLabel="닫기"
+            >
+              <X size={24} color={colors.textSecondary} />
+            </TouchableOpacity>
+          ) : (
+            <View style={styles.closeButton} />
+          )}
+        </View>
+        <Text style={styles.title}>지연 제보</Text>
+        <TouchableOpacity
+          testID="draft-save-button"
+          onPress={handleDraftSave}
+          style={styles.draftButton}
+          accessibilityRole="button"
+          accessibilityLabel="임시저장"
+        >
+          <Text style={styles.draftButtonText}>임시저장</Text>
+        </TouchableOpacity>
       </View>
+
+      <ScrollView style={styles.scrollBody} contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+
+      {/* Context banner — visible once both line and station are picked */}
+      {selectedLine && stationName ? (
+        <View style={styles.bannerWrap}>
+          <LineStationBanner lineId={selectedLine} stationName={stationName} />
+        </View>
+      ) : null}
 
       {/* Line Selection */}
       <View style={styles.section}>
@@ -214,9 +261,9 @@ export const DelayReportForm: React.FC<DelayReportFormProps> = ({
         </ScrollView>
       </View>
 
-      {/* Station Name */}
+      {/* Station Name + recommended chip row */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>역명 (선택)</Text>
+        <Text style={styles.sectionTitle}>역 / 구간</Text>
         <TextInput
           style={styles.textInput}
           placeholder="예: 강남, 홍대입구"
@@ -225,6 +272,25 @@ export const DelayReportForm: React.FC<DelayReportFormProps> = ({
           onChangeText={setStationName}
           maxLength={20}
         />
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.recommendedRow}>
+          {RECOMMENDED_STATIONS.map(name => {
+            const isSelected = stationName === name;
+            return (
+              <TouchableOpacity
+                key={name}
+                testID={`station-recommend-${name}`}
+                onPress={() => setStationName(name)}
+                style={[styles.recommendChip, isSelected && styles.recommendChipSelected]}
+                accessibilityRole="button"
+                accessibilityLabel={`추천 역 ${name}`}
+              >
+                <Text style={[styles.recommendChipText, isSelected && styles.recommendChipTextSelected]}>
+                  {name}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
       {/* Report Type */}
@@ -266,20 +332,12 @@ export const DelayReportForm: React.FC<DelayReportFormProps> = ({
       {(reportType === ReportType.DELAY ||
         reportType === ReportType.STOPPED) && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>예상 지연 시간 (분)</Text>
-          <TextInput
-            style={styles.textInput}
-            placeholder="예: 10"
-            placeholderTextColor={colors.textTertiary}
-            value={estimatedDelay}
-            onChangeText={text => setEstimatedDelay(text.replace(/[^0-9]/g, ''))}
-            keyboardType="number-pad"
-            maxLength={3}
-          />
+          <Text style={styles.sectionTitle}>지연 시간</Text>
+          <DelayDurationStepper value={estimatedDelay} onChange={setEstimatedDelay} />
         </View>
       )}
 
-      {/* Description */}
+      {/* Description + attachment row */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>상세 내용 (선택)</Text>
         <TextInput
@@ -292,35 +350,104 @@ export const DelayReportForm: React.FC<DelayReportFormProps> = ({
           numberOfLines={3}
           maxLength={200}
         />
-        <Text style={styles.charCount}>{description.length}/200</Text>
+        <View style={styles.attachmentRow}>
+          <View style={styles.attachmentIcons}>
+            <TouchableOpacity
+              testID="attach-image"
+              onPress={() => handleAttachment('image')}
+              accessibilityRole="button"
+              accessibilityLabel="사진 첨부"
+            >
+              <ImageIcon size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              testID="attach-camera"
+              onPress={() => handleAttachment('camera')}
+              accessibilityRole="button"
+              accessibilityLabel="카메라 첨부"
+            >
+              <Camera size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              testID="attach-voice"
+              onPress={() => handleAttachment('voice')}
+              accessibilityRole="button"
+              accessibilityLabel="음성 첨부"
+            >
+              <Mic size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+          <Text style={styles.charCount}>{description.length}/200</Text>
+        </View>
       </View>
 
-      {/* Submit Button */}
-      <TouchableOpacity
-        style={[
-          styles.submitButton,
-          (!selectedLine || !reportType || submitting) &&
-            styles.submitButtonDisabled,
-        ]}
-        onPress={handleSubmit}
-        disabled={!selectedLine || !reportType || submitting}
-      >
-        {submitting ? (
-          <ActivityIndicator color="#FFFFFF" />
-        ) : (
-          <>
-            <Send size={20} color="#FFFFFF" />
-            <Text style={styles.submitButtonText}>제보하기</Text>
-          </>
-        )}
-      </TouchableOpacity>
+      {/* Anonymous toggle */}
+      <View style={styles.section}>
+        <View style={styles.anonymousRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.anonymousTitle}>익명으로 제보</Text>
+            <Text style={styles.anonymousHint}>닉네임은 김** 형태로 표시돼요</Text>
+          </View>
+          <Switch
+            testID="anonymous-toggle"
+            value={anonymous}
+            onValueChange={setAnonymous}
+            accessibilityLabel="익명으로 제보"
+          />
+        </View>
+      </View>
 
-      {/* Info */}
-      <Text style={styles.infoText}>
-        제보는 다른 승객들의 판단에 도움이 됩니다.
-        {'\n'}허위 제보는 삼가해주세요.
-      </Text>
-    </ScrollView>
+      {/* GPS info card — stub: distance calculation wired in Phase B */}
+      {stationName ? (
+        <View style={styles.gpsCardWrap}>
+          <View style={styles.gpsCard} testID="gps-info-card">
+            <Info size={16} color={colors.primary} />
+            <Text style={styles.gpsCardText}>
+              현재 위치가 <Text style={styles.gpsCardTextStrong}>{stationName} 반경 200m</Text> 안이에요. GPS 기반 자동
+              검증돼서 가중치가 올라가요.
+            </Text>
+          </View>
+        </View>
+      ) : null}
+      </ScrollView>
+
+      {/* Sticky footer — bookmark + 제보 등록 CTA */}
+      <View style={styles.footer}>
+        <TouchableOpacity
+          testID="bookmark-toggle"
+          onPress={() => setBookmarked(prev => !prev)}
+          style={styles.bookmarkButton}
+          accessibilityRole="button"
+          accessibilityLabel={bookmarked ? '북마크 해제' : '북마크'}
+          accessibilityState={{ selected: bookmarked }}
+        >
+          <Bookmark
+            size={22}
+            color={bookmarked ? colors.primary : colors.textSecondary}
+            fill={bookmarked ? colors.primary : 'transparent'}
+          />
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.submitButton,
+            (!selectedLine || !reportType || submitting) && styles.submitButtonDisabled,
+          ]}
+          onPress={handleSubmit}
+          disabled={!selectedLine || !reportType || submitting}
+          accessibilityRole="button"
+          accessibilityLabel="제보 등록"
+        >
+          {submitting ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <>
+              <Send size={20} color="#FFFFFF" />
+              <Text style={styles.submitButtonText}>제보 등록</Text>
+            </>
+          )}
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
   );
 };
 
@@ -334,20 +461,48 @@ const createStyles = (colors: ThemeColors) =>
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      paddingHorizontal: SPACING.lg,
+      paddingHorizontal: SPACING.md,
       paddingVertical: SPACING.md,
       backgroundColor: colors.surface,
       borderBottomWidth: 1,
       borderBottomColor: colors.borderLight,
     },
+    headerLeading: {
+      width: 44,
+    },
     title: {
-      fontSize: TYPOGRAPHY.fontSize.xl,
+      fontSize: TYPOGRAPHY.fontSize.lg,
       fontWeight: '700',
       fontFamily: weightToFontFamily('700'),
       color: colors.textPrimary,
     },
     closeButton: {
-      padding: SPACING.xs,
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    draftButton: {
+      paddingHorizontal: SPACING.sm,
+      paddingVertical: SPACING.xs,
+      minWidth: 60,
+      alignItems: 'flex-end',
+    },
+    draftButtonText: {
+      fontSize: TYPOGRAPHY.fontSize.sm,
+      color: colors.textSecondary,
+      fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
+    },
+    scrollBody: {
+      flex: 1,
+    },
+    scrollContent: {
+      paddingBottom: 96,
+    },
+    bannerWrap: {
+      paddingHorizontal: SPACING.lg,
+      paddingTop: SPACING.md,
     },
     section: {
       padding: SPACING.lg,
@@ -394,7 +549,102 @@ const createStyles = (colors: ThemeColors) =>
       fontSize: TYPOGRAPHY.fontSize.xs,
       color: colors.textTertiary,
       textAlign: 'right',
-      marginTop: SPACING.xs,
+    },
+    recommendedRow: {
+      marginTop: SPACING.sm,
+      flexDirection: 'row',
+    },
+    recommendChip: {
+      paddingHorizontal: SPACING.md,
+      paddingVertical: SPACING.xs,
+      borderRadius: RADIUS.full,
+      borderWidth: 1,
+      borderColor: colors.borderLight,
+      marginRight: SPACING.sm,
+      backgroundColor: colors.surface,
+    },
+    recommendChipSelected: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    recommendChipText: {
+      fontSize: TYPOGRAPHY.fontSize.sm,
+      color: colors.textPrimary,
+      fontWeight: '500',
+      fontFamily: weightToFontFamily('500'),
+    },
+    recommendChipTextSelected: {
+      color: '#FFFFFF',
+    },
+    attachmentRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginTop: SPACING.sm,
+    },
+    attachmentIcons: {
+      flexDirection: 'row',
+      gap: SPACING.md,
+      alignItems: 'center',
+    },
+    anonymousRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.md,
+    },
+    anonymousTitle: {
+      fontSize: TYPOGRAPHY.fontSize.base,
+      fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
+      color: colors.textPrimary,
+    },
+    anonymousHint: {
+      fontSize: TYPOGRAPHY.fontSize.xs,
+      color: colors.textSecondary,
+      marginTop: 2,
+    },
+    gpsCardWrap: {
+      paddingHorizontal: SPACING.lg,
+      paddingTop: SPACING.md,
+      paddingBottom: SPACING.lg,
+    },
+    gpsCard: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      gap: SPACING.sm,
+      padding: SPACING.md,
+      backgroundColor: colors.backgroundSecondary,
+      borderRadius: RADIUS.md,
+    },
+    gpsCardText: {
+      flex: 1,
+      fontSize: TYPOGRAPHY.fontSize.xs,
+      color: colors.textSecondary,
+      lineHeight: 18,
+    },
+    gpsCardTextStrong: {
+      fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
+      color: colors.textPrimary,
+    },
+    footer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: SPACING.sm,
+      paddingHorizontal: SPACING.lg,
+      paddingVertical: SPACING.md,
+      borderTopWidth: 1,
+      borderTopColor: colors.borderLight,
+      backgroundColor: colors.surface,
+    },
+    bookmarkButton: {
+      width: 48,
+      height: 48,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: RADIUS.md,
+      borderWidth: 1,
+      borderColor: colors.borderLight,
     },
     typeGrid: {
       flexDirection: 'row',
@@ -432,12 +682,11 @@ const createStyles = (colors: ThemeColors) =>
       fontFamily: weightToFontFamily('600'),
     },
     submitButton: {
+      flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: colors.primary,
-      marginHorizontal: SPACING.lg,
-      marginVertical: SPACING.lg,
       paddingVertical: SPACING.md,
       borderRadius: RADIUS.lg,
       gap: SPACING.sm,
@@ -450,14 +699,6 @@ const createStyles = (colors: ThemeColors) =>
       fontWeight: '600',
       fontFamily: weightToFontFamily('600'),
       color: '#FFFFFF',
-    },
-    infoText: {
-      fontSize: TYPOGRAPHY.fontSize.xs,
-      color: colors.textTertiary,
-      textAlign: 'center',
-      paddingHorizontal: SPACING.lg,
-      paddingBottom: SPACING.xl,
-      lineHeight: 18,
     },
   });
 

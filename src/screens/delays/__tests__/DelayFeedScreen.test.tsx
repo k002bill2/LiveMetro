@@ -9,8 +9,6 @@ import { DelayFeedScreen } from '../DelayFeedScreen';
 
 import { delayReportService } from '@/services/delay/delayReportService';
 import { getSubwayLineColor } from '@/utils/colorUtils';
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type TestInstance = any;
 
 jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
 jest.mock('lucide-react-native', () => ({
@@ -84,6 +82,15 @@ jest.mock('@/services/delay/delayReportService', () => ({
 
 jest.mock('@/utils/colorUtils', () => ({
   getSubwayLineColor: jest.fn(),
+}));
+
+jest.mock('@/hooks/useFavorites', () => ({
+  useFavorites: jest.fn(() => ({
+    favorites: [],
+    favoritesWithDetails: [],
+    loading: false,
+    error: null,
+  })),
 }));
 
 jest.mock('@/components/delays/DelayReportForm', () => {
@@ -199,11 +206,24 @@ describe('DelayFeedScreen', () => {
       expect(plusIcons.length).toBeGreaterThan(0);
     });
 
-    it('shows line filter buttons', () => {
-      const { getByText } = render(<DelayFeedScreen />);
+    it('shows category filter chips and my-lines toggle', () => {
+      const { getByText, getByTestId } = render(<DelayFeedScreen />);
       expect(getByText('전체')).toBeTruthy();
-      expect(getByText('1호선')).toBeTruthy();
-      expect(getByText('2호선')).toBeTruthy();
+      expect(getByText('지연')).toBeTruthy();
+      expect(getByText('신호장애')).toBeTruthy();
+      expect(getByText('혼잡')).toBeTruthy();
+      expect(getByText('내 노선만')).toBeTruthy();
+      // my-lines toggle is disabled when no favorites
+      expect(getByTestId('report-filter-my-lines').props.accessibilityState.disabled).toBe(true);
+    });
+
+    it('renders skeleton placeholders while loading before subscribe fires', () => {
+      // Mock subscribe to never call back — simulates pending first load
+      (delayReportService.subscribeToActiveReports as jest.Mock).mockImplementation(() => jest.fn());
+
+      const { getByTestId, getAllByTestId } = render(<DelayFeedScreen />);
+      expect(getByTestId('delay-feed-skeleton-list')).toBeTruthy();
+      expect(getAllByTestId('report-card-skeleton')).toHaveLength(3);
     });
 
     it('shows report count bar', () => {
@@ -223,22 +243,14 @@ describe('DelayFeedScreen', () => {
       expect(getByText(/현재 활성화된 지연 제보가 없습니다/)).toBeTruthy();
     });
 
-    it('shows specific empty message for selected line with no reports', async () => {
-      const { getByText, UNSAFE_root } = render(<DelayFeedScreen />);
+    it('shows filtered empty message when category narrowed and no matches', async () => {
+      const { getByText, getByTestId } = render(<DelayFeedScreen />);
 
-      // Find and click line filter button
-      const buttons = UNSAFE_root.findAllByType('TouchableOpacity');
-      const lineButton = buttons.find((btn: TestInstance) => {
-        const props = btn.props;
-        return props.children?.props?.children === '2호선';
+      fireEvent.press(getByTestId('report-filter-signal_issue'));
+
+      await waitFor(() => {
+        expect(getByText('선택한 필터에 해당하는 제보가 없습니다.')).toBeTruthy();
       });
-
-      if (lineButton) {
-        fireEvent.press(lineButton);
-        await waitFor(() => {
-          expect(getByText(/2호선에 활성화된 제보가 없습니다/)).toBeTruthy();
-        });
-      }
     });
   });
 
@@ -328,7 +340,7 @@ describe('DelayFeedScreen', () => {
     });
   });
 
-  describe('Line Filtering', () => {
+  describe('Category Filtering', () => {
     beforeEach(() => {
       (delayReportService.subscribeToActiveReports as jest.Mock).mockImplementation(
         (callback: (reports: typeof mockReports) => void) => {
@@ -346,47 +358,95 @@ describe('DelayFeedScreen', () => {
       });
     });
 
-    it('filters reports by line', async () => {
-      const { getByText, UNSAFE_root } = render(<DelayFeedScreen />);
+    it('filters reports by category (지연 only)', async () => {
+      const { getByText, getByTestId } = render(<DelayFeedScreen />);
 
       await waitFor(() => {
         expect(getByText('3개의 활성 제보')).toBeTruthy();
       });
 
-      // Click on line filter
-      const buttons = UNSAFE_root.findAllByType('TouchableOpacity');
-      const line2Button = buttons.find((btn: TestInstance) => {
-        const text = btn.props.children?.props?.children;
-        return text === '2호선';
+      fireEvent.press(getByTestId('report-filter-delay'));
+
+      await waitFor(() => {
+        // mockReports has 1 delay (report-1), 1 crowded (report-2), 1 accident (report-3).
+        expect(getByText('1개의 활성 제보')).toBeTruthy();
       });
-
-      if (line2Button) {
-        fireEvent.press(line2Button);
-
-        await waitFor(() => {
-          expect(getByText('1개의 활성 제보')).toBeTruthy();
-          expect(getByText('강남')).toBeTruthy();
-        });
-      }
     });
 
-    it('shows correct count when filtering by line with multiple reports', async () => {
-      const multiLineReports = [
-        mockReports[0]!,
-        { ...mockReports[0]!, id: 'report-dup', stationName: '신논현' },
-      ];
+    it('filters reports by category (혼잡 only)', async () => {
+      const { getByText, getByTestId } = render(<DelayFeedScreen />);
+
+      await waitFor(() => {
+        expect(getByText('3개의 활성 제보')).toBeTruthy();
+      });
+
+      fireEvent.press(getByTestId('report-filter-crowded'));
+
+      await waitFor(() => {
+        expect(getByText('1개의 활성 제보')).toBeTruthy();
+      });
+    });
+  });
+
+  describe('My-lines Toggle', () => {
+    const useFavoritesMock = jest.requireMock('@/hooks/useFavorites').useFavorites;
+
+    beforeEach(() => {
+      useFavoritesMock.mockReturnValue({
+        favorites: [],
+        favoritesWithDetails: [],
+        loading: false,
+        error: null,
+      });
+    });
+
+    afterAll(() => {
+      useFavoritesMock.mockReturnValue({
+        favorites: [],
+        favoritesWithDetails: [],
+        loading: false,
+        error: null,
+      });
+    });
+
+    it('enables 내 노선만 toggle when user has favorite lines', () => {
+      useFavoritesMock.mockReturnValue({
+        favorites: [{ id: 'f1', lineId: '2', stationId: 's1' }],
+        favoritesWithDetails: [],
+        loading: false,
+        error: null,
+      });
+
+      const { getByTestId } = render(<DelayFeedScreen />);
+      expect(getByTestId('report-filter-my-lines').props.accessibilityState.disabled).toBe(false);
+    });
+
+    it('filters to favorite lines when 내 노선만 is toggled on', async () => {
+      useFavoritesMock.mockReturnValue({
+        favorites: [{ id: 'f1', lineId: '2', stationId: 's1' }],
+        favoritesWithDetails: [],
+        loading: false,
+        error: null,
+      });
 
       (delayReportService.subscribeToActiveReports as jest.Mock).mockImplementation(
-        (callback: (reports: typeof multiLineReports) => void) => {
-          callback(multiLineReports);
+        (callback: (reports: typeof mockReports) => void) => {
+          callback(mockReports);
           return jest.fn();
         }
       );
 
-      const { getByText } = render(<DelayFeedScreen />);
+      const { getByText, getByTestId } = render(<DelayFeedScreen />);
 
       await waitFor(() => {
-        expect(getByText('2개의 활성 제보')).toBeTruthy();
+        expect(getByText('3개의 활성 제보')).toBeTruthy();
+      });
+
+      fireEvent.press(getByTestId('report-filter-my-lines'));
+
+      await waitFor(() => {
+        // only line 2 reports (1 of 3) remain
+        expect(getByText('1개의 활성 제보')).toBeTruthy();
       });
     });
   });
@@ -751,10 +811,10 @@ describe('DelayFeedScreen', () => {
         }
       );
 
-      const { getByText } = render(<DelayFeedScreen />);
+      const { getByTestId } = render(<DelayFeedScreen />);
 
       await waitFor(() => {
-        expect(getByText('0')).toBeTruthy();
+        expect(getByTestId('report-upvote-count').props.children).toBe(0);
       });
     });
 

@@ -14,30 +14,18 @@ import {
   RefreshControl,
   Modal,
 } from 'react-native';
-import {
-  MessageSquare,
-  ThumbsUp,
-  Megaphone,
-  Clock,
-} from 'lucide-react-native';
+import { MessageSquare, Megaphone } from 'lucide-react-native';
 
 import { useAuth } from '@/services/auth/AuthContext';
 import { useTheme } from '@/services/theme';
+import { useFavorites } from '@/hooks/useFavorites';
 import { delayReportService } from '@/services/delay/delayReportService';
-import {
-  DelayReport,
-  ReportTypeLabels,
-  getReportTypeEmoji,
-  getSeverityColor,
-  calculateCredibilityScore,
-  shouldHighlightReport,
-} from '@/models/delayReport';
+import { DelayReport } from '@/models/delayReport';
 import { DelayReportForm } from '@/components/delays/DelayReportForm';
-import { getSubwayLineColor } from '@/utils/colorUtils';
+import { ReportCard } from '@/components/delays/ReportCard';
+import { ReportCardSkeleton } from '@/components/delays/ReportCardSkeleton';
+import { ReportFilterBar, type FilterCategory } from '@/components/delays/ReportFilterBar';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
-import { LineBadge, Pill, type LineId } from '@/components/design';
-
-const LINES = ['전체', '1', '2', '3', '4', '5', '6', '7', '8', '9'];
 
 export const DelayFeedScreen: React.FC = () => {
   const { user } = useAuth();
@@ -46,10 +34,17 @@ export const DelayFeedScreen: React.FC = () => {
   // Memoize styles — feed re-renders on report stream updates (cross-review).
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
+  const { favorites } = useFavorites();
+  const myLineIds = useMemo(
+    () => new Set(favorites.map(f => f.lineId)),
+    [favorites],
+  );
+
   const [reports, setReports] = useState<DelayReport[]>([]);
-  const [_loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedLine, setSelectedLine] = useState('전체');
+  const [category, setCategory] = useState<FilterCategory>('all');
+  const [onlyMyLines, setOnlyMyLines] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
 
   const loadReports = useCallback(async () => {
@@ -97,139 +92,32 @@ export const DelayFeedScreen: React.FC = () => {
     }
   };
 
-  const formatTimeAgo = (date: Date): string => {
-    const now = new Date();
-    const diffMs = now.getTime() - new Date(date).getTime();
-    const diffMinutes = Math.floor(diffMs / (1000 * 60));
+  const filteredReports = useMemo(
+    () =>
+      reports
+        .filter(r => category === 'all' || r.reportType === category)
+        .filter(r => !onlyMyLines || myLineIds.has(r.lineId)),
+    [reports, category, onlyMyLines, myLineIds],
+  );
 
-    if (diffMinutes < 1) return '방금 전';
-    if (diffMinutes < 60) return `${diffMinutes}분 전`;
+  const renderReportItem = ({ item: report }: { item: DelayReport }) => (
+    <ReportCard report={report} currentUserId={user?.id} onUpvote={handleUpvote} />
+  );
 
-    const diffHours = Math.floor(diffMinutes / 60);
-    if (diffHours < 24) return `${diffHours}시간 전`;
-
-    return '1일 이상 전';
-  };
-
-  const filteredReports = selectedLine === '전체'
-    ? reports
-    : reports.filter(r => r.lineId === selectedLine);
-
-  const renderReportItem = ({ item: report }: { item: DelayReport }) => {
-    const lineColor = getSubwayLineColor(report.lineId);
-    const severityColor = getSeverityColor(report.severity);
-    const credibility = calculateCredibilityScore(report);
-    const isHighlighted = shouldHighlightReport(report);
-    const hasUpvoted = user ? report.upvotedBy.includes(user.id) : false;
-
+  const renderEmptyState = () => {
+    const hasFilter = category !== 'all' || onlyMyLines;
     return (
-      <View
-        style={[
-          styles.reportCard,
-          isHighlighted && styles.reportCardHighlighted,
-        ]}
-      >
-        {/* Line Accent */}
-        <View style={[styles.lineAccent, { backgroundColor: lineColor }]} />
-
-        <View style={styles.cardContent}>
-          {/* Header — design handoff: LineBadge atom + 역명 (no auto suffix
-              per [역명 double-suffix 금지]) + 검증됨 Pill (warn tone) inline */}
-          <View style={styles.reportHeader}>
-            <View style={styles.reportMeta}>
-              <LineBadge line={report.lineId as LineId} size={22} />
-              <Text style={styles.stationText}>{report.stationName}</Text>
-              {report.verified && <Pill tone="warn" size="sm">검증됨</Pill>}
-            </View>
-            <Text style={styles.timeText}>
-              {formatTimeAgo(new Date(report.timestamp))}
-            </Text>
-          </View>
-
-          {/* Report Type */}
-          <View style={styles.reportTypeRow}>
-            <Text style={styles.reportEmoji}>
-              {getReportTypeEmoji(report.reportType)}
-            </Text>
-            <Text style={[styles.reportType, { color: severityColor }]}>
-              {ReportTypeLabels[report.reportType]}
-            </Text>
-            {report.estimatedDelayMinutes && (
-              <View style={styles.delayBadge}>
-                <Clock size={12} color={semantic.statusNegative} />
-                <Text style={styles.delayText}>
-                  +{report.estimatedDelayMinutes}분
-                </Text>
-              </View>
-            )}
-          </View>
-
-          {/* Description */}
-          {report.description && (
-            <Text style={styles.description} numberOfLines={2}>
-              {report.description}
-            </Text>
-          )}
-
-          {/* Footer */}
-          <View style={styles.reportFooter}>
-            <View style={styles.reporterInfo}>
-              <Text style={styles.reporterName}>
-                {report.userDisplayName}
-              </Text>
-              {/* `검증됨` indicator now lives in the header next to the
-                  station — see design handoff. Removing here to avoid
-                  duplication. */}
-            </View>
-
-            <View style={styles.reportActions}>
-              {/* Credibility Score */}
-              <View style={styles.credibilityBadge}>
-                <Text style={styles.credibilityText}>
-                  신뢰도 {credibility}%
-                </Text>
-              </View>
-
-              {/* Upvote Button */}
-              <TouchableOpacity
-                style={[
-                  styles.upvoteButton,
-                  hasUpvoted && styles.upvoteButtonActive,
-                ]}
-                onPress={() => handleUpvote(report)}
-              >
-                <ThumbsUp
-                  size={16}
-                  color={hasUpvoted ? semantic.primaryNormal : semantic.labelAlt}
-                  fill={hasUpvoted ? semantic.primaryNormal : 'transparent'}
-                />
-                <Text
-                  style={[
-                    styles.upvoteCount,
-                    hasUpvoted && styles.upvoteCountActive,
-                  ]}
-                >
-                  {report.upvotes}
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
+      <View style={styles.emptyState}>
+        <MessageSquare size={64} color={semantic.labelAlt} />
+        <Text style={styles.emptyTitle}>제보가 없습니다</Text>
+        <Text style={styles.emptySubtitle}>
+          {hasFilter
+            ? '선택한 필터에 해당하는 제보가 없습니다.'
+            : '현재 활성화된 지연 제보가 없습니다.\n지연이 발생하면 제보해주세요!'}
+        </Text>
       </View>
     );
   };
-
-  const renderEmptyState = () => (
-    <View style={styles.emptyState}>
-      <MessageSquare size={64} color={semantic.labelAlt} />
-      <Text style={styles.emptyTitle}>제보가 없습니다</Text>
-      <Text style={styles.emptySubtitle}>
-        {selectedLine === '전체'
-          ? '현재 활성화된 지연 제보가 없습니다.\n지연이 발생하면 제보해주세요!'
-          : `${selectedLine}호선에 활성화된 제보가 없습니다.`}
-      </Text>
-    </View>
-  );
 
   return (
     <SafeAreaView style={styles.container}>
@@ -256,41 +144,14 @@ export const DelayFeedScreen: React.FC = () => {
         </TouchableOpacity>
       </View>
 
-      {/* Line Filter */}
-      <View style={styles.filterContainer}>
-        <FlatList
-          horizontal
-          data={LINES}
-          keyExtractor={item => item}
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterList}
-          renderItem={({ item: line }) => {
-            const isSelected = selectedLine === line;
-            const lineColor =
-              line === '전체' ? semantic.labelStrong : getSubwayLineColor(line);
-
-            return (
-              <TouchableOpacity
-                style={[
-                  styles.filterButton,
-                  isSelected && { backgroundColor: lineColor },
-                ]}
-                onPress={() => setSelectedLine(line)}
-              >
-                <Text
-                  style={[
-                    styles.filterText,
-                    isSelected && styles.filterTextSelected,
-                    !isSelected && { color: lineColor },
-                  ]}
-                >
-                  {line === '전체' ? '전체' : `${line}호선`}
-                </Text>
-              </TouchableOpacity>
-            );
-          }}
-        />
-      </View>
+      {/* Category + my-lines filter */}
+      <ReportFilterBar
+        selectedCategory={category}
+        onSelectCategory={setCategory}
+        onlyMyLines={onlyMyLines}
+        onToggleMyLines={() => setOnlyMyLines(prev => !prev)}
+        myLinesAvailable={myLineIds.size > 0}
+      />
 
       {/* Report Count */}
       <View style={styles.countBar}>
@@ -300,21 +161,29 @@ export const DelayFeedScreen: React.FC = () => {
         </Text>
       </View>
 
-      {/* Report List */}
-      <FlatList
-        data={filteredReports}
-        keyExtractor={item => item.id}
-        renderItem={renderReportItem}
-        contentContainerStyle={styles.listContent}
-        ListEmptyComponent={renderEmptyState}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={semantic.labelStrong}
-          />
-        }
-      />
+      {/* Report List — show skeleton placeholders on first load */}
+      {loading && reports.length === 0 ? (
+        <View style={styles.listContent} testID="delay-feed-skeleton-list">
+          <ReportCardSkeleton />
+          <ReportCardSkeleton />
+          <ReportCardSkeleton />
+        </View>
+      ) : (
+        <FlatList
+          data={filteredReports}
+          keyExtractor={item => item.id}
+          renderItem={renderReportItem}
+          contentContainerStyle={styles.listContent}
+          ListEmptyComponent={renderEmptyState}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={semantic.labelStrong}
+            />
+          }
+        />
+      )}
 
       {/* Report Modal */}
       <Modal
@@ -376,32 +245,6 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       shadowRadius: 10,
       elevation: 4,
     },
-    filterContainer: {
-      backgroundColor: semantic.bgBase,
-      paddingVertical: WANTED_TOKENS.spacing.s2,
-      borderBottomWidth: 1,
-      borderBottomColor: semantic.lineSubtle,
-    },
-    filterList: {
-      paddingHorizontal: WANTED_TOKENS.spacing.s3,
-      gap: WANTED_TOKENS.spacing.s2,
-    },
-    filterButton: {
-      paddingHorizontal: WANTED_TOKENS.spacing.s3,
-      paddingVertical: WANTED_TOKENS.spacing.s1,
-      borderRadius: WANTED_TOKENS.radius.pill,
-      borderWidth: 1,
-      borderColor: semantic.lineSubtle,
-      marginRight: WANTED_TOKENS.spacing.s2,
-    },
-    filterText: {
-      fontSize: WANTED_TOKENS.type.label2.size,
-      fontWeight: '500',
-      fontFamily: weightToFontFamily('500'),
-    },
-    filterTextSelected: {
-      color: semantic.labelOnColor,
-    },
     countBar: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -415,134 +258,6 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     },
     listContent: {
       padding: WANTED_TOKENS.spacing.s3,
-    },
-    reportCard: {
-      backgroundColor: semantic.bgBase,
-      borderRadius: WANTED_TOKENS.radius.r6,
-      marginBottom: WANTED_TOKENS.spacing.s3,
-      overflow: 'hidden',
-      flexDirection: 'row',
-      borderWidth: 1,
-      borderColor: semantic.lineSubtle,
-    },
-    reportCardHighlighted: {
-      borderWidth: 1,
-      borderColor: semantic.statusCautionary,
-    },
-    lineAccent: {
-      width: 4,
-    },
-    cardContent: {
-      flex: 1,
-      padding: WANTED_TOKENS.spacing.s3,
-    },
-    reportHeader: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: WANTED_TOKENS.spacing.s2,
-    },
-    reportMeta: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: WANTED_TOKENS.spacing.s2,
-    },
-    stationText: {
-      fontSize: WANTED_TOKENS.type.label2.size,
-      fontWeight: '500',
-      fontFamily: weightToFontFamily('500'),
-      color: semantic.labelStrong,
-    },
-    timeText: {
-      fontSize: WANTED_TOKENS.type.caption1.size,
-      color: semantic.labelAlt,
-    },
-    reportTypeRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: WANTED_TOKENS.spacing.s2,
-      marginBottom: WANTED_TOKENS.spacing.s2,
-    },
-    reportEmoji: {
-      fontSize: 20,
-    },
-    reportType: {
-      fontSize: WANTED_TOKENS.type.body1.size,
-      fontWeight: '600',
-      fontFamily: weightToFontFamily('600'),
-    },
-    delayBadge: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: semantic.statusNegative + '20',
-      paddingHorizontal: WANTED_TOKENS.spacing.s2,
-      paddingVertical: 2,
-      borderRadius: WANTED_TOKENS.radius.r2,
-      gap: 4,
-    },
-    delayText: {
-      fontSize: WANTED_TOKENS.type.caption1.size,
-      color: semantic.statusNegative,
-      fontWeight: '600',
-      fontFamily: weightToFontFamily('600'),
-    },
-    description: {
-      fontSize: WANTED_TOKENS.type.label2.size,
-      color: semantic.labelAlt,
-      marginBottom: WANTED_TOKENS.spacing.s2,
-      lineHeight: 20,
-    },
-    reportFooter: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingTop: WANTED_TOKENS.spacing.s2,
-      borderTopWidth: 1,
-      borderTopColor: semantic.lineSubtle,
-    },
-    reporterInfo: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: WANTED_TOKENS.spacing.s1,
-    },
-    reporterName: {
-      fontSize: WANTED_TOKENS.type.caption1.size,
-      color: semantic.labelAlt,
-    },
-    reportActions: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: WANTED_TOKENS.spacing.s3,
-    },
-    credibilityBadge: {
-      backgroundColor: semantic.bgSubtle,
-      paddingHorizontal: WANTED_TOKENS.spacing.s2,
-      paddingVertical: 2,
-      borderRadius: WANTED_TOKENS.radius.r2,
-    },
-    credibilityText: {
-      fontSize: WANTED_TOKENS.type.caption1.size,
-      color: semantic.labelAlt,
-    },
-    upvoteButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      paddingVertical: WANTED_TOKENS.spacing.s1,
-      paddingHorizontal: WANTED_TOKENS.spacing.s2,
-    },
-    upvoteButtonActive: {
-      backgroundColor: semantic.primaryNormal + '20',
-      borderRadius: WANTED_TOKENS.radius.r2,
-    },
-    upvoteCount: {
-      fontSize: WANTED_TOKENS.type.label2.size,
-      color: semantic.labelAlt,
-      fontWeight: '500',
-      fontFamily: weightToFontFamily('500'),
-    },
-    upvoteCountActive: {
-      color: semantic.primaryNormal,
     },
     emptyState: {
       alignItems: 'center',
