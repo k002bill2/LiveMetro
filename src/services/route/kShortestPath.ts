@@ -54,7 +54,11 @@ interface Edge {
 /**
  * Build adjacency list graph
  */
-function buildGraph(excludeNodeKeys?: Set<string>, excludeEdges?: Set<string>): Map<string, Edge[]> {
+function buildGraph(
+  excludeNodeKeys?: Set<string>,
+  excludeEdges?: Set<string>,
+  congestionMultipliers?: ReadonlyMap<string, number>,
+): Map<string, Edge[]> {
   const graph = new Map<string, Edge[]>();
 
   // Add edges for each line
@@ -176,6 +180,20 @@ function buildGraph(excludeNodeKeys?: Set<string>, excludeEdges?: Set<string>): 
     }
   });
 
+  // Phase A: Apply congestion multipliers post-graph-construction.
+  // Edge.lineId identifies the line being traversed (or destination line for transfers).
+  if (congestionMultipliers && congestionMultipliers.size > 0) {
+    graph.forEach((edgeList, key) => {
+      graph.set(
+        key,
+        edgeList.map(edge => {
+          const m = congestionMultipliers.get(edge.lineId) ?? 1.0;
+          return m === 1.0 ? edge : { ...edge, weight: edge.weight * m };
+        }),
+      );
+    });
+  }
+
   return graph;
 }
 
@@ -271,7 +289,8 @@ function dijkstra(
 export function findKShortestPaths(
   fromStationId: string,
   toStationId: string,
-  k: number = 3
+  k: number = 3,
+  congestionMultipliers?: ReadonlyMap<string, number>,
 ): KShortestPathResult {
   const startTime = Date.now();
 
@@ -292,7 +311,7 @@ export function findKShortestPaths(
   const B = new PriorityQueue<InternalPath>(); // Candidate paths
 
   // Find the first shortest path
-  const graph = buildGraph();
+  const graph = buildGraph(undefined, undefined, congestionMultipliers);
   const firstPath = dijkstra(graph, startKeys, endKeys);
 
   if (!firstPath) {
@@ -338,7 +357,7 @@ export function findKShortestPaths(
       const excludeNodes = new Set<string>(rootPath.slice(0, -1));
 
       // Find spur path
-      const spurGraph = buildGraph(excludeNodes, excludeEdges);
+      const spurGraph = buildGraph(excludeNodes, excludeEdges, congestionMultipliers);
       const spurPath = dijkstra(spurGraph, [spurNode], endKeys);
 
       if (spurPath && spurPath.nodes.length > 1) {
@@ -539,8 +558,14 @@ export function getDiverseRoutes(
   fromStationId: string,
   toStationId: string,
   maxRoutes: number = DEFAULT_MAX_ROUTES,
+  congestionMultipliers?: ReadonlyMap<string, number>,
 ): Route[] {
-  const result = findKShortestPaths(fromStationId, toStationId, K_SHORTEST_CANDIDATES);
+  const result = findKShortestPaths(
+    fromStationId,
+    toStationId,
+    K_SHORTEST_CANDIDATES,
+    congestionMultipliers,
+  );
   if (result.paths.length === 0) return [];
 
   const filtered = result.paths.filter((r) => r.transferCount <= MAX_ROUTE_TRANSFERS);
