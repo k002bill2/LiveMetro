@@ -29,11 +29,11 @@ jest.mock('@utils/subwayMapData', () => ({
     guro: { id: 'guro', name: '구로', lines: ['1'] },
   },
   LINE_STATIONS: {
-    '1': ['seoul', 'cityHall', 'jonggak', 'dongdaemun', 'sindorim', 'guro'],
-    '2': ['cityHall', 'euljiro3ga', 'seolleung', 'gangnam', 'samseong', 'jamsil', 'sindorim'],
-    '3': ['euljiro3ga', 'chungmuro'],
-    '4': ['seoul', 'chungmuro', 'dongdaemun'],
-    bundang: ['seolleung'],
+    '1': [['seoul', 'cityHall', 'jonggak', 'dongdaemun', 'sindorim', 'guro']],
+    '2': [['cityHall', 'euljiro3ga', 'seolleung', 'gangnam', 'samseong', 'jamsil', 'sindorim']],
+    '3': [['euljiro3ga', 'chungmuro']],
+    '4': [['seoul', 'chungmuro', 'dongdaemun']],
+    bundang: [['seolleung']],
   },
   LINE_COLORS: {
     '1': '#0052A4',

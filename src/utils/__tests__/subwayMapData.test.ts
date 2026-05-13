@@ -15,6 +15,7 @@ import {
   getStationById,
   getLineColor,
   getStationsForLine,
+  lineStationSet,
 } from '../subwayMapData';
 
 describe('subwayMapData', () => {
@@ -210,6 +211,42 @@ describe('subwayMapData', () => {
         expect(stations[0]!.name).toBeDefined();
         expect(typeof stations[0]!.x).toBe('number');
       }
+    });
+  });
+
+  describe('LINE_STATIONS nested shape', () => {
+    it('LINE_STATIONS[lineId] is an array of subarrays (string[][])', () => {
+      const line1 = LINE_STATIONS['1']!;
+      expect(Array.isArray(line1)).toBe(true);
+      expect(line1.length).toBeGreaterThan(0);
+      // Each element is a subarray of station ids
+      expect(Array.isArray(line1[0])).toBe(true);
+      expect(typeof line1[0]![0]).toBe('string');
+    });
+
+    it('lineStationSet returns membership Set for existing line', () => {
+      const set1 = lineStationSet('1');
+      expect(set1).toBeInstanceOf(Set);
+      expect(set1.size).toBeGreaterThan(0);
+      // Each member is a station id from line 1's flat union
+      const flatLine1 = LINE_STATIONS['1']!.flat();
+      flatLine1.forEach(id => expect(set1.has(id)).toBe(true));
+    });
+
+    it('lineStationSet returns empty Set for non-existent line', () => {
+      const setNone = lineStationSet('nonexistent_line_id_xyz');
+      expect(setNone).toBeInstanceOf(Set);
+      expect(setNone.size).toBe(0);
+    });
+
+    it('getStationsForLine dedupes stations across subarrays', () => {
+      // Current data has all single-segment lines, so dedupe is a no-op
+      // for now. This test asserts the contract — when branched lines
+      // arrive (Task 9 gyeongui), the same test will catch dedupe regressions.
+      const stations1 = getStationsForLine('1');
+      const ids = stations1.map(s => s.id);
+      const uniqIds = new Set(ids);
+      expect(ids.length).toBe(uniqIds.size); // no duplicates
     });
   });
 });

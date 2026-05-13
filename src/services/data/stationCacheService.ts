@@ -24,7 +24,9 @@ export interface LinesCache {
   timestamp: number;
   ttl: number;
   colors: Record<string, string>;
-  stations: Record<string, string[]>;
+  // Branched-line schema: each line maps to operational segments
+  // (`string[][]`). Single-trunk lines normalize to a single subarray.
+  stations: Record<string, readonly string[][]>;
 }
 
 export interface CacheStatus {
@@ -106,7 +108,7 @@ class StationCacheService {
   /**
    * Get cached lines data
    */
-  async getLines(): Promise<{ colors: Record<string, string>; stations: Record<string, string[]> } | null> {
+  async getLines(): Promise<{ colors: Record<string, string>; stations: Record<string, readonly string[][]> } | null> {
     await this.initialize();
 
     if (!this.linesCache) return null;
@@ -150,7 +152,7 @@ class StationCacheService {
    */
   async setLines(
     colors: Record<string, string>,
-    stations: Record<string, string[]>,
+    stations: Record<string, readonly string[][]>,
     ttl: number = DEFAULT_TTL
   ): Promise<void> {
     const cache: LinesCache = {

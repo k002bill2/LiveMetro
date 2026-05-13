@@ -63,12 +63,23 @@ export const generateMapLayout = (lines?: SimpleSubwayLine[]): MapData => {
   const edges: MapEdge[] = [];
   const addedStations = new Set<string>();
 
-  // If custom lines provided, use them; otherwise use predefined data
-  const lineData = lines || Object.entries(LINE_STATIONS).map(([id, stations]) => ({
-    id,
-    color: LINE_COLORS[id] || '#888888',
-    stations,
-  }));
+  // If custom lines provided, use them; otherwise use predefined data.
+  // Emit one `lineData` entry per subarray so that the downstream edge
+  // builder iterates within each subarray only — preventing a fake
+  // visual edge from connecting the last station of one subarray to the
+  // first station of the next when a line is reshaped to multi-segment
+  // (e.g., gyeongui in PR-2+). For the 18 currently-normalized
+  // single-segment lines, `flatMap` produces exactly one entry per line,
+  // identical to prior behavior. The line `id` is intentionally stable
+  // across subarrays so color/membership lookups (createLinePaths,
+  // getLineEdges) keep working unchanged.
+  const lineData = lines || Object.entries(LINE_STATIONS).flatMap(([id, segments]) =>
+    segments.map(stations => ({
+      id,
+      color: LINE_COLORS[id] || '#888888',
+      stations: [...stations],
+    })),
+  );
 
   lineData.forEach(line => {
     const lineNodes: MapNode[] = [];
