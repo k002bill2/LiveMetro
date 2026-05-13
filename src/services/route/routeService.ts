@@ -21,7 +21,7 @@ import { PriorityQueue } from '@/utils/priorityQueue';
 import { sumHaversineDistanceKm, type LatLng } from '@/utils/haversine';
 import { getStationCoordinates } from '@/utils/stationCoordinateLookup';
 import { fareService, type FareResult } from './fareService';
-import { getDiverseRoutes } from './kShortestPath';
+import { getDiverseRoutes, trunkLineId } from './kShortestPath';
 import {
   getNextTrainWaitMinutes,
   type RealtimeArrival,
@@ -412,14 +412,14 @@ const pathToSegments = (path: string[]): RouteSegment[] => {
     const nextStation = STATIONS[nextStationId];
     if (!currentStation || !nextStation) continue;
 
-    // lineId here may carry a `::${subIdx}` suffix from sub-line encoding
-    // (kShortestPath.ts `trunkLineId`). The suffix is essential for the
-    // `currentLineId !== nextLineId` transfer comparison (sub-line shuttle
-    // change is a real user transfer), but must NOT leak to the UI segment
-    // where LINE_LABELS lookup expects the trunk id (e.g. "2", not "2::2").
+    // lineId here may carry a `::${subIdx}` suffix from sub-line encoding.
+    // The suffix is essential for the `currentLineId !== nextLineId`
+    // transfer comparison (sub-line shuttle change is a real user transfer),
+    // but must NOT leak to the UI segment where LINE_LABELS lookup expects
+    // the trunk id (e.g. "2", not "2::2"). Use trunkLineId helper.
     const isTransfer =
       currentStationId === nextStationId && currentLineId !== nextLineId;
-    const displayLineId = (isTransfer ? nextLineId : currentLineId).split('::')[0] ?? (isTransfer ? nextLineId : currentLineId);
+    const displayLineId = trunkLineId(isTransfer ? nextLineId : currentLineId);
 
     segments.push({
       fromStationId: currentStationId,

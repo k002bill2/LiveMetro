@@ -242,14 +242,28 @@ function buildGraph(
   // transfer edge is added between every sub-line pair across lines so
   // that a passenger can change between any combination — domain model
   // is that the cross-line transfer corridor is shared (Option B).
-  const subIdxsOfStationInLine = (stationId: string, lineId: string): number[] => {
-    const segs = LINE_STATIONS[lineId] ?? [];
-    const out: number[] = [];
-    segs.forEach((sub, idx) => {
-      if (sub.includes(stationId)) out.push(idx);
+  //
+  // Pre-calculate a station-to-subIdxs index per line for O(1) lookup
+  // (otherwise this would be O(Stations * Lines²) with redundant array
+  // scanning per cross-line pair).
+  const stationSubIdxIndex = new Map<string, Map<string, number[]>>();
+  Object.entries(LINE_STATIONS).forEach(([lineId, segments]) => {
+    const inner = new Map<string, number[]>();
+    segments.forEach((stationIds, subIdx) => {
+      stationIds.forEach(sid => {
+        if (!sid) return;
+        const list = inner.get(sid);
+        if (list) {
+          if (!list.includes(subIdx)) list.push(subIdx);
+        } else {
+          inner.set(sid, [subIdx]);
+        }
+      });
     });
-    return out;
-  };
+    stationSubIdxIndex.set(lineId, inner);
+  });
+  const subIdxsOfStationInLine = (stationId: string, lineId: string): number[] =>
+    stationSubIdxIndex.get(lineId)?.get(stationId) ?? [];
 
   Object.values(STATIONS).forEach(station => {
     const stationLines = station.lines.filter(
