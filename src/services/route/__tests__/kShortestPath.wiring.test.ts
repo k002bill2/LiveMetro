@@ -25,8 +25,8 @@ jest.mock('@utils/subwayMapData', () => ({
     jamsil: { id: 'jamsil', name: '잠실', lines: ['2'] },
   },
   LINE_STATIONS: {
-    '1': ['cityHall', 'jonggak', 'dongdaemun', 'sindorim'],
-    '2': ['cityHall', 'euljiro3ga', 'seolleung', 'gangnam', 'samseong', 'jamsil', 'sindorim'],
+    '1': [['cityHall', 'jonggak', 'dongdaemun', 'sindorim']],
+    '2': [['cityHall', 'euljiro3ga', 'seolleung', 'gangnam', 'samseong', 'jamsil', 'sindorim']],
   },
   LINE_COLORS: { '1': '#0052A4', '2': '#00A84D' },
 }));
