@@ -393,3 +393,79 @@ describe('gyeongui — 분기 schema 적용 후 회귀 (PR-1)', () => {
     expect(fastest.totalMinutes).toBeLessThanOrEqual(70);
   });
 });
+
+describe('gyeongchun — 분기 schema 적용 후 회귀 (PR-4)', () => {
+  /**
+   * 회귀 원인:
+   *  - 현재 lines.json `gyeongchun` array는 광운대(idx 0)에서 곧바로
+   *    청량리(idx 1)로 인접 chain이 연결됨.
+   *  - 광운대는 망우선 지선(광운대↔상봉)의 시작점, 청량리는 본선 시작점.
+   *  - graph builder가 array[i]↔array[i+1]을 인접 edge로 만들어
+   *    잘못된 광운대↔청량리 1-hop edge가 생성됨.
+   *  - 잘못된 인접 사례 (current array idx):
+   *      0-1: 광운대 ↔ 청량리 (실제 다른 노선 환승 필요, 직접 인접 아님)
+   *  - Wikipedia ground truth (.cache/gyeongchun-ground-truth.md):
+   *      본선 24역 (청량리→회기→중랑→상봉→망우→...→남춘천→춘천)
+   *      망우선 지선 2역 (광운대→상봉, 평일 출퇴근 일부 운행).
+   *      분기점/합류점: 상봉.
+   *
+   * PR-4에서 LINE_STATIONS.gyeongchun을 nested 2-subarray로 reshape하면
+   * RED 테스트가 GREEN으로 전환됨. BASELINE 테스트는 reshape 전후 모두 PASS.
+   */
+
+  /**
+   * 광운대 → 청량리: 망우선 지선 시작점과 본선 시작점이 잘못 인접.
+   * 실제 경춘선 그래프상으로는 광운대 → 상봉 → 중랑 → 회기 → 청량리 (4 hops, 같은 경춘선).
+   *
+   * 잘못된 1-hop edge가 살아있으면 fastest는 ~3분 직행으로 잘못 등장.
+   * 정상 시 fastest > 5분 (4 hops 우회 또는 다른 노선 환승).
+   */
+  it('광운대→청량리 fastest는 거리가 있어 > 5분 (잘못된 인접 edge 가드)', () => {
+    const routes = getDiverseRoutes('s_eab491ec', 'cheongnyangni');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.totalMinutes).toBeGreaterThan(5);
+  });
+
+  /**
+   * 청량리 → 회기: 본선 trunk 인접 (청량리(0) → 회기(1)).
+   * BASELINE — reshape 전후 모두 환승 0회, 1 hop ≤5분 직행이어야 함.
+   * 본선 trunk 인접성이 보존되는지 검증.
+   */
+  it('청량리→회기는 환승 0회 직행 1 hop (본선 trunk 인접 보존)', () => {
+    const routes = getDiverseRoutes('cheongnyangni', 's_ed9a8cea');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+    expect(fastest.totalMinutes).toBeLessThanOrEqual(5);
+  });
+
+  /**
+   * 광운대 → 상봉: 망우선 지선 내 인접. Wikipedia 망우선 거리표에 따르면
+   * 광운대(4.9km)와 상봉(0.6km) 사이에 영업역 없음 (이문역은 2004년 폐역).
+   * 따라서 환승 0회, 1 hop 직행이 fastest.
+   * 분기점 상봉이 본선과 지선 양쪽 subarray에 등장해도 지선 trunk 인접
+   * edge가 보존되는지 검증.
+   */
+  it('광운대→상봉은 환승 0회 직행 1 hop (망우선 지선 인접 보존)', () => {
+    const routes = getDiverseRoutes('s_eab491ec', 's_2722');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+    expect(fastest.totalMinutes).toBeLessThanOrEqual(5);
+  });
+
+  /**
+   * 상봉 → 망우: 본선 trunk 인접 (상봉(3) → 망우(4)).
+   * BASELINE — reshape 전후 모두 환승 0회 1 hop ≤5분 직행이어야 함.
+   * 분기점 상봉이 본선과 지선 양쪽 subarray에 등장해도 본선 trunk
+   * 인접성이 보존되는지 검증.
+   */
+  it('상봉→망우는 환승 0회 직행 (본선 trunk 인접 보존)', () => {
+    const routes = getDiverseRoutes('s_2722', 's_1203');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+    expect(fastest.totalMinutes).toBeLessThanOrEqual(5);
+  });
+});
