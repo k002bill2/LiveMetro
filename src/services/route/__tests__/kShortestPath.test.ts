@@ -32,6 +32,14 @@ jest.mock('@utils/subwayMapData', () => ({
     '225': { id: '225', name: '삼성', lines: ['2'] },
     '226': { id: '226', name: '종합운동장', lines: ['2', '9'] },
     '201': { id: '201', name: '시청', lines: ['1', '2'] },
+    // Synthetic branched line B for Task 7 topology tests.
+    // Topology: B1 — B2 — B3 (trunk)
+    //                \— B4 — B5 (branch off B2)
+    'B1': { id: 'B1', name: 'B1', lines: ['B'] },
+    'B2': { id: 'B2', name: 'B2', lines: ['B'] },
+    'B3': { id: 'B3', name: 'B3', lines: ['B'] },
+    'B4': { id: 'B4', name: 'B4', lines: ['B'] },
+    'B5': { id: 'B5', name: 'B5', lines: ['B'] },
   },
   // Nested array shape (Task 3+ contract: Record<string, readonly string[][]>).
   // Each top-level array is a list of segments; single-segment lines wrap once.
@@ -40,6 +48,12 @@ jest.mock('@utils/subwayMapData', () => ({
     '분당': [['224', '227', '228']],
     '9': [['226', '229', '230']],
     '1': [['201', '202', '203']],
+    // Branched line: B2 appears in both subarrays as branch point.
+    // Used by 'buildGraph — branched line topology' describe block.
+    'B': [
+      ['B1', 'B2', 'B3'],
+      ['B2', 'B4', 'B5'],
+    ],
   },
 }));
 
@@ -336,5 +350,91 @@ describe('buildTransferSignature', () => {
     ]);
     // sorted: ['강남구청', '부평구청']
     expect(buildTransferSignature(r)).toBe('강남구청|부평구청');
+  });
+});
+
+describe('buildGraph — branched line topology (nested LINE_STATIONS)', () => {
+  // These tests exercise the Task 4 nested-loop graph builder via the public
+  // findKShortestPaths API. The synthetic line 'B' in the module mock has
+  // shape [[B1,B2,B3],[B2,B4,B5]] — B2 is the branch point.
+
+  it('동일 station이 여러 subarray에 등장하면 양방향 분기 edge 생성', () => {
+    // B1 → B5 must traverse via the branch point B2 onto the second subarray.
+    // Without branch-point edge accumulation, this path would not exist
+    // because B2's adjacency on subarray[0] only goes to B1/B3, and B2 on
+    // subarray[1] only goes to B4. Same nodeKey (B2#B) means edges from
+    // both iterations accumulate, producing the branch semantics.
+    const result = findKShortestPaths('B1', 'B5', 1);
+
+    expect(result.paths.length).toBeGreaterThan(0);
+    const path = result.paths[0]!;
+    // No transfer needed — it's a single line with branches.
+    expect(path.transferCount).toBe(0);
+    // Path traverses B1 → B2 → B4 → B5 (3 hops, 4 stations).
+    const stationIds = [
+      path.segments[0]?.fromStationId,
+      ...path.segments.map(s => s.toStationId),
+    ];
+    expect(stationIds).toEqual(['B1', 'B2', 'B4', 'B5']);
+  });
+
+  it('reverse 방향도 분기 edge 사용 가능 (B5 → B1 대칭)', () => {
+    // Bidirectional check: prev-edge logic in buildGraph must also produce
+    // the branch-point traversal in reverse.
+    const result = findKShortestPaths('B5', 'B1', 1);
+
+    expect(result.paths.length).toBeGreaterThan(0);
+    const path = result.paths[0]!;
+    expect(path.transferCount).toBe(0);
+    const stationIds = [
+      path.segments[0]?.fromStationId,
+      ...path.segments.map(s => s.toStationId),
+    ];
+    expect(stationIds).toEqual(['B5', 'B4', 'B2', 'B1']);
+  });
+
+  it('단일 subarray (legacy flat) 노선은 인접 동작 보존 (backwards compat)', () => {
+    // Line '2' mock has shape [['222','223','224','225','226']] — single
+    // segment. Adjacent station traversal must still work as before Task 4.
+    const result = findKShortestPaths('222', '225', 1);
+
+    expect(result.paths.length).toBeGreaterThan(0);
+    const path = result.paths[0]!;
+    expect(path.transferCount).toBe(0);
+    // 222 → 223 → 224 → 225: 3 hops on Line 2.
+    const stationIds = [
+      path.segments[0]?.fromStationId,
+      ...path.segments.map(s => s.toStationId),
+    ];
+    expect(stationIds).toEqual(['222', '223', '224', '225']);
+  });
+
+  it('branch trunk 끝 (B3)에서 다른 branch (B5)로 환승 없이 도달', () => {
+    // B3 → B5: must go B3 → B2 (back along trunk) → B4 → B5 (down branch).
+    // This exercises the prev-edge logic at B3 + branch traversal at B2.
+    const result = findKShortestPaths('B3', 'B5', 1);
+
+    expect(result.paths.length).toBeGreaterThan(0);
+    const path = result.paths[0]!;
+    expect(path.transferCount).toBe(0);
+    const stationIds = [
+      path.segments[0]?.fromStationId,
+      ...path.segments.map(s => s.toStationId),
+    ];
+    expect(stationIds).toEqual(['B3', 'B2', 'B4', 'B5']);
+  });
+
+  it('branched line의 비인접 station 간 false circular wrap 미발생', () => {
+    // The Line-2 trunk wrap code is hardcoded to LINE_STATIONS['2']?.[0].
+    // For other lines (like 'B'), no circular edge from first to last of
+    // any subarray should exist. So B1 (start of subarray[0]) has no
+    // direct edge to B3 (end of subarray[0]) — must traverse B2.
+    const result = findKShortestPaths('B1', 'B3', 1);
+
+    expect(result.paths.length).toBeGreaterThan(0);
+    const path = result.paths[0]!;
+    // Direct path is B1 → B2 → B3 (2 hops). If a false circular wrap edge
+    // existed, the path could be 1 hop, which would be wrong.
+    expect(path.segments.length).toBe(2);
   });
 });
