@@ -16,9 +16,12 @@ interface StationData {
 
 const stations = stationsData as Record<string, StationData>;
 
+type LineStations = string[] | string[][];
+const linesStations = linesData.stations as Record<string, LineStations>;
+
 describe('lines.json schema invariants', () => {
   it('각 lineId의 stations는 string[] 또는 string[][] (mixed 금지)', () => {
-    Object.entries(linesData.stations).forEach(([lineId, raw]) => {
+    Object.entries(linesStations).forEach(([lineId, raw]) => {
       if (!Array.isArray(raw)) {
         throw new Error(`${lineId}: not an array`);
       }
@@ -34,7 +37,7 @@ describe('lines.json schema invariants', () => {
   });
 
   it('nested 노선의 각 subarray는 비어있지 않음', () => {
-    Object.entries(linesData.stations).forEach(([lineId, raw]) => {
+    Object.entries(linesStations).forEach(([lineId, raw]) => {
       if (!Array.isArray(raw) || raw.length === 0) return;
       if (typeof raw[0] === 'string') return; // flat은 skip
 
@@ -48,7 +51,7 @@ describe('lines.json schema invariants', () => {
   });
 
   it('각 line 안의 모든 station id는 stations.json에 존재', () => {
-    Object.entries(linesData.stations).forEach(([lineId, raw]) => {
+    Object.entries(linesStations).forEach(([lineId, raw]) => {
       if (!Array.isArray(raw)) return;
       const flat: string[] =
         raw.length === 0 || typeof raw[0] === 'string'
@@ -65,7 +68,7 @@ describe('lines.json schema invariants', () => {
   });
 
   it('각 line 안의 station은 stations.json[id].lines에 해당 lineId 포함', () => {
-    Object.entries(linesData.stations).forEach(([lineId, raw]) => {
+    Object.entries(linesStations).forEach(([lineId, raw]) => {
       if (!Array.isArray(raw)) return;
       const flat: string[] =
         raw.length === 0 || typeof raw[0] === 'string'
