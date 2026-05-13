@@ -75,29 +75,54 @@ export const STATIONS: Record<string, StationData> = stationsData as Record<stri
 export const LINE_COLORS: Record<string, string> = linesData.colors;
 
 /**
- * Station IDs for each line in order
- * Source: src/data/lines.json
+ * Normalize raw lines.json[lineId] into nested-array form.
+ *
+ * Backwards-compat: legacy single-trunk lines stored as `string[]` are
+ * wrapped to `[[...]]`. Branched lines stored as `string[][]` pass through.
+ *
+ * Convention: a station id appearing in multiple subarrays is an
+ * implicit branch point — graph builder dedupes via node key
+ * `${stationId}#${lineId}` and adds bidirectional edges to neighbors
+ * in each subarray.
  */
-export const LINE_STATIONS: Record<string, string[]> = linesData.stations;
+const normalizeLine = (raw: unknown): readonly string[][] => {
+  if (!Array.isArray(raw) || raw.length === 0) return [];
+  if (typeof raw[0] === 'string') return [raw as string[]];
+  return raw as string[][];
+};
 
 /**
- * Set of station ids that actually appear in any line's `stations` order in
- * lines.json. routeService's Dijkstra walks edges built from those orderings,
- * so a station declared in stations.json but missing from every line list
- * cannot be reached. We use this set to filter search results and seed
- * candidates so the user never picks a non-routable station.
+ * Station IDs for each line, normalized to nested-array form.
+ * Source: src/data/lines.json (post-normalize)
  *
- * As of the current data snapshot, ~41 declared (station,line) pairs are
- * unwired (mostly line 7 + transfer lines `bundang`/`airport`/`gyeongui`/etc.
- * whose station order is not yet present in lines.json). Backfilling
- * lines.json is the long-term fix; this filter is the user-facing guard.
+ * Type: `Record<lineId, readonly string[][]>` — outer key is line, value
+ * is one or more monotone subarrays. Single-trunk lines have one
+ * subarray; branched lines have multiple.
+ */
+export const LINE_STATIONS: Record<string, readonly string[][]> =
+  Object.fromEntries(
+    Object.entries(linesData.stations).map(
+      ([lineId, raw]) => [lineId, normalizeLine(raw)]
+    )
+  );
+
+/**
+ * Set of station ids that appear in any line's order. Used to filter
+ * search results so the user never picks a non-routable station.
  */
 export const ROUTABLE_STATION_IDS: ReadonlySet<string> = new Set(
-  Object.values(LINE_STATIONS).flat()
+  Object.values(LINE_STATIONS).flat(2)
 );
 
 export const isRoutableStation = (stationId: string): boolean =>
   ROUTABLE_STATION_IDS.has(stationId);
+
+/**
+ * Helper: flat station id set for a single line.
+ * Use for membership checks; do NOT use for adjacency (subarray order matters).
+ */
+export const lineStationSet = (lineId: string): ReadonlySet<string> =>
+  new Set(LINE_STATIONS[lineId]?.flat() ?? []);
 
 /**
  * Search stations in the routing graph by Korean or English name.
@@ -135,39 +160,45 @@ export const MAP_HEIGHT = 4400;
 // ============================================================================
 
 /**
- * Generate path data for each line
+ * Generate path data for each line.
+ * Branched lines produce multiple `M ... L ... L` runs (one per subarray).
  */
 export const generateLinePathData = (): LinePathData[] => {
   const paths: LinePathData[] = [];
 
-  Object.entries(LINE_STATIONS).forEach(([lineId, stationIds]) => {
+  Object.entries(LINE_STATIONS).forEach(([lineId, segments]) => {
     const lineColor = LINE_COLORS[lineId] || '#888888';
-    const segments: PathSegment[] = [];
+    const allSegments: PathSegment[] = [];
 
-    stationIds.forEach((stationId, index) => {
-      const station = STATIONS[stationId];
-      if (station) {
-        if (index === 0) {
-          segments.push({ type: 'M', points: [station.x, station.y] });
-        } else {
-          segments.push({ type: 'L', points: [station.x, station.y] });
-        }
-      }
+    segments.forEach(stationIds => {
+      stationIds.forEach((stationId, index) => {
+        const station = STATIONS[stationId];
+        if (!station) return;
+        // Each subarray starts with M, continues with L. This produces
+        // multiple disconnected polylines for branched lines, which is
+        // the visually correct rendering.
+        allSegments.push({
+          type: index === 0 ? 'M' : 'L',
+          points: [station.x, station.y],
+        });
+      });
     });
 
-    // Close loop for Line 2 (circular line)
-    if (lineId === '2' && stationIds.length > 1) {
-      const firstStation = STATIONS[stationIds[0]!];
+    // Close loop for Line 2 trunk subarray (segments[0]) only.
+    // Branch subarrays (성수지선, 신정지선) are not circular.
+    if (lineId === '2' && segments[0] && segments[0].length > 1) {
+      const trunk = segments[0];
+      const firstStation = STATIONS[trunk[0]!];
       if (firstStation) {
-        segments.push({ type: 'L', points: [firstStation.x, firstStation.y] });
+        allSegments.push({ type: 'L', points: [firstStation.x, firstStation.y] });
       }
     }
 
     paths.push({
       lineId,
       color: lineColor,
-      segments,
-      stations: stationIds,
+      segments: allSegments,
+      stations: segments.flat(),
     });
   });
 
@@ -211,13 +242,23 @@ export const getLineColor = (lineId: string): string => {
 };
 
 /**
- * Get all stations for a specific line
+ * Get all stations for a specific line (flat, dedupe across subarrays).
+ *
+ * Branch points appear once even if in multiple subarrays.
  */
 export const getStationsForLine = (lineId: string): StationData[] => {
-  const stationIds = LINE_STATIONS[lineId];
-  if (!stationIds) return [];
-  
-  return stationIds
-    .map(id => STATIONS[id])
-    .filter((s): s is StationData => s !== undefined);
+  const segments = LINE_STATIONS[lineId];
+  if (!segments) return [];
+
+  const seen = new Set<string>();
+  const result: StationData[] = [];
+  segments.forEach(stationIds => {
+    stationIds.forEach(id => {
+      if (seen.has(id)) return;
+      seen.add(id);
+      const s = STATIONS[id];
+      if (s) result.push(s);
+    });
+  });
+  return result;
 };
