@@ -61,6 +61,12 @@ function buildGraph(
 ): Map<string, Edge[]> {
   const graph = new Map<string, Edge[]>();
 
+  // Phase A: inline congestion-multiplier helper. Applied at edge-creation
+  // time so the hot inner loop of Yen's algorithm doesn't pay an extra
+  // O(V+E) post-pass + per-edge object allocation on every spur call.
+  const adjustWeight = (baseWeight: number, lineId: string): number =>
+    baseWeight * (congestionMultipliers?.get(lineId) ?? 1.0);
+
   // Add edges for each line
   Object.entries(LINE_STATIONS).forEach(([lineId, stationIds]) => {
     for (let i = 0; i < stationIds.length; i++) {
@@ -84,7 +90,7 @@ function buildGraph(
             if (!excludeEdges?.has(edgeKey)) {
               graph.get(nodeKey)?.push({
                 to: nextKey,
-                weight: AVG_STATION_TRAVEL_TIME,
+                weight: adjustWeight(AVG_STATION_TRAVEL_TIME, lineId),
                 isTransfer: false,
                 lineId,
               });
@@ -103,7 +109,7 @@ function buildGraph(
             if (!excludeEdges?.has(edgeKey)) {
               graph.get(nodeKey)?.push({
                 to: prevKey,
-                weight: AVG_STATION_TRAVEL_TIME,
+                weight: adjustWeight(AVG_STATION_TRAVEL_TIME, lineId),
                 isTransfer: false,
                 lineId,
               });
@@ -127,7 +133,7 @@ function buildGraph(
         if (!excludeEdges?.has(`${lastKey}->${firstKey}`)) {
           graph.get(lastKey)?.push({
             to: firstKey,
-            weight: AVG_STATION_TRAVEL_TIME,
+            weight: adjustWeight(AVG_STATION_TRAVEL_TIME, '2'),
             isTransfer: false,
             lineId: '2',
           });
@@ -135,7 +141,7 @@ function buildGraph(
         if (!excludeEdges?.has(`${firstKey}->${lastKey}`)) {
           graph.get(firstKey)?.push({
             to: lastKey,
-            weight: AVG_STATION_TRAVEL_TIME,
+            weight: adjustWeight(AVG_STATION_TRAVEL_TIME, '2'),
             isTransfer: false,
             lineId: '2',
           });
@@ -162,7 +168,7 @@ function buildGraph(
         if (graph.has(key1) && !excludeEdges?.has(`${key1}->${key2}`)) {
           graph.get(key1)?.push({
             to: key2,
-            weight: AVG_TRANSFER_TIME,
+            weight: adjustWeight(AVG_TRANSFER_TIME, line2),
             isTransfer: true,
             lineId: line2,
           });
@@ -171,7 +177,7 @@ function buildGraph(
         if (graph.has(key2) && !excludeEdges?.has(`${key2}->${key1}`)) {
           graph.get(key2)?.push({
             to: key1,
-            weight: AVG_TRANSFER_TIME,
+            weight: adjustWeight(AVG_TRANSFER_TIME, line1),
             isTransfer: true,
             lineId: line1,
           });
@@ -180,19 +186,6 @@ function buildGraph(
     }
   });
 
-  // Phase A: Apply congestion multipliers post-graph-construction.
-  // Edge.lineId identifies the line being traversed (or destination line for transfers).
-  if (congestionMultipliers && congestionMultipliers.size > 0) {
-    graph.forEach((edgeList, key) => {
-      graph.set(
-        key,
-        edgeList.map(edge => {
-          const m = congestionMultipliers.get(edge.lineId) ?? 1.0;
-          return m === 1.0 ? edge : { ...edge, weight: edge.weight * m };
-        }),
-      );
-    });
-  }
 
   return graph;
 }
