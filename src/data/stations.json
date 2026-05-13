@@ -4084,8 +4084,8 @@
     "id": "s_1718",
     "name": "오산대",
     "nameEn": "Osan College",
-    "x": 0,
-    "y": 0,
+    "x": 2784,
+    "y": 3313,
     "lines": [
       "1"
     ]
@@ -4104,8 +4104,8 @@
     "id": "s_1713",
     "name": "수원",
     "nameEn": "Suwon",
-    "x": 0,
-    "y": 0,
+    "x": 2308,
+    "y": 3247,
     "lines": [
       "1",
       "bundang"
@@ -4125,8 +4125,8 @@
     "id": "s_1710",
     "name": "의왕",
     "nameEn": "Uiwang",
-    "x": 0,
-    "y": 0,
+    "x": 2037,
+    "y": 2964,
     "lines": [
       "1"
     ]
@@ -4135,8 +4135,8 @@
     "id": "s_1706",
     "name": "안양",
     "nameEn": "Anyang",
-    "x": 0,
-    "y": 0,
+    "x": 1701,
+    "y": 2628,
     "lines": [
       "1"
     ]
@@ -4175,8 +4175,8 @@
     "id": "s_1403",
     "name": "아산",
     "nameEn": "Asan",
-    "x": 0,
-    "y": 0,
+    "x": 4022,
+    "y": 3313,
     "lines": [
       "1"
     ]
@@ -4185,8 +4185,8 @@
     "id": "s_0156",
     "name": "신설동",
     "nameEn": "Sinseol-dong",
-    "x": 0,
-    "y": 0,
+    "x": 2836,
+    "y": 1367,
     "lines": [
       "1",
       "2",
@@ -4197,8 +4197,8 @@
     "id": "s_1749",
     "name": "서동탄",
     "nameEn": "Seodongtan",
-    "x": 0,
-    "y": 0,
+    "x": 1764,
+    "y": 2746,
     "lines": [
       "1"
     ]
@@ -4227,8 +4227,8 @@
     "id": "s_1005",
     "name": "대방",
     "nameEn": "Daebang",
-    "x": 0,
-    "y": 0,
+    "x": 1976,
+    "y": 2177,
     "lines": [
       "1",
       "sillim"
@@ -4248,8 +4248,8 @@
     "id": "s_1017",
     "name": "신이문",
     "nameEn": "Sinimun",
-    "x": 0,
-    "y": 0,
+    "x": 3463,
+    "y": 1276,
     "lines": [
       "1"
     ]
@@ -4308,8 +4308,8 @@
     "id": "s_1032",
     "name": "신길",
     "nameEn": "Singil",
-    "x": 0,
-    "y": 0,
+    "x": 1859,
+    "y": 2114,
     "lines": [
       "1",
       "5"
@@ -4319,8 +4319,8 @@
     "id": "s_1911",
     "name": "덕정",
     "nameEn": "Deokjeong",
-    "x": 0,
-    "y": 0,
+    "x": 2648,
+    "y": 727,
     "lines": [
       "1"
     ]
@@ -4329,8 +4329,8 @@
     "id": "s_1909",
     "name": "양주",
     "nameEn": "Yangju",
-    "x": 0,
-    "y": 0,
+    "x": 2808,
+    "y": 727,
     "lines": [
       "1"
     ]
@@ -4339,8 +4339,8 @@
     "id": "s_1906",
     "name": "의정부",
     "nameEn": "Uijeongbu",
-    "x": 0,
-    "y": 0,
+    "x": 3047,
+    "y": 727,
     "lines": [
       "1"
     ]
@@ -4349,8 +4349,8 @@
     "id": "s_1904",
     "name": "망월사",
     "nameEn": "Mangwolsa",
-    "x": 0,
-    "y": 0,
+    "x": 3212,
+    "y": 727,
     "lines": [
       "1"
     ]
@@ -4359,8 +4359,8 @@
     "id": "s_1902",
     "name": "도봉",
     "nameEn": "Dobong",
-    "x": 0,
-    "y": 0,
+    "x": 3394,
+    "y": 746,
     "lines": [
       "1"
     ]
@@ -4389,8 +4389,8 @@
     "id": "s_1821",
     "name": "온수",
     "nameEn": "Onsu",
-    "x": 0,
-    "y": 0,
+    "x": 1297,
+    "y": 2196,
     "lines": [
       "1",
       "7"
@@ -4431,8 +4431,8 @@
     "id": "s_1811",
     "name": "동인천",
     "nameEn": "Dongincheon",
-    "x": 0,
-    "y": 0,
+    "x": 708,
+    "y": 2703,
     "lines": [
       "1"
     ]
@@ -4441,8 +4441,8 @@
     "id": "s_1809",
     "name": "주안",
     "nameEn": "Juan",
-    "x": 0,
-    "y": 0,
+    "x": 739,
+    "y": 2357,
     "lines": [
       "1",
       "incheon2"
@@ -4534,8 +4534,8 @@
     "id": "s_0207",
     "name": "상왕십리",
     "nameEn": "Sangwangsimni",
-    "x": 0,
-    "y": 0,
+    "x": 2871,
+    "y": 1532,
     "lines": [
       "2"
     ]
@@ -4544,8 +4544,8 @@
     "id": "s_0209",
     "name": "한양대",
     "nameEn": "Hanyang Univ.",
-    "x": 0,
-    "y": 0,
+    "x": 3062,
+    "y": 1579,
     "lines": [
       "2"
     ]
@@ -4574,8 +4574,8 @@
     "id": "s_0217",
     "name": "잠실새내",
     "nameEn": "Jamsilsaenae",
-    "x": 0,
-    "y": 0,
+    "x": 3202,
+    "y": 2241,
     "lines": [
       "2"
     ]
@@ -4584,8 +4584,8 @@
     "id": "s_0221",
     "name": "역삼",
     "nameEn": "Yeoksam",
-    "x": 0,
-    "y": 0,
+    "x": 2934,
+    "y": 2473,
     "lines": [
       "2"
     ]
@@ -4684,8 +4684,8 @@
     "id": "s_0228",
     "name": "서울대입구",
     "nameEn": "Seoul Nat`l Univ.",
-    "x": 0,
-    "y": 0,
+    "x": 2257,
+    "y": 2473,
     "lines": [
       "2"
     ]
@@ -4694,8 +4694,8 @@
     "id": "s_0316",
     "name": "독립문",
     "nameEn": "Dongnimmun",
-    "x": 0,
-    "y": 0,
+    "x": 2110,
+    "y": 1105,
     "lines": [
       "3"
     ]
@@ -4704,8 +4704,8 @@
     "id": "s_1956",
     "name": "정발산",
     "nameEn": "Jeongbalsan",
-    "x": 0,
-    "y": 0,
+    "x": 775,
+    "y": 859,
     "lines": [
       "3"
     ]
@@ -4714,8 +4714,8 @@
     "id": "s_1954",
     "name": "백석",
     "nameEn": "Baekseok",
-    "x": 0,
-    "y": 0,
+    "x": 949,
+    "y": 866,
     "lines": [
       "3"
     ]
@@ -4734,8 +4734,8 @@
     "id": "s_1951",
     "name": "원당",
     "nameEn": "Wondang",
-    "x": 0,
-    "y": 0,
+    "x": 1199,
+    "y": 889,
     "lines": [
       "3"
     ]
@@ -4754,8 +4754,8 @@
     "id": "s_0322",
     "name": "동대입구",
     "nameEn": "Dongguk Univ.",
-    "x": 0,
-    "y": 0,
+    "x": 2650,
+    "y": 1734,
     "lines": [
       "3"
     ]
@@ -4764,8 +4764,8 @@
     "id": "s_0331",
     "name": "남부터미널",
     "nameEn": "Nambu Bus Terminal",
-    "x": 0,
-    "y": 0,
+    "x": 2790,
+    "y": 2540,
     "lines": [
       "3"
     ]
@@ -4774,8 +4774,8 @@
     "id": "s_0335",
     "name": "대치",
     "nameEn": "Daechi",
-    "x": 0,
-    "y": 0,
+    "x": 3101,
+    "y": 2607,
     "lines": [
       "3"
     ]
@@ -4784,8 +4784,8 @@
     "id": "s_0337",
     "name": "대청",
     "nameEn": "Daecheong",
-    "x": 0,
-    "y": 0,
+    "x": 3265,
+    "y": 2609,
     "lines": [
       "3"
     ]
@@ -4794,8 +4794,8 @@
     "id": "s_0341",
     "name": "경찰병원",
     "nameEn": "National Police Hospital",
-    "x": 0,
-    "y": 0,
+    "x": 3715,
+    "y": 2424,
     "lines": [
       "3"
     ]
@@ -4844,8 +4844,8 @@
     "id": "s_0419",
     "name": "한성대입구",
     "nameEn": "Hansung Univ.",
-    "x": 0,
-    "y": 0,
+    "x": 2650,
+    "y": 1185,
     "lines": [
       "4"
     ]
@@ -4854,8 +4854,8 @@
     "id": "s_0429",
     "name": "신용산",
     "nameEn": "Sinyongsan",
-    "x": 0,
-    "y": 0,
+    "x": 2254,
+    "y": 1925,
     "lines": [
       "4"
     ]
@@ -4864,8 +4864,8 @@
     "id": "s_1450",
     "name": "선바위",
     "nameEn": "Seonbawi",
-    "x": 0,
-    "y": 0,
+    "x": 2427,
+    "y": 2636,
     "lines": [
       "4"
     ]
@@ -4874,8 +4874,8 @@
     "id": "s_1457",
     "name": "범계",
     "nameEn": "Beomgye",
-    "x": 0,
-    "y": 0,
+    "x": 1897,
+    "y": 2727,
     "lines": [
       "4"
     ]
@@ -4904,8 +4904,8 @@
     "id": "s_1755",
     "name": "한대앞",
     "nameEn": "Hanyang Univ. at Ansan",
-    "x": 0,
-    "y": 0,
+    "x": 1764,
+    "y": 3129,
     "lines": [
       "4",
       "bundang"
@@ -4926,8 +4926,8 @@
     "id": "s_1758",
     "name": "초지",
     "nameEn": "Choji",
-    "x": 0,
-    "y": 0,
+    "x": 1625,
+    "y": 3271,
     "lines": [
       "4",
       "seohaeline",
@@ -4980,8 +4980,8 @@
     "id": "s_2546",
     "name": "아차산",
     "nameEn": "Achasan",
-    "x": 0,
-    "y": 0,
+    "x": 3417,
+    "y": 1720,
     "lines": [
       "5"
     ]
@@ -4990,8 +4990,8 @@
     "id": "s_2564",
     "name": "하남풍산",
     "nameEn": "Hanam Pungsan",
-    "x": 0,
-    "y": 0,
+    "x": 4543,
+    "y": 2278,
     "lines": [
       "5"
     ]
@@ -5000,8 +5000,8 @@
     "id": "s_2539",
     "name": "신금호",
     "nameEn": "Singeumho",
-    "x": 0,
-    "y": 0,
+    "x": 2875,
+    "y": 1635,
     "lines": [
       "5"
     ]
@@ -5010,8 +5010,8 @@
     "id": "s_2533",
     "name": "서대문",
     "nameEn": "Seodaemun",
-    "x": 0,
-    "y": 0,
+    "x": 2124,
+    "y": 1438,
     "lines": [
       "5"
     ]
@@ -5030,8 +5030,8 @@
     "id": "s_2529",
     "name": "마포",
     "nameEn": "Mapo",
-    "x": 0,
-    "y": 0,
+    "x": 2015,
+    "y": 1974,
     "lines": [
       "5"
     ]
@@ -5070,8 +5070,8 @@
     "id": "s_2514",
     "name": "송정",
     "nameEn": "Songjeong",
-    "x": 0,
-    "y": 0,
+    "x": 1122,
+    "y": 1428,
     "lines": [
       "5"
     ]
@@ -5080,8 +5080,8 @@
     "id": "s_2512",
     "name": "개화산",
     "nameEn": "Gaehwasan",
-    "x": 0,
-    "y": 0,
+    "x": 1078,
+    "y": 1290,
     "lines": [
       "5"
     ]
@@ -5090,8 +5090,8 @@
     "id": "s_2555",
     "name": "둔촌동",
     "nameEn": "Dunchon-dong",
-    "x": 0,
-    "y": 0,
+    "x": 3740,
+    "y": 2185,
     "lines": [
       "5"
     ]
@@ -5110,8 +5110,8 @@
     "id": "s_2552",
     "name": "명일",
     "nameEn": "Myeongil",
-    "x": 0,
-    "y": 0,
+    "x": 4076,
+    "y": 2127,
     "lines": [
       "5"
     ]
@@ -5130,8 +5130,8 @@
     "id": "s_2639",
     "name": "보문",
     "nameEn": "Bomun",
-    "x": 0,
-    "y": 0,
+    "x": 2839,
+    "y": 1243,
     "lines": [
       "6",
       "wooyisinseol"
@@ -5141,8 +5141,8 @@
     "id": "s_2628",
     "name": "효창공원앞",
     "nameEn": "Hyochang park",
-    "x": 0,
-    "y": 0,
+    "x": 2112,
+    "y": 1865,
     "lines": [
       "6",
       "gyeongui"
@@ -5152,8 +5152,8 @@
     "id": "s_2620",
     "name": "월드컵경기장",
     "nameEn": "World Cup Stadium",
-    "x": 0,
-    "y": 0,
+    "x": 1579,
+    "y": 1509,
     "lines": [
       "6"
     ]
@@ -5193,8 +5193,8 @@
     "id": "s_3759",
     "name": "삼산체육관",
     "nameEn": "Samsan Gymnasium",
-    "x": 0,
-    "y": 0,
+    "x": 979,
+    "y": 1929,
     "lines": [
       "7"
     ]
@@ -5203,8 +5203,8 @@
     "id": "s_3756",
     "name": "신중동",
     "nameEn": "Sinjung-dong",
-    "x": 0,
-    "y": 0,
+    "x": 1209,
+    "y": 1885,
     "lines": [
       "7"
     ]
@@ -5213,8 +5213,8 @@
     "id": "s_3754",
     "name": "부천종합운동장",
     "nameEn": "Bucheon Stadium",
-    "x": 0,
-    "y": 0,
+    "x": 1297,
+    "y": 2012,
     "lines": [
       "7",
       "seohaeline"
@@ -5224,8 +5224,8 @@
     "id": "s_2745",
     "name": "신풍",
     "nameEn": "Sinpung",
-    "x": 0,
-    "y": 0,
+    "x": 1801,
+    "y": 2327,
     "lines": [
       "7"
     ]
@@ -5274,8 +5274,8 @@
     "id": "s_2728",
     "name": "어린이대공원",
     "nameEn": "Children`s  Grand Park",
-    "x": 0,
-    "y": 0,
+    "x": 3310,
+    "y": 1736,
     "lines": [
       "7"
     ]
@@ -5284,8 +5284,8 @@
     "id": "s_2725",
     "name": "용마산",
     "nameEn": "Yongmasan",
-    "x": 0,
-    "y": 0,
+    "x": 3527,
+    "y": 1519,
     "lines": [
       "7"
     ]
@@ -5294,8 +5294,8 @@
     "id": "s_2722",
     "name": "상봉",
     "nameEn": "Sangbong",
-    "x": 0,
-    "y": 0,
+    "x": 3662,
+    "y": 1315,
     "lines": [
       "7",
       "gyeongui",
@@ -5306,8 +5306,8 @@
     "id": "s_2819",
     "name": "문정",
     "nameEn": "Munjeong",
-    "x": 0,
-    "y": 0,
+    "x": 3586,
+    "y": 2559,
     "lines": [
       "8"
     ]
@@ -5336,8 +5336,8 @@
     "id": "s_2828",
     "name": "남위례",
     "nameEn": "Namwirye",
-    "x": 0,
-    "y": 0,
+    "x": 3793,
+    "y": 2689,
     "lines": [
       "8"
     ]
@@ -5367,8 +5367,8 @@
     "id": "s_2805",
     "name": "별내",
     "nameEn": "Byeollae",
-    "x": 0,
-    "y": 0,
+    "x": 4079,
+    "y": 1334,
     "lines": [
       "8",
       "gyeongchun"
@@ -5378,8 +5378,8 @@
     "id": "s_4127",
     "name": "선정릉",
     "nameEn": "Seonjeongneung",
-    "x": 0,
-    "y": 0,
+    "x": 3007,
+    "y": 2308,
     "lines": [
       "9",
       "bundang"
@@ -5409,8 +5409,8 @@
     "id": "s_4105",
     "name": "마곡나루",
     "nameEn": "Magongnaru",
-    "x": 0,
-    "y": 0,
+    "x": 1329,
+    "y": 1393,
     "lines": [
       "9",
       "airport"
@@ -5440,8 +5440,8 @@
     "id": "s_4111",
     "name": "신목동",
     "nameEn": "Sinmokdong",
-    "x": 0,
-    "y": 0,
+    "x": 1578,
+    "y": 1753,
     "lines": [
       "9"
     ]
@@ -5450,8 +5450,8 @@
     "id": "s_4122",
     "name": "신반포",
     "nameEn": "Sinbanpo",
-    "x": 0,
-    "y": 0,
+    "x": 2636,
+    "y": 2264,
     "lines": [
       "9"
     ]
@@ -5470,8 +5470,8 @@
     "id": "s_0009",
     "name": "성남",
     "nameEn": "Seongnam",
-    "x": 0,
-    "y": 0,
+    "x": 3260,
+    "y": 2904,
     "lines": [
       "gtx_a",
       "gyeonggang"
@@ -5481,8 +5481,8 @@
     "id": "s_0010",
     "name": "구성",
     "nameEn": "Guseong",
-    "x": 0,
-    "y": 0,
+    "x": 2810,
+    "y": 2966,
     "lines": [
       "gtx_a",
       "bundang"
@@ -5532,8 +5532,8 @@
     "id": "s_1275",
     "name": "일산",
     "nameEn": "Ilsan",
-    "x": 0,
-    "y": 0,
+    "x": 1072,
+    "y": 596,
     "lines": [
       "gyeongui",
       "seohaeline"
@@ -5595,8 +5595,8 @@
     "id": "s_1207",
     "name": "양정",
     "nameEn": "Yangjeong",
-    "x": 0,
-    "y": 0,
+    "x": 3846,
+    "y": 1632,
     "lines": [
       "gyeongui"
     ]
@@ -5615,8 +5615,8 @@
     "id": "s_1216",
     "name": "오빈",
     "nameEn": "Obin",
-    "x": 0,
-    "y": 0,
+    "x": 4236,
+    "y": 1746,
     "lines": [
       "gyeongui"
     ]
@@ -5645,8 +5645,8 @@
     "id": "s_1267",
     "name": "수색",
     "nameEn": "Susaek",
-    "x": 0,
-    "y": 0,
+    "x": 1490,
+    "y": 1335,
     "lines": [
       "gyeongui"
     ]
@@ -5655,8 +5655,8 @@
     "id": "s_1269",
     "name": "강매",
     "nameEn": "Gangmae",
-    "x": 0,
-    "y": 0,
+    "x": 1321,
+    "y": 1161,
     "lines": [
       "gyeongui"
     ]
@@ -5665,8 +5665,8 @@
     "id": "s_1265",
     "name": "가좌",
     "nameEn": "Gajwa",
-    "x": 0,
-    "y": 0,
+    "x": 1670,
+    "y": 1528,
     "lines": [
       "gyeongui"
     ]
@@ -5675,8 +5675,8 @@
     "id": "s_1315",
     "name": "사릉",
     "nameEn": "Sareung",
-    "x": 0,
-    "y": 0,
+    "x": 4255,
+    "y": 1295,
     "lines": [
       "gyeongchun"
     ]
@@ -5715,8 +5715,8 @@
     "id": "s_4211",
     "name": "운서",
     "nameEn": "Unseo",
-    "x": 0,
-    "y": 0,
+    "x": 566,
+    "y": 2501,
     "lines": [
       "airport"
     ]
@@ -5735,8 +5735,8 @@
     "id": "s_4208",
     "name": "계양",
     "nameEn": "Gyeyang",
-    "x": 0,
-    "y": 0,
+    "x": 884,
+    "y": 1371,
     "lines": [
       "airport",
       "incheon1"
@@ -5866,8 +5866,8 @@
     "id": "s_1890",
     "name": "신포",
     "nameEn": "Sinpo",
-    "x": 0,
-    "y": 0,
+    "x": 708,
+    "y": 2865,
     "lines": [
       "bundang"
     ]
@@ -5876,8 +5876,8 @@
     "id": "s_1884",
     "name": "원인재",
     "nameEn": "Woninjae",
-    "x": 0,
-    "y": 0,
+    "x": 976,
+    "y": 2987,
     "lines": [
       "bundang",
       "incheon1"
@@ -5887,8 +5887,8 @@
     "id": "s_1859",
     "name": "오리",
     "nameEn": "Ori",
-    "x": 0,
-    "y": 0,
+    "x": 3025,
+    "y": 2967,
     "lines": [
       "bundang"
     ]
@@ -5897,8 +5897,8 @@
     "id": "s_1857",
     "name": "정자",
     "nameEn": "Jeongja",
-    "x": 0,
-    "y": 0,
+    "x": 3175,
+    "y": 2967,
     "lines": [
       "bundang",
       "sinbundang"
@@ -5948,8 +5948,8 @@
     "id": "s_4406",
     "name": "보라매병원",
     "nameEn": "Boramae MedicalCenter",
-    "x": 0,
-    "y": 0,
+    "x": 1974,
+    "y": 2398,
     "lines": [
       "sillim"
     ]
@@ -5968,8 +5968,8 @@
     "id": "s_4315",
     "name": "수지구청",
     "nameEn": "Suji-gu office",
-    "x": 0,
-    "y": 0,
+    "x": 2796,
+    "y": 2851,
     "lines": [
       "sinbundang"
     ]
@@ -5978,8 +5978,8 @@
     "id": "s_4509",
     "name": "시청.용인대",
     "nameEn": "City Hall, Yongin Univ.",
-    "x": 0,
-    "y": 0,
+    "x": 3445,
+    "y": 3196,
     "lines": [
       "yongin"
     ]
@@ -5988,8 +5988,8 @@
     "id": "s_4504",
     "name": "어정",
     "nameEn": "Eojeong",
-    "x": 0,
-    "y": 0,
+    "x": 2941,
+    "y": 3187,
     "lines": [
       "yongin"
     ]
@@ -5998,8 +5998,8 @@
     "id": "s_4515",
     "name": "둔전",
     "nameEn": "Dunjeon",
-    "x": 0,
-    "y": 0,
+    "x": 4196,
+    "y": 3196,
     "lines": [
       "yongin"
     ]
@@ -6008,8 +6008,8 @@
     "id": "s_4513",
     "name": "고진",
     "nameEn": "Gojin",
-    "x": 0,
-    "y": 0,
+    "x": 3945,
+    "y": 3196,
     "lines": [
       "yongin"
     ]
@@ -6038,8 +6038,8 @@
     "id": "s_4710",
     "name": "정릉",
     "nameEn": "Jeongneung",
-    "x": 0,
-    "y": 0,
+    "x": 2659,
+    "y": 1056,
     "lines": [
       "wooyisinseol"
     ]
@@ -6098,8 +6098,8 @@
     "id": "s_4612",
     "name": "곤제",
     "nameEn": "gonjae",
-    "x": 0,
-    "y": 0,
+    "x": 2283,
+    "y": 643,
     "lines": [
       "uijeongbu"
     ]
@@ -6108,8 +6108,8 @@
     "id": "s_4610",
     "name": "경기도청북부청사",
     "nameEn": "Gyeonggi Provincial Government Northern Office",
-    "x": 0,
-    "y": 0,
+    "x": 2463,
+    "y": 643,
     "lines": [
       "uijeongbu"
     ]
@@ -6148,8 +6148,8 @@
     "id": "s_3221",
     "name": "인천시청",
     "nameEn": "Inchon City Hall",
-    "x": 0,
-    "y": 0,
+    "x": 952,
+    "y": 2461,
     "lines": [
       "incheon2",
       "incheon1"
@@ -6239,8 +6239,8 @@
     "id": "s_3206",
     "name": "독정",
     "nameEn": "Dokjeong",
-    "x": 0,
-    "y": 0,
+    "x": 689,
+    "y": 1325,
     "lines": [
       "incheon2"
     ]
@@ -6319,8 +6319,8 @@
     "id": "s_3126",
     "name": "인천터미널",
     "nameEn": "Incheon Bus Terminal",
-    "x": 0,
-    "y": 0,
+    "x": 952,
+    "y": 2621,
     "lines": [
       "incheon1"
     ]
@@ -6369,8 +6369,8 @@
     "id": "s_3115",
     "name": "경인교대입구",
     "nameEn": "Gyeong-in Nat`l Univ. of Education",
-    "x": 0,
-    "y": 0,
+    "x": 835,
+    "y": 1794,
     "lines": [
       "incheon1"
     ]
