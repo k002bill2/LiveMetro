@@ -150,3 +150,52 @@ describe('Line 3 운행 순서 회귀 (2026-05-13 hybrid 순서 교정)', () => 
     expect(fastest.totalMinutes).toBeLessThanOrEqual(8);
   });
 });
+
+describe('Line 4 운행 순서 회귀 (2026-05-13 수리산 위치 교정)', () => {
+  /**
+   * 회귀 원인:
+   *  - 기존 lines.json `4`에서 수리산(s_1763)이 array 끝(#51)에 위치
+   *  - 실제 운행 순서는 산본 → 수리산 → 대야미 → 반월 → ... → 오이도
+   *  - 잘못된 인접 edge `오이도(50) ↔ 수리산(51)` 2.5분 직행이 그래프에 존재
+   *  - 실제 오이도↔수리산은 약 11 hops(~28분) 거리 — 잘못된 edge로 라우팅 오염
+   *  - Wikipedia ground truth: 진접 → ... → 산본 → 수리산 → 대야미 → ... → 오이도
+   *    (51 stations, 단일 운행선, 분기 없음)
+   */
+
+  /**
+   * 산본→수리산: Wikipedia 운행 순서로 1 hop 인접. 환승 0회, ≤5분.
+   */
+  it('산본→수리산은 환승 0회 직행 1 hop (실제 인접)', () => {
+    const routes = getDiverseRoutes('sanbon', 's_1763');
+
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+    expect(fastest.totalMinutes).toBeLessThanOrEqual(5);
+  });
+
+  /**
+   * 수리산→대야미: Wikipedia 순서로 수리산(40) → 대야미(41) 인접. 1 hop ≤5분.
+   */
+  it('수리산→대야미는 환승 0회 직행 1 hop (실제 인접)', () => {
+    const routes = getDiverseRoutes('s_1763', 's_1752');
+
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+    expect(fastest.totalMinutes).toBeLessThanOrEqual(5);
+  });
+
+  /**
+   * 오이도→수리산: 잘못된 array 끝 인접 edge 회귀 가드. 정상 동작 시
+   * 단일 노선 직행 약 11 hops(약 28분) 또는 환승 우회. fastest > 15분.
+   * 잘못된 edge면 1 hop 2.5분 직행이 fastest로 잘못 등장.
+   */
+  it('오이도→수리산은 거리가 있어 fastest > 15분 (잘못된 인접 edge 가드)', () => {
+    const routes = getDiverseRoutes('oido', 's_1763');
+
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.totalMinutes).toBeGreaterThan(15);
+  });
+});
