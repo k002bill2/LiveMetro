@@ -33,13 +33,12 @@ describe('getDiverseRoutes — 실제 데이터 회귀 (lines.json order + K-sho
    *  - 강남구청 경유 (7→bundang, ~84분)  ← 본 회귀의 핵심
    *  - 초지/부천종합운동장 경유 등
    */
-  it.skip('산곡→선릉 경로 카드에 "강남구청 경유" 옵션이 포함된다 (K-cascade follow-up)', () => {
-    // FOLLOW-UP: gyeongui 4-subarray reshape (PR-1) pushed 강남구청 경유
-    // path past K=30 threshold. Per spec Risk R1 ([K-shortest 무관 데이터
-    // cascade] memory), K-tuning deferred to separate PR (proposed
-    // K_SHORTEST_CANDIDATES bump 30→40+ + canary re-verification across
-    // multiple OD pairs).
-    // Path topologically still exists; only K exploration limit changed.
+  it('산곡→선릉 경로 카드에 "강남구청 경유" 옵션이 포함된다 (K-cascade resolved)', () => {
+    // Resolved via in-loop signature-dedupe in Yen's K-shortest
+    // (memory [pr79-pending-followups] Priority 1). Each K slot now
+    // corresponds to a distinct transfer signature, so 강남구청 경유
+    // is no longer squeezed out by signature-duplicate variants of
+    // nearer routes.
     const routes = getDiverseRoutes('s_ec82b0ea', 'seolleung');
 
     expect(routes.length).toBeGreaterThan(0);
