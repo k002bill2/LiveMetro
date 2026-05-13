@@ -17,18 +17,27 @@ import {
   CommutePattern,
   CommutePatternDoc,
   PredictedCommute,
+  PredictedTransitSegment,
   FrequentRoute,
   DayOfWeek,
   MIN_LOGS_FOR_PATTERN,
+  DEFAULT_WALK_TO_STATION_MIN,
+  DEFAULT_WAIT_MIN,
+  DEFAULT_WALK_TO_DEST_MIN,
+  RANGE_HALF_MIN_FLOOR,
+  RANGE_HALF_MIN_CAP,
   calculateAverageTime,
   calculateTimeStdDev,
   calculateConfidence,
   calculateAlertTime,
+  computeArrivalTime,
+  deriveDirection,
   getDayOfWeek,
   formatDateString,
   isWeekday,
   fromCommutePatternDoc,
 } from '@/models/pattern';
+import { calculateRoute } from '@/services/route/routeService';
 import { commuteLogService } from './commuteLogService';
 
 const COLLECTION_NAME = 'commutePatterns';
@@ -115,6 +124,51 @@ class PatternAnalysisService {
       return null;
     }
 
+    // Resolve transit segments — soft-fail to null route on any failure.
+    let route: ReturnType<typeof calculateRoute> = null;
+    try {
+      route = calculateRoute(
+        pattern.frequentRoute.departureStationId,
+        pattern.frequentRoute.arrivalStationId,
+      );
+    } catch {
+      route = null;
+    }
+
+    const transitSegments: readonly PredictedTransitSegment[] | undefined =
+      route && route.segments.length > 0
+        ? route.segments.map((seg) => ({
+            ...seg,
+            congestionForecast: undefined,
+          }))
+        : undefined;
+
+    const transitMinutes = transitSegments
+      ? transitSegments.reduce((sum, seg) => sum + seg.estimatedMinutes, 0)
+      : undefined;
+
+    const walkToStationMinutes = DEFAULT_WALK_TO_STATION_MIN;
+    const waitMinutes = DEFAULT_WAIT_MIN;
+    const walkToDestinationMinutes = DEFAULT_WALK_TO_DEST_MIN;
+
+    const predictedMinutes =
+      transitMinutes !== undefined
+        ? walkToStationMinutes + waitMinutes + walkToDestinationMinutes + transitMinutes
+        : undefined;
+
+    const predictedArrivalTime =
+      predictedMinutes !== undefined
+        ? computeArrivalTime(pattern.avgDepartureTime, predictedMinutes)
+        : undefined;
+
+    let predictedMinutesRange: readonly [number, number] | undefined;
+    if (predictedMinutes !== undefined && pattern.stdDevMinutes > 0) {
+      const half = Math.min(RANGE_HALF_MIN_CAP, Math.max(RANGE_HALF_MIN_FLOOR, Math.round(pattern.stdDevMinutes)));
+      predictedMinutesRange = [predictedMinutes - half, predictedMinutes + half];
+    }
+
+    const direction = deriveDirection(route?.segments[0]);
+
     return {
       date: formatDateString(date),
       dayOfWeek,
@@ -122,6 +176,15 @@ class PatternAnalysisService {
       route: pattern.frequentRoute,
       confidence: pattern.confidence,
       suggestedAlertTime: calculateAlertTime(pattern.avgDepartureTime),
+      predictedMinutes,
+      predictedArrivalTime,
+      predictedMinutesRange,
+      deltaMinutes: undefined,
+      direction,
+      walkToStationMinutes,
+      waitMinutes,
+      walkToDestinationMinutes,
+      transitSegments,
     };
   }
 

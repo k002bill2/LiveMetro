@@ -55,7 +55,13 @@ export interface PredictionFactor {
 
 export interface UsePredictionFactorsParams {
   readonly lineId: string;
-  readonly direction: Direction;
+  /**
+   * Train direction. `undefined` when the producer cannot determine a stable
+   * direction label (e.g. loop line 2, branched Bundang/Shinbundang). When
+   * undefined, the congestion factor falls back to a neutral "전 방면" average
+   * across all directions rather than displaying a wrong "상행/하행" label.
+   */
+  readonly direction: Direction | undefined;
   readonly dayOfWeek: DayOfWeek;
 }
 
@@ -90,9 +96,10 @@ interface ConditionalSummary {
 
 function averageCongestionPercent(
   summaries: readonly ConditionalSummary[],
-  direction: Direction
+  direction: Direction | undefined
 ): number | null {
-  const filtered = summaries.filter(s => s.direction === direction);
+  const filtered =
+    direction === undefined ? summaries : summaries.filter(s => s.direction === direction);
   const pool = filtered.length > 0 ? filtered : summaries;
   if (pool.length === 0) return null;
   const total = pool.reduce((sum, s) => sum + LEVEL_TO_PERCENT[s.overallLevel], 0);
@@ -141,7 +148,7 @@ function buildWeatherFactor(
 
 function buildCongestionFactor(
   result: PromiseSettledResult<readonly TrainCongestionSummary[]>,
-  direction: Direction
+  direction: Direction | undefined
 ): PredictionFactor {
   if (result.status !== 'fulfilled') {
     return {
@@ -152,6 +159,9 @@ function buildCongestionFactor(
       impact: 'neutral',
     };
   }
+  // When direction is undefined (loop/branched line), average across all
+  // directions instead of filtering — surfaces a neutral line-wide reading
+  // rather than papering over the unknown direction with a fake 'up'.
   const avg = averageCongestionPercent(result.value, direction);
   if (avg == null) {
     return {

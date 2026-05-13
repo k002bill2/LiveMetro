@@ -48,7 +48,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useMLPrediction } from '@/hooks/useMLPrediction';
 import { useCommutePattern } from '@/hooks/useCommutePattern';
 import { usePredictionFactors } from '@/hooks/usePredictionFactors';
-import { routeService } from '@/services/route';
 import { useTheme, ThemeColors } from '@/services/theme';
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { Pill } from '@/components/design';
@@ -65,27 +64,14 @@ import {
   congestionService,
   type HourlySlot,
 } from '@/services/congestion/congestionService';
-import type { DayOfWeek, PredictedCommute } from '@/models/pattern';
+import {
+  DEFAULT_WALK_TO_STATION_MIN,
+  DEFAULT_WAIT_MIN,
+  DEFAULT_WALK_TO_DEST_MIN,
+  type DayOfWeek,
+  type PredictedCommute,
+} from '@/models/pattern';
 import { directionToDisplay, type Direction } from '@/models/route';
-
-/**
- * Compute commute minutes from "HH:mm" departure → arrival strings, wrapping
- * around midnight. Mirrors the helper in HomeScreen.tsx.
- */
-const MIN_PER_DAY = 24 * 60;
-const minutesBetween = (departure?: string, arrival?: string): number | null => {
-  if (!departure || !arrival) return null;
-  const parse = (s: string): number | null => {
-    const m = /^(\d{1,2}):(\d{2})$/.exec(s.trim());
-    if (!m) return null;
-    return parseInt(m[1]!, 10) * 60 + parseInt(m[2]!, 10);
-  };
-  const d = parse(departure);
-  const a = parse(arrival);
-  if (d === null || a === null) return null;
-  const diff = ((a - d) % MIN_PER_DAY + MIN_PER_DAY) % MIN_PER_DAY;
-  return diff > 0 ? diff : null;
-};
 
 const formatTimeShort = (now: Date = new Date()): string => {
   const h = now.getHours();
@@ -94,17 +80,6 @@ const formatTimeShort = (now: Date = new Date()): string => {
   const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
   return `${period} ${h12}:${m}`;
 };
-
-/**
- * Default walk/wait/walk durations (minutes) used by Section 6 (segment
- * breakdown) until `PredictedCommute` exposes real per-segment durations.
- * Centralized here so the substitution is easy to remove in a single edit.
- */
-const SEGMENT_DEFAULTS = {
-  walkToStationMin: 4,
-  waitMin: 3,
-  walkToDestMin: 3,
-} as const;
 
 /* ───────── Task 4: Section 9 weekly trend helpers ───────── */
 
@@ -115,15 +90,9 @@ const WEEKDAY_KEYS = [1, 2, 3, 4, 5] as const;
 
 /**
  * Build the Mon-Fri DayBarData[] consumed by WeeklyTrendChart from the
- * raw `useCommutePattern.weekPredictions` list.
- *
- * `PredictedCommute` (src/models/pattern.ts) does not yet expose an
- * `estimatedDurationMin` field — only `predictedDepartureTime` (HH:mm)
- * and a `route` without a paired arrival time. Until the model is
- * extended, we substitute a default 30-min duration for any day that
- * has a prediction, mirroring the SegmentBreakdownSection (Section 6)
- * default-substitution policy. This will be replaced with a real value
- * once `PredictedCommute` exposes duration or paired arrival time.
+ * raw `useCommutePattern.weekPredictions` list. Reads
+ * `PredictedCommute.predictedMinutes` directly; falls back to a 30-min
+ * default for predictions where the producer hasn't populated it.
  *
  * `isToday` is the single source of truth; `todayIndex` is derived
  * from `findIndex(d => d.isToday)` to keep them consistent.
@@ -142,7 +111,7 @@ const buildWeeklyDays = (
     const pred = weekPredictions.find((p) => p.dayOfWeek === key);
     return {
       dayLabel: WEEKDAY_LABELS[i]!,
-      durationMin: pred ? DEFAULT_DURATION_MIN : 0,
+      durationMin: pred ? (pred.predictedMinutes ?? DEFAULT_DURATION_MIN) : 0,
       isToday: key === todayKey,
     };
   }).filter((d) => d.durationMin > 0);
@@ -188,68 +157,54 @@ export const WeeklyPredictionScreen: React.FC = () => {
     };
   }, [morningCommute]);
 
-  // Derived values from ML prediction (with reasonable fallbacks for the
-  // not-yet-ready state — design intent is "always show the hero").
-  const predictedMinutes = useMemo(() => {
-    if (!prediction) return 28; // optimistic default while model is warming up
-    const m = minutesBetween(prediction.predictedDepartureTime, prediction.predictedArrivalTime);
-    return m ?? 28;
-  }, [prediction]);
-
-  // Range heuristic: ±2 min when confidence is high, ±4 when low.
-  // TODO: derive from prediction.delayProbability + per-segment variance once
-  // useMLPrediction exposes segment-level confidence.
-  const rangeMin = useMemo(() => {
-    if (!prediction) return [26, 32] as const;
-    const spread = prediction.confidence >= 0.7 ? 2 : 4;
-    return [Math.max(0, predictedMinutes - spread), predictedMinutes + spread] as const;
-  }, [prediction, predictedMinutes]);
-
-  const confidencePct = prediction ? Math.round(prediction.confidence * 100) : 87;
-  const arrivalTime = prediction?.predictedArrivalTime ?? '';
-  const nowLabel = useMemo(() => formatTimeShort(new Date()), []);
-  // Section 6: Segment breakdown.
-  // `PredictedCommute` (src/models/pattern.ts) currently only exposes
-  // `route: FrequentRoute` (departure/arrival station names + lineIds) and a
-  // `predictedDepartureTime`. The fine-grained walk/wait/ride durations and
-  // the per-stop count don't yet exist in the data model, so we substitute
-  // sensible defaults consistent with the design mock. These should be
-  // replaced with real fields once `PredictedCommute` is extended (tracked
-  // alongside Task 7 — hourly factor data).
   const { todayPrediction, weekPredictions } = useCommutePattern();
 
-  // Task #11 (P1.3): Replace the residual `(predictedMinutes - walk - wait - walk)`
-  // substitution for ride duration with real `RouteSegment.estimatedMinutes` from
-  // `routeService.calculateRoute`. Sums non-transfer segments so multi-line routes
-  // with a transfer report the correct ride time. Synchronous call — falls back
-  // to the residual subtraction below if the call returns null or throws.
-  const routeRideDurationMin: number | null = useMemo(() => {
-    const fr = todayPrediction?.route;
-    if (!fr) return null;
-    try {
-      const result = routeService.calculateRoute(
-        fr.departureStationId,
-        fr.arrivalStationId,
-      );
-      if (!result || result.segments.length === 0) return null;
-      const totalRide = result.segments
-        .filter((s) => !s.isTransfer)
-        .reduce((sum, s) => sum + s.estimatedMinutes, 0);
-      return totalRide > 0 ? totalRide : null;
-    } catch {
-      return null;
+  // Sum of `transitSegments[].estimatedMinutes` from the model; falls back
+  // to a 10-min default when the producer hasn't populated segments.
+  const routeRideDurationMin = useMemo(() => {
+    if (!todayPrediction?.transitSegments?.length) {
+      return 10;
     }
-  }, [todayPrediction?.route?.departureStationId, todayPrediction?.route?.arrivalStationId]);
+    return todayPrediction.transitSegments.reduce(
+      (sum, seg) => sum + seg.estimatedMinutes,
+      0,
+    );
+  }, [todayPrediction]);
 
+  // Walk/wait scalars consumed by Section 6 segment breakdown and the
+  // hero fallback below. Read straight from PredictedCommute; fall back
+  // to the model's published defaults when the producer hasn't populated
+  // them (older predictions / soft-fail outputs).
+  const walkToStationMin = todayPrediction?.walkToStationMinutes ?? DEFAULT_WALK_TO_STATION_MIN;
+  const waitMin          = todayPrediction?.waitMinutes          ?? DEFAULT_WAIT_MIN;
+  const walkToDestMin    = todayPrediction?.walkToDestinationMinutes ?? DEFAULT_WALK_TO_DEST_MIN;
+
+  // Hero predictedMinutes — consume from model, fall back to
+  // walk + wait + ride + walk when the field isn't populated.
+  const predictedMinutes = useMemo(() => {
+    if (todayPrediction?.predictedMinutes !== undefined) {
+      return todayPrediction.predictedMinutes;
+    }
+    return walkToStationMin + waitMin + routeRideDurationMin + walkToDestMin;
+  }, [todayPrediction, walkToStationMin, waitMin, routeRideDurationMin, walkToDestMin]);
+
+  // Range from model; falls back to a ±2 band around predictedMinutes.
+  const rangeMin = useMemo(() => {
+    if (todayPrediction?.predictedMinutesRange) {
+      return todayPrediction.predictedMinutesRange;
+    }
+    return [Math.max(0, predictedMinutes - 2), predictedMinutes + 2] as const;
+  }, [todayPrediction, predictedMinutes]);
+
+  const confidencePct = prediction ? Math.round(prediction.confidence * 100) : 87;
+  const arrivalTime = todayPrediction?.predictedArrivalTime ?? prediction?.predictedArrivalTime ?? '';
+  const nowLabel = useMemo(() => formatTimeShort(new Date()), []);
+
+  // Section 6: Segment breakdown.
   const segmentRoute: PredictedRoute | null = useMemo(() => {
     if (!todayPrediction) return null;
     const fr = todayPrediction.route;
     const firstLineId = fr.lineIds[0] ?? '2';
-    const { walkToStationMin, waitMin, walkToDestMin } = SEGMENT_DEFAULTS;
-    const residualRideMin = Math.max(
-      0,
-      predictedMinutes - walkToStationMin - waitMin - walkToDestMin,
-    );
     return {
       walkToStation: { durationMin: walkToStationMin },
       wait: {
@@ -261,12 +216,11 @@ export const WeeklyPredictionScreen: React.FC = () => {
         fromStation: fr.departureStationName,
         toStation: fr.arrivalStationName,
         stopsCount: 0,
-        durationMin: routeRideDurationMin ?? residualRideMin,
-        // congestionLevel intentionally omitted — not in PredictedCommute yet.
+        durationMin: routeRideDurationMin,
       },
       walkToDestination: { durationMin: walkToDestMin },
     };
-  }, [todayPrediction, predictedMinutes, routeRideDurationMin]);
+  }, [todayPrediction, walkToStationMin, waitMin, walkToDestMin, routeRideDurationMin]);
   const segmentOrigin = useMemo(
     () => ({
       name: '집',
@@ -300,18 +254,21 @@ export const WeeklyPredictionScreen: React.FC = () => {
   // is typed `number` but its runtime range matches `DayOfWeek` exactly.
   // `todayDow` is captured once per mount for parity with weekly trend.
   const todayDow = useMemo<DayOfWeek>(() => new Date().getDay() as DayOfWeek, []);
-  // `direction: 'up'` is a temporary default until PredictedCommute exposes
-  // travel direction (consistent with the segment defaults above).
   const factorsLineId = useMemo(
     () => todayPrediction?.route.lineIds[0] ?? '2',
     [todayPrediction],
   );
-  // Direction default mirrors usePredictionFactors above. Once
-  // PredictedCommute exposes travel direction, both call sites should
-  // switch together. `directionForChart` is the localized display label
-  // passed to HourlyCongestionChart (e.g. '내선' / '상행' depending on line).
-  const directionForService: Direction = 'up';
-  const directionForChart = directionToDisplay(directionForService, factorsLineId);
+  // `directionForChart` is the localized display label passed to
+  // HourlyCongestionChart (e.g. '내선' / '상행' depending on line).
+  // Producer signals `undefined` when direction is not determinable (loop
+  // line 2, Bundang/Shinbundang, etc. — see deriveDirection in pattern.ts
+  // and spec §7.1). Consumer respects that signal: direction-dependent UI
+  // is hidden or neutralized rather than rendering a wrong indicator.
+  const directionForService: Direction | undefined = todayPrediction?.direction;
+  const directionForChart =
+    directionForService !== undefined
+      ? directionToDisplay(directionForService, factorsLineId)
+      : undefined;
   const { factors } = usePredictionFactors({
     lineId: factorsLineId,
     direction: directionForService,
@@ -326,6 +283,12 @@ export const WeeklyPredictionScreen: React.FC = () => {
   const hourlyChartTime = useMemo(() => new Date(), []);
   const [hourlySlots, setHourlySlots] = useState<readonly HourlySlot[]>([]);
   useEffect(() => {
+    // Skip the direction-keyed fetch when direction is unknown — surfaces
+    // empty slots and the hourly chart section is hidden below.
+    if (directionForService === undefined) {
+      setHourlySlots([]);
+      return;
+    }
     let cancelled = false;
     congestionService
       .getHourlyForecast(factorsLineId, directionForService, hourlyChartTime)
@@ -497,15 +460,21 @@ export const WeeklyPredictionScreen: React.FC = () => {
       {/* 7. Hourly congestion forecast (Task 10) — wires
           HourlyCongestionChart (Task 9) backed by
           congestionService.getHourlyForecast (Task 8). Replaces the
-          earlier Phase 54 visual placeholder with real Firestore data. */}
-      <View style={styles.sectionPad}>
-        <HourlyCongestionChart
-          lineId={factorsLineId}
-          direction={directionForChart}
-          currentTime={hourlyChartTime}
-          slots={hourlySlots}
-        />
-      </View>
+          earlier Phase 54 visual placeholder with real Firestore data.
+          Hidden when direction is unknown (loop/branched lines) — the
+          chart subtitle is "<line>호선 <direction> 방면" and there is no
+          honest neutral label that fits the design. */}
+      {directionForChart !== undefined && (
+        <View style={styles.sectionPad}>
+          <HourlyCongestionChart
+            lineId={factorsLineId}
+            direction={directionForChart}
+            currentTime={hourlyChartTime}
+            slots={hourlySlots}
+          />
+        </View>
+      )}
+
 
       {/* 6. Segment breakdown */}
       <View style={styles.sectionPad}>
