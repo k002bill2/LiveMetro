@@ -641,3 +641,53 @@ describe('gyeongchun — 분기 schema 적용 후 회귀 (PR-4)', () => {
     expect(fastest.totalMinutes).toBeLessThanOrEqual(5);
   });
 });
+
+describe('gtx_a — 분기 schema 적용 후 회귀 (PR-5, 2단계 분리 운행)', () => {
+  /**
+   * GTX-A는 2026.5 현재 두 개의 분리된 운행 구간:
+   *   - 운정중앙↔서울 (5역, 2024.12 개통)
+   *   - 수서↔동탄 (4역, 2024.3 개통)
+   * 두 구간은 약 80km 거리. 직결은 2026.8 예정.
+   *
+   * 잘못된 인접 edge: `동탄(s_eb8f99ed) ↔ 운정중앙(s_9000)` — 분리 운행이
+   * 직결로 표현돼 있음.
+   *
+   * Task에서 LINE_STATIONS.gtx_a를 nested 2-subarray로 reshape하면 RED
+   * 테스트가 GREEN으로 전환됨. BASELINE 테스트는 reshape 전후 모두 PASS.
+   */
+
+  /**
+   * 동탄과 운정중앙은 물리적으로 분리. gtx_a 직결 hop은 절대 없어야 함.
+   * 잘못된 인접 edge가 살아있으면 fastest는 transferCount=0 (gtx_a 직결).
+   * 정상 시 다른 line 환승 필요 (transferCount ≥ 1).
+   */
+  it('동탄→운정중앙: gtx_a 직결 0-transfer 없음 (분리 운행 가드)', () => {
+    const routes = getDiverseRoutes('s_eb8f99ed', 's_9000');
+    expect(routes.length).toBeGreaterThan(0);
+    routes.forEach((route) => {
+      expect(route.transferCount).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  /**
+   * 운정 구간 본선 무회귀: 운정중앙→서울은 환승 0회 직행.
+   * BASELINE — reshape 전후 모두 PASS 기대.
+   */
+  it('운정중앙→서울 fastest는 환승 0회 직행 (운정 구간 보존)', () => {
+    const routes = getDiverseRoutes('s_9000', 's_9005');
+    expect(routes.length).toBeGreaterThan(0);
+    const direct = routes.find((r) => r.transferCount === 0);
+    expect(direct).toBeDefined();
+  });
+
+  /**
+   * 수서 구간 본선 무회귀: 수서→동탄은 환승 0회 직행.
+   * BASELINE — reshape 전후 모두 PASS 기대.
+   */
+  it('수서→동탄 fastest는 환승 0회 직행 (수서 구간 보존)', () => {
+    const routes = getDiverseRoutes('suseo', 's_eb8f99ed');
+    expect(routes.length).toBeGreaterThan(0);
+    const direct = routes.find((r) => r.transferCount === 0);
+    expect(direct).toBeDefined();
+  });
+});

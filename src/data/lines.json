@@ -607,15 +607,19 @@
       "s_eab980ed"
     ],
     "gtx_a": [
-      "suseo",
-      "s_0009",
-      "s_0010",
-      "s_eb8f99ed",
-      "s_9000",
-      "s_9001",
-      "daegok",
-      "yeonsinnae",
-      "s_9005"
+      [
+        "s_9000",
+        "s_9001",
+        "daegok",
+        "yeonsinnae",
+        "s_9005"
+      ],
+      [
+        "suseo",
+        "s_0009",
+        "s_0010",
+        "s_eb8f99ed"
+      ]
     ],
     "gyeongchun": [
       [
