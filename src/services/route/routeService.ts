@@ -19,6 +19,8 @@ import {
   getLineName,
 } from '@models/route';
 import { PriorityQueue } from '@/utils/priorityQueue';
+import { sumHaversineDistanceKm, type LatLng } from '@/utils/haversine';
+import { getStationCoordinates } from '@/utils/stationCoordinateLookup';
 import { fareService, type FareResult } from './fareService';
 import { getDiverseRoutes } from './kShortestPath';
 
@@ -600,8 +602,18 @@ export const calculateEnhancedRoute = (
   // Count stations
   const stationCount = segments.filter(s => !s.isTransfer).length + 1;
 
-  // Calculate fare
-  const fare = fareService.calculateFare(stationCount);
+  // Phase B: try GPS-based distance from path station coordinates.
+  // path is ['stationId#lineId', ...]; dedupe consecutive duplicates (transfers
+  // don't move physical location). If all coords available, use Haversine sum;
+  // else fall back to stationCount × 1.2km estimation (graceful degradation).
+  const pathStationIds = result.path
+    .map(key => key.split('#')[0])
+    .filter((id, i, arr): id is string => !!id && id !== arr[i - 1]);
+  const coordLookups = pathStationIds.map(id => getStationCoordinates(id));
+  const allCoordsAvailable = coordLookups.every((c): c is LatLng => c !== null);
+  const fare = allCoordsAvailable
+    ? fareService.calculateFareByDistance(sumHaversineDistanceKm(coordLookups))
+    : fareService.calculateFare(stationCount);
 
   return {
     ...route,
