@@ -202,17 +202,20 @@ function buildGraph(
 
   // Handle circular line 2 — only on trunk subarray (segments[0]).
   // Branch subarrays (성수지선, 신정지선) are linear, not circular.
-  // NOTE: existing key format `${first}_2` (underscore) does not match
-  // node keys (`${id}#${lineId}`), so this code is currently a silent
-  // no-op. Preserved verbatim per surgical-changes scope; fix in
-  // separate phase if Line 2 wrap is needed.
+  //
+  // Key format unified to `${stationId}#${lineId}::${subIdx}` (trunk=`::0`).
+  // Previous format `${first}_2` (underscore) was a doc-rot artifact from
+  // before the `_`→`#` rename and made this block a silent no-op. Fixed
+  // here as Sub-PR #2 follow-up: the ring closing edge (시청↔충정로) is
+  // now actually added so 2호선 순환선이 그래프상 닫힘.
   const line2Trunk = LINE_STATIONS['2']?.[0];
   if (line2Trunk && line2Trunk.length > 1) {
     const first = line2Trunk[0];
     const last = line2Trunk[line2Trunk.length - 1];
     if (first && last) {
-      const firstKey = `${first}_2`;
-      const lastKey = `${last}_2`;
+      const trunkSubLineId = '2::0';
+      const firstKey = `${first}#${trunkSubLineId}`;
+      const lastKey = `${last}#${trunkSubLineId}`;
 
       if (!excludeNodeKeys?.has(firstKey) && !excludeNodeKeys?.has(lastKey)) {
         if (!excludeEdges?.has(`${lastKey}->${firstKey}`)) {
@@ -220,7 +223,7 @@ function buildGraph(
             to: firstKey,
             weight: adjustWeight(AVG_STATION_TRAVEL_TIME, '2'),
             isTransfer: false,
-            lineId: '2',
+            lineId: trunkSubLineId,
           });
         }
         if (!excludeEdges?.has(`${firstKey}->${lastKey}`)) {
@@ -228,7 +231,7 @@ function buildGraph(
             to: lastKey,
             weight: adjustWeight(AVG_STATION_TRAVEL_TIME, '2'),
             isTransfer: false,
-            lineId: '2',
+            lineId: trunkSubLineId,
           });
         }
       }
