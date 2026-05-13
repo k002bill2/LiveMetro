@@ -393,3 +393,67 @@ describe('gyeongui — 분기 schema 적용 후 회귀 (PR-1)', () => {
     expect(fastest.totalMinutes).toBeLessThanOrEqual(70);
   });
 });
+
+describe('Line 5 — 분기 schema 적용 후 회귀 (PR-2)', () => {
+  /**
+   * 회귀 원인:
+   *  - 현재 lines.json `5` array는 본선이 끝나는 상일동(idx 43)에서 곧바로
+   *    마천지선 첫 역 둔촌동(idx 44)으로 인접 chain이 연결됨.
+   *  - 마찬가지로 마천지선 끝 마천(idx 50)에서 본선의 강일(idx 51)로
+   *    잘못된 인접 edge가 생성됨.
+   *  - graph builder가 array[i]↔array[i+1]을 인접 edge로 만들어
+   *    실제로는 인접하지 않는 station 사이에 잘못된 1-hop edge가 생성됨.
+   *  - 잘못된 인접 사례 (current array idx):
+   *      43-44: 상일동 ↔ 둔촌동 (실제 강동 경유 6 hops 필요)
+   *      50-51: 마천 ↔ 강일 (실제 강동 경유 13+ hops 필요)
+   *  - Wikipedia ground truth (.cache/line5-ground-truth.md):
+   *      본선 49역 (방화→...→강동→길동→...→상일동→강일→...→하남검단산)
+   *      마천지선 8역 (강동→둔촌동→...→마천). 분기점 강동.
+   *
+   * PR-2에서 LINE_STATIONS.5를 nested 2-subarray로 reshape하면 RED 테스트가
+   * GREEN으로 전환됨. BASELINE 테스트는 reshape 전후 모두 PASS.
+   */
+
+  /**
+   * 상일동 → 둔촌동: 본선 끝과 마천지선 시작이 잘못 인접.
+   * 실제: 상일동 → 고덕 → 명일 → 굽은다리 → 길동 → 강동 → 둔촌동 (6 hops, 같은 5호선)
+   *
+   * 잘못된 1-hop edge가 살아있으면 fastest는 ~3분 직행으로 잘못 등장.
+   * 정상 시 fastest > 10분 (6 hops 우회).
+   */
+  it('상일동→둔촌동 fastest는 거리가 있어 > 10분 (잘못된 인접 edge 가드)', () => {
+    const routes = getDiverseRoutes('s_2554', 's_2555');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.totalMinutes).toBeGreaterThan(10);
+  });
+
+  /**
+   * 마천 → 강일: 마천지선 끝과 본선이 잘못 인접.
+   * 실제: 마천 → 거여 → 개롱 → 오금 → 방이 → 올림픽공원 → 둔촌동 → 강동 →
+   *         길동 → 굽은다리 → 명일 → 고덕 → 상일동 → 강일 (13 hops, 같은 5호선)
+   *
+   * 잘못된 1-hop edge가 살아있으면 fastest는 ~3분 직행으로 잘못 등장.
+   * 정상 시 fastest > 25분 (13 hops 우회).
+   */
+  it('마천→강일 fastest는 거리가 있어 > 25분 (잘못된 인접 edge 가드)', () => {
+    const routes = getDiverseRoutes('macheon', 's_2562');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.totalMinutes).toBeGreaterThan(25);
+  });
+
+  /**
+   * 강동 → 굽은다리: 본선 trunk 인접 (강동(38) → 길동(39) → 굽은다리(40)).
+   * BASELINE — reshape 전후 모두 환승 0회, 2 hops ≤10분 직행이어야 함.
+   * 분기점 강동이 본선과 지선 양쪽 subarray 모두에 등장해도 본선 trunk
+   * 인접성이 보존되는지 검증.
+   */
+  it('강동→굽은다리는 환승 0회 직행 (본선 trunk 인접 보존)', () => {
+    const routes = getDiverseRoutes('gangdong', 's_eab5bdec');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+    expect(fastest.totalMinutes).toBeLessThanOrEqual(10);
+  });
+});
