@@ -1,24 +1,15 @@
 /**
- * Branch-line transfer semantics — RED tests (Sub-PR #1)
+ * Branch-line transfer semantics — integration tests
  *
  * 본 파일은 분기 구조 노선(`lines.json`의 `string[][]` schema)에서 본선과
  * 지선이 그래프 빌더에서 단일 노드를 공유해 본선↔지선 환승이
- * `transferCount=0`으로 fall through하는 회귀를 잡는다.
+ * `transferCount=0`으로 fall through하던 회귀를 잡는다.
  *
- * 현재 RED 원인 (Sub-PR #2 머지 전):
- *   `kShortestPath.ts:79`의 노드 키 `${stationId}#${lineId}`만 사용.
- *   같은 노선의 본선/지선이 같은 lineId라 단일 노드를 공유하고,
- *   `L162` "Add transfer edges"가 **다른 노선 간**만 transfer를 만든다.
- *   결과: 본선↔지선 환승이 그래프에 없어 K-shortest가 직통으로 인식.
- *
- * GREEN 조건 (Sub-PR #2):
+ * 해결 (Sub-PR #2, sub-line encoding):
  *   1. 노드 키 `${stationId}#${lineId}::${subIdx}` 인코딩 (trunk=`::0`).
  *   2. 같은 station이 한 노선 안에서 N개 subarray에 등장 시 sub-line 간
  *      양방향 transfer edge 추가 (weight: `AVG_BRANCH_SHUTTLE_WAIT`).
- *   3. 그 시점에 본 파일의 `it.skip` 모두 해제.
- *
- * Sub-PR #1 (본 파일) scope: 의도적으로 `.skip` 상태로 commit. CI 통과.
- * Sub-PR #2 첫 task: `.skip` 해제 후 GREEN 확인.
+ *   결과: 본선↔지선 환승이 그래프에 edge로 존재해 transferCount에 반영.
  *
  * 별도 파일로 분리한 이유: `kShortestPath.integration.test.ts`는 데이터
  * 회귀(lines.json 순서)에 집중. 본 파일은 그래프 빌더 의미론에 집중.
@@ -27,13 +18,12 @@
  * 관련:
  *   - 메모리 [[two-layer-bug-partial-green]] — PR #85 GREEN 후 알고리즘 RED
  *   - 메모리 [[line-stations-nested-array-schema]]
- *   - 메모리 [[pr79-pending-followups]] Priority 7
  *   - docs/planning/branch-line-transfer-semantics/ — phase 3-파일 계획
  */
 
 import { getDiverseRoutes, findKShortestPaths } from '../kShortestPath';
 
-describe('Branch-line transfer semantics (RED until Sub-PR #2)', () => {
+describe('Branch-line transfer semantics', () => {
   describe('Line 2 — 신정지선 ↔ 본선', () => {
     /**
      * 까치산 → 선릉:
@@ -67,7 +57,7 @@ describe('Branch-line transfer semantics (RED until Sub-PR #2)', () => {
      *
      * 성수지선은 성수↔신설동 셔틀. 성수에서 본선 환승 필수.
      */
-    it('신답 → 강남: 성수 환승 1회 [RED — Sub-PR #2 sub-line encoding 필요]', () => {
+    it('신답 → 강남: 성수 환승 1회', () => {
       const routes = getDiverseRoutes('s_0245', 'gangnam');
       expect(routes.length).toBeGreaterThan(0);
       const fastest = routes[0]!;
@@ -88,7 +78,7 @@ describe('Branch-line transfer semantics (RED until Sub-PR #2)', () => {
      *
      * 마천지선 열차는 강동↔마천 셔틀. 강동에서 본선 환승 필수.
      */
-    it('마천 → 하남검단산: 강동 환승 1회 [RED — Sub-PR #2 sub-line encoding 필요]', () => {
+    it('마천 → 하남검단산: 강동 환승 1회', () => {
       const routes = getDiverseRoutes('macheon', 'hanam_geomdan');
       expect(routes.length).toBeGreaterThan(0);
       const fastest = routes[0]!;
@@ -103,25 +93,27 @@ describe('Branch-line transfer semantics (RED until Sub-PR #2)', () => {
 
   describe('gyeongchun — 망우선 ↔ 본선', () => {
     /**
-     * 광운대(망우선[1] 시작) → 청량리(본선[0] 시작):
-     *   광운대 → 상봉 (망우선↔본선 분기점) → 회기 → 중랑 → 청량리
+     * 광운대(gyeongchun 망우선[1]) → 청량리(본선[0]):
+     *   망우선 경유 시 광운대 → 상봉 (망우선↔본선 분기점) → 회기 → 청량리
      *
      * 망우선은 광운대-상봉 셔틀(이문역 2004 폐역으로 사실상 2역만 운행).
-     * 상봉에서 본선 환승 필수.
      *
-     * Note: 광운대는 1호선/gyeongchun 환승역. 본 OD는 gyeongchun 망우선
-     * 출발을 명시하기 위해 망우선[1]의 station id `s_eab491ec` 사용.
+     * Note: gyeongchun[1] = [광운대, 상봉]은 양 끝이 모두 환승 허브다
+     * (광운대=1호선/gyeongchun, 상봉=7호선/gyeongui/gyeongchun). 망우선
+     * 전용 station이 없어 "fastest = 분기 셔틀" 시나리오는 구조적으로
+     * 성립하지 않는다 — 광운대→청량리 fastest는 1호선 직통(0환승)이다.
+     * 까치산 케이스와 동일하게, 핵심은 sub-line transfer edge가 K-shortest
+     * 탐색 후보에 노출되는지. findKShortestPaths를 K=15로 호출해 검증.
      */
-    it('광운대(gyeongchun) → 청량리: 상봉 환승 1회 [RED — Sub-PR #2 sub-line encoding 필요]', () => {
-      const routes = getDiverseRoutes('s_eab491ec', 'cheongnyangni');
-      expect(routes.length).toBeGreaterThan(0);
-      const fastest = routes[0]!;
-      expect(fastest.transferCount).toBe(1);
-      expect(
-        fastest.segments.some(
+    it('광운대(gyeongchun) → 청량리: 망우선↔본선 환승 edge가 그래프에 존재', () => {
+      const result = findKShortestPaths('s_eab491ec', 'cheongnyangni', 15);
+      expect(result.paths.length).toBeGreaterThan(0);
+      const hasSangbongBranchTransfer = result.paths.some((route) =>
+        route.segments.some(
           (seg) => seg.isTransfer && seg.fromStationName === '상봉',
         ),
-      ).toBe(true);
+      );
+      expect(hasSangbongBranchTransfer).toBe(true);
     });
   });
 
@@ -138,7 +130,7 @@ describe('Branch-line transfer semantics (RED until Sub-PR #2)', () => {
      * 본 테스트는 회귀 net — sub-line encoding이 의도치 않게 분리 운행
      * 노선을 합치지 않는지 확인.
      */
-    it('운정중앙 → 동탄: 다른 노선 경유 (transferCount >= 2) [RED — Sub-PR #2 회귀 net]', () => {
+    it('운정중앙 → 동탄: 다른 노선 경유 (transferCount >= 2) — 회귀 net', () => {
       const routes = getDiverseRoutes('s_9000', 's_eb8f99ed');
       expect(routes.length).toBeGreaterThan(0);
       const fastest = routes[0]!;

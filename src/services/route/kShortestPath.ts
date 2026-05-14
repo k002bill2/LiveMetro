@@ -615,15 +615,21 @@ function convertToRoute(internalPath: InternalPath): Route {
     const nextStation = STATIONS[nextStationId];
     if (!currentStation || !nextStation) continue;
 
+    // isTransfer detection needs the `::subIdx` suffix intact — a branch
+    // shuttle (e.g. `gyeongchun::1` → `gyeongchun::0` at 상봉) differs only
+    // in subIdx. But the segment's public `lineId`/`lineName` must carry the
+    // trunk id only; the suffix is an internal graph-encoding detail and
+    // leaks into Route.lineIds / LINE_LABELS lookup if not stripped here.
     const isTransfer = currentStationId === nextStationId && currentLineId !== nextLineId;
+    const segmentLineId = trunkLineId(isTransfer ? nextLineId : currentLineId);
 
     segments.push({
       fromStationId: currentStationId,
       fromStationName: currentStation.name,
       toStationId: nextStationId,
       toStationName: nextStation.name,
-      lineId: isTransfer ? nextLineId : currentLineId,
-      lineName: getLineName(isTransfer ? nextLineId : currentLineId),
+      lineId: segmentLineId,
+      lineName: getLineName(segmentLineId),
       estimatedMinutes: isTransfer ? getTransferTime(currentStationId) : AVG_STATION_TRAVEL_TIME,
       isTransfer,
     });
