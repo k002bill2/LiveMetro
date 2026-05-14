@@ -7,6 +7,7 @@ import {
   loadCommuteRoutes,
   updateMorningRoute,
   updateEveningRoute,
+  updateEveningEnabled,
 } from '../commuteService';
 import { CommuteRoute } from '@/models/commute';
 
@@ -111,6 +112,7 @@ describe('Commute Service', () => {
         data: () => ({
           morningRoute: mockCommuteRoute,
           eveningRoute: mockEveningRoute,
+          eveningEnabled: false,
           createdAt: null,
           updatedAt: null,
         }),
@@ -121,6 +123,23 @@ describe('Commute Service', () => {
       expect(result).not.toBeNull();
       expect(result?.morningRoute).toBeDefined();
       expect(result?.eveningRoute).toBeDefined();
+      expect(result?.eveningEnabled).toBe(false);
+    });
+
+    it('should default eveningEnabled to true for legacy docs without the field', async () => {
+      mockGetDoc.mockResolvedValue({
+        exists: () => true,
+        data: () => ({
+          morningRoute: mockCommuteRoute,
+          eveningRoute: mockEveningRoute,
+          createdAt: null,
+          updatedAt: null,
+        }),
+      });
+
+      const result = await loadCommuteRoutes('user-123');
+
+      expect(result?.eveningEnabled).toBe(true);
     });
 
     it('should return null if no uid provided', async () => {
@@ -199,6 +218,51 @@ describe('Commute Service', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Update failed');
+    });
+  });
+
+  describe('updateEveningEnabled', () => {
+    it('should persist the enabled flag via a merge write', async () => {
+      mockSetDoc.mockResolvedValue(undefined);
+
+      const result = await updateEveningEnabled('user-123', false);
+
+      expect(result.success).toBe(true);
+      expect(mockSetDoc).toHaveBeenCalledWith(
+        'mockDocRef',
+        expect.objectContaining({ eveningEnabled: false }),
+        { merge: true },
+      );
+    });
+
+    it('should persist enabled=true', async () => {
+      mockSetDoc.mockResolvedValue(undefined);
+
+      const result = await updateEveningEnabled('user-123', true);
+
+      expect(result.success).toBe(true);
+      expect(mockSetDoc).toHaveBeenCalledWith(
+        'mockDocRef',
+        expect.objectContaining({ eveningEnabled: true }),
+        { merge: true },
+      );
+    });
+
+    it('should return error if no uid provided', async () => {
+      const result = await updateEveningEnabled('', true);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('사용자 인증이 필요합니다');
+      expect(mockSetDoc).not.toHaveBeenCalled();
+    });
+
+    it('should handle write errors', async () => {
+      mockSetDoc.mockRejectedValue(new Error('Firestore error'));
+
+      const result = await updateEveningEnabled('user-123', true);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('Firestore error');
     });
   });
 });

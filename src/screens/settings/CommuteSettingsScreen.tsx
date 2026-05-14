@@ -7,7 +7,14 @@
  * commit 1dd3af1) and ChevronRight icon already follow Wanted tokens.
  */
 
-import React, { useState, useCallback, useMemo, useLayoutEffect } from 'react';
+import React, {
+  useState,
+  useCallback,
+  useMemo,
+  useLayoutEffect,
+  useRef,
+  useEffect,
+} from 'react';
 import {
   View,
   Text,
@@ -44,7 +51,11 @@ import { useTheme } from '@/services/theme';
 import { SettingsStackParamList } from '@/navigation/types';
 import { useAuth } from '@/services/auth/AuthContext';
 import { useOnboarding } from '@/contexts/OnboardingContext';
-import { loadCommuteRoutes, saveCommuteRoutes } from '@/services/commute/commuteService';
+import {
+  loadCommuteRoutes,
+  saveCommuteRoutes,
+  updateEveningEnabled,
+} from '@/services/commute/commuteService';
 import { useMLPrediction } from '@/hooks/useMLPrediction';
 import {
   CommuteRoute,
@@ -58,6 +69,7 @@ import SettingToggle from '@/components/settings/SettingToggle';
 import { SettingPicker, type PickerOption } from '@/components/settings/SettingPicker';
 import { StationSearchModal } from '@/components/commute/StationSearchModal';
 import { TimePickerCard } from '@/components/settings/TimePickerCard';
+import { useToast } from '@/components/common/Toast';
 
 type Props = NativeStackScreenProps<SettingsStackParamList, 'CommuteSettings'>;
 
@@ -152,14 +164,40 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
     : HERO_ETA_CONFIDENCE_MIN;
   const heroIsPlaceholder = baselineMinutes === null;
 
+  // Toast feedback for the "저장" header action. Settings already persist
+  // optimistically on each change, so the toast is an explicit confirmation
+  // that the (already-saved) state is committed before navigating back —
+  // it removes the "did my change actually save?" ambiguity of a silent
+  // auto-save.
+  const { showSuccess, ToastComponent } = useToast();
+
+  // Holds the deferred goBack() timer so the success toast stays visible
+  // briefly before the screen pops. Cleared on unmount so a native back
+  // press during the delay can't trigger a double-pop.
+  const saveNavTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (saveNavTimer.current) clearTimeout(saveNavTimer.current);
+    },
+    [],
+  );
+
+  const handleSavePress = useCallback((): void => {
+    showSuccess('출퇴근 설정이 저장되었습니다');
+    if (saveNavTimer.current) clearTimeout(saveNavTimer.current);
+    saveNavTimer.current = setTimeout(() => {
+      if (navigation.canGoBack()) navigation.goBack();
+    }, 900);
+  }, [navigation, showSuccess]);
+
   // "저장" header link per Wanted handoff. Settings persist optimistically
-  // on each toggle/picker change, so this button is largely confirmation +
-  // navigation back to Settings index. Visual parity with the design.
+  // on each toggle/picker change, so this button is a confirmation: it
+  // surfaces a success toast, then navigates back to the Settings index.
   useLayoutEffect(() => {
     navigation.setOptions({
       headerRight: () => (
         <TouchableOpacity
-          onPress={() => navigation.canGoBack() && navigation.goBack()}
+          onPress={handleSavePress}
           accessibilityRole="button"
           accessibilityLabel="저장하고 돌아가기"
           hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
@@ -173,10 +211,13 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
         </TouchableOpacity>
       ),
     });
-  }, [navigation]);
+  }, [navigation, handleSavePress]);
 
   const [morningRoute, setMorningRoute] = useState<CommuteRouteData | null>(null);
   const [eveningRoute, setEveningRoute] = useState<CommuteRouteData | null>(null);
+  // Evening leg active flag — separate from `eveningRoute` existence so the
+  // toggle can disable the leg without discarding its saved route data.
+  const [eveningEnabled, setEveningEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -383,6 +424,34 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
     [user, morningRoute, eveningRoute, routeDataToCommuteRoute],
   );
 
+  /**
+   * Enable/disable the evening commute leg. Optimistic — the toggle flips
+   * immediately and reverts if the Firestore write fails. Only operable when
+   * an evening route exists (a non-existent leg has nothing to enable).
+   */
+  const handleToggleEveningEnabled = useCallback(
+    async (value: boolean): Promise<void> => {
+      if (!user || !eveningRoute) return;
+      const prev = eveningEnabled;
+      setEveningEnabled(value); // optimistic
+      try {
+        setSaving(true);
+        const result = await updateEveningEnabled(user.id, value);
+        if (!result.success) {
+          setEveningEnabled(prev);
+          Alert.alert('저장 실패', result.error ?? '퇴근 경로 설정 저장에 실패했습니다.');
+        }
+      } catch (error) {
+        setEveningEnabled(prev);
+        console.error('Error toggling evening enabled:', error);
+        Alert.alert('오류', '퇴근 경로 설정 저장 중 오류가 발생했습니다.');
+      } finally {
+        setSaving(false);
+      }
+    },
+    [user, eveningRoute, eveningEnabled],
+  );
+
   // Convert Firebase CommuteRoute to local CommuteRouteData format
   const convertToRouteData = (route: CommuteRoute | null): CommuteRouteData | null => {
     if (!route) return null;
@@ -422,11 +491,13 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
       if (settings) {
         setMorningRoute(convertToRouteData(settings.morningRoute));
         setEveningRoute(convertToRouteData(settings.eveningRoute));
+        setEveningEnabled(settings.eveningEnabled ?? true);
         console.log('Commute settings loaded from Firebase');
       } else {
         console.log('No commute settings found in Firebase');
         setMorningRoute(null);
         setEveningRoute(null);
+        setEveningEnabled(true);
       }
     } catch (error) {
       console.error('Error loading commute settings:', error);
@@ -497,6 +568,8 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
             <Switch
               value={enabled ?? false}
               onValueChange={onToggleEnabled}
+              // No evening route → nothing to enable; the toggle is inert.
+              disabled={!route}
               accessibilityRole="switch"
               accessibilityLabel="퇴근 경로 사용"
               trackColor={{ false: semantic.lineNormal, true: WANTED_TOKENS.blue[500] }}
@@ -649,12 +722,8 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
             route={eveningRoute}
             onEdit={handleSetupCommute}
             onAddTransfer={() => handleAddTransfer('evening')}
-            enabled={eveningRoute !== null}
-            onToggleEnabled={() => {
-              // Toggle is informational for now; full enable/disable wiring
-              // (e.g. clearing eveningCommute on Firestore) is a follow-up.
-              Alert.alert('알림', '퇴근 경로 사용 토글은 다음 단계에서 동작합니다.');
-            }}
+            enabled={eveningRoute !== null && eveningEnabled}
+            onToggleEnabled={handleToggleEveningEnabled}
           />
         </SettingSection>
 
@@ -759,6 +828,8 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
         placeholder="환승할 역을 검색하세요"
         excludeStationIds={transferExcludeIds}
       />
+
+      <ToastComponent />
     </SafeAreaView>
   );
 };
