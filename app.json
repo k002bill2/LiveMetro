@@ -3,6 +3,13 @@
     "name": "LiveMetro",
     "slug": "livemetro-subway-app",
     "version": "1.0.0",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/5a336447-64fc-48bd-a025-f2be8b0c7176",
+      "fallbackToCacheTimeout": 0
+    },
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -106,7 +113,8 @@
             "useFrameworks": "static"
           }
         }
-      ]
+      ],
+      "expo-updates"
     ],
     "hooks": {
       "postPublish": [
