@@ -788,3 +788,143 @@ describe('Line 2 — 분기 schema 적용 후 회귀 (PR-6)', () => {
     expect(fastest.totalMinutes).toBeLessThanOrEqual(5);
   });
 });
+
+describe('Line 1 — 분기 schema 적용 후 회귀 (multi-branch, most complex line)', () => {
+  /**
+   * 회귀 원인:
+   *  - 기존 lines.json `1` array는 6개 운행 계통을 단일 flat array로 mash:
+   *      (1) 시내 (서울역↔청량리, 지하철 구간)
+   *      (2) 경부 trunk + 장항선 직결 (서울역↔구로↔천안↔신창)
+   *      (3) 경원선 (청량리↔광운대↔연천)
+   *      (4) 경인선 (구로↔인천)
+   *      (5) 광명 셔틀 (금천구청↔광명)
+   *      (6) 서동탄 지선 (병점↔세마↔오산대↔서동탄)
+   *  - graph builder가 array[i]↔array[i+1] 단순 인접 edge를 만들어 다음
+   *    잘못된 edge가 생성:
+   *      청량리 ↔ 동묘앞 (시내 segment 끝과 본선 trunk 사이)
+   *      신도림 ↔ 회기 (경부 trunk 와 경원선 사이)
+   *      창동 ↔ 신길 (경원선과 경부 trunk 중간 jump)
+   *      신창 ↔ 구로 (장항선 종착과 경부 시작)
+   *      당정 ↔ 서동탄 (경부 trunk 와 서동탄 지선)
+   *      서동탄 ↔ 광명 (서동탄/광명 두 종착역 직접 연결)
+   *      광명 ↔ 개봉 (광명/경인선 시작 직접 연결)
+   *      인천 ↔ 구일 (경인선 종착 ↔ 경인선 시작 wrap)
+   *      온양온천 ↔ 구로, 독산 ↔ 병점 등 (mash 인접)
+   *  - Wikipedia ground truth (.cache/line1-ground-truth.md):
+   *      6개 subarray (총 102역, 분기점 5개: 서울역, 청량리, 구로, 금천구청, 병점).
+   *
+   * Task에서 LINE_STATIONS.1를 nested 6-subarray로 reshape하면 RED 테스트가
+   * GREEN으로 전환됨. BASELINE 테스트는 reshape 전후 모두 PASS.
+   */
+
+  /**
+   * 온양온천(장항선 종착)과 구로(경부 trunk 분기)는 mash array에서 idx 30,32로
+   * 가까워 graph builder가 가짜 인접을 생성. 실제로는 약 95km, 환승 없이
+   * 직행 시 천안→두정→...→가산디지털단지→구로 ≥ 30 hops.
+   * 잘못된 1-hop edge가 있으면 fastest = transferCount=0 + 매우 짧은 시간.
+   */
+  it('온양온천→구로: 가짜 1-hop 직결 없음 (장항선↔경부 trunk 분리)', () => {
+    const routes = getDiverseRoutes('s_ec98a8ec', 'guro');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    // 30+ hops × 2.5 = 75+분 정상. 회귀 가드 30분.
+    expect(fastest.totalMinutes).toBeGreaterThan(30);
+  });
+
+  /**
+   * 서동탄(서동탄 지선 종착)과 광명(광명 셔틀 종착)은 서로 다른 분기.
+   * 운행 계통 무관 — 직접 인접 edge 절대 없어야 함.
+   * 잘못된 1-hop edge가 있으면 fastest = transferCount=0 + 짧은 시간.
+   */
+  it('서동탄→광명: 가짜 인접 없음 (서로 다른 분기 종착역)', () => {
+    const routes = getDiverseRoutes('s_1749', 's_eab491eb');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    // 정상: 서동탄→오산대→세마→병점→...→금천구청→광명 (10+ hops, 환승 0회 가능)
+    // 단, 1-hop 직결은 절대 아님.
+    expect(fastest.totalMinutes).toBeGreaterThan(15);
+  });
+
+  /**
+   * 인천(경인선 종착)과 구일(경인선 시작 근처)은 mash array에서 idx 74,75로
+   * 인접 위치. 실제 운행 순서로는 인천 → 동인천 → 도원 → ... → 구일이 약
+   * 20 hops. 1-hop 직결은 가짜.
+   */
+  it('인천→구일: 가짜 1-hop wrap edge 없음 (경인선 양 끝)', () => {
+    const routes = getDiverseRoutes('incheon', 's_1813');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    // 20 hops × 2.5 = 50분 정상. 회귀 가드 30분.
+    expect(fastest.totalMinutes).toBeGreaterThan(30);
+  });
+
+  /**
+   * 영등포→구로: 경부 trunk 인접 1 hop. BASELINE — reshape 전후 모두 PASS.
+   */
+  it('영등포→구로는 환승 0회 직행 1 hop (경부 trunk 보존)', () => {
+    const routes = getDiverseRoutes('s_ec9881eb', 'guro');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+    expect(fastest.totalMinutes).toBeLessThanOrEqual(5);
+  });
+
+  /**
+   * 구로→부평: 경인선 trunk 직행 11 hops 환승 0회.
+   * BASELINE — reshape 전후 모두 PASS.
+   */
+  it('구로→부평은 환승 0회 직행 (경인선 분기 trunk 보존)', () => {
+    const routes = getDiverseRoutes('guro', 's_1806');
+    expect(routes.length).toBeGreaterThan(0);
+    const direct = routes.find((r) => r.transferCount === 0);
+    expect(direct).toBeDefined();
+  });
+
+  /**
+   * 금천구청→안양: 경부 trunk 직행. 금천구청 → 석수 → 관악 → 안양 (4 hops).
+   * BASELINE — reshape 전후 모두 PASS.
+   */
+  it('금천구청→안양은 환승 0회 직행 (경부 분기 trunk 보존)', () => {
+    const routes = getDiverseRoutes('s_1703', 's_1706');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+    expect(fastest.totalMinutes).toBeLessThanOrEqual(15);
+  });
+
+  /**
+   * 청량리→회기: 경원선 trunk 첫 인접. 1 hop 환승 0회.
+   * BASELINE — reshape 전후 모두 PASS (회기는 mash array idx 16 = 신도림 다음).
+   */
+  it('청량리→회기는 환승 0회 직행 1 hop (경원선 trunk 인접)', () => {
+    const routes = getDiverseRoutes('cheongnyangni', 's_ed9a8cea');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+    expect(fastest.totalMinutes).toBeLessThanOrEqual(5);
+  });
+
+  /**
+   * 광명 셔틀: 금천구청 ↔ 광명 1 hop 환승 0회 직행.
+   * BASELINE — reshape 후에도 PASS.
+   */
+  it('금천구청→광명은 환승 0회 직행 1 hop (광명 셔틀)', () => {
+    const routes = getDiverseRoutes('s_1703', 's_eab491eb');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+    expect(fastest.totalMinutes).toBeLessThanOrEqual(10);
+  });
+
+  /**
+   * 서동탄 지선: 병점 → 세마 → 오산대 → 서동탄 (3 hops 환승 0회).
+   * BASELINE — reshape 후에도 PASS.
+   */
+  it('병점→서동탄은 환승 0회 직행 (서동탄 지선)', () => {
+    const routes = getDiverseRoutes('s_ebb391ec', 's_1749');
+    expect(routes.length).toBeGreaterThan(0);
+    const fastest = routes[0]!;
+    expect(fastest.transferCount).toBe(0);
+    expect(fastest.totalMinutes).toBeLessThanOrEqual(10);
+  });
+});
