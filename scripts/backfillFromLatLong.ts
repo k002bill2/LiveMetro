@@ -127,7 +127,7 @@ interface Update {
 }
 
 const updates: Update[] = [];
-const skipped: Array<{ id: string; name: string; reason: string }> = [];
+const skipped: { id: string; name: string; reason: string }[] = [];
 
 for (const st of Object.values(stations)) {
   if (!isZero(st)) continue;

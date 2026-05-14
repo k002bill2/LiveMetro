@@ -51,7 +51,7 @@ const stations: Record<string, StationData> = JSON.parse(
  *
  * Add new pairs as future PRs surface them.
  */
-const SUSPECT_LINE_PAIRS: ReadonlyArray<readonly [string, string]> = [
+const SUSPECT_LINE_PAIRS: readonly (readonly [string, string])[] = [
   ['5', 'gyeongui'], // s_2523 양평 case
 ];
 
@@ -70,12 +70,12 @@ interface CollisionFinding {
   id: string;
   name: string;
   lines: string[];
-  suspectPairs: Array<[string, string]>;
+  suspectPairs: [string, string][];
 }
 
 interface NameDuplicateFinding {
   name: string;
-  entries: Array<{ id: string; lines: string[] }>;
+  entries: { id: string; lines: string[] }[];
   hasOverlap: boolean;
 }
 
@@ -84,7 +84,7 @@ function findSuspectCollisions(): CollisionFinding[] {
   for (const station of Object.values(stations)) {
     if (TRANSFER_ALLOWLIST.has(station.id)) continue;
     const lines = station.lines ?? [];
-    const matchedPairs: Array<[string, string]> = [];
+    const matchedPairs: [string, string][] = [];
     for (const [a, b] of SUSPECT_LINE_PAIRS) {
       if (lines.includes(a) && lines.includes(b)) {
         matchedPairs.push([a, b]);
@@ -103,7 +103,7 @@ function findSuspectCollisions(): CollisionFinding[] {
 }
 
 function findNameDuplicates(): NameDuplicateFinding[] {
-  const byName = new Map<string, Array<{ id: string; lines: string[] }>>();
+  const byName = new Map<string, { id: string; lines: string[] }[]>();
   for (const station of Object.values(stations)) {
     const list = byName.get(station.name) ?? [];
     list.push({ id: station.id, lines: station.lines ?? [] });
