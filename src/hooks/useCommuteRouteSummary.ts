@@ -31,6 +31,8 @@ export interface CommuteRouteSummary {
   stationCount?: number;
   /** Estimated fare in KRW (regular fare type). */
   fareKrw?: number;
+  /** Estimated ride time in minutes from graph search (excludes walk). */
+  rideMinutes?: number;
   /**
    * False until both station ids are provided AND a route is found.
    * Consumers can use `ready` to gate fact-grid rendering.
@@ -57,6 +59,7 @@ export function useCommuteRouteSummary(
         transferCount: route.transferCount,
         stationCount,
         fareKrw: fare,
+        rideMinutes: route.totalMinutes,
         ready: true,
       };
     } catch {

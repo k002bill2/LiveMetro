@@ -92,6 +92,7 @@ describe('useCommuteRouteSummary', () => {
       transferCount: 1,
       stationCount: 3,
       fareKrw: 1450,
+      rideMinutes: 28,
       ready: true,
     });
     expect(mockedFare).toHaveBeenCalledWith(3);

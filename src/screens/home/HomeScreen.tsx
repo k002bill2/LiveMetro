@@ -42,6 +42,7 @@ import { useNearbyStations } from '../../hooks/useNearbyStations';
 import { useDelayDetection } from '../../hooks/useDelayDetection';
 import { useMLPrediction } from '../../hooks/useMLPrediction';
 import { useCommuteRouteSummary } from '../../hooks/useCommuteRouteSummary';
+import { useFirestoreMorningCommute } from '../../hooks/useFirestoreMorningCommute';
 import { useRealtimeTrains } from '../../hooks/useRealtimeTrains';
 import { LoadingScreen } from '../../components/common/LoadingScreen';
 import { CommutePredictionCard } from '../../components/prediction';
@@ -88,6 +89,26 @@ const minutesBetween = (departure?: string, arrival?: string): number | null => 
   if (d === null || a === null) return null;
   const diff = ((a - d) % MIN_PER_DAY + MIN_PER_DAY) % MIN_PER_DAY;
   return diff > 0 ? diff : null;
+};
+
+/**
+ * Add minutes to an "HH:mm" time string, wrapping at midnight.
+ * Returns null on malformed input. Used to derive an arrival time when
+ * only the registered departure + estimated ride duration is known
+ * (no ML prediction yet).
+ */
+const addMinutesToHHmm = (
+  hhmm: string | undefined,
+  minutes: number | undefined,
+): string | null => {
+  if (!hhmm || minutes === undefined || !Number.isFinite(minutes)) return null;
+  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim());
+  if (!m) return null;
+  const base = parseInt(m[1]!, 10) * 60 + parseInt(m[2]!, 10);
+  const total = ((base + Math.round(minutes)) % MIN_PER_DAY + MIN_PER_DAY) % MIN_PER_DAY;
+  const hh = String(Math.floor(total / 60)).padStart(2, '0');
+  const mm = String(total % 60).padStart(2, '0');
+  return `${hh}:${mm}`;
 };
 
 /** "방금 전" / "12분 전" / "3시간 전" / "2일 전" */
@@ -359,7 +380,22 @@ export const HomeScreen: React.FC = () => {
   // HomeScreen uses MLPrediction (not the PredictedCommute model extended in spec 2026-05-12 §7.1)
   const { prediction: mlPrediction, baselineMinutes } = useMLPrediction();
 
-  const morningCommute = user?.preferences.commuteSchedule?.weekdays?.morningCommute;
+  // Two stores populate the morning commute:
+  //   1. `user.preferences.commuteSchedule.weekdays.morningCommute` — written by
+  //      Settings → 출근 경로 (CommuteSettingsScreen writes through to the
+  //      user profile).
+  //   2. Firestore `commuteSettings/<uid>` — written by the onboarding flow
+  //      (CommuteRouteScreen → CommuteTimeScreen → FavoritesOnboardingScreen
+  //      → commuteService.saveCommuteRoutes). Onboarding does NOT update the
+  //      user profile, so users who registered there had no morningCommute
+  //      on the profile and the CommuteRouteCard never rendered.
+  //
+  // The hook below adapts store #2 to the same `CommuteTime` shape so the
+  // resolution is a simple `?? fallback`. Profile (#1) wins when both exist.
+  const onboardingMorningCommute = useFirestoreMorningCommute(user?.id);
+  const morningCommute =
+    user?.preferences.commuteSchedule?.weekdays?.morningCommute ??
+    onboardingMorningCommute;
 
   const routeSummary = useCommuteRouteSummary(
     morningCommute?.stationId,
@@ -412,11 +448,40 @@ export const HomeScreen: React.FC = () => {
     };
   }, [mlPrediction, baselineMinutes, commuteStationNames]);
 
-  // Dev-only fallback: when there's no ML prediction yet, swap in the sample
-  // commute so the design preview always renders both the MLHeroCard and
-  // CommuteRouteCard. Gated on __DEV__ so production stays untouched.
+  // Fallback chain for the CommuteRouteCard hero data:
+  //   1. ML prediction (heroProps)               — best signal, kicks in after ~10 rides
+  //   2. Registered commute + route summary      — production fallback so users who
+  //                                                 set morningCommute see the card
+  //                                                 immediately, with ride/arrival
+  //                                                 derived from graph search instead
+  //                                                 of ML inference
+  //   3. DEV_SAMPLE_COMMUTE                      — design preview only, tree-shaken
+  //                                                 in release bundles
+  //
+  // Note: the hero ML card still uses `heroProps` directly (see render block) — this
+  // chain only exists so CommuteRouteCard renders without ML.
+  const registeredCommuteHero = useMemo(() => {
+    if (!morningCommute) return null;
+    if (!commuteStationNames.origin || !commuteStationNames.destination) return null;
+    if (!routeSummary.ready || routeSummary.rideMinutes === undefined) return null;
+    const arrival = addMinutesToHHmm(
+      morningCommute.departureTime,
+      routeSummary.rideMinutes,
+    );
+    if (!arrival) return null;
+    return {
+      predictedMinutes: routeSummary.rideMinutes,
+      deltaMinutes: undefined as number | undefined,
+      arrivalTime: arrival,
+      confidence: undefined as number | undefined,
+      origin: commuteStationNames.origin,
+      destination: commuteStationNames.destination,
+    };
+  }, [morningCommute, commuteStationNames, routeSummary]);
+
   const effectiveHero = useMemo(() => {
     if (heroProps) return heroProps;
+    if (registeredCommuteHero) return registeredCommuteHero;
     if (!DEV_SAMPLE_COMMUTE) return null;
     return {
       predictedMinutes: DEV_SAMPLE_COMMUTE.predictedMinutes,
@@ -426,7 +491,7 @@ export const HomeScreen: React.FC = () => {
       origin: DEV_SAMPLE_COMMUTE.origin,
       destination: DEV_SAMPLE_COMMUTE.destination,
     };
-  }, [heroProps]);
+  }, [heroProps, registeredCommuteHero]);
 
   const effectiveNames = useMemo(() => {
     if (commuteStationNames.origin) return commuteStationNames;
@@ -456,6 +521,7 @@ export const HomeScreen: React.FC = () => {
 
   const effectiveDepartureTime =
     mlPrediction?.predictedDepartureTime ??
+    morningCommute?.departureTime ??
     DEV_SAMPLE_COMMUTE?.predictedDepartureTime;
 
   const [dateTimeLabel, setDateTimeLabel] = useState(() =>
