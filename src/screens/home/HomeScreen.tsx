@@ -42,6 +42,7 @@ import { useNearbyStations } from '../../hooks/useNearbyStations';
 import { useDelayDetection } from '../../hooks/useDelayDetection';
 import { useMLPrediction } from '../../hooks/useMLPrediction';
 import { useCommuteRouteSummary } from '../../hooks/useCommuteRouteSummary';
+import { useFirestoreMorningCommute } from '../../hooks/useFirestoreMorningCommute';
 import { useRealtimeTrains } from '../../hooks/useRealtimeTrains';
 import { LoadingScreen } from '../../components/common/LoadingScreen';
 import { CommutePredictionCard } from '../../components/prediction';
@@ -379,7 +380,22 @@ export const HomeScreen: React.FC = () => {
   // HomeScreen uses MLPrediction (not the PredictedCommute model extended in spec 2026-05-12 §7.1)
   const { prediction: mlPrediction, baselineMinutes } = useMLPrediction();
 
-  const morningCommute = user?.preferences.commuteSchedule?.weekdays?.morningCommute;
+  // Two stores populate the morning commute:
+  //   1. `user.preferences.commuteSchedule.weekdays.morningCommute` — written by
+  //      Settings → 출근 경로 (CommuteSettingsScreen writes through to the
+  //      user profile).
+  //   2. Firestore `commuteSettings/<uid>` — written by the onboarding flow
+  //      (CommuteRouteScreen → CommuteTimeScreen → FavoritesOnboardingScreen
+  //      → commuteService.saveCommuteRoutes). Onboarding does NOT update the
+  //      user profile, so users who registered there had no morningCommute
+  //      on the profile and the CommuteRouteCard never rendered.
+  //
+  // The hook below adapts store #2 to the same `CommuteTime` shape so the
+  // resolution is a simple `?? fallback`. Profile (#1) wins when both exist.
+  const onboardingMorningCommute = useFirestoreMorningCommute(user?.id);
+  const morningCommute =
+    user?.preferences.commuteSchedule?.weekdays?.morningCommute ??
+    onboardingMorningCommute;
 
   const routeSummary = useCommuteRouteSummary(
     morningCommute?.stationId,

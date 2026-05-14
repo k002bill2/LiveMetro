@@ -151,6 +151,15 @@ jest.mock('@/hooks/useIntegratedAlerts', () => ({
   })),
 }));
 
+// Onboarding-side commute fallback. Mock returns null so the test path mirrors
+// users who registered through Settings (profile-side) rather than onboarding.
+// Without this mock the real hook fires loadCommuteRoutes → Firestore and the
+// async setState lands after the test renderer has torn down, triggering an
+// act() warning even though assertions pass.
+jest.mock('@/hooks/useFirestoreMorningCommute', () => ({
+  useFirestoreMorningCommute: jest.fn(() => null),
+}));
+
 // Phase 2 — HomeScreen now consumes useMLPrediction for the gradient hero card.
 jest.mock('@/hooks/useMLPrediction', () => ({
   useMLPrediction: jest.fn(() => ({
