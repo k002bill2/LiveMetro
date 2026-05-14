@@ -589,24 +589,28 @@ const UNREALISTIC_TIME_FACTOR = 1.5;
 /**
  * Number of K-shortest candidates explored before signature grouping. Higher
  * values surface topologically distinct transfer paths that Yen's algorithm
- * does not reach with small K (e.g. 산곡→선릉 via 강남구청 환승 ranks ~#25 in
- * Yen's natural exploration order — K must be ≥25 to even consider it).
- *
- * Each increment roughly doubles the per-query cost; 30 was chosen as the
- * empirical break-even where realistic 수도권 OD pairs include all major
- * transfer-station alternatives. Increase further only if user reports a
- * specific missing alternative (and document the OD pair).
+ * does not reach with small K. Each increment roughly doubles the per-query
+ * cost. Increase only if user reports a specific missing alternative (and
+ * document the OD pair).
  *
  * History:
  *   - PR #58: 10 → 15 (initial transfer-grouping diversity)
- *   - PR #68: 15 → 30 (산곡→선릉 강남구청 경유)
- *   - Priority 1 fix (memory [pr79-pending-followups]): in-loop signature
- *     dedupe added in `findKShortestPaths` (each K slot now corresponds to
- *     a distinct transfer signature, not just a distinct node path). K=30
- *     retained — with dedupe, K-slots are far more diverse, but raising
- *     bumps the worst-case cost by another ~2x for limited gain.
+ *   - PR #68: 15 → 30 (산곡→선릉 강남구청 경유 — pre-signature-dedupe;
+ *     duplicate-signature variants consumed K slots, so K=30 was needed
+ *     to surface the ~#25-ranked 강남구청 alternative)
+ *   - PR #91: in-loop signature-dedupe added in `findKShortestPaths` (each
+ *     K slot now corresponds to a distinct transfer signature, not just a
+ *     distinct node path). With dedupe, K-slots are far more diverse — the
+ *     same 강남구청 alternative now appears within the top-11 unique
+ *     signatures (verified empirically: K=10 fails, K=11 passes).
+ *   - PR ?? (this): 30 → 15. Empirical experiment: 산곡→선릉 integration
+ *     test passes from K=11 onward post-dedupe (vs K=25+ pre-dedupe).
+ *     15 chosen for 4-slot safety margin above the empirical floor; halves
+ *     per-query cost relative to K=30 (~57% test-suite speedup measured:
+ *     17.3s → 7.5s median on kShortestPath.integration.test). Raise back
+ *     toward 30 only if a missing-alternative regression appears.
  */
-const K_SHORTEST_CANDIDATES = 30;
+const K_SHORTEST_CANDIDATES = 15;
 
 /**
  * Pick a diverse set of 1–5 routes from the K-shortest candidates by
