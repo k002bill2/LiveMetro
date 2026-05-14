@@ -605,6 +605,22 @@ export const HomeScreen: React.FC = () => {
     navigation.navigate('WeeklyPrediction');
   }, [navigation]);
 
+  // "경로 변경" link on the real CommuteRouteCard. Unlike handleViewPredictions
+  // (which diverts to WeeklyPrediction once a commute exists), editing the
+  // route must ALWAYS land on CommuteSettings. Same nested-navigate cast as
+  // handleViewPredictions — types.ts MainTabs/Settings aliases don't exist at
+  // runtime (see project_dual_stack_paramlist).
+  const handleEditCommuteRoute = useCallback((): void => {
+    const nestedNavigate = navigation.navigate as (
+      route: 'Main',
+      params: { screen: 'Profile'; params: { screen: 'CommuteSettings' } },
+    ) => void;
+    nestedNavigate('Main', {
+      screen: 'Profile',
+      params: { screen: 'CommuteSettings' },
+    });
+  }, [navigation]);
+
   const requestLocationPermission = useCallback(async (): Promise<void> => {
     const { status } = await Location.requestForegroundPermissionsAsync();
     if (status === 'granted') {
@@ -763,6 +779,7 @@ export const HomeScreen: React.FC = () => {
             transferCount={effectiveRouteFacts.transferCount}
             stationCount={effectiveRouteFacts.stationCount}
             fareKrw={effectiveRouteFacts.fareKrw}
+            onPressEdit={handleEditCommuteRoute}
             testID="home-commute-route-card"
           />
         ) : (

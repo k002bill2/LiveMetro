@@ -160,6 +160,20 @@ jest.mock('@/hooks/useFirestoreMorningCommute', () => ({
   useFirestoreMorningCommute: jest.fn(() => null),
 }));
 
+// useCommuteRouteSummary wraps routeService/fareService (graph search). Mock it
+// so tests can drive the registeredCommuteHero fallback chain deterministically
+// without bundling the route graph. Default `{ ready: false }` mirrors the
+// unmocked hook's EMPTY return for an unresolved route — keeps existing tests
+// (which never set a real route) on the placeholder branch.
+const mockUseCommuteRouteSummary = jest.fn(
+  (): import('@/hooks/useCommuteRouteSummary').CommuteRouteSummary => ({
+    ready: false,
+  }),
+);
+jest.mock('@/hooks/useCommuteRouteSummary', () => ({
+  useCommuteRouteSummary: () => mockUseCommuteRouteSummary(),
+}));
+
 // Phase 2 — HomeScreen now consumes useMLPrediction for the gradient hero card.
 jest.mock('@/hooks/useMLPrediction', () => ({
   useMLPrediction: jest.fn(() => ({
@@ -397,6 +411,9 @@ describe('HomeScreen', () => {
       hasLocation: false,
       searchRadius: 2000,
     });
+    // Reset route summary to the unresolved default (clearAllMocks keeps the
+    // implementation, but a prior test's mockReturnValue would otherwise leak).
+    mockUseCommuteRouteSummary.mockReturnValue({ ready: false });
   });
 
   // ---------- Rendering ----------
@@ -451,6 +468,45 @@ describe('HomeScreen', () => {
       );
 
       fireEvent.press(getByTestId('commute-route-card-placeholder'));
+      expect(mockNavigate).toHaveBeenCalledWith('Main', {
+        screen: 'Profile',
+        params: { screen: 'CommuteSettings' },
+      });
+    });
+
+    it('real CommuteRouteCard "경로 변경" link navigates to CommuteSettings', async () => {
+      // Drive the full registeredCommuteHero chain so the REAL card renders
+      // (not the placeholder): morningCommute set + endpoint names resolved +
+      // route summary ready. This is the dev-build path where DEV_SAMPLE_COMMUTE
+      // would otherwise fill the slot — the link must be wired regardless.
+      withMorningCommute();
+      mockGetStation.mockImplementation((id: string) =>
+        Promise.resolve(
+          id === 'gangnam'
+            ? { ...mockStation('gangnam', '강남'), lineId: '2' }
+            : id === 'jamsil'
+              ? { ...mockStation('jamsil', '잠실'), lineId: '2' }
+              : null,
+        ),
+      );
+      mockUseCommuteRouteSummary.mockReturnValue({
+        ready: true,
+        rideMinutes: 18,
+        transferCount: 0,
+        stationCount: 8,
+        fareKrw: 1450,
+      });
+
+      const { getByTestId } = render(<HomeScreen />);
+      // Longer timeout: this test drives the full async chain (permission →
+      // loadFavoriteStations → endpoint name resolution) and on a cold module
+      // load the default 1s waitFor budget is too tight.
+      await waitFor(
+        () => expect(getByTestId('home-commute-route-card')).toBeTruthy(),
+        { timeout: 5000 },
+      );
+
+      fireEvent.press(getByTestId('commute-route-card-edit'));
       expect(mockNavigate).toHaveBeenCalledWith('Main', {
         screen: 'Profile',
         params: { screen: 'CommuteSettings' },
