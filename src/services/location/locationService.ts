@@ -381,17 +381,32 @@ class LocationService {
    * Find nearby stations with adaptive radius expansion.
    * Starts at initialRadius and expands through ADAPTIVE_RADIUS_STEPS
    * until minStations are found or max radius is reached.
+   *
+   * When `maxRadius` is provided, expansion is hard-capped: `initialRadius`
+   * is clamped down to `maxRadius` and no expansion step beyond `maxRadius`
+   * is considered. Callers that need a strict radius (e.g. HomeScreen's
+   * "주변 역" card) pass `maxRadius` equal to their desired radius to opt out
+   * of adaptive expansion entirely. Omitting `maxRadius` keeps the original
+   * unbounded expansion behaviour.
    */
   findNearbyStationsAdaptive(
     currentLocation: LocationCoordinates,
     allStations: Station[],
     initialRadius: number = ADAPTIVE_RADIUS_STEPS[0] ?? 1000,
-    minStations: number = ADAPTIVE_MIN_STATIONS
+    minStations: number = ADAPTIVE_MIN_STATIONS,
+    maxRadius?: number
   ): AdaptiveRadiusResult {
-    // Build step list: ensure initialRadius is included, then add larger steps
+    // Clamp the starting radius so an explicit cap is never exceeded.
+    const cappedInitial =
+      maxRadius != null ? Math.min(initialRadius, maxRadius) : initialRadius;
+
+    // Build step list: start at the (clamped) initial radius, then add
+    // larger expansion steps that still fall within the cap.
     const steps = [
-      initialRadius,
-      ...ADAPTIVE_RADIUS_STEPS.filter(r => r > initialRadius),
+      cappedInitial,
+      ...ADAPTIVE_RADIUS_STEPS.filter(
+        r => r > cappedInitial && (maxRadius == null || r <= maxRadius)
+      ),
     ];
 
     for (const radius of steps) {
@@ -400,16 +415,17 @@ class LocationService {
         return {
           stations,
           effectiveRadius: radius,
-          expanded: radius > initialRadius,
+          expanded: radius > cappedInitial,
         };
       }
     }
 
     // Fallback (should not reach here due to loop logic)
+    const fallbackRadius = steps[steps.length - 1] ?? cappedInitial;
     return {
-      stations: this.findNearbyStations(currentLocation, allStations, steps[steps.length - 1]),
-      effectiveRadius: steps[steps.length - 1] ?? initialRadius,
-      expanded: true,
+      stations: this.findNearbyStations(currentLocation, allStations, fallbackRadius),
+      effectiveRadius: fallbackRadius,
+      expanded: fallbackRadius > cappedInitial,
     };
   }
 

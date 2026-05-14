@@ -153,7 +153,8 @@ describe('useNearbyStations', () => {
         mockLocation,
         expect.any(Array),
         expect.any(Number),
-        expect.any(Number)
+        expect.any(Number),
+        undefined
       );
     });
   });
@@ -167,7 +168,22 @@ describe('useNearbyStations', () => {
           expect.any(Object),
           expect.any(Array),
           500,
-          expect.any(Number)
+          expect.any(Number),
+          undefined
+        );
+      });
+    });
+
+    it('should pass maxRadius to findNearbyStationsAdaptive when provided', async () => {
+      renderHook(() => useNearbyStations({ radius: 500, maxRadius: 500 }));
+
+      await waitFor(() => {
+        expect(mockLocationService.findNearbyStationsAdaptive).toHaveBeenCalledWith(
+          expect.any(Object),
+          expect.any(Array),
+          500,
+          expect.any(Number),
+          500
         );
       });
     });
@@ -451,7 +467,8 @@ describe('useNearbyStations', () => {
         externalLocation,
         expect.any(Array),
         expect.any(Number),
-        expect.any(Number)
+        expect.any(Number),
+        undefined
       );
       expect(result.current.hasLocation).toBe(true);
     });
