@@ -362,6 +362,97 @@ const CommuteRouteCardImpl: React.FC<CommuteRouteCardProps> = ({
 export const CommuteRouteCard = memo(CommuteRouteCardImpl);
 CommuteRouteCard.displayName = 'CommuteRouteCard';
 
+interface CommuteRouteCardPlaceholderProps {
+  title?: string;
+  message?: string;
+  ctaLabel?: string;
+  onPress?: () => void;
+  style?: ViewStyle;
+  testID?: string;
+}
+
+/**
+ * Placeholder variant — shown when origin/destination/hero data is missing.
+ * Same card surface as CommuteRouteCard for visual continuity so the layout
+ * slot stays occupied instead of disappearing. Tapping should route to
+ * CommuteSettings (see HomeScreen `handleViewPredictions`).
+ */
+const CommuteRouteCardPlaceholderImpl: React.FC<CommuteRouteCardPlaceholderProps> = ({
+  title = '오늘의 출근 경로',
+  message = '출퇴근 경로를 등록하면 출발·도착 시각과 환승, 요금을 한눈에 볼 수 있어요',
+  ctaLabel = '지금 설정하기',
+  onPress,
+  style,
+  testID,
+}) => {
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+
+  return (
+    <Pressable
+      testID={testID ?? 'commute-route-card-placeholder'}
+      onPress={onPress}
+      accessibilityRole={onPress ? 'button' : undefined}
+      accessibilityLabel={`${title}. ${message}. ${ctaLabel}`}
+      style={[
+        styles.card,
+        { backgroundColor: semantic.bgBase, borderColor: semantic.lineSubtle },
+        style,
+      ]}
+    >
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <RouteIcon size={14} color={semantic.labelAlt} strokeWidth={2.4} />
+          <Text style={[styles.headerLabel, { color: semantic.labelAlt }]}>
+            {title}
+          </Text>
+        </View>
+      </View>
+
+      <Text style={[placeholderStyles.message, { color: semantic.labelNormal }]}>
+        {message}
+      </Text>
+
+      {onPress && (
+        <View style={placeholderStyles.ctaRow}>
+          <Text
+            style={[placeholderStyles.ctaText, { color: WANTED_TOKENS.blue[500] }]}
+          >
+            {ctaLabel}
+          </Text>
+          <ChevronRight
+            size={14}
+            color={WANTED_TOKENS.blue[500]}
+            strokeWidth={2.4}
+          />
+        </View>
+      )}
+    </Pressable>
+  );
+};
+
+export const CommuteRouteCardPlaceholder = memo(CommuteRouteCardPlaceholderImpl);
+CommuteRouteCardPlaceholder.displayName = 'CommuteRouteCardPlaceholder';
+
+const placeholderStyles = StyleSheet.create({
+  message: {
+    marginTop: 10,
+    fontSize: 13,
+    lineHeight: 19,
+    fontFamily: weightToFontFamily('500'),
+  },
+  ctaRow: {
+    marginTop: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  ctaText: {
+    fontSize: 13,
+    fontFamily: weightToFontFamily('700'),
+  },
+});
+
 const styles = StyleSheet.create({
   card: {
     borderRadius: 18,

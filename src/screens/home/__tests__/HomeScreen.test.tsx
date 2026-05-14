@@ -189,6 +189,8 @@ jest.mock('lucide-react-native', () => ({
   Bell: () => null, Sparkles: () => null, TrendingDown: () => null, TrendingUp: () => null,
   // Phase 9 — MLHeroCardPlaceholder uses ArrowRight in its CTA row
   ArrowRight: () => null,
+  // CommuteRouteCard + CommuteRouteCardPlaceholder icons
+  Route: () => null, Home: () => null, Building2: () => null, Footprints: () => null,
 }));
 
 // expo-linear-gradient is used by MLHeroCard
@@ -430,6 +432,28 @@ describe('HomeScreen', () => {
       await waitFor(() => {
         expect(getByTestId('ml-hero-card-placeholder')).toBeTruthy();
         expect(getByTestId('toast')).toBeTruthy();
+      });
+    });
+
+    it('shows CommuteRouteCardPlaceholder when morningCommute is unset', async () => {
+      // hero null → the "오늘의 출근 경로" card should still occupy space with a
+      // CTA placeholder instead of disappearing from the layout.
+      const { getByTestId } = render(<HomeScreen />);
+      await waitFor(() =>
+        expect(getByTestId('commute-route-card-placeholder')).toBeTruthy(),
+      );
+    });
+
+    it('CommuteRouteCardPlaceholder press navigates to CommuteSettings', async () => {
+      const { getByTestId } = render(<HomeScreen />);
+      await waitFor(() =>
+        expect(getByTestId('commute-route-card-placeholder')).toBeTruthy(),
+      );
+
+      fireEvent.press(getByTestId('commute-route-card-placeholder'));
+      expect(mockNavigate).toHaveBeenCalledWith('Main', {
+        screen: 'Profile',
+        params: { screen: 'CommuteSettings' },
       });
     });
 
@@ -720,7 +744,7 @@ describe('HomeScreen', () => {
       expect(mockShowSuccess).not.toHaveBeenCalled();
     });
 
-    it('view details navigates to Onboarding when morningCommute is unset', async () => {
+    it('view details navigates to CommuteSettings when morningCommute is unset', async () => {
       // Reset the beforeEach override so the placeholder branch fires.
       const { useAuth } = require('@/services/auth/AuthContext');
       useAuth.mockImplementation(originalAuthImpl);
@@ -729,7 +753,11 @@ describe('HomeScreen', () => {
       await waitFor(() => expect(getByTestId('ml-hero-card-placeholder')).toBeTruthy());
 
       fireEvent.press(getByTestId('ml-hero-card-placeholder'));
-      expect(mockNavigate).toHaveBeenCalledWith('Onboarding');
+      expect(mockNavigate).toHaveBeenCalledWith('Main', {
+        screen: 'Profile',
+        params: { screen: 'CommuteSettings' },
+      });
+      expect(mockShowInfo).not.toHaveBeenCalled();
     });
 
     it('view details navigates to WeeklyPrediction when morningCommute is set', async () => {
