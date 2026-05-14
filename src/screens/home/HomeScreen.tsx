@@ -49,6 +49,7 @@ import { CommutePredictionCard } from '../../components/prediction';
 import {
   CommunityDelayCard,
   CommuteRouteCard,
+  CommuteRouteCardPlaceholder,
   FavoriteRow,
   HomeTopBar,
   MLHeroCard,
@@ -580,15 +581,44 @@ export const HomeScreen: React.FC = () => {
 
   const handleViewPredictions = useCallback((): void => {
     if (!morningCommute) {
-      navigation.navigate('Onboarding');
-      showInfo('출퇴근 경로를 먼저 설정해 주세요');
+      // Nested navigate into the Settings (Profile tab) stack. Note the
+      // route names match RootNavigator's actual registrations — outer
+      // stack is `Main` and the settings tab is `Profile` (which hosts
+      // SettingsNavigator). types.ts uses `MainTabs`/`Settings` aspirationally
+      // but they do not exist at runtime — see project_dual_stack_paramlist.
+      // The typed signature can't express two-arg nested navigation, so we
+      // cast the function once instead of poisoning the whole navigation prop.
+      const nestedNavigate = navigation.navigate as (
+        route: 'Main',
+        params: { screen: 'Profile'; params: { screen: 'CommuteSettings' } },
+      ) => void;
+      nestedNavigate('Main', {
+        screen: 'Profile',
+        params: { screen: 'CommuteSettings' },
+      });
       return;
     }
     navigation.navigate('WeeklyPrediction');
-  }, [morningCommute, navigation, showInfo]);
+  }, [morningCommute, navigation]);
 
   const handleOpenPrediction = useCallback((): void => {
     navigation.navigate('WeeklyPrediction');
+  }, [navigation]);
+
+  // "경로 변경" link on the real CommuteRouteCard. Unlike handleViewPredictions
+  // (which diverts to WeeklyPrediction once a commute exists), editing the
+  // route must ALWAYS land on CommuteSettings. Same nested-navigate cast as
+  // handleViewPredictions — types.ts MainTabs/Settings aliases don't exist at
+  // runtime (see project_dual_stack_paramlist).
+  const handleEditCommuteRoute = useCallback((): void => {
+    const nestedNavigate = navigation.navigate as (
+      route: 'Main',
+      params: { screen: 'Profile'; params: { screen: 'CommuteSettings' } },
+    ) => void;
+    nestedNavigate('Main', {
+      screen: 'Profile',
+      params: { screen: 'CommuteSettings' },
+    });
   }, [navigation]);
 
   const requestLocationPermission = useCallback(async (): Promise<void> => {
@@ -731,25 +761,31 @@ export const HomeScreen: React.FC = () => {
 
       {/* 3. CommuteRouteCard — main.jsx:72-162. Renders when both endpoint
           names + a hero prediction are available. In dev, the sample
-          fallback ensures this is always satisfied so designers can preview. */}
-      {effectiveHero &&
+          fallback ensures this is always satisfied so designers can preview.
+          When the fallback chain is empty (prod + no morningCommute) the
+          placeholder occupies the slot so the layout stays anchored and the
+          user sees an explicit CTA to register their commute. */}
+      <View style={styles.routeCardWrap}>
+        {effectiveHero &&
         effectiveNames.origin &&
-        effectiveNames.destination && (
-          <View style={styles.routeCardWrap}>
-            <CommuteRouteCard
-              origin={effectiveNames.origin}
-              destination={effectiveNames.destination}
-              lineId={effectiveNames.originLineId as LineId | undefined}
-              departureTime={effectiveDepartureTime}
-              arrivalTime={effectiveHero.arrivalTime}
-              rideMinutes={effectiveHero.predictedMinutes}
-              transferCount={effectiveRouteFacts.transferCount}
-              stationCount={effectiveRouteFacts.stationCount}
-              fareKrw={effectiveRouteFacts.fareKrw}
-              testID="home-commute-route-card"
-            />
-          </View>
+        effectiveNames.destination ? (
+          <CommuteRouteCard
+            origin={effectiveNames.origin}
+            destination={effectiveNames.destination}
+            lineId={effectiveNames.originLineId as LineId | undefined}
+            departureTime={effectiveDepartureTime}
+            arrivalTime={effectiveHero.arrivalTime}
+            rideMinutes={effectiveHero.predictedMinutes}
+            transferCount={effectiveRouteFacts.transferCount}
+            stationCount={effectiveRouteFacts.stationCount}
+            fareKrw={effectiveRouteFacts.fareKrw}
+            onPressEdit={handleEditCommuteRoute}
+            testID="home-commute-route-card"
+          />
+        ) : (
+          <CommuteRouteCardPlaceholder onPress={handleViewPredictions} />
         )}
+      </View>
 
       {/* 4. Quick actions */}
       <View style={styles.quickActionsWrap}>
