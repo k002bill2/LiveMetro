@@ -456,7 +456,10 @@ export const HomeScreen: React.FC = () => {
   //                                                 derived from graph search instead
   //                                                 of ML inference
   //   3. DEV_SAMPLE_COMMUTE                      — design preview only, tree-shaken
-  //                                                 in release bundles
+  //                                                 in release bundles AND suppressed
+  //                                                 whenever a real morningCommute is
+  //                                                 registered (the sample must never
+  //                                                 mask the user's actual route)
   //
   // Note: the hero ML card still uses `heroProps` directly (see render block) — this
   // chain only exists so CommuteRouteCard renders without ML.
@@ -482,6 +485,11 @@ export const HomeScreen: React.FC = () => {
   const effectiveHero = useMemo(() => {
     if (heroProps) return heroProps;
     if (registeredCommuteHero) return registeredCommuteHero;
+    // A registered commute exists but its hero data hasn't resolved (route
+    // graph search not ready). Return null instead of the dev sample so the
+    // slot falls to the placeholder rather than showing a fake route — the
+    // sample is a design preview, never a stand-in for real user data.
+    if (morningCommute) return null;
     if (!DEV_SAMPLE_COMMUTE) return null;
     return {
       predictedMinutes: DEV_SAMPLE_COMMUTE.predictedMinutes,
@@ -491,17 +499,19 @@ export const HomeScreen: React.FC = () => {
       origin: DEV_SAMPLE_COMMUTE.origin,
       destination: DEV_SAMPLE_COMMUTE.destination,
     };
-  }, [heroProps, registeredCommuteHero]);
+  }, [heroProps, registeredCommuteHero, morningCommute]);
 
   const effectiveNames = useMemo(() => {
     if (commuteStationNames.origin) return commuteStationNames;
-    if (!DEV_SAMPLE_COMMUTE) return commuteStationNames;
+    // Same rule as effectiveHero: never let the dev sample override a real
+    // registered commute, even when its station names are still resolving.
+    if (morningCommute || !DEV_SAMPLE_COMMUTE) return commuteStationNames;
     return {
       origin: DEV_SAMPLE_COMMUTE.origin,
       destination: DEV_SAMPLE_COMMUTE.destination,
       originLineId: DEV_SAMPLE_COMMUTE.originLineId,
     };
-  }, [commuteStationNames]);
+  }, [commuteStationNames, morningCommute]);
 
   const effectiveRouteFacts = useMemo(() => {
     // Real routeSummary takes precedence; fall back to sample for facts grid.
@@ -510,14 +520,16 @@ export const HomeScreen: React.FC = () => {
       routeSummary.stationCount !== undefined ||
       routeSummary.fareKrw !== undefined;
     if (realFacts) return routeSummary;
-    if (!DEV_SAMPLE_COMMUTE) return routeSummary;
+    // Dev sample suppressed when a real commute is registered (see above) —
+    // the fact grid simply hides until graph search resolves.
+    if (morningCommute || !DEV_SAMPLE_COMMUTE) return routeSummary;
     return {
       ...routeSummary,
       transferCount: DEV_SAMPLE_COMMUTE.transferCount,
       stationCount: DEV_SAMPLE_COMMUTE.stationCount,
       fareKrw: DEV_SAMPLE_COMMUTE.fareKrw,
     };
-  }, [routeSummary]);
+  }, [routeSummary, morningCommute]);
 
   const effectiveDepartureTime =
     mlPrediction?.predictedDepartureTime ??
@@ -743,23 +755,23 @@ export const HomeScreen: React.FC = () => {
         )}
       </View>
 
-      {/* 3. CommuteRouteCard — main.jsx:72-162. Renders when both endpoint
-          names + a hero prediction are available. In dev, the sample
-          fallback ensures this is always satisfied so designers can preview.
-          When the fallback chain is empty (prod + no morningCommute) the
-          placeholder occupies the slot so the layout stays anchored and the
-          user sees an explicit CTA to register their commute. */}
+      {/* 3. CommuteRouteCard — main.jsx:72-162. Renders as soon as both
+          endpoint NAMES are known — a hero prediction is NOT required. This
+          lets a registered commute show its real origin→destination + 출발
+          시각 even before (or without) ML/graph-search results; arrivalTime,
+          rideMinutes and the fact grid degrade gracefully to hidden when the
+          hero/route summary hasn't resolved. The placeholder occupies the
+          slot only when no endpoints are known (no registered commute, and
+          the dev sample is suppressed once a commute exists). */}
       <View style={styles.routeCardWrap}>
-        {effectiveHero &&
-        effectiveNames.origin &&
-        effectiveNames.destination ? (
+        {effectiveNames.origin && effectiveNames.destination ? (
           <CommuteRouteCard
             origin={effectiveNames.origin}
             destination={effectiveNames.destination}
             lineId={effectiveNames.originLineId as LineId | undefined}
             departureTime={effectiveDepartureTime}
-            arrivalTime={effectiveHero.arrivalTime}
-            rideMinutes={effectiveHero.predictedMinutes}
+            arrivalTime={effectiveHero?.arrivalTime}
+            rideMinutes={effectiveHero?.predictedMinutes}
             transferCount={effectiveRouteFacts.transferCount}
             stationCount={effectiveRouteFacts.stationCount}
             fareKrw={effectiveRouteFacts.fareKrw}

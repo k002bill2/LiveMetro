@@ -514,6 +514,36 @@ describe('HomeScreen', () => {
       });
     });
 
+    it('renders real CommuteRouteCard from registered endpoints even when route summary is unresolved', async () => {
+      // Regression: a registered commute whose graph search fails (routeSummary
+      // never `ready`) must STILL show the user's real origin→destination —
+      // the card is gated on endpoint names alone, not on the full hero. Before
+      // the fix the slot fell through to the placeholder (or, in dev builds, to
+      // the hardcoded DEV_SAMPLE_COMMUTE route).
+      withMorningCommute();
+      mockGetStation.mockImplementation((id: string) =>
+        Promise.resolve(
+          id === 'gangnam'
+            ? { ...mockStation('gangnam', '강남'), lineId: '2' }
+            : id === 'jamsil'
+              ? { ...mockStation('jamsil', '잠실'), lineId: '2' }
+              : null,
+        ),
+      );
+      // routeSummary stays at the beforeEach default `{ ready: false }` — no
+      // transferCount/stationCount/fareKrw/rideMinutes.
+
+      const { getByTestId, getByText } = render(<HomeScreen />);
+      await waitFor(
+        () => expect(getByTestId('home-commute-route-card')).toBeTruthy(),
+        { timeout: 5000 },
+      );
+
+      // Real registered endpoints are shown (not the dev sample 홍대입구→강남).
+      expect(getByText('강남')).toBeTruthy();
+      expect(getByText('잠실')).toBeTruthy();
+    });
+
     it('shows "즐겨찾기" when permission denied', async () => {
       const { getByText } = render(<HomeScreen />);
       await waitFor(() => expect(getByText('즐겨찾기')).toBeTruthy());
