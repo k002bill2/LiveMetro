@@ -14,6 +14,24 @@ import {
 } from '@models/route';
 import { getTransferTime } from './transferTime';
 
+// Branch-line shuttle wait (same-line sub-line transfer, e.g. 신정지선↔본선 at
+// 신도림). Shuttle services are physically separate operations even when
+// share the same line id, so a `transferCount += 1` semantically represents
+// the user changing trains. Wait time is shorter than cross-line transfer
+// (`AVG_TRANSFER_TIME=4min`) because the platforms are typically adjacent.
+const AVG_BRANCH_SHUTTLE_WAIT = 3;
+
+/**
+ * For a station that appears in multiple subarrays of the same line,
+ * the graph nodes are kept distinct via the `::${subIdx}` suffix so that
+ * `transferCount` can correctly account for the branch-main shuttle change.
+ * Use this helper to derive the trunk lineId for UI display where the
+ * subIdx distinction is internal and must not leak to LINE_LABELS lookup.
+ */
+export function trunkLineId(lineIdWithSub: string): string {
+  return lineIdWithSub.split('::')[0] ?? lineIdWithSub;
+}
+
 // ============================================================================
 // Types
 // ============================================================================
@@ -67,16 +85,27 @@ function buildGraph(
   const adjustWeight = (baseWeight: number, lineId: string): number =>
     baseWeight * (congestionMultipliers?.get(lineId) ?? 1.0);
 
-  // Add edges for each line. Branched lines have multiple subarrays —
-  // a station appearing in two subarrays accumulates edges from both,
-  // which is exactly the branch-point semantics we want.
+  // Add edges for each line. Branched lines (`string[][]` schema) have N
+  // subarrays — each subarray gets its own node-key namespace via the
+  // `::${subIdx}` suffix so that branch and trunk subarrays do NOT share a
+  // node. This is critical for sub-line transfer semantics: shuttle services
+  // (e.g. 2호선 신정지선 까치산↔신도림) are operationally separate from the
+  // trunk loop, and the graph must reflect that a user changes trains at
+  // the branch junction. See `addBranchJunctionTransferEdges` below.
+  //
+  // Adjacent edges within a single subarray use `isTransfer=false` and the
+  // raw lineId. Edge.lineId carrying the `::subIdx` suffix is required for
+  // `isTransfer` detection in segment build (`routeService.ts:415`) where
+  // `currentLineId !== nextLineId` flags transfers. UI consumers strip the
+  // suffix via `trunkLineId()` for LINE_LABELS lookup.
   Object.entries(LINE_STATIONS).forEach(([lineId, segments]) => {
-    segments.forEach(stationIds => {
+    segments.forEach((stationIds, subIdx) => {
+      const subLineId = `${lineId}::${subIdx}`;
       for (let i = 0; i < stationIds.length; i++) {
         const stationId = stationIds[i];
         if (!stationId) continue;
 
-        const nodeKey = `${stationId}#${lineId}`;
+        const nodeKey = `${stationId}#${subLineId}`;
         if (excludeNodeKeys?.has(nodeKey)) continue;
 
         if (!graph.has(nodeKey)) {
@@ -87,7 +116,7 @@ function buildGraph(
         if (i < stationIds.length - 1) {
           const nextStationId = stationIds[i + 1];
           if (nextStationId) {
-            const nextKey = `${nextStationId}#${lineId}`;
+            const nextKey = `${nextStationId}#${subLineId}`;
             if (!excludeNodeKeys?.has(nextKey)) {
               const edgeKey = `${nodeKey}->${nextKey}`;
               if (!excludeEdges?.has(edgeKey)) {
@@ -95,7 +124,7 @@ function buildGraph(
                   to: nextKey,
                   weight: adjustWeight(AVG_STATION_TRAVEL_TIME, lineId),
                   isTransfer: false,
-                  lineId,
+                  lineId: subLineId,
                 });
               }
             }
@@ -106,7 +135,7 @@ function buildGraph(
         if (i > 0) {
           const prevStationId = stationIds[i - 1];
           if (prevStationId) {
-            const prevKey = `${prevStationId}#${lineId}`;
+            const prevKey = `${prevStationId}#${subLineId}`;
             if (!excludeNodeKeys?.has(prevKey)) {
               const edgeKey = `${nodeKey}->${prevKey}`;
               if (!excludeEdges?.has(edgeKey)) {
@@ -114,7 +143,7 @@ function buildGraph(
                   to: prevKey,
                   weight: adjustWeight(AVG_STATION_TRAVEL_TIME, lineId),
                   isTransfer: false,
-                  lineId,
+                  lineId: subLineId,
                 });
               }
             }
@@ -124,19 +153,69 @@ function buildGraph(
     });
   });
 
+  // Branch junction transfer edges: when the same station appears in
+  // multiple subarrays of the same line (e.g. 신도림 in line 2's 본선[0]
+  // and 신정지선[2]), add a transfer edge between the sub-line nodes with
+  // `AVG_BRANCH_SHUTTLE_WAIT` weight. This is the algorithm-layer fix that
+  // RED tests in `branchTransferSemantics.integration.test.ts` exercise.
+  Object.entries(LINE_STATIONS).forEach(([lineId, segments]) => {
+    const stationToSubs = new Map<string, number[]>();
+    segments.forEach((stationIds, subIdx) => {
+      stationIds.forEach(stationId => {
+        if (!stationId) return;
+        const list = stationToSubs.get(stationId) ?? [];
+        if (!list.includes(subIdx)) list.push(subIdx);
+        stationToSubs.set(stationId, list);
+      });
+    });
+
+    stationToSubs.forEach((subs, stationId) => {
+      if (subs.length < 2) return;
+      for (let i = 0; i < subs.length; i++) {
+        for (let j = i + 1; j < subs.length; j++) {
+          const subLineA = `${lineId}::${subs[i]}`;
+          const subLineB = `${lineId}::${subs[j]}`;
+          const keyA = `${stationId}#${subLineA}`;
+          const keyB = `${stationId}#${subLineB}`;
+          if (excludeNodeKeys?.has(keyA) || excludeNodeKeys?.has(keyB)) continue;
+
+          if (graph.has(keyA) && !excludeEdges?.has(`${keyA}->${keyB}`)) {
+            graph.get(keyA)?.push({
+              to: keyB,
+              weight: adjustWeight(AVG_BRANCH_SHUTTLE_WAIT, lineId),
+              isTransfer: true,
+              lineId: subLineB,
+            });
+          }
+          if (graph.has(keyB) && !excludeEdges?.has(`${keyB}->${keyA}`)) {
+            graph.get(keyB)?.push({
+              to: keyA,
+              weight: adjustWeight(AVG_BRANCH_SHUTTLE_WAIT, lineId),
+              isTransfer: true,
+              lineId: subLineA,
+            });
+          }
+        }
+      }
+    });
+  });
+
   // Handle circular line 2 — only on trunk subarray (segments[0]).
   // Branch subarrays (성수지선, 신정지선) are linear, not circular.
-  // NOTE: existing key format `${first}_2` (underscore) does not match
-  // node keys (`${id}#${lineId}`), so this code is currently a silent
-  // no-op. Preserved verbatim per surgical-changes scope; fix in
-  // separate phase if Line 2 wrap is needed.
+  //
+  // Key format unified to `${stationId}#${lineId}::${subIdx}` (trunk=`::0`).
+  // Previous format `${first}_2` (underscore) was a doc-rot artifact from
+  // before the `_`→`#` rename and made this block a silent no-op. Fixed
+  // here as Sub-PR #2 follow-up: the ring closing edge (시청↔충정로) is
+  // now actually added so 2호선 순환선이 그래프상 닫힘.
   const line2Trunk = LINE_STATIONS['2']?.[0];
   if (line2Trunk && line2Trunk.length > 1) {
     const first = line2Trunk[0];
     const last = line2Trunk[line2Trunk.length - 1];
     if (first && last) {
-      const firstKey = `${first}_2`;
-      const lastKey = `${last}_2`;
+      const trunkSubLineId = '2::0';
+      const firstKey = `${first}#${trunkSubLineId}`;
+      const lastKey = `${last}#${trunkSubLineId}`;
 
       if (!excludeNodeKeys?.has(firstKey) && !excludeNodeKeys?.has(lastKey)) {
         if (!excludeEdges?.has(`${lastKey}->${firstKey}`)) {
@@ -144,7 +223,7 @@ function buildGraph(
             to: firstKey,
             weight: adjustWeight(AVG_STATION_TRAVEL_TIME, '2'),
             isTransfer: false,
-            lineId: '2',
+            lineId: trunkSubLineId,
           });
         }
         if (!excludeEdges?.has(`${firstKey}->${lastKey}`)) {
@@ -152,14 +231,43 @@ function buildGraph(
             to: lastKey,
             weight: adjustWeight(AVG_STATION_TRAVEL_TIME, '2'),
             isTransfer: false,
-            lineId: '2',
+            lineId: trunkSubLineId,
           });
         }
       }
     }
   }
 
-  // Add transfer edges
+  // Cross-line transfer edges. When a station appears in multiple lines
+  // (e.g. 신도림 in line 1 and line 2), add transfer edges. After sub-line
+  // encoding, the same station may have multiple sub-line nodes per line
+  // (line 2 has 신도림#2::0 trunk and 신도림#2::2 sinjeong branch). The
+  // transfer edge is added between every sub-line pair across lines so
+  // that a passenger can change between any combination — domain model
+  // is that the cross-line transfer corridor is shared (Option B).
+  //
+  // Pre-calculate a station-to-subIdxs index per line for O(1) lookup
+  // (otherwise this would be O(Stations * Lines²) with redundant array
+  // scanning per cross-line pair).
+  const stationSubIdxIndex = new Map<string, Map<string, number[]>>();
+  Object.entries(LINE_STATIONS).forEach(([lineId, segments]) => {
+    const inner = new Map<string, number[]>();
+    segments.forEach((stationIds, subIdx) => {
+      stationIds.forEach(sid => {
+        if (!sid) return;
+        const list = inner.get(sid);
+        if (list) {
+          if (!list.includes(subIdx)) list.push(subIdx);
+        } else {
+          inner.set(sid, [subIdx]);
+        }
+      });
+    });
+    stationSubIdxIndex.set(lineId, inner);
+  });
+  const subIdxsOfStationInLine = (stationId: string, lineId: string): number[] =>
+    stationSubIdxIndex.get(lineId)?.get(stationId) ?? [];
+
   Object.values(STATIONS).forEach(station => {
     const stationLines = station.lines.filter(
       lineId => (LINE_STATIONS[lineId]?.length ?? 0) > 0
@@ -171,28 +279,36 @@ function buildGraph(
         const line2 = stationLines[j];
         if (!line1 || !line2) continue;
 
-        const key1 = `${station.id}#${line1}`;
-        const key2 = `${station.id}#${line2}`;
+        const subs1 = subIdxsOfStationInLine(station.id, line1);
+        const subs2 = subIdxsOfStationInLine(station.id, line2);
 
-        if (excludeNodeKeys?.has(key1) || excludeNodeKeys?.has(key2)) continue;
+        subs1.forEach(sub1 => {
+          subs2.forEach(sub2 => {
+            const subLine1 = `${line1}::${sub1}`;
+            const subLine2 = `${line2}::${sub2}`;
+            const key1 = `${station.id}#${subLine1}`;
+            const key2 = `${station.id}#${subLine2}`;
+            if (excludeNodeKeys?.has(key1) || excludeNodeKeys?.has(key2)) return;
 
-        if (graph.has(key1) && !excludeEdges?.has(`${key1}->${key2}`)) {
-          graph.get(key1)?.push({
-            to: key2,
-            weight: adjustWeight(getTransferTime(station.id), line2),
-            isTransfer: true,
-            lineId: line2,
+            if (graph.has(key1) && !excludeEdges?.has(`${key1}->${key2}`)) {
+              graph.get(key1)?.push({
+                to: key2,
+                weight: adjustWeight(getTransferTime(station.id), line2),
+                isTransfer: true,
+                lineId: subLine2,
+              });
+            }
+
+            if (graph.has(key2) && !excludeEdges?.has(`${key2}->${key1}`)) {
+              graph.get(key2)?.push({
+                to: key1,
+                weight: adjustWeight(getTransferTime(station.id), line1),
+                isTransfer: true,
+                lineId: subLine1,
+              });
+            }
           });
-        }
-
-        if (graph.has(key2) && !excludeEdges?.has(`${key2}->${key1}`)) {
-          graph.get(key2)?.push({
-            to: key1,
-            weight: adjustWeight(getTransferTime(station.id), line1),
-            isTransfer: true,
-            lineId: line1,
-          });
-        }
+        });
       }
     }
   });
@@ -202,15 +318,26 @@ function buildGraph(
 }
 
 /**
- * Get all node keys for a station
+ * Get all node keys for a station — enumerates every subarray (sub-line)
+ * the station belongs to. A station appearing in trunk + branch (e.g. 신도림
+ * in line 2's 본선[0] and 신정지선[2]) yields multiple keys, so multi-source
+ * Dijkstra explores from all entry points.
  */
 function getStationNodeKeys(stationId: string): string[] {
   const station = STATIONS[stationId];
   if (!station) return [];
 
-  return station.lines
-    .filter(lineId => (LINE_STATIONS[lineId]?.length ?? 0) > 0)
-    .map(lineId => `${stationId}#${lineId}`);
+  const keys: string[] = [];
+  station.lines.forEach(lineId => {
+    const segs = LINE_STATIONS[lineId];
+    if (!segs || segs.length === 0) return;
+    segs.forEach((sub, subIdx) => {
+      if (sub.includes(stationId)) {
+        keys.push(`${stationId}#${lineId}::${subIdx}`);
+      }
+    });
+  });
+  return keys;
 }
 
 // ============================================================================
@@ -488,15 +615,21 @@ function convertToRoute(internalPath: InternalPath): Route {
     const nextStation = STATIONS[nextStationId];
     if (!currentStation || !nextStation) continue;
 
+    // isTransfer detection needs the `::subIdx` suffix intact — a branch
+    // shuttle (e.g. `gyeongchun::1` → `gyeongchun::0` at 상봉) differs only
+    // in subIdx. But the segment's public `lineId`/`lineName` must carry the
+    // trunk id only; the suffix is an internal graph-encoding detail and
+    // leaks into Route.lineIds / LINE_LABELS lookup if not stripped here.
     const isTransfer = currentStationId === nextStationId && currentLineId !== nextLineId;
+    const segmentLineId = trunkLineId(isTransfer ? nextLineId : currentLineId);
 
     segments.push({
       fromStationId: currentStationId,
       fromStationName: currentStation.name,
       toStationId: nextStationId,
       toStationName: nextStation.name,
-      lineId: isTransfer ? nextLineId : currentLineId,
-      lineName: getLineName(isTransfer ? nextLineId : currentLineId),
+      lineId: segmentLineId,
+      lineName: getLineName(segmentLineId),
       estimatedMinutes: isTransfer ? getTransferTime(currentStationId) : AVG_STATION_TRAVEL_TIME,
       isTransfer,
     });
