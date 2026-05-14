@@ -21,6 +21,14 @@ const COMMUTE_COLLECTION = 'commuteSettings';
 export interface CommuteSettings {
   morningRoute: CommuteRoute | null;
   eveningRoute: CommuteRoute | null;
+  /**
+   * Whether the evening commute leg is active. A settings-level flag kept
+   * separate from `eveningRoute` so toggling the leg off (and back on)
+   * preserves the saved 퇴근 route data. Legacy documents written before
+   * this field existed default to `true` — an existing eveningRoute was
+   * implicitly enabled.
+   */
+  eveningEnabled: boolean;
   createdAt: Timestamp | null;
   updatedAt: Timestamp | null;
 }
@@ -108,6 +116,8 @@ export const loadCommuteRoutes = async (
       return {
         morningRoute: data.morningRoute || null,
         eveningRoute: data.eveningRoute || null,
+        // Legacy docs predate this field — default to enabled.
+        eveningEnabled: data.eveningEnabled ?? true,
         createdAt: data.createdAt || null,
         updatedAt: data.updatedAt || null,
       };
@@ -197,9 +207,44 @@ export const updateEveningRoute = async (
   }
 };
 
+/**
+ * Enable or disable the evening commute leg.
+ *
+ * Persists only the `eveningEnabled` settings flag — the saved
+ * `eveningRoute` data is left untouched, so toggling the leg back on
+ * restores the route without forcing the user to re-enter it. Uses
+ * `setDoc` with `merge` so the call is safe even if the document was
+ * somehow not created yet.
+ */
+export const updateEveningEnabled = async (
+  uid: string,
+  enabled: boolean
+): Promise<SaveCommuteResult> => {
+  if (!uid) {
+    return { success: false, error: '사용자 인증이 필요합니다' };
+  }
+
+  try {
+    const docRef = doc(firestore, COMMUTE_COLLECTION, uid);
+    await setDoc(
+      docRef,
+      { eveningEnabled: enabled, updatedAt: serverTimestamp() },
+      { merge: true }
+    );
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating evening enabled flag:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : '저장 중 오류가 발생했습니다',
+    };
+  }
+};
+
 export default {
   saveCommuteRoutes,
   loadCommuteRoutes,
   updateMorningRoute,
   updateEveningRoute,
+  updateEveningEnabled,
 };
