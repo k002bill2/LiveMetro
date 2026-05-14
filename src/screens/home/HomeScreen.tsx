@@ -3,7 +3,7 @@
  *
  * Sections (top → bottom, mirrors `~/Downloads/livemetro/project/src/screens/main.jsx`):
  *   1. HomeTopBar       — date/time + greeting + bell (red dot when delays)
- *   2. ML hero          — MLHeroCard | CommutePredictionCard | placeholder
+ *   2. ML hero          — MLHeroCard | placeholder
  *   3. CommuteRouteCard — 오늘의 출근 경로 (visualised legs + facts grid)
  *   4. QuickActionsGrid — 경로검색 / 노선도 / 제보 / 증명서
  *   5. 주변 역           — horizontal scroll of NearbyStationCard
@@ -45,7 +45,6 @@ import { useCommuteRouteSummary } from '../../hooks/useCommuteRouteSummary';
 import { useFirestoreMorningCommute } from '../../hooks/useFirestoreMorningCommute';
 import { useRealtimeTrains } from '../../hooks/useRealtimeTrains';
 import { LoadingScreen } from '../../components/common/LoadingScreen';
-import { CommutePredictionCard } from '../../components/prediction';
 import {
   CommunityDelayCard,
   CommuteRouteCard,
@@ -579,46 +578,29 @@ export const HomeScreen: React.FC = () => {
     [navigation],
   );
 
-  const handleViewPredictions = useCallback((): void => {
-    if (!morningCommute) {
-      // Nested navigate into the Settings (Profile tab) stack. Note the
-      // route names match RootNavigator's actual registrations — outer
-      // stack is `Main` and the settings tab is `Profile` (which hosts
-      // SettingsNavigator). types.ts uses `MainTabs`/`Settings` aspirationally
-      // but they do not exist at runtime — see project_dual_stack_paramlist.
-      // The typed signature can't express two-arg nested navigation, so we
-      // cast the function once instead of poisoning the whole navigation prop.
-      const nestedNavigate = navigation.navigate as (
-        route: 'Main',
-        params: { screen: 'Profile'; params: { screen: 'CommuteSettings' } },
-      ) => void;
-      nestedNavigate('Main', {
-        screen: 'Profile',
-        params: { screen: 'CommuteSettings' },
-      });
-      return;
-    }
-    navigation.navigate('WeeklyPrediction');
-  }, [morningCommute, navigation]);
-
   const handleOpenPrediction = useCallback((): void => {
     navigation.navigate('WeeklyPrediction');
   }, [navigation]);
 
-  // "경로 변경" link on the real CommuteRouteCard. Unlike handleViewPredictions
-  // (which diverts to WeeklyPrediction once a commute exists), editing the
-  // route must ALWAYS land on CommuteSettings. Same nested-navigate cast as
-  // handleViewPredictions — types.ts MainTabs/Settings aliases don't exist at
-  // runtime (see project_dual_stack_paramlist).
-  const handleEditCommuteRoute = useCallback((): void => {
-    const nestedNavigate = navigation.navigate as (
-      route: 'Main',
-      params: { screen: 'Profile'; params: { screen: 'CommuteSettings' } },
-    ) => void;
-    nestedNavigate('Main', {
-      screen: 'Profile',
+  // Opens CommuteSettings (출퇴근 경로 등록/변경). Every "set up your commute"
+  // affordance funnels here regardless of whether a commute already exists:
+  //   - ML hero placeholder CTA ("지금 설정하기")
+  //   - CommuteRouteCard "경로 변경" link
+  //   - CommuteRouteCardPlaceholder "지금 설정하기" CTA
+  //
+  // HomeScreen lives inside the bottom-tab navigator, so `Profile` is a direct
+  // sibling route — navigate straight to it instead of bouncing up through the
+  // outer `Main` stack route (the prior `navigate('Main', { screen: 'Profile',
+  // ... })` form silently no-op'd at runtime when already on Main). types.ts
+  // MainTabs/Settings aliases don't exist at runtime (see
+  // project_dual_stack_paramlist), so the typed signature can't express this
+  // nested navigation — cast the function once.
+  const handleOpenCommuteSettings = useCallback((): void => {
+    const navigateToSettings = navigation.navigate as (
+      route: 'Profile',
       params: { screen: 'CommuteSettings' },
-    });
+    ) => void;
+    navigateToSettings('Profile', { screen: 'CommuteSettings' });
   }, [navigation]);
 
   const requestLocationPermission = useCallback(async (): Promise<void> => {
@@ -739,8 +721,12 @@ export const HomeScreen: React.FC = () => {
         onBellPress={onPressBell}
       />
 
-      {/* 2. ML hero — uses effectiveHero so dev preview shows the card even
-          before the ML model has trained on real ride history. */}
+      {/* 2. ML hero — MLHeroCard when a prediction is available, otherwise the
+          gradient placeholder. The placeholder shows whenever effectiveHero is
+          null (no ML prediction yet) — INCLUDING when a commute is registered
+          but the model hasn't trained on enough ride history. This keeps the
+          slot visually consistent (one gradient surface, not a separate white
+          progress card) and always surfaces a "set up commute" CTA. */}
       <View style={styles.heroWrap}>
         {effectiveHero ? (
           <MLHeroCard
@@ -752,10 +738,8 @@ export const HomeScreen: React.FC = () => {
             confidence={effectiveHero.confidence}
             onPress={handleOpenPrediction}
           />
-        ) : morningCommute ? (
-          <CommutePredictionCard onViewDetails={handleOpenPrediction} />
         ) : (
-          <MLHeroCardPlaceholder onPress={handleViewPredictions} />
+          <MLHeroCardPlaceholder onPress={handleOpenCommuteSettings} />
         )}
       </View>
 
@@ -779,11 +763,11 @@ export const HomeScreen: React.FC = () => {
             transferCount={effectiveRouteFacts.transferCount}
             stationCount={effectiveRouteFacts.stationCount}
             fareKrw={effectiveRouteFacts.fareKrw}
-            onPressEdit={handleEditCommuteRoute}
+            onPressEdit={handleOpenCommuteSettings}
             testID="home-commute-route-card"
           />
         ) : (
-          <CommuteRouteCardPlaceholder onPress={handleViewPredictions} />
+          <CommuteRouteCardPlaceholder onPress={handleOpenCommuteSettings} />
         )}
       </View>
 

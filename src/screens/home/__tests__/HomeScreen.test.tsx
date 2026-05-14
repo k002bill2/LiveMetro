@@ -434,11 +434,14 @@ describe('HomeScreen', () => {
       await waitFor(() => expect(getByTestId('home-top-bar')).toBeTruthy());
     });
 
-    it('shows CommutePredictionCard and Toast when morningCommute is set', async () => {
+    it('shows MLHeroCardPlaceholder and Toast when morningCommute is set but no prediction', async () => {
+      // Even with a commute registered, an unresolved ML prediction (default
+      // useMLPrediction mock returns prediction: null) keeps the ML slot on the
+      // gradient placeholder — one consistent surface, no separate white card.
       withMorningCommute();
       const { getByTestId } = render(<HomeScreen />);
       await waitFor(() => {
-        expect(getByTestId('prediction-card')).toBeTruthy();
+        expect(getByTestId('ml-hero-card-placeholder')).toBeTruthy();
         expect(getByTestId('toast')).toBeTruthy();
       });
     });
@@ -468,9 +471,8 @@ describe('HomeScreen', () => {
       );
 
       fireEvent.press(getByTestId('commute-route-card-placeholder'));
-      expect(mockNavigate).toHaveBeenCalledWith('Main', {
-        screen: 'Profile',
-        params: { screen: 'CommuteSettings' },
+      expect(mockNavigate).toHaveBeenCalledWith('Profile', {
+        screen: 'CommuteSettings',
       });
     });
 
@@ -507,9 +509,8 @@ describe('HomeScreen', () => {
       );
 
       fireEvent.press(getByTestId('commute-route-card-edit'));
-      expect(mockNavigate).toHaveBeenCalledWith('Main', {
-        screen: 'Profile',
-        params: { screen: 'CommuteSettings' },
+      expect(mockNavigate).toHaveBeenCalledWith('Profile', {
+        screen: 'CommuteSettings',
       });
     });
 
@@ -800,7 +801,7 @@ describe('HomeScreen', () => {
       expect(mockShowSuccess).not.toHaveBeenCalled();
     });
 
-    it('view details navigates to CommuteSettings when morningCommute is unset', async () => {
+    it('MLHeroCardPlaceholder press navigates to CommuteSettings when morningCommute is unset', async () => {
       // Reset the beforeEach override so the placeholder branch fires.
       const { useAuth } = require('@/services/auth/AuthContext');
       useAuth.mockImplementation(originalAuthImpl);
@@ -809,20 +810,26 @@ describe('HomeScreen', () => {
       await waitFor(() => expect(getByTestId('ml-hero-card-placeholder')).toBeTruthy());
 
       fireEvent.press(getByTestId('ml-hero-card-placeholder'));
-      expect(mockNavigate).toHaveBeenCalledWith('Main', {
-        screen: 'Profile',
-        params: { screen: 'CommuteSettings' },
+      expect(mockNavigate).toHaveBeenCalledWith('Profile', {
+        screen: 'CommuteSettings',
       });
       expect(mockShowInfo).not.toHaveBeenCalled();
     });
 
-    it('view details navigates to WeeklyPrediction when morningCommute is set', async () => {
-      // beforeEach already set morningCommute via withMorningCommute().
+    it('MLHeroCardPlaceholder press navigates to CommuteSettings when morningCommute is set', async () => {
+      // beforeEach already set morningCommute via withMorningCommute(). With a
+      // commute registered but no ML prediction, the ML slot still shows the
+      // placeholder — and its CTA must route to CommuteSettings (not
+      // WeeklyPrediction), so the "set up commute" affordance is consistent.
       const { getByTestId } = render(<HomeScreen />);
-      await waitFor(() => expect(getByTestId('view-details-btn')).toBeTruthy());
+      await waitFor(() =>
+        expect(getByTestId('ml-hero-card-placeholder')).toBeTruthy(),
+      );
 
-      fireEvent.press(getByTestId('view-details-btn'));
-      expect(mockNavigate).toHaveBeenCalledWith('WeeklyPrediction');
+      fireEvent.press(getByTestId('ml-hero-card-placeholder'));
+      expect(mockNavigate).toHaveBeenCalledWith('Profile', {
+        screen: 'CommuteSettings',
+      });
     });
   });
 
