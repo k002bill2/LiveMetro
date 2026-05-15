@@ -23,6 +23,7 @@ interface UseNearbyStationsOptions {
   radius?: number; // in meters
   maxStations?: number;
   minStations?: number; // Minimum stations for adaptive radius (default: 3)
+  maxRadius?: number; // Hard cap for adaptive expansion. Pass equal to `radius` to disable expansion entirely.
   autoUpdate?: boolean;
   minUpdateInterval?: number; // in milliseconds
   onStationsFound?: (stations: NearbyStation[]) => void;
@@ -39,6 +40,7 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
     radius = 600, // 600m default — 도심 환경에서 도보 7-8분 거리
     maxStations = 10,
     minStations = 3, // Adaptive radius: expand until this many found
+    maxRadius, // Hard cap for adaptive expansion (undefined = unbounded, original behaviour)
     autoUpdate = true,
     minUpdateInterval = 30000, // 30 seconds
     onStationsFound,
@@ -162,7 +164,8 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
         currentLocation,
         stations,
         radius,
-        minStations
+        minStations,
+        maxRadius
       );
       const nearbyStations = adaptiveResult.stations.slice(0, maxStations);
 
@@ -213,6 +216,7 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
     radius,
     maxStations,
     minStations,
+    maxRadius,
     minUpdateInterval,
     onStationsFound,
     onClosestStationChanged,

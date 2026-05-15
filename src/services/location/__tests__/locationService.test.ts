@@ -258,6 +258,93 @@ describe('LocationService', () => {
     });
   });
 
+  describe('findNearbyStationsAdaptive', () => {
+    const adaptiveLocation: LocationCoordinates = {
+      latitude: 37.5,
+      longitude: 127.0,
+    };
+
+    const makeStation = (id: string, latOffset: number): Station => ({
+      id,
+      name: id,
+      nameEn: id,
+      lineId: '2',
+      coordinates: { latitude: 37.5 + latOffset, longitude: 127.0 },
+      transfers: [],
+    });
+
+    // All three within 600m (0m / ~222m / ~445m)
+    const closeStations: Station[] = [
+      makeStation('near1', 0),
+      makeStation('near2', 0.002),
+      makeStation('near3', 0.004),
+    ];
+
+    // Spread out: 0m / ~890m / ~1334m — needs expansion to gather 3
+    const spreadStations: Station[] = [
+      makeStation('near1', 0),
+      makeStation('far1', 0.008),
+      makeStation('far2', 0.012),
+    ];
+
+    it('should not expand when minStations are found at the initial radius', () => {
+      const result = locationService.findNearbyStationsAdaptive(
+        adaptiveLocation,
+        closeStations,
+        600,
+        3
+      );
+
+      expect(result.stations).toHaveLength(3);
+      expect(result.effectiveRadius).toBe(600);
+      expect(result.expanded).toBe(false);
+    });
+
+    it('should expand through ADAPTIVE_RADIUS_STEPS when maxRadius is omitted', () => {
+      const result = locationService.findNearbyStationsAdaptive(
+        adaptiveLocation,
+        spreadStations,
+        600,
+        3
+      );
+
+      // Expands 600 -> 1000 -> 1500 until all 3 are gathered
+      expect(result.stations).toHaveLength(3);
+      expect(result.effectiveRadius).toBe(1500);
+      expect(result.expanded).toBe(true);
+    });
+
+    it('should not expand beyond maxRadius even if fewer than minStations are found', () => {
+      const result = locationService.findNearbyStationsAdaptive(
+        adaptiveLocation,
+        spreadStations,
+        500,
+        3,
+        500 // maxRadius cap — disables expansion
+      );
+
+      // Only near1 is within 500m; expansion is suppressed by the cap
+      expect(result.stations).toHaveLength(1);
+      expect(result.stations[0]?.id).toBe('near1');
+      expect(result.effectiveRadius).toBe(500);
+      expect(result.expanded).toBe(false);
+    });
+
+    it('should clamp initialRadius down to maxRadius when initialRadius is larger', () => {
+      const result = locationService.findNearbyStationsAdaptive(
+        adaptiveLocation,
+        spreadStations,
+        1000, // larger than the cap
+        3,
+        500 // maxRadius cap
+      );
+
+      expect(result.effectiveRadius).toBe(500);
+      expect(result.expanded).toBe(false);
+      expect(result.stations).toHaveLength(1);
+    });
+  });
+
   describe('getClosestStation', () => {
     it('should return the closest station', () => {
       // Location closer to Seolleung

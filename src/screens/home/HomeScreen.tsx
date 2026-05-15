@@ -366,7 +366,8 @@ export const HomeScreen: React.FC = () => {
     refresh: refreshNearby,
     closestStation: nearbyClosestStation,
   } = useNearbyStations({
-    radius: 1000,
+    radius: 500,
+    maxRadius: 500, // 도보권 역만 노출 — 적응형 확장 비활성화 (반경 고정)
     maxStations: 5,
     autoUpdate: true,
     minUpdateInterval: 30000,
