@@ -26,6 +26,7 @@ import { useTheme } from '@/services/theme';
 import SettingSection from '@/components/settings/SettingSection';
 import SettingToggle from '@/components/settings/SettingToggle';
 import SettingTimePicker from '@/components/settings/SettingTimePicker';
+import { isUsableCommuteTime } from '@/models/user';
 
 /** "HH:MM" → decimal hours (e.g., "08:30" → 8.5). Returns 0 on parse failure. */
 const parseTime = (t: string): number => {
@@ -79,6 +80,20 @@ export const NotificationTimeScreen: React.FC = () => {
   const handleMorningTimeChange = async (time: string): Promise<void> => {
     if (!user) return;
 
+    // Only update the departure time of an *existing usable* commute.
+    // Synthesizing a commute object here with `stationId: '' ` corrupts
+    // the profile — the empty object then shadows the real commute (saved
+    // to Firestore by onboarding) and breaks station lookups downstream.
+    const existingMorning =
+      user.preferences.commuteSchedule.weekdays?.morningCommute;
+    if (!isUsableCommuteTime(existingMorning)) {
+      Alert.alert(
+        '출근 경로 먼저 설정',
+        '출근 알림 시간을 바꾸려면 먼저 출근 경로를 등록해주세요.'
+      );
+      return;
+    }
+
     try {
       setSaving(true);
       await updateUserProfile({
@@ -88,12 +103,7 @@ export const NotificationTimeScreen: React.FC = () => {
             ...user.preferences.commuteSchedule,
             weekdays: {
               ...user.preferences.commuteSchedule.weekdays,
-              morningCommute: {
-                departureTime: time,
-                stationId: user.preferences.commuteSchedule.weekdays?.morningCommute?.stationId || '',
-                destinationStationId: user.preferences.commuteSchedule.weekdays?.morningCommute?.destinationStationId || '',
-                bufferMinutes: user.preferences.commuteSchedule.weekdays?.morningCommute?.bufferMinutes || 10,
-              },
+              morningCommute: { ...existingMorning, departureTime: time },
               eveningCommute: user.preferences.commuteSchedule.weekdays?.eveningCommute || null,
             },
           },
@@ -110,6 +120,18 @@ export const NotificationTimeScreen: React.FC = () => {
   const handleEveningTimeChange = async (time: string): Promise<void> => {
     if (!user) return;
 
+    // Same rule as the morning leg: only retime an existing usable commute,
+    // never synthesize one with empty-string station ids.
+    const existingEvening =
+      user.preferences.commuteSchedule.weekdays?.eveningCommute;
+    if (!isUsableCommuteTime(existingEvening)) {
+      Alert.alert(
+        '퇴근 경로 먼저 설정',
+        '퇴근 알림 시간을 바꾸려면 먼저 퇴근 경로를 등록해주세요.'
+      );
+      return;
+    }
+
     try {
       setSaving(true);
       await updateUserProfile({
@@ -119,12 +141,7 @@ export const NotificationTimeScreen: React.FC = () => {
             ...user.preferences.commuteSchedule,
             weekdays: {
               morningCommute: user.preferences.commuteSchedule.weekdays?.morningCommute || null,
-              eveningCommute: {
-                departureTime: time,
-                stationId: user.preferences.commuteSchedule.weekdays?.eveningCommute?.stationId || '',
-                destinationStationId: user.preferences.commuteSchedule.weekdays?.eveningCommute?.destinationStationId || '',
-                bufferMinutes: user.preferences.commuteSchedule.weekdays?.eveningCommute?.bufferMinutes || 10,
-              },
+              eveningCommute: { ...existingEvening, departureTime: time },
             },
           },
         },

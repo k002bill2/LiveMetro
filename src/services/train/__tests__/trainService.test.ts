@@ -232,6 +232,18 @@ describe('TrainService', () => {
       expect(result).not.toBeNull();
       expect(mockGetLocalStation).toHaveBeenCalledWith('gangnam');
     });
+
+    it('returns null without touching Firestore when stationId is empty', async () => {
+      // An empty stationId reaches getStation when a profile carries a
+      // corrupt morningCommute ({ stationId: '' }). `doc(firestore,
+      // 'stations', '')` throws "Document references must have an even
+      // number of segments" — guard before it ever gets there.
+      const result = await trainService.getStation('');
+
+      expect(result).toBeNull();
+      expect(mockGetDoc).not.toHaveBeenCalled();
+      expect(mockGetLocalStation).not.toHaveBeenCalled();
+    });
   });
 
   describe('subscribeToTrainUpdates', () => {
