@@ -613,12 +613,22 @@ export const HomeScreen: React.FC = () => {
   // MainTabs/Settings aliases don't exist at runtime (see
   // project_dual_stack_paramlist), so the typed signature can't express this
   // nested navigation — cast the function once.
+  //
+  // `initial: false` is load-bearing: without it, navigating into an unmounted
+  // SettingsNavigator makes `CommuteSettings` that stack's *only* (initial)
+  // entry — `SettingsHome` is dropped. The bottom-tab keeps each tab's stack,
+  // so the "나" tab then shows CommuteSettings permanently, and the screen's
+  // `canGoBack()`-guarded save can never pop back. With `initial: false` the
+  // stack is seeded as [SettingsHome, CommuteSettings] instead.
   const handleOpenCommuteSettings = useCallback((): void => {
     const navigateToSettings = navigation.navigate as (
       route: 'Profile',
-      params: { screen: 'CommuteSettings' },
+      params: { screen: 'CommuteSettings'; initial: false },
     ) => void;
-    navigateToSettings('Profile', { screen: 'CommuteSettings' });
+    navigateToSettings('Profile', {
+      screen: 'CommuteSettings',
+      initial: false,
+    });
   }, [navigation]);
 
   const requestLocationPermission = useCallback(async (): Promise<void> => {

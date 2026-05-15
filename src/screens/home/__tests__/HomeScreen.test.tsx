@@ -473,6 +473,7 @@ describe('HomeScreen', () => {
       fireEvent.press(getByTestId('commute-route-card-placeholder'));
       expect(mockNavigate).toHaveBeenCalledWith('Profile', {
         screen: 'CommuteSettings',
+        initial: false,
       });
     });
 
@@ -511,6 +512,7 @@ describe('HomeScreen', () => {
       fireEvent.press(getByTestId('commute-route-card-edit'));
       expect(mockNavigate).toHaveBeenCalledWith('Profile', {
         screen: 'CommuteSettings',
+        initial: false,
       });
     });
 
@@ -842,6 +844,7 @@ describe('HomeScreen', () => {
       fireEvent.press(getByTestId('ml-hero-card-placeholder'));
       expect(mockNavigate).toHaveBeenCalledWith('Profile', {
         screen: 'CommuteSettings',
+        initial: false,
       });
       expect(mockShowInfo).not.toHaveBeenCalled();
     });
@@ -859,6 +862,7 @@ describe('HomeScreen', () => {
       fireEvent.press(getByTestId('ml-hero-card-placeholder'));
       expect(mockNavigate).toHaveBeenCalledWith('Profile', {
         screen: 'CommuteSettings',
+        initial: false,
       });
     });
   });
