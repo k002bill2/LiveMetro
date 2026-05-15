@@ -85,7 +85,7 @@ export const NotificationTimeScreen: React.FC = () => {
     // the profile — the empty object then shadows the real commute (saved
     // to Firestore by onboarding) and breaks station lookups downstream.
     const existingMorning =
-      user.preferences.commuteSchedule.weekdays?.morningCommute;
+      user.preferences.commuteSchedule?.weekdays?.morningCommute;
     if (!isUsableCommuteTime(existingMorning)) {
       Alert.alert(
         '출근 경로 먼저 설정',
@@ -102,9 +102,9 @@ export const NotificationTimeScreen: React.FC = () => {
           commuteSchedule: {
             ...user.preferences.commuteSchedule,
             weekdays: {
-              ...user.preferences.commuteSchedule.weekdays,
+              ...user.preferences.commuteSchedule?.weekdays,
               morningCommute: { ...existingMorning, departureTime: time },
-              eveningCommute: user.preferences.commuteSchedule.weekdays?.eveningCommute || null,
+              eveningCommute: user.preferences.commuteSchedule?.weekdays?.eveningCommute || null,
             },
           },
         },
@@ -123,7 +123,7 @@ export const NotificationTimeScreen: React.FC = () => {
     // Same rule as the morning leg: only retime an existing usable commute,
     // never synthesize one with empty-string station ids.
     const existingEvening =
-      user.preferences.commuteSchedule.weekdays?.eveningCommute;
+      user.preferences.commuteSchedule?.weekdays?.eveningCommute;
     if (!isUsableCommuteTime(existingEvening)) {
       Alert.alert(
         '퇴근 경로 먼저 설정',
@@ -140,7 +140,7 @@ export const NotificationTimeScreen: React.FC = () => {
           commuteSchedule: {
             ...user.preferences.commuteSchedule,
             weekdays: {
-              morningCommute: user.preferences.commuteSchedule.weekdays?.morningCommute || null,
+              morningCommute: user.preferences.commuteSchedule?.weekdays?.morningCommute || null,
               eveningCommute: { ...existingEvening, departureTime: time },
             },
           },
