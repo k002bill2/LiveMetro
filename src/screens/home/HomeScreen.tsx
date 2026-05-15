@@ -68,6 +68,7 @@ import {
 import { useTheme } from '../../services/theme';
 
 import { Station } from '../../models/train';
+import { isUsableCommuteTime } from '../../models/user';
 import { AppStackParamList } from '../../navigation/types';
 
 /**
@@ -391,10 +392,15 @@ export const HomeScreen: React.FC = () => {
   //      on the profile and the CommuteRouteCard never rendered.
   //
   // The hook below adapts store #2 to the same `CommuteTime` shape so the
-  // resolution is a simple `?? fallback`. Profile (#1) wins when both exist.
+  // resolution is a simple `?? fallback`. Profile (#1) wins only when it is
+  // actually usable — NotificationTimeScreen can leave a non-null
+  // morningCommute with empty-string station ids, and a plain `??` would
+  // let that empty object shadow the valid onboarding data.
   const onboardingMorningCommute = useFirestoreMorningCommute(user?.id);
+  const profileMorningCommute =
+    user?.preferences.commuteSchedule?.weekdays?.morningCommute;
   const morningCommute =
-    user?.preferences.commuteSchedule?.weekdays?.morningCommute ??
+    (isUsableCommuteTime(profileMorningCommute) ? profileMorningCommute : null) ??
     onboardingMorningCommute;
 
   const routeSummary = useCommuteRouteSummary(

@@ -74,6 +74,7 @@ import {
   type PredictedCommute,
 } from '@/models/pattern';
 import { directionToDisplay, type Direction } from '@/models/route';
+import { isUsableCommuteTime } from '@/models/user';
 
 const formatTimeShort = (now: Date = new Date()): string => {
   const h = now.getHours();
@@ -136,7 +137,13 @@ export const WeeklyPredictionScreen: React.FC = () => {
   const { user } = useAuth();
 
   // Origin/destination 이름 lookup — HomeScreen과 동일 패턴.
-  const morningCommute = user?.preferences.commuteSchedule?.weekdays?.morningCommute;
+  // 프로필의 morningCommute는 station id가 빈 문자열인 채로 non-null일 수
+  // 있어 (NotificationTimeScreen 합성), 사용 가능할 때만 채택한다.
+  const profileMorningCommute =
+    user?.preferences.commuteSchedule?.weekdays?.morningCommute;
+  const morningCommute = isUsableCommuteTime(profileMorningCommute)
+    ? profileMorningCommute
+    : null;
   const [routeNames, setRouteNames] = useState<{ origin?: string; destination?: string }>({});
 
   useEffect(() => {

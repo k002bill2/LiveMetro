@@ -170,3 +170,6 @@ PR_BODY_TMP.md
 
 # Superpowers brainstorm visual companion sessions
 /.superpowers/
+
+# Playwright MCP test artifacts (snapshots, console logs)
+/.playwright-mcp/

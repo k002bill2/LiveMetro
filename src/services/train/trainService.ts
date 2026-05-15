@@ -102,6 +102,13 @@ class TrainService {
    * Falls back to local data if not found in Firebase
    */
   async getStation(stationId: string): Promise<Station | null> {
+    // An empty/falsy stationId would make `doc(firestore, 'stations', '')`
+    // throw "Document references must have an even number of segments".
+    // This happens when a profile carries a corrupt commute row — guard
+    // here so callers get a clean null instead of a thrown FirebaseError.
+    if (!stationId) {
+      return null;
+    }
     try {
       // Try Firebase first
       const stationDoc = await getDoc(doc(firestore, 'stations', stationId));

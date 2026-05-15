@@ -150,6 +150,19 @@ export interface CommuteTime {
   readonly bufferMinutes: number;
 }
 
+/**
+ * A `CommuteTime` is only usable for route lookup when both endpoints are
+ * actually present. Profiles can carry a non-null `morningCommute` with
+ * empty-string station ids (NotificationTimeScreen used to synthesize one
+ * via `?.stationId || ''` when the profile had no commute), so a plain
+ * `value ?? fallback` is not enough — the empty object wins the `??` and
+ * `getStation('')` then fails. Callers should gate on this instead.
+ */
+export const isUsableCommuteTime = (
+  ct: CommuteTime | null | undefined
+): ct is CommuteTime =>
+  !!ct && !!ct.stationId && !!ct.destinationStationId;
+
 export enum SubscriptionStatus {
   FREE = 'free',
   PREMIUM = 'premium',

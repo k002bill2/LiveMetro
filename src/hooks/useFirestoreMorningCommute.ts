@@ -47,6 +47,23 @@ export function useFirestoreMorningCommute(
         !morning.arrivalStationId ||
         !morning.departureTime
       ) {
+        // A document exists but the morning leg is incomplete — log loudly
+        // so this stops being a silent null. Most often this means the
+        // commute was saved under a different uid than the one reading it.
+        if (settings) {
+          // Log which fields are missing (presence only — never the values,
+          // a commute route is user data) so this stops being a silent null.
+          console.warn(
+            '[useFirestoreMorningCommute] commute document found but morning ' +
+              'route is incomplete — falling back to null',
+            {
+              hasMorning: !!morning,
+              hasDepartureStationId: !!morning?.departureStationId,
+              hasArrivalStationId: !!morning?.arrivalStationId,
+              hasDepartureTime: !!morning?.departureTime,
+            },
+          );
+        }
         setValue(null);
         return;
       }

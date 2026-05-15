@@ -3,8 +3,16 @@
  * Handles Firebase Web SDK setup with environment variables
  */
 
+import { Platform } from 'react-native';
 import { initializeApp, FirebaseApp } from 'firebase/app';
-import { getAuth, Auth } from 'firebase/auth';
+import {
+  initializeAuth,
+  getAuth,
+  getReactNativePersistence,
+  browserLocalPersistence,
+  Auth,
+} from 'firebase/auth';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getFirestore, Firestore } from 'firebase/firestore';
 import { getFunctions, Functions } from 'firebase/functions';
 
@@ -34,8 +42,47 @@ export const firebaseConfig: FirebaseConfig = {
 // Initialize Firebase
 const app: FirebaseApp = initializeApp(firebaseConfig);
 
+/**
+ * Initialize Auth with platform-appropriate persistence so the session
+ * survives app restarts.
+ *
+ * Without explicit persistence the user is silently dropped on every
+ * relaunch and a fresh anonymous UID is created, orphaning all per-uid
+ * Firestore data (commute settings, favorites, ML history, profile).
+ *
+ * Persistence differs by platform:
+ *   - native: `getReactNativePersistence(AsyncStorage)` — this function
+ *     exists only in firebase's native bundle.
+ *   - web (Expo web): `firebase/auth` resolves to the browser bundle
+ *     where `getReactNativePersistence` is undefined, so calling it
+ *     throws. Use Firebase's own `browserLocalPersistence` (localStorage).
+ * The ternary short-circuits, so the native-only function is never
+ * evaluated on web.
+ *
+ * `initializeAuth` may only run once per app; it throws if Auth was
+ * already initialized (Fast Refresh / test module re-evaluation). In
+ * that case `getAuth` returns the existing instance — already wired
+ * with persistence — so the fallback is equivalent, not degraded.
+ */
+let authInstance: Auth;
+try {
+  authInstance = initializeAuth(app, {
+    persistence:
+      Platform.OS === 'web'
+        ? browserLocalPersistence
+        : getReactNativePersistence(AsyncStorage),
+  });
+} catch (e) {
+  // Auth was already initialized for this app (Fast Refresh / test module
+  // re-evaluation) — reuse the existing instance, which keeps its
+  // persistence. Any other failure also degrades to a working (if
+  // in-memory) auth rather than crashing app startup.
+  console.warn('[firebase] initializeAuth failed, falling back to getAuth:', e);
+  authInstance = getAuth(app);
+}
+
 // Initialize Firebase services
-export const auth: Auth = getAuth(app);
+export const auth: Auth = authInstance;
 export const firestore: Firestore = getFirestore(app);
 export const functions: Functions = getFunctions(app, 'asia-northeast3'); // Seoul region
 
