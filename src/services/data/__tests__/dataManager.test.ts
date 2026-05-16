@@ -705,5 +705,32 @@ describe('DataManager', () => {
       expect(data?.trains).toHaveLength(1);
       expect(data?.trains[0]?.id).toContain('2002');
     });
+
+    // Guide (2026-05-16) item #8 wiring: convertSeoulToTrain must preserve
+    // trainType so UI can branch on 일반/급행/특급. Prior to this fix the
+    // field was silently dropped because Train interface had no slot for it.
+    it('A3: convertSeoulToTrain preserves trainType from convertToAppTrain', async () => {
+      mockSeoulApi.getRealtimeArrival.mockResolvedValue([
+        {
+          rowNum: '1', selectedCount: '1', totalCount: '1',
+          subwayId: '1009', updnLine: '상행', trainLineNm: '급행',
+          subwayHeading: '내선', statnFid: '0901', statnTid: '0903',
+          statnId: '0902', statnNm: '노량진', trainCo: '서울교통공사',
+          ordkey: '00001', subwayList: '1009', statnList: '0902',
+          btrainSttus: '급행', barvlDt: '120', btrainNo: '9001',
+          bstatnId: '0918', bstatnNm: '중앙보훈병원', recptnDt: '2026-04-26 14:00:00',
+          arvlMsg2: '2분 후 도착', arvlMsg3: '노량진역', arvlCd: '99',
+        },
+      ]);
+      mockSeoulApi.convertToAppTrain.mockReturnValue({
+        lineId: '9', stationId: '0902', stationName: '노량진',
+        direction: 'up', arrivalMessage: '2분 후 도착', arrivalTime: 120,
+        trainNumber: '9001', destinationStation: '중앙보훈병원',
+        trainType: 'express', lastUpdated: new Date(),
+      });
+
+      const data = await dataManager.getRealtimeTrains('노량진');
+      expect(data?.trains[0]?.trainType).toBe('express');
+    });
   });
 });

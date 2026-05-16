@@ -341,6 +341,7 @@ class DataManager {
       status: TrainStatus.NORMAL,
       lastUpdated: info.lastUpdated,
       delayMinutes: 0,
+      trainType: arrival.trainType,
     }));
 
     return {
@@ -503,6 +504,7 @@ class DataManager {
       status: TrainStatus.NORMAL,
       lastUpdated: converted.lastUpdated,
       delayMinutes: 0, // Seoul API doesn't provide schedule deviation; use detectDelays() separately
+      trainType: converted.trainType,
     };
   }
 
