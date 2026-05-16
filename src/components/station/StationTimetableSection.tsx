@@ -3,25 +3,30 @@
  *
  * 가이드(2026-05-16) #7 follow-up: 시간표 surface를 StationDetailScreen에
  * 다시 추가. Phase 7 Wanted rewrite에서 시간표 tab이 제거된 이후 첫차/
- * 막차 정보가 사용자에게 도달하지 않았음. 본 컴포넌트는 그 minimum-viable
+ * 막차 정보가 사용자에게 도달하지 않았음. 본 컴포넌트는 minimum-viable
  * 복원 — 헤더에 "오늘의 첫차 · 막차"를 노출해 사용자가 운행 가능성을
  * 빠르게 판단할 수 있게 한다.
  *
- * Scope:
- *   - 오늘(자동 감지) 기준 첫차/막차 시각만 표시
- *   - dayType(평일/토요일/일요일·공휴일) 라벨은 현재 자동 감지 결과
- *     batch — 사용자 전환 tab은 follow-up phase
- *   - 전체 시간표 그리드 + 다음 출발 highlight는 별도 화면(follow-up)
+ * Scope (F3.1 update — dayType 사용자 전환 tab 추가):
+ *   - dayType 3-segment tab (평일/토요일/일요일·공휴일) — 기본은 오늘
+ *     자동 감지, 사용자 전환 가능
+ *   - 선택된 dayType 기준 첫차/막차 시각 표시
+ *   - 전체 시간표 그리드 + 방면 chip은 별도 PR (F3.2, F3.3)
  *
  * 직접 부모(StationDetailScreen)에서 isFocused gating으로 hook을 가드해
  * 비활성 화면 폴링 회피 (memory: [비활성 화면 폴링 게이팅]).
  */
 
 import { Clock } from 'lucide-react-native';
-import React, { memo, useMemo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { memo, useCallback, useMemo, useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import { useTrainSchedule, getFirstTrain, getLastTrain } from '@/hooks/useTrainSchedule';
+import {
+  useTrainSchedule,
+  getFirstTrain,
+  getLastTrain,
+  type DayTypeOverride,
+} from '@/hooks/useTrainSchedule';
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme/themeContext';
 
@@ -38,12 +43,6 @@ export interface StationTimetableSectionProps {
   readonly testID?: string;
 }
 
-const DAY_TYPE_LABEL: Record<'weekday' | 'saturday' | 'holiday', string> = {
-  weekday: '평일',
-  saturday: '토요일',
-  holiday: '일요일·공휴일',
-};
-
 const directionToCode = (d: 'up' | 'down'): '1' | '2' => (d === 'up' ? '1' : '2');
 
 // "HH:MM:SS" → "HH:MM" — sub-text에 초 정밀도는 noise
@@ -53,26 +52,52 @@ const trimSeconds = (time: string): string => {
   return `${parts[0]}:${parts[1]}`;
 };
 
+// dayType tab segments. 'auto'는 UI에서 노출 안 함 — 초기 상태일 뿐.
+const TAB_SEGMENTS: ReadonlyArray<{ key: Exclude<DayTypeOverride, 'auto'>; label: string }> = [
+  { key: 'weekday', label: '평일' },
+  { key: 'saturday', label: '토요일' },
+  { key: 'holiday', label: '일요일·공휴일' },
+];
+
+// 자동 감지된 dayType('weekday'/'saturday'/'holiday')를 사용자 선택 초기값으로 변환
+const detectInitialDayType = (now: Date = new Date()): Exclude<DayTypeOverride, 'auto'> => {
+  const day = now.getDay();
+  // 공휴일은 hook 내부 isKoreanHoliday로 추가 분기되지만, 초기 tab은 요일 기반으로 만들어 두고
+  // hook의 첫 fetch가 정확한 dayType을 schedules에 채워 넣음 (item.dayType 신호로 보정 가능)
+  if (day === 6) return 'saturday';
+  if (day === 0) return 'holiday';
+  return 'weekday';
+};
+
 export const StationTimetableSection: React.FC<StationTimetableSectionProps> = memo(
   ({ stationName, lineId, direction, enabled, testID }) => {
     const { isDark } = useTheme();
     const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+
+    // 사용자가 선택한 dayType. 초기값은 오늘 요일 자동 감지 결과 — useState
+    // initializer 함수로 mount 시 1회만 평가.
+    const [selectedDayType, setSelectedDayType] = useState<Exclude<DayTypeOverride, 'auto'>>(
+      detectInitialDayType,
+    );
+
+    const handleSelectDayType = useCallback((key: Exclude<DayTypeOverride, 'auto'>) => {
+      setSelectedDayType(key);
+    }, []);
 
     const { schedules, loading, error } = useTrainSchedule({
       stationName,
       lineNumber: lineId,
       direction: directionToCode(direction),
       enabled,
+      dayType: selectedDayType,
     });
 
-    const { firstLabel, lastLabel, dayTypeLabel } = useMemo(() => {
+    const { firstLabel, lastLabel } = useMemo(() => {
       const first = getFirstTrain(schedules);
       const last = getLastTrain(schedules);
-      const dayType = first?.dayType ?? last?.dayType;
       return {
         firstLabel: first ? trimSeconds(first.arrivalTime) : null,
         lastLabel: last ? trimSeconds(last.arrivalTime) : null,
-        dayTypeLabel: dayType ? DAY_TYPE_LABEL[dayType] : null,
       };
     }, [schedules]);
 
@@ -86,20 +111,39 @@ export const StationTimetableSection: React.FC<StationTimetableSectionProps> = m
           >
             시간표
           </Text>
-          {dayTypeLabel && (
-            <View
-              style={[
-                styles.dayTypePill,
-                { backgroundColor: semantic.bgSubtle },
-              ]}
-            >
-              <Text
-                style={[styles.dayTypeText, { color: semantic.labelNeutral }]}
+        </View>
+
+        {/* dayType 3-segment tab — 이미지 디자인의 평일/토요일/일요일·공휴일 */}
+        <View
+          style={[styles.tabRow, { backgroundColor: semantic.bgSubtle }]}
+          accessibilityRole="tablist"
+        >
+          {TAB_SEGMENTS.map(({ key, label }) => {
+            const isSelected = key === selectedDayType;
+            return (
+              <Pressable
+                key={key}
+                style={[
+                  styles.tabPill,
+                  isSelected && [styles.tabPillSelected, { backgroundColor: semantic.bgBase }],
+                ]}
+                onPress={() => handleSelectDayType(key)}
+                accessibilityRole="tab"
+                accessibilityState={{ selected: isSelected }}
+                accessibilityLabel={label}
+                testID={testID ? `${testID}-tab-${key}` : undefined}
               >
-                {dayTypeLabel}
-              </Text>
-            </View>
-          )}
+                <Text
+                  style={[
+                    styles.tabText,
+                    { color: isSelected ? semantic.labelStrong : semantic.labelAlt },
+                  ]}
+                >
+                  {label}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
 
         {loading && schedules.length === 0 ? (
@@ -156,14 +200,31 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontFamily: weightToFontFamily('700'),
   },
-  dayTypePill: {
-    paddingHorizontal: WANTED_TOKENS.spacing.s2,
-    paddingVertical: 2,
-    borderRadius: 8,
+  tabRow: {
+    flexDirection: 'row',
+    borderRadius: 12,
+    padding: 4,
+    gap: 4,
   },
-  dayTypeText: {
-    fontSize: WANTED_TOKENS.type.caption1.size,
-    lineHeight: WANTED_TOKENS.type.caption1.lh,
+  tabPill: {
+    flex: 1,
+    paddingVertical: WANTED_TOKENS.spacing.s2,
+    paddingHorizontal: WANTED_TOKENS.spacing.s3,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tabPillSelected: {
+    // 선택 상태는 인라인 backgroundColor + shadow로 강조 (이미지 디자인의 흰 카드 효과)
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowOffset: { width: 0, height: 1 },
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  tabText: {
+    fontSize: WANTED_TOKENS.type.label1.size,
+    lineHeight: WANTED_TOKENS.type.label1.lh,
     fontWeight: '600',
     fontFamily: weightToFontFamily('600'),
   },

@@ -1,24 +1,24 @@
 /**
  * StationTimetableSection Tests
  *
- * Covers: header render, loading state, error state, first/last train
- * surfacing, dayType pill, empty schedule fallback, dark/light theme.
+ * Covers: header render, dayType 3-segment tab(평일/토요일/일요일·공휴일),
+ * tab 선택 시 hook 재호출, loading/error/empty 상태, first/last train surfacing.
+ *
+ * dayType tab은 이미지 디자인(2026-05-17)을 따름 — 사용자가 요일을
+ * 직접 전환하면 useTrainSchedule이 새 weekTag로 재요청.
  */
 
-import { render } from '@testing-library/react-native';
+import { fireEvent, render } from '@testing-library/react-native';
 import React from 'react';
 
 import type { TrainScheduleItem, UseTrainScheduleResult } from '@/hooks/useTrainSchedule';
-
-import { StationTimetableSection } from '../StationTimetableSection';
 
 // useTheme - 다른 station 테스트와 동일 패턴 (memory: [useTheme 두 경로 mock])
 jest.mock('@/services/theme/themeContext', () => ({
   useTheme: () => ({ isDark: false }),
 }));
 
-// useTrainSchedule mock — 기본은 빈 결과. 각 it에서 mockReturnValueOnce로 override.
-// 글로벌 setup이 useTrainSchedule을 mock하지 않아 자체 mock 필요.
+// useTrainSchedule mock — 기본은 빈 결과. 각 it에서 mockReturnValue로 override.
 const mockUseTrainSchedule = jest.fn();
 jest.mock('@/hooks/useTrainSchedule', () => ({
   __esModule: true,
@@ -48,6 +48,8 @@ jest.mock('react-native-svg', () => {
     Stop: View,
   };
 });
+
+import { StationTimetableSection } from '../StationTimetableSection';
 
 const makeScheduleItem = (overrides: Partial<TrainScheduleItem> = {}): TrainScheduleItem => ({
   trainNumber: 'T-001',
@@ -90,44 +92,79 @@ describe('StationTimetableSection', () => {
       expect(getByText('시간표')).toBeTruthy();
     });
 
-    it('renders 평일 pill when first schedule has weekday dayType', () => {
-      mockUseTrainSchedule.mockReturnValue(
-        makeHookResult({
-          schedules: [makeScheduleItem({ dayType: 'weekday', arrivalTime: '05:31:00' })],
-        })
-      );
+    it('exposes 시간표 as header role', () => {
+      const { getByRole } = render(<StationTimetableSection {...defaultProps} />);
+      expect(getByRole('header')).toBeTruthy();
+    });
+  });
 
+  describe('dayType tab segments', () => {
+    it('renders all three tab labels regardless of data', () => {
       const { getByText } = render(<StationTimetableSection {...defaultProps} />);
       expect(getByText('평일')).toBeTruthy();
-    });
-
-    it('renders 토요일 pill when first schedule has saturday dayType', () => {
-      mockUseTrainSchedule.mockReturnValue(
-        makeHookResult({
-          schedules: [makeScheduleItem({ dayType: 'saturday', arrivalTime: '05:50:00' })],
-        })
-      );
-
-      const { getByText } = render(<StationTimetableSection {...defaultProps} />);
       expect(getByText('토요일')).toBeTruthy();
-    });
-
-    it('renders 일요일·공휴일 pill when first schedule has holiday dayType', () => {
-      mockUseTrainSchedule.mockReturnValue(
-        makeHookResult({
-          schedules: [makeScheduleItem({ dayType: 'holiday', arrivalTime: '06:00:00' })],
-        })
-      );
-
-      const { getByText } = render(<StationTimetableSection {...defaultProps} />);
       expect(getByText('일요일·공휴일')).toBeTruthy();
     });
 
-    it('hides dayType pill when no schedule data available', () => {
-      const { queryByText } = render(<StationTimetableSection {...defaultProps} />);
-      expect(queryByText('평일')).toBeNull();
-      expect(queryByText('토요일')).toBeNull();
-      expect(queryByText('일요일·공휴일')).toBeNull();
+    it('exposes tablist role with 3 tabs', () => {
+      const { getAllByRole } = render(<StationTimetableSection {...defaultProps} />);
+      const tabs = getAllByRole('tab');
+      expect(tabs).toHaveLength(3);
+    });
+
+    it('renders all tab testIDs when testID prop given', () => {
+      const { getByTestId } = render(
+        <StationTimetableSection {...defaultProps} testID="t" />
+      );
+      expect(getByTestId('t-tab-weekday')).toBeTruthy();
+      expect(getByTestId('t-tab-saturday')).toBeTruthy();
+      expect(getByTestId('t-tab-holiday')).toBeTruthy();
+    });
+
+    it('marks exactly one tab as selected via accessibilityState', () => {
+      const { getAllByRole } = render(<StationTimetableSection {...defaultProps} />);
+      const tabs = getAllByRole('tab');
+      const selectedCount = tabs.filter(
+        (tab) => tab.props.accessibilityState?.selected === true
+      ).length;
+      expect(selectedCount).toBe(1);
+    });
+
+    it('switches selection when user presses 토요일 tab', () => {
+      const { getByTestId } = render(
+        <StationTimetableSection {...defaultProps} testID="t" />
+      );
+      const saturdayTab = getByTestId('t-tab-saturday');
+      fireEvent.press(saturdayTab);
+      expect(saturdayTab.props.accessibilityState?.selected).toBe(true);
+    });
+
+    it('re-invokes useTrainSchedule with new dayType after tab press', () => {
+      const { getByTestId } = render(
+        <StationTimetableSection {...defaultProps} testID="t" />
+      );
+
+      fireEvent.press(getByTestId('t-tab-holiday'));
+
+      // 마지막 호출은 사용자 선택 dayType='holiday'로 들어가야 함
+      const lastCall = mockUseTrainSchedule.mock.calls.at(-1)?.[0];
+      expect(lastCall?.dayType).toBe('holiday');
+    });
+
+    it('switches between all three tabs preserving last selection', () => {
+      const { getByTestId } = render(
+        <StationTimetableSection {...defaultProps} testID="t" />
+      );
+      fireEvent.press(getByTestId('t-tab-saturday'));
+      fireEvent.press(getByTestId('t-tab-holiday'));
+      fireEvent.press(getByTestId('t-tab-weekday'));
+
+      const lastCall = mockUseTrainSchedule.mock.calls.at(-1)?.[0];
+      expect(lastCall?.dayType).toBe('weekday');
+      // 다른 두 tab은 unselected 상태
+      expect(getByTestId('t-tab-saturday').props.accessibilityState?.selected).toBe(false);
+      expect(getByTestId('t-tab-holiday').props.accessibilityState?.selected).toBe(false);
+      expect(getByTestId('t-tab-weekday').props.accessibilityState?.selected).toBe(true);
     });
   });
 
@@ -181,7 +218,7 @@ describe('StationTimetableSection', () => {
   });
 
   describe('Hook integration', () => {
-    it('passes stationName, lineNumber, direction code, and enabled to useTrainSchedule', () => {
+    it('passes stationName, lineNumber, direction code, enabled, and dayType to useTrainSchedule', () => {
       render(
         <StationTimetableSection
           stationName="서울대입구"
@@ -191,13 +228,17 @@ describe('StationTimetableSection', () => {
         />
       );
 
-      expect(mockUseTrainSchedule).toHaveBeenCalledWith({
-        stationName: '서울대입구',
-        lineNumber: '2',
-        // 'down' → '2' (하행/외선)
-        direction: '2',
-        enabled: true,
-      });
+      expect(mockUseTrainSchedule).toHaveBeenCalledWith(
+        expect.objectContaining({
+          stationName: '서울대입구',
+          lineNumber: '2',
+          direction: '2', // 'down' → '2' (하행/외선)
+          enabled: true,
+          // dayType은 today(TZ 의존)에 따라 weekday/saturday/holiday — 정확 값
+          // 대신 union membership 검증으로 CI flakiness 회피
+          dayType: expect.stringMatching(/^(weekday|saturday|holiday)$/),
+        })
+      );
     });
 
     it('disables hook when parent screen is unfocused (enabled=false)', () => {
@@ -224,11 +265,6 @@ describe('StationTimetableSection', () => {
   });
 
   describe('Accessibility', () => {
-    it('exposes 시간표 as header role', () => {
-      const { getByRole } = render(<StationTimetableSection {...defaultProps} />);
-      expect(getByRole('header')).toBeTruthy();
-    });
-
     it('forwards testID to root container', () => {
       const { getByTestId } = render(
         <StationTimetableSection {...defaultProps} testID="my-tt" />
@@ -248,6 +284,13 @@ describe('StationTimetableSection', () => {
 
       const { getByLabelText } = render(<StationTimetableSection {...defaultProps} />);
       expect(getByLabelText('첫차 05:31, 막차 00:21')).toBeTruthy();
+    });
+
+    it('exposes each tab with accessibilityLabel matching its display text', () => {
+      const { getByLabelText } = render(<StationTimetableSection {...defaultProps} />);
+      expect(getByLabelText('평일')).toBeTruthy();
+      expect(getByLabelText('토요일')).toBeTruthy();
+      expect(getByLabelText('일요일·공휴일')).toBeTruthy();
     });
   });
 });
