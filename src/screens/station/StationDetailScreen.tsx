@@ -42,6 +42,7 @@ import { StationDetailHeader } from '@/components/station/StationDetailHeader';
 import { DirectionSegment } from '@/components/station/DirectionSegment';
 import { ArrivalCard } from '@/components/station/ArrivalCard';
 import { ExitInfoGrid } from '@/components/station/ExitInfoGrid';
+import { StationTimetableSection } from '@/components/station/StationTimetableSection';
 import { CongestionLevel } from '@/models/congestion';
 import type { Station, Train } from '@/models/train';
 import type { LineId } from '@/components/design';
@@ -331,6 +332,14 @@ const StationDetailScreen: React.FC = () => {
           ))
         )}
       </View>
+
+      <StationTimetableSection
+        stationName={stationName}
+        lineId={lineId}
+        direction={direction}
+        enabled={isFocused}
+        testID="station-detail-timetable"
+      />
 
       <View style={styles.sectionHeaderWrap}>
         <Text style={[styles.sectionHeader, { color: semantic.labelStrong }]}>
