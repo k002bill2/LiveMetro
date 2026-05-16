@@ -55,6 +55,16 @@ type DirectionCode = '1' | '2';
 /** 요일 구분 코드 */
 type WeekTagCode = '1' | '2' | '3';
 
+/**
+ * dayType 사용자 override.
+ * - 'auto' (default): 현재 요일 자동 감지 (공휴일 → holiday, 토 → saturday, 일 → holiday, 평일 → weekday)
+ * - 'weekday' / 'saturday' / 'holiday': 사용자가 선택한 요일별 시간표 강제 조회
+ *
+ * 이미지 디자인(2026-05-17)의 평일/토요일/일요일·공휴일 3-segment tab을
+ * 지원하기 위함. UI tab 전환이 곧 fetch 재실행으로 이어진다.
+ */
+export type DayTypeOverride = 'auto' | 'weekday' | 'saturday' | 'holiday';
+
 interface UseTrainScheduleOptions {
   /** 역명 (예: "강남") */
   stationName: string;
@@ -66,6 +76,8 @@ interface UseTrainScheduleOptions {
   enabled?: boolean;
   /** 향후 몇 분 이내 열차만 표시 */
   minutesAhead?: number;
+  /** 요일 override. 미지정/`'auto'`이면 현재 요일 자동 감지 */
+  dayType?: DayTypeOverride;
 }
 
 /** 시간표 항목 */
@@ -215,6 +227,7 @@ export const useTrainSchedule = (
     lineNumber,
     direction = '1',
     enabled = true,
+    dayType = 'auto',
   } = options;
 
   const [schedules, setSchedules] = useState<TrainScheduleItem[]>([]);
@@ -240,8 +253,15 @@ export const useTrainSchedule = (
         return;
       }
 
-      // 현재 요일 기준 시간표 조회 (캐시 우선)
-      const weekTag = getCurrentWeekTag();
+      // dayType override가 'auto'면 현재 요일 자동 감지, 아니면 사용자 선택 매핑.
+      // weekday → '1' / saturday → '2' / holiday → '3' (Seoul API weekTag 규격).
+      const dayTypeToWeekTag: Record<Exclude<DayTypeOverride, 'auto'>, WeekTagCode> = {
+        weekday: '1',
+        saturday: '2',
+        holiday: '3',
+      };
+      const weekTag: WeekTagCode =
+        dayType === 'auto' ? getCurrentWeekTag() : dayTypeToWeekTag[dayType];
       const cacheKey = getTimetableCacheKey(stationCode, lineNumber, weekTag, direction);
 
       const cached = await getCachedTimetable(cacheKey);
@@ -302,7 +322,7 @@ export const useTrainSchedule = (
     } finally {
       setLoading(false);
     }
-  }, [stationName, lineNumber, direction, enabled]);
+  }, [stationName, lineNumber, direction, enabled, dayType]);
 
   const refresh = useCallback(async () => {
     await fetchSchedule();
