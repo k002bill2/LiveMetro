@@ -38,6 +38,38 @@ jest.mock('@utils/performanceUtils', () => ({
   throttle: (fn: unknown) => fn,
 }));
 
+// F4: ErrorFallback이 SeoulApiError instanceof 분기 사용 — 글로벌 setup이
+// 모듈 mock하면서 클래스 누락. partial spread로 실제 클래스만 import,
+// instance(seoulSubwayApi)는 그대로 mocked 유지. (memory: [Partial mock requireActual])
+jest.mock('@/services/api/seoulSubwayApi', () => {
+  const actual = jest.requireActual('@/services/api/seoulSubwayApi');
+  return {
+    SeoulApiError: actual.SeoulApiError,
+    seoulSubwayApi: {},
+  };
+});
+
+// F4: react-native-svg mock — ErrorFallback의 lucide 아이콘 렌더
+// (memory: [lucide+svg 테스트 mock])
+jest.mock('react-native-svg', () => {
+  const View = require('react-native').View;
+  return {
+    __esModule: true,
+    default: View,
+    Svg: View,
+    G: View,
+    Path: View,
+    Circle: View,
+    Rect: View,
+    Line: View,
+    Polyline: View,
+    Polygon: View,
+    Defs: View,
+    LinearGradient: View,
+    Stop: View,
+  };
+});
+
 const mockTrainService = trainService as jest.Mocked<typeof trainService>;
 const mockDataManager = dataManager as jest.Mocked<typeof dataManager>;
 
@@ -477,6 +509,41 @@ describe('TrainArrivalList', () => {
       await waitFor(() => {
         expect(queryByText('급행')).toBeNull();
         expect(queryByText('특급')).toBeNull();
+      });
+    });
+  });
+
+  // F4 (PR #127 follow-up): renderErrorState 자리에 ErrorFallback이 들어가
+  // SeoulApiError.category 분기 + non-Error generic fallback을 일관되게 제공.
+  // 기존 generic "도착정보를 불러올 수 없습니다" hardcode UI는 제거됨.
+  describe('Error → ErrorFallback wiring', () => {
+    it('renders ErrorFallback when station name resolution rejects (non-SeoulApiError → network fallback)', async () => {
+      // resolveAndSubscribe path: trainService.getStation → reject
+      // → catch sets error state → renders ErrorFallback
+      mockTrainService.getStation.mockRejectedValue(new Error('Network timeout'));
+
+      const { getByTestId, getByText } = render(
+        <TrainArrivalList stationId="station-1" />
+      );
+
+      await waitFor(() => {
+        expect(getByTestId('train-list-error')).toBeTruthy();
+        // generic Error → network fallback ("연결을 확인해주세요")
+        expect(getByText('연결을 확인해주세요')).toBeTruthy();
+      });
+    });
+
+    it('exposes retry button label in error state for accessibility', async () => {
+      mockTrainService.getStation.mockRejectedValue(new Error('test failure'));
+
+      const { getByLabelText } = render(
+        <TrainArrivalList stationId="station-1" />
+      );
+
+      await waitFor(() => {
+        // ErrorFallback의 retry CTA — onRetry는 항상 제공되므로 retryable
+        // category 또는 non-SeoulApiError 모두 버튼 표시
+        expect(getByLabelText('다시 시도')).toBeTruthy();
       });
     });
   });
