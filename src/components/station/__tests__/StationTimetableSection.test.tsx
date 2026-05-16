@@ -294,4 +294,110 @@ describe('StationTimetableSection', () => {
       expect(getByLabelText('일요일·공휴일')).toBeTruthy();
     });
   });
+
+  // F3.3 — DestinationChipRow integration. schedules에서 unique destinations
+  // 추출 + 사용자가 chip 선택 시 schedules 필터링.
+  describe('Destination chip filter', () => {
+    const multiDestSchedules = [
+      makeScheduleItem({ trainNumber: 'A1', arrivalTime: '05:31:00', destinationName: '잠실' }),
+      makeScheduleItem({ trainNumber: 'A2', arrivalTime: '06:00:00', destinationName: '잠실' }),
+      makeScheduleItem({ trainNumber: 'B1', arrivalTime: '05:45:00', destinationName: '서울대입구' }),
+      makeScheduleItem({ trainNumber: 'B2', arrivalTime: '07:00:00', destinationName: '서울대입구' }),
+    ];
+
+    beforeEach(() => {
+      mockUseTrainSchedule.mockReturnValue(
+        makeHookResult({ schedules: multiDestSchedules }),
+      );
+    });
+
+    it('renders destination chips when schedules have multiple destinations', () => {
+      const { getByText } = render(
+        <StationTimetableSection {...defaultProps} testID="t" />,
+      );
+      expect(getByText('잠실')).toBeTruthy();
+      expect(getByText('서울대입구')).toBeTruthy();
+      expect(getByText('전체')).toBeTruthy();
+    });
+
+    it('starts with "전체" selected (no filter applied)', () => {
+      const { getByTestId } = render(
+        <StationTimetableSection {...defaultProps} testID="t" />,
+      );
+      const allChip = getByTestId('t-destinations-chip-__all__');
+      expect(allChip.props.accessibilityState?.selected).toBe(true);
+    });
+
+    it('filters schedules when a destination chip is pressed', () => {
+      const { getByTestId, queryByTestId } = render(
+        <StationTimetableSection {...defaultProps} testID="t" />,
+      );
+
+      // 누르기 전: 둘 다 grid에 노출되는지 chip testID로 간접 확인
+      // (grid chip은 testID 패턴 `t-grid-chip-<class>-<minute>` — 05:31 잠실 + 05:45 서울대입구)
+      expect(queryByTestId(/t-grid-chip-.*-31/)).toBeTruthy();
+      expect(queryByTestId(/t-grid-chip-.*-45/)).toBeTruthy();
+
+      // 잠실 선택 → 서울대입구 출발(05:45, 07:00) 사라져야 함
+      fireEvent.press(getByTestId('t-destinations-chip-잠실'));
+      expect(queryByTestId(/t-grid-chip-.*-31/)).toBeTruthy(); // 잠실 05:31
+      expect(queryByTestId(/t-grid-chip-.*-45/)).toBeNull(); // 서울대 05:45 사라짐
+    });
+
+    it('restores all schedules when "전체" pressed after filter', () => {
+      const { getByTestId, queryByTestId } = render(
+        <StationTimetableSection {...defaultProps} testID="t" />,
+      );
+
+      fireEvent.press(getByTestId('t-destinations-chip-잠실'));
+      expect(queryByTestId(/t-grid-chip-.*-45/)).toBeNull();
+
+      fireEvent.press(getByTestId('t-destinations-chip-__all__'));
+      // 서울대 05:45 다시 표시
+      expect(queryByTestId(/t-grid-chip-.*-45/)).toBeTruthy();
+    });
+
+    it('resets destination filter when user switches dayType tab', () => {
+      const { getByTestId } = render(
+        <StationTimetableSection {...defaultProps} testID="t" />,
+      );
+
+      fireEvent.press(getByTestId('t-destinations-chip-잠실'));
+      expect(getByTestId('t-destinations-chip-잠실').props.accessibilityState?.selected).toBe(true);
+
+      // dayType 전환 → destination filter는 자동 리셋 (다른 요일 destination set이 다를 수 있음)
+      fireEvent.press(getByTestId('t-tab-saturday'));
+      expect(
+        getByTestId('t-destinations-chip-__all__').props.accessibilityState?.selected,
+      ).toBe(true);
+    });
+
+    it('does not render chips when schedules have only one destination', () => {
+      mockUseTrainSchedule.mockReturnValue(
+        makeHookResult({
+          schedules: [
+            makeScheduleItem({ arrivalTime: '05:31:00', destinationName: '잠실' }),
+            makeScheduleItem({ arrivalTime: '06:00:00', destinationName: '잠실' }),
+          ],
+        }),
+      );
+
+      const { queryByText } = render(<StationTimetableSection {...defaultProps} />);
+      // chip row 자체가 null → 잠실 chip text 없음 (헤더만)
+      expect(queryByText('전체')).toBeNull();
+    });
+
+    it('updates first/last subtitle to reflect filtered schedules', () => {
+      const { getByText, getByTestId } = render(
+        <StationTimetableSection {...defaultProps} testID="t" />,
+      );
+
+      // 전체: 첫차 05:31(잠실 A1), 막차 07:00(서울대 B2)
+      expect(getByText('05:31 첫차 · 07:00 막차')).toBeTruthy();
+
+      // 잠실만: 첫차 05:31, 막차 06:00
+      fireEvent.press(getByTestId('t-destinations-chip-잠실'));
+      expect(getByText('05:31 첫차 · 06:00 막차')).toBeTruthy();
+    });
+  });
 });
