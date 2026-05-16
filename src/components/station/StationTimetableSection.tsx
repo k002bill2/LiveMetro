@@ -18,7 +18,7 @@
  */
 
 import { Clock } from 'lucide-react-native';
-import React, { memo, useCallback, useMemo, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
@@ -30,6 +30,7 @@ import {
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme/themeContext';
 import { TimetableGrid } from './TimetableGrid';
+import { DestinationChipRow } from './DestinationChipRow';
 
 export interface StationTimetableSectionProps {
   /** 역명 (예: "강남") - Seoul timetable API 조회 키 */
@@ -83,6 +84,16 @@ export const StationTimetableSection: React.FC<StationTimetableSectionProps> = m
 
     const handleSelectDayType = useCallback((key: Exclude<DayTypeOverride, 'auto'>) => {
       setSelectedDayType(key);
+      // dayType 전환 시 destination filter는 의미가 바뀔 수 있음(다른 요일은
+      // 다른 종착지 set일 수 있음) → 안전하게 "전체"로 리셋.
+      setSelectedDestination(null);
+    }, []);
+
+    // 방면(destination) filter. null = 전체, string = 특정 종착지만.
+    const [selectedDestination, setSelectedDestination] = useState<string | null>(null);
+
+    const handleSelectDestination = useCallback((d: string | null) => {
+      setSelectedDestination(d);
     }, []);
 
     const { schedules, loading, error, isViewingToday } = useTrainSchedule({
@@ -93,14 +104,42 @@ export const StationTimetableSection: React.FC<StationTimetableSectionProps> = m
       dayType: selectedDayType,
     });
 
+    // schedules에서 unique destinations 추출 — 순서는 첫 출현 순.
+    const destinations = useMemo<readonly string[]>(() => {
+      const seen = new Set<string>();
+      const out: string[] = [];
+      for (const s of schedules) {
+        const d = s.destinationName?.trim();
+        if (!d || seen.has(d)) continue;
+        seen.add(d);
+        out.push(d);
+      }
+      return out;
+    }, [schedules]);
+
+    // selected destination가 schedule reload(다른 dayType 등) 후에도 여전히
+    // 유효한지 확인. 사라지면 자동으로 "전체"로 fallback (사용자가 보이지
+    // 않는 chip을 선택한 상태로 grid 비는 일 방지).
+    useEffect(() => {
+      if (selectedDestination && !destinations.includes(selectedDestination)) {
+        setSelectedDestination(null);
+      }
+    }, [destinations, selectedDestination]);
+
+    // 사용자 선택 destination이 있으면 그것만, 없으면 전체.
+    const filteredSchedules = useMemo(() => {
+      if (!selectedDestination) return schedules;
+      return schedules.filter((s) => s.destinationName === selectedDestination);
+    }, [schedules, selectedDestination]);
+
     const { firstLabel, lastLabel } = useMemo(() => {
-      const first = getFirstTrain(schedules);
-      const last = getLastTrain(schedules);
+      const first = getFirstTrain(filteredSchedules);
+      const last = getLastTrain(filteredSchedules);
       return {
         firstLabel: first ? trimSeconds(first.arrivalTime) : null,
         lastLabel: last ? trimSeconds(last.arrivalTime) : null,
       };
-    }, [schedules]);
+    }, [filteredSchedules]);
 
     return (
       <View style={styles.container} testID={testID}>
@@ -169,8 +208,14 @@ export const StationTimetableSection: React.FC<StationTimetableSectionProps> = m
             >
               {`${firstLabel} 첫차 · ${lastLabel} 막차`}
             </Text>
+            <DestinationChipRow
+              destinations={destinations}
+              selected={selectedDestination}
+              onSelect={handleSelectDestination}
+              testID={testID ? `${testID}-destinations` : undefined}
+            />
             <TimetableGrid
-              schedules={schedules}
+              schedules={filteredSchedules}
               isViewingToday={isViewingToday}
               testID={testID ? `${testID}-grid` : undefined}
             />
