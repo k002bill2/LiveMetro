@@ -283,7 +283,12 @@ export function createSeoulApiKeyManager(
 }
 
 /**
- * 공공데이터포털 API 키 매니저 생성
+ * 공공데이터포털 API 키 매니저 생성.
+ *
+ * 주의: 실시간(swopenapi.seoul.go.kr)과 시간표(openapi.seoul.go.kr:8088)는
+ * 인증 도메인이 다릅니다. SEOUL_SUBWAY 키를 cross-fallback으로 주입하면
+ * 시간표 호출이 silent 401을 받습니다 — graceful degradation을 위해
+ * 빈 manager는 반환하되 console.error로 명시적으로 알립니다.
  */
 export function createPublicDataApiKeyManager(
   options?: ApiKeyManagerOptions
@@ -291,12 +296,15 @@ export function createPublicDataApiKeyManager(
   const keys = [
     process.env.EXPO_PUBLIC_DATA_PORTAL_API_KEY,
     process.env.EXPO_PUBLIC_DATA_PORTAL_API_KEY_2,
-    // Fallback: Seoul subway API keys work with openapi.seoul.go.kr too
-    ...(!process.env.EXPO_PUBLIC_DATA_PORTAL_API_KEY ? [
-      process.env.EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY,
-      process.env.EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY_2,
-    ] : []),
   ].filter((key): key is string => !!key);
+
+  if (keys.length === 0) {
+    console.error(
+      'EXPO_PUBLIC_DATA_PORTAL_API_KEY is missing. ' +
+        'Timetable/public-data API calls will fail with 401. ' +
+        'The realtime SEOUL_SUBWAY key uses a different auth domain and is NOT used as a fallback.'
+    );
+  }
 
   return new ApiKeyManager(keys, options);
 }

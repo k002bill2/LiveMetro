@@ -21,8 +21,8 @@
  * 8-stop morning commute through a single line the count is 8.
  */
 import { useMemo } from 'react';
-import { routeService } from '@services/route';
-import { fareService } from '@services/route';
+import { fareService, getDiverseRoutes } from '@services/route';
+import { resolveInternalStationId } from '@utils/stationIdResolver';
 
 export interface CommuteRouteSummary {
   /** Number of transfers between origin and destination. */
@@ -48,11 +48,51 @@ export function useCommuteRouteSummary(
 ): CommuteRouteSummary {
   return useMemo<CommuteRouteSummary>(() => {
     if (!fromStationId || !toStationId || fromStationId === toStationId) {
+      if (__DEV__ && (fromStationId || toStationId)) {
+        console.warn('[useCommuteRouteSummary] skipped — invalid id pair', {
+          fromStationId,
+          toStationId,
+        });
+      }
       return EMPTY;
     }
+    // Storage layer (onboarding / Firestore) may persist Seoul Metro
+    // station_cd codes ("0220", "3762") while the graph layer keys on
+    // internal slugs ("seolleung", "s_ec82b0ea"). Normalize at the boundary
+    // so the graph stays slug-only and callers don't have to know which
+    // universe their ids came from.
+    const fromSlug = resolveInternalStationId(fromStationId);
+    const toSlug = resolveInternalStationId(toStationId);
+    if (!fromSlug || !toSlug) {
+      if (__DEV__) {
+        console.warn('[useCommuteRouteSummary] unresolved station id', {
+          fromStationId,
+          toStationId,
+          fromSlug,
+          toSlug,
+        });
+      }
+      return EMPTY;
+    }
+    if (fromSlug === toSlug) return EMPTY;
     try {
-      const route = routeService.calculateRoute(fromStationId, toStationId);
-      if (!route) return EMPTY;
+      // `getDiverseRoutes` runs Yen's K-shortest (K=15) then picks the
+      // fastest path under MAX_ROUTE_TRANSFERS≤2 with a 1.5× time-gap cap.
+      // This matches Naver's "최단시간" card semantics. Plain dijkstra (K=1)
+      // misses 산곡↔선릉 강남구청-via path which only surfaces at K≥11 — see
+      // memory note `Yen's signature-dedupe efficiency` (PR #91+#102).
+      const route = getDiverseRoutes(fromSlug, toSlug)[0] ?? null;
+      if (!route) {
+        if (__DEV__) {
+          console.warn('[useCommuteRouteSummary] getDiverseRoutes returned no path', {
+            fromStationId,
+            toStationId,
+            fromSlug,
+            toSlug,
+          });
+        }
+        return EMPTY;
+      }
       const stationCount = route.segments.filter((s) => !s.isTransfer).length;
       const fare = fareService.calculateFare(stationCount).totalFare;
       return {
@@ -62,10 +102,14 @@ export function useCommuteRouteSummary(
         rideMinutes: route.totalMinutes,
         ready: true,
       };
-    } catch {
-      // Calculation failures are non-fatal for HomeScreen — caller falls
-      // back to hiding the fact grid. No console.error to keep the home
-      // tab quiet on every render.
+    } catch (error) {
+      if (__DEV__) {
+        console.warn('[useCommuteRouteSummary] calculation threw', {
+          fromStationId,
+          toStationId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
       return EMPTY;
     }
   }, [fromStationId, toStationId]);

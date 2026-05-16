@@ -100,31 +100,32 @@ describe('TrainArrivalCard', () => {
       expect(getByText('도착')).toBeTruthy();
     });
 
-    it('should display "1분 후" for trains arriving in 1 minute', () => {
+    it('should display "1분후" for trains arriving in 1 minute', () => {
       const train = createMockTrain({
-        arrivalTime: new Date(Date.now() + 60 * 1000), // 1 minute
+        // +5s padding avoids Math.floor boundary race.
+        arrivalTime: new Date(Date.now() + 60 * 1000 + 5000),
       });
 
       const { getByText } = customRender(<TrainArrivalCard train={train} />);
-      expect(getByText('1분 후')).toBeTruthy();
+      expect(getByText('1분후')).toBeTruthy();
     });
 
     it('should display minutes for trains arriving later', () => {
       const train = createMockTrain({
-        arrivalTime: new Date(Date.now() + 5 * 60 * 1000), // 5 minutes
+        arrivalTime: new Date(Date.now() + 5 * 60 * 1000 + 5000),
       });
 
       const { getByText } = customRender(<TrainArrivalCard train={train} />);
-      expect(getByText('5분 후')).toBeTruthy();
+      expect(getByText('5분후')).toBeTruthy();
     });
 
-    it('should display "정보 없음" when arrival time is null', () => {
+    it('should display "정보없음" when arrival time is null', () => {
       const train = createMockTrain({
         arrivalTime: null,
       });
 
       const { getByText } = customRender(<TrainArrivalCard train={train} />);
-      expect(getByText('정보 없음')).toBeTruthy();
+      expect(getByText('정보없음')).toBeTruthy();
     });
   });
 

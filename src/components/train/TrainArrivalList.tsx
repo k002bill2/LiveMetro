@@ -12,6 +12,7 @@ import { Train, TrainStatus } from '../../models/train';
 import { trainService } from '../../services/train/trainService';
 import { getLocalStation } from '../../services/data/stationsDataService';
 import { dataManager, RealtimeTrainData } from '../../services/data/dataManager';
+import { formatArrivalTime } from '../../utils/dateUtils';
 import { throttle } from '../../utils/performanceUtils';
 
 interface TrainArrivalListProps {
@@ -80,25 +81,6 @@ const TrainArrivalItem: React.FC<TrainArrivalItemProps> = memo(({ train }) => {
     }
   };
 
-  const formatArrivalTime = (): string => {
-    if (!train.arrivalTime) {
-      return '정보없음';
-    }
-
-    const now = new Date();
-    const arrivalTime = new Date(train.arrivalTime);
-    const diffMs = arrivalTime.getTime() - now.getTime();
-    const diffMinutes = Math.ceil(diffMs / (1000 * 60));
-
-    if (diffMinutes <= 0) {
-      return '도착';
-    } else if (diffMinutes === 1) {
-      return '1분 후';
-    } else {
-      return `${diffMinutes}분 후`;
-    }
-  };
-
   const StatusIcon = getStatusIcon(train.status);
 
   return (
@@ -106,7 +88,7 @@ const TrainArrivalItem: React.FC<TrainArrivalItemProps> = memo(({ train }) => {
       style={styles.trainItem}
       accessible={true}
       accessibilityRole="summary"
-      accessibilityLabel={`${getDestinationName()} 방면 열차, ${getStatusText(train.status)} 상태, ${formatArrivalTime()}${train.delayMinutes > 0 ? `, ${train.delayMinutes}분 지연` : ''}`}
+      accessibilityLabel={`${getDestinationName()} 방면 열차, ${getStatusText(train.status)} 상태, ${formatArrivalTime(train.arrivalTime)}${train.delayMinutes > 0 ? `, ${train.delayMinutes}분 지연` : ''}`}
     >
       <View style={styles.trainHeader}>
         <View style={styles.directionInfo}>
@@ -122,7 +104,7 @@ const TrainArrivalItem: React.FC<TrainArrivalItemProps> = memo(({ train }) => {
 
       <View style={styles.trainDetails}>
         <View style={styles.arrivalInfo}>
-          <Text style={styles.arrivalTime}>{formatArrivalTime()}</Text>
+          <Text style={styles.arrivalTime}>{formatArrivalTime(train.arrivalTime)}</Text>
           {train.delayMinutes > 0 && <Text style={styles.delayText}>({train.delayMinutes}분 지연)</Text>}
         </View>
 

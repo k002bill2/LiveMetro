@@ -524,6 +524,10 @@ describe('SeoulSubwayApiService', () => {
 
   describe('convertToAppTrain', () => {
     it('should convert Seoul API data to app format with minutes', () => {
+      // arvlCd left empty: this fixture exercises the "X분후" text-fallback
+      // path. Real API responses never combine "3분후" text with arvlCd='2'
+      // (당역 출발) — the prior fixture had that contradictory pairing as
+      // noise that only passed because text fallback ran before arvlCd.
       const seoulData: SeoulRealtimeArrival = {
         rowNum: '1',
         selectedCount: '1',
@@ -548,7 +552,7 @@ describe('SeoulSubwayApiService', () => {
         recptnDt: '2024-01-01 12:00:00',
         arvlMsg2: '3분후[2번째전]',
         arvlMsg3: '홍대입구',
-        arvlCd: '2',
+        arvlCd: '',
       };
 
       const result = seoulSubwayApi.convertToAppTrain(seoulData);
@@ -661,6 +665,119 @@ describe('SeoulSubwayApiService', () => {
       expect(result.arrivalTime).toBeNull();
       expect(result.trainNumber).toBe('');
       expect(result.destinationStation).toBe('시청'); // Falls back to subwayHeading
+    });
+
+    // Regression: arvlCd is the authoritative signal for departure/前驛 states.
+    // Text-only matches must not override the code semantics — a departed
+    // train (arvlCd='2') was previously rendered as "도착" (0s).
+    it('should filter departed trains (arvlCd 2) regardless of message text', () => {
+      const seoulData: SeoulRealtimeArrival = {
+        rowNum: '1', selectedCount: '1', totalCount: '10',
+        subwayId: '1002', updnLine: '상행', trainLineNm: '2호선',
+        subwayHeading: '시청', statnFid: '0221', statnTid: '0223',
+        statnId: '0222', statnNm: '강남', trainCo: '', ordkey: '01',
+        subwayList: '', statnList: '', btrainSttus: '일반',
+        barvlDt: '',
+        btrainNo: '2150', bstatnId: '0250', bstatnNm: '시청',
+        recptnDt: '2024-01-01 12:00:00',
+        arvlMsg2: '당역출발',
+        arvlMsg3: '',
+        arvlCd: '2',
+      };
+
+      const result = seoulSubwayApi.convertToAppTrain(seoulData);
+
+      expect(result.arrivalTime).toBeNull();
+    });
+
+    it('should map 전역출발 (arvlCd 3) to ~120 seconds', () => {
+      const seoulData: SeoulRealtimeArrival = {
+        rowNum: '1', selectedCount: '1', totalCount: '10',
+        subwayId: '1002', updnLine: '상행', trainLineNm: '2호선',
+        subwayHeading: '시청', statnFid: '0221', statnTid: '0223',
+        statnId: '0222', statnNm: '강남', trainCo: '', ordkey: '01',
+        subwayList: '', statnList: '', btrainSttus: '일반',
+        barvlDt: '',
+        btrainNo: '2151', bstatnId: '0250', bstatnNm: '시청',
+        recptnDt: '2024-01-01 12:00:00',
+        arvlMsg2: '전역출발',
+        arvlMsg3: '',
+        arvlCd: '3',
+      };
+
+      const result = seoulSubwayApi.convertToAppTrain(seoulData);
+
+      expect(result.arrivalTime).toBe(120);
+    });
+
+    it('strips trailing "역" from statnNm and bstatnNm to prevent double-suffix', () => {
+      const seoulData: SeoulRealtimeArrival = {
+        rowNum: '1', selectedCount: '1', totalCount: '10',
+        subwayId: '1002', updnLine: '상행', trainLineNm: '2호선',
+        subwayHeading: '시청', statnFid: '0221', statnTid: '0223',
+        statnId: '0222',
+        statnNm: '강남역',
+        trainCo: '', ordkey: '01',
+        subwayList: '', statnList: '', btrainSttus: '일반',
+        barvlDt: '',
+        btrainNo: '2160',
+        bstatnId: '0250',
+        bstatnNm: '시청역',
+        recptnDt: '2024-01-01 12:00:00',
+        arvlMsg2: '3분후',
+        arvlMsg3: '',
+        arvlCd: '',
+      };
+
+      const result = seoulSubwayApi.convertToAppTrain(seoulData);
+
+      expect(result.stationName).toBe('강남');
+      expect(result.destinationStation).toBe('시청');
+    });
+
+    it('leaves already-suffix-less names unchanged', () => {
+      const seoulData: SeoulRealtimeArrival = {
+        rowNum: '1', selectedCount: '1', totalCount: '10',
+        subwayId: '1002', updnLine: '상행', trainLineNm: '2호선',
+        subwayHeading: '시청', statnFid: '0221', statnTid: '0223',
+        statnId: '0222',
+        statnNm: '강남',
+        trainCo: '', ordkey: '01',
+        subwayList: '', statnList: '', btrainSttus: '일반',
+        barvlDt: '',
+        btrainNo: '2161',
+        bstatnId: '0250',
+        bstatnNm: '시청',
+        recptnDt: '2024-01-01 12:00:00',
+        arvlMsg2: '3분후',
+        arvlMsg3: '',
+        arvlCd: '',
+      };
+
+      const result = seoulSubwayApi.convertToAppTrain(seoulData);
+
+      expect(result.stationName).toBe('강남');
+      expect(result.destinationStation).toBe('시청');
+    });
+
+    it('should map 전역진입 (arvlCd 4) to ~180 seconds (not confused with 당역진입)', () => {
+      const seoulData: SeoulRealtimeArrival = {
+        rowNum: '1', selectedCount: '1', totalCount: '10',
+        subwayId: '1002', updnLine: '상행', trainLineNm: '2호선',
+        subwayHeading: '시청', statnFid: '0221', statnTid: '0223',
+        statnId: '0222', statnNm: '강남', trainCo: '', ordkey: '01',
+        subwayList: '', statnList: '', btrainSttus: '일반',
+        barvlDt: '',
+        btrainNo: '2152', bstatnId: '0250', bstatnNm: '시청',
+        recptnDt: '2024-01-01 12:00:00',
+        arvlMsg2: '전역진입',
+        arvlMsg3: '',
+        arvlCd: '4',
+      };
+
+      const result = seoulSubwayApi.convertToAppTrain(seoulData);
+
+      expect(result.arrivalTime).toBe(180);
     });
   });
 

@@ -135,8 +135,9 @@ describe('TrainArrivalList', () => {
   describe('Data Display', () => {
     it('should display train arrival data when loaded', async () => {
       mockSubscription([
-        makeTrain({ id: 't1', finalDestination: '상행역', direction: 'up', arrivalTime: new Date(Date.now() + 2 * 60 * 1000) }),
-        makeTrain({ id: 't2', finalDestination: '하행역', direction: 'down', arrivalTime: new Date(Date.now() + 5 * 60 * 1000) }),
+        // +5s padding avoids Math.floor boundary race during render/waitFor delay.
+        makeTrain({ id: 't1', finalDestination: '상행역', direction: 'up', arrivalTime: new Date(Date.now() + 2 * 60 * 1000 + 5000) }),
+        makeTrain({ id: 't2', finalDestination: '하행역', direction: 'down', arrivalTime: new Date(Date.now() + 5 * 60 * 1000 + 5000) }),
       ]);
 
       const { getByText } = render(
@@ -146,8 +147,8 @@ describe('TrainArrivalList', () => {
       await waitFor(() => {
         expect(getByText(/상행역/)).toBeTruthy();
         expect(getByText(/하행역/)).toBeTruthy();
-        expect(getByText('2분 후')).toBeTruthy();
-        expect(getByText('5분 후')).toBeTruthy();
+        expect(getByText('2분후')).toBeTruthy();
+        expect(getByText('5분후')).toBeTruthy();
       });
     });
 
@@ -311,7 +312,8 @@ describe('TrainArrivalList', () => {
   describe('Accessibility', () => {
     it('should provide proper accessibility labels for train items', async () => {
       mockSubscription([
-        makeTrain({ finalDestination: '상행역', direction: 'up', arrivalTime: new Date(Date.now() + 2 * 60 * 1000) }),
+        // +5s padding avoids Math.floor boundary race.
+        makeTrain({ finalDestination: '상행역', direction: 'up', arrivalTime: new Date(Date.now() + 2 * 60 * 1000 + 5000) }),
       ]);
 
       const { getByLabelText } = render(
@@ -319,7 +321,7 @@ describe('TrainArrivalList', () => {
       );
 
       await waitFor(() => {
-        expect(getByLabelText(/상행역 방면 열차, 정상 상태, 2분 후/)).toBeTruthy();
+        expect(getByLabelText(/상행역 방면 열차, 정상 상태, 2분후/)).toBeTruthy();
       });
     });
   });
@@ -339,9 +341,10 @@ describe('TrainArrivalList', () => {
       });
     });
 
-    it('should show "1분 후" for 1 minute arrival', async () => {
+    it('should show "1분후" for 1 minute arrival', async () => {
       mockSubscription([
-        makeTrain({ arrivalTime: new Date(Date.now() + 60 * 1000) }),
+        // +5s padding avoids Math.floor boundary race.
+        makeTrain({ arrivalTime: new Date(Date.now() + 60 * 1000 + 5000) }),
       ]);
 
       const { getByText } = render(
@@ -349,7 +352,7 @@ describe('TrainArrivalList', () => {
       );
 
       await waitFor(() => {
-        expect(getByText('1분 후')).toBeTruthy();
+        expect(getByText('1분후')).toBeTruthy();
       });
     });
 

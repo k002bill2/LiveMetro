@@ -5,6 +5,7 @@
 import {
   formatDate,
   formatArrivalTime,
+  formatArrivalDisplay,
   isBusinessHours,
   getCommuteTimeCategory,
   parseTimeString,
@@ -75,6 +76,56 @@ describe('dateUtils', () => {
     it('should handle Date objects', () => {
       const futureDate = new Date(Date.now() + 3 * 60 * 1000);
       expect(formatArrivalTime(futureDate)).toBe('3분후');
+    });
+  });
+
+  describe('formatArrivalDisplay', () => {
+    it('returns "정보없음" + sentinel metadata for null', () => {
+      expect(formatArrivalDisplay(null)).toEqual({
+        text: '정보없음',
+        minutes: -1,
+        isImmediate: false,
+      });
+    });
+
+    it('returns "도착" + isImmediate=true for past arrivalTime', () => {
+      const past = new Date(Date.now() - 1000);
+      const display = formatArrivalDisplay(past);
+      expect(display.text).toBe('도착');
+      expect(display.minutes).toBe(0);
+      expect(display.isImmediate).toBe(true);
+    });
+
+    it('marks "곧 도착" (<60s) as imminent', () => {
+      const display = formatArrivalDisplay(45);
+      expect(display.text).toBe('곧 도착');
+      // 45s → floor(45/60) = 0 minutes; still imminent.
+      expect(display.minutes).toBeLessThanOrEqual(1);
+      expect(display.isImmediate).toBe(true);
+    });
+
+    it('marks 1-minute arrivals as imminent', () => {
+      // +5s padding avoids Math.floor boundary race during test.
+      const oneMin = new Date(Date.now() + 60 * 1000 + 5000);
+      const display = formatArrivalDisplay(oneMin);
+      expect(display.text).toBe('1분후');
+      expect(display.minutes).toBe(1);
+      expect(display.isImmediate).toBe(true);
+    });
+
+    it('marks 3-minute arrivals as NOT imminent', () => {
+      const threeMin = new Date(Date.now() + 3 * 60 * 1000 + 5000);
+      const display = formatArrivalDisplay(threeMin);
+      expect(display.text).toBe('3분후');
+      expect(display.minutes).toBe(3);
+      expect(display.isImmediate).toBe(false);
+    });
+
+    it('accepts number (seconds) input', () => {
+      const display = formatArrivalDisplay(180);
+      expect(display.text).toBe('3분후');
+      expect(display.minutes).toBe(3);
+      expect(display.isImmediate).toBe(false);
     });
   });
 

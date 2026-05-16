@@ -33,6 +33,7 @@ import {
 } from 'lucide-react-native';
 
 import { Train, TrainStatus } from '@/models/train';
+import { formatArrivalDisplay } from '@/utils/dateUtils';
 import {
   getSubwayLineColor as getLineColor,
   getLineTextColor,
@@ -95,29 +96,13 @@ export const TrainArrivalCard: React.FC<TrainArrivalCardProps> = memo(({
     return colors.textSecondary;
   }, [colors.error, colors.warning, colors.textSecondary]);
 
-  // Calculate arrival time display
-  const arrivalDisplay = useMemo((): {
-    text: string;
-    minutes: number;
-    isImmediate: boolean;
-  } => {
-    if (!train.arrivalTime) {
-      return { text: '정보 없음', minutes: -1, isImmediate: false };
-    }
-
-    const now = new Date();
-    const arrivalTime = new Date(train.arrivalTime);
-    const diffMs = arrivalTime.getTime() - now.getTime();
-    const diffMinutes = Math.ceil(diffMs / (1000 * 60));
-
-    if (diffMinutes <= 0) {
-      return { text: '도착', minutes: 0, isImmediate: true };
-    } else if (diffMinutes === 1) {
-      return { text: '1분 후', minutes: 1, isImmediate: true };
-    } else {
-      return { text: `${diffMinutes}분 후`, minutes: diffMinutes, isImmediate: false };
-    }
-  }, [train.arrivalTime]);
+  // Arrival time display — delegated to dateUtils SoT (Math.floor + "곧 도착").
+  // Previously this component used its own Math.ceil-based formatter which
+  // drifted from dateUtils, producing inconsistent ETAs across screens.
+  const arrivalDisplay = useMemo(
+    () => formatArrivalDisplay(train.arrivalTime),
+    [train.arrivalTime]
+  );
 
   // Get status display information
   const statusInfo = useMemo(() => {
