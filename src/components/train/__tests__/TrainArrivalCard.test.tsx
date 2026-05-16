@@ -385,5 +385,42 @@ describe('TrainArrivalCard', () => {
       );
       expect(queryByLabelText('급행 열차')).toBeNull();
     });
+
+    // F5 (PR #126 follow-up): Card derives trainType from train.trainType by
+    // default so callers can pass Train objects directly without manually
+    // forwarding the field. Explicit prop wins for override (e.g., storybook).
+    it('derives trainType from train.trainType when prop omitted', () => {
+      const train = createMockTrain({ trainType: 'express' });
+      const { getByLabelText, getByText } = customRender(
+        <TrainArrivalCard train={train} />,
+      );
+      expect(getByLabelText('급행 열차')).toBeTruthy();
+      expect(getByText('급행')).toBeTruthy();
+    });
+
+    it('derives 특급 from train.trainType="rapid" when prop omitted', () => {
+      const train = createMockTrain({ trainType: 'rapid' });
+      const { getByLabelText } = customRender(
+        <TrainArrivalCard train={train} />,
+      );
+      expect(getByLabelText('특급 열차')).toBeTruthy();
+    });
+
+    it('explicit trainType prop overrides train.trainType (storybook/showcase use)', () => {
+      const train = createMockTrain({ trainType: 'normal' });
+      const { getByLabelText } = customRender(
+        <TrainArrivalCard train={train} trainType="rapid" />,
+      );
+      // prop wins over train.trainType
+      expect(getByLabelText('특급 열차')).toBeTruthy();
+    });
+
+    it('explicit trainType="normal" can suppress badge even if train.trainType is express', () => {
+      const train = createMockTrain({ trainType: 'express' });
+      const { queryByLabelText } = customRender(
+        <TrainArrivalCard train={train} trainType="normal" />,
+      );
+      expect(queryByLabelText('급행 열차')).toBeNull();
+    });
   });
 });
