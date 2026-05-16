@@ -113,6 +113,72 @@ const getCurrentWeekTag = (now: Date = new Date()): WeekTagCode => {
 };
 
 /**
+ * Convert "HH:MM:SS" arrival time to a sortable minute count anchored to the
+ * **operating day** (which runs ~04:00 → next 03:59, not midnight → midnight).
+ *
+ * Why: late-night 막차 trains run past midnight (e.g. 강남 외선 막차 00:38).
+ * A naive `string.localeCompare` or `parseInt(hour)*60` would rank "00:38" as
+ * earliest of the day, mistaking the 막차 for the 첫차. Treating 00:00-03:59
+ * as "previous operating day + 24h" makes `compareScheduleTime(a, b)` produce
+ * the chronological order users expect.
+ *
+ * @returns minutes from 04:00 (e.g. "04:30" → 30, "00:30" → 1230, "23:59" → 1199).
+ */
+function arrivalTimeToOperatingMinutes(arrivalTime: string): number {
+  const parts = arrivalTime.split(':');
+  const h = Number(parts[0] ?? 0);
+  const m = Number(parts[1] ?? 0);
+  if (Number.isNaN(h) || Number.isNaN(m)) return Number.POSITIVE_INFINITY;
+  if (h < 4) return (h + 24) * 60 + m;
+  return h * 60 + m;
+}
+
+/**
+ * Return the earliest-departing train of an operating day (첫차).
+ *
+ * Guide (2026-05-16) item #7 mandates separate 첫차/막차 surfacing in the
+ * timetable UI. Implemented as a pure helper so screens or sub-tabs can
+ * filter without re-implementing the late-night arithmetic.
+ */
+export function getFirstTrain(
+  schedules: readonly TrainScheduleItem[],
+): TrainScheduleItem | null {
+  if (schedules.length === 0) return null;
+  let earliest = schedules[0]!;
+  let earliestMin = arrivalTimeToOperatingMinutes(earliest.arrivalTime);
+  for (let i = 1; i < schedules.length; i++) {
+    const candidate = schedules[i]!;
+    const candidateMin = arrivalTimeToOperatingMinutes(candidate.arrivalTime);
+    if (candidateMin < earliestMin) {
+      earliest = candidate;
+      earliestMin = candidateMin;
+    }
+  }
+  return earliest;
+}
+
+/**
+ * Return the latest-departing train of an operating day (막차).
+ * See {@link getFirstTrain} for the operating-day rationale.
+ */
+export function getLastTrain(
+  schedules: readonly TrainScheduleItem[],
+): TrainScheduleItem | null {
+  if (schedules.length === 0) return null;
+  let latest = schedules[0]!;
+  let latestMin = arrivalTimeToOperatingMinutes(latest.arrivalTime);
+  for (let i = 1; i < schedules.length; i++) {
+    const candidate = schedules[i]!;
+    const candidateMin = arrivalTimeToOperatingMinutes(candidate.arrivalTime);
+    if (candidateMin > latestMin) {
+      latest = candidate;
+      latestMin = candidateMin;
+    }
+  }
+  return latest;
+}
+
+/**
  * SeoulTimetableRow를 TrainScheduleItem으로 변환
  */
 const convertToScheduleItem = (

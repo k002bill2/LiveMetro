@@ -22,7 +22,7 @@ global.fetch = mockFetch;
 
 // Now require the actual module (after reset and unmock)
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { seoulSubwayApi, RateLimiter } = jest.requireActual('../seoulSubwayApi');
+const { seoulSubwayApi, RateLimiter, parseRecptnDtToMs, SeoulApiError, parseTrainType } = jest.requireActual('../seoulSubwayApi');
 
 // Type for test use
 interface SeoulRealtimeArrival {
@@ -778,6 +778,305 @@ describe('SeoulSubwayApiService', () => {
       const result = seoulSubwayApi.convertToAppTrain(seoulData);
 
       expect(result.arrivalTime).toBe(180);
+    });
+
+    // GAP_REPORT item #1: arvlCd 99 (운행중) — guide-mandated 7th code, was
+    // missing from prior implementation. Treat as null (no countdown) since
+    // "운행중" is a plain operating state without imminent-arrival info.
+    it('should map 운행중 (arvlCd 99) to null (no countdown, no imminent info)', () => {
+      const seoulData: SeoulRealtimeArrival = {
+        rowNum: '1', selectedCount: '1', totalCount: '10',
+        subwayId: '1002', updnLine: '상행', trainLineNm: '2호선',
+        subwayHeading: '시청', statnFid: '0221', statnTid: '0223',
+        statnId: '0222', statnNm: '강남', trainCo: '', ordkey: '01',
+        subwayList: '', statnList: '', btrainSttus: '일반',
+        barvlDt: '',
+        btrainNo: '2152', bstatnId: '0250', bstatnNm: '시청',
+        recptnDt: '2024-01-01 12:00:00',
+        arvlMsg2: '운행중',
+        arvlMsg3: '',
+        arvlCd: '99',
+      };
+
+      const result = seoulSubwayApi.convertToAppTrain(seoulData);
+
+      expect(result.arrivalTime).toBeNull();
+    });
+
+    // Phase B.3 (sprightly-hugging-snail plan, GAP_REPORT.md item #2):
+    // recptnDt latency compensation — subtract elapsed seconds between server
+    // response generation and client render so displayed arrivalTime reflects
+    // real-world remaining time. Guide (2026-05-16) mandates this for accuracy.
+    describe('recptnDt latency compensation', () => {
+      let nowSpy: jest.SpyInstance;
+
+      const baseFixture = (overrides: Partial<SeoulRealtimeArrival> = {}): SeoulRealtimeArrival => ({
+        rowNum: '1', selectedCount: '1', totalCount: '1', subwayId: '1002',
+        updnLine: '상행', trainLineNm: '강남', subwayHeading: '강남',
+        statnFid: '', statnTid: '', statnId: '0220', statnNm: '선릉',
+        trainCo: '', ordkey: '', subwayList: '', statnList: '',
+        btrainSttus: '일반', barvlDt: '180', btrainNo: '1234',
+        bstatnId: '', bstatnNm: '강남',
+        recptnDt: '2026-05-17 12:00:00',
+        arvlMsg2: '', arvlMsg3: '', arvlCd: '',
+        ...overrides,
+      });
+
+      afterEach(() => {
+        nowSpy?.mockRestore();
+      });
+
+      it('subtracts elapsed seconds from arrivalTime when recptnDt is in the past', () => {
+        // recptnDt = 12:00:00 KST, now = 12:00:05 KST → 5s elapsed
+        // barvlDt 180s → corrected to 175s.
+        const recptnMs = Date.parse('2026-05-17T12:00:00+09:00');
+        nowSpy = jest.spyOn(Date, 'now').mockReturnValue(recptnMs + 5000);
+
+        const result = seoulSubwayApi.convertToAppTrain(baseFixture());
+
+        expect(result.arrivalTime).toBe(175);
+      });
+
+      it('clips arrivalTime to 0 when elapsed exceeds arrivalTime', () => {
+        // barvlDt 30s but 60s elapsed → corrected to 0 (train passed).
+        const recptnMs = Date.parse('2026-05-17T12:00:00+09:00');
+        nowSpy = jest.spyOn(Date, 'now').mockReturnValue(recptnMs + 60_000);
+
+        const result = seoulSubwayApi.convertToAppTrain(
+          baseFixture({ barvlDt: '30' }),
+        );
+
+        expect(result.arrivalTime).toBe(0);
+      });
+
+      it('skips correction when recptnDt is empty (legacy fixture)', () => {
+        const result = seoulSubwayApi.convertToAppTrain(
+          baseFixture({ recptnDt: '', barvlDt: '120' }),
+        );
+
+        expect(result.arrivalTime).toBe(120);
+      });
+
+      it('skips correction when recptnDt is unparseable', () => {
+        const result = seoulSubwayApi.convertToAppTrain(
+          baseFixture({ recptnDt: 'not-a-date', barvlDt: '90' }),
+        );
+
+        expect(result.arrivalTime).toBe(90);
+      });
+
+      it('skips correction when clock skew puts recptnDt in the future', () => {
+        // recptnDt 12:00:00, now 11:59:55 → elapsed = -5s → skip (no inflate).
+        const recptnMs = Date.parse('2026-05-17T12:00:00+09:00');
+        nowSpy = jest.spyOn(Date, 'now').mockReturnValue(recptnMs - 5_000);
+
+        const result = seoulSubwayApi.convertToAppTrain(
+          baseFixture({ barvlDt: '120' }),
+        );
+
+        expect(result.arrivalTime).toBe(120);
+      });
+
+      it('skips correction when elapsed exceeds 600s safety cap (stale fixture)', () => {
+        // 700s elapsed > RECPTN_DT_MAX_AGE_SECONDS (600) → skip.
+        const recptnMs = Date.parse('2026-05-17T12:00:00+09:00');
+        nowSpy = jest.spyOn(Date, 'now').mockReturnValue(recptnMs + 700_000);
+
+        const result = seoulSubwayApi.convertToAppTrain(
+          baseFixture({ barvlDt: '180' }),
+        );
+
+        expect(result.arrivalTime).toBe(180);
+      });
+
+      it('skips correction when arrivalTime is null (arvlCd 2 departed)', () => {
+        const recptnMs = Date.parse('2026-05-17T12:00:00+09:00');
+        nowSpy = jest.spyOn(Date, 'now').mockReturnValue(recptnMs + 10_000);
+
+        const result = seoulSubwayApi.convertToAppTrain(
+          baseFixture({ barvlDt: '', arvlCd: '2' }),
+        );
+
+        expect(result.arrivalTime).toBeNull();
+      });
+
+      it('handles compact YYYYMMDDHHMMSS format', () => {
+        const recptnMs = Date.parse('2026-05-17T12:00:00+09:00');
+        nowSpy = jest.spyOn(Date, 'now').mockReturnValue(recptnMs + 10_000);
+
+        const result = seoulSubwayApi.convertToAppTrain(
+          baseFixture({ recptnDt: '20260517120000', barvlDt: '180' }),
+        );
+
+        expect(result.arrivalTime).toBe(170);
+      });
+    });
+  });
+
+  describe('parseRecptnDtToMs', () => {
+    it('parses YYYY-MM-DD HH:MM:SS (space-separated) as KST', () => {
+      const ms = parseRecptnDtToMs('2026-05-17 12:00:00');
+
+      expect(ms).toBe(Date.parse('2026-05-17T12:00:00+09:00'));
+    });
+
+    it('parses YYYYMMDDHHMMSS (compact) as KST', () => {
+      const ms = parseRecptnDtToMs('20260517120000');
+
+      expect(ms).toBe(Date.parse('2026-05-17T12:00:00+09:00'));
+    });
+
+    it('returns null for empty string', () => {
+      expect(parseRecptnDtToMs('')).toBeNull();
+    });
+
+    it('returns null for unrecognized format (slash separator)', () => {
+      expect(parseRecptnDtToMs('2026/05/17 12:00:00')).toBeNull();
+    });
+
+    it('returns null for unrecognized format (ISO T separator without offset)', () => {
+      expect(parseRecptnDtToMs('2026-05-17T12:00:00')).toBeNull();
+    });
+
+    it('returns null for non-date string', () => {
+      expect(parseRecptnDtToMs('not-a-date')).toBeNull();
+    });
+
+    it('treats input as KST regardless of test runner TZ', () => {
+      // KST 2026-01-01 00:00:00 == UTC 2025-12-31 15:00:00.
+      // Memory: [TZ-naive Date.getHours CI 회귀] — explicit +09:00 prevents
+      // local-TZ parsing drift across jest TZ=Asia/Seoul vs CI UTC.
+      const ms = parseRecptnDtToMs('2026-01-01 00:00:00');
+      expect(new Date(ms!).toISOString()).toBe('2025-12-31T15:00:00.000Z');
+    });
+  });
+
+  // GAP_REPORT item #6: error code categorization — ERROR-500/501 + ERROR-336 +
+  // 등 (etc.) per the guide. SeoulApiError preserves errorCode and category
+  // so UI callers can branch (transient → cached fallback, auth → key swap).
+  describe('SeoulApiError categorization', () => {
+    it('categorizes ERROR-500 / ERROR-501 / ERROR-334 / INFO-300 as quota (retryable)', () => {
+      for (const code of ['ERROR-500', 'ERROR-501', 'ERROR-334', 'INFO-300']) {
+        const err = new SeoulApiError(code, 'sample');
+        expect(err.category).toBe('quota');
+        expect(err.retryable).toBe(true);
+      }
+    });
+
+    it('categorizes ERROR-335 / ERROR-336 as transient (retryable, no key rotation)', () => {
+      for (const code of ['ERROR-335', 'ERROR-336']) {
+        const err = new SeoulApiError(code, 'sample');
+        expect(err.category).toBe('transient');
+        expect(err.retryable).toBe(true);
+      }
+    });
+
+    it('categorizes INFO-100 / ERROR-331 / ERROR-332 as auth (NOT retryable)', () => {
+      for (const code of ['INFO-100', 'ERROR-331', 'ERROR-332']) {
+        const err = new SeoulApiError(code, 'sample');
+        expect(err.category).toBe('auth');
+        expect(err.retryable).toBe(false);
+      }
+    });
+
+    it('categorizes ERROR-300 / ERROR-301 / ERROR-310 / ERROR-333 as client (NOT retryable)', () => {
+      for (const code of ['ERROR-300', 'ERROR-301', 'ERROR-310', 'ERROR-333']) {
+        const err = new SeoulApiError(code, 'sample');
+        expect(err.category).toBe('client');
+        expect(err.retryable).toBe(false);
+      }
+    });
+
+    it('falls back to "unknown" for unmapped codes', () => {
+      const err = new SeoulApiError('ERROR-999', 'novel');
+      expect(err.category).toBe('unknown');
+      expect(err.retryable).toBe(false);
+    });
+
+    it('exposes errorCode property and human-readable message', () => {
+      const err = new SeoulApiError('ERROR-336', 'Dispatcher unavailable');
+      expect(err.errorCode).toBe('ERROR-336');
+      expect(err.message).toContain('ERROR-336');
+      expect(err.message).toContain('Dispatcher unavailable');
+      expect(err.name).toBe('SeoulApiError');
+    });
+
+    it('is an instanceof Error (catchable as generic Error)', () => {
+      const err = new SeoulApiError('ERROR-500', 'overload');
+      expect(err).toBeInstanceOf(Error);
+      expect(err).toBeInstanceOf(SeoulApiError);
+    });
+  });
+
+  // GAP_REPORT item #8: btrainSttus normalization. UI can branch on the
+  // normalized enum (normal / express / rapid) instead of regex'ing Korean
+  // strings at every render site.
+  describe('parseTrainType', () => {
+    it('returns "normal" for "일반"', () => {
+      expect(parseTrainType('일반')).toBe('normal');
+    });
+
+    it('returns "express" for "급행"', () => {
+      expect(parseTrainType('급행')).toBe('express');
+    });
+
+    it('returns "rapid" for "특급"', () => {
+      expect(parseTrainType('특급')).toBe('rapid');
+    });
+
+    it('returns "rapid" for "ITX" variants (ITX-청춘, ITX 청춘)', () => {
+      expect(parseTrainType('ITX-청춘')).toBe('rapid');
+      expect(parseTrainType('ITX 청춘')).toBe('rapid');
+    });
+
+    it('returns "rapid" for "직통" (공항철도 직통)', () => {
+      expect(parseTrainType('직통')).toBe('rapid');
+    });
+
+    it('returns "normal" for empty string (safe fallback)', () => {
+      expect(parseTrainType('')).toBe('normal');
+    });
+
+    it('returns "normal" for unknown string (safe fallback)', () => {
+      expect(parseTrainType('미정의값')).toBe('normal');
+    });
+
+    it('trims whitespace before classification', () => {
+      expect(parseTrainType('  급행  ')).toBe('express');
+    });
+  });
+
+  describe('convertToAppTrain — trainType field', () => {
+    const baseFixture = (overrides: Partial<SeoulRealtimeArrival> = {}): SeoulRealtimeArrival => ({
+      rowNum: '1', selectedCount: '1', totalCount: '1', subwayId: '1009',
+      updnLine: '하행', trainLineNm: '김포공항', subwayHeading: '김포공항',
+      statnFid: '', statnTid: '', statnId: '0901', statnNm: '강남',
+      trainCo: '', ordkey: '', subwayList: '', statnList: '',
+      btrainSttus: '일반', barvlDt: '', btrainNo: '9001',
+      bstatnId: '', bstatnNm: '김포공항',
+      recptnDt: '',
+      arvlMsg2: '', arvlMsg3: '', arvlCd: '0',
+      ...overrides,
+    });
+
+    it('exposes trainType="normal" by default (일반)', () => {
+      const result = seoulSubwayApi.convertToAppTrain(baseFixture());
+      expect(result.trainType).toBe('normal');
+    });
+
+    it('exposes trainType="express" when btrainSttus is "급행" (9호선 express)', () => {
+      const result = seoulSubwayApi.convertToAppTrain(baseFixture({ btrainSttus: '급행' }));
+      expect(result.trainType).toBe('express');
+    });
+
+    it('exposes trainType="rapid" when btrainSttus is "특급" or "ITX"', () => {
+      expect(seoulSubwayApi.convertToAppTrain(baseFixture({ btrainSttus: '특급' })).trainType).toBe('rapid');
+      expect(seoulSubwayApi.convertToAppTrain(baseFixture({ btrainSttus: 'ITX-청춘' })).trainType).toBe('rapid');
+    });
+
+    it('falls back to "normal" when btrainSttus is empty', () => {
+      const result = seoulSubwayApi.convertToAppTrain(baseFixture({ btrainSttus: '' }));
+      expect(result.trainType).toBe('normal');
     });
   });
 
