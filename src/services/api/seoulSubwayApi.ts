@@ -4,6 +4,7 @@
  */
 
 import { createSeoulApiKeyManager, createPublicDataApiKeyManager, ApiKeyManager } from './apiKeyManager';
+import { formatStationName } from '../../utils/formatUtils';
 
 /**
  * Rate Limiter for Seoul API (30-second minimum interval per endpoint)
@@ -652,15 +653,18 @@ class SeoulSubwayApiService {
     const updnLine = seoulData.updnLine;
     const direction = (updnLine === '상행' || updnLine === '내선') ? 'up' : 'down';
 
+    // Normalize trailing "역" suffix so downstream UI can safely append "역"
+    // (e.g., `${stationName}역`) without producing "강남역역". Seoul API
+    // typically returns "강남" but defensive normalization tolerates either form.
     return {
       lineId: seoulData.subwayId || seoulData.trainLineNm,
       stationId: seoulData.statnId,
-      stationName: seoulData.statnNm,
+      stationName: formatStationName(seoulData.statnNm),
       direction,
       arrivalMessage: seoulData.arvlMsg2 || seoulData.arvlMsg3 || '',
       arrivalTime,
       trainNumber: seoulData.btrainNo || '',
-      destinationStation: seoulData.bstatnNm || seoulData.subwayHeading || '',
+      destinationStation: formatStationName(seoulData.bstatnNm || seoulData.subwayHeading || ''),
       lastUpdated: new Date()
     };
   }

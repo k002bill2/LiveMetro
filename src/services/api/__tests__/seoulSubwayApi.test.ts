@@ -710,6 +710,56 @@ describe('SeoulSubwayApiService', () => {
       expect(result.arrivalTime).toBe(120);
     });
 
+    it('strips trailing "역" from statnNm and bstatnNm to prevent double-suffix', () => {
+      const seoulData: SeoulRealtimeArrival = {
+        rowNum: '1', selectedCount: '1', totalCount: '10',
+        subwayId: '1002', updnLine: '상행', trainLineNm: '2호선',
+        subwayHeading: '시청', statnFid: '0221', statnTid: '0223',
+        statnId: '0222',
+        statnNm: '강남역',
+        trainCo: '', ordkey: '01',
+        subwayList: '', statnList: '', btrainSttus: '일반',
+        barvlDt: '',
+        btrainNo: '2160',
+        bstatnId: '0250',
+        bstatnNm: '시청역',
+        recptnDt: '2024-01-01 12:00:00',
+        arvlMsg2: '3분후',
+        arvlMsg3: '',
+        arvlCd: '',
+      };
+
+      const result = seoulSubwayApi.convertToAppTrain(seoulData);
+
+      expect(result.stationName).toBe('강남');
+      expect(result.destinationStation).toBe('시청');
+    });
+
+    it('leaves already-suffix-less names unchanged', () => {
+      const seoulData: SeoulRealtimeArrival = {
+        rowNum: '1', selectedCount: '1', totalCount: '10',
+        subwayId: '1002', updnLine: '상행', trainLineNm: '2호선',
+        subwayHeading: '시청', statnFid: '0221', statnTid: '0223',
+        statnId: '0222',
+        statnNm: '강남',
+        trainCo: '', ordkey: '01',
+        subwayList: '', statnList: '', btrainSttus: '일반',
+        barvlDt: '',
+        btrainNo: '2161',
+        bstatnId: '0250',
+        bstatnNm: '시청',
+        recptnDt: '2024-01-01 12:00:00',
+        arvlMsg2: '3분후',
+        arvlMsg3: '',
+        arvlCd: '',
+      };
+
+      const result = seoulSubwayApi.convertToAppTrain(seoulData);
+
+      expect(result.stationName).toBe('강남');
+      expect(result.destinationStation).toBe('시청');
+    });
+
     it('should map 전역진입 (arvlCd 4) to ~180 seconds (not confused with 당역진입)', () => {
       const seoulData: SeoulRealtimeArrival = {
         rowNum: '1', selectedCount: '1', totalCount: '10',

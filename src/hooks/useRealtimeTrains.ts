@@ -52,6 +52,10 @@ export const useRealtimeTrains = (
   const retryCountRef = useRef(0);
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const staleTimerRef = useRef<NodeJS.Timeout | null>(null);
+  // Mirrors state.lastUpdated for the AppState listener — using state directly
+  // would force the effect to re-subscribe on every data tick, churning the
+  // dataManager polling interval.
+  const lastFetchAtRef = useRef<number>(0);
 
   // Stash external callbacks in refs so the subscribe effect does NOT
   // re-run on every parent render. Inline callbacks from the parent
@@ -94,6 +98,7 @@ export const useRealtimeTrains = (
         isStale: false,
       });
 
+      lastFetchAtRef.current = data.lastUpdated.getTime();
       retryCountRef.current = 0; // Reset retry count on successful data
 
       // Set up stale timer
@@ -171,14 +176,22 @@ export const useRealtimeTrains = (
   // AppState 복귀 시 강제 refresh — 백그라운드에 오래 있다가 돌아오면 폴링 타이머가
   // 죽거나 데이터가 stale 상태로 남아있어 도착 정보가 갱신되지 않는 증상을 해소.
   // background/inactive → active 전환에서만 refetch 트리거.
+  // Burst guard: 5초 내 fresh data가 있으면 refetch skip — 짧은 background→active
+  // 전환(앱 스위처, push 알림 닫기)이 30s polling과 겹쳐 Seoul API rate budget을
+  // 낭비하는 회귀 방지.
   useEffect(() => {
     if (!enabled) return;
 
+    const BURST_GUARD_MS = 5000;
     const appStateRef = { current: AppState.currentState };
     const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
       const prev = appStateRef.current;
       appStateRef.current = nextState;
       if ((prev === 'background' || prev === 'inactive') && nextState === 'active') {
+        const sinceLastFetch = Date.now() - lastFetchAtRef.current;
+        if (sinceLastFetch < BURST_GUARD_MS) {
+          return;
+        }
         refetch();
       }
     });
