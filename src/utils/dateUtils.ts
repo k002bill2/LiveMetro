@@ -72,10 +72,41 @@ export const formatArrivalTime = (arrivalTime: Date | number | null): string => 
 
   if (diffSeconds <= 0) return '도착';
   if (diffSeconds < 60) return '곧 도착';
-  
+
   const minutes = Math.floor(diffSeconds / 60);
   if (minutes === 1) return '1분후';
   return `${minutes}분후`;
+};
+
+/**
+ * Metadata-aware variant of formatArrivalTime. Returns the same string under
+ * `text`, plus the parsed `minutes` and an `isImmediate` flag for UI styling
+ * (imminent arrivals — within ~90s). Consumers that previously rolled their
+ * own Math.ceil-based logic (TrainArrivalCard, StationCard) should call this
+ * to stay aligned with the dateUtils SoT.
+ */
+export const formatArrivalDisplay = (
+  arrivalTime: Date | number | null
+): { text: string; minutes: number; isImmediate: boolean } => {
+  const text = formatArrivalTime(arrivalTime);
+
+  if (!arrivalTime) {
+    return { text, minutes: -1, isImmediate: false };
+  }
+
+  const now = new Date();
+  const targetTime =
+    typeof arrivalTime === 'number'
+      ? new Date(now.getTime() + arrivalTime * 1000)
+      : arrivalTime;
+  const diffSeconds = Math.floor((targetTime.getTime() - now.getTime()) / 1000);
+
+  if (diffSeconds <= 0) {
+    return { text, minutes: 0, isImmediate: true };
+  }
+
+  const minutes = Math.floor(diffSeconds / 60);
+  return { text, minutes, isImmediate: minutes <= 1 };
 };
 
 /**

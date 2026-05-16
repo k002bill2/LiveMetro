@@ -30,6 +30,7 @@ import { useAuth } from '../../services/auth/AuthContext';
 import { RADIUS, SPACING, TRANSITIONS, TYPOGRAPHY, WANTED_TOKENS, type WantedSemanticTheme } from '../../styles/modernTheme';
 import { useTheme } from '../../services/theme';
 import { getSubwayLineColor } from '../../utils/colorUtils';
+import { formatArrivalDisplay } from '../../utils/dateUtils';
 import { LineBadge } from '../design';
 
 /**
@@ -245,25 +246,16 @@ export const StationCard: React.FC<StationCardProps> = memo(
         .map((train): UpcomingArrival | null => {
           if (!train.arrivalTime) return null;
 
-          const now = new Date();
-          const arrivalTime = new Date(train.arrivalTime);
-          const diffMs = arrivalTime.getTime() - now.getTime();
-          const diffMinutes = Math.ceil(diffMs / (1000 * 60));
-
-          let displayText: string;
-          if (diffMinutes <= 0) {
-            displayText = '도착';
-          } else if (diffMinutes === 1) {
-            displayText = '1분 후';
-          } else {
-            displayText = `${diffMinutes}분 후`;
-          }
+          // Delegate ETA formatting to dateUtils SoT (Math.floor + "곧 도착").
+          // Previously this used a local Math.ceil-based formatter that drifted
+          // from dateUtils, producing inconsistent ETA strings across screens.
+          const display = formatArrivalDisplay(train.arrivalTime);
 
           return {
             id: train.id,
             direction: train.direction === 'up' ? '상행' : '하행',
-            time: displayText,
-            isImmediate: diffMinutes <= 1,
+            time: display.text,
+            isImmediate: display.isImmediate,
             destination: train.finalDestination,
           };
         })
