@@ -30,6 +30,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Alert,
   SafeAreaView,
   ScrollView,
   StyleSheet,
@@ -47,6 +48,7 @@ import {
   Search,
 } from 'lucide-react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { NavigationProp, ParamListBase } from '@react-navigation/native';
 
 import {
   WANTED_TOKENS,
@@ -60,18 +62,30 @@ import {
   type TransferRouteOptionData,
 } from '@/components/onboarding/TransferRouteOption';
 import { LineBadge } from '@/components/design/LineBadge';
-import { useOnboardingCallbacks } from '@/navigation/OnboardingNavigator';
-import { OnboardingStackParamList } from '@/navigation/types';
+import { useOnboardingCallbacksOptional } from '@/navigation/OnboardingNavigator';
+import { OnboardingStackParamList, SettingsStackParamList } from '@/navigation/types';
 import {
   StationSelection,
   TransferStation,
+  CommuteRoute,
+  DEFAULT_COMMUTE_NOTIFICATIONS,
+  DEFAULT_BUFFER_MINUTES,
 } from '@/models/commute';
+import { useAuth } from '@/services/auth/AuthContext';
+import { saveCommuteRoutes } from '@/services/commute/commuteService';
 import { calculateRoute } from '@/services/route';
 import { AVG_STATION_TRAVEL_TIME, AVG_TRANSFER_TIME } from '@/models/route';
 import { STATIONS, LINE_STATIONS } from '@/utils/subwayMapData';
 import { searchLocalStations } from '@/services/data/stationsDataService';
 
-type Props = NativeStackScreenProps<OnboardingStackParamList, 'CommuteRoute'>;
+// CommuteRouteScreen serves TWO entry points:
+//   1. onboarding step 2/5 (OnboardingStack) — `route.name === 'CommuteRoute'`
+//   2. in-settings route editor (SettingsStack) — `route.name === 'EditCommuteRoute'`
+// The component branches on `route.name` to choose the picker target,
+// hydrate initial state, and decide what "다음 단계 / 저장" means.
+type Props =
+  | NativeStackScreenProps<OnboardingStackParamList, 'CommuteRoute'>
+  | NativeStackScreenProps<SettingsStackParamList, 'EditCommuteRoute'>;
 
 type StationSelectionType = 'departure' | 'arrival' | 'transfer';
 
@@ -297,11 +311,31 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
   const { isDark } = useTheme();
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
   const styles = useMemo(() => createStyles(semantic), [semantic]);
-  const { onSkip } = useOnboardingCallbacks();
+  // edit mode runs outside OnboardingNavigator. Use the optional variant
+  // (always called → Rules-of-Hooks safe) and gate the skip CTA on it.
+  const isEditMode = route.name === 'EditCommuteRoute';
+  const editParams = isEditMode
+    ? (route.params as SettingsStackParamList['EditCommuteRoute'])
+    : null;
+  const onboardingCallbacks = useOnboardingCallbacksOptional();
+  const onSkip = onboardingCallbacks?.onSkip;
+  const { user } = useAuth();
+  const [saving, setSaving] = useState(false);
 
-  const [departureStation, setDepartureStation] = useState<StationSelection | null>(null);
-  const [arrivalStation, setArrivalStation] = useState<StationSelection | null>(null);
-  const [selectedOptionId, setSelectedOptionId] = useState<string>(DIRECT_OPTION_ID);
+  const [departureStation, setDepartureStation] = useState<StationSelection | null>(
+    editParams?.initial?.departureStation ?? null,
+  );
+  const [arrivalStation, setArrivalStation] = useState<StationSelection | null>(
+    editParams?.initial?.arrivalStation ?? null,
+  );
+  const [selectedOptionId, setSelectedOptionId] = useState<string>(() => {
+    // Hydrate selected transfer option from initial route data. A non-empty
+    // transferStations array means the user previously chose a transfer
+    // station; we seed selection with that station's id so the radio list
+    // highlights it once recommendations are built. Empty → direct.
+    const first = editParams?.initial?.transferStations?.[0];
+    return first ? first.stationId : DIRECT_OPTION_ID;
+  });
   const [query, setQuery] = useState('');
 
   // Phase 52 picker handoff — picker writes back via merged params.
@@ -424,18 +458,27 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
           : type === 'arrival'
             ? arrivalStation?.stationName
             : undefined;
-      navigation.navigate('OnboardingStationPicker', {
-        selectionType: type,
-        excludeStationIds: getExcludedStationIds(),
-        currentName,
-      });
+      // Two stacks, two picker route names. Cast to a name-erased
+      // navigator so a single navigate call typechecks regardless of
+      // which stack hosts this screen.
+      const pickerName = isEditMode
+        ? 'EditCommuteStationPicker'
+        : 'OnboardingStationPicker';
+      (navigation as unknown as NavigationProp<ParamListBase>).navigate(
+        pickerName,
+        {
+          selectionType: type,
+          excludeStationIds: getExcludedStationIds(),
+          currentName,
+        },
+      );
     },
-    [navigation, departureStation, arrivalStation, getExcludedStationIds],
+    [navigation, departureStation, arrivalStation, getExcludedStationIds, isEditMode],
   );
 
   const isValid = !!(departureStation && arrivalStation);
 
-  const handleNext = useCallback(() => {
+  const handleNext = useCallback(async () => {
     if (!isValid || !departureStation || !arrivalStation || !selectedOption) return;
 
     // Search-derived options carry a "search-" prefix on the id so the
@@ -457,11 +500,85 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
           },
         ];
 
+    if (isEditMode && editParams && user) {
+      // Edit mode: persist immediately, then return to CommuteSettings.
+      // Preserve the untouched leg via `otherLeg`; when missing (e.g. user
+      // had no evening leg), reuse the edited leg for both slots to
+      // satisfy saveCommuteRoutes' two-leg signature — matches the
+      // CommuteSettingsScreen.handleSelectTransferStation degenerate path.
+      //
+      // notifications/bufferMinutes are threaded from the params (loaded
+      // from Firestore by CommuteSettings) so customized alert windows
+      // and buffer minutes aren't reset to DEFAULT on every edit.
+      const editedLeg: CommuteRoute = {
+        departureTime: editParams.initial?.departureTime ?? DEFAULT_DEPARTURE_TIME,
+        departureStationId: departureStation.stationId,
+        departureStationName: departureStation.stationName,
+        departureLineId: departureStation.lineId,
+        arrivalStationId: arrivalStation.stationId,
+        arrivalStationName: arrivalStation.stationName,
+        arrivalLineId: arrivalStation.lineId,
+        transferStations: transferStations.map((t, i) => ({
+          stationId: t.stationId,
+          stationName: t.stationName,
+          lineId: t.lineId,
+          lineName: '',
+          order: i + 1,
+        })),
+        notifications: editParams.initial?.notifications ?? DEFAULT_COMMUTE_NOTIFICATIONS,
+        bufferMinutes: editParams.initial?.bufferMinutes ?? DEFAULT_BUFFER_MINUTES,
+      };
+      const otherLegSrc = editParams.otherLeg;
+      const otherLeg: CommuteRoute = otherLegSrc
+        ? {
+            departureTime: otherLegSrc.departureTime,
+            departureStationId: otherLegSrc.departureStation.stationId,
+            departureStationName: otherLegSrc.departureStation.stationName,
+            departureLineId: otherLegSrc.departureStation.lineId,
+            arrivalStationId: otherLegSrc.arrivalStation.stationId,
+            arrivalStationName: otherLegSrc.arrivalStation.stationName,
+            arrivalLineId: otherLegSrc.arrivalStation.lineId,
+            transferStations: otherLegSrc.transferStations.map((t, i) => ({
+              stationId: t.stationId,
+              stationName: t.stationName,
+              lineId: t.lineId,
+              lineName: '',
+              order: i + 1,
+            })),
+            notifications: otherLegSrc.notifications ?? DEFAULT_COMMUTE_NOTIFICATIONS,
+            bufferMinutes: otherLegSrc.bufferMinutes ?? DEFAULT_BUFFER_MINUTES,
+          }
+        : editedLeg;
+      const morning = editParams.kind === 'morning' ? editedLeg : otherLeg;
+      const evening = editParams.kind === 'evening' ? editedLeg : otherLeg;
+
+      try {
+        setSaving(true);
+        const result = await saveCommuteRoutes(user.id, morning, evening);
+        if (!result.success) {
+          // Surface the failure so the user knows the save didn't land
+          // (previously silent — the screen just stopped responding to
+          // the CTA, looking identical to "still saving").
+          Alert.alert(
+            '저장 실패',
+            result.error ?? '경로 저장에 실패했습니다. 잠시 후 다시 시도해 주세요.',
+          );
+          return;
+        }
+        if (navigation.canGoBack()) navigation.goBack();
+      } catch {
+        Alert.alert('오류', '경로 저장 중 오류가 발생했습니다.');
+      } finally {
+        setSaving(false);
+      }
+      return;
+    }
+
     // 5-step flow: CommuteRoute forwards to CommuteTime (step 3) which
     // finalises departureTime before NotificationPermission consumes it.
     // The default '08:00' here is overwritten by the user's selection in
     // CommuteTime before reaching the alert step.
-    navigation.navigate('CommuteTime', {
+    (navigation as unknown as NavigationProp<ParamListBase>).navigate('CommuteTime', {
       route: {
         departureTime: DEFAULT_DEPARTURE_TIME,
         eveningDepartureTime: DEFAULT_EVENING_DEPARTURE_TIME,
@@ -470,7 +587,16 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
         transferStations,
       },
     });
-  }, [isValid, departureStation, arrivalStation, selectedOption, navigation]);
+  }, [
+    isValid,
+    departureStation,
+    arrivalStation,
+    selectedOption,
+    navigation,
+    isEditMode,
+    editParams,
+    user,
+  ]);
 
   const renderStationRow = (
     type: StationSelectionType,
@@ -537,17 +663,26 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <OnbHeader
-        currentStep={2}
-        onBack={() => navigation.canGoBack() && navigation.goBack()}
-        onSkip={onSkip}
-      />
+      {/* Onboarding step gauge only — in edit mode the SettingsNavigator
+          owns the screen header (title "경로 편집"), so OnbHeader is
+          suppressed to avoid a duplicate top bar. */}
+      {isEditMode ? null : (
+        <OnbHeader
+          currentStep={2}
+          onBack={() => navigation.canGoBack() && navigation.goBack()}
+          onSkip={onSkip}
+        />
+      )}
       <ScrollView
         contentContainerStyle={styles.body}
         keyboardShouldPersistTaps="handled"
       >
         <Text style={styles.eyebrow} testID="commute-eyebrow">
-          STEP 2 / 5 · 경로 설정
+          {isEditMode
+            ? editParams?.kind === 'evening'
+              ? '퇴근 경로 편집'
+              : '출근 경로 편집'
+            : 'STEP 2 / 5 · 경로 설정'}
         </Text>
         <Text style={styles.title} testID="commute-title">
           {'어디서 어디까지\n이동하시나요?'}
@@ -655,25 +790,25 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
           testID="commute-next"
           style={[
             styles.primary,
-            !isValid ? styles.primaryDisabled : null,
-            isValid ? { shadowColor: semantic.primaryNormal } : null,
+            !isValid || saving ? styles.primaryDisabled : null,
+            isValid && !saving ? { shadowColor: semantic.primaryNormal } : null,
           ]}
           onPress={handleNext}
-          disabled={!isValid}
+          disabled={!isValid || saving}
           accessibilityRole="button"
-          accessibilityLabel="다음 단계"
+          accessibilityLabel={isEditMode ? '경로 저장' : '다음 단계'}
         >
           <Text
             style={[
               styles.primaryLabel,
-              !isValid ? styles.primaryLabelDisabled : null,
+              !isValid || saving ? styles.primaryLabelDisabled : null,
             ]}
           >
-            다음 단계
+            {isEditMode ? (saving ? '저장 중...' : '저장') : '다음 단계'}
           </Text>
           <ArrowRight
             size={18}
-            color={isValid ? semantic.labelOnColor : semantic.labelDisabled}
+            color={isValid && !saving ? semantic.labelOnColor : semantic.labelDisabled}
             strokeWidth={2.4}
           />
         </TouchableOpacity>

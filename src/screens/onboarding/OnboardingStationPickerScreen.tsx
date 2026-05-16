@@ -39,6 +39,7 @@ import {
 } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import type { NavigationProp, ParamListBase } from '@react-navigation/native';
 
 import {
   WANTED_TOKENS,
@@ -51,14 +52,16 @@ import { getLocalStationsByLine } from '@/services/data/stationsDataService';
 import { useFavorites } from '@/hooks/useFavorites';
 import type {
   OnboardingStackParamList,
+  SettingsStackParamList,
   PickedStationPayload,
 } from '@/navigation/types';
 import type { StationSelection } from '@/models/commute';
 
-type Props = NativeStackScreenProps<
-  OnboardingStackParamList,
-  'OnboardingStationPicker'
->;
+// Picker serves two stacks (onboarding + settings/edit). Branch on
+// route.name to pick which screen receives the merged-param handoff.
+type Props =
+  | NativeStackScreenProps<OnboardingStackParamList, 'OnboardingStationPicker'>
+  | NativeStackScreenProps<SettingsStackParamList, 'EditCommuteStationPicker'>;
 
 const LINE_IDS_BROWSE = [
   '1', '2', '3', '4', '5', '6', '7', '8', '9',
@@ -122,20 +125,25 @@ export const OnboardingStationPickerScreen: React.FC<Props> = ({
   const meta = SLOT_META[selectionType];
   const SlotIcon = meta.Icon;
 
-  /** Commit selection back to CommuteRoute via merged params. */
+  /** Commit selection back to the host CommuteRoute screen via merged
+   *  params. Returns to 'EditCommuteRoute' when invoked from the settings
+   *  stack, otherwise the onboarding 'CommuteRoute'.
+   */
+  const returnRouteName =
+    route.name === 'EditCommuteStationPicker' ? 'EditCommuteRoute' : 'CommuteRoute';
   const handlePick = useCallback(
     (station: StationSelection): void => {
       const payload: PickedStationPayload = {
         selectionType,
         station,
       };
-      navigation.navigate({
-        name: 'CommuteRoute',
+      (navigation as unknown as NavigationProp<ParamListBase>).navigate({
+        name: returnRouteName,
         params: { pickedStation: payload },
         merge: true,
       });
     },
-    [navigation, selectionType],
+    [navigation, selectionType, returnRouteName],
   );
 
   /** Recommended list: commute favorites filtered by exclusion + query. */

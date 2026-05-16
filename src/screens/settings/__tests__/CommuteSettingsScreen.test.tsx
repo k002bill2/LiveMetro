@@ -255,12 +255,12 @@ describe('CommuteSettingsScreen', () => {
     });
 
     const { getByText } = render(<CommuteSettingsScreen {...createProps()} />);
-    // Post Wanted-handoff redesign, the RouteCard body shows transfer
-    // count rather than the transfer station name inline. Assert the
-    // count text instead of '신도림' (which now lives only in
-    // expand/edit flows reached via "환승 추가").
+    // After the EditCommuteRoute redesign, the transfer row shows both
+    // count and station name(s) — "환승 N회 · {names}" — because the
+    // standalone "환승 추가" CTA + StationSearchModal flow was removed
+    // (route changes go through the editor only).
     await waitFor(() => {
-      expect(getByText('환승 1회')).toBeTruthy();
+      expect(getByText('환승 1회 · 신도림')).toBeTruthy();
     });
   });
 
