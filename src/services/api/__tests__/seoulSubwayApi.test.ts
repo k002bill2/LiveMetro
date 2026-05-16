@@ -22,7 +22,7 @@ global.fetch = mockFetch;
 
 // Now require the actual module (after reset and unmock)
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { seoulSubwayApi, RateLimiter, parseRecptnDtToMs, SeoulApiError } = jest.requireActual('../seoulSubwayApi');
+const { seoulSubwayApi, RateLimiter, parseRecptnDtToMs, SeoulApiError, parseTrainType } = jest.requireActual('../seoulSubwayApi');
 
 // Type for test use
 interface SeoulRealtimeArrival {
@@ -1005,6 +1005,78 @@ describe('SeoulSubwayApiService', () => {
       const err = new SeoulApiError('ERROR-500', 'overload');
       expect(err).toBeInstanceOf(Error);
       expect(err).toBeInstanceOf(SeoulApiError);
+    });
+  });
+
+  // GAP_REPORT item #8: btrainSttus normalization. UI can branch on the
+  // normalized enum (normal / express / rapid) instead of regex'ing Korean
+  // strings at every render site.
+  describe('parseTrainType', () => {
+    it('returns "normal" for "일반"', () => {
+      expect(parseTrainType('일반')).toBe('normal');
+    });
+
+    it('returns "express" for "급행"', () => {
+      expect(parseTrainType('급행')).toBe('express');
+    });
+
+    it('returns "rapid" for "특급"', () => {
+      expect(parseTrainType('특급')).toBe('rapid');
+    });
+
+    it('returns "rapid" for "ITX" variants (ITX-청춘, ITX 청춘)', () => {
+      expect(parseTrainType('ITX-청춘')).toBe('rapid');
+      expect(parseTrainType('ITX 청춘')).toBe('rapid');
+    });
+
+    it('returns "rapid" for "직통" (공항철도 직통)', () => {
+      expect(parseTrainType('직통')).toBe('rapid');
+    });
+
+    it('returns "normal" for empty string (safe fallback)', () => {
+      expect(parseTrainType('')).toBe('normal');
+    });
+
+    it('returns "normal" for unknown string (safe fallback)', () => {
+      expect(parseTrainType('미정의값')).toBe('normal');
+    });
+
+    it('trims whitespace before classification', () => {
+      expect(parseTrainType('  급행  ')).toBe('express');
+    });
+  });
+
+  describe('convertToAppTrain — trainType field', () => {
+    const baseFixture = (overrides: Partial<SeoulRealtimeArrival> = {}): SeoulRealtimeArrival => ({
+      rowNum: '1', selectedCount: '1', totalCount: '1', subwayId: '1009',
+      updnLine: '하행', trainLineNm: '김포공항', subwayHeading: '김포공항',
+      statnFid: '', statnTid: '', statnId: '0901', statnNm: '강남',
+      trainCo: '', ordkey: '', subwayList: '', statnList: '',
+      btrainSttus: '일반', barvlDt: '', btrainNo: '9001',
+      bstatnId: '', bstatnNm: '김포공항',
+      recptnDt: '',
+      arvlMsg2: '', arvlMsg3: '', arvlCd: '0',
+      ...overrides,
+    });
+
+    it('exposes trainType="normal" by default (일반)', () => {
+      const result = seoulSubwayApi.convertToAppTrain(baseFixture());
+      expect(result.trainType).toBe('normal');
+    });
+
+    it('exposes trainType="express" when btrainSttus is "급행" (9호선 express)', () => {
+      const result = seoulSubwayApi.convertToAppTrain(baseFixture({ btrainSttus: '급행' }));
+      expect(result.trainType).toBe('express');
+    });
+
+    it('exposes trainType="rapid" when btrainSttus is "특급" or "ITX"', () => {
+      expect(seoulSubwayApi.convertToAppTrain(baseFixture({ btrainSttus: '특급' })).trainType).toBe('rapid');
+      expect(seoulSubwayApi.convertToAppTrain(baseFixture({ btrainSttus: 'ITX-청춘' })).trainType).toBe('rapid');
+    });
+
+    it('falls back to "normal" when btrainSttus is empty', () => {
+      const result = seoulSubwayApi.convertToAppTrain(baseFixture({ btrainSttus: '' }));
+      expect(result.trainType).toBe('normal');
     });
   });
 

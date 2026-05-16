@@ -664,7 +664,8 @@ describe('DataManager', () => {
       mockSeoulApi.convertToAppTrain.mockReturnValue({
         lineId: '2', stationId: '0222', stationName: '강남',
         direction: 'up', arrivalMessage: '2분 후 도착', arrivalTime: 120,
-        trainNumber: '2001', destinationStation: '잠실', lastUpdated: new Date(),
+        trainNumber: '2001', destinationStation: '잠실',
+        trainType: 'normal', lastUpdated: new Date(),
       });
 
       const data = await dataManager.getRealtimeTrains('강남');
@@ -694,7 +695,8 @@ describe('DataManager', () => {
       mockSeoulApi.convertToAppTrain.mockImplementation((a) => ({
         lineId: '2', stationId: a.statnId, stationName: a.statnNm,
         direction: 'up', arrivalMessage: a.arvlMsg2, arrivalTime: 120,
-        trainNumber: a.btrainNo, destinationStation: a.bstatnNm, lastUpdated: new Date(),
+        trainNumber: a.btrainNo, destinationStation: a.bstatnNm,
+        trainType: 'normal', lastUpdated: new Date(),
       }));
 
       const data = await dataManager.getRealtimeTrains('강남');

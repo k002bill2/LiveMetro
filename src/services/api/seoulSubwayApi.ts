@@ -150,6 +150,34 @@ export function parseRecptnDtToMs(recptnDt: string): number | null {
 const RECPTN_DT_MAX_AGE_SECONDS = 600;
 
 /**
+ * Normalized train service tier derived from Seoul API `btrainSttus`.
+ *
+ * - `normal`: 일반 (default, all-stops)
+ * - `express`: 급행 (skips select stations, e.g. 9호선 급행)
+ * - `rapid`: 특급 / ITX (express-of-express, e.g. 경춘선 ITX-청춘, 공항철도 직통)
+ *
+ * Guide (2026-05-16) item #8 mandates color/icon differentiation for service
+ * tier. This normalization lets UI branch once on the enum value rather than
+ * regex'ing the raw Korean string at every render site.
+ */
+export type TrainType = 'normal' | 'express' | 'rapid';
+
+/**
+ * Map Seoul API `btrainSttus` Korean string to normalized {@link TrainType}.
+ *
+ * Empty / unknown / unparseable inputs default to `'normal'` — safest fallback
+ * since misclassifying a true rapid train as normal only loses a visual badge,
+ * whereas misclassifying normal as rapid would mislead users about stops.
+ */
+export function parseTrainType(btrainSttus: string): TrainType {
+  if (!btrainSttus) return 'normal';
+  const s = btrainSttus.trim();
+  if (s === '특급' || s.includes('ITX') || s.includes('직통')) return 'rapid';
+  if (s === '급행') return 'express';
+  return 'normal';
+}
+
+/**
  * Thrown by getStationTimetable when called on a web platform.
  *
  * Seoul Open Data Portal's timetable endpoint is HTTP-only (port 8088, no HTTPS).
@@ -682,7 +710,12 @@ class SeoulSubwayApiService {
   }
 
   /**
-   * Convert Seoul API arrival data to app Train model
+   * Convert Seoul API arrival data to app Train model.
+   *
+   * `trainType` derives from `btrainSttus` per guide (2026-05-16) item #8.
+   * Values observed in live responses: "일반", "급행", "특급", "ITX". The
+   * helper normalizes synonyms (special + ITX → 'rapid') so UI can branch
+   * once.
    */
   convertToAppTrain(seoulData: SeoulRealtimeArrival): {
     lineId: string;
@@ -693,6 +726,7 @@ class SeoulSubwayApiService {
     arrivalTime: number | null;
     trainNumber: string;
     destinationStation: string;
+    trainType: TrainType;
     lastUpdated: Date;
   } {
     // Primary: use barvlDt (exact remaining seconds from Seoul API)
@@ -809,6 +843,7 @@ class SeoulSubwayApiService {
       arrivalTime,
       trainNumber: seoulData.btrainNo || '',
       destinationStation: formatStationName(seoulData.bstatnNm || seoulData.subwayHeading || ''),
+      trainType: parseTrainType(seoulData.btrainSttus),
       lastUpdated: new Date()
     };
   }

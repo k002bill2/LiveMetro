@@ -128,6 +128,7 @@ jest.mock('../services/api/seoulSubwayApi', () => ({
       arrivalTime: 120,
       trainNumber: seoulData.btrainNo || 'train-1',
       destinationStation: seoulData.bstatnNm || '종착역',
+      trainType: 'normal',
       lastUpdated: new Date(),
     })),
   },
