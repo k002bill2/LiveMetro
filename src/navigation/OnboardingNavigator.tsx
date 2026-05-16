@@ -3,8 +3,11 @@
  * Stack navigator for the commute setup onboarding flow
  */
 
-import React, { createContext, useContext, useCallback } from 'react';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import React, { createContext, useContext, useCallback, type ComponentType } from 'react';
+import {
+  createNativeStackNavigator,
+  type NativeStackScreenProps,
+} from '@react-navigation/native-stack';
 import { OnboardingStackParamList } from './types';
 import { WelcomeOnboardingScreen } from '@/screens/onboarding/WelcomeOnboardingScreen';
 import { CommuteRouteScreen } from '@/screens/onboarding/CommuteRouteScreen';
@@ -31,6 +34,16 @@ export const useOnboardingCallbacks = (): OnboardingContextType => {
     throw new Error('useOnboardingCallbacks must be used within OnboardingNavigator');
   }
   return context;
+};
+
+// Optional variant: returns null when used outside OnboardingNavigator.
+// CommuteRouteScreen reuses this hook in both the onboarding stack and
+// the settings stack (EditCommuteRoute); the latter has no provider, so
+// the strict variant would throw. Rules-of-Hooks compliant because the
+// hook is always called unconditionally.
+export const useOnboardingCallbacksOptional = (): OnboardingContextType | null => {
+  const context = useContext(OnboardingContext);
+  return context ?? null;
 };
 
 interface OnboardingNavigatorProps {
@@ -66,8 +79,27 @@ export const OnboardingNavigator: React.FC<OnboardingNavigatorProps> = ({
         initialRouteName="WelcomeOnboarding"
       >
         <Stack.Screen name="WelcomeOnboarding" component={WelcomeOnboardingScreen} />
-        <Stack.Screen name="CommuteRoute" component={CommuteRouteScreen} />
-        <Stack.Screen name="OnboardingStationPicker" component={OnboardingStationPickerScreen} />
+        {/* CommuteRouteScreen + OnboardingStationPickerScreen use union
+            Props (this stack ∪ SettingsStack.EditCommuteRoute/Picker) so
+            the same component can host both flows. Stack.Screen's
+            `component` prop is invariant in its Props, so cast each
+            registration to the precise typed-Props shape for THIS stack. */}
+        <Stack.Screen
+          name="CommuteRoute"
+          component={
+            CommuteRouteScreen as ComponentType<
+              NativeStackScreenProps<OnboardingStackParamList, 'CommuteRoute'>
+            >
+          }
+        />
+        <Stack.Screen
+          name="OnboardingStationPicker"
+          component={
+            OnboardingStationPickerScreen as ComponentType<
+              NativeStackScreenProps<OnboardingStackParamList, 'OnboardingStationPicker'>
+            >
+          }
+        />
         <Stack.Screen name="CommuteTime" component={CommuteTimeScreen} />
         <Stack.Screen name="NotificationPermission" component={NotificationPermissionScreen} />
         <Stack.Screen name="FavoritesOnboarding" component={FavoritesOnboardingScreen} />

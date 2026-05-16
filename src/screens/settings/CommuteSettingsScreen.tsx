@@ -29,7 +29,6 @@ import {
 import {
   ArrowRight,
   BellRing,
-  ChevronDown,
   Clock,
   MapPin,
   PlusCircle,
@@ -48,9 +47,8 @@ import {
   type WantedSemanticTheme,
 } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme';
-import { SettingsStackParamList } from '@/navigation/types';
+import { SettingsStackParamList, OnboardingRouteData } from '@/navigation/types';
 import { useAuth } from '@/services/auth/AuthContext';
-import { useOnboarding } from '@/contexts/OnboardingContext';
 import {
   loadCommuteRoutes,
   saveCommuteRoutes,
@@ -61,13 +59,11 @@ import {
   CommuteRoute,
   DEFAULT_COMMUTE_NOTIFICATIONS,
   DEFAULT_BUFFER_MINUTES,
-  StationSelection,
 } from '@/models/commute';
 import type { SmartFeatures } from '@/models/user';
 import SettingSection from '@/components/settings/SettingSection';
 import SettingToggle from '@/components/settings/SettingToggle';
 import { SettingPicker, type PickerOption } from '@/components/settings/SettingPicker';
-import { StationSearchModal } from '@/components/commute/StationSearchModal';
 import { TimePickerCard } from '@/components/settings/TimePickerCard';
 import { useToast } from '@/components/common/Toast';
 
@@ -90,6 +86,11 @@ interface CommuteRouteData {
     stationName: string;
     lineId: string;
   }[];
+  // Preserve customized commute settings so editing a route in the
+  // settings screen doesn't reset them to defaults on save. Undefined
+  // when the loaded route predates these fields — handle with ?? at use.
+  notifications?: CommuteRoute['notifications'];
+  bufferMinutes?: number;
 }
 
 const DAY_LABELS: readonly string[] = ['월', '화', '수', '목', '금', '토', '일'];
@@ -146,7 +147,6 @@ const addMinutesToTime = (hhmm: string, minutes: number): string | null => {
 
 export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
   const { user, updateUserProfile } = useAuth();
-  const { resetOnboarding, markTermsAgreed, markCelebrationSeen } = useOnboarding();
   const { isDark } = useTheme();
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
   const styles = useMemo(() => createStyles(semantic), [semantic]);
@@ -221,10 +221,6 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
-  // Transfer-station picker state. `kind` selects which route gets the
-  // newly chosen station; `null` means the modal is closed.
-  const [transferModalKind, setTransferModalKind] = useState<'morning' | 'evening' | null>(null);
-
   // Convert local CommuteRouteData (UI shape) into CommuteRoute (Firestore
   // shape). Adds default notifications + bufferMinutes; transferStations
   // get a synthesized lineName + order.
@@ -249,77 +245,6 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
     }),
     [],
   );
-
-  const handleAddTransfer = useCallback((kind: 'morning' | 'evening') => {
-    setTransferModalKind(kind);
-  }, []);
-
-  const handleCloseTransferModal = useCallback(() => {
-    setTransferModalKind(null);
-  }, []);
-
-  const handleSelectTransferStation = useCallback(
-    async (selection: StationSelection): Promise<void> => {
-      if (!user || !transferModalKind) return;
-      const targetRoute = transferModalKind === 'morning' ? morningRoute : eveningRoute;
-      if (!targetRoute) {
-        setTransferModalKind(null);
-        return;
-      }
-      const nextRoute: CommuteRouteData = {
-        ...targetRoute,
-        transferStations: [
-          ...targetRoute.transferStations,
-          {
-            stationId: selection.stationId,
-            stationName: selection.stationName,
-            lineId: selection.lineId,
-          },
-        ],
-      };
-
-      try {
-        setSaving(true);
-        const morningForSave = transferModalKind === 'morning' ? nextRoute : morningRoute;
-        const eveningForSave = transferModalKind === 'evening' ? nextRoute : eveningRoute;
-        // saveCommuteRoutes requires both legs; degenerate to morning when
-        // evening is missing (matches FavoritesOnboarding pattern).
-        const result = await saveCommuteRoutes(
-          user.id,
-          routeDataToCommuteRoute(morningForSave ?? nextRoute),
-          routeDataToCommuteRoute(eveningForSave ?? morningForSave ?? nextRoute),
-        );
-        if (!result.success) {
-          Alert.alert('저장 실패', result.error ?? '환승역 저장에 실패했습니다.');
-          return;
-        }
-        if (transferModalKind === 'morning') {
-          setMorningRoute(nextRoute);
-        } else {
-          setEveningRoute(nextRoute);
-        }
-      } catch (error) {
-        console.error('Error saving transfer station:', error);
-        Alert.alert('오류', '환승역 저장 중 오류가 발생했습니다.');
-      } finally {
-        setSaving(false);
-        setTransferModalKind(null);
-      }
-    },
-    [user, transferModalKind, morningRoute, eveningRoute, routeDataToCommuteRoute],
-  );
-
-  // Stations to exclude from the picker — never let the user pick the
-  // route's own departure/arrival or an already-listed transfer station.
-  const transferExcludeIds = useMemo(() => {
-    const target = transferModalKind === 'morning' ? morningRoute : eveningRoute;
-    if (!target) return [];
-    return [
-      target.departureStation.stationId,
-      target.arrivalStation.stationId,
-      ...target.transferStations.map((t) => t.stationId),
-    ];
-  }, [transferModalKind, morningRoute, eveningRoute]);
 
   // Derived prefs from user.preferences.commuteSchedule (with fallbacks for
   // existing user data that pre-dates these fields).
@@ -472,6 +397,10 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
         stationName: t.stationName,
         lineId: t.lineId,
       })),
+      // Carry user-customized notifications/bufferMinutes so the editor
+      // round-trip preserves them (Gemini regression fix).
+      notifications: route.notifications,
+      bufferMinutes: route.bufferMinutes,
     };
   };
 
@@ -513,37 +442,59 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
     }, [loadSettings])
   );
 
-  const handleSetupCommute = (): void => {
-    Alert.alert(
-      '출퇴근 경로 재설정',
-      '경로 설정 화면으로 이동합니다.\n기존 즐겨찾기와 알림 설정은 유지됩니다.',
-      [
-        { text: '취소', style: 'cancel' },
-        {
-          text: '계속',
-          onPress: async () => {
-            // CommuteSettings에 도달한 사용자는 이미 약관/축하 단계를 통과한 인증
-            // 사용자이므로, RootNavigator가 SignupStep2/SignupStep3로 분기하지
-            // 않도록 보장한 뒤 onboarding(Welcome → CommuteRoute)으로 진입한다.
-            // 이는 phoneOnly + hasAgreedToTerms===false 조합에서 약관 동의
-            // 페이지로 잘못 라우팅되는 결함의 surgical fix.
-            await Promise.all([markTermsAgreed(), markCelebrationSeen()]);
-            await resetOnboarding();
-          },
-        },
-      ],
-    );
-  };
+  // Open the in-settings route editor (EditCommuteRoute). Push the chosen
+  // leg as `initial` for hydration and the other leg as `otherLeg` so the
+  // editor's save call can persist both with saveCommuteRoutes' two-leg
+  // signature. Replaces the prior `resetOnboarding()` pattern, which
+  // restarted the entire 5-step onboarding flow just to edit one route.
+  const handleEditRoute = useCallback(
+    (kind: 'morning' | 'evening'): void => {
+      const routeDataToOnboarding = (
+        data: CommuteRouteData | null,
+      ): OnboardingRouteData | undefined =>
+        data
+          ? {
+              departureTime: data.departureTime,
+              // CommuteRouteData uses an inline shape without `lineName`;
+              // StationSelection (OnboardingRouteData) requires it. Fill
+              // with '' since the editor doesn't surface line names yet.
+              departureStation: { ...data.departureStation, lineName: '' },
+              arrivalStation: { ...data.arrivalStation, lineName: '' },
+              // 1-based `order` matches routeDataToCommuteRoute helper
+              // and the Firestore `CommuteRoute` convention. Drifting to
+              // 0-based here would cause off-by-one on the editor save.
+              transferStations: data.transferStations.map((t, i) => ({
+                stationId: t.stationId,
+                stationName: t.stationName,
+                lineId: t.lineId,
+                lineName: '',
+                order: i + 1,
+              })),
+              // Preserve user-customized values across the editor
+              // round-trip (Gemini regression fix).
+              notifications: data.notifications,
+              bufferMinutes: data.bufferMinutes,
+            }
+          : undefined;
+      const initial = routeDataToOnboarding(
+        kind === 'morning' ? morningRoute : eveningRoute,
+      );
+      const otherLeg = routeDataToOnboarding(
+        kind === 'morning' ? eveningRoute : morningRoute,
+      );
+      navigation.navigate('EditCommuteRoute', { kind, initial, otherLeg });
+    },
+    [navigation, morningRoute, eveningRoute],
+  );
 
   const RouteCard: React.FC<{
     kind: 'morning' | 'evening';
     route: CommuteRouteData | null;
     onEdit: () => void;
-    onAddTransfer: () => void;
     enabled?: boolean;
     onToggleEnabled?: (v: boolean) => void;
     arrivalEtaMinutes?: number | null;
-  }> = ({ kind, route, onEdit, onAddTransfer, enabled, onToggleEnabled, arrivalEtaMinutes }) => {
+  }> = ({ kind, route, onEdit, enabled, onToggleEnabled, arrivalEtaMinutes }) => {
     const isMorning = kind === 'morning';
     const arrivalTime = isMorning && route && arrivalEtaMinutes != null
       ? addMinutesToTime(route.departureTime, arrivalEtaMinutes)
@@ -561,7 +512,15 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
           <Text style={styles.routeWeekdayText}>평일 매일</Text>
           <View style={{ flex: 1 }} />
           {isMorning ? (
-            <TouchableOpacity onPress={onEdit} accessibilityRole="button" accessibilityLabel="경로 편집">
+            <TouchableOpacity
+              onPress={onEdit}
+              accessibilityRole="button"
+              accessibilityLabel="경로 편집"
+              // Text-only links collapse to a few px tall hit area —
+              // extend the invisible touch area without changing layout.
+              // Mirrors the "저장" header link's hitSlop (line ~210).
+              hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+            >
               <Text style={styles.routeEditLink}>편집</Text>
             </TouchableOpacity>
           ) : (
@@ -596,17 +555,20 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
                 <View style={styles.routeConnectorDot} />
                 <View style={styles.routeConnectorDot} />
               </View>
-              {/* 환승 row */}
+              {/* 환승 row — read-only summary. Transfer changes are made
+                  in the EditCommuteRoute editor (header "편집" link), so
+                  the prior "환승 추가" CTA + StationSearchModal flow was
+                  removed as a redundant entry point. */}
               <View style={styles.routeBodyRow}>
                 <View style={[styles.routeDot, { backgroundColor: WANTED_TOKENS.status.green500 }]} />
-                <Text style={styles.routeMidText}>
-                  {transferCount === 0 ? '직행 · 환승 없음' : `환승 ${transferCount}회`}
+                <Text style={styles.routeMidText} numberOfLines={1}>
+                  {transferCount === 0
+                    ? '직행 · 환승 없음'
+                    : `환승 ${transferCount}회 · ${route.transferStations
+                        .map((t) => t.stationName)
+                        .join(', ')}`}
                 </Text>
                 <View style={{ flex: 1 }} />
-                <TouchableOpacity onPress={onAddTransfer} style={styles.routeAddTransferRow} accessibilityRole="button" accessibilityLabel="환승 추가">
-                  <Text style={styles.routeAddTransferText}>환승 추가</Text>
-                  <ChevronDown size={14} color={WANTED_TOKENS.blue[500]} strokeWidth={2} />
-                </TouchableOpacity>
               </View>
               <View style={styles.routeConnector}>
                 <View style={styles.routeConnectorDot} />
@@ -712,16 +674,14 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
           <RouteCard
             kind="morning"
             route={morningRoute}
-            onEdit={handleSetupCommute}
-            onAddTransfer={() => handleAddTransfer('morning')}
+            onEdit={() => handleEditRoute('morning')}
             arrivalEtaMinutes={baselineMinutes !== null ? Math.round(baselineMinutes) : null}
           />
           <View style={styles.routeDivider} />
           <RouteCard
             kind="evening"
             route={eveningRoute}
-            onEdit={handleSetupCommute}
-            onAddTransfer={() => handleAddTransfer('evening')}
+            onEdit={() => handleEditRoute('evening')}
             enabled={eveningRoute !== null && eveningEnabled}
             onToggleEnabled={handleToggleEveningEnabled}
           />
@@ -819,15 +779,6 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
           </Text>
         </SettingSection>
       </ScrollView>
-
-      <StationSearchModal
-        visible={transferModalKind !== null}
-        onClose={handleCloseTransferModal}
-        onSelect={handleSelectTransferStation}
-        title="환승역 선택"
-        placeholder="환승할 역을 검색하세요"
-        excludeStationIds={transferExcludeIds}
-      />
 
       <ToastComponent />
     </SafeAreaView>
@@ -1123,16 +1074,6 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       fontSize: 12,
       fontFamily: weightToFontFamily('600'),
       color: semantic.labelAlt,
-    },
-    routeAddTransferRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 2,
-    },
-    routeAddTransferText: {
-      fontSize: 12,
-      fontFamily: weightToFontFamily('700'),
-      color: WANTED_TOKENS.blue[500],
     },
     routeConnector: {
       // Replaces RN's flaky `borderStyle: 'dashed'` (iOS often renders

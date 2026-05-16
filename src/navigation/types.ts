@@ -20,6 +20,24 @@ export type SettingsStackParamList = {
   SettingsHome: undefined;
   EditProfile: undefined;
   CommuteSettings: undefined;
+  // In-settings route editor. Reuses CommuteRouteScreen (onboarding) under
+  // an `edit` mode: hydrates from `initial`, saves morning+evening via
+  // saveCommuteRoutes (`otherLeg` carries the untouched leg), and pops
+  // back to CommuteSettings instead of forwarding to CommuteTime.
+  EditCommuteRoute: {
+    kind: 'morning' | 'evening';
+    initial?: OnboardingRouteData;
+    otherLeg?: OnboardingRouteData;
+    pickedStation?: PickedStationPayload;
+  };
+  // Picker drill-in from EditCommuteRoute. Mirrors OnboardingStationPicker
+  // but returns to EditCommuteRoute via merged params so the two flows
+  // don't cross-contaminate stacks.
+  EditCommuteStationPicker: {
+    selectionType: 'departure' | 'arrival' | 'transfer';
+    excludeStationIds: string[];
+    currentName?: string;
+  };
   DelayNotification: undefined;
   NotificationTime: undefined;
   SoundSettings: undefined;
@@ -43,7 +61,12 @@ export interface OnboardingRouteData {
   departureStation: StationSelection;
   arrivalStation: StationSelection;
   transferStations: TransferStation[];
+  // Preserved across the in-settings edit round-trip so user-customized
+  // values aren't reset to DEFAULT on save. Onboarding leaves them
+  // undefined; the editor reads them from the loaded route and threads
+  // them back through saveCommuteRoutes.
   notifications?: CommuteNotifications;
+  bufferMinutes?: number;
 }
 
 // Phase 52: handoff payload returned from OnboardingStationPicker → CommuteRoute

@@ -3,8 +3,11 @@
  * Handles navigation for all settings-related screens
  */
 
-import React from 'react';
-import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import React, { type ComponentType } from 'react';
+import {
+  createNativeStackNavigator,
+  type NativeStackScreenProps,
+} from '@react-navigation/native-stack';
 
 import { SettingsStackParamList } from './types';
 import { useTheme } from '@/services/theme';
@@ -23,6 +26,12 @@ import LocationPermissionScreen from '@/screens/settings/LocationPermissionScree
 import HelpScreen from '@/screens/settings/HelpScreen';
 import { FeedbackScreen } from '@/screens/feedback/FeedbackScreen';
 import PrivacyPolicyScreen from '@/screens/settings/PrivacyPolicyScreen';
+// In-settings route editor reuses the onboarding CommuteRouteScreen + its
+// station picker, both of which branch on `route.name` to know they are
+// running inside SettingsNavigator (no OnboardingNavigator context, save
+// & goBack semantics instead of forwarding to CommuteTime).
+import { CommuteRouteScreen } from '@/screens/onboarding/CommuteRouteScreen';
+import { OnboardingStationPickerScreen } from '@/screens/onboarding/OnboardingStationPickerScreen';
 
 const SettingsStack = createNativeStackNavigator<SettingsStackParamList>();
 
@@ -62,6 +71,29 @@ export const SettingsNavigator: React.FC = () => {
         name="CommuteSettings"
         component={CommuteSettingsScreen}
         options={{ title: '출퇴근 설정' }}
+      />
+      {/* Both components carry union Props (Onboarding ∪ Settings); cast
+          to this stack's precise Props shape so Stack.Screen's invariant
+          `component` prop type-checks. */}
+      <SettingsStack.Screen
+        name="EditCommuteRoute"
+        component={
+          CommuteRouteScreen as ComponentType<
+            NativeStackScreenProps<SettingsStackParamList, 'EditCommuteRoute'>
+          >
+        }
+        options={{ title: '경로 편집' }}
+      />
+      <SettingsStack.Screen
+        name="EditCommuteStationPicker"
+        component={
+          OnboardingStationPickerScreen as ComponentType<
+            NativeStackScreenProps<SettingsStackParamList, 'EditCommuteStationPicker'>
+          >
+        }
+        // Picker owns its own SafeAreaView+header (slot label, back button),
+        // so suppress the stack header to avoid a duplicate top bar.
+        options={{ headerShown: false }}
       />
       <SettingsStack.Screen
         name="DelayNotification"

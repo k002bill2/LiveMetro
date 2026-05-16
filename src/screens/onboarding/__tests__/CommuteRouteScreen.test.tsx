@@ -49,10 +49,33 @@ jest.mock('@/components/design/LineBadge', () => ({
 
 const mockOnSkip = jest.fn();
 jest.mock('@/navigation/OnboardingNavigator', () => ({
+  // CommuteRouteScreen now uses the optional variant so it can also host
+  // the in-settings EditCommuteRoute flow (no provider). Tests live in
+  // onboarding context, so both variants resolve the same callbacks.
+  // Use implementation callbacks (not factory-time literals) so the
+  // closure captures `mockOnSkip` after its TDZ resolves.
   useOnboardingCallbacks: jest.fn(() => ({
     onComplete: jest.fn(),
     onSkip: mockOnSkip,
   })),
+  useOnboardingCallbacksOptional: jest.fn(() => ({
+    onComplete: jest.fn(),
+    onSkip: mockOnSkip,
+  })),
+}));
+
+// Phase: edit-mode-in-settings — CommuteRouteScreen now also hosts the
+// SettingsStack.EditCommuteRoute route and calls useAuth() so save can
+// target the current user. Onboarding tests don't exercise save, but the
+// hook still runs on mount so it needs a stub provider.
+jest.mock('@/services/auth/AuthContext', () => ({
+  useAuth: jest.fn(() => ({ user: { id: 'test-uid' } })),
+}));
+
+// Same reason: the edit-mode save path calls saveCommuteRoutes. Onboarding
+// tests never trigger it, but the module is imported at file scope.
+jest.mock('@/services/commute/commuteService', () => ({
+  saveCommuteRoutes: jest.fn(),
 }));
 
 // Keep the model module live so DEFAULT_COMMUTE_NOTIFICATIONS / TransferStation
