@@ -70,6 +70,7 @@ const makeHookResult = (
   loading: false,
   error: null,
   refresh: jest.fn(),
+  isViewingToday: true,
   ...overrides,
 });
 
