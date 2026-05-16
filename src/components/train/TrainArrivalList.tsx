@@ -5,7 +5,7 @@
 
 import { TrainFront, CheckCircle, Clock, XCircle, Wrench, AlertTriangle, CircleHelp, RefreshCw } from 'lucide-react-native';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import { COLORS, RADIUS, SHADOWS, SPACING, TYPOGRAPHY } from '../../styles/modernTheme';
 
 import { Train, TrainStatus } from '../../models/train';
@@ -15,6 +15,7 @@ import { getLocalStation } from '../../services/data/stationsDataService';
 import { dataManager, RealtimeTrainData } from '../../services/data/dataManager';
 import { formatArrivalTime } from '../../utils/dateUtils';
 import { throttle } from '../../utils/performanceUtils';
+import { ErrorFallback } from '@/components/common/ErrorFallback';
 
 interface TrainArrivalListProps {
   stationId: string;
@@ -141,7 +142,9 @@ TrainArrivalItem.displayName = 'TrainArrivalItem';
 export const TrainArrivalList: React.FC<TrainArrivalListProps> = memo(({ stationId, stationName: stationNameProp }) => {
   const [trains, setTrains] = useState<Train[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  // 에러 원본 인스턴스 보존 — ErrorFallback이 SeoulApiError.category로 분기
+  // 가능. 이전 string 저장은 category 정보 손실.
+  const [error, setError] = useState<unknown | null>(null);
   const retryRef = useRef<(() => void) | null>(null);
   const resolvedStationNameRef = useRef<string | null>(null);
 
@@ -319,7 +322,8 @@ export const TrainArrivalList: React.FC<TrainArrivalListProps> = memo(({ station
       // Force re-subscribe
       if (unsubscribe) unsubscribe();
       resolveAndSubscribe().catch((err) => {
-        setError(err instanceof Error ? err.message : '도착정보를 불러올 수 없습니다');
+        // 원본 인스턴스 보존 — ErrorFallback이 SeoulApiError.category로 분기
+        setError(err);
         setLoading(false);
       });
     };
@@ -343,28 +347,6 @@ export const TrainArrivalList: React.FC<TrainArrivalListProps> = memo(({ station
     setLoading(true);
     retryRef.current?.();
   }, []);
-
-  const renderErrorState = (): React.ReactElement => (
-    <View
-      style={styles.emptyState}
-      accessible={true}
-      accessibilityRole="alert"
-      accessibilityLabel={`오류: ${error}. 재시도 버튼을 눌러 다시 시도하세요`}
-    >
-      <AlertTriangle size={48} color={COLORS.semantic.error} />
-      <Text style={styles.errorText}>도착정보를 불러올 수 없습니다</Text>
-      <Text style={styles.emptySubtext}>{error}</Text>
-      <Pressable
-        style={styles.retryButton}
-        onPress={handleRetry}
-        accessibilityRole="button"
-        accessibilityLabel="재시도"
-      >
-        <RefreshCw size={16} color={COLORS.white} />
-        <Text style={styles.retryButtonText}>재시도</Text>
-      </Pressable>
-    </View>
-  );
 
   const renderEmptyState = (): React.ReactElement => (
     <View
@@ -394,9 +376,11 @@ export const TrainArrivalList: React.FC<TrainArrivalListProps> = memo(({ station
   }
 
   if (error && trains.length === 0) {
+    // PR #127의 ErrorFallback이 SeoulApiError.category 5종으로 메시지 분기.
+    // network/unknown fallback도 포함 — 호출자는 try-catch 결과 그대로 던지면 됨.
     return (
       <View style={styles.container}>
-        {renderErrorState()}
+        <ErrorFallback error={error} onRetry={handleRetry} testID="train-list-error" />
       </View>
     );
   }
@@ -527,27 +511,5 @@ const styles = StyleSheet.create({
     color: COLORS.text.tertiary,
     marginTop: SPACING.sm,
     textAlign: 'center',
-  },
-  errorText: {
-    fontSize: TYPOGRAPHY.fontSize.lg,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.semantic.error,
-    marginTop: SPACING.lg,
-    textAlign: 'center',
-  },
-  retryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.primary.main,
-    paddingHorizontal: SPACING.lg,
-    paddingVertical: SPACING.sm,
-    borderRadius: RADIUS.md,
-    marginTop: SPACING.lg,
-  },
-  retryButtonText: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.white,
-    marginLeft: SPACING.xs,
   },
 });
