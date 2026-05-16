@@ -52,10 +52,11 @@ export interface TrainArrivalCardProps {
   /** Whether to show detailed information like station name and line badge */
   showDetails?: boolean;
   /**
-   * Service tier from `seoulSubwayApi.convertToAppTrain`. When 'express' or
-   * 'rapid', the card renders a small badge next to the line badge so users
-   * can distinguish 일반/급행/특급 at a glance (guide #8). Omitted or
-   * 'normal' → no badge.
+   * Service tier. Defaults to `train.trainType` (PR #126 wiring) — caller
+   * doesn't need to pass it explicitly. Pass explicitly only to override
+   * (e.g., showcase/storybook). Omitted/normal → no badge; 'express'/'rapid'
+   * → small badge next to the line badge so users can distinguish
+   * 일반/급행/특급 at a glance (guide #8).
    */
   trainType?: TrainType;
 }
@@ -78,8 +79,10 @@ export const TrainArrivalCard: React.FC<TrainArrivalCardProps> = memo(({
   onPress,
   style,
   showDetails = true,
-  trainType,
+  trainType: trainTypeProp,
 }) => {
+  // Default trainType from Train model (PR #126); explicit prop wins for override.
+  const trainType: TrainType | undefined = trainTypeProp ?? train.trainType;
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
