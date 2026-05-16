@@ -589,10 +589,14 @@ class SeoulSubwayApiService {
       }
     }
 
-    // Fallback: parse arrival message text when barvlDt is unavailable
-    if (arrivalTime === null) {
-      const arrivalMsg = seoulData.arvlMsg2 || seoulData.arvlMsg3 || '';
+    // Fallback: parse arrival message text when barvlDt is unavailable.
+    // Skip text parsing for previous-station ("전역") messages — arvlCd is
+    // the authoritative signal there, otherwise "전역진입" gets misread as
+    // "진입" (30s) and "전역출발" as "출발" (0s).
+    const arrivalMsg = seoulData.arvlMsg2 || seoulData.arvlMsg3 || '';
+    const isPrevStation = arrivalMsg.includes('전역');
 
+    if (arrivalTime === null && !isPrevStation) {
       // "X분 Y초후" pattern (e.g., "3분 20초후")
       const minSecMatch = arrivalMsg.match(/(\d+)분\s*(\d+)초/);
       if (minSecMatch?.[1] && minSecMatch[2]) {
@@ -607,11 +611,12 @@ class SeoulSubwayApiService {
         }
       }
 
-      // Station proximity patterns
+      // Station proximity patterns. The lone '출발' match was removed —
+      // a departing train must be filtered via arvlCd '2', not rendered as 0s.
       if (arrivalTime === null) {
         if (arrivalMsg.includes('곧 도착') || arrivalMsg.includes('진입')) {
           arrivalTime = 30;
-        } else if (arrivalMsg.includes('도착') || arrivalMsg.includes('출발')) {
+        } else if (arrivalMsg.includes('도착')) {
           arrivalTime = 0;
         }
       }
@@ -634,6 +639,13 @@ class SeoulSubwayApiService {
       } else if (code === '5') {
         arrivalTime = 150; // 전역 도착 → 약 2.5분 (정차 중)
       }
+    }
+
+    // Defensive override: arvlCd '2' (당역 출발) is authoritative — even when
+    // text/barvlDt fallbacks produced a value, a departed train must not be
+    // displayed as arriving.
+    if (seoulData.arvlCd === '2') {
+      arrivalTime = null;
     }
 
     // Direction: handle Line 2 circular (내선/외선)
