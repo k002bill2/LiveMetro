@@ -22,7 +22,7 @@ global.fetch = mockFetch;
 
 // Now require the actual module (after reset and unmock)
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { seoulSubwayApi, RateLimiter, parseRecptnDtToMs } = jest.requireActual('../seoulSubwayApi');
+const { seoulSubwayApi, RateLimiter, parseRecptnDtToMs, SeoulApiError } = jest.requireActual('../seoulSubwayApi');
 
 // Type for test use
 interface SeoulRealtimeArrival {
@@ -780,6 +780,29 @@ describe('SeoulSubwayApiService', () => {
       expect(result.arrivalTime).toBe(180);
     });
 
+    // GAP_REPORT item #1: arvlCd 99 (운행중) — guide-mandated 7th code, was
+    // missing from prior implementation. Treat as null (no countdown) since
+    // "운행중" is a plain operating state without imminent-arrival info.
+    it('should map 운행중 (arvlCd 99) to null (no countdown, no imminent info)', () => {
+      const seoulData: SeoulRealtimeArrival = {
+        rowNum: '1', selectedCount: '1', totalCount: '10',
+        subwayId: '1002', updnLine: '상행', trainLineNm: '2호선',
+        subwayHeading: '시청', statnFid: '0221', statnTid: '0223',
+        statnId: '0222', statnNm: '강남', trainCo: '', ordkey: '01',
+        subwayList: '', statnList: '', btrainSttus: '일반',
+        barvlDt: '',
+        btrainNo: '2152', bstatnId: '0250', bstatnNm: '시청',
+        recptnDt: '2024-01-01 12:00:00',
+        arvlMsg2: '운행중',
+        arvlMsg3: '',
+        arvlCd: '99',
+      };
+
+      const result = seoulSubwayApi.convertToAppTrain(seoulData);
+
+      expect(result.arrivalTime).toBeNull();
+    });
+
     // Phase B.3 (sprightly-hugging-snail plan, GAP_REPORT.md item #2):
     // recptnDt latency compensation — subtract elapsed seconds between server
     // response generation and client render so displayed arrivalTime reflects
@@ -925,6 +948,63 @@ describe('SeoulSubwayApiService', () => {
       // local-TZ parsing drift across jest TZ=Asia/Seoul vs CI UTC.
       const ms = parseRecptnDtToMs('2026-01-01 00:00:00');
       expect(new Date(ms!).toISOString()).toBe('2025-12-31T15:00:00.000Z');
+    });
+  });
+
+  // GAP_REPORT item #6: error code categorization — ERROR-500/501 + ERROR-336 +
+  // 등 (etc.) per the guide. SeoulApiError preserves errorCode and category
+  // so UI callers can branch (transient → cached fallback, auth → key swap).
+  describe('SeoulApiError categorization', () => {
+    it('categorizes ERROR-500 / ERROR-501 / ERROR-334 / INFO-300 as quota (retryable)', () => {
+      for (const code of ['ERROR-500', 'ERROR-501', 'ERROR-334', 'INFO-300']) {
+        const err = new SeoulApiError(code, 'sample');
+        expect(err.category).toBe('quota');
+        expect(err.retryable).toBe(true);
+      }
+    });
+
+    it('categorizes ERROR-335 / ERROR-336 as transient (retryable, no key rotation)', () => {
+      for (const code of ['ERROR-335', 'ERROR-336']) {
+        const err = new SeoulApiError(code, 'sample');
+        expect(err.category).toBe('transient');
+        expect(err.retryable).toBe(true);
+      }
+    });
+
+    it('categorizes INFO-100 / ERROR-331 / ERROR-332 as auth (NOT retryable)', () => {
+      for (const code of ['INFO-100', 'ERROR-331', 'ERROR-332']) {
+        const err = new SeoulApiError(code, 'sample');
+        expect(err.category).toBe('auth');
+        expect(err.retryable).toBe(false);
+      }
+    });
+
+    it('categorizes ERROR-300 / ERROR-301 / ERROR-310 / ERROR-333 as client (NOT retryable)', () => {
+      for (const code of ['ERROR-300', 'ERROR-301', 'ERROR-310', 'ERROR-333']) {
+        const err = new SeoulApiError(code, 'sample');
+        expect(err.category).toBe('client');
+        expect(err.retryable).toBe(false);
+      }
+    });
+
+    it('falls back to "unknown" for unmapped codes', () => {
+      const err = new SeoulApiError('ERROR-999', 'novel');
+      expect(err.category).toBe('unknown');
+      expect(err.retryable).toBe(false);
+    });
+
+    it('exposes errorCode property and human-readable message', () => {
+      const err = new SeoulApiError('ERROR-336', 'Dispatcher unavailable');
+      expect(err.errorCode).toBe('ERROR-336');
+      expect(err.message).toContain('ERROR-336');
+      expect(err.message).toContain('Dispatcher unavailable');
+      expect(err.name).toBe('SeoulApiError');
+    });
+
+    it('is an instanceof Error (catchable as generic Error)', () => {
+      const err = new SeoulApiError('ERROR-500', 'overload');
+      expect(err).toBeInstanceOf(Error);
+      expect(err).toBeInstanceOf(SeoulApiError);
     });
   });
 

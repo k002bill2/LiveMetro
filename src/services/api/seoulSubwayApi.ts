@@ -164,6 +164,72 @@ export class TimetableUnsupportedOnWebError extends Error {
   }
 }
 
+/**
+ * Seoul Open Data Portal error categories.
+ *
+ * Maps observed Seoul API error codes to action-relevant buckets so UI
+ * callers can branch (retry vs auth-fix vs offline fallback) without
+ * hardcoding individual codes. Guide (2026-05-16) item #6 mandates fallback
+ * handling for ERROR-500/336 + 등 (etc.) — categorization scales to "등".
+ *
+ * Code references compiled from prior incidents (memory: `[Seoul API HTML
+ * 응답 진단]`, `seoul-api-limits.md` BANNED rows) and Seoul Open Data Portal
+ * conventions. ERROR-336 specifically lacks official documentation but is
+ * widely treated as a transient/dispatcher hiccup in community usage.
+ */
+export type SeoulApiErrorCategory =
+  | 'auth'        // INFO-100, ERROR-331, ERROR-332 — key invalid/expired
+  | 'quota'       // INFO-300, ERROR-334, ERROR-500, ERROR-501 — rate limit / server overload
+  | 'transient'   // ERROR-335, ERROR-336 — partial / dispatcher hiccup, retry-friendly
+  | 'client'      // ERROR-300, ERROR-301, ERROR-310, ERROR-333 — bad request / unauthorized
+  | 'unknown';
+
+function categorizeSeoulApiError(errorCode: string): SeoulApiErrorCategory {
+  if (errorCode === 'INFO-100' || errorCode === 'ERROR-331' || errorCode === 'ERROR-332') {
+    return 'auth';
+  }
+  if (
+    errorCode === 'INFO-300' ||
+    errorCode === 'ERROR-334' ||
+    errorCode === 'ERROR-500' ||
+    errorCode === 'ERROR-501'
+  ) {
+    return 'quota';
+  }
+  if (errorCode === 'ERROR-335' || errorCode === 'ERROR-336') {
+    return 'transient';
+  }
+  if (
+    errorCode === 'ERROR-300' ||
+    errorCode === 'ERROR-301' ||
+    errorCode === 'ERROR-310' ||
+    errorCode === 'ERROR-333'
+  ) {
+    return 'client';
+  }
+  return 'unknown';
+}
+
+/**
+ * Structured Seoul API error. Carries the raw code so callers can branch
+ * (cached fallback for `transient`, key-swap UI for `auth`, etc.) without
+ * regex'ing the message string.
+ */
+export class SeoulApiError extends Error {
+  readonly errorCode: string;
+  readonly category: SeoulApiErrorCategory;
+  /** True for categories where retry without user action is meaningful. */
+  readonly retryable: boolean;
+
+  constructor(errorCode: string, message: string) {
+    super(`Seoul API Error: ${message} (Code: ${errorCode})`);
+    this.name = 'SeoulApiError';
+    this.errorCode = errorCode;
+    this.category = categorizeSeoulApiError(errorCode);
+    this.retryable = this.category === 'transient' || this.category === 'quota';
+  }
+}
+
 interface SeoulApiResponse<T> {
   errorMessage?: {
     status: number;
@@ -364,23 +430,37 @@ class SeoulSubwayApiService {
             return data.realtimeArrivalList || [];
           }
 
-          // Rate limit error - immediately switch to another key
-          if (errorCode === 'ERROR-500' || errorCode === 'ERROR-501') {
+          // Categorize error so caller can branch UI (transient → cached
+          // fallback, auth → key swap prompt, etc.). See SeoulApiError JSDoc.
+          const category = categorizeSeoulApiError(errorCode);
+
+          if (category === 'quota') {
+            // Rate limit / server overload — try a backup key.
             const fallbackKey = this.keyManager.reportRateLimit(apiKey);
             if (fallbackKey) {
-              console.warn(`Rate limit hit, switching to backup key`);
+              console.warn(`Rate limit hit on ${errorCode}, switching to backup key`);
             }
+          } else if (category === 'transient') {
+            // Dispatcher hiccup (ERROR-335/336). Same key is still valid;
+            // retry handled by `withRetry` wrapper. No key rotation.
+            console.warn(`Transient Seoul API error ${errorCode}, will retry`);
           } else {
             this.keyManager.reportError(apiKey);
           }
 
-          throw new Error(`Seoul API Error: ${data.errorMessage.message} (Code: ${errorCode})`);
+          throw new SeoulApiError(errorCode, data.errorMessage.message);
         }
 
         // Success - report to key manager
         this.keyManager.reportSuccess(apiKey);
         return data.realtimeArrivalList || [];
       } catch (error) {
+        // Preserve SeoulApiError's errorCode/category so callers can branch
+        // on category (transient → cached fallback, auth → key swap, etc.).
+        // Wrapping into a generic Error stripped that info historically.
+        if (error instanceof SeoulApiError) {
+          throw error;
+        }
         throw new Error(`실시간 도착정보를 가져오는데 실패했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
       }
     });
@@ -658,8 +738,11 @@ class SeoulSubwayApiService {
       }
     }
 
-    // arvlCd fallback: 0=진입, 1=도착, 2=출발, 3=전역출발, 4=전역진입, 5=전역도착
+    // arvlCd fallback: 0=진입, 1=도착, 2=출발, 3=전역출발, 4=전역진입, 5=전역도착, 99=운행중
     // 전역(前驛) = 이전 역. 순서: 전역진입→전역도착→전역출발→당역진입→당역도착→당역출발
+    // 99 (운행중) = 도착 임박 단계가 아닌 평상 운행. 잔여 시간 정보가 없으므로
+    // 부정확한 추정값 대신 null로 두어 UI에서 표시 제외 (code 2와 동일 패턴).
+    // 가이드 (2026-05-16) 7개 코드 매핑 100% 준수.
     if (arrivalTime === null && seoulData.arvlCd) {
       const code = seoulData.arvlCd;
       if (code === '0') {
@@ -674,6 +757,8 @@ class SeoulSubwayApiService {
         arrivalTime = 180; // 전역 진입 → 약 3분 (가장 먼 상태)
       } else if (code === '5') {
         arrivalTime = 150; // 전역 도착 → 약 2.5분 (정차 중)
+      } else if (code === '99') {
+        arrivalTime = null; // 운행중 → 잔여 시간 불명, 표시 제외
       }
     }
 
