@@ -500,6 +500,19 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
           },
         ];
 
+    // Edit mode without an authenticated user (e.g. session timeout
+    // mid-edit) must NOT fall through to the onboarding navigation
+    // below — that would treat a settings edit as a fresh onboarding
+    // step and push the user into CommuteTime with no way back.
+    // Surface the issue and halt; the next sign-in re-enables save.
+    if (isEditMode && !user) {
+      Alert.alert(
+        '저장 불가',
+        '세션이 만료되었습니다. 다시 로그인한 뒤 시도해 주세요.',
+      );
+      return;
+    }
+
     if (isEditMode && editParams && user) {
       // Edit mode: persist immediately, then return to CommuteSettings.
       // Preserve the untouched leg via `otherLeg`; when missing (e.g. user
