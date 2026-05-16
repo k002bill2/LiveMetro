@@ -3,6 +3,8 @@
  * Handles alternative route calculation and comparison
  */
 
+import LINE_SPEEDS_JSON from '@/data/lineSpeed.json';
+
 /**
  * Canonical travel direction used for storage, queries, and ML pipelines.
  *
@@ -145,9 +147,36 @@ export const DEFAULT_ALTERNATIVE_OPTIONS: AlternativeRouteOptions = {
 };
 
 /**
- * Average travel time between adjacent stations (minutes)
+ * Default average travel time between adjacent stations (minutes).
+ * Fallback when a lineId is missing from `data/lineSpeed.json`.
  */
 export const AVG_STATION_TRAVEL_TIME = 2.5;
+
+/**
+ * Per-line average minutes per hop, derived from published 표정속도.
+ * Used by `kShortestPath.buildGraph` and `routeService` A* heuristic.
+ * Edit `src/data/lineSpeed.json` to tune.
+ */
+export const LINE_SPEEDS: Readonly<Record<string, number>> =
+  LINE_SPEEDS_JSON as Record<string, number>;
+
+/**
+ * Return minutes per hop for a given lineId, with `AVG_STATION_TRAVEL_TIME`
+ * fallback. Accepts trunk lineIds (e.g. '7') or sub-line ids with `::N` suffix.
+ */
+export function getLineHopMinutes(lineId: string): number {
+  const trunk = lineId.split('::')[0] ?? lineId;
+  return LINE_SPEEDS[trunk] ?? AVG_STATION_TRAVEL_TIME;
+}
+
+/**
+ * Fastest known line speed (minutes per hop) — used as A* heuristic floor.
+ * Computed once at module load; safe because LINE_SPEEDS is frozen at build.
+ */
+export const FASTEST_LINE_HOP_MINUTES: number = Object.values(LINE_SPEEDS).reduce(
+  (min, v) => (v < min ? v : min),
+  AVG_STATION_TRAVEL_TIME,
+);
 
 /**
  * Average transfer time between lines (minutes)
