@@ -120,7 +120,16 @@ describe('SeoulSubwayApiService', () => {
       expect(result).toEqual([]);
     });
 
-    it('should throw error on API error response', async () => {
+    it('should throw SeoulApiError on API error response preserving errorCode', async () => {
+      // PR #123 introduced SeoulApiError class - error responses are now
+      // re-thrown directly instead of wrapped with the legacy generic message,
+      // so callers can branch on errorCode/category. The outer catch only
+      // wraps non-SeoulApiError throws.
+      //
+      // Single getRealtimeArrival call + try/catch to avoid retry-backoff
+      // timeout: each rejects assertion would invoke a fresh call with the
+      // mocked error response, triggering withRetry's backoff sequence twice
+      // and exceeding Jest's 30s default.
       const mockError = {
         errorMessage: {
           status: 500,
@@ -129,14 +138,20 @@ describe('SeoulSubwayApiService', () => {
         },
       };
 
-      mockFetch.mockResolvedValueOnce({
+      mockFetch.mockResolvedValue({
         ok: true,
         json: () => Promise.resolve(mockError),
       });
 
-      await expect(seoulSubwayApi.getRealtimeArrival('강남')).rejects.toThrow(
-        '실시간 도착정보를 가져오는데 실패했습니다'
-      );
+      let caught: unknown;
+      try {
+        await seoulSubwayApi.getRealtimeArrival('강남');
+      } catch (err) {
+        caught = err;
+      }
+
+      expect(caught).toBeInstanceOf(SeoulApiError);
+      expect((caught as InstanceType<typeof SeoulApiError>).errorCode).toBe('ERROR-300');
     });
 
     it('should throw error on network failure after retries', async () => {
