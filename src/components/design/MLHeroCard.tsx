@@ -70,6 +70,7 @@ const MLHeroCardImpl: React.FC<MLHeroCardProps> = ({
   const delta = formatDelta(deltaMinutes);
   const confidencePct = typeof confidence === 'number' ? Math.round(confidence * 100) : null;
   const routeLabel = origin && destination ? `${origin} → ${destination}` : null;
+  const displayMinutes = Number.isFinite(predictedMinutes) ? Math.round(predictedMinutes) : 0;
 
   const subtext = (() => {
     const parts: string[] = [];
@@ -83,7 +84,7 @@ const MLHeroCardImpl: React.FC<MLHeroCardProps> = ({
       testID={testID ?? 'ml-hero-card'}
       onPress={onPress}
       accessibilityRole={onPress ? 'button' : undefined}
-      accessibilityLabel={`ML 출퇴근 예측 ${predictedMinutes}분`}
+      accessibilityLabel={`ML 출퇴근 예측 ${displayMinutes}분`}
       style={[styles.wrap, style]}
     >
       <LinearGradient
@@ -106,7 +107,7 @@ const MLHeroCardImpl: React.FC<MLHeroCardProps> = ({
 
           <View style={styles.numberRow}>
             <Text style={styles.numberText} accessibilityRole="text">
-              {predictedMinutes}
+              {displayMinutes}
             </Text>
             <Text style={styles.numberUnit}>분</Text>
             {delta && (

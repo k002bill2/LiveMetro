@@ -245,9 +245,9 @@ const CommuteRouteCardImpl: React.FC<CommuteRouteCardProps> = ({
               {/^\d+$/.test(lineId) ? `${lineId}호선` : lineId}
             </Text>
           )}
-          {rideMinutes !== undefined && (
+          {rideMinutes !== undefined && Number.isFinite(rideMinutes) && (
             <Text style={[styles.nodeMeta, { color: semantic.labelAlt }]}>
-              직행 {rideMinutes}분
+              직행 {Math.round(rideMinutes)}분
             </Text>
           )}
         </View>

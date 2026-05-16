@@ -174,6 +174,7 @@ const MainTabNavigator: React.FC = () => {
         options={{
           title: '홈',
           tabBarLabel: '홈',
+          headerShown: false,
         }}
       />
       <Tab.Screen
