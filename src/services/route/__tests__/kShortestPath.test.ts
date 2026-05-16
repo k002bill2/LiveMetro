@@ -71,6 +71,7 @@ jest.mock('@models/route', () => ({
   AVG_TRANSFER_TIME: 4,
   FASTEST_LINE_HOP_MINUTES: 2,
   getLineHopMinutes: jest.fn(() => 2),
+  getEdgeMinutes: jest.fn(() => 2),
 }));
 
 describe('findKShortestPaths', () => {
