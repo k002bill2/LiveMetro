@@ -102,6 +102,13 @@ interface UseTrainScheduleResult {
   error: string | null;
   /** 새로고침 */
   refresh: () => Promise<void>;
+  /**
+   * 현재 fetch된 시간표가 오늘 요일과 일치하는지 (dayType auto + 사용자
+   * 전환 모두 반영). UI 컴포넌트가 "현재 시각 이전 strikethrough / 다음
+   * 출발 highlight" 분기를 결정하는 신호. false면 사용자가 다른 요일
+   * 시간표를 browsing 중이므로 시각 기반 분류 무의미.
+   */
+  isViewingToday: boolean;
 }
 
 /**
@@ -244,6 +251,8 @@ export const useTrainSchedule = (
   const [upcomingTrains, setUpcomingTrains] = useState<TrainScheduleItem[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  // 마지막 성공 fetch가 오늘 요일이었는지. setSchedules와 동기 업데이트.
+  const [isViewingToday, setIsViewingToday] = useState<boolean>(true);
 
   const fetchSchedule = useCallback(async () => {
     if (!stationName || !lineNumber || !enabled) {
@@ -305,8 +314,9 @@ export const useTrainSchedule = (
       // 00:05·00:30 막차를 "다음 열차"로 봐야 합니다. 시간표 행은 같은 운행일 안에
       // 인코딩되므로(00:05도 같은 row), 늦은 시간대(LATE_NIGHT_THRESHOLD 이후)에는
       // 새벽 시간대(EARLY_MORNING_LIMIT 이전) 행을 carry-over로 포함시킵니다.
-      const isViewingToday = weekTag === todayWeekTag;
-      if (!isViewingToday) {
+      const matchesToday = weekTag === todayWeekTag;
+      setIsViewingToday(matchesToday);
+      if (!matchesToday) {
         // 다른 요일 시간표 — 전체를 upcoming으로 (browsing 모드)
         setUpcomingTrains(convertedData);
       } else {
@@ -354,6 +364,7 @@ export const useTrainSchedule = (
     loading,
     error,
     refresh,
+    isViewingToday,
   };
 };
 

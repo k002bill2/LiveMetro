@@ -29,6 +29,7 @@ import {
 } from '@/hooks/useTrainSchedule';
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme/themeContext';
+import { TimetableGrid } from './TimetableGrid';
 
 export interface StationTimetableSectionProps {
   /** 역명 (예: "강남") - Seoul timetable API 조회 키 */
@@ -84,7 +85,7 @@ export const StationTimetableSection: React.FC<StationTimetableSectionProps> = m
       setSelectedDayType(key);
     }, []);
 
-    const { schedules, loading, error } = useTrainSchedule({
+    const { schedules, loading, error, isViewingToday } = useTrainSchedule({
       stationName,
       lineNumber: lineId,
       direction: directionToCode(direction),
@@ -161,12 +162,19 @@ export const StationTimetableSection: React.FC<StationTimetableSectionProps> = m
             {error}
           </Text>
         ) : firstLabel && lastLabel ? (
-          <Text
-            style={[styles.subText, { color: semantic.labelNeutral }]}
-            accessibilityLabel={`첫차 ${firstLabel}, 막차 ${lastLabel}`}
-          >
-            {`${firstLabel} 첫차 · ${lastLabel} 막차`}
-          </Text>
+          <>
+            <Text
+              style={[styles.subText, { color: semantic.labelNeutral }]}
+              accessibilityLabel={`첫차 ${firstLabel}, 막차 ${lastLabel}`}
+            >
+              {`${firstLabel} 첫차 · ${lastLabel} 막차`}
+            </Text>
+            <TimetableGrid
+              schedules={schedules}
+              isViewingToday={isViewingToday}
+              testID={testID ? `${testID}-grid` : undefined}
+            />
+          </>
         ) : (
           <Text
             style={[styles.subText, { color: semantic.labelAlt }]}
