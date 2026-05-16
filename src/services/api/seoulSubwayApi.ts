@@ -115,6 +115,41 @@ async function withRetry<T>(
 }
 
 /**
+ * Parse Seoul API `recptnDt` timestamp into UTC ms.
+ *
+ * Seoul API returns the response generation time in KST (UTC+9). Two formats
+ * are observed in live responses and test fixtures:
+ *   - "YYYY-MM-DD HH:MM:SS" (space separator)
+ *   - "YYYYMMDDHHMMSS"      (compact, no separators)
+ *
+ * Explicit `+09:00` offset is appended to avoid local-TZ parsing surprises
+ * (jest TZ=Asia/Seoul vs CI UTC — see memory `[TZ-naive Date.getHours CI 회귀]`).
+ *
+ * @returns UTC ms (number), or null when the input is empty or unrecognized.
+ */
+export function parseRecptnDtToMs(recptnDt: string): number | null {
+  if (!recptnDt) return null;
+
+  let isoLike: string | null = null;
+  if (/^\d{14}$/.test(recptnDt)) {
+    isoLike = `${recptnDt.slice(0, 4)}-${recptnDt.slice(4, 6)}-${recptnDt.slice(6, 8)}T${recptnDt.slice(8, 10)}:${recptnDt.slice(10, 12)}:${recptnDt.slice(12, 14)}`;
+  } else if (/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}$/.test(recptnDt)) {
+    isoLike = recptnDt.replace(' ', 'T');
+  }
+  if (!isoLike) return null;
+
+  const ms = Date.parse(`${isoLike}+09:00`);
+  return Number.isNaN(ms) ? null : ms;
+}
+
+/**
+ * Maximum response-age (seconds) treated as a real latency. Above this the
+ * gap is interpreted as clock skew / fixture stub and the correction is skipped
+ * to avoid silently inflating `arrivalTime`.
+ */
+const RECPTN_DT_MAX_AGE_SECONDS = 600;
+
+/**
  * Thrown by getStationTimetable when called on a web platform.
  *
  * Seoul Open Data Portal's timetable endpoint is HTTP-only (port 8088, no HTTPS).
@@ -647,6 +682,30 @@ class SeoulSubwayApiService {
     // displayed as arriving.
     if (seoulData.arvlCd === '2') {
       arrivalTime = null;
+    }
+
+    // Latency compensation: Seoul API tags responses with `recptnDt` (the
+    // moment the server generated the snapshot). Network + parsing add 1-3s
+    // before the UI renders, so the raw `arrivalTime` is chronically late
+    // by that gap. Subtract the elapsed seconds so the displayed value
+    // reflects real-world remaining time at render. Guide (2026-05-16)
+    // mandates this correction; see `train-info-gap-analysis/GAP_REPORT.md`
+    // item #2.
+    //
+    // Guards:
+    //   - skip when arrivalTime is null/0 (correction not meaningful)
+    //   - skip on parse failure or empty recptnDt (legacy fixtures)
+    //   - skip when elapsed <= 0 (clock skew toward future)
+    //   - skip when elapsed > RECPTN_DT_MAX_AGE_SECONDS (stale fixture / huge skew)
+    //   - clip result to 0 (negative would mean train already passed)
+    if (arrivalTime !== null && arrivalTime > 0) {
+      const recptnMs = parseRecptnDtToMs(seoulData.recptnDt);
+      if (recptnMs !== null) {
+        const elapsedSeconds = Math.floor((Date.now() - recptnMs) / 1000);
+        if (elapsedSeconds > 0 && elapsedSeconds <= RECPTN_DT_MAX_AGE_SECONDS) {
+          arrivalTime = Math.max(0, arrivalTime - elapsedSeconds);
+        }
+      }
     }
 
     // Direction: handle Line 2 circular (내선/외선)

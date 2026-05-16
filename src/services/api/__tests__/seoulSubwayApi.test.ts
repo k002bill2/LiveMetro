@@ -22,7 +22,7 @@ global.fetch = mockFetch;
 
 // Now require the actual module (after reset and unmock)
 // eslint-disable-next-line @typescript-eslint/no-var-requires
-const { seoulSubwayApi, RateLimiter } = jest.requireActual('../seoulSubwayApi');
+const { seoulSubwayApi, RateLimiter, parseRecptnDtToMs } = jest.requireActual('../seoulSubwayApi');
 
 // Type for test use
 interface SeoulRealtimeArrival {
@@ -778,6 +778,153 @@ describe('SeoulSubwayApiService', () => {
       const result = seoulSubwayApi.convertToAppTrain(seoulData);
 
       expect(result.arrivalTime).toBe(180);
+    });
+
+    // Phase B.3 (sprightly-hugging-snail plan, GAP_REPORT.md item #2):
+    // recptnDt latency compensation — subtract elapsed seconds between server
+    // response generation and client render so displayed arrivalTime reflects
+    // real-world remaining time. Guide (2026-05-16) mandates this for accuracy.
+    describe('recptnDt latency compensation', () => {
+      let nowSpy: jest.SpyInstance;
+
+      const baseFixture = (overrides: Partial<SeoulRealtimeArrival> = {}): SeoulRealtimeArrival => ({
+        rowNum: '1', selectedCount: '1', totalCount: '1', subwayId: '1002',
+        updnLine: '상행', trainLineNm: '강남', subwayHeading: '강남',
+        statnFid: '', statnTid: '', statnId: '0220', statnNm: '선릉',
+        trainCo: '', ordkey: '', subwayList: '', statnList: '',
+        btrainSttus: '일반', barvlDt: '180', btrainNo: '1234',
+        bstatnId: '', bstatnNm: '강남',
+        recptnDt: '2026-05-17 12:00:00',
+        arvlMsg2: '', arvlMsg3: '', arvlCd: '',
+        ...overrides,
+      });
+
+      afterEach(() => {
+        nowSpy?.mockRestore();
+      });
+
+      it('subtracts elapsed seconds from arrivalTime when recptnDt is in the past', () => {
+        // recptnDt = 12:00:00 KST, now = 12:00:05 KST → 5s elapsed
+        // barvlDt 180s → corrected to 175s.
+        const recptnMs = Date.parse('2026-05-17T12:00:00+09:00');
+        nowSpy = jest.spyOn(Date, 'now').mockReturnValue(recptnMs + 5000);
+
+        const result = seoulSubwayApi.convertToAppTrain(baseFixture());
+
+        expect(result.arrivalTime).toBe(175);
+      });
+
+      it('clips arrivalTime to 0 when elapsed exceeds arrivalTime', () => {
+        // barvlDt 30s but 60s elapsed → corrected to 0 (train passed).
+        const recptnMs = Date.parse('2026-05-17T12:00:00+09:00');
+        nowSpy = jest.spyOn(Date, 'now').mockReturnValue(recptnMs + 60_000);
+
+        const result = seoulSubwayApi.convertToAppTrain(
+          baseFixture({ barvlDt: '30' }),
+        );
+
+        expect(result.arrivalTime).toBe(0);
+      });
+
+      it('skips correction when recptnDt is empty (legacy fixture)', () => {
+        const result = seoulSubwayApi.convertToAppTrain(
+          baseFixture({ recptnDt: '', barvlDt: '120' }),
+        );
+
+        expect(result.arrivalTime).toBe(120);
+      });
+
+      it('skips correction when recptnDt is unparseable', () => {
+        const result = seoulSubwayApi.convertToAppTrain(
+          baseFixture({ recptnDt: 'not-a-date', barvlDt: '90' }),
+        );
+
+        expect(result.arrivalTime).toBe(90);
+      });
+
+      it('skips correction when clock skew puts recptnDt in the future', () => {
+        // recptnDt 12:00:00, now 11:59:55 → elapsed = -5s → skip (no inflate).
+        const recptnMs = Date.parse('2026-05-17T12:00:00+09:00');
+        nowSpy = jest.spyOn(Date, 'now').mockReturnValue(recptnMs - 5_000);
+
+        const result = seoulSubwayApi.convertToAppTrain(
+          baseFixture({ barvlDt: '120' }),
+        );
+
+        expect(result.arrivalTime).toBe(120);
+      });
+
+      it('skips correction when elapsed exceeds 600s safety cap (stale fixture)', () => {
+        // 700s elapsed > RECPTN_DT_MAX_AGE_SECONDS (600) → skip.
+        const recptnMs = Date.parse('2026-05-17T12:00:00+09:00');
+        nowSpy = jest.spyOn(Date, 'now').mockReturnValue(recptnMs + 700_000);
+
+        const result = seoulSubwayApi.convertToAppTrain(
+          baseFixture({ barvlDt: '180' }),
+        );
+
+        expect(result.arrivalTime).toBe(180);
+      });
+
+      it('skips correction when arrivalTime is null (arvlCd 2 departed)', () => {
+        const recptnMs = Date.parse('2026-05-17T12:00:00+09:00');
+        nowSpy = jest.spyOn(Date, 'now').mockReturnValue(recptnMs + 10_000);
+
+        const result = seoulSubwayApi.convertToAppTrain(
+          baseFixture({ barvlDt: '', arvlCd: '2' }),
+        );
+
+        expect(result.arrivalTime).toBeNull();
+      });
+
+      it('handles compact YYYYMMDDHHMMSS format', () => {
+        const recptnMs = Date.parse('2026-05-17T12:00:00+09:00');
+        nowSpy = jest.spyOn(Date, 'now').mockReturnValue(recptnMs + 10_000);
+
+        const result = seoulSubwayApi.convertToAppTrain(
+          baseFixture({ recptnDt: '20260517120000', barvlDt: '180' }),
+        );
+
+        expect(result.arrivalTime).toBe(170);
+      });
+    });
+  });
+
+  describe('parseRecptnDtToMs', () => {
+    it('parses YYYY-MM-DD HH:MM:SS (space-separated) as KST', () => {
+      const ms = parseRecptnDtToMs('2026-05-17 12:00:00');
+
+      expect(ms).toBe(Date.parse('2026-05-17T12:00:00+09:00'));
+    });
+
+    it('parses YYYYMMDDHHMMSS (compact) as KST', () => {
+      const ms = parseRecptnDtToMs('20260517120000');
+
+      expect(ms).toBe(Date.parse('2026-05-17T12:00:00+09:00'));
+    });
+
+    it('returns null for empty string', () => {
+      expect(parseRecptnDtToMs('')).toBeNull();
+    });
+
+    it('returns null for unrecognized format (slash separator)', () => {
+      expect(parseRecptnDtToMs('2026/05/17 12:00:00')).toBeNull();
+    });
+
+    it('returns null for unrecognized format (ISO T separator without offset)', () => {
+      expect(parseRecptnDtToMs('2026-05-17T12:00:00')).toBeNull();
+    });
+
+    it('returns null for non-date string', () => {
+      expect(parseRecptnDtToMs('not-a-date')).toBeNull();
+    });
+
+    it('treats input as KST regardless of test runner TZ', () => {
+      // KST 2026-01-01 00:00:00 == UTC 2025-12-31 15:00:00.
+      // Memory: [TZ-naive Date.getHours CI 회귀] — explicit +09:00 prevents
+      // local-TZ parsing drift across jest TZ=Asia/Seoul vs CI UTC.
+      const ms = parseRecptnDtToMs('2026-01-01 00:00:00');
+      expect(new Date(ms!).toISOString()).toBe('2025-12-31T15:00:00.000Z');
     });
   });
 
