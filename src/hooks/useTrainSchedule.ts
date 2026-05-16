@@ -125,6 +125,16 @@ const getCurrentWeekTag = (now: Date = new Date()): WeekTagCode => {
 };
 
 /**
+ * DayType override(사용자 선택) → Seoul API weekTag 매핑.
+ * Module-level constant — hook 호출마다 재생성 회피.
+ */
+const DAY_TYPE_TO_WEEK_TAG: Record<Exclude<DayTypeOverride, 'auto'>, WeekTagCode> = {
+  weekday: '1',
+  saturday: '2',
+  holiday: '3',
+};
+
+/**
  * Convert "HH:MM:SS" arrival time to a sortable minute count anchored to the
  * **operating day** (which runs ~04:00 → next 03:59, not midnight → midnight).
  *
@@ -255,13 +265,9 @@ export const useTrainSchedule = (
 
       // dayType override가 'auto'면 현재 요일 자동 감지, 아니면 사용자 선택 매핑.
       // weekday → '1' / saturday → '2' / holiday → '3' (Seoul API weekTag 규격).
-      const dayTypeToWeekTag: Record<Exclude<DayTypeOverride, 'auto'>, WeekTagCode> = {
-        weekday: '1',
-        saturday: '2',
-        holiday: '3',
-      };
+      const todayWeekTag = getCurrentWeekTag();
       const weekTag: WeekTagCode =
-        dayType === 'auto' ? getCurrentWeekTag() : dayTypeToWeekTag[dayType];
+        dayType === 'auto' ? todayWeekTag : DAY_TYPE_TO_WEEK_TAG[dayType];
       const cacheKey = getTimetableCacheKey(stationCode, lineNumber, weekTag, direction);
 
       const cached = await getCachedTimetable(cacheKey);
@@ -287,7 +293,11 @@ export const useTrainSchedule = (
       );
       setSchedules(convertedData);
 
-      // 현재 시각 이후 열차만 필터링.
+      // 현재 시각 이후 열차만 필터링 — 사용자가 오늘 시간표를 보는 경우만.
+      // 사용자가 dayType tab으로 다른 요일(예: 금요일에 토요일 시간표 조회)을
+      // 선택했으면 "현재 시각" 기준 필터는 의미 없음 → 전체를 upcoming으로
+      // 노출해야 토요일 첫 출발들을 사용자가 둘러볼 수 있다.
+      //
       // Seoul API는 "9:35:00" 같은 비패딩 형식을 반환할 수 있어 lexicographic 비교가
       // 무너집니다 ('9' > '1'). toSecondsOfDay로 정수 비교해야 정확합니다.
       //
@@ -295,19 +305,25 @@ export const useTrainSchedule = (
       // 00:05·00:30 막차를 "다음 열차"로 봐야 합니다. 시간표 행은 같은 운행일 안에
       // 인코딩되므로(00:05도 같은 row), 늦은 시간대(LATE_NIGHT_THRESHOLD 이후)에는
       // 새벽 시간대(EARLY_MORNING_LIMIT 이전) 행을 carry-over로 포함시킵니다.
-      const LATE_NIGHT_THRESHOLD = 22 * 3600; // 22:00
-      const EARLY_MORNING_LIMIT = 3 * 3600;   // 03:00
-      const now = new Date();
-      const currentSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
-      const isLateNight = currentSeconds >= LATE_NIGHT_THRESHOLD;
-      const upcoming = convertedData.filter((item) => {
-        const itemSec = toSecondsOfDay(item.arrivalTime);
-        if (itemSec < 0) return false;
-        if (itemSec >= currentSeconds) return true;
-        // Late-night carry-over for next-day early morning runs
-        return isLateNight && itemSec < EARLY_MORNING_LIMIT;
-      });
-      setUpcomingTrains(upcoming);
+      const isViewingToday = weekTag === todayWeekTag;
+      if (!isViewingToday) {
+        // 다른 요일 시간표 — 전체를 upcoming으로 (browsing 모드)
+        setUpcomingTrains(convertedData);
+      } else {
+        const LATE_NIGHT_THRESHOLD = 22 * 3600; // 22:00
+        const EARLY_MORNING_LIMIT = 3 * 3600;   // 03:00
+        const now = new Date();
+        const currentSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+        const isLateNight = currentSeconds >= LATE_NIGHT_THRESHOLD;
+        const upcoming = convertedData.filter((item) => {
+          const itemSec = toSecondsOfDay(item.arrivalTime);
+          if (itemSec < 0) return false;
+          if (itemSec >= currentSeconds) return true;
+          // Late-night carry-over for next-day early morning runs
+          return isLateNight && itemSec < EARLY_MORNING_LIMIT;
+        });
+        setUpcomingTrains(upcoming);
+      }
     } catch (err) {
       console.error('Error fetching train schedule:', err);
       // Friendly message for the web-platform case so users don't see a
