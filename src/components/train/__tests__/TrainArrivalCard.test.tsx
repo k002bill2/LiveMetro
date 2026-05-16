@@ -423,4 +423,78 @@ describe('TrainArrivalCard', () => {
       expect(queryByLabelText('급행 열차')).toBeNull();
     });
   });
+
+  // F5.2 density variant — TrainArrivalList integration 준비. compact variant는
+  // padding/margin 축소 + shadow 제거로 dense vertical stack에 적합.
+  // 본 PR은 variant prop만 추가; List 교체는 F5.2b(별도 PR).
+  describe('variant prop', () => {
+    // React Native StyleSheet.create는 numeric ID 반환 — StyleSheet.flatten으로
+    // ID를 실제 style object로 resolve. RN test env에서는 ID 대신 object를
+    // 줄 수도 있어 양쪽 모두 처리.
+    const flatStyle = (style: unknown): Record<string, unknown> => {
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const { StyleSheet } = require('react-native');
+      const flat = StyleSheet.flatten(style);
+      return (flat ?? {}) as Record<string, unknown>;
+    };
+
+    it('defaults to regular variant (no compact style)', () => {
+      const train = createMockTrain();
+      const { getByRole } = customRender(<TrainArrivalCard train={train} />);
+      const root = getByRole('summary');
+      const style = flatStyle(root.props.style);
+      // regular: padding 16, marginBottom 12 (compact는 12/8로 덮어씀)
+      expect(style.padding).toBe(16);
+      expect(style.marginBottom).toBe(12);
+    });
+
+    it('explicit variant="regular" matches default', () => {
+      const train = createMockTrain();
+      const { getByRole } = customRender(
+        <TrainArrivalCard train={train} variant="regular" />,
+      );
+      const root = getByRole('summary');
+      const style = flatStyle(root.props.style);
+      expect(style.padding).toBe(16);
+      expect(style.marginBottom).toBe(12);
+    });
+
+    it('variant="compact" applies reduced padding and margin', () => {
+      const train = createMockTrain();
+      const { getByRole } = customRender(
+        <TrainArrivalCard train={train} variant="compact" />,
+      );
+      const root = getByRole('summary');
+      const style = flatStyle(root.props.style);
+      // compact override
+      expect(style.padding).toBe(12);
+      expect(style.marginBottom).toBe(8);
+      expect(style.borderRadius).toBe(12);
+      // shadow/elevation 제거 (list stacking 시 elevation 누적 회피)
+      expect(style.elevation).toBe(0);
+      expect(style.shadowOpacity).toBe(0);
+    });
+
+    it('variant="compact" with onPress still renders pressable container', () => {
+      const train = createMockTrain();
+      const onPress = jest.fn();
+      const { getByRole } = customRender(
+        <TrainArrivalCard train={train} variant="compact" onPress={onPress} />,
+      );
+      // onPress → button role; compact style은 동일하게 적용되어야 함
+      const root = getByRole('button');
+      const style = flatStyle(root.props.style);
+      expect(style.padding).toBe(12);
+    });
+
+    it('variant="compact" preserves all semantic content (train info, badges, etc.)', () => {
+      const train = createMockTrain({ lineId: '2', trainType: 'express' });
+      const { getByText, getByLabelText } = customRender(
+        <TrainArrivalCard train={train} variant="compact" />,
+      );
+      // 시각 변화에도 컨텐츠는 동일 — accessibility 회귀 0
+      expect(getByLabelText('급행 열차')).toBeTruthy();
+      expect(getByText('급행')).toBeTruthy();
+    });
+  });
 });
