@@ -59,6 +59,18 @@ export interface TrainArrivalCardProps {
    * 일반/급행/특급 at a glance (guide #8).
    */
   trainType?: TrainType;
+  /**
+   * Layout density. F5.2 — TrainArrivalList integration 준비.
+   * - `'regular'` (default): hero-style 단일 카드 (큰 padding, vertical
+   *   stack). 기존 모든 사용처와 동일 동작.
+   * - `'compact'`: dense row form factor — 작은 padding, 큰 폰트 축소.
+   *   여러 카드를 vertical list로 stack할 때 적합 (예: TrainArrivalList).
+   *
+   * F5.2b(별도 PR)에서 List inline Item을 `variant='compact'`로 교체해
+   * Card를 production으로 끌어들일 예정. 본 PR은 variant prop만 추가하고
+   * 호출자 변경은 없음 — 시각 회귀 risk를 분리.
+   */
+  variant?: 'regular' | 'compact';
 }
 
 /**
@@ -80,11 +92,13 @@ export const TrainArrivalCard: React.FC<TrainArrivalCardProps> = memo(({
   style,
   showDetails = true,
   trainType: trainTypeProp,
+  variant = 'regular',
 }) => {
   // Default trainType from Train model (PR #126); explicit prop wins for override.
   const trainType: TrainType | undefined = trainTypeProp ?? train.trainType;
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const isCompact = variant === 'compact';
 
   // Memoize line colors to prevent recalculation
   const lineColor = useMemo(() => {
@@ -345,7 +359,7 @@ export const TrainArrivalCard: React.FC<TrainArrivalCardProps> = memo(({
   if (onPress) {
     return (
       <TouchableOpacity
-        style={[styles.container, style]}
+        style={[styles.container, isCompact && styles.containerCompact, style]}
         onPress={onPress}
         accessible
         accessibilityRole="button"
@@ -359,7 +373,7 @@ export const TrainArrivalCard: React.FC<TrainArrivalCardProps> = memo(({
 
   return (
     <View
-      style={[styles.container, style]}
+      style={[styles.container, isCompact && styles.containerCompact, style]}
       accessible
       accessibilityRole="summary"
       accessibilityLabel={accessibilityLabel}
@@ -389,6 +403,16 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     shadowRadius: 3,
     flexDirection: 'row',
     alignItems: 'center',
+  },
+  // F5.2 compact variant — TrainArrivalList row density에 맞춤.
+  // padding/margin/radius 축소 + shadow 제거(list 안에서 elevation 누적 회피).
+  containerCompact: {
+    padding: 12,
+    marginBottom: 8,
+    borderRadius: 12,
+    elevation: 0,
+    shadowOpacity: 0,
+    shadowRadius: 0,
   },
   lineBadge: {
     paddingHorizontal: 12,
