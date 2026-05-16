@@ -296,7 +296,16 @@ export const TrainArrivalList: React.FC<TrainArrivalListProps> = memo(({ station
       // Subscribe via DataManager (handles polling, caching, SWR, dedup)
       unsubscribe = dataManager.subscribeToRealtimeUpdates(
         stationName,
-        (data: RealtimeTrainData | null) => {
+        (data: RealtimeTrainData | null, subscriptionError?: unknown) => {
+          // G4: dataManager가 forward한 error를 ErrorFallback path로 전달.
+          // SeoulApiError면 category 분기, 아니면 network fallback. error가
+          // 있으면 우선 처리 — 빈 data + error 조합도 fallback UI 노출.
+          if (subscriptionError) {
+            setError(subscriptionError);
+            // loading 상태가 error 렌더를 가리지 않도록 명시 해제
+            setLoading(false);
+            return;
+          }
           if (data) {
             setError(null);
             const sorted = [...data.trains].sort((a, b) => {

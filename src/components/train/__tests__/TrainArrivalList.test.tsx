@@ -12,6 +12,7 @@ import { TrainArrivalList } from '../TrainArrivalList';
 import { trainService } from '@services/train/trainService';
 import { dataManager } from '@services/data/dataManager';
 import { TrainStatus, Train } from '@models/train';
+import { SeoulApiError } from '@/services/api/seoulSubwayApi';
 
 // Mock the train service (getStation for station name resolution)
 jest.mock('@services/train/trainService', () => ({
@@ -544,6 +545,49 @@ describe('TrainArrivalList', () => {
         // ErrorFallback의 retry CTA — onRetry는 항상 제공되므로 retryable
         // category 또는 non-SeoulApiError 모두 버튼 표시
         expect(getByLabelText('다시 시도')).toBeTruthy();
+      });
+    });
+
+    // G4: dataManager가 forward한 subscription error를 컴포넌트가 ErrorFallback
+    // path로 surface하는지 검증. SeoulApiError instance면 category 분기 활성화.
+    it('renders ErrorFallback with SeoulApiError category copy when subscription forwards error', async () => {
+      // arrivalService → dataManager가 forward한 error 시뮬레이션
+      const unsubscribe = jest.fn();
+      mockDataManager.subscribeToRealtimeUpdates.mockImplementation(
+        (_stationName, callback) => {
+          Promise.resolve().then(() => {
+            // SeoulApiError instance를 두 번째 arg로 전달 — F4 wiring이 잡음
+            const err = new SeoulApiError('ERROR-336', 'transient');
+            callback(null, err);
+          });
+          return unsubscribe;
+        },
+      );
+
+      const { getByText } = render(<TrainArrivalList stationId="station-1" />);
+
+      await waitFor(() => {
+        // ERROR-336 → transient → "도착정보를 잠시 가져올 수 없어요"
+        expect(getByText('도착정보를 잠시 가져올 수 없어요')).toBeTruthy();
+      });
+    });
+
+    it('renders network fallback when subscription forwards generic Error', async () => {
+      const unsubscribe = jest.fn();
+      mockDataManager.subscribeToRealtimeUpdates.mockImplementation(
+        (_stationName, callback) => {
+          Promise.resolve().then(() => {
+            callback(null, new Error('socket hangup'));
+          });
+          return unsubscribe;
+        },
+      );
+
+      const { getByText } = render(<TrainArrivalList stationId="station-1" />);
+
+      await waitFor(() => {
+        // non-SeoulApiError → "연결을 확인해주세요"
+        expect(getByText('연결을 확인해주세요')).toBeTruthy();
       });
     });
   });
