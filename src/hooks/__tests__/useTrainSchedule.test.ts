@@ -3,7 +3,7 @@
  */
 
 import { renderHook, act, waitFor } from '@testing-library/react-native';
-import { useTrainSchedule } from '../useTrainSchedule';
+import { useTrainSchedule, getFirstTrain, getLastTrain } from '../useTrainSchedule';
 import { seoulSubwayApi, TimetableUnsupportedOnWebError } from '@/services/api/seoulSubwayApi';
 import { findStationCdByNameAndLine } from '@/services/data/stationsDataService';
 
@@ -364,6 +364,90 @@ describe('useTrainSchedule', () => {
         '1',
         expect.any(String)
       );
+    });
+  });
+});
+
+// GAP_REPORT item #7: 첫차/막차 helper for timetable UI. Critical edge case:
+// the "operating day" runs ~04:00 → next 03:59, so 00:30 트레인은 *전날 운행*의
+// 막차로 봐야 한다. 단순 string compare("00:30" < "04:00")가 첫차로 오인하는
+// 함정을 방지하기 위해 별도 helper로 분리.
+describe('getFirstTrain / getLastTrain', () => {
+  const sched = (arrivalTime: string, trainNumber: string) => ({
+    trainNumber,
+    arrivalTime,
+    departureTime: arrivalTime,
+    destinationName: '잠실',
+    originStationName: '강남',
+    dayType: 'weekday' as const,
+    direction: 'up' as const,
+  });
+
+  describe('getFirstTrain', () => {
+    it('returns the earliest train among regular daytime entries', () => {
+      const schedules = [
+        sched('07:00:00', 'A'),
+        sched('05:30:00', 'B'),
+        sched('06:15:00', 'C'),
+      ];
+      expect(getFirstTrain(schedules)?.trainNumber).toBe('B');
+    });
+
+    it('treats post-midnight (00:30) as later than evening (23:00), not as 첫차', () => {
+      // Operating day: 23:00 is hour 23, 00:30 is hour 24:30 (next day).
+      // Naive string compare would pick "00:30" — but it is actually 막차.
+      const schedules = [
+        sched('23:00:00', 'evening'),
+        sched('00:30:00', 'after-midnight'),
+        sched('05:30:00', 'first-of-next-day'),
+      ];
+      expect(getFirstTrain(schedules)?.trainNumber).toBe('first-of-next-day');
+    });
+
+    it('returns null on empty input', () => {
+      expect(getFirstTrain([])).toBeNull();
+    });
+
+    it('returns the only entry when schedules has length 1', () => {
+      const schedules = [sched('05:30:00', 'only')];
+      expect(getFirstTrain(schedules)?.trainNumber).toBe('only');
+    });
+  });
+
+  describe('getLastTrain', () => {
+    it('returns the latest train among regular daytime entries', () => {
+      const schedules = [
+        sched('05:30:00', 'A'),
+        sched('22:45:00', 'B'),
+        sched('15:00:00', 'C'),
+      ];
+      expect(getLastTrain(schedules)?.trainNumber).toBe('B');
+    });
+
+    it('picks post-midnight train as 막차 over evening trains', () => {
+      // 강남 외선 막차 00:38 시나리오.
+      const schedules = [
+        sched('22:00:00', 'evening'),
+        sched('23:30:00', 'late-evening'),
+        sched('00:38:00', 'true-last-after-midnight'),
+      ];
+      expect(getLastTrain(schedules)?.trainNumber).toBe('true-last-after-midnight');
+    });
+
+    it('returns null on empty input', () => {
+      expect(getLastTrain([])).toBeNull();
+    });
+
+    it('handles malformed arrivalTime by treating it as the latest (Infinity rank)', () => {
+      // Defensive: malformed entries should not silently appear as 첫차.
+      // They sort to Infinity (latest), so the first-train search ignores them,
+      // and the last-train search exposes them (caller can inspect/filter).
+      const schedules = [
+        sched('06:00:00', 'good'),
+        sched('not-a-time', 'bad'),
+      ];
+      expect(getFirstTrain(schedules)?.trainNumber).toBe('good');
+      expect(getLastTrain(schedules)?.trainNumber).toBe('bad');
     });
   });
 });
