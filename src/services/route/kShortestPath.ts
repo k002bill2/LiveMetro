@@ -11,6 +11,7 @@ import {
   createRoute,
   getLineName,
   AVG_STATION_TRAVEL_TIME,
+  getLineHopMinutes,
 } from '@models/route';
 import { getTransferTime } from './transferTime';
 
@@ -122,7 +123,7 @@ function buildGraph(
               if (!excludeEdges?.has(edgeKey)) {
                 graph.get(nodeKey)?.push({
                   to: nextKey,
-                  weight: adjustWeight(AVG_STATION_TRAVEL_TIME, lineId),
+                  weight: adjustWeight(getLineHopMinutes(lineId), lineId),
                   isTransfer: false,
                   lineId: subLineId,
                 });
@@ -141,7 +142,7 @@ function buildGraph(
               if (!excludeEdges?.has(edgeKey)) {
                 graph.get(nodeKey)?.push({
                   to: prevKey,
-                  weight: adjustWeight(AVG_STATION_TRAVEL_TIME, lineId),
+                  weight: adjustWeight(getLineHopMinutes(lineId), lineId),
                   isTransfer: false,
                   lineId: subLineId,
                 });
@@ -221,7 +222,7 @@ function buildGraph(
         if (!excludeEdges?.has(`${lastKey}->${firstKey}`)) {
           graph.get(lastKey)?.push({
             to: firstKey,
-            weight: adjustWeight(AVG_STATION_TRAVEL_TIME, '2'),
+            weight: adjustWeight(getLineHopMinutes('2'), '2'),
             isTransfer: false,
             lineId: trunkSubLineId,
           });
@@ -229,7 +230,7 @@ function buildGraph(
         if (!excludeEdges?.has(`${firstKey}->${lastKey}`)) {
           graph.get(firstKey)?.push({
             to: lastKey,
-            weight: adjustWeight(AVG_STATION_TRAVEL_TIME, '2'),
+            weight: adjustWeight(getLineHopMinutes('2'), '2'),
             isTransfer: false,
             lineId: trunkSubLineId,
           });
@@ -589,7 +590,7 @@ function calculatePathCost(nodes: string[]): number {
     if (currentStationId === nextStationId && currentLineId !== nextLineId && currentStationId) {
       cost += getTransferTime(currentStationId);
     } else {
-      cost += AVG_STATION_TRAVEL_TIME;
+      cost += nextLineId ? getLineHopMinutes(nextLineId) : AVG_STATION_TRAVEL_TIME;
     }
   }
 
@@ -630,7 +631,9 @@ function convertToRoute(internalPath: InternalPath): Route {
       toStationName: nextStation.name,
       lineId: segmentLineId,
       lineName: getLineName(segmentLineId),
-      estimatedMinutes: isTransfer ? getTransferTime(currentStationId) : AVG_STATION_TRAVEL_TIME,
+      estimatedMinutes: isTransfer
+        ? getTransferTime(currentStationId)
+        : getLineHopMinutes(segmentLineId),
       isTransfer,
     });
   }

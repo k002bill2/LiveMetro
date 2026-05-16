@@ -12,7 +12,8 @@ import {
   AlternativeReason,
   AlternativeRouteOptions,
   DEFAULT_ALTERNATIVE_OPTIONS,
-  AVG_STATION_TRAVEL_TIME,
+  FASTEST_LINE_HOP_MINUTES,
+  getLineHopMinutes,
   createRoute,
   createAlternativeRoute,
   getLineName,
@@ -127,7 +128,7 @@ const buildGraph = (
             const edgeList = edges.get(key) || [];
             edgeList.push({
               to: { stationId: nextStationId, lineId, key: nextKey },
-              weight: adjustWeight(AVG_STATION_TRAVEL_TIME, lineId),
+              weight: adjustWeight(getLineHopMinutes(lineId), lineId),
               isTransfer: false,
             });
             edges.set(key, edgeList);
@@ -142,7 +143,7 @@ const buildGraph = (
             const edgeList = edges.get(key) || [];
             edgeList.push({
               to: { stationId: prevStationId, lineId, key: prevKey },
-              weight: adjustWeight(AVG_STATION_TRAVEL_TIME, lineId),
+              weight: adjustWeight(getLineHopMinutes(lineId), lineId),
               isTransfer: false,
             });
             edges.set(key, edgeList);
@@ -166,7 +167,7 @@ const buildGraph = (
       const lastEdges = edges.get(lastKey) || [];
       lastEdges.push({
         to: { stationId: firstStation, lineId: '2', key: firstKey },
-        weight: adjustWeight(AVG_STATION_TRAVEL_TIME, '2'),
+        weight: adjustWeight(getLineHopMinutes('2'), '2'),
         isTransfer: false,
       });
       edges.set(lastKey, lastEdges);
@@ -175,7 +176,7 @@ const buildGraph = (
       const firstEdges = edges.get(firstKey) || [];
       firstEdges.push({
         to: { stationId: lastStation, lineId: '2', key: lastKey },
-        weight: adjustWeight(AVG_STATION_TRAVEL_TIME, '2'),
+        weight: adjustWeight(getLineHopMinutes('2'), '2'),
         isTransfer: false,
       });
       edges.set(firstKey, firstEdges);
@@ -255,8 +256,10 @@ const heuristic = (
     }
   }
 
-  // Estimate time based on station distance (approximately 2.5 min per station)
-  return minDistance * AVG_STATION_TRAVEL_TIME * 0.8; // Underestimate for admissibility
+  // A* admissibility: h ≤ actual cost. Use the fastest known line speed
+  // (e.g. GTX-A) as the per-hop floor — any actual route has hop cost ≥ this
+  // value, so h is a valid lower bound. 0.95 margin guards float jitter.
+  return minDistance * FASTEST_LINE_HOP_MINUTES * 0.95;
 };
 
 /**
@@ -428,7 +431,9 @@ const pathToSegments = (path: string[]): RouteSegment[] => {
       toStationName: nextStation.name,
       lineId: displayLineId,
       lineName: getLineName(displayLineId),
-      estimatedMinutes: isTransfer ? getTransferTime(currentStationId) : AVG_STATION_TRAVEL_TIME,
+      estimatedMinutes: isTransfer
+        ? getTransferTime(currentStationId)
+        : getLineHopMinutes(displayLineId),
       isTransfer,
     });
   }

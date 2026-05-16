@@ -39,6 +39,8 @@ jest.mock('@utils/subwayMapData', () => ({
 jest.mock('@models/route', () => ({
   AVG_STATION_TRAVEL_TIME: 2,
   AVG_TRANSFER_TIME: 5,
+  FASTEST_LINE_HOP_MINUTES: 2,
+  getLineHopMinutes: jest.fn(() => 2),
   createRoute: jest.fn((segments) => ({
     segments,
     totalMinutes: segments.reduce((acc: number, s: { estimatedMinutes: number }) => acc + s.estimatedMinutes, 0),
