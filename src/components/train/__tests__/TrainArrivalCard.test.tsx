@@ -336,4 +336,54 @@ describe('TrainArrivalCard', () => {
       expect(() => customRender(<TrainArrivalCard train={train} />)).not.toThrow();
     });
   });
+
+  // GAP_REPORT item #8 UI follow-up: trainType badge surfaces 일반/급행/특급
+  // visually. Service exposes the normalized enum (PR #123); this card prop
+  // renders the visual differentiation.
+  describe('trainType badge', () => {
+    it('does not render a tier badge when trainType is omitted', () => {
+      const train = createMockTrain();
+      const { queryByLabelText } = customRender(<TrainArrivalCard train={train} />);
+      expect(queryByLabelText(/급행 열차/)).toBeNull();
+      expect(queryByLabelText(/특급 열차/)).toBeNull();
+    });
+
+    it('does not render a tier badge when trainType is "normal"', () => {
+      const train = createMockTrain();
+      const { queryByLabelText } = customRender(
+        <TrainArrivalCard train={train} trainType="normal" />,
+      );
+      expect(queryByLabelText(/급행 열차/)).toBeNull();
+      expect(queryByLabelText(/특급 열차/)).toBeNull();
+    });
+
+    it('renders "급행" badge with accessibility label when trainType is "express"', () => {
+      const train = createMockTrain();
+      const { getByLabelText, getByText } = customRender(
+        <TrainArrivalCard train={train} trainType="express" />,
+      );
+      expect(getByLabelText('급행 열차')).toBeTruthy();
+      expect(getByText('급행')).toBeTruthy();
+    });
+
+    it('renders "특급" badge with accessibility label when trainType is "rapid"', () => {
+      const train = createMockTrain();
+      const { getByLabelText, getByText } = customRender(
+        <TrainArrivalCard train={train} trainType="rapid" />,
+      );
+      expect(getByLabelText('특급 열차')).toBeTruthy();
+      expect(getByText('특급')).toBeTruthy();
+    });
+
+    it('suppresses the tier badge when showDetails={false}', () => {
+      // showDetails=false hides the line badge; the tier badge follows the same
+      // density-affordance pattern so compact contexts (e.g. cluster summaries)
+      // do not clutter with badges either.
+      const train = createMockTrain();
+      const { queryByLabelText } = customRender(
+        <TrainArrivalCard train={train} trainType="express" showDetails={false} />,
+      );
+      expect(queryByLabelText('급행 열차')).toBeNull();
+    });
+  });
 });
