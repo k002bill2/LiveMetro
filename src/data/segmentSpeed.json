@@ -1,0 +1,3 @@
+{
+  "_schema_doc": "Per-edge minutes for specific station pairs, used to override the line-level default in lineSpeed.json. Keyed by lineId; each entry is an array of {from, to, minutes}. Direction-agnostic: a single {from:'A',to:'B'} entry covers both A→B and B→A traversals. Edges not listed fall back to LINE_SPEEDS[lineId] then AVG_STATION_TRAVEL_TIME. See models/route.ts getEdgeMinutes()."
+}

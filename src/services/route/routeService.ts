@@ -13,7 +13,7 @@ import {
   AlternativeRouteOptions,
   DEFAULT_ALTERNATIVE_OPTIONS,
   FASTEST_LINE_HOP_MINUTES,
-  getLineHopMinutes,
+  getEdgeMinutes,
   createRoute,
   createAlternativeRoute,
   getLineName,
@@ -128,7 +128,7 @@ const buildGraph = (
             const edgeList = edges.get(key) || [];
             edgeList.push({
               to: { stationId: nextStationId, lineId, key: nextKey },
-              weight: adjustWeight(getLineHopMinutes(lineId), lineId),
+              weight: adjustWeight(getEdgeMinutes(stationId, nextStationId, lineId), lineId),
               isTransfer: false,
             });
             edges.set(key, edgeList);
@@ -143,7 +143,7 @@ const buildGraph = (
             const edgeList = edges.get(key) || [];
             edgeList.push({
               to: { stationId: prevStationId, lineId, key: prevKey },
-              weight: adjustWeight(getLineHopMinutes(lineId), lineId),
+              weight: adjustWeight(getEdgeMinutes(stationId, prevStationId, lineId), lineId),
               isTransfer: false,
             });
             edges.set(key, edgeList);
@@ -167,7 +167,7 @@ const buildGraph = (
       const lastEdges = edges.get(lastKey) || [];
       lastEdges.push({
         to: { stationId: firstStation, lineId: '2', key: firstKey },
-        weight: adjustWeight(getLineHopMinutes('2'), '2'),
+        weight: adjustWeight(getEdgeMinutes(lastStation, firstStation, '2'), '2'),
         isTransfer: false,
       });
       edges.set(lastKey, lastEdges);
@@ -176,7 +176,7 @@ const buildGraph = (
       const firstEdges = edges.get(firstKey) || [];
       firstEdges.push({
         to: { stationId: lastStation, lineId: '2', key: lastKey },
-        weight: adjustWeight(getLineHopMinutes('2'), '2'),
+        weight: adjustWeight(getEdgeMinutes(firstStation, lastStation, '2'), '2'),
         isTransfer: false,
       });
       edges.set(firstKey, firstEdges);
@@ -433,7 +433,7 @@ const pathToSegments = (path: string[]): RouteSegment[] => {
       lineName: getLineName(displayLineId),
       estimatedMinutes: isTransfer
         ? getTransferTime(currentStationId)
-        : getLineHopMinutes(displayLineId),
+        : getEdgeMinutes(currentStationId, nextStationId, displayLineId),
       isTransfer,
     });
   }

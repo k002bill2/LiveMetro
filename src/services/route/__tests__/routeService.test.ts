@@ -60,6 +60,7 @@ jest.mock('@models/route', () => ({
   AVG_TRANSFER_TIME: 5,
   FASTEST_LINE_HOP_MINUTES: 2,
   getLineHopMinutes: jest.fn(() => 2),
+  getEdgeMinutes: jest.fn(() => 2),
   createRoute: jest.fn((segments) => ({
     segments,
     totalMinutes: segments.reduce((acc: number, s: { estimatedMinutes: number }) => acc + s.estimatedMinutes, 0),

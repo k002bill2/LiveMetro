@@ -4,6 +4,7 @@
  */
 
 import LINE_SPEEDS_JSON from '@/data/lineSpeed.json';
+import SEGMENT_SPEED_JSON from '@/data/segmentSpeed.json';
 
 /**
  * Canonical travel direction used for storage, queries, and ML pipelines.
@@ -167,6 +168,83 @@ export const LINE_SPEEDS: Readonly<Record<string, number>> =
 export function getLineHopMinutes(lineId: string): number {
   const trunk = lineId.split('::')[0] ?? lineId;
   return LINE_SPEEDS[trunk] ?? AVG_STATION_TRAVEL_TIME;
+}
+
+/**
+ * Per-edge segment override entry: a specific A↔B traversal whose actual
+ * minutes differ from the line-level average.
+ */
+interface SegmentSpeedEntry {
+  readonly from: string;
+  readonly to: string;
+  readonly minutes: number;
+}
+
+/**
+ * Raw `segmentSpeed.json` shape. The `_schema_doc` key is the file's own
+ * inline documentation and is filtered out at load time. All other keys are
+ * trunk lineIds mapping to override arrays.
+ */
+type SegmentSpeedRaw = Record<string, SegmentSpeedEntry[] | string>;
+
+const SEGMENT_SPEEDS_RAW = SEGMENT_SPEED_JSON as SegmentSpeedRaw;
+
+/**
+ * Normalized segment lookup table.
+ *
+ * Structure: `Map<lineId, Map<orderedEdgeKey, minutes>>`
+ *
+ * `orderedEdgeKey` = `${min(from, to)}->${max(from, to)}` so a single entry
+ * covers both A→B and B→A traversals (most edges are bidirectional with
+ * identical timing).
+ *
+ * Built once at module load; safe because the JSON is frozen at build time.
+ */
+const SEGMENT_SPEEDS: ReadonlyMap<string, ReadonlyMap<string, number>> = (() => {
+  const out = new Map<string, Map<string, number>>();
+  for (const [lineId, entries] of Object.entries(SEGMENT_SPEEDS_RAW)) {
+    if (lineId.startsWith('_') || !Array.isArray(entries)) continue;
+    const lineMap = new Map<string, number>();
+    for (const entry of entries) {
+      const a = entry.from < entry.to ? entry.from : entry.to;
+      const b = entry.from < entry.to ? entry.to : entry.from;
+      lineMap.set(`${a}->${b}`, entry.minutes);
+    }
+    if (lineMap.size > 0) out.set(lineId, lineMap);
+  }
+  return out;
+})();
+
+/**
+ * Resolve traversal minutes for a specific edge (A↔B) on a given line, with
+ * a three-level fallback chain:
+ *
+ *   1. Segment override (`segmentSpeed.json`) — A↔B specific minutes.
+ *   2. Line-level default (`lineSpeed.json` via {@link getLineHopMinutes}).
+ *   3. Global `AVG_STATION_TRAVEL_TIME`.
+ *
+ * Edge keys are direction-agnostic — a single `{from:'A',to:'B'}` entry
+ * applies to both `A→B` and `B→A`. Most subway edges are bidirectional with
+ * the same scheduled time.
+ *
+ * Why both fallbacks: `lineSpeed.json` cannot capture intra-line variation
+ * (e.g. 2호선 도심 dwell time vs 외곽). Segments give that resolution where
+ * it matters; the rest of the line still gets the line-level average.
+ */
+export function getEdgeMinutes(
+  fromStationId: string,
+  toStationId: string,
+  lineId: string,
+): number {
+  const trunk = lineId.split('::')[0] ?? lineId;
+  const lineMap = SEGMENT_SPEEDS.get(trunk);
+  if (lineMap) {
+    const a = fromStationId < toStationId ? fromStationId : toStationId;
+    const b = fromStationId < toStationId ? toStationId : fromStationId;
+    const minutes = lineMap.get(`${a}->${b}`);
+    if (typeof minutes === 'number') return minutes;
+  }
+  return getLineHopMinutes(lineId);
 }
 
 /**
