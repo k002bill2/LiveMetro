@@ -48,7 +48,7 @@ import {
 } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme';
 import { getSubwayLineColor } from '@/utils/colorUtils';
-import { getLocalStationsByLine } from '@/services/data/stationsDataService';
+import { getLocalStation, getLocalStationsByLine } from '@/services/data/stationsDataService';
 import { useFavorites } from '@/hooks/useFavorites';
 import type {
   OnboardingStackParamList,
@@ -165,14 +165,25 @@ export const OnboardingStationPickerScreen: React.FC<Props> = ({
     return list.filter((s) => s.stationName.includes(query));
   }, [favoritesWithDetails, excludeStationIds, query]);
 
+  // 환승역은 노선별로 stationId가 다른 row를 가진다(seoulStations.json).
+  // exclude를 id만으로 비교하면 다른 노선 탭의 같은 물리적 역이 그대로
+  // 노출돼 중복 선택을 허용한다. name으로도 비교해 같은 역을 모두 제외.
+  const excludeNames = useMemo(
+    () =>
+      excludeStationIds
+        .map((id) => getLocalStation(id)?.name)
+        .filter((n): n is string => Boolean(n)),
+    [excludeStationIds],
+  );
+
   /** Browse mode: stations on the selected line, filtered by query, excluded. */
   const browseStations = useMemo(() => {
     const list = getLocalStationsByLine(selectedLineId).filter(
-      (s) => !excludeStationIds.includes(s.id),
+      (s) => !excludeStationIds.includes(s.id) && !excludeNames.includes(s.name),
     );
     if (!query) return list;
     return list.filter((s) => s.name.includes(query));
-  }, [selectedLineId, excludeStationIds, query]);
+  }, [selectedLineId, excludeStationIds, excludeNames, query]);
 
   return (
     <SafeAreaView style={styles.container}>
