@@ -9,6 +9,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { COLORS, RADIUS, SHADOWS, SPACING, TYPOGRAPHY } from '../../styles/modernTheme';
 
 import { Train, TrainStatus } from '../../models/train';
+import type { TrainType } from '../../models/train';
 import { trainService } from '../../services/train/trainService';
 import { getLocalStation } from '../../services/data/stationsDataService';
 import { dataManager, RealtimeTrainData } from '../../services/data/dataManager';
@@ -83,17 +84,37 @@ const TrainArrivalItem: React.FC<TrainArrivalItemProps> = memo(({ train }) => {
 
   const StatusIcon = getStatusIcon(train.status);
 
+  // Train tier badge: visible only for non-normal service. Mirrors
+  // TrainArrivalCard's mapping so 급행/특급 read identically across screens.
+  const trainTypeBadge = useMemo((): { label: string; backgroundColor: string; textColor: string } | null => {
+    const tier: TrainType | undefined = train.trainType;
+    if (!tier || tier === 'normal') return null;
+    if (tier === 'express') {
+      return { label: '급행', backgroundColor: COLORS.semantic.warning, textColor: '#1A1A1A' };
+    }
+    return { label: '특급', backgroundColor: COLORS.semantic.error, textColor: '#FFFFFF' };
+  }, [train.trainType]);
+
   return (
     <View
       style={styles.trainItem}
       accessible={true}
       accessibilityRole="summary"
-      accessibilityLabel={`${getDestinationName()} 방면 열차, ${getStatusText(train.status)} 상태, ${formatArrivalTime(train.arrivalTime)}${train.delayMinutes > 0 ? `, ${train.delayMinutes}분 지연` : ''}`}
+      accessibilityLabel={`${getDestinationName()} 방면${trainTypeBadge ? ` ${trainTypeBadge.label}` : ''} 열차, ${getStatusText(train.status)} 상태, ${formatArrivalTime(train.arrivalTime)}${train.delayMinutes > 0 ? `, ${train.delayMinutes}분 지연` : ''}`}
     >
       <View style={styles.trainHeader}>
         <View style={styles.directionInfo}>
           <TrainFront size={16} color={COLORS.text.secondary} />
           <Text style={styles.direction}>{getDestinationName()} 방면</Text>
+          {trainTypeBadge && (
+            <View
+              style={[styles.trainTypeBadge, { backgroundColor: trainTypeBadge.backgroundColor }]}
+            >
+              <Text style={[styles.trainTypeText, { color: trainTypeBadge.textColor }]}>
+                {trainTypeBadge.label}
+              </Text>
+            </View>
+          )}
         </View>
 
         <View style={[styles.statusBadge, { backgroundColor: getStatusColor(train.status) }]}>
@@ -421,6 +442,20 @@ const styles = StyleSheet.create({
     fontWeight: TYPOGRAPHY.fontWeight.semibold,
     color: COLORS.text.secondary,
     marginLeft: 4,
+  },
+  trainTypeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+    marginLeft: SPACING.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+  },
+  trainTypeText: {
+    fontSize: TYPOGRAPHY.fontSize.xs,
+    fontWeight: TYPOGRAPHY.fontWeight.bold,
+    textAlign: 'center',
   },
   statusBadge: {
     flexDirection: 'row',

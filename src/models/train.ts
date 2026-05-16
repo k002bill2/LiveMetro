@@ -23,6 +23,14 @@ export interface SubwayLine {
   readonly stations: readonly Station[];
 }
 
+/**
+ * Train service tier derived from Seoul API `btrainSttus`.
+ * - `normal`: 일반/완행 (no badge)
+ * - `express`: 급행 — limited stop (mostly Line 9)
+ * - `rapid`: 특급/ITX/직통 — even fewer stops
+ */
+export type TrainType = 'normal' | 'express' | 'rapid';
+
 export interface Train {
   readonly id: string;
   readonly lineId: string;
@@ -34,6 +42,7 @@ export interface Train {
   readonly arrivalTime: Date | null;
   readonly delayMinutes: number;
   readonly lastUpdated: Date;
+  readonly trainType?: TrainType;
 }
 
 export enum TrainStatus {

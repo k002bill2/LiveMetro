@@ -433,4 +433,51 @@ describe('TrainArrivalList', () => {
       });
     });
   });
+
+  // Guide (2026-05-16) item #8: differentiate 일반 / 급행 / 특급. Verifies
+  // service-tier badge surfaces in the inline TrainArrivalItem after the
+  // service-layer wiring (dataManager + arrivalService preserve trainType).
+  describe('Train type badge', () => {
+    it('should render 급행 badge when trainType is express', async () => {
+      mockSubscription([makeTrain({ trainType: 'express' })]);
+
+      const { getByText } = render(<TrainArrivalList stationId="station-1" />);
+
+      await waitFor(() => {
+        expect(getByText('급행')).toBeTruthy();
+      });
+    });
+
+    it('should render 특급 badge when trainType is rapid', async () => {
+      mockSubscription([makeTrain({ trainType: 'rapid' })]);
+
+      const { getByText } = render(<TrainArrivalList stationId="station-1" />);
+
+      await waitFor(() => {
+        expect(getByText('특급')).toBeTruthy();
+      });
+    });
+
+    it('should not render any tier badge when trainType is normal', async () => {
+      mockSubscription([makeTrain({ trainType: 'normal' })]);
+
+      const { queryByText } = render(<TrainArrivalList stationId="station-1" />);
+
+      await waitFor(() => {
+        expect(queryByText('급행')).toBeNull();
+        expect(queryByText('특급')).toBeNull();
+      });
+    });
+
+    it('should not render any tier badge when trainType is undefined (backward compat)', async () => {
+      mockSubscription([makeTrain({ /* trainType omitted */ })]);
+
+      const { queryByText } = render(<TrainArrivalList stationId="station-1" />);
+
+      await waitFor(() => {
+        expect(queryByText('급행')).toBeNull();
+        expect(queryByText('특급')).toBeNull();
+      });
+    });
+  });
 });

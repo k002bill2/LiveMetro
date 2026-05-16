@@ -6,6 +6,7 @@
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { seoulSubwayApi, SeoulRealtimeArrival } from '@/services/api/seoulSubwayApi';
+import type { TrainType } from '@/models/train';
 
 // ============================================================================
 // Types
@@ -22,6 +23,7 @@ export interface TrainArrival {
   readonly arrivalSeconds: number | null;
   readonly arrivalMessage: string;
   readonly trainNumber: string;
+  readonly trainType?: TrainType;
 }
 
 /**
@@ -291,6 +293,7 @@ class ArrivalService {
           arrivalSeconds: converted.arrivalTime,
           arrivalMessage: converted.arrivalMessage,
           trainNumber: converted.trainNumber,
+          trainType: converted.trainType,
         };
       });
 

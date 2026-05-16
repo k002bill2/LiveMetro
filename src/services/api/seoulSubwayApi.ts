@@ -5,6 +5,7 @@
 
 import { createSeoulApiKeyManager, createPublicDataApiKeyManager, ApiKeyManager } from './apiKeyManager';
 import { formatStationName } from '../../utils/formatUtils';
+import type { TrainType } from '@/models/train';
 
 /**
  * Rate Limiter for Seoul API (30-second minimum interval per endpoint)
@@ -159,8 +160,11 @@ const RECPTN_DT_MAX_AGE_SECONDS = 600;
  * Guide (2026-05-16) item #8 mandates color/icon differentiation for service
  * tier. This normalization lets UI branch once on the enum value rather than
  * regex'ing the raw Korean string at every render site.
+ *
+ * Re-exported from `@/models/train` so consumers can keep importing from
+ * either layer; canonical definition lives with the `Train` interface.
  */
-export type TrainType = 'normal' | 'express' | 'rapid';
+export type { TrainType } from '@/models/train';
 
 /**
  * Map Seoul API `btrainSttus` Korean string to normalized {@link TrainType}.
