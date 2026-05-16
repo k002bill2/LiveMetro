@@ -33,6 +33,7 @@ import {
 } from 'lucide-react-native';
 
 import { Train, TrainStatus } from '@/models/train';
+import type { TrainType } from '@/services/api/seoulSubwayApi';
 import { formatArrivalDisplay } from '@/utils/dateUtils';
 import {
   getSubwayLineColor as getLineColor,
@@ -50,6 +51,13 @@ export interface TrainArrivalCardProps {
   style?: StyleProp<ViewStyle>;
   /** Whether to show detailed information like station name and line badge */
   showDetails?: boolean;
+  /**
+   * Service tier from `seoulSubwayApi.convertToAppTrain`. When 'express' or
+   * 'rapid', the card renders a small badge next to the line badge so users
+   * can distinguish 일반/급행/특급 at a glance (guide #8). Omitted or
+   * 'normal' → no badge.
+   */
+  trainType?: TrainType;
 }
 
 /**
@@ -70,6 +78,7 @@ export const TrainArrivalCard: React.FC<TrainArrivalCardProps> = memo(({
   onPress,
   style,
   showDetails = true,
+  trainType,
 }) => {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -88,6 +97,19 @@ export const TrainArrivalCard: React.FC<TrainArrivalCardProps> = memo(({
   const lineBackgroundColor = useMemo(() => {
     return `${lineColor}20`; // 20% opacity
   }, [lineColor]);
+
+  // Train tier badge: visible only for non-normal service. Contrast text
+  // colors are hardcoded (not from theme) so readability survives in both
+  // light/dark modes — warning yellow vs error red have different optimal
+  // text contrast, theme tokens would collapse that distinction.
+  const trainTypeBadge = useMemo(() => {
+    if (!trainType || trainType === 'normal') return null;
+    if (trainType === 'express') {
+      return { label: '급행', backgroundColor: colors.warning, textColor: '#1A1A1A' };
+    }
+    // 'rapid' — 특급 / ITX / 직통
+    return { label: '특급', backgroundColor: colors.error, textColor: '#FFFFFF' };
+  }, [trainType, colors.warning, colors.error]);
 
   // Get delay color based on minutes
   const getDelayColor = useCallback((minutes: number) => {
@@ -201,6 +223,27 @@ export const TrainArrivalCard: React.FC<TrainArrivalCardProps> = memo(({
             ]}
           >
             {lineName}
+          </Text>
+        </View>
+      )}
+
+      {/* Service tier badge (express / rapid only) */}
+      {showDetails && trainTypeBadge && (
+        <View
+          style={[
+            styles.trainTypeBadge,
+            { backgroundColor: trainTypeBadge.backgroundColor },
+          ]}
+          accessibilityLabel={`${trainTypeBadge.label} 열차`}
+          accessibilityRole="text"
+        >
+          <Text
+            style={[
+              styles.trainTypeText,
+              { color: trainTypeBadge.textColor },
+            ]}
+          >
+            {trainTypeBadge.label}
           </Text>
         </View>
       )}
@@ -355,6 +398,21 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   lineText: {
     fontSize: 14,
+    fontWeight: 'bold',
+    fontFamily: weightToFontFamily('bold'),
+    textAlign: 'center',
+  },
+  trainTypeBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    marginRight: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+  },
+  trainTypeText: {
+    fontSize: 11,
     fontWeight: 'bold',
     fontFamily: weightToFontFamily('bold'),
     textAlign: 'center',
