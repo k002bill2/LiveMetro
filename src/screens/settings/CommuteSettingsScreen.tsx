@@ -524,19 +524,37 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
               <Text style={styles.routeEditLink}>편집</Text>
             </TouchableOpacity>
           ) : (
-            <Switch
-              value={enabled ?? false}
-              onValueChange={onToggleEnabled}
-              // No evening route → nothing to enable; the toggle is inert.
-              disabled={!route}
-              accessibilityRole="switch"
-              accessibilityLabel="퇴근 경로 사용"
-              trackColor={{ false: semantic.lineNormal, true: WANTED_TOKENS.blue[500] }}
-              thumbColor="#fff"
-              ios_backgroundColor={semantic.lineNormal}
-              // Match SettingToggle's scale 0.85 for visual parity.
-              style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }}
-            />
+            <>
+              {/* Evening: edit link only when a route exists (empty
+                  state's emptyCta handles initial setup). Toggle stays
+                  next to it so on/off + edit are both reachable from
+                  the header — matches morning's edit affordance for
+                  consistency. */}
+              {route ? (
+                <TouchableOpacity
+                  onPress={onEdit}
+                  accessibilityRole="button"
+                  accessibilityLabel="퇴근 경로 편집"
+                  hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+                  style={styles.routeEditLinkEveningSpacer}
+                >
+                  <Text style={styles.routeEditLink}>편집</Text>
+                </TouchableOpacity>
+              ) : null}
+              <Switch
+                value={enabled ?? false}
+                onValueChange={onToggleEnabled}
+                // No evening route → nothing to enable; the toggle is inert.
+                disabled={!route}
+                accessibilityRole="switch"
+                accessibilityLabel="퇴근 경로 사용"
+                trackColor={{ false: semantic.lineNormal, true: WANTED_TOKENS.blue[500] }}
+                thumbColor="#fff"
+                ios_backgroundColor={semantic.lineNormal}
+                // Match SettingToggle's scale 0.85 for visual parity.
+                style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }}
+              />
+            </>
           )}
         </View>
 
@@ -1040,6 +1058,12 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       fontSize: 12,
       fontFamily: weightToFontFamily('700'),
       color: WANTED_TOKENS.blue[500],
+    },
+    // Evening "편집" sits to the left of the Switch — add a gap so the
+    // text doesn't bump into the toggle. Morning has no neighbor so its
+    // link uses the default zero-spacer.
+    routeEditLinkEveningSpacer: {
+      marginRight: 12,
     },
     routeBody: {
       backgroundColor: semantic.bgSubtlePage,
