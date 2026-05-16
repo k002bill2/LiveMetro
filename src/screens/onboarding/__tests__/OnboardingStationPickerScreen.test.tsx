@@ -62,6 +62,8 @@ jest.mock('@/services/data/stationsDataService', () => ({
     }
     return [];
   }),
+  // 기본은 null. 회귀 테스트가 case별로 mockImplementationOnce 오버라이드.
+  getLocalStation: jest.fn(() => null),
 }));
 
 // Favorites — return a couple of commute-flagged stations
@@ -307,6 +309,40 @@ describe('OnboardingStationPickerScreen', () => {
       expect(getByText('2호선 · 총 2개역')).toBeTruthy();
       expect(queryByText('강남')).toBeNull();
       expect(getByText('역삼')).toBeTruthy();
+    });
+
+    // 회귀: 환승역은 노선별 다른 stationId(예: 선릉 2호선 cd=0220 vs 수인분당
+    // cd=1023). id만 비교하면 다른 노선 탭에서 같은 물리적 역이 그대로
+    // 노출돼 중복 선택을 허용. name 기반 보조 비교가 같이 빠뜨려야 한다.
+    it('excludes same-name transfer station shown under a different lineId variant', () => {
+      const service = jest.requireMock('@/services/data/stationsDataService');
+      service.getLocalStation.mockImplementationOnce((id: string) =>
+        id === '1023'
+          ? { id: '1023', name: '선릉', nameEn: 'Seolleung', lineId: '수인분당선' }
+          : null,
+      );
+      service.getLocalStationsByLine.mockImplementationOnce((lineId: string) =>
+        lineId === '2'
+          ? [
+              { id: '0222', name: '강남', nameEn: 'Gangnam', lineId: '2' },
+              { id: '0220', name: '선릉', nameEn: 'Seolleung', lineId: '2' },
+            ]
+          : [],
+      );
+
+      const { getByText, queryByText } = render(
+        <OnboardingStationPickerScreen
+          navigation={buildNavigation() as never}
+          route={
+            buildRoute('transfer', { excludeStationIds: ['1023'] }) as never
+          }
+        />,
+      );
+      // 1023(수인분당 선릉)을 excludeStationIds로 받았지만 2호선 탭의
+      // 선릉(0220)도 name 매치로 함께 제외돼야 함.
+      expect(queryByText('선릉')).toBeNull();
+      expect(getByText('2호선 · 총 1개역')).toBeTruthy();
+      expect(getByText('강남')).toBeTruthy();
     });
   });
 
