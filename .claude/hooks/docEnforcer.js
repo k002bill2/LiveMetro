@@ -17,42 +17,57 @@ if (!prompt) {
   process.exit(0);
 }
 
+// LiveMetro 도메인 키워드 → 실제 존재 문서 매핑.
+// 이전 버전은 다른 프로젝트(LangGraph 백엔드)의 fastapi/sqlalchemy/ontology
+// 등을 가리키고 있어 모든 doc이 미존재 + 키워드도 무관. (G5 follow-up)
+//
+// 매 규칙의 `doc` 경로는 git tracked file이어야 함 — 미존재 시 docEnforcer가
+// 잘못된 안내를 노출.
 const rules = [
   {
-    keywords: ['backend', 'api', '서비스', 'service', 'langgraph', '엔진',
-               'engine', '마이그레이션', 'migration', 'fastapi', 'sqlalchemy',
-               'pydantic', 'alembic', '라우터', 'router', '엔드포인트', 'endpoint'],
-    doc: 'docs/architecture.md',
-    label: 'BACKEND',
-    desc: '백엔드 아키텍처, 노드 패턴, 디렉토리 구조'
+    keywords: ['firebase', 'firestore', 'auth', '인증', 'cloud functions',
+               '클라우드 함수', 'firestore.rules', 'firebase auth'],
+    doc: 'docs/FIREBASE_SETUP.md',
+    label: 'FIREBASE',
+    desc: 'Firebase Auth / Firestore / Cloud Functions 설정'
   },
   {
-    keywords: ['dashboard', 'component', '컴포넌트', '페이지', 'page', 'ui',
-               '프론트', 'front', 'store', 'zustand', 'react', 'tsx',
-               'tailwind', 'sidebar', 'modal', '스토어'],
-    doc: 'docs/dashboard.md',
-    label: 'FRONTEND',
-    desc: '컴포넌트 목록, 스토어 패턴, 디렉토리 구조'
+    keywords: ['아키텍처', 'architecture', 'navigation', '네비게이션',
+               '상태 관리', 'state management', 'authcontext', 'data flow',
+               '데이터 흐름'],
+    doc: 'docs/claude/architecture.md',
+    label: 'ARCHITECTURE',
+    desc: '데이터 흐름, 네비게이션, 상태 관리'
   },
   {
-    keywords: ['기능', 'feature', '새로운 기능', '신규', '구현', 'implement'],
-    doc: 'docs/features.md',
-    label: 'FEATURE',
-    desc: '기존 52개 기능 목록 — 중복/충돌 확인 필수'
+    keywords: ['seoul api', '서울 api', 'rate limit', '폴링', 'polling',
+               'realtimearrival', 'firestore collection', 'arrivalservice',
+               'datamanager'],
+    doc: 'docs/claude/api-reference.md',
+    label: 'API',
+    desc: 'Seoul Metro API + Firebase collections + arrivalService 계약'
   },
   {
-    keywords: ['에이전트', 'agent', '태스크', 'task', '세션', 'session',
-               '온톨로지', 'ontology', '도메인 모델'],
-    doc: 'docs/ontology.md',
-    label: 'DOMAIN',
-    desc: '에이전트/태스크/세션 도메인 개념 관계'
+    keywords: ['새 화면', 'new screen', '새 hook', 'new hook', 'new service',
+               '커스텀 hook', 'custom hook', '서비스 추가', 'service 추가',
+               'add screen', 'add hook', 'add service'],
+    doc: 'docs/claude/development-patterns.md',
+    label: 'PATTERNS',
+    desc: '화면/훅/서비스 추가 패턴 + 경로 별칭'
   },
   {
-    keywords: ['claude code 통합', 'hook', '훅', 'skill', '스킬',
-               'mcp', '커맨드', 'command', 'sub-agent', '서브에이전트'],
-    doc: 'docs/architecture/claude-code-integration.md',
-    label: 'CLAUDE-CODE',
-    desc: 'Claude Code 통합 아키텍처, 이벤트 라이프사이클'
+    keywords: ['jest 설정', 'rntl', 'coverage 임계값', 'coverage threshold',
+               'mock pattern', '테스트 환경', 'test setup', 'test config'],
+    doc: 'docs/claude/testing.md',
+    label: 'TESTING',
+    desc: 'Jest 설정, 커버리지 임계값, RNTL 테스트 패턴'
+  },
+  {
+    keywords: ['expo build', 'eas build', 'deployment', '배포', 'production build',
+               'release', 'sdk upgrade'],
+    doc: 'docs/DEVELOPMENT.md',
+    label: 'BUILD',
+    desc: 'Expo / EAS Build / 배포 가이드'
   }
 ];
 
