@@ -366,6 +366,80 @@ describe('useTrainSchedule', () => {
       );
     });
   });
+
+  // F3.1.1 — Gemini cross-review follow-up (PR #130).
+  // When the user manually overrides dayType to a non-today value, the
+  // "current time" upcoming filter would incorrectly hide trains that depart
+  // before the current wall-clock time on a different day. Fix: skip the
+  // time filter and treat the whole list as browsable upcoming.
+  describe('upcomingTrains override-aware filtering', () => {
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('includes early-morning trains when user overrides to a non-today dayType', async () => {
+      jest.useFakeTimers();
+      // Friday 10:00. Today's weekTag = '1' (weekday).
+      jest.setSystemTime(new Date(2026, 3, 24, 10, 0, 0));
+
+      // Saturday timetable with early trains before 10:00 (would be filtered
+      // out on Friday with naive "now" comparison).
+      (seoulSubwayApi.getStationTimetable as jest.Mock).mockResolvedValue([
+        {
+          STATION_CD: '0222', TRAIN_NO: 'S-1', LEFTTIME: '05:31:00',
+          ARRIVETIME: '05:31:00', DEST_STATION_NM: '신도림', ORIGIN_STATION_NM: '강남',
+          WEEK_TAG: '2', INOUT_TAG: '1',
+        },
+        {
+          STATION_CD: '0222', TRAIN_NO: 'S-2', LEFTTIME: '09:00:00',
+          ARRIVETIME: '09:00:00', DEST_STATION_NM: '신도림', ORIGIN_STATION_NM: '강남',
+          WEEK_TAG: '2', INOUT_TAG: '1',
+        },
+      ]);
+
+      const { result } = renderHook(() =>
+        useTrainSchedule({ stationName: '강남', lineNumber: '2', dayType: 'saturday' })
+      );
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      // 양쪽 다 upcoming에 포함되어야 함 — 사용자는 토요일 시간표를 둘러보는 중
+      expect(result.current.upcomingTrains).toHaveLength(2);
+    });
+
+    it('still applies "now" filter when override matches today (auto-equivalent)', async () => {
+      jest.useFakeTimers();
+      // Friday 10:00. Today weekTag '1' — user explicitly picks 'weekday' too.
+      jest.setSystemTime(new Date(2026, 3, 24, 10, 0, 0));
+
+      (seoulSubwayApi.getStationTimetable as jest.Mock).mockResolvedValue([
+        {
+          STATION_CD: '0222', TRAIN_NO: 'W-1', LEFTTIME: '05:31:00',
+          ARRIVETIME: '05:31:00', DEST_STATION_NM: '신도림', ORIGIN_STATION_NM: '강남',
+          WEEK_TAG: '1', INOUT_TAG: '1',
+        },
+        {
+          STATION_CD: '0222', TRAIN_NO: 'W-2', LEFTTIME: '11:00:00',
+          ARRIVETIME: '11:00:00', DEST_STATION_NM: '신도림', ORIGIN_STATION_NM: '강남',
+          WEEK_TAG: '1', INOUT_TAG: '1',
+        },
+      ]);
+
+      const { result } = renderHook(() =>
+        useTrainSchedule({ stationName: '강남', lineNumber: '2', dayType: 'weekday' })
+      );
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      // 05:31은 지나간 시각 → upcoming에서 제외, 11:00만 남아야 함
+      expect(result.current.upcomingTrains).toHaveLength(1);
+      expect(result.current.upcomingTrains[0]?.trainNumber).toBe('W-2');
+    });
+  });
 });
 
 // GAP_REPORT item #7: 첫차/막차 helper for timetable UI. Critical edge case:
