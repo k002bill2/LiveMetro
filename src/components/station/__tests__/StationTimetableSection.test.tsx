@@ -126,6 +126,52 @@ describe('StationTimetableSection', () => {
     });
   });
 
+  // F3.B polish: grid chip 분류 legend — 파란 swatch="다음 출발",
+  // strikethrough sample="지난 열차". 분류가 활성인 isViewingToday=true 케이스
+  // + schedules 있을 때만 노출.
+  describe('Grid legend (F3.B)', () => {
+    it('renders 다음 출발 and 지난 열차 legend labels when grid is visible (isViewingToday=true)', () => {
+      mockUseTrainSchedule.mockReturnValue(
+        makeHookResult({
+          schedules: [makeScheduleItem({ arrivalTime: '05:31:00' })],
+          isViewingToday: true,
+        }),
+      );
+      const { getByText } = render(
+        <StationTimetableSection {...defaultProps} testID="tt" />,
+      );
+      expect(getByText('다음 출발')).toBeTruthy();
+      expect(getByText('지난 열차')).toBeTruthy();
+    });
+
+    it('hides legend when isViewingToday=false (browse mode disables past/next)', () => {
+      mockUseTrainSchedule.mockReturnValue(
+        makeHookResult({
+          schedules: [makeScheduleItem({ arrivalTime: '05:31:00' })],
+          isViewingToday: false,
+        }),
+      );
+      const { queryByText } = render(
+        <StationTimetableSection {...defaultProps} testID="tt" />,
+      );
+      expect(queryByText('다음 출발')).toBeNull();
+      expect(queryByText('지난 열차')).toBeNull();
+    });
+
+    it('hides legend when no schedules (grid is also null)', () => {
+      // 빈 schedules → firstLabel/lastLabel null → "시간표 정보가 없습니다"
+      // empty 분기로 진입. legend가 들어있는 fragment 자체에 도달하지 않음.
+      mockUseTrainSchedule.mockReturnValue(
+        makeHookResult({ schedules: [], isViewingToday: true }),
+      );
+      const { queryByText } = render(
+        <StationTimetableSection {...defaultProps} testID="tt" />,
+      );
+      expect(queryByText('다음 출발')).toBeNull();
+      expect(queryByText('지난 열차')).toBeNull();
+    });
+  });
+
   describe('dayType tab segments', () => {
     it('renders all three tab labels regardless of data', () => {
       const { getByText } = render(<StationTimetableSection {...defaultProps} />);
