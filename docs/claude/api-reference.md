@@ -67,6 +67,52 @@ The `dataManager.detectServiceDisruptions()` method scans arrival messages for k
 
 Real delay detection requires comparing realtime arrivals against the timetable (`seoulSubwayApi.getStationTimetable`). Tracked as follow-up work; do not re-enable without timetable cross-reference.
 
+### arrivalService Contract (`src/services/arrival/arrivalService.ts`)
+
+Wraps `seoulSubwayApi` with rate limiting (30s min polling), retry (exponential backoff), AsyncStorage caching, and subscription multiplexing. Singleton `arrivalService` exported alongside the `ArrivalService` class for custom instances.
+
+**Public API**:
+
+```typescript
+arrivalService.getArrivals(
+  stationName: string,
+  options?: GetArrivalsOptions
+): Promise<ArrivalInfo>
+
+arrivalService.subscribe(
+  stationName: string,
+  callback: (arrival: ArrivalInfo | null, error?: Error) => void,
+  intervalMs?: number,
+  options?: GetArrivalsOptions
+): () => void  // unsubscribe
+
+arrivalService.clearCache(stationName?: string): Promise<void>
+arrivalService.destroy(): void
+```
+
+**`GetArrivalsOptions.throwOnError`** (PR #140, added 2026-05-17):
+
+By default, `getArrivals` swallows `fetchWithRetry` errors and falls back to cached data, or returns an empty `ArrivalInfo` (`source: 'cache'`) when no cache exists. This is the *legacy behavior* — `throwOnError: false`.
+
+When `throwOnError: true`, the retry chain still runs in full, but the cache fallback layer is bypassed: the original error (often `SeoulApiError` with a category — `quota` / `auth` / `transient` / `rateLimit` / `network`) is re-thrown. Subscribers receive the error via the second callback argument.
+
+| Caller | `throwOnError` | Reason |
+|--------|----------------|--------|
+| `dataManager.subscribeToRealtimeUpdates` | `true` | Routes errors to `ErrorFallback` (`src/components/common/ErrorFallback.tsx`) which branches on `SeoulApiError.category` for user-friendly copy. Direct cache fallback would mask the category and reduce diagnostic value. |
+| Direct callers of `arrivalService.getArrivals` (legacy) | `undefined` / `false` | Cache fallback preserves stale data on transient outages — acceptable for code paths that don't surface errors to a category-aware UI. |
+
+**Caching policy summary**:
+
+- Successful arrivals (`arrivals.length > 0`): cached with TTL `cacheTTL` (default 60s).
+- Empty arrivals: **not** cached — next call re-fetches immediately (avoids 60s of stale empty state on transient API hiccup).
+- Within `minPollingInterval` (30s default): cached data returned without API hit. This is the legal Seoul API rate-limit floor.
+- On failure with `throwOnError: false`: cache (if present, regardless of expiry-vs-polling-interval), then empty-info, then never throws.
+- On failure with `throwOnError: true`: original error re-thrown after retries exhaust. Cache is not consulted.
+
+**Subscription multiplexing**: Multiple subscribers for the same `stationName` share a single polling interval. The interval starts on first subscriber and stops on last unsubscribe. Each subscriber receives every poll's result independently. `options` from the first subscriber wins for the interval-level behavior (throwOnError applies to all subsequent polls).
+
+**Cleanup**: `arrivalService.destroy()` clears all intervals + subscriptions + fetch timestamps. Tests must call it in `afterEach`.
+
 ## Firebase Integration
 
 ### Firestore Collections
