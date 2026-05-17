@@ -5,6 +5,5 @@
 
 export { TrainArrivalList } from './TrainArrivalList';
 export { TrainArrivalCard } from './TrainArrivalCard';
-export { StationCard } from './StationCard';
 
 export type { TrainArrivalCardProps } from './TrainArrivalCard';

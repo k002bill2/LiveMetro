@@ -222,21 +222,10 @@ jest.mock('@/components/common/LoadingScreen', () => {
   return { LoadingScreen: ({ message }: { message?: string }) => <V testID="loading-screen"><T>{message}</T></V> };
 });
 
-jest.mock('@/components/train/StationCard', () => {
-  const { TouchableOpacity: TO, Text: T } = require('react-native');
-  return {
-    StationCard: ({ station, onPress, onSetStart, onSetEnd }: {
-      station: { id: string; name: string }; isSelected?: boolean;
-      onPress: () => void; onSetStart: () => void; onSetEnd: () => void;
-    }) => (
-      <TO testID={`station-card-${station.id}`} onPress={onPress}>
-        <T>{station.name}</T>
-        <TO testID={`set-start-${station.id}`} onPress={onSetStart}><T>Start</T></TO>
-        <TO testID={`set-end-${station.id}`} onPress={onSetEnd}><T>End</T></TO>
-      </TO>
-    ),
-  };
-});
+// NOTE (2026-05-17): train/StationCard mock 제거. Phase 56(이전)에 HomeScreen이
+// train/StationCard 사용을 중단하고 NearbyStationCard / FavoriteRow로 마이그레이션
+// 했으나 mock 본체만 stale로 남아 있었음. 본 PR에서 train/StationCard.tsx 자체
+// 삭제와 동반 정리.
 
 jest.mock('@/components/train/TrainArrivalList', () => {
   const { View: V, Text: T } = require('react-native');
