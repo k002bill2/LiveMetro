@@ -3,141 +3,23 @@
  * Displays real-time train arrival information for a station
  */
 
-import { TrainFront, CheckCircle, Clock, XCircle, Wrench, AlertTriangle, CircleHelp, RefreshCw } from 'lucide-react-native';
+import { TrainFront, RefreshCw } from 'lucide-react-native';
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { COLORS, RADIUS, SHADOWS, SPACING, TYPOGRAPHY } from '../../styles/modernTheme';
+import { COLORS, SPACING, TYPOGRAPHY } from '../../styles/modernTheme';
 
 import { Train, TrainStatus } from '../../models/train';
-import type { TrainType } from '../../models/train';
 import { trainService } from '../../services/train/trainService';
 import { getLocalStation } from '../../services/data/stationsDataService';
 import { dataManager, RealtimeTrainData } from '../../services/data/dataManager';
-import { formatArrivalTime } from '../../utils/dateUtils';
 import { throttle } from '../../utils/performanceUtils';
 import { ErrorFallback } from '@/components/common/ErrorFallback';
+import { TrainArrivalCard } from './TrainArrivalCard';
 
 interface TrainArrivalListProps {
   stationId: string;
   stationName?: string;
 }
-
-interface TrainArrivalItemProps {
-  train: Train;
-}
-
-const TrainArrivalItem: React.FC<TrainArrivalItemProps> = memo(({ train }) => {
-  const getStatusColor = (status: TrainStatus): string => {
-    switch (status) {
-      case TrainStatus.NORMAL:
-        return COLORS.semantic.success;
-      case TrainStatus.DELAYED:
-        return COLORS.semantic.error;
-      case TrainStatus.SUSPENDED:
-        return COLORS.gray[800];
-      case TrainStatus.MAINTENANCE:
-        return COLORS.gray[500];
-      case TrainStatus.EMERGENCY:
-        return COLORS.semantic.error;
-      default:
-        return COLORS.gray[500];
-    }
-  };
-
-  const getDestinationName = (): string => {
-    // Use finalDestination from train data
-    return train.finalDestination;
-  };
-
-  const getStatusText = (status: TrainStatus): string => {
-    switch (status) {
-      case TrainStatus.NORMAL:
-        return '정상';
-      case TrainStatus.DELAYED:
-        return '지연';
-      case TrainStatus.SUSPENDED:
-        return '운행중단';
-      case TrainStatus.MAINTENANCE:
-        return '점검중';
-      case TrainStatus.EMERGENCY:
-        return '긴급';
-      default:
-        return '알수없음';
-    }
-  };
-
-  const getStatusIcon = (status: TrainStatus) => {
-    switch (status) {
-      case TrainStatus.NORMAL:
-        return CheckCircle;
-      case TrainStatus.DELAYED:
-        return Clock;
-      case TrainStatus.SUSPENDED:
-        return XCircle;
-      case TrainStatus.MAINTENANCE:
-        return Wrench;
-      case TrainStatus.EMERGENCY:
-        return AlertTriangle;
-      default:
-        return CircleHelp;
-    }
-  };
-
-  const StatusIcon = getStatusIcon(train.status);
-
-  // Train tier badge: visible only for non-normal service. Mirrors
-  // TrainArrivalCard's mapping so 급행/특급 read identically across screens.
-  const trainTypeBadge = useMemo((): { label: string; backgroundColor: string; textColor: string } | null => {
-    const tier: TrainType | undefined = train.trainType;
-    if (!tier || tier === 'normal') return null;
-    if (tier === 'express') {
-      return { label: '급행', backgroundColor: COLORS.semantic.warning, textColor: '#1A1A1A' };
-    }
-    return { label: '특급', backgroundColor: COLORS.semantic.error, textColor: '#FFFFFF' };
-  }, [train.trainType]);
-
-  return (
-    <View
-      style={styles.trainItem}
-      accessible={true}
-      accessibilityRole="summary"
-      accessibilityLabel={`${getDestinationName()} 방면${trainTypeBadge ? ` ${trainTypeBadge.label}` : ''} 열차, ${getStatusText(train.status)} 상태, ${formatArrivalTime(train.arrivalTime)}${train.delayMinutes > 0 ? `, ${train.delayMinutes}분 지연` : ''}`}
-    >
-      <View style={styles.trainHeader}>
-        <View style={styles.directionInfo}>
-          <TrainFront size={16} color={COLORS.text.secondary} />
-          <Text style={styles.direction}>{getDestinationName()} 방면</Text>
-          {trainTypeBadge && (
-            <View
-              style={[styles.trainTypeBadge, { backgroundColor: trainTypeBadge.backgroundColor }]}
-            >
-              <Text style={[styles.trainTypeText, { color: trainTypeBadge.textColor }]}>
-                {trainTypeBadge.label}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(train.status) }]}>
-          <StatusIcon size={12} color="white" />
-          <Text style={styles.statusText}>{getStatusText(train.status)}</Text>
-        </View>
-      </View>
-
-      <View style={styles.trainDetails}>
-        <View style={styles.arrivalInfo}>
-          <Text style={styles.arrivalTime}>{formatArrivalTime(train.arrivalTime)}</Text>
-          {train.delayMinutes > 0 && <Text style={styles.delayText}>({train.delayMinutes}분 지연)</Text>}
-        </View>
-
-        {train.nextStationId && <Text style={styles.nextStation}>다음역 정보 로딩중...</Text>}
-      </View>
-    </View>
-  );
-});
-
-// Set display name for debugging
-TrainArrivalItem.displayName = 'TrainArrivalItem';
 
 export const TrainArrivalList: React.FC<TrainArrivalListProps> = memo(({ stationId, stationName: stationNameProp }) => {
   const [trains, setTrains] = useState<Train[]>([]);
@@ -398,7 +280,9 @@ export const TrainArrivalList: React.FC<TrainArrivalListProps> = memo(({ station
     <View style={styles.container}>
       {trains.length === 0
         ? renderEmptyState()
-        : trains.map(train => <TrainArrivalItem key={train.id} train={train} />)}
+        : trains.map(train => (
+            <TrainArrivalCard key={train.id} train={train} variant="compact" />
+          ))}
     </View>
   );
 });
@@ -409,82 +293,6 @@ TrainArrivalList.displayName = 'TrainArrivalList';
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-  },
-  trainItem: {
-    backgroundColor: COLORS.white,
-    padding: SPACING.lg,
-    marginHorizontal: SPACING.lg,
-    marginBottom: SPACING.md,
-    borderRadius: RADIUS.md,
-    borderWidth: 1,
-    borderColor: COLORS.border.light,
-    ...SHADOWS.sm,
-  },
-  trainHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: SPACING.sm,
-  },
-  directionInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  direction: {
-    fontSize: TYPOGRAPHY.fontSize.base,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.text.secondary,
-    marginLeft: 4,
-  },
-  trainTypeBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-    marginLeft: SPACING.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-    alignSelf: 'center',
-  },
-  trainTypeText: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    textAlign: 'center',
-  },
-  statusBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: SPACING.sm,
-    paddingVertical: 4,
-    borderRadius: RADIUS.md,
-  },
-  statusText: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    fontWeight: TYPOGRAPHY.fontWeight.semibold,
-    color: COLORS.white,
-    marginLeft: 4,
-  },
-  trainDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  arrivalInfo: {
-    flex: 1,
-  },
-  arrivalTime: {
-    fontSize: TYPOGRAPHY.fontSize.xl,
-    fontWeight: TYPOGRAPHY.fontWeight.bold,
-    color: COLORS.text.primary,
-  },
-  delayText: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.semantic.error,
-    marginTop: 2,
-  },
-  nextStation: {
-    fontSize: TYPOGRAPHY.fontSize.xs,
-    color: COLORS.text.tertiary,
-    fontStyle: 'italic',
   },
   loadingContainer: {
     flex: 1,
