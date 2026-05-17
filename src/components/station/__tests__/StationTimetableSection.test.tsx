@@ -97,6 +97,33 @@ describe('StationTimetableSection', () => {
       const { getByRole } = render(<StationTimetableSection {...defaultProps} />);
       expect(getByRole('header')).toBeTruthy();
     });
+
+    // F3.A polish: 헤더에 "현재 HH:MM" timestamp — isViewingToday 분기 검증.
+    it('renders 현재 HH:MM timestamp when isViewingToday=true', () => {
+      mockUseTrainSchedule.mockReturnValue(makeHookResult({ isViewingToday: true }));
+      const { getByText } = render(
+        <StationTimetableSection {...defaultProps} testID="tt" />,
+      );
+      // 정확한 시각 값은 매 실행마다 달라지므로 prefix만 매칭.
+      // TZ=Asia/Seoul pin(jest.config) 덕에 HH:MM 포맷은 결정적.
+      expect(getByText(/^현재 \d{2}:\d{2}$/)).toBeTruthy();
+    });
+
+    it('hides 현재 timestamp when isViewingToday=false (browsing another dayType)', () => {
+      mockUseTrainSchedule.mockReturnValue(makeHookResult({ isViewingToday: false }));
+      const { queryByText } = render(
+        <StationTimetableSection {...defaultProps} testID="tt" />,
+      );
+      expect(queryByText(/^현재 \d{2}:\d{2}$/)).toBeNull();
+    });
+
+    it('exposes 현재 시각 accessibilityLabel for screen readers', () => {
+      mockUseTrainSchedule.mockReturnValue(makeHookResult({ isViewingToday: true }));
+      const { getByLabelText } = render(
+        <StationTimetableSection {...defaultProps} testID="tt" />,
+      );
+      expect(getByLabelText(/^현재 시각 \d{2}:\d{2}$/)).toBeTruthy();
+    });
   });
 
   describe('dayType tab segments', () => {

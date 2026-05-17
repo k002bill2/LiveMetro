@@ -54,6 +54,15 @@ const trimSeconds = (time: string): string => {
   return `${parts[0]}:${parts[1]}`;
 };
 
+// Date → "HH:MM" — F3.A polish: 헤더의 "현재 HH:MM" timestamp 포맷.
+// jest.config의 `process.env.TZ = 'Asia/Seoul'`이 KST를 pin하므로 로컬·CI
+// 출력 일관 ([TZ-naive Date.getHours CI 회귀] 메모리 회피).
+const formatHHMM = (d: Date): string => {
+  const h = d.getHours();
+  const m = d.getMinutes();
+  return `${h < 10 ? `0${h}` : h}:${m < 10 ? `0${m}` : m}`;
+};
+
 // dayType tab segments. 'auto'는 UI에서 노출 안 함 — 초기 상태일 뿐.
 const TAB_SEGMENTS: ReadonlyArray<{ key: Exclude<DayTypeOverride, 'auto'>; label: string }> = [
   { key: 'weekday', label: '평일' },
@@ -104,6 +113,22 @@ export const StationTimetableSection: React.FC<StationTimetableSectionProps> = m
       dayType: selectedDayType,
     });
 
+    // F3.A polish: "현재 HH:MM" timestamp — 사용자가 첫차/막차·다음 출발과
+    // 현재 시각을 즉시 대조 가능. 분 단위 정밀도면 충분하므로 60s tick. 다른
+    // 요일을 browse 중이면(isViewingToday=false) 현재 시각은 무관 정보 →
+    // interval 자체를 mount하지 않음(폴링 비용 0). useState initializer 함수로
+    // mount 시 1회만 평가 → 초기 렌더에 빈 문자열 깜빡임 없음.
+    const [nowLabel, setNowLabel] = useState<string>(() => formatHHMM(new Date()));
+    useEffect(() => {
+      if (!isViewingToday) return;
+      // 분 경계 직후가 가장 자주 갱신되는 순간 — 단순 60s interval로 ±30s 오차
+      // 허용. 정밀 60s 정렬은 비용 대비 가치 낮음.
+      const id = setInterval(() => {
+        setNowLabel(formatHHMM(new Date()));
+      }, 60_000);
+      return () => clearInterval(id);
+    }, [isViewingToday]);
+
     // schedules에서 unique destinations 추출 — 순서는 첫 출현 순.
     const destinations = useMemo<readonly string[]>(() => {
       const seen = new Set<string>();
@@ -151,6 +176,15 @@ export const StationTimetableSection: React.FC<StationTimetableSectionProps> = m
           >
             시간표
           </Text>
+          {isViewingToday && (
+            <Text
+              style={[styles.nowLabel, { color: semantic.labelAlt }]}
+              accessibilityLabel={`현재 시각 ${nowLabel}`}
+              testID={testID ? `${testID}-now` : undefined}
+            >
+              현재 {nowLabel}
+            </Text>
+          )}
         </View>
 
         {/* dayType 3-segment tab — 이미지 디자인의 평일/토요일/일요일·공휴일 */}
@@ -252,6 +286,15 @@ const styles = StyleSheet.create({
     lineHeight: WANTED_TOKENS.type.heading2.lh,
     fontWeight: '700',
     fontFamily: weightToFontFamily('700'),
+  },
+  // F3.A: 헤더 행의 우측 끝으로 timestamp 밀어내기. marginLeft: 'auto'는
+  // flex-row 안에서 남은 공간 모두 좌측 여백으로 흡수해 자기 자신을 right-align.
+  nowLabel: {
+    marginLeft: 'auto',
+    fontSize: WANTED_TOKENS.type.caption1.size,
+    lineHeight: WANTED_TOKENS.type.caption1.lh,
+    fontWeight: '500',
+    fontFamily: weightToFontFamily('500'),
   },
   tabRow: {
     flexDirection: 'row',
