@@ -306,19 +306,19 @@ class DataManager {
     callback: (data: RealtimeTrainData | null, error?: unknown) => void,
     intervalMs: number = 30000
   ): () => void {
-    // G4: arrivalService의 error 인자를 consumer까지 forward — 이전엔 `_error`로
-    // 무시했음. SeoulApiError(category=quota/auth/transient/...) 등 구조화된
-    // 에러가 ErrorFallback의 category 분기까지 도달 가능. arrivalService가 현재
-    // 대부분의 에러를 cache fallback으로 swallow하지만, fetchWithRetry가
-    // initial subscribe에서 reject할 때(getArrivals.catch) error가 살아남아
-    // 여기로 전달됨. 미래 arrivalService refactor가 더 많은 에러를 surface하면
-    // 본 wiring이 자동으로 category 분기를 활성화.
+    // G4 wiring + #2 opt-in: arrivalService의 error 인자를 consumer까지
+    // forward + `throwOnError: true`로 cache fallback 우회. SeoulApiError
+    // (category=quota/auth/transient/...) 인스턴스가 그대로 ErrorFallback의
+    // category 분기까지 도달. 직접 `arrivalService.getArrivals` 호출자는
+    // throwOnError 기본값(false)이라 cache fallback 동작 유지 — 본 wrapper
+    // 만 ErrorFallback path로 opt-in.
     return arrivalService.subscribe(
       stationName,
       (info, error) => {
         callback(this.adaptArrivalInfoToRealtimeData(info), error);
       },
-      intervalMs
+      intervalMs,
+      { throwOnError: true },
     );
   }
 

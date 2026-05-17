@@ -312,6 +312,163 @@ describe('ArrivalService', () => {
     });
   });
 
+  // Phase #2 (2026-05-17): throwOnError opt-in skips cache fallback so callers
+  // routing errors to categorized UI (ErrorFallback) see the original error
+  // instance (e.g. SeoulApiError with .category) instead of silently degrading
+  // to stale cache. Default false preserves legacy behavior — separate test
+  // above ('should use cache when API fails after retries') guards that.
+  describe('throwOnError option', () => {
+    it('rethrows the original error after retries when throwOnError=true and no cache', async () => {
+      jest.useRealTimers();
+
+      const testService = new ArrivalService({
+        minPollingInterval: 30000,
+        cacheTTL: 60000,
+        maxRetries: 2,
+        retryDelay: 5,
+      });
+
+      mockSeoulSubwayApi.getRealtimeArrival.mockReset();
+      mockAsyncStorage.getItem.mockResolvedValue(null);
+
+      const original = new Error('Persistent error');
+      mockSeoulSubwayApi.getRealtimeArrival.mockRejectedValue(original);
+
+      await expect(
+        testService.getArrivals('강남', { throwOnError: true }),
+      ).rejects.toBe(original);
+
+      // Retry chain still ran in full — throwOnError only controls the
+      // cache-fallback layer, not retry behavior.
+      expect(mockSeoulSubwayApi.getRealtimeArrival).toHaveBeenCalledTimes(2);
+
+      testService.destroy();
+      jest.useFakeTimers();
+    });
+
+    it('rethrows even when cache is available (cache fallback bypassed)', async () => {
+      jest.useRealTimers();
+
+      const testService = new ArrivalService({
+        minPollingInterval: 30000,
+        cacheTTL: 60000,
+        maxRetries: 2,
+        retryDelay: 5,
+      });
+
+      mockSeoulSubwayApi.getRealtimeArrival.mockReset();
+
+      const original = new Error('All retries failed');
+      mockSeoulSubwayApi.getRealtimeArrival.mockRejectedValue(original);
+
+      // Cache is present, but throwOnError=true should ignore it.
+      const cachedData: ArrivalInfo = {
+        stationName: '강남',
+        stationId: '0222',
+        arrivals: [
+          {
+            trainId: 'cached-train',
+            lineId: '2',
+            direction: 'up',
+            destination: '신도림',
+            arrivalSeconds: 300,
+            arrivalMessage: '5분 후 도착',
+            trainNumber: '1111',
+          },
+        ],
+        lastUpdated: new Date(),
+        source: 'api',
+      };
+      mockAsyncStorage.getItem.mockResolvedValue(
+        JSON.stringify({ data: cachedData, expiry: Date.now() + 60000 }),
+      );
+
+      await expect(
+        testService.getArrivals('강남', { throwOnError: true }),
+      ).rejects.toBe(original);
+
+      testService.destroy();
+      jest.useFakeTimers();
+    });
+
+    it('preserves error instance identity (instanceof / category survives)', async () => {
+      jest.useRealTimers();
+
+      const testService = new ArrivalService({
+        minPollingInterval: 30000,
+        cacheTTL: 60000,
+        maxRetries: 2,
+        retryDelay: 5,
+      });
+
+      mockSeoulSubwayApi.getRealtimeArrival.mockReset();
+      mockAsyncStorage.getItem.mockResolvedValue(null);
+
+      // Simulate SeoulApiError-like instance — what dataManager forwards to
+      // ErrorFallback. We don't import the real class to keep this unit test
+      // free of api module side effects; subclass identity is what matters.
+      class FakeSeoulApiError extends Error {
+        constructor(
+          message: string,
+          public category: 'quota' | 'auth' | 'transient',
+        ) {
+          super(message);
+          this.name = 'SeoulApiError';
+        }
+      }
+      const original = new FakeSeoulApiError('ERROR-336', 'transient');
+      mockSeoulSubwayApi.getRealtimeArrival.mockRejectedValue(original);
+
+      const promise = testService.getArrivals('강남', { throwOnError: true });
+      await expect(promise).rejects.toBe(original);
+      await promise.catch((err: unknown) => {
+        // Category survives — ErrorFallback can branch on it downstream.
+        expect(err).toBeInstanceOf(FakeSeoulApiError);
+        expect((err as FakeSeoulApiError).category).toBe('transient');
+      });
+
+      testService.destroy();
+      jest.useFakeTimers();
+    });
+
+    it('subscribe forwards error to callback when throwOnError=true', async () => {
+      jest.useRealTimers();
+
+      const testService = new ArrivalService({
+        minPollingInterval: 30000,
+        cacheTTL: 60000,
+        maxRetries: 2,
+        retryDelay: 5,
+      });
+
+      mockSeoulSubwayApi.getRealtimeArrival.mockReset();
+      mockAsyncStorage.getItem.mockResolvedValue(null);
+
+      const original = new Error('subscribe-time failure');
+      mockSeoulSubwayApi.getRealtimeArrival.mockRejectedValue(original);
+
+      const callback: jest.MockedFunction<ArrivalCallback> = jest.fn();
+
+      const unsubscribe = testService.subscribe(
+        '강남',
+        callback,
+        30000,
+        { throwOnError: true },
+      );
+
+      // Wait for initial getArrivals to settle (retry chain runs).
+      await new Promise((resolve) => setTimeout(resolve, 50));
+
+      // Callback was invoked with (null, error) — exactly what dataManager
+      // forwards to the consumer.
+      expect(callback).toHaveBeenCalledWith(null, original);
+
+      unsubscribe();
+      testService.destroy();
+      jest.useFakeTimers();
+    });
+  });
+
   describe('Caching', () => {
     it('should save to AsyncStorage after API call', async () => {
       await service.getArrivals('강남');
