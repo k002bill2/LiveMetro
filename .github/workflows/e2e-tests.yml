@@ -1,12 +1,16 @@
 name: E2E Tests
 
+# 트리거 정책 (Option D — 2026-05-17, E2E_CI_DIAGNOSIS.md 근거):
+#   이전엔 PR-level e2e가 트리거됐으나 최근 14/14 run이 cancelled — 단 한 번도
+#   정상 종료된 적 없음 (Gradle + Metro cold build + emulator boot이 30분 timeout
+#   초과). PR review에 noise만 누적. main의 health check 가치만 보존:
+#   - schedule: KST 새벽 2시(UTC 17:00) main HEAD 매일 1회 — 회귀 24h 내 발견
+#   - workflow_dispatch: 수동 발의 (PR 머지 직후 검증 또는 incident 재현 시)
+#
+#   build cache + smoke-only split은 후속 phase (E2E_CI_DIAGNOSIS.md Option B/E).
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      - 'src/**'
-      - 'e2e/**'
-      - 'package.json'
+  schedule:
+    - cron: '0 17 * * *'  # KST 02:00 (UTC 17:00) 매일 새벽
 
   workflow_dispatch:
     inputs:
@@ -23,9 +27,9 @@ on:
 jobs:
   e2e-android:
     if: >
-      github.event_name == 'workflow_dispatch' &&
-      (inputs.platform == 'android' || inputs.platform == 'both') ||
-      github.event_name == 'pull_request'
+      github.event_name == 'schedule' ||
+      (github.event_name == 'workflow_dispatch' &&
+       (inputs.platform == 'android' || inputs.platform == 'both'))
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -90,26 +94,7 @@ jobs:
           path: e2e/reports/
           retention-days: 14
 
-  unit-tests-gate:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          cache: 'npm'
-
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Type check
-        run: npm run type-check
-
-      - name: Lint
-        run: npm run lint
-
-      - name: Unit tests with coverage
-        run: npm test -- --coverage --ci
+  # NOTE (2026-05-17): unit-tests-gate job 제거. ci.yml의 quality-gate composite
+  # action이 type-check + lint + `npm test -- --coverage --ci`를 이미 수행 +
+  # functions/ build + expo-doctor까지 더 엄격하게 검증. 두 워크플로우가 PR에서
+  # 동시 트리거되어 같은 검증을 중복 실행하던 것 정리.
