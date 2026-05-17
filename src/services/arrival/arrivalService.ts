@@ -52,6 +52,31 @@ export interface ArrivalServiceOptions {
 }
 
 /**
+ * Per-call options for `getArrivals` / `subscribe`.
+ *
+ * Separate from {@link ArrivalServiceOptions} (service-level config). These
+ * apply per fetch and control error-handling shape — useful for callers that
+ * want category-aware error UI (e.g. ErrorFallback) instead of silent cache
+ * fallback.
+ */
+export interface GetArrivalsOptions {
+  /**
+   * If `true`, `getArrivals` re-throws the underlying error after retries
+   * exhaust, even when a cached result is available. Subscription consumers
+   * receive the error via the second callback argument. Default `false`
+   * preserves the legacy behavior — cache fallback + empty-info — so
+   * existing callers are unaffected.
+   *
+   * Use this when the caller routes errors to a category-aware UI like
+   * `ErrorFallback`, where seeing `SeoulApiError` instance directly is
+   * preferable to silently degrading to stale cache. Note: when `true`,
+   * `fetchWithRetry` still runs the full retry chain — `throwOnError`
+   * controls only the cache fallback layer.
+   */
+  throwOnError?: boolean;
+}
+
+/**
  * Callback type for arrival subscriptions
  */
 export type ArrivalCallback = (
@@ -102,8 +127,15 @@ class ArrivalService {
   /**
    * Get real-time arrival information for a station
    * Respects rate limiting and uses cache when within polling interval
+   *
+   * @param options.throwOnError — if `true`, propagates errors instead of
+   *   silently falling back to cache/empty. Default `false` preserves legacy
+   *   behavior. See {@link GetArrivalsOptions.throwOnError}.
    */
-  async getArrivals(stationName: string): Promise<ArrivalInfo> {
+  async getArrivals(
+    stationName: string,
+    options?: GetArrivalsOptions,
+  ): Promise<ArrivalInfo> {
     const trimmedName = stationName.trim();
     if (!trimmedName) {
       return this.createEmptyArrivalInfo(stationName);
@@ -135,7 +167,15 @@ class ArrivalService {
 
       return arrivals;
     } catch (error) {
-      // On failure, try to return cached data
+      // Caller wants categorized error UI — skip cache fallback, propagate the
+      // original error (e.g. SeoulApiError) so downstream can branch on category.
+      // The retry chain in fetchWithRetry already ran; this just controls
+      // whether the cache layer masks the final failure.
+      if (options?.throwOnError) {
+        throw error;
+      }
+
+      // Legacy path: try cache first, then empty fallback.
       const cached = await this.getCachedArrivals(trimmedName);
       if (cached) {
         return { ...cached, source: 'cache' };
@@ -150,11 +190,17 @@ class ArrivalService {
   /**
    * Subscribe to real-time arrival updates
    * Returns an unsubscribe function
+   *
+   * @param options.throwOnError — propagates errors to subscriber's second
+   *   callback argument instead of swallowing via cache fallback. Applies to
+   *   both the initial fetch and recurring polls. See
+   *   {@link GetArrivalsOptions.throwOnError}.
    */
   subscribe(
     stationName: string,
     callback: ArrivalCallback,
-    intervalMs?: number
+    intervalMs?: number,
+    options?: GetArrivalsOptions,
   ): () => void {
     const trimmedName = stationName.trim();
     if (!trimmedName) {
@@ -173,17 +219,18 @@ class ArrivalService {
     }
     this.activeSubscriptions.get(trimmedName)!.add(callback);
 
-    // Start polling if not already active
+    // Start polling if not already active. The interval captures `options` so
+    // every poll honors the caller's error-handling preference.
     if (!this.pollingIntervals.has(trimmedName)) {
       const interval = setInterval(async () => {
-        await this.pollAndNotify(trimmedName);
+        await this.pollAndNotify(trimmedName, options);
       }, pollInterval);
 
       this.pollingIntervals.set(trimmedName, interval);
     }
 
     // Send initial data
-    this.getArrivals(trimmedName)
+    this.getArrivals(trimmedName, options)
       .then((arrivals) => callback(arrivals))
       .catch((error) => callback(null, error as Error));
 
@@ -341,9 +388,12 @@ class ArrivalService {
   /**
    * Poll arrivals and notify all subscribers
    */
-  private async pollAndNotify(stationName: string): Promise<void> {
+  private async pollAndNotify(
+    stationName: string,
+    options?: GetArrivalsOptions,
+  ): Promise<void> {
     try {
-      const arrivals = await this.getArrivals(stationName);
+      const arrivals = await this.getArrivals(stationName, options);
       this.notifySubscribers(stationName, arrivals);
     } catch (error) {
       this.notifySubscribers(stationName, null, error as Error);
