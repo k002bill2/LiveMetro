@@ -258,6 +258,43 @@ describe('StationTimetableSection', () => {
       expect(getByText('08')).toBeTruthy();
       expect(getByText('09')).toBeTruthy();
     });
+
+    // Gemini #142 followup: toggle 노출 조건 강화 — uniqueHourCount가
+    // COLLAPSED_HOUR_GROUPS(=3) 초과여야만 의미 있음.
+    it('hides toggle when total unique hours <= COLLAPSED_HOUR_GROUPS (no-op collapse)', () => {
+      // 같은 hour의 여러 분 단위는 unique=1. 2 hours도 ≤3이라 toggle 숨김.
+      mockUseTrainSchedule.mockReturnValue(
+        makeHookResult({
+          schedules: [
+            makeScheduleItem({ trainNumber: 'T-1', arrivalTime: '07:00:00' }),
+            makeScheduleItem({ trainNumber: 'T-2', arrivalTime: '07:15:00' }),
+            makeScheduleItem({ trainNumber: 'T-3', arrivalTime: '08:00:00' }),
+            makeScheduleItem({ trainNumber: 'T-4', arrivalTime: '09:00:00' }),
+          ],
+          isViewingToday: false,
+        }),
+      );
+      const { queryByText, queryByTestId } = render(
+        <StationTimetableSection {...defaultProps} testID="tt" />,
+      );
+      // uniqueHourCount=3 → 3 > 3 false → toggle 숨김
+      expect(queryByText('전체 시간표 보기')).toBeNull();
+      expect(queryByTestId('tt-toggle')).toBeNull();
+    });
+
+    it('shows toggle when total unique hours > COLLAPSED_HOUR_GROUPS (collapse meaningful)', () => {
+      mockUseTrainSchedule.mockReturnValue(
+        makeHookResult({
+          schedules: makeMultiHourFixture(), // 5 unique hours
+          isViewingToday: false,
+        }),
+      );
+      const { getByText } = render(
+        <StationTimetableSection {...defaultProps} testID="tt" />,
+      );
+      // uniqueHourCount=5 > 3 → toggle 노출
+      expect(getByText('전체 시간표 보기')).toBeTruthy();
+    });
   });
 
   describe('dayType tab segments', () => {

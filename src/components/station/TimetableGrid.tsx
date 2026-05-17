@@ -34,6 +34,14 @@ export interface TimetableGridProps {
    * hour group을 anchor로 잡아 거기서부터 N개. false(browse)이면 첫 N개.
    */
   readonly maxHourGroups?: number;
+  /**
+   * F3.C followup (Gemini #142 review): anchor 산정에 사용할 현재 시각.
+   * 미지정 시 `new Date()` 내부 평가(기존 동작). 부모가 분 단위 tick state를
+   * 갖고 있으면 prop으로 전달 → useMemo deps 발현 → 시간 경계에서 anchor가
+   * 즉시 갱신됨. 또한 부모-자식 일관 시계 ("현재 HH:MM"과 anchor가 같은
+   * tick의 결과)을 보장.
+   */
+  readonly currentTime?: Date;
   /** 외부 셀렉터 / 테스트용 */
   readonly testID?: string;
 }
@@ -132,31 +140,56 @@ export const groupSchedulesByHour = (
 };
 
 export const TimetableGrid: React.FC<TimetableGridProps> = memo(
-  ({ schedules, isViewingToday, maxHourGroups, testID }) => {
+  ({ schedules, isViewingToday, maxHourGroups, currentTime, testID }) => {
     const { isDark } = useTheme();
     const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
 
+    // Anchor 시각: prop 우선, fallback은 `new Date()`. prop 경유면 deps 발현으로
+    // 시간 경계에서 자동 재평가 — 부모(StationTimetableSection)의 1분 tick state.
+    const now = currentTime ?? new Date();
+    const nowH = now.getHours();
+    const nowMin = now.getMinutes();
+
     const groups = useMemo(
-      () => groupSchedulesByHour(schedules, new Date(), isViewingToday),
-      [schedules, isViewingToday],
+      // groupSchedulesByHour는 past/next 분류에만 nowSec 사용 → minute 단위로
+      // anchor와 동일 시계를 공유하면 충분. deps에 nowH/nowMin 포함해 minute
+      // 경계에서 분류 갱신.
+      () => groupSchedulesByHour(schedules, now, isViewingToday),
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      [schedules, isViewingToday, nowH, nowMin],
     );
 
     // F3.C: collapsed 시 N개 hour groups만 표시. isViewingToday=true는 현재
     // 시각이 포함된 hour group을 anchor로 슬라이스 시작 — 사용자가 "지금부터"
     // 보고 싶어할 때 새벽부터 시작하는 슬라이스는 의미 약함. browse 모드는
     // 첫 N개로 단순 슬라이스.
+    //
+    // Operating-day 변환 (Gemini #142 followup): Seoul API는 자정 후를 `25:00`
+    // 형식으로 표현 가능. 새벽 1시(`nowH=1`)인데 groups에 `"25"`만 있으면
+    // 단순 문자열 매칭은 -1로 떨어져 fallback이 새벽(05시대)이 되어 의미 약함.
+    // groups는 이미 operating-day 정렬 — h<4 → h+24로 변환해 "현재 시각 이상의
+    // 첫 group"을 찾는다.
     const visibleGroups = useMemo(() => {
       if (maxHourGroups === undefined || groups.length <= maxHourGroups) {
         return groups;
       }
       if (isViewingToday) {
-        const currentHour = pad2(new Date().getHours());
-        const anchorIdx = groups.findIndex((g) => g.hour === currentHour);
-        const start = anchorIdx >= 0 ? anchorIdx : 0;
+        const nowOp = nowH < 4 ? nowH + 24 : nowH;
+        const anchorIdx = groups.findIndex((g) => {
+          const h = parseInt(g.hour, 10);
+          if (Number.isNaN(h)) return false;
+          const opH = h < 4 ? h + 24 : h;
+          return opH >= nowOp;
+        });
+        // 운영 끝났으면 마지막 N개 보여줌 (anchorIdx=-1 시 fallback).
+        const start =
+          anchorIdx >= 0
+            ? anchorIdx
+            : Math.max(0, groups.length - maxHourGroups);
         return groups.slice(start, start + maxHourGroups);
       }
       return groups.slice(0, maxHourGroups);
-    }, [groups, maxHourGroups, isViewingToday]);
+    }, [groups, maxHourGroups, isViewingToday, nowH]);
 
     if (visibleGroups.length === 0) return null;
 
