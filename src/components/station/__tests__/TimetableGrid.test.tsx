@@ -220,4 +220,73 @@ describe('TimetableGrid', () => {
       expect(getByLabelText('07시 25분')).toBeTruthy();
     });
   });
+
+  // F3.C polish: maxHourGroups slices the rendered hour rows.
+  describe('maxHourGroups (F3.C)', () => {
+    const makeMultiHourSchedules = () => [
+      makeItem({ arrivalTime: '05:00:00' }),
+      makeItem({ arrivalTime: '06:00:00' }),
+      makeItem({ arrivalTime: '07:00:00' }),
+      makeItem({ arrivalTime: '08:00:00' }),
+      makeItem({ arrivalTime: '09:00:00' }),
+    ];
+
+    it('shows all hour groups when maxHourGroups is undefined (default)', () => {
+      const { getByText } = render(
+        <TimetableGrid
+          schedules={makeMultiHourSchedules()}
+          isViewingToday={false}
+        />,
+      );
+      // 5 hour rows all present.
+      expect(getByText('05')).toBeTruthy();
+      expect(getByText('06')).toBeTruthy();
+      expect(getByText('07')).toBeTruthy();
+      expect(getByText('08')).toBeTruthy();
+      expect(getByText('09')).toBeTruthy();
+    });
+
+    it('slices to first N hour groups when isViewingToday=false (browse mode)', () => {
+      const { getByText, queryByText } = render(
+        <TimetableGrid
+          schedules={makeMultiHourSchedules()}
+          isViewingToday={false}
+          maxHourGroups={3}
+        />,
+      );
+      // First 3 hours visible
+      expect(getByText('05')).toBeTruthy();
+      expect(getByText('06')).toBeTruthy();
+      expect(getByText('07')).toBeTruthy();
+      // Beyond N hidden
+      expect(queryByText('08')).toBeNull();
+      expect(queryByText('09')).toBeNull();
+    });
+
+    it('returns full groups when count <= maxHourGroups (no slice needed)', () => {
+      const { getByText } = render(
+        <TimetableGrid
+          schedules={[
+            makeItem({ arrivalTime: '07:00:00' }),
+            makeItem({ arrivalTime: '08:00:00' }),
+          ]}
+          isViewingToday={false}
+          maxHourGroups={5}
+        />,
+      );
+      expect(getByText('07')).toBeTruthy();
+      expect(getByText('08')).toBeTruthy();
+    });
+
+    it('returns null when slice result is empty (defensive — schedules empty)', () => {
+      const { toJSON } = render(
+        <TimetableGrid
+          schedules={[]}
+          isViewingToday={false}
+          maxHourGroups={3}
+        />,
+      );
+      expect(toJSON()).toBeNull();
+    });
+  });
 });

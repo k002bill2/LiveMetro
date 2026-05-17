@@ -172,6 +172,94 @@ describe('StationTimetableSection', () => {
     });
   });
 
+  // F3.C polish: 전체 시간표 expand/collapse — 기본 collapsed, 토글로 펼침.
+  describe('Expand/collapse toggle (F3.C)', () => {
+    const makeMultiHourFixture = () => [
+      makeScheduleItem({ trainNumber: 'T-05', arrivalTime: '05:00:00' }),
+      makeScheduleItem({ trainNumber: 'T-06', arrivalTime: '06:00:00' }),
+      makeScheduleItem({ trainNumber: 'T-07', arrivalTime: '07:00:00' }),
+      makeScheduleItem({ trainNumber: 'T-08', arrivalTime: '08:00:00' }),
+      makeScheduleItem({ trainNumber: 'T-09', arrivalTime: '09:00:00' }),
+    ];
+
+    it('renders 전체 시간표 보기 CTA when schedules present (default collapsed)', () => {
+      mockUseTrainSchedule.mockReturnValue(
+        makeHookResult({ schedules: makeMultiHourFixture(), isViewingToday: false }),
+      );
+      const { getByText } = render(
+        <StationTimetableSection {...defaultProps} testID="tt" />,
+      );
+      expect(getByText('전체 시간표 보기')).toBeTruthy();
+    });
+
+    it('hides toggle when no schedules', () => {
+      mockUseTrainSchedule.mockReturnValue(makeHookResult({ schedules: [] }));
+      const { queryByText } = render(
+        <StationTimetableSection {...defaultProps} testID="tt" />,
+      );
+      expect(queryByText('전체 시간표 보기')).toBeNull();
+      expect(queryByText('접기')).toBeNull();
+    });
+
+    it('toggles label and accessibilityState.expanded when pressed', () => {
+      mockUseTrainSchedule.mockReturnValue(
+        makeHookResult({ schedules: makeMultiHourFixture(), isViewingToday: false }),
+      );
+      const { getByTestId, getByText } = render(
+        <StationTimetableSection {...defaultProps} testID="tt" />,
+      );
+      const toggle = getByTestId('tt-toggle');
+      // 초기 상태 — collapsed
+      expect(toggle.props.accessibilityState).toEqual(
+        expect.objectContaining({ expanded: false }),
+      );
+      expect(getByText('전체 시간표 보기')).toBeTruthy();
+
+      // press 1 — expanded
+      fireEvent.press(toggle);
+      expect(getByText('접기')).toBeTruthy();
+      expect(getByTestId('tt-toggle').props.accessibilityState).toEqual(
+        expect.objectContaining({ expanded: true }),
+      );
+
+      // press 2 — collapsed
+      fireEvent.press(toggle);
+      expect(getByText('전체 시간표 보기')).toBeTruthy();
+    });
+
+    it('collapsed grid (default) shows only first N hour rows (browse mode anchors at first)', () => {
+      mockUseTrainSchedule.mockReturnValue(
+        makeHookResult({ schedules: makeMultiHourFixture(), isViewingToday: false }),
+      );
+      const { getByText, queryByText } = render(
+        <StationTimetableSection {...defaultProps} testID="tt" />,
+      );
+      // Collapsed default → 3 hour groups (COLLAPSED_HOUR_GROUPS=3)
+      expect(getByText('05')).toBeTruthy();
+      expect(getByText('06')).toBeTruthy();
+      expect(getByText('07')).toBeTruthy();
+      // 4번째 이후 hour 미노출
+      expect(queryByText('08')).toBeNull();
+      expect(queryByText('09')).toBeNull();
+    });
+
+    it('expanded grid shows all hours after toggle', () => {
+      mockUseTrainSchedule.mockReturnValue(
+        makeHookResult({ schedules: makeMultiHourFixture(), isViewingToday: false }),
+      );
+      const { getByTestId, getByText } = render(
+        <StationTimetableSection {...defaultProps} testID="tt" />,
+      );
+      fireEvent.press(getByTestId('tt-toggle'));
+      // 모든 hour 노출
+      expect(getByText('05')).toBeTruthy();
+      expect(getByText('06')).toBeTruthy();
+      expect(getByText('07')).toBeTruthy();
+      expect(getByText('08')).toBeTruthy();
+      expect(getByText('09')).toBeTruthy();
+    });
+  });
+
   describe('dayType tab segments', () => {
     it('renders all three tab labels regardless of data', () => {
       const { getByText } = render(<StationTimetableSection {...defaultProps} />);

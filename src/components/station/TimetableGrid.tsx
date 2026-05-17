@@ -27,6 +27,13 @@ export interface TimetableGridProps {
   readonly schedules: readonly TrainScheduleItem[];
   /** 오늘 요일 시간표인지 (hook의 isViewingToday). false면 past/next 분류 disable */
   readonly isViewingToday: boolean;
+  /**
+   * F3.C polish: 화면에 표시할 hour group 최대 개수. undefined면 전체 표시
+   * (기본 동작 보존). 사용자 expand/collapse 토글 시 collapsed=number,
+   * expanded=undefined로 전환. isViewingToday=true이면 현재 시각이 포함된
+   * hour group을 anchor로 잡아 거기서부터 N개. false(browse)이면 첫 N개.
+   */
+  readonly maxHourGroups?: number;
   /** 외부 셀렉터 / 테스트용 */
   readonly testID?: string;
 }
@@ -125,7 +132,7 @@ export const groupSchedulesByHour = (
 };
 
 export const TimetableGrid: React.FC<TimetableGridProps> = memo(
-  ({ schedules, isViewingToday, testID }) => {
+  ({ schedules, isViewingToday, maxHourGroups, testID }) => {
     const { isDark } = useTheme();
     const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
 
@@ -134,11 +141,28 @@ export const TimetableGrid: React.FC<TimetableGridProps> = memo(
       [schedules, isViewingToday],
     );
 
-    if (groups.length === 0) return null;
+    // F3.C: collapsed 시 N개 hour groups만 표시. isViewingToday=true는 현재
+    // 시각이 포함된 hour group을 anchor로 슬라이스 시작 — 사용자가 "지금부터"
+    // 보고 싶어할 때 새벽부터 시작하는 슬라이스는 의미 약함. browse 모드는
+    // 첫 N개로 단순 슬라이스.
+    const visibleGroups = useMemo(() => {
+      if (maxHourGroups === undefined || groups.length <= maxHourGroups) {
+        return groups;
+      }
+      if (isViewingToday) {
+        const currentHour = pad2(new Date().getHours());
+        const anchorIdx = groups.findIndex((g) => g.hour === currentHour);
+        const start = anchorIdx >= 0 ? anchorIdx : 0;
+        return groups.slice(start, start + maxHourGroups);
+      }
+      return groups.slice(0, maxHourGroups);
+    }, [groups, maxHourGroups, isViewingToday]);
+
+    if (visibleGroups.length === 0) return null;
 
     return (
       <View style={styles.container} testID={testID}>
-        {groups.map(({ hour, chips }) => (
+        {visibleGroups.map(({ hour, chips }) => (
           <View key={hour} style={styles.row}>
             <Text
               style={[styles.hourLabel, { color: semantic.labelStrong }]}

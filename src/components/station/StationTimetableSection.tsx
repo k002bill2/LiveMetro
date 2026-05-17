@@ -17,7 +17,7 @@
  * 비활성 화면 폴링 회피 (memory: [비활성 화면 폴링 게이팅]).
  */
 
-import { Clock } from 'lucide-react-native';
+import { ChevronDown, ChevronUp, Clock } from 'lucide-react-native';
 import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -100,6 +100,18 @@ export const StationTimetableSection: React.FC<StationTimetableSectionProps> = m
 
     // 방면(destination) filter. null = 전체, string = 특정 종착지만.
     const [selectedDestination, setSelectedDestination] = useState<string | null>(null);
+
+    // F3.C polish: 시간표 그리드 expand/collapse. 기본은 collapsed — 카드가 너무
+    // 길어져 scroll 부담이 큼. 사용자가 "전체 시간표 보기"를 명시적으로 선택해야
+    // 펼침. dayType / destination 전환은 collapsed 상태 유지(맥락 보존).
+    const [isExpanded, setIsExpanded] = useState<boolean>(false);
+    const handleToggleExpand = useCallback(() => {
+      setIsExpanded((prev) => !prev);
+    }, []);
+    // collapsed 시 노출할 hour group 수. 작은 카드 안에서 ~3 시간대가 한 화면에
+    // 들어오는 sweet spot. expanded면 undefined로 풀어 전체 노출.
+    const COLLAPSED_HOUR_GROUPS = 3;
+    const maxHourGroups = isExpanded ? undefined : COLLAPSED_HOUR_GROUPS;
 
     const handleSelectDestination = useCallback((d: string | null) => {
       setSelectedDestination(d);
@@ -251,8 +263,35 @@ export const StationTimetableSection: React.FC<StationTimetableSectionProps> = m
             <TimetableGrid
               schedules={filteredSchedules}
               isViewingToday={isViewingToday}
+              maxHourGroups={maxHourGroups}
               testID={testID ? `${testID}-grid` : undefined}
             />
+            {/* F3.C polish: 전체 시간표 toggle. grid가 collapsed될 가능성이
+                있을 때만(=schedules 있음) 노출. expanded는 사용자 선택 상태를
+                그대로 반영 — collapsed가 의미 없는 경우(전체 hour groups ≤ 3)
+                에도 토글 자체는 안전(상태 변경만, UI 영향 0). */}
+            {filteredSchedules.length > 0 && (
+              <Pressable
+                onPress={handleToggleExpand}
+                accessibilityRole="button"
+                accessibilityState={{ expanded: isExpanded }}
+                accessibilityLabel={isExpanded ? '시간표 접기' : '전체 시간표 보기'}
+                testID={testID ? `${testID}-toggle` : undefined}
+                style={({ pressed }) => [
+                  styles.toggleRow,
+                  pressed && styles.toggleRowPressed,
+                ]}
+              >
+                <Text style={[styles.toggleLabel, { color: semantic.primaryNormal }]}>
+                  {isExpanded ? '접기' : '전체 시간표 보기'}
+                </Text>
+                {isExpanded ? (
+                  <ChevronUp size={14} color={semantic.primaryNormal} />
+                ) : (
+                  <ChevronDown size={14} color={semantic.primaryNormal} />
+                )}
+              </Pressable>
+            )}
             {/* F3.B polish: grid chip 분류(파랑=다음 출발, strikethrough=지난
                 열차)를 사용자에게 명시. browse mode(isViewingToday=false)는
                 past/next 분류가 disable이라 legend도 무관 → 숨김. 빈 schedules
@@ -401,5 +440,22 @@ const styles = StyleSheet.create({
     lineHeight: WANTED_TOKENS.type.caption1.lh,
     fontWeight: '500',
     fontFamily: weightToFontFamily('500'),
+  },
+  // F3.C: 전체 시간표 토글 CTA — 색상은 primary로 강조 + chevron icon.
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: WANTED_TOKENS.spacing.s2,
+    alignSelf: 'flex-start',
+  },
+  toggleRowPressed: {
+    opacity: 0.7,
+  },
+  toggleLabel: {
+    fontSize: WANTED_TOKENS.type.label1.size,
+    lineHeight: WANTED_TOKENS.type.label1.lh,
+    fontWeight: '600',
+    fontFamily: weightToFontFamily('600'),
   },
 });
