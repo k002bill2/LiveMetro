@@ -7,12 +7,22 @@
  */
 
 import React from 'react';
-import { render, waitFor } from '@testing-library/react-native';
+import { render as baseRender, waitFor, RenderOptions } from '@testing-library/react-native';
 import { TrainArrivalList } from '../TrainArrivalList';
 import { trainService } from '@services/train/trainService';
 import { dataManager } from '@services/data/dataManager';
 import { TrainStatus, Train } from '@models/train';
 import { SeoulApiError } from '@/services/api/seoulSubwayApi';
+import { ThemeProvider } from '@services/theme';
+
+// F5.2b: List now renders TrainArrivalCard (variant='compact') which uses
+// useTheme(). Wrap all renders with ThemeProvider so the theme context is
+// provided — mirrors TrainArrivalCard.test.tsx pattern.
+const render = (
+  ui: React.ReactElement,
+  options?: Omit<RenderOptions, 'wrapper'>,
+): ReturnType<typeof baseRender> =>
+  baseRender(ui, { wrapper: ThemeProvider, ...options });
 
 // Mock the train service (getStation for station name resolution)
 jest.mock('@services/train/trainService', () => ({
@@ -37,6 +47,16 @@ jest.mock('@services/data/stationsDataService', () => ({
 // Mock performance utils to avoid throttling in tests
 jest.mock('@utils/performanceUtils', () => ({
   throttle: (fn: unknown) => fn,
+}));
+
+// F5.2b: Card uses getSubwayLineColor / getLineTextColor — stub to deterministic
+// values so renders don't depend on the full color table. (Same pattern as
+// TrainArrivalCard.test.tsx.)
+jest.mock('@utils/colorUtils', () => ({
+  getSubwayLineColor: jest.fn(() => '#00a84d'),
+  getLineTextColor: jest.fn(() => 'white'),
+  getDelayColor: jest.fn(() => '#f59e0b'),
+  addAlpha: jest.fn((_color: string, alpha: number) => `rgba(0,168,77,${alpha})`),
 }));
 
 // F4: ErrorFallback이 SeoulApiError instanceof 분기 사용 — 글로벌 setup이
@@ -173,13 +193,19 @@ describe('TrainArrivalList', () => {
         makeTrain({ id: 't2', finalDestination: '하행역', direction: 'down', arrivalTime: new Date(Date.now() + 5 * 60 * 1000 + 5000) }),
       ]);
 
-      const { getByText } = render(
+      // F5.2b: Card markup — finalDestination text는 더 이상 노출되지 않고
+      // lineName(2호선) + direction(상행/하행) badge로 대체. 도착 시각은 보존.
+      const { getByText, getAllByText } = render(
         <TrainArrivalList stationId="station-1" />
       );
 
       await waitFor(() => {
-        expect(getByText(/상행역/)).toBeTruthy();
-        expect(getByText(/하행역/)).toBeTruthy();
+        // 2개 카드 → 2호선 line badge 2개
+        expect(getAllByText('2호선').length).toBe(2);
+        // direction badge — 상행/하행 각 1개
+        expect(getByText('상행')).toBeTruthy();
+        expect(getByText('하행')).toBeTruthy();
+        // 도착 시각 — inline과 동일
         expect(getByText('2분후')).toBeTruthy();
         expect(getByText('5분후')).toBeTruthy();
       });
@@ -206,7 +232,8 @@ describe('TrainArrivalList', () => {
 
       await waitFor(() => {
         expect(getByText('지연')).toBeTruthy();
-        expect(getByText('(3분 지연)')).toBeTruthy();
+        // F5.2b: Card는 "(N분 지연)" 괄호 없이 "{N}분 지연" 포맷.
+        expect(getByText('3분 지연')).toBeTruthy();
       });
     });
 
@@ -353,8 +380,11 @@ describe('TrainArrivalList', () => {
         <TrainArrivalList stationId="station-1" />
       );
 
+      // F5.2b: Card의 accessibilityLabel 포맷 — `${lineName}, ${direction} 열차,
+      // ${arrival}, [delayMinutes>0 시: ${delay}분 지연,] 상태: ${status}[, station]`
+      // makeTrain default nextStationId=null → station 파트 없음.
       await waitFor(() => {
-        expect(getByLabelText(/상행역 방면 열차, 정상 상태, 2분후/)).toBeTruthy();
+        expect(getByLabelText(/2호선.*상행 열차.*2분후.*상태: 정상/)).toBeTruthy();
       });
     });
   });
@@ -406,10 +436,12 @@ describe('TrainArrivalList', () => {
 
   describe('Multiple Trains Sorting', () => {
     it('should sort trains by arrival time', async () => {
+      // F5.2b: Card는 finalDestination을 더 이상 노출하지 않음. 도착 시각으로
+      // 3개 카드 존재 + 각 분단위 라벨 확인. +5s padding으로 Math.floor race 회피.
       mockSubscription([
-        makeTrain({ id: 't1', finalDestination: '역10', arrivalTime: new Date(Date.now() + 10 * 60 * 1000) }),
-        makeTrain({ id: 't2', finalDestination: '역5', arrivalTime: new Date(Date.now() + 5 * 60 * 1000) }),
-        makeTrain({ id: 't3', finalDestination: '역15', arrivalTime: new Date(Date.now() + 15 * 60 * 1000) }),
+        makeTrain({ id: 't1', finalDestination: '역10', arrivalTime: new Date(Date.now() + 10 * 60 * 1000 + 5000) }),
+        makeTrain({ id: 't2', finalDestination: '역5', arrivalTime: new Date(Date.now() + 5 * 60 * 1000 + 5000) }),
+        makeTrain({ id: 't3', finalDestination: '역15', arrivalTime: new Date(Date.now() + 15 * 60 * 1000 + 5000) }),
       ]);
 
       const { getByText, getAllByText } = render(
@@ -417,11 +449,12 @@ describe('TrainArrivalList', () => {
       );
 
       await waitFor(() => {
-        const directionTexts = getAllByText(/방면/);
-        expect(directionTexts.length).toBe(3);
-        expect(getByText('역5 방면')).toBeTruthy();
-        expect(getByText('역10 방면')).toBeTruthy();
-        expect(getByText('역15 방면')).toBeTruthy();
+        // 3개 카드 모두 렌더 — 분후 텍스트로 카운트
+        const arrivalTexts = getAllByText(/분후$/);
+        expect(arrivalTexts.length).toBe(3);
+        expect(getByText('5분후')).toBeTruthy();
+        expect(getByText('10분후')).toBeTruthy();
+        expect(getByText('15분후')).toBeTruthy();
       });
     });
   });
@@ -438,7 +471,9 @@ describe('TrainArrivalList', () => {
       expect(() => unmount()).not.toThrow();
     });
 
-    it('should display nextStationId loading message when present', async () => {
+    it('should display nextStationId as station label when present', async () => {
+      // F5.2b: inline의 "다음역 정보 로딩중..." placeholder는 제거됨. Card는
+      // nextStationId를 그대로 "{id}역" 형태로 stationName 영역에 렌더.
       mockSubscription([
         makeTrain({ nextStationId: 'station-2' }),
       ]);
@@ -448,7 +483,7 @@ describe('TrainArrivalList', () => {
       );
 
       await waitFor(() => {
-        expect(getByText('다음역 정보 로딩중...')).toBeTruthy();
+        expect(getByText('station-2역')).toBeTruthy();
       });
     });
 
@@ -461,15 +496,17 @@ describe('TrainArrivalList', () => {
         <TrainArrivalList stationId="station-1" />
       );
 
+      // F5.2b: Card는 괄호 없이 "{N}분 지연" 포맷.
       await waitFor(() => {
-        expect(getByText('(999분 지연)')).toBeTruthy();
+        expect(getByText('999분 지연')).toBeTruthy();
       });
     });
   });
 
   // Guide (2026-05-16) item #8: differentiate 일반 / 급행 / 특급. Verifies
-  // service-tier badge surfaces in the inline TrainArrivalItem after the
-  // service-layer wiring (dataManager + arrivalService preserve trainType).
+  // service-tier badge surfaces in the TrainArrivalCard (variant='compact')
+  // after F5.2b inline → Card swap. Badge labels(급행/특급) and visibility
+  // rules(normal/undefined → no badge) are unchanged from inline behavior.
   describe('Train type badge', () => {
     it('should render 급행 badge when trainType is express', async () => {
       mockSubscription([makeTrain({ trainType: 'express' })]);
