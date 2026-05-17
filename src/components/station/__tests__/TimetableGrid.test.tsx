@@ -289,4 +289,88 @@ describe('TimetableGrid', () => {
       expect(toJSON()).toBeNull();
     });
   });
+
+  // Gemini #142 review followup: deps reactivity + operating-day 24+ 시간 처리
+  describe('currentTime anchor (Gemini #142 followup)', () => {
+    // 06시~11시 5 hours fixture — anchor에 따라 slice 시작이 달라짐
+    const makeMultiHourSchedules = () => [
+      makeItem({ arrivalTime: '06:00:00' }),
+      makeItem({ arrivalTime: '07:00:00' }),
+      makeItem({ arrivalTime: '08:00:00' }),
+      makeItem({ arrivalTime: '09:00:00' }),
+      makeItem({ arrivalTime: '10:00:00' }),
+    ];
+
+    it('uses currentTime prop hour as anchor when isViewingToday=true', () => {
+      // 현재 시각=08:30 → "08" hour부터 3 hours slice → [08, 09, 10]
+      const fixed = new Date(2026, 4, 17, 8, 30, 0);
+      const { getByText, queryByText } = render(
+        <TimetableGrid
+          schedules={makeMultiHourSchedules()}
+          isViewingToday={true}
+          maxHourGroups={3}
+          currentTime={fixed}
+        />,
+      );
+      expect(getByText('08')).toBeTruthy();
+      expect(getByText('09')).toBeTruthy();
+      expect(getByText('10')).toBeTruthy();
+      // anchor 이전 hour는 슬라이스에서 제외
+      expect(queryByText('06')).toBeNull();
+      expect(queryByText('07')).toBeNull();
+    });
+
+    it('falls back to last N hours when current time is after all groups (운영 종료)', () => {
+      // 현재 시각=23:00 → 모든 group이 anchor보다 이전 → 마지막 N개 표시
+      const fixed = new Date(2026, 4, 17, 23, 0, 0);
+      const { getByText, queryByText } = render(
+        <TimetableGrid
+          schedules={makeMultiHourSchedules()}
+          isViewingToday={true}
+          maxHourGroups={3}
+          currentTime={fixed}
+        />,
+      );
+      // 마지막 3개: [08, 09, 10]
+      expect(getByText('08')).toBeTruthy();
+      expect(getByText('09')).toBeTruthy();
+      expect(getByText('10')).toBeTruthy();
+      expect(queryByText('06')).toBeNull();
+    });
+
+    it('handles operating-day 24+ hours: current=01시 with groups containing "25"', () => {
+      // 막차가 자정 넘어 25:30(=다음날 01:30) 같은 경우.
+      // 현재=01시면 nowOp=25, groups의 "25"가 anchor (opH=25)와 매칭.
+      const fixed = new Date(2026, 4, 17, 1, 0, 0);
+      const { getByText } = render(
+        <TimetableGrid
+          schedules={[
+            makeItem({ arrivalTime: '23:00:00' }),
+            makeItem({ arrivalTime: '24:00:00' }),
+            makeItem({ arrivalTime: '25:00:00' }),
+            makeItem({ arrivalTime: '26:00:00' }),
+          ]}
+          isViewingToday={true}
+          maxHourGroups={2}
+          currentTime={fixed}
+        />,
+      );
+      // anchor opH=25 ≥ nowOp=25 → "25"부터 → ["25", "26"]
+      expect(getByText('25')).toBeTruthy();
+      expect(getByText('26')).toBeTruthy();
+    });
+
+    it('falls back to currentTime=new Date() when prop is undefined (backward compat)', () => {
+      // currentTime 미지정 시 hook 내부 new Date() — 결과 그대로 렌더 가능 검증
+      const { toJSON } = render(
+        <TimetableGrid
+          schedules={[makeItem({ arrivalTime: '07:00:00' })]}
+          isViewingToday={true}
+          maxHourGroups={3}
+        />,
+      );
+      // currentTime 미지정으로도 그래프가 렌더 — 회귀 가드
+      expect(toJSON()).not.toBeNull();
+    });
+  });
 });

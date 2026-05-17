@@ -128,15 +128,18 @@ export const StationTimetableSection: React.FC<StationTimetableSectionProps> = m
     // F3.A polish: "현재 HH:MM" timestamp — 사용자가 첫차/막차·다음 출발과
     // 현재 시각을 즉시 대조 가능. 분 단위 정밀도면 충분하므로 60s tick. 다른
     // 요일을 browse 중이면(isViewingToday=false) 현재 시각은 무관 정보 →
-    // interval 자체를 mount하지 않음(폴링 비용 0). useState initializer 함수로
-    // mount 시 1회만 평가 → 초기 렌더에 빈 문자열 깜빡임 없음.
-    const [nowLabel, setNowLabel] = useState<string>(() => formatHHMM(new Date()));
+    // interval 자체를 mount하지 않음(폴링 비용 0).
+    //
+    // Date 인스턴스 자체를 state로 보관 — F3.C followup(Gemini #142)에서
+    // TimetableGrid의 anchor 계산에 동일 시계 prop 전달용. label은 derived.
+    const [nowDate, setNowDate] = useState<Date>(() => new Date());
+    const nowLabel = useMemo(() => formatHHMM(nowDate), [nowDate]);
     useEffect(() => {
       if (!isViewingToday) return;
       // 분 경계 직후가 가장 자주 갱신되는 순간 — 단순 60s interval로 ±30s 오차
       // 허용. 정밀 60s 정렬은 비용 대비 가치 낮음.
       const id = setInterval(() => {
-        setNowLabel(formatHHMM(new Date()));
+        setNowDate(new Date());
       }, 60_000);
       return () => clearInterval(id);
     }, [isViewingToday]);
@@ -168,6 +171,21 @@ export const StationTimetableSection: React.FC<StationTimetableSectionProps> = m
       if (!selectedDestination) return schedules;
       return schedules.filter((s) => s.destinationName === selectedDestination);
     }, [schedules, selectedDestination]);
+
+    // F3.C followup(Gemini #142): unique hour 개수. 토글이 의미를 가지려면
+    // 총 hour 개수가 COLLAPSED_HOUR_GROUPS를 초과해야 함. 그 이하면 collapsed
+    // == expanded 결과 동일 — toggle 노출은 거짓 affordance.
+    //
+    // arrivalTime의 첫 2글자(HH)로 unique 추출. groupSchedulesByHour와
+    // approximate match — parseHHMM 실패 case(0.x%)만 차이.
+    const uniqueHourCount = useMemo(() => {
+      const set = new Set<string>();
+      for (const s of filteredSchedules) {
+        const hh = s.arrivalTime.slice(0, 2);
+        if (hh.length === 2) set.add(hh);
+      }
+      return set.size;
+    }, [filteredSchedules]);
 
     const { firstLabel, lastLabel } = useMemo(() => {
       const first = getFirstTrain(filteredSchedules);
@@ -264,13 +282,14 @@ export const StationTimetableSection: React.FC<StationTimetableSectionProps> = m
               schedules={filteredSchedules}
               isViewingToday={isViewingToday}
               maxHourGroups={maxHourGroups}
+              currentTime={nowDate}
               testID={testID ? `${testID}-grid` : undefined}
             />
-            {/* F3.C polish: 전체 시간표 toggle. grid가 collapsed될 가능성이
-                있을 때만(=schedules 있음) 노출. expanded는 사용자 선택 상태를
-                그대로 반영 — collapsed가 의미 없는 경우(전체 hour groups ≤ 3)
-                에도 토글 자체는 안전(상태 변경만, UI 영향 0). */}
-            {filteredSchedules.length > 0 && (
+            {/* F3.C polish: 전체 시간표 toggle. 토글이 의미를 가지려면 총
+                hour 개수가 COLLAPSED_HOUR_GROUPS를 초과해야 함 — 그렇지
+                않으면 toggle 누르나 안 누르나 grid 동일이라 거짓 affordance.
+                (Gemini #142 followup) */}
+            {filteredSchedules.length > 0 && uniqueHourCount > COLLAPSED_HOUR_GROUPS && (
               <Pressable
                 onPress={handleToggleExpand}
                 accessibilityRole="button"
