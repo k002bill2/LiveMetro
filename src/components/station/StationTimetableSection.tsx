@@ -253,6 +253,43 @@ export const StationTimetableSection: React.FC<StationTimetableSectionProps> = m
               isViewingToday={isViewingToday}
               testID={testID ? `${testID}-grid` : undefined}
             />
+            {/* F3.B polish: grid chip 분류(파랑=다음 출발, strikethrough=지난
+                열차)를 사용자에게 명시. browse mode(isViewingToday=false)는
+                past/next 분류가 disable이라 legend도 무관 → 숨김. 빈 schedules
+                는 grid 자체가 null이라 legend만 떠 있으면 어색 → 숨김. */}
+            {isViewingToday && filteredSchedules.length > 0 && (
+              <View
+                style={styles.legendRow}
+                accessibilityRole="text"
+                accessibilityLabel="다음 출발은 파란색, 지난 열차는 취소선으로 표시"
+                testID={testID ? `${testID}-legend` : undefined}
+              >
+                <View
+                  style={[
+                    styles.legendSwatchNext,
+                    { backgroundColor: semantic.primaryNormal },
+                  ]}
+                />
+                <Text style={[styles.legendLabel, { color: semantic.labelAlt }]}>
+                  다음 출발
+                </Text>
+                <View
+                  style={[styles.legendDot, { backgroundColor: semantic.labelAlt }]}
+                />
+                <Text
+                  style={[
+                    styles.legendStrike,
+                    styles.legendLabel,
+                    { color: semantic.labelAlt },
+                  ]}
+                >
+                  00
+                </Text>
+                <Text style={[styles.legendLabel, { color: semantic.labelAlt }]}>
+                  지난 열차
+                </Text>
+              </View>
+            )}
           </>
         ) : (
           <Text
@@ -295,6 +332,35 @@ const styles = StyleSheet.create({
     lineHeight: WANTED_TOKENS.type.caption1.lh,
     fontWeight: '500',
     fontFamily: weightToFontFamily('500'),
+  },
+  // F3.B: grid chip 분류 legend — 사용자가 파랑 chip / strikethrough chip의
+  // 의미를 즉시 이해. 작은 swatch + 라벨 + dot separator + strikethrough 샘플.
+  legendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingTop: WANTED_TOKENS.spacing.s1,
+  },
+  legendSwatchNext: {
+    width: 14,
+    height: 14,
+    borderRadius: 4,
+  },
+  legendDot: {
+    width: 3,
+    height: 3,
+    borderRadius: 1.5,
+    marginHorizontal: 4,
+    opacity: 0.5,
+  },
+  legendLabel: {
+    fontSize: WANTED_TOKENS.type.caption1.size,
+    lineHeight: WANTED_TOKENS.type.caption1.lh,
+    fontWeight: '500',
+    fontFamily: weightToFontFamily('500'),
+  },
+  legendStrike: {
+    textDecorationLine: 'line-through',
   },
   tabRow: {
     flexDirection: 'row',
