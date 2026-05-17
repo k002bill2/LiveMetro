@@ -26,6 +26,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
+    "test:hooks": "node --test '.claude/hooks/__tests__/*.test.js'",
     "prebuild": "npm run lint && npm run type-check",
     "presubmit": "npm run lint && npm run type-check && npm run test",
     "skills:update": "ts-node scripts/skillsGuideUpdater.ts",
