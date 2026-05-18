@@ -281,7 +281,12 @@ export const TrainArrivalList: React.FC<TrainArrivalListProps> = memo(({ station
       {trains.length === 0
         ? renderEmptyState()
         : trains.map(train => (
-            <TrainArrivalCard key={train.id} train={train} variant="compact" />
+            <TrainArrivalCard
+              key={train.id}
+              train={train}
+              variant="compact"
+              showDestination
+            />
           ))}
     </View>
   );

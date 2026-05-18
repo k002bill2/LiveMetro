@@ -193,8 +193,10 @@ describe('TrainArrivalList', () => {
         makeTrain({ id: 't2', finalDestination: '하행역', direction: 'down', arrivalTime: new Date(Date.now() + 5 * 60 * 1000 + 5000) }),
       ]);
 
-      // F5.2b: Card markup — finalDestination text는 더 이상 노출되지 않고
-      // lineName(2호선) + direction(상행/하행) badge로 대체. 도착 시각은 보존.
+      // F5.2b: Card markup. F5.2b followup(showDestination=true) 적용 후 카드는
+      // 2호선 line badge + direction badge + "{dest} 방면" 라벨 + 도착 시각을
+      // 모두 노출. 회귀 가드 — 어느 하나라도 빠지면 inline → Card swap 또는
+      // showDestination wiring 회귀.
       const { getByText, getAllByText } = render(
         <TrainArrivalList stationId="station-1" />
       );
@@ -205,6 +207,9 @@ describe('TrainArrivalList', () => {
         // direction badge — 상행/하행 각 1개
         expect(getByText('상행')).toBeTruthy();
         expect(getByText('하행')).toBeTruthy();
+        // F5.2b followup: showDestination=true로 "{dest} 방면" 라벨도 노출
+        expect(getByText('상행역 방면')).toBeTruthy();
+        expect(getByText('하행역 방면')).toBeTruthy();
         // 도착 시각 — inline과 동일
         expect(getByText('2분후')).toBeTruthy();
         expect(getByText('5분후')).toBeTruthy();
@@ -380,11 +385,12 @@ describe('TrainArrivalList', () => {
         <TrainArrivalList stationId="station-1" />
       );
 
-      // F5.2b: Card의 accessibilityLabel 포맷 — `${lineName}, ${direction} 열차,
-      // ${arrival}, [delayMinutes>0 시: ${delay}분 지연,] 상태: ${status}[, station]`
+      // F5.2b followup: showDestination=true이므로 accessibilityLabel에도
+      // "{dest} 방면"이 direction과 arrival 사이에 추가됨.
+      // 포맷: `${lineName}, ${direction} 열차, ${dest} 방면, ${arrival}, [delay,] 상태: ${status}[, station]`
       // makeTrain default nextStationId=null → station 파트 없음.
       await waitFor(() => {
-        expect(getByLabelText(/2호선.*상행 열차.*2분후.*상태: 정상/)).toBeTruthy();
+        expect(getByLabelText(/2호선.*상행 열차.*상행역 방면.*2분후.*상태: 정상/)).toBeTruthy();
       });
     });
   });
@@ -455,6 +461,10 @@ describe('TrainArrivalList', () => {
         expect(getByText('5분후')).toBeTruthy();
         expect(getByText('10분후')).toBeTruthy();
         expect(getByText('15분후')).toBeTruthy();
+        // F5.2b followup: showDestination=true로 "{dest} 방면" 라벨도 카드별로 노출
+        expect(getByText('역5 방면')).toBeTruthy();
+        expect(getByText('역10 방면')).toBeTruthy();
+        expect(getByText('역15 방면')).toBeTruthy();
       });
     });
   });

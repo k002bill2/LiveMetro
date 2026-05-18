@@ -497,4 +497,63 @@ describe('TrainArrivalCard', () => {
       expect(getByText('급행')).toBeTruthy();
     });
   });
+
+  // F5.2b followup (PR #139 manual UI regression): showDestination prop으로
+  // direction badge 옆에 "{finalDestination} 방면" 라벨 노출. inline 시절
+  // 정보 모델 복원.
+  describe('showDestination prop', () => {
+    it('renders "{finalDestination} 방면" label when showDestination=true', () => {
+      const train = createMockTrain({ finalDestination: '신도림' });
+      const { getByText } = customRender(
+        <TrainArrivalCard train={train} showDestination />,
+      );
+      expect(getByText('신도림 방면')).toBeTruthy();
+    });
+
+    it('hides destination label when showDestination=false (default — backward compat)', () => {
+      const train = createMockTrain({ finalDestination: '신도림' });
+      const { queryByText } = customRender(
+        <TrainArrivalCard train={train} />,
+      );
+      // F5.2b 머지 직후 default 동작 — 목적지 텍스트 미노출
+      expect(queryByText('신도림 방면')).toBeNull();
+    });
+
+    it('hides destination label when finalDestination is empty even with showDestination=true', () => {
+      const train = createMockTrain({ finalDestination: '' });
+      const { queryByText } = customRender(
+        <TrainArrivalCard train={train} showDestination />,
+      );
+      // 빈 finalDestination은 "  방면" 같은 stub text를 노출하지 않아야 함
+      expect(queryByText(/방면$/)).toBeNull();
+    });
+
+    it('includes finalDestination in accessibilityLabel when showDestination=true', () => {
+      const train = createMockTrain({
+        finalDestination: '신도림',
+        direction: 'down',
+        // +5s padding avoids Math.floor boundary race.
+        arrivalTime: new Date(Date.now() + 2 * 60 * 1000 + 5000),
+      });
+      const { getByLabelText } = customRender(
+        <TrainArrivalCard train={train} showDestination />,
+      );
+      // 시각 라벨과 동등한 정보가 screen reader에도 도달
+      expect(getByLabelText(/하행 열차.*신도림 방면.*2분후/)).toBeTruthy();
+    });
+
+    it('omits 방면 from accessibilityLabel when showDestination=false', () => {
+      const train = createMockTrain({
+        finalDestination: '신도림',
+        direction: 'down',
+        arrivalTime: new Date(Date.now() + 2 * 60 * 1000 + 5000),
+      });
+      const { queryByLabelText, getByLabelText } = customRender(
+        <TrainArrivalCard train={train} />,
+      );
+      // 정상 라벨 구조는 유지 + 방면만 빠짐
+      expect(getByLabelText(/하행 열차.*2분후/)).toBeTruthy();
+      expect(queryByLabelText(/신도림 방면/)).toBeNull();
+    });
+  });
 });
