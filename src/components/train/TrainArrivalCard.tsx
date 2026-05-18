@@ -71,6 +71,15 @@ export interface TrainArrivalCardProps {
    * 호출자 변경은 없음 — 시각 회귀 risk를 분리.
    */
   variant?: 'regular' | 'compact';
+  /**
+   * 목적지(`finalDestination`) "방면" 라벨 노출 여부. F5.2b 머지(PR #139)
+   * 후 manual UI 검증에서 inline 시절의 "{finalDestination} 방면" 텍스트가
+   * 사라져 사용자가 열차 방면을 직관적으로 파악하기 어렵다는 회귀가 확인됨.
+   * direction(상행/하행) badge만으로는 2호선처럼 같은 방향에 여러 종착지가
+   * 있는 노선에서 정보 손실. true 시 direction badge 옆에 "{dest} 방면"을
+   * inline-style small text로 표시. default false (backward compat).
+   */
+  showDestination?: boolean;
 }
 
 /**
@@ -93,6 +102,7 @@ export const TrainArrivalCard: React.FC<TrainArrivalCardProps> = memo(({
   showDetails = true,
   trainType: trainTypeProp,
   variant = 'regular',
+  showDestination = false,
 }) => {
   // Default trainType from Train model (PR #126); explicit prop wins for override.
   const trainType: TrainType | undefined = trainTypeProp ?? train.trainType;
@@ -203,6 +213,11 @@ export const TrainArrivalCard: React.FC<TrainArrivalCardProps> = memo(({
 
     if (lineName) parts.push(lineName);
     parts.push(`${directionInfo.text} 열차`);
+    // F5.2b followup: showDestination=true 시 "{dest} 방면" 라벨도 screen
+    // reader에 노출 — 시각 라벨과 동등한 정보 제공.
+    if (showDestination && train.finalDestination) {
+      parts.push(`${train.finalDestination} 방면`);
+    }
     parts.push(arrivalDisplay.text);
 
     if (train.delayMinutes > 0) {
@@ -216,7 +231,7 @@ export const TrainArrivalCard: React.FC<TrainArrivalCardProps> = memo(({
     }
 
     return parts.join(', ');
-  }, [lineName, directionInfo.text, arrivalDisplay.text, train.delayMinutes, statusInfo.text, stationName]);
+  }, [lineName, directionInfo.text, arrivalDisplay.text, train.delayMinutes, statusInfo.text, stationName, showDestination, train.finalDestination]);
 
   const StatusIcon = statusInfo.icon;
   const DirectionIcon = directionInfo.icon;
@@ -289,6 +304,19 @@ export const TrainArrivalCard: React.FC<TrainArrivalCardProps> = memo(({
                 {directionInfo.text}
               </Text>
             </View>
+            {/* F5.2b followup: "방면" 라벨로 finalDestination 표시. inline
+                시절 정보 모델 복원 — direction badge로만 부족한 정보를 보강 */}
+            {showDestination && train.finalDestination && (
+              <Text
+                style={[
+                  styles.destinationLabel,
+                  { color: colors.textSecondary },
+                ]}
+                numberOfLines={1}
+              >
+                {train.finalDestination} 방면
+              </Text>
+            )}
           </View>
 
           <View
@@ -455,6 +483,9 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
   },
   directionContainer: {
     flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   directionBadge: {
     flexDirection: 'row',
@@ -469,6 +500,14 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     fontWeight: '600',
     fontFamily: weightToFontFamily('600'),
     marginLeft: 4,
+  },
+  // F5.2b followup: "{finalDestination} 방면" 라벨. direction badge 옆에
+  // 같은 row로 배치. flex: 1로 줄여 long 목적지명도 한 줄 ellipsis.
+  destinationLabel: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '500',
+    fontFamily: weightToFontFamily('500'),
   },
   statusBadge: {
     flexDirection: 'row',
