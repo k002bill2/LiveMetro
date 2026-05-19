@@ -151,6 +151,49 @@ describe('StationDetailScreen', () => {
     expect(getByText('현재 운행 중인 열차가 없습니다')).toBeTruthy();
   });
 
+  // PR #147 followup (manual UI 회귀 응대): empty sub-message가 시각 분기.
+  // 02:00–04:59 KST만 "운행 종료 시간대", 그 외엔 "잠시 후 다시 확인" 친화 안내.
+  describe('empty state sub-message — operating-hours branch', () => {
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('shows "운행 종료 시간대입니다" between 02:00 and 04:59 KST', () => {
+      // 03:00 KST = 18:00 UTC (KST = UTC+9)
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-05-19T18:00:00.000Z'));
+      const { getByText } = render(<StationDetailScreen />);
+      expect(getByText('운행 종료 시간대입니다')).toBeTruthy();
+    });
+
+    it('shows "잠시 후 다시 확인해주세요" during normal operating hours (e.g. 20:26 KST)', () => {
+      // 20:26 KST = 11:26 UTC — 사용자 image의 회귀 발견 시각 재현
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-05-19T11:26:00.000Z'));
+      const { getByText, queryByText } = render(<StationDetailScreen />);
+      expect(getByText('잠시 후 다시 확인해주세요')).toBeTruthy();
+      // 회귀 가드: 정상 시간엔 "운행 종료" 메시지 금지
+      expect(queryByText('운행 종료 시간대입니다')).toBeNull();
+    });
+
+    it('shows "잠시 후 다시 확인해주세요" at 05:00 KST (operating start boundary)', () => {
+      // 05:00 KST = 20:00 UTC — 첫차 직후, 운행 종료 아님
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-05-19T20:00:00.000Z'));
+      const { getByText, queryByText } = render(<StationDetailScreen />);
+      expect(getByText('잠시 후 다시 확인해주세요')).toBeTruthy();
+      expect(queryByText('운행 종료 시간대입니다')).toBeNull();
+    });
+
+    it('shows "운행 종료 시간대입니다" at 02:00 KST (boundary inclusive)', () => {
+      // 02:00 KST = 17:00 UTC
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-05-19T17:00:00.000Z'));
+      const { getByText } = render(<StationDetailScreen />);
+      expect(getByText('운행 종료 시간대입니다')).toBeTruthy();
+    });
+  });
+
   it('shows the loading state while trains are fetching', () => {
     mockedUseRealtimeTrains.mockReturnValue({
       trains: [],

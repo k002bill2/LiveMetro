@@ -48,6 +48,22 @@ import type { Station, Train } from '@/models/train';
 import type { LineId } from '@/components/design';
 import { mapCacheService, type CachedStation } from '@/services/map/mapCacheService';
 
+/**
+ * 서울 지하철 운행 종료 시간대 휴리스틱.
+ *
+ * 서울 모든 노선의 첫차 ≥ 05:00, 막차 ≤ 01:00(자정 후 약간). 02:00–04:59 KST은
+ * 모든 노선 확실히 운행 종료. 그 외 시간에 빈 도착 정보가 오는 경우는 API 일시
+ * 빈 응답, 폴링 간격 미스, 또는 진짜 도착 직전 빈 상태 — "운행 종료"가 아닌
+ * "잠시 후 다시 확인" 안내가 적절.
+ *
+ * jest.config의 `process.env.TZ = 'Asia/Seoul'` pin으로 로컬·CI 결정적
+ * (메모리: [TZ-naive Date.getHours CI 회귀] 회피).
+ */
+const isOperatingEndHours = (now: Date): boolean => {
+  const h = now.getHours();
+  return h >= 2 && h < 5;
+};
+
 type StationDetailRouteProp = RouteProp<AppStackParamList, 'StationDetail'>;
 type StationDetailNavProp = NativeStackNavigationProp<AppStackParamList>;
 
@@ -309,7 +325,9 @@ const StationDetailScreen: React.FC = () => {
               현재 운행 중인 열차가 없습니다
             </Text>
             <Text style={[styles.stateSub, { color: semantic.labelAlt }]}>
-              운행 종료 시간대입니다
+              {isOperatingEndHours(new Date())
+                ? '운행 종료 시간대입니다'
+                : '잠시 후 다시 확인해주세요'}
             </Text>
           </View>
         ) : (
