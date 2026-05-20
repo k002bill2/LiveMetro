@@ -113,4 +113,19 @@ describe('RouteCard', () => {
     );
     expect(getByText('강남구청 경유')).toBeTruthy();
   });
+
+  it('elevator-priority 경로 → "엘리베이터 우선" 태그 렌더', () => {
+    const route = {
+      segments: [],
+      totalMinutes: 30,
+      transferCount: 1,
+      lineIds: ['2'],
+      category: 'elevator-priority' as const,
+      etaMinutes: 30,
+    };
+    const { getByText } = render(
+      <RouteCard route={route as never} expanded={false} onToggleExpand={() => {}} />,
+    );
+    expect(getByText('엘리베이터 우선')).toBeTruthy();
+  });
 });

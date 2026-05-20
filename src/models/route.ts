@@ -58,14 +58,15 @@ export interface RouteSegment {
 
 /**
  * Why a route was suggested. Set by `getDiverseRoutes` when picking the
- * fastest, fewest-transfer, and via-station differentiated routes from
+ * fastest, fewest-transfer, via-station, and elevator-priority routes from
  * the K-shortest candidates.
  *
  * - 'fastest': 최단 시간 (Yen output 첫 번째)
  * - 'min-transfer': 환승 최소 (fastest보다 환승 적을 때만)
  * - 'via-station': 특정 환승역 경유 (viaTags에 라벨 텍스트)
+ * - 'elevator-priority': 환승역에 엘리베이터가 있는 경로 (고령자·임산부 best-effort)
  */
-export type RouteCategory = 'fastest' | 'min-transfer' | 'via-station';
+export type RouteCategory = 'fastest' | 'min-transfer' | 'via-station' | 'elevator-priority';
 
 /**
  * Complete route from origin to destination
