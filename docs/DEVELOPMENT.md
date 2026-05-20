@@ -76,7 +76,7 @@ RootNavigator (Stack)
 **Workflow**:
 ```bash
 # 1. Make changes directly in src/
-npx Edit src/components/train/StationCard.tsx
+npx Edit src/components/train/TrainArrivalCard.tsx
 
 # 2. Auto-validated by hooks
 # - TypeScript type-check runs automatically
@@ -87,7 +87,7 @@ npm test
 
 # 4. Commit
 git add .
-git commit -m "feat: add station card component"
+git commit -m "feat: add train arrival card component"
 ```
 
 **Advantages**:
@@ -347,8 +347,11 @@ npm test:watch
 # Coverage report
 npm test:coverage
 
+# Claude Code hook tests (node:test runner)
+npm run test:hooks
+
 # Specific file
-npm test -- src/components/train/__tests__/StationCard.test.tsx
+npm test -- src/components/train/__tests__/TrainArrivalCard.test.tsx
 ```
 
 ---
@@ -433,6 +436,7 @@ npm run type-check           # TypeScript validation
 npm run lint                 # ESLint (auto-fix)
 npm test                     # Run tests
 npm test:coverage            # Coverage report
+npm run test:hooks           # Claude Code hook tests (node:test)
 
 # Building
 npm run build:development    # Dev build (all platforms)
@@ -446,5 +450,5 @@ npm run submit:all           # Submit to stores
 
 ---
 
-**Last Updated**: 2025-01-03
-**Version**: 1.1
+**Last Updated**: 2026-05-21
+**Version**: 1.2

@@ -16,7 +16,7 @@
 npm test
 
 # Run single test file
-npm test -- src/components/train/__tests__/StationCard.test.tsx
+npm test -- src/components/train/__tests__/TrainArrivalCard.test.tsx
 
 # Run tests matching pattern
 npm test -- --testPathPattern=train
@@ -26,6 +26,9 @@ npm test:watch
 
 # Generate coverage report
 npm test:coverage
+
+# Run Claude Code hook tests (node:test runner, outside Jest)
+npm run test:hooks
 ```
 
 ## Test File Organization
@@ -34,9 +37,9 @@ Tests are co-located with source files in `__tests__` directories:
 
 ```
 src/components/train/
-├── StationCard.tsx
+├── TrainArrivalCard.tsx
 └── __tests__/
-    └── StationCard.test.tsx
+    └── TrainArrivalCard.test.tsx
 ```
 
 ## Coverage Requirements
