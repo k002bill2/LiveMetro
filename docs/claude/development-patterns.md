@@ -76,7 +76,7 @@ const isFocused = useIsFocused();
 useDelayDetection({ enabled: isFocused });
 ```
 
-For child components that own subscriptions (e.g., `StationCard`), expose an `arrivalsEnabled` prop and pass `useIsFocused()` from the parent screen. Default to `true` for backward compatibility with non-screen call sites.
+For child components that own an arrivals subscription (e.g., a train-arrival list/card), expose an `arrivalsEnabled` prop and pass `useIsFocused()` from the parent screen. Default to `true` for backward compatibility with non-screen call sites.
 
 ### 2. Pub/Sub over Polling
 

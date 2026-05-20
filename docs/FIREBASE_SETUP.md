@@ -24,39 +24,17 @@
 1. Firebase Console > Firestore Database 메뉴 선택
 2. 데이터베이스가 생성되어 있는지 확인
 3. "규칙" 탭 클릭
-4. 다음 규칙으로 설정:
-
-```javascript
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // Users collection - 본인 데이터만 읽기/쓰기 가능
-    match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
-    }
-
-    // Subway data - 인증된 사용자만 읽기 가능
-    match /stations/{document=**} {
-      allow read: if request.auth != null;
-    }
-
-    match /subwayLines/{document=**} {
-      allow read: if request.auth != null;
-    }
-
-    match /trains/{document=**} {
-      allow read: if request.auth != null;
-    }
-
-    // 기타 모든 문서 - 인증된 사용자만 읽기
-    match /{document=**} {
-      allow read: if request.auth != null;
-    }
-  }
-}
-```
-
-5. "게시" 버튼 클릭
+4. **보안 규칙의 SoT(Single Source of Truth)는 저장소의 `firestore.rules` 파일입니다.**
+   - 콘솔에 규칙을 수동으로 붙여넣지 마세요. 배포는 다음 명령으로 합니다:
+     ```bash
+     firebase deploy --only firestore
+     ```
+     (`firestore.rules` + `firestore.indexes.json` 이 함께 배포됩니다.)
+   - 콘솔 "규칙" 탭은 *현재 배포된 상태 확인* 용도로만 사용하세요. 변경이 필요하면
+     `firestore.rules` 파일을 수정한 뒤 위 명령으로 배포합니다.
+   - 이전 문서는 규칙 예시를 여기 인라인으로 복제했으나 실제 파일과 drift 되어
+     제거했습니다 (catch-all `match /{document=**}`, 누락된 `congestionReports` /
+     `congestionSummary` / `delayReports` / `favorites` 규칙 등). 코드를 SoT로 삼습니다.
 
 ### 4. 환경 변수 확인
 1. 프로젝트 루트에 `.env` 파일이 있는지 확인
@@ -92,9 +70,9 @@ EXPO_PUBLIC_FIREBASE_APP_ID=1:450020925480:web:7edf434219fde3a2d9951d
 **원인:** Firestore 보안 규칙이 너무 제한적
 
 **해결:**
-1. Firebase Console > Firestore Database > 규칙
-2. 위의 보안 규칙 적용
-3. "게시" 클릭
+1. 저장소의 `firestore.rules` 가 최신인지 확인 (필요한 collection 규칙이 모두 있는지)
+2. `firebase deploy --only firestore` 로 배포
+3. 콘솔 "규칙" 탭에서 배포 반영 확인
 
 ### "auth/email-already-in-use" 에러
 **원인:** 이미 등록된 이메일

@@ -136,6 +136,18 @@ trainDelays/          # Delay/disruption alerts
 
 congestionData/       # Train car congestion levels
 
+congestionReports/    # Crowdsourced per-car congestion reports
+  ├─ trainId, lineId, stationId, direction
+  ├─ carNumber        # 1-N car index
+  ├─ congestionLevel  # LOW | MODERATE | HIGH | CROWDED
+  ├─ reporterId       # Author uid (firestore.rules: create requires == request.auth.uid)
+  └─ timestamp, expiresAt
+
+congestionSummary/    # Aggregated per-train congestion (doc id: {lineId}_{direction}_{trainId})
+  ├─ cars[]           # Per-car congestion level + reportCount
+  ├─ overallLevel
+  └─ reportCount, lastUpdated
+
 delayReports/         # User-submitted delay reports (Phase 3)
   ├─ userId           # Report author's user ID
   ├─ userDisplayName  # Author's display name
