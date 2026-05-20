@@ -14,6 +14,7 @@ import {
   getEdgeMinutes,
 } from '@models/route';
 import { getTransferTime } from './transferTime';
+import { stationHasElevator } from './stationAccessibility';
 
 // Branch-line shuttle wait (same-line sub-line transfer, e.g. 신정지선↔본선 at
 // 신도림). Shuttle services are physically separate operations even when
@@ -827,8 +828,20 @@ export function getDiverseRoutes(
     selected.push(labelMinTransfer(minTransfer));
   }
 
+  // elevator-priority: K-후보를 환승역 무장애 점수로 사후 채점해 1개 추가.
+  // raw rep 으로 fastest/min-transfer 와 참조 비교해 중복을 걸러내고, via-station
+  // 풀에서도 제외한다. fastest/min-transfer 와 동급의 primary 카드다.
+  const elevatorRep = pickElevatorPriorityRoute(reachableReps, fastest);
+  const elevatorPriority =
+    elevatorRep && elevatorRep !== fastest && elevatorRep !== minTransfer
+      ? elevatorRep
+      : null;
+  if (elevatorPriority) {
+    selected.push(labelElevatorPriority(elevatorPriority));
+  }
+
   const remaining = reachableReps.filter(
-    (r) => r !== fastest && r !== minTransfer,
+    (r) => r !== fastest && r !== minTransfer && r !== elevatorPriority,
   );
   for (const r of remaining) {
     if (selected.length >= maxRoutes) break;
@@ -863,6 +876,46 @@ function labelViaStation(route: Route): Route {
     category: 'via-station',
     viaTags: [tag],
   };
+}
+
+/**
+ * 경로가 경유하는 환승역 중 엘리베이터가 *없는* 역의 수.
+ * `undefined`(데이터 미수록)는 세지 않는다 — 모르는 것을 "없음"으로 단정하면
+ * 거짓 신호가 된다 (설계 문서 §4.6). export 사유: 순수 함수 단위 테스트.
+ */
+export function noElevatorTransferCount(route: Route): number {
+  return route.segments
+    .filter((s) => s.isTransfer)
+    .filter((s) => stationHasElevator(s.fromStationId) === false).length;
+}
+
+function labelElevatorPriority(route: Route): Route {
+  return { ...route, category: 'elevator-priority' };
+}
+
+/**
+ * reachableReps 중 무장애 환승이 가장 적은 raw 경로를 반환 (동점 시 최단 시간).
+ * fastest 보다 *엄격히* 무장애 환승이 적을 때만 반환 — 아니면 null.
+ * 라벨링하지 않은 raw rep 을 반환하므로, 호출자가 fastest/minTransfer 와
+ * 참조 비교(`===`)로 중복을 판정할 수 있다 (labelXxx 는 새 객체를 만들어
+ * 참조가 달라지므로 라벨링 전에 비교해야 한다).
+ */
+export function pickElevatorPriorityRoute(
+  reachableReps: readonly Route[],
+  fastest: Route,
+): Route | null {
+  const fastestCost = noElevatorTransferCount(fastest);
+  if (fastestCost === 0) return null; // fastest 가 이미 무장애 — 별도 카드 불필요
+  let best: Route | null = null;
+  let bestCost = fastestCost;
+  for (const r of reachableReps) {
+    const cost = noElevatorTransferCount(r);
+    if (cost < bestCost || (cost === bestCost && best !== null && r.totalMinutes < best.totalMinutes)) {
+      best = r;
+      bestCost = cost;
+    }
+  }
+  return best !== null && bestCost < fastestCost ? best : null;
 }
 
 export default { findKShortestPaths, getDiverseRoutes };
