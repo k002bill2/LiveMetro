@@ -53,6 +53,28 @@ service cloud.firestore {
       allow write: if false;
     }
 
+    // Crowdsourced congestion reports - public read, authenticated create.
+    // Reports carry `reporterId`; expired-report cleanup runs server-side
+    // (Cloud Functions / Admin SDK, which bypasses rules), so clients never
+    // update or delete.
+    match /congestionReports/{reportId} {
+      allow read: if true;
+      allow create: if request.auth != null
+        && request.resource.data.reporterId == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    // Congestion summary - client-computed aggregate written after each report
+    // (CongestionService.updateSummaryFromReport). Summaries have no owner
+    // field, so any authenticated user may (re)compute them - matching the
+    // delayReports upvote precedent. Hardening this into a Cloud Function
+    // trigger on congestionReports is tracked as a follow-up.
+    match /congestionSummary/{summaryId} {
+      allow read: if true;
+      allow create, update: if request.auth != null;
+      allow delete: if false;
+    }
+
     // Favorites - authenticated users only for their own data
     match /favorites/{favoriteId} {
       allow read: if request.auth != null && resource.data.userId == request.auth.uid;
