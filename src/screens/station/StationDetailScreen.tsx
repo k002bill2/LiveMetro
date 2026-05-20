@@ -137,6 +137,21 @@ const StationDetailScreen: React.FC = () => {
   }, [stationName]);
 
   const isFocused = useIsFocused();
+
+  // 1Hz tick — 도착 카드의 "초" 카운트다운을 매초 갱신한다. arrivalViews는
+  // 폴링(30초) 주기에만 재계산되므로 tick이 없으면 "초" 표시가 얼어붙어 false
+  // precision이 발생한다 (메모리: feedback_no_subminute_countdown_false_precision,
+  // feedback_usememo_stale_new_date_prop_sync). 시계 SoT는 이 부모 한 곳 —
+  // ArrivalCard는 갱신된 minutes/seconds props를 받아 표시만 한다.
+  // isFocused 게이트로 비활성 화면에서는 tick을 멈춘다 (subscription-cleanup).
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
+  useEffect(() => {
+    if (!isFocused) return;
+    setNowMs(Date.now());
+    const tickId = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(tickId);
+  }, [isFocused]);
+
   const {
     trains,
     loading: trainsLoading,
@@ -194,11 +209,11 @@ const StationDetailScreen: React.FC = () => {
     return trainCongestion.cars.map((c) => LEVEL_TO_PCT[c.congestionLevel] ?? 0);
   }, [trainCongestion]);
 
+  // nowMs(1Hz tick)를 deps에 포함 → 매초 재계산되어 초 카운트다운이 흐른다.
   const arrivalViews = useMemo<ArrivalView[]>(() => {
     const list = direction === 'up' ? trainsByDirection.up : trainsByDirection.down;
-    const now = Date.now();
-    return list.map((t) => trainToArrival(t, now));
-  }, [direction, trainsByDirection]);
+    return list.map((t) => trainToArrival(t, nowMs));
+  }, [direction, trainsByDirection, nowMs]);
 
   // Header subtitle mirrors the design handoff (`Gangnam · 222 · ...`).
   // Cross-line station codes (e.g. "신분당 D07") aren't in CachedTransfer,

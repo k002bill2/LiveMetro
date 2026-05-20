@@ -56,7 +56,9 @@ export const formatDate = (date: Date, format: 'short' | 'long' | 'time' | 'date
  * Format arrival time for trains
  */
 export const formatArrivalTime = (arrivalTime: Date | number | null): string => {
-  if (!arrivalTime) return '정보없음';
+  // 명시적 null/undefined 비교 — `!arrivalTime`는 number 0(잔여 0초 = 도착)을
+  // falsy로 삼켜 "정보없음"으로 오표시 (seoul-api-limits.md BANNED 패턴).
+  if (arrivalTime === null || arrivalTime === undefined) return '정보없음';
 
   const now = new Date();
   let targetTime: Date;
@@ -90,7 +92,8 @@ export const formatArrivalDisplay = (
 ): { text: string; minutes: number; isImmediate: boolean } => {
   const text = formatArrivalTime(arrivalTime);
 
-  if (!arrivalTime) {
+  // 명시적 null/undefined 비교 — number 0이 sentinel 분기로 빠지지 않도록.
+  if (arrivalTime === null || arrivalTime === undefined) {
     return { text, minutes: -1, isImmediate: false };
   }
 
