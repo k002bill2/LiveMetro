@@ -34,6 +34,14 @@
       ]
     },
     {
+      "collectionGroup": "congestionSummary",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "lineId", "order": "ASCENDING" },
+        { "fieldPath": "lastUpdated", "order": "DESCENDING" }
+      ]
+    },
+    {
       "collectionGroup": "delayReports",
       "queryScope": "COLLECTION",
       "fields": [
