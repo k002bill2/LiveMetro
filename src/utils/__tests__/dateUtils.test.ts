@@ -59,6 +59,11 @@ describe('dateUtils', () => {
       expect(formatArrivalTime(pastDate)).toBe('도착');
     });
 
+    it('should return "도착" for 0 seconds (train arriving now)', () => {
+      // 회귀 가드: number 0(잔여 0초)이 falsy라 "정보없음"으로 빠지던 버그.
+      expect(formatArrivalTime(0)).toBe('도착');
+    });
+
     it('should return "곧 도착" for less than 60 seconds', () => {
       expect(formatArrivalTime(30)).toBe('곧 도착');
     });
@@ -94,6 +99,16 @@ describe('dateUtils', () => {
       expect(display.text).toBe('도착');
       expect(display.minutes).toBe(0);
       expect(display.isImmediate).toBe(true);
+    });
+
+    it('returns "도착" for 0 seconds — number 0 must not fall into the null branch', () => {
+      // 회귀 가드: number 0(잔여 0초)이 falsy라 {정보없음, -1, false} sentinel로
+      // 빠지던 버그. 도착하는 바로 그 순간 정보를 숨기는 최악 케이스.
+      expect(formatArrivalDisplay(0)).toEqual({
+        text: '도착',
+        minutes: 0,
+        isImmediate: true,
+      });
     });
 
     it('marks "곧 도착" (<60s) as imminent', () => {

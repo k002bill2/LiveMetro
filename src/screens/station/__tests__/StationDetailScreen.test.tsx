@@ -6,8 +6,9 @@
  */
 import React from 'react';
 import { Share } from 'react-native';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import StationDetailScreen from '../StationDetailScreen';
+import { useIsFocused } from '@react-navigation/native';
 import { useRealtimeTrains } from '@/hooks/useRealtimeTrains';
 import { useFavorites } from '@/hooks/useFavorites';
 import { usePublicDataForStation } from '@/hooks/usePublicData';
@@ -334,5 +335,97 @@ describe('StationDetailScreen', () => {
     const { findByTestId } = render(<StationDetailScreen />);
     expect(await findByTestId('station-detail-header-line-0')).toBeTruthy();
     expect(await findByTestId('station-detail-header-line-1')).toBeTruthy();
+  });
+
+  // 결함 #1 회귀: 도착 카드의 "초" 카운트다운이 폴링(30초) 사이 멈춰 false
+  // precision을 유발하던 버그. arrivalViews가 폴링 시에만 재계산되면 초 표시가
+  // 얼어붙는다 — StationDetailScreen의 1Hz tick이 매초 재계산하는지 검증.
+  describe('1Hz arrival countdown tick', () => {
+    const trainAt = (secondsAway: number) => ({
+      id: 'tick-train',
+      lineId: '2',
+      direction: 'up' as const,
+      currentStationId: 'X',
+      nextStationId: 'Y',
+      finalDestination: '잠실',
+      status: 'normal',
+      arrivalTime: new Date(Date.now() + secondsAway * 1000),
+      delayMinutes: 0,
+      lastUpdated: new Date(),
+    });
+
+    afterEach(() => {
+      jest.useRealTimers();
+      // useIsFocused 오버라이드 누출 방지 — clearAllMocks는 구현을 리셋하지 않음.
+      (useIsFocused as jest.Mock).mockReturnValue(true);
+    });
+
+    it('decrements the arrival seconds every second', () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-05-19T11:00:00.000Z'));
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: [trainAt(150)], // 2분 30초
+        loading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+      const { getByText, queryByText } = render(<StationDetailScreen />);
+      expect(getByText('30초')).toBeTruthy();
+
+      act(() => {
+        jest.advanceTimersByTime(1000);
+      });
+      // tick 한 번 → 29초. 30초가 사라진 것이 "얼어붙지 않았다"의 증거.
+      expect(getByText('29초')).toBeTruthy();
+      expect(queryByText('30초')).toBeNull();
+
+      act(() => {
+        jest.advanceTimersByTime(3000);
+      });
+      expect(getByText('26초')).toBeTruthy();
+    });
+
+    it('does not tick when the screen is not focused', () => {
+      (useIsFocused as jest.Mock).mockReturnValue(false);
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-05-19T11:00:00.000Z'));
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: [trainAt(150)],
+        loading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+      const { getByText } = render(<StationDetailScreen />);
+      expect(getByText('30초')).toBeTruthy();
+
+      act(() => {
+        jest.advanceTimersByTime(5000);
+      });
+      // 비활성 화면 — tick 정지, 초 표시 그대로 (subscription-cleanup 게이트).
+      expect(getByText('30초')).toBeTruthy();
+    });
+
+    it('clears the tick interval on unmount', () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date('2026-05-19T11:00:00.000Z'));
+      // setInterval/clearInterval id를 짝지어 검증 — clearInterval이 그냥
+      // 호출됐는지(React 내부 기계도 호출함)가 아니라, tick이 등록한 바로 그
+      // interval이 해제되는지 확인.
+      const setSpy = jest.spyOn(global, 'setInterval');
+      const clearSpy = jest.spyOn(global, 'clearInterval');
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: [trainAt(150)],
+        loading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+      const { unmount } = render(<StationDetailScreen />);
+      expect(setSpy).toHaveBeenCalled();
+      const tickId = setSpy.mock.results[setSpy.mock.results.length - 1]?.value;
+      unmount();
+      expect(clearSpy).toHaveBeenCalledWith(tickId);
+      setSpy.mockRestore();
+      clearSpy.mockRestore();
+    });
   });
 });
