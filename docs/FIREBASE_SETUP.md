@@ -41,12 +41,12 @@
 2. 파일에 다음 값들이 설정되어 있는지 확인:
 
 ```bash
-EXPO_PUBLIC_FIREBASE_API_KEY=AIzaSyArkmevCGo4T4fUqU4uN7vZUZBYg5culXU
-EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=livemetro-cc092.firebaseapp.com
-EXPO_PUBLIC_FIREBASE_PROJECT_ID=livemetro-cc092
-EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=livemetro-cc092.appspot.com
-EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=450020925480
-EXPO_PUBLIC_FIREBASE_APP_ID=1:450020925480:web:7edf434219fde3a2d9951d
+EXPO_PUBLIC_FIREBASE_API_KEY=your_firebase_api_key
+EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN=your_project.firebaseapp.com
+EXPO_PUBLIC_FIREBASE_PROJECT_ID=your_firebase_project_id
+EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET=your_project.appspot.com
+EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
+EXPO_PUBLIC_FIREBASE_APP_ID=your_firebase_app_id
 ```
 
 3. 값이 `your_`, `development-` 등으로 시작하지 않는지 확인
