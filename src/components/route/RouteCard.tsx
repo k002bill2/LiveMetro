@@ -21,6 +21,7 @@ const CATEGORY_TAGS: Record<RouteCategory, readonly string[]> = {
   'fastest': ['추천', '최단'],
   'min-transfer': ['환승최소', '빠른길'],
   'via-station': [],
+  'elevator-priority': ['엘리베이터 우선', '환승역 엘베'],
 };
 
 interface Props {

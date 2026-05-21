@@ -1,0 +1,5 @@
+{
+  "generatedAt": "2026-05-20T16:42:18.226Z",
+  "source": "SEED (empty) — run scripts/fetchStationAccessibility.ts to populate from data.go.kr/B553766/wksn/stnInfoList",
+  "stations": {}
+}

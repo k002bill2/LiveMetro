@@ -2,7 +2,13 @@
  * K-Shortest Path Tests
  */
 
-import { findKShortestPaths, getDiverseRoutes, buildTransferSignature } from '../kShortestPath';
+import {
+  findKShortestPaths,
+  getDiverseRoutes,
+  buildTransferSignature,
+  noElevatorTransferCount,
+  pickElevatorPriorityRoute,
+} from '../kShortestPath';
 import type { Route, RouteSegment } from '@/models/route';
 
 // Mock the dependencies
@@ -72,6 +78,17 @@ jest.mock('@models/route', () => ({
   FASTEST_LINE_HOP_MINUTES: 2,
   getLineHopMinutes: jest.fn(() => 2),
   getEdgeMinutes: jest.fn(() => 2),
+}));
+
+// elevator-priority 순수 헬퍼의 입력을 통제한다. factory 내부 inline 정의 —
+// 호이스팅 안전 패턴 (.claude/rules/coverage-thresholds.md).
+jest.mock('@/data/stationAccessibility.json', () => ({
+  generatedAt: 'test',
+  source: 'test',
+  stations: {
+    'STN_NO': { hasElevator: false, elevatorCount: 0 },
+    'STN_YES': { hasElevator: true, elevatorCount: 1 },
+  },
 }));
 
 describe('findKShortestPaths', () => {
@@ -443,5 +460,84 @@ describe('buildGraph — branched line topology (nested LINE_STATIONS)', () => {
     // Direct path is B1 → B2 → B3 (2 hops). If a false circular wrap edge
     // existed, the path could be 1 hop, which would be wrong.
     expect(path.segments.length).toBe(2);
+  });
+});
+
+describe('elevator-priority — 순수 헬퍼', () => {
+  // seg/route 픽스처는 describe 스코프에 둔다. 모듈 스코프에 두면
+  // describe('buildTransferSignature') 의 동명 const seg/route 가 새로
+  // no-shadow 위반이 된다 (sibling describe 스코프끼리는 무충돌).
+  function seg(fromStationId: string, isTransfer: boolean): RouteSegment {
+    return {
+      fromStationId,
+      fromStationName: fromStationId,
+      toStationId: 'DEST',
+      toStationName: 'DEST',
+      lineId: '1',
+      lineName: '1호선',
+      estimatedMinutes: 1,
+      isTransfer,
+    };
+  }
+  function route(segs: RouteSegment[], totalMinutes: number): Route {
+    return {
+      segments: segs,
+      totalMinutes,
+      transferCount: segs.filter((s) => s.isTransfer).length,
+      lineIds: ['1'],
+    };
+  }
+
+  describe('noElevatorTransferCount', () => {
+    it('엘리베이터 없는 환승역만 카운트', () => {
+      const r = route([seg('STN_NO', true), seg('STN_YES', true)], 10);
+      expect(noElevatorTransferCount(r)).toBe(1);
+    });
+    it('데이터셋에 없는 환승역(unknown)은 카운트하지 않음', () => {
+      const r = route([seg('STN_UNKNOWN', true)], 10);
+      expect(noElevatorTransferCount(r)).toBe(0);
+    });
+    it('비-환승 세그먼트는 무시', () => {
+      const r = route([seg('STN_NO', false)], 10);
+      expect(noElevatorTransferCount(r)).toBe(0);
+    });
+  });
+
+  describe('pickElevatorPriorityRoute', () => {
+    it('fastest 보다 무장애 환승이 적은 경로를 반환', () => {
+      const fastest = route([seg('STN_NO', true)], 10);
+      const alt = route([seg('STN_YES', true)], 14);
+      expect(pickElevatorPriorityRoute([fastest, alt], fastest)).toBe(alt);
+    });
+    it('fastest 가 이미 무장애(cost 0)면 null', () => {
+      const fastest = route([seg('STN_YES', true)], 10);
+      const alt = route([seg('STN_NO', true)], 14);
+      expect(pickElevatorPriorityRoute([fastest, alt], fastest)).toBeNull();
+    });
+    it('fastest 보다 나은 후보가 없으면 null', () => {
+      const fastest = route([seg('STN_NO', true)], 10);
+      const alt = route([seg('STN_NO', true)], 14);
+      expect(pickElevatorPriorityRoute([fastest, alt], fastest)).toBeNull();
+    });
+  });
+});
+
+describe('getDiverseRoutes — elevator-priority 통합 스모크', () => {
+  // 222→226: 이 파일의 모든 getDiverseRoutes 테스트가 쓰는 기존 픽스처
+  // (@utils/subwayMapData mock 안의 OD pair). 계획은 integration.test.ts 의
+  // OD 쌍을 지시하나, 그 파일의 실제 역 ID 는 이 unit 파일의 mock 에 없어
+  // getDiverseRoutes 가 [] 를 반환한다 — mocked 파일에서는 스모크 불가.
+  const SMOKE_FROM_ID = '222';
+  const SMOKE_TO_ID = '226';
+
+  it('crash 없이 동작하고, elevator-priority 가 나오면 fastest 보다 무장애 환승이 적음', () => {
+    const routes = getDiverseRoutes(SMOKE_FROM_ID, SMOKE_TO_ID);
+    expect(routes.length).toBeGreaterThan(0);
+    const ep = routes.find((r) => r.category === 'elevator-priority');
+    if (ep) {
+      expect(noElevatorTransferCount(ep)).toBeLessThan(
+        noElevatorTransferCount(routes[0]!),
+      );
+    }
   });
 });
