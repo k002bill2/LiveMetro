@@ -10,6 +10,10 @@
  * 네트워크: apis.data.go.kr 는 sandbox allowlist 에 없다 — sandbox 해제 또는
  * 일반 터미널에서 실행할 것.
  */
+
+// 1회성 CLI 빌드 스크립트 — 진행 로그·경고에 console 출력이 정상 동작이다
+// (앱 번들 코드 아님). no-console 규칙은 이 파일에 한해 비활성화한다.
+/* eslint-disable no-console */
 import { writeFileSync } from 'fs';
 import { join } from 'path';
 import { STATIONS } from '../src/utils/subwayMapData';

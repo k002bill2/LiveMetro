@@ -4,6 +4,10 @@
  * 번들 JSON 을 jest.mock 으로 대체해 입력을 통제한다 (factory 내부 inline 정의 —
  * .claude/rules/coverage-thresholds.md 의 호이스팅 안전 패턴).
  */
+import { stationHasElevator } from '../stationAccessibility';
+
+// jest.mock 은 babel-plugin-jest-hoist 가 import 위로 호이스팅하므로 소스
+// 순서는 import 우선으로 둔다 (import/first 규칙 충족, kShortestPath.test.ts 와 동일).
 jest.mock('@/data/stationAccessibility.json', () => ({
   generatedAt: '2026-05-21T00:00:00+09:00',
   source: 'test',
@@ -12,8 +16,6 @@ jest.mock('@/data/stationAccessibility.json', () => ({
     'STN_WITHOUT': { hasElevator: false, elevatorCount: 0 },
   },
 }));
-
-import { stationHasElevator } from '../stationAccessibility';
 
 describe('stationHasElevator', () => {
   it('엘리베이터 있는 역 → true', () => {

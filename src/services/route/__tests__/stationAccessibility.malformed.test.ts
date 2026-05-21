@@ -10,13 +10,15 @@
  * stations 키가 없는 JSON 으로 모듈을 로드하면 빈 테이블로 graceful degrade —
  * 크래시 없이 모든 역이 undefined.
  */
+import { stationHasElevator } from '../stationAccessibility';
+
+// jest.mock 은 babel-plugin-jest-hoist 가 import 위로 호이스팅하므로 소스
+// 순서는 import 우선으로 둔다 (import/first 규칙 충족).
 jest.mock('@/data/stationAccessibility.json', () => ({
   generatedAt: 'test',
   source: 'test',
   // stations 키 없음 — loader 의 `FILE.stations ?? {}` fallback 경로 발현
 }));
-
-import { stationHasElevator } from '../stationAccessibility';
 
 describe('stationHasElevator — malformed JSON (stations 키 부재)', () => {
   it('stations 키가 없어도 크래시 없이 undefined 반환 (graceful inert)', () => {
