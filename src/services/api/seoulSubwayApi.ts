@@ -383,6 +383,19 @@ interface SeoulTimetableResponse {
     };
     row: SeoulTimetableRow[];
   };
+  /**
+   * Gateway-level error shapes (no service wrapper). The 8088 portal returns
+   * timetable failures as a top-level `{ RESULT: { CODE, MESSAGE } }`; some
+   * errors arrive as a flat `{ status, code, message }`. See
+   * {@link SeoulSubwayApiService.getStationTimetable}.
+   */
+  RESULT?: {
+    CODE: string;
+    MESSAGE: string;
+  };
+  status?: number;
+  code?: string;
+  message?: string;
 }
 
 class SeoulSubwayApiService {
@@ -570,14 +583,30 @@ class SeoulSubwayApiService {
         const response = await this.fetchWithTimeout(url);
         const data: SeoulApiResponse<SeoulStationInfo> = await response.json();
 
-        // Check for API errors
-        if (data.errorMessage) {
-          this.keyManager.reportError(apiKey);
-          throw new Error(`Seoul API Error: ${data.errorMessage.message} (Code: ${data.errorMessage.code})`);
+        // Seoul API delivers failures over HTTP 200 in two shapes — the
+        // wrapped `errorMessage` and the top-level `{status,code,message}`
+        // (auth/quota/no-match). The legacy `RESULT.CODE` check threw a
+        // useless "API Error: undefined" for the top-level shape and never
+        // informed the key manager. See extractSeoulApiErrorCode.
+        const apiError = extractSeoulApiErrorCode(data);
+        if (apiError && apiError.code !== 'INFO-000') {
+          const category = categorizeSeoulApiError(apiError.code);
+          if (category === 'quota') {
+            this.keyManager.reportRateLimit(apiKey);
+          } else if (category !== 'transient') {
+            this.keyManager.reportError(apiKey);
+          }
+          throw new SeoulApiError(apiError.code, apiError.message);
         }
 
-        if (data.SearchInfoBySubwayNameService?.RESULT.CODE !== 'INFO-000') {
-          throw new Error(`API Error: ${data.SearchInfoBySubwayNameService?.RESULT.MESSAGE}`);
+        // Wrapped success still carries a service-level RESULT code.
+        const result = data.SearchInfoBySubwayNameService?.RESULT;
+        if (!result || result.CODE !== 'INFO-000') {
+          this.keyManager.reportError(apiKey);
+          throw new SeoulApiError(
+            result?.CODE ?? 'unknown',
+            result?.MESSAGE ?? '역 정보 응답 형식이 올바르지 않습니다.'
+          );
         }
 
         this.keyManager.reportSuccess(apiKey);
@@ -703,8 +732,34 @@ class SeoulSubwayApiService {
           );
         }
 
-        // Handle empty or invalid response structure
+        // Handle empty or invalid response structure. The 8088 portal
+        // returns gateway-level failures (invalid key, quota) with no
+        // SearchSTNTimeTableByIDService wrapper — only a top-level
+        // { RESULT: { CODE, MESSAGE } } (or flat { status, code, message }).
+        // Swallowing those as [] hides the cause AND falsely reports the key
+        // as healthy. Distinguish a real gateway error from a genuinely
+        // empty result.
         if (!data || !data.SearchSTNTimeTableByIDService) {
+          const gatewayCode =
+            data?.RESULT?.CODE ??
+            (typeof data?.code === 'string' ? data.code : null);
+          if (gatewayCode && gatewayCode !== 'INFO-000' && gatewayCode !== 'INFO-200') {
+            const gatewayMessage =
+              data?.RESULT?.MESSAGE ??
+              (typeof data?.message === 'string' ? data.message : '');
+            const category = categorizeSeoulApiError(gatewayCode);
+            if (category === 'quota') {
+              this.timetableKeyManager.reportRateLimit(apiKey);
+            } else if (category !== 'transient') {
+              this.timetableKeyManager.reportError(apiKey);
+            }
+            console.warn(
+              `[SeoulSubwayApi] Timetable gateway error: ` +
+              `code=${gatewayCode} category=${category} message=${gatewayMessage}`
+            );
+            throw new SeoulApiError(gatewayCode, gatewayMessage);
+          }
+          // INFO-200 or structurally-empty body → genuine "no timetable".
           console.warn('[SeoulSubwayApi] Empty or invalid timetable response');
           this.timetableKeyManager.reportSuccess(apiKey);
           return [];

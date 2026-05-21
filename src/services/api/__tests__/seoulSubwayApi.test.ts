@@ -356,6 +356,29 @@ describe('SeoulSubwayApiService', () => {
         '역 정보를 가져오는데 실패했습니다'
       );
     });
+
+    it('should surface the error code from a top-level error response (auth/quota)', async () => {
+      // Seoul API returns auth/quota failures in the top-level
+      // { status, code, message } shape — no errorMessage wrapper, no
+      // SearchInfoBySubwayNameService. The legacy `RESULT.CODE` check then
+      // threw a useless "API Error: undefined" without informing the key
+      // manager. The real code must survive into the thrown error.
+      const topLevelError = {
+        status: 500,
+        code: 'INFO-100',
+        message: '인증키가 유효하지 않습니다.',
+        link: '',
+        developerMessage: '',
+        total: 0,
+      };
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(topLevelError),
+      });
+
+      await expect(seoulSubwayApi.getStationsByLine('2')).rejects.toThrow('INFO-100');
+    });
   });
 
   describe('getAllStations', () => {
@@ -529,6 +552,41 @@ describe('SeoulSubwayApiService', () => {
       await expect(seoulSubwayApi.getStationTimetable('0222', '1', '1')).rejects.toThrow(
         '시간표 정보를 가져오는데 실패했습니다'
       );
+    });
+
+    it('should throw on a top-level gateway error (invalid key) instead of returning []', async () => {
+      // When the timetable gateway rejects the request (invalid key, quota)
+      // the body has no SearchSTNTimeTableByIDService wrapper — only a
+      // top-level { RESULT: { CODE, MESSAGE } }. Swallowing that as [] both
+      // hides the cause and falsely reports the key as healthy.
+      const gatewayError = {
+        RESULT: { CODE: 'INFO-100', MESSAGE: '인증키가 유효하지 않습니다.' },
+      };
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(gatewayError),
+      });
+
+      await expect(seoulSubwayApi.getStationTimetable('0222', '1', '1')).rejects.toThrow(
+        'INFO-100'
+      );
+    });
+
+    it('returns [] for a top-level INFO-200 (genuine no-data, not a gateway error)', async () => {
+      // A top-level { RESULT: { CODE: 'INFO-200' } } means the query matched
+      // no timetable — a valid empty result, not an error. It must stay [].
+      const noData = {
+        RESULT: { CODE: 'INFO-200', MESSAGE: '해당하는 데이터가 없습니다.' },
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(noData),
+      });
+
+      const result = await seoulSubwayApi.getStationTimetable('9999', '1', '1');
+      expect(result).toEqual([]);
     });
   });
 
