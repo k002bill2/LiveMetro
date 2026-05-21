@@ -154,6 +154,70 @@ describe('SeoulSubwayApiService', () => {
       expect((caught as InstanceType<typeof SeoulApiError>).errorCode).toBe('ERROR-300');
     });
 
+    it('should throw SeoulApiError on top-level error response (unmatched station name)', async () => {
+      // Seoul API delivers failures over HTTP 200 in a TOP-LEVEL
+      // { status, code, message } shape — no `errorMessage` wrapper, no
+      // `realtimeArrivalList`. The gateway emits this when the station name
+      // matches no dataset row (code INFO-200). A naive `data.errorMessage`
+      // check skips this branch and `realtimeArrivalList || []` silently
+      // yields [], surfacing a persistent, misleading "no trains" empty state
+      // instead of an error the UI can act on.
+      const topLevelError = {
+        status: 500,
+        code: 'INFO-200',
+        message: '해당하는 데이터가 없습니다.',
+        link: '',
+        developerMessage: '',
+        total: 0,
+      };
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(topLevelError),
+      });
+
+      let caught: unknown;
+      try {
+        await seoulSubwayApi.getRealtimeArrival('신설동역');
+      } catch (err) {
+        caught = err;
+      }
+
+      expect(caught).toBeInstanceOf(SeoulApiError);
+      expect((caught as InstanceType<typeof SeoulApiError>).errorCode).toBe('INFO-200');
+    });
+
+    it('should throw SeoulApiError on top-level auth error (invalid API key)', async () => {
+      // An invalid/expired key also returns the top-level shape — code
+      // INFO-100. Without explicit handling the app reports the key as
+      // "successful" to the key manager and returns [], hiding the real auth
+      // failure behind an empty arrival list.
+      const authError = {
+        status: 500,
+        code: 'INFO-100',
+        message: '인증키가 유효하지 않습니다.',
+        link: '',
+        developerMessage: '',
+        total: 0,
+      };
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(authError),
+      });
+
+      let caught: unknown;
+      try {
+        await seoulSubwayApi.getRealtimeArrival('강남');
+      } catch (err) {
+        caught = err;
+      }
+
+      expect(caught).toBeInstanceOf(SeoulApiError);
+      expect((caught as InstanceType<typeof SeoulApiError>).errorCode).toBe('INFO-100');
+      expect((caught as InstanceType<typeof SeoulApiError>).category).toBe('auth');
+    });
+
     it('should throw error on network failure after retries', async () => {
       // With retry logic, need to mock multiple failures (3 retries)
       mockFetch

@@ -280,6 +280,46 @@ interface SeoulApiResponse<T> {
     };
     row?: T[];
   };
+  /**
+   * Top-level error fields. Seoul Open API returns failures (auth INFO-100,
+   * unmatched-query INFO-200, quota/dispatcher ERROR-3xx) over HTTP 200 in a
+   * flat `{ status, code, message }` shape — no `errorMessage` wrapper and no
+   * payload list. See {@link extractSeoulApiErrorCode}.
+   */
+  status?: number;
+  code?: string;
+  message?: string;
+}
+
+/**
+ * Extract a Seoul API error code + message from either response shape.
+ *
+ * Seoul Open API replies over HTTP 200 in two shapes:
+ *   - wrapped:   `{ errorMessage: { code, message }, <payloadList> }`
+ *   - top-level: `{ status, code, message }` — auth / unmatched-query / quota
+ *
+ * The wrapped shape is the documented one; the top-level shape is what the
+ * gateway emits when the request never reaches the dataset (bad key, unknown
+ * station name, rate limit). A caller that only checks `errorMessage` treats
+ * every top-level failure as an empty payload. Returns `null` when the
+ * response carries no error code at all.
+ *
+ * A successful wrapped response still has `errorMessage.code === 'INFO-000'`,
+ * so callers must compare the returned code against `'INFO-000'`.
+ */
+function extractSeoulApiErrorCode(
+  data: SeoulApiResponse<unknown>,
+): { code: string; message: string } | null {
+  if (data.errorMessage?.code) {
+    return { code: data.errorMessage.code, message: data.errorMessage.message };
+  }
+  if (typeof data.code === 'string') {
+    return {
+      code: data.code,
+      message: typeof data.message === 'string' ? data.message : '',
+    };
+  }
+  return null;
 }
 
 interface SeoulRealtimeArrival {
@@ -452,15 +492,17 @@ class SeoulSubwayApiService {
         const response = await this.fetchWithTimeout(url);
         const data: SeoulApiResponse<SeoulRealtimeArrival> = await response.json();
 
-        // Check for API errors
-        if (data.errorMessage) {
-          const errorCode = data.errorMessage.code;
+        // Seoul API delivers both success and failure over HTTP 200, in two
+        // response shapes (see extractSeoulApiErrorCode). Normalize them so a
+        // single branch handles auth / unmatched-query / quota failures.
+        // Without this, the top-level `{status,code,message}` error shape
+        // skips a naive `data.errorMessage` check and `realtimeArrivalList ||
+        // []` silently yields [] — a persistent, misleading "no trains" empty
+        // state instead of an error the UI can surface or retry.
+        const apiError = extractSeoulApiErrorCode(data);
 
-          // INFO-000 means success - return data if available
-          if (errorCode === 'INFO-000') {
-            this.keyManager.reportSuccess(apiKey);
-            return data.realtimeArrivalList || [];
-          }
+        if (apiError && apiError.code !== 'INFO-000') {
+          const { code: errorCode, message } = apiError;
 
           // Categorize error so caller can branch UI (transient → cached
           // fallback, auth → key swap prompt, etc.). See SeoulApiError JSDoc.
@@ -480,7 +522,15 @@ class SeoulSubwayApiService {
             this.keyManager.reportError(apiKey);
           }
 
-          throw new SeoulApiError(errorCode, data.errorMessage.message);
+          // Diagnostic: the top-level error shape was historically swallowed
+          // as []. Log the resolved code so empty-arrival reports can be
+          // traced to the real cause (auth vs unmatched name vs quota).
+          console.warn(
+            `[SeoulSubwayApi] Realtime arrival error for "${stationName}": ` +
+            `code=${errorCode} category=${category} message=${message}`
+          );
+
+          throw new SeoulApiError(errorCode, message);
         }
 
         // Success - report to key manager
