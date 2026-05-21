@@ -1,0 +1,27 @@
+# gitleaks configuration for LiveMetro.
+#
+# IMPORTANT: `[extend] useDefault = true` keeps the full built-in gitleaks
+# ruleset. Without it a custom config REPLACES every rule and the secret scan
+# silently detects nothing (a passing-but-useless scan).
+#
+# Allowlist rationale — the Firebase Web SDK API key is public by design:
+#   * The `EXPO_PUBLIC_` prefix bundles it into every shipped client build,
+#     so it is already distributed in every APK/IPA.
+#   * Firebase access is gated by Firestore Security Rules + Auth + App Check,
+#     not by key secrecy. See https://firebase.google.com/docs/projects/api-keys
+#
+# gitleaks' `gcp-api-key` rule cannot distinguish a public Firebase web key
+# from a sensitive GCP key (identical `AIza` format), so this one known value
+# is allowlisted explicitly by its exact string. Every other secret — including
+# any other API key — is still detected.
+
+title = "LiveMetro gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Public Firebase Web SDK client key for project livemetro-cc092 (not a secret)."
+regexes = [
+  '''AIzaSyArkmevCGo4T4fUqU4uN7vZUZBYg5culXU''',
+]
