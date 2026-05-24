@@ -88,14 +88,12 @@ describe('A* heuristic admissibility (Issue #73 E.1)', () => {
     expect(stationIds.length).toBeGreaterThan(100);
   });
 
-  // SKIPPED — heuristic is NOT admissible (88/100 pairs violate, gaps up to 8x).
-  // Root cause: buildStationPositions uses LINE_STATIONS iteration order as the
-  // index; |endPos - currentPos| is unrelated to graph hop distance, so the
-  // FASTEST_LINE_HOP_MINUTES floor is invalid. Affects calculateRoute callers:
-  // CommuteRouteScreen, useAlternativeRoutes, patternAnalysisService.
-  // Main UI route search (getDiverseRoutes / Yen's K-Shortest) is unaffected.
-  // Tracking: Issue #73 — fix planned by replacing astar wrapper with true
-  // Dijkstra (h = 0). Un-skip after the fix.
+  // SKIPPED — heuristic is non-admissible by design (88/100 pairs violate),
+  // but no longer affects the critical path: `dijkstra()` is now a true
+  // textbook Dijkstra (h = 0) and `calculateRoute` is guaranteed optimal.
+  // The astar/heuristic functions remain only for `calculateEnhancedRoute`
+  // which has zero production callers. Full dead-code removal (including this
+  // test) tracked in Issue #73 Step 3.
   it.skip(`h(a, b) <= trueDijkstra(a, b) for ${PAIR_COUNT} random reachable pairs`, () => {
     const rng = makeRng(SEED);
     const violations: {
