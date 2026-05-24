@@ -375,21 +375,66 @@ const astar = (
 };
 
 /**
- * Find shortest path using Dijkstra's algorithm (fallback)
+ * Find shortest path using Dijkstra's algorithm.
+ *
+ * Previously wrapped `astar(graph, startKeys, endKeys)` with a non-admissible
+ * heuristic (Issue #73), which made `calculateRoute` return potentially
+ * suboptimal paths (88/100 admissibility violations measured). This is now a
+ * true textbook Dijkstra (h = 0) — guaranteed optimal, no heuristic dependency.
  */
 const dijkstra = (
   graph: Graph,
   startKeys: string[],
   endKeys: string[]
 ): DijkstraResult | null => {
-  const result = astar(graph, startKeys, endKeys);
-  if (!result) return null;
+  const gScores = new Map<string, number>();
+  const previous = new Map<string, string>();
+  const visited = new Set<string>();
+  const queue = new PriorityQueue<string>();
+  const endSet = new Set(endKeys);
 
-  return {
-    distance: result.distance,
-    previous: result.previous,
-    path: result.path,
-  };
+  for (const startKey of startKeys) {
+    if (graph.nodes.has(startKey)) {
+      gScores.set(startKey, 0);
+      queue.enqueue(startKey, 0);
+    }
+  }
+
+  while (!queue.isEmpty()) {
+    const current = queue.dequeue();
+    if (!current) break;
+    if (visited.has(current)) continue;
+    visited.add(current);
+
+    if (endSet.has(current)) {
+      const path: string[] = [];
+      let node: string | undefined = current;
+      while (node) {
+        path.unshift(node);
+        node = previous.get(node);
+      }
+      return {
+        distance: gScores.get(current) ?? 0,
+        previous,
+        path,
+      };
+    }
+
+    const currentG = gScores.get(current) ?? Infinity;
+    const edges = graph.edges.get(current) ?? [];
+    for (const edge of edges) {
+      if (visited.has(edge.to.key)) continue;
+      const tentative = currentG + edge.weight;
+      const existing = gScores.get(edge.to.key) ?? Infinity;
+      if (tentative < existing) {
+        previous.set(edge.to.key, current);
+        gScores.set(edge.to.key, tentative);
+        queue.enqueue(edge.to.key, tentative);
+      }
+    }
+  }
+
+  return null;
 };
 
 // ============================================================================
