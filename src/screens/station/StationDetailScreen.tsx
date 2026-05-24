@@ -184,15 +184,28 @@ const StationDetailScreen: React.FC = () => {
     [weatherAlert, alerts],
   );
 
+  // 환승역(예: 신설동 — 1·2·우이신설)에서 realtime API는 역에 도착하는 모든
+  // 노선의 열차를 반환한다. 이 화면은 한 노선(lineId)의 상세이므로 해당 노선
+  // 열차만 남겨 타 노선이 섞여 표시되는 것을 막는다.
+  //
+  // lineId가 1–9 숫자 노선일 때만 필터한다 — 연장·광역 노선(분당선 등)은
+  // realtime subwayId 정규화 형식이 route lineId와 달라 strict 비교가 화면을
+  // 통째로 비울 수 있으므로 그 경우 기존 동작(전체 표시)을 보존한다.
+  const lineFilteredTrains = useMemo<Train[]>(() => {
+    const all = trains ?? [];
+    if (!/^[1-9]$/.test(lineId)) return all;
+    return all.filter((t) => t.lineId === lineId);
+  }, [trains, lineId]);
+
   // Split trains by direction once and reuse across views.
   const trainsByDirection = useMemo(() => {
     const up: Train[] = [];
     const down: Train[] = [];
-    for (const t of trains ?? []) {
+    for (const t of lineFilteredTrains) {
       (t.direction === 'down' ? down : up).push(t);
     }
     return { up, down };
-  }, [trains]);
+  }, [lineFilteredTrains]);
 
   const focusedTrain: Train | undefined =
     direction === 'up' ? trainsByDirection.up[0] : trainsByDirection.down[0];
@@ -343,6 +356,18 @@ const StationDetailScreen: React.FC = () => {
               {isOperatingEndHours(new Date())
                 ? '운행 종료 시간대입니다'
                 : '잠시 후 다시 확인해주세요'}
+            </Text>
+            {/* 빈 상태는 일시적 API 빈 응답일 수 있어 수동 재시도를 제공한다.
+                에러 상태(위)에만 있던 affordance를 빈 상태에도 추가. */}
+            <Text
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel="열차 정보 다시 불러오기"
+              onPress={refetchTrains}
+              style={[styles.retryText, { color: semantic.primaryNormal }]}
+              testID="station-detail-empty-retry"
+            >
+              다시 시도
             </Text>
           </View>
         ) : (
