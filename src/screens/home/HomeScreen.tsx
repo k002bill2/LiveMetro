@@ -125,149 +125,6 @@ const formatRelativeKorean = (ts?: Date, now: Date = new Date()): string | null 
   return `${diffDay}일 전`;
 };
 
-/**
- * Dev-only sample data for the ML hero + CommuteRouteCard.
- *
- * Reason: the production gating chain (mlPrediction != null && origin name
- * lookup OK && destination lookup OK) only fires after a user has set their
- * commute schedule AND the ML model has trained on enough ride history. On
- * first run / dev simulator that never lights up, so the design preview
- * shows the placeholder instead of the real card.
- *
- * Three-way gate:
- *   __DEV__                     true in dev, false in release (tree-shake)
- *   NODE_ENV !== 'test'          false under jest so the mock-driven
- *                                 placeholder/no-prediction branch tests
- *                                 still exercise the real code paths
- *
- * Production behaviour is unchanged — placeholder still shows when no real
- * data exists.
- */
-const DEV_SAMPLE_COMMUTE =
-  __DEV__ && process.env.NODE_ENV !== 'test'
-    ? ({
-        origin: '홍대입구',
-        destination: '강남',
-        originLineId: '2',
-        predictedDepartureTime: '08:32',
-        predictedArrivalTime: '09:00',
-        predictedMinutes: 28,
-        deltaMinutes: -3,
-        confidence: 0.87,
-        transferCount: 0,
-        stationCount: 8,
-        fareKrw: 1450,
-      } as const)
-    : null;
-
-/**
- * Dev-only sample nearby stations — mirrors the design handoff image
- * (2026-05-06). Cards intentionally omit arrival/congestion data so
- * the divider + bottom-half stays hidden in this slot; real-time
- * arrival cues belong to the "즐겨찾는 역" section instead. The
- * `NearbyStationCard` component still supports the bottom half for
- * other contexts.
- */
-type SampleNearby = {
-  readonly id: string;
-  readonly lineIds: readonly ('1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | 'sb' | 'gj' | 'ap' | 'bd' | 'gx')[];
-  readonly stationName: string;
-  readonly distanceM: number;
-  readonly walkMin: number;
-  readonly exitNumber: string;
-};
-
-const DEV_SAMPLE_NEARBY: readonly SampleNearby[] | null =
-  __DEV__ && process.env.NODE_ENV !== 'test'
-    ? ([
-        {
-          id: 'sample-nearby-hongdae',
-          lineIds: ['2', 'gj', 'ap'],
-          stationName: '홍대입구',
-          distanceM: 180,
-          walkMin: 3,
-          exitNumber: '9',
-        },
-        {
-          id: 'sample-nearby-sinchon',
-          lineIds: ['2'],
-          stationName: '신촌',
-          distanceM: 720,
-          walkMin: 9,
-          exitNumber: '4',
-        },
-      ] as const)
-    : null;
-
-/**
- * Dev-only sample favorites — mirrors the design handoff image (2026-05-06):
- *   ① 강남 (2 + 신분당, 회사, 잠실 방면, 혼잡, 1분 44초 · 곧 도착)
- *   ② 홍대입구 (2 + 경의, 집, 시청 방면, 보통, 4분)
- *   ③ 잠실 (2 + 8, 모란 방면, 여유, 7분)
- *
- * Each sample item carries its own `secondsLeft` so the topmost row can
- * render the "곧 도착" overlay without hitting useRealtimeTrains.
- */
-type SampleFavorite = {
-  readonly id: string;
-  readonly lineIds: readonly ('1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' | 'sb' | 'gj' | 'ap' | 'bd' | 'gx')[];
-  readonly stationName: string;
-  readonly alias?: string;
-  readonly destinationLabel: string;
-  readonly congestion: 'low' | 'mid' | 'high' | 'vhigh';
-  readonly nextMinutes: number;
-  readonly secondsLeft?: number; // first row only — drives "X초 · 곧 도착"
-};
-
-const DEV_SAMPLE_FAVORITES: readonly SampleFavorite[] | null =
-  __DEV__ && process.env.NODE_ENV !== 'test'
-    ? ([
-        {
-          id: 'sample-fav-gangnam',
-          lineIds: ['2', 'sb'],
-          stationName: '강남',
-          alias: '회사',
-          destinationLabel: '잠실 방면',
-          congestion: 'high',
-          nextMinutes: 1,
-          secondsLeft: 104, // 1분 44초
-        },
-        {
-          id: 'sample-fav-hongdae',
-          lineIds: ['2', 'gj'],
-          stationName: '홍대입구',
-          alias: '집',
-          destinationLabel: '시청 방면',
-          congestion: 'mid',
-          nextMinutes: 4,
-        },
-        {
-          id: 'sample-fav-jamsil',
-          lineIds: ['2', '8'],
-          stationName: '잠실',
-          destinationLabel: '모란 방면',
-          congestion: 'low',
-          nextMinutes: 7,
-        },
-      ] as const)
-    : null;
-
-/**
- * Dev-only sample community delay — mirrors the design handoff:
- *   "강남역 신호장애 · 검증됨 · 교대~강남 구간 약 5분 정차 중 · 12분 전 · 47명 확인"
- */
-const DEV_SAMPLE_DELAY =
-  __DEV__ && process.env.NODE_ENV !== 'test'
-    ? ({
-        lineId: '2' as const,
-        lineName: '2호선',
-        title: '강남역 신호장애',
-        description: '교대~강남 구간 약 5분 정차 중',
-        timestampLabel: '12분 전 · 47명 확인',
-        verified: true,
-      } as const)
-    : null;
-
 /** "2026.05.03 (수) · 오전 8:32" */
 const formatDateTimeLabel = (now: Date = new Date()): string => {
   const days = ['일', '월', '화', '수', '목', '금', '토'];
@@ -521,11 +378,6 @@ export const HomeScreen: React.FC = () => {
   //                                                 immediately, with ride/arrival
   //                                                 derived from graph search instead
   //                                                 of ML inference
-  //   3. DEV_SAMPLE_COMMUTE                      — design preview only, tree-shaken
-  //                                                 in release bundles AND suppressed
-  //                                                 whenever a real morningCommute is
-  //                                                 registered (the sample must never
-  //                                                 mask the user's actual route)
   //
   // Note: the hero ML card still uses `heroProps` directly (see render block) — this
   // chain only exists so CommuteRouteCard renders without ML.
@@ -551,56 +403,15 @@ export const HomeScreen: React.FC = () => {
   const effectiveHero = useMemo(() => {
     if (heroProps) return heroProps;
     if (registeredCommuteHero) return registeredCommuteHero;
-    // A registered commute exists but its hero data hasn't resolved (route
-    // graph search not ready). Return null instead of the dev sample so the
-    // slot falls to the placeholder rather than showing a fake route — the
-    // sample is a design preview, never a stand-in for real user data.
-    if (morningCommute) return null;
-    if (!DEV_SAMPLE_COMMUTE) return null;
-    return {
-      predictedMinutes: DEV_SAMPLE_COMMUTE.predictedMinutes,
-      deltaMinutes: DEV_SAMPLE_COMMUTE.deltaMinutes,
-      arrivalTime: DEV_SAMPLE_COMMUTE.predictedArrivalTime,
-      confidence: DEV_SAMPLE_COMMUTE.confidence,
-      origin: DEV_SAMPLE_COMMUTE.origin,
-      destination: DEV_SAMPLE_COMMUTE.destination,
-    };
-  }, [heroProps, registeredCommuteHero, morningCommute]);
+    return null;
+  }, [heroProps, registeredCommuteHero]);
 
-  const effectiveNames = useMemo(() => {
-    if (commuteStationNames.origin) return commuteStationNames;
-    // Same rule as effectiveHero: never let the dev sample override a real
-    // registered commute, even when its station names are still resolving.
-    if (morningCommute || !DEV_SAMPLE_COMMUTE) return commuteStationNames;
-    return {
-      origin: DEV_SAMPLE_COMMUTE.origin,
-      destination: DEV_SAMPLE_COMMUTE.destination,
-      originLineId: DEV_SAMPLE_COMMUTE.originLineId,
-    };
-  }, [commuteStationNames, morningCommute]);
+  const effectiveNames = commuteStationNames;
 
-  const effectiveRouteFacts = useMemo(() => {
-    // Real routeSummary takes precedence; fall back to sample for facts grid.
-    const realFacts =
-      routeSummary.transferCount !== undefined ||
-      routeSummary.stationCount !== undefined ||
-      routeSummary.fareKrw !== undefined;
-    if (realFacts) return routeSummary;
-    // Dev sample suppressed when a real commute is registered (see above) —
-    // the fact grid simply hides until graph search resolves.
-    if (morningCommute || !DEV_SAMPLE_COMMUTE) return routeSummary;
-    return {
-      ...routeSummary,
-      transferCount: DEV_SAMPLE_COMMUTE.transferCount,
-      stationCount: DEV_SAMPLE_COMMUTE.stationCount,
-      fareKrw: DEV_SAMPLE_COMMUTE.fareKrw,
-    };
-  }, [routeSummary, morningCommute]);
+  const effectiveRouteFacts = routeSummary;
 
   const effectiveDepartureTime =
-    mlPrediction?.predictedDepartureTime ??
-    morningCommute?.departureTime ??
-    DEV_SAMPLE_COMMUTE?.predictedDepartureTime;
+    mlPrediction?.predictedDepartureTime ?? morningCommute?.departureTime;
 
   const [dateTimeLabel, setDateTimeLabel] = useState(() =>
     formatDateTimeLabel(new Date()),
@@ -722,20 +533,9 @@ export const HomeScreen: React.FC = () => {
 
   const nearbyList = locationPermission ? hookNearbyStations : favoriteStations;
 
-  // Dev sample policy (2026-05-06 review pass): in dev simulator we ALWAYS
-  // prefer the design-handoff sample so the card layout (line badges,
-  // station name, walk meta) is stable across mounts. The bottom-half
-  // (arrival/congestion) is intentionally omitted in this slot — those
-  // cues live in "즐겨찾는 역". Production/jest are unaffected because
-  // DEV_SAMPLE_* is null there.
-  const useSampleNearby = DEV_SAMPLE_NEARBY !== null;
-  const showNearbySection = useSampleNearby || nearbyList.length > 0;
-
-  const useSampleFavorites = DEV_SAMPLE_FAVORITES !== null;
-  const showFavoritesSection = useSampleFavorites || favoriteStations.length > 0;
-
-  const useSampleDelay = DEV_SAMPLE_DELAY !== null;
-  const showCommunitySection = useSampleDelay || activeDelays.length > 0;
+  const showNearbySection = nearbyList.length > 0;
+  const showFavoritesSection = favoriteStations.length > 0;
+  const showCommunitySection = activeDelays.length > 0;
 
   const onPressRouteSearch = useCallback((): void => {
     if (nearbyClosestStation) {
@@ -918,44 +718,30 @@ export const HomeScreen: React.FC = () => {
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.nearbyScroll}
           >
-            {useSampleNearby
-              ? DEV_SAMPLE_NEARBY!.map((s) => (
-                  <NearbyStationCard
-                    key={s.id}
-                    lineIds={[...s.lineIds]}
-                    stationName={s.stationName}
-                    distanceM={s.distanceM}
-                    walkMin={s.walkMin}
-                    exitNumber={s.exitNumber}
-                    testID={`home-nearby-${s.id}`}
-                  />
-                ))
-              : nearbyList.map((station) => {
-                  const distanceM =
-                    'distance' in station
-                      ? (station as Station & { distance: number }).distance
-                      : 0;
-                  return (
-                    <NearbyStationCard
-                      key={station.id}
-                      lineIds={[station.lineId as LineId]}
-                      stationName={station.name}
-                      distanceM={distanceM}
-                      walkMin={Math.max(
-                        1,
-                        Math.ceil(distanceM / WALK_METERS_PER_MINUTE),
-                      )}
-                      onPress={() => handleStationPress(station)}
-                    />
-                  );
-                })}
+            {nearbyList.map((station) => {
+              const distanceM =
+                'distance' in station
+                  ? (station as Station & { distance: number }).distance
+                  : 0;
+              return (
+                <NearbyStationCard
+                  key={station.id}
+                  lineIds={[station.lineId as LineId]}
+                  stationName={station.name}
+                  distanceM={distanceM}
+                  walkMin={Math.max(
+                    1,
+                    Math.ceil(distanceM / WALK_METERS_PER_MINUTE),
+                  )}
+                  onPress={() => handleStationPress(station)}
+                />
+              );
+            })}
           </ScrollView>
         )}
       </View>
 
-      {/* 6. 즐겨찾는 역 — real favorites preferred; falls back to dev
-          samples in dev simulator (DEV_SAMPLE_FAVORITES tree-shakes in
-          release / jest). Empty state inside the section keeps the slot
+      {/* 6. 즐겨찾는 역 — real favorites only. Empty state keeps the slot
           reserved per the empty-state policy. */}
       <View style={styles.section}>
         <SectionHeader
@@ -981,47 +767,27 @@ export const HomeScreen: React.FC = () => {
           </View>
         ) : (
           <View style={styles.favoriteList}>
-            {useSampleFavorites
-              ? DEV_SAMPLE_FAVORITES!.map((s, idx) => {
-                  const isFirst = idx === 0;
-                  const showImminent =
-                    isFirst && typeof s.secondsLeft === 'number';
-                  return (
-                    <FavoriteRow
-                      key={s.id}
-                      lines={[...s.lineIds]}
-                      stationName={s.stationName}
-                      nickname={s.alias ?? null}
-                      destinationLabel={s.destinationLabel}
-                      congestion={s.congestion}
-                      nextMinutes={s.nextMinutes}
-                      imminent={showImminent}
-                      testID={`home-favorite-${s.id}`}
-                    />
-                  );
-                })
-              : favoriteStations.map((station, idx) => {
-                  const fav = user?.preferences.favoriteStations.find(
-                    (f) => f.stationId === station.id,
-                  );
-                  const isFirst = idx === 0;
-                  return (
-                    <HomeFavoriteRow
-                      key={station.id}
-                      station={station}
-                      alias={fav?.alias}
-                      isFocused={isFocused}
-                      isFirst={isFirst}
-                      onPress={() => handleStationPress(station)}
-                    />
-                  );
-                })}
+            {favoriteStations.map((station, idx) => {
+              const fav = user?.preferences.favoriteStations.find(
+                (f) => f.stationId === station.id,
+              );
+              const isFirst = idx === 0;
+              return (
+                <HomeFavoriteRow
+                  key={station.id}
+                  station={station}
+                  alias={fav?.alias}
+                  isFocused={isFocused}
+                  isFirst={isFirst}
+                  onPress={() => handleStationPress(station)}
+                />
+              );
+            })}
           </View>
         )}
       </View>
 
-      {/* 7. 실시간 제보 — real activeDelays preferred; dev sample renders
-          when there are no real delays so the design preview is complete. */}
+      {/* 7. 실시간 제보 — real activeDelays only. */}
       <View style={styles.section}>
         <SectionHeader title="실시간 제보" subtitle="근처 노선" />
         {!showCommunitySection ? (
@@ -1033,34 +799,22 @@ export const HomeScreen: React.FC = () => {
           </View>
         ) : (
           <View style={styles.communityCardWrap}>
-            {useSampleDelay && DEV_SAMPLE_DELAY ? (
-              <CommunityDelayCard
-                line={DEV_SAMPLE_DELAY.lineId}
-                title={DEV_SAMPLE_DELAY.title}
-                description={DEV_SAMPLE_DELAY.description}
-                verified={DEV_SAMPLE_DELAY.verified}
-                timestampLabel={DEV_SAMPLE_DELAY.timestampLabel}
-                onPress={onPressDelayCard}
-                testID="home-community-delay-card"
-              />
-            ) : (
-              <CommunityDelayCard
-                line={activeDelays[0]!.lineId as LineId}
-                title={`${
-                  activeDelays[0]!.lineName ?? `${activeDelays[0]!.lineId}호선`
-                }${activeDelays[0]!.reason ? ` ${activeDelays[0]!.reason}` : ' 지연 발생'}`}
-                description={
-                  activeDelays[0]!.delayMinutes > 0
-                    ? `약 ${activeDelays[0]!.delayMinutes}분 지연 중`
-                    : undefined
-                }
-                timestampLabel={
-                  formatRelativeKorean(activeDelays[0]!.timestamp) ?? undefined
-                }
-                onPress={onPressDelayCard}
-                testID="home-community-delay-card"
-              />
-            )}
+            <CommunityDelayCard
+              line={activeDelays[0]!.lineId as LineId}
+              title={`${
+                activeDelays[0]!.lineName ?? `${activeDelays[0]!.lineId}호선`
+              }${activeDelays[0]!.reason ? ` ${activeDelays[0]!.reason}` : ' 지연 발생'}`}
+              description={
+                activeDelays[0]!.delayMinutes > 0
+                  ? `약 ${activeDelays[0]!.delayMinutes}분 지연 중`
+                  : undefined
+              }
+              timestampLabel={
+                formatRelativeKorean(activeDelays[0]!.timestamp) ?? undefined
+              }
+              onPress={onPressDelayCard}
+              testID="home-community-delay-card"
+            />
           </View>
         )}
       </View>
