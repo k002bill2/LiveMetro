@@ -26,6 +26,28 @@
 **trainId derivation**: `${btrainNo}_${ordkey}_${statnId}_${index}` (deterministic, FlatList-key safe).
 Avoid `Date.now()` in IDs — it churns every poll and breaks memoization.
 
+**Response shapes — success vs failure** (PR #153, 2026-05-21):
+
+Seoul Open API delivers both success and failure over **HTTP 200** in two different JSON shapes. The 8088 timetable portal adds a third. Any caller that only checks one shape silently swallows the others as empty data:
+
+| Shape | Where | Trigger |
+|-------|-------|---------|
+| Wrapped: `{ errorMessage: {code, message}, realtimeArrivalList: [...] }` | Realtime API success + known/documented errors | Success has `errorMessage.code === 'INFO-000'` |
+| Top-level: `{ status, code, message }` (no `errorMessage` wrapper, no payload list) | Realtime/`SearchInfoBySubwayNameService` gateway failures | Auth `INFO-100`, unmatched query `INFO-200`, quota/dispatcher `ERROR-3xx` |
+| Top-level RESULT: `{ RESULT: { CODE, MESSAGE } }` (no service wrapper) | 8088 timetable portal gateway failures | Same categories as above, different envelope |
+
+`getRealtimeArrival` / `getStationsByLine` / `getStationTimetable` all use `extractSeoulApiErrorCode(data)` to normalize across shapes — any non-`INFO-000` code is thrown as `SeoulApiError` with category + diagnostic `console.warn`. Without this normalization, an expired API key surfaces as a persistent "no trains" empty state instead of an actionable auth error.
+
+When debugging an empty arrival list, the **diagnostic log line** identifies the root cause precisely:
+```
+[SeoulSubwayApi] Realtime arrival error for "<stationName>": code=<code> category=<auth|quota|transient|client|unknown> message=<…>
+```
+- `code=INFO-100` → API key invalid/expired. Rotate `EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY`. Metro inlines `EXPO_PUBLIC_*` at build time — run `expo start --clear` after.
+- `code=INFO-200` → station name doesn't match a dataset row. Trace navigation params (NFC vs NFD, accidental `역` suffix, etc.).
+- `code=ERROR-3xx` → quota / dispatcher. `timetableKeyManager` will rotate to a backup key (`_KEY_2`) if registered; otherwise back off.
+
+See [postmortem: 신설동 빈 화면](../postmortems/2026-05-shinseoldong-empty-screen.md) for the full incident chain that led to this layer.
+
 ### Timetable API
 
 **Base URL:** `http://openAPI.seoul.go.kr:8088/{API_KEY}/json/SearchSTNTimeTableByIDService/{START}/{END}/{STATION_CODE}/{WEEK_TAG}/{INOUT_TAG}/`
