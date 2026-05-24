@@ -1,6 +1,8 @@
 /**
  * Route Service
- * Calculates optimal and alternative routes using A* algorithm with heuristics
+ * Calculates optimal and alternative routes using Dijkstra over the
+ * station-line graph. K-shortest diverse routes via Yen's algorithm
+ * (re-exported from ./kShortestPath).
  */
 
 import { STATIONS, LINE_STATIONS, LINE_COLORS } from '@utils/subwayMapData';
@@ -12,16 +14,12 @@ import {
   AlternativeReason,
   AlternativeRouteOptions,
   DEFAULT_ALTERNATIVE_OPTIONS,
-  FASTEST_LINE_HOP_MINUTES,
   getEdgeMinutes,
   createRoute,
   createAlternativeRoute,
   getLineName,
 } from '@models/route';
 import { PriorityQueue } from '@/utils/priorityQueue';
-import { sumHaversineDistanceKm, type LatLng } from '@/utils/haversine';
-import { getStationCoordinates } from '@/utils/stationCoordinateLookup';
-import { fareService, type FareResult } from './fareService';
 import { getDiverseRoutes, trunkLineId } from './kShortestPath';
 import {
   getNextTrainWaitMinutes,
@@ -50,36 +48,10 @@ interface Graph {
   edges: Map<string, GraphEdge[]>;
 }
 
-interface AStarResult {
-  distance: number;
-  previous: Map<string, string>;
-  path: string[];
-  nodesExplored: number;
-}
-
-// Dijkstra result type (same structure without nodesExplored)
 interface DijkstraResult {
   distance: number;
   previous: Map<string, string>;
   path: string[];
-}
-
-/**
- * Route with additional metadata
- */
-export interface EnhancedRoute extends Route {
-  readonly fare: FareResult;
-  readonly stationCount: number;
-  readonly estimatedArrivalTime?: string;
-}
-
-/**
- * Real-time delay info for route calculation
- */
-export interface DelayInfo {
-  lineId: string;
-  delayMinutes: number;
-  reason?: string;
 }
 
 // ============================================================================
@@ -227,152 +199,8 @@ const buildGraph = (
 };
 
 // ============================================================================
-// A* Algorithm (Optimized)
+// Pathfinding (Dijkstra)
 // ============================================================================
-
-/**
- * Heuristic function for A* algorithm
- * Estimates minimum time to reach destination
- */
-const heuristic = (
-  currentKey: string,
-  endKeys: string[],
-  stationPositions: Map<string, number>
-): number => {
-  const currentStationId = currentKey.split('#')[0];
-  if (!currentStationId) return 0;
-
-  const currentPos = stationPositions.get(currentStationId) ?? 0;
-
-  // Find closest end station
-  let minDistance = Infinity;
-  for (const endKey of endKeys) {
-    const endStationId = endKey.split('#')[0];
-    if (!endStationId) continue;
-    const endPos = stationPositions.get(endStationId) ?? 0;
-    const distance = Math.abs(endPos - currentPos);
-    if (distance < minDistance) {
-      minDistance = distance;
-    }
-  }
-
-  // A* admissibility: h ≤ actual cost. Use the fastest known line speed
-  // (e.g. GTX-A) as the per-hop floor — any actual route has hop cost ≥ this
-  // value, so h is a valid lower bound. 0.95 margin guards float jitter.
-  return minDistance * FASTEST_LINE_HOP_MINUTES * 0.95;
-};
-
-/**
- * Build station position map for heuristic
- */
-const buildStationPositions = (): Map<string, number> => {
-  const positions = new Map<string, number>();
-  let counter = 0;
-
-  Object.entries(LINE_STATIONS).forEach(([_lineId, segments]) => {
-    segments.forEach(stationIds => {
-      stationIds.forEach(stationId => {
-        if (!positions.has(stationId)) {
-          positions.set(stationId, counter);
-          counter++;
-        }
-      });
-    });
-  });
-
-  return positions;
-};
-
-/**
- * Find shortest path using A* algorithm with priority queue
- */
-const astar = (
-  graph: Graph,
-  startKeys: string[],
-  endKeys: string[],
-  lineDelays?: Map<string, number>
-): AStarResult | null => {
-  const gScores = new Map<string, number>();
-  const fScores = new Map<string, number>();
-  const previous = new Map<string, string>();
-  const visited = new Set<string>();
-
-  const queue = new PriorityQueue<string>();
-  const stationPositions = buildStationPositions();
-  let nodesExplored = 0;
-
-  // Initialize
-  graph.nodes.forEach((_, key) => {
-    gScores.set(key, Infinity);
-    fScores.set(key, Infinity);
-  });
-
-  // Add start nodes
-  for (const startKey of startKeys) {
-    if (graph.nodes.has(startKey)) {
-      gScores.set(startKey, 0);
-      const h = heuristic(startKey, endKeys, stationPositions);
-      fScores.set(startKey, h);
-      queue.enqueue(startKey, h);
-    }
-  }
-
-  while (!queue.isEmpty()) {
-    const current = queue.dequeue();
-    if (!current) break;
-
-    nodesExplored++;
-
-    if (visited.has(current)) continue;
-    visited.add(current);
-
-    // Check if reached destination
-    if (endKeys.includes(current)) {
-      const path: string[] = [];
-      let node: string | undefined = current;
-      while (node) {
-        path.unshift(node);
-        node = previous.get(node);
-      }
-
-      return {
-        distance: gScores.get(current) ?? 0,
-        previous,
-        path,
-        nodesExplored,
-      };
-    }
-
-    const currentG = gScores.get(current) ?? Infinity;
-    const edges = graph.edges.get(current) ?? [];
-
-    for (const edge of edges) {
-      if (visited.has(edge.to.key)) continue;
-
-      // Apply delay penalty if line has delays
-      let weight = edge.weight;
-      if (lineDelays && !edge.isTransfer) {
-        const lineId = edge.to.lineId;
-        const delay = lineDelays.get(lineId) ?? 0;
-        weight += delay;
-      }
-
-      const tentativeG = currentG + weight;
-      const existingG = gScores.get(edge.to.key) ?? Infinity;
-
-      if (tentativeG < existingG) {
-        previous.set(edge.to.key, current);
-        gScores.set(edge.to.key, tentativeG);
-        const h = heuristic(edge.to.key, endKeys, stationPositions);
-        const f = tentativeG + h;
-        fScores.set(edge.to.key, f);
-        queue.enqueue(edge.to.key, f);
-      }
-    }
-  }
-
-  return null;
-};
 
 /**
  * Find shortest path using Dijkstra's algorithm.
@@ -644,81 +472,6 @@ export const getLineColor = (lineId: string): string => {
   return LINE_COLORS[lineId] || '#888888';
 };
 
-// ============================================================================
-// Enhanced Route Calculation
-// ============================================================================
-
-/**
- * Calculate route with fare and additional metadata
- */
-export const calculateEnhancedRoute = (
-  fromStationId: string,
-  toStationId: string,
-  excludeLineIds: readonly string[] = [],
-  delays?: DelayInfo[]
-): EnhancedRoute | null => {
-  const graph = buildGraph(excludeLineIds);
-  const startKeys = getStationKeys(fromStationId, excludeLineIds);
-  const endKeys = getStationKeys(toStationId, excludeLineIds);
-
-  if (startKeys.length === 0 || endKeys.length === 0) {
-    return null;
-  }
-
-  // Build delay map
-  const lineDelays = delays
-    ? new Map(delays.map(d => [d.lineId, d.delayMinutes]))
-    : undefined;
-
-  // Find path using A*
-  const result = astar(graph, startKeys, endKeys, lineDelays);
-  if (!result) return null;
-
-  const segments = pathToSegments(result.path);
-  if (segments.length === 0) return null;
-
-  const route = createRoute(segments);
-
-  // Count stations
-  const stationCount = segments.filter(s => !s.isTransfer).length + 1;
-
-  // Phase B: try GPS-based distance from path station coordinates.
-  // path is ['stationId#lineId', ...]; dedupe consecutive duplicates (transfers
-  // don't move physical location). If all coords available, use Haversine sum;
-  // else fall back to stationCount × 1.2km estimation (graceful degradation).
-  const pathStationIds = result.path
-    .map(key => key.split('#')[0])
-    .filter((id, i, arr): id is string => !!id && id !== arr[i - 1]);
-  const coordLookups = pathStationIds.map(id => getStationCoordinates(id));
-  const allCoordsAvailable = coordLookups.every((c): c is LatLng => c !== null);
-  const fare = allCoordsAvailable
-    ? fareService.calculateFareByDistance(sumHaversineDistanceKm(coordLookups))
-    : fareService.calculateFare(stationCount);
-
-  return {
-    ...route,
-    fare,
-    stationCount,
-  };
-};
-
-/**
- * Calculate route with real-time delay consideration
- */
-export const calculateRouteWithDelays = (
-  fromStationId: string,
-  toStationId: string,
-  delays: DelayInfo[]
-): Route | null => {
-  const enhanced = calculateEnhancedRoute(fromStationId, toStationId, [], delays);
-  return enhanced ? {
-    segments: enhanced.segments,
-    totalMinutes: enhanced.totalMinutes,
-    transferCount: enhanced.transferCount,
-    lineIds: enhanced.lineIds,
-  } : null;
-};
-
 /**
  * Find multiple alternative routes
  */
@@ -813,8 +566,6 @@ export const compareRoutes = (
 
 export const routeService = {
   calculateRoute,
-  calculateEnhancedRoute,
-  calculateRouteWithDelays,
   findAlternativeRoutes,
   findMultipleAlternatives,
   compareRoutes,
@@ -823,13 +574,6 @@ export const routeService = {
   getStationInfo,
   getLineColor,
   getDiverseRoutes,
-};
-
-export const __testing__ = {
-  heuristic,
-  buildStationPositions,
-  buildGraph,
-  getStationKeys,
 };
 
 export default routeService;
