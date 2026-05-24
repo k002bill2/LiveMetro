@@ -780,4 +780,11 @@ export const routeService = {
   getDiverseRoutes,
 };
 
+export const __testing__ = {
+  heuristic,
+  buildStationPositions,
+  buildGraph,
+  getStationKeys,
+};
+
 export default routeService;
