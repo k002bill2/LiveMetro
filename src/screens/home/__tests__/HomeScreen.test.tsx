@@ -469,8 +469,7 @@ describe('HomeScreen', () => {
     it('real CommuteRouteCard "경로 변경" link navigates to CommuteSettings', async () => {
       // Drive the full registeredCommuteHero chain so the REAL card renders
       // (not the placeholder): morningCommute set + endpoint names resolved +
-      // route summary ready. This is the dev-build path where DEV_SAMPLE_COMMUTE
-      // would otherwise fill the slot — the link must be wired regardless.
+      // route summary ready. The link must be wired regardless.
       withMorningCommute();
       mockGetStation.mockImplementation((id: string) =>
         Promise.resolve(
@@ -509,8 +508,7 @@ describe('HomeScreen', () => {
       // Regression: a registered commute whose graph search fails (routeSummary
       // never `ready`) must STILL show the user's real origin→destination —
       // the card is gated on endpoint names alone, not on the full hero. Before
-      // the fix the slot fell through to the placeholder (or, in dev builds, to
-      // the hardcoded DEV_SAMPLE_COMMUTE route).
+      // the fix the slot fell through to the placeholder.
       withMorningCommute();
       mockGetStation.mockImplementation((id: string) =>
         Promise.resolve(
@@ -530,7 +528,7 @@ describe('HomeScreen', () => {
         { timeout: 5000 },
       );
 
-      // Real registered endpoints are shown (not the dev sample 홍대입구→강남).
+      // Real registered endpoints are shown.
       expect(getByText('강남')).toBeTruthy();
       expect(getByText('잠실')).toBeTruthy();
     });
