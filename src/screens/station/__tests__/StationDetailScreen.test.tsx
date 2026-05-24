@@ -220,6 +220,22 @@ describe('StationDetailScreen', () => {
     expect(getByText('다시 시도')).toBeTruthy();
   });
 
+  // 빈 상태는 일시적 API 빈 응답일 수 있어 수동 재시도를 제공한다 — 기존엔
+  // 에러 상태에만 있던 affordance. 빈 상태 retry가 useRealtimeTrains.refetch을
+  // 호출하는지 검증.
+  it('calls refetch when the empty-state retry affordance is pressed', () => {
+    const refetch = jest.fn();
+    mockedUseRealtimeTrains.mockReturnValue({
+      trains: [],
+      loading: false,
+      error: null,
+      refetch,
+    });
+    const { getByTestId } = render(<StationDetailScreen />);
+    fireEvent.press(getByTestId('station-detail-empty-retry'));
+    expect(refetch).toHaveBeenCalledTimes(1);
+  });
+
   it('renders one ArrivalCard per up-direction train when 상행 is selected', () => {
     mockedUseRealtimeTrains.mockReturnValue({
       trains: [
@@ -251,6 +267,43 @@ describe('StationDetailScreen', () => {
     fireEvent.press(getByTestId('station-detail-direction-down'));
     expect(getByText('서울대입구행')).toBeTruthy();
     expect(queryByText('잠실행')).toBeNull();
+  });
+
+  // 신설동 사례 회귀: 환승역에서 realtime API는 역에 도착하는 모든 노선
+  // (1·2·우이신설)의 열차를 반환한다. 이 화면은 한 노선(route lineId)의
+  // 상세이므로 타 노선 열차가 섞이면 안 된다.
+  describe('line filtering at transfer stations', () => {
+    it('filters out trains from other lines (route lineId="2")', () => {
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: [
+          buildTrain({ id: 'line2-up', finalDestination: '잠실', direction: 'up', lineId: '2' }),
+          buildTrain({ id: 'line1-up', finalDestination: '동두천', direction: 'up', lineId: '1' }),
+        ],
+        loading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+      const { getByText, queryByText } = render(<StationDetailScreen />);
+      expect(getByText('잠실행')).toBeTruthy();
+      // 1호선 열차는 2호선 화면에서 제외된다.
+      expect(queryByText('동두천행')).toBeNull();
+    });
+
+    it('shows the empty state when only other-line trains are available', () => {
+      // 2호선 열차 0건 + 1호선 열차만 있으면 2호선 화면은 빈 상태 — 타 노선
+      // 열차로 화면을 채우지 않는다.
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: [
+          buildTrain({ id: 'line1-up', finalDestination: '동두천', direction: 'up', lineId: '1' }),
+        ],
+        loading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+      const { getByTestId, queryByText } = render(<StationDetailScreen />);
+      expect(getByTestId('station-detail-empty')).toBeTruthy();
+      expect(queryByText('동두천행')).toBeNull();
+    });
   });
 
   it('invokes Share.share when the share affordance is pressed', async () => {

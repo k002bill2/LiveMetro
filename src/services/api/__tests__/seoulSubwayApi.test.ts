@@ -154,6 +154,70 @@ describe('SeoulSubwayApiService', () => {
       expect((caught as InstanceType<typeof SeoulApiError>).errorCode).toBe('ERROR-300');
     });
 
+    it('should throw SeoulApiError on top-level error response (unmatched station name)', async () => {
+      // Seoul API delivers failures over HTTP 200 in a TOP-LEVEL
+      // { status, code, message } shape — no `errorMessage` wrapper, no
+      // `realtimeArrivalList`. The gateway emits this when the station name
+      // matches no dataset row (code INFO-200). A naive `data.errorMessage`
+      // check skips this branch and `realtimeArrivalList || []` silently
+      // yields [], surfacing a persistent, misleading "no trains" empty state
+      // instead of an error the UI can act on.
+      const topLevelError = {
+        status: 500,
+        code: 'INFO-200',
+        message: '해당하는 데이터가 없습니다.',
+        link: '',
+        developerMessage: '',
+        total: 0,
+      };
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(topLevelError),
+      });
+
+      let caught: unknown;
+      try {
+        await seoulSubwayApi.getRealtimeArrival('신설동역');
+      } catch (err) {
+        caught = err;
+      }
+
+      expect(caught).toBeInstanceOf(SeoulApiError);
+      expect((caught as InstanceType<typeof SeoulApiError>).errorCode).toBe('INFO-200');
+    });
+
+    it('should throw SeoulApiError on top-level auth error (invalid API key)', async () => {
+      // An invalid/expired key also returns the top-level shape — code
+      // INFO-100. Without explicit handling the app reports the key as
+      // "successful" to the key manager and returns [], hiding the real auth
+      // failure behind an empty arrival list.
+      const authError = {
+        status: 500,
+        code: 'INFO-100',
+        message: '인증키가 유효하지 않습니다.',
+        link: '',
+        developerMessage: '',
+        total: 0,
+      };
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(authError),
+      });
+
+      let caught: unknown;
+      try {
+        await seoulSubwayApi.getRealtimeArrival('강남');
+      } catch (err) {
+        caught = err;
+      }
+
+      expect(caught).toBeInstanceOf(SeoulApiError);
+      expect((caught as InstanceType<typeof SeoulApiError>).errorCode).toBe('INFO-100');
+      expect((caught as InstanceType<typeof SeoulApiError>).category).toBe('auth');
+    });
+
     it('should throw error on network failure after retries', async () => {
       // With retry logic, need to mock multiple failures (3 retries)
       mockFetch
@@ -291,6 +355,29 @@ describe('SeoulSubwayApiService', () => {
       await expect(seoulSubwayApi.getStationsByLine('99')).rejects.toThrow(
         '역 정보를 가져오는데 실패했습니다'
       );
+    });
+
+    it('should surface the error code from a top-level error response (auth/quota)', async () => {
+      // Seoul API returns auth/quota failures in the top-level
+      // { status, code, message } shape — no errorMessage wrapper, no
+      // SearchInfoBySubwayNameService. The legacy `RESULT.CODE` check then
+      // threw a useless "API Error: undefined" without informing the key
+      // manager. The real code must survive into the thrown error.
+      const topLevelError = {
+        status: 500,
+        code: 'INFO-100',
+        message: '인증키가 유효하지 않습니다.',
+        link: '',
+        developerMessage: '',
+        total: 0,
+      };
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(topLevelError),
+      });
+
+      await expect(seoulSubwayApi.getStationsByLine('2')).rejects.toThrow('INFO-100');
     });
   });
 
@@ -465,6 +552,41 @@ describe('SeoulSubwayApiService', () => {
       await expect(seoulSubwayApi.getStationTimetable('0222', '1', '1')).rejects.toThrow(
         '시간표 정보를 가져오는데 실패했습니다'
       );
+    });
+
+    it('should throw on a top-level gateway error (invalid key) instead of returning []', async () => {
+      // When the timetable gateway rejects the request (invalid key, quota)
+      // the body has no SearchSTNTimeTableByIDService wrapper — only a
+      // top-level { RESULT: { CODE, MESSAGE } }. Swallowing that as [] both
+      // hides the cause and falsely reports the key as healthy.
+      const gatewayError = {
+        RESULT: { CODE: 'INFO-100', MESSAGE: '인증키가 유효하지 않습니다.' },
+      };
+
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(gatewayError),
+      });
+
+      await expect(seoulSubwayApi.getStationTimetable('0222', '1', '1')).rejects.toThrow(
+        'INFO-100'
+      );
+    });
+
+    it('returns [] for a top-level INFO-200 (genuine no-data, not a gateway error)', async () => {
+      // A top-level { RESULT: { CODE: 'INFO-200' } } means the query matched
+      // no timetable — a valid empty result, not an error. It must stay [].
+      const noData = {
+        RESULT: { CODE: 'INFO-200', MESSAGE: '해당하는 데이터가 없습니다.' },
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(noData),
+      });
+
+      const result = await seoulSubwayApi.getStationTimetable('9999', '1', '1');
+      expect(result).toEqual([]);
     });
   });
 
