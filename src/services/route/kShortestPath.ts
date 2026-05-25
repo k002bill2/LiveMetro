@@ -348,12 +348,19 @@ function getStationNodeKeys(stationId: string): string[] {
 // ============================================================================
 
 /**
- * Find shortest path using Dijkstra
+ * Find shortest path using Dijkstra.
+ *
+ * Optional `excludeNodes`/`excludeEdges` are traversal predicates used by
+ * Yen's spur step (Issue #162). Equivalent to running on a graph rebuilt
+ * with those exclusions, but avoids the O(V+E) buildGraph cost per spur
+ * — measurable hot path at K=15 (baseline ~165ms/call).
  */
 function dijkstra(
   graph: Map<string, Edge[]>,
   startKeys: string[],
-  endKeys: string[]
+  endKeys: string[],
+  excludeNodes?: ReadonlySet<string>,
+  excludeEdges?: ReadonlySet<string>,
 ): InternalPath | null {
   const distances = new Map<string, number>();
   const previous = new Map<string, string>();
@@ -365,7 +372,7 @@ function dijkstra(
   });
 
   for (const startKey of startKeys) {
-    if (graph.has(startKey)) {
+    if (graph.has(startKey) && !excludeNodes?.has(startKey)) {
       distances.set(startKey, 0);
       queue.enqueue(startKey, 0);
     }
@@ -397,6 +404,8 @@ function dijkstra(
     const edges = graph.get(current) ?? [];
     for (const edge of edges) {
       if (visited.has(edge.to)) continue;
+      if (excludeNodes?.has(edge.to)) continue;
+      if (excludeEdges?.has(`${current}->${edge.to}`)) continue;
 
       const currentDist = distances.get(current) ?? Infinity;
       const newDist = currentDist + edge.weight;
@@ -506,9 +515,10 @@ export function findKShortestPaths(
       // Exclude root path nodes (except spur node)
       const excludeNodes = new Set<string>(rootPath.slice(0, -1));
 
-      // Find spur path
-      const spurGraph = buildGraph(excludeNodes, excludeEdges, congestionMultipliers);
-      const spurPath = dijkstra(spurGraph, [spurNode], endKeys);
+      // Issue #162: reuse base graph + pass exclusions as Dijkstra predicates.
+      // Equivalent to rebuilding the graph with exclusions but avoids the
+      // O(V+E) buildGraph call per spur (was the dominant cost at K=15).
+      const spurPath = dijkstra(graph, [spurNode], endKeys, excludeNodes, excludeEdges);
 
       if (spurPath && spurPath.nodes.length > 1) {
         // Combine root path and spur path
