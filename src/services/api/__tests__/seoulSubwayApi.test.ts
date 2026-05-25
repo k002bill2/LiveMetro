@@ -154,16 +154,18 @@ describe('SeoulSubwayApiService', () => {
       expect((caught as InstanceType<typeof SeoulApiError>).errorCode).toBe('ERROR-300');
     });
 
-    it('should throw SeoulApiError on top-level error response (unmatched station name)', async () => {
-      // Seoul API delivers failures over HTTP 200 in a TOP-LEVEL
-      // { status, code, message } shape — no `errorMessage` wrapper, no
-      // `realtimeArrivalList`. The gateway emits this when the station name
-      // matches no dataset row (code INFO-200). A naive `data.errorMessage`
-      // check skips this branch and `realtimeArrivalList || []` silently
-      // yields [], surfacing a persistent, misleading "no trains" empty state
-      // instead of an error the UI can act on.
-      const topLevelError = {
-        status: 500,
+    it('returns [] for top-level INFO-200 (no trains right now, not an error)', async () => {
+      // INFO-200 ("해당하는 데이터가 없습니다") is a NORMAL no-data signal —
+      // the dataset has no realtime row for this station right now (out of
+      // service hours, between dispatches, train turnaround, etc.). Earlier
+      // PRs treated INFO-200 as an error, which routed it through
+      // `categorizeSeoulApiError` → 'unknown' → `keyManager.reportError`, so
+      // every off-hours call disabled an API key. Multiple keys went down in
+      // sequence until the manager ran out (see colocated `getStationTimetable`
+      // INFO-200 handling at the same file). Realtime arrival now matches that
+      // behavior: empty array, no throw, no key penalty.
+      const topLevelNoData = {
+        status: 200,
         code: 'INFO-200',
         message: '해당하는 데이터가 없습니다.',
         link: '',
@@ -173,18 +175,12 @@ describe('SeoulSubwayApiService', () => {
 
       mockFetch.mockResolvedValue({
         ok: true,
-        json: () => Promise.resolve(topLevelError),
+        json: () => Promise.resolve(topLevelNoData),
       });
 
-      let caught: unknown;
-      try {
-        await seoulSubwayApi.getRealtimeArrival('신설동역');
-      } catch (err) {
-        caught = err;
-      }
+      const result = await seoulSubwayApi.getRealtimeArrival('신설동역');
 
-      expect(caught).toBeInstanceOf(SeoulApiError);
-      expect((caught as InstanceType<typeof SeoulApiError>).errorCode).toBe('INFO-200');
+      expect(result).toEqual([]);
     });
 
     it('should throw SeoulApiError on top-level auth error (invalid API key)', async () => {
@@ -1114,6 +1110,15 @@ describe('SeoulSubwayApiService', () => {
         expect(err.category).toBe('auth');
         expect(err.retryable).toBe(false);
       }
+    });
+
+    it('categorizes INFO-200 as no-data (NOT an error, NOT retryable)', () => {
+      // INFO-200 = "해당하는 데이터가 없습니다" is a normal empty-result
+      // signal. It must NOT route through key-error handling — see colocated
+      // realtime / timetable INFO-200 handling.
+      const err = new SeoulApiError('INFO-200', '해당하는 데이터가 없습니다.');
+      expect(err.category).toBe('no-data');
+      expect(err.retryable).toBe(false);
     });
 
     it('categorizes ERROR-300 / ERROR-301 / ERROR-310 / ERROR-333 as client (NOT retryable)', () => {
