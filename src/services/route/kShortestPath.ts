@@ -15,6 +15,7 @@ import {
 } from '@models/route';
 import { getTransferTime } from './transferTime';
 import { stationHasElevator } from './stationAccessibility';
+import * as routeCache from './routeCache';
 
 // Branch-line shuttle wait (same-line sub-line transfer, e.g. 신정지선↔본선 at
 // 신도림). Shuttle services are physically separate operations even when
@@ -774,6 +775,31 @@ export function getDiverseRoutes(
   fromStationId: string,
   toStationId: string,
   maxRoutes: number = DEFAULT_MAX_ROUTES,
+  congestionMultipliers?: ReadonlyMap<string, number>,
+): Route[] {
+  const cacheKey = routeCache.buildCacheKey(
+    fromStationId,
+    toStationId,
+    maxRoutes,
+    congestionMultipliers,
+  );
+  const cached = routeCache.get(cacheKey);
+  if (cached) return [...cached];
+
+  const result = computeDiverseRoutes(
+    fromStationId,
+    toStationId,
+    maxRoutes,
+    congestionMultipliers,
+  );
+  routeCache.set(cacheKey, result);
+  return result;
+}
+
+function computeDiverseRoutes(
+  fromStationId: string,
+  toStationId: string,
+  maxRoutes: number,
   congestionMultipliers?: ReadonlyMap<string, number>,
 ): Route[] {
   const result = findKShortestPaths(
