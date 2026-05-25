@@ -214,9 +214,13 @@ export type SeoulApiErrorCategory =
   | 'quota'       // INFO-300, ERROR-334, ERROR-500, ERROR-501 — rate limit / server overload
   | 'transient'   // ERROR-335, ERROR-336 — partial / dispatcher hiccup, retry-friendly
   | 'client'      // ERROR-300, ERROR-301, ERROR-310, ERROR-333 — bad request / unauthorized
+  | 'no-data'     // INFO-200 — empty result for this query right now; NOT an error
   | 'unknown';
 
 function categorizeSeoulApiError(errorCode: string): SeoulApiErrorCategory {
+  if (errorCode === 'INFO-200') {
+    return 'no-data';
+  }
   if (errorCode === 'INFO-100' || errorCode === 'ERROR-331' || errorCode === 'ERROR-332') {
     return 'auth';
   }
@@ -521,6 +525,16 @@ class SeoulSubwayApiService {
           // fallback, auth → key swap prompt, etc.). See SeoulApiError JSDoc.
           const category = categorizeSeoulApiError(errorCode);
 
+          // INFO-200: no realtime row for this station right now (out of
+          // service hours, between dispatches, turnaround). Normal no-data,
+          // not a key failure — must NOT route through reportError or the
+          // off-hours/empty-station case will disable every key in sequence.
+          // Matches `getStationTimetable` INFO-200 handling elsewhere in this file.
+          if (category === 'no-data') {
+            this.keyManager.reportSuccess(apiKey);
+            return [];
+          }
+
           if (category === 'quota') {
             // Rate limit / server overload — try a backup key.
             const fallbackKey = this.keyManager.reportRateLimit(apiKey);
@@ -591,6 +605,12 @@ class SeoulSubwayApiService {
         const apiError = extractSeoulApiErrorCode(data);
         if (apiError && apiError.code !== 'INFO-000') {
           const category = categorizeSeoulApiError(apiError.code);
+          // INFO-200: empty station list for this line right now. Normal,
+          // not a key failure. Same rationale as `getRealtimeArrival`.
+          if (category === 'no-data') {
+            this.keyManager.reportSuccess(apiKey);
+            return [];
+          }
           if (category === 'quota') {
             this.keyManager.reportRateLimit(apiKey);
           } else if (category !== 'transient') {

@@ -78,6 +78,16 @@ const CATEGORY_COPY: Record<SeoulApiErrorCategory, FallbackCopy> = {
     Icon: Info,
     iconColor: COLORS.semantic.error,
   },
+  // 데이터 없음 (INFO-200) - 정상 빈 결과. 일반적으로 호출자가 빈 배열
+  // 처리하므로 ErrorFallback에 도달하지 않지만, 향후 직접 throw하는 호출자에
+  // 대비한 defensive copy. 운행 종료 시간대/배차 간격 사이가 전형적.
+  'no-data': {
+    title: '운행 정보가 없어요',
+    description: '지금 이 역에 표시할 도착 정보가 없습니다. 운행 시간에 다시 확인해주세요.',
+    showRetry: true,
+    Icon: Info,
+    iconColor: COLORS.semantic.warning,
+  },
   // 분류 불가 - generic + retry
   unknown: {
     title: '문제가 발생했어요',
