@@ -8,12 +8,12 @@
 import { fireEvent, render } from '@testing-library/react-native';
 import React from 'react';
 
+import { DestinationChipRow } from '../DestinationChipRow';
+
 // useTheme - 다른 station 테스트와 동일 패턴 (memory: [useTheme 두 경로 mock])
 jest.mock('@/services/theme/themeContext', () => ({
   useTheme: () => ({ isDark: false }),
 }));
-
-import { DestinationChipRow } from '../DestinationChipRow';
 
 describe('DestinationChipRow', () => {
   describe('Visibility', () => {
