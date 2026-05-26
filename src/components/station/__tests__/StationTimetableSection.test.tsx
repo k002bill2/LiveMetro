@@ -13,6 +13,8 @@ import React from 'react';
 
 import type { TrainScheduleItem, UseTrainScheduleResult } from '@/hooks/useTrainSchedule';
 
+import { StationTimetableSection } from '../StationTimetableSection';
+
 // useTheme - 다른 station 테스트와 동일 패턴 (memory: [useTheme 두 경로 mock])
 jest.mock('@/services/theme/themeContext', () => ({
   useTheme: () => ({ isDark: false }),
@@ -48,8 +50,6 @@ jest.mock('react-native-svg', () => {
     Stop: View,
   };
 });
-
-import { StationTimetableSection } from '../StationTimetableSection';
 
 const makeScheduleItem = (overrides: Partial<TrainScheduleItem> = {}): TrainScheduleItem => ({
   trainNumber: 'T-001',

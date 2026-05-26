@@ -64,7 +64,7 @@ const formatHHMM = (d: Date): string => {
 };
 
 // dayType tab segments. 'auto'는 UI에서 노출 안 함 — 초기 상태일 뿐.
-const TAB_SEGMENTS: ReadonlyArray<{ key: Exclude<DayTypeOverride, 'auto'>; label: string }> = [
+const TAB_SEGMENTS: readonly { key: Exclude<DayTypeOverride, 'auto'>; label: string }[] = [
   { key: 'weekday', label: '평일' },
   { key: 'saturday', label: '토요일' },
   { key: 'holiday', label: '일요일·공휴일' },
