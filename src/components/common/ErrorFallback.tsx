@@ -54,10 +54,11 @@ const CATEGORY_COPY: Record<SeoulApiErrorCategory, FallbackCopy> = {
     Icon: AlertTriangle,
     iconColor: COLORS.semantic.warning,
   },
-  // 할당량/서버 부하 - 자동 복구 안내 + 선택적 retry
+  // 할당량/서버 부하 - 원인 표시 + 수동 retry. 자동 retry 메커니즘이 없으므로
+  // "자동 복구" 같은 약속 회피 (사용자 신뢰).
   quota:  {
-    title: '잠시 후 자동 복구됩니다',
-    description: '서버 부하로 응답이 제한되고 있어요. 잠시 후 자동으로 다시 시도합니다.',
+    title: '서버가 잠시 바빠요',
+    description: '응답이 제한되고 있어요. 잠시 후 다시 시도해주세요.',
     showRetry: true,
     Icon: AlertTriangle,
     iconColor: COLORS.semantic.warning,
@@ -73,7 +74,7 @@ const CATEGORY_COPY: Record<SeoulApiErrorCategory, FallbackCopy> = {
   // 사용자 입력 오류 - 역 이름 등 확인 유도
   client: {
     title: '역 정보를 다시 확인해주세요',
-    description: '요청에 문제가 있습니다. 역 이름이 정확한지 확인해주세요.',
+    description: '입력하신 정보에 문제가 있어요. 역 이름이 정확한지 확인해주세요.',
     showRetry: false,
     Icon: Info,
     iconColor: COLORS.semantic.error,
@@ -83,7 +84,7 @@ const CATEGORY_COPY: Record<SeoulApiErrorCategory, FallbackCopy> = {
   // 대비한 defensive copy. 운행 종료 시간대/배차 간격 사이가 전형적.
   'no-data': {
     title: '운행 정보가 없어요',
-    description: '지금 이 역에 표시할 도착 정보가 없습니다. 운행 시간에 다시 확인해주세요.',
+    description: '현재 이 역에 도착하는 열차가 없습니다. 운행 시간에 다시 확인해주세요.',
     showRetry: true,
     Icon: Info,
     iconColor: COLORS.semantic.warning,

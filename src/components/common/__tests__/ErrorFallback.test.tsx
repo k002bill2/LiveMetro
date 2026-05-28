@@ -1,7 +1,7 @@
 /**
  * ErrorFallback Component Tests
  *
- * Covers SeoulApiError 5 category branches + non-SeoulApiError generic +
+ * Covers SeoulApiError 6 category branches + non-SeoulApiError generic +
  * retry button visibility/invocation semantics. Each category has its own
  * copy + Icon mapping so we assert on title text (user-visible contract).
  */
@@ -67,7 +67,21 @@ describe('ErrorFallback', () => {
         <ErrorFallback error={error} onRetry={jest.fn()} />
       );
 
-      expect(getByText('잠시 후 자동 복구됩니다')).toBeTruthy();
+      expect(getByText('서버가 잠시 바빠요')).toBeTruthy();
+      expect(getByText('다시 시도')).toBeTruthy();
+    });
+
+    it('renders no-data copy and retry button for INFO-200 (defensive)', () => {
+      // INFO-200은 호출자가 보통 빈 배열로 처리하므로 ErrorFallback에 도달하지
+      // 않지만, 직접 throw하는 경로(`throwOnError: true`)를 위한 defensive copy.
+      // 운행 종료 시간대/배차 간격 사이가 전형적 — retry 의미 있음.
+      const error = new SeoulApiError('INFO-200', 'no data');
+
+      const { getByText } = render(
+        <ErrorFallback error={error} onRetry={jest.fn()} />
+      );
+
+      expect(getByText('운행 정보가 없어요')).toBeTruthy();
       expect(getByText('다시 시도')).toBeTruthy();
     });
 
