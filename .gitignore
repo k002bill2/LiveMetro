@@ -24,6 +24,7 @@ ios/
 .env
 .env.local
 .env.*.local
+.env.pre-*
 
 # Firebase config (contains API keys; inject at build time via EAS/CI secrets)
 google-services.json
