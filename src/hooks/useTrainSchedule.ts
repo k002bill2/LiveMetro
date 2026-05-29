@@ -335,12 +335,14 @@ export const useTrainSchedule = (
         setUpcomingTrains(upcoming);
       }
     } catch (err) {
-      console.error('Error fetching train schedule:', err);
-      // Friendly message for the web-platform case so users don't see a
-      // generic "failed" state when the limitation is platform-level.
+      // Web platform limitation is expected behavior, not a real error —
+      // log at debug level to avoid red console noise. Genuine fetch failures
+      // still surface as console.error.
       if (err instanceof TimetableUnsupportedOnWebError) {
+        console.debug('[useTrainSchedule] Timetable unsupported on web');
         setError('시간표는 모바일 앱에서 확인할 수 있습니다.');
       } else {
+        console.error('Error fetching train schedule:', err);
         setError('시간표를 불러오는데 실패했습니다.');
       }
       setSchedules([]);
