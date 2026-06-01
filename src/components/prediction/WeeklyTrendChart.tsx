@@ -19,6 +19,7 @@ import {
   weightToFontFamily,
   type WantedSemanticTheme,
 } from '@/styles/modernTheme';
+import { truncateMinutes } from '@/utils/dateUtils';
 
 // ============================================================================
 // Types
@@ -66,7 +67,7 @@ const WeeklyTrendChartComponent: React.FC<WeeklyTrendChartProps> = ({
       others.length > 0
         ? others.reduce((sum, d) => sum + d.durationMin, 0) / others.length
         : 0;
-    const diff = Math.round(today.durationMin - avgExcludingToday);
+    const diff = truncateMinutes(today.durationMin - avgExcludingToday);
     if (diff < 0) return `평균 대비 오늘 ${diff}분`;
     if (diff > 0) return `평균 대비 오늘 +${diff}분`;
     return '평소와 같음';
@@ -103,7 +104,7 @@ const WeeklyTrendChartComponent: React.FC<WeeklyTrendChartProps> = ({
               testID={isToday ? 'weekly-today-bar' : undefined}
             >
               <Text style={[styles.minuteLabel, isToday && styles.minuteLabelToday]}>
-                {day.durationMin}분
+                {truncateMinutes(day.durationMin)}분
               </Text>
               <View
                 testID={`weekly-bar-${i}`}

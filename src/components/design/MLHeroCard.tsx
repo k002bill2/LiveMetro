@@ -12,6 +12,7 @@ import { Pressable, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { ArrowRight, Sparkles, TrendingDown, TrendingUp } from 'lucide-react-native';
 import { weightToFontFamily } from '@/styles/modernTheme';
+import { truncateMinutes } from '@/utils/dateUtils';
 
 interface MLHeroCardProps {
   /** "홍대입구" → 출발역 표시명 */
@@ -49,7 +50,7 @@ const formatDelta = (delta: number | undefined): { label: string; isFaster: bool
   if (typeof delta !== 'number' || Number.isNaN(delta)) return null;
   if (delta === 0) return { label: '평소와 비슷', isFaster: false };
   const isFaster = delta < 0;
-  const abs = Math.abs(Math.round(delta));
+  const abs = Math.abs(truncateMinutes(delta));
   return {
     label: isFaster ? `평소보다 -${abs}분` : `평소보다 +${abs}분`,
     isFaster,
@@ -68,6 +69,8 @@ const MLHeroCardImpl: React.FC<MLHeroCardProps> = ({
   testID,
 }) => {
   const delta = formatDelta(deltaMinutes);
+  // 절삭(버림) — ML 예측의 부동소수점 꼬리("75.7999…")가 UI에 노출되지 않도록.
+  const displayMinutes = truncateMinutes(predictedMinutes);
   const confidencePct = typeof confidence === 'number' ? Math.round(confidence * 100) : null;
   const routeLabel = origin && destination ? `${origin} → ${destination}` : null;
 
@@ -83,7 +86,7 @@ const MLHeroCardImpl: React.FC<MLHeroCardProps> = ({
       testID={testID ?? 'ml-hero-card'}
       onPress={onPress}
       accessibilityRole={onPress ? 'button' : undefined}
-      accessibilityLabel={`ML 출퇴근 예측 ${predictedMinutes}분`}
+      accessibilityLabel={`ML 출퇴근 예측 ${displayMinutes}분`}
       style={[styles.wrap, style]}
     >
       <LinearGradient
@@ -106,7 +109,7 @@ const MLHeroCardImpl: React.FC<MLHeroCardProps> = ({
 
           <View style={styles.numberRow}>
             <Text style={styles.numberText} accessibilityRole="text">
-              {predictedMinutes}
+              {displayMinutes}
             </Text>
             <Text style={styles.numberUnit}>분</Text>
             {delta && (

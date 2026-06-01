@@ -52,6 +52,7 @@ import { usePredictionFactors } from '@/hooks/usePredictionFactors';
 import { useIntegratedAlerts } from '@/hooks/useIntegratedAlerts';
 import { useTheme, ThemeColors } from '@/services/theme';
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
+import { truncateMinutes } from '@/utils/dateUtils';
 import { Pill } from '@/components/design';
 import {
   SegmentBreakdownSection,
@@ -320,7 +321,7 @@ export const WeeklyPredictionScreen: React.FC = () => {
 
   useEffect(() => {
     const id = animatedValue.addListener(({ value }) => {
-      setDisplayMin(Math.round(value));
+      setDisplayMin(truncateMinutes(value));
     });
     Animated.timing(animatedValue, {
       toValue: predictedMinutes,
@@ -404,11 +405,11 @@ export const WeeklyPredictionScreen: React.FC = () => {
           {/* Range bar */}
           <View style={styles.rangeWrap}>
             <View style={styles.rangeLabels}>
-              <Text style={[styles.rangeLabelSide, { color: semantic.labelAlt }]}>최단 {rangeMin[0]}분</Text>
+              <Text style={[styles.rangeLabelSide, { color: semantic.labelAlt }]}>최단 {truncateMinutes(rangeMin[0])}분</Text>
               <Text style={[styles.rangeLabelCenter, { color: semantic.primaryNormal }]}>
-                예상 {predictedMinutes}분
+                예상 {truncateMinutes(predictedMinutes)}분
               </Text>
-              <Text style={[styles.rangeLabelSide, { color: semantic.labelAlt }]}>최장 {rangeMin[1]}분</Text>
+              <Text style={[styles.rangeLabelSide, { color: semantic.labelAlt }]}>최장 {truncateMinutes(rangeMin[1])}분</Text>
             </View>
             <View style={styles.rangeTrack}>
               <LinearGradient
