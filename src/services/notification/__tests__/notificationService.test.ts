@@ -543,3 +543,71 @@ describe('NotificationService', () => {
     });
   });
 });
+
+describe('NotificationService.scheduleArrivalAlert', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date('2026-05-19T11:00:00.000Z'));
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+  });
+
+  it('schedules a {seconds} trigger `secondsBefore` ahead of a future arrival', async () => {
+    mockNotifications.scheduleNotificationAsync.mockResolvedValue('arr-id');
+    const arrival = new Date(Date.now() + 120_000); // +120s
+
+    const id = await notificationService.scheduleArrivalAlert(arrival, { secondsBefore: 30 });
+
+    expect(id).toBe('arr-id');
+    const arg = mockNotifications.scheduleNotificationAsync.mock.calls[0]?.[0];
+    expect(arg?.trigger).toEqual({ seconds: 90 }); // 120 - 30
+    expect(arg?.content.data).toMatchObject({ type: NotificationType.ARRIVAL_REMINDER });
+  });
+
+  it('fires immediately (trigger null) when arrival is within the lead window', async () => {
+    mockNotifications.scheduleNotificationAsync.mockResolvedValue('imminent-id');
+    const arrival = new Date(Date.now() + 20_000); // +20s < 30s lead → past fire moment
+
+    const id = await notificationService.scheduleArrivalAlert(arrival, { secondsBefore: 30 });
+
+    expect(id).toBe('imminent-id');
+    expect(mockNotifications.scheduleNotificationAsync.mock.calls[0]?.[0]?.trigger).toBeNull();
+  });
+
+  it('fires immediately for an already-past arrival', async () => {
+    mockNotifications.scheduleNotificationAsync.mockResolvedValue('past-id');
+    const arrival = new Date(Date.now() - 60_000);
+
+    await notificationService.scheduleArrivalAlert(arrival);
+
+    expect(mockNotifications.scheduleNotificationAsync.mock.calls[0]?.[0]?.trigger).toBeNull();
+  });
+
+  it('merges custom title/body/data and tags the ARRIVAL_REMINDER type', async () => {
+    mockNotifications.scheduleNotificationAsync.mockResolvedValue('x');
+    const arrival = new Date(Date.now() + 300_000);
+
+    await notificationService.scheduleArrivalAlert(arrival, {
+      secondsBefore: 30,
+      title: '잠실 방면 곧 도착',
+      body: '이동하세요',
+      data: { stationName: '강남' },
+    });
+
+    const content = mockNotifications.scheduleNotificationAsync.mock.calls[0]?.[0]?.content;
+    expect(content?.title).toBe('잠실 방면 곧 도착');
+    expect(content?.body).toBe('이동하세요');
+    expect(content?.data).toEqual({ type: NotificationType.ARRIVAL_REMINDER, stationName: '강남' });
+  });
+
+  it('returns null when scheduling throws', async () => {
+    mockNotifications.scheduleNotificationAsync.mockRejectedValue(new Error('boom'));
+
+    const id = await notificationService.scheduleArrivalAlert(new Date(Date.now() + 120_000));
+
+    expect(id).toBeNull();
+  });
+});

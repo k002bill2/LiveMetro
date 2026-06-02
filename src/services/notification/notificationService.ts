@@ -306,6 +306,55 @@ class NotificationService {
   }
 
   /**
+   * Schedule a one-shot LOCAL notification firing `secondsBefore` seconds before
+   * `arrivalTime`. Powers the "탑승 열차 30초 전 도착 알림".
+   *
+   * Uses a `{ seconds }` interval trigger (not `{ date }`): when the fire moment
+   * is already past (train arriving within `secondsBefore` — Seoul realtime
+   * arrivalTime can be 0/near-0) it degrades to an immediate notification
+   * (`trigger: null`) instead of rejecting on a past date. Returns the
+   * identifier for later cancellation, or null on error. Does NOT gate on
+   * permission — the caller requests permission first.
+   */
+  async scheduleArrivalAlert(
+    arrivalTime: Date,
+    opts: {
+      secondsBefore?: number;
+      title?: string;
+      body?: string;
+      data?: Record<string, unknown>;
+    } = {}
+  ): Promise<string | null> {
+    try {
+      const {
+        secondsBefore = 30,
+        title = '곧 도착',
+        body = '승강장으로 이동하세요',
+        data = {},
+      } = opts;
+      const fireAtMs = arrivalTime.getTime() - secondsBefore * 1000;
+      const secondsFromNow = Math.round((fireAtMs - Date.now()) / 1000);
+      // 과거/임박(<1s) → 즉시 발송(null). 그 외 → N초 후 트리거.
+      const trigger = secondsFromNow >= 1 ? { seconds: secondsFromNow } : null;
+
+      const identifier = await Notifications.scheduleNotificationAsync({
+        content: {
+          title,
+          body,
+          data: { type: NotificationType.ARRIVAL_REMINDER, ...data },
+          sound: 'default',
+        },
+        trigger,
+      });
+
+      return identifier;
+    } catch (error) {
+      console.error('Error scheduling arrival alert:', error);
+      return null;
+    }
+  }
+
+  /**
    * Cancel notification by identifier
    */
   async cancelNotification(identifier: string): Promise<void> {

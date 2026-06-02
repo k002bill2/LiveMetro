@@ -114,6 +114,13 @@ export type AppStackParamList = {
     stationName: string;
     lineId: string;
   };
+  // 탑승 열차 선택 — drill-in from StationDetail. Same station triplet as
+  // StationDetail so the boarding screen can target the identical station+line.
+  TrainSelection: {
+    stationId: string;
+    stationName: string;
+    lineId: string;
+  };
   StationNavigator: {
     stationId: string;
     lineId: string;
