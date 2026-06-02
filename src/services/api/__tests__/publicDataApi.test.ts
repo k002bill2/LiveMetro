@@ -19,6 +19,10 @@ describe('PublicDataApiService', () => {
     mockFetch.mockReset();
   });
 
+  // TODO(혼잡도): 실시간 혼잡도 소스 비활성 — getCongestionInfo / getCurrentCongestion
+  //   메서드가 주석 처리되어 아래 두 describe 블록도 함께 비활성. 서울시 AI 실시간
+  //   혼잡도 소스 공개 후 메서드 복원 시 이 블록 주석(/* */)도 해제.
+  /*
   describe('getCongestionInfo', () => {
     it('should fetch and convert congestion data', async () => {
       mockFetch.mockResolvedValue({
@@ -125,6 +129,7 @@ describe('PublicDataApiService', () => {
       consoleSpy.mockRestore();
     }, 15000);
   });
+  */
 
   describe('getExitLandmarks', () => {
     it('should fetch exit landmark data', async () => {

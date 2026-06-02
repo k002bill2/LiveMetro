@@ -12,9 +12,9 @@
 import {
   PublicDataResponse,
   DataGoKrResponse,
-  CongestionRawData,
-  CongestionInfo,
-  CurrentCongestion,
+  // CongestionRawData,
+  // CongestionInfo,
+  // CurrentCongestion,
   AccessibilityRawData,
   AccessibilityInfo,
   AlertRawData,
@@ -25,7 +25,7 @@ import {
   TrainSchedule,
   DayTypeCode,
   DirectionCode,
-  getCongestionLevel,
+  // getCongestionLevel,
   parseAlertType,
   parseLandmarkCategory,
 } from '@/models/publicData';
@@ -40,7 +40,7 @@ const API_TIMEOUT = 10000;
 // NOTE: apis.data.go.kr endpoints don't support CORS (browser access blocked)
 // These APIs work on native platforms (iOS/Android) but NOT on web
 const ENDPOINTS = {
-  CONGESTION: 'https://api.odcloud.kr/api/15071311/v1/uddi:f5381f71-5c8a-4a78-9773-1327922dc657',
+  // CONGESTION: 'https://api.odcloud.kr/api/15071311/v1/uddi:f5381f71-5c8a-4a78-9773-1327922dc657',
   ACCESSIBILITY: 'https://apis.data.go.kr/B553766/wksn/stnInfoList',
   ALERTS: 'https://apis.data.go.kr/B553766/ntce/ntceList',
   EXIT_LANDMARKS: 'https://api.odcloud.kr/api/15073460/v1/uddi:5e336c4a-7f38-4429-b815-e1c31c0a6c46',
@@ -119,76 +119,83 @@ class PublicDataApiService {
   private rateLimiter = new RateLimiter(1000);
 
   // ==========================================================================
-  // 1. 혼잡도 정보
+  // 1. 혼잡도 정보 — 비활성 (DISABLED)
   // ==========================================================================
+  // TODO(혼잡도): 실시간 혼잡도 소스 전면 비활성. 서울시 제공 데이터는 30분 단위
+  //   통계(비실시간)이고, SK/TMAP PUZZLE 실시간 API는 비용 부담이 큼. 서울시가
+  //   개발 중인 AI 기반 실시간 승강장 혼잡도 소스가 공개되면 아래 블록 주석 해제.
+  //   관련 화면 비활성: StationDetailScreen / TrainSelectionScreen.
+  //   getCongestionInfo / getCurrentCongestion 및 전용 헬퍼
+  //   (convertCongestionData / parseDayType / getCurrentTimeSlot / getDayType)
+  //   + CONGESTION 엔드포인트 + 관련 import 가 함께 주석 처리됨.
 
-  /**
-   * 역별 혼잡도 정보 조회
-   */
-  async getCongestionInfo(stationName: string): Promise<CongestionInfo[]> {
-    return withRetry(async () => {
-      await this.rateLimiter.throttle('congestion');
+  // /**
+   // * 역별 혼잡도 정보 조회
+   // */
+  // async getCongestionInfo(stationName: string): Promise<CongestionInfo[]> {
+    // return withRetry(async () => {
+      // await this.rateLimiter.throttle('congestion');
+//
+      // const controller = new AbortController();
+      // const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
+//
+      // try {
+        // const url = new URL(ENDPOINTS.CONGESTION);
+        // url.searchParams.append('serviceKey', decodeURIComponent(API_KEY));
+        // url.searchParams.append('page', '1');
+        // url.searchParams.append('perPage', '100');
+        // url.searchParams.append('cond[역명::EQ]', stationName);
+//
+        // const response = await fetch(url.toString(), {
+          // signal: controller.signal,
+          // headers: { 'Accept': 'application/json' },
+        // });
+//
+        // if (!response.ok) {
+          // throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        // }
+//
+        // const data: PublicDataResponse<CongestionRawData> = await response.json();
+        // return this.convertCongestionData(data.data);
+      // } finally {
+        // clearTimeout(timeoutId);
+      // }
+    // });
+  // }
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
-
-      try {
-        const url = new URL(ENDPOINTS.CONGESTION);
-        url.searchParams.append('serviceKey', decodeURIComponent(API_KEY));
-        url.searchParams.append('page', '1');
-        url.searchParams.append('perPage', '100');
-        url.searchParams.append('cond[역명::EQ]', stationName);
-
-        const response = await fetch(url.toString(), {
-          signal: controller.signal,
-          headers: { 'Accept': 'application/json' },
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const data: PublicDataResponse<CongestionRawData> = await response.json();
-        return this.convertCongestionData(data.data);
-      } finally {
-        clearTimeout(timeoutId);
-      }
-    });
-  }
-
-  /**
-   * 현재 시간대 혼잡도 조회
-   */
-  async getCurrentCongestion(stationName: string, direction: 'up' | 'down'): Promise<CurrentCongestion | null> {
-    try {
-      const congestionList = await this.getCongestionInfo(stationName);
-      const now = new Date();
-      const currentTimeSlot = this.getCurrentTimeSlot(now);
-      const dayType = this.getDayType(now);
-
-      const matching = congestionList.find(
-        (c) => c.direction === direction && c.dayType === dayType
-      );
-
-      if (!matching) {
-        return null;
-      }
-
-      const percentage = matching.timeSlots.get(currentTimeSlot) || 0;
-
-      return {
-        stationName,
-        lineNum: matching.lineNum,
-        direction,
-        level: getCongestionLevel(percentage),
-        percentage,
-        updatedAt: now,
-      };
-    } catch (error) {
-      console.error('Error getting current congestion:', error);
-      return null;
-    }
-  }
+  // /**
+   // * 현재 시간대 혼잡도 조회
+   // */
+  // async getCurrentCongestion(stationName: string, direction: 'up' | 'down'): Promise<CurrentCongestion | null> {
+    // try {
+      // const congestionList = await this.getCongestionInfo(stationName);
+      // const now = new Date();
+      // const currentTimeSlot = this.getCurrentTimeSlot(now);
+      // const dayType = this.getDayType(now);
+//
+      // const matching = congestionList.find(
+        // (c) => c.direction === direction && c.dayType === dayType
+      // );
+//
+      // if (!matching) {
+        // return null;
+      // }
+//
+      // const percentage = matching.timeSlots.get(currentTimeSlot) || 0;
+//
+      // return {
+        // stationName,
+        // lineNum: matching.lineNum,
+        // direction,
+        // level: getCongestionLevel(percentage),
+        // percentage,
+        // updatedAt: now,
+      // };
+    // } catch (error) {
+      // console.error('Error getting current congestion:', error);
+      // return null;
+    // }
+  // }
 
   // ==========================================================================
   // 2. 교통약자 이용 정보
@@ -428,27 +435,27 @@ class PublicDataApiService {
   // Private Helper Methods
   // ==========================================================================
 
-  private convertCongestionData(rawData: readonly CongestionRawData[]): CongestionInfo[] {
-    return rawData.map((raw) => {
-      const timeSlots = new Map<string, number>();
-
+  // private convertCongestionData(rawData: readonly CongestionRawData[]): CongestionInfo[] {
+    // return rawData.map((raw) => {
+      // const timeSlots = new Map<string, number>();
+//
       // 시간대별 혼잡도 매핑
-      const rawRecord = raw as unknown as Record<string, string>;
-      const timeKeys = Object.keys(rawRecord).filter((key) => key.includes('시'));
-      for (const key of timeKeys) {
-        const value = parseFloat(rawRecord[key] || '0');
-        timeSlots.set(key, value);
-      }
-
-      return {
-        lineNum: raw.호선,
-        stationName: raw.역명,
-        direction: raw.상하구분 === '상선' ? 'up' : 'down',
-        dayType: this.parseDayType(raw.요일구분),
-        timeSlots,
-      };
-    });
-  }
+      // const rawRecord = raw as unknown as Record<string, string>;
+      // const timeKeys = Object.keys(rawRecord).filter((key) => key.includes('시'));
+      // for (const key of timeKeys) {
+        // const value = parseFloat(rawRecord[key] || '0');
+        // timeSlots.set(key, value);
+      // }
+//
+      // return {
+        // lineNum: raw.호선,
+        // stationName: raw.역명,
+        // direction: raw.상하구분 === '상선' ? 'up' : 'down',
+        // dayType: this.parseDayType(raw.요일구분),
+        // timeSlots,
+      // };
+    // });
+  // }
 
   private convertAccessibilityData(raw: AccessibilityRawData): AccessibilityInfo {
     return {
@@ -504,25 +511,25 @@ class PublicDataApiService {
     }));
   }
 
-  private parseDayType(dayStr: string): 'weekday' | 'saturday' | 'holiday' {
-    if (dayStr.includes('토')) return 'saturday';
-    if (dayStr.includes('일') || dayStr.includes('공휴')) return 'holiday';
-    return 'weekday';
-  }
+  // private parseDayType(dayStr: string): 'weekday' | 'saturday' | 'holiday' {
+    // if (dayStr.includes('토')) return 'saturday';
+    // if (dayStr.includes('일') || dayStr.includes('공휴')) return 'holiday';
+    // return 'weekday';
+  // }
 
-  private getCurrentTimeSlot(date: Date): string {
-    const hours = date.getHours();
-    const minutes = date.getMinutes();
-    const slot = minutes < 30 ? '00분' : '30분';
-    return `${hours}시${slot}`;
-  }
+  // private getCurrentTimeSlot(date: Date): string {
+    // const hours = date.getHours();
+    // const minutes = date.getMinutes();
+    // const slot = minutes < 30 ? '00분' : '30분';
+    // return `${hours}시${slot}`;
+  // }
 
-  private getDayType(date: Date): 'weekday' | 'saturday' | 'holiday' {
-    const day = date.getDay();
-    if (day === 0) return 'holiday';
-    if (day === 6) return 'saturday';
-    return 'weekday';
-  }
+  // private getDayType(date: Date): 'weekday' | 'saturday' | 'holiday' {
+    // const day = date.getDay();
+    // if (day === 0) return 'holiday';
+    // if (day === 6) return 'saturday';
+    // return 'weekday';
+  // }
 
   // Removed deprecated train schedule helper methods
   // Use seoulSubwayApi.getStationTimetable() or useTrainSchedule hook instead
