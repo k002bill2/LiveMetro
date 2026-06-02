@@ -45,7 +45,8 @@ import { DirectionSegment } from '@/components/station/DirectionSegment';
 import { ArrivalCard } from '@/components/station/ArrivalCard';
 import { ExitInfoGrid } from '@/components/station/ExitInfoGrid';
 import { StationTimetableSection } from '@/components/station/StationTimetableSection';
-import { CongestionLevel, type TrainCongestionSummary } from '@/models/congestion';
+import type { TrainCongestionSummary } from '@/models/congestion';
+import { carsToPercentages } from '@/utils/congestionDisplay';
 import {
   getBoardingSelection,
   clearBoardingSelection,
@@ -84,14 +85,6 @@ interface ArrivalView {
 }
 
 const REFETCH_INTERVAL_MS = 30_000;
-
-/** Center-of-band percentages for each congestion level (drives the bar fill). */
-const LEVEL_TO_PCT: Record<CongestionLevel, number> = {
-  [CongestionLevel.LOW]: 20,
-  [CongestionLevel.MODERATE]: 50,
-  [CongestionLevel.HIGH]: 80,
-  [CongestionLevel.CROWDED]: 95,
-};
 
 const trainToArrival = (train: Train, now: number): ArrivalView => {
   const total = train.arrivalTime
@@ -260,7 +253,8 @@ const StationDetailScreen: React.FC = () => {
 
   const carCongestionPct = useMemo(() => {
     if (!trainCongestion?.cars?.length) return undefined;
-    return trainCongestion.cars.map((c) => LEVEL_TO_PCT[c.congestionLevel] ?? 0);
+    // 공유 SoT 유틸 사용 — StationDetail 전용 LEVEL_TO_PCT 중복 제거 (코드리뷰 #7).
+    return carsToPercentages(trainCongestion.cars);
   }, [trainCongestion]);
 
   // nowMs(1Hz tick)를 deps에 포함 → 매초 재계산되어 초 카운트다운이 흐른다.

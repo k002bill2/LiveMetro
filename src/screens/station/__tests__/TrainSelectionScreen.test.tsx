@@ -252,6 +252,21 @@ describe('TrainSelectionScreen', () => {
     expect(mockGoBack).toHaveBeenCalledTimes(1);
   });
 
+  // 코드리뷰 #8: ETA 미상(arrivalTime null = 운행중)은 CTA에서 "곧 도착"이 아니라
+  // "운행 중"으로 정직 표시한다.
+  it('shows "운행 중" in the CTA when the selected train has no ETA (arrivalTime null)', () => {
+    mockedUseRealtimeTrains.mockReturnValue({
+      trains: [
+        { ...buildTrain({ id: 'u1', finalDestination: '잠실', direction: 'up' }), arrivalTime: null },
+      ],
+      loading: false,
+      error: null,
+      refetch: jest.fn(),
+    });
+    const { getByTestId } = render(<TrainSelectionScreen />);
+    expect(getByTestId('train-selection-cta-eta')).toHaveTextContent('운행 중');
+  });
+
   it('does NOT schedule an arrival alert when the toggle is off', () => {
     mockedUseRealtimeTrains.mockReturnValue(
       okState([buildTrain({ id: 'u1', finalDestination: '잠실', direction: 'up' })])

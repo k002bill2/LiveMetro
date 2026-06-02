@@ -54,13 +54,17 @@ interface Eta {
   minutes: number;
   seconds: number;
   total: number;
+  /** false → arrivalTime null(운행중, no countdown) → show "운행 중" not "곧 도착". */
+  hasEta: boolean;
 }
 
 const etaOf = (train: Train, now: number): Eta => {
-  const total = train.arrivalTime
-    ? Math.max(0, Math.floor((train.arrivalTime.getTime() - now) / 1000))
-    : 0;
-  return { minutes: Math.floor(total / 60), seconds: total % 60, total };
+  // 명시적 null 체크 — arrivalTime은 Date|null이며 null은 ETA 미상(운행중)을 의미.
+  if (train.arrivalTime === null) {
+    return { minutes: 0, seconds: 0, total: 0, hasEta: false };
+  }
+  const total = Math.max(0, Math.floor((train.arrivalTime.getTime() - now) / 1000));
+  return { minutes: Math.floor(total / 60), seconds: total % 60, total, hasEta: true };
 };
 
 const TrainSelectionScreen: React.FC = () => {
@@ -216,9 +220,11 @@ const TrainSelectionScreen: React.FC = () => {
   const selEta = selectedTrain ? etaOf(selectedTrain, nowMs) : null;
   const ctaEtaText = !selEta
     ? ''
-    : selEta.total === 0
-      ? '곧 도착'
-      : `${selEta.minutes}분 ${String(selEta.seconds).padStart(2, '0')}초 후`;
+    : !selEta.hasEta
+      ? '운행 중'
+      : selEta.total === 0
+        ? '곧 도착'
+        : `${selEta.minutes}분 ${String(selEta.seconds).padStart(2, '0')}초 후`;
 
   const renderList = (): React.ReactNode => {
     if (trainsLoading) {
@@ -280,6 +286,7 @@ const TrainSelectionScreen: React.FC = () => {
           destination={t.finalDestination}
           minutes={eta.minutes}
           seconds={eta.seconds}
+          hasEta={eta.hasEta}
           trainType={t.trainType}
           delayMinutes={t.delayMinutes}
           selected={isSel}

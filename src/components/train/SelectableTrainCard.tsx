@@ -39,6 +39,12 @@ export interface SelectableTrainCardProps {
   minutes: number;
   /** Seconds portion (0–59), padded to 2 digits. */
   seconds: number;
+  /**
+   * Whether a precise arrival ETA is known. false → the train is running but
+   * the API gave no countdown (Seoul arvlCd '99' 운행중 → arrivalTime null), so
+   * we show "운행 중" instead of conflating it with "곧 도착" (코드리뷰 #8 honesty).
+   */
+  hasEta?: boolean;
   /** Whether this train is the chosen boarding train (radio on + congestion strip). */
   selected: boolean;
   /** Selection handler (whole card is the touch target). */
@@ -71,6 +77,7 @@ const SelectableTrainCardImpl: React.FC<SelectableTrainCardProps> = ({
   destination,
   minutes,
   seconds,
+  hasEta = true,
   selected,
   onSelect,
   trainType = 'normal',
@@ -160,7 +167,7 @@ const SelectableTrainCardImpl: React.FC<SelectableTrainCardProps> = ({
       accessibilityRole="radio"
       accessibilityState={{ selected }}
       accessibilityLabel={`${line}호선 ${destination} 방면, ${
-        showImminentOnly ? '곧 도착' : `${minutes}분 ${seconds}초 후`
+        !hasEta ? '운행 중' : showImminentOnly ? '곧 도착' : `${minutes}분 ${seconds}초 후`
       }`}
     >
       <View style={styles.headerRow}>
@@ -199,7 +206,11 @@ const SelectableTrainCardImpl: React.FC<SelectableTrainCardProps> = ({
         </View>
 
         <View style={styles.timeBlock}>
-          {showImminentOnly ? (
+          {!hasEta ? (
+            <Pill tone="neutral" size="sm" testID={testID ? `${testID}-no-eta` : undefined}>
+              운행 중
+            </Pill>
+          ) : showImminentOnly ? (
             <Pill tone="primary" size="sm" testID={testID ? `${testID}-imminent` : undefined}>
               곧 도착
             </Pill>

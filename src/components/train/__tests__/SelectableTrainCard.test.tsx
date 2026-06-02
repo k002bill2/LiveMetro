@@ -53,6 +53,16 @@ describe('SelectableTrainCard', () => {
     expect(queryByText('47초')).toBeNull();
   });
 
+  // 코드리뷰 #8: arrivalTime null(운행중, ETA 미상)은 "곧 도착"이 아니라 "운행 중".
+  it('shows "운행 중" instead of "곧 도착" when no ETA is known (hasEta=false)', () => {
+    const { getByText, queryByText } = render(
+      <SelectableTrainCard {...baseProps} hasEta={false} />
+    );
+    expect(getByText('운행 중')).toBeTruthy();
+    expect(queryByText('곧 도착')).toBeNull();
+    expect(queryByText('47초')).toBeNull();
+  });
+
   it('calls onSelect when the card is pressed', () => {
     const onSelect = jest.fn();
     const { getByTestId } = render(
