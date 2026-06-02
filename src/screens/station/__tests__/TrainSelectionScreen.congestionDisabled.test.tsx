@@ -115,4 +115,12 @@ describe('TrainSelectionScreen — congestion disabled', () => {
     const { getByTestId } = render(<TrainSelectionScreen />);
     expect(getByTestId('train-selection-cta-eta')).toBeTruthy();
   });
+
+  // 코드리뷰 #5 회귀 가드: hero subtitle이 비활성 placeholder와 모순되게 "칸별
+  // 혼잡도"를 약속하지 않는다. 실제 제공 항목(도착 시간 + 알림)만 안내.
+  it('hero subtitle does not promise per-car congestion while it is disabled', () => {
+    const { getByText, queryByText } = render(<TrainSelectionScreen />);
+    expect(getByText('탑승할 열차를 선택하면 도착 시간과 30초 전 알림을 안내해 드려요')).toBeTruthy();
+    expect(queryByText('탑승할 열차를 선택하면 칸별 혼잡도를 안내해 드려요')).toBeNull();
+  });
 });

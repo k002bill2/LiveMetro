@@ -14,7 +14,7 @@
  * Orchestrator only — visual cards live in `SelectableTrainCard`; direction
  * control in `DirectionSegment`.
  */
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -184,8 +184,13 @@ const TrainSelectionScreen: React.FC = () => {
     }
   }, []);
 
+  // 중복 탭 가드 — handleBoard는 fire-and-forget로 알림을 예약하고 즉시 goBack한다.
+  // unmount 전 빠른 더블탭이 예약을 두 번 돌려 알림이 중복/orphan되는 레이스를
+  // 차단한다 (코드리뷰 #4). 한 번 탑승하면 재진입 불가.
+  const boardedRef = useRef(false);
   const handleBoard = useCallback(() => {
-    if (!selectedTrain) return;
+    if (!selectedTrain || boardedRef.current) return;
+    boardedRef.current = true;
     setBoardingSelection({
       stationId,
       stationName,
@@ -308,8 +313,11 @@ const TrainSelectionScreen: React.FC = () => {
               <Text style={[styles.liveText, { color: green }]}>LIVE</Text>
             </View>
           </View>
+          {/* TODO(혼잡도): 실시간 칸별 혼잡도 복원 시 "탑승할 열차를 선택하면 칸별
+              혼잡도를 안내해 드려요"로 되돌릴 것. 현재는 혼잡도가 비활성이라 실제
+              제공 항목(도착 시간 + 30초 전 알림)만 약속한다 (코드리뷰 #5, honesty). */}
           <Text style={[styles.heroSubtitle, { color: semantic.labelAlt }]}>
-            탑승할 열차를 선택하면 칸별 혼잡도를 안내해 드려요
+            탑승할 열차를 선택하면 도착 시간과 30초 전 알림을 안내해 드려요
           </Text>
         </View>
 

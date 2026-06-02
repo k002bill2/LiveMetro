@@ -137,7 +137,7 @@ describe('TrainSelectionScreen', () => {
     const { getByText, getByTestId } = render(<TrainSelectionScreen />);
     expect(getByText('강남')).toBeTruthy();
     expect(getByTestId('train-selection-live')).toBeTruthy();
-    expect(getByText('탑승할 열차를 선택하면 칸별 혼잡도를 안내해 드려요')).toBeTruthy();
+    expect(getByText('탑승할 열차를 선택하면 도착 시간과 30초 전 알림을 안내해 드려요')).toBeTruthy();
   });
 
   it('renders the direction segment with both options', () => {
@@ -236,6 +236,20 @@ describe('TrainSelectionScreen', () => {
     expect(mockScheduleBoardingAlert).toHaveBeenCalledWith(
       expect.objectContaining({ stationName: '강남', finalDestination: '잠실' })
     );
+  });
+
+  // 코드리뷰 #4 회귀 가드: 빠른 더블탭이 예약/복귀를 두 번 트리거하지 않는다.
+  it('guards against double-tap — schedules and navigates back only once', () => {
+    mockedUseRealtimeTrains.mockReturnValue(
+      okState([buildTrain({ id: 'u1', finalDestination: '잠실', direction: 'up' })])
+    );
+    const { getByTestId } = render(<TrainSelectionScreen />);
+    const cta = getByTestId('train-selection-cta-button');
+    fireEvent.press(cta);
+    fireEvent.press(cta); // 즉시 두 번째 탭
+
+    expect(mockScheduleBoardingAlert).toHaveBeenCalledTimes(1);
+    expect(mockGoBack).toHaveBeenCalledTimes(1);
   });
 
   it('does NOT schedule an arrival alert when the toggle is off', () => {

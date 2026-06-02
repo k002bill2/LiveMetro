@@ -16,6 +16,7 @@ import { mapCacheService } from '@/services/map/mapCacheService';
 import {
   setBoardingSelection,
   clearBoardingSelection,
+  getBoardingSelection,
 } from '@/services/train/boardingSelectionStore';
 
 const mockNavigate = jest.fn();
@@ -566,6 +567,67 @@ describe('StationDetailScreen', () => {
       // 다른 역의 선택 → 무시. 기본 'up' 유지 → 성수행 표시, 잠실행(down) 숨김.
       expect(getByText('성수행')).toBeTruthy();
       expect(queryByText('잠실행')).toBeNull();
+    });
+
+    // 코드리뷰 #2 회귀 가드: boarding 방향이 현재 방향과 같을 때(상행→상행)
+    // setDirection은 no-op이지만 reorder는 즉시 반영돼야 한다(폴링 대기 금지).
+    it('reorders immediately when the boarding direction equals the current direction', () => {
+      setBoardingSelection({
+        stationId: 'gangnam',
+        stationName: '강남',
+        lineId: '2',
+        direction: 'up',
+        finalDestination: '성수',
+        selectedCar: null,
+      });
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: [
+          buildTrain({ id: 'u1', finalDestination: '잠실', direction: 'up' }),
+          buildTrain({ id: 'u2', finalDestination: '성수', direction: 'up' }),
+        ],
+        loading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+      // 기본 방향 'up' == boarding 'up'. 추가 폴링(trains 갱신) 없이 첫 렌더에서
+      // 성수가 최상단(arrival-0)으로 와야 한다.
+      const { getByTestId } = render(<StationDetailScreen />);
+      expect(
+        within(getByTestId('station-detail-arrival-0')).getByText('성수행')
+      ).toBeTruthy();
+    });
+
+    // 코드리뷰 #1 회귀 가드: 적용 즉시 store를 비워(consume-on-read) 이후 무관
+    // 재방문에서 stale 선택이 되살아나지 않는다.
+    it('consumes (clears) the boarding selection after applying it, so a later mount does not re-apply', () => {
+      setBoardingSelection({
+        stationId: 'gangnam',
+        stationName: '강남',
+        lineId: '2',
+        direction: 'down',
+        finalDestination: '잠실',
+        selectedCar: null,
+      });
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: [
+          buildTrain({ id: 'u1', finalDestination: '성수', direction: 'up' }),
+          buildTrain({ id: 'd1', finalDestination: '잠실', direction: 'down' }),
+        ],
+        loading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+      const first = render(<StationDetailScreen />);
+      // 적용됨: down 방향 → 잠실행 노출. 그리고 store는 소비되어 비워진다.
+      expect(first.getByText('잠실행')).toBeTruthy();
+      expect(getBoardingSelection()).toBeNull();
+      first.unmount();
+
+      // fresh mount(무관 재방문): store가 비어 있어 stale 'down' 재적용 없이
+      // 기본 'up' 유지 → 성수행 노출, 잠실행(down) 숨김.
+      const second = render(<StationDetailScreen />);
+      expect(second.getByText('성수행')).toBeTruthy();
+      expect(second.queryByText('잠실행')).toBeNull();
     });
   });
 });

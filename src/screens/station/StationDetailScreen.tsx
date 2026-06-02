@@ -15,7 +15,7 @@
  *   - LiveClock + manual refresh + GPS chip in the header
  *   - 시간표 tab (TrainSchedule hook)
  */
-import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
@@ -48,6 +48,7 @@ import { StationTimetableSection } from '@/components/station/StationTimetableSe
 import { CongestionLevel, type TrainCongestionSummary } from '@/models/congestion';
 import {
   getBoardingSelection,
+  clearBoardingSelection,
   boardingSelectionMatches,
 } from '@/services/train/boardingSelectionStore';
 import type { Station, Train } from '@/models/train';
@@ -213,34 +214,37 @@ const StationDetailScreen: React.FC = () => {
     return { up, down };
   }, [lineFilteredTrains]);
 
-  // 탑승 시작한 선택이 이 역/노선과 매칭되면 해당 방향으로 1회 전환 — 사용자가
-  // 고른 열차의 도착 정보가 메인으로 보이도록. 선택 identity(방향+종착지)가
-  // 바뀔 때만 적용해 이후 수동 방향 토글과 충돌하지 않는다 (isFocused 게이트로
-  // 화면 재포커스 시점에만 검사).
-  const appliedBoardingKeyRef = useRef<string | null>(null);
+  // 탑승 시작한 선택을 이 화면의 reactive state로 끌어올린다. 매칭되면 (1) 해당
+  // 방향으로 전환하고 (2) store를 즉시 비운다(consume-on-read). 두 가지를 한다:
+  //   - clear: module 싱글턴이 세션 내내 살아남아 이후 무관한 재방문 때 stale하게
+  //     재적용되는 것을 막는다 (코드리뷰 #1).
+  //   - state로 승격: 같은 방향(예: 상행→상행) 선택이라 setDirection이 no-op이어도
+  //     boardingTarget 변경이 orderedTrains를 즉시 재계산시켜 reorder가 폴링을
+  //     기다리지 않고 바로 반영된다 (코드리뷰 #2).
+  const [boardingTarget, setBoardingTarget] = useState<{
+    direction: 'up' | 'down';
+    finalDestination: string;
+  } | null>(null);
   useEffect(() => {
     if (!isFocused) return;
     const sel = getBoardingSelection();
     if (!boardingSelectionMatches(sel, { stationId, stationName, lineId })) return;
-    const key = `${sel.direction}:${sel.finalDestination}`;
-    if (appliedBoardingKeyRef.current === key) return;
-    appliedBoardingKeyRef.current = key;
+    clearBoardingSelection();
+    setBoardingTarget({ direction: sel.direction, finalDestination: sel.finalDestination });
     setDirection(sel.direction);
   }, [isFocused, stationId, stationName, lineId]);
 
-  // 선택된 boarding 열차를 최상단으로 끌어올린 방향별 리스트. 매칭/선택이 없으면
-  // 원래 순서 그대로 — 기존 동작 보존. focusedTrain·arrivalViews의 공통 SoT라
-  // 혼잡도 구독·하이라이트·도착시간이 모두 같은 열차를 가리킨다.
+  // 선택된 boarding 열차를 최상단으로 끌어올린 방향별 리스트. boardingTarget(state)이
+  // dep이라 reactive하게 재계산된다. 매칭/선택이 없으면 원래 순서 그대로 — 기존 동작
+  // 보존. orderedTrains는 arrivalViews(+isFirst 강조)의 공통 SoT.
   const orderedTrains = useMemo<Train[]>(() => {
     const list = direction === 'up' ? trainsByDirection.up : trainsByDirection.down;
-    const sel = getBoardingSelection();
-    if (!boardingSelectionMatches(sel, { stationId, stationName, lineId })) return list;
-    if (sel.direction !== direction) return list;
-    const idx = list.findIndex((t) => t.finalDestination === sel.finalDestination);
+    if (!boardingTarget || boardingTarget.direction !== direction) return list;
+    const idx = list.findIndex((t) => t.finalDestination === boardingTarget.finalDestination);
     const matched = idx > 0 ? list[idx] : undefined;
     if (!matched) return list;
     return [matched, ...list.slice(0, idx), ...list.slice(idx + 1)];
-  }, [direction, trainsByDirection, stationId, stationName, lineId]);
+  }, [direction, trainsByDirection, boardingTarget]);
 
   // TODO(혼잡도): 실시간 혼잡도 비활성 — 복원 시 focusedTrain 및 아래 useCongestion
   //   주석 해제하고 `const trainCongestion = null` 라인 삭제. (서울시 AI 소스 대기)
