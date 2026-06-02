@@ -6,18 +6,24 @@
  */
 import React from 'react';
 import { Share } from 'react-native';
-import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
+import { render, fireEvent, waitFor, act, within } from '@testing-library/react-native';
 import StationDetailScreen from '../StationDetailScreen';
 import { useIsFocused } from '@react-navigation/native';
 import { useRealtimeTrains } from '@/hooks/useRealtimeTrains';
 import { useFavorites } from '@/hooks/useFavorites';
 import { usePublicDataForStation } from '@/hooks/usePublicData';
 import { mapCacheService } from '@/services/map/mapCacheService';
+import {
+  setBoardingSelection,
+  clearBoardingSelection,
+} from '@/services/train/boardingSelectionStore';
+
+const mockNavigate = jest.fn();
 
 jest.mock('@react-navigation/native', () => ({
   useIsFocused: jest.fn(() => true),
   useNavigation: jest.fn(() => ({
-    navigate: jest.fn(),
+    navigate: mockNavigate,
     push: jest.fn(),
     goBack: jest.fn(),
     canGoBack: jest.fn(() => true),
@@ -114,6 +120,7 @@ const buildTrain = (overrides: Partial<{ id: string; finalDestination: string; m
 describe('StationDetailScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    clearBoardingSelection();
     mockedUseRealtimeTrains.mockReturnValue({
       trains: [],
       loading: false,
@@ -479,6 +486,86 @@ describe('StationDetailScreen', () => {
       expect(clearSpy).toHaveBeenCalledWith(tickId);
       setSpy.mockRestore();
       clearSpy.mockRestore();
+    });
+  });
+
+  // 탑승 열차 선택 화면으로의 진입 — 도착 카드가 있을 때만 노출.
+  describe('탑승 열차 선택 entry', () => {
+    it('navigates to TrainSelection with the station params when pressed', () => {
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: [buildTrain({ id: 'u1', finalDestination: '잠실', direction: 'up' })],
+        loading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+      const { getByTestId } = render(<StationDetailScreen />);
+      fireEvent.press(getByTestId('station-detail-train-select'));
+      expect(mockNavigate).toHaveBeenCalledWith('TrainSelection', {
+        stationId: 'gangnam',
+        stationName: '강남',
+        lineId: '2',
+      });
+    });
+
+    it('does not show the entry button when there are no trains', () => {
+      const { queryByTestId } = render(<StationDetailScreen />);
+      expect(queryByTestId('station-detail-train-select')).toBeNull();
+    });
+  });
+
+  // 탑승 시작 후 역 상세로 복귀 시: boarding 선택이 방향 전환 + 선택 열차를
+  // 최상단으로 끌어올려 "탑승 열차에 따라 도착시간 변경"을 가시화한다.
+  describe('boarding selection reflection', () => {
+    it('switches to the boarding direction and surfaces the chosen train first', () => {
+      setBoardingSelection({
+        stationId: 'gangnam',
+        stationName: '강남',
+        lineId: '2',
+        direction: 'down',
+        finalDestination: '잠실',
+        selectedCar: 7,
+      });
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: [
+          buildTrain({ id: 'u1', finalDestination: '성수', direction: 'up' }),
+          buildTrain({ id: 'd1', finalDestination: '서울대입구', direction: 'down' }),
+          buildTrain({ id: 'd2', finalDestination: '잠실', direction: 'down' }),
+        ],
+        loading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+      const { getByTestId, queryByText } = render(<StationDetailScreen />);
+      // 기본 'up'이지만 boarding 선택이 'down' → up 열차는 숨겨진다.
+      expect(queryByText('성수행')).toBeNull();
+      // 매칭 종착지(잠실)가 최상단(arrival-0)으로 재정렬되어 강조된다.
+      expect(
+        within(getByTestId('station-detail-arrival-0')).getByText('잠실행')
+      ).toBeTruthy();
+    });
+
+    it('ignores a boarding selection that belongs to a different station', () => {
+      setBoardingSelection({
+        stationId: 'OTHER',
+        stationName: '역삼',
+        lineId: '2',
+        direction: 'down',
+        finalDestination: '잠실',
+        selectedCar: null,
+      });
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: [
+          buildTrain({ id: 'u1', finalDestination: '성수', direction: 'up' }),
+          buildTrain({ id: 'd1', finalDestination: '잠실', direction: 'down' }),
+        ],
+        loading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+      const { getByText, queryByText } = render(<StationDetailScreen />);
+      // 다른 역의 선택 → 무시. 기본 'up' 유지 → 성수행 표시, 잠실행(down) 숨김.
+      expect(getByText('성수행')).toBeTruthy();
+      expect(queryByText('잠실행')).toBeNull();
     });
   });
 });

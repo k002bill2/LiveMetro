@@ -36,6 +36,7 @@ import { SettingsNavigator } from './SettingsNavigator';
 import { OnboardingNavigator } from './OnboardingNavigator';
 import StationNavigatorScreen from '../screens/station/StationNavigatorScreen';
 import StationDetailScreen from '../screens/station/StationDetailScreen';
+import TrainSelectionScreen from '../screens/station/TrainSelectionScreen';
 import { DelayCertificateScreen } from '../screens/delays/DelayCertificateScreen';
 import { DelayFeedScreen } from '../screens/delays/DelayFeedScreen';
 import { ReportDetailScreenAdapter } from '../screens/delays/ReportDetailScreenAdapter';
@@ -72,6 +73,11 @@ export type RootStackParamList = {
     mode?: 'departure' | 'arrival';
   };
   StationDetail: {
+    stationId: string;
+    stationName: string;
+    lineId: string;
+  };
+  TrainSelection: {
     stationId: string;
     stationName: string;
     lineId: string;
@@ -303,6 +309,14 @@ const RootNavigatorContent: React.FC = () => {
         options={{
           headerShown: true,
           title: '역 상세정보',
+        }}
+      />
+      <Stack.Screen
+        name="TrainSelection"
+        component={TrainSelectionScreen}
+        options={{
+          headerShown: true,
+          title: '탑승 열차 선택',
         }}
       />
       <Stack.Screen

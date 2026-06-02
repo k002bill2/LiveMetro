@@ -15,13 +15,14 @@
  *   - LiveClock + manual refresh + GPS chip in the header
  *   - 시간표 tab (TrainSchedule hook)
  */
-import React, { useEffect, useMemo, useState, useCallback } from 'react';
+import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import {
   ActivityIndicator,
   ScrollView,
   Share,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import { RouteProp, useRoute, useNavigation, useIsFocused } from '@react-navigation/native';
@@ -32,7 +33,8 @@ import { AppStackParamList } from '../../navigation/types';
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme/themeContext';
 import { useRealtimeTrains } from '@/hooks/useRealtimeTrains';
-import { useCongestion } from '@/hooks/useCongestion';
+// TODO(혼잡도): 실시간 혼잡도 표시 비활성 — 서울시 AI 실시간 혼잡도 소스 공개 시 복원
+// import { useCongestion } from '@/hooks/useCongestion';
 import { usePublicDataForStation } from '@/hooks/usePublicData';
 import { useFavorites } from '@/hooks/useFavorites';
 import { useAutoCommuteLog } from '@/hooks/useAutoCommuteLog';
@@ -43,7 +45,11 @@ import { DirectionSegment } from '@/components/station/DirectionSegment';
 import { ArrivalCard } from '@/components/station/ArrivalCard';
 import { ExitInfoGrid } from '@/components/station/ExitInfoGrid';
 import { StationTimetableSection } from '@/components/station/StationTimetableSection';
-import { CongestionLevel } from '@/models/congestion';
+import { CongestionLevel, type TrainCongestionSummary } from '@/models/congestion';
+import {
+  getBoardingSelection,
+  boardingSelectionMatches,
+} from '@/services/train/boardingSelectionStore';
 import type { Station, Train } from '@/models/train';
 import type { LineId } from '@/components/design';
 import { mapCacheService, type CachedStation } from '@/services/map/mapCacheService';
@@ -207,15 +213,46 @@ const StationDetailScreen: React.FC = () => {
     return { up, down };
   }, [lineFilteredTrains]);
 
-  const focusedTrain: Train | undefined =
-    direction === 'up' ? trainsByDirection.up[0] : trainsByDirection.down[0];
+  // 탑승 시작한 선택이 이 역/노선과 매칭되면 해당 방향으로 1회 전환 — 사용자가
+  // 고른 열차의 도착 정보가 메인으로 보이도록. 선택 identity(방향+종착지)가
+  // 바뀔 때만 적용해 이후 수동 방향 토글과 충돌하지 않는다 (isFocused 게이트로
+  // 화면 재포커스 시점에만 검사).
+  const appliedBoardingKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!isFocused) return;
+    const sel = getBoardingSelection();
+    if (!boardingSelectionMatches(sel, { stationId, stationName, lineId })) return;
+    const key = `${sel.direction}:${sel.finalDestination}`;
+    if (appliedBoardingKeyRef.current === key) return;
+    appliedBoardingKeyRef.current = key;
+    setDirection(sel.direction);
+  }, [isFocused, stationId, stationName, lineId]);
 
-  const { trainCongestion } = useCongestion({
-    lineId,
-    trainId: focusedTrain?.id,
-    direction,
-    autoSubscribe: !!focusedTrain,
-  });
+  // 선택된 boarding 열차를 최상단으로 끌어올린 방향별 리스트. 매칭/선택이 없으면
+  // 원래 순서 그대로 — 기존 동작 보존. focusedTrain·arrivalViews의 공통 SoT라
+  // 혼잡도 구독·하이라이트·도착시간이 모두 같은 열차를 가리킨다.
+  const orderedTrains = useMemo<Train[]>(() => {
+    const list = direction === 'up' ? trainsByDirection.up : trainsByDirection.down;
+    const sel = getBoardingSelection();
+    if (!boardingSelectionMatches(sel, { stationId, stationName, lineId })) return list;
+    if (sel.direction !== direction) return list;
+    const idx = list.findIndex((t) => t.finalDestination === sel.finalDestination);
+    const matched = idx > 0 ? list[idx] : undefined;
+    if (!matched) return list;
+    return [matched, ...list.slice(0, idx), ...list.slice(idx + 1)];
+  }, [direction, trainsByDirection, stationId, stationName, lineId]);
+
+  // TODO(혼잡도): 실시간 혼잡도 비활성 — 복원 시 focusedTrain 및 아래 useCongestion
+  //   주석 해제하고 `const trainCongestion = null` 라인 삭제. (서울시 AI 소스 대기)
+  // const focusedTrain: Train | undefined = orderedTrains[0];
+  // const { trainCongestion } = useCongestion({
+  //   lineId,
+  //   trainId: focusedTrain?.id,
+  //   direction,
+  //   autoSubscribe: !!focusedTrain,
+  // });
+  // null 단언 캐스트: 죽은 분기의 narrowing 유지 (const-narrowing이 never로 좁히는 것 방지)
+  const trainCongestion = null as TrainCongestionSummary | null;
 
   const carCongestionPct = useMemo(() => {
     if (!trainCongestion?.cars?.length) return undefined;
@@ -223,10 +260,11 @@ const StationDetailScreen: React.FC = () => {
   }, [trainCongestion]);
 
   // nowMs(1Hz tick)를 deps에 포함 → 매초 재계산되어 초 카운트다운이 흐른다.
-  const arrivalViews = useMemo<ArrivalView[]>(() => {
-    const list = direction === 'up' ? trainsByDirection.up : trainsByDirection.down;
-    return list.map((t) => trainToArrival(t, nowMs));
-  }, [direction, trainsByDirection, nowMs]);
+  // orderedTrains를 소스로 사용 → boarding 선택 열차가 최상단(isFirst)에 온다.
+  const arrivalViews = useMemo<ArrivalView[]>(
+    () => orderedTrains.map((t) => trainToArrival(t, nowMs)),
+    [orderedTrains, nowMs]
+  );
 
   // Header subtitle mirrors the design handoff (`Gangnam · 222 · ...`).
   // Cross-line station codes (e.g. "신분당 D07") aren't in CachedTransfer,
@@ -272,6 +310,14 @@ const StationDetailScreen: React.FC = () => {
   const handleBack = useCallback(() => {
     if (navigation.canGoBack()) navigation.goBack();
   }, [navigation]);
+
+  const handleOpenTrainSelect = useCallback(() => {
+    navigation.navigate('TrainSelection', {
+      stationId: stationId ?? '',
+      stationName,
+      lineId,
+    });
+  }, [navigation, stationId, stationName, lineId]);
 
   const handleShare = useCallback(async () => {
     try {
@@ -371,23 +417,39 @@ const StationDetailScreen: React.FC = () => {
             </Text>
           </View>
         ) : (
-          arrivalViews.map((arrival, idx) => (
-            <ArrivalCard
-              key={arrival.id}
-              line={arrival.line}
-              destination={arrival.destination}
-              minutes={arrival.minutes}
-              seconds={arrival.seconds}
-              delayMinutes={arrival.delayMinutes}
-              isFirst={idx === 0}
-              carCongestion={idx === 0 ? carCongestionPct : undefined}
-              // Phase 55: surface a friendly placeholder on the focused
-              // (first) arrival when congestion data hasn't loaded yet —
-              // avoids the prior "blank space" UX when subscribe fails.
-              showEmptyCongestion={idx === 0}
-              testID={`station-detail-arrival-${idx}`}
-            />
-          ))
+          <>
+            {/* 탑승 열차 선택 화면 진입 — 도착 카드가 있을 때만 노출. */}
+            <TouchableOpacity
+              testID="station-detail-train-select"
+              onPress={handleOpenTrainSelect}
+              style={[styles.trainSelectButton, { backgroundColor: semantic.primaryNormal }]}
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel="탑승 열차 선택"
+              accessibilityHint="탑승할 열차를 선택하면 칸별 혼잡도와 도착 시간을 안내합니다"
+            >
+              <Text style={styles.trainSelectText}>탑승 열차 선택</Text>
+            </TouchableOpacity>
+            {arrivalViews.map((arrival, idx) => (
+              <ArrivalCard
+                key={arrival.id}
+                line={arrival.line}
+                destination={arrival.destination}
+                minutes={arrival.minutes}
+                seconds={arrival.seconds}
+                delayMinutes={arrival.delayMinutes}
+                isFirst={idx === 0}
+                carCongestion={idx === 0 ? carCongestionPct : undefined}
+                // Phase 55: surface a friendly placeholder on the focused
+                // (first) arrival when congestion data hasn't loaded yet —
+                // avoids the prior "blank space" UX when subscribe fails.
+                // TODO(혼잡도): 실시간 혼잡도 비활성 동안 빈 placeholder도 숨김.
+                //   복원 시 `idx === 0` 으로 되돌릴 것.
+                showEmptyCongestion={false}
+                testID={`station-detail-arrival-${idx}`}
+              />
+            ))}
+          </>
         )}
       </View>
 
@@ -426,6 +488,20 @@ const styles = StyleSheet.create({
   arrivalsWrap: {
     paddingHorizontal: WANTED_TOKENS.spacing.s5,
     gap: WANTED_TOKENS.spacing.s2,
+  },
+  trainSelectButton: {
+    paddingVertical: WANTED_TOKENS.spacing.s3,
+    borderRadius: WANTED_TOKENS.radius.r6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: WANTED_TOKENS.spacing.s1,
+  },
+  trainSelectText: {
+    color: '#FFFFFF',
+    fontSize: WANTED_TOKENS.type.label1.size,
+    lineHeight: WANTED_TOKENS.type.label1.lh,
+    fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
   },
   statePanel: {
     alignItems: 'center',
