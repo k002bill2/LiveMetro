@@ -606,7 +606,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       fontFamily: weightToFontFamily('800'),
       color: semantic.labelStrong,
       letterSpacing:
-        WANTED_TOKENS.type.title2.size * WANTED_TOKENS.type.title2.tracking,
+        WANTED_TOKENS.type.heading1.size * WANTED_TOKENS.type.heading1.tracking,
     },
     content: {
       flex: 1,
