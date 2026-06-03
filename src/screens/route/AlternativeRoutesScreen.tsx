@@ -14,7 +14,7 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
-import { useNavigation, useRoute, RouteProp } from '@react-navigation/native';
+import { useNavigation, useRoute, useIsFocused, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import {
   ArrowLeft,
@@ -55,6 +55,7 @@ export const AlternativeRoutesScreen: React.FC = () => {
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
   const navigation = useNavigation<AlternativeRoutesScreenNavigationProp>();
   const route = useRoute<AlternativeRoutesScreenRouteProp>();
+  const isFocused = useIsFocused();
 
   const { fromStationId, toStationId, fromStationName, toStationName } =
     route.params || {};
@@ -66,7 +67,9 @@ export const AlternativeRoutesScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
 
   // Hooks
-  const { delays } = useDelayDetection();
+  // 비포커스 시 9개 대표역 폴링 중단 — rate-limit 예산 보호 + per-station 키
+  // 교차 오염 방지(StationDetail 굶주림 회귀와 동일 원인).
+  const { delays } = useDelayDetection({ enabled: isFocused });
   const {
     originalRoute,
     alternatives,

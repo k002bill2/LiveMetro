@@ -8,6 +8,7 @@ jest.mock('@/services/theme', () => ({
 
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({ navigate: jest.fn(), goBack: jest.fn() }),
+  useIsFocused: () => true,
 }));
 
 jest.mock('@/hooks/useNearbyStations', () => ({

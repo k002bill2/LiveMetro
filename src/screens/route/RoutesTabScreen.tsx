@@ -21,6 +21,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search } from 'lucide-react-native';
+import { useIsFocused } from '@react-navigation/native';
 
 import { useTheme } from '@/services/theme';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
@@ -44,6 +45,10 @@ export const RoutesTabScreen: React.FC = () => {
   const { isDark } = useTheme();
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
   const styles = useMemo(() => createStyles(semantic), [semantic]);
+
+  // 비포커스 탭에서 useRouteSearch 내부 useDelayDetection의 9개 대표역 폴링을
+  // 멈춘다 — bottom-tab은 blur 시 unmount되지 않아 게이트가 없으면 영구 폴링한다.
+  const isFocused = useIsFocused();
 
   const { closestStation } = useNearbyStations({
     radius: 1000,
@@ -86,6 +91,7 @@ export const RoutesTabScreen: React.FC = () => {
     toId: toStation?.id,
     departureTime,
     departureMode,
+    enabled: isFocused,
   });
 
   // Client-side re-order by the selected sort tab — no re-search. The hook

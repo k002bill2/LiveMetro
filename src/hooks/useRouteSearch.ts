@@ -17,6 +17,13 @@ interface UseRouteSearchInput {
   toId?: string;
   departureTime: Date | null;
   departureMode: DepartureMode;
+  /**
+   * 화면 포커스 여부. 기본값 `true`(하위 호환).
+   * 비포커스(다른 탭)일 때 내부 useDelayDetection의 9개 대표역 폴링을 멈춰
+   * Seoul API rate-limit 예산 낭비와 per-station 키 교차 오염을 막는다.
+   * RoutesTabScreen은 `useIsFocused()`를 전달한다.
+   */
+  enabled?: boolean;
 }
 
 interface UseRouteSearchResult {
@@ -62,7 +69,7 @@ function enrichRoute(route: Route, index: number, delayedLineIds: Set<string>): 
 }
 
 export function useRouteSearch(input: UseRouteSearchInput): UseRouteSearchResult {
-  const { delays } = useDelayDetection();
+  const { delays } = useDelayDetection({ enabled: input.enabled ?? true });
   const delayedLineIds = useMemo(
     () => new Set(delays.map((d: { lineId: string }) => d.lineId)),
     [delays]

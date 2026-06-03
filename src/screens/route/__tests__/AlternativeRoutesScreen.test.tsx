@@ -29,6 +29,7 @@ jest.mock('@react-navigation/native', () => ({
       toStationName: '잠실',
     },
   })),
+  useIsFocused: () => true,
   RouteProp: {},
 }));
 jest.mock('@/services/theme', () => ({
