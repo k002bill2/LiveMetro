@@ -18,6 +18,7 @@ import {
   getKoreanDayOfWeek,
   formatCountdown,
   toSecondsOfDay,
+  truncateMinutes,
 } from '../dateUtils';
 
 describe('dateUtils', () => {
@@ -377,6 +378,36 @@ describe('dateUtils', () => {
       expect(toSecondsOfDay('-1:00:00')).toBe(-1);
       expect(toSecondsOfDay(undefined as unknown as string)).toBe(-1);
       expect(toSecondsOfDay(null as unknown as string)).toBe(-1);
+    });
+  });
+
+  describe('truncateMinutes', () => {
+    it('drops the fractional part of float-noisy minutes (the bug)', () => {
+      // 회귀 가드: ML 예측 평균/합산이 만든 부동소수점 꼬리가 UI에 그대로
+      // 노출되던 버그 ("75.7999999999997분"). 절삭하면 75분.
+      expect(truncateMinutes(75.7999999999997)).toBe(75);
+    });
+
+    it('truncates toward zero, not rounds (45.9 → 45, not 46)', () => {
+      expect(truncateMinutes(45.9)).toBe(45);
+      expect(truncateMinutes(45.1)).toBe(45);
+    });
+
+    it('passes integers through unchanged', () => {
+      expect(truncateMinutes(30)).toBe(30);
+      expect(truncateMinutes(0)).toBe(0);
+    });
+
+    it('truncates negative deltas toward zero (-3.7 → -3, not -4)', () => {
+      // delta("평소보다 -3분")처럼 음수 시간 표현도 절댓값을 키우지 않고 절삭.
+      expect(truncateMinutes(-3.7)).toBe(-3);
+      expect(truncateMinutes(-0.4)).toBe(0);
+    });
+
+    it('returns 0 for non-finite input (NaN / Infinity)', () => {
+      expect(truncateMinutes(Number.NaN)).toBe(0);
+      expect(truncateMinutes(Number.POSITIVE_INFINITY)).toBe(0);
+      expect(truncateMinutes(Number.NEGATIVE_INFINITY)).toBe(0);
     });
   });
 });

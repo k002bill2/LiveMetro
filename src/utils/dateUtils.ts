@@ -53,6 +53,23 @@ export const formatDate = (date: Date, format: 'short' | 'long' | 'time' | 'date
 };
 
 /**
+ * Truncate a minute value for display — drops the fractional part so floating
+ * point accumulation never leaks into the UI.
+ *
+ * ML 출퇴근 예측의 평균/합산 연산은 "75.7999999999997" 같은 부동소수점 꼬리를
+ * 만든다. 화면에 표시되는 모든 분(分) 값은 이 헬퍼로 절삭(버림)해 정수로 보여야
+ * 한다. `Math.trunc`(0 방향 절삭)을 쓰므로 음수 delta("평소보다 -3분")도
+ * 절댓값을 키우지 않고 안전하게 처리된다 (Math.floor(-3.7) === -4 회피).
+ *
+ * @param minutes raw minute value (may carry float noise or be non-finite)
+ * @returns integer minutes; 0 for NaN/Infinity
+ */
+export const truncateMinutes = (minutes: number): number =>
+  // `+ 0` normalizes negative zero (Math.trunc(-0.4) === -0) to a clean 0 so
+  // callers never surface "-0분".
+  Number.isFinite(minutes) ? Math.trunc(minutes) + 0 : 0;
+
+/**
  * Format arrival time for trains
  */
 export const formatArrivalTime = (arrivalTime: Date | number | null): string => {

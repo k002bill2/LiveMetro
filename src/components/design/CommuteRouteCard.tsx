@@ -38,6 +38,7 @@ import {
 import { useTheme } from '@/services/theme';
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { getSubwayLineColor } from '@/utils/colorUtils';
+import { truncateMinutes } from '@/utils/dateUtils';
 import { LineBadge, type LineId } from './LineBadge';
 
 interface CommuteRouteCardProps {
@@ -213,7 +214,7 @@ const CommuteRouteCardImpl: React.FC<CommuteRouteCardProps> = ({
           </View>
           {walkMinutes !== undefined && (
             <Text style={[styles.legSubLabel, { color: semantic.labelAlt }]}>
-              도보 {walkMinutes}분
+              도보 {truncateMinutes(walkMinutes)}분
             </Text>
           )}
         </View>
@@ -247,7 +248,7 @@ const CommuteRouteCardImpl: React.FC<CommuteRouteCardProps> = ({
           )}
           {rideMinutes !== undefined && (
             <Text style={[styles.nodeMeta, { color: semantic.labelAlt }]}>
-              직행 {rideMinutes}분
+              직행 {truncateMinutes(rideMinutes)}분
             </Text>
           )}
         </View>

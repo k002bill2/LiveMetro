@@ -9,8 +9,9 @@ export { publicDataApi } from './publicDataApi';
 
 // Re-export types from publicData model for convenience
 export type {
-  CongestionInfo,
-  CurrentCongestion,
+  // TODO(혼잡도): 실시간 혼잡도 소스 비활성 — 서울시 AI 실시간 혼잡도 공개 시 복원
+  // CongestionInfo,
+  // CurrentCongestion,
   AccessibilityInfo,
   SubwayAlert,
   ExitLandmark,

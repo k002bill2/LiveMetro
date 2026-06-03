@@ -32,6 +32,16 @@ describe('MLHeroCard', () => {
     expect(getByText('홍대입구 → 강남')).toBeTruthy();
   });
 
+  it('truncates float-noisy predictedMinutes for display (75.7999… → 75)', () => {
+    // 회귀 가드: ML 예측 평균/합산의 부동소수점 꼬리가 UI에 그대로 노출되던
+    // 버그(2026-06-01 홈 스크린샷). 표시는 절삭(버림)된 정수여야 한다.
+    const { getByText, queryByText } = wrap(
+      <MLHeroCard predictedMinutes={75.7999999999997} />,
+    );
+    expect(getByText('75')).toBeTruthy();
+    expect(queryByText('75.7999999999997')).toBeNull();
+  });
+
   it('shows -3분 trend pill when delta is negative', () => {
     const { getByText } = wrap(<MLHeroCard predictedMinutes={28} deltaMinutes={-3} />);
     expect(getByText('평소보다 -3분')).toBeTruthy();

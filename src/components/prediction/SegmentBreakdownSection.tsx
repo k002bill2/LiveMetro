@@ -22,6 +22,7 @@ import {
 } from '@/styles/modernTheme';
 import { LineBadge } from '@/components/design/LineBadge';
 import { CongestionDots } from '@/components/design/CongestionDots';
+import { truncateMinutes } from '@/utils/dateUtils';
 import { CongestionLevel } from '@/models/congestion';
 import type { CongestionLevel as DesignCongestionLevel } from '@/components/design/congestion';
 
@@ -113,7 +114,7 @@ const SegmentRow: React.FC<RowProps> = memo(
           <Text style={styles.sublabel}>{sublabel}</Text>
         </View>
         <Text style={styles.duration}>
-          <Text style={styles.durationNumber}>{durationMin}</Text>
+          <Text style={styles.durationNumber}>{truncateMinutes(durationMin)}</Text>
           <Text style={styles.durationUnit}>분</Text>
         </Text>
       </View>
