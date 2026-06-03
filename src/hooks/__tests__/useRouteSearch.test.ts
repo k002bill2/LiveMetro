@@ -99,6 +99,32 @@ describe('useRouteSearch', () => {
     expect(result.current.routes[0]!.etaConfidenceMinutes).toBe(5);
   });
 
+  it('preserves the service-attached fare on enriched routes', async () => {
+    mockGetDiverseRoutes.mockReturnValue([
+      {
+        segments: [
+          {
+            fromStationId: 'a',
+            toStationId: 'b',
+            lineId: '2',
+            isTransfer: false,
+            fromStationName: '강남',
+            toStationName: '잠실',
+          },
+        ],
+        totalMinutes: 25,
+        transferCount: 0,
+        lineIds: ['2'],
+        fare: 1500,
+      },
+    ]);
+    const { result } = renderHook(() =>
+      useRouteSearch({ fromId: 'a', toId: 'b', departureTime: null, departureMode: 'now' })
+    );
+    await waitFor(() => expect(result.current.routes.length).toBeGreaterThan(0));
+    expect(result.current.routes[0]!.fare).toBe(1500);
+  });
+
   it('marks delayRiskLineIds when route uses delayed line', async () => {
     mockUseDelayDetection.mockReturnValue({
       delays: [{ lineId: '2', lineName: '2호선', delayMinutes: 5, timestamp: new Date() }],

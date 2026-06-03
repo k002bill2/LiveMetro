@@ -22,6 +22,7 @@ import { ArrowRight, Footprints } from 'lucide-react-native';
 import { useTheme } from '@/services/theme';
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { getSubwayLineColor } from '@/utils/colorUtils';
+import { truncateMinutes } from '@/utils/dateUtils';
 import { getLineShortLabel, type LineId } from './LineBadge';
 
 /** Discriminated union for the strip's leg shapes. */
@@ -108,7 +109,7 @@ const JourneyStripImpl: React.FC<JourneyStripProps> = ({
               <Text
                 style={[styles.walkText, { color: semantic.labelNeutral }]}
               >
-                {leg.minutes}
+                {truncateMinutes(leg.minutes)}
               </Text>
             </View>
           );
@@ -124,7 +125,7 @@ const JourneyStripImpl: React.FC<JourneyStripProps> = ({
             ]}
           >
             <Text style={styles.trainLabel}>{labelFor(leg)}</Text>
-            <Text style={styles.trainMinutes}>{leg.minutes}분</Text>
+            <Text style={styles.trainMinutes}>{truncateMinutes(leg.minutes)}분</Text>
           </View>
         );
       })}

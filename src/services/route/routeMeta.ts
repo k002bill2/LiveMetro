@@ -6,6 +6,7 @@
  */
 import { LINE_STATIONS, STATIONS } from '@/utils/subwayMapData';
 import type { Route } from '@/models/route';
+import { fareService } from './fareService';
 
 /**
  * Origin walk + destination walk + ~1 min per transfer. Real walking time
@@ -16,16 +17,19 @@ export const estimateWalkingMinutes = (route: Route): number => {
 };
 
 /**
- * Stub matching Seoul Metro 2024 fare structure (1,400 base + tier per
- * traveled distance). We approximate distance with hop count because many
- * graph nodes still lack coordinates.
+ * Regular-type fare (KRW) for a route via the distance-based {@link fareService}.
+ *
+ * Station count = non-transfer hops + 1 (a transfer reuses the same station,
+ * so transfer segments must NOT inflate the count). `fareService` estimates
+ * distance as `(stationCount - 1) * 1.2km` and applies the Seoul Metro 2024
+ * tiered surcharge. This replaces the former hop-bucket stub — distance-based
+ * tiers are more accurate near the 10km base-fare boundary and unify the app
+ * on a single fare source. Drives the 'min-fare' sort tab.
  */
-export const estimateFare = (route: Route): number => {
+export const deriveFare = (route: Route): number => {
   const hopCount = route.segments.filter(s => !s.isTransfer).length;
-  if (hopCount <= 10) return 1400;
-  if (hopCount <= 20) return 1500;
-  if (hopCount <= 30) return 1700;
-  return 1900;
+  const stationCount = hopCount + 1;
+  return fareService.calculateFare(stationCount, 'regular').totalFare;
 };
 
 /**

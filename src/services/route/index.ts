@@ -19,5 +19,6 @@ export {
 export {
   findKShortestPaths,
   getDiverseRoutes,
+  sortRoutesByTab,
   type KShortestPathResult,
 } from './kShortestPath';

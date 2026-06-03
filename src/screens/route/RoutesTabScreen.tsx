@@ -19,16 +19,20 @@ import {
   ActivityIndicator,
   RefreshControl,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search } from 'lucide-react-native';
 
 import { useTheme } from '@/services/theme';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { useNearbyStations } from '@/hooks/useNearbyStations';
 import { useRouteSearch, type DepartureMode } from '@/hooks/useRouteSearch';
+import { routeService } from '@/services/route';
+import type { RouteSortTab } from '@/models/route';
 import { STATIONS as GRAPH_STATIONS, isRoutableStation } from '@/utils/subwayMapData';
 import { StationSearchBar } from '@/components/route/StationSearchBar';
 import { TimeChipRow } from '@/components/route/TimeChipRow';
 import { StationPickerModal } from '@/components/route/StationPickerModal';
+import { RouteSortTabs } from '@/components/route/RouteSortTabs';
 import { RouteCard } from '@/components/route/RouteCard';
 
 interface StationLite {
@@ -55,6 +59,7 @@ export const RoutesTabScreen: React.FC = () => {
   const [pickerSlot, setPickerSlot] = useState<'from' | 'to' | null>(null);
   const [expandedRouteId, setExpandedRouteId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState<boolean>(false);
+  const [sortTab, setSortTab] = useState<RouteSortTab>('optimal');
 
   // Seed closest station to fromStation when it first becomes available.
   // Only seeds while fromStation is null — user explicit clears stick.
@@ -82,6 +87,13 @@ export const RoutesTabScreen: React.FC = () => {
     departureTime,
     departureMode,
   });
+
+  // Client-side re-order by the selected sort tab — no re-search. The hook
+  // returns the diverse candidate pool; switching tabs only re-sorts it.
+  const sortedRoutes = useMemo(
+    () => routeService.sortRoutesByTab(routes, sortTab),
+    [routes, sortTab]
+  );
 
   const handleSwap = useCallback((): void => {
     setFromStation(toStation);
@@ -160,12 +172,14 @@ export const RoutesTabScreen: React.FC = () => {
 
     return (
       <View>
-        {routes.map((route, idx) => (
+        <RouteSortTabs value={sortTab} onChange={setSortTab} testID="route-sort-tabs" />
+        {sortedRoutes.map((route, idx) => (
           <RouteCard
             key={route.id}
             route={route}
             expanded={expandedRouteId === route.id}
             recommended={idx === 0}
+            activeSortTab={sortTab}
             onToggleExpand={(): void => handleToggleExpand(route.id)}
           />
         ))}
@@ -176,7 +190,7 @@ export const RoutesTabScreen: React.FC = () => {
   const hasRoutes = routes.length > 0 && !loading && !error;
 
   return (
-    <View style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       <ScrollView
         contentContainerStyle={[styles.content, hasRoutes && styles.contentWithCta]}
         refreshControl={
@@ -227,7 +241,7 @@ export const RoutesTabScreen: React.FC = () => {
         onSelect={handleSelect}
         recentStations={[]}
       />
-    </View>
+    </SafeAreaView>
   );
 };
 

@@ -148,6 +148,52 @@ describe('RoutesTabScreen', () => {
     expect(getByTestId('route-r2')).toBeTruthy();
   });
 
+  it('reorders cards when a different sort tab is selected', async () => {
+    // r1: 1 transfer, 25min  r2: 0 transfer, 30min
+    // optimal score → r1: 25+4=29, r2: 30 → r1 first.
+    // min-transfer → r2 (0 transfers) must jump to the top.
+    mockUseRouteSearch.mockReturnValue({
+      routes: [
+        {
+          id: 'r1',
+          etaMinutes: 25,
+          etaConfidenceMinutes: 3,
+          delayRiskLineIds: [],
+          transferCount: 1,
+          segments: [],
+          lineIds: ['2', '3'],
+          totalMinutes: 25,
+        },
+        {
+          id: 'r2',
+          etaMinutes: 30,
+          etaConfidenceMinutes: 2,
+          delayRiskLineIds: [],
+          transferCount: 0,
+          segments: [],
+          lineIds: ['2'],
+          totalMinutes: 30,
+        },
+      ],
+      loading: false,
+      error: null,
+      refetch: jest.fn(),
+    });
+    const { getByTestId, getAllByTestId } = render(<RoutesTabScreen />);
+    fireEvent.press(getByTestId('to-row'));
+    fireEvent.press(getByTestId('picker'));
+    await waitFor(() => expect(getByTestId('route-r1')).toBeTruthy());
+
+    // Default 'optimal' tab keeps the lower-score route (r1) first.
+    expect(getAllByTestId(/^route-r\d$/)[0]?.props.testID).toBe('route-r1');
+
+    // Switching to '최소환승' must put the 0-transfer route (r2) on top.
+    fireEvent.press(getByTestId('route-sort-tabs-min-transfer'));
+    await waitFor(() =>
+      expect(getAllByTestId(/^route-r\d$/)[0]?.props.testID).toBe('route-r2')
+    );
+  });
+
   it('shows error when useRouteSearch returns error', async () => {
     mockUseRouteSearch.mockReturnValue({
       routes: [],

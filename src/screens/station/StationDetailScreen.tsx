@@ -25,6 +25,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { RouteProp, useRoute, useNavigation, useIsFocused } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AlertCircle, Moon } from 'lucide-react-native';
@@ -336,10 +337,14 @@ const StationDetailScreen: React.FC = () => {
   }, [toggleFavorite, stationLike]);
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: semantic.bgSubtlePage }]}
-      contentInsetAdjustmentBehavior="automatic"
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: semantic.bgSubtlePage }]}
+      edges={['top']}
     >
+      <ScrollView
+        style={[styles.container, { backgroundColor: semantic.bgSubtlePage }]}
+        contentInsetAdjustmentBehavior="automatic"
+      >
       <StationDetailHeader
         stationName={stationName}
         subtitle={headerSubtitle}
@@ -467,11 +472,15 @@ const StationDetailScreen: React.FC = () => {
       <View style={styles.exitWrap}>
         <ExitInfoGrid exits={exitInfo} max={6} testID="station-detail-exits" />
       </View>
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+  },
   container: {
     flex: 1,
   },

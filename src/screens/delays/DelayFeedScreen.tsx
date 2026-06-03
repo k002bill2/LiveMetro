@@ -8,12 +8,12 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   FlatList,
   TouchableOpacity,
   RefreshControl,
   Modal,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { MessageSquare, Megaphone } from 'lucide-react-native';
 
 import { useNavigation } from '@react-navigation/native';
@@ -136,7 +136,7 @@ export const DelayFeedScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header — Phase 4 redesign: 28px title + round add button */}
       <View style={styles.header}>
         <View style={styles.headerTitleWrap}>

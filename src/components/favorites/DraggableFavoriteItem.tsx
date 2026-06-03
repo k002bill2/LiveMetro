@@ -10,14 +10,14 @@ import {
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
-import { AlertCircle, Trash2, Bell, BellOff, Briefcase } from 'lucide-react-native';
+import { AlertCircle, Trash2, Bell, BellOff } from 'lucide-react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { SPACING, RADIUS, TYPOGRAPHY, WANTED_TOKENS, WantedSemanticTheme, weightToFontFamily } from '../../styles/modernTheme';
 import { useTheme, ThemeColors } from '../../services/theme';
 import { FavoriteWithDetails } from '../../hooks/useFavorites';
 import { useRealtimeTrains } from '../../hooks/useRealtimeTrains';
 import { FavoriteEditForm } from './FavoriteEditForm';
-import { FavoriteRow, Pill, type LineId } from '../design';
+import { FavoriteRow, type LineId } from '../design';
 
 interface DraggableFavoriteItemProps {
   favorite: FavoriteWithDetails;
@@ -227,6 +227,7 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
             lines={linesForRow}
             stationName={station.name}
             nickname={favorite.alias ?? undefined}
+            isCommute={favorite.isCommuteStation}
             destinationLabel={directionToLabel(favorite.direction)}
             nextMinutes={nextMinutes}
             showDragHandle
@@ -251,25 +252,18 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
       </Swipeable>
 
       {/* Edit Form — entered via the upcoming global "편집" mode (Phase B+).
-          Hidden by default; isEditing is currently never true post-overlay
-          removal but we keep the integration point so the per-favorite
-          edit UI doesn't have to be re-plumbed when the global mode lands. */}
-      <FavoriteEditForm
-        favorite={favorite}
-        isExpanded={isEditing}
-        onSave={onSaveEdit}
-        onCancel={onEditToggle}
-      />
-
-      {!isEditing && favorite.isCommuteStation && (
-        <View style={styles.metadataRow}>
-          <Pill tone="neutral" size="sm" testID="favorite-commute-pill">
-            <View style={styles.pillContent}>
-              <Briefcase size={11} color={semantic.labelNeutral} />
-              <Text style={styles.commuteTextPill}>출퇴근</Text>
-            </View>
-          </Pill>
-        </View>
+          Mounted only while editing so a collapsed (maxHeight:0) form does not
+          leave an invisible 8px-margin spacer between every card. isEditing is
+          currently never true post-overlay removal, but the integration point
+          stays so the per-favorite edit UI re-plumbs cleanly when the global
+          mode lands. */}
+      {isEditing && (
+        <FavoriteEditForm
+          favorite={favorite}
+          isExpanded={isEditing}
+          onSave={onSaveEdit}
+          onCancel={onEditToggle}
+        />
       )}
     </View>
   );
@@ -278,7 +272,7 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
 const createStyles = (colors: ThemeColors, semantic: WantedSemanticTheme) => {
   return StyleSheet.create({
   container: {
-    marginBottom: SPACING.xl,
+    marginBottom: SPACING.sm,
   },
   containerDragActive: {
     // Lift the card while it's being reordered. Both shadow and elevation
@@ -308,7 +302,7 @@ const createStyles = (colors: ThemeColors, semantic: WantedSemanticTheme) => {
   aliasContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: SPACING.sm,
+    marginBottom: SPACING.xs,
     paddingHorizontal: SPACING.xs,
   },
   aliasText: {
@@ -353,22 +347,11 @@ const createStyles = (colors: ThemeColors, semantic: WantedSemanticTheme) => {
     color: '#FFFFFF',
     fontFamily: weightToFontFamily('700'),
   },
-  pillContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-  },
   pillText: {
     fontSize: 11,
     fontWeight: '700',
     fontFamily: weightToFontFamily('700'),
     color: semantic.primaryPress,
-  },
-  commuteTextPill: {
-    fontSize: 11,
-    fontWeight: '700',
-    fontFamily: weightToFontFamily('700'),
-    color: semantic.labelNeutral,
   },
   dragHandle: {
     position: 'absolute',
@@ -378,13 +361,6 @@ const createStyles = (colors: ThemeColors, semantic: WantedSemanticTheme) => {
     backgroundColor: colors.borderLight,
     borderRadius: RADIUS.sm,
     padding: SPACING.xs,
-  },
-  metadataRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: SPACING.sm,
-    paddingHorizontal: SPACING.xs,
-    gap: SPACING.sm,
   },
   metadataItem: {
     flexDirection: 'row',

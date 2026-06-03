@@ -162,16 +162,10 @@ const MainTabNavigator: React.FC = () => {
           fontFamily: weightToFontFamily('600'),
           letterSpacing: 0,
         },
-        headerStyle: {
-          backgroundColor: semantic.primaryNormal,
-        },
-        // Use semantic.labelOnColor — colors.textInverse is #121212 in dark
-        // mode, which would render dark text on a blue header (poor contrast).
-        headerTintColor: semantic.labelOnColor,
-        headerTitleStyle: {
-          fontWeight: '700',
-          fontFamily: weightToFontFamily('700'),
-        },
+        // Tab screens render their own in-screen titles (e.g. FavoritesScreen's
+        // "즐겨찾기" header row), so the duplicate native top header is hidden.
+        // Profile already sets headerShown:false to defer to SettingsNavigator.
+        headerShown: false,
       })}
     >
       <Tab.Screen
@@ -307,8 +301,9 @@ const RootNavigatorContent: React.FC = () => {
         name="StationDetail"
         component={StationDetailScreen}
         options={{
-          headerShown: true,
-          title: '역 상세정보',
+          // StationDetailHeader renders its own "역 상세정보" title + back/share/
+          // favorite row, so the duplicate native header is hidden.
+          headerShown: false,
         }}
       />
       <Stack.Screen

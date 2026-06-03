@@ -75,6 +75,7 @@ jest.mock('@models/route', () => ({
   getLineName: jest.fn((lineId) => `${lineId}호선`),
   AVG_STATION_TRAVEL_TIME: 2,
   AVG_TRANSFER_TIME: 4,
+  TRANSFER_PENALTY_MINUTES: 4,
   FASTEST_LINE_HOP_MINUTES: 2,
   getLineHopMinutes: jest.fn(() => 2),
   getEdgeMinutes: jest.fn(() => 2),
