@@ -727,6 +727,24 @@ export function buildTransferSignature(route: Route): string {
 }
 
 /**
+ * True when a route leaves a line and later returns to it after a detour on
+ * another line — a "U-turn" (e.g. 4→1→4 at 서울역 when 4호선 runs straight
+ * through). Yen's K-shortest produces these for diversity, but they are never
+ * a sensible suggestion when a single-line path exists, so they must be culled
+ * from the card candidate pool.
+ *
+ * Detection uses the train (non-transfer) lineId SEQUENCE, NOT `route.lineIds`
+ * — the latter is `Set`-deduped (`getRouteLineIds`) and loses the [4,1,4]
+ * ordering entirely. Consecutive duplicates are collapsed first so a same-trunk
+ * branch-shuttle revisit (본선↔지선, both trunk '2') is preserved as legitimate.
+ */
+export function hasRedundantLineRevisit(route: Route): boolean {
+  const trainLines = route.segments.filter((s) => !s.isTransfer).map((s) => s.lineId);
+  const compressed = trainLines.filter((l, i) => i === 0 || l !== trainLines[i - 1]);
+  return new Set(compressed).size !== compressed.length;
+}
+
+/**
  * Hard cap on transfers for any suggested route. Empirically routes in
  * 수도권 cover all reasonable origin-destination pairs with ≤2 transfers;
  * 3+ transfers almost always indicate a detour the user would not pick.
@@ -850,10 +868,13 @@ function computeDiverseRoutes(
   // 2. Identify fastest (already first after sort)
   const fastest = representatives[0]!;
 
-  // 3. Apply 1.5x time-gap cap relative to fastest
+  // 3. Apply 1.5x time-gap cap relative to fastest + drop U-turn routes
+  // (same line revisited after a detour, e.g. 4→1→4). fastest is taken from
+  // representatives[0] above, so a single-line direct route is unaffected;
+  // this only prunes the via-station/min-transfer candidate pool.
   const timeThreshold = fastest.totalMinutes * UNREALISTIC_TIME_FACTOR;
   const reachableReps = representatives.filter(
-    (r) => r.totalMinutes <= timeThreshold,
+    (r) => r.totalMinutes <= timeThreshold && !hasRedundantLineRevisit(r),
   );
 
   // 4. Identify min-transfer ONLY if strictly better than fastest

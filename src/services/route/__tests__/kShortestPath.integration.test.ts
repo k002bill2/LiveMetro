@@ -12,7 +12,29 @@
  * 탐색 후보 set에 포함조차 못 들어가던 회귀를 고정한다.
  */
 
-import { getDiverseRoutes } from '../kShortestPath';
+import { getDiverseRoutes, hasRedundantLineRevisit } from '../kShortestPath';
+
+describe('getDiverseRoutes — U-turn(같은 노선 비연속 재방문) 카드 제거', () => {
+  /**
+   * 노원(4호선, id=nowon) → 사당(4호선, id=sadang)
+   *
+   * 4호선이 노원~서울역~사당을 직선으로 잇는데, Yen's K-shortest가 다양성
+   * 목적으로 "4→1→4"(서울역에서 1호선으로 나갔다 다시 4호선) U-turn 경로를
+   * 후보로 생성했고, 시간 cap·환승 수·signature 어느 필터에도 안 걸려
+   * "서울역 경유" via-station 카드로 노출되던 회귀.
+   */
+  it('노원→사당: 4→1→4 같은 U-turn 카드가 노출되지 않는다', () => {
+    const routes = getDiverseRoutes('nowon', 'sadang');
+
+    expect(routes.length).toBeGreaterThan(0);
+    // 4호선 직행(환승 0)이 추천으로 존재
+    expect(routes.some((r) => r.transferCount === 0)).toBe(true);
+    // 모든 카드가 U-turn 아님 (서울역 4→1→4 제거됨)
+    for (const route of routes) {
+      expect(hasRedundantLineRevisit(route)).toBe(false);
+    }
+  });
+});
 
 describe('getDiverseRoutes — 실제 데이터 회귀 (lines.json order + K-shortest 탐색)', () => {
   /**
