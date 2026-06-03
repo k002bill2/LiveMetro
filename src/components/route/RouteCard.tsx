@@ -6,8 +6,9 @@ import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/s
 import { JourneyStrip, type JourneyStripLeg } from '@/components/design/JourneyStrip';
 import { LineBadge } from '@/components/design/LineBadge';
 import { deriveFare, estimateWalkingMinutes, getRouteDirection } from '@/services/route/routeMeta';
+import { truncateMinutes } from '@/utils/dateUtils';
 import type { RouteWithMLMeta } from '@/hooks/useRouteSearch';
-import type { Route, RouteCategory, RouteSegment } from '@/models/route';
+import type { Route, RouteCategory, RouteSegment, RouteSortTab } from '@/models/route';
 
 /**
  * Tags shown in the top-left of each card. Two tags per category mirrors the
@@ -24,11 +25,25 @@ const CATEGORY_TAGS: Record<RouteCategory, readonly string[]> = {
   'elevator-priority': ['엘리베이터 우선', '환승역 엘베'],
 };
 
+/**
+ * Badge shown on the #1 card to reflect the user's selected sort tab. Gives
+ * visual feedback when switching tabs even if the ordering is unchanged
+ * (common on short/single-fare OD pairs). `optimal` is intentionally absent —
+ * the "종합 추천" tab keeps its richer category tags (추천/최단/환승최소).
+ */
+const SORT_TAB_BADGE: Partial<Record<RouteSortTab, string>> = {
+  'fastest': '최소시간',
+  'min-transfer': '최소환승',
+  'min-fare': '최소요금',
+};
+
 interface Props {
   route: RouteWithMLMeta;
   expanded: boolean;
   onToggleExpand: () => void;
   recommended?: boolean;
+  /** Currently selected sort tab — drives the badge on the recommended card. */
+  activeSortTab?: RouteSortTab;
 }
 
 /**
@@ -100,16 +115,18 @@ function singleLegSummary(route: Route): { lineId: string; from: string; to: str
   };
 }
 
-export const RouteCard: React.FC<Props> = ({ route, expanded, onToggleExpand, recommended }) => {
+export const RouteCard: React.FC<Props> = ({ route, expanded, onToggleExpand, recommended, activeSortTab }) => {
   const { isDark } = useTheme();
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
   const styles = createStyles(semantic);
 
   const legs = routeToLegs(route);
-  // via-station은 동적 viaTags 우선, 그 외 카테고리는 정적 매핑.
-  // viaTags가 비어 있는 비정상 케이스는 빈 배열로 안전 fallback.
-  const tags: readonly string[] =
-    route.category === 'via-station' && route.viaTags && route.viaTags.length > 0
+  // 1위 카드는 선택한 정렬 탭 배지를 우선 표시 (optimal 제외) — 순서가 같아도
+  // 탭 전환 피드백을 준다. 그 외에는 via-station 동적 viaTags > 정적 category 매핑.
+  const sortBadge = recommended && activeSortTab ? SORT_TAB_BADGE[activeSortTab] : undefined;
+  const tags: readonly string[] = sortBadge
+    ? [sortBadge]
+    : route.category === 'via-station' && route.viaTags && route.viaTags.length > 0
       ? route.viaTags
       : route.category
         ? CATEGORY_TAGS[route.category]
@@ -148,7 +165,7 @@ export const RouteCard: React.FC<Props> = ({ route, expanded, onToggleExpand, re
 
       <View style={styles.etaRow}>
         <Text style={styles.etaNumber} testID="route-card-eta">
-          {route.etaMinutes}
+          {truncateMinutes(route.etaMinutes)}
         </Text>
         <Text style={styles.etaUnit}>분</Text>
         <View style={styles.etaSubMeta}>

@@ -179,6 +179,7 @@ export const RoutesTabScreen: React.FC = () => {
             route={route}
             expanded={expandedRouteId === route.id}
             recommended={idx === 0}
+            activeSortTab={sortTab}
             onToggleExpand={(): void => handleToggleExpand(route.id)}
           />
         ))}

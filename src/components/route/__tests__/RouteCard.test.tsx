@@ -54,6 +54,14 @@ describe('RouteCard', () => {
     expect(getByText('25')).toBeTruthy();
   });
 
+  it('truncates a float ETA to a whole number (no 76.56 tail)', () => {
+    const floatRoute: RouteWithMLMeta = { ...baseRoute, etaMinutes: 76.56 };
+    const { getByTestId } = render(
+      <RouteCard route={floatRoute} expanded={false} onToggleExpand={() => {}} />
+    );
+    expect(getByTestId('route-card-eta').props.children).toBe(76);
+  });
+
   it('renders the meta sub-line with transfer / walk / fare', () => {
     const { getByText } = render(
       <RouteCard route={baseRoute} expanded={false} onToggleExpand={() => {}} />
@@ -121,6 +129,49 @@ describe('RouteCard', () => {
       <RouteCard route={viaStationRoute} expanded={false} onToggleExpand={() => {}} />
     );
     expect(getByText('강남구청 경유')).toBeTruthy();
+  });
+
+  it('shows the active sort-tab badge on the recommended card (min-fare → 최소요금)', () => {
+    const { getByText, queryByText } = render(
+      <RouteCard
+        route={{ ...baseRoute, category: 'fastest' }}
+        expanded={false}
+        onToggleExpand={() => {}}
+        recommended
+        activeSortTab="min-fare"
+      />
+    );
+    expect(getByText('최소요금')).toBeTruthy();
+    // sort-tab badge replaces the static category tags on the top card
+    expect(queryByText('최단')).toBeNull();
+  });
+
+  it('keeps category tags on the optimal tab (no override)', () => {
+    const { getByText } = render(
+      <RouteCard
+        route={{ ...baseRoute, category: 'fastest' }}
+        expanded={false}
+        onToggleExpand={() => {}}
+        recommended
+        activeSortTab="optimal"
+      />
+    );
+    expect(getByText('추천')).toBeTruthy();
+    expect(getByText('최단')).toBeTruthy();
+  });
+
+  it('does not show a sort-tab badge on non-recommended cards', () => {
+    const { queryByText } = render(
+      <RouteCard
+        route={{ ...baseRoute, category: 'via-station', viaTags: ['강남구청 경유'] }}
+        expanded={false}
+        onToggleExpand={() => {}}
+        recommended={false}
+        activeSortTab="min-fare"
+      />
+    );
+    expect(queryByText('최소요금')).toBeNull();
+    expect(queryByText('강남구청 경유')).toBeTruthy();
   });
 
   it('elevator-priority 경로 → "엘리베이터 우선" 태그 렌더', () => {
