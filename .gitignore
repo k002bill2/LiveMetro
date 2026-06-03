@@ -117,6 +117,7 @@ dev-debug.log
 
 # File lock state (advisory, runtime-only)
 .claude/.locks/
+.claude/*.lock
 
 # Claude Code backups (local)
 # Comment out this line if you want to commit backups to git
