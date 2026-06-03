@@ -13,7 +13,7 @@
  */
 import React, { memo } from 'react';
 import { Pressable, StyleSheet, Text, View, ViewStyle } from 'react-native';
-import { GripVertical } from 'lucide-react-native';
+import { GripVertical, Briefcase } from 'lucide-react-native';
 import { useTheme } from '@/services/theme';
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { LineBadge, type LineId } from './LineBadge';
@@ -27,6 +27,12 @@ interface FavoriteRowProps {
   stationName: string;
   /** Optional user-defined alias ("회사", "집") shown as primary Pill. */
   nickname?: string | null;
+  /**
+   * When true and no `nickname` is set, render an in-card "출퇴근" Pill in
+   * place of the nickname. The nickname takes precedence because a custom
+   * alias ("회사"/"집") already conveys the commute meaning.
+   */
+  isCommute?: boolean;
   /** Direction summary ("잠실 방면"). */
   destinationLabel?: string;
   /** Congestion level shown next to direction with tone-colored dot. */
@@ -57,6 +63,7 @@ const FavoriteRowImpl: React.FC<FavoriteRowProps> = ({
   lines,
   stationName,
   nickname,
+  isCommute = false,
   destinationLabel,
   congestion,
   nextMinutes,
@@ -106,11 +113,20 @@ const FavoriteRowImpl: React.FC<FavoriteRowProps> = ({
       {/* Center: name + direction/congestion line */}
       <View style={styles.center}>
         <View style={styles.nameRow}>
-          {nickname && (
+          {nickname ? (
             <Pill tone="primary" size="sm">
               {nickname}
             </Pill>
-          )}
+          ) : isCommute ? (
+            <Pill tone="neutral" size="sm" testID="favorite-commute-pill">
+              <View style={styles.commutePill}>
+                <Briefcase size={11} color={semantic.labelNeutral} />
+                <Text style={[styles.commutePillText, { color: semantic.labelNeutral }]}>
+                  출퇴근
+                </Text>
+              </View>
+            </Pill>
+          ) : null}
           <Text style={[styles.stationName, { color: semantic.labelStrong }]} numberOfLines={1}>
             {stationName}
           </Text>
@@ -179,6 +195,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+  },
+  commutePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  commutePillText: {
+    fontSize: 11,
+    fontFamily: weightToFontFamily('700'),
   },
   stationName: {
     fontSize: 16,
