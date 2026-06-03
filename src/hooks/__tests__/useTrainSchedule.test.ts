@@ -440,6 +440,57 @@ describe('useTrainSchedule', () => {
       expect(result.current.upcomingTrains[0]?.trainNumber).toBe('W-2');
     });
   });
+
+  // Issue #173 — 경의선/광역 노선 timetable 미커버 정직한 안내.
+  // 서울교통공사 시간표 데이터셋(SearchSTNTimeTableByIDService)은 숫자
+  // 1~9호선만 보유. Korail 운영 경의중앙선 등은 역코드와 무관하게 INFO-200을
+  // 반환하므로(라이브 API probe로 확인), API를 호출하기 전에 차단하고 "미제공"
+  // 안내를 표시한다 — 빈 화면이 버그처럼 보이는 것 방지 + rate-limit 절약.
+  describe('Issue #173 — uncovered line honest messaging', () => {
+    it('shows "미제공" message for 경의선 and does NOT call the timetable API', async () => {
+      const { result } = renderHook(() =>
+        useTrainSchedule({ stationName: '서울역', lineNumber: '경의선' })
+      );
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      expect(result.current.error).toBe('이 노선의 시간표는 제공되지 않습니다.');
+      expect(result.current.schedules).toEqual([]);
+      expect(result.current.upcomingTrains).toEqual([]);
+      // 미커버 노선은 station_cd 해석조차 시도하지 않고 short-circuit.
+      expect(findStationCdByNameAndLine).not.toHaveBeenCalled();
+      expect(seoulSubwayApi.getStationTimetable).not.toHaveBeenCalled();
+    });
+
+    it('also short-circuits for 공항철도 (another uncovered line)', async () => {
+      const { result } = renderHook(() =>
+        useTrainSchedule({ stationName: '홍대입구', lineNumber: '공항철도' })
+      );
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      expect(result.current.error).toBe('이 노선의 시간표는 제공되지 않습니다.');
+      expect(seoulSubwayApi.getStationTimetable).not.toHaveBeenCalled();
+    });
+
+    it('still fetches normally for a covered numbered line (2호선)', async () => {
+      const { result } = renderHook(() =>
+        useTrainSchedule({ stationName: '강남', lineNumber: '2' })
+      );
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      expect(result.current.error).toBeNull();
+      expect(findStationCdByNameAndLine).toHaveBeenCalledWith('강남', '2');
+      expect(seoulSubwayApi.getStationTimetable).toHaveBeenCalled();
+    });
+  });
 });
 
 // GAP_REPORT item #7: 첫차/막차 helper for timetable UI. Critical edge case:
