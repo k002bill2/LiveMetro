@@ -61,7 +61,16 @@ const StationDetailHeaderImpl: React.FC<StationDetailHeaderProps> = ({
     paddingBottom: WANTED_TOKENS.spacing.s1,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+  };
+
+  // Centered screen title that replaces the now-hidden native header. Lives in
+  // the flex:1 middle zone so it sits at the true screen center regardless of
+  // the back vs share+favorite side widths.
+  const topBarTitleStyle: TextStyle = {
+    flex: 1,
+    textAlign: 'center',
+    ...typeStyle('headline2', '700'),
+    color: semantic.labelStrong,
   };
 
   const heroStyle: ViewStyle = {
@@ -73,17 +82,22 @@ const StationDetailHeaderImpl: React.FC<StationDetailHeaderProps> = ({
   return (
     <View testID={testID}>
       <View style={topBarStyle}>
-        <TouchableOpacity
-          testID={testID ? `${testID}-back` : undefined}
-          onPress={onBack}
-          accessible
-          accessibilityRole="button"
-          accessibilityLabel="뒤로 가기"
-          hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
-        >
-          <ChevronLeft size={26} strokeWidth={2} color={iconColor} />
-        </TouchableOpacity>
-        <View style={styles.actionGroup}>
+        <View style={styles.side}>
+          <TouchableOpacity
+            testID={testID ? `${testID}-back` : undefined}
+            onPress={onBack}
+            accessible
+            accessibilityRole="button"
+            accessibilityLabel="뒤로 가기"
+            hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+          >
+            <ChevronLeft size={26} strokeWidth={2} color={iconColor} />
+          </TouchableOpacity>
+        </View>
+        <Text style={topBarTitleStyle} numberOfLines={1}>
+          역 상세정보
+        </Text>
+        <View style={[styles.actionGroup, styles.side]}>
           <TouchableOpacity
             testID={testID ? `${testID}-share` : undefined}
             onPress={onShare}
@@ -134,10 +148,18 @@ const StationDetailHeaderImpl: React.FC<StationDetailHeaderProps> = ({
 };
 
 const styles = StyleSheet.create({
+  // Left (back) and right (share+favorite) zones each take flex:1 so the
+  // middle title zone is centered on the screen, not between the icons.
+  side: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
   actionGroup: {
     flexDirection: 'row',
     gap: WANTED_TOKENS.spacing.s2,
     alignItems: 'center',
+    justifyContent: 'flex-end',
   },
   favoriteIcon: {
     marginLeft: 6,

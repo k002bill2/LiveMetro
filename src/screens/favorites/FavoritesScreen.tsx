@@ -16,13 +16,13 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   RefreshControl,
   TouchableOpacity,
   Alert,
   ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import DraggableFlatList, {
   type RenderItemParams,
 } from 'react-native-draggable-flatlist';
@@ -389,7 +389,7 @@ export const FavoritesScreen: React.FC = () => {
   // Show loading state
   if (loading && favoritesWithDetails.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={semantic.labelStrong} />
           <Text style={styles.loadingText}>즐겨찾기를 불러오는 중...</Text>
@@ -401,7 +401,7 @@ export const FavoritesScreen: React.FC = () => {
   // Show error state
   if (error && favoritesWithDetails.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.errorContainer}>
           <AlertCircle size={64} color={semantic.labelAlt} />
           <Text style={styles.errorTitle}>{error}</Text>
@@ -416,7 +416,7 @@ export const FavoritesScreen: React.FC = () => {
   // Show login prompt for unauthenticated users
   if (!user) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.emptyState}>
           <LogIn size={64} color={semantic.labelAlt} />
           <Text style={styles.emptyTitle}>로그인이 필요합니다</Text>
@@ -433,7 +433,7 @@ export const FavoritesScreen: React.FC = () => {
   const hasNoResults = !hasNoFavorites && filteredFavorites.length === 0;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header — Phase 3 redesign: large title + sort/add round buttons */}
       <View style={styles.header}>
         <Text

@@ -32,6 +32,11 @@ describe('StationDetailHeader', () => {
     expect(getByText('Gangnam · 222 · 신분당 D07')).toBeTruthy();
   });
 
+  it('renders the centered "역 상세정보" screen title that replaces the native header', () => {
+    const { getByText } = render(<StationDetailHeader {...baseProps} />);
+    expect(getByText('역 상세정보')).toBeTruthy();
+  });
+
   it('renders one LineBadge per line provided', () => {
     const { getAllByTestId } = render(
       <StationDetailHeader {...baseProps} testID="hdr" />

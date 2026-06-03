@@ -22,6 +22,7 @@ import {
   Text,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   FileText,
   Map as MapIcon,
@@ -588,7 +589,8 @@ export const HomeScreen: React.FC = () => {
   }
 
   return (
-    <ScrollView
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      <ScrollView
       style={styles.container}
       refreshControl={
         <RefreshControl
@@ -820,12 +822,17 @@ export const HomeScreen: React.FC = () => {
       </View>
 
       <ToastComponent />
-    </ScrollView>
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
 const createStyles = (semantic: WantedSemanticTheme) =>
   StyleSheet.create({
+    safeArea: {
+      flex: 1,
+      backgroundColor: semantic.bgSubtlePage,
+    },
     container: {
       flex: 1,
       backgroundColor: semantic.bgSubtlePage,
