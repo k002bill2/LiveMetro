@@ -72,6 +72,17 @@ const isOperatingEndHours = (now: Date): boolean => {
   return h >= 2 && h < 5;
 };
 
+/**
+ * alerts-by-line 조회용 노선명 파생.
+ *
+ * 숫자 노선(1~9)만 "N호선"으로 결합한다. 비숫자 노선(경의선·공항철도·분당선
+ * 등)의 lineId는 이미 완성된 노선명이므로 그대로 사용한다 — `${lineId}호선`
+ * 단순 결합은 "경의선호선" 같은 malformed 문자열을 만들어 `getAlertsByLine`의
+ * 부분 매칭(`alert.lineName.includes(lineName)`)을 깬다.
+ */
+const toAlertLineName = (lineId: string): string =>
+  /^[1-9]$/.test(lineId) ? `${lineId}호선` : lineId;
+
 type StationDetailRouteProp = RouteProp<AppStackParamList, 'StationDetail'>;
 type StationDetailNavProp = NativeStackNavigationProp<AppStackParamList>;
 
@@ -164,7 +175,7 @@ const StationDetailScreen: React.FC = () => {
   });
 
   const { exitInfo, alerts } = usePublicDataForStation(stationName, {
-    lineName: `${lineId}호선`,
+    lineName: toAlertLineName(lineId),
   });
 
   const { isFavorite, toggleFavorite } = useFavorites();

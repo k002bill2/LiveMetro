@@ -8,7 +8,7 @@ import React from 'react';
 import { Share } from 'react-native';
 import { render, fireEvent, waitFor, act, within } from '@testing-library/react-native';
 import StationDetailScreen from '../StationDetailScreen';
-import { useIsFocused } from '@react-navigation/native';
+import { useIsFocused, useRoute } from '@react-navigation/native';
 import { useRealtimeTrains } from '@/hooks/useRealtimeTrains';
 import { useFavorites } from '@/hooks/useFavorites';
 import { usePublicDataForStation } from '@/hooks/usePublicData';
@@ -628,6 +628,42 @@ describe('StationDetailScreen', () => {
       const second = render(<StationDetailScreen />);
       expect(second.getByText('성수행')).toBeTruthy();
       expect(second.queryByText('잠실행')).toBeNull();
+    });
+  });
+
+  // alerts-by-line 조회용 lineName 파생. `${lineId}호선` 단순 결합은 비숫자
+  // 노선(경의선·공항철도 등)에서 "경의선호선" 같은 malformed 문자열을 만들어
+  // getAlertsByLine 부분 매칭을 깬다 (경의선 서울역 빈 데이터 조사에서 발견).
+  describe('alert lineName derivation', () => {
+    it('appends 호선 only for numeric lines', () => {
+      (useRoute as jest.Mock).mockReturnValueOnce({
+        params: { stationId: 'gangnam', stationName: '강남', lineId: '2' },
+      });
+
+      render(<StationDetailScreen />);
+
+      expect(mockedUsePublicData).toHaveBeenCalledWith(
+        '강남',
+        expect.objectContaining({ lineName: '2호선' }),
+      );
+    });
+
+    it('uses the line name as-is for non-numeric lines (no 경의선호선)', () => {
+      (useRoute as jest.Mock).mockReturnValueOnce({
+        params: { stationId: '1251', stationName: '서울역', lineId: '경의선' },
+      });
+
+      render(<StationDetailScreen />);
+
+      expect(mockedUsePublicData).toHaveBeenCalledWith(
+        '서울역',
+        expect.objectContaining({ lineName: '경의선' }),
+      );
+      // malformed 결합이 재발하지 않도록 명시 단언.
+      expect(mockedUsePublicData).not.toHaveBeenCalledWith(
+        '서울역',
+        expect.objectContaining({ lineName: '경의선호선' }),
+      );
     });
   });
 });

@@ -4,7 +4,7 @@
  */
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
-import { seoulSubwayApi, SeoulRealtimeArrival } from '@/services/api/seoulSubwayApi';
+import { arrivalService } from '@/services/arrival/arrivalService';
 import type { DelayInfo } from '@/components/delays/DelayAlertBanner';
 
 // 지연 감지 키워드
@@ -62,15 +62,17 @@ interface UseDelayDetectionResult {
 }
 
 /**
- * Seoul API 도착 메시지에서 지연을 감지합니다
+ * 도착 메시지에서 지연을 감지합니다.
+ *
+ * 입력은 arrivalService가 정규화한 `arrivalMessage`(원본 arvlMsg2 우선, 없으면
+ * arvlMsg3) 문자열이다. 지연 키워드(지연·서행·운행중지 등)는 arvlMsg2에 실리므로
+ * 단일 문자열만으로 충분하다.
  */
-function detectDelayFromArrival(arrival: SeoulRealtimeArrival): {
+function detectDelayFromArrival(message: string): {
   isDelayed: boolean;
   delayMinutes: number;
   reason?: string;
 } {
-  const message = `${arrival.arvlMsg2 || ''} ${arrival.arvlMsg3 || ''}`;
-
   // 지연 키워드 검색
   const hasDelayKeyword = DELAY_KEYWORDS.some(keyword =>
     message.includes(keyword)
@@ -93,15 +95,6 @@ function detectDelayFromArrival(arrival: SeoulRealtimeArrival): {
   else reason = '운행 지연';
 
   return { isDelayed: true, delayMinutes, reason };
-}
-
-/**
- * 노선 ID를 표시 이름으로 변환합니다
- */
-function getLineName(subwayId: string): string {
-  // Seoul API의 subwayId 형식: "1001" (1호선), "1002" (2호선), etc.
-  const lineNumber = subwayId.replace('100', '').replace('00', '');
-  return `${lineNumber}호선`;
 }
 
 /**
@@ -148,28 +141,31 @@ export function useDelayDetection(
       const detectedDelays: DelayInfo[] = [];
       const delayMap = new Map<string, DelayInfo>(); // 중복 방지
 
-      // 각 노선의 대표 역에서 도착 정보 조회
+      // 각 노선의 대표 역에서 도착 정보 조회.
+      //
+      // arrivalService.getArrivals를 경유한다(seoulSubwayApi.getRealtimeArrival
+      // 직접 호출 금지). 직접 호출은 StationDetail과 같은 per-station rate-limit
+      // 키를 캐시 공유 없이 리셋해, 상세 화면 첫 로드를 최대 30초 throttle로
+      // 굶주리게 만들었다. 공유 캐시 계층을 통하면 30초 윈도 안의 중복 요청은
+      // 캐시로 흡수되어 rate-limit 충돌이 사라진다.
       const fetchPromises = lineIds.map(async (lineId) => {
         const stationName = LINE_REPRESENTATIVE_STATIONS[lineId];
         if (!stationName) return;
 
         try {
-          const arrivals = await seoulSubwayApi.getRealtimeArrival(stationName);
+          const info = await arrivalService.getArrivals(stationName);
 
-          // 해당 노선의 도착 정보만 필터링
-          const lineArrivals = arrivals.filter(a =>
-            a.subwayId === `100${lineId}` ||
-            a.trainLineNm?.includes(`${lineId}호선`)
-          );
+          // arrivalService는 lineId를 "1".."9"로 정규화하므로 직접 비교한다.
+          const lineArrivals = info.arrivals.filter((a) => a.lineId === lineId);
 
           // 각 도착 정보에서 지연 감지
           for (const arrival of lineArrivals) {
-            const detection = detectDelayFromArrival(arrival);
+            const detection = detectDelayFromArrival(arrival.arrivalMessage);
 
             if (detection.isDelayed && !delayMap.has(lineId)) {
               const delayInfo: DelayInfo = {
                 lineId,
-                lineName: getLineName(arrival.subwayId || lineId),
+                lineName: `${lineId}호선`,
                 delayMinutes: detection.delayMinutes,
                 reason: detection.reason,
                 timestamp: new Date(),

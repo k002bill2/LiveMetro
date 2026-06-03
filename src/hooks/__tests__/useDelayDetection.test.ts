@@ -1,13 +1,26 @@
 /**
  * useDelayDetection Hook Tests
+ *
+ * 데이터 소스: arrivalService.getArrivals (공유 캐시 계층).
+ * useDelayDetection은 seoulSubwayApi.getRealtimeArrival를 직접 호출하지 않는다 —
+ * 직접 호출은 StationDetail과 같은 per-station rate-limit 키를 캐시 공유 없이
+ * 리셋해 상세 화면 첫 로드를 최대 30초 throttle로 굶주리게 만들었다(회귀).
  */
 
 import { renderHook, act } from '@testing-library/react-native';
 import { useDelayDetection } from '../useDelayDetection';
-import type { SeoulRealtimeArrival } from '@/services/api/seoulSubwayApi';
+import { arrivalService, type ArrivalInfo, type TrainArrival } from '@/services/arrival/arrivalService';
+// seoulSubwayApi is globally mocked in src/__tests__/setup.ts — referenced here
+// only to assert the hook does NOT call it directly anymore.
 import { seoulSubwayApi } from '@/services/api/seoulSubwayApi';
 
-// seoulSubwayApi is already mocked in src/__tests__/setup.ts
+jest.mock('@/services/arrival/arrivalService', () => ({
+  arrivalService: {
+    getArrivals: jest.fn(),
+  },
+}));
+
+const mockGetArrivals = arrivalService.getArrivals as jest.Mock;
 const mockGetRealtimeArrival = seoulSubwayApi.getRealtimeArrival as jest.Mock;
 
 // Helper: flush all pending promises and state updates
@@ -19,37 +32,96 @@ async function flushAll(): Promise<void> {
   });
 }
 
-const baseMockArrival: SeoulRealtimeArrival = {
-  rowNum: '1',
-  selectedCount: '10',
-  totalCount: '100',
-  subwayId: '1001',
-  updnLine: '0',
-  trainLineNm: '1호선',
-  subwayHeading: '서울역방향',
-  statnFid: '1000001',
-  statnTid: '0001002',
-  statnId: '1000001',
-  statnNm: '강남',
-  trainCo: '1',
-  ordkey: '001',
-  subwayList: '1',
-  statnList: '강남',
-  btrainSttus: '1',
-  barvlDt: '20240101120000',
-  btrainNo: '1001',
-  bstatnId: '1000001',
-  bstatnNm: '강남',
-  recptnDt: '20240101120000',
-  arvlMsg2: '',
-  arvlMsg3: '',
-  arvlCd: '0',
+const makeArrival = (
+  lineId: string,
+  arrivalMessage: string,
+  overrides: Partial<TrainArrival> = {}
+): TrainArrival => ({
+  trainId: `train_${lineId}_${arrivalMessage}`,
+  lineId,
+  direction: 'up',
+  destination: '종착역',
+  arrivalSeconds: 120,
+  arrivalMessage,
+  trainNumber: '0001',
+  ...overrides,
+});
+
+const emptyInfo = (stationName: string): ArrivalInfo => ({
+  stationName,
+  stationId: stationName,
+  arrivals: [],
+  lastUpdated: new Date(),
+  source: 'api',
+});
+
+const infoWith = (
+  stationName: string,
+  arrivals: TrainArrival[]
+): ArrivalInfo => ({
+  stationName,
+  stationId: stationName,
+  arrivals,
+  lastUpdated: new Date(),
+  source: 'api',
+});
+
+// 노선별 대표 역 — useDelayDetection 내부 LINE_REPRESENTATIVE_STATIONS와 일치해야 한다.
+const REP: Record<string, string> = {
+  '1': '서울역',
+  '2': '강남',
+  '3': '교대',
+  '4': '동대문역사문화공원',
+  '5': '광화문',
+  '6': '삼각지',
+  '7': '건대입구',
+  '8': '잠실',
+  '9': '여의도',
 };
+
+/**
+ * 특정 노선들에 대해 대표 역이 반환할 ArrivalInfo를 구성하는 mock 헬퍼.
+ * 그 외 역은 빈 도착 정보를 반환한다.
+ */
+function mockArrivalsByLine(byLine: Record<string, TrainArrival[]>): void {
+  mockGetArrivals.mockImplementation((stationName: string) => {
+    const lineId = Object.keys(REP).find((id) => REP[id] === stationName);
+    if (lineId && byLine[lineId]) {
+      return Promise.resolve(infoWith(stationName, byLine[lineId]!));
+    }
+    return Promise.resolve(emptyInfo(stationName));
+  });
+}
 
 describe('useDelayDetection', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockGetRealtimeArrival.mockResolvedValue([]);
+    mockGetArrivals.mockImplementation((stationName: string) =>
+      Promise.resolve(emptyInfo(stationName))
+    );
+  });
+
+  describe('Data source — shared cache (regression)', () => {
+    it('routes through arrivalService.getArrivals, not seoulSubwayApi.getRealtimeArrival', async () => {
+      renderHook(() => useDelayDetection({ autoPolling: false }));
+
+      await flushAll();
+
+      // 공유 캐시 계층을 통해야 한다.
+      expect(mockGetArrivals).toHaveBeenCalled();
+      // per-station rate-limit 키를 직접 리셋하는 우회 경로는 금지.
+      expect(mockGetRealtimeArrival).not.toHaveBeenCalled();
+    });
+
+    it('queries each line representative station by name', async () => {
+      renderHook(() => useDelayDetection({ autoPolling: false, lineIds: ['1', '2'] }));
+
+      await flushAll();
+
+      const queried = mockGetArrivals.mock.calls.map((c) => c[0]);
+      expect(queried).toContain('서울역');
+      expect(queried).toContain('강남');
+    });
   });
 
   describe('Initialization', () => {
@@ -63,7 +135,7 @@ describe('useDelayDetection', () => {
     });
 
     it('should initialize with loading state during fetch', () => {
-      mockGetRealtimeArrival.mockImplementation(
+      mockGetArrivals.mockImplementation(
         () => new Promise(() => {}) // Never resolves
       );
 
@@ -105,16 +177,13 @@ describe('useDelayDetection', () => {
 
       await flushAll();
 
-      // lastUpdated should have changed (or at least be set)
       expect(result.current.lastUpdated).not.toBeNull();
     });
   });
 
   describe('Delay Detection - detectDelayFromArrival', () => {
     it('should detect delays with 지연 keyword', async () => {
-      mockGetRealtimeArrival.mockResolvedValue([
-        { ...baseMockArrival, arvlMsg2: '약 5분 지연' },
-      ]);
+      mockArrivalsByLine({ '1': [makeArrival('1', '약 5분 지연')] });
 
       const { result } = renderHook(() => useDelayDetection({ autoPolling: false }));
 
@@ -129,9 +198,7 @@ describe('useDelayDetection', () => {
     });
 
     it('should detect delays with 운행중지 keyword', async () => {
-      mockGetRealtimeArrival.mockResolvedValue([
-        { ...baseMockArrival, subwayId: '1002', trainLineNm: '2호선', arvlMsg2: '약 10분 운행중지' },
-      ]);
+      mockArrivalsByLine({ '2': [makeArrival('2', '약 10분 운행중지')] });
 
       const { result } = renderHook(() => useDelayDetection({ autoPolling: false }));
 
@@ -143,9 +210,7 @@ describe('useDelayDetection', () => {
     });
 
     it('should detect delays with 고장 keyword and set reason', async () => {
-      mockGetRealtimeArrival.mockResolvedValue([
-        { ...baseMockArrival, subwayId: '1003', trainLineNm: '3호선', statnNm: '교대', arvlMsg2: '약 3분 지연 열차 고장' },
-      ]);
+      mockArrivalsByLine({ '3': [makeArrival('3', '약 3분 지연 열차 고장')] });
 
       const { result } = renderHook(() => useDelayDetection({ autoPolling: false }));
 
@@ -155,9 +220,7 @@ describe('useDelayDetection', () => {
     });
 
     it('should detect delays with 사고 keyword and set reason', async () => {
-      mockGetRealtimeArrival.mockResolvedValue([
-        { ...baseMockArrival, subwayId: '1004', trainLineNm: '4호선', statnNm: '동대문역사문화공원', arvlMsg2: '약 7분 지연 사고 발생' },
-      ]);
+      mockArrivalsByLine({ '4': [makeArrival('4', '약 7분 지연 사고 발생')] });
 
       const { result } = renderHook(() => useDelayDetection({ autoPolling: false }));
 
@@ -167,9 +230,7 @@ describe('useDelayDetection', () => {
     });
 
     it('should detect delays with 점검 keyword and set reason', async () => {
-      mockGetRealtimeArrival.mockResolvedValue([
-        { ...baseMockArrival, subwayId: '1005', trainLineNm: '5호선', statnNm: '광화문', arvlMsg2: '약 2분 지연 시설 점검' },
-      ]);
+      mockArrivalsByLine({ '5': [makeArrival('5', '약 2분 지연 시설 점검')] });
 
       const { result } = renderHook(() => useDelayDetection({ autoPolling: false }));
 
@@ -179,9 +240,7 @@ describe('useDelayDetection', () => {
     });
 
     it('should not detect 혼잡 as delay (not in DELAY_KEYWORDS)', async () => {
-      mockGetRealtimeArrival.mockResolvedValue([
-        { ...baseMockArrival, subwayId: '1006', trainLineNm: '6호선', statnNm: '삼각지', arvlMsg2: '곧 도착 역 혼잡' },
-      ]);
+      mockArrivalsByLine({ '6': [makeArrival('6', '곧 도착 역 혼잡')] });
 
       const { result } = renderHook(() => useDelayDetection({ autoPolling: false }));
 
@@ -192,9 +251,7 @@ describe('useDelayDetection', () => {
     });
 
     it('should use default 5 minutes when delay time not extractable', async () => {
-      mockGetRealtimeArrival.mockResolvedValue([
-        { ...baseMockArrival, arvlMsg2: '곧 도착 장애 발생' },
-      ]);
+      mockArrivalsByLine({ '1': [makeArrival('1', '곧 도착 장애 발생')] });
 
       const { result } = renderHook(() => useDelayDetection({ autoPolling: false }));
 
@@ -204,9 +261,7 @@ describe('useDelayDetection', () => {
     });
 
     it('should ignore arrivals without delay keywords', async () => {
-      mockGetRealtimeArrival.mockResolvedValue([
-        { ...baseMockArrival, arvlMsg2: '곧 도착' },
-      ]);
+      mockArrivalsByLine({ '1': [makeArrival('1', '곧 도착')] });
 
       const { result } = renderHook(() => useDelayDetection({ autoPolling: false }));
 
@@ -214,26 +269,11 @@ describe('useDelayDetection', () => {
 
       expect(result.current.delays).toHaveLength(0);
     });
-
-    it('should handle multiple arrival messages (arvlMsg2 and arvlMsg3)', async () => {
-      mockGetRealtimeArrival.mockResolvedValue([
-        { ...baseMockArrival, arvlMsg2: '곧 도착', arvlMsg3: '약 3분 지연' },
-      ]);
-
-      const { result } = renderHook(() => useDelayDetection({ autoPolling: false }));
-
-      await flushAll();
-
-      expect(result.current.delays).toHaveLength(1);
-      expect(result.current.delays[0]!.delayMinutes).toBe(3);
-    });
   });
 
   describe('Line Name Conversion', () => {
-    it('should convert subwayId to line name (1001 -> 1호선)', async () => {
-      mockGetRealtimeArrival.mockResolvedValue([
-        { ...baseMockArrival, subwayId: '1001', trainLineNm: '1호선', arvlMsg2: '약 5분 지연' },
-      ]);
+    it('should derive line name from lineId (1 -> 1호선)', async () => {
+      mockArrivalsByLine({ '1': [makeArrival('1', '약 5분 지연')] });
 
       const { result } = renderHook(() => useDelayDetection({ autoPolling: false }));
 
@@ -242,24 +282,16 @@ describe('useDelayDetection', () => {
       expect(result.current.delays[0]!.lineName).toBe('1호선');
     });
 
-    it('should convert various subway IDs correctly', async () => {
+    it('should derive line name for various lines correctly', async () => {
       const testCases = [
-        { subwayId: '1001', expected: '1호선' },
-        { subwayId: '1002', expected: '2호선' },
-        { subwayId: '1009', expected: '9호선' },
+        { lineId: '1', expected: '1호선' },
+        { lineId: '2', expected: '2호선' },
+        { lineId: '9', expected: '9호선' },
       ];
 
       for (const testCase of testCases) {
         jest.clearAllMocks();
-
-        mockGetRealtimeArrival.mockResolvedValue([
-          {
-            ...baseMockArrival,
-            subwayId: testCase.subwayId,
-            trainLineNm: testCase.expected,
-            arvlMsg2: '약 5분 지연',
-          },
-        ]);
+        mockArrivalsByLine({ [testCase.lineId]: [makeArrival(testCase.lineId, '약 5분 지연')] });
 
         const { result } = renderHook(() => useDelayDetection({ autoPolling: false }));
 
@@ -272,12 +304,10 @@ describe('useDelayDetection', () => {
 
   describe('Delay Sorting and Deduplication', () => {
     it('should sort delays by minutes descending', async () => {
-      const mockArrivals: SeoulRealtimeArrival[] = [
-        { ...baseMockArrival, subwayId: '1001', trainLineNm: '1호선', statnNm: '서울역', arvlMsg2: '약 3분 지연' },
-        { ...baseMockArrival, subwayId: '1002', trainLineNm: '2호선', statnNm: '강남', arvlMsg2: '약 10분 지연' },
-      ];
-
-      mockGetRealtimeArrival.mockResolvedValue(mockArrivals);
+      mockArrivalsByLine({
+        '1': [makeArrival('1', '약 3분 지연')],
+        '2': [makeArrival('2', '약 10분 지연')],
+      });
 
       const options = { autoPolling: false, lineIds: ['1', '2'] };
       const { result } = renderHook(() => useDelayDetection(options));
@@ -290,12 +320,12 @@ describe('useDelayDetection', () => {
     });
 
     it('should prevent duplicate delays per line', async () => {
-      const mockArrivals: SeoulRealtimeArrival[] = [
-        { ...baseMockArrival, arvlMsg2: '약 5분 지연' },
-        { ...baseMockArrival, ordkey: '002', btrainNo: '1002', arvlMsg2: '약 3분 지연' },
-      ];
-
-      mockGetRealtimeArrival.mockResolvedValue(mockArrivals);
+      mockArrivalsByLine({
+        '1': [
+          makeArrival('1', '약 5분 지연', { trainId: 'a' }),
+          makeArrival('1', '약 3분 지연', { trainId: 'b' }),
+        ],
+      });
 
       const { result } = renderHook(() => useDelayDetection({ autoPolling: false }));
 
@@ -308,7 +338,7 @@ describe('useDelayDetection', () => {
 
   describe('Fetch and Refresh', () => {
     it('should set loading state during fetch', () => {
-      mockGetRealtimeArrival.mockImplementation(
+      mockGetArrivals.mockImplementation(
         () => new Promise(() => {}) // Never resolves
       );
 
@@ -322,18 +352,18 @@ describe('useDelayDetection', () => {
 
       await flushAll();
 
-      const callCountBefore = mockGetRealtimeArrival.mock.calls.length;
+      const callCountBefore = mockGetArrivals.mock.calls.length;
 
       await act(async () => {
         await result.current.refresh();
       });
 
-      const callCountAfter = mockGetRealtimeArrival.mock.calls.length;
+      const callCountAfter = mockGetArrivals.mock.calls.length;
       expect(callCountAfter).toBeGreaterThan(callCountBefore);
     });
 
     it('should not fetch while already loading', () => {
-      mockGetRealtimeArrival.mockImplementation(
+      mockGetArrivals.mockImplementation(
         () => new Promise(() => {}) // Never resolves
       );
 
@@ -342,10 +372,34 @@ describe('useDelayDetection', () => {
       expect(result.current.loading).toBe(true);
 
       // Try to refresh while loading - should not add more calls
-      const callCountDuringLoad = mockGetRealtimeArrival.mock.calls.length;
+      const callCountDuringLoad = mockGetArrivals.mock.calls.length;
       result.current.refresh();
-      const callCountAfter = mockGetRealtimeArrival.mock.calls.length;
+      const callCountAfter = mockGetArrivals.mock.calls.length;
       expect(callCountAfter).toBeLessThanOrEqual(callCountDuringLoad + 1);
+    });
+  });
+
+  describe('Enabled gating', () => {
+    it('should not fetch when enabled is false', async () => {
+      renderHook(() => useDelayDetection({ autoPolling: false, enabled: false }));
+
+      await flushAll();
+
+      expect(mockGetArrivals).not.toHaveBeenCalled();
+    });
+
+    it('should not set up polling when enabled is false', async () => {
+      const setIntervalSpy = jest.spyOn(global, 'setInterval');
+
+      renderHook(() =>
+        useDelayDetection({ autoPolling: true, pollingInterval: 60000, enabled: false })
+      );
+
+      await flushAll();
+
+      expect(setIntervalSpy).not.toHaveBeenCalled();
+
+      setIntervalSpy.mockRestore();
     });
   });
 
@@ -353,22 +407,21 @@ describe('useDelayDetection', () => {
     it('should handle API errors gracefully', async () => {
       // Individual line errors are caught inside the map, so error state is not set
       // but the hook still completes without crashing
-      mockGetRealtimeArrival.mockRejectedValue(new Error('API request failed'));
+      mockGetArrivals.mockRejectedValue(new Error('API request failed'));
 
       const { result } = renderHook(() => useDelayDetection({ autoPolling: false }));
 
       await flushAll();
 
-      // Should complete without crashing, delays will be empty
       expect(result.current.delays).toEqual([]);
     });
 
     it('should continue operation after single line failure', async () => {
-      mockGetRealtimeArrival.mockImplementation((stationName: string) => {
+      mockGetArrivals.mockImplementation((stationName: string) => {
         if (stationName === '강남') {
           return Promise.reject(new Error('API error'));
         }
-        return Promise.resolve([]);
+        return Promise.resolve(emptyInfo(stationName));
       });
 
       const options = { autoPolling: false, lineIds: ['1', '2'] };
@@ -380,14 +433,16 @@ describe('useDelayDetection', () => {
     });
 
     it('should recover after errors on retry', async () => {
-      mockGetRealtimeArrival.mockRejectedValue(new Error('API error'));
+      mockGetArrivals.mockRejectedValue(new Error('API error'));
 
       const { result } = renderHook(() => useDelayDetection({ autoPolling: false }));
 
       await flushAll();
 
       // Reset mock to succeed
-      mockGetRealtimeArrival.mockResolvedValue([]);
+      mockGetArrivals.mockImplementation((stationName: string) =>
+        Promise.resolve(emptyInfo(stationName))
+      );
 
       await act(async () => {
         await result.current.refresh();
@@ -395,7 +450,6 @@ describe('useDelayDetection', () => {
 
       await flushAll();
 
-      // Should complete without error
       expect(result.current.delays).toEqual([]);
     });
   });
@@ -484,7 +538,7 @@ describe('useDelayDetection', () => {
     });
 
     it('should not update state after unmount', () => {
-      mockGetRealtimeArrival.mockImplementation(
+      mockGetArrivals.mockImplementation(
         () => new Promise(() => {}) // Never resolves
       );
 
@@ -497,7 +551,7 @@ describe('useDelayDetection', () => {
     });
 
     it('should prevent updates when isMountedRef is false', () => {
-      mockGetRealtimeArrival.mockImplementation(
+      mockGetArrivals.mockImplementation(
         () => new Promise(() => {}) // Never resolves
       );
 
@@ -512,32 +566,26 @@ describe('useDelayDetection', () => {
 
   describe('Custom Line IDs', () => {
     it('should fetch only specified lines', async () => {
-      mockGetRealtimeArrival.mockResolvedValue([]);
-
       const options = { autoPolling: false, lineIds: ['1', '2', '3'] };
       renderHook(() => useDelayDetection(options));
 
       await flushAll();
 
-      expect(mockGetRealtimeArrival).toHaveBeenCalledTimes(3);
+      expect(mockGetArrivals).toHaveBeenCalledTimes(3);
     });
 
     it('should use default all lines when lineIds not provided', async () => {
-      mockGetRealtimeArrival.mockResolvedValue([]);
-
       renderHook(() => useDelayDetection({ autoPolling: false }));
 
       await flushAll();
 
-      expect(mockGetRealtimeArrival).toHaveBeenCalledTimes(9);
+      expect(mockGetArrivals).toHaveBeenCalledTimes(9);
     });
   });
 
   describe('Edge Cases', () => {
-    it('should handle null arvlMsg2 and arvlMsg3', async () => {
-      mockGetRealtimeArrival.mockResolvedValue([
-        { ...baseMockArrival, arvlMsg2: '', arvlMsg3: '' },
-      ]);
+    it('should handle empty arrival message', async () => {
+      mockArrivalsByLine({ '1': [makeArrival('1', '')] });
 
       const { result } = renderHook(() => useDelayDetection({ autoPolling: false }));
 
@@ -547,7 +595,9 @@ describe('useDelayDetection', () => {
     });
 
     it('should handle empty arrivals array', async () => {
-      mockGetRealtimeArrival.mockResolvedValue([]);
+      mockGetArrivals.mockImplementation((stationName: string) =>
+        Promise.resolve(emptyInfo(stationName))
+      );
 
       const { result } = renderHook(() => useDelayDetection({ autoPolling: false }));
 
@@ -556,10 +606,8 @@ describe('useDelayDetection', () => {
       expect(result.current.delays).toHaveLength(0);
     });
 
-    it('should handle arrival with undefined timestamp', async () => {
-      mockGetRealtimeArrival.mockResolvedValue([
-        { ...baseMockArrival, arvlMsg2: '약 5분 지연' },
-      ]);
+    it('should set a Date timestamp on detected delays', async () => {
+      mockArrivalsByLine({ '1': [makeArrival('1', '약 5분 지연')] });
 
       const { result } = renderHook(() => useDelayDetection({ autoPolling: false }));
 
