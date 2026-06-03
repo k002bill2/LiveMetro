@@ -61,6 +61,15 @@ describe('RouteCard', () => {
     expect(getByText(/환승 0.*도보.*분.*원/)).toBeTruthy();
   });
 
+  it('prefers an attached route.fare over the deriveFare fallback', () => {
+    // baseRoute (1 hop) derives 1,400원; an explicit fare must win.
+    const farePinned: RouteWithMLMeta = { ...baseRoute, fare: 1500 };
+    const { getByText } = render(
+      <RouteCard route={farePinned} expanded={false} onToggleExpand={() => {}} />
+    );
+    expect(getByText(/1,500원/)).toBeTruthy();
+  });
+
   it('renders journey strip', () => {
     const { getByTestId } = render(
       <RouteCard route={baseRoute} expanded={false} onToggleExpand={() => {}} />

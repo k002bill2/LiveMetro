@@ -69,6 +69,18 @@ export interface RouteSegment {
 export type RouteCategory = 'fastest' | 'min-transfer' | 'via-station' | 'elevator-priority';
 
 /**
+ * User-selectable sort criterion for the route result list (네이버 스타일
+ * 세그먼트 탭). Orthogonal to {@link RouteCategory}: `category` explains why a
+ * card was surfaced, `RouteSortTab` is how the user chose to order the cards.
+ *
+ * - 'optimal': 종합 (시간 + 환승 페널티 가중) — 기존 getDiverseRoutes 의미
+ * - 'fastest': 최소 시간 (totalMinutes)
+ * - 'min-transfer': 최소 환승 (transferCount, 동수 시 시간)
+ * - 'min-fare': 최소 요금 (fare, 동수 시 시간)
+ */
+export type RouteSortTab = 'optimal' | 'fastest' | 'min-transfer' | 'min-fare';
+
+/**
  * Complete route from origin to destination
  */
 export interface Route {
@@ -83,6 +95,13 @@ export interface Route {
    * when category === 'via-station'. Example: ['강남구청 경유'].
    */
   readonly viaTags?: readonly string[];
+  /**
+   * Estimated regular-type fare in KRW, attached by the service layer
+   * (`computeDiverseRoutes`) via {@link deriveFare}. Optional because raw
+   * `createRoute` output and test fixtures may omit it — consumers fall back
+   * to `deriveFare(route)`. Drives the 'min-fare' sort tab.
+   */
+  readonly fare?: number;
 }
 
 /**
@@ -261,6 +280,22 @@ export const FASTEST_LINE_HOP_MINUTES: number = Object.values(LINE_SPEEDS).reduc
  * Average transfer time between lines (minutes)
  */
 export const AVG_TRANSFER_TIME = 4;
+
+/**
+ * Extra *ranking* cost (minutes) added to each transfer edge during graph
+ * search so the algorithm avoids transfer-heavy paths the way Naver/Kakao do —
+ * a rider perceives one transfer as far costlier than its literal walk time.
+ *
+ * CRITICAL: this is a *search cost only*. `convertToRoute` rebuilds each
+ * segment's `estimatedMinutes` from `getEdgeMinutes`/`getTransferTime`, so a
+ * route's displayed `totalMinutes` stays penalty-free (the honest travel
+ * time). Do NOT derive `totalMinutes` from the path cost, or every time-based
+ * assertion will shift by `transferCount * TRANSFER_PENALTY_MINUTES`.
+ *
+ * Kept small (4) and exported so K-shortest regressions (e.g. 강남구청 경유)
+ * can be tuned without hunting through graph code.
+ */
+export const TRANSFER_PENALTY_MINUTES = 4;
 
 /**
  * Line name mapping

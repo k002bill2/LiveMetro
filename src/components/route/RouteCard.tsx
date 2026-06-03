@@ -5,7 +5,7 @@ import { useTheme } from '@/services/theme';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { JourneyStrip, type JourneyStripLeg } from '@/components/design/JourneyStrip';
 import { LineBadge } from '@/components/design/LineBadge';
-import { estimateFare, estimateWalkingMinutes, getRouteDirection } from '@/services/route/routeMeta';
+import { deriveFare, estimateWalkingMinutes, getRouteDirection } from '@/services/route/routeMeta';
 import type { RouteWithMLMeta } from '@/hooks/useRouteSearch';
 import type { Route, RouteCategory, RouteSegment } from '@/models/route';
 
@@ -154,7 +154,7 @@ export const RouteCard: React.FC<Props> = ({ route, expanded, onToggleExpand, re
         <View style={styles.etaSubMeta}>
           <ArrowLeftRight size={12} color={semantic.labelAlt} strokeWidth={1.8} />
           <Text style={styles.etaSubText}>
-            {`환승 ${route.transferCount} · 도보 ${estimateWalkingMinutes(route)}분 · ${estimateFare(route).toLocaleString()}원`}
+            {`환승 ${route.transferCount} · 도보 ${estimateWalkingMinutes(route)}분 · ${(route.fare ?? deriveFare(route)).toLocaleString()}원`}
           </Text>
         </View>
       </View>

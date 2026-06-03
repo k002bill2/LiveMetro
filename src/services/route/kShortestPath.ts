@@ -8,13 +8,16 @@ import { STATIONS, LINE_STATIONS } from '@utils/subwayMapData';
 import {
   Route,
   RouteSegment,
+  RouteSortTab,
   createRoute,
   getLineName,
   AVG_STATION_TRAVEL_TIME,
+  TRANSFER_PENALTY_MINUTES,
   getEdgeMinutes,
 } from '@models/route';
 import { getTransferTime } from './transferTime';
 import { stationHasElevator } from './stationAccessibility';
+import { deriveFare } from './routeMeta';
 import * as routeCache from './routeCache';
 
 // Branch-line shuttle wait (same-line sub-line transfer, e.g. 신정지선↔본선 at
@@ -87,6 +90,14 @@ function buildGraph(
   // O(V+E) post-pass + per-edge object allocation on every spur call.
   const adjustWeight = (baseWeight: number, lineId: string): number =>
     baseWeight * (congestionMultipliers?.get(lineId) ?? 1.0);
+
+  // Transfer edges carry an extra ranking penalty on top of their congestion-
+  // adjusted wait time so the search avoids transfer-heavy paths (Naver/Kakao
+  // behavior). Penalty is a fixed ranking cost added AFTER the multiplier — it
+  // does not scale with congestion. `convertToRoute` rebuilds segment minutes
+  // from getTransferTime, so this never leaks into displayed totalMinutes.
+  const transferWeight = (baseWeight: number, lineId: string): number =>
+    adjustWeight(baseWeight, lineId) + TRANSFER_PENALTY_MINUTES;
 
   // Add edges for each line. Branched lines (`string[][]` schema) have N
   // subarrays — each subarray gets its own node-key namespace via the
@@ -185,7 +196,7 @@ function buildGraph(
           if (graph.has(keyA) && !excludeEdges?.has(`${keyA}->${keyB}`)) {
             graph.get(keyA)?.push({
               to: keyB,
-              weight: adjustWeight(AVG_BRANCH_SHUTTLE_WAIT, lineId),
+              weight: transferWeight(AVG_BRANCH_SHUTTLE_WAIT, lineId),
               isTransfer: true,
               lineId: subLineB,
             });
@@ -193,7 +204,7 @@ function buildGraph(
           if (graph.has(keyB) && !excludeEdges?.has(`${keyB}->${keyA}`)) {
             graph.get(keyB)?.push({
               to: keyA,
-              weight: adjustWeight(AVG_BRANCH_SHUTTLE_WAIT, lineId),
+              weight: transferWeight(AVG_BRANCH_SHUTTLE_WAIT, lineId),
               isTransfer: true,
               lineId: subLineA,
             });
@@ -296,7 +307,7 @@ function buildGraph(
             if (graph.has(key1) && !excludeEdges?.has(`${key1}->${key2}`)) {
               graph.get(key1)?.push({
                 to: key2,
-                weight: adjustWeight(getTransferTime(station.id), line2),
+                weight: transferWeight(getTransferTime(station.id), line2),
                 isTransfer: true,
                 lineId: subLine2,
               });
@@ -305,7 +316,7 @@ function buildGraph(
             if (graph.has(key2) && !excludeEdges?.has(`${key2}->${key1}`)) {
               graph.get(key2)?.push({
                 to: key1,
-                weight: adjustWeight(getTransferTime(station.id), line1),
+                weight: transferWeight(getTransferTime(station.id), line1),
                 isTransfer: true,
                 lineId: subLine1,
               });
@@ -884,7 +895,45 @@ function computeDiverseRoutes(
     selected.push(labelViaStation(r));
   }
 
-  return selected;
+  // Attach fare (regular type) so the 'min-fare' sort tab and the card meta
+  // line read from a single domain field rather than recomputing per render.
+  return selected.map((r) => ({ ...r, fare: deriveFare(r) }));
+}
+
+/**
+ * Ranking cost used by the 'optimal' tab: honest travel time plus a per-
+ * transfer penalty, mirroring how Naver/Kakao discourage transfer-heavy
+ * routes. `totalMinutes` itself stays penalty-free (see TRANSFER_PENALTY_MINUTES).
+ */
+function optimalScore(route: Route): number {
+  return route.totalMinutes + route.transferCount * TRANSFER_PENALTY_MINUTES;
+}
+
+function fareOf(route: Route): number {
+  return route.fare ?? deriveFare(route);
+}
+
+/**
+ * Re-order a route candidate pool by the user-selected sort tab. Pure and
+ * non-mutating (returns a new array) so the UI can switch tabs with zero
+ * re-search. Every comparator uses `totalMinutes` as the final tie-break for
+ * deterministic ordering.
+ */
+export function sortRoutesByTab<T extends Route>(routes: readonly T[], tab: RouteSortTab): T[] {
+  const arr = [...routes];
+  switch (tab) {
+    case 'fastest':
+      return arr.sort((a, b) => a.totalMinutes - b.totalMinutes);
+    case 'min-transfer':
+      return arr.sort(
+        (a, b) => a.transferCount - b.transferCount || a.totalMinutes - b.totalMinutes,
+      );
+    case 'min-fare':
+      return arr.sort((a, b) => fareOf(a) - fareOf(b) || a.totalMinutes - b.totalMinutes);
+    case 'optimal':
+    default:
+      return arr.sort((a, b) => optimalScore(a) - optimalScore(b));
+  }
 }
 
 function labelFastest(route: Route): Route {

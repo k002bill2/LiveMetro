@@ -20,7 +20,7 @@ import {
   getLineName,
 } from '@models/route';
 import { PriorityQueue } from '@/utils/priorityQueue';
-import { getDiverseRoutes, trunkLineId } from './kShortestPath';
+import { getDiverseRoutes, sortRoutesByTab, trunkLineId } from './kShortestPath';
 import {
   getNextTrainWaitMinutes,
   type RealtimeArrival,
@@ -574,6 +574,7 @@ export const routeService = {
   getStationInfo,
   getLineColor,
   getDiverseRoutes,
+  sortRoutesByTab,
 };
 
 export default routeService;
