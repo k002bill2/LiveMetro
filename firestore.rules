@@ -108,5 +108,12 @@ service cloud.firestore {
       allow delete: if request.auth != null
         && resource.data.userId == request.auth.uid;
     }
+
+    // Commute settings - one document per user, keyed by uid.
+    // Document body has no userId field; ownership is enforced via the doc ID.
+    // Matches commuteService.ts: doc(firestore, 'commuteSettings', uid).
+    match /commuteSettings/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
   }
 }
