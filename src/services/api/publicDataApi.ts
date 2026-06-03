@@ -10,7 +10,6 @@
  */
 
 import {
-  PublicDataResponse,
   DataGoKrResponse,
   // CongestionRawData,
   // CongestionInfo,
@@ -19,7 +18,6 @@ import {
   AccessibilityInfo,
   AlertRawData,
   SubwayAlert,
-  ExitLandmarkRawData,
   ExitLandmark,
   ExitInfo,
   TrainSchedule,
@@ -27,8 +25,8 @@ import {
   DirectionCode,
   // getCongestionLevel,
   parseAlertType,
-  parseLandmarkCategory,
 } from '@/models/publicData';
+import { getStaticExitLandmarks } from './staticExitLandmarks';
 
 // ============================================================================
 // Constants
@@ -319,40 +317,13 @@ class PublicDataApiService {
    * NOTE: api.odcloud.kr may have CORS issues - returns empty array on web platform
    */
   async getExitLandmarks(stationName: string): Promise<ExitLandmark[]> {
-    // Skip API call on web platform (CORS not reliably supported)
-    if (isWebPlatform()) {
-      console.debug('[PublicDataApi] Skipping exit landmarks API on web (CORS not supported)');
-      return [];
-    }
-
-    return withRetry(async () => {
-      await this.rateLimiter.throttle('exits');
-
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
-
-      try {
-        const url = new URL(ENDPOINTS.EXIT_LANDMARKS);
-        url.searchParams.append('serviceKey', decodeURIComponent(API_KEY));
-        url.searchParams.append('page', '1');
-        url.searchParams.append('perPage', '100');
-        url.searchParams.append('cond[역명::EQ]', stationName);
-
-        const response = await fetch(url.toString(), {
-          signal: controller.signal,
-          headers: { 'Accept': 'application/json' },
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-        }
-
-        const data: PublicDataResponse<ExitLandmarkRawData> = await response.json();
-        return this.convertExitLandmarkData(data.data);
-      } finally {
-        clearTimeout(timeoutId);
-      }
-    });
+    // Issue #173: 출구 데이터는 정적 테이블(src/data/exitLandmarks.json,
+    // scripts/fetchExitLandmarks.ts 산출)을 SoT 로 사용한다. 라이브 odcloud
+    // 출구 API(15073460)는 data.go.kr 서비스 등록이 필요하고(미등록 시
+    // {"code":-3,"등록되지 않은 서비스"} 400), web 에선 CORS 로 막혀, 런타임
+    // 호출은 모든 역에서 실패+재시도로 느리기만 했다. stationAccessibility 와
+    // 동일한 정적-JSON 패턴으로 전환 — 데이터 갱신은 스크립트 재실행으로 한다.
+    return getStaticExitLandmarks(stationName);
   }
 
   /**
@@ -498,17 +469,6 @@ class PublicDataApiService {
         affectedStations: [],
       };
     });
-  }
-
-  private convertExitLandmarkData(rawData: readonly ExitLandmarkRawData[]): ExitLandmark[] {
-    return rawData.map((raw) => ({
-      stationCode: raw.역번호,
-      stationName: raw.역명,
-      lineNum: raw.호선,
-      exitNumber: raw.출구번호,
-      landmarkName: raw.주요장소,
-      category: parseLandmarkCategory(raw.장소분류 || ''),
-    }));
   }
 
   // private parseDayType(dayStr: string): 'weekday' | 'saturday' | 'holiday' {

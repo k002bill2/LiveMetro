@@ -1,0 +1,5 @@
+{
+  "generatedAt": "2026-06-03T17:00:01.000Z",
+  "source": "SEED (empty) — run scripts/fetchExitLandmarks.ts to populate from data.go.kr 국가철도공단_출구별주요장소 (odcloud 15073460). Requires an EXPO_PUBLIC_DATA_PORTAL_API_KEY registered for that service.",
+  "stations": {}
+}

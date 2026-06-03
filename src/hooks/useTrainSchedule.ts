@@ -11,6 +11,13 @@ import { seoulSubwayApi, SeoulTimetableRow, TimetableUnsupportedOnWebError } fro
 import { findStationCdByNameAndLine } from '@/services/data/stationsDataService';
 import { toSecondsOfDay } from '@/utils/dateUtils';
 import { isKoreanHoliday } from '@/utils/koreanHolidays';
+import { isSeoulMetroTimetableLine } from '@/utils/timetableCoverage';
+
+/**
+ * 서울교통공사 시간표 데이터셋(1~9호선) 밖의 노선에 표시할 안내 문구.
+ * 빈 시간표("시간표 정보가 없습니다")가 버그처럼 보이는 것을 막기 위한 정직한 메시지.
+ */
+const TIMETABLE_UNSUPPORTED_LINE_MESSAGE = '이 노선의 시간표는 제공되지 않습니다.';
 
 /** 시간표 캐시 TTL: 24시간 (시간표는 일 단위 변경) */
 const TIMETABLE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -256,6 +263,19 @@ export const useTrainSchedule = (
 
   const fetchSchedule = useCallback(async () => {
     if (!stationName || !lineNumber || !enabled) {
+      return;
+    }
+
+    // Issue #173: 서울교통공사 시간표 데이터셋(SearchSTNTimeTableByIDService)은
+    // 숫자 1~9호선만 보유한다. Korail/사철 광역·경전철 노선(경의중앙선·수인분당선·
+    // 공항철도 등)은 역코드와 무관하게 INFO-200(빈 응답)을 반환하므로, API를
+    // 호출하기 전에 차단하고 정직한 "미제공" 안내를 표시한다 — 빈 화면이 버그처럼
+    // 보이는 것 방지 + 불필요한 rate-limit 소모 제거.
+    if (!isSeoulMetroTimetableLine(lineNumber)) {
+      setError(TIMETABLE_UNSUPPORTED_LINE_MESSAGE);
+      setSchedules([]);
+      setUpcomingTrains([]);
+      setLoading(false);
       return;
     }
 

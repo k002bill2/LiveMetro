@@ -3,11 +3,20 @@
  */
 
 import { publicDataApi } from '../publicDataApi';
+import { getStaticExitLandmarks } from '../staticExitLandmarks';
+import type { ExitLandmark } from '@/models/publicData';
 
 jest.mock('@/models/publicData', () => ({
   getCongestionLevel: jest.fn().mockReturnValue('moderate'),
   parseAlertType: jest.fn().mockReturnValue('delay'),
   parseLandmarkCategory: jest.fn().mockReturnValue('convenience'),
+}));
+
+// Issue #173: 출구 라이브 API(odcloud 15073460)는 키 등록 필요 + web CORS 차단.
+// publicDataApi 는 정적 fallback 테이블을 통해 빈 화면을 막는다. 테스트에서는
+// 정적 로더를 mock 해 fallback 경로를 결정적으로 검증한다.
+jest.mock('../staticExitLandmarks', () => ({
+  getStaticExitLandmarks: jest.fn((): ExitLandmark[] => []),
 }));
 
 const mockFetch = jest.fn();
@@ -131,53 +140,69 @@ describe('PublicDataApiService', () => {
   });
   */
 
-  describe('getExitLandmarks', () => {
-    it('should fetch exit landmark data', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          data: [
-            {
-              '역번호': '222',
-              '역명': '역삼',
-              '호선': '2호선',
-              '출구번호': '1',
-              '주요장소': '강남세브란스병원',
-              '장소분류': '의료',
-            },
-          ],
-        }),
-      });
+  // Issue #173: jsdom 테스트 환경은 isWebPlatform()=true 라 라이브 fetch 경로가
+  // 아니라 정적 fallback 경로를 탄다(실제 web 사용자와 동일). 따라서 정적 로더를
+  // mock 해 fallback 동작을 검증한다.
+  const exitLandmark = (
+    exitNumber: string,
+    landmarkName: string,
+  ): ExitLandmark => ({
+    stationCode: '1251',
+    stationName: '서울역',
+    lineNum: '경의선',
+    exitNumber,
+    landmarkName,
+    category: 'shopping',
+  });
 
-      const result = await publicDataApi.getExitLandmarks('역삼');
-      expect(Array.isArray(result)).toBe(true);
-      if (result.length > 0) {
-        expect(result[0]!.stationName).toBe('역삼');
-        expect(result[0]!.exitNumber).toBe('1');
-        expect(result[0]!.landmarkName).toBe('강남세브란스병원');
-      }
-    }, 15000);
+  describe('getExitLandmarks', () => {
+    it('returns the static fallback dataset (web/jsdom path) instead of an empty array', async () => {
+      (getStaticExitLandmarks as jest.Mock).mockReturnValue([
+        exitLandmark('1', '서울로7017'),
+        exitLandmark('2', '롯데마트 서울역점'),
+      ]);
+
+      const result = await publicDataApi.getExitLandmarks('서울역');
+
+      expect(getStaticExitLandmarks).toHaveBeenCalledWith('서울역');
+      expect(result).toHaveLength(2);
+      expect(result[0]!.landmarkName).toBe('서울로7017');
+      expect(result[1]!.exitNumber).toBe('2');
+    });
+
+    it('returns [] when the static table has no entry for the station', async () => {
+      (getStaticExitLandmarks as jest.Mock).mockReturnValue([]);
+
+      const result = await publicDataApi.getExitLandmarks('데이터없는역');
+
+      expect(result).toEqual([]);
+    });
   });
 
   describe('getExitInfoGrouped', () => {
-    it('should group exits by number', async () => {
-      mockFetch.mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          data: [
-            { '역번호': '222', '역명': '역삼', '호선': '2호선', '출구번호': '1', '주요장소': 'A', '장소분류': '의료' },
-            { '역번호': '222', '역명': '역삼', '호선': '2호선', '출구번호': '1', '주요장소': 'B', '장소분류': '공원' },
-            { '역번호': '222', '역명': '역삼', '호선': '2호선', '출구번호': '2', '주요장소': 'C', '장소분류': '편의' },
-          ],
-        }),
-      });
+    it('groups static fallback landmarks by exit number, sorted ascending', async () => {
+      (getStaticExitLandmarks as jest.Mock).mockReturnValue([
+        exitLandmark('1', 'A'),
+        exitLandmark('1', 'B'),
+        exitLandmark('2', 'C'),
+      ]);
 
-      const result = await publicDataApi.getExitInfoGrouped('역삼');
+      const result = await publicDataApi.getExitInfoGrouped('서울역');
+
       expect(result.length).toBe(2);
       expect(result[0]!.exitNumber).toBe('1');
       expect(result[0]!.landmarks.length).toBe(2);
       expect(result[1]!.exitNumber).toBe('2');
-    }, 15000);
+      expect(result[1]!.landmarks.length).toBe(1);
+    });
+
+    it('returns [] when the static fallback is empty', async () => {
+      (getStaticExitLandmarks as jest.Mock).mockReturnValue([]);
+
+      const result = await publicDataApi.getExitInfoGrouped('데이터없는역');
+
+      expect(result).toEqual([]);
+    });
   });
 
   describe('deprecated schedule methods', () => {
