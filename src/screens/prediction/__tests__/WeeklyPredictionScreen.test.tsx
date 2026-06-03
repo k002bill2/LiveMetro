@@ -12,6 +12,7 @@ import { render, fireEvent } from '@testing-library/react-native';
 import { WeeklyPredictionScreen } from '../WeeklyPredictionScreen';
 import type { PredictedCommute } from '@/models/pattern';
 import { useCommutePattern } from '@/hooks/useCommutePattern';
+import { useMLPrediction } from '@/hooks/useMLPrediction';
 
 jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
 
@@ -41,9 +42,10 @@ jest.mock('react-native', () => {
 });
 
 const mockGoBack = jest.fn();
+const mockNavigate = jest.fn();
 jest.mock('@react-navigation/native', () => ({
   useNavigation: jest.fn(() => ({
-    navigate: jest.fn(),
+    navigate: mockNavigate,
     goBack: mockGoBack,
   })),
   NavigationProp: {},
@@ -179,6 +181,10 @@ describe('WeeklyPredictionScreen', () => {
       loading: false,
       error: null,
     });
+    // Re-apply the no-prediction default. clearAllMocks() wipes call records
+    // but not mockReturnValue, so a persistent override in one test would
+    // otherwise leak into the next.
+    (useMLPrediction as jest.Mock).mockReturnValue({ prediction: null });
   });
 
   it('renders the screen container with stable testID', () => {
@@ -323,6 +329,61 @@ describe('WeeklyPredictionScreen', () => {
     const { getByTestId } = render(<WeeklyPredictionScreen />);
     fireEvent.press(getByTestId('commute-prediction-back'));
     expect(mockGoBack).toHaveBeenCalled();
+  });
+
+  // The top-bar gear is the always-available "change route" affordance.
+  // WeeklyPrediction sits on the root stack (sibling to `Main`), so reaching
+  // CommuteSettings is a 3-level nested navigation:
+  //   Root('Main') → Tab('Profile'=SettingsNavigator) → Stack('CommuteSettings').
+  // `initial: false` seeds [SettingsHome, CommuteSettings] so back lands on
+  // SettingsHome rather than trapping the user (mirrors HomeScreen).
+  it('navigates to commute settings when the settings gear is pressed', () => {
+    const { getByTestId } = render(<WeeklyPredictionScreen />);
+    fireEvent.press(getByTestId('commute-prediction-settings'));
+    expect(mockNavigate).toHaveBeenCalledWith('Main', {
+      screen: 'Profile',
+      params: { screen: 'CommuteSettings', initial: false },
+    });
+  });
+
+  // Default mocks supply no commuteSchedule (useAuth preferences = {}) and
+  // trainService.getStation → null, so routeNames stays empty. Instead of a
+  // silent gap, the screen surfaces a tappable setup banner that explains the
+  // empty sections ("경로 정보 없음" etc.) and routes to CommuteSettings.
+  it('shows an actionable route-setup banner when no commute route is configured', () => {
+    const { getByTestId, queryByTestId } = render(<WeeklyPredictionScreen />);
+    expect(getByTestId('commute-prediction-route-setup')).toBeTruthy();
+    // The configured-route row must be absent in the unconfigured state.
+    expect(queryByTestId('commute-prediction-route-row')).toBeNull();
+    fireEvent.press(getByTestId('commute-prediction-route-setup'));
+    expect(mockNavigate).toHaveBeenCalledWith('Main', {
+      screen: 'Profile',
+      params: { screen: 'CommuteSettings', initial: false },
+    });
+  });
+
+  // Edge: no real ML prediction yet (useMLPrediction → prediction: null, the
+  // default mock). The hardcoded "87% · 지난 30일 학습" would be a false claim,
+  // so the confidence slot reads "데이터 수집중" instead.
+  it('shows "데이터 수집중" when no real ML prediction exists', () => {
+    const { getByText, queryByText } = render(<WeeklyPredictionScreen />);
+    expect(getByText('데이터 수집중')).toBeTruthy();
+    expect(queryByText('· 지난 30일 학습')).toBeNull();
+  });
+
+  // Happy: a real prediction (non-null) restores the percentage + learning
+  // meta and removes the collecting label. Uses mockReturnValue (not Once)
+  // because the screen re-renders on async slot state updates and each render
+  // re-reads useMLPrediction — a one-shot override would be consumed by the
+  // first render and revert to null before assertions run.
+  it('shows confidence percentage and learning meta when a real prediction exists', () => {
+    (useMLPrediction as jest.Mock).mockReturnValue({
+      prediction: { confidence: 0.92, predictedArrivalTime: '09:15' },
+    });
+    const { getByText, queryByText } = render(<WeeklyPredictionScreen />);
+    expect(getByText('92%')).toBeTruthy();
+    expect(getByText('· 지난 30일 학습')).toBeTruthy();
+    expect(queryByText('데이터 수집중')).toBeNull();
   });
 });
 

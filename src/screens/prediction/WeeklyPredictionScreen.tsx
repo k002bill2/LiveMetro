@@ -21,7 +21,7 @@
  *   8. "예측에 반영된 요소" factors list (Task 7 — usePredictionFactors)
  *   9. Weekly comparison bar chart (Task 4)
  */
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/services/auth/AuthContext';
 import { trainService } from '@/services/train/trainService';
 import {
@@ -134,6 +134,29 @@ export const WeeklyPredictionScreen: React.FC = () => {
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
   const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
 
+  // 출퇴근 경로 등록/변경 진입점. HomeScreen.handleOpenCommuteSettings와 동일
+  // 목적이지만, 이 화면은 root Stack 상의 'WeeklyPrediction'(= Main 탭 위에
+  // push된 형제)이라 Main을 한 단계 더 거친다:
+  //   Root('Main') → Tab('Profile'=SettingsNavigator) → Stack('CommuteSettings').
+  // `initial: false`는 SettingsNavigator 스택을 [SettingsHome, CommuteSettings]로
+  // 시드해 뒤로가기가 SettingsHome으로 빠지게 한다 (CommuteSettings가 유일
+  // entry가 되어 pop 불가해지는 것 방지 — HomeScreen 주석 참조). types.ts의
+  // 중첩 alias는 런타임에 없어 시그니처를 타입으로 표현 불가하므로 navigate를
+  // 한 번 캐스팅한다 (project_dual_stack_paramlist).
+  const handleOpenCommuteSettings = useCallback((): void => {
+    const navigateToCommuteSettings = navigation.navigate as (
+      route: 'Main',
+      params: {
+        screen: 'Profile';
+        params: { screen: 'CommuteSettings'; initial: false };
+      },
+    ) => void;
+    navigateToCommuteSettings('Main', {
+      screen: 'Profile',
+      params: { screen: 'CommuteSettings', initial: false },
+    });
+  }, [navigation]);
+
   const { prediction } = useMLPrediction();
   const { user } = useAuth();
 
@@ -207,6 +230,11 @@ export const WeeklyPredictionScreen: React.FC = () => {
     return [Math.max(0, predictedMinutes - 2), predictedMinutes + 2] as const;
   }, [todayPrediction, predictedMinutes]);
 
+  // 실제 ML 예측이 산출됐는지 여부. useMLPrediction은 모델 준비 + 통근 로그가
+  // 있을 때만 prediction을 채운다(없으면 null). null이면 신뢰도 "87% · 지난 30일
+  // 학습"과 델타 "3분 빨라요"는 모두 거짓 fallback이므로, 신뢰도 자리에는
+  // "데이터 수집중"을 표기하고 델타 pill은 숨겨 정직한 빈 상태를 만든다.
+  const hasRealPrediction = prediction !== null;
   const confidencePct = prediction ? Math.round(prediction.confidence * 100) : 87;
   const arrivalTime = todayPrediction?.predictedArrivalTime ?? prediction?.predictedArrivalTime ?? '';
   const nowLabel = useMemo(() => formatTimeShort(new Date()), []);
@@ -363,7 +391,15 @@ export const WeeklyPredictionScreen: React.FC = () => {
           <ChevronLeft size={26} color={semantic.labelAlt} strokeWidth={2} />
           <Text style={[styles.topBarLeftText, { color: semantic.labelAlt }]}>홈</Text>
         </Pressable>
-        <Settings2 size={22} color={semantic.labelNormal} strokeWidth={1.8} />
+        <Pressable
+          onPress={handleOpenCommuteSettings}
+          accessibilityRole="button"
+          accessibilityLabel="출퇴근 경로 설정"
+          testID="commute-prediction-settings"
+          hitSlop={8}
+        >
+          <Settings2 size={22} color={semantic.labelNormal} strokeWidth={1.8} />
+        </Pressable>
       </View>
 
       {/* 2. Hero header */}
@@ -392,14 +428,16 @@ export const WeeklyPredictionScreen: React.FC = () => {
               {displayMin}
             </Text>
             <Text style={[styles.bigUnit, { color: semantic.labelNeutral }]}>분</Text>
-            <View style={styles.deltaPillWrap}>
-              <Pill tone="pos" size="md">
-                <View style={styles.tagInner}>
-                  <TrendingDown size={12} color="#008F30" strokeWidth={2.4} />
-                  <Text style={styles.deltaText}>3분 빨라요</Text>
-                </View>
-              </Pill>
-            </View>
+            {hasRealPrediction && (
+              <View style={styles.deltaPillWrap}>
+                <Pill tone="pos" size="md">
+                  <View style={styles.tagInner}>
+                    <TrendingDown size={12} color="#008F30" strokeWidth={2.4} />
+                    <Text style={styles.deltaText}>3분 빨라요</Text>
+                  </View>
+                </Pill>
+              </View>
+            )}
           </View>
 
           {/* Range bar */}
@@ -445,17 +483,37 @@ export const WeeklyPredictionScreen: React.FC = () => {
               <Text style={[styles.confidenceLabel, { color: semantic.labelNeutral }]}>예측 신뢰도</Text>
             </View>
             <View style={styles.confidenceRight}>
-              <Text style={[styles.confidenceValue, { color: semantic.labelStrong }]}>{confidencePct}%</Text>
-              <Text style={[styles.confidenceMeta, { color: semantic.labelAlt }]}>· 지난 30일 학습</Text>
+              {hasRealPrediction ? (
+                <>
+                  <Text style={[styles.confidenceValue, { color: semantic.labelStrong }]}>{confidencePct}%</Text>
+                  <Text style={[styles.confidenceMeta, { color: semantic.labelAlt }]}>· 지난 30일 학습</Text>
+                </>
+              ) : (
+                <Text
+                  style={[styles.confidenceMeta, { color: semantic.labelAlt }]}
+                  testID="commute-prediction-collecting"
+                >
+                  데이터 수집중
+                </Text>
+              )}
             </View>
           </View>
         </View>
       </View>
 
-      {/* 4. Route summary — commuteSchedule 설정 시에만 표시 */}
-      {routeNames.origin && routeNames.destination && (
+      {/* 4. Route summary — 설정 시 '경로 변경' 진입, 미설정 시 설정 유도 배너.
+          미설정 상태에서는 todayPrediction/factors 등 하위 섹션이 모두 빈
+          상태("경로 정보 없음" 등)가 되므로, 침묵하는 공백 대신 원인을 설명하고
+          CommuteSettings로 보내는 탭 가능한 배너를 노출한다. */}
+      {routeNames.origin && routeNames.destination ? (
         <View style={styles.sectionPad}>
-          <View style={styles.routeRow}>
+          <Pressable
+            onPress={handleOpenCommuteSettings}
+            accessibilityRole="button"
+            accessibilityLabel="출퇴근 경로 변경"
+            testID="commute-prediction-route-row"
+            style={({ pressed }) => [styles.routeRow, { opacity: pressed ? 0.7 : 1 }]}
+          >
             <Text style={[styles.routeText, { color: semantic.labelStrong }]}>
               {routeNames.origin}
             </Text>
@@ -463,8 +521,36 @@ export const WeeklyPredictionScreen: React.FC = () => {
             <Text style={[styles.routeText, { color: semantic.labelStrong }]}>
               {routeNames.destination}
             </Text>
-            <Text style={[styles.routeAction, { color: semantic.labelAlt }]}>경로 보기</Text>
-          </View>
+            <Text style={[styles.routeAction, { color: semantic.primaryNormal }]}>경로 변경</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <View style={styles.sectionPad}>
+          <Pressable
+            onPress={handleOpenCommuteSettings}
+            accessibilityRole="button"
+            accessibilityLabel="출퇴근 경로 설정"
+            testID="commute-prediction-route-setup"
+            style={({ pressed }) => [
+              styles.routeSetupBanner,
+              { backgroundColor: semantic.bgElevated, opacity: pressed ? 0.85 : 1 },
+            ]}
+          >
+            <View style={styles.routeSetupTextWrap}>
+              <Text style={[styles.routeSetupTitle, { color: semantic.labelStrong }]}>
+                출퇴근 경로를 설정해 주세요
+              </Text>
+              <Text style={[styles.routeSetupSub, { color: semantic.labelAlt }]}>
+                경로를 등록하면 도착 시간·혼잡도 예측이 정확해져요
+              </Text>
+            </View>
+            <View style={styles.routeSetupCta}>
+              <Text style={[styles.routeSetupCtaText, { color: semantic.primaryNormal }]}>
+                설정하기
+              </Text>
+              <ArrowRight size={15} color={semantic.primaryNormal} strokeWidth={2.4} />
+            </View>
+          </Pressable>
         </View>
       )}
 
@@ -755,6 +841,41 @@ const createStyles = (_colors: ThemeColors, isDark: boolean) => {
       fontSize: 12,
       fontWeight: '600',
       fontFamily: weightToFontFamily('600'),
+    },
+    routeSetupBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      borderRadius: 16,
+      paddingVertical: 16,
+      paddingHorizontal: 18,
+      gap: 12,
+    },
+    routeSetupTextWrap: {
+      flex: 1,
+    },
+    routeSetupTitle: {
+      fontSize: 15,
+      fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
+      letterSpacing: -0.2,
+    },
+    routeSetupSub: {
+      fontSize: 12,
+      fontWeight: '500',
+      fontFamily: weightToFontFamily('500'),
+      marginTop: 4,
+      lineHeight: 17,
+    },
+    routeSetupCta: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 2,
+    },
+    routeSetupCtaText: {
+      fontSize: 13,
+      fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
     },
     ctaButton: {
       flexDirection: 'row',
