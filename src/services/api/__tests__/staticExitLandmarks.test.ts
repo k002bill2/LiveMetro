@@ -1,12 +1,11 @@
 /**
  * staticExitLandmarks tests
  *
- * Issue #173: odcloud 출구별주요장소 API(15073460)는 키 등록이 필요하고 web 에선
- * CORS 로 막힌다. stationAccessibility 와 동일하게 빌드타임에 정적 JSON 으로 베이크한
- * 테이블을 fallback SoT 로 사용한다. 이 로더는 그 테이블의 graceful 조회를 책임진다.
+ * Issue #173: 출구 데이터는 국가철도공단_서울교통공사 출구별 주요 장소 CSV 를
+ * 빌드타임에 정적 JSON 으로 베이크해 SoT 로 쓴다. 저장 구조는 번들 크기를 위해
+ * 역명 → 출구번호 → 시설명[] 컴팩트 맵이며, 이 로더가 stationName·exitNumber 를
+ * 채워 ExitLandmark[] 로 복원한다. 본 테스트는 그 복원/조회를 검증한다.
  */
-
-import type { ExitLandmark } from '@/models/publicData';
 
 describe('staticExitLandmarks', () => {
   afterEach(() => {
@@ -15,16 +14,14 @@ describe('staticExitLandmarks', () => {
 
   describe('shipped dataset (populated from CSV)', () => {
     it('returns the exit landmark list for a known station (서울역)', () => {
-      // 실제 번들된 exitLandmarks.json(국가철도공단_서울교통공사 출구별 주요
-      // 장소 CSV 산출)을 그대로 사용한다.
+      // 실제 번들된 exitLandmarks.json 을 그대로 사용한다.
       const { getStaticExitLandmarks } = require('../staticExitLandmarks');
       const result = getStaticExitLandmarks('서울역');
       expect(result.length).toBeGreaterThan(0);
-      // 각 엔트리는 파일 스키마 4필드를 갖는다 (stationCode/category 없음).
+      // 복원된 엔트리는 stationName·exitNumber·landmarkName 을 갖는다.
       expect(result[0]).toEqual(
         expect.objectContaining({
           stationName: '서울역',
-          lineNum: expect.any(String),
           exitNumber: expect.any(String),
           landmarkName: expect.any(String),
         }),
@@ -37,25 +34,12 @@ describe('staticExitLandmarks', () => {
     });
   });
 
-  describe('populated table', () => {
-    const seoulExits: ExitLandmark[] = [
-      {
-        stationCode: '1251',
-        stationName: '서울역',
-        lineNum: '경의선',
-        exitNumber: '1',
-        landmarkName: '서울로7017',
-        category: 'culture',
-      },
-      {
-        stationCode: '1251',
-        stationName: '서울역',
-        lineNum: '경의선',
-        exitNumber: '2',
-        landmarkName: '롯데마트 서울역점',
-        category: 'shopping',
-      },
-    ];
+  describe('compact table reconstruction', () => {
+    // 컴팩트 저장 구조: 역명 → 출구번호 → 시설명[]
+    const seoulExits = {
+      '1': ['서울로7017'],
+      '2': ['롯데마트 서울역점', '서울역우체국'],
+    };
 
     beforeEach(() => {
       jest.resetModules();
@@ -66,12 +50,13 @@ describe('staticExitLandmarks', () => {
       }));
     });
 
-    it('returns the landmark list for a known station', () => {
+    it('reconstructs one ExitLandmark per facility, injecting stationName/exitNumber', () => {
       const { getStaticExitLandmarks } = require('../staticExitLandmarks');
       const result = getStaticExitLandmarks('서울역');
-      expect(result).toHaveLength(2);
-      expect(result[0].landmarkName).toBe('서울로7017');
-      expect(result[1].exitNumber).toBe('2');
+      expect(result).toHaveLength(3);
+      expect(result[0]).toEqual({ stationName: '서울역', exitNumber: '1', landmarkName: '서울로7017' });
+      expect(result[1]).toEqual({ stationName: '서울역', exitNumber: '2', landmarkName: '롯데마트 서울역점' });
+      expect(result[2]).toEqual({ stationName: '서울역', exitNumber: '2', landmarkName: '서울역우체국' });
     });
 
     it('returns [] for a station not in the table', () => {
@@ -79,15 +64,12 @@ describe('staticExitLandmarks', () => {
       expect(getStaticExitLandmarks('없는역')).toEqual([]);
     });
 
-    it('returns a defensive copy — mutating the result does not corrupt the table', () => {
+    it('returns fresh objects — mutating the result does not corrupt the table', () => {
       const { getStaticExitLandmarks } = require('../staticExitLandmarks');
       const first = getStaticExitLandmarks('서울역');
-      first.push({
-        stationCode: 'X', stationName: '서울역', lineNum: '경의선',
-        exitNumber: '99', landmarkName: 'mutation', category: 'shopping',
-      });
+      first.push({ stationName: '서울역', exitNumber: '99', landmarkName: 'mutation' });
       const second = getStaticExitLandmarks('서울역');
-      expect(second).toHaveLength(2);
+      expect(second).toHaveLength(3);
     });
   });
 

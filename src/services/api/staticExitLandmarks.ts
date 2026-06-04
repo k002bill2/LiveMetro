@@ -20,21 +20,36 @@
 import type { ExitLandmark } from '@/models/publicData';
 import exitLandmarksJson from '@/data/exitLandmarks.json';
 
+/** 역명 → 출구번호 → 시설명[] (컴팩트 저장 구조). */
+type CompactExits = Readonly<Record<string, readonly string[]>>;
+
 interface ExitLandmarksFile {
   readonly generatedAt: string;
   readonly source: string;
-  readonly stations?: Readonly<Record<string, readonly ExitLandmark[]>>;
+  readonly stations?: Readonly<Record<string, CompactExits>>;
 }
 
 const FILE = exitLandmarksJson as ExitLandmarksFile;
-const TABLE: Readonly<Record<string, readonly ExitLandmark[]>> = FILE.stations ?? {};
+const TABLE: Readonly<Record<string, CompactExits>> = FILE.stations ?? {};
 
 /**
  * 역명의 정적 출구 주요장소 목록.
+ *
+ * 컴팩트 저장소(출구번호→시설명[])에서 stationName·exitNumber 를 채워 ExitLandmark
+ * 로 복원한다. 매 호출마다 새 객체를 생성하므로 호출부 mutation 이 테이블을
+ * 오염시키지 않는다.
+ *
  * @param stationName 역명 (예: "서울역"). 데이터셋의 키와 정확히 일치해야 한다.
- * @returns 출구 장소 배열 (방어적 복사본). 미수록 역은 빈 배열.
+ * @returns 출구 장소 배열. 미수록 역은 빈 배열.
  */
 export function getStaticExitLandmarks(stationName: string): ExitLandmark[] {
-  const entry = TABLE[stationName];
-  return entry ? [...entry] : [];
+  const byExit = TABLE[stationName];
+  if (!byExit) return [];
+  const out: ExitLandmark[] = [];
+  for (const exitNumber of Object.keys(byExit)) {
+    for (const landmarkName of byExit[exitNumber]!) {
+      out.push({ stationName, exitNumber, landmarkName });
+    }
+  }
+  return out;
 }
