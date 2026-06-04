@@ -13,12 +13,27 @@ describe('staticExitLandmarks', () => {
     jest.resetModules();
   });
 
-  describe('empty seed (shipped default)', () => {
-    it('returns [] for any station when stations table is empty', () => {
-      // 실제 번들된 빈 seed(src/data/exitLandmarks.json)를 그대로 사용.
+  describe('shipped dataset (populated from CSV)', () => {
+    it('returns the exit landmark list for a known station (서울역)', () => {
+      // 실제 번들된 exitLandmarks.json(국가철도공단_서울교통공사 출구별 주요
+      // 장소 CSV 산출)을 그대로 사용한다.
       const { getStaticExitLandmarks } = require('../staticExitLandmarks');
-      expect(getStaticExitLandmarks('서울역')).toEqual([]);
-      expect(getStaticExitLandmarks('강남')).toEqual([]);
+      const result = getStaticExitLandmarks('서울역');
+      expect(result.length).toBeGreaterThan(0);
+      // 각 엔트리는 파일 스키마 4필드를 갖는다 (stationCode/category 없음).
+      expect(result[0]).toEqual(
+        expect.objectContaining({
+          stationName: '서울역',
+          lineNum: expect.any(String),
+          exitNumber: expect.any(String),
+          landmarkName: expect.any(String),
+        }),
+      );
+    });
+
+    it('returns [] for a station not in the dataset', () => {
+      const { getStaticExitLandmarks } = require('../staticExitLandmarks');
+      expect(getStaticExitLandmarks('존재하지않는역명ABC')).toEqual([]);
     });
   });
 

@@ -1,120 +1,105 @@
 /**
- * fetchExitLandmarks — one-off generator for src/data/exitLandmarks.json
+ * fetchExitLandmarks — generator for src/data/exitLandmarks.json
  *
- * 국가철도공단_출구별주요장소 API(odcloud 15073460)의 전체 데이터셋을 내려받아
- * 역명별로 그룹화해 정적 JSON 으로 베이크한다. 출구 주요장소는 거의 안 변하므로
- * 가끔만 재실행한다. `scripts/fetchStationAccessibility.ts` 와 동일한 패턴.
+ * 국가철도공단_서울교통공사 출구별 주요 장소 CSV(data.go.kr 파일데이터)를 읽어
+ * 역명별 출구 주요시설 목록으로 변환한다. 출구 시설은 거의 안 변하므로 데이터셋
+ * 갱신 시에만 재실행한다. `scripts/fetchStationAccessibility.ts` 와 동일하게
+ * 정적 JSON 을 산출하는 빌드타임 스크립트.
  *
- * 사전 준비 (Issue #173):
- *   이 API 는 data.go.kr 에서 데이터셋(15073460)별 "활용신청"(서비스 등록)이
- *   필요하다. 등록되지 않은 키로 호출하면 HTTP 400 {"code":-3,"msg":"등록되지
- *   않은 서비스 입니다."} 가 반환된다. data.go.kr 에서 해당 데이터셋을 활용신청한
- *   serviceKey 를 EXPO_PUBLIC_DATA_PORTAL_API_KEY 에 넣은 뒤 실행할 것.
+ * 데이터 출처 (Issue #173):
+ *   data.go.kr → "국가철도공단_서울교통공사 출구별 주요 장소" (파일데이터, CSV).
+ *   CSV 인코딩은 EUC-KR(CP949), 컬럼: 철도운영기관,노선명,역명,출구번호,출구별주요시설명.
+ *   (라이브 odcloud REST API(15073460)는 실제로 존재하지 않아 폐기됨.)
  *
  * 실행:
- *   EXPO_PUBLIC_DATA_PORTAL_API_KEY=<registered-key> npx ts-node scripts/fetchExitLandmarks.ts
- *
- * 네트워크: api.odcloud.kr 는 sandbox allowlist 에 없다 — sandbox 해제 또는
- * 일반 터미널에서 실행할 것.
+ *   npx ts-node scripts/fetchExitLandmarks.ts "<다운로드한 CSV 경로>"
  */
 
-// 1회성 CLI 빌드 스크립트 — 진행 로그·경고에 console 출력이 정상 동작이다
+// 1회성 CLI 빌드 스크립트 — 진행 로그에 console 출력이 정상 동작이다
 // (앱 번들 코드 아님). no-console 규칙은 이 파일에 한해 비활성화한다.
 /* eslint-disable no-console */
-import { writeFileSync } from 'fs';
+import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import {
-  ExitLandmark,
-  ExitLandmarkRawData,
-  parseLandmarkCategory,
-} from '../src/models/publicData';
+import { TextDecoder } from 'util';
+import { ExitLandmark } from '../src/models/publicData';
 
-const API_KEY = process.env.EXPO_PUBLIC_DATA_PORTAL_API_KEY ?? '';
-const ENDPOINT =
-  'https://api.odcloud.kr/api/15073460/v1/uddi:5e336c4a-7f38-4429-b815-e1c31c0a6c46';
-const PER_PAGE = 1000;
-const RATE_LIMIT_MS = 300; // odcloud 페이지 간 여유
+const CSV_COLUMNS = ['철도운영기관', '노선명', '역명', '출구번호', '출구별주요시설명'] as const;
 
-interface OdcloudResponse {
-  readonly currentCount?: number;
-  readonly matchCount?: number;
-  readonly totalCount?: number;
-  readonly data?: readonly ExitLandmarkRawData[];
+interface SeoulStationsFile {
+  readonly DATA: readonly { readonly station_nm: string }[];
 }
 
-const sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
+/** 앱이 stationName 으로 쓰는 정식 역명 집합 (seoulStations.json). */
+function loadAppStationNames(): Set<string> {
+  const raw = readFileSync(join(__dirname, '../src/data/seoulStations.json'), 'utf8');
+  const file = JSON.parse(raw) as SeoulStationsFile;
+  return new Set(file.DATA.map((s) => s.station_nm));
+}
 
-/** 전체 데이터셋을 페이지네이션으로 모두 수집. */
-async function fetchAllRows(): Promise<ExitLandmarkRawData[]> {
-  const all: ExitLandmarkRawData[] = [];
-  let page = 1;
-
-  for (;;) {
-    const url = new URL(ENDPOINT);
-    url.searchParams.append('serviceKey', decodeURIComponent(API_KEY));
-    url.searchParams.append('page', String(page));
-    url.searchParams.append('perPage', String(PER_PAGE));
-
-    const res = await fetch(url.toString(), { headers: { Accept: 'application/json' } });
-    if (!res.ok) {
-      const body = await res.text();
-      throw new Error(`HTTP ${res.status} ${res.statusText}: ${body.slice(0, 200)}`);
-    }
-
-    const json = (await res.json()) as OdcloudResponse;
-    const rows = json.data ?? [];
-    all.push(...rows);
-
-    const total = json.totalCount ?? all.length;
-    console.log(`  page ${page}: +${rows.length} rows (${all.length}/${total})`);
-
-    if (rows.length === 0 || all.length >= total) break;
-    page += 1;
-    await sleep(RATE_LIMIT_MS);
+/**
+ * CSV 역명을 앱 stationName 포맷으로 정규화.
+ *  1) 부역명 괄호 제거: "잠실(송파구청)" → "잠실"
+ *  2) "역" 접미사는 떼었을 때 알려진 역이 될 때만 제거: "하남검단산역" → "하남검단산".
+ *     ("서울역" 처럼 역이 정식 명칭의 일부인 경우는 유지 — seoulStations 에 그대로 존재.)
+ */
+function normalizeStationName(raw: string, appNames: Set<string>): string {
+  const base = raw.replace(/\(.*\)\s*$/, '').trim();
+  if (!appNames.has(base) && base.endsWith('역')) {
+    const stripped = base.slice(0, -1);
+    if (appNames.has(stripped)) return stripped;
   }
-
-  return all;
+  return base;
 }
 
-/** 원시 행을 역명별 ExitLandmark[] 로 그룹화. */
-function groupByStation(rows: readonly ExitLandmarkRawData[]): Record<string, ExitLandmark[]> {
-  const stations: Record<string, ExitLandmark[]> = {};
-  for (const raw of rows) {
-    const name = raw.역명;
-    if (!name) continue;
-    const landmark: ExitLandmark = {
-      stationCode: raw.역번호,
-      stationName: raw.역명,
-      lineNum: raw.호선,
-      exitNumber: raw.출구번호,
-      landmarkName: raw.주요장소,
-      category: parseLandmarkCategory(raw.장소분류 || ''),
-    };
-    (stations[name] ??= []).push(landmark);
-  }
-  return stations;
-}
-
-async function main(): Promise<void> {
-  if (!API_KEY) {
-    console.error('EXPO_PUBLIC_DATA_PORTAL_API_KEY 미설정');
+function main(): void {
+  const csvPath = process.argv[2];
+  if (!csvPath) {
+    console.error('사용법: npx ts-node scripts/fetchExitLandmarks.ts "<CSV 경로>"');
     process.exit(1);
   }
 
-  console.log('국가철도공단 출구별주요장소 전체 수집 중...');
-  const rows = await fetchAllRows();
-  const stations = groupByStation(rows);
+  const appNames = loadAppStationNames();
+  const text = new TextDecoder('euc-kr').decode(readFileSync(csvPath));
+  const lines = text.split(/\r?\n/).filter((l) => l.length > 0);
 
-  const stationCount = Object.keys(stations).length;
-  console.log(`수집 완료: ${rows.length} rows → ${stationCount} 역`);
+  const header = lines[0]?.split(',').map((c) => c.trim()) ?? [];
+  const headerOk = CSV_COLUMNS.every((col, i) => header[i] === col);
+  if (!headerOk) {
+    console.error(`예상 컬럼과 다릅니다. expected=${CSV_COLUMNS.join(',')} got=${header.join(',')}`);
+    process.exit(1);
+  }
+
+  const stations: Record<string, ExitLandmark[]> = {};
+  let skipped = 0;
+  for (let i = 1; i < lines.length; i++) {
+    const cols = lines[i]!.split(',');
+    if (cols.length < 5) { skipped++; continue; }
+    const lineNum = cols[1]!.trim();
+    const stationName = normalizeStationName(cols[2]!, appNames);
+    const exitNumber = cols[3]!.trim();
+    const landmarkName = cols[4]!.trim();
+    if (!stationName || !landmarkName) { skipped++; continue; }
+
+    const landmark: ExitLandmark = { stationName, lineNum, exitNumber, landmarkName };
+    (stations[stationName] ??= []).push(landmark);
+  }
+
+  // 결정적 diff 를 위해 역명 키를 정렬해 직렬화.
+  const sortedStations: Record<string, ExitLandmark[]> = {};
+  for (const name of Object.keys(stations).sort((a, b) => a.localeCompare(b, 'ko'))) {
+    sortedStations[name] = stations[name]!;
+  }
+
+  const stationCount = Object.keys(sortedStations).length;
+  const facilityCount = Object.values(sortedStations).reduce((n, list) => n + list.length, 0);
+  console.log(`변환 완료: ${facilityCount} 시설 / ${stationCount} 역 (skip ${skipped})`);
 
   const out = {
     generatedAt: new Date().toISOString(),
     source:
-      '국가철도공단_출구별주요장소 (data.go.kr / odcloud 15073460). ' +
+      '국가철도공단_서울교통공사 출구별 주요 장소 (data.go.kr 파일데이터, CSV). ' +
       'Generated by scripts/fetchExitLandmarks.ts',
-    stations,
+    stations: sortedStations,
   };
 
   const outPath = join(__dirname, '../src/data/exitLandmarks.json');
@@ -122,7 +107,4 @@ async function main(): Promise<void> {
   console.log(`기록 완료: ${outPath}`);
 }
 
-main().catch((err) => {
-  console.error('fetchExitLandmarks 실패:', err instanceof Error ? err.message : err);
-  process.exit(1);
-});
+main();

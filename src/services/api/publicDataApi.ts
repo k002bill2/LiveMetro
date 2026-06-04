@@ -41,7 +41,8 @@ const ENDPOINTS = {
   // CONGESTION: 'https://api.odcloud.kr/api/15071311/v1/uddi:f5381f71-5c8a-4a78-9773-1327922dc657',
   ACCESSIBILITY: 'https://apis.data.go.kr/B553766/wksn/stnInfoList',
   ALERTS: 'https://apis.data.go.kr/B553766/ntce/ntceList',
-  EXIT_LANDMARKS: 'https://api.odcloud.kr/api/15073460/v1/uddi:5e336c4a-7f38-4429-b815-e1c31c0a6c46',
+  // EXIT_LANDMARKS removed (Issue #173): odcloud REST 출구 API 는 존재하지 않았다.
+  // 출구 데이터는 staticExitLandmarks(파일 기반 정적 JSON)로 제공한다.
   // SCHEDULE endpoint removed - use seoulSubwayApi.getStationTimetable instead
 } as const;
 
@@ -319,10 +320,10 @@ class PublicDataApiService {
   async getExitLandmarks(stationName: string): Promise<ExitLandmark[]> {
     // Issue #173: 출구 데이터는 정적 테이블(src/data/exitLandmarks.json,
     // scripts/fetchExitLandmarks.ts 산출)을 SoT 로 사용한다. 라이브 odcloud
-    // 출구 API(15073460)는 data.go.kr 서비스 등록이 필요하고(미등록 시
-    // {"code":-3,"등록되지 않은 서비스"} 400), web 에선 CORS 로 막혀, 런타임
-    // 호출은 모든 역에서 실패+재시도로 느리기만 했다. stationAccessibility 와
-    // 동일한 정적-JSON 패턴으로 전환 — 데이터 갱신은 스크립트 재실행으로 한다.
+    // REST 출구 API 는 실제로 존재하지 않았고(원 코드의 15073460 은 죽은 전제),
+    // 실데이터는 data.go.kr "서울교통공사 출구별 주요 장소" 파일데이터(CSV)로만
+    // 제공된다. stationAccessibility 와 동일한 정적-JSON 패턴 — 데이터 갱신은
+    // 스크립트 재실행으로 한다.
     return getStaticExitLandmarks(stationName);
   }
 

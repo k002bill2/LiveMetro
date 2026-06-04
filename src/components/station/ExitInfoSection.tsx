@@ -59,9 +59,12 @@ const ExitCard: React.FC<ExitCardProps> = memo(({ exit, semantic }) => {
   const landmarksByCategory = useMemo(() => {
     const grouped = new Map<LandmarkCategory, string[]>();
     for (const landmark of exit.landmarks) {
-      const existing = grouped.get(landmark.category) || [];
+      // 파일 데이터 소스(CSV)에는 category 가 없어 undefined 일 수 있다 →
+      // 'other'(📍)로 그룹화해 표시 (Issue #173).
+      const category = landmark.category ?? 'other';
+      const existing = grouped.get(category) || [];
       existing.push(landmark.landmarkName);
-      grouped.set(landmark.category, existing);
+      grouped.set(category, existing);
     }
     return grouped;
   }, [exit.landmarks]);
