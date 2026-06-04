@@ -73,6 +73,30 @@ describe('staticExitLandmarks', () => {
     });
   });
 
+  describe('역-suffix fallback (서울 → 서울역)', () => {
+    // 좌표가 동일한 GTX-A "서울" 노드(stations.json s_9005)를 탭하면 stationName 이
+    // "서울"(역 suffix 없음)로 들어온다. 실시간 API 는 부분매칭으로 살지만 출구는
+    // exact 키 "서울역"과 어긋나 빈다 → 역-suffix fallback 으로 매칭한다.
+    it('resolves a 역-less name to the "역" key in the real dataset', () => {
+      const { getStaticExitLandmarks } = require('../staticExitLandmarks');
+      const canonical = getStaticExitLandmarks('서울역');
+      const variant = getStaticExitLandmarks('서울');
+      expect(canonical.length).toBeGreaterThan(0);
+      expect(variant.length).toBe(canonical.length);
+      expect(variant[0].stationName).toBe('서울역');
+    });
+
+    it('trims surrounding whitespace before lookup', () => {
+      const { getStaticExitLandmarks } = require('../staticExitLandmarks');
+      expect(getStaticExitLandmarks('  서울역  ').length).toBeGreaterThan(0);
+    });
+
+    it('does not falsely match when neither exact nor +역 key exists', () => {
+      const { getStaticExitLandmarks } = require('../staticExitLandmarks');
+      expect(getStaticExitLandmarks('존재하지않는역명')).toEqual([]);
+    });
+  });
+
   describe('malformed table', () => {
     it('returns [] when the stations key is missing entirely', () => {
       jest.resetModules();
