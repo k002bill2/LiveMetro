@@ -39,6 +39,7 @@ jest.mock('firebase/auth', () => ({
   linkWithCredential: (...args: unknown[]) => mockLinkWithCredential(...args),
   EmailAuthProvider: {
     credential: jest.fn(() => 'mockCredential'),
+    PROVIDER_ID: 'password',
   },
   PhoneAuthProvider: {
     credential: (...args: unknown[]) => mockPhoneAuthProviderCredential(...args),
@@ -489,6 +490,52 @@ describe('AuthContext', () => {
       expect(mockUpdateProfile).toHaveBeenCalledWith(fakeUser, { displayName: '홍길동' });
 
       mockCurrentUser.value = null; // reset for other tests
+    });
+
+    // 멱등성: phone-only user 에 이미 email/password provider 가 연결된 상태(재시도·
+    // 동일 전화번호 재가입)에서 link 를 다시 호출하면 auth/provider-already-linked 로
+    // "계정 생성에 실패했습니다" 가 떠 가입이 막힌다 (관찰된 버그).
+    it('skips linkWithCredential when the email provider is already linked (idempotent retry)', async () => {
+      const fakeUser = {
+        uid: 'phone-uid',
+        email: 'a@test.com',
+        providerData: [{ providerId: 'password' }],
+      };
+      mockCurrentUser.value = fakeUser;
+      mockUpdateProfile.mockResolvedValue(undefined);
+
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => {
+        await result.current.linkEmailToCurrentUser('a@test.com', 'pw123456', '홍길동');
+      });
+
+      expect(mockLinkWithCredential).not.toHaveBeenCalled();
+      expect(mockUpdateProfile).toHaveBeenCalledWith(fakeUser, { displayName: '홍길동' });
+
+      mockCurrentUser.value = null;
+    });
+
+    it('treats auth/provider-already-linked as success instead of failing signup', async () => {
+      const fakeUser = { uid: 'phone-uid', email: 'a@test.com', providerData: [] };
+      mockCurrentUser.value = fakeUser;
+      mockLinkWithCredential.mockRejectedValue({ code: 'auth/provider-already-linked' });
+      mockUpdateProfile.mockResolvedValue(undefined);
+      const errSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      // 던지지 않고 성공으로 마무리되어야 한다.
+      await act(async () => {
+        await result.current.linkEmailToCurrentUser('a@test.com', 'pw123456');
+      });
+
+      expect(mockLinkWithCredential).toHaveBeenCalled();
+
+      errSpy.mockRestore();
+      mockCurrentUser.value = null;
     });
   });
 });
