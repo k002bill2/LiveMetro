@@ -20,21 +20,56 @@
 import type { ExitLandmark } from '@/models/publicData';
 import exitLandmarksJson from '@/data/exitLandmarks.json';
 
+/** 역명 → 출구번호 → 시설명[] (컴팩트 저장 구조). */
+type CompactExits = Readonly<Record<string, readonly string[]>>;
+
 interface ExitLandmarksFile {
   readonly generatedAt: string;
   readonly source: string;
-  readonly stations?: Readonly<Record<string, readonly ExitLandmark[]>>;
+  readonly stations?: Readonly<Record<string, CompactExits>>;
 }
 
 const FILE = exitLandmarksJson as ExitLandmarksFile;
-const TABLE: Readonly<Record<string, readonly ExitLandmark[]>> = FILE.stations ?? {};
+const TABLE: Readonly<Record<string, CompactExits>> = FILE.stations ?? {};
+
+/**
+ * stationName 을 출구 테이블 키로 해석.
+ *  1) trim 후 정확 일치 우선
+ *  2) 역 suffix 없는 변형은 "역" 을 붙여 재시도 ("서울" → "서울역")
+ *
+ * 좌표가 동일한 GTX-A "서울" 노드(stations.json s_9005, seoulStations cd 9005)를
+ * 탭하면 stationName 이 "서울"(역 suffix 없음)로 들어온다. 실시간 API 는 부분매칭으로
+ * 살지만 출구 lookup 은 exact 키 "서울역"과 어긋나 빈다 — 그 비대칭을 보정한다.
+ */
+function resolveStationKey(stationName: string): string | null {
+  const name = stationName.trim();
+  if (Object.prototype.hasOwnProperty.call(TABLE, name)) return name;
+  if (!name.endsWith('역')) {
+    const withSuffix = `${name}역`;
+    if (Object.prototype.hasOwnProperty.call(TABLE, withSuffix)) return withSuffix;
+  }
+  return null;
+}
 
 /**
  * 역명의 정적 출구 주요장소 목록.
- * @param stationName 역명 (예: "서울역"). 데이터셋의 키와 정확히 일치해야 한다.
- * @returns 출구 장소 배열 (방어적 복사본). 미수록 역은 빈 배열.
+ *
+ * 컴팩트 저장소(출구번호→시설명[])에서 정규화된 역명·exitNumber 를 채워 ExitLandmark
+ * 로 복원한다. 매 호출마다 새 객체를 생성하므로 호출부 mutation 이 테이블을
+ * 오염시키지 않는다.
+ *
+ * @param stationName 역명 (예: "서울역" 또는 "서울"). trim·역-suffix fallback 적용.
+ * @returns 출구 장소 배열 (stationName 은 매칭된 정식 키). 미수록 역은 빈 배열.
  */
 export function getStaticExitLandmarks(stationName: string): ExitLandmark[] {
-  const entry = TABLE[stationName];
-  return entry ? [...entry] : [];
+  const key = resolveStationKey(stationName);
+  if (!key) return [];
+  const byExit = TABLE[key]!;
+  const out: ExitLandmark[] = [];
+  for (const exitNumber of Object.keys(byExit)) {
+    for (const landmarkName of byExit[exitNumber]!) {
+      out.push({ stationName: key, exitNumber, landmarkName });
+    }
+  }
+  return out;
 }

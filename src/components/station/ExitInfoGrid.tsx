@@ -71,7 +71,7 @@ const ExitInfoGridImpl: React.FC<ExitInfoGridProps> = ({ exits, max, testID }) =
               <View style={badgeStyle}>
                 <Text style={badgeText}>{exit.exitNumber}</Text>
               </View>
-              <Text style={landmarkText} numberOfLines={1}>
+              <Text style={landmarkText}>
                 {names}
               </Text>
             </View>

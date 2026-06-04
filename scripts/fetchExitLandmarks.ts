@@ -2,14 +2,17 @@
  * fetchExitLandmarks — generator for src/data/exitLandmarks.json
  *
  * 국가철도공단_서울교통공사 출구별 주요 장소 CSV(data.go.kr 파일데이터)를 읽어
- * 역명별 출구 주요시설 목록으로 변환한다. 출구 시설은 거의 안 변하므로 데이터셋
- * 갱신 시에만 재실행한다. `scripts/fetchStationAccessibility.ts` 와 동일하게
- * 정적 JSON 을 산출하는 빌드타임 스크립트.
+ * 역명 → 출구번호 → 시설명[] 의 컴팩트 정적 JSON 으로 변환한다. 출구 시설은
+ * 거의 안 변하므로 데이터셋 갱신 시에만 재실행한다. `fetchStationAccessibility.ts`
+ * 와 동일하게 정적 JSON 을 산출하는 빌드타임 스크립트.
+ *
+ * 컴팩트 구조: 엔트리마다 stationName(=그룹 키)·lineNum(미사용)을 중복 저장하지
+ * 않고 출구번호→시설명[] 로만 적재한다. staticExitLandmarks 로더가 읽을 때
+ * stationName·exitNumber 를 채워 ExitLandmark 로 복원한다 (번들 크기 절감).
  *
  * 데이터 출처 (Issue #173):
  *   data.go.kr → "국가철도공단_서울교통공사 출구별 주요 장소" (파일데이터, CSV).
- *   CSV 인코딩은 EUC-KR(CP949), 컬럼: 철도운영기관,노선명,역명,출구번호,출구별주요시설명.
- *   (라이브 odcloud REST API(15073460)는 실제로 존재하지 않아 폐기됨.)
+ *   인코딩 EUC-KR(CP949), 컬럼: 철도운영기관,노선명,역명,출구번호,출구별주요시설명.
  *
  * 실행:
  *   npx ts-node scripts/fetchExitLandmarks.ts "<다운로드한 CSV 경로>"
@@ -21,7 +24,6 @@
 import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { TextDecoder } from 'util';
-import { ExitLandmark } from '../src/models/publicData';
 
 const CSV_COLUMNS = ['철도운영기관', '노선명', '역명', '출구번호', '출구별주요시설명'] as const;
 
@@ -51,6 +53,14 @@ function normalizeStationName(raw: string, appNames: Set<string>): string {
   return base;
 }
 
+/** 출구번호 정렬: 숫자 우선, 그 외는 문자열 비교. */
+function compareExit(a: string, b: string): number {
+  const na = Number.parseInt(a, 10);
+  const nb = Number.parseInt(b, 10);
+  if (Number.isNaN(na) || Number.isNaN(nb)) return a.localeCompare(b, 'ko');
+  return na - nb;
+}
+
 function main(): void {
   const csvPath = process.argv[2];
   if (!csvPath) {
@@ -63,35 +73,39 @@ function main(): void {
   const lines = text.split(/\r?\n/).filter((l) => l.length > 0);
 
   const header = lines[0]?.split(',').map((c) => c.trim()) ?? [];
-  const headerOk = CSV_COLUMNS.every((col, i) => header[i] === col);
-  if (!headerOk) {
+  if (!CSV_COLUMNS.every((col, i) => header[i] === col)) {
     console.error(`예상 컬럼과 다릅니다. expected=${CSV_COLUMNS.join(',')} got=${header.join(',')}`);
     process.exit(1);
   }
 
-  const stations: Record<string, ExitLandmark[]> = {};
+  // 역명 → 출구번호 → 시설명[]
+  const stations: Record<string, Record<string, string[]>> = {};
   let skipped = 0;
+  let facilityCount = 0;
   for (let i = 1; i < lines.length; i++) {
     const cols = lines[i]!.split(',');
     if (cols.length < 5) { skipped++; continue; }
-    const lineNum = cols[1]!.trim();
     const stationName = normalizeStationName(cols[2]!, appNames);
     const exitNumber = cols[3]!.trim();
     const landmarkName = cols[4]!.trim();
-    if (!stationName || !landmarkName) { skipped++; continue; }
-
-    const landmark: ExitLandmark = { stationName, lineNum, exitNumber, landmarkName };
-    (stations[stationName] ??= []).push(landmark);
+    if (!stationName || !exitNumber || !landmarkName) { skipped++; continue; }
+    const byExit = (stations[stationName] ??= {});
+    (byExit[exitNumber] ??= []).push(landmarkName);
+    facilityCount++;
   }
 
-  // 결정적 diff 를 위해 역명 키를 정렬해 직렬화.
-  const sortedStations: Record<string, ExitLandmark[]> = {};
+  // 결정적 diff: 역명(ko) + 출구번호(숫자) 정렬.
+  const sortedStations: Record<string, Record<string, string[]>> = {};
   for (const name of Object.keys(stations).sort((a, b) => a.localeCompare(b, 'ko'))) {
-    sortedStations[name] = stations[name]!;
+    const byExit = stations[name]!;
+    const sortedByExit: Record<string, string[]> = {};
+    for (const exit of Object.keys(byExit).sort(compareExit)) {
+      sortedByExit[exit] = byExit[exit]!;
+    }
+    sortedStations[name] = sortedByExit;
   }
 
   const stationCount = Object.keys(sortedStations).length;
-  const facilityCount = Object.values(sortedStations).reduce((n, list) => n + list.length, 0);
   console.log(`변환 완료: ${facilityCount} 시설 / ${stationCount} 역 (skip ${skipped})`);
 
   const out = {
