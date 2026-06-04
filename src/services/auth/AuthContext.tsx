@@ -374,17 +374,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (!current) {
       throw new Error('로그인된 사용자가 없습니다. 본인 인증을 먼저 완료해주세요.');
     }
-    try {
-      const credential = EmailAuthProvider.credential(email, password);
-      await linkWithCredential(current, credential);
-      if (displayName) {
-        await updateProfile(current, { displayName });
-      }
-      // CRITICAL: updateProfile() does NOT fire onAuthStateChanged. Without
-      // this manual refresh, AuthContext's React state still holds the
-      // pre-link snapshot (typically displayName === '익명 사용자' for a
-      // phone-only user) and SignupStep3 celebration shows the wrong name.
-      // We patch local user state from the now-mutated currentUser.
+
+    // CRITICAL: updateProfile()/linkWithCredential 은 onAuthStateChanged 를 발화하지
+    // 않으므로, 갱신 후 AuthContext 의 React state 를 now-mutated currentUser 로 직접
+    // 보정한다. 그렇지 않으면 SignupStep3 축하 화면이 pre-link 스냅샷(phone-only 는
+    // 보통 displayName === '익명 사용자')을 보여준다.
+    const syncLocalUser = (): void => {
       setUser((prev) =>
         prev
           ? {
@@ -394,9 +389,41 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
             }
           : prev,
       );
+    };
+
+    // 멱등성: phone-only user 에 이미 email/password provider 가 연결돼 있으면
+    // (재시도·중복 제출·동일 전화번호 재가입) linkWithCredential 재호출이
+    // auth/provider-already-linked 로 실패해 가입이 영영 막힌다. 이미 연결돼 있으면
+    // link 단계를 건너뛰고 프로필·상태 갱신만 진행한다. (providerData 미보유 user 도
+    // 빈 배열로 안전 처리.)
+    const emailAlreadyLinked = (current.providerData ?? []).some(
+      (p) => p?.providerId === EmailAuthProvider.PROVIDER_ID,
+    );
+
+    try {
+      if (!emailAlreadyLinked) {
+        const credential = EmailAuthProvider.credential(email, password);
+        await linkWithCredential(current, credential);
+      }
+      if (displayName) {
+        await updateProfile(current, { displayName });
+      }
+      syncLocalUser();
     } catch (error: unknown) {
       console.error('Link email credential error:', error);
       const firebaseError = error as { code?: string };
+      // 경쟁 상태로 이미 연결됨 — 인증·연결은 완료된 상태이므로 성공으로 간주한다.
+      if (firebaseError.code === 'auth/provider-already-linked') {
+        if (displayName) {
+          try {
+            await updateProfile(current, { displayName });
+          } catch {
+            // best-effort: 프로필 갱신 실패가 가입 성공을 막지 않는다.
+          }
+        }
+        syncLocalUser();
+        return;
+      }
       if (firebaseError.code === 'auth/email-already-in-use') {
         throw new Error('이미 사용 중인 이메일입니다.');
       }
