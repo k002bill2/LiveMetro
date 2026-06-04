@@ -5,10 +5,11 @@
  * 역명(stationName)으로 조회한다. `stationAccessibility.ts` 와 동일한
  * 정적-JSON-테이블 패턴 (memory: [Empty-data foundation 패턴]).
  *
- * 왜 정적인가: odcloud 국가철도공단 출구별주요장소 API(15073460)는 data.go.kr
- * 활용신청(서비스 등록)이 필요하고 web 에선 CORS 로 막힌다. 라이브 호출이 빈
- * 결과/에러를 줄 때(또는 web) 이 테이블을 fallback SoT 로 사용해, "출구 안내
- * 정보가 없습니다" 빈 화면이 모든 역에 뜨는 것을 막는다 (Issue #173).
+ * 왜 정적인가: 라이브 odcloud REST 출구 API 는 실제로 존재하지 않았다(Issue
+ * #173 — 원 코드의 15073460 은 죽은 전제였다). 실데이터는 data.go.kr
+ * "국가철도공단_서울교통공사 출구별 주요 장소" 파일데이터(CSV)로만 제공되므로,
+ * 이를 빌드타임에 정적 JSON 으로 베이크해 SoT 로 쓴다. 미수록 역은 빈 배열을
+ * 반환해 "출구 안내 정보가 없습니다" 를 표시한다.
  *
  * Invariants:
  *  - 같은 입력 → 같은 출력 (deterministic)

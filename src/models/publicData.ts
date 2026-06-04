@@ -192,14 +192,22 @@ export interface ExitLandmarkRawData {
   readonly 장소분류: string;
 }
 
-/** 출구별 주요 장소 정보 (앱 사용) */
+/**
+ * 출구별 주요 장소 정보 (앱 사용)
+ *
+ * 데이터 소스는 국가철도공단_서울교통공사 출구별 주요 장소 CSV
+ * (scripts/fetchExitLandmarks.ts). CSV 스키마는 역명·노선명·출구번호·시설명만
+ * 제공하므로 `stationCode`·`category` 는 optional(미수록) 이다.
+ */
 export interface ExitLandmark {
-  readonly stationCode: string;
   readonly stationName: string;
   readonly lineNum: string;
   readonly exitNumber: string;
   readonly landmarkName: string;
-  readonly category: LandmarkCategory;
+  /** 역코드 — 파일 데이터 소스에 없어 optional */
+  readonly stationCode?: string;
+  /** 장소 분류 — 파일 데이터 소스에 없어 optional */
+  readonly category?: LandmarkCategory;
 }
 
 /** 출구 정보 (그룹화) */
