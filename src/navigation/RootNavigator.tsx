@@ -288,7 +288,9 @@ const RootNavigatorContent: React.FC = () => {
 
   // Authenticated and completed onboarding - show main app
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator
+      screenOptions={{ headerShown: false, headerBackTitleVisible: false }}
+    >
       <Stack.Screen name="Main" component={MainTabNavigator} />
       <Stack.Screen
         name="StationNavigator"
