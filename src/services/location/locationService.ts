@@ -174,22 +174,55 @@ class LocationService {
       return null;
     }
 
-    try {
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: highAccuracy ? Location.Accuracy.BestForNavigation : Location.Accuracy.Balanced,
-      });
+    // Primary attempt. Use High (not BestForNavigation) even for the
+    // high-accuracy path: navigation-grade fixes are GPS-only and the slowest /
+    // most failure-prone on a cold start, while ~10m is ample for nearby stations.
+    const primaryAccuracy = highAccuracy ? Location.Accuracy.High : Location.Accuracy.Balanced;
+    const primary = await this.tryGetPosition(primaryAccuracy);
+    if (primary) {
+      return primary;
+    }
 
+    // The live fix missed (e.g. iOS kCLErrorLocationUnknown on a cold GPS).
+    // Prefer a recent cached fix over surfacing "no location".
+    const lastKnown = await this.getLastKnownLocation();
+    if (lastKnown) {
+      return lastKnown;
+    }
+
+    // No cached fix either — retry once at Balanced accuracy, which can resolve
+    // via wifi/cell positioning (fast, works indoors) where a GPS-grade fix
+    // could not. This is the real-device cold-start recovery path.
+    if (primaryAccuracy !== Location.Accuracy.Balanced) {
+      const balanced = await this.tryGetPosition(Location.Accuracy.Balanced);
+      if (balanced) {
+        return balanced;
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Attempt a single live position fix at the given accuracy. Returns coordinates
+   * on success, or null on a (transient) failure — kCLErrorLocationUnknown, cold
+   * GPS, etc. — without throwing, so callers can fall through to the last known
+   * position or a lower-accuracy retry. The dev-only warning keeps a transient
+   * miss from becoming red error noise on every poll.
+   */
+  private async tryGetPosition(
+    accuracy: Location.Accuracy
+  ): Promise<LocationCoordinates | null> {
+    try {
+      const location = await Location.getCurrentPositionAsync({ accuracy });
       const coordinates = this.toCoordinates(location.coords);
       this.currentLocation = coordinates;
       return coordinates;
     } catch (error) {
-      // Transient miss — fall back to the last known fix instead of reporting
-      // "no location". Logged as a dev-only warning because a transient failure
-      // is expected, not red-noise-worthy on every poll.
       if (__DEV__) {
-        console.warn('getCurrentPositionAsync failed; falling back to last known position:', error);
+        console.warn(`getCurrentPositionAsync(accuracy=${accuracy}) failed:`, error);
       }
-      return this.getLastKnownLocation();
+      return null;
     }
   }
 

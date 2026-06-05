@@ -656,6 +656,67 @@ describe('LocationService', () => {
 
       expect(location).toBeNull();
     });
+
+    it('requests High (not navigation-grade) accuracy for the high-accuracy fix', async () => {
+      // BestForNavigation is GPS-only and the slowest/most failure-prone on a
+      // cold start; High (~10m) is ample for nearby-station use.
+      mockLocation.getCurrentPositionAsync.mockResolvedValue({
+        coords: {
+          latitude: 37.5,
+          longitude: 127.0,
+          accuracy: 8,
+          altitude: 0,
+          altitudeAccuracy: 0,
+          heading: 0,
+          speed: 0,
+        },
+        timestamp: Date.now(),
+      });
+
+      const location = await locationService.getCurrentLocation(true);
+
+      expect(location?.latitude).toBe(37.5);
+      expect(mockLocation.getCurrentPositionAsync).toHaveBeenCalledTimes(1);
+      expect(mockLocation.getCurrentPositionAsync).toHaveBeenCalledWith({
+        accuracy: Location.Accuracy.High,
+      });
+    });
+
+    it('retries at Balanced accuracy when the high-accuracy fix fails and no last known position exists', async () => {
+      // Real-device cold GPS: the high-accuracy (GPS-only) request throws
+      // kCLErrorLocationUnknown and there is no cached fix, but a lower-accuracy
+      // request resolves via wifi/cell positioning.
+      mockLocation.getCurrentPositionAsync
+        .mockRejectedValueOnce(
+          new Error('Cannot obtain current location: Error Domain=kCLErrorDomain Code=0 "(null)"')
+        )
+        .mockResolvedValueOnce({
+          coords: {
+            latitude: 37.5172,
+            longitude: 127.0473,
+            accuracy: 140,
+            altitude: 0,
+            altitudeAccuracy: 0,
+            heading: 0,
+            speed: 0,
+          },
+          timestamp: Date.now(),
+        });
+      mockLocation.getLastKnownPositionAsync.mockResolvedValue(null);
+
+      const location = await locationService.getCurrentLocation(true);
+
+      expect(location).not.toBeNull();
+      expect(location?.latitude).toBe(37.5172);
+      expect(location?.accuracy).toBe(140);
+      expect(mockLocation.getCurrentPositionAsync).toHaveBeenCalledTimes(2);
+      expect(mockLocation.getCurrentPositionAsync).toHaveBeenNthCalledWith(1, {
+        accuracy: Location.Accuracy.High,
+      });
+      expect(mockLocation.getCurrentPositionAsync).toHaveBeenNthCalledWith(2, {
+        accuracy: Location.Accuracy.Balanced,
+      });
+    });
   });
 
   describe('location tracking', () => {
