@@ -115,5 +115,25 @@ service cloud.firestore {
     match /commuteSettings/{userId} {
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
+
+    // Commute patterns - per-user subcollection of weekday patterns.
+    // patternAnalysisService.ts: collection(db, 'commutePatterns', uid, 'patterns').
+    // Ownership enforced via the {userId} path segment (no userId field in body),
+    // mirroring the commuteSettings precedent above.
+    match /commutePatterns/{userId}/patterns/{patternId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Commute logs - per-user subcollection of ride logs feeding pattern analysis.
+    // commuteLogService.ts: collection(db, 'commuteLogs', uid, 'logs').
+    match /commuteLogs/{userId}/logs/{logId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
+
+    // Smart notification settings - one document per user, keyed by uid.
+    // smartNotificationService.ts: doc(db, 'smartNotificationSettings', uid).
+    match /smartNotificationSettings/{userId} {
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+    }
   }
 }
