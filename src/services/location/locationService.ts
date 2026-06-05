@@ -27,6 +27,10 @@ export interface AdaptiveRadiusResult {
 const ADAPTIVE_RADIUS_STEPS: readonly number[] = [600, 1000, 1500] as const;
 const ADAPTIVE_MIN_STATIONS = 3;
 
+/** Freshness window (ms) for the last-known-position fallback. Matches the
+ * 60s location cache guidance — a fix older than this is treated as stale. */
+const LAST_KNOWN_MAX_AGE_MS = 60_000;
+
 export interface GeofenceRegion {
   identifier: string;
   latitude: number;
@@ -152,30 +156,111 @@ class LocationService {
   }
 
   /**
-   * Get current location
+   * Get current location.
+   *
+   * `getCurrentPositionAsync` can fail *transiently*: iOS reports
+   * `kCLErrorLocationUnknown` (Error Domain=kCLErrorDomain Code=0) when it
+   * cannot resolve a fix right away — cold GPS, indoors, or a simulator with no
+   * location set. Apple's guidance is to treat that as "keep trying", not a hard
+   * failure. So rather than surfacing `null` on every transient miss (which the
+   * UI renders as "현재 위치를 가져올 수 없습니다"), we degrade gracefully to the
+   * most recent cached fix from `getLastKnownPositionAsync`.
    */
   async getCurrentLocation(highAccuracy: boolean = false): Promise<LocationCoordinates | null> {
-    try {
-      if (!this.hasPermission) {
-        throw new Error('Location permission not granted');
+    if (!this.hasPermission) {
+      if (__DEV__) {
+        console.warn('getCurrentLocation called before location permission was granted');
       }
+      return null;
+    }
 
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: highAccuracy ? Location.Accuracy.BestForNavigation : Location.Accuracy.Balanced,
-      });
+    // Primary attempt. Use High (not BestForNavigation) even for the
+    // high-accuracy path: navigation-grade fixes are GPS-only and the slowest /
+    // most failure-prone on a cold start, while ~10m is ample for nearby stations.
+    const primaryAccuracy = highAccuracy ? Location.Accuracy.High : Location.Accuracy.Balanced;
+    const primary = await this.tryGetPosition(primaryAccuracy);
+    if (primary) {
+      return primary;
+    }
 
-      const coordinates: LocationCoordinates = {
-        latitude: location.coords.latitude,
-        longitude: location.coords.longitude,
-        accuracy: location.coords.accuracy || undefined,
-      };
+    // The live fix missed (e.g. iOS kCLErrorLocationUnknown on a cold GPS).
+    // Prefer a recent cached fix over surfacing "no location".
+    const lastKnown = await this.getLastKnownLocation();
+    if (lastKnown) {
+      return lastKnown;
+    }
 
+    // No cached fix either — retry once at Balanced accuracy, which can resolve
+    // via wifi/cell positioning (fast, works indoors) where a GPS-grade fix
+    // could not. This is the real-device cold-start recovery path.
+    if (primaryAccuracy !== Location.Accuracy.Balanced) {
+      const balanced = await this.tryGetPosition(Location.Accuracy.Balanced);
+      if (balanced) {
+        return balanced;
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * Attempt a single live position fix at the given accuracy. Returns coordinates
+   * on success, or null on a (transient) failure — kCLErrorLocationUnknown, cold
+   * GPS, etc. — without throwing, so callers can fall through to the last known
+   * position or a lower-accuracy retry. The dev-only warning keeps a transient
+   * miss from becoming red error noise on every poll.
+   */
+  private async tryGetPosition(
+    accuracy: Location.Accuracy
+  ): Promise<LocationCoordinates | null> {
+    try {
+      const location = await Location.getCurrentPositionAsync({ accuracy });
+      const coordinates = this.toCoordinates(location.coords);
       this.currentLocation = coordinates;
       return coordinates;
     } catch (error) {
-      console.error('Error getting current location:', error);
+      if (__DEV__) {
+        console.warn(`getCurrentPositionAsync(accuracy=${accuracy}) failed:`, error);
+      }
       return null;
     }
+  }
+
+  /**
+   * Return the device's last cached fix (within LAST_KNOWN_MAX_AGE_MS), or null
+   * when no recent fix is available. Used as a graceful fallback when a live fix
+   * cannot be obtained.
+   */
+  private async getLastKnownLocation(): Promise<LocationCoordinates | null> {
+    try {
+      const lastKnown = await Location.getLastKnownPositionAsync({
+        maxAge: LAST_KNOWN_MAX_AGE_MS,
+      });
+
+      if (!lastKnown) {
+        return null;
+      }
+
+      const coordinates = this.toCoordinates(lastKnown.coords);
+      this.currentLocation = coordinates;
+      return coordinates;
+    } catch (error) {
+      if (__DEV__) {
+        console.warn('getLastKnownPositionAsync failed:', error);
+      }
+      return null;
+    }
+  }
+
+  /**
+   * Map an expo-location coords payload to our internal coordinate shape.
+   */
+  private toCoordinates(coords: Location.LocationObjectCoords): LocationCoordinates {
+    return {
+      latitude: coords.latitude,
+      longitude: coords.longitude,
+      accuracy: coords.accuracy || undefined,
+    };
   }
 
   /**
