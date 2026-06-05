@@ -98,6 +98,52 @@ describe('useNearbyStations', () => {
     jest.useRealTimers();
   });
 
+  describe('one-shot location fallback', () => {
+    it('does not re-fire getCurrentLocation when a transient failure keeps location null', async () => {
+      // Repro for the iOS kCLErrorLocationUnknown retry loop: useLocation toggles
+      // `loading` true→false on each failed attempt while `location` stays null.
+      // The fallback effect must fire exactly ONCE — without a guard it re-fires
+      // every time `loading` settles back to false, hammering CoreLocation and
+      // spamming "현재 위치를 가져올 수 없습니다".
+      const getCurrentLocation = jest.fn().mockResolvedValue(null);
+      let loading = false;
+
+      mockUseLocation.mockImplementation(() => ({
+        location: null,
+        loading,
+        error: loading ? null : '현재 위치를 가져올 수 없습니다.',
+        hasPermission: true,
+        hasBackgroundPermission: false,
+        isTracking: false,
+        trackingMode: 'normal',
+        accuracy: null,
+        getCurrentLocation,
+        startTracking: jest.fn(),
+        startBatteryEfficientTracking: jest.fn(),
+        startHighAccuracyTracking: jest.fn(),
+        stopTracking: jest.fn(),
+        checkLocationServices: jest.fn(),
+        initializeLocation: jest.fn(),
+        requestBackgroundPermission: jest.fn(),
+      }));
+
+      const { rerender } = renderHook(() => useNearbyStations());
+
+      // Mount: location null + loading false → the one-shot fallback fires once.
+      await waitFor(() => expect(getCurrentLocation).toHaveBeenCalledTimes(1));
+
+      // Simulate the failed attempt settling: loading true (in-flight) → false
+      // (failed), with location still null on every render.
+      loading = true;
+      rerender({});
+      loading = false;
+      rerender({});
+
+      // Guard: the fallback must NOT re-fire on the loading true→false settle.
+      expect(getCurrentLocation).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('Initialization', () => {
     it('should initialize with loading true', () => {
       const { result } = renderHook(() => useNearbyStations());

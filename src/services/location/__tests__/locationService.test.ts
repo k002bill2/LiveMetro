@@ -15,6 +15,7 @@ jest.mock('expo-location', () => ({
   getForegroundPermissionsAsync: jest.fn(),
   getBackgroundPermissionsAsync: jest.fn(),
   getCurrentPositionAsync: jest.fn(),
+  getLastKnownPositionAsync: jest.fn(),
   watchPositionAsync: jest.fn(),
   reverseGeocodeAsync: jest.fn(),
   hasServicesEnabledAsync: jest.fn(),
@@ -611,6 +612,45 @@ describe('LocationService', () => {
 
     it('should return null on error', async () => {
       mockLocation.getCurrentPositionAsync.mockRejectedValue(new Error('Location error'));
+      mockLocation.getLastKnownPositionAsync.mockResolvedValue(null);
+
+      const location = await locationService.getCurrentLocation();
+
+      expect(location).toBeNull();
+    });
+
+    it('falls back to last known position when the live fix fails transiently', async () => {
+      // iOS kCLErrorLocationUnknown (Code=0) / cold GPS: the live request throws,
+      // but a recent cached fix should still be returned instead of null.
+      mockLocation.getCurrentPositionAsync.mockRejectedValue(
+        new Error('Cannot obtain current location: Error Domain=kCLErrorDomain Code=0 "(null)"')
+      );
+      mockLocation.getLastKnownPositionAsync.mockResolvedValue({
+        coords: {
+          latitude: 37.5547,
+          longitude: 126.9707,
+          accuracy: 65,
+          altitude: 0,
+          altitudeAccuracy: 0,
+          heading: 0,
+          speed: 0,
+        },
+        timestamp: Date.now(),
+      });
+
+      const location = await locationService.getCurrentLocation();
+
+      expect(location).not.toBeNull();
+      expect(location?.latitude).toBe(37.5547);
+      expect(location?.longitude).toBe(126.9707);
+      expect(location?.accuracy).toBe(65);
+    });
+
+    it('returns null when both the live fix and last known position are unavailable', async () => {
+      mockLocation.getCurrentPositionAsync.mockRejectedValue(
+        new Error('Error Domain=kCLErrorDomain Code=0 "(null)"')
+      );
+      mockLocation.getLastKnownPositionAsync.mockResolvedValue(null);
 
       const location = await locationService.getCurrentLocation();
 

@@ -279,9 +279,22 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
     loadAllStations();
   }, [loadAllStations]);
 
-  // Fallback: if no external/mock location and GPS hasn't provided one, try one-shot
+  // Fallback: if no external/mock location and GPS hasn't provided one, try
+  // one-shot. Guarded by a ref because a *failed* getCurrentLocation() leaves
+  // gpsLocation null while toggling locationLoading true→false; that settle
+  // re-satisfies the condition below and, without the guard, re-fires forever
+  // (the iOS kCLErrorLocationUnknown retry loop that spammed location errors
+  // from both the Home and Routes tabs at once). The guard re-arms whenever a
+  // location source (mock/external/GPS) is present, so the one-shot can fire
+  // again if every source later goes away.
+  const oneShotFallbackAttemptedRef = useRef(false);
   useEffect(() => {
-    if (!mockLocation && !externalLocation && !gpsLocation && !locationLoading) {
+    if (mockLocation || externalLocation || gpsLocation) {
+      oneShotFallbackAttemptedRef.current = false;
+      return;
+    }
+    if (!locationLoading && !oneShotFallbackAttemptedRef.current) {
+      oneShotFallbackAttemptedRef.current = true;
       getCurrentLocation();
     }
   }, [mockLocation, externalLocation, gpsLocation, locationLoading, getCurrentLocation]);

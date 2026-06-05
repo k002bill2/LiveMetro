@@ -49,7 +49,7 @@ jest.mock('expo-location', () => ({
   requestForegroundPermissionsAsync: jest.fn(() => 
     Promise.resolve({ status: 'granted' })
   ),
-  getCurrentPositionAsync: jest.fn(() => 
+  getCurrentPositionAsync: jest.fn(() =>
     Promise.resolve({
       coords: {
         latitude: 37.5665,
@@ -58,6 +58,7 @@ jest.mock('expo-location', () => ({
       },
     })
   ),
+  getLastKnownPositionAsync: jest.fn(() => Promise.resolve(null)),
   Accuracy: {
     Balanced: 3,
     High: 6,
