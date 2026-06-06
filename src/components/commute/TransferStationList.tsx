@@ -13,6 +13,7 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
+  Platform,
 } from 'react-native';
 import { ArrowLeftRight, XCircle, PlusCircle, Info } from 'lucide-react-native';
 import {
@@ -212,7 +213,9 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       borderWidth: 1,
       borderColor: WANTED_TOKENS.blue[500],
       borderRadius: WANTED_TOKENS.radius.r4,
-      borderStyle: 'dashed',
+      // iOS can't draw dashed borders with a borderRadius (renders solid +
+      // warns); keep dashed on Android.
+      borderStyle: Platform.OS === 'ios' ? 'solid' : 'dashed',
     },
     addButtonText: {
       marginLeft: WANTED_TOKENS.spacing.s2,

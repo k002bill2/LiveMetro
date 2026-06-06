@@ -22,6 +22,7 @@ import {
   Text,
   TouchableOpacity,
   View,
+  Platform,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -610,7 +611,9 @@ const styles = StyleSheet.create({
     marginTop: WANTED_TOKENS.spacing.s4,
     borderRadius: WANTED_TOKENS.radius.r6,
     borderWidth: 1,
-    borderStyle: 'dashed',
+    // iOS can't draw dashed borders with a borderRadius (renders solid +
+    // warns); keep dashed on Android.
+    borderStyle: Platform.OS === 'ios' ? 'solid' : 'dashed',
     overflow: 'hidden',
   },
   bonusInner: {

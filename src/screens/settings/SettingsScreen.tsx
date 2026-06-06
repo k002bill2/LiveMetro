@@ -14,6 +14,7 @@ import {
   ScrollView,
   Alert,
   Switch,
+  Platform,
 } from 'react-native';
 import {
   ChevronRight,
@@ -815,7 +816,9 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       paddingVertical: WANTED_TOKENS.spacing.s4,
       borderRadius: WANTED_TOKENS.radius.r6,
       borderWidth: 1,
-      borderStyle: 'dashed',
+      // iOS can't draw dashed borders with a borderRadius (renders solid +
+      // warns "Unsupported dashed / dotted border style"); keep dashed on Android.
+      borderStyle: Platform.OS === 'ios' ? 'solid' : 'dashed',
       borderColor: semantic.lineNormal,
     },
     devButtonDanger: {
