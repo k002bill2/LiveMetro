@@ -580,7 +580,7 @@ export const HomeScreen: React.FC = () => {
     // Navigate to the Favorites tab. Cast to never to avoid coupling
     // HomeScreen's prop type to MainTabParamList — the tab navigator owns
     // the route name space.
-    () => navigation.navigate('MainTabs' as never),
+    () => navigation.navigate('Favorites' as never),
     [navigation],
   );
   const onPressDelayCard = useCallback(
