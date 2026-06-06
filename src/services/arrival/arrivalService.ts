@@ -115,6 +115,9 @@ class ArrivalService {
   private lastFetchTime: Map<string, number> = new Map();
   private activeSubscriptions: Map<string, Set<ArrivalCallback>> = new Map();
   private pollingIntervals: Map<string, ReturnType<typeof setInterval>> = new Map();
+  // 역명별 "진행 중인 초기 fetch"를 추적해, 같은 역명의 후속 구독자가 새 fetch를
+  // 트리거하지 않고 같은 Promise를 재사용하게 한다. (subscribe 참고)
+  private initialFetches: Map<string, Promise<ArrivalInfo>> = new Map();
 
   constructor(options?: ArrivalServiceOptions) {
     this.options = { ...DEFAULT_OPTIONS, ...options };
@@ -213,7 +216,9 @@ class ArrivalService {
       this.options.minPollingInterval
     );
 
-    // Register subscriber
+    // Register subscriber. Capture "첫 구독자 여부" BEFORE adding — 초기 fetch를
+    // 첫 구독자만 트리거하기 위함.
+    const isFirstSubscriber = !this.activeSubscriptions.has(trimmedName);
     if (!this.activeSubscriptions.has(trimmedName)) {
       this.activeSubscriptions.set(trimmedName, new Set());
     }
@@ -229,10 +234,69 @@ class ArrivalService {
       this.pollingIntervals.set(trimmedName, interval);
     }
 
-    // Send initial data
-    this.getArrivals(trimmedName, options)
-      .then((arrivals) => callback(arrivals))
-      .catch((error) => callback(null, error as Error));
+    // Send initial data.
+    //
+    // 첫 구독자만 fetch를 트리거하고 그 Promise를 `initialFetches`에 공유한다.
+    // 같은 역명의 후속 구독자(예: 같은 역 즐겨찾기 2행)는 진행 중 fetch를 재사용하고,
+    // 없으면 캐시 값을 받는다 — 갱신은 공유 폴링 interval에 맡긴다.
+    //
+    // 무조건 getArrivals를 호출하면, 빠르게 연속된 두 구독이 getArrivals의
+    // lastFetchTime 가드가 설정되기 전(첫 fetch 완료 전)에 둘 다 캐시 미스로 통과해
+    // per-station throttle 큐(최대 ~30초 대기)를 쌓는 회귀가 발생한다.
+    // 콜백이 여전히 활성 구독자일 때만 호출한다. subscribe 직후 즉시 unsubscribe하면
+    // 비행 중이던 초기 fetch가 늦게 resolve되며 죽은 콜백(예: unmount된 컴포넌트의
+    // setState)을 깨우는 race가 생긴다. unsubscribe가 activeSubscriptions Set에서
+    // 콜백을 제거하므로(아래 unsubscribe 참고) 그 멤버십을 호출 직전에 확인한다.
+    const notifyIfActive = (info: ArrivalInfo | null, error?: Error): void => {
+      if (!this.activeSubscriptions.get(trimmedName)?.has(callback)) {
+        return;
+      }
+      // 호출 시그니처 보존: 정상 경로는 단일 인자(callback(info)), 에러 경로만
+      // 두 번째 인자를 전달한다. undefined를 명시적으로 넘기면 인자 개수가 달라져
+      // 기존 소비자/테스트의 정확 매칭이 깨진다.
+      if (error !== undefined) {
+        callback(info, error);
+      } else {
+        callback(info);
+      }
+    };
+
+    // 에러 핸들러는 `.then(onFulfilled, onRejected)` 2-인자 형태로 전달한다.
+    // `.then(...).catch(...)`였다면 onFulfilled(콜백) 내부에서 throw된 에러까지
+    // catch가 삼켜 callback(null, error)로 잘못 재호출했을 것 — 여기서는 fetch
+    // rejection(네트워크/API 실패)만 에러 경로로 보낸다.
+    if (isFirstSubscriber) {
+      const initial = this.getArrivals(trimmedName, options);
+      this.initialFetches.set(trimmedName, initial);
+      initial
+        .then(
+          (arrivals) => notifyIfActive(arrivals),
+          (error) => notifyIfActive(null, error as Error),
+        )
+        .finally(() => {
+          // 이 Promise가 여전히 등록된 것일 때만 삭제 (이후 사이클 덮어쓰기 보호).
+          if (this.initialFetches.get(trimmedName) === initial) {
+            this.initialFetches.delete(trimmedName);
+          }
+        });
+    } else {
+      const pending = this.initialFetches.get(trimmedName);
+      if (pending) {
+        pending.then(
+          (arrivals) => notifyIfActive(arrivals),
+          (error) => notifyIfActive(null, error as Error),
+        );
+      } else {
+        this.getCachedArrivals(trimmedName).then(
+          (cached) => {
+            if (cached) notifyIfActive(cached);
+          },
+          () => {
+            // 캐시 미스/오류는 무시 — 다음 폴링 주기가 데이터를 채운다.
+          },
+        );
+      }
+    }
 
     // Return unsubscribe function
     return () => this.unsubscribe(trimmedName, callback);
@@ -267,6 +331,9 @@ class ArrivalService {
 
     // Clear subscriptions
     this.activeSubscriptions.clear();
+
+    // Clear in-flight initial fetches
+    this.initialFetches.clear();
 
     // Clear fetch timestamps
     this.lastFetchTime.clear();

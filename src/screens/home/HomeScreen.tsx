@@ -231,10 +231,14 @@ export const HomeScreen: React.FC = () => {
     minUpdateInterval: 30000,
   });
 
+  // 지연 배너 비활성화: 1~9호선 "대표역" 9곳을 1분마다 폴링해 Seoul API
+  // rate budget(일 1,000회)을 소진하고, per-station throttle 누적으로 즐겨찾기
+  // 도착정보까지 굶주리게 했다. enabled:false면 초기 fetch·폴링 모두 중단되고
+  // delays는 빈 배열을 유지해 의존 UI(실시간 제보 섹션·벨 알림)가 자동 숨김된다.
   const { delays: activeDelays } = useDelayDetection({
     pollingInterval: 60000,
     autoPolling: true,
-    enabled: isFocused,
+    enabled: false,
   });
 
   // HomeScreen uses MLPrediction (not the PredictedCommute model extended in spec 2026-05-12 §7.1)
