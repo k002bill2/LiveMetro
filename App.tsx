@@ -12,6 +12,7 @@ import { useFonts } from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 
 import { AuthProvider } from './src/services/auth/AuthContext';
+import { FavoritesProvider } from './src/contexts/FavoritesContext';
 import { I18nProvider } from './src/services/i18n';
 import { ThemeProvider, useTheme } from './src/services/theme';
 import { RootNavigator } from './src/navigation/RootNavigator';
@@ -73,7 +74,9 @@ const App: React.FC = () => {
         <I18nProvider>
           <ThemeProvider>
             <AuthProvider>
-              <AppContent />
+              <FavoritesProvider>
+                <AppContent />
+              </FavoritesProvider>
             </AuthProvider>
           </ThemeProvider>
         </I18nProvider>
