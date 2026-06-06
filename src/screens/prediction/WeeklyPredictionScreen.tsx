@@ -102,6 +102,9 @@ const WEEKDAY_KEYS = [1, 2, 3, 4, 5] as const;
  * from `findIndex(d => d.isToday)` to keep them consistent.
  */
 const DEFAULT_DURATION_MIN = 30;
+// Dash segments for the confidence divider. Over-provisioned and clipped by the
+// container's `overflow: 'hidden'`, so it fills any width without measuring.
+const DIVIDER_DASH_COUNT = 40;
 const buildWeeklyDays = (
   weekPredictions: readonly PredictedCommute[],
   now: Date,
@@ -476,8 +479,19 @@ export const WeeklyPredictionScreen: React.FC = () => {
             </View>
           </View>
 
+          {/* Dashed divider — rendered as clipped dash segments because RN
+              warns on (and won't draw) a single-side `borderStyle: 'dashed'`. */}
+          <View style={styles.confidenceDivider}>
+            {Array.from({ length: DIVIDER_DASH_COUNT }).map((_, i) => (
+              <View
+                key={i}
+                style={[styles.confidenceDash, { backgroundColor: semantic.lineSubtle }]}
+              />
+            ))}
+          </View>
+
           {/* Confidence row */}
-          <View style={[styles.confidenceRow, { borderTopColor: semantic.lineSubtle }]}>
+          <View style={styles.confidenceRow}>
             <View style={styles.confidenceLeft}>
               <ShieldCheck size={16} color={semantic.primaryNormal} strokeWidth={2} />
               <Text style={[styles.confidenceLabel, { color: semantic.labelNeutral }]}>예측 신뢰도</Text>
@@ -791,11 +805,22 @@ const createStyles = (_colors: ThemeColors, isDark: boolean) => {
       shadowRadius: 4,
       elevation: 4,
     },
-    confidenceRow: {
+    confidenceDivider: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      overflow: 'hidden',
       marginTop: 14,
+    },
+    confidenceDash: {
+      // 4px dash + 4px gap, repeated and clipped to the container width — a
+      // cross-platform dashed rule without the single-side `borderStyle:
+      // 'dashed'` that RN renders solid and warns on.
+      width: 4,
+      height: 1,
+      marginRight: 4,
+    },
+    confidenceRow: {
       paddingTop: 14,
-      borderTopWidth: 1,
-      borderStyle: 'dashed',
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
