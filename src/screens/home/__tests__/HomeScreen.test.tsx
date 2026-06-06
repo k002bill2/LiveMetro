@@ -560,6 +560,22 @@ describe('HomeScreen', () => {
       );
     });
 
+    // Regression: the "전체 보기" link must target the Favorites *tab* by its
+    // real route name. A prior bug navigated to 'MainTabs' (a route that only
+    // exists in the legacy AppStackParamList type, not in the live navigator),
+    // raising "action 'NAVIGATE' with payload {name:'MainTabs'} was not
+    // handled by any navigator". HomeScreen renders inside the Tab.Navigator,
+    // so the tab name 'Favorites' is resolved directly by that navigator.
+    it('"전체 보기" press navigates to the Favorites tab', async () => {
+      const { getByLabelText } = render(<HomeScreen />);
+      await waitFor(() =>
+        expect(getByLabelText('즐겨찾는 역 전체 보기')).toBeTruthy(),
+      );
+
+      fireEvent.press(getByLabelText('즐겨찾는 역 전체 보기'));
+      expect(mockNavigate).toHaveBeenCalledWith('Favorites');
+    });
+
     // Phase 56: StationCard testIDs replaced by NearbyStationCard.
     it.skip('shows nearby stations from hook when permission granted', async () => {
       mockLocationRequest.mockResolvedValue({ status: 'granted' });
