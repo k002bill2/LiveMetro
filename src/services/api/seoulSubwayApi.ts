@@ -3,6 +3,7 @@
  * Real-time subway data from Seoul Open API
  */
 
+import { Platform } from 'react-native';
 import { createSeoulApiKeyManager, createPublicDataApiKeyManager, ApiKeyManager } from './apiKeyManager';
 import { formatStationName } from '../../utils/formatUtils';
 import type { TrainType } from '@/models/train';
@@ -818,9 +819,14 @@ class SeoulSubwayApiService {
       const response = await fetch(url, {
         signal: controller.signal,
         headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'LiveMetro/1.0'
-        }
+          Accept: 'application/json',
+          // `User-Agent` is a forbidden header in browsers (Fetch spec): setting
+          // it forces a CORS preflight that the Seoul API rejects (its
+          // `Access-Control-Allow-Headers` omits `User-Agent`), blocking every
+          // realtime request on Expo Web. Native has no such restriction, so the
+          // custom UA is kept there only.
+          ...(Platform.OS === 'web' ? {} : { 'User-Agent': 'LiveMetro/1.0' }),
+        },
       });
 
       if (!response.ok) {

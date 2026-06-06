@@ -23,7 +23,7 @@
  *   - Firestore read error (logged inside commuteService)
  */
 import { useEffect, useState } from 'react';
-import { loadCommuteRoutes } from '@/services/commute/commuteService';
+import { subscribeCommuteRoutes } from '@/services/commute/commuteService';
 import type { CommuteTime } from '@/models/user';
 
 export function useFirestoreMorningCommute(
@@ -36,10 +36,11 @@ export function useFirestoreMorningCommute(
       setValue(null);
       return;
     }
-    let cancelled = false;
-    (async () => {
-      const settings = await loadCommuteRoutes(uid);
-      if (cancelled) return;
+    // Live subscription (onSnapshot). The callback fires once immediately and
+    // again on every change, so a commute saved on CommuteSettings/onboarding
+    // shows up here without a remount (home-refresh audit B4). The previous
+    // one-shot `loadCommuteRoutes` could only ever reflect the first value.
+    const unsubscribe = subscribeCommuteRoutes(uid, (settings) => {
       const morning = settings?.morningRoute;
       if (
         !morning ||
@@ -73,10 +74,8 @@ export function useFirestoreMorningCommute(
         destinationStationId: morning.arrivalStationId,
         bufferMinutes: morning.bufferMinutes ?? 0,
       });
-    })();
-    return () => {
-      cancelled = true;
-    };
+    });
+    return unsubscribe;
   }, [uid]);
 
   return value;
