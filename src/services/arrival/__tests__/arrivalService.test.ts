@@ -719,5 +719,51 @@ describe('ArrivalService', () => {
       // After all retries fail, should still receive a result (empty or cached)
       expect(callback).toHaveBeenCalled();
     });
+
+    it('같은 역명 동시 구독 시 초기 fetch는 1회만 수행한다 (중복 fetch dedup)', async () => {
+      mockSeoulSubwayApi.getRealtimeArrival.mockClear();
+
+      const cb1: ArrivalCallback = jest.fn();
+      const cb2: ArrivalCallback = jest.fn();
+
+      // 같은 역명을 거의 동시에 두 번 구독 (예: 같은 역 즐겨찾기 2행).
+      // 첫 구독의 초기 fetch가 진행 중일 때 둘째 구독이 들어온다.
+      const unsub1 = service.subscribe('선릉', cb1);
+      const unsub2 = service.subscribe('선릉', cb2);
+
+      // 폴링 interval(setInterval)은 건드리지 않고 초기 fetch의 마이크로태스크만
+      // flush — 구독 시점의 중복 fetch만 분리해 측정한다.
+      for (let i = 0; i < 12; i += 1) {
+        await Promise.resolve();
+      }
+
+      // 후속 구독자는 진행 중 fetch/캐시를 재사용해야 한다. 무조건 getArrivals를
+      // 트리거하면 lastFetchTime 가드가 설정되기 전에 둘 다 통과해 per-station
+      // throttle 큐(최대 ~30초 대기)를 쌓는 회귀가 발생한다.
+      expect(mockSeoulSubwayApi.getRealtimeArrival).toHaveBeenCalledTimes(1);
+
+      // 두 구독자 모두 초기 데이터를 수신해야 한다.
+      expect(cb1).toHaveBeenCalled();
+      expect(cb2).toHaveBeenCalled();
+
+      unsub1();
+      unsub2();
+    });
+
+    it('subscribe 직후 unsubscribe하면 늦게 온 초기 fetch가 콜백을 깨우지 않는다', async () => {
+      mockSeoulSubwayApi.getRealtimeArrival.mockClear();
+
+      const cb: ArrivalCallback = jest.fn();
+      // 초기 fetch가 resolve되기 전에 즉시 해제 — unmount된 컴포넌트의 setState를
+      // 깨우는 race를 재현.
+      const unsub = service.subscribe('교대', cb);
+      unsub();
+
+      for (let i = 0; i < 12; i += 1) {
+        await Promise.resolve();
+      }
+
+      expect(cb).not.toHaveBeenCalled();
+    });
   });
 });
