@@ -218,8 +218,12 @@ export const HomeScreen: React.FC = () => {
   // The bottom-tab navigator keeps HomeScreen mounted, so the prior mount-only
   // effect left the list stale until app restart (home-refresh audit B1/B2/B3).
   const { favoritesWithDetails, refresh: refreshFavorites } = useFavorites();
-  // Top-5 favorites that resolved to a station, in the user's saved order. The
-  // station's lineId is already overridden to the favorite's lineId inside
+  // Home shows only the FIRST 5 favorites (`slice(0, 5)`), in the user's saved
+  // order — i.e. the order they were added (arrayUnion appends, so oldest
+  // first) unless reordered on the Favorites tab. This is a home-surface cap,
+  // NOT a "most recently added" view: a 6th favorite lands at the end of the
+  // array and won't appear here. The full list lives behind "전체 보기 ›".
+  // The station's lineId is already overridden to the favorite's lineId inside
   // FavoritesContext, so transfer stations render the correct line.
   const favoriteStations = useMemo<Station[]>(
     () =>
@@ -778,6 +782,8 @@ export const HomeScreen: React.FC = () => {
           </View>
         ) : (
           <View style={styles.favoriteList}>
+            {/* Capped at the first 5 favorites (saved order). The "전체 보기 ›"
+                link above navigates to the Favorites tab for the rest. */}
             {favoritesWithDetails
               .slice(0, 5)
               .map((fav, idx) => {
