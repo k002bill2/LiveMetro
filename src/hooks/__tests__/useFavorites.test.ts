@@ -572,4 +572,33 @@ describe('useFavorites', () => {
       expect(commuteStations[0]?.station?.name).toBe('강남역');
     });
   });
+
+  describe('Context state sharing', () => {
+    it('shares favorites between two consumers under one provider', async () => {
+      const station = createMockStation('0208', '왕십리');
+      mockFavoritesService.getFavorites.mockResolvedValue([]);
+      mockFavoritesService.addFavorite.mockImplementation(async () => {
+        mockFavoritesService.getFavorites.mockResolvedValue([
+          createMockFavorite('fav-1', '0208'),
+        ]);
+        return createMockFavorite('fav-1', '0208');
+      });
+
+      const { result } = renderHook(
+        () => ({ a: useFavorites(), b: useFavorites() }),
+        { wrapper }
+      );
+
+      await waitFor(() => expect(result.current.a.loading).toBe(false));
+
+      await act(async () => {
+        await result.current.a.addFavorite(station);
+      });
+
+      // consumer B sees the favorite added via consumer A (shared provider state)
+      await waitFor(() => {
+        expect(result.current.b.isFavorite('0208')).toBe(true);
+      });
+    });
+  });
 });
