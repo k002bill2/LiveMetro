@@ -370,6 +370,7 @@ export const SubwayMapScreen: React.FC = () => {
                   <View style={styles.modalSection}>
                     <Text style={styles.modalSectionTitle}>환승 노선</Text>
                     <LineFavoritePicker
+                      key={selectedStation.id}
                       options={lineOptions}
                       lineLabel={(lineId) => subwayLines.find((l) => l.id === lineId)?.name || lineId}
                       lineColor={(lineId) => getSubwayLineColor(lineId)}
