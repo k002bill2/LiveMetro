@@ -516,10 +516,15 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
               onPress={onEdit}
               accessibilityRole="button"
               accessibilityLabel="경로 편집"
-              // Text-only links collapse to a few px tall hit area —
-              // extend the invisible touch area without changing layout.
-              // Mirrors the "저장" header link's hitSlop (line ~210).
-              hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
+              // The 12px text alone is a ~24×16pt target — below the 44pt
+              // minimum. hitSlop can't help here: the parent SettingSection
+              // has overflow:hidden, which clips any hit area extending past
+              // the card edge (both iOS clipsToBounds and Android clipChildren).
+              // So we grow the REAL touch area via padding (stays inside the
+              // parent) and cancel the visual shift with negative margins that
+              // are absorbed by routeHeaderRow's own padding (14/10/16).
+              hitSlop={8}
+              style={styles.routeEditTouch}
             >
               <Text style={styles.routeEditLink}>편집</Text>
             </TouchableOpacity>
@@ -535,8 +540,11 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
                   onPress={onEdit}
                   accessibilityRole="button"
                   accessibilityLabel="퇴근 경로 편집"
-                  hitSlop={{ top: 16, bottom: 16, left: 16, right: 16 }}
-                  style={styles.routeEditLinkEveningSpacer}
+                  // Same touch-area fix as morning, but the right side neighbors
+                  // the Switch — so no negative right margin (would overlap the
+                  // toggle's hit area). padding(8) + marginRight(4) preserves the
+                  // original 12px gap to the Switch.
+                  style={styles.routeEditTouchEvening}
                 >
                   <Text style={styles.routeEditLink}>편집</Text>
                 </TouchableOpacity>
@@ -948,6 +956,11 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       paddingHorizontal: 20,
       marginHorizontal: WANTED_TOKENS.spacing.s4,
       marginBottom: WANTED_TOKENS.spacing.s4,
+      // iOS shadow fast-path: shadow가 LinearGradient에 직접 걸리면 투명 알파에서
+      // 매 프레임 경로를 역산해 "cannot calculate shadow efficiently" advice를 띄운다.
+      // 불투명 배경색을 주면 그 직사각형에서 그림자를 캐싱한다. 위 gradient(#0066FF→#2C7BFF,
+      // 완전 불투명)가 이 색을 가려 시각적 변화는 없다 — gradient의 시작 stop과 일치.
+      backgroundColor: '#0066FF',
       shadowColor: WANTED_TOKENS.blue[500],
       shadowOffset: { width: 0, height: 8 },
       shadowOpacity: 0.2,
@@ -1059,11 +1072,26 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       fontFamily: weightToFontFamily('700'),
       color: WANTED_TOKENS.blue[500],
     },
-    // Evening "편집" sits to the left of the Switch — add a gap so the
-    // text doesn't bump into the toggle. Morning has no neighbor so its
-    // link uses the default zero-spacer.
-    routeEditLinkEveningSpacer: {
-      marginRight: 12,
+    // Morning "편집": padding grows the real touch target to ~40×36pt
+    // (+8 hitSlop) while negative margins (absorbed by routeHeaderRow's
+    // 14/10/16 padding) keep the text visually in place. No clipping
+    // because the touch area stays within the overflow:hidden parent.
+    routeEditTouch: {
+      paddingVertical: 10,
+      paddingHorizontal: 8,
+      marginVertical: -10,
+      marginHorizontal: -8,
+    },
+    // Evening "편집" sits to the left of the Switch — same vertical/left
+    // growth, but the right edge keeps a positive margin (padding 8 +
+    // marginRight 4 = the original 12px gap) so the touch area never
+    // overlaps the toggle.
+    routeEditTouchEvening: {
+      paddingVertical: 10,
+      paddingHorizontal: 8,
+      marginVertical: -10,
+      marginLeft: -8,
+      marginRight: 4,
     },
     routeBody: {
       backgroundColor: semantic.bgSubtlePage,
