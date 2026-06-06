@@ -16,6 +16,10 @@ interface LineFavoritePickerProps {
   readonly options: readonly LineFavoriteOption[];
   readonly lineLabel: (lineId: string) => string;
   readonly lineColor: (lineId: string) => string;
+  /** Save button background (theme token; e.g. semantic.primaryNormal). */
+  readonly saveColor: string;
+  /** Text color over colored backgrounds (theme token; e.g. semantic.labelOnColor). */
+  readonly onColor: string;
   readonly onSave: (diff: FavoriteDiff) => void;
 }
 
@@ -26,6 +30,8 @@ export const LineFavoritePicker: React.FC<LineFavoritePickerProps> = ({
   options,
   lineLabel,
   lineColor,
+  saveColor,
+  onColor,
   onSave,
 }) => {
   const [selected, setSelected] = useState<Set<string>>(() => initialSelected(options));
@@ -69,7 +75,7 @@ export const LineFavoritePicker: React.FC<LineFavoritePickerProps> = ({
                 },
               ]}
             >
-              <Text style={[styles.chipText, { color: isSelected ? '#ffffff' : lineColor(opt.lineId) }]}>
+              <Text style={[styles.chipText, { color: isSelected ? onColor : lineColor(opt.lineId) }]}>
                 {lineLabel(opt.lineId)}
               </Text>
             </TouchableOpacity>
@@ -84,9 +90,9 @@ export const LineFavoritePicker: React.FC<LineFavoritePickerProps> = ({
         accessibilityRole="button"
         accessibilityState={{ disabled: !dirty }}
         accessibilityLabel="선택한 노선 즐겨찾기 저장"
-        style={[styles.saveButton, !dirty && styles.saveButtonDisabled]}
+        style={[styles.saveButton, { backgroundColor: saveColor }, !dirty && styles.saveButtonDisabled]}
       >
-        <Text style={styles.saveButtonText}>즐겨찾기 저장</Text>
+        <Text style={[styles.saveButtonText, { color: onColor }]}>즐겨찾기 저장</Text>
       </TouchableOpacity>
     </View>
   );
@@ -106,10 +112,9 @@ const styles = StyleSheet.create({
   saveButton: {
     minHeight: 44,
     borderRadius: 12,
-    backgroundColor: '#FF3B30',
     alignItems: 'center',
     justifyContent: 'center',
   },
   saveButtonDisabled: { opacity: 0.4 },
-  saveButtonText: { color: '#ffffff', fontSize: 16, fontWeight: '600', fontFamily: weightToFontFamily('600') },
+  saveButtonText: { fontSize: 16, fontWeight: '600', fontFamily: weightToFontFamily('600') },
 });

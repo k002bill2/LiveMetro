@@ -10,6 +10,8 @@ const options: LineFavoriteOption[] = [
 
 const lineLabel = (lineId: string) => `${lineId}호선`;
 const lineColor = () => '#000000';
+const saveColor = '#0066FF';
+const onColor = '#ffffff';
 
 describe('LineFavoritePicker', () => {
   it('initializes selection from already-favorited options', () => {
@@ -19,6 +21,8 @@ describe('LineFavoritePicker', () => {
         options={options}
         lineLabel={lineLabel}
         lineColor={lineColor}
+        saveColor={saveColor}
+        onColor={onColor}
         onSave={onSave}
       />
     );
@@ -30,7 +34,7 @@ describe('LineFavoritePicker', () => {
   it('toggles a chip locally without calling onSave', () => {
     const onSave = jest.fn();
     const { getByTestId } = render(
-      <LineFavoritePicker options={options} lineLabel={lineLabel} lineColor={lineColor} onSave={onSave} />
+      <LineFavoritePicker options={options} lineLabel={lineLabel} lineColor={lineColor} saveColor={saveColor} onColor={onColor} onSave={onSave} />
     );
     fireEvent.press(getByTestId('line-chip-5'));
     expect(getByTestId('line-chip-5').props.accessibilityState.selected).toBe(true);
@@ -40,7 +44,7 @@ describe('LineFavoritePicker', () => {
   it('on save passes diff: toggling 5 on and 2 off', () => {
     const onSave = jest.fn();
     const { getByTestId } = render(
-      <LineFavoritePicker options={options} lineLabel={lineLabel} lineColor={lineColor} onSave={onSave} />
+      <LineFavoritePicker options={options} lineLabel={lineLabel} lineColor={lineColor} saveColor={saveColor} onColor={onColor} onSave={onSave} />
     );
     fireEvent.press(getByTestId('line-chip-5')); // select 5
     fireEvent.press(getByTestId('line-chip-2')); // deselect 2
@@ -51,7 +55,7 @@ describe('LineFavoritePicker', () => {
   it('disables save when selection matches initial state', () => {
     const onSave = jest.fn();
     const { getByTestId } = render(
-      <LineFavoritePicker options={options} lineLabel={lineLabel} lineColor={lineColor} onSave={onSave} />
+      <LineFavoritePicker options={options} lineLabel={lineLabel} lineColor={lineColor} saveColor={saveColor} onColor={onColor} onSave={onSave} />
     );
     expect(getByTestId('line-favorite-save').props.accessibilityState.disabled).toBe(true);
   });

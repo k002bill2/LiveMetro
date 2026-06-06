@@ -374,6 +374,8 @@ export const SubwayMapScreen: React.FC = () => {
                       options={lineOptions}
                       lineLabel={(lineId) => subwayLines.find((l) => l.id === lineId)?.name || lineId}
                       lineColor={(lineId) => getSubwayLineColor(lineId)}
+                      saveColor={semantic.primaryNormal}
+                      onColor={semantic.labelOnColor}
                       onSave={handleSaveLineFavorites}
                     />
                   </View>
