@@ -3,8 +3,10 @@
  * Tests for managing user's favorite stations
  */
 
+import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import { useFavorites } from '../useFavorites';
+import { FavoritesProvider } from '../../contexts/FavoritesContext';
 import { favoritesService, migrateFavoritesToNewFormat } from '../../services/favorites/favoritesService';
 import { trainService } from '../../services/train/trainService';
 import { useAuth } from '../../services/auth/AuthContext';
@@ -33,6 +35,9 @@ const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const mockMigrateFavoritesToNewFormat = migrateFavoritesToNewFormat as jest.MockedFunction<typeof migrateFavoritesToNewFormat>;
 
 const mockUser = { id: 'user-123', email: 'test@test.com' };
+
+const wrapper = ({ children }: { children: React.ReactNode }) =>
+  React.createElement(FavoritesProvider, null, children);
 
 const createMockStation = (id: string, name: string): Station => ({
   id,
@@ -82,7 +87,7 @@ describe('useFavorites', () => {
         loading: false,
       } as any);
 
-      const { result } = renderHook(() => useFavorites());
+      const { result } = renderHook(() => useFavorites(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -98,7 +103,7 @@ describe('useFavorites', () => {
         loading: false,
       } as any);
 
-      renderHook(() => useFavorites());
+      renderHook(() => useFavorites(), { wrapper });
 
       expect(mockFavoritesService.getFavorites).not.toHaveBeenCalled();
     });
@@ -109,7 +114,7 @@ describe('useFavorites', () => {
       const mockFavorites = [createMockFavorite('fav-1', 'station-1')];
       mockFavoritesService.getFavorites.mockResolvedValue(mockFavorites);
 
-      const { result } = renderHook(() => useFavorites());
+      const { result } = renderHook(() => useFavorites(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -129,7 +134,7 @@ describe('useFavorites', () => {
         .mockResolvedValueOnce(createMockStation('station-1', '강남역'))
         .mockResolvedValueOnce(createMockStation('station-2', '역삼역'));
 
-      const { result } = renderHook(() => useFavorites());
+      const { result } = renderHook(() => useFavorites(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -144,7 +149,7 @@ describe('useFavorites', () => {
       mockFavoritesService.getFavorites.mockResolvedValue(mockFavorites);
       mockTrainService.getStation.mockRejectedValue(new Error('Station not found'));
 
-      const { result } = renderHook(() => useFavorites());
+      const { result } = renderHook(() => useFavorites(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -158,7 +163,7 @@ describe('useFavorites', () => {
     it('should handle load favorites error', async () => {
       mockFavoritesService.getFavorites.mockRejectedValue(new Error('Load failed'));
 
-      const { result } = renderHook(() => useFavorites());
+      const { result } = renderHook(() => useFavorites(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -171,7 +176,7 @@ describe('useFavorites', () => {
   describe('Add Favorite', () => {
     it('addFavorite should call service with correct params', async () => {
       const station = createMockStation('station-1', '강남역');
-      const { result } = renderHook(() => useFavorites());
+      const { result } = renderHook(() => useFavorites(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -192,7 +197,7 @@ describe('useFavorites', () => {
 
     it('addFavorite should reload favorites after', async () => {
       const station = createMockStation('station-1', '강남역');
-      const { result } = renderHook(() => useFavorites());
+      const { result } = renderHook(() => useFavorites(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -215,7 +220,7 @@ describe('useFavorites', () => {
       } as any);
 
       const station = createMockStation('station-1', '강남역');
-      const { result } = renderHook(() => useFavorites());
+      const { result } = renderHook(() => useFavorites(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -231,7 +236,7 @@ describe('useFavorites', () => {
 
   describe('Remove Favorite', () => {
     it('removeFavorite should call service', async () => {
-      const { result } = renderHook(() => useFavorites());
+      const { result } = renderHook(() => useFavorites(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -248,7 +253,7 @@ describe('useFavorites', () => {
       const mockFavorite = createMockFavorite('fav-1', 'station-1');
       mockFavoritesService.getFavoriteByStationId.mockResolvedValue(mockFavorite);
 
-      const { result } = renderHook(() => useFavorites());
+      const { result } = renderHook(() => useFavorites(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -269,7 +274,7 @@ describe('useFavorites', () => {
       mockFavoritesService.getFavorites.mockResolvedValue([mockFavorite]);
       mockFavoritesService.setNotificationEnabled.mockResolvedValue(undefined);
 
-      const { result } = renderHook(() => useFavorites());
+      const { result } = renderHook(() => useFavorites(), { wrapper });
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
       });
@@ -290,7 +295,7 @@ describe('useFavorites', () => {
       mockFavoritesService.getFavorites.mockResolvedValue([mockFavorite]);
       mockFavoritesService.setNotificationEnabled.mockResolvedValue(undefined);
 
-      const { result } = renderHook(() => useFavorites());
+      const { result } = renderHook(() => useFavorites(), { wrapper });
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
       });
@@ -311,7 +316,7 @@ describe('useFavorites', () => {
         loading: false,
       } as any);
 
-      const { result } = renderHook(() => useFavorites());
+      const { result } = renderHook(() => useFavorites(), { wrapper });
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
       });
@@ -334,7 +339,7 @@ describe('useFavorites', () => {
         }),
       );
 
-      const { result } = renderHook(() => useFavorites());
+      const { result } = renderHook(() => useFavorites(), { wrapper });
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
       });
@@ -359,7 +364,7 @@ describe('useFavorites', () => {
       const station = createMockStation('station-1', '강남역');
       mockFavoritesService.addFavorite.mockResolvedValue(createMockFavorite('fav-1', 'station-1'));
 
-      const { result } = renderHook(() => useFavorites());
+      const { result } = renderHook(() => useFavorites(), { wrapper });
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
       });
@@ -382,7 +387,7 @@ describe('useFavorites', () => {
         }),
       );
 
-      const { result } = renderHook(() => useFavorites());
+      const { result } = renderHook(() => useFavorites(), { wrapper });
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
       });
@@ -406,7 +411,7 @@ describe('useFavorites', () => {
 
   describe('Update Favorite', () => {
     it('updateFavorite should call service with updates', async () => {
-      const { result } = renderHook(() => useFavorites());
+      const { result } = renderHook(() => useFavorites(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -424,7 +429,7 @@ describe('useFavorites', () => {
     });
 
     it('updateFavorite should reload after', async () => {
-      const { result } = renderHook(() => useFavorites());
+      const { result } = renderHook(() => useFavorites(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -446,7 +451,7 @@ describe('useFavorites', () => {
       mockFavoritesService.getFavorites.mockResolvedValue(mockFavorites);
       mockTrainService.getStation.mockResolvedValue(createMockStation('station-1', '강남역'));
 
-      const { result } = renderHook(() => useFavorites());
+      const { result } = renderHook(() => useFavorites(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -459,7 +464,7 @@ describe('useFavorites', () => {
     it('isFavorite should return false for non-favorited', async () => {
       mockFavoritesService.getFavorites.mockResolvedValue([]);
 
-      const { result } = renderHook(() => useFavorites());
+      const { result } = renderHook(() => useFavorites(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -472,7 +477,7 @@ describe('useFavorites', () => {
       mockFavoritesService.getFavorites.mockResolvedValue([]);
       const station = createMockStation('station-1', '강남역');
 
-      const { result } = renderHook(() => useFavorites());
+      const { result } = renderHook(() => useFavorites(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -492,7 +497,7 @@ describe('useFavorites', () => {
       mockTrainService.getStation.mockResolvedValue(createMockStation('station-1', '강남역'));
       const station = createMockStation('station-1', '강남역');
 
-      const { result } = renderHook(() => useFavorites());
+      const { result } = renderHook(() => useFavorites(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -514,7 +519,7 @@ describe('useFavorites', () => {
         createMockFavorite('fav-1', 'station-1'),
       ];
 
-      const { result } = renderHook(() => useFavorites());
+      const { result } = renderHook(() => useFavorites(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -528,7 +533,7 @@ describe('useFavorites', () => {
     });
 
     it('reorderFavorites should reload after', async () => {
-      const { result } = renderHook(() => useFavorites());
+      const { result } = renderHook(() => useFavorites(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
@@ -555,7 +560,7 @@ describe('useFavorites', () => {
         .mockResolvedValueOnce(createMockStation('station-1', '강남역'))
         .mockResolvedValueOnce(createMockStation('station-2', '역삼역'));
 
-      const { result } = renderHook(() => useFavorites());
+      const { result } = renderHook(() => useFavorites(), { wrapper });
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
