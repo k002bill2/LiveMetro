@@ -16,6 +16,12 @@ import { FavoritesProvider } from './src/contexts/FavoritesContext';
 import { I18nProvider } from './src/services/i18n';
 import { ThemeProvider, useTheme } from './src/services/theme';
 import { RootNavigator } from './src/navigation/RootNavigator';
+import { installWebAlertPolyfill } from './src/utils/webAlertPolyfill';
+
+// react-native-web's `Alert.alert` is a no-op, so every confirm/notification
+// in the app silently fails on Expo Web. Patch it once, before any screen can
+// call it. No-op on native.
+installWebAlertPolyfill();
 
 // Hold the native splash until fonts are ready — avoids the brief flash of
 // system-font UI before Pretendard loads. Errors are swallowed because the
