@@ -25,7 +25,12 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { getSubwayLineColor, getLineTextColor } from '@utils/colorUtils';
 import { LINE_NAMES } from '@utils/transferLabel';
-import { getLocalStationsByLine } from '@services/data/stationsDataService';
+import {
+  getLocalStationsByLine,
+  findStationCdByNameAndLine,
+} from '@services/data/stationsDataService';
+import { LineFavoritePicker } from '@components/map/LineFavoritePicker';
+import { resolveLineFavorites, type FavoriteDiff } from './lineFavoriteResolver';
 import { useFavorites } from '@hooks/useFavorites';
 import { useTheme } from '@services/theme';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
@@ -111,7 +116,7 @@ type NavigationProp = NativeStackNavigationProp<AppStackParamList>;
 
 export const SubwayMapScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
-  const { toggleFavorite, isFavorite } = useFavorites();
+  const { toggleFavorite, isFavorite, addFavorite, removeFavoriteByStationId } = useFavorites();
   const { isDark } = useTheme();
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
   const styles = useMemo(() => createStyles(semantic), [semantic]);
@@ -151,6 +156,39 @@ export const SubwayMapScreen: React.FC = () => {
       );
     }
   }, [selectedStation, toggleFavorite]);
+
+  const lineOptions = useMemo(() => {
+    if (!selectedStation || !selectedStation.isTransfer || !selectedLine) return [];
+    const allLines = [selectedLine, ...selectedStation.transferLines];
+    return resolveLineFavorites(selectedStation.name, allLines, isFavorite);
+  }, [selectedStation, selectedLine, isFavorite]);
+
+  const handleSaveLineFavorites = useCallback(
+    async (diff: FavoriteDiff): Promise<void> => {
+      if (!selectedStation) return;
+      try {
+        for (const lineId of diff.toAdd) {
+          const cd = findStationCdByNameAndLine(selectedStation.name, lineId);
+          if (!cd) continue;
+          await addFavorite({
+            ...selectedStation.originalStation,
+            id: cd,
+            lineId,
+          });
+        }
+        for (const cd of diff.toRemove) {
+          await removeFavoriteByStationId(cd);
+        }
+        setShowStationModal(false);
+      } catch (error) {
+        Alert.alert(
+          '알림',
+          error instanceof Error ? error.message : '즐겨찾기 처리에 실패했습니다.'
+        );
+      }
+    },
+    [selectedStation, addFavorite, removeFavoriteByStationId]
+  );
 
   const isStationFavorite = selectedStation ? isFavorite(selectedStation.id) : false;
   const selectedLineData = subwayLines.find(line => line.id === selectedLine);
@@ -328,38 +366,20 @@ export const SubwayMapScreen: React.FC = () => {
                   </TouchableOpacity>
                 </View>
 
-                {selectedStation.isTransfer && selectedStation.transferLines && (
+                {selectedStation.isTransfer && lineOptions.length > 0 ? (
                   <View style={styles.modalSection}>
                     <Text style={styles.modalSectionTitle}>환승 노선</Text>
-                    <View style={styles.transferBadges}>
-                      {[selectedLineData?.id, ...selectedStation.transferLines].map((line) => {
-                        if (!line) return null;
-                        const lineColor = getSubwayLineColor(line);
-                        const lineTextColor = getLineTextColor(line);
-                        const lineName = subwayLines.find(l => l.id === line)?.name || line;
-
-                        return (
-                          <View
-                            key={line}
-                            style={[
-                              styles.transferBadgeLarge,
-                              { backgroundColor: lineColor },
-                            ]}
-                          >
-                            <Text
-                              style={[
-                                styles.transferBadgeTextLarge,
-                                { color: lineTextColor },
-                              ]}
-                            >
-                              {lineName}
-                            </Text>
-                          </View>
-                        );
-                      })}
-                    </View>
+                    <LineFavoritePicker
+                      key={selectedStation.id}
+                      options={lineOptions}
+                      lineLabel={(lineId) => subwayLines.find((l) => l.id === lineId)?.name || lineId}
+                      lineColor={(lineId) => getSubwayLineColor(lineId)}
+                      saveColor={semantic.primaryNormal}
+                      onColor={semantic.labelOnColor}
+                      onSave={handleSaveLineFavorites}
+                    />
                   </View>
-                )}
+                ) : null}
 
                 <View style={styles.modalSection}>
                   <Text style={styles.modalSectionTitle}>실시간 정보</Text>
@@ -378,26 +398,25 @@ export const SubwayMapScreen: React.FC = () => {
                   </TouchableOpacity>
                 </View>
 
-                <TouchableOpacity
-                  style={[
-                    styles.addFavoriteButton,
-                    isStationFavorite && styles.removeFavoriteButton,
-                  ]}
-                  onPress={handleToggleFavorite}
-                  accessible
-                  accessibilityRole="button"
-                  accessibilityLabel={isStationFavorite ? '즐겨찾기 제거' : '즐겨찾기 추가'}
-                >
-                  <Heart
-                    size={20}
-                    color="#ffffff"
-                    fill={isStationFavorite ? '#ffffff' : 'transparent'}
-                    strokeWidth={2}
-                  />
-                  <Text style={styles.addFavoriteButtonText}>
-                    {isStationFavorite ? '즐겨찾기 제거' : '즐겨찾기 추가'}
-                  </Text>
-                </TouchableOpacity>
+                {!selectedStation.isTransfer || lineOptions.length === 0 ? (
+                  <TouchableOpacity
+                    style={[styles.addFavoriteButton, isStationFavorite && styles.removeFavoriteButton]}
+                    onPress={handleToggleFavorite}
+                    accessible
+                    accessibilityRole="button"
+                    accessibilityLabel={isStationFavorite ? '즐겨찾기 제거' : '즐겨찾기 추가'}
+                  >
+                    <Heart
+                      size={20}
+                      color="#ffffff"
+                      fill={isStationFavorite ? '#ffffff' : 'transparent'}
+                      strokeWidth={2}
+                    />
+                    <Text style={styles.addFavoriteButtonText}>
+                      {isStationFavorite ? '즐겨찾기 제거' : '즐겨찾기 추가'}
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
               </>
             )}
           </View>
