@@ -2,20 +2,38 @@
  * useFirestoreMorningCommute tests — verifies the adapter between
  * onboarding's commuteSettings store and HomeScreen's CommuteTime shape.
  *
+ * The hook subscribes to the commuteSettings/<uid> document in real time
+ * (onSnapshot via commuteService.subscribeCommuteRoutes) so a commute saved
+ * on another screen propagates to Home without a remount (home-refresh audit
+ * B4). These tests drive the subscription callback directly.
+ *
  * Focus areas:
  *   - happy path: well-formed Firestore row → adapted CommuteTime
  *   - graceful nulls: missing uid / missing doc / missing required fields
  *   - bufferMinutes default when omitted
+ *   - reactivity: a second snapshot updates the returned value
+ *   - cleanup: unsubscribe on unmount and on uid change (no leaked listener)
  */
-import { renderHook, waitFor } from '@testing-library/react-native';
-import { loadCommuteRoutes } from '@services/commute/commuteService';
+import { renderHook, waitFor, act } from '@testing-library/react-native';
+import { subscribeCommuteRoutes } from '@services/commute/commuteService';
+import type { CommuteSettings } from '@services/commute/commuteService';
 import { useFirestoreMorningCommute } from '../useFirestoreMorningCommute';
 
 jest.mock('@services/commute/commuteService', () => ({
-  loadCommuteRoutes: jest.fn(),
+  subscribeCommuteRoutes: jest.fn(),
 }));
 
-const mockedLoad = loadCommuteRoutes as jest.Mock;
+const mockedSubscribe = subscribeCommuteRoutes as jest.Mock;
+
+// Capture the onChange callback handed to subscribeCommuteRoutes so tests can
+// simulate Firestore snapshots firing.
+let capturedOnChange: ((settings: CommuteSettings | null) => void) | null;
+const mockUnsubscribe = jest.fn();
+
+const emit = (settings: CommuteSettings | null): void => {
+  if (!capturedOnChange) throw new Error('subscribeCommuteRoutes was not called');
+  act(() => capturedOnChange!(settings));
+};
 
 const fullMorning = {
   departureTime: '08:30',
@@ -30,103 +48,133 @@ const fullMorning = {
   bufferMinutes: 10,
 };
 
+const settingsWith = (
+  morningRoute: Record<string, unknown> | null,
+): CommuteSettings =>
+  ({
+    morningRoute,
+    eveningRoute: null,
+    eveningEnabled: true,
+    createdAt: null,
+    updatedAt: null,
+  } as unknown as CommuteSettings);
+
 describe('useFirestoreMorningCommute', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    capturedOnChange = null;
+    mockedSubscribe.mockImplementation((_uid: string, onChange) => {
+      capturedOnChange = onChange;
+      return mockUnsubscribe;
+    });
   });
 
-  it('returns null when uid is undefined (signed out)', () => {
+  it('returns null when uid is undefined (signed out) and does not subscribe', () => {
     const { result } = renderHook(() => useFirestoreMorningCommute(undefined));
     expect(result.current).toBeNull();
-    expect(mockedLoad).not.toHaveBeenCalled();
+    expect(mockedSubscribe).not.toHaveBeenCalled();
   });
 
-  it('returns null when no Firestore document exists', async () => {
-    mockedLoad.mockResolvedValue(null);
+  it('subscribes with the uid when provided', () => {
+    renderHook(() => useFirestoreMorningCommute('uid-1'));
+    expect(mockedSubscribe).toHaveBeenCalledWith('uid-1', expect.any(Function));
+  });
+
+  it('returns null when the snapshot has no document', async () => {
     const { result } = renderHook(() => useFirestoreMorningCommute('uid-1'));
-    await waitFor(() => expect(mockedLoad).toHaveBeenCalledWith('uid-1'));
-    expect(result.current).toBeNull();
+    emit(null);
+    await waitFor(() => expect(result.current).toBeNull());
   });
 
   it('returns null when morningRoute is missing departureStationId', async () => {
-    mockedLoad.mockResolvedValue({
-      morningRoute: { ...fullMorning, departureStationId: '' },
-      eveningRoute: null,
-      createdAt: null,
-      updatedAt: null,
-    });
     const { result } = renderHook(() => useFirestoreMorningCommute('uid-1'));
-    await waitFor(() => expect(mockedLoad).toHaveBeenCalled());
-    expect(result.current).toBeNull();
+    emit(settingsWith({ ...fullMorning, departureStationId: '' }));
+    await waitFor(() => expect(result.current).toBeNull());
   });
 
   it('returns null when morningRoute is missing arrivalStationId', async () => {
-    mockedLoad.mockResolvedValue({
-      morningRoute: { ...fullMorning, arrivalStationId: '' },
-      eveningRoute: null,
-      createdAt: null,
-      updatedAt: null,
-    });
     const { result } = renderHook(() => useFirestoreMorningCommute('uid-1'));
-    await waitFor(() => expect(mockedLoad).toHaveBeenCalled());
-    expect(result.current).toBeNull();
+    emit(settingsWith({ ...fullMorning, arrivalStationId: '' }));
+    await waitFor(() => expect(result.current).toBeNull());
   });
 
   it('returns null when morningRoute is missing departureTime', async () => {
-    mockedLoad.mockResolvedValue({
-      morningRoute: { ...fullMorning, departureTime: '' },
-      eveningRoute: null,
-      createdAt: null,
-      updatedAt: null,
-    });
     const { result } = renderHook(() => useFirestoreMorningCommute('uid-1'));
-    await waitFor(() => expect(mockedLoad).toHaveBeenCalled());
-    expect(result.current).toBeNull();
+    emit(settingsWith({ ...fullMorning, departureTime: '' }));
+    await waitFor(() => expect(result.current).toBeNull());
   });
 
   it('adapts a full Firestore morningRoute to CommuteTime shape', async () => {
-    mockedLoad.mockResolvedValue({
-      morningRoute: fullMorning,
-      eveningRoute: null,
-      createdAt: null,
-      updatedAt: null,
-    });
     const { result } = renderHook(() => useFirestoreMorningCommute('uid-1'));
-    await waitFor(() => expect(result.current).not.toBeNull());
-    expect(result.current).toEqual({
-      departureTime: '08:30',
-      stationId: 'stn-hongdae',
-      destinationStationId: 'stn-gangnam',
-      bufferMinutes: 10,
-    });
+    emit(settingsWith(fullMorning));
+    await waitFor(() =>
+      expect(result.current).toEqual({
+        departureTime: '08:30',
+        stationId: 'stn-hongdae',
+        destinationStationId: 'stn-gangnam',
+        bufferMinutes: 10,
+      }),
+    );
   });
 
   it('defaults bufferMinutes to 0 when omitted in Firestore row', async () => {
-    mockedLoad.mockResolvedValue({
-      morningRoute: { ...fullMorning, bufferMinutes: undefined },
-      eveningRoute: null,
-      createdAt: null,
-      updatedAt: null,
-    });
     const { result } = renderHook(() => useFirestoreMorningCommute('uid-1'));
-    await waitFor(() => expect(result.current).not.toBeNull());
-    expect(result.current?.bufferMinutes).toBe(0);
+    emit(settingsWith({ ...fullMorning, bufferMinutes: undefined }));
+    await waitFor(() => expect(result.current?.bufferMinutes).toBe(0));
   });
 
-  it('refetches when uid changes', async () => {
-    mockedLoad.mockResolvedValue({
-      morningRoute: fullMorning,
-      eveningRoute: null,
-      createdAt: null,
-      updatedAt: null,
-    });
+  it('updates the returned value when a later snapshot changes the route (reactive)', async () => {
+    // The core B4 fix: a one-shot fetch could only ever reflect the first
+    // value. A live subscription must apply the second snapshot too — this is
+    // what makes a commute saved on another screen appear on Home.
+    const { result } = renderHook(() => useFirestoreMorningCommute('uid-1'));
+
+    emit(settingsWith(fullMorning));
+    await waitFor(() => expect(result.current?.stationId).toBe('stn-hongdae'));
+
+    emit(
+      settingsWith({
+        ...fullMorning,
+        departureTime: '09:15',
+        departureStationId: 'stn-seongsu',
+        arrivalStationId: 'stn-jamsil',
+      }),
+    );
+    await waitFor(() =>
+      expect(result.current).toEqual({
+        departureTime: '09:15',
+        stationId: 'stn-seongsu',
+        destinationStationId: 'stn-jamsil',
+        bufferMinutes: 10,
+      }),
+    );
+  });
+
+  it('clears the value when a later snapshot deletes the document', async () => {
+    const { result } = renderHook(() => useFirestoreMorningCommute('uid-1'));
+    emit(settingsWith(fullMorning));
+    await waitFor(() => expect(result.current).not.toBeNull());
+    emit(null);
+    await waitFor(() => expect(result.current).toBeNull());
+  });
+
+  it('unsubscribes on unmount (no leaked listener)', () => {
+    const { unmount } = renderHook(() => useFirestoreMorningCommute('uid-1'));
+    expect(mockedSubscribe).toHaveBeenCalledTimes(1);
+    unmount();
+    expect(mockUnsubscribe).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-subscribes and unsubscribes the old listener when uid changes', () => {
     const { rerender } = renderHook(
       ({ uid }: { uid: string | undefined }) => useFirestoreMorningCommute(uid),
       { initialProps: { uid: 'uid-1' as string | undefined } },
     );
-    await waitFor(() => expect(mockedLoad).toHaveBeenCalledWith('uid-1'));
+    expect(mockedSubscribe).toHaveBeenCalledWith('uid-1', expect.any(Function));
+
     rerender({ uid: 'uid-2' });
-    await waitFor(() => expect(mockedLoad).toHaveBeenCalledWith('uid-2'));
-    expect(mockedLoad).toHaveBeenCalledTimes(2);
+    expect(mockUnsubscribe).toHaveBeenCalledTimes(1);
+    expect(mockedSubscribe).toHaveBeenCalledWith('uid-2', expect.any(Function));
+    expect(mockedSubscribe).toHaveBeenCalledTimes(2);
   });
 });

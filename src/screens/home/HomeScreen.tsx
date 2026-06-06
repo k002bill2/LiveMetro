@@ -45,6 +45,7 @@ import { useMLPrediction } from '../../hooks/useMLPrediction';
 import { useCommuteRouteSummary } from '../../hooks/useCommuteRouteSummary';
 import { useFirestoreMorningCommute } from '../../hooks/useFirestoreMorningCommute';
 import { useRealtimeTrains } from '../../hooks/useRealtimeTrains';
+import { useFavorites } from '../../hooks/useFavorites';
 import { LoadingScreen } from '../../components/common/LoadingScreen';
 import {
   CommunityDelayCard,
@@ -209,9 +210,28 @@ export const HomeScreen: React.FC = () => {
   const styles = useMemo(() => createStyles(semantic), [semantic]);
   const { showError, showSuccess, showInfo, ToastComponent } = useToast();
 
+  // Favorites come from the app-wide reactive FavoritesContext — the single
+  // source of truth shared with FavoritesScreen / SubwayMap. Reading it here
+  // (instead of a mount-only snapshot of user.preferences resolved through
+  // trainService.getStation) means a favorite added, removed, or renamed on
+  // any other tab is reflected on Home without a remount or pull-to-refresh.
+  // The bottom-tab navigator keeps HomeScreen mounted, so the prior mount-only
+  // effect left the list stale until app restart (home-refresh audit B1/B2/B3).
+  const { favoritesWithDetails, refresh: refreshFavorites } = useFavorites();
+  // Top-5 favorites that resolved to a station, in the user's saved order. The
+  // station's lineId is already overridden to the favorite's lineId inside
+  // FavoritesContext, so transfer stations render the correct line.
+  const favoriteStations = useMemo<Station[]>(
+    () =>
+      favoritesWithDetails
+        .slice(0, 5)
+        .map((f) => f.station)
+        .filter((s): s is Station => s !== null),
+    [favoritesWithDetails],
+  );
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [favoriteStations, setFavoriteStations] = useState<Station[]>([]);
   const [locationPermission, setLocationPermission] = useState<boolean>(false);
   const [commuteStationNames, setCommuteStationNames] = useState<{
     origin?: string;
@@ -429,37 +449,20 @@ export const HomeScreen: React.FC = () => {
     return () => clearInterval(id);
   }, []);
 
-  const loadFavoriteStations = useCallback(async (): Promise<void> => {
-    if (!user?.preferences.favoriteStations.length) {
-      setFavoriteStations([]);
-      return;
-    }
-    try {
-      const ids = user.preferences.favoriteStations.map((f) => f.stationId);
-      const stations: Station[] = [];
-      for (const stationId of ids.slice(0, 5)) {
-        const s = await trainService.getStation(stationId);
-        if (s) stations.push(s);
-      }
-      setFavoriteStations(stations);
-    } catch {
-      // Empty state covers visual case
-    }
-  }, [user?.preferences.favoriteStations]);
-
   const initializeScreen = useCallback(async (): Promise<void> => {
     try {
       setLoading(true);
       const { status } = await Location.requestForegroundPermissionsAsync();
       const granted = status === 'granted';
       setLocationPermission(granted);
-      await loadFavoriteStations();
+      // Favorites are no longer loaded here — they flow reactively from
+      // FavoritesContext (see favoriteStations memo above).
     } catch {
       showError('데이터를 불러오는데 실패했습니다. 네트워크 연결을 확인해주세요.');
     } finally {
       setLoading(false);
     }
-  }, [loadFavoriteStations, showError]);
+  }, [showError]);
 
   const handleStationPress = useCallback(
     (station: Station): void => {
@@ -523,13 +526,15 @@ export const HomeScreen: React.FC = () => {
     try {
       if (locationPermission) {
         refreshNearby();
-      } else {
-        await loadFavoriteStations();
       }
+      // Always re-pull favorites from Firestore. The prior code skipped this
+      // whenever location was granted, so a pull-to-refresh could never recover
+      // a stale favorites list on a location-enabled device (audit B1 ④).
+      await refreshFavorites();
     } finally {
       setRefreshing(false);
     }
-  }, [loadFavoriteStations, locationPermission, refreshNearby]);
+  }, [locationPermission, refreshNearby, refreshFavorites]);
 
   useEffect(() => {
     initializeScreen();
@@ -773,22 +778,23 @@ export const HomeScreen: React.FC = () => {
           </View>
         ) : (
           <View style={styles.favoriteList}>
-            {favoriteStations.map((station, idx) => {
-              const fav = user?.preferences.favoriteStations.find(
-                (f) => f.stationId === station.id,
-              );
-              const isFirst = idx === 0;
-              return (
-                <HomeFavoriteRow
-                  key={station.id}
-                  station={station}
-                  alias={fav?.alias}
-                  isFocused={isFocused}
-                  isFirst={isFirst}
-                  onPress={() => handleStationPress(station)}
-                />
-              );
-            })}
+            {favoritesWithDetails
+              .slice(0, 5)
+              .map((fav, idx) => {
+                const station = fav.station;
+                if (!station) return null;
+                const isFirst = idx === 0;
+                return (
+                  <HomeFavoriteRow
+                    key={station.id}
+                    station={station}
+                    alias={fav.alias}
+                    isFocused={isFocused}
+                    isFirst={isFirst}
+                    onPress={() => handleStationPress(station)}
+                  />
+                );
+              })}
           </View>
         )}
       </View>

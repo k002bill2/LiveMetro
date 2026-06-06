@@ -9,6 +9,7 @@ import {
   setDoc,
   getDoc,
   updateDoc,
+  onSnapshot,
   serverTimestamp,
   Timestamp,
 } from 'firebase/firestore';
@@ -132,6 +133,54 @@ export const loadCommuteRoutes = async (
 };
 
 /**
+ * Subscribe to a user's commute routes in real time.
+ *
+ * Fires `onChange` with the current value immediately and again on every
+ * subsequent change to the `commuteSettings/<uid>` document. This is what lets
+ * a commute saved on CommuteSettings / onboarding propagate to consumers (e.g.
+ * HomeScreen's CommuteRouteCard) without a remount or manual refresh.
+ *
+ * Returns an unsubscribe function — callers MUST invoke it on cleanup to avoid
+ * a leaked Firestore listener (see .claude/rules/subscription-cleanup.md).
+ * Errors and a missing/empty document both surface as `null` so consumers can
+ * treat them uniformly (no throw — see error-handling rule).
+ */
+export const subscribeCommuteRoutes = (
+  uid: string,
+  onChange: (settings: CommuteSettings | null) => void
+): (() => void) => {
+  if (!uid) {
+    console.warn('No UID provided for subscribing to commute routes');
+    onChange(null);
+    return () => {};
+  }
+
+  const docRef = doc(firestore, COMMUTE_COLLECTION, uid);
+  return onSnapshot(
+    docRef,
+    (docSnap) => {
+      if (!docSnap.exists()) {
+        onChange(null);
+        return;
+      }
+      const data = docSnap.data();
+      onChange({
+        morningRoute: data.morningRoute || null,
+        eveningRoute: data.eveningRoute || null,
+        // Legacy docs predate this field — default to enabled.
+        eveningEnabled: data.eveningEnabled ?? true,
+        createdAt: data.createdAt || null,
+        updatedAt: data.updatedAt || null,
+      });
+    },
+    (error) => {
+      console.error('Error subscribing to commute routes:', error);
+      onChange(null);
+    }
+  );
+};
+
+/**
  * Update only morning route
  */
 export const updateMorningRoute = async (
@@ -244,6 +293,7 @@ export const updateEveningEnabled = async (
 export default {
   saveCommuteRoutes,
   loadCommuteRoutes,
+  subscribeCommuteRoutes,
   updateMorningRoute,
   updateEveningRoute,
   updateEveningEnabled,

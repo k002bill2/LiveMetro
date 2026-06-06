@@ -195,6 +195,63 @@ jest.mock('@/hooks/useMLPrediction', () => ({
   })),
 }));
 
+// HomeFavoriteRow subscribes to per-row realtime arrivals. Once favorites
+// actually render (driven by the FavoritesContext mock below) this hook fires,
+// so stub it to avoid real Seoul API polling / act() warnings in tests.
+jest.mock('@/hooks/useRealtimeTrains', () => ({
+  useRealtimeTrains: jest.fn(() => ({
+    trains: [],
+    loading: false,
+    error: null,
+    lastUpdated: null,
+    isStale: false,
+    refetch: jest.fn(),
+    unsubscribe: jest.fn(),
+    isRetrying: false,
+  })),
+}));
+
+// FavoritesContext is the app-wide reactive source of truth for favorites.
+// HomeScreen subscribes via useFavorites(); mock it so tests can drive the
+// favorites list (and simulate mutations made on other screens) directly,
+// without a FavoritesProvider wrapper.
+const mockFavoritesRefresh = jest.fn();
+const mockStationFav = (id: string, name: string, lineId = '2') => ({
+  id,
+  name,
+  nameEn: name,
+  lineId,
+  coordinates: { latitude: 37.5665, longitude: 126.978 },
+  transfers: [],
+});
+type FavMockItem = {
+  id: string;
+  stationId: string;
+  lineId: string;
+  alias: string | null;
+  station: ReturnType<typeof mockStationFav> | null;
+};
+const favoritesMockBase = {
+  favorites: [] as unknown[],
+  favoritesWithDetails: [] as FavMockItem[],
+  loading: false,
+  error: null as string | null,
+  addFavorite: jest.fn(),
+  removeFavorite: jest.fn(),
+  removeFavoriteByStationId: jest.fn(),
+  updateFavorite: jest.fn(),
+  setNotificationEnabled: jest.fn(),
+  isFavorite: jest.fn(() => false),
+  toggleFavorite: jest.fn(),
+  reorderFavorites: jest.fn(),
+  getCommuteStations: jest.fn(() => []),
+  refresh: mockFavoritesRefresh,
+};
+const mockUseFavorites = jest.fn(() => favoritesMockBase);
+jest.mock('@/hooks/useFavorites', () => ({
+  useFavorites: () => mockUseFavorites(),
+}));
+
 jest.mock('lucide-react-native', () => ({
   CloudOff: () => null, MapPin: () => null, ChevronRight: () => null,
   TrainFront: () => null, RefreshCw: () => null,
@@ -403,6 +460,9 @@ describe('HomeScreen', () => {
     // Reset route summary to the unresolved default (clearAllMocks keeps the
     // implementation, but a prior test's mockReturnValue would otherwise leak).
     mockUseCommuteRouteSummary.mockReturnValue({ ready: false });
+    // Reset favorites context to the empty default. clearAllMocks keeps the
+    // implementation but not a prior test's mockReturnValue override.
+    mockUseFavorites.mockReturnValue(favoritesMockBase);
   });
 
   // ---------- Rendering ----------
@@ -694,6 +754,93 @@ describe('HomeScreen', () => {
       const { getAllByText } = render(<HomeScreen />);
       await waitFor(() =>
         expect(getAllByText('데이터가 없습니다.').length).toBeGreaterThan(0),
+      );
+    });
+  });
+
+  // ---------- Favorites reactivity (FavoritesContext = single SoT) ----------
+
+  // Regression for the home-refresh audit (B1/B2/B3): HomeScreen must read the
+  // favorites LIST from the reactive FavoritesContext, not from a mount-only
+  // snapshot of user.preferences + trainService.getStation. Otherwise a
+  // favorite added/removed/renamed on another tab never appears until app
+  // restart (the bottom-tab navigator keeps HomeScreen mounted, so a
+  // mount-only effect never re-runs).
+  describe('Favorites reactivity (FavoritesContext SoT)', () => {
+    it('renders favorites sourced from FavoritesContext, not getStation', async () => {
+      // getStation returns null for everything — so any station name that shows
+      // up MUST have come from the FavoritesContext, proving the new data path.
+      mockGetStation.mockResolvedValue(null);
+      mockUseFavorites.mockReturnValue({
+        ...favoritesMockBase,
+        favoritesWithDetails: [
+          {
+            id: 'f1',
+            stationId: 's-wangsimni',
+            lineId: '2',
+            alias: null,
+            station: mockStationFav('s-wangsimni', '왕십리', '2'),
+          },
+        ],
+      });
+
+      // With location denied, favorites legitimately render in BOTH the
+      // "주변 역" fallback slot (NearbyStationCard) and the "즐겨찾는 역" list
+      // (FavoriteRow), so the name matches more than once — assert ≥ 1.
+      const { getAllByText } = render(<HomeScreen />);
+      await waitFor(() =>
+        expect(getAllByText('왕십리').length).toBeGreaterThan(0),
+      );
+    });
+
+    it('shows the alias from FavoritesContext, not user.preferences', async () => {
+      mockGetStation.mockResolvedValue(null);
+      mockUseFavorites.mockReturnValue({
+        ...favoritesMockBase,
+        favoritesWithDetails: [
+          {
+            id: 'f1',
+            stationId: 's-seongsu',
+            lineId: '2',
+            alias: '회사',
+            station: mockStationFav('s-seongsu', '성수', '2'),
+          },
+        ],
+      });
+
+      const { getByText } = render(<HomeScreen />);
+      await waitFor(() => expect(getByText('회사')).toBeTruthy());
+    });
+
+    it('reflects a favorite added after mount without remounting (reactive)', async () => {
+      mockGetStation.mockResolvedValue(null);
+      mockUseFavorites.mockReturnValue({
+        ...favoritesMockBase,
+        favoritesWithDetails: [],
+      });
+
+      const { queryAllByText, getAllByText, rerender } = render(<HomeScreen />);
+      await waitFor(() => expect(queryAllByText('건대입구').length).toBe(0));
+
+      // Simulate the user adding a favorite on the Favorites/Map tab: the
+      // shared FavoritesContext now returns one more item. HomeScreen stays
+      // mounted (no remount) and must reflect it on the next render.
+      mockUseFavorites.mockReturnValue({
+        ...favoritesMockBase,
+        favoritesWithDetails: [
+          {
+            id: 'f-new',
+            stationId: 's-kondae',
+            lineId: '2',
+            alias: null,
+            station: mockStationFav('s-kondae', '건대입구', '2'),
+          },
+        ],
+      });
+      rerender(<HomeScreen />);
+
+      await waitFor(() =>
+        expect(getAllByText('건대입구').length).toBeGreaterThan(0),
       );
     });
   });
