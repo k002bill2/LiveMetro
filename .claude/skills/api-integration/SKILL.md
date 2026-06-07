@@ -1,6 +1,6 @@
 ---
 name: api-integration
-description: Seoul Open Data API integration for real-time subway arrival data and timetables. Use when working with external Seoul Metro APIs.
+description: Seoul Open Data API 호출(call) 레이어 — 외부 Seoul Metro 실시간 도착/시간표 API에 대한 fetch, rate-limit(최소 30초 폴링), timeout(AbortController 10초), retry/backoff, API 키 매니저, 다단계 fallback 트리거를 담당. 외부 HTTP 호출 코드를 작성할 때 사용. 원시 응답 정규화/변환, 역 조회·검색·소비, 경로/요금 계산 같은 인접 작업은 형제 스킬(subway-data-processor, station-info, route-fare-calculation) 소관.
 ---
 
 # Seoul API Integration Guidelines
@@ -10,6 +10,16 @@ description: Seoul Open Data API integration for real-time subway arrival data a
 - Fetching real-time train arrival data
 - Working with subway timetables
 - Implementing data fallback strategies
+
+## 사용하지 말아야 할 때 (When NOT to use)
+
+이 스킬은 외부 Seoul Open API "호출"(fetch/rate-limit/timeout/retry) 레이어에만 한정됩니다. 아래 인접 작업은 형제 스킬 소관이므로 해당 스킬을 사용하세요:
+
+- 원시 API 응답을 앱 모델로 정규화/변환(`convertToAppTrain`, `barvlDt` 파싱, `updnLine` 방향 매핑 등): `subway-data-processor`
+- 역 조회/검색/상세/주변역/실시간 도착정보 "소비"(UI에 표시할 역 데이터 가져오기, 역명 해석): `station-info`
+- 경로 탐색(A*/K-shortest), 환승 처리, 요금 타입별 계산: `route-fare-calculation`
+
+이 스킬은 위 작업을 직접 다루지 않습니다 — 외부 HTTP 호출의 경계(fetch 발신, rate-limit 가드, timeout, 키 매니저, fallback 트리거)까지만 책임집니다.
 
 ## API 엔드포인트/키 구분표
 
@@ -35,7 +45,7 @@ Key Response Fields:
 
 ### Timetable API
 ```
-URL: http://openAPI.seoul.go.kr:8088/{API_KEY}/json/SearchSTNTimeTableByIDService/{START}/{END}/{STATION_CODE}/{WEEK_TAG}/{INOUT_TAG}/
+URL: http://openapi.seoul.go.kr:8088/{API_KEY}/json/SearchSTNTimeTableByIDService/{START}/{END}/{STATION_CODE}/{WEEK_TAG}/{INOUT_TAG}/
 
 Parameters:
 - WEEK_TAG: '1' (Weekday), '2' (Saturday), '3' (Sunday/Holiday)
@@ -86,15 +96,15 @@ Priority Order:
 | Setting | Value | Notes |
 |---------|-------|-------|
 | Polling Interval | 30s minimum | No official rate limit, be conservative |
-| Timeout | 5000ms | Per request |
+| Timeout | 10000ms (10s) | AbortController per request |
 | Max Retries | 3 | With exponential backoff |
 
 ## Best Practices
 
 1. **Environment Variables**
    ```typescript
-   const API_KEY = process.env.SEOUL_SUBWAY_API_KEY;
-   if (!API_KEY) throw new Error('SEOUL_SUBWAY_API_KEY is not set');
+   const API_KEY = process.env.EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY;
+   if (!API_KEY) throw new Error('EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY is not set');
    ```
 
 2. **Response Validation**

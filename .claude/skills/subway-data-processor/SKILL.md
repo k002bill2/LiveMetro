@@ -1,6 +1,6 @@
 ---
 name: subway-data-processor
-description: Process and transform Seoul subway data including station info, real-time arrivals, and timetables. Use when working with Seoul Open Data API responses or subway data normalization.
+description: Normalize and transform raw Seoul Open Data API responses into LiveMetro's internal subway shapes (parse arrival messages, map Korean direction/line fields to enums, classify service disruptions, shape timetable rows). Use when transforming or normalizing raw API payloads; this is the data normalization/transformation layer only — fetching the API belongs to api-integration, consuming/querying the normalized station data belongs to station-info, and route/fare computation belongs to route-fare-calculation.
 ---
 
 # Subway Data Processor Skill
@@ -15,6 +15,15 @@ Handle Seoul subway data transformations, API response parsing, and data normali
 - Handling service disruption detection
 - Processing timetable data
 - Implementing caching logic
+
+## 사용하지 말아야 할 때 (When NOT to use)
+
+이 스킬은 원시 응답을 내부 형태로 "정규화/변환"하는 레이어다. 다음 인접 작업은 형제 스킬 소관이므로 위임한다:
+
+- **외부 Seoul Open API를 직접 호출**(fetch, rate-limit, timeout, 재시도, 캐시 폴백 트리거) → `api-integration`. 이 스킬은 이미 받아온 페이로드만 변환한다.
+- **정규화된 역 데이터를 조회/검색/소비**(역 검색, 역 상세, 주변역, 실시간 도착정보 사용, 시간표 조회) → `station-info`.
+- **경로 탐색·환승·요금 계산**(A*/K-shortest, 최단경로, 환승 시간, 요금 타입별 계산) → `route-fare-calculation`.
+- **UI 컴포넌트/화면 렌더링**(도착 카드, 리스트, 네비게이션) → `react-native-development`.
 
 ## Data Types
 
@@ -51,7 +60,8 @@ interface Station {
 ```json
 {
   "realtimeArrivalList": [{
-    "arvlMsg2": "2분후[1번째전]",   // Arrival message
+    "barvlDt": "120",              // 잔여 초 (Primary arrival-time source per seoul-api-limits)
+    "arvlMsg2": "2분후[1번째전]",   // Arrival message (fallback text)
     "btrainNo": "T1001",           // Train number
     "bstatnNm": "신도림",           // Destination
     "updnLine": "상행",             // Direction
@@ -65,7 +75,9 @@ interface Station {
 ## Key Parsing Rules
 
 ### Arrival Time
-| Message | Seconds |
+**Primary**: `barvlDt`(잔여 초) 우선 사용 — `parseInt(barvlDt, 10)`. `arvlMsg2` 텍스트만으로 도착 시간을 파싱하는 것은 BANNED(`.claude/rules/seoul-api-limits.md`). 아래 텍스트 파싱은 `barvlDt` 부재 시 **fallback**이며, `전역`(이전역) 메시지는 `arvlCd`로 판별해 건너뛴다.
+
+| Message (fallback) | Seconds |
 |---------|---------|
 | `2분후[1번째전]` | 120 |
 | `곧 도착` | 30 |
@@ -83,8 +95,8 @@ interface Station {
 ### Line ID Mapping
 | Korean | ID |
 |--------|-----|
-| `1호선` - `9호선` | `line1` - `line9` |
-| `신분당선` | `shinbundang` |
+| `1호선` - `9호선` | `'1'` - `'9'` |
+| `신분당선` | `sinbundang` |
 | `경의중앙선` | `gyeongui` |
 | `공항철도` | `airport` |
 | `수인분당선` | `suin` |

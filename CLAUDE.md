@@ -50,7 +50,7 @@ State:      AuthContext + Custom Hooks (no Redux)
 
 ## Project Rules (`.claude/rules/`)
 
-프로젝트 전용 규칙 7개가 항상 로드됩니다. 각 규칙의 BANNED 표·상세는 해당 파일이 SSOT (여기엔 복붙하지 않음):
+프로젝트 전용 규칙 10개(핵심 7개 + 추가 3개)가 항상 로드됩니다. 각 규칙의 BANNED 표·상세는 해당 파일이 SSOT (여기엔 복붙하지 않음):
 
 | 규칙 파일 | 내용 |
 |-----------|------|
@@ -68,7 +68,7 @@ State:      AuthContext + Custom Hooks (no Redux)
 
 ## Workflow
 
-- **구현 전 스킬 호출 (필수)**: 작업 유형별 Skill 라우팅 SSOT는 `.claude/rules/livemetro-workflow.md`. 전체 커맨드(21)·스킬(22) 인벤토리는 [Commands & Skills](docs/claude/commands-and-skills.md).
+- **구현 전 스킬 호출 (필수)**: 작업 유형별 Skill 라우팅 SSOT는 `.claude/rules/livemetro-workflow.md`. 전체 커맨드·스킬 인벤토리는 [Commands & Skills](docs/claude/commands-and-skills.md).
 - **피드백 루프**: 코드 변경 후 `/verify-app` → PR 전 `/check-health` → 커밋 `/commit-push-pr` → 리팩토링 `/simplify-code`.
 - **검증 후 커밋**: `/verify-app`(tsc + lint + test) 통과 후에만 커밋. 빌드 깨진 채 커밋 금지.
 - **2-Strike Rule**: 같은 수정을 2회 시도 후 실패하면 멈추고 근본 원인 분석.
