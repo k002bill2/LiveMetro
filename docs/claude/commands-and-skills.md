@@ -3,7 +3,7 @@
 LiveMetro의 Skills 2.0 three-tier 인벤토리 전체 목록.
 CLAUDE.md에서 분리 — 자주 쓰는 커맨드/스킬 라우팅 SSOT는 `.claude/rules/livemetro-workflow.md` 참조.
 
-## Commands (`.claude/commands/`) — 21개, 사용자 `/` 호출
+## Commands (`.claude/commands/`) — 20개, 사용자 `/` 호출
 
 | 커맨드 | 용도 |
 |--------|------|
@@ -27,9 +27,8 @@ CLAUDE.md에서 분리 — 자주 쓰는 커맨드/스킬 라우팅 SSOT는 `.cl
 | `/dev-docs` | Dev Docs 시스템 생성 |
 | `/update-dev-docs` | Dev Docs 업데이트 |
 | `/sync-registry` | 레지스트리 동기화 |
-| `/run-workflow` | 워크플로우 실행 |
 
-## Skills (`.claude/skills/`) — 22개, 컨텍스트 기반 on-demand 로드
+## Skills (`.claude/skills/`) — 21개, 컨텍스트 기반 on-demand 로드
 
 구현 전 반드시 해당 스킬을 Skill 도구로 호출할 것. 모든 스킬은 Skills 2.0 progressive disclosure 구조(`SKILL.md` ≤500줄 + `references/<topic>.md`)를 따른다.
 
@@ -54,7 +53,6 @@ CLAUDE.md에서 분리 — 자주 쓰는 커맨드/스킬 라우팅 SSOT는 `.cl
 | 성능 모니터링/헬스체크/크래시 | `monitoring-observability` |
 | 에이전트 실패 진단/개선 | `agent-improvement` |
 | 에이전트 트레이싱/메트릭 | `agent-observability` |
-| AOS Dashboard (React 웹) 구현 | `react-web-development-aos` |
 | Git worktree 머지 자동화 | `merge-worktree` |
 | 에이전트 평가 실행 (pass@k) | `run-eval` |
 

@@ -62,11 +62,6 @@
       "description": "AI 에이전트 평가 태스크 실행 및 pass@k 지표 계산",
       "allowedTools": "Read, Write, Bash, Glob, Grep"
     },
-    "run-workflow": {
-      "file": ".claude/commands/run-workflow.md",
-      "description": "/run-workflow",
-      "allowedTools": null
-    },
     "save-and-compact": {
       "file": ".claude/commands/save-and-compact.md",
       "description": "Save context to Dev Docs and run /compact in one command",
