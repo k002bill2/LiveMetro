@@ -45,7 +45,7 @@ Key Response Fields:
 
 ### Timetable API
 ```
-URL: http://openAPI.seoul.go.kr:8088/{API_KEY}/json/SearchSTNTimeTableByIDService/{START}/{END}/{STATION_CODE}/{WEEK_TAG}/{INOUT_TAG}/
+URL: http://openapi.seoul.go.kr:8088/{API_KEY}/json/SearchSTNTimeTableByIDService/{START}/{END}/{STATION_CODE}/{WEEK_TAG}/{INOUT_TAG}/
 
 Parameters:
 - WEEK_TAG: '1' (Weekday), '2' (Saturday), '3' (Sunday/Holiday)
@@ -96,15 +96,15 @@ Priority Order:
 | Setting | Value | Notes |
 |---------|-------|-------|
 | Polling Interval | 30s minimum | No official rate limit, be conservative |
-| Timeout | 5000ms | Per request |
+| Timeout | 10000ms (10s) | AbortController per request |
 | Max Retries | 3 | With exponential backoff |
 
 ## Best Practices
 
 1. **Environment Variables**
    ```typescript
-   const API_KEY = process.env.SEOUL_SUBWAY_API_KEY;
-   if (!API_KEY) throw new Error('SEOUL_SUBWAY_API_KEY is not set');
+   const API_KEY = process.env.EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY;
+   if (!API_KEY) throw new Error('EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY is not set');
    ```
 
 2. **Response Validation**
