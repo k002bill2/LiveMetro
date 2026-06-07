@@ -79,9 +79,9 @@ State:      AuthContext + Custom Hooks (no Redux)
 
 ## Automation & Orchestration
 
-Claude Code 네이티브 훅으로 모든 자동화를 구현 (외부 데몬 없음): 민감 경로 보호, 파일락, Gemini 크로스 리뷰, 시크릿 필터, 스킬 자동 활성화. 멀티 에이전트는 네이티브 Agent 툴로 스폰.
+Claude Code 네이티브 훅으로 모든 자동화를 구현 (외부 데몬 없음): 민감 경로 보호, 파일락, 시크릿 필터, 스킬 자동 활성화. 멀티 에이전트는 네이티브 Agent 툴로 스폰.
 
-상세(훅 목록·Gemini·MCP·Quality Gates·effort scaling·에이전트 구성·File Lock·모델 선택): [Automation & Orchestration](docs/claude/automation.md)
+상세(훅 목록·MCP·Quality Gates·effort scaling·에이전트 구성·File Lock·모델 선택): [Automation & Orchestration](docs/claude/automation.md)
 
 ## Reference Documentation
 
@@ -89,6 +89,6 @@ Claude Code 네이티브 훅으로 모든 자동화를 구현 (외부 데몬 없
 - [API Reference](docs/claude/api-reference.md) — Seoul Metro API, Firebase collections
 - [Development Patterns](docs/claude/development-patterns.md) — Adding screens/hooks/services, 성능 패턴, anti-patterns
 - [Testing Guide](docs/claude/testing.md) — Jest config, coverage, test patterns
-- [Automation & Orchestration](docs/claude/automation.md) — Hooks, Gemini, MCP, multi-agent, 모델 선택
+- [Automation & Orchestration](docs/claude/automation.md) — Hooks, MCP, multi-agent, 모델 선택
 - [Commands & Skills](docs/claude/commands-and-skills.md) — 전체 커맨드·스킬 인벤토리
 - [Development Guide](docs/DEVELOPMENT.md) — Workflows, validation gates, deploy

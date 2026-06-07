@@ -37,10 +37,6 @@ process.stdin.on('end', () => {
 
     const messages = [];
 
-    // 0. Gemini 크로스 리뷰 결과 확인
-    const geminiMsg = checkPendingGeminiReviews();
-    if (geminiMsg) messages.push(geminiMsg);
-
     // 1. React Native 패턴 감지
     const reactMsg = detectReactNativePatterns(prompt);
     if (reactMsg) messages.push(reactMsg);
@@ -248,120 +244,6 @@ function shouldActivateSkill(prompt, rule) {
   }
 
   return false;
-}
-
-// --- Gemini 크로스 리뷰 결과 확인 ---
-function checkPendingGeminiReviews() {
-  try {
-    const stateFile = path.join(PROJECT_ROOT, '.claude', 'gemini-bridge', 'state.json');
-    if (!fs.existsSync(stateFile)) return null;
-
-    const state = JSON.parse(fs.readFileSync(stateFile, 'utf8'));
-    const pending = (state.pendingReviews || []).filter(r => r.status === 'completed');
-
-    if (pending.length === 0) return null;
-
-    const reviewsDir = path.join(PROJECT_ROOT, '.claude', 'gemini-bridge', 'reviews');
-    const reviewBlocks = [];
-    const thirtyMinAgo = Date.now() - 30 * 60 * 1000;
-
-    for (const review of pending) {
-      const reviewTime = new Date(review.timestamp).getTime();
-      if (reviewTime < thirtyMinAgo) {
-        review.status = 'stale';
-        continue;
-      }
-
-      const reviewFile = path.join(reviewsDir, `${review.id}.json`);
-      if (!fs.existsSync(reviewFile)) {
-        review.status = 'missing';
-        continue;
-      }
-
-      try {
-        const reviewData = JSON.parse(fs.readFileSync(reviewFile, 'utf8'));
-        if (reviewData.review) {
-          const extracted = extractReviewSummary(reviewData.review);
-          reviewBlocks.push(extracted);
-        }
-        review.status = 'shown';
-      } catch (_) {
-        review.status = 'read_error';
-      }
-    }
-
-    state.pendingReviews = state.pendingReviews.filter(r => {
-      if (['shown', 'stale', 'missing', 'read_error'].includes(r.status)) {
-        const age = Date.now() - new Date(r.timestamp).getTime();
-        return age < 30 * 60 * 1000;
-      }
-      return true;
-    });
-
-    fs.writeFileSync(stateFile, JSON.stringify(state, null, 2) + '\n');
-
-    if (reviewBlocks.length === 0) return null;
-
-    const allText = reviewBlocks.join('\n');
-    const hasCritical = /severity:critical/i.test(allText);
-    const hasWarning = /severity:warning/i.test(allText);
-    const needsAttention = /needs-attention/i.test(allText);
-
-    let msg = '[GEMINI REVIEW - Cross-verification by Gemini CLI]';
-    for (const block of reviewBlocks) {
-      msg += '\n' + block;
-    }
-    msg += '\n[/GEMINI REVIEW]';
-
-    if (hasCritical) {
-      msg += '\n!! Gemini가 critical 이슈를 발견했습니다. 커밋 전에 반드시 확인하세요.';
-    } else if (hasWarning || needsAttention) {
-      msg += '\n* Gemini가 warning 이슈를 제기했습니다. 관련 작업 시 참고하세요.';
-    }
-
-    return msg;
-  } catch (_) {
-    return null;
-  }
-}
-
-function extractReviewSummary(reviewText) {
-  const lines = reviewText.split('\n');
-
-  let lastIssuesIdx = -1;
-  for (let i = lines.length - 1; i >= 0; i--) {
-    if (/^ISSUES:/i.test(lines[i].trim())) {
-      lastIssuesIdx = i;
-      break;
-    }
-  }
-
-  if (lastIssuesIdx >= 0) {
-    const block = lines.slice(lastIssuesIdx);
-    const hasVerdict = block.some(l => /^VERDICT:/i.test(l.trim()));
-    const hasSummary = block.some(l => /^SUMMARY:/i.test(l.trim()));
-
-    if (hasVerdict) {
-      if (hasSummary) {
-        const summaryIdx = block.findIndex(l => /^SUMMARY:/i.test(l.trim()));
-        return block.slice(0, summaryIdx + 1).join('\n').trim();
-      }
-      const verdictIdx = block.findIndex(l => /^VERDICT:/i.test(l.trim()));
-      return block.slice(0, verdictIdx + 1).join('\n').trim();
-    }
-  }
-
-  const verdictIdx = lines.findIndex(l => /^VERDICT:/i.test(l.trim()));
-  if (verdictIdx >= 0) {
-    const start = Math.max(0, verdictIdx - 5);
-    const end = Math.min(lines.length, verdictIdx + 3);
-    return lines.slice(start, end).join('\n').trim();
-  }
-
-  if (reviewText.length > 500) {
-    return '...' + reviewText.slice(-500).trim();
-  }
-  return reviewText.trim();
 }
 
 // --- 에이전트 자동 추천 ---

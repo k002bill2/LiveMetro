@@ -37,16 +37,6 @@
       "description": "AI 에이전트 평가 결과 대시보드 - 추세 분석 및 저성능 태스크 식별",
       "allowedTools": "Read, Glob, Grep"
     },
-    "gemini-review": {
-      "file": ".claude/commands/gemini-review.md",
-      "description": "Gemini CLI로 현재 코드 변경사항 크로스 리뷰 실행",
-      "allowedTools": "Bash(gemini *), Bash(git diff*), Read"
-    },
-    "gemini-scan": {
-      "file": ".claude/commands/gemini-scan.md",
-      "description": "Gemini CLI로 대규모 코드베이스 분석 실행",
-      "allowedTools": "Bash(gemini *), Read, Glob"
-    },
     "resume": {
       "file": ".claude/commands/resume.md",
       "description": "dev/active에서 저장된 컨텍스트를 불러와 작업 재개",
