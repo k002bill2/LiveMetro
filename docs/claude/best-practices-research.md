@@ -8,7 +8,7 @@
 - 22개 출처 fetch → 110개 주장 추출 → 적대적 검증(주장당 회의론자 3명, 2/3 반박 시 폐기).
 - **✅ 고신뢰**: 공식 문서 출처 + 3-0/2-0 만장일치 검증 통과 (약 17건).
 - **⚠️ 논쟁적/미확정**: 검증자 일부만 가동(서버 rate-limit) + 반박 표 존재 (hook 2건, GitHub 이슈 출처).
-- **검증 불가(이번 회차)**: claude.com/blog 4건은 서버 rate-limit로 검증 중단 — *반박된 것이 아니라 표를 못 모음*. 별도 표기.
+- **재검증 완료**: 1차에 서버 rate-limit로 표를 못 모았던 claude.com/blog 4건은 출처 직접 대조로 재검증 → **전부 CONFIRMED** (Skills 섹션에 반영).
 
 | 단계 | 수치 |
 |------|------|
@@ -16,9 +16,9 @@
 | fetch 출처 | 22 |
 | 추출 주장 | 110 |
 | 검증 시도 | 35 (25 + 재검증 10) |
-| ✅ 확정 | ~17 |
+| ✅ 확정 | ~21 |
 | ⚠️ 논쟁적 | 2 |
-| 검증 불가 | 4 |
+| 검증 불가 | 0 (재검증 완료) |
 
 ---
 
@@ -77,6 +77,9 @@
 - **메타데이터 = 트리거 엔진**: 스킬 작성의 핵심은 YAML frontmatter의 name과 description을 다듬는 것이다. Claude는 이 메타데이터로 스킬을 트리거/로드할지 결정한다 ✅ ([agent-skills](https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills)).
 - **핵심 use case를 맨 앞에, 자연어 키워드 포함**: description + when_to_use 결합 텍스트는 스킬 목록에서 **1,536자에서 잘린다**. 가장 중요한 용례를 앞에 배치하라 ✅ ([skills](https://code.claude.com/docs/en/skills)).
 - **CLAUDE.md → Skill 전환 판단**: 같은 지시/체크리스트/multi-step 절차를 반복 붙여넣거나, CLAUDE.md 섹션이 사실이 아닌 절차로 자랐을 때 Skill을 만든다 ✅ ([skills](https://code.claude.com/docs/en/skills)).
+- **description은 "모델 발견(discovery)"용**: 요약이 아니라 *언제 트리거할지*를 적는다 — 사람 가독성보다 모델이 호출 시점을 판단하게 ✅ ([lessons](https://claude.com/blog/lessons-from-building-claude-code-how-we-use-skills)).
+- **Gotchas 섹션이 최고 신호**: 스킬에서 가장 가치 높은 부분은 Claude가 실제로 부딪힌 실패 지점을 모은 Gotchas. 시간이 지나며 갱신 ✅ ([lessons](https://claude.com/blog/lessons-from-building-claude-code-how-we-use-skills)).
+- **검증(verification) 스킬의 큰 효과**: Anthropic 내부 측정에서 출력 품질에 가장 큰 영향을 낸 스킬 패턴 ✅ ([lessons](https://claude.com/blog/lessons-from-building-claude-code-how-we-use-skills)).
 
 ### (3) 흔한 실수 / 안티패턴
 
@@ -85,6 +88,7 @@
 | **Monolithic / oversized SKILL.md** | 500줄 한계 초과, 컨텍스트 낭비 | 별도 파일로 split, SKILL.md에서 이름으로 참조 ✅ ([agent-skills](https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills), [agent-skills/best-practices](https://docs.claude.com/en/docs/agents-and-tools/agent-skills/best-practices)) |
 | **모호한 description** | "Helps with documents" 같은 표현은 트리거 실패 유발 | 3인칭 + 무엇/언제 명시 ✅ ([agent-skills/best-practices](https://docs.claude.com/en/docs/agents-and-tools/agent-skills/best-practices)) |
 | **reference 중첩 과다** | one-level보다 깊은 reference는 부분만 읽힘(head -100 미리보기) → 정보 누락 | reference는 SKILL.md에서 **one level deep**로 유지 ✅ ([agent-skills/best-practices](https://docs.claude.com/en/docs/agents-and-tools/agent-skills/best-practices)) |
+| **Railroading (과잉 명세)** | 기본 동작을 재서술하면 가치 없이 컨텍스트만 소모 | 기본 코딩 설명 대신 Claude를 평소 사고에서 끌어내고 유연성 부여 ✅ ([lessons](https://claude.com/blog/lessons-from-building-claude-code-how-we-use-skills)) |
 
 ---
 
@@ -122,17 +126,6 @@
 
 ---
 
-## 검증 불가 (이번 회차 — 반박된 것 아님)
-
-서버 rate-limit로 검증자가 가동되지 못해 표를 모으지 못한 주장 (출처: [claude.com/blog](https://claude.com/blog/lessons-from-building-claude-code-how-we-use-skills)). 추후 재검증 대상:
-
-- 검증(verification) 스킬이 Claude 출력 품질에 내부적으로 가장 큰 측정 효과를 냈다.
-- 스킬 description은 사람 가독성보다 **모델 발견(model discovery)**을 위해, 명시적 호출 트리거 중심으로 작성해야 한다.
-- 스킬에서 가장 가치 높은 섹션은 **Gotchas** — 실제 실패 지점에서 만들고 시간이 지나며 갱신.
-- 스킬 과잉명세("railroading") 안티패턴 — 좋은 스킬은 기본 코딩을 설명하지 않고 Claude를 평소 사고에서 끌어낸다.
-
----
-
 ## 출처
 
 | # | 출처 | 등급 |
@@ -143,5 +136,5 @@
 | 4 | [Hooks Guide](https://code.claude.com/docs/en/hooks-guide) | 공식 ✅ |
 | 5 | [Agent Skills Best Practices](https://docs.claude.com/en/docs/agents-and-tools/agent-skills/best-practices) | 공식 ✅ |
 | 6 | [Equipping Agents for the Real World with Agent Skills (Anthropic Engineering)](https://www.anthropic.com/engineering/equipping-agents-for-the-real-world-with-agent-skills) | 공식 ✅ |
-| 7 | [Lessons from building Claude Code: how we use skills](https://claude.com/blog/lessons-from-building-claude-code-how-we-use-skills) | 공식 (검증 불가) |
+| 7 | [Lessons from building Claude Code: how we use skills](https://claude.com/blog/lessons-from-building-claude-code-how-we-use-skills) | 공식 ✅ (직접 대조 재검증) |
 | 8 | [claude-code GitHub Issue #6305](https://github.com/anthropics/claude-code/issues/6305) | 커뮤니티 ⚠️ |
