@@ -690,6 +690,11 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       justifyContent: 'center',
       alignItems: 'center',
       marginRight: WANTED_TOKENS.spacing.s4,
+      // iOS shadow fast-path: shadow가 LinearGradient에 직접 걸리면 투명 알파에서
+      // 매 프레임 경로를 역산해 "cannot calculate shadow efficiently" advice를 띄운다.
+      // 불투명 배경색으로 pill 모양에서 그림자를 캐싱한다. 위 gradient(#0066FF→#6FA8FF,
+      // 완전 불투명)가 이 색을 가려 시각적 변화는 없다 — gradient의 시작 stop과 일치.
+      backgroundColor: '#0066FF',
       shadowColor: '#0066FF',
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.18,
