@@ -60,7 +60,8 @@ interface Station {
 ```json
 {
   "realtimeArrivalList": [{
-    "arvlMsg2": "2분후[1번째전]",   // Arrival message
+    "barvlDt": "120",              // 잔여 초 (Primary arrival-time source per seoul-api-limits)
+    "arvlMsg2": "2분후[1번째전]",   // Arrival message (fallback text)
     "btrainNo": "T1001",           // Train number
     "bstatnNm": "신도림",           // Destination
     "updnLine": "상행",             // Direction
@@ -74,7 +75,9 @@ interface Station {
 ## Key Parsing Rules
 
 ### Arrival Time
-| Message | Seconds |
+**Primary**: `barvlDt`(잔여 초) 우선 사용 — `parseInt(barvlDt, 10)`. `arvlMsg2` 텍스트만으로 도착 시간을 파싱하는 것은 BANNED(`.claude/rules/seoul-api-limits.md`). 아래 텍스트 파싱은 `barvlDt` 부재 시 **fallback**이며, `전역`(이전역) 메시지는 `arvlCd`로 판별해 건너뛴다.
+
+| Message (fallback) | Seconds |
 |---------|---------|
 | `2분후[1번째전]` | 120 |
 | `곧 도착` | 30 |
@@ -92,8 +95,8 @@ interface Station {
 ### Line ID Mapping
 | Korean | ID |
 |--------|-----|
-| `1호선` - `9호선` | `line1` - `line9` |
-| `신분당선` | `shinbundang` |
+| `1호선` - `9호선` | `'1'` - `'9'` |
+| `신분당선` | `sinbundang` |
 | `경의중앙선` | `gyeongui` |
 | `공항철도` | `airport` |
 | `수인분당선` | `suin` |
