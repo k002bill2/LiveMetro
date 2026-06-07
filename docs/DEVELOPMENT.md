@@ -97,7 +97,7 @@ git commit -m "feat: add train arrival card component"
 
 ### Parallel-Agent Development (Advanced)
 
-복잡한 기능은 Claude Code 네이티브 Agent 툴로 병렬 개발한다. 자세한 가이드는 `CLAUDE.md`의 "Multi-Agent Orchestration" 섹션 참조.
+복잡한 기능은 Claude Code 네이티브 Agent 툴로 병렬 개발한다. 자세한 가이드는 [`docs/claude/automation.md`](claude/automation.md)의 "Multi-Agent Orchestration" 섹션 참조.
 
 **When to use**:
 - ✅ 3+ 독립 서브태스크 (UI + API + Tests)
@@ -116,7 +116,7 @@ npm run type-check && npm run lint && npm test
 git add . && git commit -m "feat: implement <feature>"
 ```
 
-**File lock 규칙** (`CLAUDE.md` "Multi-Agent Orchestration" → File Lock 표 참조):
+**File lock 규칙** ([`docs/claude/automation.md`](claude/automation.md) "Multi-Agent Orchestration" → File Lock 표 참조):
 - 같은 파일 타깃 → 순차 실행
 - 같은 디렉토리·다른 파일 → 병렬 허용
 - 크로스 영역 → 병렬 + worktree 격리 권장
@@ -418,7 +418,8 @@ npm run type-check
 
 ## Additional Resources
 
-- **CLAUDE.md**: Project architecture and guidelines (Multi-Agent Orchestration 섹션 포함)
+- **CLAUDE.md**: Project architecture and guidelines (핵심 규칙 인덱스)
+- **docs/claude/automation.md**: Claude Code 자동화·Multi-Agent Orchestration 상세
 - **CONTRIBUTING.md**: Contribution guidelines
 
 ---
