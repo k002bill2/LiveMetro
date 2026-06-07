@@ -47,6 +47,7 @@ The project uses **strict TypeScript** with additional safety flags:
 3. Avoid `any` - use `unknown` and type guards instead
 4. All async functions must handle errors with try-catch
 5. Use optional chaining (`?.`) and nullish coalescing (`??`) for nullable values
+6. 복잡한 로직에는 주석을 추가한다 (문서화)
 
 **Model Definitions:**
 All data models are centralized in `src/models/`:
@@ -221,3 +222,18 @@ At 22:00+, include schedule rows < 03:00 next-day as upcoming. Seoul subway runs
 2. **Seoul API Rate Limiting**: No official rate limits documented, but the app implements 30-second polling intervals to be conservative.
 3. **Location Permissions on iOS**: Requires `NSLocationWhenInUseUsageDescription` in app.json. Always request permissions before accessing GPS.
 4. **TypeScript Path Aliases in Tests**: Configured in jest.config.js `moduleNameMapper`. If tests fail with module resolution errors, verify the mapping matches tsconfig.json paths.
+
+## Anti-Patterns (Lessons Log)
+
+팀 공유 — 과거 잘못된 행동과 해결책. (CLAUDE.md에서 이관) 행동 규칙으로 압축된 핵심(2-Strike Rule, 검증 후 커밋)은 CLAUDE.md "Workflow" 섹션 참조.
+
+| 날짜 | 문제 | 해결 방법 |
+|------|------|----------|
+| 2024-01-05 | `any` 타입 사용 | `unknown` 또는 구체적 타입으로 대체 |
+| 2024-01-05 | useEffect 정리 함수 누락 | 모든 구독/타이머에 cleanup 추가 |
+| 2024-01-05 | 상대 경로 import 사용 | `@` 경로 별칭 사용 |
+| 2024-01-05 | console.log 남김 | 프로덕션 코드에서 제거 |
+| 2024-01-05 | 테스트 없이 구현 | 구현과 함께 테스트 작성 |
+| 2026-02-06 | 동일 수정 3회+ 반복 | 2회 실패 후 접근 전환 (2-Strike Rule) |
+| 2026-02-06 | 배포 전 환경 점검 누락 | Pre-validation 단계 필수 실행 |
+| 2026-02-06 | 단순 요약만 제공 | 원인/영향/해결책 분석 포함 |
