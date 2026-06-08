@@ -6,7 +6,7 @@
 
 ### calculateRoute
 
-기본 A* 경로 탐색.
+기본 Dijkstra 최단경로 탐색 (A* heuristic은 non-admissible로 Issue #73에서 제거).
 
 ```typescript
 calculateRoute(
@@ -259,7 +259,7 @@ getTimeDifferenceSeverity(minutes: number):
 
 `import { PriorityQueue } from '@/utils/priorityQueue';`
 
-Min-Heap 기반. A*, Dijkstra, Yen's에서 공통 사용.
+Min-Heap 기반. Dijkstra, Yen's에서 공통 사용.
 
 ```typescript
 class PriorityQueue<T> {
