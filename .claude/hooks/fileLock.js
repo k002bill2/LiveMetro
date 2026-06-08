@@ -9,7 +9,7 @@
  *
  * 한계 (의도된 advisory):
  *   - 같은 Claude 세션의 sub-agent는 ppid 동일 → 구분 불가 (Claude가 도구 호출을 직렬화하므로 실제 문제 적음)
- *   - 외부 프로세스(gemini-bridge 등) 또는 stale lock(60s+)은 효과적으로 감지
+ *   - 외부 프로세스 또는 stale lock(60s+)은 효과적으로 감지
  *   - JSON/파일 손상 시 fail-open (작업 중단 < 데이터 손실 위험)
  *
  * @hook-config

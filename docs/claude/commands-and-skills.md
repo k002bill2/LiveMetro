@@ -3,7 +3,7 @@
 LiveMetro의 Skills 2.0 three-tier 인벤토리 전체 목록.
 CLAUDE.md에서 분리 — 자주 쓰는 커맨드/스킬 라우팅 SSOT는 `.claude/rules/livemetro-workflow.md` 참조.
 
-## Commands (`.claude/commands/`) — 20개, 사용자 `/` 호출
+## Commands (`.claude/commands/`) — 18개, 사용자 `/` 호출
 
 | 커맨드 | 용도 |
 |--------|------|
@@ -16,8 +16,6 @@ CLAUDE.md에서 분리 — 자주 쓰는 커맨드/스킬 라우팅 SSOT는 `.cl
 | `/simplify-code` | 복잡도 분석 및 단순화 |
 | `/draft-commits` | Conventional Commits 초안 |
 | `/start-dev` | Expo dev 서버 시작 |
-| `/gemini-review` | Gemini 크로스 리뷰 |
-| `/gemini-scan` | Gemini 대규모 분석 |
 | `/run-eval` | 평가 태스크 실행 |
 | `/eval-dashboard` | 평가 결과 대시보드 |
 | `/config-backup` | 설정 백업/복원 |

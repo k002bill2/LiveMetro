@@ -30,12 +30,6 @@
           },
           {
             "type": "command",
-            "command": "node .claude/hooks/tddGuard.js",
-            "timeout": 3,
-            "statusMessage": "TDD check..."
-          },
-          {
-            "type": "command",
             "command": "node .claude/hooks/skillGateGuard.js",
             "timeout": 3,
             "statusMessage": "Skill gate check..."
@@ -63,12 +57,6 @@
             "command": "node .claude/hooks/fileLock.js release 2>/dev/null || true",
             "timeout": 5,
             "statusMessage": "File lock release..."
-          },
-          {
-            "type": "command",
-            "command": "node .claude/hooks/geminiAutoTrigger.js 2>/dev/null || true",
-            "timeout": 5,
-            "statusMessage": "Gemini review queued..."
           }
         ]
       },
@@ -163,7 +151,7 @@
           },
           {
             "type": "command",
-            "command": "node -e \"const fs=require('fs');['/tmp/claude-hard-gate-livemetro','/tmp/claude-tdd-guard-livemetro','/tmp/claude-skill-gate-livemetro','/tmp/claude-skill-gate-cooldown-livemetro'].forEach(d=>{try{fs.rmSync(d,{recursive:true})}catch{}});\"",
+            "command": "node -e \"const fs=require('fs');['/tmp/claude-hard-gate-livemetro','/tmp/claude-skill-gate-livemetro','/tmp/claude-skill-gate-cooldown-livemetro'].forEach(d=>{try{fs.rmSync(d,{recursive:true})}catch{}});\"",
             "timeout": 3,
             "statusMessage": "Resetting session state..."
           }

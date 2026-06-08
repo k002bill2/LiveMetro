@@ -107,12 +107,7 @@ dev-debug.log
 # Task files
 # tasks.json
 # tasks/
-!/.gemini/antigravity/mcp_config.json
-!/.gemini/
-!/.gemini/**
-
-# Gemini bridge & coordination
-.claude/gemini-bridge/
+# Coordination state (advisory, runtime-only)
 .claude/coordination/
 
 # File lock state (advisory, runtime-only)

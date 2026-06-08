@@ -5,7 +5,7 @@
 | 수정 대상 | 필수 Read 문서 |
 |-----------|---------------|
 | `src/` (RN 앱) | `CLAUDE.md`, `COMPONENT_SHOWCASE.md` |
-| `functions/` (Firebase Functions) | `DEPLOYMENT.md`, `.claude/rules/livemetro-functions.md` |
+| `functions/` (Firebase Functions) | `DEPLOYMENT.md`, `functions/CLAUDE.md` (functions/ 작업 시 자동 로드) |
 | Firestore 보안 규칙 변경 | `firestore.rules`, `firestore.indexes.json` 직접 검토 |
 | 디자인 시스템 변경 | `DESIGN_SYSTEM_2024_CHANGELOG.md`, `docs/design/` 인덱스 |
 | 새 스크린/내비게이션 추가 | `App.tsx`, `src/navigation/` 구조 |

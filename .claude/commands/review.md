@@ -149,5 +149,4 @@ npm test -- --findRelatedTests {changed_files}
 
 ## Integration
 
-- **Gemini Cross-Review**: `geminiAutoTrigger.js`가 변경 시 자동 큐잉
 - **Quality Validator**: `quality-validator` 에이전트가 최종 검증

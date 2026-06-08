@@ -107,8 +107,7 @@
   <div class="ace-body">
     <div class="node config"><span class="icon">📊</span><div><div class="label">effort-scaling.md</div><div class="detail">복잡도별 에이전트 할당: Trivial(0) ~ Complex(3+)</div></div></div>
     <div class="node skill"><span class="icon">🎯</span><div><div class="label">CLAUDE.md Skill Routing</div><div class="detail">작업 유형 → 스킬 자동 매핑 (21개 도메인)</div></div></div>
-    <div class="node hook"><span class="icon">🚀</span><div><div class="label">userPromptSubmit.js</div><div class="detail">UserPromptSubmit &mdash; 스킬/에이전트 자동 활성화, Gemini 결과 주입</div></div></div>
-    <div class="node hook"><span class="icon">⚡</span><div><div class="label">geminiAutoTrigger.js</div><div class="detail">PostToolUse:Edit|Write &mdash; 30초 debounce 후 Gemini 크로스 리뷰</div></div></div>
+    <div class="node hook"><span class="icon">🚀</span><div><div class="label">userPromptSubmit.js</div><div class="detail">UserPromptSubmit &mdash; 스킬/에이전트 자동 활성화</div></div></div>
     <div class="node config"><span class="icon">📁</span><div><div class="label">commands-registry.json</div><div class="detail">21개 스킬 라우팅 레지스트리</div></div></div>
   </div>
 </div>
@@ -143,7 +142,6 @@
 <!-- ============================================================ -->
 <div class="connectors">
   <div class="conn-title">Module Dependencies</div>
-  <div class="conn-line"><span class="src">geminiAutoTrigger.js</span> <span class="arrow">──spawn───▶</span> <span class="tgt">scripts/gemini-bridge.js</span></div>
   <div class="conn-line"><span class="src">pathProtection.js</span> <span class="arrow">──read────▶</span> <span class="tgt">pathProtection.config.json</span></div>
   <div class="conn-line"><span class="src">typeCheckHook.sh</span> <span class="arrow">──run─────▶</span> <span class="tgt">npx tsc --noEmit (PostToolUse:Edit|Write)</span></div>
 </div>
@@ -178,7 +176,7 @@
       </div>
     </div>
     <div>
-      <div style="font-size: 12px; font-weight: 600; color: #d29922; margin-bottom: 8px;">Workflow Commands (21)</div>
+      <div style="font-size: 12px; font-weight: 600; color: #d29922; margin-bottom: 8px;">Workflow Commands (19)</div>
       <div class="grid-3" style="grid-template-columns: 1fr 1fr;">
         <div class="node skill"><span class="icon">✓</span><div class="label">verify-app</div></div>
         <div class="node skill"><span class="icon">🏥</span><div class="label">check-health</div></div>
@@ -196,8 +194,6 @@
         <div class="node skill"><span class="icon">⏹</span><div class="label">session-wrap</div></div>
         <div class="node skill"><span class="icon">🔁</span><div class="label">resume</div></div>
         <div class="node skill"><span class="icon">💿</span><div class="label">config-backup</div></div>
-        <div class="node skill"><span class="icon">⚡</span><div class="label">gemini-review</div></div>
-        <div class="node skill"><span class="icon">🔬</span><div class="label">gemini-scan</div></div>
         <div class="node skill"><span class="icon">🏃</span><div class="label">run-eval</div></div>
         <div class="node skill"><span class="icon">📊</span><div class="label">eval-dashboard</div></div>
       </div>
@@ -213,7 +209,6 @@
   <div style="display: flex; flex-wrap: wrap; gap: 10px;">
     <div class="node mcp"><span class="icon">📚</span><div><div class="label">MCP: context7</div><div class="detail">React Native, Expo, Firebase 실시간 문서 조회</div></div></div>
     <div class="node mcp"><span class="icon">🧠</span><div><div class="label">MCP: serena</div><div class="detail">시맨틱 코딩 도구 (심볼 탐색, 리팩토링)</div></div></div>
-    <div class="node data"><span class="icon">🤖</span><div><div class="label">Gemini CLI Bridge</div><div class="detail">scripts/gemini-bridge.js &mdash; 크로스 리뷰, 대규모 분석</div></div></div>
     <div class="node data"><span class="icon">📋</span><div><div class="label">Checklists (4)</div><div class="detail">code-review, testing, rn-specific, deployment</div></div></div>
     <div class="node data"><span class="icon">🗂</span><div><div class="label">Memory (2)</div><div class="detail">quick-reference, common-patterns</div></div></div>
     <div class="node data"><span class="icon">📊</span><div><div class="label">Evals System</div><div class="detail">rubrics, tasks, benchmarks, results</div></div></div>
@@ -232,7 +227,7 @@
       <span class="flow-arrow">→</span>
       <span class="flow-target">userPromptSubmit.js</span>
       <span class="flow-arrow">→</span>
-      <span class="flow-label">스킬 자동 감지 + Gemini 리뷰 결과 주입</span>
+      <span class="flow-label">스킬 자동 감지</span>
     </div>
     <div class="flow-row">
       <span class="flow-arrow">2.</span>
@@ -252,14 +247,6 @@
     </div>
     <div class="flow-row">
       <span class="flow-arrow">4.</span>
-      <span class="flow-label">Edit/Write 후</span>
-      <span class="flow-arrow">→</span>
-      <span class="flow-target">geminiAutoTrigger.js</span>
-      <span class="flow-arrow">→</span>
-      <span class="flow-label">30초 debounce → gemini-bridge.js review 실행</span>
-    </div>
-    <div class="flow-row">
-      <span class="flow-arrow">5.</span>
       <span class="flow-label">Bash 출력</span>
       <span class="flow-arrow">→</span>
       <span class="flow-target">outputSecretFilter.js</span>
@@ -271,10 +258,10 @@
 
 <!-- Legend -->
 <div class="legend">
-  <div class="legend-item"><div class="legend-color" style="background:#f85149;"></div> Hook (6)</div>
+  <div class="legend-item"><div class="legend-color" style="background:#f85149;"></div> Hook (5)</div>
   <div class="legend-item"><div class="legend-color" style="background:#58a6ff;"></div> Agent (5)</div>
   <div class="legend-item"><div class="legend-color" style="background:#3fb950;"></div> Skill (17)</div>
-  <div class="legend-item"><div class="legend-color" style="background:#d29922;"></div> Command (21)</div>
+  <div class="legend-item"><div class="legend-color" style="background:#d29922;"></div> Command (19)</div>
   <div class="legend-item"><div class="legend-color" style="background:#d2a8ff;"></div> MCP Server (2)</div>
   <div class="legend-item"><div class="legend-color" style="background:#388bfd;"></div> Data/External</div>
   <div class="legend-item"><div class="legend-color" style="background:#8b949e;"></div> Config</div>

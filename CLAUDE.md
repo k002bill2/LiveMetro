@@ -50,7 +50,7 @@ State:      AuthContext + Custom Hooks (no Redux)
 
 ## Project Rules (`.claude/rules/`)
 
-프로젝트 전용 규칙 10개(핵심 7개 + 추가 3개)가 항상 로드됩니다. 각 규칙의 BANNED 표·상세는 해당 파일이 SSOT (여기엔 복붙하지 않음):
+프로젝트 전용 규칙 9개(핵심 7개 + 추가 2개)가 항상 로드됩니다. 각 규칙의 BANNED 표·상세는 해당 파일이 SSOT (여기엔 복붙하지 않음):
 
 | 규칙 파일 | 내용 |
 |-----------|------|
@@ -62,7 +62,7 @@ State:      AuthContext + Custom Hooks (no Redux)
 | `react-native-patterns.md` | StyleSheet.create, memo, FlatList, 접근성 |
 | `coverage-thresholds.md` | Stmt 75%, Fn 70%, Branch 60% |
 
-추가 컨텍스트 규칙: `mandatory-docs.md`(영역별 필수 Read 문서), `livemetro-workflow.md`(skill routing·에이전트 수·배포 검증), `livemetro-functions.md`(Firebase Functions).
+추가 컨텍스트 규칙: `mandatory-docs.md`(영역별 필수 Read 문서), `livemetro-workflow.md`(skill routing·에이전트 수·배포 검증). Firebase Functions 규칙은 `functions/CLAUDE.md`로 분리 — functions/ 작업 시에만 자동 로드(항상-로드 비용 제거).
 
 > 글로벌 규칙(`~/.claude/rules/`)도 함께 적용: surgical changes, DRY/KISS/YAGNI, 보안, 검증
 
@@ -79,9 +79,9 @@ State:      AuthContext + Custom Hooks (no Redux)
 
 ## Automation & Orchestration
 
-Claude Code 네이티브 훅으로 모든 자동화를 구현 (외부 데몬 없음): 민감 경로 보호, 파일락, Gemini 크로스 리뷰, 시크릿 필터, 스킬 자동 활성화. 멀티 에이전트는 네이티브 Agent 툴로 스폰.
+Claude Code 네이티브 훅으로 모든 자동화를 구현 (외부 데몬 없음): 민감 경로 보호, 파일락, 시크릿 필터, 스킬 자동 활성화. 멀티 에이전트는 네이티브 Agent 툴로 스폰.
 
-상세(훅 목록·Gemini·MCP·Quality Gates·effort scaling·에이전트 구성·File Lock·모델 선택): [Automation & Orchestration](docs/claude/automation.md)
+상세(훅 목록·MCP·Quality Gates·effort scaling·에이전트 구성·File Lock·모델 선택): [Automation & Orchestration](docs/claude/automation.md)
 
 ## Reference Documentation
 
@@ -89,6 +89,6 @@ Claude Code 네이티브 훅으로 모든 자동화를 구현 (외부 데몬 없
 - [API Reference](docs/claude/api-reference.md) — Seoul Metro API, Firebase collections
 - [Development Patterns](docs/claude/development-patterns.md) — Adding screens/hooks/services, 성능 패턴, anti-patterns
 - [Testing Guide](docs/claude/testing.md) — Jest config, coverage, test patterns
-- [Automation & Orchestration](docs/claude/automation.md) — Hooks, Gemini, MCP, multi-agent, 모델 선택
+- [Automation & Orchestration](docs/claude/automation.md) — Hooks, MCP, multi-agent, 모델 선택
 - [Commands & Skills](docs/claude/commands-and-skills.md) — 전체 커맨드·스킬 인벤토리
 - [Development Guide](docs/DEVELOPMENT.md) — Workflows, validation gates, deploy
