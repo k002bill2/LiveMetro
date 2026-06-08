@@ -1,4 +1,6 @@
-# LiveMetro Firebase Functions Rules
+# CLAUDE.md — Firebase Cloud Functions (`functions/`)
+
+> `functions/` 작업 시 자동 로드되는 컨텍스트. 이전엔 `.claude/rules/livemetro-functions.md`로 매 세션 항상 로드됐으나, functions/ 무관 세션의 컨텍스트 비용을 줄이기 위해 2026-06-08 이동(harness-diet §4 MOVE).
 
 Node 20 + TypeScript strict + Firebase Cloud Functions 2nd gen 기준.
 

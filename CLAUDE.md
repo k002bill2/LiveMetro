@@ -50,7 +50,7 @@ State:      AuthContext + Custom Hooks (no Redux)
 
 ## Project Rules (`.claude/rules/`)
 
-프로젝트 전용 규칙 10개(핵심 7개 + 추가 3개)가 항상 로드됩니다. 각 규칙의 BANNED 표·상세는 해당 파일이 SSOT (여기엔 복붙하지 않음):
+프로젝트 전용 규칙 9개(핵심 7개 + 추가 2개)가 항상 로드됩니다. 각 규칙의 BANNED 표·상세는 해당 파일이 SSOT (여기엔 복붙하지 않음):
 
 | 규칙 파일 | 내용 |
 |-----------|------|
@@ -62,7 +62,7 @@ State:      AuthContext + Custom Hooks (no Redux)
 | `react-native-patterns.md` | StyleSheet.create, memo, FlatList, 접근성 |
 | `coverage-thresholds.md` | Stmt 75%, Fn 70%, Branch 60% |
 
-추가 컨텍스트 규칙: `mandatory-docs.md`(영역별 필수 Read 문서), `livemetro-workflow.md`(skill routing·에이전트 수·배포 검증), `livemetro-functions.md`(Firebase Functions).
+추가 컨텍스트 규칙: `mandatory-docs.md`(영역별 필수 Read 문서), `livemetro-workflow.md`(skill routing·에이전트 수·배포 검증). Firebase Functions 규칙은 `functions/CLAUDE.md`로 분리 — functions/ 작업 시에만 자동 로드(항상-로드 비용 제거).
 
 > 글로벌 규칙(`~/.claude/rules/`)도 함께 적용: surgical changes, DRY/KISS/YAGNI, 보안, 검증
 
