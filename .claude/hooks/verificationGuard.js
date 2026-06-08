@@ -41,7 +41,7 @@ function reportAndDecide(result) {
   if (result.errors >= TS_ERROR_THRESHOLD) {
     console.log(
       `\n[BLOCKED] TypeScript (${result.label}): ${result.errors} error(s) (threshold: ${TS_ERROR_THRESHOLD})\n` +
-      `${head}\nACTION: 타입 에러를 먼저 수정하세요. /build-fix 사용 권장.\n`
+      `${head}\nACTION: 타입 에러를 먼저 수정하세요.\n`
     );
     return true;
   }
