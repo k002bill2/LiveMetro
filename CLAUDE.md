@@ -36,17 +36,7 @@ State:      AuthContext + Custom Hooks (no Redux)
 
 ## Path Aliases
 
-| Alias | Path |
-|-------|------|
-| `@` | `src/` |
-| `@components` | `src/components` |
-| `@screens` | `src/screens` |
-| `@services` | `src/services` |
-| `@models` | `src/models` |
-| `@utils` | `src/utils` |
-| `@hooks` | `src/hooks` |
-
-**Use path aliases, not relative imports.**
+`@/` = `src/` (+ `@components`/`@screens`/`@services`/`@models`/`@utils`/`@hooks`). 상대 경로 import 금지 — 전체 매핑표 SSOT는 항상-로드 규칙 [`path-aliases.md`](.claude/rules/path-aliases.md) (L53 원칙대로 여기엔 복붙하지 않음).
 
 ## Project Rules (`.claude/rules/`)
 
