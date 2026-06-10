@@ -31,9 +31,10 @@ git log --oneline -5
 | `.claude/commands/` | Claude Commands | docs(commands) |
 | `.claude/agents/` | Claude Agents | docs(agents) |
 | `.claude/*.json` | Claude Config | chore(config) |
-| `src/backend/` | Backend | feat(api/services/models) |
-| `src/dashboard/src/pages/` | Dashboard Pages | feat(pages) |
-| `src/dashboard/src/components/` | Dashboard Components | feat(components) |
+| `src/components/` | Components | feat(components) |
+| `src/screens/` | Screens | feat(screens) |
+| `src/services/` | Services | feat(services) |
+| `functions/` | Firebase Functions | feat(functions) |
 | `tests/` | Tests | test |
 | `docs/` | Documentation | docs |
 | `infra/` | Infrastructure | chore(infra) |
