@@ -16,9 +16,9 @@ argument-hint: [검색어] [--deps] [--scope 경로]
 | 입력 | 확장 |
 |------|------|
 | auth | login, logout, session, jwt, token |
-| agent | orchestrator, node, graph, langgraph |
 | api | endpoint, route, handler, router |
-| dashboard | component, page, ui, react |
+| station | 역, station, subway, line, arrival, 도착 |
+| route | 경로, route, fare, transfer, 환승, dijkstra |
 
 ## 2단계: 초기 탐색
 
