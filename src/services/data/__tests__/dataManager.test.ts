@@ -84,6 +84,35 @@ describe('DataManager', () => {
         expect(mockSeoulApi.getRealtimeArrival).toHaveBeenCalled();
       });
 
+      it('should carry raw updnLine onto Train.directionLabel (내선 → 내선순환)', async () => {
+        const mockSeoulResponse = [
+          {
+            statnNm: '시청',
+            trainLineNm: '2호선',
+            arvlMsg2: '2분 후 도착',
+            btrainSttus: '일반',
+            btrainNo: '2438',
+            statnId: '0201',
+            updnLine: '내선',
+          },
+          {
+            statnNm: '시청',
+            trainLineNm: '2호선',
+            arvlMsg2: '4분 후 도착',
+            btrainSttus: '일반',
+            btrainNo: '2445',
+            statnId: '0201',
+            updnLine: '외선',
+          },
+        ] as never;
+        mockSeoulApi.getRealtimeArrival.mockResolvedValue(mockSeoulResponse);
+
+        const result = await dataManager.getRealtimeTrains('시청');
+
+        expect(result?.trains[0]?.directionLabel).toBe('내선순환');
+        expect(result?.trains[1]?.directionLabel).toBe('외선순환');
+      });
+
       it('should invalidate cache after TTL expires', async () => {
         mockSeoulApi.getRealtimeArrival.mockResolvedValue(mockTrains as never);
         jest.useFakeTimers();

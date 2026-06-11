@@ -102,12 +102,13 @@ const mockedUseFavorites = useFavorites as jest.Mock;
 const mockedUsePublicData = usePublicDataForStation as jest.Mock;
 const mockedSearchStations = mapCacheService.searchStations as jest.Mock;
 
-const buildTrain = (overrides: Partial<{ id: string; finalDestination: string; minutesAway: number; direction: 'up' | 'down'; lineId: string }> = {}) => {
+const buildTrain = (overrides: Partial<{ id: string; finalDestination: string; minutesAway: number; direction: 'up' | 'down'; lineId: string; directionLabel: string }> = {}) => {
   const minutesAway = overrides.minutesAway ?? 2;
   return {
     id: overrides.id ?? 't1',
     lineId: overrides.lineId ?? '2',
     direction: overrides.direction ?? 'up',
+    ...(overrides.directionLabel ? { directionLabel: overrides.directionLabel } : {}),
     currentStationId: 'X',
     nextStationId: 'Y',
     finalDestination: overrides.finalDestination ?? '잠실',
@@ -258,6 +259,55 @@ describe('StationDetailScreen', () => {
     expect(getByText('잠실행')).toBeTruthy();
     // Only the up-direction train shows by default.
     expect(queryByText('서울대입구행')).toBeNull();
+  });
+
+  // 2호선 순환선 방면 라벨: train.directionLabel(API 원본)이 최우선,
+  // 없으면 directionToDisplay(lineId) fallback — 둘 다 '내선순환/외선순환'.
+  describe('direction segment labels (Line 2 circular)', () => {
+    it('shows raw API labels 내선순환/외선순환 when trains carry directionLabel', () => {
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: [
+          buildTrain({ id: 'u1', finalDestination: '성수', direction: 'up', directionLabel: '내선순환' }),
+          buildTrain({ id: 'd1', finalDestination: '성수', direction: 'down', directionLabel: '외선순환' }),
+        ],
+        loading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+      const { getByText } = render(<StationDetailScreen />);
+      expect(getByText('내선순환 (성수)')).toBeTruthy();
+      expect(getByText('외선순환 (성수)')).toBeTruthy();
+    });
+
+    it('falls back to line-level 내선순환/외선순환 labels when directionLabel is absent', () => {
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: [
+          buildTrain({ id: 'u1', finalDestination: '잠실', direction: 'up' }),
+          buildTrain({ id: 'd1', finalDestination: '서울대입구', direction: 'down' }),
+        ],
+        loading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+      const { getByText } = render(<StationDetailScreen />);
+      expect(getByText('내선순환 (잠실)')).toBeTruthy();
+      expect(getByText('외선순환 (서울대입구)')).toBeTruthy();
+    });
+
+    it('shows 상행/하행 labels for Line 2 branch trains carrying 상행/하행 directionLabel', () => {
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: [
+          buildTrain({ id: 'u1', finalDestination: '성수', direction: 'up', directionLabel: '상행' }),
+          buildTrain({ id: 'd1', finalDestination: '까치산', direction: 'down', directionLabel: '하행' }),
+        ],
+        loading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+      const { getByText } = render(<StationDetailScreen />);
+      expect(getByText('상행 (성수)')).toBeTruthy();
+      expect(getByText('하행 (까치산)')).toBeTruthy();
+    });
   });
 
   it('switches the visible arrivals when the direction segment changes', () => {

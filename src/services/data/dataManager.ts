@@ -8,6 +8,7 @@ import { seoulSubwayApi, SeoulRealtimeArrival } from '../api/seoulSubwayApi';
 import { arrivalService, ArrivalInfo } from '../arrival/arrivalService';
 import { trainService } from '../train/trainService';
 import { Train, Station, TrainDelay, DelaySeverity, TrainStatus, ServiceDisruption } from '../../models/train';
+import { updnLineToDisplay } from '@/models/route';
 import { getLocalStationByName } from './stationsDataService';
 
 interface CachedData<T> {
@@ -507,6 +508,7 @@ class DataManager {
       nextStationId: null,
       finalDestination: converted.destinationStation || '종착역 미확인',
       direction: converted.direction === 'up' ? 'up' : 'down',
+      directionLabel: updnLineToDisplay(arrival.updnLine),
       arrivalTime: converted.arrivalTime !== null
         ? new Date(Date.now() + converted.arrivalTime * 1000)
         : null,

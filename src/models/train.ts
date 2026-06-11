@@ -35,6 +35,13 @@ export interface Train {
   readonly id: string;
   readonly lineId: string;
   readonly direction: 'up' | 'down';
+  /**
+   * Display label sourced from the raw Seoul API `updnLine` value
+   * (via `updnLineToDisplay`): '상행' | '하행' | '내선순환' | '외선순환'.
+   * Optional — the arrivalService subscription path has no raw access, so
+   * consumers must fall back to `directionToDisplay(direction, lineId)`.
+   */
+  readonly directionLabel?: string;
   readonly currentStationId: string;
   readonly nextStationId: string | null;
   readonly finalDestination: string; // 종착역 이름 (예: "장암", "도봉산", "석남")

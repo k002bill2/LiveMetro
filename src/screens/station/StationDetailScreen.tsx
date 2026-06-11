@@ -54,6 +54,7 @@ import {
   boardingSelectionMatches,
 } from '@/services/train/boardingSelectionStore';
 import type { Station, Train } from '@/models/train';
+import { directionToDisplay } from '@/models/route';
 import type { LineId } from '@/components/design';
 import { mapCacheService, type CachedStation } from '@/services/map/mapCacheService';
 
@@ -294,13 +295,22 @@ const StationDetailScreen: React.FC = () => {
     return [lineId as LineId];
   }, [stationMeta, lineId]);
 
+  // Direction labels: prefer the raw API label carried on the train (handles
+  // Line 2 circular 내선순환/외선순환 vs its 상행/하행 branch services), fall
+  // back to the line-level mapping when no train is present.
   const upLabel = useMemo(
-    () => `상행${trainsByDirection.up[0] ? ` (${trainsByDirection.up[0].finalDestination})` : ''}`,
-    [trainsByDirection.up]
+    () =>
+      `${trainsByDirection.up[0]?.directionLabel ?? directionToDisplay('up', lineId)}${
+        trainsByDirection.up[0] ? ` (${trainsByDirection.up[0].finalDestination})` : ''
+      }`,
+    [trainsByDirection.up, lineId]
   );
   const downLabel = useMemo(
-    () => `하행${trainsByDirection.down[0] ? ` (${trainsByDirection.down[0].finalDestination})` : ''}`,
-    [trainsByDirection.down]
+    () =>
+      `${trainsByDirection.down[0]?.directionLabel ?? directionToDisplay('down', lineId)}${
+        trainsByDirection.down[0] ? ` (${trainsByDirection.down[0].finalDestination})` : ''
+      }`,
+    [trainsByDirection.down, lineId]
   );
 
   const stationLike: Station = useMemo(
