@@ -1,54 +1,72 @@
 /**
- * Delay Certificate Screen
- * 지연증명서 조회 및 발급 화면
+ * Delay Certificate Screen — Wanted handoff (settings-detail-2.jsx §1)
+ *
+ * 지연증명서 조회 및 발급 화면.
+ * - 히어로: 발급 가능한 최근 지연 (DelayCertHeroCard)
+ * - 탭 세그먼트: 발급 가능 N / 발급 내역 N
+ * - 이력 리스트: DelayCertEligibleRow / DelayCertIssuedRow
+ * - 증명서 안내: 참고용 증빙 · PDF 저장 · 발급 기한
+ *
+ * 비즈니스 로직은 delayHistoryService(기록/발급/삭제) +
+ * pdfService(PDF 생성·공유)를 그대로 사용한다.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  ScrollView,
-  TouchableOpacity,
-  RefreshControl,
   Alert,
+  FlatList,
+  RefreshControl,
+  SafeAreaView,
   Share,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
-import {
-  FileText,
-  Clock,
-  Share2,
-  Trash2,
-  AlertCircle,
-  ChevronRight,
-} from 'lucide-react-native';
+import { BadgeCheck, Download, FileText, History } from 'lucide-react-native';
 
 import { useAuth } from '@/services/auth/AuthContext';
 import { useTheme } from '@/services/theme';
 import { delayHistoryService } from '@/services/delay/delayHistoryService';
+import { pdfService } from '@/services/certificate/pdfService';
 import {
   DelayCertificate,
   DelayHistoryEntry,
-  DelayReasonLabels,
 } from '@/models/delayCertificate';
-import { getSubwayLineColor } from '@/utils/colorUtils';
-import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
+import { DelayCertHeroCard } from '@/components/delays/certificate/DelayCertHeroCard';
+import { DelayCertEligibleRow } from '@/components/delays/certificate/DelayCertEligibleRow';
+import { DelayCertIssuedRow } from '@/components/delays/certificate/DelayCertIssuedRow';
+import {
+  CERT_VALID_DAYS,
+  formatBoardTime,
+  isEntryExpired,
+  toDate,
+} from '@/components/delays/certificate/delayCertFormat';
+import {
+  WANTED_TOKENS,
+  weightToFontFamily,
+  type WantedSemanticTheme,
+} from '@/styles/modernTheme';
+
+type TabId = 'eligible' | 'issued';
 
 export const DelayCertificateScreen: React.FC = () => {
   const { user } = useAuth();
   const { isDark } = useTheme();
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
-  const styles = createStyles(semantic);
+  const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   const [certificates, setCertificates] = useState<DelayCertificate[]>([]);
   const [history, setHistory] = useState<DelayHistoryEntry[]>([]);
-  const [_loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [activeTab, setActiveTab] = useState<'certificates' | 'history'>('certificates');
+  const [activeTab, setActiveTab] = useState<TabId>('eligible');
 
   const loadData = useCallback(async () => {
-    if (!user) return;
+    if (!user) {
+      setLoading(false);
+      return;
+    }
 
     try {
       const [userCerts, userHistory] = await Promise.all([
@@ -59,7 +77,10 @@ export const DelayCertificateScreen: React.FC = () => {
       setCertificates(userCerts);
       setHistory(userHistory);
     } catch (error) {
-      console.error('Failed to load delay data:', error);
+      if (__DEV__) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to load delay data:', error);
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -75,25 +96,71 @@ export const DelayCertificateScreen: React.FC = () => {
     await loadData();
   }, [loadData]);
 
-  const handleShareCertificate = async (certificate: DelayCertificate) => {
+  /** timestamp 내림차순 정렬 이력 (서비스 정렬에 의존하지 않음) */
+  const sortedHistory = useMemo(
+    () =>
+      [...history].sort(
+        (a, b) => toDate(b.timestamp).getTime() - toDate(a.timestamp).getTime()
+      ),
+    [history]
+  );
+
+  /** 발급 가능 = 기한 내 + 미발급 */
+  const eligibleCount = useMemo(
+    () =>
+      sortedHistory.filter(
+        (entry) => !entry.certificateGenerated && !isEntryExpired(entry.timestamp)
+      ).length,
+    [sortedHistory]
+  );
+
+  /** 히어로 — 발급 가능한 가장 최근 지연 */
+  const heroEntry = useMemo(
+    () =>
+      sortedHistory.find(
+        (entry) => !entry.certificateGenerated && !isEntryExpired(entry.timestamp)
+      ) ?? null,
+    [sortedHistory]
+  );
+
+  // --------------------------------------------------------------------
+  // Actions (기존 비즈니스 로직 보존)
+  // --------------------------------------------------------------------
+
+  const handleSharePdf = useCallback(async (certificate: DelayCertificate) => {
+    try {
+      const shared = await pdfService.generateAndSharePdf(certificate);
+      if (!shared) {
+        // PDF 모듈 미가용 환경(웹 등) — 텍스트 공유로 폴백
+        const text = delayHistoryService.formatCertificateText(certificate);
+        await Share.share({ message: text, title: '지연증명서' });
+      }
+    } catch (error) {
+      if (__DEV__) {
+        // eslint-disable-next-line no-console
+        console.error('PDF share failed:', error);
+      }
+      Alert.alert('오류', '증명서 공유에 실패했습니다.');
+    }
+  }, []);
+
+  const handleShareText = useCallback(async (certificate: DelayCertificate) => {
     const text = delayHistoryService.formatCertificateText(certificate);
 
     try {
-      await Share.share({
-        message: text,
-        title: '지연증명서',
-      });
+      await Share.share({ message: text, title: '지연증명서' });
     } catch (error) {
-      console.error('Share failed:', error);
+      if (__DEV__) {
+        // eslint-disable-next-line no-console
+        console.error('Share failed:', error);
+      }
       Alert.alert('오류', '공유에 실패했습니다.');
     }
-  };
+  }, []);
 
-  const handleDeleteCertificate = (certificate: DelayCertificate) => {
-    Alert.alert(
-      '증명서 삭제',
-      '이 지연증명서를 삭제하시겠습니까?',
-      [
+  const handleDeleteCertificate = useCallback(
+    (certificate: DelayCertificate) => {
+      Alert.alert('증명서 삭제', '이 지연증명서를 삭제하시겠습니까?', [
         { text: '취소', style: 'cancel' },
         {
           text: '삭제',
@@ -103,180 +170,49 @@ export const DelayCertificateScreen: React.FC = () => {
             await loadData();
           },
         },
-      ]
-    );
-  };
+      ]);
+    },
+    [loadData]
+  );
 
-  const handleGenerateCertificate = async (entry: DelayHistoryEntry) => {
-    if (entry.certificateGenerated) {
-      Alert.alert('알림', '이미 증명서가 발급되었습니다.');
-      return;
-    }
+  const handleGenerateCertificate = useCallback(
+    async (entry: DelayHistoryEntry) => {
+      if (entry.certificateGenerated) {
+        Alert.alert('알림', '이미 증명서가 발급되었습니다.');
+        return;
+      }
 
-    // For simplicity, use current time as actual time
-    const timestamp = new Date(entry.timestamp);
-    const scheduledTime = timestamp.toLocaleTimeString('ko-KR', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+      try {
+        // For simplicity, use current time as actual time
+        const timestamp = toDate(entry.timestamp);
+        const scheduledTime = formatBoardTime(timestamp);
+        const actualTimestamp = new Date(
+          timestamp.getTime() + entry.delayMinutes * 60000
+        );
+        const actualTime = formatBoardTime(actualTimestamp);
 
-    const actualTimestamp = new Date(timestamp.getTime() + entry.delayMinutes * 60000);
-    const actualTime = actualTimestamp.toLocaleTimeString('ko-KR', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
+        const certificate = await delayHistoryService.generateCertificate(
+          entry.id,
+          scheduledTime,
+          actualTime
+        );
 
-    const certificate = await delayHistoryService.generateCertificate(
-      entry.id,
-      scheduledTime,
-      actualTime
-    );
+        if (certificate) {
+          Alert.alert('발급 완료', '지연증명서가 발급되었습니다.');
+          await loadData();
+        }
+      } catch (error) {
+        if (__DEV__) {
+          // eslint-disable-next-line no-console
+          console.error('Certificate generation failed:', error);
+        }
+        Alert.alert('오류', '증명서 발급에 실패했습니다.');
+      }
+    },
+    [loadData]
+  );
 
-    if (certificate) {
-      Alert.alert('발급 완료', '지연증명서가 발급되었습니다.');
-      await loadData();
-    }
-  };
-
-  const formatDate = (date: Date): string => {
-    return date.toLocaleDateString('ko-KR', {
-      month: 'short',
-      day: 'numeric',
-      weekday: 'short',
-    });
-  };
-
-  const formatTime = (date: Date): string => {
-    return date.toLocaleTimeString('ko-KR', {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
-  const renderCertificateItem = (certificate: DelayCertificate) => {
-    const lineColor = getSubwayLineColor(certificate.lineId);
-
-    return (
-      <View key={certificate.id} style={styles.certificateCard}>
-        <View style={[styles.lineAccent, { backgroundColor: lineColor }]} />
-
-        <View style={styles.cardContent}>
-          {/* Header */}
-          <View style={styles.cardHeader}>
-            <View style={styles.certificateNumber}>
-              <FileText size={16} color={semantic.labelAlt} />
-              <Text style={styles.certificateNumberText}>
-                {certificate.certificateNumber}
-              </Text>
-            </View>
-            <Text style={styles.dateText}>
-              {formatDate(new Date(certificate.date))}
-            </Text>
-          </View>
-
-          {/* Info */}
-          <View style={styles.infoRow}>
-            <View style={[styles.lineBadge, { backgroundColor: lineColor }]}>
-              <Text style={styles.lineBadgeText}>{certificate.lineId}호선</Text>
-            </View>
-            <Text style={styles.stationText}>{certificate.stationName}역</Text>
-          </View>
-
-          <View style={styles.delayInfo}>
-            <Clock size={14} color={semantic.statusNegative} />
-            <Text style={styles.delayText}>
-              {certificate.delayMinutes}분 지연
-            </Text>
-            <Text style={styles.timeText}>
-              ({certificate.scheduledTime} → {certificate.actualTime})
-            </Text>
-          </View>
-
-          {/* Actions */}
-          <View style={styles.cardActions}>
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => handleShareCertificate(certificate)}
-            >
-              <Share2 size={18} color={semantic.primaryNormal} />
-              <Text style={[styles.actionText, { color: semantic.primaryNormal }]}>
-                공유
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={() => handleDeleteCertificate(certificate)}
-            >
-              <Trash2 size={18} color={semantic.statusNegative} />
-              <Text style={[styles.actionText, { color: semantic.statusNegative }]}>
-                삭제
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </View>
-    );
-  };
-
-  const renderHistoryItem = (entry: DelayHistoryEntry) => {
-    const lineColor = getSubwayLineColor(entry.lineId);
-
-    return (
-      <TouchableOpacity
-        key={entry.id}
-        style={styles.historyCard}
-        onPress={() => !entry.certificateGenerated && handleGenerateCertificate(entry)}
-        disabled={entry.certificateGenerated}
-      >
-        <View style={[styles.lineAccent, { backgroundColor: lineColor }]} />
-
-        <View style={styles.cardContent}>
-          <View style={styles.cardHeader}>
-            <View style={styles.infoRow}>
-              <View style={[styles.lineBadge, { backgroundColor: lineColor }]}>
-                <Text style={styles.lineBadgeText}>{entry.lineId}호선</Text>
-              </View>
-              <Text style={styles.stationText}>{entry.stationName}역</Text>
-            </View>
-            <Text style={styles.dateText}>
-              {formatDate(new Date(entry.timestamp))}
-            </Text>
-          </View>
-
-          <View style={styles.delayInfo}>
-            <AlertCircle size={14} color={semantic.statusNegative} />
-            <Text style={styles.delayText}>
-              {entry.delayMinutes}분 지연
-            </Text>
-            <Text style={styles.timeText}>
-              {formatTime(new Date(entry.timestamp))}
-            </Text>
-          </View>
-
-          {entry.reason && (
-            <Text style={styles.reasonText}>
-              사유: {DelayReasonLabels[entry.reason]}
-            </Text>
-          )}
-
-          {entry.certificateGenerated ? (
-            <View style={styles.generatedBadge}>
-              <FileText size={12} color={semantic.statusPositive} />
-              <Text style={styles.generatedText}>증명서 발급됨</Text>
-            </View>
-          ) : (
-            <View style={styles.generateHint}>
-              <Text style={styles.generateHintText}>탭하여 증명서 발급</Text>
-              <ChevronRight size={16} color={semantic.labelAlt} />
-            </View>
-          )}
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
-  const handleAddSampleData = async () => {
+  const handleAddSampleData = useCallback(async () => {
     if (!user) return;
 
     try {
@@ -284,128 +220,306 @@ export const DelayCertificateScreen: React.FC = () => {
       Alert.alert('완료', '샘플 데이터가 추가되었습니다.');
       await loadData();
     } catch (error) {
-      console.error('Failed to add sample data:', error);
+      if (__DEV__) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to add sample data:', error);
+      }
       Alert.alert('오류', '샘플 데이터 추가에 실패했습니다.');
     }
-  };
+  }, [user, loadData]);
 
-  const renderEmptyState = () => (
-    <View style={styles.emptyState}>
-      <FileText size={64} color={semantic.labelAlt} />
-      <Text style={styles.emptyTitle}>
-        {activeTab === 'certificates'
-          ? '발급된 증명서가 없습니다'
-          : '지연 이력이 없습니다'}
-      </Text>
-      <Text style={styles.emptySubtitle}>
-        {activeTab === 'certificates'
-          ? '지연 발생 시 자동으로 기록되며,\n이력에서 증명서를 발급할 수 있습니다.'
-          : '지연이 감지되면 자동으로 기록됩니다.'}
-      </Text>
-      {__DEV__ && (
-        <TouchableOpacity
-          style={styles.sampleButton}
-          onPress={handleAddSampleData}
-        >
-          <Text style={styles.sampleButtonText}>샘플 데이터 추가 (개발용)</Text>
-        </TouchableOpacity>
-      )}
-    </View>
+  const handleSelectEligible = useCallback(() => {
+    setActiveTab('eligible');
+  }, []);
+  const handleSelectIssued = useCallback(() => {
+    setActiveTab('issued');
+  }, []);
+
+  // --------------------------------------------------------------------
+  // List composition
+  // --------------------------------------------------------------------
+
+  const listData: readonly (DelayHistoryEntry | DelayCertificate)[] =
+    activeTab === 'eligible' ? sortedHistory : certificates;
+
+  const keyExtractor = useCallback(
+    (item: DelayHistoryEntry | DelayCertificate) => item.id,
+    []
   );
+
+  const renderItem = useCallback(
+    ({
+      item,
+      index,
+    }: {
+      item: DelayHistoryEntry | DelayCertificate;
+      index: number;
+    }) => {
+      const isFirst = index === 0;
+      const isLast = index === listData.length - 1;
+
+      if (activeTab === 'eligible') {
+        return (
+          <DelayCertEligibleRow
+            entry={item as DelayHistoryEntry}
+            isFirst={isFirst}
+            isLast={isLast}
+            onGenerate={handleGenerateCertificate}
+          />
+        );
+      }
+      return (
+        <DelayCertIssuedRow
+          cert={item as DelayCertificate}
+          isFirst={isFirst}
+          isLast={isLast}
+          onSharePdf={handleSharePdf}
+          onShareText={handleShareText}
+          onDelete={handleDeleteCertificate}
+        />
+      );
+    },
+    [
+      activeTab,
+      listData.length,
+      handleGenerateCertificate,
+      handleSharePdf,
+      handleShareText,
+      handleDeleteCertificate,
+    ]
+  );
+
+  const renderListHeader = useCallback(
+    () => (
+      <View>
+        <DelayCertHeroCard entry={heroEntry} onIssue={handleGenerateCertificate} />
+
+        {/* 탭 세그먼트 */}
+        <View style={styles.tabsWrap}>
+          <View style={styles.tabsTrack}>
+            <TouchableOpacity
+              style={[styles.tabButton, activeTab === 'eligible' && styles.tabButtonActive]}
+              onPress={handleSelectEligible}
+              accessibilityRole="tab"
+              accessibilityLabel={`발급 가능 ${eligibleCount}건`}
+              accessibilityState={{ selected: activeTab === 'eligible' }}
+              testID="eligible-tab"
+            >
+              <Text
+                style={[styles.tabLabel, activeTab === 'eligible' && styles.tabLabelActive]}
+              >
+                발급 가능
+              </Text>
+              <View
+                style={[
+                  styles.tabCountChip,
+                  activeTab === 'eligible' && styles.tabCountChipActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.tabCountText,
+                    activeTab === 'eligible' && styles.tabCountTextActive,
+                  ]}
+                  testID="eligible-count"
+                >
+                  {eligibleCount}
+                </Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[styles.tabButton, activeTab === 'issued' && styles.tabButtonActive]}
+              onPress={handleSelectIssued}
+              accessibilityRole="tab"
+              accessibilityLabel={`발급 내역 ${certificates.length}건`}
+              accessibilityState={{ selected: activeTab === 'issued' }}
+              testID="issued-tab"
+            >
+              <Text
+                style={[styles.tabLabel, activeTab === 'issued' && styles.tabLabelActive]}
+              >
+                발급 내역
+              </Text>
+              <View
+                style={[
+                  styles.tabCountChip,
+                  activeTab === 'issued' && styles.tabCountChipActive,
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.tabCountText,
+                    activeTab === 'issued' && styles.tabCountTextActive,
+                  ]}
+                  testID="issued-count"
+                >
+                  {certificates.length}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* 섹션 라벨 */}
+        <View style={styles.sectionLabelRow}>
+          <Text style={styles.sectionLabel}>
+            {activeTab === 'eligible' ? '최근 지연 이력' : '발급 내역'}
+          </Text>
+          <Text style={styles.sectionLabelHint}>
+            {activeTab === 'eligible'
+              ? `최근 ${CERT_VALID_DAYS}일`
+              : `총 ${certificates.length}건`}
+          </Text>
+        </View>
+      </View>
+    ),
+    [
+      heroEntry,
+      handleGenerateCertificate,
+      activeTab,
+      eligibleCount,
+      certificates.length,
+      handleSelectEligible,
+      handleSelectIssued,
+      styles,
+    ]
+  );
+
+  const renderListEmpty = useCallback(
+    () => (
+      <View style={styles.emptyCard} testID="list-empty">
+        <FileText size={40} color={semantic.labelAlt} />
+        <Text style={styles.emptyTitle}>
+          {activeTab === 'eligible' ? '지연 이력이 없어요' : '발급 내역이 없어요'}
+        </Text>
+        <Text style={styles.emptySub}>
+          {activeTab === 'eligible'
+            ? '지연이 감지되면 자동으로 기록돼요'
+            : '발급 가능 탭에서 증명서를 발급해 보세요'}
+        </Text>
+      </View>
+    ),
+    [activeTab, styles, semantic]
+  );
+
+  const renderListFooter = useCallback(
+    () => (
+      <View>
+        {activeTab === 'eligible' && listData.length > 0 && (
+          <Text style={styles.listFooterNote}>
+            지연증명서는 지연 후 {CERT_VALID_DAYS}일까지 발급할 수 있어요. 발급한
+            증명서는 PDF로 저장해 회사 · 학교에 제출할 수 있어요.
+          </Text>
+        )}
+
+        {/* 증명서 안내 */}
+        <View style={styles.sectionLabelRow}>
+          <Text style={styles.sectionLabel}>증명서 안내</Text>
+        </View>
+        <View style={styles.infoCard}>
+          <View style={[styles.infoRow, styles.infoRowDivider]}>
+            <View style={[styles.infoIconBox, styles.infoIconBoxPositive]}>
+              <BadgeCheck size={16} color={semantic.statusPositive} strokeWidth={2} />
+            </View>
+            <View style={styles.infoRowBody}>
+              <Text style={styles.infoRowLabel}>공식 증빙 안내</Text>
+              <Text style={styles.infoRowSub}>
+                공식 지연증명서는 운영기관(또타지하철) 앱에서 발급 · 본 기록은
+                참고용이에요
+              </Text>
+            </View>
+          </View>
+          <View style={[styles.infoRow, styles.infoRowDivider]}>
+            <View style={styles.infoIconBox}>
+              <Download size={16} color={semantic.labelNeutral} strokeWidth={2} />
+            </View>
+            <View style={styles.infoRowBody}>
+              <Text style={styles.infoRowLabel}>PDF 저장 · 공유</Text>
+              <Text style={styles.infoRowSub}>
+                발급한 증명서를 PDF로 저장하거나 텍스트로 공유할 수 있어요
+              </Text>
+            </View>
+          </View>
+          <View style={styles.infoRow}>
+            <View style={styles.infoIconBox}>
+              <History size={16} color={semantic.labelNeutral} strokeWidth={2} />
+            </View>
+            <View style={styles.infoRowBody}>
+              <Text style={styles.infoRowLabel}>발급 기한</Text>
+              <Text style={styles.infoRowSub}>
+                지연 발생일 기준 {CERT_VALID_DAYS}일 이내
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {__DEV__ && (
+          <TouchableOpacity
+            style={styles.sampleButton}
+            onPress={handleAddSampleData}
+            accessibilityRole="button"
+            accessibilityLabel="샘플 데이터 추가"
+            testID="add-sample-data"
+          >
+            <Text style={styles.sampleButtonText}>샘플 데이터 추가 (개발용)</Text>
+          </TouchableOpacity>
+        )}
+
+        <View style={styles.bottomSpacer} />
+      </View>
+    ),
+    [activeTab, listData.length, handleAddSampleData, styles, semantic]
+  );
+
+  // --------------------------------------------------------------------
+  // Render
+  // --------------------------------------------------------------------
 
   return (
     <SafeAreaView style={styles.container}>
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>지연증명서</Text>
-        <Text style={styles.headerSubtitle}>
-          지연 이력 조회 및 증명서 발급
-        </Text>
+        <Text style={styles.headerSubtitle}>지연 이력 조회 및 증명서 발급</Text>
       </View>
 
-      {/* Tabs */}
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          testID="certificates-tab"
-          style={[
-            styles.tab,
-            activeTab === 'certificates' && styles.tabActive,
-          ]}
-          onPress={() => setActiveTab('certificates')}
-        >
-          <FileText
-            size={18}
-            color={activeTab === 'certificates' ? semantic.primaryNormal : semantic.labelAlt}
-          />
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === 'certificates' && styles.tabTextActive,
-            ]}
-          >
-            증명서 ({certificates.length})
-          </Text>
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          testID="history-tab"
-          style={[
-            styles.tab,
-            activeTab === 'history' && styles.tabActive,
-          ]}
-          onPress={() => setActiveTab('history')}
-        >
-          <Clock
-            size={18}
-            color={activeTab === 'history' ? semantic.primaryNormal : semantic.labelAlt}
-          />
-          <Text
-            style={[
-              styles.tabText,
-              activeTab === 'history' && styles.tabTextActive,
-            ]}
-          >
-            이력 ({history.length})
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      {/* Content */}
-      <ScrollView
-        style={styles.content}
-        contentContainerStyle={styles.contentContainer}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={semantic.labelStrong}
-          />
-        }
-      >
-        {activeTab === 'certificates' ? (
-          certificates.length === 0 ? (
-            renderEmptyState()
-          ) : (
-            certificates.map(renderCertificateItem)
-          )
-        ) : history.length === 0 ? (
-          renderEmptyState()
-        ) : (
-          history.map(renderHistoryItem)
-        )}
-
-        {/* Info Box */}
-        <View style={styles.infoBox}>
-          <AlertCircle size={16} color={semantic.labelAlt} />
-          <Text style={styles.infoText}>
-            공식 지연증명서는 또타지하철 앱에서 발급받으실 수 있습니다.
-            본 서비스는 참고용 기록입니다.
-          </Text>
+      {loading && history.length === 0 && certificates.length === 0 ? (
+        /* 로딩 스켈레톤 — 빈 화면 금지 */
+        <View style={styles.skeletonWrap} testID="delay-cert-skeleton">
+          <View style={styles.skeletonHero} />
+          <View style={styles.skeletonTabs} />
+          <View style={styles.skeletonRow} />
+          <View style={styles.skeletonRow} />
+          <View style={styles.skeletonRow} />
         </View>
-      </ScrollView>
+      ) : (
+        <FlatList
+          data={listData}
+          keyExtractor={keyExtractor}
+          renderItem={renderItem}
+          ListHeaderComponent={renderListHeader}
+          ListEmptyComponent={renderListEmpty}
+          ListFooterComponent={renderListFooter}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={semantic.labelStrong}
+            />
+          }
+        />
+      )}
     </SafeAreaView>
   );
 };
+
+DelayCertificateScreen.displayName = 'DelayCertificateScreen';
+
+// ============================================================================
+// Styles
+// ============================================================================
 
 const createStyles = (semantic: WantedSemanticTheme) =>
   StyleSheet.create({
@@ -414,232 +528,230 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       backgroundColor: semantic.bgSubtlePage,
     },
     header: {
-      paddingHorizontal: WANTED_TOKENS.spacing.s4,
-      paddingVertical: WANTED_TOKENS.spacing.s4,
-      backgroundColor: semantic.bgBase,
-      borderBottomWidth: 1,
-      borderBottomColor: semantic.lineSubtle,
+      paddingHorizontal: WANTED_TOKENS.spacing.s5,
+      paddingVertical: WANTED_TOKENS.spacing.s3,
     },
     headerTitle: {
       fontSize: WANTED_TOKENS.type.title3.size,
       fontWeight: '700',
       fontFamily: weightToFontFamily('700'),
       color: semantic.labelStrong,
+      letterSpacing: -0.2,
     },
     headerSubtitle: {
       fontSize: WANTED_TOKENS.type.caption1.size,
+      fontFamily: weightToFontFamily('500'),
       color: semantic.labelAlt,
       marginTop: WANTED_TOKENS.spacing.s1,
     },
-    tabContainer: {
-      flexDirection: 'row',
-      backgroundColor: semantic.bgBase,
-      paddingHorizontal: WANTED_TOKENS.spacing.s3,
-      borderBottomWidth: 1,
-      borderBottomColor: semantic.lineSubtle,
+    listContent: {
+      paddingBottom: WANTED_TOKENS.spacing.s6,
     },
-    tab: {
+
+    /* ---- Tabs ---- */
+    tabsWrap: {
+      paddingHorizontal: WANTED_TOKENS.spacing.s5,
+      paddingBottom: WANTED_TOKENS.spacing.s3,
+    },
+    tabsTrack: {
+      flexDirection: 'row',
+      backgroundColor: semantic.bgSubtle,
+      borderRadius: WANTED_TOKENS.radius.r6,
+      padding: WANTED_TOKENS.spacing.s1,
+    },
+    tabButton: {
       flex: 1,
+      minHeight: 44,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: WANTED_TOKENS.spacing.s3,
-      gap: WANTED_TOKENS.spacing.s1,
+      gap: 6,
+      paddingVertical: WANTED_TOKENS.spacing.s2,
+      paddingHorizontal: WANTED_TOKENS.spacing.s2,
+      borderRadius: WANTED_TOKENS.radius.r5,
     },
-    tabActive: {
-      borderBottomWidth: 2,
-      borderBottomColor: semantic.primaryNormal,
+    tabButtonActive: {
+      backgroundColor: semantic.bgBase,
+      shadowColor: '#000000',
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.06,
+      shadowRadius: 2,
+      elevation: 2,
     },
-    tabText: {
-      fontSize: WANTED_TOKENS.type.caption1.size,
+    tabLabel: {
+      fontSize: 13,
+      fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
       color: semantic.labelAlt,
-      fontWeight: '500',
-      fontFamily: weightToFontFamily('500'),
     },
-    tabTextActive: {
-      color: semantic.primaryNormal,
-      fontWeight: '600',
-      fontFamily: weightToFontFamily('600'),
+    tabLabelActive: {
+      color: semantic.labelStrong,
     },
-    content: {
-      flex: 1,
+    tabCountChip: {
+      paddingHorizontal: 7,
+      paddingVertical: 1,
+      borderRadius: WANTED_TOKENS.radius.pill,
+      backgroundColor: semantic.bgSubtle,
     },
-    contentContainer: {
-      padding: WANTED_TOKENS.spacing.s4,
+    tabCountChipActive: {
+      backgroundColor: semantic.primaryNormal,
     },
-    certificateCard: {
-      backgroundColor: semantic.bgBase,
-      borderRadius: WANTED_TOKENS.radius.r6,
-      marginBottom: WANTED_TOKENS.spacing.s3,
-      overflow: 'hidden',
+    tabCountText: {
+      fontSize: 11,
+      fontWeight: '800',
+      fontFamily: weightToFontFamily('800'),
+      color: semantic.labelAlt,
+    },
+    tabCountTextActive: {
+      color: semantic.labelOnColor,
+    },
+
+    /* ---- Section labels ---- */
+    sectionLabelRow: {
       flexDirection: 'row',
-    },
-    historyCard: {
-      backgroundColor: semantic.bgBase,
-      borderRadius: WANTED_TOKENS.radius.r6,
-      marginBottom: WANTED_TOKENS.spacing.s3,
-      overflow: 'hidden',
-      flexDirection: 'row',
-    },
-    lineAccent: {
-      width: 4,
-    },
-    cardContent: {
-      flex: 1,
-      padding: WANTED_TOKENS.spacing.s3,
-    },
-    cardHeader: {
-      flexDirection: 'row',
+      alignItems: 'baseline',
       justifyContent: 'space-between',
-      alignItems: 'center',
-      marginBottom: WANTED_TOKENS.spacing.s2,
+      paddingHorizontal: WANTED_TOKENS.spacing.s6,
+      paddingTop: WANTED_TOKENS.spacing.s2,
+      paddingBottom: WANTED_TOKENS.spacing.s2,
     },
-    certificateNumber: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: WANTED_TOKENS.spacing.s1,
-    },
-    certificateNumberText: {
+    sectionLabel: {
       fontSize: WANTED_TOKENS.type.caption1.size,
+      fontWeight: '800',
+      fontFamily: weightToFontFamily('800'),
       color: semantic.labelAlt,
-      fontFamily: 'monospace',
+      letterSpacing: 0.48,
+      textTransform: 'uppercase',
     },
-    dateText: {
-      fontSize: WANTED_TOKENS.type.caption1.size,
+    sectionLabelHint: {
+      fontSize: 11,
+      fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
       color: semantic.labelAlt,
+    },
+
+    /* ---- Empty list ---- */
+    emptyCard: {
+      marginHorizontal: WANTED_TOKENS.spacing.s5,
+      borderRadius: WANTED_TOKENS.radius.r8,
+      backgroundColor: semantic.bgBase,
+      borderWidth: 1,
+      borderColor: semantic.lineSubtle,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: WANTED_TOKENS.spacing.s10,
+      paddingHorizontal: WANTED_TOKENS.spacing.s5,
+      gap: WANTED_TOKENS.spacing.s2,
+    },
+    emptyTitle: {
+      fontSize: WANTED_TOKENS.type.body2.size,
+      fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
+      color: semantic.labelStrong,
+      textAlign: 'center',
+    },
+    emptySub: {
+      fontSize: WANTED_TOKENS.type.caption1.size,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+      textAlign: 'center',
+    },
+
+    /* ---- Footer ---- */
+    listFooterNote: {
+      marginHorizontal: WANTED_TOKENS.spacing.s5,
+      paddingTop: WANTED_TOKENS.spacing.s2,
+      paddingHorizontal: WANTED_TOKENS.spacing.s1,
+      fontSize: 11.5,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+      lineHeight: 17,
+    },
+    infoCard: {
+      marginHorizontal: WANTED_TOKENS.spacing.s5,
+      borderRadius: WANTED_TOKENS.radius.r8,
+      backgroundColor: semantic.bgBase,
+      borderWidth: 1,
+      borderColor: semantic.lineSubtle,
     },
     infoRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: WANTED_TOKENS.spacing.s2,
-    },
-    lineBadge: {
-      paddingHorizontal: WANTED_TOKENS.spacing.s2,
-      paddingVertical: 2,
-      borderRadius: WANTED_TOKENS.radius.r2,
-    },
-    lineBadgeText: {
-      fontSize: WANTED_TOKENS.type.caption1.size,
-      color: '#FFFFFF',
-      fontWeight: '600',
-      fontFamily: weightToFontFamily('600'),
-    },
-    stationText: {
-      fontSize: WANTED_TOKENS.type.body1.size,
-      fontWeight: '600',
-      fontFamily: weightToFontFamily('600'),
-      color: semantic.labelStrong,
-    },
-    delayInfo: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: WANTED_TOKENS.spacing.s1,
-      marginTop: WANTED_TOKENS.spacing.s2,
-    },
-    delayText: {
-      fontSize: WANTED_TOKENS.type.caption1.size,
-      fontWeight: '600',
-      fontFamily: weightToFontFamily('600'),
-      color: semantic.statusNegative,
-    },
-    timeText: {
-      fontSize: WANTED_TOKENS.type.caption1.size,
-      color: semantic.labelAlt,
-    },
-    reasonText: {
-      fontSize: WANTED_TOKENS.type.caption1.size,
-      color: semantic.labelAlt,
-      marginTop: WANTED_TOKENS.spacing.s1,
-    },
-    cardActions: {
-      flexDirection: 'row',
-      justifyContent: 'flex-end',
       gap: WANTED_TOKENS.spacing.s3,
-      marginTop: WANTED_TOKENS.spacing.s3,
-      paddingTop: WANTED_TOKENS.spacing.s2,
-      borderTopWidth: 1,
-      borderTopColor: semantic.lineSubtle,
+      paddingVertical: 14,
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
     },
-    actionButton: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: WANTED_TOKENS.spacing.s1,
-      paddingVertical: WANTED_TOKENS.spacing.s1,
-      paddingHorizontal: WANTED_TOKENS.spacing.s2,
+    infoRowDivider: {
+      borderBottomWidth: 1,
+      borderBottomColor: semantic.lineSubtle,
     },
-    actionText: {
-      fontSize: WANTED_TOKENS.type.caption1.size,
-      fontWeight: '500',
-      fontFamily: weightToFontFamily('500'),
-    },
-    generatedBadge: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: WANTED_TOKENS.spacing.s1,
-      marginTop: WANTED_TOKENS.spacing.s2,
-    },
-    generatedText: {
-      fontSize: WANTED_TOKENS.type.caption1.size,
-      color: semantic.statusPositive,
-      fontWeight: '500',
-      fontFamily: weightToFontFamily('500'),
-    },
-    generateHint: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'flex-end',
-      marginTop: WANTED_TOKENS.spacing.s2,
-    },
-    generateHintText: {
-      fontSize: WANTED_TOKENS.type.caption1.size,
-      color: semantic.labelAlt,
-    },
-    emptyState: {
+    infoIconBox: {
+      width: 32,
+      height: 32,
+      borderRadius: WANTED_TOKENS.radius.r4,
+      backgroundColor: semantic.bgSubtle,
       alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: WANTED_TOKENS.spacing.s12,
+      flexShrink: 0,
     },
-    emptyTitle: {
-      fontSize: WANTED_TOKENS.type.heading2.size,
+    infoIconBoxPositive: {
+      backgroundColor: 'rgba(0,191,64,0.12)',
+    },
+    infoRowBody: {
+      flex: 1,
+      minWidth: 0,
+    },
+    infoRowLabel: {
+      fontSize: 14,
       fontWeight: '600',
       fontFamily: weightToFontFamily('600'),
       color: semantic.labelStrong,
-      marginTop: WANTED_TOKENS.spacing.s4,
     },
-    emptySubtitle: {
-      fontSize: WANTED_TOKENS.type.body2.size,
+    infoRowSub: {
+      fontSize: 11.5,
+      fontFamily: weightToFontFamily('500'),
       color: semantic.labelAlt,
-      textAlign: 'center',
-      marginTop: WANTED_TOKENS.spacing.s2,
-      lineHeight: 20,
+      marginTop: 2,
+      lineHeight: 16,
     },
     sampleButton: {
       marginTop: WANTED_TOKENS.spacing.s4,
-      paddingHorizontal: WANTED_TOKENS.spacing.s4,
-      paddingVertical: WANTED_TOKENS.spacing.s2,
+      marginHorizontal: WANTED_TOKENS.spacing.s5,
+      minHeight: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
       backgroundColor: semantic.primaryNormal,
       borderRadius: WANTED_TOKENS.radius.r4,
     },
     sampleButtonText: {
-      color: '#FFFFFF',
+      color: semantic.labelOnColor,
       fontSize: WANTED_TOKENS.type.label1.size,
       fontWeight: '600',
       fontFamily: weightToFontFamily('600'),
     },
-    infoBox: {
-      flexDirection: 'row',
-      alignItems: 'flex-start',
-      backgroundColor: semantic.bgSubtle,
-      padding: WANTED_TOKENS.spacing.s3,
-      borderRadius: WANTED_TOKENS.radius.r4,
-      marginTop: WANTED_TOKENS.spacing.s4,
-      gap: WANTED_TOKENS.spacing.s2,
+    bottomSpacer: {
+      height: WANTED_TOKENS.spacing.s6,
     },
-    infoText: {
-      flex: 1,
-      fontSize: WANTED_TOKENS.type.caption1.size,
-      color: semantic.labelAlt,
-      lineHeight: 18,
+
+    /* ---- Skeleton ---- */
+    skeletonWrap: {
+      paddingHorizontal: WANTED_TOKENS.spacing.s5,
+      gap: WANTED_TOKENS.spacing.s3,
+    },
+    skeletonHero: {
+      height: 180,
+      borderRadius: WANTED_TOKENS.radius.r10,
+      backgroundColor: semantic.bgSubtle,
+    },
+    skeletonTabs: {
+      height: 52,
+      borderRadius: WANTED_TOKENS.radius.r6,
+      backgroundColor: semantic.bgSubtle,
+    },
+    skeletonRow: {
+      height: 72,
+      borderRadius: WANTED_TOKENS.radius.r8,
+      backgroundColor: semantic.bgSubtle,
     },
   });
 
