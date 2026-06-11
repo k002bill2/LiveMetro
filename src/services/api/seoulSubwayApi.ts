@@ -7,6 +7,7 @@ import { Platform } from 'react-native';
 import { createSeoulApiKeyManager, createPublicDataApiKeyManager, ApiKeyManager } from './apiKeyManager';
 import { formatStationName } from '../../utils/formatUtils';
 import type { TrainType } from '@/models/train';
+import type { TrainPosition, TrainPositionStatus } from '@/models/trainPosition';
 
 /**
  * Rate Limiter for Seoul API (30-second minimum interval per endpoint)
@@ -277,6 +278,7 @@ interface SeoulApiResponse<T> {
     total?: number;
   };
   realtimeArrivalList?: T[];
+  realtimePositionList?: T[];
   SearchInfoBySubwayNameService?: {
     list_total_count: number;
     RESULT: {
@@ -354,6 +356,36 @@ interface SeoulRealtimeArrival {
   arvlCd: string;
 }
 
+/**
+ * Row of the `realtimePosition` endpoint (실시간 열차 위치).
+ *
+ * CAUTION: unlike the arrival API, `updnLine` here is a CODE value —
+ * '0' = 상행/내선, '1' = 하행/외선 — not the Korean words.
+ */
+interface SeoulRealtimePosition {
+  subwayId: string;
+  subwayNm: string;
+  /** Current station id */
+  statnId: string;
+  /** Current station name */
+  statnNm: string;
+  trainNo: string;
+  /** Server snapshot timestamp */
+  recptnDt: string;
+  /** Direction code: '0' 상행/내선, '1' 하행/외선 */
+  updnLine: string;
+  /** Terminal station id */
+  statnTid: string;
+  /** Terminal station name */
+  statnTnm: string;
+  /** Train status: '0' 진입, '1' 도착, '2' 출발, '3' 전역출발 */
+  trainSttus: string;
+  /** Express flag: '1' = 급행 */
+  directAt: string;
+  /** Last-train flag: '1' = 막차 */
+  lstcarAt: string;
+}
+
 interface SeoulStationInfo {
   STATION_CD: string;
   STATION_NM: string;
@@ -411,12 +443,15 @@ class SeoulSubwayApiService {
   private readonly timetableKeyManager: ApiKeyManager;
   /** In-flight request cache for deduplication */
   private readonly inflightRequests: Map<string, Promise<SeoulRealtimeArrival[]>> = new Map();
+  /** In-flight cache for realtime position requests (per line) */
+  private readonly inflightPositionRequests: Map<string, Promise<SeoulRealtimePosition[]>> = new Map();
 
   /**
    * Clear in-flight request cache (for testing)
    */
   clearInflightRequests(): void {
     this.inflightRequests.clear();
+    this.inflightPositionRequests.clear();
   }
 
   constructor() {
@@ -574,6 +609,129 @@ class SeoulSubwayApiService {
         throw new Error(`실시간 도착정보를 가져오는데 실패했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
       }
     });
+  }
+
+  /**
+   * Get real-time train positions for a whole line (실시간 열차 위치).
+   * Rate limited to 30-second minimum interval per line.
+   *
+   * @param lineName Korean line name as the API expects it (e.g. '2호선',
+   *                 '신분당선') — use `formatLineName(lineId)` to derive it.
+   */
+  async getRealtimePosition(lineName: string): Promise<SeoulRealtimePosition[]> {
+    const dedupKey = `position:${lineName}`;
+    const inflight = this.inflightPositionRequests.get(dedupKey);
+    if (inflight) {
+      return inflight;
+    }
+
+    const promise = this.fetchRealtimePosition(lineName);
+
+    this.inflightPositionRequests.set(dedupKey, promise);
+    promise.then(
+      () => { this.inflightPositionRequests.delete(dedupKey); },
+      () => { this.inflightPositionRequests.delete(dedupKey); }
+    );
+
+    return promise;
+  }
+
+  /**
+   * Internal: actual fetch logic for realtime position (separated for dedup).
+   * Mirrors `fetchRealtimeArrival` — same key rotation, rate limiting,
+   * INFO-200 no-data handling and error categorization.
+   */
+  private async fetchRealtimePosition(lineName: string): Promise<SeoulRealtimePosition[]> {
+    const rateLimitKey = `position:${lineName}`;
+
+    const waitedMs = await this.rateLimiter.throttle(rateLimitKey);
+    if (waitedMs > 0) {
+      console.debug(`Rate limited: waited ${waitedMs}ms before fetching positions for ${lineName}`);
+    }
+
+    return withRetry(async () => {
+      const apiKey = this.keyManager.getNextKey();
+      if (!apiKey) {
+        throw new Error('사용 가능한 API 키가 없습니다. 잠시 후 다시 시도해주세요.');
+      }
+
+      try {
+        const url = `${this.baseUrl}/${apiKey}/json/realtimePosition/0/100/${encodeURIComponent(lineName)}`;
+
+        const response = await this.fetchWithTimeout(url);
+        const data: SeoulApiResponse<SeoulRealtimePosition> = await response.json();
+
+        const apiError = extractSeoulApiErrorCode(data);
+
+        if (apiError && apiError.code !== 'INFO-000') {
+          const { code: errorCode, message } = apiError;
+          const category = categorizeSeoulApiError(errorCode);
+
+          // INFO-200: no train currently running on this line (off-hours).
+          // Normal no-data — must not burn the key (see fetchRealtimeArrival).
+          if (category === 'no-data') {
+            this.keyManager.reportSuccess(apiKey);
+            return [];
+          }
+
+          if (category === 'quota') {
+            const fallbackKey = this.keyManager.reportRateLimit(apiKey);
+            if (fallbackKey) {
+              console.warn(`Rate limit hit on ${errorCode}, switching to backup key`);
+            }
+          } else if (category === 'transient') {
+            console.warn(`Transient Seoul API error ${errorCode}, will retry`);
+          } else {
+            this.keyManager.reportError(apiKey);
+          }
+
+          console.warn(
+            `[SeoulSubwayApi] Realtime position error for "${lineName}": ` +
+            `code=${errorCode} category=${category} message=${message}`
+          );
+
+          throw new SeoulApiError(errorCode, message);
+        }
+
+        this.keyManager.reportSuccess(apiKey);
+        return data.realtimePositionList || [];
+      } catch (error) {
+        if (error instanceof SeoulApiError) {
+          throw error;
+        }
+        throw new Error(`실시간 열차 위치를 가져오는데 실패했습니다: ${error instanceof Error ? error.message : '알 수 없는 오류'}`);
+      }
+    });
+  }
+
+  /**
+   * Convert a raw realtime-position row to the app {@link TrainPosition}.
+   *
+   * CAUTION: the position API's `updnLine` is a code ('0' = 상행/내선 → up,
+   * '1' = 하행/외선 → down) — NOT the Korean words used by the arrival API.
+   * Keep this converter separate from `convertToAppTrain` to avoid mixing
+   * the two encodings.
+   */
+  convertToTrainPosition(row: SeoulRealtimePosition): TrainPosition {
+    const statusMap: Record<string, TrainPositionStatus> = {
+      '0': 'entering',
+      '1': 'arrived',
+      '2': 'departed',
+      '3': 'departed_prev',
+    };
+
+    return {
+      trainNo: row.trainNo || '',
+      subwayId: row.subwayId || '',
+      stationId: row.statnId || '',
+      stationName: formatStationName(row.statnNm || ''),
+      direction: row.updnLine === '0' ? 'up' : 'down',
+      terminalName: formatStationName(row.statnTnm || ''),
+      status: statusMap[row.trainSttus] ?? 'unknown',
+      isExpress: row.directAt === '1',
+      isLastTrain: row.lstcarAt === '1',
+      receivedAt: parseRecptnDtToMs(row.recptnDt || ''),
+    };
   }
 
   /**
@@ -989,4 +1147,4 @@ export const seoulSubwayApi = new SeoulSubwayApiService();
 
 // Export utilities for external use
 export { RateLimiter, withRetry };
-export type { SeoulRealtimeArrival, SeoulStationInfo, SeoulTimetableRow, SeoulTimetableResponse };
+export type { SeoulRealtimeArrival, SeoulRealtimePosition, SeoulStationInfo, SeoulTimetableRow, SeoulTimetableResponse };
