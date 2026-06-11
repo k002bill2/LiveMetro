@@ -5,15 +5,13 @@ import { Alert, Linking } from 'react-native';
 import * as Location from 'expo-location';
 import { LocationPermissionScreen } from '../LocationPermissionScreen';
 
-jest.mock('@react-navigation/native', () => ({
-  useNavigation: () => ({
-    navigate: jest.fn(),
-    goBack: jest.fn(),
-  }),
+jest.mock('@react-navigation/native-stack', () => ({
+  createNativeStackNavigator: jest.fn(),
 }));
 
 jest.mock('@/services/theme', () => ({
   useTheme: () => ({
+    isDark: false,
     colors: {
       primary: '#007AFF',
       primaryLight: '#E5F0FF',
@@ -65,11 +63,53 @@ jest.mock('@/components/settings/SettingSection', () => {
   };
 });
 
+jest.mock('@/components/settings/SettingToggle', () => {
+  const React = require('react');
+  const { TouchableOpacity, Text } = require('react-native');
+  return {
+    __esModule: true,
+    default: ({
+      label,
+      value,
+      onValueChange,
+      disabled,
+    }: {
+      label: string;
+      value: boolean;
+      onValueChange: (v: boolean) => void;
+      disabled?: boolean;
+    }) =>
+      React.createElement(
+        TouchableOpacity,
+        {
+          testID: `toggle-${label}`,
+          disabled,
+          accessibilityState: { checked: value, disabled: !!disabled },
+          onPress: () => onValueChange(!value),
+        },
+        React.createElement(Text, null, label),
+      ),
+  };
+});
+
 jest.mock('@/services/location/locationService', () => ({
   locationService: {
     requestBackgroundPermission: jest.fn(() => Promise.resolve(true)),
   },
 }));
+
+const mockNavigate = jest.fn();
+const mockGoBack = jest.fn();
+const mockNavigation = { navigate: mockNavigate, goBack: mockGoBack } as unknown;
+
+const defaultProps = {
+  navigation: mockNavigation as never,
+  route: {
+    key: 'LocationPermission',
+    name: 'LocationPermission',
+    params: undefined,
+  } as never,
+};
 
 describe('LocationPermissionScreen', () => {
   beforeEach(() => {
@@ -93,48 +133,56 @@ describe('LocationPermissionScreen', () => {
 
   describe('Rendering', () => {
     it('renders location uses section', async () => {
-      const { getByText } = render(<LocationPermissionScreen />);
+      const { getByText } = render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
         expect(getByText('위치 정보 사용 목적')).toBeTruthy();
       });
 
-      expect(getByText('주변 역 찾기')).toBeTruthy();
-      expect(getByText('출퇴근 경로 설정')).toBeTruthy();
-      expect(getByText('맞춤 알림')).toBeTruthy();
+      expect(getByText('주변 역 자동 검색')).toBeTruthy();
+      expect(getByText('출퇴근 경로 추천')).toBeTruthy();
+      expect(getByText('역 근처 알림')).toBeTruthy();
     });
 
-    it('renders permission management section', async () => {
-      const { getByText } = render(<LocationPermissionScreen />);
+    it('renders detail settings section with background toggle', async () => {
+      const { getByText, getByTestId } = render(
+        <LocationPermissionScreen {...defaultProps} />,
+      );
 
       await waitFor(() => {
-        expect(getByText('권한 관리')).toBeTruthy();
+        expect(getByText('세부 설정')).toBeTruthy();
       });
+
+      expect(getByTestId('toggle-백그라운드 위치')).toHaveTextContent('백그라운드 위치');
     });
 
     it('renders privacy notice', async () => {
-      const { getByText } = render(<LocationPermissionScreen />);
+      const { getByText } = render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
         expect(getByText(/위치 정보는 기기에만 저장/)).toBeTruthy();
       });
     });
 
-    it('renders app settings button', async () => {
-      const { getByText } = render(<LocationPermissionScreen />);
+    it('renders system settings button when permission is granted', async () => {
+      (Location.getForegroundPermissionsAsync as jest.Mock).mockResolvedValue({
+        status: 'granted',
+      });
+
+      const { getByText } = render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
-        expect(getByText('앱 설정 열기')).toBeTruthy();
+        expect(getByText('시스템 설정에서 변경')).toBeTruthy();
       });
     });
 
     it('shows feature descriptions with correct content', async () => {
-      const { getByText } = render(<LocationPermissionScreen />);
+      const { getByText } = render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
-        expect(getByText('현재 위치에서 가까운 지하철역을 자동으로 찾아줍니다')).toBeTruthy();
-        expect(getByText('자주 이용하는 경로를 추천하고 설정할 수 있습니다')).toBeTruthy();
-        expect(getByText('위치 기반으로 실시간 지연 알림을 받을 수 있습니다')).toBeTruthy();
+        expect(getByText('현재 위치 기준 가까운 역 표시')).toBeTruthy();
+        expect(getByText('자주 이용하는 경로 설정')).toBeTruthy();
+        expect(getByText('위치 기반 실시간 지연 알림')).toBeTruthy();
       });
     });
   });
@@ -145,7 +193,7 @@ describe('LocationPermissionScreen', () => {
         () => new Promise(resolve => setTimeout(() => resolve({ status: 'undetermined' }), 100))
       );
 
-      const { getByText } = render(<LocationPermissionScreen />);
+      const { getByText } = render(<LocationPermissionScreen {...defaultProps} />);
 
       // Initially loading message might appear
       await waitFor(() => {
@@ -154,11 +202,13 @@ describe('LocationPermissionScreen', () => {
     });
 
     it('shows undetermined status initially', async () => {
-      const { getByText } = render(<LocationPermissionScreen />);
+      const { getByText } = render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
         expect(getByText('위치 권한을 요청하지 않았습니다')).toBeTruthy();
       });
+
+      expect(getByText('미설정')).toBeTruthy();
     });
 
     it('shows granted status when permission is allowed', async () => {
@@ -166,11 +216,15 @@ describe('LocationPermissionScreen', () => {
         status: 'granted',
       });
 
-      const { getByText } = render(<LocationPermissionScreen />);
+      const { getByText } = render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
         expect(getByText('위치 권한이 허용되었습니다')).toBeTruthy();
       });
+
+      expect(getByText('허용됨')).toBeTruthy();
+      expect(getByText('위치 권한 활성화')).toBeTruthy();
+      expect(getByText('앱 사용 중에만')).toBeTruthy();
     });
 
     it('shows denied status when permission is denied', async () => {
@@ -178,10 +232,27 @@ describe('LocationPermissionScreen', () => {
         status: 'denied',
       });
 
-      const { getByText } = render(<LocationPermissionScreen />);
+      const { getByText } = render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
         expect(getByText('위치 권한이 거부되었습니다')).toBeTruthy();
+      });
+
+      expect(getByText('거부됨')).toBeTruthy();
+    });
+
+    it('shows always-allowed caption when background is also granted', async () => {
+      (Location.getForegroundPermissionsAsync as jest.Mock).mockResolvedValue({
+        status: 'granted',
+      });
+      (Location.getBackgroundPermissionsAsync as jest.Mock).mockResolvedValue({
+        status: 'granted',
+      });
+
+      const { getByText } = render(<LocationPermissionScreen {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(getByText('항상 허용')).toBeTruthy();
       });
     });
 
@@ -190,7 +261,7 @@ describe('LocationPermissionScreen', () => {
         status: 'granted',
       });
 
-      render(<LocationPermissionScreen />);
+      render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
         expect(Location.getForegroundPermissionsAsync).toHaveBeenCalled();
@@ -202,7 +273,7 @@ describe('LocationPermissionScreen', () => {
         status: 'denied',
       });
 
-      render(<LocationPermissionScreen />);
+      render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
         expect(Location.getForegroundPermissionsAsync).toHaveBeenCalled();
@@ -210,7 +281,7 @@ describe('LocationPermissionScreen', () => {
     });
 
     it('displays correct icon for undetermined status', async () => {
-      render(<LocationPermissionScreen />);
+      render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
         expect(Location.getForegroundPermissionsAsync).toHaveBeenCalled();
@@ -220,7 +291,7 @@ describe('LocationPermissionScreen', () => {
 
   describe('Permission Request Flow', () => {
     it('shows request permission button when not granted', async () => {
-      const { getByText } = render(<LocationPermissionScreen />);
+      const { getByText } = render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
         expect(getByText('위치 권한 요청')).toBeTruthy();
@@ -232,7 +303,7 @@ describe('LocationPermissionScreen', () => {
         status: 'granted',
       });
 
-      const { queryByText } = render(<LocationPermissionScreen />);
+      const { queryByText } = render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
         expect(queryByText('위치 권한 요청')).toBeNull();
@@ -240,7 +311,7 @@ describe('LocationPermissionScreen', () => {
     });
 
     it('requests foreground permission when button pressed', async () => {
-      const { getByText } = render(<LocationPermissionScreen />);
+      const { getByText } = render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
         expect(getByText('위치 권한 요청')).toBeTruthy();
@@ -258,7 +329,7 @@ describe('LocationPermissionScreen', () => {
     });
 
     it('shows explanation alert before requesting permission', async () => {
-      const { getByText } = render(<LocationPermissionScreen />);
+      const { getByText } = render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
         expect(getByText('위치 권한 요청')).toBeTruthy();
@@ -280,7 +351,7 @@ describe('LocationPermissionScreen', () => {
         status: 'granted',
       });
 
-      const { getByText } = render(<LocationPermissionScreen />);
+      const { getByText } = render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
         expect(getByText('위치 권한 요청')).toBeTruthy();
@@ -312,7 +383,7 @@ describe('LocationPermissionScreen', () => {
         status: 'denied',
       });
 
-      const { getByText } = render(<LocationPermissionScreen />);
+      const { getByText } = render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
         expect(getByText('위치 권한 요청')).toBeTruthy();
@@ -335,7 +406,7 @@ describe('LocationPermissionScreen', () => {
     });
 
     it('handles cancel from explanation alert', async () => {
-      const { getByText } = render(<LocationPermissionScreen />);
+      const { getByText } = render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
         expect(getByText('위치 권한 요청')).toBeTruthy();
@@ -365,7 +436,7 @@ describe('LocationPermissionScreen', () => {
         new Error('Permission request failed'),
       );
 
-      const { getByText } = render(<LocationPermissionScreen />);
+      const { getByText } = render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
         expect(getByText('위치 권한 요청')).toBeTruthy();
@@ -392,7 +463,7 @@ describe('LocationPermissionScreen', () => {
         () => new Promise(resolve => setTimeout(() => resolve({ status: 'granted' }), 100))
       );
 
-      const { getByText } = render(<LocationPermissionScreen />);
+      const { getByText } = render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
         expect(getByText('위치 권한 요청')).toBeTruthy();
@@ -410,7 +481,7 @@ describe('LocationPermissionScreen', () => {
   });
 
   describe('Background Permission Flow', () => {
-    it('shows background permission button when foreground is granted', async () => {
+    it('shows background toggle off when background is not granted', async () => {
       (Location.getForegroundPermissionsAsync as jest.Mock).mockResolvedValue({
         status: 'granted',
       });
@@ -418,22 +489,14 @@ describe('LocationPermissionScreen', () => {
         status: 'undetermined',
       });
 
-      const { getByText } = render(<LocationPermissionScreen />);
+      const { getByTestId } = render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
-        expect(getByText('백그라운드 권한 요청')).toBeTruthy();
+        expect(getByTestId('toggle-백그라운드 위치').props.accessibilityState.checked).toBe(false);
       });
     });
 
-    it('does not show background button when not granted yet', async () => {
-      const { queryByText } = render(<LocationPermissionScreen />);
-
-      await waitFor(() => {
-        expect(queryByText('백그라운드 권한 요청')).toBeNull();
-      });
-    });
-
-    it('shows granted badge when background permission is granted', async () => {
+    it('shows background toggle on when background permission is granted', async () => {
       (Location.getForegroundPermissionsAsync as jest.Mock).mockResolvedValue({
         status: 'granted',
       });
@@ -441,24 +504,38 @@ describe('LocationPermissionScreen', () => {
         status: 'granted',
       });
 
-      const { getByText } = render(<LocationPermissionScreen />);
+      const { getByTestId } = render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
-        expect(getByText('백그라운드 위치 허용됨')).toBeTruthy();
+        expect(getByTestId('toggle-백그라운드 위치').props.accessibilityState.checked).toBe(true);
       });
     });
 
     it('alerts when foreground permission missing before background request', async () => {
+      const { locationService } = require('@/services/location/locationService');
+
       (Location.getForegroundPermissionsAsync as jest.Mock).mockResolvedValue({
         status: 'undetermined',
       });
 
-      const { queryByText } = render(<LocationPermissionScreen />);
+      const { getByTestId, getByText } = render(
+        <LocationPermissionScreen {...defaultProps} />,
+      );
 
-      // Should not show background button for undetermined foreground
       await waitFor(() => {
-        expect(queryByText('백그라운드 권한 요청')).toBeNull();
+        expect(getByText('위치 권한을 요청하지 않았습니다')).toBeTruthy();
       });
+
+      fireEvent.press(getByTestId('toggle-백그라운드 위치'));
+
+      await waitFor(() => {
+        expect(Alert.alert).toHaveBeenCalledWith(
+          '전경 권한 필요',
+          '먼저 위치 권한을 허용해주세요.',
+        );
+      });
+
+      expect(locationService.requestBackgroundPermission).not.toHaveBeenCalled();
     });
 
     it('requests background permission successfully', async () => {
@@ -472,17 +549,20 @@ describe('LocationPermissionScreen', () => {
         status: 'undetermined',
       });
 
-      const { getByText } = render(<LocationPermissionScreen />);
+      const { getByTestId, getByText } = render(
+        <LocationPermissionScreen {...defaultProps} />,
+      );
 
       await waitFor(() => {
-        expect(getByText('백그라운드 권한 요청')).toBeTruthy();
+        expect(getByText('위치 권한이 허용되었습니다')).toBeTruthy();
       });
 
-      fireEvent.press(getByText('백그라운드 권한 요청'));
+      fireEvent.press(getByTestId('toggle-백그라운드 위치'));
 
       await waitFor(() => {
         // On iOS, should directly show success alert
         // On Android 11+, should show guide first
+        expect(locationService.requestBackgroundPermission).toHaveBeenCalled();
         expect(Alert.alert).toHaveBeenCalled();
       });
     });
@@ -495,13 +575,15 @@ describe('LocationPermissionScreen', () => {
         status: 'undetermined',
       });
 
-      const { getByText } = render(<LocationPermissionScreen />);
+      const { getByTestId, getByText } = render(
+        <LocationPermissionScreen {...defaultProps} />,
+      );
 
       await waitFor(() => {
-        expect(getByText('백그라운드 권한 요청')).toBeTruthy();
+        expect(getByText('위치 권한이 허용되었습니다')).toBeTruthy();
       });
 
-      fireEvent.press(getByText('백그라운드 권한 요청'));
+      fireEvent.press(getByTestId('toggle-백그라운드 위치'));
 
       await waitFor(() => {
         expect(Alert.alert).toHaveBeenCalled();
@@ -516,13 +598,15 @@ describe('LocationPermissionScreen', () => {
         status: 'undetermined',
       });
 
-      const { getByText } = render(<LocationPermissionScreen />);
+      const { getByTestId, getByText } = render(
+        <LocationPermissionScreen {...defaultProps} />,
+      );
 
       await waitFor(() => {
-        expect(getByText('백그라운드 권한 요청')).toBeTruthy();
+        expect(getByText('위치 권한이 허용되었습니다')).toBeTruthy();
       });
 
-      fireEvent.press(getByText('백그라운드 권한 요청'));
+      fireEvent.press(getByTestId('toggle-백그라운드 위치'));
 
       await waitFor(() => {
         expect(Alert.alert).toHaveBeenCalled();
@@ -540,13 +624,15 @@ describe('LocationPermissionScreen', () => {
         status: 'undetermined',
       });
 
-      const { getByText } = render(<LocationPermissionScreen />);
+      const { getByTestId, getByText } = render(
+        <LocationPermissionScreen {...defaultProps} />,
+      );
 
       await waitFor(() => {
-        expect(getByText('백그라운드 권한 요청')).toBeTruthy();
+        expect(getByText('위치 권한이 허용되었습니다')).toBeTruthy();
       });
 
-      fireEvent.press(getByText('백그라운드 권한 요청'));
+      fireEvent.press(getByTestId('toggle-백그라운드 위치'));
 
       await waitFor(() => {
         // Should call Alert.alert for success message
@@ -554,11 +640,13 @@ describe('LocationPermissionScreen', () => {
       });
 
       // Verify success alert was shown
-      const alertCalls = (Alert.alert as jest.Mock).mock.calls;
-      const hasSuccessAlert = alertCalls.some((call) =>
-        call[0]?.includes('권한 허용') || call[0]?.includes('성공')
-      );
-      expect(hasSuccessAlert).toBeTruthy();
+      await waitFor(() => {
+        const alertCalls = (Alert.alert as jest.Mock).mock.calls;
+        const hasSuccessAlert = alertCalls.some((call) =>
+          call[0]?.includes('권한 허용') || call[0]?.includes('성공')
+        );
+        expect(hasSuccessAlert).toBeTruthy();
+      });
     });
 
     it('shows denial alert when background permission denied', async () => {
@@ -572,13 +660,15 @@ describe('LocationPermissionScreen', () => {
         status: 'undetermined',
       });
 
-      const { getByText } = render(<LocationPermissionScreen />);
+      const { getByTestId, getByText } = render(
+        <LocationPermissionScreen {...defaultProps} />,
+      );
 
       await waitFor(() => {
-        expect(getByText('백그라운드 권한 요청')).toBeTruthy();
+        expect(getByText('위치 권한이 허용되었습니다')).toBeTruthy();
       });
 
-      fireEvent.press(getByText('백그라운드 권한 요청'));
+      fireEvent.press(getByTestId('toggle-백그라운드 위치'));
 
       await waitFor(() => {
         // Should call Alert.alert for denial message
@@ -586,11 +676,13 @@ describe('LocationPermissionScreen', () => {
       });
 
       // Verify denial alert was shown
-      const alertCalls = (Alert.alert as jest.Mock).mock.calls;
-      const hasDenialAlert = alertCalls.some((call) =>
-        call[0]?.includes('권한 거부') || call[0]?.includes('거부')
-      );
-      expect(hasDenialAlert).toBeTruthy();
+      await waitFor(() => {
+        const alertCalls = (Alert.alert as jest.Mock).mock.calls;
+        const hasDenialAlert = alertCalls.some((call) =>
+          call[0]?.includes('권한 거부') || call[0]?.includes('거부')
+        );
+        expect(hasDenialAlert).toBeTruthy();
+      });
     });
 
     it('handles error during background permission request', async () => {
@@ -606,13 +698,15 @@ describe('LocationPermissionScreen', () => {
         status: 'undetermined',
       });
 
-      const { getByText } = render(<LocationPermissionScreen />);
+      const { getByTestId, getByText } = render(
+        <LocationPermissionScreen {...defaultProps} />,
+      );
 
       await waitFor(() => {
-        expect(getByText('백그라운드 권한 요청')).toBeTruthy();
+        expect(getByText('위치 권한이 허용되었습니다')).toBeTruthy();
       });
 
-      fireEvent.press(getByText('백그라운드 권한 요청'));
+      fireEvent.press(getByTestId('toggle-백그라운드 위치'));
 
       await waitFor(() => {
         // Should call Alert.alert for error message
@@ -620,14 +714,16 @@ describe('LocationPermissionScreen', () => {
       });
 
       // Verify error alert was shown
-      const alertCalls = (Alert.alert as jest.Mock).mock.calls;
-      const hasErrorAlert = alertCalls.some((call) =>
-        call[0]?.includes('오류') || call[0]?.includes('실패')
-      );
-      expect(hasErrorAlert).toBeTruthy();
+      await waitFor(() => {
+        const alertCalls = (Alert.alert as jest.Mock).mock.calls;
+        const hasErrorAlert = alertCalls.some((call) =>
+          call[0]?.includes('오류') || call[0]?.includes('실패')
+        );
+        expect(hasErrorAlert).toBeTruthy();
+      });
     });
 
-    it('disables button while requesting background permission', async () => {
+    it('disables toggle while requesting background permission', async () => {
       const { locationService } = require('@/services/location/locationService');
       (locationService.requestBackgroundPermission as jest.Mock).mockImplementation(
         () => new Promise(resolve => setTimeout(() => resolve(true), 200))
@@ -640,16 +736,18 @@ describe('LocationPermissionScreen', () => {
         status: 'undetermined',
       });
 
-      const { getByText } = render(<LocationPermissionScreen />);
+      const { getByTestId, getByText } = render(
+        <LocationPermissionScreen {...defaultProps} />,
+      );
 
       await waitFor(() => {
-        expect(getByText('백그라운드 권한 요청')).toBeTruthy();
+        expect(getByText('위치 권한이 허용되었습니다')).toBeTruthy();
       });
 
-      fireEvent.press(getByText('백그라운드 권한 요청'));
+      fireEvent.press(getByTestId('toggle-백그라운드 위치'));
 
       await waitFor(() => {
-        expect(getByText('권한 요청 중...')).toBeTruthy();
+        expect(getByTestId('toggle-백그라운드 위치').props.accessibilityState.disabled).toBe(true);
       });
     });
 
@@ -669,30 +767,68 @@ describe('LocationPermissionScreen', () => {
       const initialCallCountFG = getForegroundSpy.mock.calls.length;
       void getBackgroundSpy.mock.calls.length;
 
-      const { getByText } = render(<LocationPermissionScreen />);
+      const { getByTestId, getByText } = render(
+        <LocationPermissionScreen {...defaultProps} />,
+      );
 
       await waitFor(() => {
-        expect(getByText('백그라운드 권한 요청')).toBeTruthy();
+        expect(getByText('위치 권한이 허용되었습니다')).toBeTruthy();
       });
 
-      fireEvent.press(getByText('백그라운드 권한 요청'));
+      fireEvent.press(getByTestId('toggle-백그라운드 위치'));
 
       await waitFor(() => {
         // Should call checkPermission (which calls getForegroundPermissionsAsync and getBackgroundPermissionsAsync)
-        expect(getForegroundSpy.mock.calls.length).toBeGreaterThan(initialCallCountFG);
+        expect(getForegroundSpy.mock.calls.length).toBeGreaterThan(initialCallCountFG + 1);
       });
+    });
+
+    it('opens settings guide when toggling off granted background permission', async () => {
+      const { locationService } = require('@/services/location/locationService');
+
+      (Location.getForegroundPermissionsAsync as jest.Mock).mockResolvedValue({
+        status: 'granted',
+      });
+      (Location.getBackgroundPermissionsAsync as jest.Mock).mockResolvedValue({
+        status: 'granted',
+      });
+
+      const { getByTestId } = render(<LocationPermissionScreen {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(getByTestId('toggle-백그라운드 위치').props.accessibilityState.checked).toBe(true);
+      });
+
+      fireEvent.press(getByTestId('toggle-백그라운드 위치'));
+
+      await waitFor(() => {
+        expect(Alert.alert).toHaveBeenCalledWith(
+          '설정 열기',
+          'LiveMetro 앱의 위치 권한을 변경하시겠습니까?',
+          expect.any(Array),
+        );
+      });
+
+      // Programmatic revoke is impossible — must not call the request flow
+      expect(locationService.requestBackgroundPermission).not.toHaveBeenCalled();
     });
   });
 
   describe('App Settings', () => {
+    beforeEach(() => {
+      (Location.getForegroundPermissionsAsync as jest.Mock).mockResolvedValue({
+        status: 'granted',
+      });
+    });
+
     it('opens app settings when button pressed', async () => {
-      const { getByText } = render(<LocationPermissionScreen />);
+      const { getByText } = render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
-        expect(getByText('앱 설정 열기')).toBeTruthy();
+        expect(getByText('시스템 설정에서 변경')).toBeTruthy();
       });
 
-      fireEvent.press(getByText('앱 설정 열기'));
+      fireEvent.press(getByText('시스템 설정에서 변경'));
 
       expect(Alert.alert).toHaveBeenCalledWith(
         '설정 열기',
@@ -702,13 +838,13 @@ describe('LocationPermissionScreen', () => {
     });
 
     it('calls Linking.openSettings when settings button confirmed', async () => {
-      const { getByText } = render(<LocationPermissionScreen />);
+      const { getByText } = render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
-        expect(getByText('앱 설정 열기')).toBeTruthy();
+        expect(getByText('시스템 설정에서 변경')).toBeTruthy();
       });
 
-      fireEvent.press(getByText('앱 설정 열기'));
+      fireEvent.press(getByText('시스템 설정에서 변경'));
 
       await waitFor(() => {
         expect(Alert.alert).toHaveBeenCalled();
@@ -727,13 +863,13 @@ describe('LocationPermissionScreen', () => {
     });
 
     it('cancels settings alert when cancel pressed', async () => {
-      const { getByText } = render(<LocationPermissionScreen />);
+      const { getByText } = render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
-        expect(getByText('앱 설정 열기')).toBeTruthy();
+        expect(getByText('시스템 설정에서 변경')).toBeTruthy();
       });
 
-      fireEvent.press(getByText('앱 설정 열기'));
+      fireEvent.press(getByText('시스템 설정에서 변경'));
 
       await waitFor(() => {
         expect(Alert.alert).toHaveBeenCalled();
@@ -751,9 +887,23 @@ describe('LocationPermissionScreen', () => {
     });
   });
 
+  describe('Privacy Link', () => {
+    it('navigates to PrivacyPolicy when privacy card pressed', async () => {
+      const { getByTestId } = render(<LocationPermissionScreen {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(getByTestId('privacy-link-card')).toBeTruthy();
+      });
+
+      fireEvent.press(getByTestId('privacy-link-card'));
+
+      expect(mockNavigate).toHaveBeenCalledWith('PrivacyPolicy');
+    });
+  });
+
   describe('Permission Check on Mount', () => {
     it('checks foreground permission on mount', async () => {
-      render(<LocationPermissionScreen />);
+      render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
         expect(Location.getForegroundPermissionsAsync).toHaveBeenCalled();
@@ -761,7 +911,7 @@ describe('LocationPermissionScreen', () => {
     });
 
     it('checks background permission on mount', async () => {
-      render(<LocationPermissionScreen />);
+      render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
         expect(Location.getBackgroundPermissionsAsync).toHaveBeenCalled();
@@ -773,7 +923,7 @@ describe('LocationPermissionScreen', () => {
         new Error('Check failed'),
       );
 
-      const { getByText } = render(<LocationPermissionScreen />);
+      const { getByText } = render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
         // Should still render with undetermined state
@@ -782,7 +932,7 @@ describe('LocationPermissionScreen', () => {
     });
 
     it('sets loading to false after permission check', async () => {
-      const { getByText } = render(<LocationPermissionScreen />);
+      const { getByText } = render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
         // After check, should show actual status (not loading)
@@ -801,7 +951,7 @@ describe('LocationPermissionScreen', () => {
         status: 'granted',
       });
 
-      const { getByText } = render(<LocationPermissionScreen />);
+      const { getByText } = render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
         expect(getByText('위치 권한 요청')).toBeTruthy();
@@ -824,7 +974,7 @@ describe('LocationPermissionScreen', () => {
         .mockRejectedValueOnce(new Error('Check 1 failed'))
         .mockResolvedValueOnce({ status: 'granted' });
 
-      render(<LocationPermissionScreen />);
+      render(<LocationPermissionScreen {...defaultProps} />);
 
       // Should recover and show undetermined initially
       await waitFor(() => {
@@ -833,22 +983,22 @@ describe('LocationPermissionScreen', () => {
     });
 
     it('displays all feature items correctly', async () => {
-      const { getByText } = render(<LocationPermissionScreen />);
+      const { getByText } = render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
         // Check all feature titles
-        expect(getByText('주변 역 찾기')).toBeTruthy();
-        expect(getByText('출퇴근 경로 설정')).toBeTruthy();
-        expect(getByText('맞춤 알림')).toBeTruthy();
+        expect(getByText('주변 역 자동 검색')).toBeTruthy();
+        expect(getByText('출퇴근 경로 추천')).toBeTruthy();
+        expect(getByText('역 근처 알림')).toBeTruthy();
       });
 
       // Verify descriptions
-      expect(getByText(/가까운 지하철역을/)).toBeTruthy();
+      expect(getByText(/가까운 역 표시/)).toBeTruthy();
       expect(getByText(/자주 이용하는 경로/)).toBeTruthy();
       expect(getByText(/실시간 지연 알림/)).toBeTruthy();
     });
 
-    it('handles background permission request without foreground check', async () => {
+    it('alerts instead of requesting when toggling background with denied foreground', async () => {
       const { locationService } = require('@/services/location/locationService');
       (locationService.requestBackgroundPermission as jest.Mock).mockResolvedValue(true);
 
@@ -857,12 +1007,24 @@ describe('LocationPermissionScreen', () => {
         status: 'denied',
       });
 
-      const { queryByText } = render(<LocationPermissionScreen />);
+      const { getByTestId, getByText } = render(
+        <LocationPermissionScreen {...defaultProps} />,
+      );
 
       await waitFor(() => {
-        // Should not show background button
-        expect(queryByText('백그라운드 권한 요청')).toBeNull();
+        expect(getByText('위치 권한이 거부되었습니다')).toBeTruthy();
       });
+
+      fireEvent.press(getByTestId('toggle-백그라운드 위치'));
+
+      await waitFor(() => {
+        expect(Alert.alert).toHaveBeenCalledWith(
+          '전경 권한 필요',
+          '먼저 위치 권한을 허용해주세요.',
+        );
+      });
+
+      expect(locationService.requestBackgroundPermission).not.toHaveBeenCalled();
     });
 
     it('maintains permission state across renders', async () => {
@@ -873,14 +1035,16 @@ describe('LocationPermissionScreen', () => {
         status: 'granted',
       });
 
-      const { getByText, rerender } = render(<LocationPermissionScreen />);
+      const { getByText, rerender } = render(
+        <LocationPermissionScreen {...defaultProps} />,
+      );
 
       await waitFor(() => {
         expect(getByText('위치 권한이 허용되었습니다')).toBeTruthy();
       });
 
       // Rerender and verify state persists
-      rerender(<LocationPermissionScreen />);
+      rerender(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
         expect(getByText('위치 권한이 허용되었습니다')).toBeTruthy();
