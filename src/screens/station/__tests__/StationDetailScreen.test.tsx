@@ -564,6 +564,30 @@ describe('StationDetailScreen', () => {
     });
   });
 
+  // 실시간 열차 위치 화면으로의 진입 — 탑승 열차 선택 버튼과 동일하게
+  // 도착 카드가 있을 때만 노출.
+  describe('실시간 열차 위치 entry', () => {
+    it('navigates to TrainPosition with lineId + focusStationId when pressed', () => {
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: [buildTrain({ id: 'u1', finalDestination: '잠실', direction: 'up' })],
+        loading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+      const { getByTestId } = render(<StationDetailScreen />);
+      fireEvent.press(getByTestId('station-detail-train-position'));
+      expect(mockNavigate).toHaveBeenCalledWith('TrainPosition', {
+        lineId: '2',
+        focusStationId: 'gangnam',
+      });
+    });
+
+    it('does not show the entry button when there are no trains', () => {
+      const { queryByTestId } = render(<StationDetailScreen />);
+      expect(queryByTestId('station-detail-train-position')).toBeNull();
+    });
+  });
+
   // 탑승 시작 후 역 상세로 복귀 시: boarding 선택이 방향 전환 + 선택 열차를
   // 최상단으로 끌어올려 "탑승 열차에 따라 도착시간 변경"을 가시화한다.
   describe('boarding selection reflection', () => {

@@ -121,6 +121,12 @@ export type AppStackParamList = {
     stationName: string;
     lineId: string;
   };
+  // 실시간 열차 위치 — 노선 전체 타임라인. focusStationId는 진입한 역으로
+  // 초기 스크롤/지선 선택을 맞추는 데 사용 (lines.json station id).
+  TrainPosition: {
+    lineId: string;
+    focusStationId?: string;
+  };
   StationNavigator: {
     stationId: string;
     lineId: string;
