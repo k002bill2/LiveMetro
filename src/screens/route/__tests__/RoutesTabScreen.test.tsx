@@ -1,13 +1,19 @@
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { RoutesTabScreen } from '../RoutesTabScreen';
+import {
+  getGuidanceSession,
+  clearGuidanceSession,
+} from '@/services/guidance/guidanceSessionStore';
 
 jest.mock('@/services/theme', () => ({
   useTheme: () => ({ isDark: false }),
 }));
 
+const mockNavigate = jest.fn();
+
 jest.mock('@react-navigation/native', () => ({
-  useNavigation: () => ({ navigate: jest.fn(), goBack: jest.fn() }),
+  useNavigation: () => ({ navigate: mockNavigate, goBack: jest.fn() }),
   useIsFocused: () => true,
 }));
 
@@ -193,6 +199,93 @@ describe('RoutesTabScreen', () => {
     await waitFor(() =>
       expect(getAllByTestId(/^route-r\d$/)[0]?.props.testID).toBe('route-r2')
     );
+  });
+
+  it('starts guidance from the CTA — recommended route by default', async () => {
+    clearGuidanceSession();
+    mockUseRouteSearch.mockReturnValue({
+      routes: [
+        {
+          id: 'r1',
+          etaMinutes: 25,
+          etaConfidenceMinutes: 3,
+          delayRiskLineIds: [],
+          transferCount: 0,
+          segments: [],
+          lineIds: ['2'],
+          totalMinutes: 25,
+        },
+        {
+          id: 'r2',
+          etaMinutes: 30,
+          etaConfidenceMinutes: 4,
+          delayRiskLineIds: [],
+          transferCount: 1,
+          segments: [],
+          lineIds: ['2', '7'],
+          totalMinutes: 30,
+        },
+      ],
+      loading: false,
+      error: null,
+      refetch: jest.fn(),
+    });
+    const { getByTestId } = render(<RoutesTabScreen />);
+    fireEvent.press(getByTestId('to-row'));
+    fireEvent.press(getByTestId('picker'));
+    await waitFor(() => expect(getByTestId('route-start-cta')).toBeTruthy());
+
+    fireEvent.press(getByTestId('route-start-cta'));
+
+    const session = getGuidanceSession();
+    expect(session).not.toBeNull();
+    expect((session?.route as { id?: string }).id).toBe('r1');
+    expect(session?.fromStationName).toBe('강남');
+    expect(session?.toStationName).toBe('잠실');
+    expect(mockNavigate).toHaveBeenCalledWith('RouteGuidance');
+    clearGuidanceSession();
+  });
+
+  it('starts guidance with the expanded card when one is selected', async () => {
+    clearGuidanceSession();
+    mockUseRouteSearch.mockReturnValue({
+      routes: [
+        {
+          id: 'r1',
+          etaMinutes: 25,
+          etaConfidenceMinutes: 3,
+          delayRiskLineIds: [],
+          transferCount: 0,
+          segments: [],
+          lineIds: ['2'],
+          totalMinutes: 25,
+        },
+        {
+          id: 'r2',
+          etaMinutes: 30,
+          etaConfidenceMinutes: 4,
+          delayRiskLineIds: [],
+          transferCount: 1,
+          segments: [],
+          lineIds: ['2', '7'],
+          totalMinutes: 30,
+        },
+      ],
+      loading: false,
+      error: null,
+      refetch: jest.fn(),
+    });
+    const { getByTestId } = render(<RoutesTabScreen />);
+    fireEvent.press(getByTestId('to-row'));
+    fireEvent.press(getByTestId('picker'));
+    await waitFor(() => expect(getByTestId('route-r2')).toBeTruthy());
+
+    fireEvent.press(getByTestId('route-r2')); // expand the second card
+    fireEvent.press(getByTestId('route-start-cta'));
+
+    expect((getGuidanceSession()?.route as { id?: string }).id).toBe('r2');
+    expect(mockNavigate).toHaveBeenCalledWith('RouteGuidance');
+    clearGuidanceSession();
   });
 
   it('shows error when useRouteSearch returns error', async () => {

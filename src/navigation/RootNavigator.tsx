@@ -42,6 +42,7 @@ import { DelayFeedScreen } from '../screens/delays/DelayFeedScreen';
 import { ReportDetailScreenAdapter } from '../screens/delays/ReportDetailScreenAdapter';
 import { ReportFeedbackScreenAdapter } from '../screens/delays/ReportFeedbackScreenAdapter';
 import { AlternativeRoutesScreen } from '../screens/route/AlternativeRoutesScreen';
+import { RouteGuidanceScreen } from '../screens/guidance/RouteGuidanceScreen';
 import { RoutesTabScreen } from '../screens/route/RoutesTabScreen';
 import { WeeklyPredictionScreen } from '../screens/prediction';
 
@@ -94,6 +95,9 @@ export type RootStackParamList = {
     fromStationName: string;
     toStationName: string;
   };
+  // 실시간 길안내 — RoutesTabScreen CTA에서 진입. Route payload는 param이
+  // 아닌 guidanceSessionStore(모듈 싱글톤)로 전달 (30+ segment 직렬화 회피).
+  RouteGuidance: undefined;
   // Phase 56 — moved out of MainTabs (TabBar v3 = 5 tabs without Map/Alerts).
   // QuickActionsGrid '노선도' button + HomeTopBar Bell still navigate here,
   // so they must remain reachable through the outer Stack.
@@ -345,6 +349,13 @@ const RootNavigatorContent: React.FC = () => {
       <Stack.Screen
         name="AlternativeRoutes"
         component={AlternativeRoutesScreen}
+        options={{
+          headerShown: false,
+        }}
+      />
+      <Stack.Screen
+        name="RouteGuidance"
+        component={RouteGuidanceScreen}
         options={{
           headerShown: false,
         }}
