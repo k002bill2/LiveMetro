@@ -26,6 +26,7 @@ import LocationPermissionScreen from '@/screens/settings/LocationPermissionScree
 import HelpScreen from '@/screens/settings/HelpScreen';
 import { FeedbackScreen } from '@/screens/feedback/FeedbackScreen';
 import PrivacyPolicyScreen from '@/screens/settings/PrivacyPolicyScreen';
+import TermsOfServiceScreen from '@/screens/settings/TermsOfServiceScreen';
 // In-settings route editor reuses the onboarding CommuteRouteScreen + its
 // station picker, both of which branch on `route.name` to know they are
 // running inside SettingsNavigator (no OnboardingNavigator context, save
@@ -139,6 +140,11 @@ export const SettingsNavigator: React.FC = () => {
         name="PrivacyPolicy"
         component={PrivacyPolicyScreen}
         options={{ title: '개인정보처리방침' }}
+      />
+      <SettingsStack.Screen
+        name="TermsOfService"
+        component={TermsOfServiceScreen}
+        options={{ title: '서비스이용약관' }}
       />
     </SettingsStack.Navigator>
   );

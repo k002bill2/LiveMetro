@@ -577,8 +577,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
             <SettingItem
               Icon={ShieldCheck}
               title={t.settings.termsOfService}
-              onPress={() => {}}
-              showChevron={false}
+              onPress={() => navigation.navigate('TermsOfService')}
             />
             <SettingItem
               Icon={Info}
