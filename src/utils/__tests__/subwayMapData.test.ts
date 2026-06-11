@@ -16,6 +16,8 @@ import {
   getLineColor,
   getStationsForLine,
   lineStationSet,
+  getLineBranches,
+  buildStationNameToIdMap,
 } from '../subwayMapData';
 
 describe('subwayMapData', () => {
@@ -247,6 +249,56 @@ describe('subwayMapData', () => {
       const ids = stations1.map(s => s.id);
       const uniqIds = new Set(ids);
       expect(ids.length).toBe(uniqIds.size); // no duplicates
+    });
+  });
+
+  describe('getLineBranches', () => {
+    it('returns 3 branches for Line 2 with the circular trunk first', () => {
+      const branches = getLineBranches('2');
+      expect(branches).toHaveLength(3);
+      expect(branches[0]?.isLoop).toBe(true);
+      expect(branches[0]?.label).toBe('순환선');
+      expect(branches[0]?.stationIds.length).toBeGreaterThan(40);
+    });
+
+    it('labels Line 2 branch subarrays as 첫역–끝역', () => {
+      const branches = getLineBranches('2');
+      expect(branches[1]?.isLoop).toBe(false);
+      expect(branches[1]?.label).toBe('성수–신설동');
+      expect(branches[2]?.label).toBe('신도림–까치산');
+    });
+
+    it('returns a single non-loop branch for single-trunk lines', () => {
+      const branches = getLineBranches('9');
+      expect(branches).toHaveLength(1);
+      expect(branches[0]?.isLoop).toBe(false);
+      expect(branches[0]?.label).toContain('–');
+    });
+
+    it('returns [] for unknown line ids', () => {
+      expect(getLineBranches('nonexistent_line_id_xyz')).toEqual([]);
+    });
+  });
+
+  describe('buildStationNameToIdMap', () => {
+    it('maps normalized station names to ids for a branch', () => {
+      const loop = getLineBranches('2')[0]!;
+      const map = buildStationNameToIdMap(loop.stationIds);
+      expect(map.get('시청')).toBe('city_hall_1');
+      expect(map.get('동대문역사문화공원')).toBeDefined();
+    });
+
+    it('joins names with and without 역 suffix to the same id', () => {
+      const loop = getLineBranches('2')[0]!;
+      const map = buildStationNameToIdMap(loop.stationIds);
+      // normalizeStationKey strips a trailing 역 on the lookup side too —
+      // callers normalize API statnNm before lookup with the same rule.
+      expect(map.get('시청역'.trim().replace(/역$/, ''))).toBe('city_hall_1');
+    });
+
+    it('returns an empty map for ids without station metadata', () => {
+      const map = buildStationNameToIdMap(['no_such_station_id']);
+      expect(map.size).toBe(0);
     });
   });
 });
