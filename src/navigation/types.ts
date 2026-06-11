@@ -142,6 +142,8 @@ export type AppStackParamList = {
     fromStationName: string;
     toStationName: string;
   };
+  // 실시간 길안내 — payload는 guidanceSessionStore 경유 (param 직렬화 회피).
+  RouteGuidance: undefined;
   // Phase 56: top-level routes still navigable via QuickActionsGrid
   // (노선도) and HomeTopBar (Bell) after their tabs were removed.
   SubwayMap: undefined;

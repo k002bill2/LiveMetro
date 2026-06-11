@@ -21,13 +21,16 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search } from 'lucide-react-native';
-import { useIsFocused } from '@react-navigation/native';
+import { useIsFocused, useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { useTheme } from '@/services/theme';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { useNearbyStations } from '@/hooks/useNearbyStations';
 import { useRouteSearch, type DepartureMode } from '@/hooks/useRouteSearch';
 import { routeService } from '@/services/route';
+import { setGuidanceSession } from '@/services/guidance/guidanceSessionStore';
+import type { AppStackParamList } from '@/navigation/types';
 import type { RouteSortTab } from '@/models/route';
 import { STATIONS as GRAPH_STATIONS, isRoutableStation } from '@/utils/subwayMapData';
 import { StationSearchBar } from '@/components/route/StationSearchBar';
@@ -41,10 +44,13 @@ interface StationLite {
   name: string;
 }
 
+type NavigationProp = NativeStackNavigationProp<AppStackParamList>;
+
 export const RoutesTabScreen: React.FC = () => {
   const { isDark } = useTheme();
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
   const styles = useMemo(() => createStyles(semantic), [semantic]);
+  const navigation = useNavigation<NavigationProp>();
 
   // 비포커스 탭에서 useRouteSearch 내부 useDelayDetection의 9개 대표역 폴링을
   // 멈춘다 — bottom-tab은 blur 시 unmount되지 않아 게이트가 없으면 영구 폴링한다.
@@ -124,6 +130,21 @@ export const RoutesTabScreen: React.FC = () => {
   const handleToggleExpand = useCallback((id: string): void => {
     setExpandedRouteId((prev) => (prev === id ? null : id));
   }, []);
+
+  // 길안내 시작 — 펼친 카드가 있으면 그 경로, 없으면 1위(추천) 경로.
+  // Route payload는 navigation param이 아닌 guidanceSessionStore로 핸드오프.
+  const handleStartGuidance = useCallback((): void => {
+    const selected =
+      sortedRoutes.find((r) => r.id === expandedRouteId) ?? sortedRoutes[0];
+    if (!selected || !fromStation || !toStation) return;
+    setGuidanceSession({
+      route: selected,
+      fromStationName: fromStation.name,
+      toStationName: toStation.name,
+      startedAt: Date.now(),
+    });
+    navigation.navigate('RouteGuidance');
+  }, [sortedRoutes, expandedRouteId, fromStation, toStation, navigation]);
 
   const handlePressFrom = useCallback((): void => {
     setPickerSlot('from');
@@ -232,6 +253,7 @@ export const RoutesTabScreen: React.FC = () => {
         <View style={[styles.ctaBar, { backgroundColor: semantic.bgBase, borderTopColor: semantic.lineSubtle }]}>
           <Pressable
             style={[styles.ctaButton, { backgroundColor: semantic.primaryNormal }]}
+            onPress={handleStartGuidance}
             accessibilityRole="button"
             accessibilityLabel="선택한 경로로 길안내 시작"
             testID="route-start-cta"
