@@ -49,7 +49,10 @@ describe('LineFavoritePicker', () => {
     fireEvent.press(getByTestId('line-chip-5')); // select 5
     fireEvent.press(getByTestId('line-chip-2')); // deselect 2
     fireEvent.press(getByTestId('line-favorite-save'));
-    expect(onSave).toHaveBeenCalledWith({ toAdd: ['5'], toRemove: ['0208'] });
+    expect(onSave).toHaveBeenCalledWith({
+      toAdd: [{ lineId: '5', stationCd: '2541', isFavorite: false }],
+      toRemove: ['0208'],
+    });
   });
 
   it('disables save when selection matches initial state', () => {

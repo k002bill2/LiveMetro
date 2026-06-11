@@ -14,7 +14,7 @@
  * real-time TrainArrivalList were removed in Phase 56 — their data still
  * feeds CommunityDelayCard / the empty-state link / StationDetail.
  */
-import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   RefreshControl,
   ScrollView,
@@ -44,14 +44,12 @@ import { useDelayDetection } from '../../hooks/useDelayDetection';
 import { useMLPrediction } from '../../hooks/useMLPrediction';
 import { useCommuteRouteSummary } from '../../hooks/useCommuteRouteSummary';
 import { useFirestoreMorningCommute } from '../../hooks/useFirestoreMorningCommute';
-import { useRealtimeTrains } from '../../hooks/useRealtimeTrains';
 import { useFavorites } from '../../hooks/useFavorites';
 import { LoadingScreen } from '../../components/common/LoadingScreen';
 import {
   CommunityDelayCard,
   CommuteRouteCard,
   CommuteRouteCardPlaceholder,
-  FavoriteRow,
   HomeTopBar,
   MLHeroCard,
   MLHeroCardPlaceholder,
@@ -72,134 +70,16 @@ import { useTheme } from '../../services/theme';
 import { Station } from '../../models/train';
 import { isUsableCommuteTime } from '../../models/user';
 import { AppStackParamList } from '../../navigation/types';
+import { HomeFavoriteRow } from './HomeFavoriteRow';
+import { useCommuteDiagnostics } from './useCommuteDiagnostics';
+import {
+  addMinutesToHHmm,
+  formatDateTimeLabel,
+  formatRelativeKorean,
+  minutesBetween,
+} from './homeTimeFormat';
 
-/**
- * Compute commute minutes from "HH:mm" departure → arrival strings.
- * Wraps midnight (23:55 → 00:20 = 25 min). Returns null on malformed input.
- */
-const MIN_PER_DAY = 24 * 60;
 const WALK_METERS_PER_MINUTE = 80;
-
-const minutesBetween = (departure?: string, arrival?: string): number | null => {
-  if (!departure || !arrival) return null;
-  const parse = (s: string): number | null => {
-    const m = /^(\d{1,2}):(\d{2})$/.exec(s.trim());
-    if (!m) return null;
-    return parseInt(m[1]!, 10) * 60 + parseInt(m[2]!, 10);
-  };
-  const d = parse(departure);
-  const a = parse(arrival);
-  if (d === null || a === null) return null;
-  const diff = ((a - d) % MIN_PER_DAY + MIN_PER_DAY) % MIN_PER_DAY;
-  return diff > 0 ? diff : null;
-};
-
-/**
- * Add minutes to an "HH:mm" time string, wrapping at midnight.
- * Returns null on malformed input. Used to derive an arrival time when
- * only the registered departure + estimated ride duration is known
- * (no ML prediction yet).
- */
-const addMinutesToHHmm = (
-  hhmm: string | undefined,
-  minutes: number | undefined,
-): string | null => {
-  if (!hhmm || minutes === undefined || !Number.isFinite(minutes)) return null;
-  const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim());
-  if (!m) return null;
-  const base = parseInt(m[1]!, 10) * 60 + parseInt(m[2]!, 10);
-  const total = ((base + Math.round(minutes)) % MIN_PER_DAY + MIN_PER_DAY) % MIN_PER_DAY;
-  const hh = String(Math.floor(total / 60)).padStart(2, '0');
-  const mm = String(total % 60).padStart(2, '0');
-  return `${hh}:${mm}`;
-};
-
-/** "방금 전" / "12분 전" / "3시간 전" / "2일 전" */
-const formatRelativeKorean = (ts?: Date, now: Date = new Date()): string | null => {
-  if (!ts) return null;
-  const diffSec = Math.max(0, Math.floor((now.getTime() - ts.getTime()) / 1000));
-  if (diffSec < 60) return '방금 전';
-  const diffMin = Math.floor(diffSec / 60);
-  if (diffMin < 60) return `${diffMin}분 전`;
-  const diffHr = Math.floor(diffMin / 60);
-  if (diffHr < 24) return `${diffHr}시간 전`;
-  const diffDay = Math.floor(diffHr / 24);
-  return `${diffDay}일 전`;
-};
-
-/** "2026.05.03 (수) · 오전 8:32" */
-const formatDateTimeLabel = (now: Date = new Date()): string => {
-  const days = ['일', '월', '화', '수', '목', '금', '토'];
-  const yyyy = now.getFullYear();
-  const mm = String(now.getMonth() + 1).padStart(2, '0');
-  const dd = String(now.getDate()).padStart(2, '0');
-  const dow = days[now.getDay()];
-  const h = now.getHours();
-  const min = String(now.getMinutes()).padStart(2, '0');
-  const period = h < 12 ? '오전' : '오후';
-  const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
-  return `${yyyy}.${mm}.${dd} (${dow}) · ${period} ${h12}:${min}`;
-};
-
-/**
- * One favorite-row item with its own real-time arrivals subscription. Each
- * card is gated on `isFocused` to avoid background polling
- * (project_inactive_screen_polling_gating.md).
- *
- * `isFirst` enables the design-handoff treatment for the topmost favorite:
- * shows an extra "초" countdown and a green "곧 도착" label, ticking once
- * per second (main.jsx:259-294). Subsequent rows show only minutes.
- */
-interface HomeFavoriteRowProps {
-  station: Station;
-  alias?: string | null;
-  isFocused: boolean;
-  isFirst?: boolean;
-  onPress: () => void;
-  testID?: string;
-}
-
-const HomeFavoriteRow: React.FC<HomeFavoriteRowProps> = memo(
-  ({ station, alias, isFocused, isFirst = false, onPress, testID }) => {
-    const { trains } = useRealtimeTrains(station.name, { enabled: isFocused });
-    const next = trains[0];
-
-    // Tick every second only when this is the first row AND the screen is
-    // focused — avoids 1Hz timers across the favorite stack.
-    const [, setTick] = useState(0);
-    useEffect(() => {
-      if (!isFirst || !isFocused) return;
-      const id = setInterval(() => setTick((t) => t + 1), 1000);
-      return () => clearInterval(id);
-    }, [isFirst, isFocused]);
-
-    const totalSecondsLeft = next?.arrivalTime
-      ? Math.max(0, Math.round((next.arrivalTime.getTime() - Date.now()) / 1000))
-      : 0;
-    const nextMinutes = Math.floor(totalSecondsLeft / 60);
-
-    const destLabel = next?.finalDestination
-      ? `${next.finalDestination} 방면`
-      : undefined;
-
-    const imminent =
-      isFirst && totalSecondsLeft > 0 && totalSecondsLeft <= 90;
-
-    return (
-      <FavoriteRow
-        lines={[station.lineId as LineId]}
-        stationName={station.name}
-        nickname={alias ?? null}
-        destinationLabel={destLabel}
-        nextMinutes={nextMinutes}
-        imminent={imminent}
-        onPress={onPress}
-        testID={testID}
-      />
-    );
-  },
-);
-HomeFavoriteRow.displayName = 'HomeFavoriteRow';
 
 export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<AppStackParamList>>();
@@ -295,64 +175,15 @@ export const HomeScreen: React.FC = () => {
     morningCommute?.destinationStationId,
   );
 
-  // Dev-only diagnostic: compare what each store stored vs. what
-  // trainService.getStation() resolves to. If a store wrote an external
-  // OpenAPI code instead of an internal slug, the lookup returns null here
-  // even though `morningCommute` is non-null — the exact failure shape that
-  // hides the fact grid on the home card.
-  useEffect(() => {
-    if (!__DEV__) return;
-    // Skip in jest — the async warn fires past act() boundaries and flakes
-    // unrelated assertions. JEST_WORKER_ID is set on every jest worker.
-    if (process.env.JEST_WORKER_ID) return;
-    if (!morningCommute) return;
-    let cancelled = false;
-    (async () => {
-      const ids = {
-        fromProfile: profileMorningCommute
-          ? {
-              from: profileMorningCommute.stationId,
-              to: profileMorningCommute.destinationStationId,
-            }
-          : null,
-        fromOnboarding: onboardingMorningCommute
-          ? {
-              from: onboardingMorningCommute.stationId,
-              to: onboardingMorningCommute.destinationStationId,
-            }
-          : null,
-        chosen: {
-          from: morningCommute.stationId,
-          to: morningCommute.destinationStationId,
-        },
-      };
-      const [fromStation, toStation] = await Promise.all([
-        trainService.getStation(morningCommute.stationId).catch(() => null),
-        trainService
-          .getStation(morningCommute.destinationStationId)
-          .catch(() => null),
-      ]);
-      if (cancelled) return;
-      console.warn('[HomeScreen.commuteDiag] stored ids vs resolved stations', {
-        ids,
-        resolved: {
-          from: fromStation
-            ? { id: fromStation.id, name: fromStation.name }
-            : null,
-          to: toStation ? { id: toStation.id, name: toStation.name } : null,
-        },
-        routeSummary,
-      });
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [
+  // Dev-only diagnostic (no-op in production/jest): logs stored commute ids
+  // vs. resolved stations — see useCommuteDiagnostics for the failure shape
+  // it catches.
+  useCommuteDiagnostics({
     morningCommute,
     profileMorningCommute,
     onboardingMorningCommute,
     routeSummary,
-  ]);
+  });
 
   useEffect(() => {
     if (!morningCommute) {
@@ -429,15 +260,7 @@ export const HomeScreen: React.FC = () => {
     };
   }, [morningCommute, commuteStationNames, routeSummary]);
 
-  const effectiveHero = useMemo(() => {
-    if (heroProps) return heroProps;
-    if (registeredCommuteHero) return registeredCommuteHero;
-    return null;
-  }, [heroProps, registeredCommuteHero]);
-
-  const effectiveNames = commuteStationNames;
-
-  const effectiveRouteFacts = routeSummary;
+  const effectiveHero = heroProps ?? registeredCommuteHero;
 
   const effectiveDepartureTime =
     mlPrediction?.predictedDepartureTime ?? morningCommute?.departureTime;
@@ -549,7 +372,7 @@ export const HomeScreen: React.FC = () => {
 
   const showNearbySection = nearbyList.length > 0;
   const showFavoritesSection = favoriteStations.length > 0;
-  const showCommunitySection = activeDelays.length > 0;
+  const firstDelay = activeDelays[0];
 
   const onPressRouteSearch = useCallback((): void => {
     if (nearbyClosestStation) {
@@ -655,17 +478,17 @@ export const HomeScreen: React.FC = () => {
           slot only when no endpoints are known (no registered commute, and
           the dev sample is suppressed once a commute exists). */}
       <View style={styles.routeCardWrap}>
-        {effectiveNames.origin && effectiveNames.destination ? (
+        {commuteStationNames.origin && commuteStationNames.destination ? (
           <CommuteRouteCard
-            origin={effectiveNames.origin}
-            destination={effectiveNames.destination}
-            lineId={effectiveNames.originLineId as LineId | undefined}
+            origin={commuteStationNames.origin}
+            destination={commuteStationNames.destination}
+            lineId={commuteStationNames.originLineId as LineId | undefined}
             departureTime={effectiveDepartureTime}
             arrivalTime={effectiveHero?.arrivalTime}
             rideMinutes={effectiveHero?.predictedMinutes}
-            transferCount={effectiveRouteFacts.transferCount}
-            stationCount={effectiveRouteFacts.stationCount}
-            fareKrw={effectiveRouteFacts.fareKrw}
+            transferCount={routeSummary.transferCount}
+            stationCount={routeSummary.stationCount}
+            fareKrw={routeSummary.fareKrw}
             onPressEdit={handleOpenCommuteSettings}
             testID="home-commute-route-card"
           />
@@ -808,7 +631,7 @@ export const HomeScreen: React.FC = () => {
       {/* 7. 실시간 제보 — real activeDelays only. */}
       <View style={styles.section}>
         <SectionHeader title="실시간 제보" subtitle="근처 노선" />
-        {!showCommunitySection ? (
+        {!firstDelay ? (
           <View style={styles.sectionEmpty}>
             <Text style={styles.emptyText}>데이터가 없습니다.</Text>
             <Text style={styles.emptySubtext}>
@@ -818,17 +641,17 @@ export const HomeScreen: React.FC = () => {
         ) : (
           <View style={styles.communityCardWrap}>
             <CommunityDelayCard
-              line={activeDelays[0]!.lineId as LineId}
+              line={firstDelay.lineId as LineId}
               title={`${
-                activeDelays[0]!.lineName ?? `${activeDelays[0]!.lineId}호선`
-              }${activeDelays[0]!.reason ? ` ${activeDelays[0]!.reason}` : ' 지연 발생'}`}
+                firstDelay.lineName ?? `${firstDelay.lineId}호선`
+              }${firstDelay.reason ? ` ${firstDelay.reason}` : ' 지연 발생'}`}
               description={
-                activeDelays[0]!.delayMinutes > 0
-                  ? `약 ${activeDelays[0]!.delayMinutes}분 지연 중`
+                firstDelay.delayMinutes > 0
+                  ? `약 ${firstDelay.delayMinutes}분 지연 중`
                   : undefined
               }
               timestampLabel={
-                formatRelativeKorean(activeDelays[0]!.timestamp) ?? undefined
+                formatRelativeKorean(firstDelay.timestamp) ?? undefined
               }
               onPress={onPressDelayCard}
               testID="home-community-delay-card"

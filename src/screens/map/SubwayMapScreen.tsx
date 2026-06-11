@@ -25,10 +25,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { getSubwayLineColor, getLineTextColor } from '@utils/colorUtils';
 import { LINE_NAMES } from '@utils/transferLabel';
-import {
-  getLocalStationsByLine,
-  findStationCdByNameAndLine,
-} from '@services/data/stationsDataService';
+import { getLocalStationsByLine } from '@services/data/stationsDataService';
 import { LineFavoritePicker } from '@components/map/LineFavoritePicker';
 import { resolveLineFavorites, type FavoriteDiff } from './lineFavoriteResolver';
 import { useFavorites } from '@hooks/useFavorites';
@@ -167,12 +164,10 @@ export const SubwayMapScreen: React.FC = () => {
     async (diff: FavoriteDiff): Promise<void> => {
       if (!selectedStation) return;
       try {
-        for (const lineId of diff.toAdd) {
-          const cd = findStationCdByNameAndLine(selectedStation.name, lineId);
-          if (!cd) continue;
+        for (const { lineId, stationCd } of diff.toAdd) {
           await addFavorite({
             ...selectedStation.originalStation,
-            id: cd,
+            id: stationCd,
             lineId,
           });
         }
@@ -570,23 +565,6 @@ const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
     alignItems: 'flex-end',
     justifyContent: 'center',
     paddingRight: 16,
-  },
-  transferBadgeText: {
-    fontSize: 11,
-    fontWeight: 'bold',
-    fontFamily: weightToFontFamily('bold'),
-  },
-  transferBadgeLarge: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 12,
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  transferBadgeTextLarge: {
-    fontSize: 14,
-    fontWeight: 'bold',
-    fontFamily: weightToFontFamily('bold'),
   },
   modalOverlay: {
     flex: 1,

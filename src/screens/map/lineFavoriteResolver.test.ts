@@ -44,7 +44,11 @@ describe('lineFavoriteResolver', () => {
     it('returns adds for newly selected and removes for deselected', () => {
       // initial favorited: {2}. selected: {5, 경의선} -> add 5,경의선; remove 2
       const diff = computeFavoriteDiff(options, new Set(['5', '경의선']));
-      expect(diff.toAdd).toEqual(['5', '경의선']);
+      // toAdd entries carry the resolved station_cd so consumers don't re-resolve
+      expect(diff.toAdd).toEqual([
+        { lineId: '5', stationCd: '2541', isFavorite: false },
+        { lineId: '경의선', stationCd: '1013', isFavorite: false },
+      ]);
       expect(diff.toRemove).toEqual(['0208']);
     });
 
