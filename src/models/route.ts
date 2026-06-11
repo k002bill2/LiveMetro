@@ -22,19 +22,37 @@ export type Direction = 'up' | 'down';
  * Map a canonical {@link Direction} to a localized display label, given the
  * line context.
  *
- * - Line `'2'` (circular): `'up' → '내선'`, `'down' → '외선'`
+ * - Line `'2'` (circular): `'up' → '내선순환'`, `'down' → '외선순환'`
  * - Other known lines: `'up' → '상행'`, `'down' → '하행'`
  * - Unknown lines: same `'상행' | '하행'` fallback (safe default for the
  *   non-circular Korean subway network).
+ *
+ * Note: this is a line-level fallback — Line 2 branch stations (성수지선,
+ * 신정지선) share lineId '2' but run 상행/하행 service. When a `Train` with
+ * a raw API label is available, prefer `train.directionLabel` (sourced from
+ * `updnLine` via {@link updnLineToDisplay}) over this function.
  *
  * @param direction Canonical direction token
  * @param lineId    Subway line id (e.g. `'1'`, `'2'`)
  */
 export const directionToDisplay = (direction: Direction, lineId: string): string => {
   if (lineId === '2') {
-    return direction === 'up' ? '내선' : '외선';
+    return direction === 'up' ? '내선순환' : '외선순환';
   }
   return direction === 'up' ? '상행' : '하행';
+};
+
+/**
+ * Map a raw Seoul realtime-arrival `updnLine` value to a display label.
+ *
+ * - `'내선' → '내선순환'`, `'외선' → '외선순환'` (Line 2 circular service)
+ * - Everything else (`'상행'`, `'하행'`, already-expanded or unknown values)
+ *   passes through unchanged — the API value is the source of truth.
+ */
+export const updnLineToDisplay = (updnLine: string): string => {
+  if (updnLine === '내선') return '내선순환';
+  if (updnLine === '외선') return '외선순환';
+  return updnLine;
 };
 
 /**
