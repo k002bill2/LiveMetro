@@ -389,8 +389,10 @@ class TrainArrivalAlertService {
   private matchesDirection(updnLine: string | undefined, direction: 'up' | 'down'): boolean {
     if (!updnLine) return true; // No direction info, include all
 
-    const upKeywords = ['상행', '내선', '외선'];
-    const downKeywords = ['하행'];
+    // Line 2 circular: 내선(inner) runs as up, 외선(outer) as down — mirrors
+    // the canonical mapping in seoulSubwayApi.convertToAppTrain.
+    const upKeywords = ['상행', '내선'];
+    const downKeywords = ['하행', '외선'];
 
     if (direction === 'up') {
       return upKeywords.some((kw) => updnLine.includes(kw));

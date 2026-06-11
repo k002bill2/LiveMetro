@@ -258,10 +258,12 @@ class DataManager {
 
         const reportedAt = arrival.recptnDt ? new Date(arrival.recptnDt) : now;
 
+        // Line 2 circular: 내선 runs as up, 외선 as down — mirrors the
+        // canonical mapping in seoulSubwayApi.convertToAppTrain.
         let affectedDirections: ('up' | 'down')[] = [];
-        if (arrival.updnLine === '상행') {
+        if (arrival.updnLine === '상행' || arrival.updnLine === '내선') {
           affectedDirections = ['up'];
-        } else if (arrival.updnLine === '하행') {
+        } else if (arrival.updnLine === '하행' || arrival.updnLine === '외선') {
           affectedDirections = ['down'];
         } else {
           affectedDirections = ['up', 'down'];
