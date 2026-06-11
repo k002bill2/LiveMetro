@@ -8,6 +8,7 @@ import { seoulSubwayApi, SeoulRealtimeArrival } from '../api/seoulSubwayApi';
 import { arrivalService, ArrivalInfo } from '../arrival/arrivalService';
 import { trainService } from '../train/trainService';
 import { Train, Station, TrainDelay, DelaySeverity, TrainStatus, ServiceDisruption } from '../../models/train';
+import { updnLineToDisplay } from '@/models/route';
 import { getLocalStationByName } from './stationsDataService';
 
 interface CachedData<T> {
@@ -258,10 +259,12 @@ class DataManager {
 
         const reportedAt = arrival.recptnDt ? new Date(arrival.recptnDt) : now;
 
+        // Line 2 circular: 내선 runs as up, 외선 as down — mirrors the
+        // canonical mapping in seoulSubwayApi.convertToAppTrain.
         let affectedDirections: ('up' | 'down')[] = [];
-        if (arrival.updnLine === '상행') {
+        if (arrival.updnLine === '상행' || arrival.updnLine === '내선') {
           affectedDirections = ['up'];
-        } else if (arrival.updnLine === '하행') {
+        } else if (arrival.updnLine === '하행' || arrival.updnLine === '외선') {
           affectedDirections = ['down'];
         } else {
           affectedDirections = ['up', 'down'];
@@ -505,6 +508,7 @@ class DataManager {
       nextStationId: null,
       finalDestination: converted.destinationStation || '종착역 미확인',
       direction: converted.direction === 'up' ? 'up' : 'down',
+      directionLabel: updnLineToDisplay(arrival.updnLine),
       arrivalTime: converted.arrivalTime !== null
         ? new Date(Date.now() + converted.arrivalTime * 1000)
         : null,

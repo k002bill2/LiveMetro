@@ -44,6 +44,7 @@ import { setBoardingSelection } from '@/services/train/boardingSelectionStore';
 import { scheduleBoardingAlert } from '@/services/notification/boardingAlertService';
 import { notificationService } from '@/services/notification/notificationService';
 import type { Train } from '@/models/train';
+import { directionToDisplay } from '@/models/route';
 
 type TrainSelectionRouteProp = RouteProp<AppStackParamList, 'TrainSelection'>;
 type TrainSelectionNavProp = NativeStackNavigationProp<AppStackParamList>;
@@ -154,13 +155,22 @@ const TrainSelectionScreen: React.FC = () => {
   // The car shown in the CTA summary: explicit tap wins, else the recommendation.
   const effectiveCar = selectedCar ?? recommendedCar;
 
+  // Direction labels: prefer the raw API label carried on the train (handles
+  // Line 2 circular 내선순환/외선순환 vs its 상행/하행 branch services), fall
+  // back to the line-level mapping when no train is present.
   const upLabel = useMemo(
-    () => `상행${trainsByDirection.up[0] ? ` · ${trainsByDirection.up[0].finalDestination}` : ''}`,
-    [trainsByDirection.up]
+    () =>
+      `${trainsByDirection.up[0]?.directionLabel ?? directionToDisplay('up', lineId)}${
+        trainsByDirection.up[0] ? ` · ${trainsByDirection.up[0].finalDestination}` : ''
+      }`,
+    [trainsByDirection.up, lineId]
   );
   const downLabel = useMemo(
-    () => `하행${trainsByDirection.down[0] ? ` · ${trainsByDirection.down[0].finalDestination}` : ''}`,
-    [trainsByDirection.down]
+    () =>
+      `${trainsByDirection.down[0]?.directionLabel ?? directionToDisplay('down', lineId)}${
+        trainsByDirection.down[0] ? ` · ${trainsByDirection.down[0].finalDestination}` : ''
+      }`,
+    [trainsByDirection.down, lineId]
   );
 
   const handleDirectionChange = useCallback((next: 'up' | 'down') => {

@@ -54,6 +54,7 @@ import {
   boardingSelectionMatches,
 } from '@/services/train/boardingSelectionStore';
 import type { Station, Train } from '@/models/train';
+import { directionToDisplay } from '@/models/route';
 import type { LineId } from '@/components/design';
 import { mapCacheService, type CachedStation } from '@/services/map/mapCacheService';
 
@@ -294,13 +295,22 @@ const StationDetailScreen: React.FC = () => {
     return [lineId as LineId];
   }, [stationMeta, lineId]);
 
+  // Direction labels: prefer the raw API label carried on the train (handles
+  // Line 2 circular 내선순환/외선순환 vs its 상행/하행 branch services), fall
+  // back to the line-level mapping when no train is present.
   const upLabel = useMemo(
-    () => `상행${trainsByDirection.up[0] ? ` (${trainsByDirection.up[0].finalDestination})` : ''}`,
-    [trainsByDirection.up]
+    () =>
+      `${trainsByDirection.up[0]?.directionLabel ?? directionToDisplay('up', lineId)}${
+        trainsByDirection.up[0] ? ` (${trainsByDirection.up[0].finalDestination})` : ''
+      }`,
+    [trainsByDirection.up, lineId]
   );
   const downLabel = useMemo(
-    () => `하행${trainsByDirection.down[0] ? ` (${trainsByDirection.down[0].finalDestination})` : ''}`,
-    [trainsByDirection.down]
+    () =>
+      `${trainsByDirection.down[0]?.directionLabel ?? directionToDisplay('down', lineId)}${
+        trainsByDirection.down[0] ? ` (${trainsByDirection.down[0].finalDestination})` : ''
+      }`,
+    [trainsByDirection.down, lineId]
   );
 
   const stationLike: Station = useMemo(
@@ -328,6 +338,13 @@ const StationDetailScreen: React.FC = () => {
       lineId,
     });
   }, [navigation, stationId, stationName, lineId]);
+
+  const handleOpenTrainPosition = useCallback(() => {
+    navigation.navigate('TrainPosition', {
+      lineId,
+      focusStationId: stationId || undefined,
+    });
+  }, [navigation, stationId, lineId]);
 
   const handleShare = useCallback(async () => {
     try {
@@ -444,6 +461,20 @@ const StationDetailScreen: React.FC = () => {
             >
               <Text style={styles.trainSelectText}>탑승 열차 선택</Text>
             </TouchableOpacity>
+            {/* 실시간 열차 위치 — 노선 전체 타임라인 화면 진입. */}
+            <TouchableOpacity
+              testID="station-detail-train-position"
+              onPress={handleOpenTrainPosition}
+              style={[styles.trainPositionButton, { borderColor: semantic.primaryNormal }]}
+              accessible
+              accessibilityRole="button"
+              accessibilityLabel="실시간 열차 위치 보기"
+              accessibilityHint="노선 전체에서 운행 중인 열차의 현재 위치를 보여줍니다"
+            >
+              <Text style={[styles.trainPositionText, { color: semantic.primaryNormal }]}>
+                열차 위치 보기
+              </Text>
+            </TouchableOpacity>
             {arrivalViews.map((arrival, idx) => (
               <ArrivalCard
                 key={arrival.id}
@@ -516,6 +547,20 @@ const styles = StyleSheet.create({
   },
   trainSelectText: {
     color: '#FFFFFF',
+    fontSize: WANTED_TOKENS.type.label1.size,
+    lineHeight: WANTED_TOKENS.type.label1.lh,
+    fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
+  },
+  trainPositionButton: {
+    paddingVertical: WANTED_TOKENS.spacing.s3,
+    borderRadius: WANTED_TOKENS.radius.r6,
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: WANTED_TOKENS.spacing.s1,
+  },
+  trainPositionText: {
     fontSize: WANTED_TOKENS.type.label1.size,
     lineHeight: WANTED_TOKENS.type.label1.lh,
     fontWeight: '700',

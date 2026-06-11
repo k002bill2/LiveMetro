@@ -96,11 +96,13 @@ const buildTrain = (
     direction: 'up' | 'down';
     lineId: string;
     trainType: 'normal' | 'express' | 'rapid';
+    directionLabel: string;
   }> = {}
 ) => ({
   id: overrides.id ?? 't1',
   lineId: overrides.lineId ?? '2',
   direction: overrides.direction ?? 'up',
+  ...(overrides.directionLabel ? { directionLabel: overrides.directionLabel } : {}),
   currentStationId: 'X',
   nextStationId: 'Y',
   finalDestination: overrides.finalDestination ?? '잠실',
@@ -171,6 +173,34 @@ describe('TrainSelectionScreen', () => {
   it('shows the empty state when no trains run in the selected direction', () => {
     const { getByTestId } = render(<TrainSelectionScreen />);
     expect(getByTestId('train-selection-empty')).toBeTruthy();
+  });
+
+  // 2호선 순환선 방면 라벨: train.directionLabel(API 원본) 우선,
+  // 없으면 directionToDisplay(lineId) fallback.
+  describe('direction segment labels (Line 2 circular)', () => {
+    it('shows raw API labels 내선순환/외선순환 when trains carry directionLabel', () => {
+      mockedUseRealtimeTrains.mockReturnValue(
+        okState([
+          buildTrain({ id: 'u1', finalDestination: '성수', direction: 'up', directionLabel: '내선순환' }),
+          buildTrain({ id: 'd1', finalDestination: '성수', direction: 'down', directionLabel: '외선순환' }),
+        ])
+      );
+      const { getByText } = render(<TrainSelectionScreen />);
+      expect(getByText('내선순환 · 성수')).toBeTruthy();
+      expect(getByText('외선순환 · 성수')).toBeTruthy();
+    });
+
+    it('falls back to line-level 내선순환/외선순환 labels when directionLabel is absent', () => {
+      mockedUseRealtimeTrains.mockReturnValue(
+        okState([
+          buildTrain({ id: 'u1', finalDestination: '잠실', direction: 'up' }),
+          buildTrain({ id: 'd1', finalDestination: '서울대입구', direction: 'down' }),
+        ])
+      );
+      const { getByText } = render(<TrainSelectionScreen />);
+      expect(getByText('내선순환 · 잠실')).toBeTruthy();
+      expect(getByText('외선순환 · 서울대입구')).toBeTruthy();
+    });
   });
 
   it('lists only up-direction trains by default and switches with the segment', () => {

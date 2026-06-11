@@ -303,6 +303,45 @@ describe('TrainArrivalAlertService', () => {
 
       expect(statuses).toEqual([]);
     });
+
+    describe('Line 2 circular direction filtering (내선/외선)', () => {
+      const circularArrivals = [
+        {
+          subwayId: '2',
+          updnLine: '내선',
+          arvlMsg2: '3분 후 도착',
+          btrainNo: '2438',
+          bstatnNm: '성수',
+        },
+        {
+          subwayId: '2',
+          updnLine: '외선',
+          arvlMsg2: '5분 후 도착',
+          btrainNo: '2445',
+          bstatnNm: '성수',
+        },
+      ];
+
+      it('matches 내선 trains to up direction only', async () => {
+        mockSeoulSubwayApi.getRealtimeArrival.mockResolvedValue(circularArrivals);
+
+        const statuses = await trainArrivalAlertService.getTrainArrivalStatus('시청', '2', 'up');
+
+        expect(statuses.length).toBe(1);
+        expect(statuses[0]?.trainNumber).toBe('2438');
+        expect(statuses[0]?.direction).toBe('up');
+      });
+
+      it('matches 외선 trains to down direction (regression: 외선 was in up keywords)', async () => {
+        mockSeoulSubwayApi.getRealtimeArrival.mockResolvedValue(circularArrivals);
+
+        const statuses = await trainArrivalAlertService.getTrainArrivalStatus('시청', '2', 'down');
+
+        expect(statuses.length).toBe(1);
+        expect(statuses[0]?.trainNumber).toBe('2445');
+        expect(statuses[0]?.direction).toBe('down');
+      });
+    });
   });
 
   describe('calculateOptimalTrain', () => {

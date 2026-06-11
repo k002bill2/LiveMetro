@@ -37,6 +37,7 @@ import { OnboardingNavigator } from './OnboardingNavigator';
 import StationNavigatorScreen from '../screens/station/StationNavigatorScreen';
 import StationDetailScreen from '../screens/station/StationDetailScreen';
 import TrainSelectionScreen from '../screens/station/TrainSelectionScreen';
+import TrainPositionScreen from '../screens/station/TrainPositionScreen';
 import { DelayCertificateScreen } from '../screens/delays/DelayCertificateScreen';
 import { DelayFeedScreen } from '../screens/delays/DelayFeedScreen';
 import { ReportDetailScreenAdapter } from '../screens/delays/ReportDetailScreenAdapter';
@@ -82,6 +83,12 @@ export type RootStackParamList = {
     stationId: string;
     stationName: string;
     lineId: string;
+  };
+  // 실시간 열차 위치 — 노선 전체 타임라인. focusStationId는 진입한 역으로
+  // 초기 스크롤/지선 선택을 맞추는 데 사용 (lines.json station id).
+  TrainPosition: {
+    lineId: string;
+    focusStationId?: string;
   };
   DelayCertificate: undefined;
   DelayFeed: {
@@ -318,6 +325,14 @@ const RootNavigatorContent: React.FC = () => {
         options={{
           headerShown: true,
           title: '탑승 열차 선택',
+        }}
+      />
+      <Stack.Screen
+        name="TrainPosition"
+        component={TrainPositionScreen}
+        options={{
+          headerShown: true,
+          title: '실시간 열차 위치',
         }}
       />
       <Stack.Screen

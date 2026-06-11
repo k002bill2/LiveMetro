@@ -251,6 +251,150 @@ describe('SeoulSubwayApiService', () => {
     });
   });
 
+  describe('getRealtimePosition', () => {
+    const buildPositionRow = (overrides: Partial<Record<string, string>> = {}) => ({
+      subwayId: '1002',
+      subwayNm: '2호선',
+      statnId: '0205',
+      statnNm: '동대문역사문화공원',
+      trainNo: '2445',
+      recptnDt: '2024-01-01 12:00:00',
+      updnLine: '1',
+      statnTid: '0211',
+      statnTnm: '성수',
+      trainSttus: '1',
+      directAt: '0',
+      lstcarAt: '0',
+      ...overrides,
+    });
+
+    it('should return position rows on successful API call', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ realtimePositionList: [buildPositionRow()] }),
+      });
+
+      const result = await seoulSubwayApi.getRealtimePosition('2호선');
+
+      expect(result).toHaveLength(1);
+      expect(result[0]?.trainNo).toBe('2445');
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/json/realtimePosition/0/100/'),
+        expect.anything()
+      );
+    });
+
+    it('should return empty array when no position data', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ realtimePositionList: null }),
+      });
+
+      const result = await seoulSubwayApi.getRealtimePosition('2호선');
+
+      expect(result).toEqual([]);
+    });
+
+    it('should treat INFO-200 (no running trains) as empty data, not an error', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          errorMessage: { status: 500, code: 'INFO-200', message: '해당하는 데이터가 없습니다.' },
+        }),
+      });
+
+      const result = await seoulSubwayApi.getRealtimePosition('2호선');
+
+      expect(result).toEqual([]);
+    });
+
+    it('should throw SeoulApiError on top-level error shape preserving errorCode', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({ status: 500, code: 'ERROR-300', message: '필수 값 누락' }),
+      });
+
+      try {
+        await seoulSubwayApi.getRealtimePosition('2호선');
+        throw new Error('expected SeoulApiError');
+      } catch (error) {
+        expect(error).toBeInstanceOf(SeoulApiError);
+        expect((error as InstanceType<typeof SeoulApiError>).errorCode).toBe('ERROR-300');
+      }
+    });
+
+    it('should deduplicate concurrent requests for the same line', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve({ realtimePositionList: [buildPositionRow()] }),
+      });
+
+      const [a, b] = await Promise.all([
+        seoulSubwayApi.getRealtimePosition('2호선'),
+        seoulSubwayApi.getRealtimePosition('2호선'),
+      ]);
+
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(a).toEqual(b);
+    });
+  });
+
+  describe('convertToTrainPosition', () => {
+    const baseRow = {
+      subwayId: '1002',
+      subwayNm: '2호선',
+      statnId: '0205',
+      statnNm: '동대문역사문화공원',
+      trainNo: '2445',
+      recptnDt: '2024-01-01 12:00:00',
+      updnLine: '1',
+      statnTid: '0211',
+      statnTnm: '성수역',
+      trainSttus: '1',
+      directAt: '1',
+      lstcarAt: '1',
+    };
+
+    it('maps position code 0 → up and 1 → down (NOT Korean words)', () => {
+      expect(seoulSubwayApi.convertToTrainPosition({ ...baseRow, updnLine: '0' }).direction).toBe('up');
+      expect(seoulSubwayApi.convertToTrainPosition({ ...baseRow, updnLine: '1' }).direction).toBe('down');
+    });
+
+    it('maps trainSttus codes to status enum', () => {
+      expect(seoulSubwayApi.convertToTrainPosition({ ...baseRow, trainSttus: '0' }).status).toBe('entering');
+      expect(seoulSubwayApi.convertToTrainPosition({ ...baseRow, trainSttus: '1' }).status).toBe('arrived');
+      expect(seoulSubwayApi.convertToTrainPosition({ ...baseRow, trainSttus: '2' }).status).toBe('departed');
+      expect(seoulSubwayApi.convertToTrainPosition({ ...baseRow, trainSttus: '3' }).status).toBe('departed_prev');
+      expect(seoulSubwayApi.convertToTrainPosition({ ...baseRow, trainSttus: '99' }).status).toBe('unknown');
+    });
+
+    it('normalizes station names and maps express/last-train flags', () => {
+      const pos = seoulSubwayApi.convertToTrainPosition(baseRow);
+      expect(pos.stationName).toBe('동대문역사문화공원');
+      expect(pos.terminalName).toBe('성수'); // 역 suffix stripped
+      expect(pos.isExpress).toBe(true);
+      expect(pos.isLastTrain).toBe(true);
+      expect(pos.receivedAt).not.toBeNull();
+    });
+
+    it('handles missing/empty fields defensively', () => {
+      const pos = seoulSubwayApi.convertToTrainPosition({
+        ...baseRow,
+        trainNo: '',
+        statnNm: '',
+        statnTnm: '',
+        directAt: '',
+        lstcarAt: '',
+        recptnDt: '',
+      });
+      expect(pos.trainNo).toBe('');
+      expect(pos.stationName).toBe('');
+      expect(pos.isExpress).toBe(false);
+      expect(pos.isLastTrain).toBe(false);
+      expect(pos.receivedAt).toBeNull();
+    });
+  });
+
   describe('getStationsByLine', () => {
     it('should return stations for a line on success', async () => {
       const mockData = {

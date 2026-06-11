@@ -84,6 +84,35 @@ describe('DataManager', () => {
         expect(mockSeoulApi.getRealtimeArrival).toHaveBeenCalled();
       });
 
+      it('should carry raw updnLine onto Train.directionLabel (내선 → 내선순환)', async () => {
+        const mockSeoulResponse = [
+          {
+            statnNm: '시청',
+            trainLineNm: '2호선',
+            arvlMsg2: '2분 후 도착',
+            btrainSttus: '일반',
+            btrainNo: '2438',
+            statnId: '0201',
+            updnLine: '내선',
+          },
+          {
+            statnNm: '시청',
+            trainLineNm: '2호선',
+            arvlMsg2: '4분 후 도착',
+            btrainSttus: '일반',
+            btrainNo: '2445',
+            statnId: '0201',
+            updnLine: '외선',
+          },
+        ] as never;
+        mockSeoulApi.getRealtimeArrival.mockResolvedValue(mockSeoulResponse);
+
+        const result = await dataManager.getRealtimeTrains('시청');
+
+        expect(result?.trains[0]?.directionLabel).toBe('내선순환');
+        expect(result?.trains[1]?.directionLabel).toBe('외선순환');
+      });
+
       it('should invalidate cache after TTL expires', async () => {
         mockSeoulApi.getRealtimeArrival.mockResolvedValue(mockTrains as never);
         jest.useFakeTimers();
@@ -574,6 +603,86 @@ describe('DataManager', () => {
 
       expect(disruptions.length).toBe(1);
       expect(disruptions[0]?.status).toBe('emergency');
+    });
+
+    it('should map 상행 disruption to up direction only', async () => {
+      const mockArrival = {
+        statnNm: '강남',
+        trainLineNm: '2호선',
+        arvlMsg2: '운행중단',
+        arvlMsg3: '',
+        btrainSttus: '',
+        subwayId: '1002',
+        updnLine: '상행',
+        recptnDt: '2024-01-01 12:00:00',
+        statnId: '0222',
+      };
+
+      mockSeoulApi.getRealtimeArrival.mockResolvedValue([mockArrival] as never);
+
+      const disruptions = await dataManager.detectServiceDisruptions('강남');
+
+      expect(disruptions[0]?.affectedDirections).toEqual(['up']);
+    });
+
+    it('should map 내선 disruption to up direction (Line 2 circular)', async () => {
+      const mockArrival = {
+        statnNm: '시청',
+        trainLineNm: '2호선',
+        arvlMsg2: '운행중단',
+        arvlMsg3: '',
+        btrainSttus: '',
+        subwayId: '1002',
+        updnLine: '내선',
+        recptnDt: '2024-01-01 12:00:00',
+        statnId: '0201',
+      };
+
+      mockSeoulApi.getRealtimeArrival.mockResolvedValue([mockArrival] as never);
+
+      const disruptions = await dataManager.detectServiceDisruptions('시청');
+
+      expect(disruptions[0]?.affectedDirections).toEqual(['up']);
+    });
+
+    it('should map 외선 disruption to down direction (Line 2 circular)', async () => {
+      const mockArrival = {
+        statnNm: '시청',
+        trainLineNm: '2호선',
+        arvlMsg2: '장애 발생',
+        arvlMsg3: '',
+        btrainSttus: '',
+        subwayId: '1002',
+        updnLine: '외선',
+        recptnDt: '2024-01-01 12:00:00',
+        statnId: '0201',
+      };
+
+      mockSeoulApi.getRealtimeArrival.mockResolvedValue([mockArrival] as never);
+
+      const disruptions = await dataManager.detectServiceDisruptions('시청');
+
+      expect(disruptions[0]?.affectedDirections).toEqual(['down']);
+    });
+
+    it('should affect both directions when updnLine is missing', async () => {
+      const mockArrival = {
+        statnNm: '강남',
+        trainLineNm: '2호선',
+        arvlMsg2: '운행중단',
+        arvlMsg3: '',
+        btrainSttus: '',
+        subwayId: '1002',
+        updnLine: '',
+        recptnDt: '2024-01-01 12:00:00',
+        statnId: '0222',
+      };
+
+      mockSeoulApi.getRealtimeArrival.mockResolvedValue([mockArrival] as never);
+
+      const disruptions = await dataManager.detectServiceDisruptions('강남');
+
+      expect(disruptions[0]?.affectedDirections).toEqual(['up', 'down']);
     });
 
     it('should return empty array for normal arrivals', async () => {

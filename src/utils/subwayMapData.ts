@@ -124,6 +124,76 @@ export const isRoutableStation = (stationId: string): boolean =>
 export const lineStationSet = (lineId: string): ReadonlySet<string> =>
   new Set(LINE_STATIONS[lineId]?.flat() ?? []);
 
+// ============================================================================
+// Line branches (실시간 열차 위치 화면용)
+// ============================================================================
+
+/**
+ * One service branch of a line — a single monotone subarray of
+ * {@link LINE_STATIONS}. Line 2 has three (순환 본선, 성수지선, 신정지선);
+ * most lines have one.
+ */
+export interface LineBranch {
+  readonly key: string;
+  readonly label: string;
+  readonly stationIds: readonly string[];
+  readonly isLoop: boolean;
+}
+
+const stationDisplayName = (stationId: string): string =>
+  STATIONS[stationId]?.name ?? stationId;
+
+/**
+ * Service branches of a line, derived from lines.json subarray structure.
+ *
+ * - Line 2 subarray 0 is the circular trunk → fixed label '순환선',
+ *   `isLoop: true` (the loop closure 충정로↔시청 lives in routeService, the
+ *   array itself is open-ended).
+ * - Every other subarray is labeled `첫역–끝역` from station names.
+ * - Lines with a single subarray return one branch — UI hides the chip row
+ *   when `length <= 1`.
+ */
+export const getLineBranches = (lineId: string): LineBranch[] => {
+  const subarrays = LINE_STATIONS[lineId] ?? [];
+  return subarrays.map((stationIds, index) => {
+    const isLoop = lineId === '2' && index === 0;
+    const first = stationIds[0];
+    const last = stationIds[stationIds.length - 1];
+    const label =
+      isLoop || !first || !last
+        ? '순환선'
+        : `${stationDisplayName(first)}–${stationDisplayName(last)}`;
+    return {
+      key: `${lineId}-${index}`,
+      label,
+      stationIds,
+      isLoop,
+    };
+  });
+};
+
+/** Normalize a station name for cross-source joins (역 suffix + whitespace). */
+const normalizeStationKey = (name: string): string =>
+  name.trim().replace(/역$/, '');
+
+/**
+ * Build a normalized station-name → stationId map for one branch, used to
+ * join Seoul API rows (`statnNm`) onto lines.json station ids. Both sides
+ * go through {@link normalizeStationKey}, so '강남' and '강남역' meet.
+ */
+export const buildStationNameToIdMap = (
+  stationIds: readonly string[]
+): ReadonlyMap<string, string> => {
+  const map = new Map<string, string>();
+  for (const id of stationIds) {
+    const name = STATIONS[id]?.name;
+    if (name) {
+      map.set(normalizeStationKey(name), id);
+    }
+  }
+  return map;
+};
+
 /**
  * Search stations in the routing graph by Korean or English name.
  *
