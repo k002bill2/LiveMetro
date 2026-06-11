@@ -17,7 +17,7 @@
  *    why they're already toggled on.
  *  - "완료 ({n})" CTA — disabled when n=0. Tap →
  *      saveCommuteRoutes(uid, route, route)  // single-route bridge
- *      Promise.all(favoritesService.addFavorite(...))
+ *      addFavorite(...) per selection        // via FavoritesContext (SSOT)
  *      onComplete()
  */
 import React, { useCallback, useMemo, useState } from 'react';
@@ -43,7 +43,7 @@ import { Pill } from '@/components/design/Pill';
 import { useOnboardingCallbacks } from '@/navigation/OnboardingNavigator';
 import { OnboardingStackParamList } from '@/navigation/types';
 import { saveCommuteRoutes } from '@/services/commute/commuteService';
-import { favoritesService } from '@/services/favorites/favoritesService';
+import { useFavorites } from '@/hooks/useFavorites';
 import { CommuteRoute } from '@/models/commute';
 import type { OnboardingRouteData } from '@/navigation/types';
 import { Station } from '@/models/train';
@@ -112,6 +112,7 @@ export const FavoritesOnboardingScreen: React.FC<Props> = ({ navigation, route }
   const { isDark } = useTheme();
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
   const { user } = useAuth();
+  const { addFavorite } = useFavorites();
   const { onComplete, onSkip } = useOnboardingCallbacks();
 
   // Annotate recommendations with the user's route stations as pre-selections.
@@ -196,26 +197,26 @@ export const FavoritesOnboardingScreen: React.FC<Props> = ({ navigation, route }
         return;
       }
 
-      // 2. Add each selected station as a favorite. Failures are logged but
-      //    don't block onComplete — partial favorites are recoverable
-      //    later from the Favorites screen.
+      // 2. Add each selected station as a favorite — through FavoritesContext,
+      //    never favoritesService directly: the context only reloads on its
+      //    own mutations, so a bypassed write leaves every screen showing an
+      //    empty list until the next in-context mutation. Sequential on
+      //    purpose: each context add triggers a full reload, and parallel
+      //    reloads can race a not-yet-written sibling add out of the final
+      //    state. Failures are logged but don't block onComplete — partial
+      //    favorites are recoverable later from the Favorites screen.
       const selected = annotated.filter((r) => selectedIds.has(r.id));
-      await Promise.all(
-        selected.map((s) =>
-          favoritesService
-            .addFavorite({
-              userId: uid,
-              station: toStationModel(s),
-              isCommuteStation:
-                s.id === route.params.route.departureStation.stationId ||
-                s.id === route.params.route.arrivalStation.stationId,
-            })
-            .catch((err) => {
-              console.error('Add favorite failed for', s.id, err);
-              return null;
-            }),
-        ),
-      );
+      for (const s of selected) {
+        try {
+          await addFavorite(toStationModel(s), {
+            isCommuteStation:
+              s.id === route.params.route.departureStation.stationId ||
+              s.id === route.params.route.arrivalStation.stationId,
+          });
+        } catch (err) {
+          console.error('Add favorite failed for', s.id, err);
+        }
+      }
 
       // 3. Signal onboarding completion → RootNavigator routes to Main.
       await onComplete();
@@ -232,6 +233,7 @@ export const FavoritesOnboardingScreen: React.FC<Props> = ({ navigation, route }
     route.params.notifications,
     annotated,
     selectedIds,
+    addFavorite,
     onComplete,
   ]);
 
