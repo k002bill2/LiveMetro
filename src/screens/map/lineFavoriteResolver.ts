@@ -12,8 +12,10 @@ export interface LineFavoriteOption {
 }
 
 export interface FavoriteDiff {
-  readonly toAdd: string[]; // lineIds to add
-  readonly toRemove: string[]; // station_cds to remove
+  /** Newly selected lines — each entry carries the station_cd it resolved
+   *  to, so consumers never need to re-resolve name+line → cd. */
+  readonly toAdd: readonly LineFavoriteOption[];
+  readonly toRemove: readonly string[]; // station_cds to remove
 }
 
 /**
@@ -42,11 +44,11 @@ export const computeFavoriteDiff = (
   options: readonly LineFavoriteOption[],
   selectedLineIds: ReadonlySet<string>,
 ): FavoriteDiff => {
-  const toAdd: string[] = [];
+  const toAdd: LineFavoriteOption[] = [];
   const toRemove: string[] = [];
   for (const opt of options) {
     const nowSelected = selectedLineIds.has(opt.lineId);
-    if (nowSelected && !opt.isFavorite) toAdd.push(opt.lineId);
+    if (nowSelected && !opt.isFavorite) toAdd.push(opt);
     if (!nowSelected && opt.isFavorite) toRemove.push(opt.stationCd);
   }
   return { toAdd, toRemove };

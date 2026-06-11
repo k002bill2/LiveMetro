@@ -10,6 +10,7 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   useRef,
 } from 'react';
 import {
@@ -114,7 +115,6 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const { migrated, hasChanges } = migrateFavoritesToNewFormat(favorites);
 
         if (hasChanges) {
-          console.log('📦 Migrating favorites to new station_cd format...');
           // Update Firebase with migrated data
           await favoritesService.reorderFavorites(user.id, migrated);
           favorites = migrated;
@@ -163,6 +163,51 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }, [user]);
 
   /**
+   * Shared mutation pipeline: require auth, run the service call, then
+   * reload favorites so every consumer sees the new state. Errors are
+   * logged with the given label and rethrown for the caller's UI.
+   * A task may return `false` to skip the reload (no-op mutation).
+   */
+  const runMutation = useCallback(
+    async (
+      label: string,
+      task: (userId: string) => Promise<boolean | void>,
+    ): Promise<void> => {
+      if (!user) {
+        throw new Error('로그인이 필요합니다.');
+      }
+      try {
+        const changed = await task(user.id);
+        if (changed !== false) {
+          await loadFavorites();
+        }
+      } catch (error) {
+        console.error(`Error ${label}:`, error);
+        throw error;
+      }
+    },
+    [user, loadFavorites],
+  );
+
+  /**
+   * Lock key for a favoriteId-addressed mutation. Resolves the stationId
+   * from cache so the key matches the one used by addFavorite/
+   * removeFavoriteByStationId — without this, a UI that races
+   * removeFavorite(favoriteId) against removeFavoriteByStationId (or
+   * toggleFavorite) for the same record would slip through both guards
+   * under different namespaces. Falls back to favoriteId when the cache
+   * hasn't loaded yet (acceptable: the only caller paths that hit that
+   * branch don't cross the toggle path).
+   */
+  const resolveLockKey = useCallback(
+    (favoriteId: string): string => {
+      const cached = state.favorites.find((f) => f.id === favoriteId);
+      return cached ? `station:${cached.stationId}` : `favorite:${favoriteId}`;
+    },
+    [state.favorites],
+  );
+
+  /**
    * Add a station to favorites
    */
   const addFavorite = useCallback(
@@ -173,87 +218,49 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         direction?: 'up' | 'down' | 'both';
         isCommuteStation?: boolean;
       }
-    ): Promise<void> => {
-      if (!user) {
-        throw new Error('로그인이 필요합니다.');
-      }
-
-      await runExclusive(`station:${station.id}`, async () => {
-        try {
+    ): Promise<void> =>
+      runExclusive(`station:${station.id}`, () =>
+        runMutation('adding favorite', async (userId) => {
           const params: AddFavoriteParams = {
-            userId: user.id,
+            userId,
             station,
             alias: options?.alias,
             direction: options?.direction,
             isCommuteStation: options?.isCommuteStation,
           };
-
           await favoritesService.addFavorite(params);
-          await loadFavorites();
-        } catch (error) {
-          console.error('Error adding favorite:', error);
-          throw error;
-        }
-      });
-    },
-    [user, loadFavorites, runExclusive]
+        }),
+      ),
+    [runExclusive, runMutation]
   );
 
   /**
    * Remove a station from favorites
    */
   const removeFavorite = useCallback(
-    async (favoriteId: string): Promise<void> => {
-      if (!user) {
-        throw new Error('로그인이 필요합니다.');
-      }
-
-      // Resolve stationId from cache so this lock key matches the one used
-      // by addFavorite/removeFavoriteByStationId. Without this, a UI that
-      // races removeFavorite(favoriteId) against removeFavoriteByStationId
-      // (or toggleFavorite) for the same record would slip through both
-      // guards under different namespaces. Falls back to favoriteId when
-      // the cache hasn't loaded yet (acceptable: the only caller paths
-      // that hit that branch don't cross the toggle path).
-      const cached = state.favorites.find((f) => f.id === favoriteId);
-      const lockKey = cached ? `station:${cached.stationId}` : `favorite:${favoriteId}`;
-
-      await runExclusive(lockKey, async () => {
-        try {
-          await favoritesService.removeFavorite(user.id, favoriteId);
-          await loadFavorites();
-        } catch (error) {
-          console.error('Error removing favorite:', error);
-          throw error;
-        }
-      });
-    },
-    [user, loadFavorites, runExclusive, state.favorites]
+    async (favoriteId: string): Promise<void> =>
+      runExclusive(resolveLockKey(favoriteId), () =>
+        runMutation('removing favorite', async (userId) => {
+          await favoritesService.removeFavorite(userId, favoriteId);
+        }),
+      ),
+    [runExclusive, runMutation, resolveLockKey]
   );
 
   /**
    * Remove favorite by station ID
    */
   const removeFavoriteByStationId = useCallback(
-    async (stationId: string): Promise<void> => {
-      if (!user) {
-        throw new Error('로그인이 필요합니다.');
-      }
-
-      await runExclusive(`station:${stationId}`, async () => {
-        try {
-          const favorite = await favoritesService.getFavoriteByStationId(user.id, stationId);
-          if (favorite) {
-            await favoritesService.removeFavorite(user.id, favorite.id);
-            await loadFavorites();
-          }
-        } catch (error) {
-          console.error('Error removing favorite:', error);
-          throw error;
-        }
-      });
-    },
-    [user, loadFavorites, runExclusive]
+    async (stationId: string): Promise<void> =>
+      runExclusive(`station:${stationId}`, () =>
+        runMutation('removing favorite', async (userId) => {
+          const favorite = await favoritesService.getFavoriteByStationId(userId, stationId);
+          if (!favorite) return false; // nothing to remove — skip the reload
+          await favoritesService.removeFavorite(userId, favorite.id);
+          return true;
+        }),
+      ),
+    [runExclusive, runMutation]
   );
 
   /**
@@ -267,24 +274,15 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         direction?: 'up' | 'down' | 'both';
         isCommuteStation?: boolean;
       }
-    ): Promise<void> => {
-      if (!user) {
-        throw new Error('로그인이 필요합니다.');
-      }
-
-      try {
+    ): Promise<void> =>
+      runMutation('updating favorite', async (userId) => {
         await favoritesService.updateFavorite({
-          userId: user.id,
+          userId,
           favoriteId,
           ...updates,
         });
-        await loadFavorites();
-      } catch (error) {
-        console.error('Error updating favorite:', error);
-        throw error;
-      }
-    },
-    [user, loadFavorites]
+      }),
+    [runMutation]
   );
 
   /**
@@ -293,27 +291,13 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
    * cannot race the same record's removal.
    */
   const setNotificationEnabled = useCallback(
-    async (favoriteId: string, enabled: boolean): Promise<void> => {
-      if (!user) {
-        throw new Error('로그인이 필요합니다.');
-      }
-
-      const cached = state.favorites.find((f) => f.id === favoriteId);
-      const lockKey = cached
-        ? `station:${cached.stationId}`
-        : `favorite:${favoriteId}`;
-
-      await runExclusive(lockKey, async () => {
-        try {
-          await favoritesService.setNotificationEnabled(user.id, favoriteId, enabled);
-          await loadFavorites();
-        } catch (error) {
-          console.error('Error toggling favorite notification:', error);
-          throw error;
-        }
-      });
-    },
-    [user, loadFavorites, runExclusive, state.favorites],
+    async (favoriteId: string, enabled: boolean): Promise<void> =>
+      runExclusive(resolveLockKey(favoriteId), () =>
+        runMutation('toggling favorite notification', async (userId) => {
+          await favoritesService.setNotificationEnabled(userId, favoriteId, enabled);
+        }),
+      ),
+    [runExclusive, runMutation, resolveLockKey],
   );
 
   /**
@@ -350,20 +334,11 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
    * Reorder favorites
    */
   const reorderFavorites = useCallback(
-    async (reorderedFavorites: FavoriteStation[]): Promise<void> => {
-      if (!user) {
-        throw new Error('로그인이 필요합니다.');
-      }
-
-      try {
-        await favoritesService.reorderFavorites(user.id, reorderedFavorites);
-        await loadFavorites();
-      } catch (error) {
-        console.error('Error reordering favorites:', error);
-        throw error;
-      }
-    },
-    [user, loadFavorites]
+    async (reorderedFavorites: FavoriteStation[]): Promise<void> =>
+      runMutation('reordering favorites', async (userId) => {
+        await favoritesService.reorderFavorites(userId, reorderedFavorites);
+      }),
+    [runMutation]
   );
 
   /**
@@ -378,22 +353,40 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     loadFavorites();
   }, [loadFavorites]);
 
-  const value: FavoritesContextValue = {
-    favorites: state.favorites,
-    favoritesWithDetails: state.favoritesWithDetails,
-    loading: state.loading,
-    error: state.error,
-    addFavorite,
-    removeFavorite,
-    removeFavoriteByStationId,
-    updateFavorite,
-    setNotificationEnabled,
-    isFavorite,
-    toggleFavorite,
-    reorderFavorites,
-    getCommuteStations,
-    refresh: loadFavorites,
-  };
+  // Memoized so a provider re-render without a state change (e.g. a parent
+  // update) doesn't hand every consumer a fresh object reference — Context
+  // re-renders all consumers whenever the value reference changes.
+  const value = useMemo<FavoritesContextValue>(
+    () => ({
+      favorites: state.favorites,
+      favoritesWithDetails: state.favoritesWithDetails,
+      loading: state.loading,
+      error: state.error,
+      addFavorite,
+      removeFavorite,
+      removeFavoriteByStationId,
+      updateFavorite,
+      setNotificationEnabled,
+      isFavorite,
+      toggleFavorite,
+      reorderFavorites,
+      getCommuteStations,
+      refresh: loadFavorites,
+    }),
+    [
+      state,
+      addFavorite,
+      removeFavorite,
+      removeFavoriteByStationId,
+      updateFavorite,
+      setNotificationEnabled,
+      isFavorite,
+      toggleFavorite,
+      reorderFavorites,
+      getCommuteStations,
+      loadFavorites,
+    ],
+  );
 
   return <FavoritesContext.Provider value={value}>{children}</FavoritesContext.Provider>;
 };
