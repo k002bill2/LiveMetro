@@ -10,7 +10,7 @@ const mockGoBack = jest.fn();
 const mockOnComplete = jest.fn(() => Promise.resolve());
 const mockOnSkip = jest.fn();
 const mockSaveCommuteRoutes = jest.fn();
-const mockAddFavorite = jest.fn();
+const mockContextAddFavorite = jest.fn();
 
 jest.mock('@/services/theme/themeContext', () => ({
   useTheme: jest.fn(() => ({ isDark: false })),
@@ -39,10 +39,13 @@ jest.mock('@/services/commute/commuteService', () => ({
   saveCommuteRoutes: (...args: unknown[]) => mockSaveCommuteRoutes(...args),
 }));
 
-jest.mock('@/services/favorites/favoritesService', () => ({
-  favoritesService: {
-    addFavorite: (...args: unknown[]) => mockAddFavorite(...args),
-  },
+// Favorites writes must go through FavoritesContext (app-wide SSOT) — a
+// direct favoritesService call would leave the context state stale until
+// the next context mutation (the "favorites invisible until next add" bug).
+jest.mock('@/hooks/useFavorites', () => ({
+  useFavorites: () => ({
+    addFavorite: (...args: unknown[]) => mockContextAddFavorite(...args),
+  }),
 }));
 
 jest.mock('@/components/design/LineBadge', () => ({
@@ -85,7 +88,7 @@ beforeEach(() => {
   mockOnComplete.mockClear();
   mockOnSkip.mockClear();
   mockSaveCommuteRoutes.mockReset();
-  mockAddFavorite.mockReset();
+  mockContextAddFavorite.mockReset();
 });
 
 describe('FavoritesOnboardingScreen (step 4/4)', () => {
@@ -130,9 +133,9 @@ describe('FavoritesOnboardingScreen (step 4/4)', () => {
     expect(cta.props.accessibilityState?.disabled).toBe(false);
   });
 
-  it('"완료" runs save → addFavorite (per selected) → onComplete', async () => {
+  it('"완료" runs save → context addFavorite (per selected) → onComplete', async () => {
     mockSaveCommuteRoutes.mockResolvedValue({ success: true });
-    mockAddFavorite.mockResolvedValue({ id: 'fav-1' });
+    mockContextAddFavorite.mockResolvedValue(undefined);
 
     const { getByTestId } = render(
       <FavoritesOnboardingScreen navigation={baseNavigation} route={baseRoute} />,
@@ -141,8 +144,36 @@ describe('FavoritesOnboardingScreen (step 4/4)', () => {
 
     await waitFor(() => {
       expect(mockSaveCommuteRoutes).toHaveBeenCalledTimes(1);
-      // 2 pre-selected stations → 2 addFavorite calls
-      expect(mockAddFavorite).toHaveBeenCalledTimes(2);
+      // 2 pre-selected stations → 2 context addFavorite calls
+      expect(mockContextAddFavorite).toHaveBeenCalledTimes(2);
+      expect(mockOnComplete).toHaveBeenCalledTimes(1);
+    });
+
+    // Route stations are commute stations — flag must flow through the
+    // context options (Station object, options) signature.
+    expect(mockContextAddFavorite).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'stn-dep', name: '서울역' }),
+      { isCommuteStation: true },
+    );
+    expect(mockContextAddFavorite).toHaveBeenCalledWith(
+      expect.objectContaining({ id: 'stn-arr', name: '강남' }),
+      { isCommuteStation: true },
+    );
+  });
+
+  it('still calls onComplete when a favorite add fails (partial favorites are recoverable)', async () => {
+    mockSaveCommuteRoutes.mockResolvedValue({ success: true });
+    mockContextAddFavorite
+      .mockRejectedValueOnce(new Error('firestore unavailable'))
+      .mockResolvedValueOnce(undefined);
+
+    const { getByTestId } = render(
+      <FavoritesOnboardingScreen navigation={baseNavigation} route={baseRoute} />,
+    );
+    fireEvent.press(getByTestId('favorites-cta'));
+
+    await waitFor(() => {
+      expect(mockContextAddFavorite).toHaveBeenCalledTimes(2);
       expect(mockOnComplete).toHaveBeenCalledTimes(1);
     });
   });
@@ -158,7 +189,7 @@ describe('FavoritesOnboardingScreen (step 4/4)', () => {
     await waitFor(() => {
       expect(mockSaveCommuteRoutes).toHaveBeenCalledTimes(1);
     });
-    expect(mockAddFavorite).not.toHaveBeenCalled();
+    expect(mockContextAddFavorite).not.toHaveBeenCalled();
     expect(mockOnComplete).not.toHaveBeenCalled();
   });
 });
