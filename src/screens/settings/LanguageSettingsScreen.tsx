@@ -1,9 +1,13 @@
 /**
  * Language Settings Screen
  * Configure app language (Korean / English)
+ *
+ * Wanted handoff (settings-detail-2) — 플래그 + 이름/원어 2줄 + 우측 라디오
+ * 서클 row 패턴. 디자인의 8개국어 목록 중 앱이 실제 지원하는 한국어/영어만
+ * 노출 (시스템 언어 따르기 · 역명 병기 · 제보 자동 번역은 미지원으로 생략).
  */
 
-import React from 'react';
+import React, { useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,7 +16,7 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
-import { CheckCircle } from 'lucide-react-native';
+import { Check } from 'lucide-react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { useI18n, Language } from '@/services/i18n';
@@ -25,13 +29,15 @@ type Props = NativeStackScreenProps<SettingsStackParamList, 'LanguageSettings'>;
 interface LanguageOptionData {
   id: Language;
   flag: string;
-  title: string;
-  subtitle: string;
+  /** 해당 언어 표기 (디자인: name 15/700) */
+  name: string;
+  /** 현재 언어 기준 보조 표기 (디자인: native 11.5/600) */
+  native: string;
 }
 
-const languageOptions: LanguageOptionData[] = [
-  { id: 'ko', flag: '🇰🇷', title: '한국어', subtitle: 'Korean' },
-  { id: 'en', flag: '🇺🇸', title: 'English', subtitle: '영어' },
+const LANGUAGE_OPTIONS: readonly LanguageOptionData[] = [
+  { id: 'ko', flag: '🇰🇷', name: '한국어', native: 'Korean' },
+  { id: 'en', flag: '🇺🇸', name: 'English', native: '영어' },
 ];
 
 export const LanguageSettingsScreen: React.FC<Props> = ({ navigation }) => {
@@ -39,65 +45,59 @@ export const LanguageSettingsScreen: React.FC<Props> = ({ navigation }) => {
   const { isDark } = useTheme();
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
 
-  const handleLanguageChange = async (lang: Language): Promise<void> => {
-    if (lang !== language) {
-      await setLanguage(lang);
-    }
-    navigation.goBack();
-  };
+  const styles = useMemo(() => createStyles(semantic), [semantic]);
 
-  const styles = createStyles(semantic);
-
-  const LanguageOption: React.FC<{
-    flag: string;
-    title: string;
-    subtitle: string;
-    value: Language;
-    isSelected: boolean;
-  }> = ({ flag, title, subtitle, value, isSelected }) => (
-    <TouchableOpacity
-      style={[styles.languageOption, isSelected && styles.languageOptionSelected]}
-      onPress={() => handleLanguageChange(value)}
-    >
-      <View style={styles.languageFlagContainer}>
-        <Text style={styles.languageFlag}>{flag}</Text>
-      </View>
-      <View style={styles.languageContent}>
-        <Text style={[styles.languageTitle, isSelected && styles.selectedText]}>
-          {title}
-        </Text>
-        <Text style={styles.languageSubtitle}>{subtitle}</Text>
-      </View>
-      {isSelected && (
-        <CheckCircle size={24} color={semantic.primaryNormal} strokeWidth={2} />
-      )}
-    </TouchableOpacity>
+  const handleLanguageChange = useCallback(
+    async (lang: Language): Promise<void> => {
+      if (lang !== language) {
+        await setLanguage(lang);
+      }
+      navigation.goBack();
+    },
+    [language, setLanguage, navigation],
   );
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.content}>
         <SettingSection title={t.languageSettings.title}>
-          {languageOptions.map((option) => (
-            <LanguageOption
-              key={option.id}
-              flag={option.flag}
-              title={option.title}
-              subtitle={option.subtitle}
-              value={option.id}
-              isSelected={language === option.id}
-            />
-          ))}
+          {LANGUAGE_OPTIONS.map((option, index) => {
+            const selected = language === option.id;
+            return (
+              <TouchableOpacity
+                key={option.id}
+                style={[
+                  styles.languageRow,
+                  index === LANGUAGE_OPTIONS.length - 1 && styles.languageRowLast,
+                ]}
+                onPress={() => handleLanguageChange(option.id)}
+                accessibilityRole="button"
+                accessibilityLabel={option.name}
+                accessibilityState={{ selected }}
+                testID={`language-${option.id}`}
+              >
+                <Text style={styles.flag}>{option.flag}</Text>
+                <View style={styles.labelColumn}>
+                  <Text style={styles.name}>{option.name}</Text>
+                  <Text style={styles.native}>{option.native}</Text>
+                </View>
+                {selected ? (
+                  <View style={styles.checkCircle}>
+                    <Check size={14} color="#FFFFFF" strokeWidth={3} />
+                  </View>
+                ) : (
+                  <View style={styles.emptyCircle} />
+                )}
+              </TouchableOpacity>
+            );
+          })}
         </SettingSection>
 
-        {/* Info Box */}
-        <View style={styles.infoBox}>
-          <Text style={styles.infoText}>
-            {language === 'ko'
-              ? 'ℹ️ 언어를 변경하면 앱 전체에 즉시 적용됩니다.'
-              : 'ℹ️ Language changes will be applied immediately throughout the app.'}
-          </Text>
-        </View>
+        <Text style={styles.footerCaption}>
+          {language === 'ko'
+            ? '언어를 변경하면 앱 전체에 즉시 적용됩니다.'
+            : 'Language changes will be applied immediately throughout the app.'}
+        </Text>
       </ScrollView>
     </SafeAreaView>
   );
@@ -112,65 +112,62 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     content: {
       flex: 1,
     },
-    languageOption: {
+    languageRow: {
       flexDirection: 'row',
       alignItems: 'center',
+      gap: 14,
+      paddingVertical: 14,
       paddingHorizontal: WANTED_TOKENS.spacing.s4,
-      paddingVertical: WANTED_TOKENS.spacing.s4,
       borderBottomWidth: 1,
-      borderBottomColor: semantic.lineSubtle,
-      borderLeftWidth: 3,
-      borderLeftColor: 'transparent',
-      backgroundColor: semantic.bgBase,
+      borderBottomColor: 'rgba(112,115,124,0.10)',
     },
-    languageOptionSelected: {
-      borderLeftColor: semantic.primaryNormal,
-      backgroundColor: semantic.primaryBg,
+    languageRowLast: {
+      borderBottomWidth: 0,
     },
-    languageFlagContainer: {
-      width: 56,
-      height: 56,
-      backgroundColor: semantic.bgSubtle,
-      borderRadius: WANTED_TOKENS.radius.r6,
-      justifyContent: 'center',
-      alignItems: 'center',
-      marginRight: WANTED_TOKENS.spacing.s4,
+    flag: {
+      fontSize: 24,
+      lineHeight: 28,
     },
-    languageFlag: {
-      fontSize: 32,
-    },
-    languageContent: {
+    labelColumn: {
       flex: 1,
+      minWidth: 0,
     },
-    languageTitle: {
-      fontSize: WANTED_TOKENS.type.body1.size,
-      fontWeight: '700',
+    name: {
+      fontSize: 15,
       fontFamily: weightToFontFamily('700'),
       color: semantic.labelStrong,
-      marginBottom: 4,
+      letterSpacing: -0.08,
     },
-    selectedText: {
-      color: semantic.primaryNormal,
-    },
-    languageSubtitle: {
-      fontSize: WANTED_TOKENS.type.label2.size,
+    native: {
+      fontSize: 11.5,
+      fontFamily: weightToFontFamily('600'),
       color: semantic.labelAlt,
+      marginTop: 2,
     },
-    infoBox: {
-      backgroundColor: semantic.primaryBg,
-      paddingHorizontal: WANTED_TOKENS.spacing.s4,
-      paddingVertical: WANTED_TOKENS.spacing.s4,
-      marginHorizontal: WANTED_TOKENS.spacing.s4,
-      marginTop: WANTED_TOKENS.spacing.s5,
+    checkCircle: {
+      width: 24,
+      height: 24,
+      borderRadius: 999,
+      backgroundColor: WANTED_TOKENS.blue[500],
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    emptyCircle: {
+      width: 22,
+      height: 22,
+      borderRadius: 999,
+      borderWidth: 2,
+      borderColor: 'rgba(112,115,124,0.30)',
+      backgroundColor: semantic.bgBase,
+    },
+    footerCaption: {
+      marginTop: -WANTED_TOKENS.spacing.s4,
       marginBottom: WANTED_TOKENS.spacing.s5,
-      borderRadius: WANTED_TOKENS.radius.r6,
-      borderWidth: 1,
-      borderColor: semantic.lineNormal,
-    },
-    infoText: {
-      fontSize: WANTED_TOKENS.type.body2.size,
+      paddingHorizontal: WANTED_TOKENS.spacing.s5,
+      fontSize: 11.5,
+      fontFamily: weightToFontFamily('500'),
       color: semantic.labelAlt,
-      lineHeight: WANTED_TOKENS.type.body2.lh,
+      lineHeight: 11.5 * 1.45,
     },
   });
 
