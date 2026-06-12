@@ -146,6 +146,45 @@ describe('useTrainPositions', () => {
     expect(mockApi.getRealtimePosition).toHaveBeenCalledTimes(1);
   });
 
+  it('maps 경의선 to the official API name 경의중앙선 (regression: INFO-200 empty screen)', async () => {
+    mockApi.getRealtimePosition.mockResolvedValue([positionRow('5129')]);
+
+    const { result } = renderHook(() => useTrainPositions('경의선'));
+    await flush();
+
+    expect(mockApi.getRealtimePosition).toHaveBeenCalledWith('경의중앙선');
+    expect(result.current.positions).toHaveLength(1);
+    expect(result.current.unsupported).toBe(false);
+  });
+
+  it('skips the API call entirely and reports unsupported for 인천2 (regression: Seoul Line 2 trains shown as Incheon Line 2)', async () => {
+    mockApi.getRealtimePosition.mockResolvedValue([positionRow('2445')]);
+
+    const { result } = renderHook(() => useTrainPositions('인천2'));
+    await flush();
+
+    expect(mockApi.getRealtimePosition).not.toHaveBeenCalled();
+    expect(result.current.unsupported).toBe(true);
+    expect(result.current.positions).toEqual([]);
+    expect(result.current.loading).toBe(false);
+    expect(result.current.error).toBeNull();
+  });
+
+  it('refetch is a no-op for unsupported lines (no stuck loading state)', async () => {
+    mockApi.getRealtimePosition.mockResolvedValue([]);
+
+    const { result } = renderHook(() => useTrainPositions('김포도시철도'));
+    await flush();
+
+    await act(async () => {
+      result.current.refetch();
+    });
+    await flush();
+
+    expect(mockApi.getRealtimePosition).not.toHaveBeenCalled();
+    expect(result.current.loading).toBe(false);
+  });
+
   it('refetch triggers an immediate new fetch', async () => {
     mockApi.getRealtimePosition.mockResolvedValue([]);
 

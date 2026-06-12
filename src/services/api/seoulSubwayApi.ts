@@ -616,7 +616,8 @@ class SeoulSubwayApiService {
    * Rate limited to 30-second minimum interval per line.
    *
    * @param lineName Korean line name as the API expects it (e.g. '2호선',
-   *                 '신분당선') — use `formatLineName(lineId)` to derive it.
+   *                 '신분당선') — use `toSeoulApiLineName(lineId)` to derive
+   *                 it (returns null for lines the API does not provide).
    */
   async getRealtimePosition(lineName: string): Promise<SeoulRealtimePosition[]> {
     const dedupKey = `position:${lineName}`;
