@@ -24,7 +24,7 @@ export const ReportTypeLabels: Record<ReportType, string> = {
   [ReportType.ACCIDENT]: '사고',
   [ReportType.CROWDED]: '혼잡',
   [ReportType.DOOR_ISSUE]: '출입문 고장',
-  [ReportType.SIGNAL_ISSUE]: '신호 장애',
+  [ReportType.SIGNAL_ISSUE]: '신호장애',
   [ReportType.STOPPED]: '운행 중단',
   [ReportType.OTHER]: '기타',
 };
@@ -114,6 +114,11 @@ export interface DelayReport {
   description?: string;
   /** Estimated delay in minutes (if applicable) */
   estimatedDelayMinutes?: number;
+  /**
+   * Travel direction as "{인접역} 방면" label — 시안 #2 방면 세그먼트.
+   * Older docs have no field; UI treats missing as direction-unspecified.
+   */
+  direction?: string;
   /** Report timestamp */
   timestamp: Date;
   /** Number of upvotes from other users */
@@ -168,6 +173,7 @@ export interface CreateReportInput {
   severity?: ReportSeverity;
   description?: string;
   estimatedDelayMinutes?: number;
+  direction?: string;
 }
 
 /**

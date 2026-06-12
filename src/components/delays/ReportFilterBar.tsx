@@ -114,18 +114,15 @@ export const ReportFilterBar: React.FC<ReportFilterBarProps> = ({
 const createStyles = (semantic: WantedSemanticTheme) =>
   StyleSheet.create({
     filterContainer: {
-      backgroundColor: semantic.bgBase,
       paddingVertical: WANTED_TOKENS.spacing.s2,
-      borderBottomWidth: 1,
-      borderBottomColor: semantic.lineSubtle,
     },
     filterList: {
-      paddingHorizontal: WANTED_TOKENS.spacing.s3,
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
       gap: WANTED_TOKENS.spacing.s2,
     },
     filterButton: {
-      paddingHorizontal: WANTED_TOKENS.spacing.s3,
-      paddingVertical: WANTED_TOKENS.spacing.s1,
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s2,
       borderRadius: WANTED_TOKENS.radius.pill,
       borderWidth: 1,
       borderColor: semantic.lineSubtle,

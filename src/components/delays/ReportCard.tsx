@@ -1,23 +1,16 @@
 /**
  * Report Card
  *
- * 실시간 제보 피드의 단일 카드. DelayFeedScreen에서 추출(behavior unchanged).
- * 시각 정렬은 후속 phase에서 진행.
+ * 실시간 제보 피드의 단일 카드 — 시안 #1 풀매칭.
+ * LineBadge + 역명 + 검증됨 헤더, 본문(설명), 푸터(#해시태그 | 👍 💬 공유).
  */
 
-import React, { useMemo } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { ThumbsUp, Clock, MessageSquare } from 'lucide-react-native';
+import React, { useCallback, useMemo } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Share } from 'react-native';
+import { ThumbsUp, MessageCircle, Share2 } from 'lucide-react-native';
 
 import { useTheme } from '@/services/theme';
-import {
-  DelayReport,
-  ReportTypeLabels,
-  getReportTypeEmoji,
-  getSeverityColor,
-  shouldHighlightReport,
-} from '@/models/delayReport';
-import { getSubwayLineColor } from '@/utils/colorUtils';
+import { DelayReport, ReportTypeLabels } from '@/models/delayReport';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { LineBadge, Pill, type LineId } from '@/components/design';
 
@@ -43,15 +36,35 @@ const formatTimeAgo = (date: Date): string => {
   return '1일 이상 전';
 };
 
+/**
+ * 설명이 없는 제보의 본문 대체 문구 — 시안은 항상 본문 텍스트를 보여주므로
+ * 가장 가까운 실데이터(유형·지연분)로 구성한다.
+ */
+const buildBodyText = (report: DelayReport): string => {
+  if (report.description) return report.description;
+  const label = ReportTypeLabels[report.reportType];
+  if (report.estimatedDelayMinutes) {
+    return `약 ${report.estimatedDelayMinutes}분 ${label} 중`;
+  }
+  return `${label} 제보`;
+};
+
 export const ReportCard: React.FC<ReportCardProps> = ({ report, currentUserId, onUpvote, onOpen }) => {
   const { isDark } = useTheme();
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
-  const lineColor = getSubwayLineColor(report.lineId);
-  const severityColor = getSeverityColor(report.severity);
-  const isHighlighted = shouldHighlightReport(report);
   const hasUpvoted = currentUserId ? report.upvotedBy.includes(currentUserId) : false;
+
+  const handleShare = useCallback(async () => {
+    try {
+      await Share.share({
+        message: `[LiveMetro] ${report.stationName} ${ReportTypeLabels[report.reportType]} — ${buildBodyText(report)}`,
+      });
+    } catch (error) {
+      console.error('Failed to share report:', error);
+    }
+  }, [report]);
 
   const handleCardPress = onOpen ? () => onOpen(report) : undefined;
   const CardWrapper: React.ComponentType<{ children: React.ReactNode }> = onOpen
@@ -62,92 +75,72 @@ export const ReportCard: React.FC<ReportCardProps> = ({ report, currentUserId, o
           onPress={handleCardPress}
           accessibilityRole="button"
           accessibilityLabel={`${report.stationName} ${ReportTypeLabels[report.reportType]} 상세 보기`}
-          style={[styles.reportCard, isHighlighted && styles.reportCardHighlighted]}
+          style={styles.reportCard}
         >
           {children}
         </TouchableOpacity>
       )
-    : ({ children }) => (
-        <View style={[styles.reportCard, isHighlighted && styles.reportCardHighlighted]}>{children}</View>
-      );
+    : ({ children }) => <View style={styles.reportCard}>{children}</View>;
 
   return (
     <CardWrapper>
-      {/* Line Accent */}
-      <View style={[styles.lineAccent, { backgroundColor: lineColor }]} />
-
-      <View style={styles.cardContent}>
-        {/* Header — design handoff: LineBadge atom + 역명 (no auto suffix
-            per [역명 double-suffix 금지]) + 검증됨 Pill (warn tone) inline */}
-        <View style={styles.reportHeader}>
-          <View style={styles.reportMeta}>
-            <LineBadge line={report.lineId as LineId} size={22} />
-            <Text style={styles.stationText}>{report.stationName}</Text>
-            {report.verified && <Pill tone="warn" size="sm">검증됨</Pill>}
-          </View>
-          <Text style={styles.timeText}>{formatTimeAgo(new Date(report.timestamp))}</Text>
+      {/* Header — LineBadge + 역명 (no auto suffix per [역명 double-suffix 금지])
+          + 검증됨 Pill (warn tone), 시간 우측 */}
+      <View style={styles.reportHeader}>
+        <View style={styles.reportMeta}>
+          <LineBadge line={report.lineId as LineId} size={26} />
+          <Text style={styles.stationText}>{report.stationName}</Text>
+          {report.verified && <Pill tone="warn" size="sm">검증됨</Pill>}
         </View>
+        <Text style={styles.timeText}>{formatTimeAgo(new Date(report.timestamp))}</Text>
+      </View>
 
-        {/* Report Type */}
-        <View style={styles.reportTypeRow}>
-          <Text style={styles.reportEmoji}>{getReportTypeEmoji(report.reportType)}</Text>
-          <Text style={[styles.reportType, { color: severityColor }]}>
-            {ReportTypeLabels[report.reportType]}
-          </Text>
-          {report.estimatedDelayMinutes && (
-            <View style={styles.delayBadge}>
-              <Clock size={12} color={semantic.statusNegative} />
-              <Text style={styles.delayText}>+{report.estimatedDelayMinutes}분</Text>
-            </View>
-          )}
-        </View>
+      {/* Body — 설명 본문 (없으면 유형·지연분 기반 대체 문구) */}
+      <Text style={styles.bodyText} numberOfLines={2}>
+        {buildBodyText(report)}
+      </Text>
 
-        {/* Description */}
-        {report.description && (
-          <Text style={styles.description} numberOfLines={2}>
-            {report.description}
-          </Text>
-        )}
+      {/* Footer — 좌측 해시태그, 우측 좋아요·댓글·공유 */}
+      <View style={styles.reportFooter}>
+        <Pill tone="neutral" size="sm">
+          {`# ${ReportTypeLabels[report.reportType]}`}
+        </Pill>
 
-        {/* Hashtag — design handoff: report type as hashtag pill below body */}
-        <View style={styles.hashtagRow}>
-          <Pill tone="neutral" size="sm">
-            {`#${ReportTypeLabels[report.reportType]}`}
-          </Pill>
-        </View>
-
-        {/* Footer */}
-        <View style={styles.reportFooter}>
-          <View style={styles.reporterInfo}>
-            <Text style={styles.reporterName}>{report.userDisplayName}</Text>
-          </View>
-
-          <View style={styles.reportActions}>
-            {/* Comment count stub — Phase B wires real count */}
-            <View style={styles.commentStub} testID="report-comment-stub">
-              <MessageSquare size={14} color={semantic.labelAlt} />
-              <Text style={styles.commentText}>0</Text>
-            </View>
-
-            <TouchableOpacity
-              style={[styles.upvoteButton, hasUpvoted && styles.upvoteButtonActive]}
-              onPress={() => onUpvote(report)}
-              accessibilityRole="button"
-              accessibilityLabel={hasUpvoted ? '좋아요 취소' : '좋아요'}
+        <View style={styles.reportActions}>
+          <TouchableOpacity
+            style={[styles.actionButton, hasUpvoted && styles.actionButtonActive]}
+            onPress={() => onUpvote(report)}
+            accessibilityRole="button"
+            accessibilityLabel={hasUpvoted ? '좋아요 취소' : '좋아요'}
+          >
+            <ThumbsUp
+              size={16}
+              color={hasUpvoted ? semantic.primaryNormal : semantic.labelAlt}
+              fill={hasUpvoted ? semantic.primaryNormal : 'transparent'}
+            />
+            <Text
+              testID="report-upvote-count"
+              style={[styles.actionCount, hasUpvoted && styles.actionCountActive]}
             >
-              <ThumbsUp
-                size={16}
-                color={hasUpvoted ? semantic.primaryNormal : semantic.labelAlt}
-                fill={hasUpvoted ? semantic.primaryNormal : 'transparent'}
-              />
-              <Text
-                testID="report-upvote-count"
-                style={[styles.upvoteCount, hasUpvoted && styles.upvoteCountActive]}
-              >
-                {report.upvotes}
-              </Text>
-            </TouchableOpacity>
+              {report.upvotes}
+            </Text>
+          </TouchableOpacity>
+
+          <View style={styles.commentStub} testID="report-comment-stub">
+            <MessageCircle size={16} color={semantic.labelAlt} />
+            <Text style={styles.actionCount}>{report.commentCount ?? 0}</Text>
           </View>
+
+          <TouchableOpacity
+            testID="report-share-button"
+            style={styles.shareButton}
+            hitSlop={{ top: 6, bottom: 6, left: 6, right: 6 }}
+            onPress={handleShare}
+            accessibilityRole="button"
+            accessibilityLabel="제보 공유"
+          >
+            <Share2 size={16} color={semantic.labelAlt} />
+          </TouchableOpacity>
         </View>
       </View>
     </CardWrapper>
@@ -158,29 +151,17 @@ const createStyles = (semantic: WantedSemanticTheme) =>
   StyleSheet.create({
     reportCard: {
       backgroundColor: semantic.bgBase,
-      borderRadius: WANTED_TOKENS.radius.r6,
+      borderRadius: WANTED_TOKENS.radius.r10,
       marginBottom: WANTED_TOKENS.spacing.s3,
-      overflow: 'hidden',
-      flexDirection: 'row',
       borderWidth: 1,
       borderColor: semantic.lineSubtle,
-    },
-    reportCardHighlighted: {
-      borderWidth: 1,
-      borderColor: semantic.statusCautionary,
-    },
-    lineAccent: {
-      width: 4,
-    },
-    cardContent: {
-      flex: 1,
-      padding: WANTED_TOKENS.spacing.s3,
+      padding: WANTED_TOKENS.spacing.s4,
     },
     reportHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginBottom: WANTED_TOKENS.spacing.s2,
+      marginBottom: WANTED_TOKENS.spacing.s3,
     },
     reportMeta: {
       flexDirection: 'row',
@@ -188,106 +169,62 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       gap: WANTED_TOKENS.spacing.s2,
     },
     stationText: {
-      fontSize: WANTED_TOKENS.type.label2.size,
-      fontWeight: '500',
-      fontFamily: weightToFontFamily('500'),
+      fontSize: 16,
+      fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
       color: semantic.labelStrong,
+      letterSpacing: -0.2,
     },
     timeText: {
       fontSize: WANTED_TOKENS.type.caption1.size,
       color: semantic.labelAlt,
     },
-    reportTypeRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: WANTED_TOKENS.spacing.s2,
-      marginBottom: WANTED_TOKENS.spacing.s2,
-    },
-    reportEmoji: {
-      fontSize: 20,
-    },
-    reportType: {
-      fontSize: WANTED_TOKENS.type.body1.size,
-      fontWeight: '600',
-      fontFamily: weightToFontFamily('600'),
-    },
-    delayBadge: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: semantic.statusNegative + '20',
-      paddingHorizontal: WANTED_TOKENS.spacing.s2,
-      paddingVertical: 2,
-      borderRadius: WANTED_TOKENS.radius.r2,
-      gap: 4,
-    },
-    delayText: {
-      fontSize: WANTED_TOKENS.type.caption1.size,
-      color: semantic.statusNegative,
-      fontWeight: '600',
-      fontFamily: weightToFontFamily('600'),
-    },
-    description: {
-      fontSize: WANTED_TOKENS.type.label2.size,
-      color: semantic.labelAlt,
-      marginBottom: WANTED_TOKENS.spacing.s2,
-      lineHeight: 20,
+    bodyText: {
+      fontSize: 15,
+      color: semantic.labelNormal,
+      lineHeight: 22,
+      marginBottom: WANTED_TOKENS.spacing.s3,
     },
     reportFooter: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      paddingTop: WANTED_TOKENS.spacing.s2,
-      borderTopWidth: 1,
-      borderTopColor: semantic.lineSubtle,
-    },
-    reporterInfo: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: WANTED_TOKENS.spacing.s1,
-    },
-    reporterName: {
-      fontSize: WANTED_TOKENS.type.caption1.size,
-      color: semantic.labelAlt,
     },
     reportActions: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: WANTED_TOKENS.spacing.s3,
     },
-    hashtagRow: {
+    actionButton: {
       flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: WANTED_TOKENS.spacing.s1,
-      marginBottom: WANTED_TOKENS.spacing.s2,
+      alignItems: 'center',
+      gap: 4,
+      paddingVertical: WANTED_TOKENS.spacing.s1,
+      paddingHorizontal: WANTED_TOKENS.spacing.s1,
+    },
+    actionButtonActive: {
+      backgroundColor: semantic.primaryBg,
+      borderRadius: WANTED_TOKENS.radius.r2,
+    },
+    actionCount: {
+      fontSize: WANTED_TOKENS.type.label2.size,
+      color: semantic.labelAlt,
+      fontWeight: '500',
+      fontFamily: weightToFontFamily('500'),
+    },
+    actionCountActive: {
+      color: semantic.primaryNormal,
     },
     commentStub: {
       flexDirection: 'row',
       alignItems: 'center',
       gap: 4,
     },
-    commentText: {
-      fontSize: WANTED_TOKENS.type.caption1.size,
-      color: semantic.labelAlt,
-    },
-    upvoteButton: {
-      flexDirection: 'row',
+    shareButton: {
+      width: 32,
+      height: 32,
       alignItems: 'center',
-      gap: 4,
-      paddingVertical: WANTED_TOKENS.spacing.s1,
-      paddingHorizontal: WANTED_TOKENS.spacing.s2,
-    },
-    upvoteButtonActive: {
-      backgroundColor: semantic.primaryNormal + '20',
-      borderRadius: WANTED_TOKENS.radius.r2,
-    },
-    upvoteCount: {
-      fontSize: WANTED_TOKENS.type.label2.size,
-      color: semantic.labelAlt,
-      fontWeight: '500',
-      fontFamily: weightToFontFamily('500'),
-    },
-    upvoteCountActive: {
-      color: semantic.primaryNormal,
+      justifyContent: 'center',
     },
   });
 

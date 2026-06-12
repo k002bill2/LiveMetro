@@ -147,7 +147,9 @@ export const DelayFeedScreen: React.FC = () => {
           >
             실시간 제보
           </Text>
-          <Text style={styles.headerSubtitle}>승객들의 실시간 지연 정보</Text>
+          <Text style={styles.headerSubtitle} testID="delay-feed-header-subtitle">
+            지난 4시간 · 실시간 제보 {filteredReports.length}건
+          </Text>
         </View>
         <TouchableOpacity
           style={styles.addButton}
@@ -168,14 +170,6 @@ export const DelayFeedScreen: React.FC = () => {
         onToggleMyLines={() => setOnlyMyLines(prev => !prev)}
         myLinesAvailable={myLineIds.size > 0}
       />
-
-      {/* Report Count */}
-      <View style={styles.countBar}>
-        <MessageSquare size={14} color={semantic.labelAlt} />
-        <Text style={styles.countText}>
-          {filteredReports.length}개의 활성 제보
-        </Text>
-      </View>
 
       {/* Report List — show skeleton placeholders on first load */}
       {loading && reports.length === 0 ? (
@@ -260,17 +254,6 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       shadowOpacity: 0.25,
       shadowRadius: 10,
       elevation: 4,
-    },
-    countBar: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: WANTED_TOKENS.spacing.s4,
-      paddingVertical: WANTED_TOKENS.spacing.s2,
-      gap: WANTED_TOKENS.spacing.s1,
-    },
-    countText: {
-      fontSize: WANTED_TOKENS.type.label2.size,
-      color: semantic.labelAlt,
     },
     listContent: {
       padding: WANTED_TOKENS.spacing.s3,
