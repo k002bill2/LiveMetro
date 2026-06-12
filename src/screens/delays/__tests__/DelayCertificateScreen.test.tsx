@@ -1,55 +1,46 @@
 /**
- * DelayCertificateScreen Test Suite
- * Tests delay certificate screen rendering, interactions, and data operations
+ * DelayCertificateScreen Test Suite — Wanted handoff redesign
+ *
+ * 히어로(발급 가능한 최근 지연), 탭 세그먼트(발급 가능/발급 내역),
+ * 이력 리스트(만료/발급됨/발급 pill), PDF 발급·공유, 빈 상태/스켈레톤 검증.
  */
 
-// Mock modules BEFORE any imports (Jest hoisting)
-// Now import components and services AFTER mocks
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, fireEvent, waitFor, within, screen } from '@testing-library/react-native';
 import { Alert, Share } from 'react-native';
 import { DelayCertificateScreen } from '../DelayCertificateScreen';
 import { delayHistoryService } from '@/services/delay/delayHistoryService';
+import { pdfService } from '@/services/certificate/pdfService';
 import { useAuth } from '@/services/auth/AuthContext';
 
-jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
+jest.mock('expo-linear-gradient', () => {
+  const ReactLib = require('react');
+  const { View } = require('react-native');
+  return {
+    LinearGradient: ({
+      children,
+      style,
+      testID,
+    }: {
+      children?: React.ReactNode;
+      style?: unknown;
+      testID?: string;
+    }) => ReactLib.createElement(View, { style, testID }, children),
+  };
+});
+
 jest.mock('lucide-react-native', () => ({
+  BadgeCheck: 'BadgeCheck',
+  Download: 'Download',
+  FileCheck2: 'FileCheck2',
   FileText: 'FileText',
-  Clock: 'Clock',
+  History: 'History',
   Share2: 'Share2',
   Trash2: 'Trash2',
-  AlertCircle: 'AlertCircle',
-  ChevronRight: 'ChevronRight',
-}));
-
-jest.mock('@react-navigation/native', () => ({
-  useNavigation: jest.fn(() => ({
-    navigate: jest.fn(),
-    goBack: jest.fn(),
-    setOptions: jest.fn(),
-  })),
-  useRoute: jest.fn(() => ({ params: {} })),
 }));
 
 jest.mock('@/services/theme', () => ({
-  useTheme: jest.fn(() => ({
-    colors: {
-      primary: '#007AFF',
-      background: '#FFFFFF',
-      surface: '#FFFFFF',
-      textPrimary: '#000000',
-      textSecondary: '#8E8E93',
-      textTertiary: '#C7C7CC',
-      borderLight: '#E5E5EA',
-      borderMedium: '#D1D1D6',
-      error: '#FF3B30',
-      success: '#34C759',
-      warning: '#FF9500',
-      backgroundSecondary: '#F2F2F7',
-      textInverse: '#FFFFFF',
-    },
-  })),
-  ThemeColors: {},
+  useTheme: jest.fn(() => ({ isDark: false })),
 }));
 
 jest.mock('@/services/auth/AuthContext', () => ({
@@ -63,34 +54,31 @@ jest.mock('@/services/delay/delayHistoryService', () => ({
     getUserCertificates: jest.fn(() => Promise.resolve([])),
     getUserHistory: jest.fn(() => Promise.resolve([])),
     formatCertificateText: jest.fn(() => 'certificate text'),
-    deleteCertificate: jest.fn(() => Promise.resolve()),
+    deleteCertificate: jest.fn(() => Promise.resolve(true)),
     generateCertificate: jest.fn(() => Promise.resolve(null)),
     addSampleData: jest.fn(() => Promise.resolve()),
   },
 }));
 
-jest.mock('@/utils/colorUtils', () => ({
-  getSubwayLineColor: jest.fn(() => '#00A84D'),
+jest.mock('@/services/certificate/pdfService', () => ({
+  pdfService: {
+    generateAndSharePdf: jest.fn(() => Promise.resolve(true)),
+  },
 }));
 
-// Types
-interface DelayCertificate {
-  id: string;
-  certificateNumber: string;
-  userId: string;
-  date: string;
-  lineId: string;
-  stationName: string;
-  delayMinutes: number;
-  scheduledTime: string;
-  actualTime: string;
-  reason?: string;
-}
+// ============================================================================
+// Fixtures
+// ============================================================================
 
-interface DelayHistoryEntry {
+const DAY_MS = 24 * 60 * 60 * 1000;
+const daysAgo = (days: number): string =>
+  new Date(Date.now() - days * DAY_MS).toISOString();
+
+interface HistoryFixture {
   id: string;
   userId: string;
   lineId: string;
+  stationId: string;
   stationName: string;
   delayMinutes: number;
   timestamp: string;
@@ -98,279 +86,461 @@ interface DelayHistoryEntry {
   certificateGenerated: boolean;
 }
 
+interface CertFixture {
+  id: string;
+  certificateNumber: string;
+  userId: string;
+  date: string;
+  lineId: string;
+  stationId: string;
+  stationName: string;
+  scheduledTime: string;
+  actualTime: string;
+  delayMinutes: number;
+  reason: string;
+  verified: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const makeEntry = (overrides: Partial<HistoryFixture> = {}): HistoryFixture => ({
+  id: 'hist-1',
+  userId: 'test-user-id',
+  lineId: '2',
+  stationId: 's_1',
+  stationName: '홍대입구',
+  delayMinutes: 18,
+  timestamp: daysAgo(2),
+  reason: 'signal_failure',
+  certificateGenerated: false,
+  ...overrides,
+});
+
+const makeCert = (overrides: Partial<CertFixture> = {}): CertFixture => ({
+  id: 'cert-1',
+  certificateNumber: 'LM-20260601-ABC123',
+  userId: 'test-user-id',
+  date: daysAgo(3),
+  lineId: '2',
+  stationId: 's_1',
+  stationName: '홍대입구',
+  scheduledTime: '08:32',
+  actualTime: '08:50',
+  delayMinutes: 18,
+  reason: 'signal_failure',
+  verified: false,
+  createdAt: daysAgo(3),
+  updatedAt: daysAgo(3),
+  ...overrides,
+});
+
+const mockHistory = (entries: HistoryFixture[]): void => {
+  (delayHistoryService.getUserHistory as jest.Mock).mockResolvedValue(entries);
+};
+const mockCerts = (certs: CertFixture[]): void => {
+  (delayHistoryService.getUserCertificates as jest.Mock).mockResolvedValue(certs);
+};
+
 describe('DelayCertificateScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    // Reset useAuth mock to default (critical: previous test may set user to null)
     (useAuth as jest.Mock).mockReturnValue({
       user: { id: 'test-user-id', displayName: 'Test User' },
     });
-    // Reset service mocks to default implementations (critical: mockRejectedValue leaks)
     (delayHistoryService.getUserCertificates as jest.Mock).mockResolvedValue([]);
     (delayHistoryService.getUserHistory as jest.Mock).mockResolvedValue([]);
-    (delayHistoryService.formatCertificateText as jest.Mock).mockReturnValue('certificate text');
-    (delayHistoryService.deleteCertificate as jest.Mock).mockResolvedValue(undefined);
+    (delayHistoryService.formatCertificateText as jest.Mock).mockReturnValue(
+      'certificate text'
+    );
+    (delayHistoryService.deleteCertificate as jest.Mock).mockResolvedValue(true);
     (delayHistoryService.generateCertificate as jest.Mock).mockResolvedValue(null);
+    (delayHistoryService.addSampleData as jest.Mock).mockResolvedValue(undefined);
+    (pdfService.generateAndSharePdf as jest.Mock).mockResolvedValue(true);
     jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' });
   });
 
-  afterEach(() => {
-    // Note: avoid jest.restoreAllMocks() here as it can reset
-    // jest.mock() factory implementations in some Jest versions
-  });
-
-  // ========== Rendering Tests ==========
+  // ========== Rendering ==========
   describe('Rendering', () => {
-    it('renders header and tabs', () => {
+    it('renders header title and subtitle', async () => {
       const { getByText } = render(<DelayCertificateScreen />);
-      expect(getByText('지연증명서')).toBeTruthy();
-      expect(getByText('지연 이력 조회 및 증명서 발급')).toBeTruthy();
+      expect(getByText('지연증명서')).toHaveTextContent('지연증명서');
+      expect(getByText('지연 이력 조회 및 증명서 발급')).toHaveTextContent(
+        '지연 이력 조회 및 증명서 발급'
+      );
+      await waitFor(() => {
+        expect(delayHistoryService.getUserHistory).toHaveBeenCalledWith(
+          'test-user-id'
+        );
+      });
     });
 
-    it('shows certificate and history tab counts', () => {
-      const { getByText } = render(<DelayCertificateScreen />);
-      expect(getByText('증명서 (0)')).toBeTruthy();
-      expect(getByText('이력 (0)')).toBeTruthy();
+    it('shows loading skeleton while data is pending', () => {
+      (delayHistoryService.getUserHistory as jest.Mock).mockReturnValue(
+        new Promise(() => {})
+      );
+      (delayHistoryService.getUserCertificates as jest.Mock).mockReturnValue(
+        new Promise(() => {})
+      );
+
+      render(<DelayCertificateScreen />);
+      expect(screen.queryByTestId('delay-cert-skeleton')).not.toBeNull();
     });
 
-    it('shows empty state for certificates tab initially', () => {
-      const { getByText } = render(<DelayCertificateScreen />);
-      expect(getByText('발급된 증명서가 없습니다')).toBeTruthy();
+    it('renders hero card with the most recent eligible delay (real data)', async () => {
+      mockHistory([
+        makeEntry({ id: 'hist-old', delayMinutes: 9, timestamp: daysAgo(10) }),
+        makeEntry({ id: 'hist-new', delayMinutes: 18, timestamp: daysAgo(2) }),
+      ]);
+
+      const { getByTestId, getByText } = render(<DelayCertificateScreen />);
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('hero-card')).not.toBeNull();
+      });
+      expect(getByTestId('hero-delay-minutes')).toHaveTextContent('18');
+      expect(getByText('발급 가능한 최근 지연')).toHaveTextContent('발급 가능한 최근 지연');
+      const hero = within(getByTestId('hero-card'));
+      expect(hero.getByText('홍대입구')).toHaveTextContent('홍대입구');
+      expect(hero.getByText(/탑승$/)).toHaveTextContent(/탑승$/);
     });
 
-    it('shows info box about official certificates', () => {
+    it('truncates fractional delay minutes in hero (no float tails)', async () => {
+      mockHistory([makeEntry({ delayMinutes: 12.79999 })]);
+
+      const { getByTestId } = render(<DelayCertificateScreen />);
+
+      await waitFor(() => {
+        expect(getByTestId('hero-delay-minutes')).toHaveTextContent('12');
+      });
+    });
+
+    it('shows hero empty card when no eligible delay within 30 days', async () => {
+      mockHistory([makeEntry({ id: 'hist-exp', timestamp: daysAgo(40) })]);
+
       const { getByText } = render(<DelayCertificateScreen />);
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('hero-empty')).not.toBeNull();
+      });
       expect(
-        getByText(/공식 지연증명서는 또타지하철 앱에서/)
-      ).toBeTruthy();
+        getByText('최근 30일 내 발급 가능한 지연이 없어요')
+      ).toHaveTextContent('최근 30일 내 발급 가능한 지연이 없어요');
     });
 
-    it('displays certificates with correct data', async () => {
-      const mockCertificates: DelayCertificate[] = [
-        {
-          id: 'cert-1',
-          certificateNumber: 'DC-2024-001',
-          userId: 'test-user-id',
-          date: new Date('2024-01-15').toISOString(),
-          lineId: '2',
-          stationName: '강남',
-          delayMinutes: 10,
-          scheduledTime: '08:30',
-          actualTime: '08:40',
-          reason: 'mechanical_failure',
-        },
-      ];
-      (delayHistoryService.getUserCertificates as jest.Mock).mockResolvedValue(
-        mockCertificates
-      );
-
+    it('shows empty list card when there is no history at all', async () => {
       const { getByText } = render(<DelayCertificateScreen />);
 
       await waitFor(() => {
-        expect(getByText('DC-2024-001')).toBeTruthy();
+        expect(screen.queryByTestId('list-empty')).not.toBeNull();
       });
-      expect(getByText('강남역')).toBeTruthy();
-      expect(getByText('10분 지연')).toBeTruthy();
-      expect(getByText(/08:30 → 08:40/)).toBeTruthy();
-    });
-
-    it('displays multiple certificates', async () => {
-      const mockCertificates: DelayCertificate[] = [
-        {
-          id: 'cert-1',
-          certificateNumber: 'DC-2024-001',
-          userId: 'test-user-id',
-          date: new Date('2024-01-15').toISOString(),
-          lineId: '2',
-          stationName: '강남',
-          delayMinutes: 10,
-          scheduledTime: '08:30',
-          actualTime: '08:40',
-        },
-        {
-          id: 'cert-2',
-          certificateNumber: 'DC-2024-002',
-          userId: 'test-user-id',
-          date: new Date('2024-01-16').toISOString(),
-          lineId: '3',
-          stationName: '교대',
-          delayMinutes: 5,
-          scheduledTime: '09:15',
-          actualTime: '09:20',
-        },
-      ];
-      (delayHistoryService.getUserCertificates as jest.Mock).mockResolvedValue(
-        mockCertificates
-      );
-
-      const { getByText } = render(<DelayCertificateScreen />);
-
-      await waitFor(() => {
-        expect(getByText('증명서 (2)')).toBeTruthy();
-      });
-      expect(getByText('DC-2024-001')).toBeTruthy();
-      expect(getByText('DC-2024-002')).toBeTruthy();
-    });
-
-    it('shows sample data button in __DEV__ mode', () => {
-      const { getByText } = render(<DelayCertificateScreen />);
-      expect(getByText('샘플 데이터 추가 (개발용)')).toBeTruthy();
+      expect(getByText('지연 이력이 없어요')).toHaveTextContent('지연 이력이 없어요');
     });
   });
 
-  // ========== Tab Navigation Tests ==========
-  describe('Tab Navigation', () => {
-    it('switches to history tab on press', () => {
-      const { getByText, getByTestId } = render(<DelayCertificateScreen />);
-      fireEvent.press(getByTestId('history-tab'));
-      expect(getByText('지연 이력이 없습니다')).toBeTruthy();
-    });
+  // ========== Tabs ==========
+  describe('Tab segment', () => {
+    it('shows eligible count (in-window, not generated) and issued count', async () => {
+      mockHistory([
+        makeEntry({ id: 'h1', timestamp: daysAgo(1) }),
+        makeEntry({ id: 'h2', timestamp: daysAgo(5) }),
+        makeEntry({ id: 'h3', timestamp: daysAgo(40) }), // expired
+        makeEntry({ id: 'h4', timestamp: daysAgo(3), certificateGenerated: true }),
+      ]);
+      mockCerts([makeCert()]);
 
-    it('displays history entries on history tab', async () => {
-      const mockHistory: DelayHistoryEntry[] = [
-        {
-          id: 'hist-1',
-          userId: 'test-user-id',
-          lineId: '3',
-          stationName: '교대',
-          delayMinutes: 5,
-          timestamp: new Date('2024-01-15T09:00:00').toISOString(),
-          reason: 'signal_failure',
-          certificateGenerated: false,
-        },
-      ];
-      (delayHistoryService.getUserHistory as jest.Mock).mockResolvedValue(
-        mockHistory
-      );
-
-      const { getByText, getByTestId } = render(<DelayCertificateScreen />);
+      const { getByTestId } = render(<DelayCertificateScreen />);
 
       await waitFor(() => {
-        expect(getByText('이력 (1)')).toBeTruthy();
+        expect(getByTestId('eligible-count')).toHaveTextContent('2');
       });
-
-      fireEvent.press(getByTestId('history-tab'));
-
-      expect(getByText('교대역')).toBeTruthy();
-      expect(getByText('5분 지연')).toBeTruthy();
+      expect(getByTestId('issued-count')).toHaveTextContent('1');
     });
 
-    it('shows hint to generate certificate for uncertified history', async () => {
-      const mockHistory: DelayHistoryEntry[] = [
-        {
-          id: 'hist-1',
-          userId: 'test-user-id',
-          lineId: '3',
-          stationName: '교대',
-          delayMinutes: 5,
-          timestamp: new Date('2024-01-15T09:00:00').toISOString(),
-          reason: 'signal_failure',
-          certificateGenerated: false,
-        },
-      ];
-      (delayHistoryService.getUserHistory as jest.Mock).mockResolvedValue(
-        mockHistory
-      );
+    it('switches to issued tab and shows issued empty state', async () => {
+      mockHistory([makeEntry()]);
 
-      const { getByText, getByTestId } = render(<DelayCertificateScreen />);
+      const { getByTestId, getByText } = render(<DelayCertificateScreen />);
 
       await waitFor(() => {
-        expect(getByText('이력 (1)')).toBeTruthy();
+        expect(screen.queryByTestId('issued-tab')).not.toBeNull();
       });
 
-      fireEvent.press(getByTestId('history-tab'));
-      expect(getByText('탭하여 증명서 발급')).toBeTruthy();
+      fireEvent.press(getByTestId('issued-tab'));
+
+      expect(getByText('발급 내역이 없어요')).toHaveTextContent('발급 내역이 없어요');
     });
 
-    it('shows badge for already generated certificates in history', async () => {
-      const mockHistory: DelayHistoryEntry[] = [
-        {
-          id: 'hist-1',
-          userId: 'test-user-id',
-          lineId: '3',
-          stationName: '교대',
-          delayMinutes: 5,
-          timestamp: new Date('2024-01-15T09:00:00').toISOString(),
-          reason: 'signal_failure',
-          certificateGenerated: true,
-        },
-      ];
-      (delayHistoryService.getUserHistory as jest.Mock).mockResolvedValue(
-        mockHistory
-      );
+    it('switches back to eligible tab and shows history rows again', async () => {
+      mockHistory([makeEntry({ id: 'hist-1' })]);
 
-      const { getByText, getByTestId } = render(<DelayCertificateScreen />);
+      const { getByTestId } = render(<DelayCertificateScreen />);
 
       await waitFor(() => {
-        expect(getByText('이력 (1)')).toBeTruthy();
+        expect(screen.queryByTestId('history-row-hist-1')).not.toBeNull();
       });
 
-      fireEvent.press(getByTestId('history-tab'));
-      expect(getByText('증명서 발급됨')).toBeTruthy();
-    });
+      fireEvent.press(getByTestId('issued-tab'));
+      fireEvent.press(getByTestId('eligible-tab'));
 
-    it('switches back to certificates tab', async () => {
-      const mockCertificates: DelayCertificate[] = [
-        {
-          id: 'cert-1',
-          certificateNumber: 'DC-2024-001',
-          userId: 'test-user-id',
-          date: new Date('2024-01-15').toISOString(),
-          lineId: '2',
-          stationName: '강남',
-          delayMinutes: 10,
-          scheduledTime: '08:30',
-          actualTime: '08:40',
-        },
-      ];
-      (delayHistoryService.getUserCertificates as jest.Mock).mockResolvedValue(
-        mockCertificates
-      );
-
-      const { getByText, getByTestId } = render(<DelayCertificateScreen />);
-
-      await waitFor(() => {
-        expect(getByText('증명서 (1)')).toBeTruthy();
-      });
-
-      fireEvent.press(getByTestId('history-tab'));
-      fireEvent.press(getByTestId('certificates-tab'));
-
-      expect(getByText('DC-2024-001')).toBeTruthy();
+      expect(screen.queryByTestId('history-row-hist-1')).not.toBeNull();
     });
   });
 
-  // ========== Certificate Sharing Tests ==========
-  describe('Certificate Sharing', () => {
-    it('shares certificate with formatted text', async () => {
-      const mockCertificates: DelayCertificate[] = [
-        {
-          id: 'cert-1',
-          certificateNumber: 'DC-2024-001',
-          userId: 'test-user-id',
-          date: new Date('2024-01-15').toISOString(),
-          lineId: '2',
-          stationName: '강남',
-          delayMinutes: 10,
-          scheduledTime: '08:30',
-          actualTime: '08:40',
-        },
-      ];
-      (delayHistoryService.getUserCertificates as jest.Mock).mockResolvedValue(
-        mockCertificates
+  // ========== Issuance ==========
+  describe('Certificate issuance', () => {
+    it('issues a certificate from the hero CTA with computed times', async () => {
+      mockHistory([makeEntry({ id: 'hist-1' })]);
+      (delayHistoryService.generateCertificate as jest.Mock).mockResolvedValue(
+        makeCert()
       );
+
+      const { getByTestId } = render(<DelayCertificateScreen />);
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('hero-issue-cta')).not.toBeNull();
+      });
+
+      fireEvent.press(getByTestId('hero-issue-cta'));
+
+      await waitFor(() => {
+        expect(delayHistoryService.generateCertificate).toHaveBeenCalledWith(
+          'hist-1',
+          expect.stringMatching(/^\d{2}:\d{2}$/),
+          expect.stringMatching(/^\d{2}:\d{2}$/)
+        );
+      });
+      await waitFor(() => {
+        expect(Alert.alert).toHaveBeenCalledWith(
+          '발급 완료',
+          '지연증명서가 발급되었습니다.'
+        );
+      });
+    });
+
+    it('issues a certificate from a list row 발급 pill', async () => {
+      mockHistory([
+        makeEntry({ id: 'hist-1', timestamp: daysAgo(1) }),
+        makeEntry({ id: 'hist-2', timestamp: daysAgo(5) }),
+      ]);
+      (delayHistoryService.generateCertificate as jest.Mock).mockResolvedValue(
+        makeCert()
+      );
+
+      const { getByTestId } = render(<DelayCertificateScreen />);
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('issue-pill-hist-2')).not.toBeNull();
+      });
+
+      fireEvent.press(getByTestId('issue-pill-hist-2'));
+
+      await waitFor(() => {
+        expect(delayHistoryService.generateCertificate).toHaveBeenCalledWith(
+          'hist-2',
+          expect.any(String),
+          expect.any(String)
+        );
+      });
+    });
+
+    it('reloads data after successful issuance', async () => {
+      mockHistory([makeEntry({ id: 'hist-1' })]);
+      (delayHistoryService.generateCertificate as jest.Mock).mockResolvedValue(
+        makeCert()
+      );
+
+      const { getByTestId } = render(<DelayCertificateScreen />);
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('hero-issue-cta')).not.toBeNull();
+      });
+
+      const initialCalls = (delayHistoryService.getUserHistory as jest.Mock).mock
+        .calls.length;
+
+      fireEvent.press(getByTestId('hero-issue-cta'));
+
+      await waitFor(() => {
+        expect(
+          (delayHistoryService.getUserHistory as jest.Mock).mock.calls.length
+        ).toBeGreaterThan(initialCalls);
+      });
+    });
+
+    it('does not show success alert when issuance returns null', async () => {
+      mockHistory([makeEntry({ id: 'hist-1' })]);
+      (delayHistoryService.generateCertificate as jest.Mock).mockResolvedValue(
+        null
+      );
+
+      const { getByTestId } = render(<DelayCertificateScreen />);
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('hero-issue-cta')).not.toBeNull();
+      });
+
+      fireEvent.press(getByTestId('hero-issue-cta'));
+
+      await waitFor(() => {
+        expect(delayHistoryService.generateCertificate).toHaveBeenCalled();
+      });
+      expect(Alert.alert).not.toHaveBeenCalledWith(
+        '발급 완료',
+        expect.any(String)
+      );
+    });
+
+    it('shows error alert when issuance throws', async () => {
+      mockHistory([makeEntry({ id: 'hist-1' })]);
+      (delayHistoryService.generateCertificate as jest.Mock).mockRejectedValue(
+        new Error('issue failed')
+      );
+
+      const { getByTestId } = render(<DelayCertificateScreen />);
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('hero-issue-cta')).not.toBeNull();
+      });
+
+      fireEvent.press(getByTestId('hero-issue-cta'));
+
+      await waitFor(() => {
+        expect(Alert.alert).toHaveBeenCalledWith(
+          '오류',
+          '증명서 발급에 실패했습니다.'
+        );
+      });
+    });
+  });
+
+  // ========== Expired & generated row states ==========
+  describe('Row states', () => {
+    it('marks rows older than 30 days as 발급 기한 만료 without issue pill', async () => {
+      mockHistory([
+        makeEntry({ id: 'hist-ok', timestamp: daysAgo(2) }),
+        makeEntry({ id: 'hist-exp', timestamp: daysAgo(40) }),
+      ]);
+
+      const { getByText, queryByTestId } = render(
+        <DelayCertificateScreen />
+      );
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('history-row-hist-exp')).not.toBeNull();
+      });
+      expect(getByText('발급 기한 만료')).toHaveTextContent('발급 기한 만료');
+      expect(queryByTestId('issue-pill-hist-exp')).toBeNull();
+      expect(screen.queryByTestId('issue-pill-hist-ok')).not.toBeNull();
+    });
+
+    it('marks already-generated rows as 발급됨 without issue pill', async () => {
+      mockHistory([
+        makeEntry({ id: 'hist-gen', certificateGenerated: true }),
+      ]);
+
+      const { getByText, queryByTestId } = render(<DelayCertificateScreen />);
+
+      await waitFor(() => {
+        expect(getByText('발급됨')).toHaveTextContent('발급됨');
+      });
+      expect(queryByTestId('issue-pill-hist-gen')).toBeNull();
+    });
+
+    it('shows reason label in row subtitle when present', async () => {
+      mockHistory([makeEntry({ id: 'hist-1', reason: 'signal_failure' })]);
+
+      const { getByText } = render(<DelayCertificateScreen />);
+
+      await waitFor(() => {
+        expect(getByText(/탑승 · 신호 장애/)).toHaveTextContent(/탑승 · 신호 장애/);
+      });
+    });
+
+    it('omits reason from row subtitle when missing', async () => {
+      mockHistory([makeEntry({ id: 'hist-1', reason: undefined })]);
+
+      const { getByTestId, queryByText } = render(<DelayCertificateScreen />);
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('history-row-hist-1')).not.toBeNull();
+      });
+      const row = within(getByTestId('history-row-hist-1'));
+      expect(row.getByText(/탑승$/)).toHaveTextContent(/탑승$/);
+      expect(queryByText(/탑승 · /)).toBeNull();
+    });
+  });
+
+  // ========== Issued tab ==========
+  describe('Issued certificates', () => {
+    it('renders issued certificate row with number and delay title', async () => {
+      mockCerts([makeCert({ id: 'cert-1', delayMinutes: 18 })]);
+
+      const { getByTestId, getByText } = render(<DelayCertificateScreen />);
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('issued-tab')).not.toBeNull();
+      });
+
+      fireEvent.press(getByTestId('issued-tab'));
+
+      expect(screen.queryByTestId('cert-row-cert-1')).not.toBeNull();
+      expect(getByText(/18분 지연 증명서/)).toHaveTextContent(/18분 지연 증명서/);
+      expect(getByText(/LM-20260601-ABC123/)).toHaveTextContent(/LM-20260601-ABC123/);
+    });
+
+    it('shares certificate as PDF via pdfService', async () => {
+      mockCerts([makeCert({ id: 'cert-1' })]);
+
+      const { getByTestId } = render(<DelayCertificateScreen />);
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('issued-tab')).not.toBeNull();
+      });
+      fireEvent.press(getByTestId('issued-tab'));
+      fireEvent.press(getByTestId('pdf-share-cert-1'));
+
+      await waitFor(() => {
+        expect(pdfService.generateAndSharePdf).toHaveBeenCalledWith(
+          expect.objectContaining({ id: 'cert-1' })
+        );
+      });
+      expect(Share.share).not.toHaveBeenCalled();
+    });
+
+    it('falls back to text share when PDF generation is unavailable', async () => {
+      mockCerts([makeCert({ id: 'cert-1' })]);
+      (pdfService.generateAndSharePdf as jest.Mock).mockResolvedValue(false);
+
+      const { getByTestId } = render(<DelayCertificateScreen />);
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('issued-tab')).not.toBeNull();
+      });
+      fireEvent.press(getByTestId('issued-tab'));
+      fireEvent.press(getByTestId('pdf-share-cert-1'));
+
+      await waitFor(() => {
+        expect(Share.share).toHaveBeenCalledWith({
+          message: 'certificate text',
+          title: '지연증명서',
+        });
+      });
+    });
+
+    it('shares certificate as text via Share button', async () => {
+      mockCerts([makeCert({ id: 'cert-1' })]);
       (delayHistoryService.formatCertificateText as jest.Mock).mockReturnValue(
         'Formatted certificate text'
       );
 
-      const { getByText } = render(<DelayCertificateScreen />);
+      const { getByTestId } = render(<DelayCertificateScreen />);
 
       await waitFor(() => {
-        expect(getByText('DC-2024-001')).toBeTruthy();
+        expect(screen.queryByTestId('issued-tab')).not.toBeNull();
       });
-
-      fireEvent.press(getByText('공유'));
+      fireEvent.press(getByTestId('issued-tab'));
+      fireEvent.press(getByTestId('text-share-cert-1'));
 
       await waitFor(() => {
         expect(Share.share).toHaveBeenCalledWith({
@@ -380,466 +550,110 @@ describe('DelayCertificateScreen', () => {
       });
     });
 
-    it('handles share success', async () => {
-      const mockCertificates: DelayCertificate[] = [
-        {
-          id: 'cert-1',
-          certificateNumber: 'DC-2024-001',
-          userId: 'test-user-id',
-          date: new Date('2024-01-15').toISOString(),
-          lineId: '2',
-          stationName: '강남',
-          delayMinutes: 10,
-          scheduledTime: '08:30',
-          actualTime: '08:40',
-        },
-      ];
-      (delayHistoryService.getUserCertificates as jest.Mock).mockResolvedValue(
-        mockCertificates
-      );
-      (Share.share as jest.Mock).mockResolvedValue({ action: 'sharedAction' });
-
-      const { getByText } = render(<DelayCertificateScreen />);
-
-      await waitFor(() => {
-        expect(getByText('DC-2024-001')).toBeTruthy();
-      });
-
-      fireEvent.press(getByText('공유'));
-
-      await waitFor(() => {
-        expect(Share.share).toHaveBeenCalled();
-      });
-    });
-
-    it('handles share error gracefully', async () => {
-      const mockCertificates: DelayCertificate[] = [
-        {
-          id: 'cert-1',
-          certificateNumber: 'DC-2024-001',
-          userId: 'test-user-id',
-          date: new Date('2024-01-15').toISOString(),
-          lineId: '2',
-          stationName: '강남',
-          delayMinutes: 10,
-          scheduledTime: '08:30',
-          actualTime: '08:40',
-        },
-      ];
-      (delayHistoryService.getUserCertificates as jest.Mock).mockResolvedValue(
-        mockCertificates
-      );
+    it('shows error alert when text share fails', async () => {
+      mockCerts([makeCert({ id: 'cert-1' })]);
       (Share.share as jest.Mock).mockRejectedValue(new Error('Share failed'));
 
-      const { getByText } = render(<DelayCertificateScreen />);
+      const { getByTestId } = render(<DelayCertificateScreen />);
 
       await waitFor(() => {
-        expect(getByText('DC-2024-001')).toBeTruthy();
+        expect(screen.queryByTestId('issued-tab')).not.toBeNull();
       });
-
-      fireEvent.press(getByText('공유'));
+      fireEvent.press(getByTestId('issued-tab'));
+      fireEvent.press(getByTestId('text-share-cert-1'));
 
       await waitFor(() => {
         expect(Alert.alert).toHaveBeenCalledWith('오류', '공유에 실패했습니다.');
       });
     });
-  });
 
-  // ========== Certificate Deletion Tests ==========
-  describe('Certificate Deletion', () => {
-    it('shows delete confirmation alert', async () => {
-      const mockCertificates: DelayCertificate[] = [
-        {
-          id: 'cert-1',
-          certificateNumber: 'DC-2024-001',
-          userId: 'test-user-id',
-          date: new Date('2024-01-15').toISOString(),
-          lineId: '2',
-          stationName: '강남',
-          delayMinutes: 10,
-          scheduledTime: '08:30',
-          actualTime: '08:40',
-        },
-      ];
-      (delayHistoryService.getUserCertificates as jest.Mock).mockResolvedValue(
-        mockCertificates
+    it('confirms deletion and calls deleteCertificate', async () => {
+      mockCerts([makeCert({ id: 'cert-1' })]);
+
+      let deleteHandler: (() => Promise<void>) | null = null;
+      (Alert.alert as jest.Mock).mockImplementation(
+        (
+          _title: string,
+          _message: string,
+          buttons?: { style?: string; onPress?: () => Promise<void> }[]
+        ) => {
+          const destructive = buttons?.find((b) => b.style === 'destructive');
+          if (destructive) deleteHandler = destructive.onPress ?? null;
+        }
       );
 
-      const { getByText } = render(<DelayCertificateScreen />);
+      const { getByTestId } = render(<DelayCertificateScreen />);
 
       await waitFor(() => {
-        expect(getByText('DC-2024-001')).toBeTruthy();
+        expect(screen.queryByTestId('issued-tab')).not.toBeNull();
       });
+      fireEvent.press(getByTestId('issued-tab'));
+      fireEvent.press(getByTestId('delete-cert-cert-1'));
 
-      fireEvent.press(getByText('삭제'));
+      expect(Alert.alert).toHaveBeenCalledWith(
+        '증명서 삭제',
+        '이 지연증명서를 삭제하시겠습니까?',
+        expect.any(Array)
+      );
+
+      if (deleteHandler) {
+        await (deleteHandler as () => Promise<void>)();
+      }
 
       await waitFor(() => {
-        expect(Alert.alert).toHaveBeenCalledWith(
-          '증명서 삭제',
-          '이 지연증명서를 삭제하시겠습니까?',
-          expect.any(Array)
+        expect(delayHistoryService.deleteCertificate).toHaveBeenCalledWith(
+          'cert-1'
         );
       });
     });
 
-    it('cancels deletion without calling delete service', async () => {
-      const mockCertificates: DelayCertificate[] = [
-        {
-          id: 'cert-1',
-          certificateNumber: 'DC-2024-001',
-          userId: 'test-user-id',
-          date: new Date('2024-01-15').toISOString(),
-          lineId: '2',
-          stationName: '강남',
-          delayMinutes: 10,
-          scheduledTime: '08:30',
-          actualTime: '08:40',
-        },
-      ];
-      (delayHistoryService.getUserCertificates as jest.Mock).mockResolvedValue(
-        mockCertificates
-      );
+    it('cancel button does not delete the certificate', async () => {
+      mockCerts([makeCert({ id: 'cert-1' })]);
 
       let cancelHandler: (() => void) | null = null;
-      (Alert.alert as jest.Mock).mockImplementation((_title: string, _message: string, buttons: { style?: string; onPress?: () => void }[]) => {
-        const cancelBtn = buttons.find((btn) => btn.style === 'cancel');
-        if (cancelBtn) cancelHandler = cancelBtn.onPress ?? null;
-      });
+      (Alert.alert as jest.Mock).mockImplementation(
+        (
+          _title: string,
+          _message: string,
+          buttons?: { style?: string; onPress?: () => void }[]
+        ) => {
+          const cancel = buttons?.find((b) => b.style === 'cancel');
+          if (cancel) cancelHandler = cancel.onPress ?? null;
+        }
+      );
 
-      const { getByText } = render(<DelayCertificateScreen />);
+      const { getByTestId } = render(<DelayCertificateScreen />);
 
       await waitFor(() => {
-        expect(getByText('DC-2024-001')).toBeTruthy();
+        expect(screen.queryByTestId('issued-tab')).not.toBeNull();
       });
+      fireEvent.press(getByTestId('issued-tab'));
+      fireEvent.press(getByTestId('delete-cert-cert-1'));
 
-      fireEvent.press(getByText('삭제'));
       if (cancelHandler) (cancelHandler as () => void)();
 
       expect(delayHistoryService.deleteCertificate).not.toHaveBeenCalled();
     });
-
-    it('confirms deletion and refreshes data', async () => {
-      const mockCertificates: DelayCertificate[] = [
-        {
-          id: 'cert-1',
-          certificateNumber: 'DC-2024-001',
-          userId: 'test-user-id',
-          date: new Date('2024-01-15').toISOString(),
-          lineId: '2',
-          stationName: '강남',
-          delayMinutes: 10,
-          scheduledTime: '08:30',
-          actualTime: '08:40',
-        },
-      ];
-      (delayHistoryService.getUserCertificates as jest.Mock).mockResolvedValue(
-        mockCertificates
-      );
-
-      let deleteHandler: (() => Promise<void>) | null = null;
-      (Alert.alert as jest.Mock).mockImplementation((_title: string, _message: string, buttons: { style?: string; onPress?: () => Promise<void> }[]) => {
-        const deleteBtn = buttons.find((btn) => btn.style === 'destructive');
-        if (deleteBtn) deleteHandler = deleteBtn.onPress ?? null;
-      });
-
-      const { getByText } = render(<DelayCertificateScreen />);
-
-      await waitFor(() => {
-        expect(getByText('DC-2024-001')).toBeTruthy();
-      });
-
-      fireEvent.press(getByText('삭제'));
-
-      if (deleteHandler) {
-        await (deleteHandler as () => Promise<void>)();
-      }
-
-      await waitFor(() => {
-        expect(delayHistoryService.deleteCertificate).toHaveBeenCalledWith('cert-1');
-      });
-    });
-
-    it('reloads data after successful deletion', async () => {
-      const mockCertificates: DelayCertificate[] = [
-        {
-          id: 'cert-1',
-          certificateNumber: 'DC-2024-001',
-          userId: 'test-user-id',
-          date: new Date('2024-01-15').toISOString(),
-          lineId: '2',
-          stationName: '강남',
-          delayMinutes: 10,
-          scheduledTime: '08:30',
-          actualTime: '08:40',
-        },
-      ];
-      (delayHistoryService.getUserCertificates as jest.Mock).mockResolvedValue(
-        mockCertificates
-      );
-
-      let deleteHandler: (() => Promise<void>) | null = null;
-      (Alert.alert as jest.Mock).mockImplementation((_title: string, _message: string, buttons: { style?: string; onPress?: () => Promise<void> }[]) => {
-        const deleteBtn = buttons.find((btn) => btn.style === 'destructive');
-        if (deleteBtn) deleteHandler = deleteBtn.onPress ?? null;
-      });
-
-      const { getByText } = render(<DelayCertificateScreen />);
-
-      await waitFor(() => {
-        expect(getByText('DC-2024-001')).toBeTruthy();
-      });
-
-      const initialCallCount = (delayHistoryService.getUserCertificates as jest.Mock).mock
-        .calls.length;
-
-      fireEvent.press(getByText('삭제'));
-
-      if (deleteHandler) {
-        await (deleteHandler as () => Promise<void>)();
-      }
-
-      await waitFor(() => {
-        expect((delayHistoryService.getUserCertificates as jest.Mock).mock.calls.length).toBeGreaterThan(
-          initialCallCount
-        );
-      });
-    });
   });
 
-  // ========== Certificate Generation Tests ==========
-  describe('Certificate Generation from History', () => {
-    it('allows generating certificate from history item', async () => {
-      const mockHistory: DelayHistoryEntry[] = [
-        {
-          id: 'hist-1',
-          userId: 'test-user-id',
-          lineId: '3',
-          stationName: '교대',
-          delayMinutes: 5,
-          timestamp: new Date('2024-01-15T09:00:00').toISOString(),
-          reason: 'signal_failure',
-          certificateGenerated: false,
-        },
-      ];
-      (delayHistoryService.getUserHistory as jest.Mock).mockResolvedValue(
-        mockHistory
-      );
-
-      const { getByText, getByTestId } = render(<DelayCertificateScreen />);
-
-      await waitFor(() => {
-        expect(getByText('이력 (1)')).toBeTruthy();
-      });
-
-      fireEvent.press(getByTestId('history-tab'));
-      fireEvent.press(getByText('탭하여 증명서 발급'));
-
-      await waitFor(() => {
-        expect(delayHistoryService.generateCertificate).toHaveBeenCalledWith(
-          'hist-1',
-          expect.any(String),
-          expect.any(String)
-        );
-      });
-    });
-
-    it('shows alert when certificate already generated', async () => {
-      const mockHistory: DelayHistoryEntry[] = [
-        {
-          id: 'hist-1',
-          userId: 'test-user-id',
-          lineId: '3',
-          stationName: '교대',
-          delayMinutes: 5,
-          timestamp: new Date('2024-01-15T09:00:00').toISOString(),
-          reason: 'signal_failure',
-          certificateGenerated: true,
-        },
-      ];
-      (delayHistoryService.getUserHistory as jest.Mock).mockResolvedValue(
-        mockHistory
-      );
-
-      const { getByText, getByTestId } = render(<DelayCertificateScreen />);
-
-      await waitFor(() => {
-        expect(getByText('이력 (1)')).toBeTruthy();
-      });
-
-      fireEvent.press(getByTestId('history-tab'));
-
-      // Try to press the disabled item - it should be disabled, so press won't trigger generation
-      expect(delayHistoryService.generateCertificate).not.toHaveBeenCalled();
-    });
-
-    it('shows success alert after generating certificate', async () => {
-      const mockHistory: DelayHistoryEntry[] = [
-        {
-          id: 'hist-1',
-          userId: 'test-user-id',
-          lineId: '3',
-          stationName: '교대',
-          delayMinutes: 5,
-          timestamp: new Date('2024-01-15T09:00:00').toISOString(),
-          reason: 'signal_failure',
-          certificateGenerated: false,
-        },
-      ];
-      (delayHistoryService.getUserHistory as jest.Mock).mockResolvedValue(
-        mockHistory
-      );
-      (delayHistoryService.generateCertificate as jest.Mock).mockResolvedValue({
-        id: 'cert-1',
-        certificateNumber: 'DC-2024-001',
-      });
-
-      const { getByText, getByTestId } = render(<DelayCertificateScreen />);
-
-      await waitFor(() => {
-        expect(getByText('이력 (1)')).toBeTruthy();
-      });
-
-      fireEvent.press(getByTestId('history-tab'));
-      fireEvent.press(getByText('탭하여 증명서 발급'));
-
-      await waitFor(() => {
-        expect(Alert.alert).toHaveBeenCalledWith('발급 완료', '지연증명서가 발급되었습니다.');
-      });
-    });
-
-    it('reloads data after generating certificate', async () => {
-      const mockHistory: DelayHistoryEntry[] = [
-        {
-          id: 'hist-1',
-          userId: 'test-user-id',
-          lineId: '3',
-          stationName: '교대',
-          delayMinutes: 5,
-          timestamp: new Date('2024-01-15T09:00:00').toISOString(),
-          reason: 'signal_failure',
-          certificateGenerated: false,
-        },
-      ];
-      (delayHistoryService.getUserHistory as jest.Mock).mockResolvedValue(
-        mockHistory
-      );
-      (delayHistoryService.generateCertificate as jest.Mock).mockResolvedValue({
-        id: 'cert-1',
-      });
-
-      const { getByText, getByTestId } = render(<DelayCertificateScreen />);
-
-      await waitFor(() => {
-        expect(getByText('이력 (1)')).toBeTruthy();
-      });
-
-      const initialCallCount = (delayHistoryService.getUserHistory as jest.Mock).mock
-        .calls.length;
-
-      fireEvent.press(getByTestId('history-tab'));
-      fireEvent.press(getByText('탭하여 증명서 발급'));
-
-      await waitFor(() => {
-        expect((delayHistoryService.getUserHistory as jest.Mock).mock.calls.length).toBeGreaterThan(
-          initialCallCount
-        );
-      });
-    });
-
-    it('does not show success alert if generation returns null', async () => {
-      const mockHistory: DelayHistoryEntry[] = [
-        {
-          id: 'hist-1',
-          userId: 'test-user-id',
-          lineId: '3',
-          stationName: '교대',
-          delayMinutes: 5,
-          timestamp: new Date('2024-01-15T09:00:00').toISOString(),
-          reason: 'signal_failure',
-          certificateGenerated: false,
-        },
-      ];
-      (delayHistoryService.getUserHistory as jest.Mock).mockResolvedValue(
-        mockHistory
-      );
-      (delayHistoryService.generateCertificate as jest.Mock).mockResolvedValue(null);
-
-      const { getByText, getByTestId } = render(<DelayCertificateScreen />);
-
-      await waitFor(() => {
-        expect(getByText('이력 (1)')).toBeTruthy();
-      });
-
-      fireEvent.press(getByTestId('history-tab'));
-      fireEvent.press(getByText('탭하여 증명서 발급'));
-
-      await waitFor(() => {
-        expect(delayHistoryService.generateCertificate).toHaveBeenCalled();
-      });
-    });
-  });
-
-  // ========== Sample Data Tests ==========
-  describe('Sample Data (Development)', () => {
-    it('adds sample data and shows success alert', async () => {
-      const { getByText } = render(<DelayCertificateScreen />);
-
-      fireEvent.press(getByText('샘플 데이터 추가 (개발용)'));
-
-      await waitFor(() => {
-        expect(delayHistoryService.addSampleData).toHaveBeenCalledWith('test-user-id');
-      });
-
-      expect(Alert.alert).toHaveBeenCalledWith('완료', '샘플 데이터가 추가되었습니다.');
-    });
-
-    it('reloads data after adding sample data', async () => {
-      const { getByText } = render(<DelayCertificateScreen />);
-
-      const initialCallCount = (delayHistoryService.getUserCertificates as jest.Mock).mock
-        .calls.length;
-
-      fireEvent.press(getByText('샘플 데이터 추가 (개발용)'));
-
-      await waitFor(() => {
-        expect((delayHistoryService.getUserCertificates as jest.Mock).mock.calls.length).toBeGreaterThan(
-          initialCallCount
-        );
-      });
-    });
-
-    it('handles sample data addition error', async () => {
-      (delayHistoryService.addSampleData as jest.Mock).mockRejectedValue(
-        new Error('Add sample failed')
-      );
-
-      const { getByText } = render(<DelayCertificateScreen />);
-
-      fireEvent.press(getByText('샘플 데이터 추가 (개발용)'));
-
-      await waitFor(() => {
-        expect(Alert.alert).toHaveBeenCalledWith('오류', '샘플 데이터 추가에 실패했습니다.');
-      });
-    });
-  });
-
-  // ========== Data Loading & Refresh Tests ==========
-  describe('Data Loading and Refresh', () => {
-    it('does not load data when user is null', () => {
+  // ========== Data loading edge cases ==========
+  describe('Data loading', () => {
+    it('does not call services when user is null', async () => {
       (useAuth as jest.Mock).mockReturnValue({ user: null });
 
       render(<DelayCertificateScreen />);
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('hero-empty')).not.toBeNull();
+      });
       expect(delayHistoryService.getUserCertificates).not.toHaveBeenCalled();
+      expect(delayHistoryService.getUserHistory).not.toHaveBeenCalled();
     });
 
-    it('loads both certificates and history on mount', () => {
-      render(<DelayCertificateScreen />);
-
-      expect(delayHistoryService.getUserCertificates).toHaveBeenCalledWith('test-user-id');
-      expect(delayHistoryService.getUserHistory).toHaveBeenCalledWith('test-user-id');
-    });
-
-    it('handles data loading errors gracefully', async () => {
+    it('renders empty states gracefully when loading fails', async () => {
+      (delayHistoryService.getUserHistory as jest.Mock).mockRejectedValue(
+        new Error('Load failed')
+      );
       (delayHistoryService.getUserCertificates as jest.Mock).mockRejectedValue(
         new Error('Load failed')
       );
@@ -847,218 +661,49 @@ describe('DelayCertificateScreen', () => {
       const { getByText } = render(<DelayCertificateScreen />);
 
       await waitFor(() => {
-        expect(getByText('발급된 증명서가 없습니다')).toBeTruthy();
+        expect(screen.queryByTestId('hero-empty')).not.toBeNull();
       });
+      expect(getByText('지연 이력이 없어요')).toHaveTextContent('지연 이력이 없어요');
     });
-  });
 
-  // ========== History with Reason Display Tests ==========
-  describe('History with Reason Display', () => {
-    it('displays reason label when history entry has reason', async () => {
-      const mockHistory: DelayHistoryEntry[] = [
-        {
-          id: 'hist-1',
-          userId: 'test-user-id',
-          lineId: '3',
-          stationName: '교대',
-          delayMinutes: 5,
-          timestamp: new Date('2024-01-15T09:00:00').toISOString(),
-          reason: 'signal_failure',
-          certificateGenerated: false,
-        },
-      ];
-      (delayHistoryService.getUserHistory as jest.Mock).mockResolvedValue(
-        mockHistory
+    it('adds sample data in dev mode and reloads', async () => {
+      const { getByTestId } = render(<DelayCertificateScreen />);
+
+      await waitFor(() => {
+        expect(screen.queryByTestId('add-sample-data')).not.toBeNull();
+      });
+
+      fireEvent.press(getByTestId('add-sample-data'));
+
+      await waitFor(() => {
+        expect(delayHistoryService.addSampleData).toHaveBeenCalledWith(
+          'test-user-id'
+        );
+      });
+      expect(Alert.alert).toHaveBeenCalledWith(
+        '완료',
+        '샘플 데이터가 추가되었습니다.'
+      );
+    });
+
+    it('shows error alert when adding sample data fails', async () => {
+      (delayHistoryService.addSampleData as jest.Mock).mockRejectedValue(
+        new Error('Add sample failed')
       );
 
-      const { getByText, getByTestId } = render(<DelayCertificateScreen />);
+      const { getByTestId } = render(<DelayCertificateScreen />);
 
       await waitFor(() => {
-        expect(getByText('이력 (1)')).toBeTruthy();
+        expect(screen.queryByTestId('add-sample-data')).not.toBeNull();
       });
 
-      fireEvent.press(getByTestId('history-tab'));
-
-      // Check that reason is displayed
-      expect(getByText(/사유:/)).toBeTruthy();
-    });
-
-    it('omits reason display when history entry has no reason', async () => {
-      const mockHistory: DelayHistoryEntry[] = [
-        {
-          id: 'hist-1',
-          userId: 'test-user-id',
-          lineId: '3',
-          stationName: '교대',
-          delayMinutes: 5,
-          timestamp: new Date('2024-01-15T09:00:00').toISOString(),
-          reason: undefined,
-          certificateGenerated: false,
-        },
-      ];
-      (delayHistoryService.getUserHistory as jest.Mock).mockResolvedValue(
-        mockHistory
-      );
-
-      const { getByText, getByTestId, queryByText } = render(<DelayCertificateScreen />);
+      fireEvent.press(getByTestId('add-sample-data'));
 
       await waitFor(() => {
-        expect(getByText('이력 (1)')).toBeTruthy();
-      });
-
-      fireEvent.press(getByTestId('history-tab'));
-
-      // Reason label should not be visible
-      expect(queryByText(/사유:/)).toBeFalsy();
-    });
-  });
-
-  // ========== Edge Cases & Empty States ==========
-  describe('Edge Cases', () => {
-    it('handles empty certificates and history', async () => {
-      (delayHistoryService.getUserCertificates as jest.Mock).mockResolvedValue([]);
-      (delayHistoryService.getUserHistory as jest.Mock).mockResolvedValue([]);
-
-      const { getByText } = render(<DelayCertificateScreen />);
-
-      await waitFor(() => {
-        expect(getByText('증명서 (0)')).toBeTruthy();
-        expect(getByText('이력 (0)')).toBeTruthy();
-      });
-
-      expect(getByText('발급된 증명서가 없습니다')).toBeTruthy();
-    });
-
-    it('displays correct empty state message for history tab', async () => {
-      (delayHistoryService.getUserCertificates as jest.Mock).mockResolvedValue([]);
-      (delayHistoryService.getUserHistory as jest.Mock).mockResolvedValue([]);
-
-      const { getByText, getByTestId } = render(<DelayCertificateScreen />);
-
-      await waitFor(() => {
-        expect(getByText('이력 (0)')).toBeTruthy();
-      });
-
-      fireEvent.press(getByTestId('history-tab'));
-      expect(getByText('지연 이력이 없습니다')).toBeTruthy();
-    });
-
-    it('shows empty state subtitle with appropriate message', () => {
-      const { getByText, getByTestId } = render(<DelayCertificateScreen />);
-      // Switch to history tab to see history empty state message
-      fireEvent.press(getByTestId('history-tab'));
-      expect(
-        getByText(/지연이 감지되면 자동으로 기록됩니다/)
-      ).toBeTruthy();
-    });
-
-    it('calculates correct times for certificate generation', async () => {
-      const mockHistory: DelayHistoryEntry[] = [
-        {
-          id: 'hist-1',
-          userId: 'test-user-id',
-          lineId: '3',
-          stationName: '교대',
-          delayMinutes: 10,
-          timestamp: new Date('2024-01-15T09:00:00').toISOString(),
-          reason: 'signal_failure',
-          certificateGenerated: false,
-        },
-      ];
-      (delayHistoryService.getUserHistory as jest.Mock).mockResolvedValue(
-        mockHistory
-      );
-
-      const { getByText, getByTestId } = render(<DelayCertificateScreen />);
-
-      await waitFor(() => {
-        expect(getByText('이력 (1)')).toBeTruthy();
-      });
-
-      fireEvent.press(getByTestId('history-tab'));
-      fireEvent.press(getByText('탭하여 증명서 발급'));
-
-      await waitFor(() => {
-        // Verify that times were calculated
-        expect(delayHistoryService.generateCertificate).toHaveBeenCalled();
-        const call = (delayHistoryService.generateCertificate as jest.Mock).mock
-          .calls[0];
-        expect(call[0]).toBe('hist-1');
-        expect(call[1]).toBeTruthy(); // scheduled time
-        expect(call[2]).toBeTruthy(); // actual time
-      });
-    });
-  });
-
-  // ========== Tab Count Updates ==========
-  describe('Tab Count Updates', () => {
-    it('updates certificate count when data loads', async () => {
-      const mockCertificates: DelayCertificate[] = [
-        {
-          id: 'cert-1',
-          certificateNumber: 'DC-2024-001',
-          userId: 'test-user-id',
-          date: new Date('2024-01-15').toISOString(),
-          lineId: '2',
-          stationName: '강남',
-          delayMinutes: 10,
-          scheduledTime: '08:30',
-          actualTime: '08:40',
-        },
-        {
-          id: 'cert-2',
-          certificateNumber: 'DC-2024-002',
-          userId: 'test-user-id',
-          date: new Date('2024-01-16').toISOString(),
-          lineId: '3',
-          stationName: '교대',
-          delayMinutes: 5,
-          scheduledTime: '09:15',
-          actualTime: '09:20',
-        },
-      ];
-      (delayHistoryService.getUserCertificates as jest.Mock).mockResolvedValue(
-        mockCertificates
-      );
-
-      const { getByText } = render(<DelayCertificateScreen />);
-
-      await waitFor(() => {
-        expect(getByText('증명서 (2)')).toBeTruthy();
-      });
-    });
-
-    it('updates history count when data loads', async () => {
-      const mockHistory: DelayHistoryEntry[] = [
-        {
-          id: 'hist-1',
-          userId: 'test-user-id',
-          lineId: '3',
-          stationName: '교대',
-          delayMinutes: 5,
-          timestamp: new Date('2024-01-15T09:00:00').toISOString(),
-          reason: 'signal_failure',
-          certificateGenerated: false,
-        },
-        {
-          id: 'hist-2',
-          userId: 'test-user-id',
-          lineId: '2',
-          stationName: '강남',
-          delayMinutes: 8,
-          timestamp: new Date('2024-01-15T10:00:00').toISOString(),
-          reason: 'power_failure',
-          certificateGenerated: true,
-        },
-      ];
-      (delayHistoryService.getUserHistory as jest.Mock).mockResolvedValue(
-        mockHistory
-      );
-
-      const { getByText } = render(<DelayCertificateScreen />);
-
-      await waitFor(() => {
-        expect(getByText('이력 (2)')).toBeTruthy();
+        expect(Alert.alert).toHaveBeenCalledWith(
+          '오류',
+          '샘플 데이터 추가에 실패했습니다.'
+        );
       });
     });
   });
