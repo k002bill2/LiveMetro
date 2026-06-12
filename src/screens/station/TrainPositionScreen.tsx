@@ -30,6 +30,7 @@ import { useTheme } from '@/services/theme/themeContext';
 import { useTrainPositions } from '@/hooks/useTrainPositions';
 import { DirectionSegment, type DirectionValue } from '@/components/station/DirectionSegment';
 import { StationTimelineRow, TIMELINE_ROW_HEIGHT } from '@/components/station/StationTimelineRow';
+import { TrainMarkerOverlay, type OverlayTrain } from '@/components/station/TrainMarkerOverlay';
 import { LineBadge, type LineId } from '@/components/design';
 import {
   getLineBranches,
@@ -109,6 +110,19 @@ const TrainPositionScreen: React.FC = () => {
     for (const list of trainsByStation.values()) count += list.length;
     return count;
   }, [trainsByStation]);
+
+  // Overlay cards keyed by trainNo: each train carries its timeline row
+  // index so TrainMarkerOverlay can slide it to the new offset on refresh.
+  const overlayTrains = useMemo(() => {
+    if (!branch) return [];
+    const result: OverlayTrain[] = [];
+    branch.stationIds.forEach((stationId, stationIndex) => {
+      const list = trainsByStation.get(stationId);
+      if (!list) return;
+      for (const train of list) result.push({ train, stationIndex });
+    });
+    return result;
+  }, [branch, trainsByStation]);
 
   // Direction labels: loop trunk uses 내선순환/외선순환 (directionToDisplay
   // handles Line 2); Line 2 branches run plain 상행/하행 service.
@@ -284,6 +298,20 @@ const TrainPositionScreen: React.FC = () => {
           getItemLayout={getItemLayout}
           initialScrollIndex={initialScrollIndex}
           contentContainerStyle={styles.listContent}
+          // Zero-height header: marker cards live in content coordinates so
+          // they scroll with the rows and can animate across station rows.
+          // Remounted (key) on branch/direction switch to avoid cross-branch
+          // slide artifacts; clipping off so off-screen cards stay drawn.
+          ListHeaderComponent={
+            <TrainMarkerOverlay
+              key={`${branch?.key ?? ''}-${direction}`}
+              trains={overlayTrains}
+              lineColor={lineColor}
+              testID="train-position-overlay"
+            />
+          }
+          ListHeaderComponentStyle={styles.overlayHeader}
+          removeClippedSubviews={false}
           testID="train-position-list"
         />
       )}
@@ -352,6 +380,9 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: WANTED_TOKENS.spacing.s4,
     paddingBottom: WANTED_TOKENS.spacing.s8,
+  },
+  overlayHeader: {
+    zIndex: 10,
   },
 });
 

@@ -27,6 +27,10 @@ jest.mock('@/hooks/useTrainPositions', () => ({
   useTrainPositions: jest.fn(),
 }));
 
+// TrainMarkerOverlay cards animate via Animated.timing (setTimeout-driven in
+// jest); fake timers keep frames from firing outside act() after teardown.
+jest.useFakeTimers();
+
 const mockedUseTrainPositions = useTrainPositions as jest.Mock;
 
 const buildPosition = (overrides: Partial<TrainPosition> = {}): TrainPosition => ({
@@ -88,12 +92,12 @@ describe('TrainPositionScreen', () => {
     expect(queryByTestId('train-position-row-city_hall_1')).toBeNull();
   });
 
-  it('joins trains onto their station row by normalized name', () => {
+  it('joins trains onto the overlay marker by normalized name', () => {
     mockedUseTrainPositions.mockReturnValue(
       okState([buildPosition({ trainNo: '2438', stationName: '시청' })])
     );
     const { getByTestId } = render(<TrainPositionScreen />);
-    expect(getByTestId('train-position-row-city_hall_1-marker-2438')).toBeTruthy();
+    expect(getByTestId('train-position-overlay-marker-2438', { includeHiddenElements: true })).toBeTruthy();
   });
 
   it('filters markers by the selected direction (down train hidden on up)', () => {
@@ -101,10 +105,10 @@ describe('TrainPositionScreen', () => {
       okState([buildPosition({ trainNo: '2445', direction: 'down' })])
     );
     const { queryByTestId, getByTestId } = render(<TrainPositionScreen />);
-    expect(queryByTestId('train-position-row-city_hall_1-marker-2445')).toBeNull();
+    expect(queryByTestId('train-position-overlay-marker-2445', { includeHiddenElements: true })).toBeNull();
 
     fireEvent.press(getByTestId('train-position-direction-down'));
-    expect(getByTestId('train-position-row-city_hall_1-marker-2445')).toBeTruthy();
+    expect(getByTestId('train-position-overlay-marker-2445', { includeHiddenElements: true })).toBeTruthy();
   });
 
   it('skips trains whose station name fails the join (no crash, no marker)', () => {
@@ -113,7 +117,21 @@ describe('TrainPositionScreen', () => {
     );
     const { queryByTestId, getByTestId } = render(<TrainPositionScreen />);
     expect(getByTestId('train-position-list')).toBeTruthy();
-    expect(queryByTestId('train-position-row-city_hall_1-marker-9999')).toBeNull();
+    expect(queryByTestId('train-position-overlay-marker-9999', { includeHiddenElements: true })).toBeNull();
+  });
+
+  it('keeps a single marker per trainNo after a poll moves the train (animated, not remounted)', () => {
+    mockedUseTrainPositions.mockReturnValue(
+      okState([buildPosition({ trainNo: '2438', stationName: '시청', status: 'arrived' })])
+    );
+    const { rerender, getAllByTestId } = render(<TrainPositionScreen />);
+
+    mockedUseTrainPositions.mockReturnValue(
+      okState([buildPosition({ trainNo: '2438', stationName: '충정로', status: 'entering' })])
+    );
+    rerender(<TrainPositionScreen />);
+
+    expect(getAllByTestId('train-position-overlay-marker-2438', { includeHiddenElements: true })).toHaveLength(1);
   });
 
   it('hides the chip row for single-trunk lines and shows 상행/하행', () => {
@@ -172,7 +190,9 @@ describe('TrainPositionScreen', () => {
     );
     const { getByTestId, getByText } = render(<TrainPositionScreen />);
     expect(getByTestId('train-position-row-wangsimni')).toBeTruthy();
-    expect(getByTestId('train-position-row-wangsimni-marker-6152')).toBeTruthy();
+    expect(
+      getByTestId('train-position-overlay-marker-6152', { includeHiddenElements: true })
+    ).toBeTruthy();
     expect(getByText('운행 중 1대')).toBeTruthy();
   });
 

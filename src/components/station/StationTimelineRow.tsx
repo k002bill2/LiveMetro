@@ -4,9 +4,9 @@
  *
  * Layout: fixed-height flex row with an absolutely-positioned vertical rail
  * (RN has no CSS grid — rail halves are cut at the first/last row of a
- * non-loop branch). Train markers sit on the rail: at the station dot for
- * arrived/departed trains, on the upper half (toward the previous station)
- * for entering / departed-previous trains.
+ * non-loop branch). Visual train cards are NOT rendered here — they live in
+ * TrainMarkerOverlay so they can animate across rows; this row only reserves
+ * the marker column and announces its trains for accessibility.
  */
 import React, { memo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
@@ -17,6 +17,12 @@ import { positionStatusToDisplay } from '@/models/trainPosition';
 
 /** Fixed row height — required by FlatList getItemLayout. */
 export const TIMELINE_ROW_HEIGHT = 72;
+
+/** Rail column width — TrainMarkerOverlay offsets its cards past this. */
+export const RAIL_ZONE_WIDTH = 36;
+
+/** Marker column width reserved between the rail and the station name. */
+export const MARKER_ZONE_WIDTH = 120;
 
 export interface StationTimelineRowProps {
   stationName: string;
@@ -30,13 +36,6 @@ export interface StationTimelineRowProps {
   lineColor: string;
   testID?: string;
 }
-
-const trainMarkerLabel = (train: TrainPosition): string => {
-  const flags = [train.isExpress ? '급행' : null, train.isLastTrain ? '막차' : null]
-    .filter(Boolean)
-    .join('·');
-  return flags ? `${train.trainNo} ${flags}` : train.trainNo;
-};
 
 const StationTimelineRowImpl: React.FC<StationTimelineRowProps> = ({
   stationName,
@@ -54,40 +53,12 @@ const StationTimelineRowImpl: React.FC<StationTimelineRowProps> = ({
   const cutTop = !isLoop && isFirst;
   const cutBottom = !isLoop && isLast;
 
-  // A train rendered "between" stations (entering / departed_prev) sits on
-  // the upper rail half; arrived/departed trains sit at the dot.
-  const betweenTrains = trains.filter(
-    (t) => t.status === 'entering' || t.status === 'departed_prev'
-  );
-  const atStationTrains = trains.filter(
-    (t) => t.status !== 'entering' && t.status !== 'departed_prev'
-  );
-
   const a11ySummary =
     trains.length > 0
       ? `${stationName}, 열차 ${trains.length}대 — ${trains
           .map((t) => `${t.terminalName}행 ${positionStatusToDisplay(t.status)}`)
           .join(', ')}`
       : stationName;
-
-  const renderMarker = (train: TrainPosition, between: boolean): React.ReactElement => (
-    <View
-      key={`${train.trainNo}-${train.status}`}
-      style={[
-        styles.marker,
-        between ? styles.markerBetween : styles.markerAtStation,
-        { backgroundColor: semantic.bgBase, borderColor: lineColor },
-      ]}
-      testID={testID ? `${testID}-marker-${train.trainNo}` : undefined}
-    >
-      <Text style={[styles.markerTrainNo, { color: semantic.labelStrong }]} numberOfLines={1}>
-        {trainMarkerLabel(train)}
-      </Text>
-      <Text style={[styles.markerDest, { color: semantic.labelAlt }]} numberOfLines={1}>
-        {train.terminalName}행 {positionStatusToDisplay(train.status)}
-      </Text>
-    </View>
-  );
 
   return (
     <View
@@ -112,11 +83,6 @@ const StationTimelineRowImpl: React.FC<StationTimelineRowProps> = ({
         />
       </View>
 
-      <View style={styles.markerZone} pointerEvents="none">
-        {betweenTrains.map((t) => renderMarker(t, true))}
-        {atStationTrains.map((t) => renderMarker(t, false))}
-      </View>
-
       <View style={styles.nameZone}>
         <Text
           style={[
@@ -131,9 +97,6 @@ const StationTimelineRowImpl: React.FC<StationTimelineRowProps> = ({
     </View>
   );
 };
-
-const RAIL_ZONE_WIDTH = 36;
-const MARKER_ZONE_WIDTH = 120;
 
 const styles = StyleSheet.create({
   row: {
@@ -166,32 +129,6 @@ const styles = StyleSheet.create({
     height: 12,
     borderRadius: 6,
     borderWidth: 3,
-  },
-  markerZone: {
-    position: 'absolute',
-    left: RAIL_ZONE_WIDTH + WANTED_TOKENS.spacing.s1,
-    width: MARKER_ZONE_WIDTH,
-    height: '100%',
-    justifyContent: 'center',
-  },
-  marker: {
-    borderWidth: 1.5,
-    borderRadius: WANTED_TOKENS.radius.r4,
-    paddingHorizontal: WANTED_TOKENS.spacing.s2,
-    paddingVertical: 2,
-    alignSelf: 'flex-start',
-    maxWidth: MARKER_ZONE_WIDTH,
-  },
-  markerBetween: {
-    position: 'absolute',
-    top: 0,
-  },
-  markerAtStation: {},
-  markerTrainNo: {
-    ...typeStyle('caption1', '700'),
-  },
-  markerDest: {
-    ...typeStyle('caption2', '500'),
   },
   nameZone: {
     flex: 1,
