@@ -1,9 +1,9 @@
 /**
  * Delay Report Form Component
- * 실시간 지연 제보 입력 폼
+ * 실시간 지연 제보 입력 폼 — 시안 #2 풀매칭
  */
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import {
   View,
   Text,
@@ -21,8 +21,8 @@ import {
   AlertTriangle,
   Users,
   Radio,
-  OctagonX,
-  HelpCircle,
+  Ban,
+  MoreHorizontal,
   Send,
   X,
   Bookmark,
@@ -30,21 +30,26 @@ import {
   Camera,
   Mic,
   Info,
+  Search,
+  MapPin,
+  ShieldCheck,
 } from 'lucide-react-native';
+import type { LucideIcon } from 'lucide-react-native';
 
 import { useAuth } from '@/services/auth/AuthContext';
-import { useTheme, ThemeColors } from '@/services/theme';
+import { useTheme } from '@/services/theme';
 import { delayReportService } from '@/services/delay/delayReportService';
 import {
   ReportType,
   ReportTypeLabels,
   ReportSeverity,
-  getReportTypeEmoji,
 } from '@/models/delayReport';
 import { getSubwayLineColor } from '@/utils/colorUtils';
-import { SPACING, RADIUS, TYPOGRAPHY, weightToFontFamily } from '@/styles/modernTheme';
+import { getDirectionOptions } from '@/utils/directionOptions';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { DelayDurationStepper } from './DelayDurationStepper';
 import { LineStationBanner } from './LineStationBanner';
+import { DirectionToggle } from './DirectionToggle';
 
 interface DelayReportFormProps {
   /** Pre-selected line ID */
@@ -61,14 +66,33 @@ interface DelayReportFormProps {
 const LINES = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const RECOMMENDED_STATIONS = ['강남', '홍대입구', '잠실', '서울역', '사당', '신도림', '여의도', '왕십리'];
 
-const REPORT_TYPES: { type: ReportType; icon: any }[] = [
-  { type: ReportType.DELAY, icon: Clock },
-  { type: ReportType.ACCIDENT, icon: AlertTriangle },
-  { type: ReportType.CROWDED, icon: Users },
-  { type: ReportType.SIGNAL_ISSUE, icon: Radio },
-  { type: ReportType.STOPPED, icon: OctagonX },
-  { type: ReportType.OTHER, icon: HelpCircle },
+/**
+ * 유형 그리드 메타 — 시안 #2의 컬러 원형 아이콘. accent는 라이트/다크 공용
+ * 브랜드성 상태색(기존 getSeverityColor 전례와 동일하게 컴포넌트 상수).
+ */
+const REPORT_TYPES: { type: ReportType; icon: LucideIcon; accent: string }[] = [
+  { type: ReportType.DELAY, icon: Clock, accent: '#F97316' },
+  { type: ReportType.SIGNAL_ISSUE, icon: Radio, accent: '#EF4444' },
+  { type: ReportType.CROWDED, icon: Users, accent: '#F59E0B' },
+  { type: ReportType.STOPPED, icon: Ban, accent: '#8B5CF6' },
+  { type: ReportType.ACCIDENT, icon: AlertTriangle, accent: '#EF4444' },
+  { type: ReportType.OTHER, icon: MoreHorizontal, accent: '#70737C' },
 ];
+
+const getSeverityFromType = (type: ReportType): ReportSeverity => {
+  switch (type) {
+    case ReportType.STOPPED:
+    case ReportType.ACCIDENT:
+      return ReportSeverity.CRITICAL;
+    case ReportType.SIGNAL_ISSUE:
+      return ReportSeverity.HIGH;
+    case ReportType.DELAY:
+    case ReportType.DOOR_ISSUE:
+      return ReportSeverity.MEDIUM;
+    default:
+      return ReportSeverity.LOW;
+  }
+};
 
 export const DelayReportForm: React.FC<DelayReportFormProps> = ({
   lineId: initialLineId,
@@ -78,17 +102,32 @@ export const DelayReportForm: React.FC<DelayReportFormProps> = ({
   onCancel,
 }) => {
   const { user } = useAuth();
-  const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const { isDark } = useTheme();
+  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   const [selectedLine, setSelectedLine] = useState<string>(initialLineId || '');
   const [stationName, setStationName] = useState(initialStationName || '');
+  const [direction, setDirection] = useState<string | null>(null);
   const [reportType, setReportType] = useState<ReportType | null>(null);
   const [description, setDescription] = useState('');
   const [estimatedDelay, setEstimatedDelay] = useState<number>(5);
   const [anonymous, setAnonymous] = useState<boolean>(true);
   const [bookmarked, setBookmarked] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // 노선·역이 정해지면 lines.json 인접성으로 방면 옵션 도출 (시안 #2 세그먼트)
+  const directionOptions = useMemo(
+    () => (selectedLine && stationName ? getDirectionOptions(selectedLine, stationName) : []),
+    [selectedLine, stationName],
+  );
+
+  // 옵션이 바뀌면 유효하지 않은 선택을 첫 옵션으로 리셋 (옵션 없으면 해제)
+  useEffect(() => {
+    setDirection(prev =>
+      prev && directionOptions.includes(prev) ? prev : directionOptions[0] ?? null,
+    );
+  }, [directionOptions]);
 
   const handleDraftSave = useCallback(() => {
     // Stub: AsyncStorage draft persistence is wired in Phase B.
@@ -147,6 +186,7 @@ export const DelayReportForm: React.FC<DelayReportFormProps> = ({
           reportType === ReportType.DELAY || reportType === ReportType.STOPPED
             ? estimatedDelay
             : undefined,
+        direction: direction ?? undefined,
       });
 
       Alert.alert('제보 완료', '소중한 제보 감사합니다!');
@@ -164,24 +204,10 @@ export const DelayReportForm: React.FC<DelayReportFormProps> = ({
     stationName,
     description,
     estimatedDelay,
+    direction,
     initialStationId,
     onSubmitSuccess,
   ]);
-
-  const getSeverityFromType = (type: ReportType): ReportSeverity => {
-    switch (type) {
-      case ReportType.STOPPED:
-      case ReportType.ACCIDENT:
-        return ReportSeverity.CRITICAL;
-      case ReportType.SIGNAL_ISSUE:
-        return ReportSeverity.HIGH;
-      case ReportType.DELAY:
-      case ReportType.DOOR_ISSUE:
-        return ReportSeverity.MEDIUM;
-      default:
-        return ReportSeverity.LOW;
-    }
-  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -196,7 +222,7 @@ export const DelayReportForm: React.FC<DelayReportFormProps> = ({
               accessibilityRole="button"
               accessibilityLabel="닫기"
             >
-              <X size={24} color={colors.textSecondary} />
+              <X size={24} color={semantic.labelStrong} />
             </TouchableOpacity>
           ) : (
             <View style={styles.closeButton} />
@@ -223,9 +249,9 @@ export const DelayReportForm: React.FC<DelayReportFormProps> = ({
         </View>
       ) : null}
 
-      {/* Line Selection */}
+      {/* Line Selection — 시안 #2: 원형 숫자 칩 */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>노선 선택</Text>
+        <Text style={styles.sectionTitle}>노선</Text>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -238,22 +264,25 @@ export const DelayReportForm: React.FC<DelayReportFormProps> = ({
             return (
               <TouchableOpacity
                 key={line}
+                testID={`line-select-${line}`}
+                accessibilityRole="button"
+                accessibilityLabel={`${line}호선 선택`}
+                accessibilityState={{ selected: isSelected }}
                 style={[
-                  styles.lineButton,
-                  {
-                    backgroundColor: isSelected ? lineColor : colors.surface,
-                    borderColor: lineColor,
-                  },
+                  styles.lineCircle,
+                  isSelected
+                    ? { backgroundColor: lineColor, borderColor: lineColor }
+                    : null,
                 ]}
                 onPress={() => setSelectedLine(line)}
               >
                 <Text
                   style={[
-                    styles.lineButtonText,
-                    { color: isSelected ? '#FFFFFF' : lineColor },
+                    styles.lineCircleText,
+                    { color: isSelected ? WANTED_TOKENS.light.labelOnColor : lineColor },
                   ]}
                 >
-                  {line}호선
+                  {line}
                 </Text>
               </TouchableOpacity>
             );
@@ -261,18 +290,22 @@ export const DelayReportForm: React.FC<DelayReportFormProps> = ({
         </ScrollView>
       </View>
 
-      {/* Station Name + recommended chip row */}
+      {/* Station Name — 검색 아이콘 + 위치 핀 내장 입력 */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>역 / 구간</Text>
-        <TextInput
-          style={styles.textInput}
-          placeholder="예: 강남, 홍대입구"
-          placeholderTextColor={colors.textTertiary}
-          value={stationName}
-          onChangeText={setStationName}
-          maxLength={20}
-        />
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.recommendedRow}>
+        <View style={styles.stationInputWrap}>
+          <Search size={20} color={semantic.labelAlt} />
+          <TextInput
+            style={styles.stationInput}
+            placeholder="예: 강남, 홍대입구"
+            placeholderTextColor={semantic.labelAlt}
+            value={stationName}
+            onChangeText={setStationName}
+            maxLength={20}
+          />
+          <MapPin size={20} color={semantic.primaryNormal} />
+        </View>
+        <View style={styles.recommendedRow}>
           {RECOMMENDED_STATIONS.map(name => {
             const isSelected = stationName === name;
             return (
@@ -290,30 +323,43 @@ export const DelayReportForm: React.FC<DelayReportFormProps> = ({
               </TouchableOpacity>
             );
           })}
-        </ScrollView>
+        </View>
+
+        {/* 방면 세그먼트 — lines.json 인접역 기반 (시안의 더미 역명 대신 실데이터) */}
+        {directionOptions.length > 0 && (
+          <View style={styles.directionWrap}>
+            <DirectionToggle
+              options={directionOptions}
+              value={direction}
+              onChange={setDirection}
+            />
+          </View>
+        )}
       </View>
 
-      {/* Report Type */}
+      {/* Report Type — 컬러 원형 아이콘 그리드 */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>제보 유형</Text>
         <View style={styles.typeGrid}>
-          {REPORT_TYPES.map(({ type, icon: Icon }) => {
+          {REPORT_TYPES.map(({ type, icon: Icon, accent }) => {
             const isSelected = reportType === type;
 
             return (
               <TouchableOpacity
                 key={type}
+                testID={`report-type-${type}`}
+                accessibilityRole="button"
+                accessibilityLabel={`${ReportTypeLabels[type]} 유형 선택`}
+                accessibilityState={{ selected: isSelected }}
                 style={[
                   styles.typeButton,
-                  isSelected && styles.typeButtonSelected,
+                  isSelected && { borderColor: accent, borderWidth: 2 },
                 ]}
                 onPress={() => setReportType(type)}
               >
-                <Text style={styles.typeEmoji}>{getReportTypeEmoji(type)}</Text>
-                <Icon
-                  size={20}
-                  color={isSelected ? colors.primary : colors.textSecondary}
-                />
+                <View style={[styles.typeIconCircle, { backgroundColor: `${accent}1A` }]}>
+                  <Icon size={20} color={accent} />
+                </View>
                 <Text
                   style={[
                     styles.typeLabel,
@@ -337,54 +383,62 @@ export const DelayReportForm: React.FC<DelayReportFormProps> = ({
         </View>
       )}
 
-      {/* Description + attachment row */}
+      {/* Description — 첨부 아이콘·카운터를 입력 박스 내부에 배치 */}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>상세 내용 (선택)</Text>
-        <TextInput
-          style={[styles.textInput, styles.textArea]}
-          placeholder="예: 2호선 강남역에서 열차가 10분째 멈춰있습니다"
-          placeholderTextColor={colors.textTertiary}
-          value={description}
-          onChangeText={setDescription}
-          multiline
-          numberOfLines={3}
-          maxLength={200}
-        />
-        <View style={styles.attachmentRow}>
-          <View style={styles.attachmentIcons}>
-            <TouchableOpacity
-              testID="attach-image"
-              onPress={() => handleAttachment('image')}
-              accessibilityRole="button"
-              accessibilityLabel="사진 첨부"
-            >
-              <ImageIcon size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              testID="attach-camera"
-              onPress={() => handleAttachment('camera')}
-              accessibilityRole="button"
-              accessibilityLabel="카메라 첨부"
-            >
-              <Camera size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              testID="attach-voice"
-              onPress={() => handleAttachment('voice')}
-              accessibilityRole="button"
-              accessibilityLabel="음성 첨부"
-            >
-              <Mic size={20} color={colors.textSecondary} />
-            </TouchableOpacity>
+        <View style={styles.sectionTitleRow}>
+          <Text style={styles.sectionTitle}>상세 내용</Text>
+          <Text style={styles.sectionTitleSuffix}>선택</Text>
+        </View>
+        <View style={styles.descriptionBox}>
+          <TextInput
+            style={styles.descriptionInput}
+            placeholder="예) 교대역 사이 신호장애로 5분째 정차 중입니다."
+            placeholderTextColor={semantic.labelAlt}
+            value={description}
+            onChangeText={setDescription}
+            multiline
+            numberOfLines={3}
+            maxLength={200}
+          />
+          <View style={styles.attachmentRow}>
+            <View style={styles.attachmentIcons}>
+              <TouchableOpacity
+                testID="attach-image"
+                onPress={() => handleAttachment('image')}
+                accessibilityRole="button"
+                accessibilityLabel="사진 첨부"
+              >
+                <ImageIcon size={20} color={semantic.labelAlt} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="attach-camera"
+                onPress={() => handleAttachment('camera')}
+                accessibilityRole="button"
+                accessibilityLabel="카메라 첨부"
+              >
+                <Camera size={20} color={semantic.labelAlt} />
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="attach-voice"
+                onPress={() => handleAttachment('voice')}
+                accessibilityRole="button"
+                accessibilityLabel="음성 첨부"
+              >
+                <Mic size={20} color={semantic.labelAlt} />
+              </TouchableOpacity>
+            </View>
+            <Text style={styles.charCount}>{description.length}/200</Text>
           </View>
-          <Text style={styles.charCount}>{description.length}/200</Text>
         </View>
       </View>
 
-      {/* Anonymous toggle */}
+      {/* Anonymous toggle — 방패 아이콘 카드 */}
       <View style={styles.section}>
-        <View style={styles.anonymousRow}>
-          <View style={{ flex: 1 }}>
+        <View style={styles.anonymousCard}>
+          <View style={styles.anonymousIconCircle}>
+            <ShieldCheck size={18} color={semantic.primaryNormal} />
+          </View>
+          <View style={styles.anonymousTextWrap}>
             <Text style={styles.anonymousTitle}>익명으로 제보</Text>
             <Text style={styles.anonymousHint}>닉네임은 김** 형태로 표시돼요</Text>
           </View>
@@ -401,7 +455,7 @@ export const DelayReportForm: React.FC<DelayReportFormProps> = ({
       {stationName ? (
         <View style={styles.gpsCardWrap}>
           <View style={styles.gpsCard} testID="gps-info-card">
-            <Info size={16} color={colors.primary} />
+            <Info size={16} color={semantic.primaryNormal} />
             <Text style={styles.gpsCardText}>
               현재 위치가 <Text style={styles.gpsCardTextStrong}>{stationName} 반경 200m</Text> 안이에요. GPS 기반 자동
               검증돼서 가중치가 올라가요.
@@ -423,8 +477,8 @@ export const DelayReportForm: React.FC<DelayReportFormProps> = ({
         >
           <Bookmark
             size={22}
-            color={bookmarked ? colors.primary : colors.textSecondary}
-            fill={bookmarked ? colors.primary : 'transparent'}
+            color={bookmarked ? semantic.primaryNormal : semantic.labelAlt}
+            fill={bookmarked ? semantic.primaryNormal : 'transparent'}
           />
         </TouchableOpacity>
         <TouchableOpacity
@@ -438,10 +492,10 @@ export const DelayReportForm: React.FC<DelayReportFormProps> = ({
           accessibilityLabel="제보 등록"
         >
           {submitting ? (
-            <ActivityIndicator color="#FFFFFF" />
+            <ActivityIndicator color={WANTED_TOKENS.light.labelOnColor} />
           ) : (
             <>
-              <Send size={20} color="#FFFFFF" />
+              <Send size={20} color={WANTED_TOKENS.light.labelOnColor} />
               <Text style={styles.submitButtonText}>제보 등록</Text>
             </>
           )}
@@ -451,30 +505,28 @@ export const DelayReportForm: React.FC<DelayReportFormProps> = ({
   );
 };
 
-const createStyles = (colors: ThemeColors) =>
+const createStyles = (semantic: WantedSemanticTheme) =>
   StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background,
+      backgroundColor: semantic.bgSubtlePage,
     },
     header: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      paddingHorizontal: SPACING.md,
-      paddingVertical: SPACING.md,
-      backgroundColor: colors.surface,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.borderLight,
+      paddingHorizontal: WANTED_TOKENS.spacing.s3,
+      paddingVertical: WANTED_TOKENS.spacing.s3,
+      backgroundColor: semantic.bgSubtlePage,
     },
     headerLeading: {
       width: 44,
     },
     title: {
-      fontSize: TYPOGRAPHY.fontSize.lg,
+      fontSize: 17,
       fontWeight: '700',
       fontFamily: weightToFontFamily('700'),
-      color: colors.textPrimary,
+      color: semantic.labelStrong,
     },
     closeButton: {
       width: 44,
@@ -483,14 +535,14 @@ const createStyles = (colors: ThemeColors) =>
       justifyContent: 'center',
     },
     draftButton: {
-      paddingHorizontal: SPACING.sm,
-      paddingVertical: SPACING.xs,
+      paddingHorizontal: WANTED_TOKENS.spacing.s2,
+      paddingVertical: WANTED_TOKENS.spacing.s1,
       minWidth: 60,
       alignItems: 'flex-end',
     },
     draftButtonText: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      color: colors.textSecondary,
+      fontSize: WANTED_TOKENS.type.label2.size,
+      color: semantic.labelAlt,
       fontWeight: '600',
       fontFamily: weightToFontFamily('600'),
     },
@@ -501,204 +553,253 @@ const createStyles = (colors: ThemeColors) =>
       paddingBottom: 96,
     },
     bannerWrap: {
-      paddingHorizontal: SPACING.lg,
-      paddingTop: SPACING.md,
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingTop: WANTED_TOKENS.spacing.s2,
     },
     section: {
-      padding: SPACING.lg,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.borderLight,
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingTop: WANTED_TOKENS.spacing.s5,
     },
     sectionTitle: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
+      fontSize: WANTED_TOKENS.type.label2.size,
       fontWeight: '600',
       fontFamily: weightToFontFamily('600'),
-      color: colors.textSecondary,
-      marginBottom: SPACING.sm,
+      color: semantic.labelNeutral,
+      marginBottom: WANTED_TOKENS.spacing.s3,
+    },
+    sectionTitleRow: {
+      flexDirection: 'row',
+      alignItems: 'baseline',
+      gap: WANTED_TOKENS.spacing.s1,
+    },
+    sectionTitleSuffix: {
+      fontSize: WANTED_TOKENS.type.caption1.size,
+      color: semantic.labelAlt,
     },
     lineSelector: {
       flexDirection: 'row',
     },
-    lineButton: {
-      paddingHorizontal: SPACING.md,
-      paddingVertical: SPACING.sm,
-      borderRadius: RADIUS.full,
-      borderWidth: 2,
-      marginRight: SPACING.sm,
+    lineCircle: {
+      width: 52,
+      height: 52,
+      borderRadius: 9999,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: semantic.bgBase,
+      borderWidth: 1.5,
+      borderColor: semantic.lineSubtle,
+      marginRight: WANTED_TOKENS.spacing.s3,
     },
-    lineButtonText: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      fontWeight: '600',
-      fontFamily: weightToFontFamily('600'),
+    lineCircleText: {
+      fontSize: 18,
+      fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
     },
-    textInput: {
-      backgroundColor: colors.surface,
-      borderRadius: RADIUS.md,
-      paddingHorizontal: SPACING.md,
-      paddingVertical: SPACING.sm,
-      fontSize: TYPOGRAPHY.fontSize.base,
-      color: colors.textPrimary,
+    stationInputWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: WANTED_TOKENS.spacing.s2,
+      backgroundColor: semantic.bgBase,
+      borderRadius: WANTED_TOKENS.radius.r6,
       borderWidth: 1,
-      borderColor: colors.borderLight,
+      borderColor: semantic.lineSubtle,
+      paddingHorizontal: WANTED_TOKENS.spacing.s3,
     },
-    textArea: {
-      height: 80,
-      textAlignVertical: 'top',
-    },
-    charCount: {
-      fontSize: TYPOGRAPHY.fontSize.xs,
-      color: colors.textTertiary,
-      textAlign: 'right',
+    stationInput: {
+      flex: 1,
+      paddingVertical: WANTED_TOKENS.spacing.s3,
+      fontSize: WANTED_TOKENS.type.body1.size,
+      color: semantic.labelStrong,
     },
     recommendedRow: {
-      marginTop: SPACING.sm,
       flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: WANTED_TOKENS.spacing.s2,
+      marginTop: WANTED_TOKENS.spacing.s3,
     },
     recommendChip: {
-      paddingHorizontal: SPACING.md,
-      paddingVertical: SPACING.xs,
-      borderRadius: RADIUS.full,
+      paddingHorizontal: WANTED_TOKENS.spacing.s3,
+      paddingVertical: WANTED_TOKENS.spacing.s2,
+      borderRadius: WANTED_TOKENS.radius.pill,
       borderWidth: 1,
-      borderColor: colors.borderLight,
-      marginRight: SPACING.sm,
-      backgroundColor: colors.surface,
+      borderColor: semantic.lineSubtle,
+      backgroundColor: semantic.bgBase,
     },
     recommendChipSelected: {
-      backgroundColor: colors.primary,
-      borderColor: colors.primary,
+      backgroundColor: semantic.primaryBg,
+      borderColor: semantic.primaryNormal,
     },
     recommendChipText: {
-      fontSize: TYPOGRAPHY.fontSize.sm,
-      color: colors.textPrimary,
+      fontSize: WANTED_TOKENS.type.label2.size,
+      color: semantic.labelNormal,
       fontWeight: '500',
       fontFamily: weightToFontFamily('500'),
     },
     recommendChipTextSelected: {
-      color: '#FFFFFF',
+      color: semantic.primaryNormal,
+      fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
+    },
+    directionWrap: {
+      marginTop: WANTED_TOKENS.spacing.s3,
+    },
+    typeGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: WANTED_TOKENS.spacing.s2,
+    },
+    typeButton: {
+      width: '31%',
+      backgroundColor: semantic.bgBase,
+      borderRadius: WANTED_TOKENS.radius.r8,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: semantic.lineSubtle,
+      paddingVertical: WANTED_TOKENS.spacing.s4,
+      gap: WANTED_TOKENS.spacing.s2,
+    },
+    typeIconCircle: {
+      width: 44,
+      height: 44,
+      borderRadius: 9999,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    typeLabel: {
+      fontSize: WANTED_TOKENS.type.label2.size,
+      color: semantic.labelNeutral,
+      fontWeight: '500',
+      fontFamily: weightToFontFamily('500'),
+    },
+    typeLabelSelected: {
+      color: semantic.labelStrong,
+      fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
+    },
+    descriptionBox: {
+      backgroundColor: semantic.bgBase,
+      borderRadius: WANTED_TOKENS.radius.r6,
+      borderWidth: 1,
+      borderColor: semantic.lineSubtle,
+      paddingHorizontal: WANTED_TOKENS.spacing.s3,
+      paddingTop: WANTED_TOKENS.spacing.s2,
+      paddingBottom: WANTED_TOKENS.spacing.s3,
+    },
+    descriptionInput: {
+      minHeight: 96,
+      textAlignVertical: 'top',
+      fontSize: WANTED_TOKENS.type.body1.size,
+      color: semantic.labelStrong,
+      paddingVertical: WANTED_TOKENS.spacing.s2,
     },
     attachmentRow: {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      marginTop: SPACING.sm,
+      marginTop: WANTED_TOKENS.spacing.s2,
     },
     attachmentIcons: {
       flexDirection: 'row',
-      gap: SPACING.md,
+      gap: WANTED_TOKENS.spacing.s4,
       alignItems: 'center',
     },
-    anonymousRow: {
+    charCount: {
+      fontSize: WANTED_TOKENS.type.caption1.size,
+      color: semantic.labelAlt,
+    },
+    anonymousCard: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: SPACING.md,
+      gap: WANTED_TOKENS.spacing.s3,
+      backgroundColor: semantic.bgBase,
+      borderRadius: WANTED_TOKENS.radius.r6,
+      borderWidth: 1,
+      borderColor: semantic.lineSubtle,
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s3,
+    },
+    anonymousIconCircle: {
+      width: 36,
+      height: 36,
+      borderRadius: 9999,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: semantic.primaryBg,
+    },
+    anonymousTextWrap: {
+      flex: 1,
     },
     anonymousTitle: {
-      fontSize: TYPOGRAPHY.fontSize.base,
+      fontSize: WANTED_TOKENS.type.body1.size,
       fontWeight: '600',
       fontFamily: weightToFontFamily('600'),
-      color: colors.textPrimary,
+      color: semantic.labelStrong,
     },
     anonymousHint: {
-      fontSize: TYPOGRAPHY.fontSize.xs,
-      color: colors.textSecondary,
+      fontSize: WANTED_TOKENS.type.caption1.size,
+      color: semantic.labelAlt,
       marginTop: 2,
     },
     gpsCardWrap: {
-      paddingHorizontal: SPACING.lg,
-      paddingTop: SPACING.md,
-      paddingBottom: SPACING.lg,
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingTop: WANTED_TOKENS.spacing.s5,
     },
     gpsCard: {
       flexDirection: 'row',
       alignItems: 'flex-start',
-      gap: SPACING.sm,
-      padding: SPACING.md,
-      backgroundColor: colors.backgroundSecondary,
-      borderRadius: RADIUS.md,
+      gap: WANTED_TOKENS.spacing.s2,
+      padding: WANTED_TOKENS.spacing.s4,
+      backgroundColor: semantic.primaryBg,
+      borderRadius: WANTED_TOKENS.radius.r6,
     },
     gpsCardText: {
       flex: 1,
-      fontSize: TYPOGRAPHY.fontSize.xs,
-      color: colors.textSecondary,
+      fontSize: WANTED_TOKENS.type.caption1.size,
+      color: semantic.primaryNormal,
       lineHeight: 18,
     },
     gpsCardTextStrong: {
       fontWeight: '700',
       fontFamily: weightToFontFamily('700'),
-      color: colors.textPrimary,
     },
     footer: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: SPACING.sm,
-      paddingHorizontal: SPACING.lg,
-      paddingVertical: SPACING.md,
+      gap: WANTED_TOKENS.spacing.s2,
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s3,
       borderTopWidth: 1,
-      borderTopColor: colors.borderLight,
-      backgroundColor: colors.surface,
+      borderTopColor: semantic.lineSubtle,
+      backgroundColor: semantic.bgBase,
     },
     bookmarkButton: {
       width: 48,
       height: 48,
       alignItems: 'center',
       justifyContent: 'center',
-      borderRadius: RADIUS.md,
+      borderRadius: WANTED_TOKENS.radius.r6,
       borderWidth: 1,
-      borderColor: colors.borderLight,
-    },
-    typeGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: SPACING.sm,
-    },
-    typeButton: {
-      width: '30%',
-      aspectRatio: 1,
-      backgroundColor: colors.surface,
-      borderRadius: RADIUS.lg,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: 1,
-      borderColor: colors.borderLight,
-      gap: SPACING.xs,
-    },
-    typeButtonSelected: {
-      borderColor: colors.primary,
-      borderWidth: 2,
-      backgroundColor: colors.backgroundSecondary,
-    },
-    typeEmoji: {
-      fontSize: 24,
-    },
-    typeLabel: {
-      fontSize: TYPOGRAPHY.fontSize.xs,
-      color: colors.textSecondary,
-      fontWeight: '500',
-      fontFamily: weightToFontFamily('500'),
-    },
-    typeLabelSelected: {
-      color: colors.primary,
-      fontWeight: '600',
-      fontFamily: weightToFontFamily('600'),
+      borderColor: semantic.lineSubtle,
     },
     submitButton: {
       flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.primary,
-      paddingVertical: SPACING.md,
-      borderRadius: RADIUS.lg,
-      gap: SPACING.sm,
+      backgroundColor: semantic.primaryNormal,
+      paddingVertical: WANTED_TOKENS.spacing.s4,
+      borderRadius: WANTED_TOKENS.radius.r8,
+      gap: WANTED_TOKENS.spacing.s2,
     },
     submitButtonDisabled: {
-      backgroundColor: colors.textTertiary,
+      backgroundColor: semantic.labelDisabled,
     },
     submitButtonText: {
-      fontSize: TYPOGRAPHY.fontSize.base,
+      fontSize: WANTED_TOKENS.type.body1.size,
       fontWeight: '600',
       fontFamily: weightToFontFamily('600'),
-      color: '#FFFFFF',
+      color: WANTED_TOKENS.light.labelOnColor,
     },
   });
 

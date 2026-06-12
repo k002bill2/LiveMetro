@@ -13,7 +13,9 @@ import { getSubwayLineColor } from '@/utils/colorUtils';
 jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
 jest.mock('lucide-react-native', () => ({
   MessageSquare: 'MessageSquare',
+  MessageCircle: 'MessageCircle',
   ThumbsUp: 'ThumbsUp',
+  Share2: 'Share2',
   Megaphone: 'Megaphone',
   Clock: 'Clock',
   CheckCircle: 'CheckCircle',
@@ -193,10 +195,12 @@ describe('DelayFeedScreen', () => {
   });
 
   describe('Rendering', () => {
-    it('renders header with title and subtitle', () => {
-      const { getByText } = render(<DelayFeedScreen />);
+    it('renders header with title and report-count subtitle', () => {
+      const { getByText, getByTestId } = render(<DelayFeedScreen />);
       expect(getByText('실시간 제보')).toBeTruthy();
-      expect(getByText('승객들의 실시간 지연 정보')).toBeTruthy();
+      expect(getByTestId('delay-feed-header-subtitle')).toHaveTextContent(
+        '지난 4시간 · 실시간 제보 0건',
+      );
     });
 
     it('renders add report button', () => {
@@ -226,9 +230,11 @@ describe('DelayFeedScreen', () => {
       expect(getAllByTestId('report-card-skeleton')).toHaveLength(3);
     });
 
-    it('shows report count bar', () => {
-      const { getByText } = render(<DelayFeedScreen />);
-      expect(getByText('0개의 활성 제보')).toBeTruthy();
+    it('shows zero count in header subtitle when no reports', () => {
+      const { getByTestId } = render(<DelayFeedScreen />);
+      expect(getByTestId('delay-feed-header-subtitle')).toHaveTextContent(
+        '지난 4시간 · 실시간 제보 0건',
+      );
     });
   });
 
@@ -263,13 +269,15 @@ describe('DelayFeedScreen', () => {
         }
       );
 
-      const { getByText } = render(<DelayFeedScreen />);
+      const { getByText, getByTestId } = render(<DelayFeedScreen />);
 
       await waitFor(() => {
         expect(getByText('강남')).toBeTruthy();
       });
-      expect(getByText('승객A')).toBeTruthy();
-      expect(getByText('3개의 활성 제보')).toBeTruthy();
+      expect(getByText('열차 지연 발생')).toBeTruthy();
+      expect(getByTestId('delay-feed-header-subtitle')).toHaveTextContent(
+        '지난 4시간 · 실시간 제보 3건',
+      );
     });
 
     it('renders report with all fields', async () => {
@@ -284,8 +292,7 @@ describe('DelayFeedScreen', () => {
 
       await waitFor(() => {
         expect(getByText('강남')).toBeTruthy();
-        expect(getByText('승객A')).toBeTruthy();
-        expect(getByText(/\+10분/)).toBeTruthy();
+        expect(getByText('열차 지연 발생')).toBeTruthy();
         expect(getByText('3')).toBeTruthy(); // upvote count
       });
     });
@@ -302,6 +309,8 @@ describe('DelayFeedScreen', () => {
 
       await waitFor(() => {
         expect(getByText(/서울역/)).toBeTruthy();
+        // 설명이 없으면 유형 라벨 기반 대체 본문이 표시된다.
+        expect(getByText('혼잡 제보')).toBeTruthy();
       });
     });
 
@@ -351,39 +360,49 @@ describe('DelayFeedScreen', () => {
     });
 
     it('shows all reports when 전체 is selected', async () => {
-      const { getByText } = render(<DelayFeedScreen />);
+      const { getByTestId } = render(<DelayFeedScreen />);
 
       await waitFor(() => {
-        expect(getByText('3개의 활성 제보')).toBeTruthy();
+        expect(getByTestId('delay-feed-header-subtitle')).toHaveTextContent(
+          '지난 4시간 · 실시간 제보 3건',
+        );
       });
     });
 
     it('filters reports by category (지연 only)', async () => {
-      const { getByText, getByTestId } = render(<DelayFeedScreen />);
+      const { getByTestId } = render(<DelayFeedScreen />);
 
       await waitFor(() => {
-        expect(getByText('3개의 활성 제보')).toBeTruthy();
+        expect(getByTestId('delay-feed-header-subtitle')).toHaveTextContent(
+          '지난 4시간 · 실시간 제보 3건',
+        );
       });
 
       fireEvent.press(getByTestId('report-filter-delay'));
 
       await waitFor(() => {
         // mockReports has 1 delay (report-1), 1 crowded (report-2), 1 accident (report-3).
-        expect(getByText('1개의 활성 제보')).toBeTruthy();
+        expect(getByTestId('delay-feed-header-subtitle')).toHaveTextContent(
+          '지난 4시간 · 실시간 제보 1건',
+        );
       });
     });
 
     it('filters reports by category (혼잡 only)', async () => {
-      const { getByText, getByTestId } = render(<DelayFeedScreen />);
+      const { getByTestId } = render(<DelayFeedScreen />);
 
       await waitFor(() => {
-        expect(getByText('3개의 활성 제보')).toBeTruthy();
+        expect(getByTestId('delay-feed-header-subtitle')).toHaveTextContent(
+          '지난 4시간 · 실시간 제보 3건',
+        );
       });
 
       fireEvent.press(getByTestId('report-filter-crowded'));
 
       await waitFor(() => {
-        expect(getByText('1개의 활성 제보')).toBeTruthy();
+        expect(getByTestId('delay-feed-header-subtitle')).toHaveTextContent(
+          '지난 4시간 · 실시간 제보 1건',
+        );
       });
     });
   });
@@ -436,17 +455,21 @@ describe('DelayFeedScreen', () => {
         }
       );
 
-      const { getByText, getByTestId } = render(<DelayFeedScreen />);
+      const { getByTestId } = render(<DelayFeedScreen />);
 
       await waitFor(() => {
-        expect(getByText('3개의 활성 제보')).toBeTruthy();
+        expect(getByTestId('delay-feed-header-subtitle')).toHaveTextContent(
+          '지난 4시간 · 실시간 제보 3건',
+        );
       });
 
       fireEvent.press(getByTestId('report-filter-my-lines'));
 
       await waitFor(() => {
         // only line 2 reports (1 of 3) remain
-        expect(getByText('1개의 활성 제보')).toBeTruthy();
+        expect(getByTestId('delay-feed-header-subtitle')).toHaveTextContent(
+          '지난 4시간 · 실시간 제보 1건',
+        );
       });
     });
   });
@@ -707,11 +730,42 @@ describe('DelayFeedScreen', () => {
         }
       );
 
-      const { getByText } = render(<DelayFeedScreen />);
+      const { getByTestId } = render(<DelayFeedScreen />);
 
       await waitFor(() => {
-        expect(getByText('3개의 활성 제보')).toBeTruthy();
+        expect(getByTestId('delay-feed-header-subtitle')).toHaveTextContent(
+          '지난 4시간 · 실시간 제보 3건',
+        );
       });
+    });
+  });
+
+  describe('Share', () => {
+    it('invokes native share sheet with report summary', async () => {
+      const { Share } = require('react-native');
+      const shareSpy = jest.spyOn(Share, 'share').mockResolvedValue({ action: 'sharedAction' });
+
+      (delayReportService.subscribeToActiveReports as jest.Mock).mockImplementation(
+        (callback: (reports: typeof mockReports) => void) => {
+          callback([mockReports[0]!]);
+          return jest.fn();
+        }
+      );
+
+      const { getByTestId } = render(<DelayFeedScreen />);
+
+      await waitFor(() => {
+        expect(getByTestId('report-share-button')).toBeTruthy();
+      });
+
+      fireEvent.press(getByTestId('report-share-button'));
+
+      await waitFor(() => {
+        expect(shareSpy).toHaveBeenCalledWith({
+          message: expect.stringContaining('강남'),
+        });
+      });
+      shareSpy.mockRestore();
     });
   });
 
