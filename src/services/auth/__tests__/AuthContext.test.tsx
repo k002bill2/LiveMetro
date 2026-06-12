@@ -49,11 +49,13 @@ jest.mock('firebase/auth', () => ({
 // Mock Firebase Firestore
 const mockGetDoc = jest.fn();
 const mockSetDoc = jest.fn();
+const mockOnSnapshot = jest.fn();
 
 jest.mock('firebase/firestore', () => ({
   doc: jest.fn(() => 'mockDocRef'),
   getDoc: (...args: unknown[]) => mockGetDoc(...args),
   setDoc: (...args: unknown[]) => mockSetDoc(...args),
+  onSnapshot: (...args: unknown[]) => mockOnSnapshot(...args),
 }));
 
 // Mock Firebase config — `auth` is referenced via `auth.currentUser` inside
@@ -77,10 +79,13 @@ jest.mock('../../firebase/config', () => ({
 
 describe('AuthContext', () => {
   let authStateCallback: ((user: unknown) => void) | null = null;
+  let snapshotCallback: ((snap: unknown) => void) | null = null;
+  const mockSnapshotUnsubscribe = jest.fn();
 
   beforeEach(() => {
     jest.clearAllMocks();
     authStateCallback = null;
+    snapshotCallback = null;
 
     // Setup onAuthStateChanged to capture the callback
     mockOnAuthStateChanged.mockImplementation((_auth, callback) => {
@@ -89,6 +94,13 @@ describe('AuthContext', () => {
       setTimeout(() => callback(null), 0);
       // Return unsubscribe function
       return jest.fn();
+    });
+
+    // Capture the user-document snapshot listener so tests can push
+    // remote document changes, mirroring the onAuthStateChanged pattern.
+    mockOnSnapshot.mockImplementation((_ref: unknown, onNext: unknown) => {
+      snapshotCallback = onNext as (snap: unknown) => void;
+      return mockSnapshotUnsubscribe;
     });
   });
 
@@ -378,6 +390,159 @@ describe('AuthContext', () => {
           await result.current.updateUserProfile({ displayName: 'New Name' });
         })
       ).rejects.toThrow('사용자가 로그인되어 있지 않습니다.');
+    });
+  });
+
+  // Shared fixtures for preference-write and snapshot-subscription tests.
+  // The stored favorite simulates server state written by FavoritesContext
+  // (a path that does NOT go through AuthContext local state).
+  const storedFavorite = {
+    id: 'fav_1',
+    stationId: '0222',
+    lineId: 'line_2',
+    alias: null,
+    direction: 'both',
+    isCommuteStation: false,
+    addedAt: new Date('2026-01-01T00:00:00Z'),
+  };
+
+  const buildUserDocData = (favorites: unknown[]): Record<string, unknown> => ({
+    preferences: {
+      favoriteStations: favorites,
+      notificationSettings: { enabled: true, delayThresholdMinutes: 5 },
+      language: 'ko',
+      theme: 'system',
+      units: 'metric',
+    },
+    subscription: 'free',
+    createdAt: { toDate: () => new Date('2026-01-01T00:00:00Z') },
+  });
+
+  const signInWithStoredFavorites = async (
+    result: { current: ReturnType<typeof useAuth> },
+    mockFirebaseUser: Record<string, unknown>,
+  ): Promise<void> => {
+    mockGetDoc.mockResolvedValue({
+      exists: () => true,
+      data: () => buildUserDocData([storedFavorite]),
+    });
+    mockSetDoc.mockResolvedValue(undefined);
+
+    await act(async () => {
+      if (authStateCallback) {
+        authStateCallback(mockFirebaseUser);
+      }
+    });
+
+    await waitFor(() => expect(result.current.user).not.toBeNull());
+  };
+
+  const mockPrefsFirebaseUser = {
+    uid: 'user-123',
+    email: 'test@example.com',
+    displayName: 'Test User',
+    isAnonymous: false,
+    photoURL: null,
+  };
+
+  describe('updateUserPreferences', () => {
+    it('writes only the given preference keys — never favoriteStations (즐겨찾기 보존 회귀)', async () => {
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      await signInWithStoredFavorites(result, mockPrefsFirebaseUser);
+
+      mockSetDoc.mockClear();
+
+      await act(async () => {
+        await result.current.updateUserPreferences({
+          notificationSettings: {
+            ...result.current.user!.preferences.notificationSettings,
+            enabled: false,
+          },
+        });
+      });
+
+      expect(mockSetDoc).toHaveBeenCalledTimes(1);
+      const [, payload, options] = mockSetDoc.mock.calls[0]!;
+      expect(options).toEqual({ merge: true });
+      expect(payload.preferences.notificationSettings.enabled).toBe(false);
+      // The whole point of the API: favoriteStations must never ride along.
+      expect('favoriteStations' in payload.preferences).toBe(false);
+    });
+
+    it('updates local user state while preserving favoriteStations', async () => {
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      await signInWithStoredFavorites(result, mockPrefsFirebaseUser);
+
+      await act(async () => {
+        await result.current.updateUserPreferences({ language: 'en' });
+      });
+
+      expect(result.current.user?.preferences.language).toBe('en');
+      expect(result.current.user?.preferences.favoriteStations).toHaveLength(1);
+      expect(result.current.user?.preferences.notificationSettings.enabled).toBe(true);
+    });
+
+    it('throws when not logged in', async () => {
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await expect(
+        act(async () => {
+          await result.current.updateUserPreferences({ language: 'en' });
+        })
+      ).rejects.toThrow('사용자가 로그인되어 있지 않습니다.');
+    });
+  });
+
+  describe('user document realtime subscription', () => {
+    it('subscribes after sign-in and applies remote preference changes to local user', async () => {
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      await signInWithStoredFavorites(result, mockPrefsFirebaseUser);
+
+      expect(mockOnSnapshot).toHaveBeenCalled();
+
+      // Simulate FavoritesContext adding a second favorite directly in
+      // Firestore — the subscription must propagate it into user state.
+      const secondFavorite = { ...storedFavorite, id: 'fav_2', stationId: '0150' };
+      await act(async () => {
+        if (snapshotCallback) {
+          snapshotCallback({
+            exists: () => true,
+            data: () => buildUserDocData([storedFavorite, secondFavorite]),
+          });
+        }
+      });
+
+      await waitFor(() => {
+        expect(result.current.user?.preferences.favoriteStations).toHaveLength(2);
+      });
+    });
+
+    it('unsubscribes from the user document on sign-out', async () => {
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      await signInWithStoredFavorites(result, mockPrefsFirebaseUser);
+
+      await act(async () => {
+        if (authStateCallback) {
+          authStateCallback(null);
+        }
+      });
+
+      expect(mockSnapshotUnsubscribe).toHaveBeenCalled();
+    });
+
+    it('unsubscribes from the user document on unmount', async () => {
+      const { result, unmount } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      await signInWithStoredFavorites(result, mockPrefsFirebaseUser);
+
+      unmount();
+
+      expect(mockSnapshotUnsubscribe).toHaveBeenCalled();
     });
   });
 

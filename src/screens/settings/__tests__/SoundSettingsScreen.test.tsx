@@ -58,7 +58,7 @@ jest.mock('@/services/auth/AuthContext', () => ({
         },
       },
     },
-    updateUserProfile: jest.fn(() => Promise.resolve()),
+    updateUserPreferences: jest.fn(() => Promise.resolve()),
   })),
 }));
 
@@ -179,7 +179,7 @@ jest.mock('@/components/settings/VibrationPicker', () => {
 });
 
 describe('SoundSettingsScreen', () => {
-  let mockUpdateUserProfile: jest.Mock;
+  let mockUpdateUserPreferences: jest.Mock;
   let mockSendTestNotification: jest.Mock;
   let mockSendTestEmail: jest.Mock;
 
@@ -187,7 +187,7 @@ describe('SoundSettingsScreen', () => {
     jest.clearAllMocks();
     jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 
-    mockUpdateUserProfile = jest.fn(() => Promise.resolve());
+    mockUpdateUserPreferences = jest.fn(() => Promise.resolve());
     mockSendTestNotification = jest.fn(() => Promise.resolve(true));
     mockSendTestEmail = jest.fn(() => Promise.resolve(true));
 
@@ -213,7 +213,7 @@ describe('SoundSettingsScreen', () => {
           },
         },
       },
-      updateUserProfile: mockUpdateUserProfile,
+      updateUserPreferences: mockUpdateUserPreferences,
     });
 
     // Get the mocked useNotifications and set return value
@@ -291,7 +291,7 @@ describe('SoundSettingsScreen', () => {
             },
           },
         },
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
       });
 
       const { getByText } = render(<SoundSettingsScreen />);
@@ -321,7 +321,7 @@ describe('SoundSettingsScreen', () => {
             },
           },
         },
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
       });
 
       const { getByText } = render(<SoundSettingsScreen />);
@@ -351,7 +351,7 @@ describe('SoundSettingsScreen', () => {
             },
           },
         },
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
       });
 
       const { getByText } = render(<SoundSettingsScreen />);
@@ -368,12 +368,10 @@ describe('SoundSettingsScreen', () => {
       fireEvent(pushSwitch, 'valueChange', false);
 
       await waitFor(() => {
-        expect(mockUpdateUserProfile).toHaveBeenCalledWith(
+        expect(mockUpdateUserPreferences).toHaveBeenCalledWith(
           expect.objectContaining({
-            preferences: expect.objectContaining({
-              notificationSettings: expect.objectContaining({
-                pushNotifications: false,
-              }),
+            notificationSettings: expect.objectContaining({
+              pushNotifications: false,
             }),
           })
         );
@@ -387,12 +385,10 @@ describe('SoundSettingsScreen', () => {
       fireEvent(pushSwitch, 'valueChange', false);
 
       await waitFor(() => {
-        expect(mockUpdateUserProfile).toHaveBeenCalledWith(
+        expect(mockUpdateUserPreferences).toHaveBeenCalledWith(
           expect.objectContaining({
-            preferences: expect.objectContaining({
-              notificationSettings: expect.objectContaining({
-                emailNotifications: false,
-              }),
+            notificationSettings: expect.objectContaining({
+              emailNotifications: false,
             }),
           })
         );
@@ -400,7 +396,7 @@ describe('SoundSettingsScreen', () => {
     });
 
     it('shows error alert when push notification toggle fails', async () => {
-      mockUpdateUserProfile.mockRejectedValueOnce(new Error('Update failed'));
+      mockUpdateUserPreferences.mockRejectedValueOnce(new Error('Update failed'));
 
       const { getByTestId } = render(<SoundSettingsScreen />);
 
@@ -421,12 +417,10 @@ describe('SoundSettingsScreen', () => {
       fireEvent(emailSwitch, 'valueChange', true);
 
       await waitFor(() => {
-        expect(mockUpdateUserProfile).toHaveBeenCalledWith(
+        expect(mockUpdateUserPreferences).toHaveBeenCalledWith(
           expect.objectContaining({
-            preferences: expect.objectContaining({
-              notificationSettings: expect.objectContaining({
-                emailNotifications: true,
-              }),
+            notificationSettings: expect.objectContaining({
+              emailNotifications: true,
             }),
           })
         );
@@ -454,7 +448,7 @@ describe('SoundSettingsScreen', () => {
             },
           },
         },
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
       });
 
       const { getByTestId } = render(<SoundSettingsScreen />);
@@ -464,7 +458,7 @@ describe('SoundSettingsScreen', () => {
     });
 
     it('shows error alert when email notification toggle fails', async () => {
-      mockUpdateUserProfile.mockRejectedValueOnce(new Error('Update failed'));
+      mockUpdateUserPreferences.mockRejectedValueOnce(new Error('Update failed'));
 
       const { getByTestId } = render(<SoundSettingsScreen />);
 
@@ -485,13 +479,11 @@ describe('SoundSettingsScreen', () => {
       fireEvent(soundSwitch, 'valueChange', false);
 
       await waitFor(() => {
-        expect(mockUpdateUserProfile).toHaveBeenCalledWith(
+        expect(mockUpdateUserPreferences).toHaveBeenCalledWith(
           expect.objectContaining({
-            preferences: expect.objectContaining({
-              notificationSettings: expect.objectContaining({
-                soundSettings: expect.objectContaining({
-                  soundEnabled: false,
-                }),
+            notificationSettings: expect.objectContaining({
+              soundSettings: expect.objectContaining({
+                soundEnabled: false,
               }),
             }),
           })
@@ -500,7 +492,7 @@ describe('SoundSettingsScreen', () => {
     });
 
     it('shows error alert when sound toggle fails', async () => {
-      mockUpdateUserProfile.mockRejectedValueOnce(new Error('Update failed'));
+      mockUpdateUserPreferences.mockRejectedValueOnce(new Error('Update failed'));
 
       const { getByTestId } = render(<SoundSettingsScreen />);
 
@@ -533,7 +525,7 @@ describe('SoundSettingsScreen', () => {
             },
           },
         },
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
       });
 
       const { queryByText } = render(<SoundSettingsScreen />);
@@ -563,7 +555,7 @@ describe('SoundSettingsScreen', () => {
             },
           },
         },
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
       });
 
       const { queryByText } = render(<SoundSettingsScreen />);
@@ -592,7 +584,7 @@ describe('SoundSettingsScreen', () => {
             },
           },
         },
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
       });
 
       const { queryByText } = render(<SoundSettingsScreen />);
@@ -610,13 +602,11 @@ describe('SoundSettingsScreen', () => {
       fireEvent(vibrationSwitch, 'valueChange', false);
 
       await waitFor(() => {
-        expect(mockUpdateUserProfile).toHaveBeenCalledWith(
+        expect(mockUpdateUserPreferences).toHaveBeenCalledWith(
           expect.objectContaining({
-            preferences: expect.objectContaining({
-              notificationSettings: expect.objectContaining({
-                soundSettings: expect.objectContaining({
-                  vibrationEnabled: false,
-                }),
+            notificationSettings: expect.objectContaining({
+              soundSettings: expect.objectContaining({
+                vibrationEnabled: false,
               }),
             }),
           })
@@ -625,7 +615,7 @@ describe('SoundSettingsScreen', () => {
     });
 
     it('shows error alert when vibration toggle fails', async () => {
-      mockUpdateUserProfile.mockRejectedValueOnce(new Error('Update failed'));
+      mockUpdateUserPreferences.mockRejectedValueOnce(new Error('Update failed'));
 
       const { getByTestId } = render(<SoundSettingsScreen />);
 
@@ -712,7 +702,7 @@ describe('SoundSettingsScreen', () => {
             },
           },
         },
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
       });
 
       const { getByText } = render(<SoundSettingsScreen />);
@@ -751,7 +741,7 @@ describe('SoundSettingsScreen', () => {
             },
           },
         },
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
       });
 
       mockSendTestEmail.mockResolvedValueOnce(false);
@@ -791,7 +781,7 @@ describe('SoundSettingsScreen', () => {
             },
           },
         },
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
       });
 
       mockSendTestEmail.mockRejectedValueOnce(new Error('Email service error'));
@@ -828,7 +818,7 @@ describe('SoundSettingsScreen', () => {
             },
           },
         },
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
       });
 
       const { queryByText } = render(<SoundSettingsScreen />);
@@ -843,7 +833,7 @@ describe('SoundSettingsScreen', () => {
       const { useAuth: mockUseAuth } = require('@/services/auth/AuthContext');
       mockUseAuth.mockReturnValueOnce({
         user: null,
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
       });
 
       const { getByText } = render(<SoundSettingsScreen />);
@@ -864,7 +854,7 @@ describe('SoundSettingsScreen', () => {
             notificationSettings: undefined,
           },
         },
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
       });
 
       const { getByText } = render(<SoundSettingsScreen />);
@@ -888,7 +878,7 @@ describe('SoundSettingsScreen', () => {
             },
           },
         },
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
       });
 
       const { getByText } = render(<SoundSettingsScreen />);
@@ -897,11 +887,11 @@ describe('SoundSettingsScreen', () => {
       expect(getByText('알림 효과')).toBeTruthy();
     });
 
-    it('does not call updateUserProfile when user is null', async () => {
+    it('does not call updateUserPreferences when user is null', async () => {
       const { useAuth: mockUseAuth } = require('@/services/auth/AuthContext');
       mockUseAuth.mockReturnValueOnce({
         user: null,
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
       });
 
       const { getByTestId } = render(<SoundSettingsScreen />);
@@ -912,7 +902,7 @@ describe('SoundSettingsScreen', () => {
       // Wait a moment for any updates
       await new Promise(resolve => setTimeout(resolve, 100));
 
-      expect(mockUpdateUserProfile).not.toHaveBeenCalled();
+      expect(mockUpdateUserPreferences).not.toHaveBeenCalled();
     });
   });
 
@@ -959,12 +949,12 @@ describe('SoundSettingsScreen', () => {
             },
           },
         },
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
       });
 
       rerender(<SoundSettingsScreen />);
 
-      expect(mockUpdateUserProfile).not.toHaveBeenCalled();
+      expect(mockUpdateUserPreferences).not.toHaveBeenCalled();
     });
   });
 });

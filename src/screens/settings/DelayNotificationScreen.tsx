@@ -126,7 +126,7 @@ const ALERT_SOURCE_ROWS: readonly AlertSourceRowSpec[] = [
 ];
 
 export const DelayNotificationScreen: React.FC = () => {
-  const { user, updateUserProfile } = useAuth();
+  const { user, updateUserPreferences } = useAuth();
   const { sendTestNotification } = useNotifications();
   const { isDark } = useTheme();
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
@@ -150,13 +150,10 @@ export const DelayNotificationScreen: React.FC = () => {
       : [...lineFilter, lineId];
     try {
       setSaving(true);
-      await updateUserProfile({
-        preferences: {
-          ...user.preferences,
-          notificationSettings: {
-            ...user.preferences.notificationSettings,
-            lineFilter: next,
-          },
+      await updateUserPreferences({
+        notificationSettings: {
+          ...user.preferences.notificationSettings,
+          lineFilter: next,
         },
       });
     } catch (error) {
@@ -174,13 +171,10 @@ export const DelayNotificationScreen: React.FC = () => {
     if (!user) return;
     try {
       setSaving(true);
-      await updateUserProfile({
-        preferences: {
-          ...user.preferences,
-          notificationSettings: {
-            ...user.preferences.notificationSettings,
-            alertSources: { ...alertSources, [key]: value },
-          },
+      await updateUserPreferences({
+        notificationSettings: {
+          ...user.preferences.notificationSettings,
+          alertSources: { ...alertSources, [key]: value },
         },
       });
     } catch (error) {
@@ -196,13 +190,10 @@ export const DelayNotificationScreen: React.FC = () => {
 
     try {
       setSaving(true);
-      await updateUserProfile({
-        preferences: {
-          ...user.preferences,
-          notificationSettings: {
-            ...user.preferences.notificationSettings,
-            enabled: value,
-          },
+      await updateUserPreferences({
+        notificationSettings: {
+          ...user.preferences.notificationSettings,
+          enabled: value,
         },
       });
     } catch (error) {
@@ -217,13 +208,10 @@ export const DelayNotificationScreen: React.FC = () => {
     if (!user) return;
 
     try {
-      await updateUserProfile({
-        preferences: {
-          ...user.preferences,
-          notificationSettings: {
-            ...user.preferences.notificationSettings,
-            delayThresholdMinutes: value,
-          },
+      await updateUserPreferences({
+        notificationSettings: {
+          ...user.preferences.notificationSettings,
+          delayThresholdMinutes: value,
         },
       });
     } catch (error) {
@@ -240,15 +228,12 @@ export const DelayNotificationScreen: React.FC = () => {
 
     try {
       setSaving(true);
-      await updateUserProfile({
-        preferences: {
-          ...user.preferences,
-          notificationSettings: {
-            ...user.preferences.notificationSettings,
-            alertTypes: {
-              ...user.preferences.notificationSettings.alertTypes,
-              [alertType]: value,
-            },
+      await updateUserPreferences({
+        notificationSettings: {
+          ...user.preferences.notificationSettings,
+          alertTypes: {
+            ...user.preferences.notificationSettings.alertTypes,
+            [alertType]: value,
           },
         },
       });
