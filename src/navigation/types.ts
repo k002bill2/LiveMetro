@@ -47,6 +47,7 @@ export type SettingsStackParamList = {
   Help: undefined;
   Feedback: undefined;
   PrivacyPolicy: undefined;
+  TermsOfService: undefined;
 };
 
 // Route data passed between onboarding screens.

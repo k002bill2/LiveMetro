@@ -1,53 +1,28 @@
 /**
- * Privacy Policy Screen
- * Display privacy policy using markdown.
+ * Privacy Policy Screen — Wanted handoff settings-detail-2.jsx
+ * `SettingsPrivacyScreen` (lines 714-724).
  *
- * Phase 47 — migrated from legacy COLORS API to Wanted Design System.
- * MarkdownViewer (Phase 45) already drives the body styling; this screen
- * only owns the container chrome.
+ * Redesigned from the Phase 45/47 MarkdownViewer rendering to the shared
+ * LegalDocumentScreen layout (meta card → TOC → numbered sections →
+ * contact footer). Content lives in legalContent.ts.
  */
 
-import React, { useMemo } from 'react';
-import { StyleSheet, SafeAreaView, ScrollView } from 'react-native';
+import React from 'react';
+import { LegalDocumentScreen } from '@/components/settings/LegalDocumentScreen';
 import {
-  WANTED_TOKENS,
-  type WantedSemanticTheme,
-} from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme';
-import { MarkdownViewer } from '@/components/settings/MarkdownViewer';
-import { PRIVACY_POLICY_CONTENT } from '@/utils/privacyPolicyContent';
+  PRIVACY_POLICY_META,
+  PRIVACY_SECTIONS,
+} from '@/screens/settings/legalContent';
 
-export const PrivacyPolicyScreen: React.FC = () => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
-  const styles = useMemo(() => createStyles(semantic), [semantic]);
+export const PrivacyPolicyScreen: React.FC = () => (
+  <LegalDocumentScreen
+    intro={PRIVACY_POLICY_META.intro}
+    sections={PRIVACY_SECTIONS}
+    lastUpdated={PRIVACY_POLICY_META.lastUpdated}
+    version={PRIVACY_POLICY_META.version}
+  />
+);
 
-  return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView
-        style={styles.scrollView}
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={true}
-      >
-        <MarkdownViewer content={PRIVACY_POLICY_CONTENT} />
-      </ScrollView>
-    </SafeAreaView>
-  );
-};
-
-const createStyles = (semantic: WantedSemanticTheme) =>
-  StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: semantic.bgBase,
-    },
-    scrollView: {
-      flex: 1,
-    },
-    content: {
-      paddingHorizontal: WANTED_TOKENS.spacing.s4,
-      paddingVertical: WANTED_TOKENS.spacing.s4,
-    },
-  });
+PrivacyPolicyScreen.displayName = 'PrivacyPolicyScreen';
 
 export default PrivacyPolicyScreen;

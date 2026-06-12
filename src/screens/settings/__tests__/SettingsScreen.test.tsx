@@ -380,6 +380,12 @@ describe('SettingsScreen', () => {
       expect(mockNavigate).toHaveBeenCalledWith('PrivacyPolicy');
     });
 
+    it('navigates to TermsOfService', () => {
+      const { getByText } = render(<SettingsScreen {...defaultProps} />);
+      fireEvent.press(getByText('서비스 이용약관'));
+      expect(mockNavigate).toHaveBeenCalledWith('TermsOfService');
+    });
+
     it('navigates to DelayFeed via root navigation', () => {
       const { getByText } = render(<SettingsScreen {...defaultProps} />);
       fireEvent.press(getByText('실시간 제보'));
@@ -774,11 +780,11 @@ describe('SettingsScreen', () => {
       expect(mockNavigate).toHaveBeenCalledWith('ThemeSettings');
     });
 
-    it('renders all app info items without navigation', () => {
+    it('renders app info items (terms row now navigates, version stays static)', () => {
       const { getByText } = render(<SettingsScreen {...defaultProps} />);
 
-      expect(getByText('서비스 이용약관')).toBeTruthy();
-      expect(getByText('버전 1.0.0')).toBeTruthy();
+      expect(getByText('서비스 이용약관')).toHaveTextContent('서비스 이용약관');
+      expect(getByText('버전 1.0.0')).toHaveTextContent('버전 1.0.0');
     });
   });
 
