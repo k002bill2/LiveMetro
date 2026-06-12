@@ -12,6 +12,16 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   setItem: jest.fn().mockResolvedValue(undefined),
 }));
 
+// 일출/일몰 실계산은 sunSchedule.test.ts에서 검증 — 여기선 판정만 제어
+jest.mock('@/utils/sunSchedule', () => ({
+  isNightInSeoul: jest.fn().mockReturnValue(false),
+}));
+
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const { isNightInSeoul } = require('@/utils/sunSchedule') as {
+  isNightInSeoul: jest.Mock;
+};
+
 const wrapper = ({ children }: { children: React.ReactNode }) => (
   <ThemeProvider>{children}</ThemeProvider>
 );
@@ -21,6 +31,7 @@ describe('themeContext', () => {
     jest.clearAllMocks();
     (AsyncStorage.getItem as jest.Mock).mockResolvedValue(null);
     (AsyncStorage.setItem as jest.Mock).mockResolvedValue(undefined);
+    isNightInSeoul.mockReturnValue(false);
   });
 
   describe('useTheme', () => {
@@ -167,6 +178,155 @@ describe('themeContext', () => {
       ).rejects.toThrow('Write error');
 
       consoleSpy.mockRestore();
+    });
+  });
+
+  describe('accent color', () => {
+    it('defaults to classic blue with the base palette untouched', async () => {
+      const { result } = renderHook(() => useTheme(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.accentColorId).toBe('blue');
+      expect(result.current.colors.primary).toBe('#546FFF');
+    });
+
+    it('overrides primary palette when an accent is selected', async () => {
+      const { result } = renderHook(() => useTheme(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      await act(async () => {
+        await result.current.setAccentColor('purple');
+      });
+
+      expect(result.current.accentColorId).toBe('purple');
+      expect(result.current.colors.primary).toBe('#8B5CF6');
+      expect(result.current.colors.blue).toBe('#8B5CF6');
+      expect(AsyncStorage.setItem).toHaveBeenCalledWith(
+        '@livemetro_accent_color',
+        'purple'
+      );
+    });
+
+    it('uses the dark accent variant in dark mode', async () => {
+      (AsyncStorage.getItem as jest.Mock).mockImplementation((key: string) => {
+        if (key === '@livemetro_theme') return Promise.resolve('dark');
+        if (key === '@livemetro_accent_color') return Promise.resolve('green');
+        return Promise.resolve(null);
+      });
+
+      const { result } = renderHook(() => useTheme(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.accentColorId).toBe('green');
+      expect(result.current.colors.primary).toBe('#34D399');
+    });
+
+    it('ignores an invalid saved accent id', async () => {
+      (AsyncStorage.getItem as jest.Mock).mockImplementation((key: string) =>
+        Promise.resolve(key === '@livemetro_accent_color' ? 'magenta' : null)
+      );
+
+      const { result } = renderHook(() => useTheme(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.accentColorId).toBe('blue');
+    });
+  });
+
+  describe('auto dark switch', () => {
+    it('defaults to disabled', async () => {
+      const { result } = renderHook(() => useTheme(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.autoSwitchEnabled).toBe(false);
+    });
+
+    it('loads the persisted enabled flag', async () => {
+      (AsyncStorage.getItem as jest.Mock).mockImplementation((key: string) =>
+        Promise.resolve(key === '@livemetro_theme_auto_switch' ? 'true' : null)
+      );
+
+      const { result } = renderHook(() => useTheme(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      expect(result.current.autoSwitchEnabled).toBe(true);
+    });
+
+    it('resolves dark after sunset regardless of the selected mode', async () => {
+      isNightInSeoul.mockReturnValue(true);
+
+      const { result } = renderHook(() => useTheme(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      await act(async () => {
+        await result.current.setThemeMode('light');
+        await result.current.setAutoSwitchEnabled(true);
+      });
+
+      expect(result.current.resolvedTheme).toBe('dark');
+      expect(result.current.isDark).toBe(true);
+      expect(AsyncStorage.setItem).toHaveBeenCalledWith(
+        '@livemetro_theme_auto_switch',
+        'true'
+      );
+    });
+
+    it('resolves light during the day even when mode is dark', async () => {
+      isNightInSeoul.mockReturnValue(false);
+
+      const { result } = renderHook(() => useTheme(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      await act(async () => {
+        await result.current.setThemeMode('dark');
+        await result.current.setAutoSwitchEnabled(true);
+      });
+
+      expect(result.current.resolvedTheme).toBe('light');
+    });
+
+    it('clears the polling interval when disabled (subscription cleanup)', async () => {
+      const clearIntervalSpy = jest.spyOn(global, 'clearInterval');
+
+      const { result } = renderHook(() => useTheme(), { wrapper });
+
+      await waitFor(() => {
+        expect(result.current.isLoading).toBe(false);
+      });
+
+      await act(async () => {
+        await result.current.setAutoSwitchEnabled(true);
+      });
+      await act(async () => {
+        await result.current.setAutoSwitchEnabled(false);
+      });
+
+      expect(clearIntervalSpy).toHaveBeenCalled();
+      clearIntervalSpy.mockRestore();
     });
   });
 
