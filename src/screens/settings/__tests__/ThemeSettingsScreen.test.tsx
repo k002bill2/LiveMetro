@@ -25,14 +25,58 @@ jest.mock('lucide-react-native', () =>
   ),
 );
 
-const mockSetThemeMode = jest.fn(() => Promise.resolve());
-jest.mock('@/services/theme', () => ({
-  useTheme: jest.fn(() => ({
+// BANNED 규칙 준수: jest.fn은 factory 내부 inline 정의 (hoist 함정 회피).
+// 테스트에서는 jest.requireMock의 __themeValue로 setter들에 접근한다.
+jest.mock('@/services/theme', () => {
+  const themeValue = {
     themeMode: 'system',
-    setThemeMode: mockSetThemeMode,
+    setThemeMode: jest.fn(() => Promise.resolve()),
     isDark: false,
-  })),
-}));
+    accentColorId: 'blue',
+    setAccentColor: jest.fn(() => Promise.resolve()),
+    autoSwitchEnabled: false,
+    setAutoSwitchEnabled: jest.fn(() => Promise.resolve()),
+  };
+  return {
+    useTheme: jest.fn(() => themeValue),
+    __themeValue: themeValue,
+  };
+});
+
+const { __themeValue: baseThemeValue } = jest.requireMock('@/services/theme') as {
+  __themeValue: {
+    themeMode: string;
+    setThemeMode: jest.Mock;
+    isDark: boolean;
+    accentColorId: string;
+    setAccentColor: jest.Mock;
+    autoSwitchEnabled: boolean;
+    setAutoSwitchEnabled: jest.Mock;
+  };
+};
+const mockSetThemeMode = baseThemeValue.setThemeMode;
+const mockSetAccentColor = baseThemeValue.setAccentColor;
+const mockSetAutoSwitchEnabled = baseThemeValue.setAutoSwitchEnabled;
+
+jest.mock('@/components/settings/AccentColorSwatches', () => {
+  const React = require('react');
+  const { Text, TouchableOpacity } = require('react-native');
+  return {
+    __esModule: true,
+    default: ({
+      selectedId,
+      onSelect,
+    }: {
+      selectedId: string;
+      onSelect: (id: string) => void;
+    }) =>
+      React.createElement(
+        TouchableOpacity,
+        { testID: 'accent-swatches', onPress: () => onSelect('purple') },
+        React.createElement(Text, null, selectedId),
+      ),
+  };
+});
 
 jest.mock('@/services/i18n', () => ({
   useI18n: jest.fn(() => ({
@@ -111,10 +155,10 @@ describe('ThemeSettingsScreen', () => {
     jest.clearAllMocks();
   });
 
-  it('renders the theme settings section title', () => {
+  it('renders the mode section title (design: "모드")', () => {
     const { getByText } = render(<ThemeSettingsScreen {...defaultProps} />);
 
-    expect(getByText('테마 설정')).toHaveTextContent('테마 설정');
+    expect(getByText('모드')).toHaveTextContent('모드');
   });
 
   it('renders the three theme mode preview cards', () => {
@@ -155,8 +199,8 @@ describe('ThemeSettingsScreen', () => {
 
   it('shows the dark theme caption when isDark is true', () => {
     (useTheme as jest.Mock).mockReturnValueOnce({
+      ...baseThemeValue,
       themeMode: 'dark',
-      setThemeMode: mockSetThemeMode,
       isDark: true,
     });
 
@@ -202,5 +246,66 @@ describe('ThemeSettingsScreen', () => {
     fireEvent.press(getByTestId('toggle-모션 줄이기'));
 
     expect(mockUpdateSettings).toHaveBeenCalledWith({ reduceMotionEnabled: false });
+  });
+
+  // ========== 다크 모드 자동 전환 ==========
+
+  it('wires the auto dark switch toggle to the theme context', () => {
+    const { getByTestId } = render(<ThemeSettingsScreen {...defaultProps} />);
+
+    fireEvent.press(getByTestId('toggle-시간대별 자동 전환'));
+
+    expect(mockSetAutoSwitchEnabled).toHaveBeenCalledWith(true);
+  });
+
+  it('shows the manual mode caption when auto switch is off', () => {
+    const { getByText } = render(<ThemeSettingsScreen {...defaultProps} />);
+
+    expect(getByText('직접 모드를 선택해 사용해요.')).toHaveTextContent(
+      '직접 모드를 선택해 사용해요.',
+    );
+  });
+
+  it('shows the sunrise/sunset caption when auto switch is on', () => {
+    (useTheme as jest.Mock).mockReturnValueOnce({
+      ...baseThemeValue,
+      autoSwitchEnabled: true,
+    });
+
+    const { getByText } = render(<ThemeSettingsScreen {...defaultProps} />);
+
+    expect(
+      getByText('서울 일출 · 일몰 기준으로 자동 전환돼요.'),
+    ).toHaveTextContent('서울 일출 · 일몰 기준으로 자동 전환돼요.');
+  });
+
+  it('turns auto switch off when a mode card is tapped while enabled', () => {
+    (useTheme as jest.Mock).mockReturnValueOnce({
+      ...baseThemeValue,
+      autoSwitchEnabled: true,
+    });
+
+    const { getByTestId } = render(<ThemeSettingsScreen {...defaultProps} />);
+
+    fireEvent.press(getByTestId('theme-mode-light'));
+
+    expect(mockSetAutoSwitchEnabled).toHaveBeenCalledWith(false);
+    expect(mockSetThemeMode).toHaveBeenCalledWith('light');
+  });
+
+  // ========== 강조 색상 ==========
+
+  it('shows the current accent color label', () => {
+    const { getByText } = render(<ThemeSettingsScreen {...defaultProps} />);
+
+    expect(getByText('클래식 블루')).toHaveTextContent('클래식 블루');
+  });
+
+  it('wires accent selection to the theme context', () => {
+    const { getByTestId } = render(<ThemeSettingsScreen {...defaultProps} />);
+
+    fireEvent.press(getByTestId('accent-swatches'));
+
+    expect(mockSetAccentColor).toHaveBeenCalledWith('purple');
   });
 });

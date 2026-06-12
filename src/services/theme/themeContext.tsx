@@ -7,7 +7,19 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+import { isNightInSeoul } from '@/utils/sunSchedule';
+import {
+  AccentColorId,
+  DEFAULT_ACCENT_COLOR_ID,
+  applyAccentToColors,
+  isAccentColorId,
+} from './accentColors';
+
 const THEME_STORAGE_KEY = '@livemetro_theme';
+const ACCENT_STORAGE_KEY = '@livemetro_accent_color';
+const AUTO_SWITCH_STORAGE_KEY = '@livemetro_theme_auto_switch';
+/** 자동 전환 재판정 주기 — 일출/일몰 경계 1분 해상도면 충분 */
+const AUTO_SWITCH_POLL_MS = 60 * 1000;
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 export type ResolvedTheme = 'light' | 'dark';
@@ -134,6 +146,12 @@ interface ThemeContextType {
   colors: ThemeColors;
   isDark: boolean;
   setThemeMode: (mode: ThemeMode) => Promise<void>;
+  /** 강조 색상 — primary 계열 팔레트 오버라이드 */
+  accentColorId: AccentColorId;
+  setAccentColor: (id: AccentColorId) => Promise<void>;
+  /** 시간대별 자동 전환 — ON이면 서울 일출/일몰이 모드 선택을 우선함 */
+  autoSwitchEnabled: boolean;
+  setAutoSwitchEnabled: (enabled: boolean) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -146,15 +164,30 @@ interface ThemeProviderProps {
 export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   const systemColorScheme = useColorScheme();
   const [themeMode, setThemeModeState] = useState<ThemeMode>('system');
+  const [accentColorId, setAccentColorIdState] = useState<AccentColorId>(
+    DEFAULT_ACCENT_COLOR_ID
+  );
+  const [autoSwitchEnabled, setAutoSwitchEnabledState] = useState(false);
+  const [isNight, setIsNight] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Load saved theme on mount
+  // Load saved preferences on mount
   useEffect(() => {
     const loadTheme = async (): Promise<void> => {
       try {
-        const savedTheme = await AsyncStorage.getItem(THEME_STORAGE_KEY);
+        const [savedTheme, savedAccent, savedAutoSwitch] = await Promise.all([
+          AsyncStorage.getItem(THEME_STORAGE_KEY),
+          AsyncStorage.getItem(ACCENT_STORAGE_KEY),
+          AsyncStorage.getItem(AUTO_SWITCH_STORAGE_KEY),
+        ]);
         if (savedTheme && (savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'system')) {
           setThemeModeState(savedTheme);
+        }
+        if (isAccentColorId(savedAccent)) {
+          setAccentColorIdState(savedAccent);
+        }
+        if (savedAutoSwitch === 'true') {
+          setAutoSwitchEnabledState(true);
         }
       } catch (error) {
         console.error('Error loading theme preference:', error);
@@ -166,16 +199,35 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     loadTheme();
   }, []);
 
-  // Resolve theme based on mode and system preference
+  // 자동 전환 ON 동안 1분 해상도로 일출/일몰 경계 재판정
+  useEffect(() => {
+    if (!autoSwitchEnabled) {
+      return undefined;
+    }
+    const update = (): void => {
+      setIsNight(isNightInSeoul(new Date()));
+    };
+    update();
+    const intervalId = setInterval(update, AUTO_SWITCH_POLL_MS);
+    return () => clearInterval(intervalId);
+  }, [autoSwitchEnabled]);
+
+  // Resolve theme: 자동 전환 > 수동 모드 > 시스템
   const resolvedTheme: ResolvedTheme = React.useMemo(() => {
+    if (autoSwitchEnabled) {
+      return isNight ? 'dark' : 'light';
+    }
     if (themeMode === 'system') {
       return systemColorScheme === 'dark' ? 'dark' : 'light';
     }
     return themeMode;
-  }, [themeMode, systemColorScheme]);
+  }, [autoSwitchEnabled, isNight, themeMode, systemColorScheme]);
 
   const isDark = resolvedTheme === 'dark';
-  const colors = isDark ? darkColors : lightColors;
+  const colors = useMemo(
+    () => applyAccentToColors(isDark ? darkColors : lightColors, accentColorId, isDark),
+    [isDark, accentColorId]
+  );
 
   // Set theme and persist
   const setThemeMode = useCallback(async (mode: ThemeMode): Promise<void> => {
@@ -188,14 +240,55 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
     }
   }, []);
 
+  const setAccentColor = useCallback(async (id: AccentColorId): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(ACCENT_STORAGE_KEY, id);
+      setAccentColorIdState(id);
+    } catch (error) {
+      if (__DEV__) {
+        // eslint-disable-next-line no-console
+        console.error('Error saving accent color preference:', error);
+      }
+      throw error;
+    }
+  }, []);
+
+  const setAutoSwitchEnabled = useCallback(async (enabled: boolean): Promise<void> => {
+    try {
+      await AsyncStorage.setItem(AUTO_SWITCH_STORAGE_KEY, enabled ? 'true' : 'false');
+      setAutoSwitchEnabledState(enabled);
+    } catch (error) {
+      if (__DEV__) {
+        // eslint-disable-next-line no-console
+        console.error('Error saving auto switch preference:', error);
+      }
+      throw error;
+    }
+  }, []);
+
   const value = useMemo<ThemeContextType>(() => ({
     themeMode,
     resolvedTheme,
     colors,
     isDark,
     setThemeMode,
+    accentColorId,
+    setAccentColor,
+    autoSwitchEnabled,
+    setAutoSwitchEnabled,
     isLoading,
-  }), [themeMode, resolvedTheme, colors, isDark, setThemeMode, isLoading]);
+  }), [
+    themeMode,
+    resolvedTheme,
+    colors,
+    isDark,
+    setThemeMode,
+    accentColorId,
+    setAccentColor,
+    autoSwitchEnabled,
+    setAutoSwitchEnabled,
+    isLoading,
+  ]);
 
   return (
     <ThemeContext.Provider value={value}>

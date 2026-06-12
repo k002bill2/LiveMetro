@@ -454,6 +454,12 @@ export const DelayCertificateScreen: React.FC = () => {
           </View>
         </View>
 
+        {/* 시안 하단 노트 — 실제 데이터 출처에 맞춘 honest copy */}
+        <Text style={styles.dataSourceNote} testID="data-source-note">
+          지연 기록은 서울교통공사 · 코레일 등 운영기관 실시간 데이터를 기반으로
+          자동 감지돼요.
+        </Text>
+
         {__DEV__ && (
           <TouchableOpacity
             style={styles.sampleButton}
@@ -478,12 +484,7 @@ export const DelayCertificateScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>지연증명서</Text>
-        <Text style={styles.headerSubtitle}>지연 이력 조회 및 증명서 발급</Text>
-      </View>
-
+      {/* 제목은 네이티브 헤더(RootNavigator)가 담당 — 화면 내 중복 헤더 없음 */}
       {loading && history.length === 0 && certificates.length === 0 ? (
         /* 로딩 스켈레톤 — 빈 화면 금지 */
         <View style={styles.skeletonWrap} testID="delay-cert-skeleton">
@@ -527,24 +528,8 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       flex: 1,
       backgroundColor: semantic.bgSubtlePage,
     },
-    header: {
-      paddingHorizontal: WANTED_TOKENS.spacing.s5,
-      paddingVertical: WANTED_TOKENS.spacing.s3,
-    },
-    headerTitle: {
-      fontSize: WANTED_TOKENS.type.title3.size,
-      fontWeight: '700',
-      fontFamily: weightToFontFamily('700'),
-      color: semantic.labelStrong,
-      letterSpacing: -0.2,
-    },
-    headerSubtitle: {
-      fontSize: WANTED_TOKENS.type.caption1.size,
-      fontFamily: weightToFontFamily('500'),
-      color: semantic.labelAlt,
-      marginTop: WANTED_TOKENS.spacing.s1,
-    },
     listContent: {
+      paddingTop: WANTED_TOKENS.spacing.s2,
       paddingBottom: WANTED_TOKENS.spacing.s6,
     },
 
@@ -714,6 +699,15 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       marginTop: 2,
       lineHeight: 16,
     },
+    dataSourceNote: {
+      marginTop: WANTED_TOKENS.spacing.s3,
+      marginHorizontal: WANTED_TOKENS.spacing.s5,
+      paddingHorizontal: WANTED_TOKENS.spacing.s1,
+      fontSize: 11.5,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+      lineHeight: 17,
+    },
     sampleButton: {
       marginTop: WANTED_TOKENS.spacing.s4,
       marginHorizontal: WANTED_TOKENS.spacing.s5,
@@ -735,6 +729,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
 
     /* ---- Skeleton ---- */
     skeletonWrap: {
+      paddingTop: WANTED_TOKENS.spacing.s3,
       paddingHorizontal: WANTED_TOKENS.spacing.s5,
       gap: WANTED_TOKENS.spacing.s3,
     },

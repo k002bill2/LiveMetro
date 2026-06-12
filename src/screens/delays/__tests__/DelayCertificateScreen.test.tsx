@@ -162,15 +162,23 @@ describe('DelayCertificateScreen', () => {
 
   // ========== Rendering ==========
   describe('Rendering', () => {
-    it('renders header title and subtitle', async () => {
-      const { getByText } = render(<DelayCertificateScreen />);
-      expect(getByText('지연증명서')).toHaveTextContent('지연증명서');
-      expect(getByText('지연 이력 조회 및 증명서 발급')).toHaveTextContent(
-        '지연 이력 조회 및 증명서 발급'
-      );
+    it('does not render an in-screen header (native header owns the title)', async () => {
+      const { queryByText } = render(<DelayCertificateScreen />);
+      // 시안: 네이티브 헤더 "지연증명서" 하나만 — 화면 내 중복 제목/부제 금지
+      expect(queryByText('지연증명서')).toBeNull();
+      expect(queryByText('지연 이력 조회 및 증명서 발급')).toBeNull();
       await waitFor(() => {
         expect(delayHistoryService.getUserHistory).toHaveBeenCalledWith(
           'test-user-id'
+        );
+      });
+    });
+
+    it('renders operator data source note under the info card', async () => {
+      const { getByTestId } = render(<DelayCertificateScreen />);
+      await waitFor(() => {
+        expect(getByTestId('data-source-note')).toHaveTextContent(
+          '지연 기록은 서울교통공사 · 코레일 등 운영기관 실시간 데이터를 기반으로 자동 감지돼요.'
         );
       });
     });
