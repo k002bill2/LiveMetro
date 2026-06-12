@@ -1,6 +1,16 @@
 /**
  * Location Permission Settings Screen
- * Manage location permissions
+ * Manage location permissions.
+ *
+ * Wanted handoff (settings-detail-2.jsx:433-533 SettingsLocationScreen) —
+ * 상태 히어로 카드(56px 아이콘 사각 + 상태 Pill + 풀폭 액션 버튼),
+ * 사용 목적 4행, 세부 설정 3토글, 개인정보 링크 카드.
+ *
+ * Honesty 매핑: "정확한 위치"는 실상태 표시(Android=권한 accuracy, iOS=권한
+ * granted proxy — SDK 49 expo-location이 iOS precise 미노출) + 시스템 설정
+ * 위임. "자동 주변 역 검색"은 nearbySearchPreference 실연동(useNearbyStations
+ * 게이트). 권한 비즈니스 로직(checkPermission/requestPermission/
+ * requestBackgroundPermission/openSettings)은 무수정.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -15,31 +25,88 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import { CheckCircle, HelpCircle, Locate, MapPin, Navigation, Bell, Settings, ShieldCheck, Train, XCircle, type LucideIcon } from 'lucide-react-native';
+import {
+  BellRing,
+  Check,
+  ChevronRight,
+  Crosshair,
+  MapPin,
+  Navigation,
+  Route,
+  RotateCw,
+  Settings,
+  ShieldCheck,
+  TrainFront,
+  Zap,
+  type LucideIcon,
+} from 'lucide-react-native';
 import * as Location from 'expo-location';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme';
+import { SettingsStackParamList } from '@/navigation/types';
 import SettingSection from '@/components/settings/SettingSection';
+import SettingToggle from '@/components/settings/SettingToggle';
 import { locationService } from '@/services/location/locationService';
+import {
+  getNearbyAutoSearchEnabled,
+  setNearbyAutoSearchEnabled,
+  subscribeNearbyAutoSearch,
+} from '@/services/location/nearbySearchPreference';
+
+type Props = NativeStackScreenProps<SettingsStackParamList, 'LocationPermission'>;
 
 interface PermissionState {
   foreground: Location.PermissionStatus;
   background: Location.PermissionStatus;
+  /** Android=권한 accuracy 'fine', iOS=granted proxy (SDK 49 precise 미노출) */
+  precise: boolean;
 }
 
 type PermissionStatusString = 'granted' | 'denied' | 'undetermined' | 'loading';
 
-export const LocationPermissionScreen: React.FC = () => {
+interface PurposeRow {
+  readonly Icon: LucideIcon;
+  readonly label: string;
+  readonly sub: string;
+  readonly tinted?: boolean;
+}
+
+// 디자인 4행. sub 카피는 실기능 기준으로 보정: "가까운 5개역"=홈 maxStations:5,
+// 환승 안내는 위치 자동이 아닌 길안내 화면 기능이라 "길안내 중"으로 한정.
+const PURPOSE_ROWS: readonly PurposeRow[] = [
+  { Icon: Navigation, label: '주변 역 자동 검색', sub: '현재 위치 기준 가까운 5개역', tinted: true },
+  { Icon: TrainFront, label: '출발/도착 자동 인식', sub: '가까운 역의 노선·도착 정보 자동 표시' },
+  { Icon: BellRing, label: '역 근처 알림', sub: '설정한 출퇴근 역 도착 시 알림' },
+  { Icon: Route, label: '환승 안내', sub: '길안내 중 환승역에서 다음 노선 안내' },
+];
+
+export const LocationPermissionScreen: React.FC<Props> = ({ navigation }) => {
   const { isDark } = useTheme();
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
   const styles = createStyles(semantic);
   const [permissionState, setPermissionState] = useState<PermissionState>({
     foreground: Location.PermissionStatus.UNDETERMINED,
     background: Location.PermissionStatus.UNDETERMINED,
+    precise: false,
   });
   const [isLoading, setIsLoading] = useState(true);
   const [requesting, setRequesting] = useState(false);
   const [requestingBackground, setRequestingBackground] = useState(false);
+  const [nearbyAutoSearch, setNearbyAutoSearch] = useState(true);
+
+  // "자동 주변 역 검색" preference 로드 + 구독 (다른 화면 변경 반영)
+  useEffect(() => {
+    let alive = true;
+    getNearbyAutoSearchEnabled().then((enabled) => {
+      if (alive) setNearbyAutoSearch(enabled);
+    });
+    const unsubscribe = subscribeNearbyAutoSearch(setNearbyAutoSearch);
+    return () => {
+      alive = false;
+      unsubscribe();
+    };
+  }, []);
 
   // For backward compatibility with UI rendering
   const permissionStatus: PermissionStatusString = isLoading
@@ -50,6 +117,8 @@ export const LocationPermissionScreen: React.FC = () => {
     ? 'denied'
     : 'undetermined';
 
+  const backgroundGranted = permissionState.background === Location.PermissionStatus.GRANTED;
+
   useEffect(() => {
     checkPermission();
   }, []);
@@ -57,14 +126,30 @@ export const LocationPermissionScreen: React.FC = () => {
   const checkPermission = async (): Promise<void> => {
     try {
       setIsLoading(true);
-      const { status: foreground } = await Location.getForegroundPermissionsAsync();
+      const foregroundResponse = await Location.getForegroundPermissionsAsync();
       const { status: background } = await Location.getBackgroundPermissionsAsync();
-      setPermissionState({ foreground, background });
+      const granted = foregroundResponse.status === Location.PermissionStatus.GRANTED;
+      // Android는 권한 응답의 accuracy로 정확한 위치 여부를 직접 읽는다.
+      // iOS는 SDK 49 expo-location이 precise 플래그를 노출하지 않아 granted를
+      // proxy로 사용 (변경은 시스템 설정 위임이라 표시 오차만 존재).
+      const precise =
+        Platform.OS === 'android'
+          ? foregroundResponse.android?.accuracy === 'fine'
+          : granted;
+      setPermissionState({
+        foreground: foregroundResponse.status,
+        background,
+        precise,
+      });
     } catch (error) {
-      console.error('Error checking location permission:', error);
+      if (__DEV__) {
+        // eslint-disable-next-line no-console
+        console.error('Error checking location permission:', error);
+      }
       setPermissionState({
         foreground: Location.PermissionStatus.UNDETERMINED,
         background: Location.PermissionStatus.UNDETERMINED,
+        precise: false,
       });
     } finally {
       setIsLoading(false);
@@ -106,7 +191,10 @@ export const LocationPermissionScreen: React.FC = () => {
         );
       }
     } catch (error) {
-      console.error('Error requesting location permission:', error);
+      if (__DEV__) {
+        // eslint-disable-next-line no-console
+        console.error('Error requesting location permission:', error);
+      }
       Alert.alert('오류', '권한 요청에 실패했습니다.');
     } finally {
       setRequesting(false);
@@ -153,7 +241,10 @@ export const LocationPermissionScreen: React.FC = () => {
         );
       }
     } catch (error) {
-      console.error('Error requesting background permission:', error);
+      if (__DEV__) {
+        // eslint-disable-next-line no-console
+        console.error('Error requesting background permission:', error);
+      }
       Alert.alert('오류', '백그라운드 권한 요청에 실패했습니다.');
     } finally {
       setRequestingBackground(false);
@@ -179,6 +270,37 @@ export const LocationPermissionScreen: React.FC = () => {
     );
   };
 
+  // 백그라운드 토글: off→on 은 기존 요청 플로우, on→off 는 프로그램으로
+  // 회수가 불가하므로 시스템 설정 안내로 위임.
+  const handleBackgroundToggle = (value: boolean): void => {
+    if (value) {
+      void requestBackgroundPermission();
+    } else {
+      openSettings();
+    }
+  };
+
+  // 정확한 위치는 OS만 변경 가능 — 시스템 설정으로 위임
+  const handlePreciseToggle = (): void => {
+    Alert.alert(
+      '정확한 위치',
+      '정확한 위치 사용 여부는 시스템 설정에서만 변경할 수 있어요.',
+      [
+        { text: '취소', style: 'cancel' },
+        { text: '설정 열기', onPress: () => Linking.openSettings() },
+      ],
+    );
+  };
+
+  const handleNearbyAutoSearchToggle = (value: boolean): void => {
+    setNearbyAutoSearch(value); // 낙관적 반영 (구독 통지로도 동기화)
+    void setNearbyAutoSearchEnabled(value);
+  };
+
+  const handlePrivacyPress = (): void => {
+    navigation.navigate('PrivacyPolicy');
+  };
+
   const getStatusColor = (): string => {
     switch (permissionStatus) {
       case 'granted':
@@ -190,10 +312,36 @@ export const LocationPermissionScreen: React.FC = () => {
     }
   };
 
-  const getStatusText = (): string => {
+  const getStatusTitle = (): string => {
     switch (permissionStatus) {
       case 'granted':
-        return '위치 권한이 허용되었습니다';
+        return '위치 권한 활성화';
+      case 'denied':
+        return '위치 권한 꺼짐';
+      case 'loading':
+        return '위치 권한 확인 중';
+      default:
+        return '위치 권한 필요';
+    }
+  };
+
+  const getStatusPillText = (): string => {
+    switch (permissionStatus) {
+      case 'granted':
+        return '허용됨';
+      case 'denied':
+        return '거부됨';
+      case 'loading':
+        return '확인 중';
+      default:
+        return '미설정';
+    }
+  };
+
+  const getStatusDescription = (): string => {
+    switch (permissionStatus) {
+      case 'granted':
+        return permissionState.precise ? '정확한 위치 사용 중' : '대략적인 위치 사용 중';
       case 'denied':
         return '위치 권한이 거부되었습니다';
       case 'loading':
@@ -203,134 +351,145 @@ export const LocationPermissionScreen: React.FC = () => {
     }
   };
 
-  const getStatusIcon = (): LucideIcon => {
-    switch (permissionStatus) {
-      case 'granted':
-        return CheckCircle;
-      case 'denied':
-        return XCircle;
-      default:
-        return HelpCircle;
-    }
-  };
+  const statusColor = getStatusColor();
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.content}>
-        {/* Permission Status */}
-        <View style={styles.statusCard}>
-          <View
-            style={[styles.statusIcon, { backgroundColor: getStatusColor() + '20' }]}
-          >
-            {(() => {
-              const StatusIcon = getStatusIcon();
-              return <StatusIcon size={48} color={getStatusColor()} strokeWidth={2} />;
-            })()}
-          </View>
-          <Text style={[styles.statusText, { color: getStatusColor() }]}>
-            {getStatusText()}
-          </Text>
-        </View>
-
-        {/* Location Uses */}
-        <SettingSection title="위치 정보 사용 목적">
-          <View style={styles.featureItem}>
-            <View style={styles.featureIcon}>
-              <Locate size={24} color={semantic.labelStrong} strokeWidth={2} />
+        {/* Status hero card (handoff 443-491) */}
+        <View style={styles.heroCard}>
+          <View style={styles.heroTop}>
+            <View style={[styles.heroIconSquare, { backgroundColor: statusColor + '20' }]}>
+              <MapPin size={26} color={statusColor} strokeWidth={2.2} />
+              {permissionStatus === 'granted' && (
+                <View style={styles.heroBadgeOuter}>
+                  <View style={styles.heroBadgeInner}>
+                    <Check size={9} color="#FFFFFF" strokeWidth={4} />
+                  </View>
+                </View>
+              )}
             </View>
-            <View style={styles.featureContent}>
-              <Text style={styles.featureTitle}>주변 역 찾기</Text>
-              <Text style={styles.featureDescription}>
-                현재 위치에서 가까운 지하철역을 자동으로 찾아줍니다
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.featureItem}>
-            <View style={styles.featureIcon}>
-              <Train size={24} color={semantic.labelStrong} strokeWidth={2} />
-            </View>
-            <View style={styles.featureContent}>
-              <Text style={styles.featureTitle}>출퇴근 경로 설정</Text>
-              <Text style={styles.featureDescription}>
-                자주 이용하는 경로를 추천하고 설정할 수 있습니다
-              </Text>
+            <View style={styles.heroTextColumn}>
+              <View style={styles.heroPillRow}>
+                <View style={[styles.heroPill, { backgroundColor: statusColor + '20' }]}>
+                  <Text style={[styles.heroPillText, { color: statusColor }]}>
+                    {getStatusPillText()}
+                  </Text>
+                </View>
+                {permissionStatus === 'granted' && (
+                  <Text style={styles.heroPillCaption}>
+                    {backgroundGranted ? '항상 허용' : '앱 사용 중에만'}
+                  </Text>
+                )}
+              </View>
+              <Text style={styles.heroTitle}>{getStatusTitle()}</Text>
+              <Text style={styles.heroSub}>{getStatusDescription()}</Text>
             </View>
           </View>
 
-          <View style={styles.featureItem}>
-            <View style={styles.featureIcon}>
-              <Bell size={24} color={semantic.labelStrong} strokeWidth={2} />
-            </View>
-            <View style={styles.featureContent}>
-              <Text style={styles.featureTitle}>맞춤 알림</Text>
-              <Text style={styles.featureDescription}>
-                위치 기반으로 실시간 지연 알림을 받을 수 있습니다
-              </Text>
-            </View>
-          </View>
-        </SettingSection>
-
-        {/* Permission Actions */}
-        <SettingSection title="권한 관리">
-          {permissionStatus !== 'granted' && (
+          {permissionStatus === 'granted' ? (
             <TouchableOpacity
-              style={styles.actionButton}
+              style={styles.heroButtonNeutral}
+              onPress={openSettings}
+              accessibilityRole="button"
+              accessibilityLabel="시스템 설정에서 변경"
+            >
+              <Settings size={14} color={semantic.labelNeutral} strokeWidth={2} />
+              <Text style={styles.heroButtonNeutralText}>시스템 설정에서 변경</Text>
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity
+              style={styles.heroButtonPrimary}
               onPress={requestPermission}
               disabled={requesting}
+              accessibilityRole="button"
+              accessibilityLabel="위치 권한 요청"
             >
-              <MapPin size={20} color={'#FFFFFF'} strokeWidth={2} />
-              <Text style={styles.actionButtonText}>
+              <MapPin size={14} color="#FFFFFF" strokeWidth={2} />
+              <Text style={styles.heroButtonPrimaryText}>
                 {requesting ? '권한 요청 중...' : '위치 권한 요청'}
               </Text>
             </TouchableOpacity>
           )}
+        </View>
 
-          {permissionStatus === 'granted' && permissionState.background !== 'granted' && (
-            <TouchableOpacity
-              style={styles.actionButton}
-              onPress={requestBackgroundPermission}
-              disabled={requestingBackground}
+        {/* Why we need it (handoff 493-504, 실기능 3행) */}
+        <SettingSection title="위치 정보 사용 목적">
+          {PURPOSE_ROWS.map((row, index) => (
+            <View
+              key={row.label}
+              style={[
+                styles.purposeRow,
+                index === PURPOSE_ROWS.length - 1 && styles.purposeRowLast,
+              ]}
             >
-              <Navigation size={20} color={'#FFFFFF'} strokeWidth={2} />
-              <Text style={styles.actionButtonText}>
-                {requestingBackground ? '권한 요청 중...' : '백그라운드 권한 요청'}
-              </Text>
-            </TouchableOpacity>
-          )}
-
-          {permissionState.background === 'granted' && (
-            <View style={styles.permissionGrantedBadge}>
-              <CheckCircle size={20} color={semantic.statusPositive} strokeWidth={2} />
-              <Text style={[styles.badgeText, { color: semantic.statusPositive }]}>
-                백그라운드 위치 허용됨
-              </Text>
+              <View
+                style={[
+                  styles.purposeIconSquare,
+                  row.tinted && styles.purposeIconSquareTinted,
+                ]}
+              >
+                <row.Icon
+                  size={16}
+                  color={row.tinted ? WANTED_TOKENS.blue[500] : semantic.labelNeutral}
+                  strokeWidth={2}
+                />
+              </View>
+              <View style={styles.purposeTextColumn}>
+                <Text style={styles.purposeLabel}>{row.label}</Text>
+                <Text style={styles.purposeSub}>{row.sub}</Text>
+              </View>
             </View>
-          )}
-
-          <TouchableOpacity
-            style={[styles.actionButton, styles.secondaryButton]}
-            onPress={openSettings}
-          >
-            <Settings size={20} color={semantic.labelStrong} strokeWidth={2} />
-            <Text style={[styles.actionButtonText, styles.secondaryButtonText]}>
-              앱 설정 열기
-            </Text>
-          </TouchableOpacity>
+          ))}
         </SettingSection>
 
-        {/* Privacy Notice */}
-        <View style={styles.privacyBox}>
-          <ShieldCheck size={20} color={semantic.labelAlt} strokeWidth={2} />
+        {/* Fine controls (handoff 506-512) */}
+        <SettingSection title="세부 설정">
+          <SettingToggle
+            icon={Crosshair}
+            label="정확한 위치 사용"
+            subtitle="비활성 시 약 1km 범위로 처리"
+            value={permissionState.precise}
+            onValueChange={handlePreciseToggle}
+            disabled={isLoading}
+          />
+          <SettingToggle
+            icon={Zap}
+            label="자동 주변 역 검색"
+            subtitle="앱 실행 시 자동 감지"
+            value={nearbyAutoSearch}
+            onValueChange={handleNearbyAutoSearchToggle}
+          />
+          <SettingToggle
+            icon={RotateCw}
+            label="백그라운드 새로고침"
+            subtitle="배터리 사용량 증가"
+            value={backgroundGranted}
+            onValueChange={handleBackgroundToggle}
+            disabled={requestingBackground || isLoading}
+          />
+        </SettingSection>
+
+        {/* Privacy link (handoff 514-528) */}
+        <TouchableOpacity
+          style={styles.privacyCard}
+          onPress={handlePrivacyPress}
+          accessibilityRole="button"
+          accessibilityLabel="개인정보 처리방침 보기"
+          testID="privacy-link-card"
+        >
+          <ShieldCheck size={20} color={WANTED_TOKENS.blue[500]} strokeWidth={2.2} />
           <Text style={styles.privacyText}>
-            위치 정보는 기기에만 저장되며 서버로 전송되지 않습니다. 개인정보는
-            안전하게 보호됩니다.
+            위치 정보는 기기에만 저장되며, LiveMetro 서버로 전송되지 않습니다.
           </Text>
-        </View>
+          <ChevronRight size={16} color={WANTED_TOKENS.blue[500]} strokeWidth={2} />
+        </TouchableOpacity>
       </ScrollView>
     </SafeAreaView>
   );
 };
+
+LocationPermissionScreen.displayName = 'LocationPermissionScreen';
 
 const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
   container: {
@@ -340,121 +499,175 @@ const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
   content: {
     flex: 1,
   },
-  statusCard: {
+  heroCard: {
     backgroundColor: semantic.bgBase,
     marginHorizontal: WANTED_TOKENS.spacing.s4,
     marginTop: WANTED_TOKENS.spacing.s4,
     marginBottom: WANTED_TOKENS.spacing.s5,
-    paddingVertical: WANTED_TOKENS.spacing.s8,
-    borderRadius: WANTED_TOKENS.radius.r6,
+    paddingVertical: WANTED_TOKENS.spacing.s5,
+    paddingHorizontal: 18,
+    borderRadius: 18,
     borderWidth: 1,
     borderColor: semantic.lineSubtle,
+  },
+  heroTop: {
+    flexDirection: 'row',
     alignItems: 'center',
   },
-  statusIcon: {
-    width: 80,
-    height: 80,
-    borderRadius: WANTED_TOKENS.radius.pill,
+  heroIconSquare: {
+    width: 56,
+    height: 56,
+    borderRadius: WANTED_TOKENS.radius.r8,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: WANTED_TOKENS.spacing.s4,
+    marginRight: 14,
   },
-  statusText: {
-    fontSize: WANTED_TOKENS.type.body1.size,
-    fontWeight: '600',
-    fontFamily: weightToFontFamily('600'),
-    textAlign: 'center',
-    paddingHorizontal: WANTED_TOKENS.spacing.s4,
+  heroBadgeOuter: {
+    position: 'absolute',
+    bottom: -2,
+    right: -2,
+    width: 18,
+    height: 18,
+    borderRadius: WANTED_TOKENS.radius.pill,
+    backgroundColor: semantic.bgBase,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  featureItem: {
+  heroBadgeInner: {
+    width: 12,
+    height: 12,
+    borderRadius: WANTED_TOKENS.radius.pill,
+    backgroundColor: semantic.statusPositive,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  heroTextColumn: {
+    flex: 1,
+  },
+  heroPillRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
+  },
+  heroPill: {
+    paddingHorizontal: WANTED_TOKENS.spacing.s2,
+    paddingVertical: 3,
+    borderRadius: WANTED_TOKENS.radius.pill,
+  },
+  heroPillText: {
+    fontSize: WANTED_TOKENS.type.caption2.size,
+    fontFamily: weightToFontFamily('700'),
+  },
+  heroPillCaption: {
+    fontSize: WANTED_TOKENS.type.caption2.size,
+    fontFamily: weightToFontFamily('700'),
+    color: semantic.labelAlt,
+    marginLeft: 6,
+  },
+  heroTitle: {
+    fontSize: 16,
+    fontFamily: weightToFontFamily('800'),
+    color: semantic.labelStrong,
+    letterSpacing: -0.16,
+    marginTop: 6,
+  },
+  heroSub: {
+    fontSize: 11.5,
+    fontFamily: weightToFontFamily('600'),
+    color: semantic.labelAlt,
+    marginTop: 2,
+  },
+  heroButtonNeutral: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: WANTED_TOKENS.spacing.s4,
+    minHeight: 44,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    borderRadius: WANTED_TOKENS.radius.r6,
+    backgroundColor: semantic.bgSubtle,
+  },
+  heroButtonNeutralText: {
+    fontSize: WANTED_TOKENS.type.label2.size,
+    fontFamily: weightToFontFamily('700'),
+    color: semantic.labelStrong,
+    marginLeft: 6,
+  },
+  heroButtonPrimary: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: WANTED_TOKENS.spacing.s4,
+    minHeight: 44,
+    paddingVertical: 11,
+    paddingHorizontal: 14,
+    borderRadius: WANTED_TOKENS.radius.r6,
+    backgroundColor: WANTED_TOKENS.blue[500],
+  },
+  heroButtonPrimaryText: {
+    fontSize: WANTED_TOKENS.type.label2.size,
+    fontFamily: weightToFontFamily('700'),
+    color: '#FFFFFF',
+    marginLeft: 6,
+  },
+  purposeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: WANTED_TOKENS.spacing.s4,
-    paddingVertical: WANTED_TOKENS.spacing.s4,
+    paddingVertical: 14,
     borderBottomWidth: 1,
     borderBottomColor: semantic.lineSubtle,
   },
-  featureIcon: {
-    width: 40,
-    height: 40,
+  purposeRowLast: {
+    borderBottomWidth: 0,
+  },
+  purposeIconSquare: {
+    width: 32,
+    height: 32,
+    borderRadius: WANTED_TOKENS.radius.r4,
     backgroundColor: semantic.bgSubtle,
-    borderRadius: WANTED_TOKENS.radius.pill,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: WANTED_TOKENS.spacing.s3,
   },
-  featureContent: {
+  purposeIconSquareTinted: {
+    backgroundColor: 'rgba(0,102,255,0.12)',
+  },
+  purposeTextColumn: {
     flex: 1,
   },
-  featureTitle: {
-    fontSize: WANTED_TOKENS.type.body1.size,
-    fontWeight: '600',
+  purposeLabel: {
+    fontSize: 14,
     fontFamily: weightToFontFamily('600'),
     color: semantic.labelStrong,
-    marginBottom: 4,
   },
-  featureDescription: {
-    fontSize: WANTED_TOKENS.type.label2.size,
+  purposeSub: {
+    fontSize: 11.5,
+    fontFamily: weightToFontFamily('500'),
     color: semantic.labelAlt,
-    lineHeight: WANTED_TOKENS.type.label2.lh,
+    lineHeight: 16,
+    marginTop: 2,
   },
-  actionButton: {
+  privacyCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: semantic.labelStrong,
-    paddingVertical: WANTED_TOKENS.spacing.s4,
     marginHorizontal: WANTED_TOKENS.spacing.s4,
-    marginBottom: WANTED_TOKENS.spacing.s3,
-    borderRadius: WANTED_TOKENS.radius.r6,
-  },
-  secondaryButton: {
-    backgroundColor: semantic.bgBase,
-    borderWidth: 1,
-    borderColor: semantic.lineNormal,
-  },
-  actionButtonText: {
-    fontSize: WANTED_TOKENS.type.body1.size,
-    fontWeight: '700',
-    fontFamily: weightToFontFamily('700'),
-    color: '#FFFFFF',
-    marginLeft: WANTED_TOKENS.spacing.s2,
-  },
-  secondaryButtonText: {
-    color: semantic.labelStrong,
-  },
-  privacyBox: {
-    flexDirection: 'row',
-    backgroundColor: semantic.primaryBg,
+    marginBottom: WANTED_TOKENS.spacing.s6,
+    minHeight: 44,
+    paddingVertical: 14,
     paddingHorizontal: WANTED_TOKENS.spacing.s4,
-    paddingVertical: WANTED_TOKENS.spacing.s4,
-    marginHorizontal: WANTED_TOKENS.spacing.s4,
-    marginTop: WANTED_TOKENS.spacing.s5,
-    marginBottom: WANTED_TOKENS.spacing.s5,
-    borderRadius: WANTED_TOKENS.radius.r6,
+    borderRadius: 14,
+    backgroundColor: 'rgba(0,102,255,0.05)',
     borderWidth: 1,
-    borderColor: semantic.lineNormal,
+    borderColor: 'rgba(0,102,255,0.15)',
   },
   privacyText: {
     flex: 1,
-    fontSize: WANTED_TOKENS.type.label2.size,
-    color: semantic.labelAlt,
-    lineHeight: 1.5 * WANTED_TOKENS.type.label2.size,
-    marginLeft: WANTED_TOKENS.spacing.s3,
-  },
-  permissionGrantedBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: WANTED_TOKENS.spacing.s3,
-    marginHorizontal: WANTED_TOKENS.spacing.s4,
-    marginBottom: WANTED_TOKENS.spacing.s3,
-  },
-  badgeText: {
-    fontSize: WANTED_TOKENS.type.label2.size,
-    fontWeight: '600',
+    fontSize: WANTED_TOKENS.type.caption1.size,
     fontFamily: weightToFontFamily('600'),
-    marginLeft: WANTED_TOKENS.spacing.s2,
+    color: semantic.labelNeutral,
+    lineHeight: Math.round(WANTED_TOKENS.type.caption1.size * 1.45),
+    marginHorizontal: WANTED_TOKENS.spacing.s3,
   },
 });
 

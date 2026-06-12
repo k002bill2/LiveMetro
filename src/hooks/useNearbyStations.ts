@@ -6,6 +6,10 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useLocation } from './useLocation';
 import { locationService, NearbyStation, LocationCoordinates, AdaptiveRadiusResult } from '../services/location/locationService';
+import {
+  getNearbyAutoSearchEnabled,
+  subscribeNearbyAutoSearch,
+} from '../services/location/nearbySearchPreference';
 import { trainService } from '../services/train/trainService';
 import { Station } from '../models/train';
 
@@ -60,6 +64,21 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
   });
 
   const [allStations, setAllStations] = useState<Station[]>([]);
+
+  // "자동 주변 역 검색" 설정 (위치 권한 화면 토글). off면 위치 기반 자동
+  // 검색을 중단한다 — 수동 refresh()는 명시적 액션이라 게이트하지 않음.
+  const [autoSearchEnabled, setAutoSearchEnabled] = useState(true);
+  useEffect(() => {
+    let alive = true;
+    getNearbyAutoSearchEnabled().then((enabled) => {
+      if (alive) setAutoSearchEnabled(enabled);
+    });
+    const unsubscribe = subscribeNearbyAutoSearch(setAutoSearchEnabled);
+    return () => {
+      alive = false;
+      unsubscribe();
+    };
+  }, []);
 
   // Refs (not state) for values mutated *inside* findNearbyStations:
   // listing them in the useCallback deps below would recreate the callback
@@ -226,6 +245,9 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
    * Handle location updates
    */
   function handleLocationUpdate(newLocation: LocationCoordinates) {
+    if (!autoSearchEnabled) {
+      return;
+    }
     findNearbyStations(newLocation);
   }
 
@@ -289,6 +311,9 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
   // again if every source later goes away.
   const oneShotFallbackAttemptedRef = useRef(false);
   useEffect(() => {
+    if (!autoSearchEnabled) {
+      return;
+    }
     if (mockLocation || externalLocation || gpsLocation) {
       oneShotFallbackAttemptedRef.current = false;
       return;
@@ -297,14 +322,14 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
       oneShotFallbackAttemptedRef.current = true;
       getCurrentLocation();
     }
-  }, [mockLocation, externalLocation, gpsLocation, locationLoading, getCurrentLocation]);
+  }, [autoSearchEnabled, mockLocation, externalLocation, gpsLocation, locationLoading, getCurrentLocation]);
 
   // Find nearby stations when location is available
   useEffect(() => {
-    if (location && !locationLoading) {
+    if (location && !locationLoading && autoSearchEnabled) {
       findNearbyStations();
     }
-  }, [location, locationLoading, findNearbyStations]);
+  }, [location, locationLoading, autoSearchEnabled, findNearbyStations]);
 
   // Handle location errors
   useEffect(() => {
