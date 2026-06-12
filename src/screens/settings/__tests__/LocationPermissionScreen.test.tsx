@@ -92,6 +92,13 @@ jest.mock('@/components/settings/SettingToggle', () => {
   };
 });
 
+const mockSetNearbyAutoSearchEnabled = jest.fn((_v: boolean) => Promise.resolve());
+jest.mock('@/services/location/nearbySearchPreference', () => ({
+  getNearbyAutoSearchEnabled: jest.fn(() => Promise.resolve(true)),
+  setNearbyAutoSearchEnabled: (v: boolean) => mockSetNearbyAutoSearchEnabled(v),
+  subscribeNearbyAutoSearch: jest.fn(() => () => {}),
+}));
+
 jest.mock('@/services/location/locationService', () => ({
   locationService: {
     requestBackgroundPermission: jest.fn(() => Promise.resolve(true)),
@@ -140,7 +147,7 @@ describe('LocationPermissionScreen', () => {
       });
 
       expect(getByText('주변 역 자동 검색')).toBeTruthy();
-      expect(getByText('출퇴근 경로 추천')).toBeTruthy();
+      expect(getByText('출발/도착 자동 인식')).toBeTruthy();
       expect(getByText('역 근처 알림')).toBeTruthy();
     });
 
@@ -153,7 +160,7 @@ describe('LocationPermissionScreen', () => {
         expect(getByText('세부 설정')).toBeTruthy();
       });
 
-      expect(getByTestId('toggle-백그라운드 위치')).toHaveTextContent('백그라운드 위치');
+      expect(getByTestId('toggle-백그라운드 새로고침')).toHaveTextContent('백그라운드 새로고침');
     });
 
     it('renders privacy notice', async () => {
@@ -180,9 +187,10 @@ describe('LocationPermissionScreen', () => {
       const { getByText } = render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
-        expect(getByText('현재 위치 기준 가까운 역 표시')).toBeTruthy();
-        expect(getByText('자주 이용하는 경로 설정')).toBeTruthy();
-        expect(getByText('위치 기반 실시간 지연 알림')).toBeTruthy();
+        expect(getByText('현재 위치 기준 가까운 5개역')).toBeTruthy();
+        expect(getByText('가까운 역의 노선·도착 정보 자동 표시')).toBeTruthy();
+        expect(getByText('길안내 중 환승역에서 다음 노선 안내')).toBeTruthy();
+        expect(getByText('설정한 출퇴근 역 도착 시 알림')).toBeTruthy();
       });
     });
   });
@@ -219,7 +227,7 @@ describe('LocationPermissionScreen', () => {
       const { getByText } = render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
-        expect(getByText('위치 권한이 허용되었습니다')).toBeTruthy();
+        expect(getByText('정확한 위치 사용 중')).toBeTruthy();
       });
 
       expect(getByText('허용됨')).toBeTruthy();
@@ -492,7 +500,7 @@ describe('LocationPermissionScreen', () => {
       const { getByTestId } = render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
-        expect(getByTestId('toggle-백그라운드 위치').props.accessibilityState.checked).toBe(false);
+        expect(getByTestId('toggle-백그라운드 새로고침').props.accessibilityState.checked).toBe(false);
       });
     });
 
@@ -507,7 +515,7 @@ describe('LocationPermissionScreen', () => {
       const { getByTestId } = render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
-        expect(getByTestId('toggle-백그라운드 위치').props.accessibilityState.checked).toBe(true);
+        expect(getByTestId('toggle-백그라운드 새로고침').props.accessibilityState.checked).toBe(true);
       });
     });
 
@@ -526,7 +534,7 @@ describe('LocationPermissionScreen', () => {
         expect(getByText('위치 권한을 요청하지 않았습니다')).toBeTruthy();
       });
 
-      fireEvent.press(getByTestId('toggle-백그라운드 위치'));
+      fireEvent.press(getByTestId('toggle-백그라운드 새로고침'));
 
       await waitFor(() => {
         expect(Alert.alert).toHaveBeenCalledWith(
@@ -554,10 +562,10 @@ describe('LocationPermissionScreen', () => {
       );
 
       await waitFor(() => {
-        expect(getByText('위치 권한이 허용되었습니다')).toBeTruthy();
+        expect(getByText('정확한 위치 사용 중')).toBeTruthy();
       });
 
-      fireEvent.press(getByTestId('toggle-백그라운드 위치'));
+      fireEvent.press(getByTestId('toggle-백그라운드 새로고침'));
 
       await waitFor(() => {
         // On iOS, should directly show success alert
@@ -580,10 +588,10 @@ describe('LocationPermissionScreen', () => {
       );
 
       await waitFor(() => {
-        expect(getByText('위치 권한이 허용되었습니다')).toBeTruthy();
+        expect(getByText('정확한 위치 사용 중')).toBeTruthy();
       });
 
-      fireEvent.press(getByTestId('toggle-백그라운드 위치'));
+      fireEvent.press(getByTestId('toggle-백그라운드 새로고침'));
 
       await waitFor(() => {
         expect(Alert.alert).toHaveBeenCalled();
@@ -603,10 +611,10 @@ describe('LocationPermissionScreen', () => {
       );
 
       await waitFor(() => {
-        expect(getByText('위치 권한이 허용되었습니다')).toBeTruthy();
+        expect(getByText('정확한 위치 사용 중')).toBeTruthy();
       });
 
-      fireEvent.press(getByTestId('toggle-백그라운드 위치'));
+      fireEvent.press(getByTestId('toggle-백그라운드 새로고침'));
 
       await waitFor(() => {
         expect(Alert.alert).toHaveBeenCalled();
@@ -629,10 +637,10 @@ describe('LocationPermissionScreen', () => {
       );
 
       await waitFor(() => {
-        expect(getByText('위치 권한이 허용되었습니다')).toBeTruthy();
+        expect(getByText('정확한 위치 사용 중')).toBeTruthy();
       });
 
-      fireEvent.press(getByTestId('toggle-백그라운드 위치'));
+      fireEvent.press(getByTestId('toggle-백그라운드 새로고침'));
 
       await waitFor(() => {
         // Should call Alert.alert for success message
@@ -665,10 +673,10 @@ describe('LocationPermissionScreen', () => {
       );
 
       await waitFor(() => {
-        expect(getByText('위치 권한이 허용되었습니다')).toBeTruthy();
+        expect(getByText('정확한 위치 사용 중')).toBeTruthy();
       });
 
-      fireEvent.press(getByTestId('toggle-백그라운드 위치'));
+      fireEvent.press(getByTestId('toggle-백그라운드 새로고침'));
 
       await waitFor(() => {
         // Should call Alert.alert for denial message
@@ -703,10 +711,10 @@ describe('LocationPermissionScreen', () => {
       );
 
       await waitFor(() => {
-        expect(getByText('위치 권한이 허용되었습니다')).toBeTruthy();
+        expect(getByText('정확한 위치 사용 중')).toBeTruthy();
       });
 
-      fireEvent.press(getByTestId('toggle-백그라운드 위치'));
+      fireEvent.press(getByTestId('toggle-백그라운드 새로고침'));
 
       await waitFor(() => {
         // Should call Alert.alert for error message
@@ -741,13 +749,13 @@ describe('LocationPermissionScreen', () => {
       );
 
       await waitFor(() => {
-        expect(getByText('위치 권한이 허용되었습니다')).toBeTruthy();
+        expect(getByText('정확한 위치 사용 중')).toBeTruthy();
       });
 
-      fireEvent.press(getByTestId('toggle-백그라운드 위치'));
+      fireEvent.press(getByTestId('toggle-백그라운드 새로고침'));
 
       await waitFor(() => {
-        expect(getByTestId('toggle-백그라운드 위치').props.accessibilityState.disabled).toBe(true);
+        expect(getByTestId('toggle-백그라운드 새로고침').props.accessibilityState.disabled).toBe(true);
       });
     });
 
@@ -772,10 +780,10 @@ describe('LocationPermissionScreen', () => {
       );
 
       await waitFor(() => {
-        expect(getByText('위치 권한이 허용되었습니다')).toBeTruthy();
+        expect(getByText('정확한 위치 사용 중')).toBeTruthy();
       });
 
-      fireEvent.press(getByTestId('toggle-백그라운드 위치'));
+      fireEvent.press(getByTestId('toggle-백그라운드 새로고침'));
 
       await waitFor(() => {
         // Should call checkPermission (which calls getForegroundPermissionsAsync and getBackgroundPermissionsAsync)
@@ -796,10 +804,10 @@ describe('LocationPermissionScreen', () => {
       const { getByTestId } = render(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
-        expect(getByTestId('toggle-백그라운드 위치').props.accessibilityState.checked).toBe(true);
+        expect(getByTestId('toggle-백그라운드 새로고침').props.accessibilityState.checked).toBe(true);
       });
 
-      fireEvent.press(getByTestId('toggle-백그라운드 위치'));
+      fireEvent.press(getByTestId('toggle-백그라운드 새로고침'));
 
       await waitFor(() => {
         expect(Alert.alert).toHaveBeenCalledWith(
@@ -938,7 +946,7 @@ describe('LocationPermissionScreen', () => {
         // After check, should show actual status (not loading)
         expect(
           getByText('위치 권한을 요청하지 않았습니다') ||
-          getByText('위치 권한이 허용되었습니다') ||
+          getByText('정확한 위치 사용 중') ||
           getByText('위치 권한이 거부되었습니다')
         ).toBeTruthy();
       });
@@ -988,14 +996,14 @@ describe('LocationPermissionScreen', () => {
       await waitFor(() => {
         // Check all feature titles
         expect(getByText('주변 역 자동 검색')).toBeTruthy();
-        expect(getByText('출퇴근 경로 추천')).toBeTruthy();
+        expect(getByText('출발/도착 자동 인식')).toBeTruthy();
         expect(getByText('역 근처 알림')).toBeTruthy();
       });
 
       // Verify descriptions
-      expect(getByText(/가까운 역 표시/)).toBeTruthy();
-      expect(getByText(/자주 이용하는 경로/)).toBeTruthy();
-      expect(getByText(/실시간 지연 알림/)).toBeTruthy();
+      expect(getByText(/가까운 5개역/)).toBeTruthy();
+      expect(getByText(/노선·도착 정보 자동 표시/)).toBeTruthy();
+      expect(getByText(/출퇴근 역 도착 시 알림/)).toBeTruthy();
     });
 
     it('alerts instead of requesting when toggling background with denied foreground', async () => {
@@ -1015,7 +1023,7 @@ describe('LocationPermissionScreen', () => {
         expect(getByText('위치 권한이 거부되었습니다')).toBeTruthy();
       });
 
-      fireEvent.press(getByTestId('toggle-백그라운드 위치'));
+      fireEvent.press(getByTestId('toggle-백그라운드 새로고침'));
 
       await waitFor(() => {
         expect(Alert.alert).toHaveBeenCalledWith(
@@ -1040,14 +1048,57 @@ describe('LocationPermissionScreen', () => {
       );
 
       await waitFor(() => {
-        expect(getByText('위치 권한이 허용되었습니다')).toBeTruthy();
+        expect(getByText('정확한 위치 사용 중')).toBeTruthy();
       });
 
       // Rerender and verify state persists
       rerender(<LocationPermissionScreen {...defaultProps} />);
 
       await waitFor(() => {
-        expect(getByText('위치 권한이 허용되었습니다')).toBeTruthy();
+        expect(getByText('정확한 위치 사용 중')).toBeTruthy();
+      });
+    });
+  });
+  describe('Fine Controls (handoff toggles)', () => {
+    it('shows precise-location toggle reflecting permission state', async () => {
+      const { getByTestId } = render(<LocationPermissionScreen {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(getByTestId('toggle-정확한 위치 사용')).toHaveTextContent('정확한 위치 사용');
+      });
+    });
+
+    it('opens system-settings alert when precise toggle pressed', async () => {
+      (Location.getForegroundPermissionsAsync as jest.Mock).mockResolvedValue({
+        status: 'granted',
+      });
+
+      const { getByTestId, getByText } = render(<LocationPermissionScreen {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(getByText('정확한 위치 사용 중')).toBeTruthy();
+      });
+      fireEvent.press(getByTestId('toggle-정확한 위치 사용'));
+
+      await waitFor(() => {
+        expect(Alert.alert).toHaveBeenCalledWith(
+          '정확한 위치',
+          expect.stringContaining('시스템 설정'),
+          expect.any(Array),
+        );
+      });
+    });
+
+    it('persists nearby auto-search preference when toggled', async () => {
+      const { getByTestId } = render(<LocationPermissionScreen {...defaultProps} />);
+
+      await waitFor(() => {
+        expect(getByTestId('toggle-자동 주변 역 검색')).toHaveTextContent('자동 주변 역 검색');
+      });
+      fireEvent.press(getByTestId('toggle-자동 주변 역 검색'));
+
+      await waitFor(() => {
+        expect(mockSetNearbyAutoSearchEnabled).toHaveBeenCalledWith(false);
       });
     });
   });

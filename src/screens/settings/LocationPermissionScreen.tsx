@@ -4,11 +4,13 @@
  *
  * Wanted handoff (settings-detail-2.jsx:433-533 SettingsLocationScreen) —
  * 상태 히어로 카드(56px 아이콘 사각 + 상태 Pill + 풀폭 액션 버튼),
- * 사용 목적 3행, 백그라운드 위치 토글, 개인정보 링크 카드.
+ * 사용 목적 4행, 세부 설정 3토글, 개인정보 링크 카드.
  *
- * Honesty 매핑: 디자인의 "환승 안내" 행과 "정확한 위치"/"자동 주변 역 검색"
- * 토글은 backing 기능이 없어 생략. 권한 비즈니스 로직(checkPermission/
- * requestPermission/requestBackgroundPermission/openSettings)은 무수정.
+ * Honesty 매핑: "정확한 위치"는 실상태 표시(Android=권한 accuracy, iOS=권한
+ * granted proxy — SDK 49 expo-location이 iOS precise 미노출) + 시스템 설정
+ * 위임. "자동 주변 역 검색"은 nearbySearchPreference 실연동(useNearbyStations
+ * 게이트). 권한 비즈니스 로직(checkPermission/requestPermission/
+ * requestBackgroundPermission/openSettings)은 무수정.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -27,12 +29,15 @@ import {
   BellRing,
   Check,
   ChevronRight,
+  Crosshair,
   MapPin,
   Navigation,
+  Route,
   RotateCw,
   Settings,
   ShieldCheck,
-  Train,
+  TrainFront,
+  Zap,
   type LucideIcon,
 } from 'lucide-react-native';
 import * as Location from 'expo-location';
@@ -43,12 +48,19 @@ import { SettingsStackParamList } from '@/navigation/types';
 import SettingSection from '@/components/settings/SettingSection';
 import SettingToggle from '@/components/settings/SettingToggle';
 import { locationService } from '@/services/location/locationService';
+import {
+  getNearbyAutoSearchEnabled,
+  setNearbyAutoSearchEnabled,
+  subscribeNearbyAutoSearch,
+} from '@/services/location/nearbySearchPreference';
 
 type Props = NativeStackScreenProps<SettingsStackParamList, 'LocationPermission'>;
 
 interface PermissionState {
   foreground: Location.PermissionStatus;
   background: Location.PermissionStatus;
+  /** Android=권한 accuracy 'fine', iOS=granted proxy (SDK 49 precise 미노출) */
+  precise: boolean;
 }
 
 type PermissionStatusString = 'granted' | 'denied' | 'undetermined' | 'loading';
@@ -60,11 +72,13 @@ interface PurposeRow {
   readonly tinted?: boolean;
 }
 
-// 실기능이 있는 사용 목적만 노출 (디자인의 "환승 안내" 행은 미지원으로 생략)
+// 디자인 4행. sub 카피는 실기능 기준으로 보정: "가까운 5개역"=홈 maxStations:5,
+// 환승 안내는 위치 자동이 아닌 길안내 화면 기능이라 "길안내 중"으로 한정.
 const PURPOSE_ROWS: readonly PurposeRow[] = [
-  { Icon: Navigation, label: '주변 역 자동 검색', sub: '현재 위치 기준 가까운 역 표시', tinted: true },
-  { Icon: Train, label: '출퇴근 경로 추천', sub: '자주 이용하는 경로 설정' },
-  { Icon: BellRing, label: '역 근처 알림', sub: '위치 기반 실시간 지연 알림' },
+  { Icon: Navigation, label: '주변 역 자동 검색', sub: '현재 위치 기준 가까운 5개역', tinted: true },
+  { Icon: TrainFront, label: '출발/도착 자동 인식', sub: '가까운 역의 노선·도착 정보 자동 표시' },
+  { Icon: BellRing, label: '역 근처 알림', sub: '설정한 출퇴근 역 도착 시 알림' },
+  { Icon: Route, label: '환승 안내', sub: '길안내 중 환승역에서 다음 노선 안내' },
 ];
 
 export const LocationPermissionScreen: React.FC<Props> = ({ navigation }) => {
@@ -74,10 +88,25 @@ export const LocationPermissionScreen: React.FC<Props> = ({ navigation }) => {
   const [permissionState, setPermissionState] = useState<PermissionState>({
     foreground: Location.PermissionStatus.UNDETERMINED,
     background: Location.PermissionStatus.UNDETERMINED,
+    precise: false,
   });
   const [isLoading, setIsLoading] = useState(true);
   const [requesting, setRequesting] = useState(false);
   const [requestingBackground, setRequestingBackground] = useState(false);
+  const [nearbyAutoSearch, setNearbyAutoSearch] = useState(true);
+
+  // "자동 주변 역 검색" preference 로드 + 구독 (다른 화면 변경 반영)
+  useEffect(() => {
+    let alive = true;
+    getNearbyAutoSearchEnabled().then((enabled) => {
+      if (alive) setNearbyAutoSearch(enabled);
+    });
+    const unsubscribe = subscribeNearbyAutoSearch(setNearbyAutoSearch);
+    return () => {
+      alive = false;
+      unsubscribe();
+    };
+  }, []);
 
   // For backward compatibility with UI rendering
   const permissionStatus: PermissionStatusString = isLoading
@@ -97,9 +126,21 @@ export const LocationPermissionScreen: React.FC<Props> = ({ navigation }) => {
   const checkPermission = async (): Promise<void> => {
     try {
       setIsLoading(true);
-      const { status: foreground } = await Location.getForegroundPermissionsAsync();
+      const foregroundResponse = await Location.getForegroundPermissionsAsync();
       const { status: background } = await Location.getBackgroundPermissionsAsync();
-      setPermissionState({ foreground, background });
+      const granted = foregroundResponse.status === Location.PermissionStatus.GRANTED;
+      // Android는 권한 응답의 accuracy로 정확한 위치 여부를 직접 읽는다.
+      // iOS는 SDK 49 expo-location이 precise 플래그를 노출하지 않아 granted를
+      // proxy로 사용 (변경은 시스템 설정 위임이라 표시 오차만 존재).
+      const precise =
+        Platform.OS === 'android'
+          ? foregroundResponse.android?.accuracy === 'fine'
+          : granted;
+      setPermissionState({
+        foreground: foregroundResponse.status,
+        background,
+        precise,
+      });
     } catch (error) {
       if (__DEV__) {
         // eslint-disable-next-line no-console
@@ -108,6 +149,7 @@ export const LocationPermissionScreen: React.FC<Props> = ({ navigation }) => {
       setPermissionState({
         foreground: Location.PermissionStatus.UNDETERMINED,
         background: Location.PermissionStatus.UNDETERMINED,
+        precise: false,
       });
     } finally {
       setIsLoading(false);
@@ -238,6 +280,23 @@ export const LocationPermissionScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
+  // 정확한 위치는 OS만 변경 가능 — 시스템 설정으로 위임
+  const handlePreciseToggle = (): void => {
+    Alert.alert(
+      '정확한 위치',
+      '정확한 위치 사용 여부는 시스템 설정에서만 변경할 수 있어요.',
+      [
+        { text: '취소', style: 'cancel' },
+        { text: '설정 열기', onPress: () => Linking.openSettings() },
+      ],
+    );
+  };
+
+  const handleNearbyAutoSearchToggle = (value: boolean): void => {
+    setNearbyAutoSearch(value); // 낙관적 반영 (구독 통지로도 동기화)
+    void setNearbyAutoSearchEnabled(value);
+  };
+
   const handlePrivacyPress = (): void => {
     navigation.navigate('PrivacyPolicy');
   };
@@ -282,7 +341,7 @@ export const LocationPermissionScreen: React.FC<Props> = ({ navigation }) => {
   const getStatusDescription = (): string => {
     switch (permissionStatus) {
       case 'granted':
-        return '위치 권한이 허용되었습니다';
+        return permissionState.precise ? '정확한 위치 사용 중' : '대략적인 위치 사용 중';
       case 'denied':
         return '위치 권한이 거부되었습니다';
       case 'loading':
@@ -384,12 +443,27 @@ export const LocationPermissionScreen: React.FC<Props> = ({ navigation }) => {
           ))}
         </SettingSection>
 
-        {/* Fine controls (handoff 506-512, backing 있는 토글만) */}
+        {/* Fine controls (handoff 506-512) */}
         <SettingSection title="세부 설정">
           <SettingToggle
+            icon={Crosshair}
+            label="정확한 위치 사용"
+            subtitle="비활성 시 약 1km 범위로 처리"
+            value={permissionState.precise}
+            onValueChange={handlePreciseToggle}
+            disabled={isLoading}
+          />
+          <SettingToggle
+            icon={Zap}
+            label="자동 주변 역 검색"
+            subtitle="앱 실행 시 자동 감지"
+            value={nearbyAutoSearch}
+            onValueChange={handleNearbyAutoSearchToggle}
+          />
+          <SettingToggle
             icon={RotateCw}
-            label="백그라운드 위치"
-            subtitle="앱이 꺼져있을 때도 알림"
+            label="백그라운드 새로고침"
+            subtitle="배터리 사용량 증가"
             value={backgroundGranted}
             onValueChange={handleBackgroundToggle}
             disabled={requestingBackground || isLoading}
