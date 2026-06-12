@@ -49,6 +49,7 @@ const okState = (positions: TrainPosition[]) => ({
   error: null,
   lastUpdated: new Date('2026-06-11T12:00:00+09:00'),
   isStale: false,
+  unsupported: false,
   refetch: jest.fn(),
 });
 
@@ -184,6 +185,16 @@ describe('TrainPositionScreen', () => {
     const { getByTestId, queryByTestId } = render(<TrainPositionScreen />);
     expect(getByTestId('train-position-row-kkachisan')).toBeTruthy();
     expect(queryByTestId('train-position-row-city_hall_1')).toBeNull();
+  });
+
+  it('shows the unsupported panel instead of 운행 종료 for lines the Seoul API does not provide', () => {
+    mockUseRoute.mockReturnValue({ params: { lineId: '김포도시철도', focusStationId: undefined } });
+    mockedUseTrainPositions.mockReturnValue({ ...okState([]), unsupported: true });
+    const { getByTestId, queryByTestId, getByText } = render(<TrainPositionScreen />);
+    expect(getByTestId('train-position-unsupported')).toBeTruthy();
+    expect(getByText('이 노선은 실시간 열차 위치 정보를 제공하지 않아요')).toBeTruthy();
+    expect(queryByTestId('train-position-empty')).toBeNull();
+    expect(queryByTestId('train-position-list')).toBeNull();
   });
 
   it('marks stale data in the status row', () => {

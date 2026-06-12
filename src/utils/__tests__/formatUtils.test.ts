@@ -5,6 +5,7 @@
 import {
   formatStationName,
   formatLineName,
+  toSeoulApiLineName,
   formatPhoneNumber,
   formatNumber,
   truncateText,
@@ -55,6 +56,64 @@ describe('formatUtils', () => {
 
     it('should return original if unknown', () => {
       expect(formatLineName('unknown')).toBe('unknown');
+    });
+  });
+
+  describe('toSeoulApiLineName', () => {
+    it('maps numeric line ids 1-9 to N호선', () => {
+      expect(toSeoulApiLineName('1')).toBe('1호선');
+      expect(toSeoulApiLineName('2')).toBe('2호선');
+      expect(toSeoulApiLineName('3')).toBe('3호선');
+      expect(toSeoulApiLineName('4')).toBe('4호선');
+      expect(toSeoulApiLineName('5')).toBe('5호선');
+      expect(toSeoulApiLineName('6')).toBe('6호선');
+      expect(toSeoulApiLineName('7')).toBe('7호선');
+      expect(toSeoulApiLineName('8')).toBe('8호선');
+      expect(toSeoulApiLineName('9')).toBe('9호선');
+    });
+
+    it('maps 경의선 to the official API name 경의중앙선 (regression: INFO-200 empty screen)', () => {
+      expect(toSeoulApiLineName('경의선')).toBe('경의중앙선');
+    });
+
+    it('maps 우이신설경전철 to the official API name 우이신설선', () => {
+      expect(toSeoulApiLineName('우이신설경전철')).toBe('우이신설선');
+    });
+
+    it('passes through line ids that already match the API name', () => {
+      expect(toSeoulApiLineName('공항철도')).toBe('공항철도');
+      expect(toSeoulApiLineName('경춘선')).toBe('경춘선');
+      expect(toSeoulApiLineName('수인분당선')).toBe('수인분당선');
+      expect(toSeoulApiLineName('신분당선')).toBe('신분당선');
+      expect(toSeoulApiLineName('경강선')).toBe('경강선');
+      expect(toSeoulApiLineName('서해선')).toBe('서해선');
+      expect(toSeoulApiLineName('신림선')).toBe('신림선');
+      expect(toSeoulApiLineName('GTX-A')).toBe('GTX-A');
+    });
+
+    it('returns null for lines the Seoul realtimePosition API does not provide', () => {
+      expect(toSeoulApiLineName('김포도시철도')).toBeNull();
+      expect(toSeoulApiLineName('용인경전철')).toBeNull();
+      expect(toSeoulApiLineName('의정부경전철')).toBeNull();
+      expect(toSeoulApiLineName('인천선')).toBeNull();
+    });
+
+    it('returns null for 인천2 instead of extracting digits into 2호선 (regression: Seoul Line 2 trains shown as Incheon Line 2)', () => {
+      expect(toSeoulApiLineName('인천2')).toBeNull();
+      expect(toSeoulApiLineName('인천2')).not.toBe('2호선');
+    });
+
+    it('falls back to the legacy slug mapping for english slugs', () => {
+      expect(toSeoulApiLineName('gyeongui')).toBe('경의중앙선');
+      expect(toSeoulApiLineName('airport')).toBe('공항철도');
+    });
+
+    it('trims surrounding whitespace before lookup', () => {
+      expect(toSeoulApiLineName(' 경의선 ')).toBe('경의중앙선');
+    });
+
+    it('returns unknown ids unchanged (current INFO-200-safe behavior)', () => {
+      expect(toSeoulApiLineName('미지의노선')).toBe('미지의노선');
     });
   });
 

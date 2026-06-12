@@ -10,7 +10,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { AppState, AppStateStatus } from 'react-native';
 import { seoulSubwayApi } from '@/services/api/seoulSubwayApi';
-import { formatLineName } from '@/utils/formatUtils';
+import { toSeoulApiLineName } from '@/utils/formatUtils';
 import type { TrainPosition } from '@/models/trainPosition';
 
 interface UseTrainPositionsState {
@@ -38,9 +38,13 @@ const lastSuccessCache = new Map<string, { positions: TrainPosition[]; at: Date 
 export const useTrainPositions = (
   lineId: string,
   options: UseTrainPositionsOptions = {}
-): UseTrainPositionsState & { refetch: () => void } => {
+): UseTrainPositionsState & { refetch: () => void; unsupported: boolean } => {
   const { enabled = true, refetchInterval = MIN_POLL_INTERVAL_MS } = options;
   const pollInterval = Math.max(refetchInterval, MIN_POLL_INTERVAL_MS);
+
+  // null = the Seoul realtimePosition API does not cover this line; calling
+  // anyway returns INFO-200 (or worse, a digit-extracted wrong line name).
+  const apiLineName = lineId ? toSeoulApiLineName(lineId) : null;
 
   const [state, setState] = useState<UseTrainPositionsState>({
     positions: [],
@@ -54,8 +58,9 @@ export const useTrainPositions = (
   const lastFetchAtRef = useRef(0);
 
   const fetchPositions = useCallback(async (): Promise<void> => {
+    if (apiLineName === null) return;
     try {
-      const rows = await seoulSubwayApi.getRealtimePosition(formatLineName(lineId));
+      const rows = await seoulSubwayApi.getRealtimePosition(apiLineName);
       const positions = rows.map((row) => seoulSubwayApi.convertToTrainPosition(row));
       const at = new Date();
       lastSuccessCache.set(lineId, { positions, at });
@@ -74,18 +79,19 @@ export const useTrainPositions = (
         isStale: cached != null,
       });
     }
-  }, [lineId]);
+  }, [lineId, apiLineName]);
 
   const refetch = useCallback(() => {
+    if (apiLineName === null) return;
     setState((prev) => ({ ...prev, loading: true, error: null }));
     void fetchPositions();
-  }, [fetchPositions]);
+  }, [fetchPositions, apiLineName]);
 
   // Polling lifecycle — gated on `enabled` (screen focus) per the inactive
   // screen polling rule; interval + mounted flag cleaned up on unmount.
   useEffect(() => {
     mountedRef.current = true;
-    if (!enabled || !lineId) {
+    if (!enabled || !lineId || apiLineName === null) {
       setState((prev) => ({ ...prev, loading: false }));
       return undefined;
     }
@@ -101,7 +107,7 @@ export const useTrainPositions = (
       mountedRef.current = false;
       clearInterval(intervalId);
     };
-  }, [enabled, lineId, pollInterval, fetchPositions]);
+  }, [enabled, lineId, apiLineName, pollInterval, fetchPositions]);
 
   // Foreground-resume refetch with burst guard (mirrors useRealtimeTrains).
   useEffect(() => {
@@ -122,5 +128,5 @@ export const useTrainPositions = (
     };
   }, [enabled, fetchPositions]);
 
-  return { ...state, refetch };
+  return { ...state, unsupported: apiLineName === null && lineId !== '', refetch };
 };

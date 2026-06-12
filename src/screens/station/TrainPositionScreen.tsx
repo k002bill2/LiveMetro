@@ -22,7 +22,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RouteProp, useRoute, useIsFocused } from '@react-navigation/native';
-import { AlertCircle, Moon } from 'lucide-react-native';
+import { AlertCircle, Info, Moon } from 'lucide-react-native';
 
 import { AppStackParamList } from '../../navigation/types';
 import { WANTED_TOKENS, typeStyle } from '@/styles/modernTheme';
@@ -64,10 +64,8 @@ const TrainPositionScreen: React.FC = () => {
   const lineColor = LINE_COLORS[lineKey] ?? semantic.primaryNormal;
 
   const isScreenFocused = useIsFocused();
-  const { positions, loading, error, isStale, lastUpdated, refetch } = useTrainPositions(
-    lineId,
-    { enabled: isScreenFocused }
-  );
+  const { positions, loading, error, isStale, lastUpdated, unsupported, refetch } =
+    useTrainPositions(lineId, { enabled: isScreenFocused });
 
   const branches = useMemo(() => getLineBranches(lineKey), [lineKey]);
 
@@ -240,7 +238,14 @@ const TrainPositionScreen: React.FC = () => {
         />
       </View>
 
-      {loading && positions.length === 0 ? (
+      {unsupported ? (
+        <View style={styles.statePanel} testID="train-position-unsupported">
+          <Info size={48} color={semantic.labelAlt} />
+          <Text style={[typeStyle('body2', '500'), styles.stateText, { color: semantic.labelNeutral }]}>
+            이 노선은 실시간 열차 위치 정보를 제공하지 않아요
+          </Text>
+        </View>
+      ) : loading && positions.length === 0 ? (
         <View style={styles.statePanel} testID="train-position-loading">
           <ActivityIndicator size="large" color={semantic.primaryNormal} />
           <Text style={[typeStyle('body2', '500'), styles.stateText, { color: semantic.labelNeutral }]}>
