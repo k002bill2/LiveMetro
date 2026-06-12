@@ -18,6 +18,7 @@ import {
   lineStationSet,
   getLineBranches,
   buildStationNameToIdMap,
+  resolveLineKey,
 } from '../subwayMapData';
 
 describe('subwayMapData', () => {
@@ -277,6 +278,50 @@ describe('subwayMapData', () => {
 
     it('returns [] for unknown line ids', () => {
       expect(getLineBranches('nonexistent_line_id_xyz')).toEqual([]);
+    });
+  });
+
+  describe('resolveLineKey', () => {
+    it('passes through ids that are already lines.json keys', () => {
+      expect(resolveLineKey('2')).toBe('2');
+      expect(resolveLineKey('bundang')).toBe('bundang');
+    });
+
+    it('maps stationsDataService Korean line names to lines.json keys', () => {
+      // Station.lineId for non-numeric lines is the Seoul API Korean name
+      // (convertLineNumToLineId strips only 호선) — every emitted name must
+      // resolve to a LINE_STATIONS key or the position screen renders empty.
+      expect(resolveLineKey('수인분당선')).toBe('bundang');
+      expect(resolveLineKey('신분당선')).toBe('sinbundang');
+      expect(resolveLineKey('경의선')).toBe('gyeongui');
+      expect(resolveLineKey('경의중앙선')).toBe('gyeongui');
+      expect(resolveLineKey('공항철도')).toBe('airport');
+      expect(resolveLineKey('경춘선')).toBe('gyeongchun');
+      expect(resolveLineKey('경강선')).toBe('gyeonggang');
+      expect(resolveLineKey('서해선')).toBe('seohaeline');
+      expect(resolveLineKey('김포도시철도')).toBe('gimpo');
+      expect(resolveLineKey('신림선')).toBe('sillim');
+      expect(resolveLineKey('용인경전철')).toBe('yongin');
+      expect(resolveLineKey('우이신설경전철')).toBe('wooyisinseol');
+      expect(resolveLineKey('의정부경전철')).toBe('uijeongbu');
+      expect(resolveLineKey('인천선')).toBe('incheon1');
+      expect(resolveLineKey('인천2')).toBe('incheon2');
+      expect(resolveLineKey('GTX-A')).toBe('gtx_a');
+    });
+
+    it('resolves every emitted Korean name to a line with stations', () => {
+      const emitted = [
+        '수인분당선', '신분당선', '경의선', '공항철도', '경춘선', '경강선',
+        '서해선', '김포도시철도', '신림선', '용인경전철', '우이신설경전철',
+        '의정부경전철', '인천선', '인천2', 'GTX-A',
+      ];
+      for (const name of emitted) {
+        expect(getLineBranches(resolveLineKey(name)).length).toBeGreaterThan(0);
+      }
+    });
+
+    it('returns unknown ids unchanged', () => {
+      expect(resolveLineKey('nonexistent_line_id_xyz')).toBe('nonexistent_line_id_xyz');
     });
   });
 

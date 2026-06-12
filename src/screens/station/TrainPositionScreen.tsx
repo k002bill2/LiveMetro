@@ -34,10 +34,12 @@ import { LineBadge, type LineId } from '@/components/design';
 import {
   getLineBranches,
   buildStationNameToIdMap,
+  resolveLineKey,
   STATIONS,
   LINE_COLORS,
   type LineBranch,
 } from '@/utils/subwayMapData';
+import { resolveInternalStationId } from '@/utils/stationIdResolver';
 import { directionToDisplay } from '@/models/route';
 import type { TrainPosition } from '@/models/trainPosition';
 
@@ -48,11 +50,18 @@ const formatClock = (date: Date): string =>
 
 const TrainPositionScreen: React.FC = () => {
   const route = useRoute<TrainPositionRouteProp>();
-  const { lineId, focusStationId } = route.params;
+  const { lineId, focusStationId: rawFocusStationId } = route.params;
+
+  // Two ID normalizations at the boundary: Station.lineId is the Seoul API
+  // Korean name for non-numeric lines ('수인분당선') while LINE_STATIONS /
+  // LINE_COLORS key on lines.json slugs ('bundang'); focusStationId arrives
+  // as an external station_cd while branch.stationIds are internal slugs.
+  const lineKey = resolveLineKey(lineId);
+  const focusStationId = resolveInternalStationId(rawFocusStationId) ?? undefined;
 
   const { isDark } = useTheme();
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
-  const lineColor = LINE_COLORS[lineId] ?? semantic.primaryNormal;
+  const lineColor = LINE_COLORS[lineKey] ?? semantic.primaryNormal;
 
   const isScreenFocused = useIsFocused();
   const { positions, loading, error, isStale, lastUpdated, refetch } = useTrainPositions(
@@ -60,7 +69,7 @@ const TrainPositionScreen: React.FC = () => {
     { enabled: isScreenFocused }
   );
 
-  const branches = useMemo(() => getLineBranches(lineId), [lineId]);
+  const branches = useMemo(() => getLineBranches(lineKey), [lineKey]);
 
   // Initial branch: the one containing the station the user came from.
   const [branchKey, setBranchKey] = useState<string>(() => {
@@ -107,12 +116,12 @@ const TrainPositionScreen: React.FC = () => {
   // handles Line 2); Line 2 branches run plain 상행/하행 service.
   const dirLabel = useCallback(
     (d: DirectionValue): string => {
-      if (branch && !branch.isLoop && lineId === '2') {
+      if (branch && !branch.isLoop && lineKey === '2') {
         return d === 'up' ? '상행' : '하행';
       }
-      return directionToDisplay(d, lineId);
+      return directionToDisplay(d, lineKey);
     },
-    [branch, lineId]
+    [branch, lineKey]
   );
 
   const handleSelectBranch = useCallback((key: string) => {

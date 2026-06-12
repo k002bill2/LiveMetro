@@ -172,6 +172,49 @@ export const getLineBranches = (lineId: string): LineBranch[] => {
   });
 };
 
+/**
+ * Seoul API Korean line names → lines.json keys.
+ *
+ * Station.lineId from stationsDataService is the raw Seoul API line name for
+ * non-numeric lines (convertLineNumToLineId only strips 호선) — e.g.
+ * '수인분당선', '인천선'. lines.json keys are graph slugs ('bundang',
+ * 'incheon1'). Same two-universe split LineBadge absorbs with its alias
+ * table; this one bridges into LINE_STATIONS / LINE_COLORS lookups.
+ */
+const KOREAN_LINE_NAME_TO_KEY: Record<string, string> = {
+  '수인분당선': 'bundang',
+  '분당선': 'bundang',
+  '신분당선': 'sinbundang',
+  '경의선': 'gyeongui',
+  '경의중앙선': 'gyeongui',
+  '공항철도': 'airport',
+  '경춘선': 'gyeongchun',
+  '경강선': 'gyeonggang',
+  '서해선': 'seohaeline',
+  '김포도시철도': 'gimpo',
+  '신림선': 'sillim',
+  '용인경전철': 'yongin',
+  '에버라인': 'yongin',
+  '우이신설경전철': 'wooyisinseol',
+  '우이신설선': 'wooyisinseol',
+  '의정부경전철': 'uijeongbu',
+  '인천선': 'incheon1',
+  '인천1호선': 'incheon1',
+  '인천2': 'incheon2',
+  '인천2호선': 'incheon2',
+  'GTX-A': 'gtx_a',
+};
+
+/**
+ * Resolve any line identifier (lines.json key, digit, or Seoul API Korean
+ * name) to the lines.json key used by LINE_STATIONS / LINE_COLORS.
+ * Unknown ids pass through unchanged so callers keep their `?? []` fallback.
+ */
+export const resolveLineKey = (lineId: string): string => {
+  if (LINE_STATIONS[lineId]) return lineId;
+  return KOREAN_LINE_NAME_TO_KEY[lineId] ?? lineId;
+};
+
 /** Normalize a station name for cross-source joins (역 suffix + whitespace). */
 const normalizeStationKey = (name: string): string =>
   name.trim().replace(/역$/, '');
