@@ -158,6 +158,34 @@ describe('TrainPositionScreen', () => {
     expect(getByTestId('train-position-empty')).toBeTruthy();
   });
 
+  it('renders the timeline and joins trains for a Korean line name id (수인분당선)', () => {
+    // Regression: Station.lineId for non-numeric lines is the Seoul API
+    // Korean name; before resolveLineKey the LINE_STATIONS lookup missed
+    // ('bundang' key) and the screen showed 운행 중 0대 over a blank list
+    // while the API was returning trains.
+    mockUseRoute.mockReturnValue({ params: { lineId: '수인분당선', focusStationId: undefined } });
+    mockedUseTrainPositions.mockReturnValue(
+      // 왕십리 — near the head of the bundang order so the row is inside
+      // the FlatList initial render window under test virtualization.
+      okState([buildPosition({ trainNo: '6152', stationName: '왕십리', terminalName: '왕십리' })])
+    );
+    const { getByTestId, getByText } = render(<TrainPositionScreen />);
+    expect(getByTestId('train-position-row-wangsimni')).toBeTruthy();
+    expect(getByTestId('train-position-row-wangsimni-marker-6152')).toBeTruthy();
+    expect(getByText('운행 중 1대')).toBeTruthy();
+  });
+
+  it('resolves an external station_cd focusStationId to pick the containing branch', () => {
+    // StationDetail passes the Seoul station_cd (까치산 2호선 = '0200');
+    // branch.stationIds hold internal slugs, so without resolution the
+    // initial-branch selection never matched and fell back to the loop.
+    mockUseRoute.mockReturnValue({ params: { lineId: '2', focusStationId: '0200' } });
+    mockedUseTrainPositions.mockReturnValue(okState([buildPosition()]));
+    const { getByTestId, queryByTestId } = render(<TrainPositionScreen />);
+    expect(getByTestId('train-position-row-kkachisan')).toBeTruthy();
+    expect(queryByTestId('train-position-row-city_hall_1')).toBeNull();
+  });
+
   it('marks stale data in the status row', () => {
     mockedUseTrainPositions.mockReturnValue({
       ...okState([buildPosition()]),
