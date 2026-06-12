@@ -103,6 +103,36 @@ describe('TrainMarkerOverlay', () => {
     expect(overlay.props.importantForAccessibility).toBe('no-hide-descendants');
   });
 
+  it('shows a moving arrow for in-motion trains (출발/진입/전역출발)', () => {
+    const { getByTestId } = render(
+      <TrainMarkerOverlay
+        trains={[
+          overlayTrain(1, { trainNo: '7001', status: 'departed' }),
+          overlayTrain(2, { trainNo: '7002', status: 'entering' }),
+          overlayTrain(3, { trainNo: '7003', status: 'departed_prev' }),
+        ]}
+        lineColor="#00A84D"
+        testID="overlay"
+      />
+    );
+    expect(getByTestId('overlay-marker-7001-moving', { includeHiddenElements: true })).toBeTruthy();
+    expect(getByTestId('overlay-marker-7002-moving', { includeHiddenElements: true })).toBeTruthy();
+    expect(getByTestId('overlay-marker-7003-moving', { includeHiddenElements: true })).toBeTruthy();
+  });
+
+  it('hides the moving arrow for trains stopped at a station (도착)', () => {
+    const { queryByTestId } = render(
+      <TrainMarkerOverlay
+        trains={[overlayTrain(1, { trainNo: '7004', status: 'arrived' })]}
+        lineColor="#00A84D"
+        testID="overlay"
+      />
+    );
+    expect(
+      queryByTestId('overlay-marker-7004-moving', { includeHiddenElements: true })
+    ).toBeNull();
+  });
+
   it('renders nothing visible when there are no trains (no crash)', () => {
     const { getByTestId } = render(
       <TrainMarkerOverlay trains={[]} lineColor="#00A84D" testID="overlay" />

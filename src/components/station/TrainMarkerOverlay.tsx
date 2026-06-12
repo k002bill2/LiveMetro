@@ -10,6 +10,7 @@
  */
 import React, { memo, useEffect, useMemo, useRef } from 'react';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { ChevronDown, ChevronUp } from 'lucide-react-native';
 import { WANTED_TOKENS, typeStyle } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme/themeContext';
 import type { TrainPosition } from '@/models/trainPosition';
@@ -26,6 +27,9 @@ export const TRAIN_MARKER_HEIGHT = 38;
 const STACK_GAP = 2;
 const SLIDE_DURATION_MS = 600;
 const FADE_IN_DURATION_MS = 250;
+const ARROW_SIZE = 14;
+const ARROW_TRAVEL = 4;
+const ARROW_LOOP_MS = 900;
 
 /** A position row joined onto its timeline row index. */
 export interface OverlayTrain {
@@ -57,6 +61,55 @@ export const computeMarkerTop = (
 
 const isBetweenStatus = (train: TrainPosition): boolean =>
   train.status === 'entering' || train.status === 'departed_prev';
+
+/** Stopped only at 도착; 출발/진입/전역출발(and unknown=운행중) are in motion. */
+const isMoving = (train: TrainPosition): boolean => train.status !== 'arrived';
+
+/**
+ * Looping chevron on the rail beside the card — continuous "이동 중" cue
+ * between the 30s polls (cards themselves only slide when a poll moves them).
+ */
+const MovingArrow: React.FC<{ direction: TrainPosition['direction']; lineColor: string; testID?: string }> = ({
+  direction,
+  lineColor,
+  testID,
+}) => {
+  const phase = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const loop = Animated.loop(
+      Animated.timing(phase, {
+        toValue: 1,
+        duration: ARROW_LOOP_MS,
+        easing: Easing.out(Easing.quad),
+        useNativeDriver: true,
+      })
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [phase]);
+
+  // Up trains travel toward row 0 (screen-up); arrow drifts the same way.
+  const translateY = phase.interpolate({
+    inputRange: [0, 1],
+    outputRange: direction === 'up' ? [ARROW_TRAVEL, -ARROW_TRAVEL] : [-ARROW_TRAVEL, ARROW_TRAVEL],
+  });
+  const opacity = phase.interpolate({
+    inputRange: [0, 0.25, 0.75, 1],
+    outputRange: [0, 1, 1, 0],
+  });
+
+  const Chevron = direction === 'up' ? ChevronUp : ChevronDown;
+
+  return (
+    <Animated.View
+      style={[styles.movingArrow, { opacity, transform: [{ translateY }] }]}
+      testID={testID}
+    >
+      <Chevron size={ARROW_SIZE} color={lineColor} strokeWidth={3} />
+    </Animated.View>
+  );
+};
 
 const trainMarkerLabel = (train: TrainPosition): string => {
   const flags = [train.isExpress ? '급행' : null, train.isLastTrain ? '막차' : null]
@@ -119,6 +172,13 @@ const TrainMarkerCard: React.FC<TrainMarkerCardProps> = ({
       ]}
       testID={testID}
     >
+      {isMoving(train) ? (
+        <MovingArrow
+          direction={train.direction}
+          lineColor={lineColor}
+          testID={testID ? `${testID}-moving` : undefined}
+        />
+      ) : null}
       <Text style={[styles.markerTrainNo, { color: semantic.labelStrong }]} numberOfLines={1}>
         {trainMarkerLabel(train)}
       </Text>
@@ -182,6 +242,16 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderRadius: WANTED_TOKENS.radius.r4,
     paddingHorizontal: WANTED_TOKENS.spacing.s2,
+  },
+  movingArrow: {
+    position: 'absolute',
+    // Centered on the rail line, to the left of the card.
+    left: -(RAIL_ZONE_WIDTH / 2 + ARROW_SIZE / 2 + WANTED_TOKENS.spacing.s1),
+    top: (TRAIN_MARKER_HEIGHT - ARROW_SIZE) / 2,
+    width: ARROW_SIZE,
+    height: ARROW_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   markerTrainNo: {
     ...typeStyle('caption1', '700'),
