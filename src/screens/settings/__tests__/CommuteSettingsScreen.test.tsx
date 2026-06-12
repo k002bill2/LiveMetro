@@ -117,7 +117,7 @@ describe('CommuteSettingsScreen', () => {
       signInWithEmail: jest.fn(),
       signUpWithEmail: jest.fn(),
       signOut: jest.fn(),
-      updateUserProfile: jest.fn(),
+      updateUserPreferences: jest.fn(),
       resetPassword: jest.fn(),
       changePassword: jest.fn(),
     } as any);
@@ -199,7 +199,7 @@ describe('CommuteSettingsScreen', () => {
       signInWithEmail: jest.fn(),
       signUpWithEmail: jest.fn(),
       signOut: jest.fn(),
-      updateUserProfile: jest.fn(),
+      updateUserPreferences: jest.fn(),
       resetPassword: jest.fn(),
       changePassword: jest.fn(),
     } as any);

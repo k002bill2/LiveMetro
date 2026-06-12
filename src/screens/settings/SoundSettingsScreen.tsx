@@ -91,7 +91,7 @@ const DEFAULT_SOUND_SETTINGS: SoundPreferences = {
 };
 
 export const SoundSettingsScreen: React.FC = () => {
-  const { user, updateUserProfile } = useAuth();
+  const { user, updateUserPreferences } = useAuth();
   const { sendTestNotification } = useNotifications();
   const { isDark } = useTheme();
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
@@ -131,15 +131,12 @@ export const SoundSettingsScreen: React.FC = () => {
 
       try {
         setSaving(true);
-        await updateUserProfile({
-          preferences: {
-            ...user.preferences,
-            notificationSettings: {
-              ...user.preferences.notificationSettings,
-              soundSettings: {
-                ...soundSettings,
-                ...updates,
-              },
+        await updateUserPreferences({
+          notificationSettings: {
+            ...user.preferences.notificationSettings,
+            soundSettings: {
+              ...soundSettings,
+              ...updates,
             },
           },
         });
@@ -150,7 +147,7 @@ export const SoundSettingsScreen: React.FC = () => {
         setSaving(false);
       }
     },
-    [user, soundSettings, updateUserProfile]
+    [user, soundSettings, updateUserPreferences]
   );
 
   const handleTogglePushNotifications = async (value: boolean): Promise<void> => {
@@ -158,13 +155,10 @@ export const SoundSettingsScreen: React.FC = () => {
 
     try {
       setSaving(true);
-      await updateUserProfile({
-        preferences: {
-          ...user.preferences,
-          notificationSettings: {
-            ...user.preferences.notificationSettings,
-            pushNotifications: value,
-          },
+      await updateUserPreferences({
+        notificationSettings: {
+          ...user.preferences.notificationSettings,
+          pushNotifications: value,
         },
       });
     } catch (error) {
@@ -180,13 +174,10 @@ export const SoundSettingsScreen: React.FC = () => {
 
     try {
       setSaving(true);
-      await updateUserProfile({
-        preferences: {
-          ...user.preferences,
-          notificationSettings: {
-            ...user.preferences.notificationSettings,
-            emailNotifications: value,
-          },
+      await updateUserPreferences({
+        notificationSettings: {
+          ...user.preferences.notificationSettings,
+          emailNotifications: value,
         },
       });
     } catch (error) {
@@ -213,13 +204,10 @@ export const SoundSettingsScreen: React.FC = () => {
       if (!user) return;
       try {
         setSaving(true);
-        await updateUserProfile({
-          preferences: {
-            ...user.preferences,
-            notificationSettings: {
-              ...user.preferences.notificationSettings,
-              perEventSound: { ...perEventSound, [key]: value },
-            },
+        await updateUserPreferences({
+          notificationSettings: {
+            ...user.preferences.notificationSettings,
+            perEventSound: { ...perEventSound, [key]: value },
           },
         });
       } catch (error) {
@@ -229,7 +217,7 @@ export const SoundSettingsScreen: React.FC = () => {
         setSaving(false);
       }
     },
-    [user, perEventSound, updateUserProfile],
+    [user, perEventSound, updateUserPreferences],
   );
 
   // Sound settings handlers

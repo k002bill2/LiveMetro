@@ -3,7 +3,7 @@
  * Provides user authentication state and methods throughout the app
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   ApplicationVerifier,
   User as FirebaseUser,
@@ -23,7 +23,7 @@ import {
   signInWithPhoneNumber,
   deleteUser,
 } from 'firebase/auth';
-import { doc, setDoc, getDoc } from 'firebase/firestore';
+import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
 
 import { auth, firestore } from '../firebase/config';
 import { User, UserPreferences, SubscriptionStatus } from '../../models/user';
@@ -36,7 +36,18 @@ interface AuthContextType {
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string, displayName?: string) => Promise<void>;
   signOut: () => Promise<void>;
-  updateUserProfile: (updates: Partial<User>) => Promise<void>;
+  // preferences is banned here on purpose: profile writes go through
+  // setDoc(merge) with whatever rides in `updates`, so a stale
+  // user.preferences snapshot would clobber server-side favoriteStations.
+  // Use updateUserPreferences for preference fields instead.
+  updateUserProfile: (updates: Partial<Omit<User, 'preferences'>>) => Promise<void>;
+  // Preference-only partial write. favoriteStations is excluded at the type
+  // level: that array is owned by FavoritesContext/favoritesService, and a
+  // whole-preferences write from a stale in-memory snapshot would clobber it
+  // (Firestore merge deep-merges maps but replaces arrays wholesale).
+  updateUserPreferences: (
+    updates: Partial<Omit<UserPreferences, 'favoriteStations'>>
+  ) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   changePassword: (currentPassword: string, newPassword: string) => Promise<void>;
   // Phone auth — request OTP via SMS, returns a verificationId.
@@ -195,17 +206,59 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  // Realtime user-document listener handle. Kept in a ref (not state) so the
+  // auth callback can detach/reattach synchronously across sign-in/out without
+  // re-running the effect.
+  const userDocUnsubscribeRef = useRef<(() => void) | null>(null);
+
+  const detachUserDocListener = useCallback((): void => {
+    if (userDocUnsubscribeRef.current) {
+      userDocUnsubscribeRef.current();
+      userDocUnsubscribeRef.current = null;
+    }
+  }, []);
+
   // Auth state listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setLoading(true);
-      
+
+      // Any auth transition invalidates the previous user's doc subscription.
+      detachUserDocListener();
+
       if (firebaseUser) {
         try {
           const userData = await createOrGetUserDocument(firebaseUser);
           setUser(userData);
           setFirebaseUser(firebaseUser);
-          
+
+          // Subscribe to the user document so server-side writes that bypass
+          // this context (e.g. FavoritesContext mutating favoriteStations)
+          // keep the in-memory user fresh instead of going stale until the
+          // next app launch.
+          const userRef = doc(firestore, 'users', firebaseUser.uid);
+          userDocUnsubscribeRef.current = onSnapshot(
+            userRef,
+            (snapshot) => {
+              if (!snapshot.exists()) {
+                return;
+              }
+              const data = snapshot.data();
+              setUser(prev =>
+                prev
+                  ? {
+                      ...prev,
+                      preferences: (data.preferences as UserPreferences) || prev.preferences,
+                      subscription: data.subscription || prev.subscription,
+                    }
+                  : prev,
+              );
+            },
+            (error) => {
+              console.error('Error subscribing to user document:', error);
+            },
+          );
+
           // Update last active time
           await updateLastActive(firebaseUser.uid);
         } catch (error) {
@@ -217,12 +270,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         setUser(null);
         setFirebaseUser(null);
       }
-      
+
       setLoading(false);
     });
 
-    return unsubscribe;
-  }, []);
+    return () => {
+      unsubscribe();
+      detachUserDocListener();
+    };
+  }, [detachUserDocListener]);
 
   const handleSignInAnonymously = useCallback(async (): Promise<void> => {
     try {
@@ -287,7 +343,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, []);
 
-  const handleUpdateUserProfile = useCallback(async (updates: Partial<User>): Promise<void> => {
+  const handleUpdateUserProfile = useCallback(async (updates: Partial<Omit<User, 'preferences'>>): Promise<void> => {
     if (!firebaseUser || !user) {
       throw new Error('사용자가 로그인되어 있지 않습니다.');
     }
@@ -308,6 +364,36 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       throw new Error('프로필 업데이트에 실패했습니다.');
     }
   }, [firebaseUser, user]);
+
+  const handleUpdateUserPreferences = useCallback(
+    async (updates: Partial<Omit<UserPreferences, 'favoriteStations'>>): Promise<void> => {
+      if (!firebaseUser || !user) {
+        throw new Error('사용자가 로그인되어 있지 않습니다.');
+      }
+
+      try {
+        const userRef = doc(firestore, 'users', firebaseUser.uid);
+        // Only the changed preference keys ride in the payload — setDoc(merge)
+        // deep-merges maps, so untouched siblings (favoriteStations 포함) stay
+        // intact on the server.
+        await setDoc(
+          userRef,
+          { preferences: updates, lastActiveAt: new Date() },
+          { merge: true },
+        );
+
+        setUser(prev =>
+          prev
+            ? { ...prev, preferences: { ...prev.preferences, ...updates } }
+            : prev,
+        );
+      } catch (error) {
+        console.error('Error updating user preferences:', error);
+        throw new Error('설정 저장에 실패했습니다.');
+      }
+    },
+    [firebaseUser, user],
+  );
 
   const handleResetPassword = useCallback(async (email: string): Promise<void> => {
     try {
@@ -478,6 +564,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signUpWithEmail: handleSignUpWithEmail,
     signOut: handleSignOut,
     updateUserProfile: handleUpdateUserProfile,
+    updateUserPreferences: handleUpdateUserPreferences,
     resetPassword: handleResetPassword,
     changePassword: handleChangePassword,
     requestPhoneVerification: handleRequestPhoneVerification,
@@ -493,6 +580,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     handleSignUpWithEmail,
     handleSignOut,
     handleUpdateUserProfile,
+    handleUpdateUserPreferences,
     handleResetPassword,
     handleChangePassword,
     handleRequestPhoneVerification,

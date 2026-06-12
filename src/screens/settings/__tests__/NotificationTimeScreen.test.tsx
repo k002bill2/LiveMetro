@@ -129,7 +129,7 @@ describe('NotificationTimeScreen', () => {
       signInWithEmail: jest.fn(),
       signUpWithEmail: jest.fn(),
       signOut: jest.fn(),
-      updateUserProfile: jest.fn().mockResolvedValue(undefined),
+      updateUserPreferences: jest.fn().mockResolvedValue(undefined),
       resetPassword: jest.fn(),
       changePassword: jest.fn(),
     } as any);
@@ -205,7 +205,7 @@ describe('NotificationTimeScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: jest.fn(),
+        updateUserPreferences: jest.fn(),
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       } as any);
@@ -236,7 +236,7 @@ describe('NotificationTimeScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: jest.fn(),
+        updateUserPreferences: jest.fn(),
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       } as any);
@@ -269,7 +269,7 @@ describe('NotificationTimeScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: jest.fn(),
+        updateUserPreferences: jest.fn(),
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       } as any);
@@ -295,7 +295,7 @@ describe('NotificationTimeScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: jest.fn(),
+        updateUserPreferences: jest.fn(),
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       } as any);
@@ -323,7 +323,7 @@ describe('NotificationTimeScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: jest.fn(),
+        updateUserPreferences: jest.fn(),
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       } as any);
@@ -354,7 +354,7 @@ describe('NotificationTimeScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: jest.fn(),
+        updateUserPreferences: jest.fn(),
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       } as any);
@@ -424,7 +424,7 @@ describe('NotificationTimeScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: jest.fn(),
+        updateUserPreferences: jest.fn(),
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       } as any);
@@ -459,7 +459,7 @@ describe('NotificationTimeScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: jest.fn(),
+        updateUserPreferences: jest.fn(),
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       } as any);
@@ -483,7 +483,7 @@ describe('NotificationTimeScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: jest.fn().mockRejectedValue(new Error('Update failed')),
+        updateUserPreferences: jest.fn().mockRejectedValue(new Error('Update failed')),
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       } as any);
@@ -505,7 +505,7 @@ describe('NotificationTimeScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: jest.fn().mockRejectedValue(new Error('Update failed')),
+        updateUserPreferences: jest.fn().mockRejectedValue(new Error('Update failed')),
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       } as any);
@@ -527,7 +527,7 @@ describe('NotificationTimeScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: jest.fn().mockRejectedValue(new Error('Update failed')),
+        updateUserPreferences: jest.fn().mockRejectedValue(new Error('Update failed')),
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       } as any);
@@ -549,7 +549,7 @@ describe('NotificationTimeScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: jest.fn().mockRejectedValue(new Error('Update failed')),
+        updateUserPreferences: jest.fn().mockRejectedValue(new Error('Update failed')),
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       } as any);
@@ -579,7 +579,7 @@ describe('NotificationTimeScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: jest.fn(),
+        updateUserPreferences: jest.fn(),
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       } as any);
@@ -609,7 +609,7 @@ describe('NotificationTimeScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: jest.fn(),
+        updateUserPreferences: jest.fn(),
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       } as any);
@@ -641,7 +641,7 @@ describe('NotificationTimeScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: jest.fn(),
+        updateUserPreferences: jest.fn(),
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       } as any);
@@ -672,7 +672,7 @@ describe('NotificationTimeScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: jest.fn(),
+        updateUserPreferences: jest.fn(),
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       } as any);

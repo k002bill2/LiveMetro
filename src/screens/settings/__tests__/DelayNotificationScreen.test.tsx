@@ -17,23 +17,21 @@ jest.mock('expo-linear-gradient', () => {
 });
 
 interface NotificationCallArgs {
-  preferences: {
-    notificationSettings: {
-      enabled: boolean;
-      delayThresholdMinutes: number;
-      alertTypes: {
-        delays: boolean;
-        suspensions: boolean;
-        congestion: boolean;
-        alternativeRoutes: boolean;
-        serviceUpdates: boolean;
-      };
-      lineFilter?: string[];
-      alertSources?: {
-        official: boolean;
-        community: boolean;
-        urgent: boolean;
-      };
+  notificationSettings: {
+    enabled: boolean;
+    delayThresholdMinutes: number;
+    alertTypes: {
+      delays: boolean;
+      suspensions: boolean;
+      congestion: boolean;
+      alternativeRoutes: boolean;
+      serviceUpdates: boolean;
+    };
+    lineFilter?: string[];
+    alertSources?: {
+      official: boolean;
+      community: boolean;
+      urgent: boolean;
     };
   };
 }
@@ -63,7 +61,7 @@ jest.mock('@/services/auth/AuthContext', () => ({
     signInWithEmail: jest.fn(),
     signUpWithEmail: jest.fn(),
     signOut: jest.fn(),
-    updateUserProfile: jest.fn(() => Promise.resolve()),
+    updateUserPreferences: jest.fn(() => Promise.resolve()),
     resetPassword: jest.fn(),
     changePassword: jest.fn(),
   })),
@@ -233,7 +231,7 @@ describe('DelayNotificationScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: jest.fn(),
+        updateUserPreferences: jest.fn(),
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       });
@@ -267,8 +265,8 @@ describe('DelayNotificationScreen', () => {
       });
     });
 
-    it('calls updateUserProfile when enabled toggle is changed to true', async () => {
-      const mockUpdateUserProfile = jest.fn(() => Promise.resolve());
+    it('calls updateUserPreferences when enabled toggle is changed to true', async () => {
+      const mockUpdateUserPreferences = jest.fn(() => Promise.resolve());
       const { useAuth } = require('@/services/auth/AuthContext');
       useAuth.mockReturnValue({
         user: {
@@ -293,7 +291,7 @@ describe('DelayNotificationScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       });
@@ -303,14 +301,74 @@ describe('DelayNotificationScreen', () => {
       fireEvent(switches[0], 'valueChange', true);
 
       await waitFor(() => {
-        expect(mockUpdateUserProfile).toHaveBeenCalled();
-        const callArgs = (mockUpdateUserProfile.mock.calls as unknown[][])[0]![0] as NotificationCallArgs;
-        expect(callArgs.preferences.notificationSettings.enabled).toBe(true);
+        expect(mockUpdateUserPreferences).toHaveBeenCalled();
+        const callArgs = (mockUpdateUserPreferences.mock.calls as unknown[][])[0]![0] as NotificationCallArgs;
+        expect(callArgs.notificationSettings.enabled).toBe(true);
       });
     });
 
-    it('calls updateUserProfile when enabled toggle is changed to false', async () => {
-      const mockUpdateUserProfile = jest.fn(() => Promise.resolve());
+    it('writes only notificationSettings via updateUserPreferences — never favoriteStations (즐겨찾기 보존 회귀)', async () => {
+      const mockUpdateUserPreferences = jest.fn(() => Promise.resolve());
+      const { useAuth } = require('@/services/auth/AuthContext');
+      useAuth.mockReturnValue({
+        user: {
+          id: 'user-1',
+          preferences: {
+            // 로그인 시점 스냅샷에 stale 즐겨찾기가 들어있는 상황을 재현 —
+            // 토글 시 이 배열이 쓰기 페이로드에 절대 실려가면 안 된다.
+            favoriteStations: [
+              {
+                id: 'fav_stale',
+                stationId: '0222',
+                lineId: 'line_2',
+                alias: null,
+                direction: 'both',
+                isCommuteStation: false,
+                addedAt: new Date('2026-01-01T00:00:00Z'),
+              },
+            ],
+            notificationSettings: {
+              enabled: false,
+              delayThresholdMinutes: 5,
+              alertTypes: {
+                delays: false,
+                suspensions: false,
+                congestion: false,
+                alternativeRoutes: false,
+                serviceUpdates: false,
+              },
+            },
+          },
+        },
+        firebaseUser: null,
+        loading: false,
+        signInAnonymously: jest.fn(),
+        signInWithEmail: jest.fn(),
+        signUpWithEmail: jest.fn(),
+        signOut: jest.fn(),
+        updateUserPreferences: mockUpdateUserPreferences,
+        resetPassword: jest.fn(),
+        changePassword: jest.fn(),
+      });
+
+      const { UNSAFE_getAllByType } = render(<DelayNotificationScreen />);
+      const switches = UNSAFE_getAllByType(Switch);
+      fireEvent(switches[0], 'valueChange', true);
+
+      await waitFor(() => {
+        expect(mockUpdateUserPreferences).toHaveBeenCalled();
+        const payload = (mockUpdateUserPreferences.mock.calls as unknown[][])[0]![0] as Record<
+          string,
+          unknown
+        >;
+        // 부분 업데이트 페이로드에는 변경한 키만 존재해야 한다.
+        expect(Object.keys(payload)).toEqual(['notificationSettings']);
+        expect('favoriteStations' in payload).toBe(false);
+      });
+    });
+
+    it('calls updateUserPreferences when enabled toggle is changed to false', async () => {
+      const mockUpdateUserPreferences = jest.fn(() => Promise.resolve());
       const { useAuth } = require('@/services/auth/AuthContext');
       useAuth.mockReturnValue({
         user: {
@@ -335,7 +393,7 @@ describe('DelayNotificationScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       });
@@ -345,14 +403,14 @@ describe('DelayNotificationScreen', () => {
       fireEvent(switches[0], 'valueChange', false);
 
       await waitFor(() => {
-        expect(mockUpdateUserProfile).toHaveBeenCalled();
-        const callArgs = (mockUpdateUserProfile.mock.calls as unknown[][])[0]![0] as NotificationCallArgs;
-        expect(callArgs.preferences.notificationSettings.enabled).toBe(false);
+        expect(mockUpdateUserPreferences).toHaveBeenCalled();
+        const callArgs = (mockUpdateUserPreferences.mock.calls as unknown[][])[0]![0] as NotificationCallArgs;
+        expect(callArgs.notificationSettings.enabled).toBe(false);
       });
     });
 
     it('shows saving state during enabled toggle update', async () => {
-      const mockUpdateUserProfile = jest.fn(
+      const mockUpdateUserPreferences = jest.fn(
         () => new Promise((resolve) => setTimeout(resolve, 100))
       );
       const { useAuth } = require('@/services/auth/AuthContext');
@@ -379,7 +437,7 @@ describe('DelayNotificationScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       });
@@ -389,14 +447,14 @@ describe('DelayNotificationScreen', () => {
       fireEvent(switches[0], 'valueChange', true);
 
       await waitFor(() => {
-        expect(mockUpdateUserProfile).toHaveBeenCalled();
+        expect(mockUpdateUserPreferences).toHaveBeenCalled();
       });
     });
   });
 
   describe('User Interactions - Threshold Change', () => {
     it('updates threshold when slider value changes', async () => {
-      const mockUpdateUserProfile = jest.fn(() => Promise.resolve());
+      const mockUpdateUserPreferences = jest.fn(() => Promise.resolve());
       const { useAuth } = require('@/services/auth/AuthContext');
       useAuth.mockReturnValue({
         user: {
@@ -421,7 +479,7 @@ describe('DelayNotificationScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       });
@@ -431,14 +489,14 @@ describe('DelayNotificationScreen', () => {
       fireEvent.press(getByTestId('threshold-step-15'));
 
       await waitFor(() => {
-        expect(mockUpdateUserProfile).toHaveBeenCalled();
-        const callArgs = (mockUpdateUserProfile.mock.calls as unknown[][])[0]![0] as NotificationCallArgs;
-        expect(callArgs.preferences.notificationSettings.delayThresholdMinutes).toBe(15);
+        expect(mockUpdateUserPreferences).toHaveBeenCalled();
+        const callArgs = (mockUpdateUserPreferences.mock.calls as unknown[][])[0]![0] as NotificationCallArgs;
+        expect(callArgs.notificationSettings.delayThresholdMinutes).toBe(15);
       });
     });
 
     it('shows error alert when threshold update fails', async () => {
-      const mockUpdateUserProfile = jest.fn(() =>
+      const mockUpdateUserPreferences = jest.fn(() =>
         Promise.reject(new Error('Update failed'))
       );
       const { useAuth } = require('@/services/auth/AuthContext');
@@ -465,7 +523,7 @@ describe('DelayNotificationScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       });
@@ -480,7 +538,7 @@ describe('DelayNotificationScreen', () => {
     });
 
     it('handles null user gracefully for threshold change', () => {
-      const mockUpdateUserProfile = jest.fn();
+      const mockUpdateUserPreferences = jest.fn();
       const { useAuth } = require('@/services/auth/AuthContext');
       useAuth.mockReturnValue({
         user: null,
@@ -490,7 +548,7 @@ describe('DelayNotificationScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       });
@@ -498,14 +556,14 @@ describe('DelayNotificationScreen', () => {
       render(<DelayNotificationScreen />);
 
       // When user is null, screen may show different content
-      // updateUserProfile should not have been called
-      expect(mockUpdateUserProfile).not.toHaveBeenCalled();
+      // updateUserPreferences should not have been called
+      expect(mockUpdateUserPreferences).not.toHaveBeenCalled();
     });
   });
 
   describe('User Interactions - Alert Types', () => {
     it('toggles delays alert type', async () => {
-      const mockUpdateUserProfile = jest.fn(() => Promise.resolve());
+      const mockUpdateUserPreferences = jest.fn(() => Promise.resolve());
       const { useAuth } = require('@/services/auth/AuthContext');
       useAuth.mockReturnValue({
         user: {
@@ -530,7 +588,7 @@ describe('DelayNotificationScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       });
@@ -545,14 +603,14 @@ describe('DelayNotificationScreen', () => {
       fireEvent(switches[4], 'valueChange', false);
 
       await waitFor(() => {
-        expect(mockUpdateUserProfile).toHaveBeenCalled();
-        const callArgs = (mockUpdateUserProfile.mock.calls as unknown[][])[0]![0] as NotificationCallArgs;
-        expect(callArgs.preferences.notificationSettings.alertTypes.delays).toBe(false);
+        expect(mockUpdateUserPreferences).toHaveBeenCalled();
+        const callArgs = (mockUpdateUserPreferences.mock.calls as unknown[][])[0]![0] as NotificationCallArgs;
+        expect(callArgs.notificationSettings.alertTypes.delays).toBe(false);
       });
     });
 
     it('toggles suspensions alert type', async () => {
-      const mockUpdateUserProfile = jest.fn(() => Promise.resolve());
+      const mockUpdateUserPreferences = jest.fn(() => Promise.resolve());
       const { useAuth } = require('@/services/auth/AuthContext');
       useAuth.mockReturnValue({
         user: {
@@ -577,7 +635,7 @@ describe('DelayNotificationScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       });
@@ -589,14 +647,14 @@ describe('DelayNotificationScreen', () => {
       fireEvent(switches[5], 'valueChange', true);
 
       await waitFor(() => {
-        expect(mockUpdateUserProfile).toHaveBeenCalled();
-        const callArgs = (mockUpdateUserProfile.mock.calls as unknown[][])[0]![0] as NotificationCallArgs;
-        expect(callArgs.preferences.notificationSettings.alertTypes.suspensions).toBe(true);
+        expect(mockUpdateUserPreferences).toHaveBeenCalled();
+        const callArgs = (mockUpdateUserPreferences.mock.calls as unknown[][])[0]![0] as NotificationCallArgs;
+        expect(callArgs.notificationSettings.alertTypes.suspensions).toBe(true);
       });
     });
 
     it('toggles congestion alert type', async () => {
-      const mockUpdateUserProfile = jest.fn(() => Promise.resolve());
+      const mockUpdateUserPreferences = jest.fn(() => Promise.resolve());
       const { useAuth } = require('@/services/auth/AuthContext');
       useAuth.mockReturnValue({
         user: {
@@ -621,7 +679,7 @@ describe('DelayNotificationScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       });
@@ -633,14 +691,14 @@ describe('DelayNotificationScreen', () => {
       fireEvent(switches[6], 'valueChange', true);
 
       await waitFor(() => {
-        expect(mockUpdateUserProfile).toHaveBeenCalled();
-        const callArgs = (mockUpdateUserProfile.mock.calls as unknown[][])[0]![0] as NotificationCallArgs;
-        expect(callArgs.preferences.notificationSettings.alertTypes.congestion).toBe(true);
+        expect(mockUpdateUserPreferences).toHaveBeenCalled();
+        const callArgs = (mockUpdateUserPreferences.mock.calls as unknown[][])[0]![0] as NotificationCallArgs;
+        expect(callArgs.notificationSettings.alertTypes.congestion).toBe(true);
       });
     });
 
     it('toggles alternativeRoutes alert type', async () => {
-      const mockUpdateUserProfile = jest.fn(() => Promise.resolve());
+      const mockUpdateUserPreferences = jest.fn(() => Promise.resolve());
       const { useAuth } = require('@/services/auth/AuthContext');
       useAuth.mockReturnValue({
         user: {
@@ -665,7 +723,7 @@ describe('DelayNotificationScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       });
@@ -677,14 +735,14 @@ describe('DelayNotificationScreen', () => {
       fireEvent(switches[7], 'valueChange', true);
 
       await waitFor(() => {
-        expect(mockUpdateUserProfile).toHaveBeenCalled();
-        const callArgs = (mockUpdateUserProfile.mock.calls as unknown[][])[0]![0] as NotificationCallArgs;
-        expect(callArgs.preferences.notificationSettings.alertTypes.alternativeRoutes).toBe(true);
+        expect(mockUpdateUserPreferences).toHaveBeenCalled();
+        const callArgs = (mockUpdateUserPreferences.mock.calls as unknown[][])[0]![0] as NotificationCallArgs;
+        expect(callArgs.notificationSettings.alertTypes.alternativeRoutes).toBe(true);
       });
     });
 
     it('toggles serviceUpdates alert type', async () => {
-      const mockUpdateUserProfile = jest.fn(() => Promise.resolve());
+      const mockUpdateUserPreferences = jest.fn(() => Promise.resolve());
       const { useAuth } = require('@/services/auth/AuthContext');
       useAuth.mockReturnValue({
         user: {
@@ -709,7 +767,7 @@ describe('DelayNotificationScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       });
@@ -721,16 +779,16 @@ describe('DelayNotificationScreen', () => {
       fireEvent(switches[8], 'valueChange', true);
 
       await waitFor(() => {
-        expect(mockUpdateUserProfile).toHaveBeenCalled();
-        const callArgs = (mockUpdateUserProfile.mock.calls as unknown[][])[0]![0] as NotificationCallArgs;
-        expect(callArgs.preferences.notificationSettings.alertTypes.serviceUpdates).toBe(true);
+        expect(mockUpdateUserPreferences).toHaveBeenCalled();
+        const callArgs = (mockUpdateUserPreferences.mock.calls as unknown[][])[0]![0] as NotificationCallArgs;
+        expect(callArgs.notificationSettings.alertTypes.serviceUpdates).toBe(true);
       });
     });
   });
 
   describe('Error Handling - Toggle Enabled', () => {
     it('shows error alert when enabled toggle fails', async () => {
-      const mockUpdateUserProfile = jest.fn(() =>
+      const mockUpdateUserPreferences = jest.fn(() =>
         Promise.reject(new Error('Network error'))
       );
       const { useAuth } = require('@/services/auth/AuthContext');
@@ -757,7 +815,7 @@ describe('DelayNotificationScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       });
@@ -774,7 +832,7 @@ describe('DelayNotificationScreen', () => {
 
   describe('Error Handling - Alert Types', () => {
     it('shows error alert when alert type toggle fails', async () => {
-      const mockUpdateUserProfile = jest.fn(() =>
+      const mockUpdateUserPreferences = jest.fn(() =>
         Promise.reject(new Error('Database error'))
       );
       const { useAuth } = require('@/services/auth/AuthContext');
@@ -801,7 +859,7 @@ describe('DelayNotificationScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       });
@@ -856,7 +914,7 @@ describe('DelayNotificationScreen', () => {
 
   describe('Edge Cases - User Null', () => {
     it('handles null user gracefully for enabled toggle', async () => {
-      const mockUpdateUserProfile = jest.fn();
+      const mockUpdateUserPreferences = jest.fn();
       const { useAuth } = require('@/services/auth/AuthContext');
       useAuth.mockReturnValue({
         user: null,
@@ -866,7 +924,7 @@ describe('DelayNotificationScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       });
@@ -875,12 +933,12 @@ describe('DelayNotificationScreen', () => {
       const switches = UNSAFE_getAllByType(Switch);
       fireEvent(switches[0], 'valueChange', true);
 
-      // Should not call updateUserProfile when user is null
-      expect(mockUpdateUserProfile).not.toHaveBeenCalled();
+      // Should not call updateUserPreferences when user is null
+      expect(mockUpdateUserPreferences).not.toHaveBeenCalled();
     });
 
     it('handles null user gracefully for alert type toggle', async () => {
-      const mockUpdateUserProfile = jest.fn();
+      const mockUpdateUserPreferences = jest.fn();
       const { useAuth } = require('@/services/auth/AuthContext');
       useAuth.mockReturnValue({
         user: null,
@@ -890,7 +948,7 @@ describe('DelayNotificationScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       });
@@ -899,8 +957,8 @@ describe('DelayNotificationScreen', () => {
       const switches = UNSAFE_getAllByType(Switch);
       fireEvent(switches[1], 'valueChange', true);
 
-      // Should not call updateUserProfile when user is null
-      expect(mockUpdateUserProfile).not.toHaveBeenCalled();
+      // Should not call updateUserPreferences when user is null
+      expect(mockUpdateUserPreferences).not.toHaveBeenCalled();
     });
 
     it('displays default enabled state when user is null', () => {
@@ -913,7 +971,7 @@ describe('DelayNotificationScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: jest.fn(),
+        updateUserPreferences: jest.fn(),
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       });
@@ -940,7 +998,7 @@ describe('DelayNotificationScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: jest.fn(),
+        updateUserPreferences: jest.fn(),
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       });
@@ -975,7 +1033,7 @@ describe('DelayNotificationScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: jest.fn(),
+        updateUserPreferences: jest.fn(),
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       });
@@ -987,7 +1045,7 @@ describe('DelayNotificationScreen', () => {
 
   describe('User Interactions - Line Filter', () => {
     it('adds a line when an unselected pill is pressed', async () => {
-      const mockUpdateUserProfile = jest.fn(() => Promise.resolve());
+      const mockUpdateUserPreferences = jest.fn(() => Promise.resolve());
       const { useAuth } = require('@/services/auth/AuthContext');
       useAuth.mockReturnValue({
         user: {
@@ -1012,7 +1070,7 @@ describe('DelayNotificationScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       });
@@ -1021,14 +1079,14 @@ describe('DelayNotificationScreen', () => {
       fireEvent.press(getByText('2호선'));
 
       await waitFor(() => {
-        expect(mockUpdateUserProfile).toHaveBeenCalled();
-        const callArgs = (mockUpdateUserProfile.mock.calls as unknown[][])[0]![0] as NotificationCallArgs;
-        expect(callArgs.preferences.notificationSettings.lineFilter).toEqual(['2']);
+        expect(mockUpdateUserPreferences).toHaveBeenCalled();
+        const callArgs = (mockUpdateUserPreferences.mock.calls as unknown[][])[0]![0] as NotificationCallArgs;
+        expect(callArgs.notificationSettings.lineFilter).toEqual(['2']);
       });
     });
 
     it('removes a line when a selected pill is pressed and shows the count hint', async () => {
-      const mockUpdateUserProfile = jest.fn(() => Promise.resolve());
+      const mockUpdateUserPreferences = jest.fn(() => Promise.resolve());
       const { useAuth } = require('@/services/auth/AuthContext');
       useAuth.mockReturnValue({
         user: {
@@ -1054,7 +1112,7 @@ describe('DelayNotificationScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       });
@@ -1065,14 +1123,14 @@ describe('DelayNotificationScreen', () => {
       fireEvent.press(getByText('2호선'));
 
       await waitFor(() => {
-        expect(mockUpdateUserProfile).toHaveBeenCalled();
-        const callArgs = (mockUpdateUserProfile.mock.calls as unknown[][])[0]![0] as NotificationCallArgs;
-        expect(callArgs.preferences.notificationSettings.lineFilter).toEqual(['9']);
+        expect(mockUpdateUserPreferences).toHaveBeenCalled();
+        const callArgs = (mockUpdateUserPreferences.mock.calls as unknown[][])[0]![0] as NotificationCallArgs;
+        expect(callArgs.notificationSettings.lineFilter).toEqual(['9']);
       });
     });
 
-    it('does not call updateUserProfile for line pills when user is null', () => {
-      const mockUpdateUserProfile = jest.fn();
+    it('does not call updateUserPreferences for line pills when user is null', () => {
+      const mockUpdateUserPreferences = jest.fn();
       const { useAuth } = require('@/services/auth/AuthContext');
       useAuth.mockReturnValue({
         user: null,
@@ -1082,7 +1140,7 @@ describe('DelayNotificationScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       });
@@ -1090,13 +1148,13 @@ describe('DelayNotificationScreen', () => {
       const { getByText } = render(<DelayNotificationScreen />);
       fireEvent.press(getByText('2호선'));
 
-      expect(mockUpdateUserProfile).not.toHaveBeenCalled();
+      expect(mockUpdateUserPreferences).not.toHaveBeenCalled();
     });
   });
 
   describe('User Interactions - Alert Sources', () => {
     it('toggles the community alert source off', async () => {
-      const mockUpdateUserProfile = jest.fn(() => Promise.resolve());
+      const mockUpdateUserPreferences = jest.fn(() => Promise.resolve());
       const { useAuth } = require('@/services/auth/AuthContext');
       useAuth.mockReturnValue({
         user: {
@@ -1122,7 +1180,7 @@ describe('DelayNotificationScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       });
@@ -1131,9 +1189,9 @@ describe('DelayNotificationScreen', () => {
       fireEvent(getByTestId('source-toggle-community'), 'valueChange', false);
 
       await waitFor(() => {
-        expect(mockUpdateUserProfile).toHaveBeenCalled();
-        const callArgs = (mockUpdateUserProfile.mock.calls as unknown[][])[0]![0] as NotificationCallArgs;
-        expect(callArgs.preferences.notificationSettings.alertSources).toEqual({
+        expect(mockUpdateUserPreferences).toHaveBeenCalled();
+        const callArgs = (mockUpdateUserPreferences.mock.calls as unknown[][])[0]![0] as NotificationCallArgs;
+        expect(callArgs.notificationSettings.alertSources).toEqual({
           official: true,
           community: false,
           urgent: true,
@@ -1144,7 +1202,7 @@ describe('DelayNotificationScreen', () => {
 
   describe('State Management', () => {
     it('maintains separate state for multiple toggling operations', async () => {
-      const mockUpdateUserProfile = jest.fn(() => Promise.resolve());
+      const mockUpdateUserPreferences = jest.fn(() => Promise.resolve());
       const { useAuth } = require('@/services/auth/AuthContext');
       useAuth.mockReturnValue({
         user: {
@@ -1169,7 +1227,7 @@ describe('DelayNotificationScreen', () => {
         signInWithEmail: jest.fn(),
         signUpWithEmail: jest.fn(),
         signOut: jest.fn(),
-        updateUserProfile: mockUpdateUserProfile,
+        updateUserPreferences: mockUpdateUserPreferences,
         resetPassword: jest.fn(),
         changePassword: jest.fn(),
       });
@@ -1181,10 +1239,10 @@ describe('DelayNotificationScreen', () => {
       fireEvent(switches[0], 'valueChange', false);
 
       await waitFor(() => {
-        expect(mockUpdateUserProfile).toHaveBeenCalledTimes(1);
+        expect(mockUpdateUserPreferences).toHaveBeenCalledTimes(1);
       });
 
-      mockUpdateUserProfile.mockClear();
+      mockUpdateUserPreferences.mockClear();
 
       // Re-render to simulate state update
       rerender(<DelayNotificationScreen />);
@@ -1194,7 +1252,7 @@ describe('DelayNotificationScreen', () => {
       fireEvent(updatedSwitches[1], 'valueChange', false);
 
       await waitFor(() => {
-        expect(mockUpdateUserProfile).toHaveBeenCalledTimes(1);
+        expect(mockUpdateUserPreferences).toHaveBeenCalledTimes(1);
       });
     });
   });

@@ -36,7 +36,7 @@ const parseTime = (t: string): number => {
 };
 
 export const NotificationTimeScreen: React.FC = () => {
-  const { user, updateUserProfile } = useAuth();
+  const { user, updateUserPreferences } = useAuth();
   const { isDark } = useTheme();
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
   const styles = useMemo(() => createStyles(semantic), [semantic]);
@@ -96,16 +96,13 @@ export const NotificationTimeScreen: React.FC = () => {
 
     try {
       setSaving(true);
-      await updateUserProfile({
-        preferences: {
-          ...user.preferences,
-          commuteSchedule: {
-            ...user.preferences.commuteSchedule,
-            weekdays: {
-              ...user.preferences.commuteSchedule?.weekdays,
-              morningCommute: { ...existingMorning, departureTime: time },
-              eveningCommute: user.preferences.commuteSchedule?.weekdays?.eveningCommute || null,
-            },
+      await updateUserPreferences({
+        commuteSchedule: {
+          ...user.preferences.commuteSchedule,
+          weekdays: {
+            ...user.preferences.commuteSchedule?.weekdays,
+            morningCommute: { ...existingMorning, departureTime: time },
+            eveningCommute: user.preferences.commuteSchedule?.weekdays?.eveningCommute || null,
           },
         },
       });
@@ -134,15 +131,12 @@ export const NotificationTimeScreen: React.FC = () => {
 
     try {
       setSaving(true);
-      await updateUserProfile({
-        preferences: {
-          ...user.preferences,
-          commuteSchedule: {
-            ...user.preferences.commuteSchedule,
-            weekdays: {
-              morningCommute: user.preferences.commuteSchedule?.weekdays?.morningCommute || null,
-              eveningCommute: { ...existingEvening, departureTime: time },
-            },
+      await updateUserPreferences({
+        commuteSchedule: {
+          ...user.preferences.commuteSchedule,
+          weekdays: {
+            morningCommute: user.preferences.commuteSchedule?.weekdays?.morningCommute || null,
+            eveningCommute: { ...existingEvening, departureTime: time },
           },
         },
       });
@@ -159,15 +153,12 @@ export const NotificationTimeScreen: React.FC = () => {
 
     try {
       setSaving(true);
-      await updateUserProfile({
-        preferences: {
-          ...user.preferences,
-          notificationSettings: {
-            ...user.preferences.notificationSettings,
-            quietHours: {
-              ...user.preferences.notificationSettings.quietHours,
-              enabled: value,
-            },
+      await updateUserPreferences({
+        notificationSettings: {
+          ...user.preferences.notificationSettings,
+          quietHours: {
+            ...user.preferences.notificationSettings.quietHours,
+            enabled: value,
           },
         },
       });
@@ -184,15 +175,12 @@ export const NotificationTimeScreen: React.FC = () => {
 
     try {
       setSaving(true);
-      await updateUserProfile({
-        preferences: {
-          ...user.preferences,
-          notificationSettings: {
-            ...user.preferences.notificationSettings,
-            quietHours: {
-              ...user.preferences.notificationSettings.quietHours,
-              startTime: time,
-            },
+      await updateUserPreferences({
+        notificationSettings: {
+          ...user.preferences.notificationSettings,
+          quietHours: {
+            ...user.preferences.notificationSettings.quietHours,
+            startTime: time,
           },
         },
       });
@@ -209,15 +197,12 @@ export const NotificationTimeScreen: React.FC = () => {
 
     try {
       setSaving(true);
-      await updateUserProfile({
-        preferences: {
-          ...user.preferences,
-          notificationSettings: {
-            ...user.preferences.notificationSettings,
-            quietHours: {
-              ...user.preferences.notificationSettings.quietHours,
-              endTime: time,
-            },
+      await updateUserPreferences({
+        notificationSettings: {
+          ...user.preferences.notificationSettings,
+          quietHours: {
+            ...user.preferences.notificationSettings.quietHours,
+            endTime: time,
           },
         },
       });
@@ -234,15 +219,12 @@ export const NotificationTimeScreen: React.FC = () => {
 
     try {
       setSaving(true);
-      await updateUserProfile({
-        preferences: {
-          ...user.preferences,
-          notificationSettings: {
-            ...user.preferences.notificationSettings,
-            quietHours: {
-              ...user.preferences.notificationSettings.quietHours,
-              weekendsAlwaysSilent: value,
-            },
+      await updateUserPreferences({
+        notificationSettings: {
+          ...user.preferences.notificationSettings,
+          quietHours: {
+            ...user.preferences.notificationSettings.quietHours,
+            weekendsAlwaysSilent: value,
           },
         },
       });
@@ -259,13 +241,10 @@ export const NotificationTimeScreen: React.FC = () => {
 
     try {
       setSaving(true);
-      await updateUserProfile({
-        preferences: {
-          ...user.preferences,
-          notificationSettings: {
-            ...user.preferences.notificationSettings,
-            weekdaysOnly: value,
-          },
+      await updateUserPreferences({
+        notificationSettings: {
+          ...user.preferences.notificationSettings,
+          weekdaysOnly: value,
         },
       });
     } catch (error) {

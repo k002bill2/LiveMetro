@@ -146,7 +146,7 @@ const addMinutesToTime = (hhmm: string, minutes: number): string | null => {
 };
 
 export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
-  const { user, updateUserProfile } = useAuth();
+  const { user, updateUserPreferences } = useAuth();
   const { isDark } = useTheme();
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
   const styles = useMemo(() => createStyles(semantic), [semantic]);
@@ -258,13 +258,10 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
       if (!user) return;
       try {
         setSaving(true);
-        await updateUserProfile({
-          preferences: {
-            ...user.preferences,
-            commuteSchedule: {
-              ...user.preferences.commuteSchedule,
-              ...patch,
-            },
+        await updateUserPreferences({
+          commuteSchedule: {
+            ...user.preferences.commuteSchedule,
+            ...patch,
           },
         });
       } catch (error) {
