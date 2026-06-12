@@ -9,6 +9,13 @@ jest.mock('@/services/theme', () => ({
   useTheme: () => ({ isDark: false }),
 }));
 
+// Hero master card renders a gradient when enabled — View pass-through mock
+// (same pattern as other screens using expo-linear-gradient).
+jest.mock('expo-linear-gradient', () => {
+  const { View } = require('react-native');
+  return { LinearGradient: View };
+});
+
 interface NotificationCallArgs {
   preferences: {
     notificationSettings: {
@@ -20,6 +27,12 @@ interface NotificationCallArgs {
         congestion: boolean;
         alternativeRoutes: boolean;
         serviceUpdates: boolean;
+      };
+      lineFilter?: string[];
+      alertSources?: {
+        official: boolean;
+        community: boolean;
+        urgent: boolean;
       };
     };
   };
@@ -105,35 +118,6 @@ jest.mock('@/components/settings/SettingToggle', () => {
   };
 });
 
-jest.mock('@/components/settings/SettingSlider', () => {
-  const React = require('react');
-  const { View, Text } = require('react-native');
-  return {
-    __esModule: true,
-    default: ({
-      label,
-      subtitle,
-      value,
-      onValueChange: _onValueChange,
-    }: {
-      label: string;
-      subtitle?: string;
-      value?: number;
-      minValue?: number;
-      maxValue?: number;
-      step?: number;
-      onValueChange?: (val: number) => void;
-    }) =>
-      React.createElement(
-        View,
-        { testID: `slider-${label}` },
-        React.createElement(Text, null, label),
-        subtitle ? React.createElement(Text, null, subtitle) : null,
-        React.createElement(Text, null, String(value || 0)),
-      ),
-  };
-});
-
 jest.spyOn(Alert, 'alert');
 
 describe('DelayNotificationScreen', () => {
@@ -142,15 +126,46 @@ describe('DelayNotificationScreen', () => {
   });
 
   describe('Rendering', () => {
-    it('renders the basic settings section', () => {
+    it('renders the master hero card with title and enabled subtitle', () => {
       const { getByText } = render(<DelayNotificationScreen />);
-      expect(getByText('기본 설정')).toBeTruthy();
+      expect(getByText('지연 알림')).toBeTruthy();
+      expect(getByText('내 노선의 지연을 실시간으로 알려드려요')).toBeTruthy();
     });
 
-    it('renders the delay threshold section', () => {
+    it('renders the delay threshold section with step labels and footer', () => {
       const { getByText } = render(<DelayNotificationScreen />);
-      expect(getByText('지연 기준')).toBeTruthy();
-      expect(getByText('알림 기준 시간')).toBeTruthy();
+      expect(getByText('알림 기준')).toBeTruthy();
+      expect(getByText('3분')).toBeTruthy();
+      expect(getByText('5분')).toBeTruthy();
+      expect(getByText('10분')).toBeTruthy();
+      expect(getByText('15분')).toBeTruthy();
+      expect(
+        getByText('설정한 시간보다 짧은 지연은 알림이 오지 않아요.'),
+      ).toBeTruthy();
+    });
+
+    it('renders the line filter section with badge pills', () => {
+      const { getByText } = render(<DelayNotificationScreen />);
+      expect(getByText('알림 받을 노선')).toBeTruthy();
+      expect(getByText('1호선')).toBeTruthy();
+      expect(getByText('9호선')).toBeTruthy();
+      expect(getByText('경의중앙선')).toBeTruthy();
+    });
+
+    it('shows 전체 노선 hint when no lines are filtered', () => {
+      const { getByText } = render(<DelayNotificationScreen />);
+      expect(getByText('전체 노선')).toBeTruthy();
+    });
+
+    it('renders the alert source rows', () => {
+      const { getByText } = render(<DelayNotificationScreen />);
+      expect(getByText('알림 종류')).toBeTruthy();
+      expect(getByText('공식 운영기관 발표')).toBeTruthy();
+      expect(getByText('서울교통공사 · 코레일 공지')).toBeTruthy();
+      expect(getByText('실시간 제보')).toBeTruthy();
+      expect(getByText('검증된 사용자 제보 3건 이상')).toBeTruthy();
+      expect(getByText('긴급 푸시')).toBeTruthy();
+      expect(getByText('10분 이상 심각한 지연만 진동/소리')).toBeTruthy();
     });
 
     it('renders all alert type toggles', () => {
@@ -174,15 +189,14 @@ describe('DelayNotificationScreen', () => {
       ).toBeTruthy();
     });
 
-    it('shows delay threshold subtitle with current value', () => {
+    it('shows delay threshold hint with current value', () => {
       const { getByText } = render(<DelayNotificationScreen />);
-      expect(getByText(/10분 이상 지연 시 알림/)).toBeTruthy();
+      expect(getByText('10분 이상 지연')).toBeTruthy();
     });
 
-    it('renders the delay notification enable toggle', () => {
-      const { getByText } = render(<DelayNotificationScreen />);
-      expect(getByText('지연 알림 받기')).toBeTruthy();
-      expect(getByText('열차 지연 시 알림을 보냅니다')).toBeTruthy();
+    it('renders the delay notification master toggle', () => {
+      const { getByTestId } = render(<DelayNotificationScreen />);
+      expect(getByTestId('delay-master-toggle').props.value).toBe(true);
     });
 
     it('renders alert type subtitles', () => {
@@ -225,12 +239,12 @@ describe('DelayNotificationScreen', () => {
       });
 
       const { getByText } = render(<DelayNotificationScreen />);
-      expect(getByText(/5분 이상 지연 시 알림/)).toBeTruthy();
+      expect(getByText('5분 이상 지연')).toBeTruthy();
     });
 
     it('displays enabled toggle state correctly', () => {
       const { getByText, UNSAFE_getAllByType } = render(<DelayNotificationScreen />);
-      expect(getByText('지연 알림 받기')).toBeTruthy();
+      expect(getByText('지연 알림')).toBeTruthy();
       const switches = UNSAFE_getAllByType(Switch);
       expect(switches.length).toBeGreaterThan(0);
     });
@@ -412,12 +426,15 @@ describe('DelayNotificationScreen', () => {
         changePassword: jest.fn(),
       });
 
-      const { getByText } = render(<DelayNotificationScreen />);
+      const { getByTestId } = render(<DelayNotificationScreen />);
 
-      // Verify the threshold slider label is rendered
-      expect(getByText('알림 기준 시간')).toBeTruthy();
-      // Verify updateUserProfile is available
-      expect(mockUpdateUserProfile).toBeDefined();
+      fireEvent.press(getByTestId('threshold-step-15'));
+
+      await waitFor(() => {
+        expect(mockUpdateUserProfile).toHaveBeenCalled();
+        const callArgs = (mockUpdateUserProfile.mock.calls as unknown[][])[0]![0] as NotificationCallArgs;
+        expect(callArgs.preferences.notificationSettings.delayThresholdMinutes).toBe(15);
+      });
     });
 
     it('shows error alert when threshold update fails', async () => {
@@ -453,13 +470,13 @@ describe('DelayNotificationScreen', () => {
         changePassword: jest.fn(),
       });
 
-      const { getByText } = render(<DelayNotificationScreen />);
+      const { getByTestId } = render(<DelayNotificationScreen />);
 
-      // Verify threshold slider renders with correct value
-      expect(getByText('알림 기준 시간')).toBeTruthy();
-      // Verify the error-handling mock is set up
-      expect(mockUpdateUserProfile).toBeDefined();
-      await expect(mockUpdateUserProfile()).rejects.toThrow('Update failed');
+      fireEvent.press(getByTestId('threshold-step-3'));
+
+      await waitFor(() => {
+        expect(Alert.alert).toHaveBeenCalledWith('오류', '설정 저장에 실패했습니다.');
+      });
     });
 
     it('handles null user gracefully for threshold change', () => {
@@ -902,7 +919,8 @@ describe('DelayNotificationScreen', () => {
       });
 
       const { getByText } = render(<DelayNotificationScreen />);
-      expect(getByText('지연 알림 받기')).toBeTruthy();
+      // null user → enabled=false → hero renders the off-state subtitle
+      expect(getByText('지연 알림이 꺼져 있어요')).toBeTruthy();
     });
   });
 
@@ -928,7 +946,8 @@ describe('DelayNotificationScreen', () => {
       });
 
       const { getByText } = render(<DelayNotificationScreen />);
-      expect(getByText('기본 설정')).toBeTruthy();
+      // undefined settings → enabled=false → off-state hero still renders
+      expect(getByText('지연 알림이 꺼져 있어요')).toBeTruthy();
     });
 
     it('handles partially defined alert types', () => {
@@ -963,6 +982,163 @@ describe('DelayNotificationScreen', () => {
 
       const { getByText } = render(<DelayNotificationScreen />);
       expect(getByText('열차 지연')).toBeTruthy();
+    });
+  });
+
+  describe('User Interactions - Line Filter', () => {
+    it('adds a line when an unselected pill is pressed', async () => {
+      const mockUpdateUserProfile = jest.fn(() => Promise.resolve());
+      const { useAuth } = require('@/services/auth/AuthContext');
+      useAuth.mockReturnValue({
+        user: {
+          id: 'user-1',
+          preferences: {
+            notificationSettings: {
+              enabled: true,
+              delayThresholdMinutes: 5,
+              alertTypes: {
+                delays: true,
+                suspensions: true,
+                congestion: false,
+                alternativeRoutes: false,
+                serviceUpdates: true,
+              },
+            },
+          },
+        },
+        firebaseUser: null,
+        loading: false,
+        signInAnonymously: jest.fn(),
+        signInWithEmail: jest.fn(),
+        signUpWithEmail: jest.fn(),
+        signOut: jest.fn(),
+        updateUserProfile: mockUpdateUserProfile,
+        resetPassword: jest.fn(),
+        changePassword: jest.fn(),
+      });
+
+      const { getByText } = render(<DelayNotificationScreen />);
+      fireEvent.press(getByText('2호선'));
+
+      await waitFor(() => {
+        expect(mockUpdateUserProfile).toHaveBeenCalled();
+        const callArgs = (mockUpdateUserProfile.mock.calls as unknown[][])[0]![0] as NotificationCallArgs;
+        expect(callArgs.preferences.notificationSettings.lineFilter).toEqual(['2']);
+      });
+    });
+
+    it('removes a line when a selected pill is pressed and shows the count hint', async () => {
+      const mockUpdateUserProfile = jest.fn(() => Promise.resolve());
+      const { useAuth } = require('@/services/auth/AuthContext');
+      useAuth.mockReturnValue({
+        user: {
+          id: 'user-1',
+          preferences: {
+            notificationSettings: {
+              enabled: true,
+              delayThresholdMinutes: 5,
+              lineFilter: ['2', '9'],
+              alertTypes: {
+                delays: true,
+                suspensions: true,
+                congestion: false,
+                alternativeRoutes: false,
+                serviceUpdates: true,
+              },
+            },
+          },
+        },
+        firebaseUser: null,
+        loading: false,
+        signInAnonymously: jest.fn(),
+        signInWithEmail: jest.fn(),
+        signUpWithEmail: jest.fn(),
+        signOut: jest.fn(),
+        updateUserProfile: mockUpdateUserProfile,
+        resetPassword: jest.fn(),
+        changePassword: jest.fn(),
+      });
+
+      const { getByText } = render(<DelayNotificationScreen />);
+      expect(getByText('2개 선택됨')).toBeTruthy();
+
+      fireEvent.press(getByText('2호선'));
+
+      await waitFor(() => {
+        expect(mockUpdateUserProfile).toHaveBeenCalled();
+        const callArgs = (mockUpdateUserProfile.mock.calls as unknown[][])[0]![0] as NotificationCallArgs;
+        expect(callArgs.preferences.notificationSettings.lineFilter).toEqual(['9']);
+      });
+    });
+
+    it('does not call updateUserProfile for line pills when user is null', () => {
+      const mockUpdateUserProfile = jest.fn();
+      const { useAuth } = require('@/services/auth/AuthContext');
+      useAuth.mockReturnValue({
+        user: null,
+        firebaseUser: null,
+        loading: false,
+        signInAnonymously: jest.fn(),
+        signInWithEmail: jest.fn(),
+        signUpWithEmail: jest.fn(),
+        signOut: jest.fn(),
+        updateUserProfile: mockUpdateUserProfile,
+        resetPassword: jest.fn(),
+        changePassword: jest.fn(),
+      });
+
+      const { getByText } = render(<DelayNotificationScreen />);
+      fireEvent.press(getByText('2호선'));
+
+      expect(mockUpdateUserProfile).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('User Interactions - Alert Sources', () => {
+    it('toggles the community alert source off', async () => {
+      const mockUpdateUserProfile = jest.fn(() => Promise.resolve());
+      const { useAuth } = require('@/services/auth/AuthContext');
+      useAuth.mockReturnValue({
+        user: {
+          id: 'user-1',
+          preferences: {
+            notificationSettings: {
+              enabled: true,
+              delayThresholdMinutes: 5,
+              alertSources: { official: true, community: true, urgent: true },
+              alertTypes: {
+                delays: true,
+                suspensions: true,
+                congestion: false,
+                alternativeRoutes: false,
+                serviceUpdates: true,
+              },
+            },
+          },
+        },
+        firebaseUser: null,
+        loading: false,
+        signInAnonymously: jest.fn(),
+        signInWithEmail: jest.fn(),
+        signUpWithEmail: jest.fn(),
+        signOut: jest.fn(),
+        updateUserProfile: mockUpdateUserProfile,
+        resetPassword: jest.fn(),
+        changePassword: jest.fn(),
+      });
+
+      const { getByTestId } = render(<DelayNotificationScreen />);
+      fireEvent(getByTestId('source-toggle-community'), 'valueChange', false);
+
+      await waitFor(() => {
+        expect(mockUpdateUserProfile).toHaveBeenCalled();
+        const callArgs = (mockUpdateUserProfile.mock.calls as unknown[][])[0]![0] as NotificationCallArgs;
+        expect(callArgs.preferences.notificationSettings.alertSources).toEqual({
+          official: true,
+          community: false,
+          urgent: true,
+        });
+      });
     });
   });
 
