@@ -1,7 +1,6 @@
 /**
  * LiveMetro Cloud Functions
  * Email notification service using SendGrid
- * Admin verification functions for delay reports
  */
 
 import * as functions from 'firebase-functions';
@@ -12,15 +11,6 @@ import {
   EmailNotificationRequest,
   EmailNotificationResponse,
 } from './types';
-
-// Export admin verification functions
-export {
-  verifyDelayReport,
-  autoVerifyReports,
-  onDelayReportCreated,
-  getPendingReports,
-  getVerificationStats,
-} from './admin/reportVerification';
 
 // Export notification triggers
 export {
