@@ -23,11 +23,26 @@ npm run --silent lint:typography || exit 1
 # TypeScript type-check gate — 빌드를 깨뜨리는 커밋을 차단한다.
 # staged 파일에 .ts/.tsx(functions/ 제외)가 있을 때만 실행: tsc --noEmit는
 # staged 파일만이 아니라 프로젝트 전체를 검사하므로, 문서/설정만 바꾼 커밋은
-# 건너뛰어 빠르게 통과시킨다. functions/는 별도 tsconfig라 필요 시 따로 게이트.
+# 건너뛰어 빠르게 통과시킨다. functions/는 별도 tsconfig·node_modules라 아래 블록에서 따로 게이트.
 if git diff --cached --name-only | grep -E '\.tsx?$' | grep -qv '^functions/'; then
   echo "🔍 Type-checking (tsc --noEmit)..."
   npm run --silent type-check || {
     echo "❌ 타입 에러로 커밋이 차단되었습니다. 위 tsc 출력을 수정한 뒤 다시 커밋하세요."
     exit 1
   }
+fi
+
+# functions/ TypeScript gate — root tsconfig는 functions/를 안 보므로 별도 검사한다.
+# staged에 functions/ .ts가 있을 때만, functions 자체 tsconfig로 tsc --noEmit 실행.
+# build 스크립트(tsc)는 lib/를 emit하므로 쓰지 않고 --noEmit으로 타입만 검사.
+if git diff --cached --name-only | grep -qE '^functions/.*\.tsx?$'; then
+  if [ -x functions/node_modules/.bin/tsc ]; then
+    echo "🔍 Type-checking functions (tsc --noEmit)..."
+    ( cd functions && ./node_modules/.bin/tsc --noEmit ) || {
+      echo "❌ functions 타입 에러로 커밋이 차단되었습니다. 위 tsc 출력을 수정한 뒤 다시 커밋하세요."
+      exit 1
+    }
+  else
+    echo "⚠️  functions/node_modules 미설치 — functions 타입체크 건너뜀 (먼저 'cd functions && npm ci')"
+  fi
 fi
