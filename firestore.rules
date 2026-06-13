@@ -97,7 +97,7 @@ service cloud.firestore {
 
       // Upvote: any authenticated user can update only vote-related fields
       allow update: if request.auth != null
-        && onlyUpdates(['upvotes', 'upvotedBy', 'updatedAt']);
+        && onlyUpdates(['upvotes', 'upvotedBy', 'reactions', 'reactedBy', 'commentCount', 'updatedAt']);
 
       // Owner can resolve or update their own report
       allow update: if request.auth != null
@@ -107,6 +107,22 @@ service cloud.firestore {
       // Only owner can delete
       allow delete: if request.auth != null
         && resource.data.userId == request.auth.uid;
+    }
+
+    // Report comments - per-report subcollection (delayReports/{reportId}/comments).
+    // reportCommentService.ts: collection(reportRef, 'comments'). Firestore rules
+    // do NOT cascade from the parent delayReports match, so this needs its own
+    // block. Public read; authenticated users create with own userId (and a
+    // reportId matching the path); like-toggle (any auth user) may touch only
+    // like fields; no client deletes (no client delete path exists).
+    match /delayReports/{reportId}/comments/{commentId} {
+      allow read: if true;
+      allow create: if request.auth != null
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.reportId == reportId;
+      allow update: if request.auth != null
+        && onlyUpdates(['likes', 'likedBy']);
+      allow delete: if false;
     }
 
     // Commute settings - one document per user, keyed by uid.
