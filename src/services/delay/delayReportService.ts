@@ -130,10 +130,20 @@ class DelayReportService {
       limit(20)
     );
 
-    return onSnapshot(q, snapshot => {
-      const reports = snapshot.docs.map(doc => this.docToReport(doc));
-      callback(reports);
-    });
+    return onSnapshot(
+      q,
+      snapshot => {
+        const reports = snapshot.docs.map(doc => this.docToReport(doc));
+        callback(reports);
+      },
+      error => {
+        if (__DEV__) {
+          // eslint-disable-next-line no-console
+          console.error('subscribeToLineReports failed:', error);
+        }
+        callback([]);
+      }
+    );
   }
 
   /**
@@ -153,10 +163,20 @@ class DelayReportService {
       limit(50)
     );
 
-    return onSnapshot(q, snapshot => {
-      const reports = snapshot.docs.map(doc => this.docToReport(doc));
-      callback(reports);
-    });
+    return onSnapshot(
+      q,
+      snapshot => {
+        const reports = snapshot.docs.map(doc => this.docToReport(doc));
+        callback(reports);
+      },
+      error => {
+        if (__DEV__) {
+          // eslint-disable-next-line no-console
+          console.error('subscribeToActiveReports failed:', error);
+        }
+        callback([]);
+      }
+    );
   }
 
   /**
