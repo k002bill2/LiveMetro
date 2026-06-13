@@ -9,6 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
   AccessibilityProvider,
   useAccessibility,
+  useShouldReduceMotion,
 } from '../AccessibilityContext';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
@@ -251,5 +252,41 @@ describe('AccessibilityContext', () => {
 
     // Should use defaults
     expect(result.current.settings.highContrastEnabled).toBe(false);
+  });
+});
+
+describe('useShouldReduceMotion', () => {
+  beforeEach(() => {
+    // Isolate from sibling tests that override these mocks (e.g. the
+    // mockRejectedValue storage-error case leaks the rejecting getItem).
+    (AsyncStorage.getItem as jest.Mock).mockReset().mockResolvedValue(null);
+    (AccessibilityInfo.isReduceMotionEnabled as jest.Mock)
+      .mockReset()
+      .mockResolvedValue(false);
+    (AccessibilityInfo.isScreenReaderEnabled as jest.Mock).mockResolvedValue(false);
+  });
+
+  it('returns false when used without a provider (tolerant fallback)', () => {
+    const { result } = renderHook(() => useShouldReduceMotion());
+    expect(result.current).toBe(false);
+  });
+
+  it('returns false by default inside a provider (motion allowed)', async () => {
+    const { result } = renderHook(() => useShouldReduceMotion(), { wrapper });
+    await waitFor(() => expect(result.current).toBe(false));
+  });
+
+  it('returns true when the OS reports reduce-motion enabled', async () => {
+    (AccessibilityInfo.isReduceMotionEnabled as jest.Mock).mockResolvedValue(true);
+    const { result } = renderHook(() => useShouldReduceMotion(), { wrapper });
+    await waitFor(() => expect(result.current).toBe(true));
+  });
+
+  it('returns true when autoplay animations are turned off in settings', async () => {
+    (AsyncStorage.getItem as jest.Mock).mockResolvedValue(
+      JSON.stringify({ autoplayAnimations: false }),
+    );
+    const { result } = renderHook(() => useShouldReduceMotion(), { wrapper });
+    await waitFor(() => expect(result.current).toBe(true));
   });
 });

@@ -287,6 +287,20 @@ export const useAccessibility = (): AccessibilityContextValue => {
   return context;
 };
 
+/**
+ * Tolerant read of the derived "reduce motion" flag (reduceMotionEnabled OR
+ * autoplayAnimations off — see the `shouldReduceMotion` memo above).
+ *
+ * Unlike `useAccessibility()`, this does NOT throw when no provider is mounted —
+ * it returns `false`. The whole app is wrapped in `AccessibilityProvider`, so at
+ * runtime this always reflects the user setting; the fallback only matters for
+ * isolated component tests that render without the provider.
+ */
+export const useShouldReduceMotion = (): boolean => {
+  const context = useContext(AccessibilityContext);
+  return context?.shouldReduceMotion ?? false;
+};
+
 // ============================================================================
 // Export
 // ============================================================================

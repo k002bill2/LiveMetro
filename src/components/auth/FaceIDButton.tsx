@@ -9,6 +9,7 @@ import { Animated, Easing, Text, TouchableOpacity, View, StyleSheet, ViewStyle, 
 import { Fingerprint } from 'lucide-react-native';
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme/themeContext';
+import { useShouldReduceMotion } from '@/contexts/AccessibilityContext';
 
 export type FaceIDVariant = 'face' | 'touch';
 
@@ -43,10 +44,16 @@ const FaceIDButtonImpl: React.FC<FaceIDButtonProps> = ({
 }) => {
   const { isDark } = useTheme();
   const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const shouldReduceMotion = useShouldReduceMotion();
   const pulseAnim = useRef(new Animated.Value(0.4)).current;
   const animationRef = useRef<Animated.CompositeAnimation | null>(null);
 
   useEffect(() => {
+    // Reduce motion: hold the glow fully visible (no pulsing) instead of looping.
+    if (shouldReduceMotion) {
+      pulseAnim.setValue(1);
+      return undefined;
+    }
     animationRef.current = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
@@ -68,7 +75,7 @@ const FaceIDButtonImpl: React.FC<FaceIDButtonProps> = ({
       animationRef.current?.stop();
       animationRef.current = null;
     };
-  }, [pulseAnim]);
+  }, [pulseAnim, shouldReduceMotion]);
 
   const buttonStyle: ViewStyle = {
     height: 56,

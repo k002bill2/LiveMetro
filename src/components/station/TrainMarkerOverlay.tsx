@@ -13,6 +13,7 @@ import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { ChevronDown, ChevronUp } from 'lucide-react-native';
 import { WANTED_TOKENS, typeStyle } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme/themeContext';
+import { useShouldReduceMotion } from '@/contexts/AccessibilityContext';
 import type { TrainPosition } from '@/models/trainPosition';
 import { positionStatusToDisplay } from '@/models/trainPosition';
 import {
@@ -74,9 +75,12 @@ const MovingArrow: React.FC<{ direction: TrainPosition['direction']; lineColor: 
   lineColor,
   testID,
 }) => {
+  const shouldReduceMotion = useShouldReduceMotion();
   const phase = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    // Reduce motion: skip the drifting loop — a static chevron is rendered below.
+    if (shouldReduceMotion) return undefined;
     const loop = Animated.loop(
       Animated.timing(phase, {
         toValue: 1,
@@ -87,7 +91,22 @@ const MovingArrow: React.FC<{ direction: TrainPosition['direction']; lineColor: 
     );
     loop.start();
     return () => loop.stop();
-  }, [phase]);
+  }, [phase, shouldReduceMotion]);
+
+  const Chevron = direction === 'up' ? ChevronUp : ChevronDown;
+
+  // Reduce motion: the animated opacity rests at 0 (invisible), so a stopped loop
+  // would erase the direction cue. Render a fixed-opacity static chevron instead.
+  if (shouldReduceMotion) {
+    return (
+      <Animated.View
+        style={[styles.movingArrow, { opacity: 0.5 }]}
+        testID={testID}
+      >
+        <Chevron size={ARROW_SIZE} color={lineColor} strokeWidth={3} />
+      </Animated.View>
+    );
+  }
 
   // Up trains travel toward row 0 (screen-up); arrow drifts the same way.
   const translateY = phase.interpolate({
@@ -98,8 +117,6 @@ const MovingArrow: React.FC<{ direction: TrainPosition['direction']; lineColor: 
     inputRange: [0, 0.25, 0.75, 1],
     outputRange: [0, 1, 1, 0],
   });
-
-  const Chevron = direction === 'up' ? ChevronUp : ChevronDown;
 
   return (
     <Animated.View

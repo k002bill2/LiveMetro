@@ -34,6 +34,7 @@ import { useNavigation } from '@react-navigation/native';
 
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme/themeContext';
+import { useShouldReduceMotion } from '@/contexts/AccessibilityContext';
 import { SignupHeader } from '@/components/auth/SignupHeader';
 import { RootStackParamList } from '@/navigation/RootNavigator';
 import { useAuth } from '@/services/auth/AuthContext';
@@ -100,9 +101,15 @@ export const SignupStep1Screen: React.FC = () => {
   const otpRefs = useRef<(TextInput | null)[]>(Array(OTP_LENGTH).fill(null));
   const recaptchaRef = useRef<FirebaseRecaptchaVerifierModal>(null);
 
+  const shouldReduceMotion = useShouldReduceMotion();
   const cursorOpacity = useRef(new Animated.Value(1)).current;
   useEffect(() => {
     if (phase !== 'otp') return undefined;
+    // Reduce motion: keep the cursor fully visible (no blink) instead of looping.
+    if (shouldReduceMotion) {
+      cursorOpacity.setValue(1);
+      return undefined;
+    }
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(cursorOpacity, {
@@ -121,7 +128,7 @@ export const SignupStep1Screen: React.FC = () => {
     );
     loop.start();
     return () => loop.stop();
-  }, [phase, cursorOpacity]);
+  }, [phase, cursorOpacity, shouldReduceMotion]);
 
   useEffect(() => {
     if (phase !== 'otp') return undefined;
