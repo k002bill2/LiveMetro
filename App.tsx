@@ -81,15 +81,15 @@ const App: React.FC = () => {
       <View style={{ flex: 1 }}>
         <ErrorBoundary>
           <I18nProvider>
-            <ThemeProvider>
-              <AuthProvider>
-                <FavoritesProvider>
-                  <AccessibilityProvider>
+            <AccessibilityProvider>
+              <ThemeProvider>
+                <AuthProvider>
+                  <FavoritesProvider>
                     <AppContent />
-                  </AccessibilityProvider>
-                </FavoritesProvider>
-              </AuthProvider>
-            </ThemeProvider>
+                  </FavoritesProvider>
+                </AuthProvider>
+              </ThemeProvider>
+            </AccessibilityProvider>
           </I18nProvider>
         </ErrorBoundary>
       </View>
