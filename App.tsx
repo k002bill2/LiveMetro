@@ -17,6 +17,7 @@ import { AccessibilityProvider } from './src/contexts/AccessibilityContext';
 import { I18nProvider } from './src/services/i18n';
 import { ThemeProvider, useTheme } from './src/services/theme';
 import { RootNavigator } from './src/navigation/RootNavigator';
+import { ErrorBoundary } from './src/components/common/ErrorBoundary';
 import { installWebAlertPolyfill } from './src/utils/webAlertPolyfill';
 
 // react-native-web's `Alert.alert` is a no-op, so every confirm/notification
@@ -78,17 +79,19 @@ const App: React.FC = () => {
   return (
     <GestureHandlerRootView style={{ flex: 1 }} onLayout={onLayoutRootView}>
       <View style={{ flex: 1 }}>
-        <I18nProvider>
-          <ThemeProvider>
-            <AuthProvider>
-              <FavoritesProvider>
-                <AccessibilityProvider>
-                  <AppContent />
-                </AccessibilityProvider>
-              </FavoritesProvider>
-            </AuthProvider>
-          </ThemeProvider>
-        </I18nProvider>
+        <ErrorBoundary>
+          <I18nProvider>
+            <ThemeProvider>
+              <AuthProvider>
+                <FavoritesProvider>
+                  <AccessibilityProvider>
+                    <AppContent />
+                  </AccessibilityProvider>
+                </FavoritesProvider>
+              </AuthProvider>
+            </ThemeProvider>
+          </I18nProvider>
+        </ErrorBoundary>
       </View>
     </GestureHandlerRootView>
   );
