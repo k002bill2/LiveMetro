@@ -19,3 +19,15 @@ fi
 # Phase 31.1: HARD_PREFIXES filter removed — every src/ directory is
 # enforced from its first commit, including any new directory.
 npm run --silent lint:typography || exit 1
+
+# TypeScript type-check gate — 빌드를 깨뜨리는 커밋을 차단한다.
+# staged 파일에 .ts/.tsx(functions/ 제외)가 있을 때만 실행: tsc --noEmit는
+# staged 파일만이 아니라 프로젝트 전체를 검사하므로, 문서/설정만 바꾼 커밋은
+# 건너뛰어 빠르게 통과시킨다. functions/는 별도 tsconfig라 필요 시 따로 게이트.
+if git diff --cached --name-only | grep -E '\.tsx?$' | grep -qv '^functions/'; then
+  echo "🔍 Type-checking (tsc --noEmit)..."
+  npm run --silent type-check || {
+    echo "❌ 타입 에러로 커밋이 차단되었습니다. 위 tsc 출력을 수정한 뒤 다시 커밋하세요."
+    exit 1
+  }
+fi
