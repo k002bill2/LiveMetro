@@ -13,6 +13,7 @@ import * as SplashScreen from 'expo-splash-screen';
 
 import { AuthProvider } from './src/services/auth/AuthContext';
 import { FavoritesProvider } from './src/contexts/FavoritesContext';
+import { AccessibilityProvider } from './src/contexts/AccessibilityContext';
 import { I18nProvider } from './src/services/i18n';
 import { ThemeProvider, useTheme } from './src/services/theme';
 import { RootNavigator } from './src/navigation/RootNavigator';
@@ -81,7 +82,9 @@ const App: React.FC = () => {
           <ThemeProvider>
             <AuthProvider>
               <FavoritesProvider>
-                <AppContent />
+                <AccessibilityProvider>
+                  <AppContent />
+                </AccessibilityProvider>
               </FavoritesProvider>
             </AuthProvider>
           </ThemeProvider>
