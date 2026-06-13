@@ -3,6 +3,7 @@
  * marker identity across position updates, and accessibility hiding.
  */
 import React from 'react';
+import { Animated } from 'react-native';
 import { render } from '@testing-library/react-native';
 import {
   TrainMarkerOverlay,
@@ -12,10 +13,16 @@ import {
 } from '../TrainMarkerOverlay';
 import { TIMELINE_ROW_HEIGHT } from '../StationTimelineRow';
 import type { TrainPosition } from '@/models/trainPosition';
+import { useShouldReduceMotion } from '@/contexts/AccessibilityContext';
 
 jest.mock('@/services/theme/themeContext', () => ({
   useTheme: jest.fn(() => ({ isDark: false })),
 }));
+jest.mock('@/contexts/AccessibilityContext', () => ({
+  useShouldReduceMotion: jest.fn(),
+}));
+
+const mockReduceMotion = useShouldReduceMotion as jest.Mock;
 
 // Animated.timing ticks via setTimeout in the jest env; fake timers keep the
 // frames from firing outside act() after each test finishes.
@@ -59,6 +66,10 @@ describe('computeMarkerTop', () => {
 });
 
 describe('TrainMarkerOverlay', () => {
+  beforeEach(() => {
+    mockReduceMotion.mockReturnValue(false);
+  });
+
   it('renders one card per train with train number and destination/status', () => {
     const { getByText, getByTestId } = render(
       <TrainMarkerOverlay
@@ -138,5 +149,45 @@ describe('TrainMarkerOverlay', () => {
       <TrainMarkerOverlay trains={[]} lineColor="#00A84D" testID="overlay" />
     );
     expect(getByTestId('overlay', { includeHiddenElements: true }).props.children).toEqual([]);
+  });
+
+  it('animates the moving arrow with a loop when motion is allowed', () => {
+    mockReduceMotion.mockReturnValue(false);
+    const loopSpy = jest.spyOn(Animated, 'loop');
+    const { getByTestId } = render(
+      <TrainMarkerOverlay
+        trains={[overlayTrain(2, { trainNo: '7002', status: 'entering' })]}
+        lineColor="#00A84D"
+        testID="overlay"
+      />
+    );
+    expect(loopSpy).toHaveBeenCalled();
+    expect(
+      getByTestId('overlay-marker-7002-moving', { includeHiddenElements: true })
+    ).toBeTruthy();
+    loopSpy.mockRestore();
+  });
+
+  it('renders a static visible chevron with no loop when reduce-motion is enabled', () => {
+    mockReduceMotion.mockReturnValue(true);
+    const loopSpy = jest.spyOn(Animated, 'loop');
+    const { getByTestId } = render(
+      <TrainMarkerOverlay
+        trains={[overlayTrain(2, { trainNo: '7002', status: 'entering' })]}
+        lineColor="#00A84D"
+        testID="overlay"
+      />
+    );
+    // No drifting loop is started…
+    expect(loopSpy).not.toHaveBeenCalled();
+    // …but the direction cue is preserved: the chevron still renders, held at a
+    // fixed visible opacity (the animated opacity rests at 0 = invisible).
+    const arrow = getByTestId('overlay-marker-7002-moving', {
+      includeHiddenElements: true,
+    });
+    // RN flattens the style array into one merged object; the static path pins
+    // opacity to a fixed visible 0.5 (vs the animated interpolation that rests at 0).
+    expect(arrow.props.style.opacity).toBe(0.5);
+    loopSpy.mockRestore();
   });
 });

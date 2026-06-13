@@ -41,6 +41,7 @@ import { useNavigation } from '@react-navigation/native';
 
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme/themeContext';
+import { useShouldReduceMotion } from '@/contexts/AccessibilityContext';
 import { useAuth } from '@/services/auth/AuthContext';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { RootStackParamList } from '@/navigation/RootNavigator';
@@ -86,9 +87,15 @@ export const SignupStep3Screen: React.FC = () => {
 
   const [submitting, setSubmitting] = useState(false);
 
+  const shouldReduceMotion = useShouldReduceMotion();
   const pulseValue = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
+    // Reduce motion: hold the avatar at its resting scale (pulseValue 0 → scale 1).
+    if (shouldReduceMotion) {
+      pulseValue.setValue(0);
+      return undefined;
+    }
     const loop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseValue, {
@@ -107,7 +114,7 @@ export const SignupStep3Screen: React.FC = () => {
     );
     loop.start();
     return () => loop.stop();
-  }, [pulseValue]);
+  }, [pulseValue, shouldReduceMotion]);
 
   // Drop any stashed biometric credentials if the user leaves this screen
   // without tapping a CTA. handleCta consumes them on the happy path.

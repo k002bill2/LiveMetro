@@ -2,15 +2,21 @@
  * SignupStep3Screen — RTL smoke tests covering summary render + CTA flow.
  */
 import React from 'react';
-import { Alert } from 'react-native';
+import { Alert, Animated } from 'react-native';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import { SignupStep3Screen } from '../SignupStep3Screen';
+import { useShouldReduceMotion } from '@/contexts/AccessibilityContext';
 import {
   __resetPendingBiometricCredentials,
   consumePendingBiometricCredentials,
   setPendingBiometricCredentials,
 } from '@/services/auth/pendingBiometricSetup';
 
+jest.mock('@/contexts/AccessibilityContext', () => ({
+  useShouldReduceMotion: jest.fn(),
+}));
+
+const mockReduceMotion = useShouldReduceMotion as jest.Mock;
 const mockNavigate = jest.fn();
 const mockMarkCelebrationSeen = jest.fn(() => Promise.resolve());
 const mockIsBiometricAvailable = jest.fn();
@@ -86,6 +92,7 @@ beforeEach(() => {
   mockGetBiometricTypeName.mockReset();
   mockEnableBiometricLogin.mockReset();
   __resetPendingBiometricCredentials();
+  mockReduceMotion.mockReturnValue(false);
 });
 
 describe('SignupStep3Screen', () => {
@@ -265,5 +272,21 @@ describe('SignupStep3Screen', () => {
       expect(mockMarkCelebrationSeen).toHaveBeenCalledTimes(1);
       expect(mockNavigate).toHaveBeenCalledTimes(1);
     });
+  });
+
+  it('runs the avatar pulse loop when motion is allowed', () => {
+    mockReduceMotion.mockReturnValue(false);
+    const loopSpy = jest.spyOn(Animated, 'loop');
+    render(<SignupStep3Screen />);
+    expect(loopSpy).toHaveBeenCalled();
+    loopSpy.mockRestore();
+  });
+
+  it('skips the avatar pulse loop when reduce-motion is enabled', () => {
+    mockReduceMotion.mockReturnValue(true);
+    const loopSpy = jest.spyOn(Animated, 'loop');
+    render(<SignupStep3Screen />);
+    expect(loopSpy).not.toHaveBeenCalled();
+    loopSpy.mockRestore();
   });
 });
