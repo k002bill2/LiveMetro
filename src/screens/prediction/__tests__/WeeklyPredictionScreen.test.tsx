@@ -10,10 +10,10 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 import { WeeklyPredictionScreen } from '../WeeklyPredictionScreen';
-import type { PredictedCommute } from '@/models/pattern';
 import { useCommutePattern } from '@/hooks/useCommutePattern';
 import { useMLPrediction } from '@/hooks/useMLPrediction';
 import { useFirestoreMorningCommute } from '@/hooks/useFirestoreMorningCommute';
+import { useCommuteRouteSummary } from '@/hooks/useCommuteRouteSummary';
 import { useCommuteRouteSteps } from '@/hooks/useCommuteRouteSteps';
 import { trainService } from '@/services/train/trainService';
 import { useAuth } from '@/services/auth/AuthContext';
@@ -87,6 +87,7 @@ jest.mock('@/services/auth/AuthContext', () => ({
 jest.mock('@/hooks/useMLPrediction', () => ({
   useMLPrediction: jest.fn(() => ({
     prediction: null,
+    baselineMinutes: null,
   })),
 }));
 
@@ -94,6 +95,16 @@ jest.mock('@/hooks/useMLPrediction', () => ({
 // route; individual tests override to exercise the store-#1 ?? store-#2 path.
 jest.mock('@/hooks/useFirestoreMorningCommute', () => ({
   useFirestoreMorningCommute: jest.fn(() => null),
+}));
+
+// useCommuteHeroEstimate (the new shared single source of truth for the
+// headline number / arrival / departure) composes useCommuteRouteSummary
+// internally. The REAL hook runs in these tests — driven by the sub-hook mocks
+// above — so the screen and hook are exercised together (regression guard).
+// Stub the graph search to stay offline; tests override rideMinutes to drive
+// the shared headline.
+jest.mock('@/hooks/useCommuteRouteSummary', () => ({
+  useCommuteRouteSummary: jest.fn(() => ({ ready: false })),
 }));
 
 // Route-timeline source. The real hook runs graph search (getDiverseRoutes);
@@ -233,10 +244,11 @@ describe('WeeklyPredictionScreen', () => {
     // Re-apply the no-prediction default. clearAllMocks() wipes call records
     // but not mockReturnValue, so a persistent override in one test would
     // otherwise leak into the next.
-    (useMLPrediction as jest.Mock).mockReturnValue({ prediction: null });
+    (useMLPrediction as jest.Mock).mockReturnValue({ prediction: null, baselineMinutes: null });
     // Same leak-guard for the new store-#2 + route-step seams and the station
     // name lookup (a per-test mockImplementation otherwise persists).
     (useFirestoreMorningCommute as jest.Mock).mockReturnValue(null);
+    (useCommuteRouteSummary as jest.Mock).mockReturnValue({ ready: false });
     (useCommuteRouteSteps as jest.Mock).mockReturnValue([]);
     (trainService.getStation as jest.Mock).mockResolvedValue(null);
     // Default auth: signed in, empty preferences (store #1 absent). Re-applied
@@ -276,48 +288,41 @@ describe('WeeklyPredictionScreen', () => {
     expect(getByText('예측 신뢰도')).toBeTruthy();
   });
 
-  // With no PredictedCommute, the screen falls back to the model's
-  // walk/wait/walk defaults (4+3+3) plus a 10-min ride default = 20 min,
-  // with a ±2 range band. Asserting the constants is intentional — a
-  // change in fallbacks is a design-contract change that must be reviewed.
-  it('renders range labels using fallback when prediction is unavailable', () => {
-    const { getByText } = render(<WeeklyPredictionScreen />);
-    expect(getByText('최단 18분')).toBeTruthy();
-    expect(getByText('최장 22분')).toBeTruthy();
-    expect(getByText('예상 20분')).toBeTruthy();
+  // Honest empty state: with no ML prediction AND no resolvable commute route,
+  // the shared estimate is null. The old screen invented a 4+3+10+3=20 constant
+  // here (diverging from HomeScreen, which showed the graph ride time); the
+  // unified screen shows an em-dash and hides the range instead of a fabricated
+  // number.
+  it('renders an em-dash and hides the range when no shared estimate exists', () => {
+    const { getByTestId, queryByText } = render(<WeeklyPredictionScreen />);
+    expect(getByTestId('commute-prediction-minutes')).toHaveTextContent('—');
+    expect(queryByText(/^예상 /)).toBeNull();
+    expect(queryByText(/^최단 /)).toBeNull();
+    expect(queryByText(/^최장 /)).toBeNull();
   });
 
-  it('reflects prediction values in range labels and CTA when data is loaded', () => {
-    (useCommutePattern as jest.Mock).mockReturnValueOnce({
-      todayPrediction: {
-        date: '2026-05-12',
-        dayOfWeek: 2,
+  // The headline number is the user-visible contract that regressed: home and
+  // this screen must show the SAME value. Both now read useCommuteHeroEstimate;
+  // here the shared ML estimate (departure 08:30 → arrival 09:15 = 45 min)
+  // drives the headline, range (±2 band), header timestamp and CTA together.
+  it('reflects the shared ML estimate in headline, range, header and CTA', () => {
+    (useMLPrediction as jest.Mock).mockReturnValue({
+      prediction: {
         predictedDepartureTime: '08:30',
         predictedArrivalTime: '09:15',
-        predictedMinutes: 45,
-        predictedMinutesRange: [43, 47] as const,
-        direction: 'up' as const,
-        route: {
-          departureStationId: '0150', departureStationName: '서울역',
-          arrivalStationId: '0220', arrivalStationName: '강남역',
-          lineIds: ['1'],
-        },
         confidence: 0.9,
-        suggestedAlertTime: '08:15',
       },
-      patterns: [],
-      weekPredictions: [],
-      recentLogs: [],
-      notificationSettings: null,
-      todayNotification: null,
-      loading: false,
-      error: null,
+      baselineMinutes: null,
     });
 
     const { getByText } = render(<WeeklyPredictionScreen />);
-    expect(getByText('최단 43분')).toBeTruthy();
     expect(getByText('예상 45분')).toBeTruthy();
+    expect(getByText('최단 43분')).toBeTruthy();
     expect(getByText('최장 47분')).toBeTruthy();
+    // (B) Header = 도착 시각 (same field as HomeScreen's card), NOT the current
+    // wall-clock time. arrival 09:15 → "오늘 오전 9:15 도착".
+    expect(getByText('오늘 오전 9:15 도착')).toBeTruthy();
+    // CTA echoes the predicted arrival.
     expect(getByText('출발 시간에 알려드릴게요 (09:15)')).toBeTruthy();
   });
 
@@ -549,7 +554,12 @@ describe('WeeklyPredictionScreen', () => {
   // first render and revert to null before assertions run.
   it('shows confidence percentage and learning meta when a real prediction exists', () => {
     (useMLPrediction as jest.Mock).mockReturnValue({
-      prediction: { confidence: 0.92, predictedArrivalTime: '09:15' },
+      prediction: {
+        predictedDepartureTime: '08:23',
+        predictedArrivalTime: '09:15',
+        confidence: 0.92,
+      },
+      baselineMinutes: null,
     });
     const { getByText, queryByText } = render(<WeeklyPredictionScreen />);
     expect(getByText('92%')).toBeTruthy();
@@ -558,57 +568,92 @@ describe('WeeklyPredictionScreen', () => {
   });
 });
 
-describe('WeeklyPredictionScreen — model field consumption', () => {
-  const richPrediction: PredictedCommute = {
-    date: '2026-05-12',
-    dayOfWeek: 2,
-    predictedDepartureTime: '08:00',
-    predictedArrivalTime: '08:30',
-    predictedMinutes: 30,
-    predictedMinutesRange: [27, 33],
-    direction: 'up',
-    walkToStationMinutes: 4,
-    waitMinutes: 3,
-    walkToDestinationMinutes: 3,
-    transitSegments: [{
-      fromStationId: '0150', fromStationName: '서울역',
-      toStationId: '0220', toStationName: '강남역',
-      lineId: '1', lineName: '1호선',
-      estimatedMinutes: 20, isTransfer: false,
-    }],
-    route: {
-      departureStationId: '0150', departureStationName: '서울역',
-      arrivalStationId: '0220', arrivalStationName: '강남역',
-      lineIds: ['1'],
-    },
-    confidence: 0.8,
-    suggestedAlertTime: '07:45',
-  };
-
-  const mockHookWithPrediction = (): void => {
-    (useCommutePattern as jest.Mock).mockReturnValueOnce({
-      todayPrediction: richPrediction,
+describe('WeeklyPredictionScreen — unified headline source', () => {
+  // This block uses persistent mockReturnValue overrides; re-apply the
+  // no-prediction / no-route defaults each test so they don't leak forward
+  // (memory project_tdd_red_mock_once_leak).
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (useMLPrediction as jest.Mock).mockReturnValue({ prediction: null, baselineMinutes: null });
+    (useCommutePattern as jest.Mock).mockReturnValue({
+      todayPrediction: null,
       patterns: [],
-      weekPredictions: [richPrediction],
+      weekPredictions: [],
       recentLogs: [],
       notificationSettings: null,
       todayNotification: null,
       loading: false,
       error: null,
     });
-  };
-
-  it('renders predictedMinutes from model, not heuristic', () => {
-    mockHookWithPrediction();
-    const { getByText } = render(<WeeklyPredictionScreen />);
-    expect(getByText(/예상 30분/)).toBeTruthy();
+    (useFirestoreMorningCommute as jest.Mock).mockReturnValue(null);
+    (useCommuteRouteSummary as jest.Mock).mockReturnValue({ ready: false });
+    (useCommuteRouteSteps as jest.Mock).mockReturnValue([]);
+    (trainService.getStation as jest.Mock).mockResolvedValue(null);
+    (useAuth as jest.Mock).mockReturnValue({ user: { id: 'test-user-id', preferences: {} } });
   });
 
-  it('renders predictedMinutesRange from model, not ±2/±4 heuristic', () => {
-    mockHookWithPrediction();
-    const { getByText } = render(<WeeklyPredictionScreen />);
-    // Range UI text should show 27/33 (model range), not 28/32 (±2 heuristic).
-    expect(getByText('최단 27분')).toBeTruthy();
-    expect(getByText('최장 33분')).toBeTruthy();
+  // The bug the user hit: this screen and HomeScreen showed different numbers.
+  // The headline now reads the shared useCommuteHeroEstimate and must IGNORE the
+  // useCommutePattern.todayPrediction.predictedMinutes it used to read (that
+  // pipeline still drives the trend / factors / hourly sections, not the hero).
+  it('renders the shared estimate minutes and ignores todayPrediction.predictedMinutes', () => {
+    // Shared estimate (ML) = 45 min; todayPrediction carries a *different* 30.
+    (useMLPrediction as jest.Mock).mockReturnValue({
+      prediction: {
+        predictedDepartureTime: '08:30',
+        predictedArrivalTime: '09:15',
+        confidence: 0.8,
+      },
+      baselineMinutes: null,
+    });
+    (useCommutePattern as jest.Mock).mockReturnValue({
+      todayPrediction: {
+        date: '2026-05-12',
+        dayOfWeek: 2,
+        predictedDepartureTime: '08:00',
+        predictedArrivalTime: '08:30',
+        predictedMinutes: 30,
+        predictedMinutesRange: [27, 33],
+        direction: 'up',
+        route: {
+          departureStationId: '0150', departureStationName: '서울역',
+          arrivalStationId: '0220', arrivalStationName: '강남역',
+          lineIds: ['1'],
+        },
+        confidence: 0.8,
+        suggestedAlertTime: '07:45',
+      },
+      patterns: [],
+      weekPredictions: [],
+      recentLogs: [],
+      notificationSettings: null,
+      todayNotification: null,
+      loading: false,
+      error: null,
+    });
+
+    const { getByText, queryByText } = render(<WeeklyPredictionScreen />);
+    expect(getByText('예상 45분')).toBeTruthy();
+    expect(queryByText('예상 30분')).toBeNull();
+  });
+
+  it('falls back to graph ride minutes when no ML prediction exists (matches HomeScreen)', async () => {
+    // No ML; a registered commute + graph route summary → ride minutes (26)
+    // surface as the headline, exactly as HomeScreen derives it.
+    (useFirestoreMorningCommute as jest.Mock).mockReturnValue({
+      stationId: '0150',
+      destinationStationId: '0220',
+      departureTime: '08:00',
+      bufferMinutes: 0,
+    });
+    (useCommuteRouteSummary as jest.Mock).mockReturnValue({ ready: true, rideMinutes: 26 });
+    (trainService.getStation as jest.Mock).mockImplementation((id: string) =>
+      Promise.resolve(
+        id === '0150' ? { id: '0150', name: '서울역' } : { id: '0220', name: '강남역' },
+      ),
+    );
+
+    const { findByText } = render(<WeeklyPredictionScreen />);
+    expect(await findByText('예상 26분')).toBeTruthy();
   });
 });

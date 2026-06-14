@@ -159,8 +159,16 @@ class CongestionPredictionService {
       return this.getDefaultPrediction(stationId, lineId, direction, timeSlot, dayOfWeek, hour);
     }
 
-    // Calculate statistics
-    const levels = relevantData.map(d => this.levelToNumber(d.congestionLevel));
+    // Calculate statistics. Drop any non-finite levels (defensive: malformed or
+    // legacy-shaped stored data whose congestionLevel isn't in the level map →
+    // levelToNumber returns undefined). Without this, avgLevel/stdDev and the
+    // 0-1 `confidence` derived from them become NaN, violating the 0-1 contract.
+    const levels = relevantData
+      .map(d => this.levelToNumber(d.congestionLevel))
+      .filter((n): n is number => Number.isFinite(n));
+    if (levels.length === 0) {
+      return this.getDefaultPrediction(stationId, lineId, direction, timeSlot, dayOfWeek, hour);
+    }
     const avgLevel = levels.reduce((a, b) => a + b, 0) / levels.length;
     const variance = levels.reduce((a, b) => a + Math.pow(b - avgLevel, 2), 0) / levels.length;
     const stdDev = Math.sqrt(variance);

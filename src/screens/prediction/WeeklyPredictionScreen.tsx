@@ -23,17 +23,15 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/services/auth/AuthContext';
-import { trainService } from '@/services/train/trainService';
 import { Alert, Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ArrowRight, Bell, ChevronLeft, Settings2, ShieldCheck, Sparkles, TrendingDown } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { useMLPrediction } from '@/hooks/useMLPrediction';
 import { useCommutePattern } from '@/hooks/useCommutePattern';
 import { usePredictionFactors } from '@/hooks/usePredictionFactors';
 import { useIntegratedAlerts } from '@/hooks/useIntegratedAlerts';
-import { useFirestoreMorningCommute } from '@/hooks/useFirestoreMorningCommute';
+import { useCommuteHeroEstimate } from '@/hooks/useCommuteHeroEstimate';
 import { useCommuteRouteSteps } from '@/hooks/useCommuteRouteSteps';
 import { useSemanticTokens } from '@/services/theme';
 import { weightToFontFamily } from '@/styles/modernTheme';
@@ -42,16 +40,27 @@ import { Pill } from '@/components/design';
 import { WeeklyTrendChart, PredictionFactorsSection, HourlyCongestionChart, type DayBarData, type WeekdayLabel } from '@/components/prediction';
 import { GuidanceStepRow } from '@/components/guidance';
 import { congestionService, type HourlySlot } from '@/services/congestion/congestionService';
-import { DEFAULT_WALK_TO_STATION_MIN, DEFAULT_WAIT_MIN, DEFAULT_WALK_TO_DEST_MIN, type DayOfWeek, type PredictedCommute } from '@/models/pattern';
+import { type DayOfWeek, type PredictedCommute } from '@/models/pattern';
 import { directionToDisplay, type Direction } from '@/models/route';
-import { isUsableCommuteTime } from '@/models/user';
 
-const formatTimeShort = (now: Date = new Date()): string => {
-  const h = now.getHours();
-  const m = String(now.getMinutes()).padStart(2, '0');
+/**
+ * Format an "HH:mm" time string as "오전/오후 h:mm".
+ * Returns null on missing/malformed input so the caller can omit the label.
+ *
+ * Used for the header arrival time. The header is NOT the current wall-clock
+ * time — the old `new Date()` value showed the wrong field (a night-time clock
+ * on a "오늘 출근" card) and went stale because it was frozen at mount. It now
+ * shows the predicted 도착 시각, the same field HomeScreen's card surfaces
+ * ("지금 출발하면 ○ 도착"), so the two screens read consistently.
+ */
+const formatHHmmLabel = (hhmm?: string): string | null => {
+  if (!hhmm) return null;
+  const match = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim());
+  if (!match) return null;
+  const h = parseInt(match[1]!, 10);
   const period = h < 12 ? '오전' : '오후';
   const h12 = h === 0 ? 12 : h > 12 ? h - 12 : h;
-  return `${period} ${h12}:${m}`;
+  return `${period} ${h12}:${match[2]!}`;
 };
 
 /* ───────── Task 4: Section 9 weekly trend helpers ───────── */
@@ -128,47 +137,20 @@ export const WeeklyPredictionScreen: React.FC = () => {
     });
   }, [navigation]);
 
-  const { prediction } = useMLPrediction();
   const { user } = useAuth();
 
-  // Origin/destination 이름 lookup — HomeScreen과 동일한 2-store 해석.
-  // 출퇴근 경로는 두 곳에 저장된다:
-  //   #1 user.preferences.commuteSchedule.weekdays.morningCommute (프로필,
-  //      SettingsScreen 알림 흐름이 채움) — station id가 빈 문자열인 채로
-  //      non-null일 수 있어(NotificationTimeScreen 합성) isUsableCommuteTime로
-  //      게이트한다. 빈 객체가 `??`를 가로채 store #2를 가리는 것 방지.
-  //   #2 Firestore commuteSettings/<uid> (CommuteSettings·온보딩이
-  //      saveCommuteRoutes로 채움) — useFirestoreMorningCommute로 읽는다.
-  // 과거 이 화면은 store #1만 읽어, 설정/온보딩으로 등록한 경로(store #2)가
-  // 있어도 "경로 정보 없음"이 떴다. HomeScreen은 이미 fallback을 쓰므로
-  // 동일하게 맞춘다(home/HomeScreen.tsx 참조).
-  const onboardingMorningCommute = useFirestoreMorningCommute(user?.id);
-  const profileMorningCommute =
-    user?.preferences.commuteSchedule?.weekdays?.morningCommute;
-  const morningCommute =
-    (isUsableCommuteTime(profileMorningCommute) ? profileMorningCommute : null) ??
-    onboardingMorningCommute;
-  const [routeNames, setRouteNames] = useState<{ origin?: string; destination?: string }>({});
-
-  useEffect(() => {
-    if (!morningCommute) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const [origin, dest] = await Promise.all([
-          trainService.getStation(morningCommute.stationId).catch(() => null),
-          trainService.getStation(morningCommute.destinationStationId).catch(() => null),
-        ]);
-        if (cancelled) return;
-        setRouteNames({ origin: origin?.name, destination: dest?.name });
-      } catch {
-        // graceful fallback — route summary 라인 자체를 생략
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [morningCommute]);
+  // 출퇴근 hero 추정치는 HomeScreen과 단일 소스(useCommuteHeroEstimate)를
+  // 공유한다. 이 hook이 useMLPrediction/useFirestoreMorningCommute/
+  // useCommuteRouteSummary와 역명 resolution의 유일 호출자이므로, 두 화면의
+  // 숫자·출발 시각·역명이 절대 어긋나지 않는다(과거: 홈=graph ride 분, 이
+  // 화면=4+3+10+3 fallback 상수). morningCommute(2-store 해석)·
+  // commuteStationNames도 여기서 받아 직접 lookup을 제거한다.
+  const {
+    morningCommute,
+    commuteStationNames,
+    effectiveHero,
+    hasRealPrediction,
+  } = useCommuteHeroEstimate();
 
   const { todayPrediction, weekPredictions } = useCommutePattern();
   const { scheduleDepartureAlert } = useIntegratedAlerts();
@@ -181,51 +163,29 @@ export const WeeklyPredictionScreen: React.FC = () => {
     morningCommute?.destinationStationId,
   );
 
-  // Sum of `transitSegments[].estimatedMinutes` from the model; falls back
-  // to a 10-min default when the producer hasn't populated segments.
-  const routeRideDurationMin = useMemo(() => {
-    if (!todayPrediction?.transitSegments?.length) {
-      return 10;
-    }
-    return todayPrediction.transitSegments.reduce(
-      (sum, seg) => sum + seg.estimatedMinutes,
-      0,
-    );
-  }, [todayPrediction]);
+  // Hero predictedMinutes — shared single source with HomeScreen via
+  // useCommuteHeroEstimate (ML door-to-door 분 ?? graph-search ride 분). 0 when
+  // no estimate is available yet; the big number renders "—" in that case.
+  // 과거의 walk+wait+ride+walk=20 fallback 상수는 홈과 어긋나는 원인이라 제거.
+  const predictedMinutes = effectiveHero?.predictedMinutes ?? 0;
 
-  // Walk/wait scalars consumed by Section 6 segment breakdown and the
-  // hero fallback below. Read straight from PredictedCommute; fall back
-  // to the model's published defaults when the producer hasn't populated
-  // them (older predictions / soft-fail outputs).
-  const walkToStationMin = todayPrediction?.walkToStationMinutes ?? DEFAULT_WALK_TO_STATION_MIN;
-  const waitMin          = todayPrediction?.waitMinutes          ?? DEFAULT_WAIT_MIN;
-  const walkToDestMin    = todayPrediction?.walkToDestinationMinutes ?? DEFAULT_WALK_TO_DEST_MIN;
+  // ±2 band around the unified estimate (the source carries a point estimate,
+  // not a confidence interval).
+  const rangeMin = useMemo(
+    () => [Math.max(0, predictedMinutes - 2), predictedMinutes + 2] as const,
+    [predictedMinutes],
+  );
 
-  // Hero predictedMinutes — consume from model, fall back to
-  // walk + wait + ride + walk when the field isn't populated.
-  const predictedMinutes = useMemo(() => {
-    if (todayPrediction?.predictedMinutes !== undefined) {
-      return todayPrediction.predictedMinutes;
-    }
-    return walkToStationMin + waitMin + routeRideDurationMin + walkToDestMin;
-  }, [todayPrediction, walkToStationMin, waitMin, routeRideDurationMin, walkToDestMin]);
-
-  // Range from model; falls back to a ±2 band around predictedMinutes.
-  const rangeMin = useMemo(() => {
-    if (todayPrediction?.predictedMinutesRange) {
-      return todayPrediction.predictedMinutesRange;
-    }
-    return [Math.max(0, predictedMinutes - 2), predictedMinutes + 2] as const;
-  }, [todayPrediction, predictedMinutes]);
-
-  // 실제 ML 예측이 산출됐는지 여부. useMLPrediction은 모델 준비 + 통근 로그가
-  // 있을 때만 prediction을 채운다(없으면 null). null이면 신뢰도 "87% · 지난 30일
-  // 학습"과 델타 "3분 빨라요"는 모두 거짓 fallback이므로, 신뢰도 자리에는
-  // "데이터 수집중"을 표기하고 델타 pill은 숨겨 정직한 빈 상태를 만든다.
-  const hasRealPrediction = prediction !== null;
-  const confidencePct = prediction ? Math.round(prediction.confidence * 100) : 87;
-  const arrivalTime = todayPrediction?.predictedArrivalTime ?? prediction?.predictedArrivalTime ?? '';
-  const nowLabel = useMemo(() => formatTimeShort(new Date()), []);
+  // hasRealPrediction(=실 ML 예측 존재)는 hook이 단일 판정한다. false면 신뢰도
+  // "87% · 지난 30일 학습"과 델타 "3분 빨라요"는 모두 거짓 fallback이므로, 신뢰도
+  // 자리에는 "데이터 수집중"을 표기하고 델타 pill은 숨겨 정직한 빈 상태를 만든다.
+  const confidencePct =
+    effectiveHero?.confidence != null ? Math.round(effectiveHero.confidence * 100) : 87;
+  const arrivalTime = effectiveHero?.arrivalTime ?? '';
+  // 헤더 = 도착 시각(현재 벽시계 시각 아님). 홈 카드("지금 출발하면 ○ 도착")와
+  // 동일한 effectiveHero.arrivalTime을 써서 두 화면 시각이 일치한다. 미설정이면
+  // null → 라벨 자체를 생략한다.
+  const arrivalLabel = formatHHmmLabel(arrivalTime);
 
   // Section 9: weekly trend — Mon-Fri bars with today highlighted.
   // `now` is captured per `weekPredictions` change so the today highlight
@@ -360,7 +320,9 @@ export const WeeklyPredictionScreen: React.FC = () => {
               <Text style={[styles.tagText, { color: semantic.primaryPress }]}>ML 예측</Text>
             </View>
           </Pill>
-          <Text style={[styles.heroTagTime, { color: semantic.labelAlt }]}>오늘 {nowLabel}</Text>
+          {arrivalLabel && (
+            <Text style={[styles.heroTagTime, { color: semantic.labelAlt }]}>오늘 {arrivalLabel} 도착</Text>
+          )}
         </View>
         <Text style={[styles.heroLead, { color: semantic.labelStrong }]}>오늘 출근, 약</Text>
       </View>
@@ -374,7 +336,7 @@ export const WeeklyPredictionScreen: React.FC = () => {
               accessibilityRole="text"
               testID="commute-prediction-minutes"
             >
-              {displayMin}
+              {effectiveHero ? displayMin : '—'}
             </Text>
             <Text style={[styles.bigUnit, { color: semantic.labelNeutral }]}>분</Text>
             {hasRealPrediction && (
@@ -389,7 +351,8 @@ export const WeeklyPredictionScreen: React.FC = () => {
             )}
           </View>
 
-          {/* Range bar */}
+          {/* Range bar — hidden until a shared estimate is available. */}
+          {effectiveHero && (
           <View style={styles.rangeWrap}>
             <View style={styles.rangeLabels}>
               <Text style={[styles.rangeLabelSide, { color: semantic.labelAlt }]}>최단 {truncateMinutes(rangeMin[0])}분</Text>
@@ -424,6 +387,7 @@ export const WeeklyPredictionScreen: React.FC = () => {
               />
             </View>
           </View>
+          )}
 
           {/* Dashed divider — rendered as clipped dash segments because RN
               warns on (and won't draw) a single-side `borderStyle: 'dashed'`. */}
@@ -465,7 +429,7 @@ export const WeeklyPredictionScreen: React.FC = () => {
           미설정 상태에서는 todayPrediction/factors 등 하위 섹션이 모두 빈
           상태("경로 정보 없음" 등)가 되므로, 침묵하는 공백 대신 원인을 설명하고
           CommuteSettings로 보내는 탭 가능한 배너를 노출한다. */}
-      {routeNames.origin && routeNames.destination ? (
+      {commuteStationNames.origin && commuteStationNames.destination ? (
         <View style={styles.sectionPad}>
           <Pressable
             onPress={handleOpenCommuteSettings}
@@ -475,11 +439,11 @@ export const WeeklyPredictionScreen: React.FC = () => {
             style={({ pressed }) => [styles.routeRow, { opacity: pressed ? 0.7 : 1 }]}
           >
             <Text style={[styles.routeText, { color: semantic.labelStrong }]}>
-              {routeNames.origin}
+              {commuteStationNames.origin}
             </Text>
             <ArrowRight size={16} color={semantic.labelAlt} strokeWidth={2.4} />
             <Text style={[styles.routeText, { color: semantic.labelStrong }]}>
-              {routeNames.destination}
+              {commuteStationNames.destination}
             </Text>
             <Text style={[styles.routeAction, { color: semantic.primaryNormal }]}>경로 변경</Text>
           </Pressable>
@@ -704,11 +668,14 @@ const createStyles = (semantic: ReturnType<typeof useSemanticTokens>) => {
       gap: 8,
     },
     bigNumber: {
-      fontSize: 96,
+      // lineHeight(84) >= fontSize(80): RN/iOS clips glyphs that overflow the
+      // lineHeight box, so the old 96/88 pair cut the top/bottom of the digits.
+      // Smaller font + lineHeight ≥ fontSize keeps "25"·"분" fully visible.
+      fontSize: 80,
       fontWeight: '800',
       fontFamily: weightToFontFamily('800'),
-      lineHeight: 88,
-      letterSpacing: -4.8,
+      lineHeight: 84,
+      letterSpacing: -4.0,
       fontVariant: ['tabular-nums'],
     },
     bigUnit: {

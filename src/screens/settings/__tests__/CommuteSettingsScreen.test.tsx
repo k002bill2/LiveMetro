@@ -10,6 +10,7 @@ import {
   loadCommuteRoutes,
   updateEveningEnabled,
 } from '@/services/commute/commuteService';
+import { useCommuteRouteSummary } from '@/hooks/useCommuteRouteSummary';
 
 jest.mock('@react-navigation/native', () => ({
   useFocusEffect: (cb: () => void) => {
@@ -87,6 +88,13 @@ jest.mock('@/hooks/useMLPrediction', () => ({
   }),
 }));
 
+// Hero ETA also reads the shared graph estimate (useCommuteRouteSummary) for
+// the configured route. Default to "no route resolved" so the placeholder
+// path runs; the parity test overrides it with a concrete rideMinutes.
+jest.mock('@/hooks/useCommuteRouteSummary', () => ({
+  useCommuteRouteSummary: jest.fn(() => ({ ready: false })),
+}));
+
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const mockLoadCommuteRoutes = loadCommuteRoutes as jest.MockedFunction<typeof loadCommuteRoutes>;
 const mockUpdateEveningEnabled = updateEveningEnabled as jest.MockedFunction<
@@ -123,6 +131,7 @@ describe('CommuteSettingsScreen', () => {
     } as any);
     mockLoadCommuteRoutes.mockResolvedValue(null);
     mockUpdateEveningEnabled.mockResolvedValue({ success: true });
+    (useCommuteRouteSummary as jest.Mock).mockReturnValue({ ready: false });
   });
 
   it('renders loading state initially', () => {
@@ -261,6 +270,48 @@ describe('CommuteSettingsScreen', () => {
     // (route changes go through the editor only).
     await waitFor(() => {
       expect(getByText('환승 1회 · 신도림')).toBeTruthy();
+    });
+  });
+
+  it('hero ETA shows the shared graph ride estimate (parity with Home/WeeklyPrediction), not the placeholder', async () => {
+    mockLoadCommuteRoutes.mockResolvedValue({
+      morningRoute: {
+        departureTime: '08:00',
+        departureStationId: 's1',
+        departureStationName: '을지로3가',
+        departureLineId: '3',
+        arrivalStationId: 's2',
+        arrivalStationName: '신길',
+        arrivalLineId: '1',
+        transferStations: [
+          { stationId: 's3', stationName: '충정로', lineId: '5', lineName: '5호선', order: 1 },
+        ],
+        notifications: {
+          transferAlert: true,
+          arrivalAlert: true,
+          delayAlert: true,
+          incidentAlert: true,
+          alertMinutesBefore: 5,
+        },
+        bufferMinutes: 10,
+      },
+      eveningRoute: null,
+      eveningEnabled: true,
+      createdAt: null,
+      updatedAt: null,
+    });
+    // baselineMinutes is null (global useMLPrediction mock), so the hero must
+    // use the shared graph ride estimate (25) for the configured route — the
+    // SAME number Home / WeeklyPrediction show — instead of the 32 placeholder.
+    (useCommuteRouteSummary as jest.Mock).mockReturnValue({
+      ready: true,
+      rideMinutes: 25,
+      transferCount: 1,
+    });
+
+    const { getByTestId } = render(<CommuteSettingsScreen {...createProps()} />);
+    await waitFor(() => {
+      expect(getByTestId('commute-hero-eta-minutes')).toHaveTextContent('25');
     });
   });
 
