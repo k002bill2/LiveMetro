@@ -33,11 +33,14 @@ import { useMLPrediction } from '@/hooks/useMLPrediction';
 import { useCommutePattern } from '@/hooks/useCommutePattern';
 import { usePredictionFactors } from '@/hooks/usePredictionFactors';
 import { useIntegratedAlerts } from '@/hooks/useIntegratedAlerts';
+import { useFirestoreMorningCommute } from '@/hooks/useFirestoreMorningCommute';
+import { useCommuteRouteSteps } from '@/hooks/useCommuteRouteSteps';
 import { useSemanticTokens } from '@/services/theme';
 import { weightToFontFamily } from '@/styles/modernTheme';
 import { truncateMinutes } from '@/utils/dateUtils';
 import { Pill } from '@/components/design';
-import { SegmentBreakdownSection, WeeklyTrendChart, PredictionFactorsSection, HourlyCongestionChart, type PredictedRoute, type DayBarData, type WeekdayLabel } from '@/components/prediction';
+import { WeeklyTrendChart, PredictionFactorsSection, HourlyCongestionChart, type DayBarData, type WeekdayLabel } from '@/components/prediction';
+import { GuidanceStepRow } from '@/components/guidance';
 import { congestionService, type HourlySlot } from '@/services/congestion/congestionService';
 import { DEFAULT_WALK_TO_STATION_MIN, DEFAULT_WAIT_MIN, DEFAULT_WALK_TO_DEST_MIN, type DayOfWeek, type PredictedCommute } from '@/models/pattern';
 import { directionToDisplay, type Direction } from '@/models/route';
@@ -128,14 +131,23 @@ export const WeeklyPredictionScreen: React.FC = () => {
   const { prediction } = useMLPrediction();
   const { user } = useAuth();
 
-  // Origin/destination 이름 lookup — HomeScreen과 동일 패턴.
-  // 프로필의 morningCommute는 station id가 빈 문자열인 채로 non-null일 수
-  // 있어 (NotificationTimeScreen 합성), 사용 가능할 때만 채택한다.
+  // Origin/destination 이름 lookup — HomeScreen과 동일한 2-store 해석.
+  // 출퇴근 경로는 두 곳에 저장된다:
+  //   #1 user.preferences.commuteSchedule.weekdays.morningCommute (프로필,
+  //      SettingsScreen 알림 흐름이 채움) — station id가 빈 문자열인 채로
+  //      non-null일 수 있어(NotificationTimeScreen 합성) isUsableCommuteTime로
+  //      게이트한다. 빈 객체가 `??`를 가로채 store #2를 가리는 것 방지.
+  //   #2 Firestore commuteSettings/<uid> (CommuteSettings·온보딩이
+  //      saveCommuteRoutes로 채움) — useFirestoreMorningCommute로 읽는다.
+  // 과거 이 화면은 store #1만 읽어, 설정/온보딩으로 등록한 경로(store #2)가
+  // 있어도 "경로 정보 없음"이 떴다. HomeScreen은 이미 fallback을 쓰므로
+  // 동일하게 맞춘다(home/HomeScreen.tsx 참조).
+  const onboardingMorningCommute = useFirestoreMorningCommute(user?.id);
   const profileMorningCommute =
     user?.preferences.commuteSchedule?.weekdays?.morningCommute;
-  const morningCommute = isUsableCommuteTime(profileMorningCommute)
-    ? profileMorningCommute
-    : null;
+  const morningCommute =
+    (isUsableCommuteTime(profileMorningCommute) ? profileMorningCommute : null) ??
+    onboardingMorningCommute;
   const [routeNames, setRouteNames] = useState<{ origin?: string; destination?: string }>({});
 
   useEffect(() => {
@@ -160,6 +172,14 @@ export const WeeklyPredictionScreen: React.FC = () => {
 
   const { todayPrediction, weekPredictions } = useCommutePattern();
   const { scheduleDepartureAlert } = useIntegratedAlerts();
+
+  // 전체 경로 타임라인 — 설정된 출퇴근 OD에서 길안내와 동일한
+  // board→ride→transfer→alight 스텝을 즉시 계산한다. ML 로그 누적과 무관하게
+  // 경로만 설정돼 있으면 표시된다. 미설정/미해결 시 빈 배열.
+  const routeSteps = useCommuteRouteSteps(
+    morningCommute?.stationId,
+    morningCommute?.destinationStationId,
+  );
 
   // Sum of `transitSegments[].estimatedMinutes` from the model; falls back
   // to a 10-min default when the producer hasn't populated segments.
@@ -206,45 +226,6 @@ export const WeeklyPredictionScreen: React.FC = () => {
   const confidencePct = prediction ? Math.round(prediction.confidence * 100) : 87;
   const arrivalTime = todayPrediction?.predictedArrivalTime ?? prediction?.predictedArrivalTime ?? '';
   const nowLabel = useMemo(() => formatTimeShort(new Date()), []);
-
-  // Section 6: Segment breakdown.
-  const segmentRoute: PredictedRoute | null = useMemo(() => {
-    if (!todayPrediction) return null;
-    const fr = todayPrediction.route;
-    const firstLineId = fr.lineIds[0] ?? '2';
-    return {
-      walkToStation: { durationMin: walkToStationMin },
-      wait: {
-        lineId: firstLineId,
-        direction: fr.arrivalStationName, // direction = terminus per design copy
-        durationMin: waitMin,
-      },
-      ride: {
-        fromStation: fr.departureStationName,
-        toStation: fr.arrivalStationName,
-        stopsCount: 0,
-        durationMin: routeRideDurationMin,
-      },
-      walkToDestination: { durationMin: walkToDestMin },
-    };
-  }, [todayPrediction, walkToStationMin, waitMin, walkToDestMin, routeRideDurationMin]);
-  const segmentOrigin = useMemo(
-    () => ({
-      name: '집',
-      exit: todayPrediction?.route.departureStationName ?? routeNames.origin ?? '출발역',
-    }),
-    [todayPrediction, routeNames.origin],
-  );
-  // Destination row reads as `${name} → ${exit}` (station → office), inverse
-  // of the origin row (home → station). Naming reflects template position,
-  // not literal "exit number" — see note above.
-  const segmentDestination = useMemo(
-    () => ({
-      name: todayPrediction?.route.arrivalStationName ?? routeNames.destination ?? '도착역',
-      exit: '회사',
-    }),
-    [todayPrediction, routeNames.destination],
-  );
 
   // Section 9: weekly trend — Mon-Fri bars with today highlighted.
   // `now` is captured per `weekPredictions` change so the today highlight
@@ -551,14 +532,29 @@ export const WeeklyPredictionScreen: React.FC = () => {
         </View>
       )}
 
-      {/* 6. Segment breakdown */}
-      <View style={styles.sectionPad}>
-        <SegmentBreakdownSection
-          route={segmentRoute}
-          origin={segmentOrigin}
-          destination={segmentDestination}
-        />
-      </View>
+      {/* 6. 전체 경로 타임라인 — 설정된 출퇴근 경로를 길안내 화면과 동일한
+          board→ride→transfer→alight 스텝으로 보여준다. routeSteps는
+          useCommuteRouteSteps가 OD에서 즉시 계산하므로 ML 로그 누적 전에도
+          노출된다. 미설정/미해결(빈 배열)이면 섹션을 숨긴다 — 위 설정 배너가
+          이미 원인을 안내한다. 라이브 여정이 아닌 미리보기라 모든 스텝은
+          'upcoming'(중립 아웃라인) 상태. 경계 있는 짧은 리스트(≤~10 스텝)라
+          ScrollView 내부 .map() 사용 — FlatList 중첩 시 VirtualizedList 경고. */}
+      {routeSteps.length > 0 && (
+        <View style={styles.sectionPad} testID="commute-prediction-route-timeline">
+          <Text style={[styles.routeTimelineLabel, { color: semantic.labelAlt }]}>
+            전체 경로
+          </Text>
+          {routeSteps.map((step, i) => (
+            <GuidanceStepRow
+              key={step.id}
+              step={step}
+              status="upcoming"
+              isFirst={i === 0}
+              isLast={i === routeSteps.length - 1}
+            />
+          ))}
+        </View>
+      )}
 
       {/* 9. Weekly trend (Section 9 — wired in Task 4). */}
       <View style={styles.sectionPad}>
@@ -684,6 +680,13 @@ const createStyles = (semantic: ReturnType<typeof useSemanticTokens>) => {
     sectionPad: {
       paddingHorizontal: 20,
       paddingTop: 12,
+    },
+    routeTimelineLabel: {
+      fontSize: 12,
+      fontWeight: '800',
+      fontFamily: weightToFontFamily('800'),
+      letterSpacing: 0.36,
+      marginBottom: 10,
     },
     bigCard: {
       borderRadius: 24,
