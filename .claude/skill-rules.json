@@ -106,8 +106,7 @@
     },
     "fileTriggers": {
       "pathPatterns": [
-        "src/services/firebase*.ts",
-        "src/config/firebase*.ts",
+        "src/services/firebase/**",
         "src/services/auth/**"
       ]
     }
@@ -135,8 +134,8 @@
     },
     "fileTriggers": {
       "pathPatterns": [
-        "src/services/train*.ts",
-        "src/services/seoul*.ts"
+        "src/services/train/**",
+        "src/services/api/seoul*.ts"
       ]
     },
     "reminder": "30초 최소 폴링 간격 준수"
@@ -186,7 +185,7 @@
     },
     "fileTriggers": {
       "pathPatterns": [
-        "src/services/location*.ts",
+        "src/services/location/**",
         "src/hooks/useLocation*.ts"
       ]
     }
@@ -210,7 +209,7 @@
     },
     "fileTriggers": {
       "pathPatterns": [
-        "src/services/notification*.ts"
+        "src/services/notification/**"
       ]
     }
   },
@@ -438,7 +437,6 @@
     },
     "fileTriggers": {
       "pathPatterns": [
-        "**/services/seoul*/**",
         "**/services/api/**"
       ]
     }
