@@ -13,6 +13,10 @@ import { WeeklyPredictionScreen } from '../WeeklyPredictionScreen';
 import type { PredictedCommute } from '@/models/pattern';
 import { useCommutePattern } from '@/hooks/useCommutePattern';
 import { useMLPrediction } from '@/hooks/useMLPrediction';
+import { useFirestoreMorningCommute } from '@/hooks/useFirestoreMorningCommute';
+import { useCommuteRouteSteps } from '@/hooks/useCommuteRouteSteps';
+import { trainService } from '@/services/train/trainService';
+import { useAuth } from '@/services/auth/AuthContext';
 
 jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
 
@@ -85,6 +89,50 @@ jest.mock('@/hooks/useMLPrediction', () => ({
     prediction: null,
   })),
 }));
+
+// Store #2 (Firestore commuteSettings) bridge. Default null = no onboarding
+// route; individual tests override to exercise the store-#1 ?? store-#2 path.
+jest.mock('@/hooks/useFirestoreMorningCommute', () => ({
+  useFirestoreMorningCommute: jest.fn(() => null),
+}));
+
+// Route-timeline source. The real hook runs graph search (getDiverseRoutes);
+// stub it to a deterministic step list so the screen test stays offline and
+// asserts the screen's wiring (isFirst/isLast/status), not the reshape logic
+// (covered by useCommuteRouteSteps.test.ts + guidanceSteps.test.ts).
+jest.mock('@/hooks/useCommuteRouteSteps', () => ({
+  useCommuteRouteSteps: jest.fn(() => []),
+}));
+
+// GuidanceStepRow has its own test (GuidanceStepRow.test.tsx). Stub it to a
+// testID + the props the screen controls so we verify the mapping without
+// re-rendering LineBadge/icons here.
+jest.mock('@/components/guidance', () => {
+  const React = require('react');
+  const { View, Text } = require('react-native');
+  return {
+    GuidanceStepRow: ({
+      step,
+      status,
+      isFirst,
+      isLast,
+    }: {
+      step: { id: string; kind: string };
+      status: string;
+      isFirst: boolean;
+      isLast: boolean;
+    }) =>
+      React.createElement(
+        View,
+        { testID: `guidance-step-${step.id}` },
+        React.createElement(
+          Text,
+          null,
+          `${step.kind}|${status}|first=${isFirst}|last=${isLast}`,
+        ),
+      ),
+  };
+});
 
 // Task 20 / Section 6 wiring: SegmentBreakdownSection consumes
 // useCommutePattern. The real hook fetches from Firestore on mount, so a
@@ -186,6 +234,17 @@ describe('WeeklyPredictionScreen', () => {
     // but not mockReturnValue, so a persistent override in one test would
     // otherwise leak into the next.
     (useMLPrediction as jest.Mock).mockReturnValue({ prediction: null });
+    // Same leak-guard for the new store-#2 + route-step seams and the station
+    // name lookup (a per-test mockImplementation otherwise persists).
+    (useFirestoreMorningCommute as jest.Mock).mockReturnValue(null);
+    (useCommuteRouteSteps as jest.Mock).mockReturnValue([]);
+    (trainService.getStation as jest.Mock).mockResolvedValue(null);
+    // Default auth: signed in, empty preferences (store #1 absent). Re-applied
+    // here so a per-test override (the gate-discrimination test below) doesn't
+    // leak into the next test.
+    (useAuth as jest.Mock).mockReturnValue({
+      user: { id: 'test-user-id', preferences: {} },
+    });
   });
 
   it('renders the screen container with stable testID', () => {
@@ -361,6 +420,117 @@ describe('WeeklyPredictionScreen', () => {
       screen: 'Profile',
       params: { screen: 'CommuteSettings', initial: false },
     });
+  });
+
+  // Regression: the commute route is saved in two stores. Previously this
+  // screen read only store #1 (profile.commuteSchedule), so a route registered
+  // via CommuteSettings/onboarding (store #2, Firestore commuteSettings) showed
+  // "출퇴근 경로를 설정해 주세요" even though HomeScreen rendered it. The screen
+  // must fall back to store #2 just like HomeScreen does.
+  it('resolves the commute route from store #2 (onboarding) when the profile store is empty', async () => {
+    // useAuth default → preferences = {} (store #1 empty). Store #2 returns a
+    // usable CommuteTime; station names resolve so the configured route row wins.
+    (useFirestoreMorningCommute as jest.Mock).mockReturnValue({
+      stationId: '0150',
+      destinationStationId: '0228',
+      departureTime: '08:00',
+      bufferMinutes: 0,
+    });
+    (trainService.getStation as jest.Mock).mockImplementation((id: string) =>
+      Promise.resolve(
+        id === '0150'
+          ? { id: '0150', name: '서울역' }
+          : { id: '0228', name: '상계' },
+      ),
+    );
+
+    const { findByTestId, queryByTestId } = render(<WeeklyPredictionScreen />);
+
+    // Route row appears once the async station lookup resolves...
+    expect(await findByTestId('commute-prediction-route-row')).toBeTruthy();
+    // ...and the "set up your route" banner is gone.
+    expect(queryByTestId('commute-prediction-route-setup')).toBeNull();
+  });
+
+  // Discriminates the isUsableCommuteTime GATE (not just the ?? fallback):
+  // store #1 holds a non-null morningCommute with empty-string station ids —
+  // exactly what NotificationTimeScreen can synthesize (project memory PR #114
+  // "empty object shadows fallback"). The gate must drop it to null so store #2
+  // wins. A plain `profileMorningCommute ?? onboarding` would let the empty
+  // object win → getStation('') → null → setup banner. This test FAILS under
+  // plain `??` and PASSES under the gate, so it guards the central new logic.
+  it('falls back to store #2 when store #1 is a non-null but unusable commute (empty station ids)', async () => {
+    (useAuth as jest.Mock).mockReturnValue({
+      user: {
+        id: 'test-user-id',
+        preferences: {
+          commuteSchedule: {
+            weekdays: {
+              morningCommute: {
+                stationId: '',
+                destinationStationId: '',
+                departureTime: '08:00',
+                bufferMinutes: 0,
+              },
+            },
+          },
+        },
+      },
+    });
+    (useFirestoreMorningCommute as jest.Mock).mockReturnValue({
+      stationId: '0150',
+      destinationStationId: '0228',
+      departureTime: '08:00',
+      bufferMinutes: 0,
+    });
+    // Only the store-#2 ids resolve; an empty/unknown id resolves to null
+    // (mirrors trainService's falsy-id early return), so the broken `??` path
+    // would surface the setup banner instead of a route row.
+    (trainService.getStation as jest.Mock).mockImplementation((id: string) =>
+      Promise.resolve(
+        id === '0150'
+          ? { id: '0150', name: '서울역' }
+          : id === '0228'
+            ? { id: '0228', name: '상계' }
+            : null,
+      ),
+    );
+
+    const { findByTestId, queryByTestId } = render(<WeeklyPredictionScreen />);
+
+    expect(await findByTestId('commute-prediction-route-row')).toBeTruthy();
+    expect(queryByTestId('commute-prediction-route-setup')).toBeNull();
+  });
+
+  // The user-facing ask: show the configured route as a full timeline (like the
+  // 길안내 screen) instead of "경로 정보 없음". When useCommuteRouteSteps yields
+  // steps, the screen renders the 전체 경로 timeline with each step as a row,
+  // all 'upcoming' (preview, not a live journey), first/last flags wired.
+  it('renders the full-route timeline when commute route steps are available', () => {
+    (useCommuteRouteSteps as jest.Mock).mockReturnValue([
+      { kind: 'board', id: 'board-0' },
+      { kind: 'ride', id: 'ride-1' },
+      { kind: 'transfer', id: 'transfer-2' },
+      { kind: 'alight', id: 'alight-3' },
+    ]);
+
+    const { getByTestId, getByText } = render(<WeeklyPredictionScreen />);
+
+    expect(getByTestId('commute-prediction-route-timeline')).toBeTruthy();
+    expect(getByText('전체 경로')).toBeTruthy();
+    expect(getByTestId('guidance-step-board-0')).toBeTruthy();
+    expect(getByTestId('guidance-step-ride-1')).toBeTruthy();
+    expect(getByTestId('guidance-step-transfer-2')).toBeTruthy();
+    expect(getByTestId('guidance-step-alight-3')).toBeTruthy();
+    // Endpoint flags + neutral preview status are wired correctly.
+    expect(getByText('board|upcoming|first=true|last=false')).toBeTruthy();
+    expect(getByText('alight|upcoming|first=false|last=true')).toBeTruthy();
+  });
+
+  it('hides the route timeline when no commute route steps are available', () => {
+    // Default mock → useCommuteRouteSteps returns [].
+    const { queryByTestId } = render(<WeeklyPredictionScreen />);
+    expect(queryByTestId('commute-prediction-route-timeline')).toBeNull();
   });
 
   // Edge: no real ML prediction yet (useMLPrediction → prediction: null, the
