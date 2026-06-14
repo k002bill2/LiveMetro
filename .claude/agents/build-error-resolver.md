@@ -29,11 +29,11 @@ model: sonnet
 
   <Investigation_Protocol>
     1) Detect project type:
-       - `src/dashboard/package.json` → TypeScript/React
-       - `src/backend/pyproject.toml` → Python/FastAPI
+       - `package.json` (루트) → React Native/TypeScript
+       - `functions/package.json` → Firebase Functions/TypeScript
     2) Collect ALL errors: run build command.
-       - Dashboard: `cd src/dashboard && npx tsc --noEmit`
-       - Backend: `cd src/backend && python -m py_compile api/app.py`
+       - RN 앱: `npx tsc --noEmit`
+       - Functions: `cd functions && npx tsc --noEmit`
     3) Categorize errors: type inference, missing definitions, import/export, configuration.
     4) Fix each error with minimal change.
     5) Verify fix after each change.

@@ -6,7 +6,7 @@ allowed-tools: Bash(npm *), Bash(npx *), Bash(eas *)
 
 # Deploy with Tests
 
-Backend(Python)과 Frontend(TypeScript) 모두 검증 후 배포합니다.
+Firebase Functions와 RN 앱(TypeScript) 모두 검증 후 배포합니다.
 **단계를 절대 건너뛰지 마세요. 어떤 단계든 실패하면 계속하기 전에 멈추고 수정하세요.**
 
 ## Checklists
@@ -16,10 +16,10 @@ Backend(Python)과 Frontend(TypeScript) 모두 검증 후 배포합니다.
 
 ## 실행 단계
 
-### 1. Backend 사전 검증
+### 1. Firebase Functions 사전 검증
 
 ```bash
-cd src/backend && python -m pytest ../../tests/backend --tb=short -q
+cd functions && npx tsc --noEmit
 ```
 
 ### 2. Frontend 사전 검증
