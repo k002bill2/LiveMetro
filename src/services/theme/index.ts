@@ -5,6 +5,7 @@
 
 export * from './highContrastTheme';
 export { ThemeProvider, useTheme, useColors } from './themeContext';
+export { useSemanticTokens } from './useSemanticTokens';
 export type { ThemeColors, ThemeMode, ResolvedTheme } from './themeContext';
 export {
   ACCENT_COLORS,
