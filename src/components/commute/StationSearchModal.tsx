@@ -7,41 +7,14 @@
  */
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import {
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  FlatList,
-  Modal,
-  StyleSheet,
-  SafeAreaView,
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-} from 'react-native';
-import {
-  Star,
-  ChevronRight,
-  Search,
-  X,
-  XCircle,
-  AlertCircle,
-  Check,
-} from 'lucide-react-native';
-import {
-  WANTED_TOKENS,
-  weightToFontFamily,
-  type WantedSemanticTheme,
-} from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme';
+import { useSemanticTokens } from '@/services/theme';
+import { View, Text, TextInput, TouchableOpacity, FlatList, Modal, StyleSheet, SafeAreaView, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import { Star, ChevronRight, Search, X, XCircle, AlertCircle, Check } from 'lucide-react-native';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
+
 import { getSubwayLineColor } from '@/utils/colorUtils';
 import { StationSelection } from '@/models/commute';
-import {
-  getStationsWithLineInfo,
-  StationWithLineInfo,
-} from '@/services/data/stationsDataService';
+import { getStationsWithLineInfo, StationWithLineInfo } from '@/services/data/stationsDataService';
 import { useFavorites } from '@/hooks/useFavorites';
 
 interface StationSearchModalProps {
@@ -79,8 +52,7 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
   placeholder = '역 이름을 검색하세요',
   excludeStationIds = [],
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLine, setSelectedLine] = useState<string | null>(null);

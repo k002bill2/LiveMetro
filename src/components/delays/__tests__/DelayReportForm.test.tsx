@@ -34,6 +34,7 @@ jest.mock('@/components/design', () => {
 });
 
 jest.mock('@/services/theme', () => ({
+  useSemanticTokens: jest.fn(() => jest.requireActual('@/styles/modernTheme').WANTED_TOKENS.light),
   useTheme: () => ({
     isDark: false,
     colors: {

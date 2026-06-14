@@ -101,6 +101,7 @@ jest.mock('@/services/theme/themeContext', () => ({
 }));
 
 jest.mock('@/services/theme', () => ({
+  useSemanticTokens: jest.fn(() => jest.requireActual('@/styles/modernTheme').WANTED_TOKENS.light),
   useTheme: jest.fn(() => ({
     colors: {
       primary: '#000', primaryLight: '#E5E5E5', surface: '#FFF',

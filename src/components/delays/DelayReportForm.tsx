@@ -4,46 +4,15 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  TextInput,
-  ScrollView,
-  Alert,
-  ActivityIndicator,
-  Switch,
-  SafeAreaView,
-} from 'react-native';
-import {
-  Clock,
-  AlertTriangle,
-  Users,
-  Radio,
-  Ban,
-  MoreHorizontal,
-  Send,
-  X,
-  Bookmark,
-  Image as ImageIcon,
-  Camera,
-  Mic,
-  Info,
-  Search,
-  MapPin,
-  ShieldCheck,
-} from 'lucide-react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Alert, ActivityIndicator, Switch, SafeAreaView } from 'react-native';
+import { Clock, AlertTriangle, Users, Radio, Ban, MoreHorizontal, Send, X, Bookmark, Image as ImageIcon, Camera, Mic, Info, Search, MapPin, ShieldCheck } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 
 import { useAuth } from '@/services/auth/AuthContext';
-import { useTheme } from '@/services/theme';
+
 import { delayReportService } from '@/services/delay/delayReportService';
-import {
-  ReportType,
-  ReportTypeLabels,
-  ReportSeverity,
-} from '@/models/delayReport';
+import { ReportType, ReportTypeLabels, ReportSeverity } from '@/models/delayReport';
 import { getSubwayLineColor } from '@/utils/colorUtils';
 import { getDirectionOptions } from '@/utils/directionOptions';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
@@ -102,8 +71,7 @@ export const DelayReportForm: React.FC<DelayReportFormProps> = ({
   onCancel,
 }) => {
   const { user } = useAuth();
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   const [selectedLine, setSelectedLine] = useState<string>(initialLineId || '');

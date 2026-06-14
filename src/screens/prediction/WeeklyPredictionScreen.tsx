@@ -24,25 +24,8 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/services/auth/AuthContext';
 import { trainService } from '@/services/train/trainService';
-import {
-  Alert,
-  Animated,
-  Easing,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import {
-  ArrowRight,
-  Bell,
-  ChevronLeft,
-  Settings2,
-  ShieldCheck,
-  Sparkles,
-  TrendingDown,
-} from 'lucide-react-native';
+import { Alert, Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ArrowRight, Bell, ChevronLeft, Settings2, ShieldCheck, Sparkles, TrendingDown } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -50,30 +33,13 @@ import { useMLPrediction } from '@/hooks/useMLPrediction';
 import { useCommutePattern } from '@/hooks/useCommutePattern';
 import { usePredictionFactors } from '@/hooks/usePredictionFactors';
 import { useIntegratedAlerts } from '@/hooks/useIntegratedAlerts';
-import { useTheme, ThemeColors } from '@/services/theme';
-import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
+import { useSemanticTokens } from '@/services/theme';
+import { weightToFontFamily } from '@/styles/modernTheme';
 import { truncateMinutes } from '@/utils/dateUtils';
 import { Pill } from '@/components/design';
-import {
-  SegmentBreakdownSection,
-  WeeklyTrendChart,
-  PredictionFactorsSection,
-  HourlyCongestionChart,
-  type PredictedRoute,
-  type DayBarData,
-  type WeekdayLabel,
-} from '@/components/prediction';
-import {
-  congestionService,
-  type HourlySlot,
-} from '@/services/congestion/congestionService';
-import {
-  DEFAULT_WALK_TO_STATION_MIN,
-  DEFAULT_WAIT_MIN,
-  DEFAULT_WALK_TO_DEST_MIN,
-  type DayOfWeek,
-  type PredictedCommute,
-} from '@/models/pattern';
+import { SegmentBreakdownSection, WeeklyTrendChart, PredictionFactorsSection, HourlyCongestionChart, type PredictedRoute, type DayBarData, type WeekdayLabel } from '@/components/prediction';
+import { congestionService, type HourlySlot } from '@/services/congestion/congestionService';
+import { DEFAULT_WALK_TO_STATION_MIN, DEFAULT_WAIT_MIN, DEFAULT_WALK_TO_DEST_MIN, type DayOfWeek, type PredictedCommute } from '@/models/pattern';
 import { directionToDisplay, type Direction } from '@/models/route';
 import { isUsableCommuteTime } from '@/models/user';
 
@@ -133,9 +99,8 @@ const buildWeeklyDays = (
 
 export const WeeklyPredictionScreen: React.FC = () => {
   const navigation = useNavigation();
-  const { colors, isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
-  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
+  const semantic = useSemanticTokens();
+  const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   // 출퇴근 경로 등록/변경 진입점. HomeScreen.handleOpenCommuteSettings와 동일
   // 목적이지만, 이 화면은 root Stack 상의 'WeeklyPrediction'(= Main 탭 위에
@@ -586,7 +551,6 @@ export const WeeklyPredictionScreen: React.FC = () => {
         </View>
       )}
 
-
       {/* 6. Segment breakdown */}
       <View style={styles.sectionPad}>
         <SegmentBreakdownSection
@@ -657,8 +621,7 @@ export const WeeklyPredictionScreen: React.FC = () => {
   );
 };
 
-const createStyles = (_colors: ThemeColors, isDark: boolean) => {
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+const createStyles = (semantic: ReturnType<typeof useSemanticTokens>) => {
   return StyleSheet.create({
     container: {
       flex: 1,

@@ -8,6 +8,7 @@ jest.mock('lucide-react-native', () => new Proxy({}, { get: (_, name) => name })
 // WANTED_TOKENS semantic theme. Legacy COLORS/SPACING/RADIUS/TYPOGRAPHY
 // mock removed because component no longer imports them.
 jest.mock('@/services/theme', () => ({
+  useSemanticTokens: jest.fn(() => jest.requireActual('@/styles/modernTheme').WANTED_TOKENS.light),
   useTheme: () => ({ isDark: false }),
 }));
 

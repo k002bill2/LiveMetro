@@ -63,6 +63,7 @@ jest.mock('@/services/auth/AuthContext', () => ({
 }));
 
 jest.mock('@/services/theme', () => ({
+  useSemanticTokens: jest.fn(() => jest.requireActual('@/styles/modernTheme').WANTED_TOKENS.light),
   useTheme: () => ({
     colors: {
       primary: '#007AFF',

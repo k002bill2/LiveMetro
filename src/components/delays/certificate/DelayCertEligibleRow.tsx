@@ -7,24 +7,14 @@
  */
 
 import React, { memo, useCallback, useMemo } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
-import { useTheme } from '@/services/theme';
 import { DelayHistoryEntry } from '@/models/delayCertificate';
 import { LineBadge } from '@/components/design/LineBadge';
 import { truncateMinutes } from '@/utils/dateUtils';
-import {
-  WEEKDAY_SHORT,
-  formatEntrySub,
-  formatMonthDay,
-  isEntryExpired,
-  toDate,
-} from '@/components/delays/certificate/delayCertFormat';
-import {
-  WANTED_TOKENS,
-  weightToFontFamily,
-  type WantedSemanticTheme,
-} from '@/styles/modernTheme';
+import { WEEKDAY_SHORT, formatEntrySub, formatMonthDay, isEntryExpired, toDate } from '@/components/delays/certificate/delayCertFormat';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 
 interface DelayCertEligibleRowProps {
   entry: DelayHistoryEntry;
@@ -39,8 +29,7 @@ const DelayCertEligibleRowImpl: React.FC<DelayCertEligibleRowProps> = ({
   isLast,
   onGenerate,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   const handleGenerate = useCallback(() => {

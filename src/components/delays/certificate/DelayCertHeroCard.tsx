@@ -8,25 +8,16 @@
  */
 
 import React, { memo, useCallback, useMemo } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Download, FileCheck2, FileText } from 'lucide-react-native';
 
-import { useTheme } from '@/services/theme';
 import { DelayHistoryEntry } from '@/models/delayCertificate';
 import { getLineShortLabel } from '@/components/design/LineBadge';
 import { truncateMinutes } from '@/utils/dateUtils';
-import {
-  CERT_VALID_DAYS,
-  formatBoardTime,
-  formatHeroDate,
-  toDate,
-} from '@/components/delays/certificate/delayCertFormat';
-import {
-  WANTED_TOKENS,
-  weightToFontFamily,
-  type WantedSemanticTheme,
-} from '@/styles/modernTheme';
+import { CERT_VALID_DAYS, formatBoardTime, formatHeroDate, toDate } from '@/components/delays/certificate/delayCertFormat';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 
 interface DelayCertHeroCardProps {
   /** 발급 가능한 가장 최근 지연 — 없으면 빈 상태 카드 */
@@ -38,8 +29,7 @@ const DelayCertHeroCardImpl: React.FC<DelayCertHeroCardProps> = ({
   entry,
   onIssue,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   const handleIssue = useCallback(() => {

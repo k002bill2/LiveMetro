@@ -6,17 +6,13 @@
  */
 
 import React, { useMemo, useState } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 // @ts-ignore - expo-datetimepicker wraps @react-native-community/datetimepicker
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { Clock } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
-import {
-  WANTED_TOKENS,
-  weightToFontFamily,
-  type WantedSemanticTheme,
-} from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 
 interface SettingTimePickerProps {
   label: string;
@@ -33,8 +29,7 @@ export const SettingTimePicker: React.FC<SettingTimePickerProps> = ({
   onValueChange,
   icon: IconComponent,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
   const [showPicker, setShowPicker] = useState(false);
 

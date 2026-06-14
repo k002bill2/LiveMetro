@@ -7,32 +7,13 @@
  */
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  LayoutAnimation,
-  Platform,
-  UIManager,
-} from 'react-native';
-import {
-  ChevronUp,
-  ChevronDown,
-  MapPin,
-  Navigation,
-  Train,
-  Clock,
-  Crosshair,
-} from 'lucide-react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { View, Text, TouchableOpacity, StyleSheet, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { ChevronUp, ChevronDown, MapPin, Navigation, Train, Clock, Crosshair } from 'lucide-react-native';
 
 import { useLocation } from '@/hooks/useLocation';
-import { useTheme } from '@/services/theme';
-import {
-  WANTED_TOKENS,
-  weightToFontFamily,
-  type WantedSemanticTheme,
-} from '@/styles/modernTheme';
+
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { LocationCoordinates, NearbyStation } from '@/services/location/locationService';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -97,8 +78,7 @@ export const LocationDebugPanel: React.FC<LocationDebugPanelProps> = ({
   lastUpdated = null,
   stationsLoading = false,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   const [isExpanded, setIsExpanded] = useState(false);

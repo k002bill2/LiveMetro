@@ -3,6 +3,7 @@ import { render } from '@testing-library/react-native';
 import { JourneyStrip } from '../JourneyStrip';
 
 jest.mock('@/services/theme', () => ({
+  useSemanticTokens: jest.fn(() => jest.requireActual('@/styles/modernTheme').WANTED_TOKENS.light),
   useTheme: () => ({ isDark: false }),
 }));
 

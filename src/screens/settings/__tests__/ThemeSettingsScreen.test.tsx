@@ -39,6 +39,9 @@ jest.mock('@/services/theme', () => {
   };
   return {
     useTheme: jest.fn(() => themeValue),
+    useSemanticTokens: jest.fn(() =>
+      jest.requireActual('@/styles/modernTheme').WANTED_TOKENS.light,
+    ),
     __themeValue: themeValue,
   };
 });

@@ -8,14 +8,10 @@
  */
 
 import React, { useMemo } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { Alert, Linking } from 'react-native';
 import Markdown from 'react-native-markdown-display';
-import {
-  WANTED_TOKENS,
-  weightToFontFamily,
-  type WantedSemanticTheme,
-} from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 
 interface MarkdownViewerProps {
   content: string;
@@ -26,8 +22,7 @@ export const MarkdownViewer: React.FC<MarkdownViewerProps> = ({
   content,
   onLinkPress,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const markdownStyles = useMemo(() => buildStyles(semantic), [semantic]);
 
   const handleLinkPress = (url: string): boolean => {

@@ -7,12 +7,8 @@
 import React, { useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Check } from 'lucide-react-native';
-import {
-  WANTED_TOKENS,
-  weightToFontFamily,
-  type WantedSemanticTheme,
-} from '@/styles/modernTheme';
-import { useTheme, type ThemeMode } from '@/services/theme';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
+import { type ThemeMode, useSemanticTokens } from '@/services/theme';
 
 interface ThemeModePreviewCardProps {
   mode: ThemeMode;
@@ -68,8 +64,7 @@ export const ThemeModePreviewCard: React.FC<ThemeModePreviewCardProps> = ({
   selected,
   onPress,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   return (

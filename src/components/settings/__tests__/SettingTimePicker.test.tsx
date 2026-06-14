@@ -13,6 +13,7 @@ jest.mock('@react-native-community/datetimepicker', () => 'DateTimePicker');
 // mock removed because the component no longer imports them. useTheme is
 // what now needs to be mocked (drives WANTED_TOKENS light/dark selection).
 jest.mock('@/services/theme', () => ({
+  useSemanticTokens: jest.fn(() => jest.requireActual('@/styles/modernTheme').WANTED_TOKENS.light),
   useTheme: () => ({ isDark: false }),
 }));
 

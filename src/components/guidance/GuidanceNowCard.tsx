@@ -8,14 +8,11 @@
  * estimated countdown — platform wait is realtime data, never estimated.
  */
 import React, { memo, useMemo } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { StyleSheet, Text, View } from 'react-native';
 import { DoorOpen, Footprints, MapPin, TrainFront } from 'lucide-react-native';
-import { useTheme } from '@/services/theme';
-import {
-  WANTED_TOKENS,
-  weightToFontFamily,
-  type WantedSemanticTheme,
-} from '@/styles/modernTheme';
+
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { getSubwayLineColor } from '@/utils/colorUtils';
 import { computeRideProgress } from '@/services/guidance/guidanceSteps';
 import type { GuidanceStep, RideStep } from '@/models/guidance';
@@ -55,8 +52,7 @@ const GuidanceNowCardImpl: React.FC<GuidanceNowCardProps> = ({
   elapsedInStepSec,
   liveWaitText,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   const lineId = step.kind === 'transfer' ? step.toLineId : step.lineId;

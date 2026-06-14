@@ -4,25 +4,12 @@
  */
 
 import React, { useEffect, useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  SafeAreaView,
-  TouchableOpacity,
-  ActivityIndicator,
-  RefreshControl,
-} from 'react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { View, Text, StyleSheet, ScrollView, SafeAreaView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { useNavigation, useRoute, useIsFocused, RouteProp } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import {
-  ArrowLeft,
-  AlertTriangle,
-  RefreshCw,
-  Map,
-} from 'lucide-react-native';
-import { useTheme } from '@/services/theme';
+import { ArrowLeft, AlertTriangle, RefreshCw, Map } from 'lucide-react-native';
+
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { getSubwayLineColor } from '@/utils/colorUtils';
 import { AlternativeRouteCard } from '@/components/route/AlternativeRouteCard';
@@ -51,8 +38,7 @@ type AlternativeRoutesScreenNavigationProp = NativeStackNavigationProp<
 // ============================================================================
 
 export const AlternativeRoutesScreen: React.FC = () => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const navigation = useNavigation<AlternativeRoutesScreenNavigationProp>();
   const route = useRoute<AlternativeRoutesScreenRouteProp>();
   const isFocused = useIsFocused();

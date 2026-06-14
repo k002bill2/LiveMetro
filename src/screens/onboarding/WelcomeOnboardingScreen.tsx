@@ -14,6 +14,7 @@
  * pace and keeps the focal point on the title/CTA rather than motion.
  */
 import React, { useCallback } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import {
   SafeAreaView,
   ScrollView,
@@ -80,7 +81,7 @@ const VALUE_PROPS: readonly ValueProp[] = [
 
 export const WelcomeOnboardingScreen: React.FC<Props> = ({ navigation }) => {
   const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
 
   const handleStart = useCallback(() => {
     navigation.navigate('CommuteRoute');

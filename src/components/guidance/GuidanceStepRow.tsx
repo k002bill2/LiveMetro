@@ -4,14 +4,11 @@
  * active=blue glow, upcoming=outline, destination=flag).
  */
 import React, { memo, useMemo } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { StyleSheet, Text, View } from 'react-native';
 import { Check, Flag, Footprints, MoveRight, TrainFront } from 'lucide-react-native';
-import { useTheme } from '@/services/theme';
-import {
-  WANTED_TOKENS,
-  weightToFontFamily,
-  type WantedSemanticTheme,
-} from '@/styles/modernTheme';
+
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { LineBadge, type LineId } from '@/components/design/LineBadge';
 import type { GuidanceStep } from '@/models/guidance';
 
@@ -89,8 +86,7 @@ const GuidanceStepRowImpl: React.FC<GuidanceStepRowProps> = ({
   isFirst,
   isLast,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   const content = contentFor(step);

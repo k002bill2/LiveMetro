@@ -30,6 +30,7 @@ jest.mock('@/hooks/useFavorites', () => ({
 
 // Phase 49 — Wanted DS migration: useTheme().isDark drives semantic theme.
 jest.mock('@/services/theme', () => ({
+  useSemanticTokens: jest.fn(() => jest.requireActual('@/styles/modernTheme').WANTED_TOKENS.light),
   useTheme: () => ({ isDark: false }),
 }));
 

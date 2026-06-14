@@ -1,7 +1,8 @@
 import React, { useState, useCallback } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { useTheme } from '@/services/theme';
+
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 
 export type DepartureMode = 'now' | 'depart' | 'arrive';
@@ -22,8 +23,7 @@ function formatHm(d: Date): string {
 }
 
 export const TimeChipRow: React.FC<Props> = ({ mode, time, onChangeMode, onChangeTime }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = createStyles(semantic);
   const [pickerVisible, setPickerVisible] = useState(false);
 

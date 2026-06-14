@@ -33,6 +33,7 @@ jest.mock('lucide-react-native', () => {
 
 // Theme — both paths (alias + direct themeContext) so atomic imports work
 jest.mock('@/services/theme', () => ({
+  useSemanticTokens: jest.fn(() => jest.requireActual('@/styles/modernTheme').WANTED_TOKENS.light),
   useTheme: jest.fn(() => ({ isDark: false })),
 }));
 jest.mock('@/services/theme/themeContext', () => ({

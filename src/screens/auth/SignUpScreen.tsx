@@ -14,36 +14,14 @@
  *   "add email" entry points (e.g., Settings) can navigate here.
  */
 import React, { useCallback, useMemo, useState } from 'react';
-import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TextStyle,
-  TouchableOpacity,
-  View,
-  ViewStyle,
-} from 'react-native';
-import {
-  ArrowRight,
-  Check,
-  ChevronRight,
-  Eye,
-  EyeOff,
-  Lock,
-  Mail,
-  User,
-} from 'lucide-react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TextStyle, TouchableOpacity, View, ViewStyle } from 'react-native';
+import { ArrowRight, Check, ChevronRight, Eye, EyeOff, Lock, Mail, User } from 'lucide-react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme/themeContext';
+
 import { useAuth } from '@/services/auth/AuthContext';
 import { analyzeAuthError, printFirebaseDebugInfo } from '@/utils/firebaseDebug';
 import { AppStackParamList } from '@/navigation/types';
@@ -110,8 +88,7 @@ const AGREEMENT_ROWS: readonly AgreementRow[] = [
 ];
 
 export const SignUpScreen: React.FC<SignUpScreenProps> = ({ mode = 'create' }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const navigation = useNavigation<Nav>();
   const { signUpWithEmail, linkEmailToCurrentUser } = useAuth();
   const isLinkMode = mode === 'link';

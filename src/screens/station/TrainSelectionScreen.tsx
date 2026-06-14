@@ -15,22 +15,15 @@
  * control in `DirectionSegment`.
  */
 import React, { useEffect, useMemo, useState, useCallback, useRef } from 'react';
-import {
-  ActivityIndicator,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { ActivityIndicator, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { RouteProp, useRoute, useNavigation, useIsFocused } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { AlertCircle, Moon } from 'lucide-react-native';
 
 import { AppStackParamList } from '../../navigation/types';
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme/themeContext';
+
 import { useRealtimeTrains } from '@/hooks/useRealtimeTrains';
 // TODO(혼잡도): 실시간 혼잡도 표시 비활성 — 서울시 AI 실시간 혼잡도 소스 공개 시 복원
 // import { useCongestion } from '@/hooks/useCongestion';
@@ -71,8 +64,7 @@ const etaOf = (train: Train, now: number): Eta => {
 const TrainSelectionScreen: React.FC = () => {
   const route = useRoute<TrainSelectionRouteProp>();
   const navigation = useNavigation<TrainSelectionNavProp>();
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const green = WANTED_TOKENS.status.green500;
 
   const { stationId = '', stationName = '강남', lineId = '2' } = route.params || {};

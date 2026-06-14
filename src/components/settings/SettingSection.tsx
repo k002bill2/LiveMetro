@@ -15,7 +15,7 @@ import {
   weightToFontFamily,
   type WantedSemanticTheme,
 } from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme';
+import { useSemanticTokens } from '@/services/theme';
 
 interface SettingSectionProps {
   title?: string;
@@ -28,8 +28,7 @@ export const SettingSection: React.FC<SettingSectionProps> = ({
   children,
   style,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   return (

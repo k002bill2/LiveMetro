@@ -14,45 +14,18 @@
  */
 
 import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  ScrollView,
-  TouchableOpacity,
-  Linking,
-  Alert,
-  Platform,
-} from 'react-native';
-import {
-  BellRing,
-  Check,
-  ChevronRight,
-  Crosshair,
-  MapPin,
-  Navigation,
-  Route,
-  RotateCw,
-  Settings,
-  ShieldCheck,
-  TrainFront,
-  Zap,
-  type LucideIcon,
-} from 'lucide-react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Linking, Alert, Platform } from 'react-native';
+import { BellRing, Check, ChevronRight, Crosshair, MapPin, Navigation, Route, RotateCw, Settings, ShieldCheck, TrainFront, Zap, type LucideIcon } from 'lucide-react-native';
 import * as Location from 'expo-location';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme';
+
 import { SettingsStackParamList } from '@/navigation/types';
 import SettingSection from '@/components/settings/SettingSection';
 import SettingToggle from '@/components/settings/SettingToggle';
 import { locationService } from '@/services/location/locationService';
-import {
-  getNearbyAutoSearchEnabled,
-  setNearbyAutoSearchEnabled,
-  subscribeNearbyAutoSearch,
-} from '@/services/location/nearbySearchPreference';
+import { getNearbyAutoSearchEnabled, setNearbyAutoSearchEnabled, subscribeNearbyAutoSearch } from '@/services/location/nearbySearchPreference';
 
 type Props = NativeStackScreenProps<SettingsStackParamList, 'LocationPermission'>;
 
@@ -82,8 +55,7 @@ const PURPOSE_ROWS: readonly PurposeRow[] = [
 ];
 
 export const LocationPermissionScreen: React.FC<Props> = ({ navigation }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = createStyles(semantic);
   const [permissionState, setPermissionState] = useState<PermissionState>({
     foreground: Location.PermissionStatus.UNDETERMINED,

@@ -7,10 +7,10 @@
  *   kakao  — yellow bg, dark fg, chat-bubble icon
  */
 import React, { memo } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { Text, TouchableOpacity, ViewStyle, TextStyle } from 'react-native';
 import { Apple, Globe, MessageCircle, type LucideIcon } from 'lucide-react-native';
-import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme/themeContext';
+import { weightToFontFamily } from '@/styles/modernTheme';
 
 export type SocialProvider = 'apple' | 'google' | 'kakao';
 
@@ -36,8 +36,7 @@ const SocialButtonImpl: React.FC<SocialButtonProps> = ({
   loading = false,
   testID,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
 
   const variants: Record<SocialProvider, ProviderStyle> = {
     apple: { bg: '#000000', fg: '#FFFFFF', Icon: Apple },

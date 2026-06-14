@@ -17,10 +17,11 @@
  * `AlternativeRouteCard` for the canonical mapping from `RouteSegment[]`.
  */
 import React, { memo } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { ArrowRight, Footprints } from 'lucide-react-native';
-import { useTheme } from '@/services/theme';
-import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
+
+import { weightToFontFamily } from '@/styles/modernTheme';
 import { getSubwayLineColor } from '@/utils/colorUtils';
 import { truncateMinutes } from '@/utils/dateUtils';
 import { getLineShortLabel, type LineId } from './LineBadge';
@@ -75,8 +76,7 @@ const JourneyStripImpl: React.FC<JourneyStripProps> = ({
   style,
   testID,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
 
   return (
     <View

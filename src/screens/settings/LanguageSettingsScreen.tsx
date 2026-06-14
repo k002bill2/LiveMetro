@@ -8,19 +8,13 @@
  */
 
 import React, { useCallback, useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  ScrollView,
-  TouchableOpacity,
-} from 'react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
 import { Check } from 'lucide-react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { useI18n, Language } from '@/services/i18n';
-import { useTheme } from '@/services/theme';
+
 import { SettingsStackParamList } from '@/navigation/types';
 import SettingSection from '@/components/settings/SettingSection';
 
@@ -42,8 +36,7 @@ const LANGUAGE_OPTIONS: readonly LanguageOptionData[] = [
 
 export const LanguageSettingsScreen: React.FC<Props> = ({ navigation }) => {
   const { language, setLanguage, t } = useI18n();
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
 
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 

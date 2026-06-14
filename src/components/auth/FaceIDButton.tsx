@@ -5,10 +5,11 @@
  * pulse indicator on the right edge that toggles every 1.4s.
  */
 import React, { memo, useEffect, useRef } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { Animated, Easing, Text, TouchableOpacity, View, StyleSheet, ViewStyle, TextStyle } from 'react-native';
 import { Fingerprint } from 'lucide-react-native';
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme/themeContext';
+
 import { useShouldReduceMotion } from '@/contexts/AccessibilityContext';
 
 export type FaceIDVariant = 'face' | 'touch';
@@ -42,8 +43,7 @@ const FaceIDButtonImpl: React.FC<FaceIDButtonProps> = ({
   variant = 'face',
   testID,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const shouldReduceMotion = useShouldReduceMotion();
   const pulseAnim = useRef(new Animated.Value(0.4)).current;
   const animationRef = useRef<Animated.CompositeAnimation | null>(null);

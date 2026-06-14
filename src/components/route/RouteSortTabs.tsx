@@ -7,9 +7,10 @@
  * route list via `sortRoutesByTab(routes, tab)` — no re-search on tab change.
  */
 import React, { memo, useCallback } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { Text, TouchableOpacity, View, ViewStyle, TextStyle } from 'react-native';
 import { WANTED_TOKENS, typeStyle } from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme';
+
 import type { RouteSortTab } from '@/models/route';
 
 interface RouteSortTabsProps {
@@ -26,8 +27,7 @@ const OPTIONS: readonly { value: RouteSortTab; label: string }[] = [
 ];
 
 const RouteSortTabsImpl: React.FC<RouteSortTabsProps> = ({ value, onChange, testID }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
 
   const trackStyle: ViewStyle = {
     flexDirection: 'row',

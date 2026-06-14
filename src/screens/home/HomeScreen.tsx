@@ -15,27 +15,12 @@
  * feeds CommunityDelayCard / the empty-state link / StationDetail.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import {
-  FileText,
-  Map as MapIcon,
-  Megaphone,
-  Search,
-  TrainFront,
-} from 'lucide-react-native';
+import { FileText, Map as MapIcon, Megaphone, Search, TrainFront } from 'lucide-react-native';
 import * as Location from 'expo-location';
-import {
-  NavigationProp,
-  useIsFocused,
-  useNavigation,
-} from '@react-navigation/native';
+import { NavigationProp, useIsFocused, useNavigation } from '@react-navigation/native';
 
 import { useAuth } from '../../services/auth/AuthContext';
 import { trainService } from '../../services/train/trainService';
@@ -46,38 +31,17 @@ import { useCommuteRouteSummary } from '../../hooks/useCommuteRouteSummary';
 import { useFirestoreMorningCommute } from '../../hooks/useFirestoreMorningCommute';
 import { useFavorites } from '../../hooks/useFavorites';
 import { LoadingScreen } from '../../components/common/LoadingScreen';
-import {
-  CommunityDelayCard,
-  CommuteRouteCard,
-  CommuteRouteCardPlaceholder,
-  HomeTopBar,
-  MLHeroCard,
-  MLHeroCardPlaceholder,
-  NearbyStationCard,
-  Pill,
-  QuickActionsGrid,
-  SectionHeader,
-} from '../../components/design';
+import { CommunityDelayCard, CommuteRouteCard, CommuteRouteCardPlaceholder, HomeTopBar, MLHeroCard, MLHeroCardPlaceholder, NearbyStationCard, Pill, QuickActionsGrid, SectionHeader } from '../../components/design';
 import type { LineId } from '../../components/design';
 import { useToast } from '../../components/common/Toast';
-import {
-  WANTED_TOKENS,
-  weightToFontFamily,
-  type WantedSemanticTheme,
-} from '../../styles/modernTheme';
-import { useTheme } from '../../services/theme';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '../../styles/modernTheme';
 
 import { Station } from '../../models/train';
 import { isUsableCommuteTime } from '../../models/user';
 import { AppStackParamList } from '../../navigation/types';
 import { HomeFavoriteRow } from './HomeFavoriteRow';
 import { useCommuteDiagnostics } from './useCommuteDiagnostics';
-import {
-  addMinutesToHHmm,
-  formatDateTimeLabel,
-  formatRelativeKorean,
-  minutesBetween,
-} from './homeTimeFormat';
+import { addMinutesToHHmm, formatDateTimeLabel, formatRelativeKorean, minutesBetween } from './homeTimeFormat';
 
 const WALK_METERS_PER_MINUTE = 80;
 
@@ -85,8 +49,7 @@ export const HomeScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<AppStackParamList>>();
   const isFocused = useIsFocused();
   const { user } = useAuth();
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
   const { showError, showSuccess, showInfo, ToastComponent } = useToast();
 

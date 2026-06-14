@@ -18,6 +18,7 @@
  *  - Secondary text link "다음에" — skip the permission ask and continue
  */
 import React, { useCallback, useState } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import {
   SafeAreaView,
   ScrollView,
@@ -100,7 +101,7 @@ const TOGGLES: readonly ToggleSpec[] = [
 
 export const NotificationPermissionScreen: React.FC<Props> = ({ navigation, route }) => {
   const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const { onSkip } = useOnboardingCallbacks();
 
   // Local toggle state. The values flow forward through navigation to the

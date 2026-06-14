@@ -4,9 +4,9 @@
  * Used as `간편 로그인` between the email-login button and social buttons.
  */
 import React, { memo } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { Text, View, StyleSheet, ViewStyle, TextStyle } from 'react-native';
-import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme/themeContext';
+import { weightToFontFamily } from '@/styles/modernTheme';
 
 interface OrDividerProps {
   label?: string;
@@ -14,8 +14,7 @@ interface OrDividerProps {
 }
 
 const OrDividerImpl: React.FC<OrDividerProps> = ({ label = '또는', testID }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
 
   const containerStyle: ViewStyle = {
     flexDirection: 'row',

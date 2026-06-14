@@ -4,20 +4,14 @@
  */
 
 import React from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import {
-  Home,
-  Star,
-  Route as RouteIcon,
-  Megaphone,
-  User,
-  CircleHelp,
-} from 'lucide-react-native';
+import { Home, Star, Route as RouteIcon, Megaphone, User, CircleHelp } from 'lucide-react-native';
 
 import { useAuth } from '../services/auth/AuthContext';
-import { useTheme } from '../services/theme';
-import { WANTED_TOKENS, weightToFontFamily } from '../styles/modernTheme';
+
+import { weightToFontFamily } from '../styles/modernTheme';
 import { LoadingScreen } from '../components/common/LoadingScreen';
 import { OnboardingProvider, useOnboarding } from '../contexts/OnboardingContext';
 
@@ -129,8 +123,7 @@ const Stack = createStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 const MainTabNavigator: React.FC = () => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
 
   return (
     <Tab.Navigator

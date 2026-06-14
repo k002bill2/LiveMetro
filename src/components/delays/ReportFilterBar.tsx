@@ -6,9 +6,9 @@
  */
 
 import React, { useMemo } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 
-import { useTheme } from '@/services/theme';
 import { ReportType } from '@/models/delayReport';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 
@@ -49,8 +49,7 @@ export const ReportFilterBar: React.FC<ReportFilterBarProps> = ({
   onToggleMyLines,
   myLinesAvailable,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   const items: ChipItem[] = [

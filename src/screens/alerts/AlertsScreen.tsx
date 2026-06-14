@@ -4,36 +4,15 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  FlatList,
-  type ListRenderItem,
-  RefreshControl,
-  TouchableOpacity,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
-import {
-  AlertCircle,
-  AlertTriangle,
-  BarChart3,
-  Bell,
-  Clock,
-  Plus,
-  Star,
-  TrainFront,
-  Trash2,
-  X,
-} from 'lucide-react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { View, Text, StyleSheet, SafeAreaView, FlatList, type ListRenderItem, RefreshControl, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { AlertCircle, AlertTriangle, BarChart3, Bell, Clock, Plus, Star, TrainFront, Trash2, X } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { useAlerts } from '../../hooks/useAlerts';
 import { useTranslation } from '@/services/i18n';
 import { StoredNotification } from '../../services/notification/notificationStorageService';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '../../styles/modernTheme';
-import { useTheme } from '../../services/theme';
+
 import { addTestNotifications, addRandomNotification } from '../../utils/notificationTestHelper';
 import { LineBadge, type LineId } from '@/components/design';
 
@@ -92,8 +71,7 @@ const matchesFilter = (
 
 export const AlertsScreen: React.FC = () => {
   const t = useTranslation();
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   // Memoize styles so notification updates don't recreate the StyleSheet
   // object on every render (regression noted in cross-review).
   const styles = useMemo(() => createStyles(semantic), [semantic]);
@@ -316,7 +294,6 @@ export const AlertsScreen: React.FC = () => {
       )}
     </View>
   );
-
 
   const keyExtractor = useCallback(
     (notification: StoredNotification) => notification.id,

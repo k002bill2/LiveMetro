@@ -13,6 +13,7 @@ jest.mock('lucide-react-native', () => new Proxy({}, { get: (_, name) => name })
 // the component no longer imports COLORS/SPACING/RADIUS/TYPOGRAPHY. useTheme
 // drives the WANTED_TOKENS light/dark selection.
 jest.mock('@/services/theme', () => ({
+  useSemanticTokens: jest.fn(() => jest.requireActual('@/styles/modernTheme').WANTED_TOKENS.light),
   useTheme: () => ({ isDark: false }),
 }));
 

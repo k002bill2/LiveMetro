@@ -7,9 +7,9 @@
  */
 
 import React, { useMemo } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 
-import { useTheme } from '@/services/theme';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 
 interface DirectionToggleProps {
@@ -20,8 +20,7 @@ interface DirectionToggleProps {
 }
 
 export const DirectionToggle: React.FC<DirectionToggleProps> = ({ options, value, onChange }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   if (options.length === 0) {

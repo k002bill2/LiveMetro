@@ -18,17 +18,11 @@
  * lower half blank for a tap-through experience.
  */
 import React, { memo, useMemo } from 'react';
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-  ViewStyle,
-  useWindowDimensions,
-} from 'react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { Pressable, StyleSheet, Text, View, ViewStyle, useWindowDimensions } from 'react-native';
 import { Footprints, MapPin } from 'lucide-react-native';
-import { useTheme } from '@/services/theme';
-import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
+
+import { weightToFontFamily } from '@/styles/modernTheme';
 import { LineBadge, type LineId } from './LineBadge';
 import { CONG_TONE, type CongestionLevel } from './congestion';
 
@@ -101,8 +95,7 @@ const NearbyStationCardImpl: React.FC<NearbyStationCardProps> = ({
   style,
   testID,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const { width } = useWindowDimensions();
 
   const computedWalkMin = walkMin ?? Math.max(1, Math.ceil(distanceM / WALK_METERS_PER_MINUTE));

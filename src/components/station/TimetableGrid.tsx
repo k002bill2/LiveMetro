@@ -16,10 +16,11 @@
  */
 
 import React, { memo, useMemo } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { StyleSheet, Text, View } from 'react-native';
 
 import type { TrainScheduleItem } from '@/hooks/useTrainSchedule';
-import { useTheme } from '@/services/theme/themeContext';
+
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 
 export interface TimetableGridProps {
@@ -141,8 +142,7 @@ export const groupSchedulesByHour = (
 
 export const TimetableGrid: React.FC<TimetableGridProps> = memo(
   ({ schedules, isViewingToday, maxHourGroups, currentTime, testID }) => {
-    const { isDark } = useTheme();
-    const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+    const semantic = useSemanticTokens();
 
     // Anchor 시각: prop 우선, fallback은 `new Date()`. prop 경유면 deps 발현으로
     // 시간 경계에서 자동 재평가 — 부모(StationTimetableSection)의 1분 tick state.

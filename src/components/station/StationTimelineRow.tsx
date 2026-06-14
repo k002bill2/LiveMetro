@@ -9,9 +9,10 @@
  * the marker column and announces its trains for accessibility.
  */
 import React, { memo } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { StyleSheet, Text, View } from 'react-native';
 import { WANTED_TOKENS, typeStyle } from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme/themeContext';
+
 import type { TrainPosition } from '@/models/trainPosition';
 import { positionStatusToDisplay } from '@/models/trainPosition';
 
@@ -47,8 +48,7 @@ const StationTimelineRowImpl: React.FC<StationTimelineRowProps> = ({
   lineColor,
   testID,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
 
   const cutTop = !isLoop && isFirst;
   const cutBottom = !isLoop && isLast;

@@ -5,9 +5,9 @@
  * pill on `bg-base` with subtle shadow.
  */
 import React, { memo, useCallback } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { Text, TouchableOpacity, View, ViewStyle, TextStyle } from 'react-native';
 import { WANTED_TOKENS, typeStyle } from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme/themeContext';
 
 export type DirectionValue = 'up' | 'down';
 
@@ -26,8 +26,7 @@ const DirectionSegmentImpl: React.FC<DirectionSegmentProps> = ({
   onChange,
   testID,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
 
   const trackStyle: ViewStyle = {
     flexDirection: 'row',

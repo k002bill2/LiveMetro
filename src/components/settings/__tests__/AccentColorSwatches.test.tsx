@@ -26,6 +26,7 @@ jest.mock('@/services/theme', () => {
   const actual = jest.requireActual('@/services/theme');
   return {
     ...actual,
+    useSemanticTokens: jest.fn(() => jest.requireActual('@/styles/modernTheme').WANTED_TOKENS.light),
     useTheme: jest.fn(() => ({ isDark: false })),
   };
 });

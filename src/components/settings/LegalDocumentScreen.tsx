@@ -13,22 +13,10 @@
  */
 
 import React, { useCallback, useMemo, useRef } from 'react';
-import {
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  type LayoutChangeEvent,
-} from 'react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View, type LayoutChangeEvent } from 'react-native';
 import { ChevronRight, FileText } from 'lucide-react-native';
-import {
-  WANTED_TOKENS,
-  weightToFontFamily,
-  type WantedSemanticTheme,
-} from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 
 /** One numbered article ("제 N 조") of a legal document. */
 export interface LegalSection {
@@ -53,8 +41,7 @@ export const LegalDocumentScreen: React.FC<LegalDocumentScreenProps> = ({
   lastUpdated,
   version,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   const scrollRef = useRef<ScrollView>(null);

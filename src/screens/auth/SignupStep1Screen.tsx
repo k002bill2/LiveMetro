@@ -9,6 +9,7 @@
  * follow-up phase (decision in plan: src/services/auth/niceAuth.ts deferred).
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import {
   Alert,
   Animated,
@@ -82,7 +83,7 @@ const formatTimer = (seconds: number): string => {
 
 export const SignupStep1Screen: React.FC = () => {
   const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const navigation = useNavigation<Nav>();
   const { requestPhoneVerification, confirmPhoneCode } = useAuth();
 

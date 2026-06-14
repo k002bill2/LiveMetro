@@ -55,7 +55,7 @@ import {
   weightToFontFamily,
   type WantedSemanticTheme,
 } from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme';
+import { useTheme, useSemanticTokens } from '@/services/theme';
 import { OnbHeader } from '@/components/onboarding/OnbHeader';
 import {
   TransferRouteOption,
@@ -309,7 +309,7 @@ const buildRecommendations = (
 
 export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
   const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
   // edit mode runs outside OnboardingNavigator. Use the optional variant
   // (always called → Rules-of-Hooks safe) and gate the skip CTA on it.

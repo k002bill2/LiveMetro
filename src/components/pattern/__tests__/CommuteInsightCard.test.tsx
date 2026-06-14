@@ -8,6 +8,7 @@ jest.mock('lucide-react-native', () => new Proxy({}, { get: (_, name) => name })
 // Phase 50 — Wanted DS migration. Legacy COLORS/SPACING/RADIUS/TYPOGRAPHY
 // mock removed; component now imports WANTED_TOKENS + weightToFontFamily.
 jest.mock('@/services/theme', () => ({
+  useSemanticTokens: jest.fn(() => jest.requireActual('@/styles/modernTheme').WANTED_TOKENS.light),
   useTheme: () => ({ isDark: false }),
 }));
 

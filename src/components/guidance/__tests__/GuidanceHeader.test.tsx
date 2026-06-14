@@ -3,6 +3,7 @@ import { fireEvent, render } from '@testing-library/react-native';
 import { GuidanceHeader } from '../GuidanceHeader';
 
 jest.mock('@/services/theme', () => ({
+  useSemanticTokens: jest.fn(() => jest.requireActual('@/styles/modernTheme').WANTED_TOKENS.light),
   useTheme: () => ({ isDark: false }),
 }));
 

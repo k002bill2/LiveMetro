@@ -12,16 +12,8 @@
  */
 
 import React, { useCallback, useState, useMemo, useEffect, memo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  RefreshControl,
-  TouchableOpacity,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { View, Text, StyleSheet, ScrollView, RefreshControl, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import DraggableFlatList, {
   type RenderItemParams,
@@ -40,7 +32,6 @@ import { StationSearchModal } from '../../components/commute/StationSearchModal'
 import { StationSelection } from '../../models/commute';
 import { Station } from '../../models/train';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '../../styles/modernTheme';
-import { useTheme } from '../../services/theme';
 
 type NavigationProp = NativeStackNavigationProp<AppStackParamList>;
 
@@ -51,8 +42,7 @@ export const FavoritesScreen: React.FC = () => {
   // re-fetching realtime arrivals while the user was elsewhere.
   const isFocused = useIsFocused();
   const { user } = useAuth();
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
   const {
     favoritesWithDetails,

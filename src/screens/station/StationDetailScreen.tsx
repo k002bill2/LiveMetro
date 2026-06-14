@@ -16,15 +16,8 @@
  *   - 시간표 tab (TrainSchedule hook)
  */
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
-import {
-  ActivityIndicator,
-  ScrollView,
-  Share,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { ActivityIndicator, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RouteProp, useRoute, useNavigation, useIsFocused } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -32,7 +25,7 @@ import { AlertCircle, Moon } from 'lucide-react-native';
 
 import { AppStackParamList } from '../../navigation/types';
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme/themeContext';
+
 import { useRealtimeTrains } from '@/hooks/useRealtimeTrains';
 // TODO(혼잡도): 실시간 혼잡도 표시 비활성 — 서울시 AI 실시간 혼잡도 소스 공개 시 복원
 // import { useCongestion } from '@/hooks/useCongestion';
@@ -48,11 +41,7 @@ import { ExitInfoGrid } from '@/components/station/ExitInfoGrid';
 import { StationTimetableSection } from '@/components/station/StationTimetableSection';
 import type { TrainCongestionSummary } from '@/models/congestion';
 import { carsToPercentages } from '@/utils/congestionDisplay';
-import {
-  getBoardingSelection,
-  clearBoardingSelection,
-  boardingSelectionMatches,
-} from '@/services/train/boardingSelectionStore';
+import { getBoardingSelection, clearBoardingSelection, boardingSelectionMatches } from '@/services/train/boardingSelectionStore';
 import type { Station, Train } from '@/models/train';
 import { directionToDisplay } from '@/models/route';
 import type { LineId } from '@/components/design';
@@ -116,8 +105,7 @@ const trainToArrival = (train: Train, now: number): ArrivalView => {
 const StationDetailScreen: React.FC = () => {
   const route = useRoute<StationDetailRouteProp>();
   const navigation = useNavigation<StationDetailNavProp>();
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
 
   const {
     stationId,

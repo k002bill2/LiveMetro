@@ -4,9 +4,9 @@
  * Mirrors the Wanted handoff: 11px caption, centered, two underlined links.
  */
 import React, { memo } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { Text, TouchableOpacity, View, StyleSheet, TextStyle } from 'react-native';
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme/themeContext';
 
 interface TermsFooterProps {
   onTermsPress: () => void;
@@ -15,8 +15,7 @@ interface TermsFooterProps {
 }
 
 const TermsFooterImpl: React.FC<TermsFooterProps> = ({ onTermsPress, onPrivacyPress, testID }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
 
   const baseText: TextStyle = {
     fontSize: 11,

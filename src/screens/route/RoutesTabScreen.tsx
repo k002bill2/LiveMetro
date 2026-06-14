@@ -10,21 +10,13 @@
  * Spec: docs/superpowers/specs/2026-05-09-routes-screen-design.md
  */
 import React, { useCallback, useMemo, useState, useEffect } from 'react';
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-  ActivityIndicator,
-  RefreshControl,
-} from 'react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { Pressable, ScrollView, StyleSheet, Text, View, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search } from 'lucide-react-native';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-import { useTheme } from '@/services/theme';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { useNearbyStations } from '@/hooks/useNearbyStations';
 import { useRouteSearch, type DepartureMode } from '@/hooks/useRouteSearch';
@@ -47,8 +39,7 @@ interface StationLite {
 type NavigationProp = NativeStackNavigationProp<AppStackParamList>;
 
 export const RoutesTabScreen: React.FC = () => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
   const navigation = useNavigation<NavigationProp>();
 

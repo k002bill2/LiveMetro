@@ -6,10 +6,10 @@
  */
 
 import React, { useCallback, useMemo } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { View, Text, StyleSheet, TouchableOpacity, Share } from 'react-native';
 import { ThumbsUp, MessageCircle, Share2 } from 'lucide-react-native';
 
-import { useTheme } from '@/services/theme';
 import { DelayReport, ReportTypeLabels } from '@/models/delayReport';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { LineBadge, Pill, type LineId } from '@/components/design';
@@ -50,8 +50,7 @@ const buildBodyText = (report: DelayReport): string => {
 };
 
 export const ReportCard: React.FC<ReportCardProps> = ({ report, currentUserId, onUpvote, onOpen }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   const hasUpvoted = currentUserId ? report.upvotedBy.includes(currentUserId) : false;

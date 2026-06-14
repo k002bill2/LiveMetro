@@ -35,7 +35,7 @@ import {
   Route as RouteIcon,
   TrainFront,
 } from 'lucide-react-native';
-import { useTheme } from '@/services/theme';
+import { useSemanticTokens } from '@/services/theme';
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { getSubwayLineColor } from '@/utils/colorUtils';
 import { truncateMinutes } from '@/utils/dateUtils';
@@ -88,8 +88,7 @@ const CommuteRouteCardImpl: React.FC<CommuteRouteCardProps> = ({
   style,
   testID,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
 
   // Card hides entirely if we don't have both endpoints — partial origin/dest
   // is worse than absent, since an empty timeline reads as broken.
@@ -386,8 +385,7 @@ const CommuteRouteCardPlaceholderImpl: React.FC<CommuteRouteCardPlaceholderProps
   style,
   testID,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
 
   return (
     <Pressable

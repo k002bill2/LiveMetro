@@ -9,6 +9,7 @@
  */
 
 import React, { memo, useCallback, useMemo } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import {
   TouchableOpacity,
   View,
@@ -16,7 +17,6 @@ import {
   StyleSheet,
   ViewStyle,
 } from 'react-native';
-import { useTheme } from '@/services/theme/themeContext';
 import { getSubwayLineColor } from '@/utils/colorUtils';
 import {
   WANTED_TOKENS,
@@ -52,8 +52,7 @@ export interface StationCardProps {
  */
 export const StationCard: React.FC<StationCardProps> = memo(
   ({ station, onPress, isSelected = false, testID, style }) => {
-    const { isDark } = useTheme();
-    const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+    const semantic = useSemanticTokens();
     const styles = useMemo(() => createStyles(semantic), [semantic]);
 
     // Get line color from utility

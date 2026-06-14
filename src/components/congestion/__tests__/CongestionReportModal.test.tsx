@@ -5,6 +5,7 @@ import { CongestionReportModal } from '../CongestionReportModal';
 jest.mock('lucide-react-native', () => new Proxy({}, { get: (_, name) => name }));
 
 jest.mock('@/services/theme', () => ({
+  useSemanticTokens: jest.fn(() => jest.requireActual('@/styles/modernTheme').WANTED_TOKENS.light),
   useTheme: () => ({
     colors: {
       primary: '#007AFF',

@@ -9,45 +9,22 @@
  */
 
 import React, { useCallback, useState, useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  RefreshControl,
-} from 'react-native';
-import {
-  Minus,
-  ChevronRight,
-  AlertCircle,
-  ArrowLeft,
-  RefreshCw,
-  ArrowUp,
-  ArrowDown,
-  Flag,
-} from 'lucide-react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import { Minus, ChevronRight, AlertCircle, ArrowLeft, RefreshCw, ArrowUp, ArrowDown, Flag } from 'lucide-react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AppStackParamList } from '../../navigation/types';
 import { useStationNavigation } from '../../hooks/useStationNavigation';
 import { useRealtimeTrains } from '../../hooks/useRealtimeTrains';
 import { TrainArrivalList } from '../../components/train/TrainArrivalList';
-import {
-  WANTED_TOKENS,
-  weightToFontFamily,
-  type WantedSemanticTheme,
-} from '../../styles/modernTheme';
-import { useTheme } from '../../services/theme';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '../../styles/modernTheme';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'StationNavigator'>;
 
 export const StationNavigatorScreen: React.FC<Props> = ({ route, navigation }) => {
   const { stationId, lineId, mode } = route.params;
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   // 방향 선택 상태 (출발 모드에서 사용)

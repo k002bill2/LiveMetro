@@ -6,24 +6,12 @@
  */
 
 import React, { useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  Modal,
-  StyleSheet,
-  SafeAreaView,
-  ScrollView,
-  ActivityIndicator,
-} from 'react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { View, Text, TouchableOpacity, Modal, StyleSheet, SafeAreaView, ScrollView, ActivityIndicator } from 'react-native';
 import { ChevronRight, X, Check, PlayCircle } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
-import {
-  WANTED_TOKENS,
-  weightToFontFamily,
-  type WantedSemanticTheme,
-} from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
+
 import { NotificationSoundId } from '@/models/user';
 import { SoundOption, soundService } from '@/services/sound/soundService';
 
@@ -46,8 +34,7 @@ export const SoundPicker: React.FC<SoundPickerProps> = ({
   icon: IconComponent,
   disabled = false,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
   const [modalVisible, setModalVisible] = useState(false);
   const [playingId, setPlayingId] = useState<NotificationSoundId | null>(null);

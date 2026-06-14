@@ -5,6 +5,7 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import {
   View,
   Text,
@@ -83,8 +84,8 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   const { user, signOut, deleteCurrentUser } = useAuth();
   const { resetSignupFlow } = useOnboarding();
   const { language, t } = useI18n();
-  const { themeMode, isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const { themeMode } = useTheme();
+  const semantic = useSemanticTokens();
   // Root navigation for screens outside SettingsNavigator
   const rootNavigation = useNavigation<NavigationProp<AppStackParamList>>();
 

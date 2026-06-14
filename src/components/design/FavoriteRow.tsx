@@ -12,10 +12,11 @@
  * StationDetailScreen lists once their owning components are migrated.
  */
 import React, { memo } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { Pressable, StyleSheet, Text, View, ViewStyle } from 'react-native';
 import { GripVertical, Briefcase } from 'lucide-react-native';
-import { useTheme } from '@/services/theme';
-import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
+
+import { weightToFontFamily } from '@/styles/modernTheme';
 import { LineBadge, type LineId } from './LineBadge';
 import { Pill } from './Pill';
 import { CONG_TONE, type CongestionLevel } from './congestion';
@@ -74,8 +75,7 @@ const FavoriteRowImpl: React.FC<FavoriteRowProps> = ({
   style,
   testID,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const tone = congestion ? CONG_TONE[congestion] : null;
 
   return (

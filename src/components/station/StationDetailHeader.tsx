@@ -8,10 +8,11 @@
  *   Gangnam · 222 · 신분당 D07     ← caption with `label-alt`
  */
 import React, { memo } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { Text, TouchableOpacity, View, StyleSheet, ViewStyle, TextStyle } from 'react-native';
 import { ChevronLeft, Share2, Star } from 'lucide-react-native';
 import { WANTED_TOKENS, typeStyle } from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme/themeContext';
+
 import { LineBadge, type LineId } from '@/components/design';
 
 interface StationDetailHeaderProps {
@@ -37,8 +38,7 @@ const StationDetailHeaderImpl: React.FC<StationDetailHeaderProps> = ({
   onToggleFavorite,
   testID,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
 
   const titleStyle: TextStyle = {
     marginTop: WANTED_TOKENS.spacing.s3,

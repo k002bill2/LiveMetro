@@ -6,14 +6,13 @@
  */
 
 import React, { useMemo } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { View, StyleSheet } from 'react-native';
 
-import { useTheme } from '@/services/theme';
 import { WANTED_TOKENS, type WantedSemanticTheme } from '@/styles/modernTheme';
 
 export const ReportCardSkeleton: React.FC = () => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   return (

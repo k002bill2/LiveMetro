@@ -26,6 +26,7 @@ jest.mock('@react-navigation/native', () => ({
   useRoute: jest.fn(() => ({ params: {} })),
 }));
 jest.mock('@/services/theme', () => ({
+  useSemanticTokens: jest.fn(() => jest.requireActual('@/styles/modernTheme').WANTED_TOKENS.light),
   useTheme: jest.fn(() => ({ isDark: false })),
 }));
 jest.mock('@/services/theme/themeContext', () => ({

@@ -7,30 +7,13 @@
  */
 
 import React, { useEffect, useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ActivityIndicator,
-} from 'react-native';
-import {
-  Clock,
-  TrendingUp,
-  AlertTriangle,
-  Bell,
-  ChevronRight,
-  Brain,
-  RefreshCw,
-} from 'lucide-react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { Clock, TrendingUp, AlertTriangle, Bell, ChevronRight, Brain, RefreshCw } from 'lucide-react-native';
 
 import { useMLPrediction } from '@/hooks/useMLPrediction';
-import { useTheme } from '@/services/theme';
-import {
-  WANTED_TOKENS,
-  weightToFontFamily,
-  type WantedSemanticTheme,
-} from '@/styles/modernTheme';
+
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { MIN_LOGS_FOR_ML_TRAINING } from '@/models/ml';
 
 // ============================================================================
@@ -58,8 +41,7 @@ export const CommutePredictionCard: React.FC<CommutePredictionCardProps> = ({
   onTrainModel,
   compact = false,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic, compact), [semantic, compact]);
 
   const {
