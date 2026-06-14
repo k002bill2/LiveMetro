@@ -319,8 +319,9 @@ describe('WeeklyPredictionScreen', () => {
     expect(getByText('예상 45분')).toBeTruthy();
     expect(getByText('최단 43분')).toBeTruthy();
     expect(getByText('최장 47분')).toBeTruthy();
-    // (B) Header timestamp = 출근 출발 시각, NOT the current wall-clock time.
-    expect(getByText('오늘 오전 8:30')).toBeTruthy();
+    // (B) Header = 도착 시각 (same field as HomeScreen's card), NOT the current
+    // wall-clock time. arrival 09:15 → "오늘 오전 9:15 도착".
+    expect(getByText('오늘 오전 9:15 도착')).toBeTruthy();
     // CTA echoes the predicted arrival.
     expect(getByText('출발 시간에 알려드릴게요 (09:15)')).toBeTruthy();
   });

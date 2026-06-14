@@ -44,16 +44,16 @@ import { type DayOfWeek, type PredictedCommute } from '@/models/pattern';
 import { directionToDisplay, type Direction } from '@/models/route';
 
 /**
- * Format a registered "HH:mm" departure time as "오전/오후 h:mm".
+ * Format an "HH:mm" time string as "오전/오후 h:mm".
  * Returns null on missing/malformed input so the caller can omit the label.
  *
- * This is the 출근 출발 시각 the design pins next to "ML 예측"
- * (commute-prediction.jsx:53 "오늘 오전 8:32", matching the CTA "(8:32)") —
- * NOT the current wall-clock time. The old `new Date()` value both showed the
- * wrong field (a night-time clock on a "오늘 출근" card) and went stale because
- * it was frozen at mount; a fixed departure time fixes both.
+ * Used for the header arrival time. The header is NOT the current wall-clock
+ * time — the old `new Date()` value showed the wrong field (a night-time clock
+ * on a "오늘 출근" card) and went stale because it was frozen at mount. It now
+ * shows the predicted 도착 시각, the same field HomeScreen's card surfaces
+ * ("지금 출발하면 ○ 도착"), so the two screens read consistently.
  */
-const formatDepartureLabel = (hhmm?: string): string | null => {
+const formatHHmmLabel = (hhmm?: string): string | null => {
   if (!hhmm) return null;
   const match = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim());
   if (!match) return null;
@@ -149,7 +149,6 @@ export const WeeklyPredictionScreen: React.FC = () => {
     morningCommute,
     commuteStationNames,
     effectiveHero,
-    effectiveDepartureTime,
     hasRealPrediction,
   } = useCommuteHeroEstimate();
 
@@ -183,9 +182,10 @@ export const WeeklyPredictionScreen: React.FC = () => {
   const confidencePct =
     effectiveHero?.confidence != null ? Math.round(effectiveHero.confidence * 100) : 87;
   const arrivalTime = effectiveHero?.arrivalTime ?? '';
-  // 헤더 타임스탬프 = 출근 출발 시각(현재 벽시계 시각 아님). effectiveDepartureTime은
-  // ML 예측 출발 ?? 등록 출발(HH:mm). 미설정이면 null → 라벨 자체를 생략한다.
-  const departureLabel = formatDepartureLabel(effectiveDepartureTime);
+  // 헤더 = 도착 시각(현재 벽시계 시각 아님). 홈 카드("지금 출발하면 ○ 도착")와
+  // 동일한 effectiveHero.arrivalTime을 써서 두 화면 시각이 일치한다. 미설정이면
+  // null → 라벨 자체를 생략한다.
+  const arrivalLabel = formatHHmmLabel(arrivalTime);
 
   // Section 9: weekly trend — Mon-Fri bars with today highlighted.
   // `now` is captured per `weekPredictions` change so the today highlight
@@ -320,8 +320,8 @@ export const WeeklyPredictionScreen: React.FC = () => {
               <Text style={[styles.tagText, { color: semantic.primaryPress }]}>ML 예측</Text>
             </View>
           </Pill>
-          {departureLabel && (
-            <Text style={[styles.heroTagTime, { color: semantic.labelAlt }]}>오늘 {departureLabel}</Text>
+          {arrivalLabel && (
+            <Text style={[styles.heroTagTime, { color: semantic.labelAlt }]}>오늘 {arrivalLabel} 도착</Text>
           )}
         </View>
         <Text style={[styles.heroLead, { color: semantic.labelStrong }]}>오늘 출근, 약</Text>
