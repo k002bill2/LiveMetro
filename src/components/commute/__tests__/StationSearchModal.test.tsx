@@ -136,6 +136,32 @@ describe('StationSearchModal', () => {
     });
   });
 
+  it('excludes stations by excludeStationNames (hides already-listed stations regardless of id space)', async () => {
+    const { queryByText, getByText } = render(
+      <StationSearchModal {...defaultProps} excludeStationNames={['강남']} />,
+    );
+    await waitFor(() => {
+      expect(getByText('서울역')).toBeTruthy();
+      expect(queryByText('강남')).toBeNull();
+    });
+  });
+
+  it('combines excludeStationIds and excludeStationNames', async () => {
+    const { queryByText, getByText } = render(
+      <StationSearchModal
+        {...defaultProps}
+        excludeStationIds={['0150']}
+        excludeStationNames={['강남']}
+      />,
+    );
+    await waitFor(() => {
+      // 명동/홍대입구 remain; 강남 (by name) and 서울역 (by id) are hidden.
+      expect(getByText('명동')).toBeTruthy();
+      expect(queryByText('강남')).toBeNull();
+      expect(queryByText('서울역')).toBeNull();
+    });
+  });
+
   it('renders Modal with visible=false when not visible', () => {
     const { toJSON } = render(
       <StationSearchModal {...defaultProps} visible={false} />,

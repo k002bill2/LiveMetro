@@ -145,8 +145,12 @@ export const FavoritesOnboardingScreen: React.FC<Props> = ({ navigation, route }
     [annotated, searchAdded],
   );
 
-  // Already-listed station_cd ids hide their rows in the search modal.
+  // Already-listed stations are hidden from the search modal. Names cover the
+  // whole pool (recommendations use slug ids that an id-only exclude misses,
+  // and one name can map to several sibling-line station_cds); ids add an
+  // exact guard for search-added station_cds.
   const excludeIds = useMemo(() => Array.from(selectedIds), [selectedIds]);
+  const excludeNames = useMemo(() => pool.map((s) => s.name), [pool]);
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -476,6 +480,7 @@ export const FavoritesOnboardingScreen: React.FC<Props> = ({ navigation, route }
         title="역 검색"
         placeholder="자주 가는 역을 검색하세요"
         excludeStationIds={excludeIds}
+        excludeStationNames={excludeNames}
       />
     </SafeAreaView>
   );

@@ -24,6 +24,11 @@ interface StationSearchModalProps {
   title?: string;
   placeholder?: string;
   excludeStationIds?: string[];
+  // Hide stations by name as well as id. Needed when the caller's list mixes
+  // id spaces (e.g. onboarding recommendation slugs vs station_cd), where an
+  // id-only exclude would leave already-listed stations — and their same-name
+  // sibling-line codes — visible in search.
+  excludeStationNames?: string[];
 }
 
 const LINE_NAMES: Record<string, string> = {
@@ -51,6 +56,7 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
   title = '역 선택',
   placeholder = '역 이름을 검색하세요',
   excludeStationIds = [],
+  excludeStationNames = [],
 }) => {
   const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
@@ -119,8 +125,12 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
       result = result.filter((s) => !excludeStationIds.includes(s.id));
     }
 
+    if (excludeStationNames.length > 0) {
+      result = result.filter((s) => !excludeStationNames.includes(s.name));
+    }
+
     return result.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
-  }, [stations, searchQuery, selectedLine, excludeStationIds]);
+  }, [stations, searchQuery, selectedLine, excludeStationIds, excludeStationNames]);
 
   const handleSelectStation = useCallback(
     (station: StationWithLine) => {
