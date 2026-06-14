@@ -31,6 +31,20 @@ const ADAPTIVE_MIN_STATIONS = 3;
  * 60s location cache guidance — a fix older than this is treated as stale. */
 const LAST_KNOWN_MAX_AGE_MS = 60_000;
 
+/** Max acceptable horizontal accuracy radius (meters) for a usable live fix.
+ * A fix coarser than this is cell-tower-grade: its uncertainty band spans
+ * roughly the whole nearby-station search radius, so it cannot reliably place
+ * the user among ~500m-spaced stations. Such a fix is treated as a transient
+ * miss — the caller falls through to the last-known fix or a lower-accuracy
+ * retry instead of rendering a wrong station as definitive. */
+const MAX_ACCEPTABLE_ACCURACY_M = 500;
+
+/** Required accuracy (meters) for the last-known-position fallback. `maxAge`
+ * alone bounds staleness but not quality: a fresh-but-coarse cached fix would
+ * otherwise pass. Asking expo-location for this bound makes it return null for
+ * coarse cached fixes, so the chain advances to a live retry. */
+const LAST_KNOWN_REQUIRED_ACCURACY_M = 100;
+
 export interface GeofenceRegion {
   identifier: string;
   latitude: number;
@@ -216,6 +230,23 @@ class LocationService {
     try {
       const location = await Location.getCurrentPositionAsync({ accuracy });
       const coordinates = this.toCoordinates(location.coords);
+
+      // Reject a fix whose reported uncertainty is too large to place the user
+      // among nearby stations. Treat it like a transient miss (return null) so
+      // the caller can fall through to the last-known fix or a Balanced retry,
+      // rather than caching/returning a coarse fix as if it were definitive.
+      if (
+        coordinates.accuracy != null &&
+        coordinates.accuracy > MAX_ACCEPTABLE_ACCURACY_M
+      ) {
+        if (__DEV__) {
+          console.warn(
+            `getCurrentPositionAsync(accuracy=${accuracy}) returned a coarse fix (${coordinates.accuracy}m > ${MAX_ACCEPTABLE_ACCURACY_M}m); rejecting`
+          );
+        }
+        return null;
+      }
+
       this.currentLocation = coordinates;
       return coordinates;
     } catch (error) {
@@ -235,6 +266,7 @@ class LocationService {
     try {
       const lastKnown = await Location.getLastKnownPositionAsync({
         maxAge: LAST_KNOWN_MAX_AGE_MS,
+        requiredAccuracy: LAST_KNOWN_REQUIRED_ACCURACY_M,
       });
 
       if (!lastKnown) {
@@ -259,7 +291,10 @@ class LocationService {
     return {
       latitude: coords.latitude,
       longitude: coords.longitude,
-      accuracy: coords.accuracy || undefined,
+      // `?? undefined` (not `|| undefined`): a legitimate accuracy of 0 (a
+      // precise fix) must survive instead of being coerced to undefined, so a
+      // downstream gate can distinguish "precise 0" from "unknown accuracy".
+      accuracy: coords.accuracy ?? undefined,
     };
   }
 

@@ -719,6 +719,165 @@ describe('LocationService', () => {
     });
   });
 
+  describe('accuracy gating (coarse-fix rejection)', () => {
+    beforeEach(async () => {
+      mockLocation.getForegroundPermissionsAsync.mockResolvedValue({
+        status: 'granted',
+        granted: true,
+        canAskAgain: true,
+        expires: 'never',
+      } as Location.PermissionResponse);
+      mockLocation.getBackgroundPermissionsAsync.mockResolvedValue({
+        status: 'undetermined',
+        granted: false,
+        canAskAgain: true,
+        expires: 'never',
+      } as Location.PermissionResponse);
+      await locationService.initialize();
+      // clearAllMocks() resets call data but NOT the mockResolvedValueOnce queue;
+      // a once-value left unconsumed by one test would leak into the next. Reset
+      // the two position mocks so each test in this block starts from a clean slate.
+      mockLocation.getCurrentPositionAsync.mockReset();
+      mockLocation.getLastKnownPositionAsync.mockReset();
+    });
+
+    it('rejects a coarse live fix (accuracy > 500m) and falls back to last known position', async () => {
+      // A cell-tower-only fix (~2km radius) cannot place the user among
+      // ~500m-spaced stations, so it must be treated as a miss — not accepted as
+      // definitive. The precise cached fix should win instead.
+      mockLocation.getCurrentPositionAsync.mockResolvedValue({
+        coords: {
+          latitude: 37.5,
+          longitude: 127.0,
+          accuracy: 2000,
+          altitude: 0,
+          altitudeAccuracy: 0,
+          heading: 0,
+          speed: 0,
+        },
+        timestamp: Date.now(),
+      });
+      mockLocation.getLastKnownPositionAsync.mockResolvedValue({
+        coords: {
+          latitude: 37.5547,
+          longitude: 126.9707,
+          accuracy: 60,
+          altitude: 0,
+          altitudeAccuracy: 0,
+          heading: 0,
+          speed: 0,
+        },
+        timestamp: Date.now(),
+      });
+
+      const location = await locationService.getCurrentLocation();
+
+      expect(location?.latitude).toBe(37.5547);
+      expect(location?.accuracy).toBe(60);
+    });
+
+    it('falls through to the Balanced retry when the high-accuracy fix is too coarse', async () => {
+      // A coarse High fix (e.g. 1500m, indoors) must not be accepted; the code
+      // should drop to the Balanced (wifi/cell) retry, which can resolve a
+      // usable fix where GPS-grade could not.
+      mockLocation.getCurrentPositionAsync
+        .mockResolvedValueOnce({
+          coords: {
+            latitude: 37.9,
+            longitude: 127.9,
+            accuracy: 1500,
+            altitude: 0,
+            altitudeAccuracy: 0,
+            heading: 0,
+            speed: 0,
+          },
+          timestamp: Date.now(),
+        })
+        .mockResolvedValueOnce({
+          coords: {
+            latitude: 37.5,
+            longitude: 127.0,
+            accuracy: 40,
+            altitude: 0,
+            altitudeAccuracy: 0,
+            heading: 0,
+            speed: 0,
+          },
+          timestamp: Date.now(),
+        });
+      mockLocation.getLastKnownPositionAsync.mockResolvedValue(null);
+
+      const location = await locationService.getCurrentLocation(true);
+
+      expect(location?.latitude).toBe(37.5);
+      expect(location?.accuracy).toBe(40);
+      expect(mockLocation.getCurrentPositionAsync).toHaveBeenNthCalledWith(1, {
+        accuracy: Location.Accuracy.High,
+      });
+      expect(mockLocation.getCurrentPositionAsync).toHaveBeenNthCalledWith(2, {
+        accuracy: Location.Accuracy.Balanced,
+      });
+    });
+
+    it('accepts a fix at the 500m accuracy boundary (threshold is strict >, not >=)', async () => {
+      mockLocation.getCurrentPositionAsync.mockResolvedValue({
+        coords: {
+          latitude: 37.5,
+          longitude: 127.0,
+          accuracy: 500,
+          altitude: 0,
+          altitudeAccuracy: 0,
+          heading: 0,
+          speed: 0,
+        },
+        timestamp: Date.now(),
+      });
+
+      const location = await locationService.getCurrentLocation();
+
+      expect(location?.latitude).toBe(37.5);
+      expect(location?.accuracy).toBe(500);
+    });
+
+    it('preserves a reported accuracy of 0 instead of dropping it to undefined', async () => {
+      // toCoordinates used `accuracy || undefined`, which silently coerced a
+      // legitimate 0 (a precise fix) to undefined. `?? undefined` keeps the 0 so
+      // a downstream accuracy gate can tell "precise 0" from "unknown".
+      mockLocation.getCurrentPositionAsync.mockResolvedValue({
+        coords: {
+          latitude: 37.5,
+          longitude: 127.0,
+          accuracy: 0,
+          altitude: 0,
+          altitudeAccuracy: 0,
+          heading: 0,
+          speed: 0,
+        },
+        timestamp: Date.now(),
+      });
+
+      const location = await locationService.getCurrentLocation();
+
+      expect(location?.accuracy).toBe(0);
+    });
+
+    it('requests last known position with a requiredAccuracy bound, not just maxAge', async () => {
+      // maxAge bounds staleness but NOT quality: a 60s-fresh cell-tower fix
+      // (~2km) would otherwise pass. requiredAccuracy makes expo-location itself
+      // return null for coarse cached fixes, so the fallback chain advances.
+      mockLocation.getCurrentPositionAsync.mockRejectedValue(
+        new Error('Error Domain=kCLErrorDomain Code=0 "(null)"')
+      );
+      mockLocation.getLastKnownPositionAsync.mockResolvedValue(null);
+
+      await locationService.getCurrentLocation();
+
+      expect(mockLocation.getLastKnownPositionAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ maxAge: 60000, requiredAccuracy: 100 })
+      );
+    });
+  });
+
   describe('location tracking', () => {
     beforeEach(async () => {
       mockLocation.getForegroundPermissionsAsync.mockResolvedValue({
