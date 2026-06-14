@@ -6,31 +6,31 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/pathProtection.js",
+            "command": "node ${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/pathProtection.js",
             "timeout": 5,
             "statusMessage": "Path protection..."
           },
           {
             "type": "command",
-            "command": "node .claude/hooks/fileLock.js acquire",
+            "command": "node ${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/fileLock.js acquire",
             "timeout": 5,
             "statusMessage": "File lock acquire..."
           },
           {
             "type": "command",
-            "command": "node .claude/hooks/ethicalValidator.js",
+            "command": "node ${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/ethicalValidator.js",
             "timeout": 5,
             "statusMessage": "코드 시크릿/하드코딩 검사..."
           },
           {
             "type": "command",
-            "command": "node .claude/hooks/hardGateGuard.js",
+            "command": "node ${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/hardGateGuard.js",
             "timeout": 3,
             "statusMessage": "HARD-GATE check..."
           },
           {
             "type": "command",
-            "command": "node .claude/hooks/skillGateGuard.js",
+            "command": "node ${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/skillGateGuard.js",
             "timeout": 3,
             "statusMessage": "Skill gate check..."
           }
@@ -41,7 +41,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/ethicalValidator.js",
+            "command": "node ${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/ethicalValidator.js",
             "timeout": 5,
             "statusMessage": "보안 명령 검사..."
           }
@@ -54,7 +54,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/fileLock.js release 2>/dev/null || true",
+            "command": "node ${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/fileLock.js release 2>/dev/null || true",
             "timeout": 5,
             "statusMessage": "File lock release..."
           }
@@ -65,7 +65,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/outputSecretFilter.js 2>/dev/null || true",
+            "command": "node ${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/outputSecretFilter.js 2>/dev/null || true",
             "timeout": 5,
             "statusMessage": "Secret filtering..."
           }
@@ -76,7 +76,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/skillGateGuard.js",
+            "command": "node ${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/skillGateGuard.js",
             "timeout": 3,
             "statusMessage": "Recording skill invocation..."
           }
@@ -87,7 +87,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/verificationGuard.js",
+            "command": "node ${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/verificationGuard.js",
             "timeout": 20,
             "statusMessage": "Verification check..."
           }
@@ -100,7 +100,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/notify.js 2>/dev/null || true",
+            "command": "node ${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/notify.js 2>/dev/null || true",
             "timeout": 5,
             "statusMessage": "Notifying..."
           }
@@ -113,13 +113,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/userPromptSubmit.js 2>/dev/null || true",
+            "command": "node ${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/userPromptSubmit.js 2>/dev/null || true",
             "timeout": 5,
             "statusMessage": "Context activation..."
           },
           {
             "type": "command",
-            "command": "node .claude/hooks/docEnforcer.js 2>/dev/null || true",
+            "command": "node ${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/docEnforcer.js 2>/dev/null || true",
             "timeout": 3,
             "statusMessage": "Doc enforcement..."
           }
@@ -132,7 +132,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/agentLearnings.js 2>/dev/null || true",
+            "command": "node ${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/agentLearnings.js 2>/dev/null || true",
             "timeout": 5,
             "statusMessage": "Saving learnings..."
           }
@@ -145,7 +145,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/evalCleanup.js 2>/dev/null || true",
+            "command": "node ${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/evalCleanup.js 2>/dev/null || true",
             "timeout": 5,
             "statusMessage": "Eval cleanup..."
           },
@@ -164,13 +164,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "node .claude/hooks/evalCleanup.js 2>/dev/null || true",
+            "command": "node ${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/evalCleanup.js 2>/dev/null || true",
             "timeout": 5,
             "statusMessage": "Eval cleanup..."
           },
           {
             "type": "command",
-            "command": "node .claude/hooks/evalArtifactCleanup.js 2>/dev/null || true",
+            "command": "node ${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/evalArtifactCleanup.js 2>/dev/null || true",
             "timeout": 30,
             "statusMessage": "Cleaning eval artifacts..."
           }
