@@ -23,12 +23,9 @@ import * as Location from 'expo-location';
 import { NavigationProp, useIsFocused, useNavigation } from '@react-navigation/native';
 
 import { useAuth } from '../../services/auth/AuthContext';
-import { trainService } from '../../services/train/trainService';
 import { useNearbyStations } from '../../hooks/useNearbyStations';
 import { useDelayDetection } from '../../hooks/useDelayDetection';
-import { useMLPrediction } from '../../hooks/useMLPrediction';
-import { useCommuteRouteSummary } from '../../hooks/useCommuteRouteSummary';
-import { useFirestoreMorningCommute } from '../../hooks/useFirestoreMorningCommute';
+import { useCommuteHeroEstimate } from '../../hooks/useCommuteHeroEstimate';
 import { useFavorites } from '../../hooks/useFavorites';
 import { LoadingScreen } from '../../components/common/LoadingScreen';
 import { CommunityDelayCard, CommuteRouteCard, CommuteRouteCardPlaceholder, HomeTopBar, MLHeroCard, MLHeroCardPlaceholder, NearbyStationCard, Pill, QuickActionsGrid, SectionHeader } from '../../components/design';
@@ -37,11 +34,10 @@ import { useToast } from '../../components/common/Toast';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '../../styles/modernTheme';
 
 import { Station } from '../../models/train';
-import { isUsableCommuteTime } from '../../models/user';
 import { AppStackParamList } from '../../navigation/types';
 import { HomeFavoriteRow } from './HomeFavoriteRow';
 import { useCommuteDiagnostics } from './useCommuteDiagnostics';
-import { addMinutesToHHmm, formatDateTimeLabel, formatRelativeKorean, minutesBetween } from './homeTimeFormat';
+import { formatDateTimeLabel, formatRelativeKorean } from './homeTimeFormat';
 
 const WALK_METERS_PER_MINUTE = 80;
 
@@ -80,11 +76,6 @@ export const HomeScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [locationPermission, setLocationPermission] = useState<boolean>(false);
-  const [commuteStationNames, setCommuteStationNames] = useState<{
-    origin?: string;
-    destination?: string;
-    originLineId?: string;
-  }>({});
 
   const {
     nearbyStations: hookNearbyStations,
@@ -108,35 +99,23 @@ export const HomeScreen: React.FC = () => {
     enabled: false,
   });
 
-  // HomeScreen uses MLPrediction (not the PredictedCommute model extended in spec 2026-05-12 §7.1)
-  const { prediction: mlPrediction, baselineMinutes } = useMLPrediction();
-
-  // Two stores populate the morning commute:
-  //   1. `user.preferences.commuteSchedule.weekdays.morningCommute` — written by
-  //      Settings → 출근 경로 (CommuteSettingsScreen writes through to the
-  //      user profile).
-  //   2. Firestore `commuteSettings/<uid>` — written by the onboarding flow
-  //      (CommuteRouteScreen → CommuteTimeScreen → FavoritesOnboardingScreen
-  //      → commuteService.saveCommuteRoutes). Onboarding does NOT update the
-  //      user profile, so users who registered there had no morningCommute
-  //      on the profile and the CommuteRouteCard never rendered.
-  //
-  // The hook below adapts store #2 to the same `CommuteTime` shape so the
-  // resolution is a simple `?? fallback`. Profile (#1) wins only when it is
-  // actually usable — NotificationTimeScreen can leave a non-null
-  // morningCommute with empty-string station ids, and a plain `??` would
-  // let that empty object shadow the valid onboarding data.
-  const onboardingMorningCommute = useFirestoreMorningCommute(user?.id);
-  const profileMorningCommute =
-    user?.preferences.commuteSchedule?.weekdays?.morningCommute;
-  const morningCommute =
-    (isUsableCommuteTime(profileMorningCommute) ? profileMorningCommute : null) ??
-    onboardingMorningCommute;
-
-  const routeSummary = useCommuteRouteSummary(
-    morningCommute?.stationId,
-    morningCommute?.destinationStationId,
-  );
+  // Commute hero estimate — shared single source of truth with
+  // WeeklyPredictionScreen via useCommuteHeroEstimate. This hook is the sole
+  // caller of useMLPrediction / useFirestoreMorningCommute /
+  // useCommuteRouteSummary and the station-name resolution (the 2-store morning
+  // commute resolution included), so the home card and the prediction screen
+  // can never show different numbers / departure times. The estimate chain (ML
+  // door-to-door ?? registered-commute graph ride) and the isUsableCommuteTime
+  // gate now live in that hook (see its JSDoc).
+  const {
+    morningCommute,
+    profileMorningCommute,
+    onboardingMorningCommute,
+    routeSummary,
+    commuteStationNames,
+    effectiveHero,
+    effectiveDepartureTime,
+  } = useCommuteHeroEstimate();
 
   // Dev-only diagnostic (no-op in production/jest): logs stored commute ids
   // vs. resolved stations — see useCommuteDiagnostics for the failure shape
@@ -147,86 +126,6 @@ export const HomeScreen: React.FC = () => {
     onboardingMorningCommute,
     routeSummary,
   });
-
-  useEffect(() => {
-    if (!morningCommute) {
-      setCommuteStationNames({});
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const [origin, dest] = await Promise.all([
-          trainService.getStation(morningCommute.stationId).catch(() => null),
-          trainService.getStation(morningCommute.destinationStationId).catch(() => null),
-        ]);
-        if (cancelled) return;
-        setCommuteStationNames({
-          origin: origin?.name,
-          destination: dest?.name,
-          originLineId: origin?.lineId,
-        });
-      } catch {
-        // ignore — components tolerate missing endpoint names
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [morningCommute]);
-
-  const heroProps = useMemo(() => {
-    if (!mlPrediction) return null;
-    const minutes = minutesBetween(
-      mlPrediction.predictedDepartureTime,
-      mlPrediction.predictedArrivalTime,
-    );
-    if (minutes === null) return null;
-    const delta =
-      baselineMinutes !== null ? minutes - baselineMinutes : undefined;
-    return {
-      predictedMinutes: minutes,
-      deltaMinutes: delta,
-      arrivalTime: mlPrediction.predictedArrivalTime,
-      confidence: mlPrediction.confidence,
-      origin: commuteStationNames.origin,
-      destination: commuteStationNames.destination,
-    };
-  }, [mlPrediction, baselineMinutes, commuteStationNames]);
-
-  // Fallback chain for the CommuteRouteCard hero data:
-  //   1. ML prediction (heroProps)               — best signal, kicks in after ~10 rides
-  //   2. Registered commute + route summary      — production fallback so users who
-  //                                                 set morningCommute see the card
-  //                                                 immediately, with ride/arrival
-  //                                                 derived from graph search instead
-  //                                                 of ML inference
-  //
-  // Note: the hero ML card still uses `heroProps` directly (see render block) — this
-  // chain only exists so CommuteRouteCard renders without ML.
-  const registeredCommuteHero = useMemo(() => {
-    if (!morningCommute) return null;
-    if (!commuteStationNames.origin || !commuteStationNames.destination) return null;
-    if (!routeSummary.ready || routeSummary.rideMinutes === undefined) return null;
-    const arrival = addMinutesToHHmm(
-      morningCommute.departureTime,
-      routeSummary.rideMinutes,
-    );
-    if (!arrival) return null;
-    return {
-      predictedMinutes: routeSummary.rideMinutes,
-      deltaMinutes: undefined as number | undefined,
-      arrivalTime: arrival,
-      confidence: undefined as number | undefined,
-      origin: commuteStationNames.origin,
-      destination: commuteStationNames.destination,
-    };
-  }, [morningCommute, commuteStationNames, routeSummary]);
-
-  const effectiveHero = heroProps ?? registeredCommuteHero;
-
-  const effectiveDepartureTime =
-    mlPrediction?.predictedDepartureTime ?? morningCommute?.departureTime;
 
   const [dateTimeLabel, setDateTimeLabel] = useState(() =>
     formatDateTimeLabel(new Date()),
