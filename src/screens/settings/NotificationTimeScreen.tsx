@@ -1,31 +1,80 @@
 /**
  * Notification Time Settings Screen
- * Configure commute schedule and quiet hours.
+ * Configure commute alert windows and quiet hours.
  *
- * Phase 46 — migrated from legacy COLORS/SPACING/RADIUS/TYPOGRAPHY API
- * to Wanted Design System tokens.
+ * Phase 51 — Wanted "알림 시간대" handoff:
+ *   - 24h timeline card (commute windows + hatched quiet hours)
+ *   - 출퇴근 알림 시간 (Pill badge rows; start = editable departure time,
+ *     end = derived read-only window — see plan D1)
+ *   - 방해 금지 (toggle + start/end + "주말은 종일 무음")
+ *   - header "저장" confirmation (settings persist optimistically)
+ *
+ * Honesty notes:
+ *   - Commute legs store only a single `departureTime`; the alert *window*
+ *     is a display derivation, never a new persisted field.
+ *   - "주말은 종일 무음" maps to `weekdaysOnly`, the field actually consumed
+ *     by notificationService.shouldSendNotification. The legacy
+ *     `weekendsAlwaysSilent` flag is unwired and intentionally not surfaced.
  */
 
-import React, { useMemo, useState } from 'react';
+import React, {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  SafeAreaView,
+  ScrollView,
+  TouchableOpacity,
+  Alert,
+} from 'react-native';
+import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { Calendar, Moon } from 'lucide-react-native';
+
 import { useSemanticTokens } from '@/services/theme';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, Alert } from 'react-native';
-import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
-import { Calendar, Clock, Moon, Sun } from 'lucide-react-native';
+import {
+  WANTED_TOKENS,
+  weightToFontFamily,
+  type WantedSemanticTheme,
+} from '@/styles/modernTheme';
 import { useAuth } from '@/services/auth/AuthContext';
+import { useToast } from '@/components/common/Toast';
+import { isUsableCommuteTime, type CommuteTime } from '@/models/user';
+import { useFirestoreCommuteRoutes } from '@/hooks/useFirestoreCommuteRoutes';
+import type { SettingsStackParamList } from '@/navigation/types';
 
 import SettingSection from '@/components/settings/SettingSection';
 import SettingToggle from '@/components/settings/SettingToggle';
-import SettingTimePicker from '@/components/settings/SettingTimePicker';
-import { isUsableCommuteTime } from '@/models/user';
+import TimeFieldBox from '@/components/settings/TimeFieldBox';
+import CommuteAlertRow from '@/components/settings/CommuteAlertRow';
+import NotificationTimeline, {
+  parseTime,
+} from '@/components/settings/NotificationTimeline';
 
-/** "HH:MM" → decimal hours (e.g., "08:30" → 8.5). Returns 0 on parse failure. */
-const parseTime = (t: string): number => {
-  const m = /^(\d{1,2}):(\d{2})$/.exec(t.trim());
-  if (!m) return 0;
-  return parseInt(m[1]!, 10) + parseInt(m[2]!, 10) / 60;
+type Props = NativeStackScreenProps<SettingsStackParamList, 'NotificationTime'>;
+
+/** Commute window lengths (hours) past the departure time — display only. */
+const MORNING_WINDOW_H = 2;
+const EVENING_WINDOW_H = 3;
+
+/** departure "HH:MM" + N hours → "HH:MM", clamped to 24:00. */
+const deriveWindowEnd = (departure: string, addHours: number): string => {
+  const endMinutes = Math.min(
+    24 * 60,
+    Math.round(parseTime(departure) * 60) + addHours * 60
+  );
+  const hh = Math.floor(endMinutes / 60);
+  const mm = endMinutes % 60;
+  return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
 };
 
-export const NotificationTimeScreen: React.FC = () => {
+export const NotificationTimeScreen: React.FC<Props> = ({ navigation }) => {
   const { user, updateUserPreferences } = useAuth();
   const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
@@ -34,394 +83,288 @@ export const NotificationTimeScreen: React.FC = () => {
   const notificationSettings = user?.preferences.notificationSettings;
   const commuteSchedule = user?.preferences.commuteSchedule;
 
-  // Default times if not set
-  const morningTime = commuteSchedule?.weekdays?.morningCommute?.departureTime || '08:00';
-  const eveningTime = commuteSchedule?.weekdays?.eveningCommute?.departureTime || '18:00';
+  // The commute lives in one of two stores: the user profile (#1) or the
+  // CommuteSettings/onboarding Firestore doc (#2, written by commuteService).
+  // They are not kept in sync, so resolve PER LEG with the HomeScreen pattern:
+  // a usable profile leg wins, else fall back to the Firestore leg. Reading
+  // only #1 (the old behavior) made commutes set via CommuteSettings invisible
+  // here — showing a false "set your route first" prompt.
+  const firestoreRoutes = useFirestoreCommuteRoutes(user?.id);
+  const resolveLeg = (
+    profileLeg: CommuteTime | null | undefined,
+    firestoreLeg: CommuteTime | null
+  ): CommuteTime | null =>
+    isUsableCommuteTime(profileLeg) ? profileLeg : firestoreLeg;
+
+  const morningCommute = resolveLeg(
+    commuteSchedule?.weekdays?.morningCommute,
+    firestoreRoutes.morning
+  );
+  const eveningCommute = resolveLeg(
+    commuteSchedule?.weekdays?.eveningCommute,
+    firestoreRoutes.evening
+  );
+  const morningUsable = isUsableCommuteTime(morningCommute);
+  const eveningUsable = isUsableCommuteTime(eveningCommute);
+
+  const morningTime = morningCommute?.departureTime || '08:00';
+  const eveningTime = eveningCommute?.departureTime || '18:00';
   const quietHoursStart = notificationSettings?.quietHours?.startTime || '22:00';
   const quietHoursEnd = notificationSettings?.quietHours?.endTime || '07:00';
-
-  // Phase 50: 24h timeline derived from existing single-departure data.
-  // The Wanted handoff design uses commute *windows* (start/end), but the
-  // current data model stores only a single departureTime. We derive a
-  // visualization-only window centered on the departure (morning −1h…+2h,
-  // evening −1h…+3h) — purely cosmetic, no data shape change.
-  const morningH = parseTime(morningTime);
-  const eveningH = parseTime(eveningTime);
-  const quietStartH = parseTime(quietHoursStart);
-  const quietEndH = parseTime(quietHoursEnd);
   const quietEnabled = notificationSettings?.quietHours?.enabled || false;
-  const morningStart = Math.max(0, morningH - 1);
-  const morningEnd = Math.min(24, morningH + 2);
-  const eveningStart = Math.max(0, eveningH - 1);
-  const eveningEnd = Math.min(24, eveningH + 3);
-  // Quiet hours commonly cross midnight (e.g., 22:00 → 07:00). Render two
-  // bands when wrapped; otherwise a single band.
-  const quietBands: { left: number; width: number }[] = quietEnabled
-    ? quietStartH > quietEndH
-      ? [
-          { left: quietStartH, width: 24 - quietStartH },
-          { left: 0, width: quietEndH },
+
+  const morningEnd = deriveWindowEnd(morningTime, MORNING_WINDOW_H);
+  const eveningEnd = deriveWindowEnd(eveningTime, EVENING_WINDOW_H);
+
+  // The commute alert window is read-only here — its departure time is owned by
+  // CommuteSettings (the single canonical commute editor, used app-wide), so we
+  // never fork/desync it. When a leg isn't set, tapping its row routes the user
+  // to CommuteSettings to set it up.
+  const goToCommuteSetup = useCallback(
+    (leg: '출근' | '퇴근'): void => {
+      Alert.alert(
+        `${leg} 경로 먼저 설정`,
+        `${leg} 알림 시간은 출퇴근 경로에 맞춰 정해져요. 출퇴근 설정에서 경로를 등록해주세요.`,
+        [
+          { text: '취소', style: 'cancel' },
+          {
+            text: '설정으로 이동',
+            onPress: () => navigation.navigate('CommuteSettings'),
+          },
         ]
-      : [{ left: quietStartH, width: Math.max(0, quietEndH - quietStartH) }]
-    : [];
-  const pct = (n: number): `${number}%` => `${(n / 24) * 100}%`;
-
-  const handleMorningTimeChange = async (time: string): Promise<void> => {
-    if (!user) return;
-
-    // Only update the departure time of an *existing usable* commute.
-    // Synthesizing a commute object here with `stationId: '' ` corrupts
-    // the profile — the empty object then shadows the real commute (saved
-    // to Firestore by onboarding) and breaks station lookups downstream.
-    const existingMorning =
-      user.preferences.commuteSchedule?.weekdays?.morningCommute;
-    if (!isUsableCommuteTime(existingMorning)) {
-      Alert.alert(
-        '출근 경로 먼저 설정',
-        '출근 알림 시간을 바꾸려면 먼저 출근 경로를 등록해주세요.'
       );
-      return;
-    }
+    },
+    [navigation]
+  );
+  const showMorningRouteGuide = useCallback(
+    () => goToCommuteSetup('출근'),
+    [goToCommuteSetup]
+  );
+  const showEveningRouteGuide = useCallback(
+    () => goToCommuteSetup('퇴근'),
+    [goToCommuteSetup]
+  );
 
-    try {
-      setSaving(true);
-      await updateUserPreferences({
-        commuteSchedule: {
-          ...user.preferences.commuteSchedule,
-          weekdays: {
-            ...user.preferences.commuteSchedule?.weekdays,
-            morningCommute: { ...existingMorning, departureTime: time },
-            eveningCommute: user.preferences.commuteSchedule?.weekdays?.eveningCommute || null,
+  // "저장" header action — settings already persist optimistically on each
+  // change, so this surfaces a confirmation toast then pops back. Mirrors
+  // the CommuteSettingsScreen pattern.
+  const { showSuccess, ToastComponent } = useToast();
+  const saveNavTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(
+    () => () => {
+      if (saveNavTimer.current) clearTimeout(saveNavTimer.current);
+    },
+    []
+  );
+
+  const handleSavePress = useCallback((): void => {
+    showSuccess('알림 시간대가 저장되었습니다');
+    if (saveNavTimer.current) clearTimeout(saveNavTimer.current);
+    saveNavTimer.current = setTimeout(() => {
+      if (navigation.canGoBack()) navigation.goBack();
+    }, 900);
+  }, [navigation, showSuccess]);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerRight: () => (
+        <TouchableOpacity
+          onPress={handleSavePress}
+          accessibilityRole="button"
+          accessibilityLabel="저장하고 돌아가기"
+          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+        >
+          <Text style={styles.headerSave}>저장</Text>
+        </TouchableOpacity>
+      ),
+    });
+  }, [navigation, handleSavePress, styles.headerSave]);
+
+  const handleToggleQuietHours = useCallback(
+    async (value: boolean): Promise<void> => {
+      if (!user) return;
+      try {
+        setSaving(true);
+        await updateUserPreferences({
+          notificationSettings: {
+            ...user.preferences.notificationSettings,
+            quietHours: {
+              ...user.preferences.notificationSettings.quietHours,
+              enabled: value,
+            },
           },
-        },
-      });
-    } catch (error) {
-      console.error('Error updating morning commute time:', error);
-      Alert.alert('오류', '설정 저장에 실패했습니다.');
-    } finally {
-      setSaving(false);
-    }
-  };
+        });
+      } catch (error) {
+        console.error('Error updating quiet hours:', error);
+        Alert.alert('오류', '설정 저장에 실패했습니다.');
+      } finally {
+        setSaving(false);
+      }
+    },
+    [user, updateUserPreferences]
+  );
 
-  const handleEveningTimeChange = async (time: string): Promise<void> => {
-    if (!user) return;
-
-    // Same rule as the morning leg: only retime an existing usable commute,
-    // never synthesize one with empty-string station ids.
-    const existingEvening =
-      user.preferences.commuteSchedule?.weekdays?.eveningCommute;
-    if (!isUsableCommuteTime(existingEvening)) {
-      Alert.alert(
-        '퇴근 경로 먼저 설정',
-        '퇴근 알림 시간을 바꾸려면 먼저 퇴근 경로를 등록해주세요.'
-      );
-      return;
-    }
-
-    try {
-      setSaving(true);
-      await updateUserPreferences({
-        commuteSchedule: {
-          ...user.preferences.commuteSchedule,
-          weekdays: {
-            morningCommute: user.preferences.commuteSchedule?.weekdays?.morningCommute || null,
-            eveningCommute: { ...existingEvening, departureTime: time },
+  const handleQuietHoursStartChange = useCallback(
+    async (time: string): Promise<void> => {
+      if (!user) return;
+      try {
+        setSaving(true);
+        await updateUserPreferences({
+          notificationSettings: {
+            ...user.preferences.notificationSettings,
+            quietHours: {
+              ...user.preferences.notificationSettings.quietHours,
+              startTime: time,
+            },
           },
-        },
-      });
-    } catch (error) {
-      console.error('Error updating evening commute time:', error);
-      Alert.alert('오류', '설정 저장에 실패했습니다.');
-    } finally {
-      setSaving(false);
-    }
-  };
+        });
+      } catch (error) {
+        console.error('Error updating quiet hours start time:', error);
+        Alert.alert('오류', '설정 저장에 실패했습니다.');
+      } finally {
+        setSaving(false);
+      }
+    },
+    [user, updateUserPreferences]
+  );
 
-  const handleToggleQuietHours = async (value: boolean): Promise<void> => {
-    if (!user) return;
-
-    try {
-      setSaving(true);
-      await updateUserPreferences({
-        notificationSettings: {
-          ...user.preferences.notificationSettings,
-          quietHours: {
-            ...user.preferences.notificationSettings.quietHours,
-            enabled: value,
+  const handleQuietHoursEndChange = useCallback(
+    async (time: string): Promise<void> => {
+      if (!user) return;
+      try {
+        setSaving(true);
+        await updateUserPreferences({
+          notificationSettings: {
+            ...user.preferences.notificationSettings,
+            quietHours: {
+              ...user.preferences.notificationSettings.quietHours,
+              endTime: time,
+            },
           },
-        },
-      });
-    } catch (error) {
-      console.error('Error updating quiet hours:', error);
-      Alert.alert('오류', '설정 저장에 실패했습니다.');
-    } finally {
-      setSaving(false);
-    }
-  };
+        });
+      } catch (error) {
+        console.error('Error updating quiet hours end time:', error);
+        Alert.alert('오류', '설정 저장에 실패했습니다.');
+      } finally {
+        setSaving(false);
+      }
+    },
+    [user, updateUserPreferences]
+  );
 
-  const handleQuietHoursStartChange = async (time: string): Promise<void> => {
-    if (!user) return;
-
-    try {
-      setSaving(true);
-      await updateUserPreferences({
-        notificationSettings: {
-          ...user.preferences.notificationSettings,
-          quietHours: {
-            ...user.preferences.notificationSettings.quietHours,
-            startTime: time,
+  // "주말은 종일 무음" → weekdaysOnly (the wired weekend gate). The legacy
+  // quietHours.weekendsAlwaysSilent flag is unwired; we deliberately drive
+  // the real field so this toggle actually silences weekend alerts.
+  const handleToggleWeekendsSilent = useCallback(
+    async (value: boolean): Promise<void> => {
+      if (!user) return;
+      try {
+        setSaving(true);
+        await updateUserPreferences({
+          notificationSettings: {
+            ...user.preferences.notificationSettings,
+            weekdaysOnly: value,
           },
-        },
-      });
-    } catch (error) {
-      console.error('Error updating quiet hours start time:', error);
-      Alert.alert('오류', '설정 저장에 실패했습니다.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleQuietHoursEndChange = async (time: string): Promise<void> => {
-    if (!user) return;
-
-    try {
-      setSaving(true);
-      await updateUserPreferences({
-        notificationSettings: {
-          ...user.preferences.notificationSettings,
-          quietHours: {
-            ...user.preferences.notificationSettings.quietHours,
-            endTime: time,
-          },
-        },
-      });
-    } catch (error) {
-      console.error('Error updating quiet hours end time:', error);
-      Alert.alert('오류', '설정 저장에 실패했습니다.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleToggleWeekendsAlwaysSilent = async (value: boolean): Promise<void> => {
-    if (!user) return;
-
-    try {
-      setSaving(true);
-      await updateUserPreferences({
-        notificationSettings: {
-          ...user.preferences.notificationSettings,
-          quietHours: {
-            ...user.preferences.notificationSettings.quietHours,
-            weekendsAlwaysSilent: value,
-          },
-        },
-      });
-    } catch (error) {
-      console.error('Error updating weekends always silent:', error);
-      Alert.alert('오류', '설정 저장에 실패했습니다.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleToggleWeekdaysOnly = async (value: boolean): Promise<void> => {
-    if (!user) return;
-
-    try {
-      setSaving(true);
-      await updateUserPreferences({
-        notificationSettings: {
-          ...user.preferences.notificationSettings,
-          weekdaysOnly: value,
-        },
-      });
-    } catch (error) {
-      console.error('Error updating weekdays only:', error);
-      Alert.alert('오류', '설정 저장에 실패했습니다.');
-    } finally {
-      setSaving(false);
-    }
-  };
+        });
+      } catch (error) {
+        console.error('Error updating weekend silence:', error);
+        Alert.alert('오류', '설정 저장에 실패했습니다.');
+      } finally {
+        setSaving(false);
+      }
+    },
+    [user, updateUserPreferences]
+  );
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.content}>
-        {/* Phase 50: 24h alert timeline (Wanted handoff signature). Visualizes
-            commute alert windows + quiet hours on a single 24h horizontal bar. */}
-        <View style={styles.timelineCard}>
-          <Text style={styles.timelineEyebrow}>24시간 알림</Text>
-          <Text style={styles.timelineTitle}>평일 알림 활성 시간</Text>
+      <ScrollView style={styles.content} contentContainerStyle={styles.contentInner}>
+        <NotificationTimeline
+          morningTime={morningTime}
+          eveningTime={eveningTime}
+          quietStart={quietHoursStart}
+          quietEnd={quietHoursEnd}
+          quietEnabled={quietEnabled}
+          morningActive={morningUsable}
+          eveningActive={eveningUsable}
+        />
 
-          {/* Labels above the bar — anchored to commute window start */}
-          <View style={styles.timelineLabelRow}>
-            <Text style={[styles.timelineLabel, { left: pct(morningStart) }]}>출근</Text>
-            <Text style={[styles.timelineLabel, { left: pct(eveningStart) }]}>퇴근</Text>
-          </View>
-
-          {/* Track + bands */}
-          <View style={styles.timelineTrack}>
-            {/* Daytime light band: morning end → evening start */}
-            {eveningStart > morningEnd && (
-              <View
-                style={[
-                  styles.timelineBand,
-                  styles.timelineBandLight,
-                  { left: pct(morningEnd), width: pct(eveningStart - morningEnd) },
-                ]}
-              />
-            )}
-            {/* Morning commute solid */}
-            <View
-              style={[
-                styles.timelineBand,
-                styles.timelineBandSolid,
-                { left: pct(morningStart), width: pct(morningEnd - morningStart) },
-              ]}
-            />
-            {/* Evening commute solid */}
-            <View
-              style={[
-                styles.timelineBand,
-                styles.timelineBandSolid,
-                { left: pct(eveningStart), width: pct(eveningEnd - eveningStart) },
-              ]}
-            />
-            {/* Quiet hours muted bands (rendered last so they overlay) */}
-            {quietBands.map((b, i) => (
-              <View
-                key={`quiet-${i}`}
-                style={[
-                  styles.timelineBand,
-                  styles.timelineBandQuiet,
-                  { left: pct(b.left), width: pct(b.width) },
-                ]}
-              />
-            ))}
-          </View>
-
-          {/* Hour ticks: evenly spaced 0/6/12/18/24 */}
-          <View style={styles.timelineTickRow}>
-            {[0, 6, 12, 18, 24].map((h) => (
-              <Text key={h} style={styles.timelineTick}>
-                {String(h).padStart(2, '0')}
-              </Text>
-            ))}
-          </View>
-
-          {/* Legend */}
-          <View style={styles.timelineLegendRow}>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendSwatch, styles.timelineBandSolid]} />
-              <Text style={styles.legendText}>출퇴근 (강조)</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendSwatch, styles.timelineBandLight]} />
-              <Text style={styles.legendText}>일반</Text>
-            </View>
-            {quietEnabled && (
-              <View style={styles.legendItem}>
-                <View style={[styles.legendSwatch, styles.timelineBandQuiet]} />
-                <Text style={styles.legendText}>방해 금지</Text>
-              </View>
-            )}
-          </View>
-        </View>
-
-        {/* Commute Schedule */}
-        <SettingSection title="출퇴근 시간">
-          <SettingTimePicker
-            icon={Sun}
-            label="아침 출근"
-            value={morningTime}
-            onValueChange={handleMorningTimeChange}
+        {/* Commute alert windows (read-only — departure time is owned by
+            CommuteSettings). An unset leg locks: tapping routes to setup. */}
+        <SettingSection title="출퇴근 알림 시간">
+          <CommuteAlertRow
+            badgeLabel="출근"
+            badgeTone="primary"
+            caption="출발 시점부터 알림"
+            startTime={morningTime}
+            endTime={morningEnd}
+            locked={!morningUsable}
+            onLockedPress={showMorningRouteGuide}
+            testID="commute-morning"
           />
-          <View style={styles.stationInfo}>
-            <Text style={styles.stationLabel}>
-              {commuteSchedule?.weekdays?.morningCommute?.stationId
-                ? `출발역에서 출발`
-                : '즐겨찾기에서 출발역을 설정하세요'}
-            </Text>
-          </View>
-
-          <SettingTimePicker
-            icon={Moon}
-            label="저녁 퇴근"
-            value={eveningTime}
-            onValueChange={handleEveningTimeChange}
+          <CommuteAlertRow
+            badgeLabel="퇴근"
+            badgeTone="primary"
+            caption="퇴근 시점부터 알림"
+            startTime={eveningTime}
+            endTime={eveningEnd}
+            locked={!eveningUsable}
+            onLockedPress={showEveningRouteGuide}
+            testID="commute-evening"
           />
-          <View style={styles.stationInfo}>
-            <Text style={styles.stationLabel}>
-              {commuteSchedule?.weekdays?.eveningCommute?.stationId
-                ? `출발역에서 출발`
-                : '즐겨찾기에서 출발역을 설정하세요'}
-            </Text>
-          </View>
         </SettingSection>
 
-        {/* Quiet Hours */}
-        <SettingSection title="방해 금지 모드">
+        {/* Quiet hours */}
+        <SettingSection title="방해 금지">
           <SettingToggle
             icon={Moon}
-            label="조용한 시간대 사용"
-            subtitle="이 시간에는 알림을 받지 않습니다"
-            value={notificationSettings?.quietHours?.enabled || false}
+            label="방해 금지 사용"
+            subtitle="설정 시간 동안 무음"
+            value={quietEnabled}
             onValueChange={handleToggleQuietHours}
             disabled={saving}
           />
 
-          {notificationSettings?.quietHours?.enabled && (
-            <>
-              <SettingTimePicker
-                icon={Clock}
-                label="시작 시간"
+          {quietEnabled && (
+            <View style={styles.quietRow}>
+              <TimeFieldBox
+                label="시작"
                 value={quietHoursStart}
-                onValueChange={handleQuietHoursStartChange}
-              />
-              <SettingTimePicker
-                icon={Clock}
-                label="종료 시간"
-                value={quietHoursEnd}
-                onValueChange={handleQuietHoursEndChange}
-              />
-              <SettingToggle
-                icon={Calendar}
-                label="주말은 종일 무음"
-                subtitle="토 · 일"
-                value={notificationSettings?.quietHours?.weekendsAlwaysSilent ?? false}
-                onValueChange={handleToggleWeekendsAlwaysSilent}
+                onChange={handleQuietHoursStartChange}
                 disabled={saving}
+                testID="quiet-start"
               />
-            </>
+              <Text style={styles.dash} accessible={false}>
+                —
+              </Text>
+              <TimeFieldBox
+                label="종료"
+                value={quietHoursEnd}
+                onChange={handleQuietHoursEndChange}
+                disabled={saving}
+                testID="quiet-end"
+              />
+            </View>
           )}
-        </SettingSection>
 
-        {/* Additional Settings */}
-        <SettingSection title="추가 설정">
           <SettingToggle
             icon={Calendar}
-            label="평일만 알림 받기"
-            subtitle="주말과 공휴일에는 알림을 받지 않습니다"
+            label="주말은 종일 무음"
+            subtitle="토 · 일"
             value={notificationSettings?.weekdaysOnly || false}
-            onValueChange={handleToggleWeekdaysOnly}
+            onValueChange={handleToggleWeekendsSilent}
             disabled={saving}
           />
         </SettingSection>
 
-        {/* Info Box */}
-        <View style={styles.infoBox}>
-          <Text style={styles.infoText}>
-            ℹ️ 출퇴근 시간을 설정하면 해당 시간대에 맞춤 알림을 받을 수
-            있습니다. 즐겨찾기에서 출발역과 도착역을 설정하세요.
-          </Text>
-        </View>
+        <Text style={styles.footerText}>
+          방해 금지 시간에는 긴급 지연 알림도 무음으로 와요.
+        </Text>
       </ScrollView>
+      <ToastComponent />
     </SafeAreaView>
   );
 };
-
-const INFO_FONT_SIZE = 13;
-const INFO_LINE_HEIGHT = INFO_FONT_SIZE * 1.6;
 
 const createStyles = (semantic: WantedSemanticTheme) =>
   StyleSheet.create({
@@ -432,128 +375,36 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     content: {
       flex: 1,
     },
-    stationInfo: {
+    contentInner: {
+      paddingBottom: WANTED_TOKENS.spacing.s6,
+    },
+    headerSave: {
+      color: WANTED_TOKENS.blue[500],
+      fontSize: 17,
+      fontFamily: weightToFontFamily('700'),
+      paddingRight: 4,
+    },
+    quietRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: WANTED_TOKENS.spacing.s2,
       paddingHorizontal: WANTED_TOKENS.spacing.s4,
-      paddingBottom: WANTED_TOKENS.spacing.s3,
+      paddingVertical: WANTED_TOKENS.spacing.s4,
       borderBottomWidth: 1,
       borderBottomColor: semantic.lineSubtle,
     },
-    stationLabel: {
-      fontSize: 13,
-      fontFamily: weightToFontFamily('500'),
+    dash: {
+      fontSize: 16,
+      fontFamily: weightToFontFamily('600'),
       color: semantic.labelAlt,
     },
-    infoBox: {
-      backgroundColor: 'rgba(0,102,255,0.10)',
-      paddingHorizontal: WANTED_TOKENS.spacing.s4,
-      paddingVertical: WANTED_TOKENS.spacing.s4,
-      marginHorizontal: WANTED_TOKENS.spacing.s4,
-      marginBottom: WANTED_TOKENS.spacing.s5,
-      borderRadius: WANTED_TOKENS.radius.r8,
-      borderWidth: 1,
-      borderColor: semantic.lineSubtle,
-    },
-    infoText: {
-      fontSize: INFO_FONT_SIZE,
-      fontFamily: weightToFontFamily('500'),
-      color: semantic.labelNeutral,
-      lineHeight: INFO_LINE_HEIGHT,
-    },
-    /* Phase 50: 24h timeline card */
-    timelineCard: {
-      backgroundColor: semantic.bgBase,
-      borderRadius: WANTED_TOKENS.radius.r10,
-      borderWidth: 1,
-      borderColor: semantic.lineSubtle,
-      padding: WANTED_TOKENS.spacing.s5,
-      marginHorizontal: WANTED_TOKENS.spacing.s4,
-      marginTop: WANTED_TOKENS.spacing.s4,
-      marginBottom: WANTED_TOKENS.spacing.s2,
-    },
-    timelineEyebrow: {
+    footerText: {
       fontSize: WANTED_TOKENS.type.caption1.size,
-      lineHeight: WANTED_TOKENS.type.caption1.lh,
-      fontWeight: '700',
-      fontFamily: weightToFontFamily('700'),
+      lineHeight: Math.round(WANTED_TOKENS.type.caption1.size * 1.5),
+      fontFamily: weightToFontFamily('500'),
       color: semantic.labelAlt,
-      letterSpacing: WANTED_TOKENS.type.caption1.size * 0.04,
-      textTransform: 'uppercase',
-    },
-    timelineTitle: {
-      fontSize: WANTED_TOKENS.type.headline1.size,
-      lineHeight: WANTED_TOKENS.type.headline1.lh,
-      fontWeight: '700',
-      fontFamily: weightToFontFamily('700'),
-      color: semantic.labelStrong,
-      marginTop: WANTED_TOKENS.spacing.s1,
-    },
-    timelineLabelRow: {
-      position: 'relative',
-      height: 16,
-      marginTop: WANTED_TOKENS.spacing.s4,
-    },
-    timelineLabel: {
-      position: 'absolute',
-      fontSize: 10,
-      fontWeight: '700',
-      fontFamily: weightToFontFamily('700'),
-      color: semantic.primaryHover,
-      paddingLeft: 4,
-    },
-    timelineTrack: {
-      position: 'relative',
-      height: 48,
-      borderRadius: WANTED_TOKENS.radius.r6,
-      backgroundColor: semantic.bgSubtle,
-      overflow: 'hidden',
-    },
-    timelineBand: {
-      position: 'absolute',
-      top: 0,
-      bottom: 0,
-    },
-    timelineBandSolid: {
-      backgroundColor: semantic.primaryNormal,
-    },
-    timelineBandLight: {
-      backgroundColor: semantic.primaryBg,
-    },
-    timelineBandQuiet: {
-      backgroundColor: 'rgba(112,115,124,0.32)',
-    },
-    timelineTickRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      marginTop: WANTED_TOKENS.spacing.s2,
-    },
-    timelineTick: {
-      fontSize: 10,
-      fontWeight: '700',
-      fontFamily: weightToFontFamily('700'),
-      color: semantic.labelAlt,
-    },
-    timelineLegendRow: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
+      marginHorizontal: WANTED_TOKENS.spacing.s4,
       marginTop: WANTED_TOKENS.spacing.s3,
-    },
-    legendItem: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginRight: WANTED_TOKENS.spacing.s4,
-      marginTop: WANTED_TOKENS.spacing.s1,
-    },
-    legendSwatch: {
-      width: 10,
-      height: 10,
-      borderRadius: 3,
-      marginRight: 6,
-    },
-    legendText: {
-      fontSize: WANTED_TOKENS.type.caption1.size,
-      fontWeight: '700',
-      fontFamily: weightToFontFamily('700'),
-      color: semantic.labelNeutral,
     },
   });
 
