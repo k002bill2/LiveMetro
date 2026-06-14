@@ -1,25 +1,23 @@
 /**
- * NotificationTimeScreen Test Suite
- * Tests notification time settings rendering and interactions
+ * NotificationTimeScreen Test Suite (Phase 51 — Wanted 알림 시간대 handoff)
+ *
+ * Covers the recomposed screen: timeline + commute alert rows + quiet hours +
+ * the "주말은 종일 무음" toggle. Critical regression guard (plan D2): that
+ * weekend toggle must write the *wired* `weekdaysOnly` field, NOT the unwired
+ * legacy `weekendsAlwaysSilent`.
  */
 
 import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import { NotificationTimeScreen } from '../NotificationTimeScreen';
 import { useAuth } from '@/services/auth/AuthContext';
+import { useFirestoreCommuteRoutes } from '@/hooks/useFirestoreCommuteRoutes';
 
-jest.mock('@react-navigation/native', () => ({
-  useNavigation: () => ({
-    navigate: jest.fn(),
-    goBack: jest.fn(),
-  }),
-}));
-
-// Phase 46 — screen now calls useTheme().isDark to drive WANTED_TOKENS
-// semantic selection. Force light variant for stable assertions.
 jest.mock('@/services/theme', () => ({
-  useSemanticTokens: jest.fn(() => jest.requireActual('@/styles/modernTheme').WANTED_TOKENS.light),
+  useSemanticTokens: jest.fn(() =>
+    jest.requireActual('@/styles/modernTheme').WANTED_TOKENS.light
+  ),
   useTheme: () => ({ isDark: false }),
 }));
 
@@ -27,62 +25,178 @@ jest.mock('@/services/auth/AuthContext', () => ({
   useAuth: jest.fn(),
 }));
 
+jest.mock('@/components/common/Toast', () => ({
+  __esModule: true,
+  useToast: () => ({ showSuccess: () => {}, ToastComponent: () => null }),
+}));
+
+jest.mock('@/components/settings/NotificationTimeline', () => {
+  const ReactLocal = require('react');
+  const { View } = require('react-native');
+  return {
+    __esModule: true,
+    default: () => ReactLocal.createElement(View, { testID: 'notification-timeline' }),
+    // Screen imports parseTime for deriveWindowEnd — provide a real impl.
+    parseTime: (t: string): number => {
+      const m = /^(\d{1,2}):(\d{2})$/.exec(String(t).trim());
+      return m ? parseInt(m[1]!, 10) + parseInt(m[2]!, 10) / 60 : 0;
+    },
+  };
+});
+
+jest.mock('@/components/settings/CommuteAlertRow', () => {
+  const ReactLocal = require('react');
+  const { Pressable, Text } = require('react-native');
+  return {
+    __esModule: true,
+    default: ({
+      badgeLabel,
+      caption,
+      startTime,
+      endTime,
+      locked,
+      onLockedPress,
+      testID,
+    }: {
+      badgeLabel: string;
+      caption: string;
+      startTime: string;
+      endTime: string;
+      locked?: boolean;
+      onLockedPress?: () => void;
+      testID?: string;
+    }) =>
+      ReactLocal.createElement(
+        Pressable,
+        {
+          testID,
+          // Mirror real behavior: a locked row routes to setup; an unlocked
+          // (resolved) row is read-only.
+          onPress: locked ? onLockedPress : undefined,
+        },
+        ReactLocal.createElement(Text, null, badgeLabel),
+        ReactLocal.createElement(Text, null, caption),
+        ReactLocal.createElement(Text, { testID: `${testID}-start` }, startTime),
+        ReactLocal.createElement(Text, { testID: `${testID}-end` }, endTime),
+        ReactLocal.createElement(
+          Text,
+          { testID: `${testID}-locked` },
+          String(!!locked)
+        )
+      ),
+  };
+});
+
+// Store #2 (Firestore commuteSettings) reader — default: nothing set.
+jest.mock('@/hooks/useFirestoreCommuteRoutes', () => ({
+  __esModule: true,
+  useFirestoreCommuteRoutes: jest.fn(() => ({ morning: null, evening: null })),
+}));
+
+jest.mock('@/components/settings/TimeFieldBox', () => {
+  const ReactLocal = require('react');
+  const { Pressable, Text } = require('react-native');
+  return {
+    __esModule: true,
+    default: ({
+      label,
+      value,
+      onChange,
+      testID,
+    }: {
+      label: string;
+      value: string;
+      onChange?: (t: string) => void;
+      testID?: string;
+    }) =>
+      ReactLocal.createElement(
+        Pressable,
+        { testID, onPress: onChange ? () => onChange('23:30') : undefined },
+        ReactLocal.createElement(Text, null, label),
+        ReactLocal.createElement(Text, null, value)
+      ),
+  };
+});
+
 jest.mock('@/components/settings/SettingSection', () => {
-  const React = require('react');
+  const ReactLocal = require('react');
   const { View, Text } = require('react-native');
   return {
     __esModule: true,
     default: ({ title, children }: { title: string; children: React.ReactNode }) =>
-      React.createElement(View, { testID: `section-${title}` },
-        React.createElement(Text, null, title),
-        children,
+      ReactLocal.createElement(
+        View,
+        { testID: `section-${title}` },
+        ReactLocal.createElement(Text, null, title),
+        children
       ),
   };
 });
 
 jest.mock('@/components/settings/SettingToggle', () => {
-  const React = require('react');
-  const { View, Text, Pressable } = require('react-native');
+  const ReactLocal = require('react');
+  const { Pressable, Text } = require('react-native');
   return {
     __esModule: true,
-    default: ({ label, subtitle, value, onValueChange, disabled }: {
-      label: string; subtitle?: string; value: boolean;
-      onValueChange: (v: boolean) => void; disabled?: boolean;
+    default: ({
+      label,
+      subtitle,
+      value,
+      onValueChange,
+      disabled,
+    }: {
+      label: string;
+      subtitle?: string;
+      value: boolean;
+      onValueChange: (v: boolean) => void;
+      disabled?: boolean;
     }) =>
-      React.createElement(Pressable, {
-        testID: `toggle-${label}`,
-        onPress: disabled ? undefined : () => onValueChange(!value),
-      },
-        React.createElement(Text, null, label),
-        subtitle && React.createElement(Text, null, subtitle),
-        React.createElement(View, {
-          testID: `switch-${label}`,
-        }),
-      ),
-  };
-});
-
-jest.mock('@/components/settings/SettingTimePicker', () => {
-  const React = require('react');
-  const { Text, Pressable } = require('react-native');
-  return {
-    __esModule: true,
-    default: ({ label, value, onValueChange }: {
-      label: string; value: string; onValueChange?: (v: string) => void;
-    }) =>
-      React.createElement(Pressable, {
-        testID: `time-${label}`,
-        onPress: onValueChange ? () => onValueChange('09:30') : undefined,
-      },
-        React.createElement(Text, null, label),
-        React.createElement(Text, null, value),
+      ReactLocal.createElement(
+        Pressable,
+        {
+          testID: `toggle-${label}`,
+          onPress: disabled ? undefined : () => onValueChange(!value),
+        },
+        ReactLocal.createElement(Text, null, label),
+        subtitle && ReactLocal.createElement(Text, null, subtitle)
       ),
   };
 });
 
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
+const mockFsRoutes = useFirestoreCommuteRoutes as jest.MockedFunction<
+  typeof useFirestoreCommuteRoutes
+>;
 
-const createDefaultUser = () => ({
+const createNavigation = () =>
+  ({
+    setOptions: jest.fn(),
+    canGoBack: jest.fn(() => true),
+    goBack: jest.fn(),
+    navigate: jest.fn(),
+  }) as any;
+
+const renderScreen = (nav = createNavigation()) => ({
+  nav,
+  ...render(<NotificationTimeScreen navigation={nav} route={{} as any} />),
+});
+
+const usableCommute = {
+  morningCommute: {
+    departureTime: '08:00',
+    stationId: 'station-1',
+    destinationStationId: 'station-2',
+    bufferMinutes: 10,
+  },
+  eveningCommute: {
+    departureTime: '18:00',
+    stationId: 'station-2',
+    destinationStationId: 'station-1',
+    bufferMinutes: 10,
+  },
+};
+
+const createDefaultUser = (overrides: Record<string, unknown> = {}) => ({
   uid: 'test-uid',
   displayName: 'Test User',
   email: 'test@example.com',
@@ -91,49 +205,36 @@ const createDefaultUser = () => ({
     notificationSettings: {
       pushNotifications: true,
       weekdaysOnly: false,
-      quietHours: {
-        enabled: false,
-        startTime: '22:00',
-        endTime: '07:00',
-      },
+      quietHours: { enabled: false, startTime: '23:00', endTime: '07:00' },
     },
-    commuteSchedule: {
-      weekdays: {
-        morningCommute: {
-          departureTime: '08:00',
-          stationId: 'station-1',
-          destinationStationId: 'station-2',
-          bufferMinutes: 10,
-        },
-        eveningCommute: {
-          departureTime: '18:00',
-          stationId: 'station-2',
-          destinationStationId: 'station-1',
-          bufferMinutes: 10,
-        },
-      },
-    },
+    commuteSchedule: { weekdays: usableCommute },
+    ...overrides,
   },
 });
+
+const mockAuth = (user: unknown, update = jest.fn().mockResolvedValue(undefined)) => {
+  mockUseAuth.mockReturnValue({
+    user,
+    firebaseUser: null,
+    loading: false,
+    signInAnonymously: jest.fn(),
+    signInWithEmail: jest.fn(),
+    signUpWithEmail: jest.fn(),
+    signOut: jest.fn(),
+    updateUserPreferences: update,
+    resetPassword: jest.fn(),
+    changePassword: jest.fn(),
+  } as any);
+  return update;
+};
 
 describe('NotificationTimeScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     jest.spyOn(Alert, 'alert').mockImplementation(() => {});
     jest.spyOn(console, 'error').mockImplementation(() => {});
-
-    mockUseAuth.mockReturnValue({
-      user: createDefaultUser(),
-      firebaseUser: null,
-      loading: false,
-      signInAnonymously: jest.fn(),
-      signInWithEmail: jest.fn(),
-      signUpWithEmail: jest.fn(),
-      signOut: jest.fn(),
-      updateUserPreferences: jest.fn().mockResolvedValue(undefined),
-      resetPassword: jest.fn(),
-      changePassword: jest.fn(),
-    } as any);
+    mockFsRoutes.mockReturnValue({ morning: null, evening: null });
+    mockAuth(createDefaultUser());
   });
 
   afterEach(() => {
@@ -141,547 +242,267 @@ describe('NotificationTimeScreen', () => {
   });
 
   describe('Rendering', () => {
-    it('renders commute schedule section', () => {
-      const { getByText } = render(<NotificationTimeScreen />);
-
-      expect(getByText('출퇴근 시간')).toBeTruthy();
-      expect(getByText('아침 출근')).toBeTruthy();
-      expect(getByText('저녁 퇴근')).toBeTruthy();
+    it('renders the 24h timeline', () => {
+      const { getByTestId } = renderScreen();
+      expect(getByTestId('notification-timeline')).toBeTruthy();
     });
 
-    it('displays current commute times', () => {
-      const { getByText } = render(<NotificationTimeScreen />);
-
-      expect(getByText('08:00')).toBeTruthy();
-      expect(getByText('18:00')).toBeTruthy();
+    it('renders the commute alert section with both legs', () => {
+      const { getByTestId, getByText } = renderScreen();
+      expect(getByTestId('section-출퇴근 알림 시간')).toBeTruthy();
+      expect(getByTestId('commute-morning')).toBeTruthy();
+      expect(getByTestId('commute-evening')).toBeTruthy();
+      expect(getByText('출근')).toBeTruthy();
+      expect(getByText('퇴근')).toBeTruthy();
     });
 
-    it('renders quiet hours section', () => {
-      const { getByText } = render(<NotificationTimeScreen />);
-
-      expect(getByText('방해 금지 모드')).toBeTruthy();
-      expect(getByText('조용한 시간대 사용')).toBeTruthy();
+    it('shows the commute departure as start and derived window as end', () => {
+      const { getByTestId } = renderScreen();
+      // morning 08:00 → end 08:00 + 2h = 10:00
+      expect(getByTestId('commute-morning-start')).toHaveTextContent('08:00');
+      expect(getByTestId('commute-morning-end')).toHaveTextContent('10:00');
+      // evening 18:00 → end 18:00 + 3h = 21:00
+      expect(getByTestId('commute-evening-start')).toHaveTextContent('18:00');
+      expect(getByTestId('commute-evening-end')).toHaveTextContent('21:00');
     });
 
-    it('renders additional settings section', () => {
-      const { getByText } = render(<NotificationTimeScreen />);
-
-      expect(getByText('추가 설정')).toBeTruthy();
-      expect(getByText('평일만 알림 받기')).toBeTruthy();
+    it('renders the quiet hours section and weekend toggle', () => {
+      const { getByTestId } = renderScreen();
+      expect(getByTestId('section-방해 금지')).toBeTruthy();
+      expect(getByTestId('toggle-방해 금지 사용')).toBeTruthy();
+      expect(getByTestId('toggle-주말은 종일 무음')).toBeTruthy();
     });
 
-    it('renders info box text', () => {
-      const { getByText } = render(<NotificationTimeScreen />);
-
-      expect(getByText(/출퇴근 시간을 설정하면/)).toBeTruthy();
+    it('renders the footer disclosure', () => {
+      const { getByText } = renderScreen();
+      expect(getByText(/긴급 지연 알림도 무음으로 와요/)).toBeTruthy();
     });
 
-    it('shows station info when stations are set', () => {
-      const { getAllByText } = render(<NotificationTimeScreen />);
-
-      expect(getAllByText('출발역에서 출발').length).toBe(2);
-    });
-
-    it('shows placeholder text when no stations are set', () => {
-      mockUseAuth.mockReturnValue({
-        user: {
-          uid: 'test-uid',
-          preferences: {
-            notificationSettings: {
-              pushNotifications: true,
-              weekdaysOnly: false,
-              quietHours: { enabled: false, startTime: '22:00', endTime: '07:00' },
-            },
-            commuteSchedule: {
-              weekdays: {
-                morningCommute: { departureTime: '08:00', stationId: '', destinationStationId: '', bufferMinutes: 10 },
-                eveningCommute: { departureTime: '18:00', stationId: '', destinationStationId: '', bufferMinutes: 10 },
-              },
-            },
+    it('shows quiet time fields only when quiet hours enabled', () => {
+      mockAuth(
+        createDefaultUser({
+          notificationSettings: {
+            weekdaysOnly: false,
+            quietHours: { enabled: true, startTime: '23:00', endTime: '07:00' },
           },
-        },
-        firebaseUser: null,
-        loading: false,
-        signInAnonymously: jest.fn(),
-        signInWithEmail: jest.fn(),
-        signUpWithEmail: jest.fn(),
-        signOut: jest.fn(),
-        updateUserPreferences: jest.fn(),
-        resetPassword: jest.fn(),
-        changePassword: jest.fn(),
-      } as any);
-
-      const { getAllByText } = render(<NotificationTimeScreen />);
-      expect(getAllByText('즐겨찾기에서 출발역을 설정하세요').length).toBe(2);
+        })
+      );
+      const { getByTestId } = renderScreen();
+      expect(getByTestId('quiet-start')).toBeTruthy();
+      expect(getByTestId('quiet-end')).toBeTruthy();
     });
 
-    it('shows quiet hours time pickers when enabled', () => {
-      mockUseAuth.mockReturnValue({
-        user: {
-          uid: 'test-uid',
-          preferences: {
-            notificationSettings: {
-              quietHours: { enabled: true, startTime: '22:00', endTime: '07:00' },
-            },
-            commuteSchedule: {
-              weekdays: {
-                morningCommute: { departureTime: '08:00', stationId: 'st-1', destinationStationId: 'st-2', bufferMinutes: 10 },
-                eveningCommute: null,
-              },
-            },
-          },
-        },
-        firebaseUser: null,
-        loading: false,
-        signInAnonymously: jest.fn(),
-        signInWithEmail: jest.fn(),
-        signUpWithEmail: jest.fn(),
-        signOut: jest.fn(),
-        updateUserPreferences: jest.fn(),
-        resetPassword: jest.fn(),
-        changePassword: jest.fn(),
-      } as any);
-
-      const { getByText } = render(<NotificationTimeScreen />);
-
-      expect(getByText('시작 시간')).toBeTruthy();
-      expect(getByText('종료 시간')).toBeTruthy();
+    it('hides quiet time fields when quiet hours disabled', () => {
+      const { queryByTestId } = renderScreen();
+      expect(queryByTestId('quiet-start')).toBeNull();
+      expect(queryByTestId('quiet-end')).toBeNull();
     });
 
-    it('hides quiet hours time pickers when disabled', () => {
-      mockUseAuth.mockReturnValue({
-        user: {
-          uid: 'test-uid',
-          preferences: {
-            notificationSettings: {
-              quietHours: { enabled: false, startTime: '22:00', endTime: '07:00' },
-            },
-            commuteSchedule: {
-              weekdays: {
-                morningCommute: { departureTime: '08:00', stationId: '', destinationStationId: '', bufferMinutes: 10 },
-                eveningCommute: { departureTime: '18:00', stationId: '', destinationStationId: '', bufferMinutes: 10 },
-              },
-            },
-          },
+    it('falls back to default times when preferences are absent', () => {
+      mockAuth({
+        uid: 'test-uid',
+        preferences: {
+          notificationSettings: { quietHours: {} },
+          commuteSchedule: { weekdays: {} },
         },
-        firebaseUser: null,
-        loading: false,
-        signInAnonymously: jest.fn(),
-        signInWithEmail: jest.fn(),
-        signUpWithEmail: jest.fn(),
-        signOut: jest.fn(),
-        updateUserPreferences: jest.fn(),
-        resetPassword: jest.fn(),
-        changePassword: jest.fn(),
-      } as any);
-
-      const { queryByText } = render(<NotificationTimeScreen />);
-
-      expect(queryByText('시작 시간')).toBeFalsy();
-      expect(queryByText('종료 시간')).toBeFalsy();
+      });
+      const { getByTestId } = renderScreen();
+      expect(getByTestId('commute-morning-start')).toHaveTextContent('08:00');
+      expect(getByTestId('commute-evening-start')).toHaveTextContent('18:00');
     });
 
-    it('uses default times when preferences are not set', () => {
-      mockUseAuth.mockReturnValue({
-        user: {
-          uid: 'test-uid',
-          preferences: {
-            notificationSettings: { quietHours: {} },
-            commuteSchedule: { weekdays: {} },
-          },
+    it('handles null notificationSettings without crashing', () => {
+      mockAuth({
+        uid: 'test-uid',
+        preferences: {
+          notificationSettings: null,
+          commuteSchedule: { weekdays: usableCommute },
         },
-        firebaseUser: null,
-        loading: false,
-        signInAnonymously: jest.fn(),
-        signInWithEmail: jest.fn(),
-        signUpWithEmail: jest.fn(),
-        signOut: jest.fn(),
-        updateUserPreferences: jest.fn(),
-        resetPassword: jest.fn(),
-        changePassword: jest.fn(),
-      } as any);
-
-      const { getByText } = render(<NotificationTimeScreen />);
-
-      // Default commute times are rendered
-      expect(getByText('08:00')).toBeTruthy();
-      expect(getByText('18:00')).toBeTruthy();
-      // Quiet hours times (22:00/07:00) are not rendered when quietHours is disabled
-    });
-
-    it('handles null commuteSchedule', () => {
-      mockUseAuth.mockReturnValue({
-        user: {
-          uid: 'test-uid',
-          preferences: {
-            notificationSettings: { quietHours: { enabled: false, startTime: '22:00', endTime: '07:00' } },
-            commuteSchedule: null,
-          },
-        },
-        firebaseUser: null,
-        loading: false,
-        signInAnonymously: jest.fn(),
-        signInWithEmail: jest.fn(),
-        signUpWithEmail: jest.fn(),
-        signOut: jest.fn(),
-        updateUserPreferences: jest.fn(),
-        resetPassword: jest.fn(),
-        changePassword: jest.fn(),
-      } as any);
-
-      const { getByText } = render(<NotificationTimeScreen />);
-
-      expect(getByText('08:00')).toBeTruthy();
-      expect(getByText('18:00')).toBeTruthy();
-    });
-
-    it('handles null notificationSettings', () => {
-      mockUseAuth.mockReturnValue({
-        user: {
-          uid: 'test-uid',
-          preferences: {
-            notificationSettings: null,
-            commuteSchedule: {
-              weekdays: {
-                morningCommute: { departureTime: '08:00', stationId: '', destinationStationId: '', bufferMinutes: 10 },
-                eveningCommute: { departureTime: '18:00', stationId: '', destinationStationId: '', bufferMinutes: 10 },
-              },
-            },
-          },
-        },
-        firebaseUser: null,
-        loading: false,
-        signInAnonymously: jest.fn(),
-        signInWithEmail: jest.fn(),
-        signUpWithEmail: jest.fn(),
-        signOut: jest.fn(),
-        updateUserPreferences: jest.fn(),
-        resetPassword: jest.fn(),
-        changePassword: jest.fn(),
-      } as any);
-
-      const { getByText } = render(<NotificationTimeScreen />);
-
-      expect(getByText('조용한 시간대 사용')).toBeTruthy();
+      });
+      const { getByTestId } = renderScreen();
+      expect(getByTestId('toggle-방해 금지 사용')).toBeTruthy();
     });
   });
 
-  describe('User Interactions', () => {
-    it('triggers handler when morning time picker is pressed', () => {
-      const { getByTestId } = render(<NotificationTimeScreen />);
-
-      const morningTimePicker = getByTestId('time-아침 출근');
-      fireEvent.press(morningTimePicker);
-
-      expect(morningTimePicker).toBeTruthy();
+  describe('Commute resolution (store #1 / store #2)', () => {
+    it('marks a usable profile (store #1) commute as not locked', () => {
+      mockAuth(createDefaultUser());
+      const { getByTestId } = renderScreen();
+      expect(getByTestId('commute-morning-locked')).toHaveTextContent('false');
+      expect(getByTestId('commute-evening-locked')).toHaveTextContent('false');
     });
 
-    it('triggers handler when evening time picker is pressed', () => {
-      const { getByTestId } = render(<NotificationTimeScreen />);
-
-      const eveningTimePicker = getByTestId('time-저녁 퇴근');
-      fireEvent.press(eveningTimePicker);
-
-      expect(eveningTimePicker).toBeTruthy();
-    });
-
-    it('triggers handler when quiet hours toggle is pressed', () => {
-      const { getByTestId } = render(<NotificationTimeScreen />);
-
-      const quietHoursToggle = getByTestId('toggle-조용한 시간대 사용');
-      fireEvent.press(quietHoursToggle);
-
-      expect(quietHoursToggle).toBeTruthy();
-    });
-
-    it('triggers handler when weekdays only toggle is pressed', () => {
-      const { getByTestId } = render(<NotificationTimeScreen />);
-
-      const weekdaysToggle = getByTestId('toggle-평일만 알림 받기');
-      fireEvent.press(weekdaysToggle);
-
-      expect(weekdaysToggle).toBeTruthy();
-    });
-
-    it('shows start time picker when quiet hours enabled and pressed', () => {
-      mockUseAuth.mockReturnValue({
-        user: {
-          uid: 'test-uid',
-          preferences: {
-            notificationSettings: {
-              quietHours: { enabled: true, startTime: '22:00', endTime: '07:00' },
-            },
-            commuteSchedule: {
-              weekdays: {
-                morningCommute: { departureTime: '08:00', stationId: '', destinationStationId: '', bufferMinutes: 10 },
-                eveningCommute: { departureTime: '18:00', stationId: '', destinationStationId: '', bufferMinutes: 10 },
+    it('resolves a commute from Firestore (store #2) when the profile leg is unusable', () => {
+      // Profile (#1) morning is a phantom (empty station ids); the real route
+      // lives in Firestore (#2). The row must show the #2 time and not lock.
+      mockFsRoutes.mockReturnValue({
+        morning: {
+          departureTime: '07:40',
+          stationId: 'fs-1',
+          destinationStationId: 'fs-2',
+          bufferMinutes: 5,
+        },
+        evening: null,
+      });
+      mockAuth(
+        createDefaultUser({
+          commuteSchedule: {
+            weekdays: {
+              morningCommute: {
+                departureTime: '08:00',
+                stationId: '',
+                destinationStationId: '',
+                bufferMinutes: 10,
               },
+              eveningCommute: null,
             },
           },
-        },
-        firebaseUser: null,
-        loading: false,
-        signInAnonymously: jest.fn(),
-        signInWithEmail: jest.fn(),
-        signUpWithEmail: jest.fn(),
-        signOut: jest.fn(),
-        updateUserPreferences: jest.fn(),
-        resetPassword: jest.fn(),
-        changePassword: jest.fn(),
-      } as any);
-
-      const { getByTestId } = render(<NotificationTimeScreen />);
-
-      const startTimePicker = getByTestId('time-시작 시간');
-      fireEvent.press(startTimePicker);
-
-      expect(startTimePicker).toBeTruthy();
+        })
+      );
+      const { getByTestId } = renderScreen();
+      expect(getByTestId('commute-morning-locked')).toHaveTextContent('false');
+      expect(getByTestId('commute-morning-start')).toHaveTextContent('07:40');
+      // 07:40 + 2h = 09:40 derived end
+      expect(getByTestId('commute-morning-end')).toHaveTextContent('09:40');
     });
 
-    it('shows end time picker when quiet hours enabled and pressed', () => {
-      mockUseAuth.mockReturnValue({
-        user: {
-          uid: 'test-uid',
-          preferences: {
-            notificationSettings: {
-              quietHours: { enabled: true, startTime: '22:00', endTime: '07:00' },
-            },
-            commuteSchedule: {
-              weekdays: {
-                morningCommute: { departureTime: '08:00', stationId: '', destinationStationId: '', bufferMinutes: 10 },
-                eveningCommute: { departureTime: '18:00', stationId: '', destinationStationId: '', bufferMinutes: 10 },
+    it('locks the row and routes to setup when neither store has the commute', () => {
+      mockFsRoutes.mockReturnValue({ morning: null, evening: null });
+      mockAuth(
+        createDefaultUser({
+          commuteSchedule: {
+            weekdays: {
+              morningCommute: {
+                departureTime: '08:00',
+                stationId: '',
+                destinationStationId: '',
+                bufferMinutes: 10,
               },
+              eveningCommute: null,
             },
           },
-        },
-        firebaseUser: null,
-        loading: false,
-        signInAnonymously: jest.fn(),
-        signInWithEmail: jest.fn(),
-        signUpWithEmail: jest.fn(),
-        signOut: jest.fn(),
-        updateUserPreferences: jest.fn(),
-        resetPassword: jest.fn(),
-        changePassword: jest.fn(),
-      } as any);
+        })
+      );
+      const { getByTestId } = renderScreen();
+      expect(getByTestId('commute-morning-locked')).toHaveTextContent('true');
 
-      const { getByTestId } = render(<NotificationTimeScreen />);
+      fireEvent.press(getByTestId('commute-morning'));
+      expect(Alert.alert).toHaveBeenCalledWith(
+        '출근 경로 먼저 설정',
+        expect.any(String),
+        expect.any(Array)
+      );
+    });
 
-      const endTimePicker = getByTestId('time-종료 시간');
-      fireEvent.press(endTimePicker);
+    it('navigates to CommuteSettings from the locked-row guide action', () => {
+      mockAuth(
+        createDefaultUser({
+          commuteSchedule: { weekdays: { morningCommute: null, eveningCommute: null } },
+        })
+      );
+      const nav = createNavigation();
+      const { getByTestId } = renderScreen(nav);
+      fireEvent.press(getByTestId('commute-morning'));
 
-      expect(endTimePicker).toBeTruthy();
+      // Invoke the "설정으로 이동" button from the Alert's action array.
+      const buttons = (Alert.alert as jest.Mock).mock.calls.at(-1)![2];
+      const go = buttons.find((b: { text: string }) => b.text === '설정으로 이동');
+      go.onPress();
+      expect(nav.navigate).toHaveBeenCalledWith('CommuteSettings');
     });
   });
 
-  describe('Error Handling', () => {
-    it('handles error when morning time update fails', () => {
-      mockUseAuth.mockReturnValue({
-        user: createDefaultUser(),
-        firebaseUser: null,
-        loading: false,
-        signInAnonymously: jest.fn(),
-        signInWithEmail: jest.fn(),
-        signUpWithEmail: jest.fn(),
-        signOut: jest.fn(),
-        updateUserPreferences: jest.fn().mockRejectedValue(new Error('Update failed')),
-        resetPassword: jest.fn(),
-        changePassword: jest.fn(),
-      } as any);
-
-      const { getByTestId } = render(<NotificationTimeScreen />);
-
-      const morningTimePicker = getByTestId('time-아침 출근');
-      fireEvent.press(morningTimePicker);
-
-      expect(morningTimePicker).toBeTruthy();
+  describe('Quiet hours interactions', () => {
+    it('toggles quiet hours enabled', async () => {
+      const update = mockAuth(createDefaultUser());
+      const { getByTestId } = renderScreen();
+      fireEvent.press(getByTestId('toggle-방해 금지 사용'));
+      await waitFor(() =>
+        expect(update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            notificationSettings: expect.objectContaining({
+              quietHours: expect.objectContaining({ enabled: true }),
+            }),
+          })
+        )
+      );
     });
 
-    it('handles error when evening time update fails', () => {
-      mockUseAuth.mockReturnValue({
-        user: createDefaultUser(),
-        firebaseUser: null,
-        loading: false,
-        signInAnonymously: jest.fn(),
-        signInWithEmail: jest.fn(),
-        signUpWithEmail: jest.fn(),
-        signOut: jest.fn(),
-        updateUserPreferences: jest.fn().mockRejectedValue(new Error('Update failed')),
-        resetPassword: jest.fn(),
-        changePassword: jest.fn(),
-      } as any);
+    it('persists the quiet hours start and end times', async () => {
+      const update = mockAuth(
+        createDefaultUser({
+          notificationSettings: {
+            weekdaysOnly: false,
+            quietHours: { enabled: true, startTime: '23:00', endTime: '07:00' },
+          },
+        })
+      );
+      const { getByTestId } = renderScreen();
 
-      const { getByTestId } = render(<NotificationTimeScreen />);
+      fireEvent.press(getByTestId('quiet-start'));
+      await waitFor(() =>
+        expect(update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            notificationSettings: expect.objectContaining({
+              quietHours: expect.objectContaining({ startTime: '23:30' }),
+            }),
+          })
+        )
+      );
 
-      const eveningTimePicker = getByTestId('time-저녁 퇴근');
-      fireEvent.press(eveningTimePicker);
-
-      expect(eveningTimePicker).toBeTruthy();
-    });
-
-    it('handles error when quiet hours toggle update fails', () => {
-      mockUseAuth.mockReturnValue({
-        user: createDefaultUser(),
-        firebaseUser: null,
-        loading: false,
-        signInAnonymously: jest.fn(),
-        signInWithEmail: jest.fn(),
-        signUpWithEmail: jest.fn(),
-        signOut: jest.fn(),
-        updateUserPreferences: jest.fn().mockRejectedValue(new Error('Update failed')),
-        resetPassword: jest.fn(),
-        changePassword: jest.fn(),
-      } as any);
-
-      const { getByTestId } = render(<NotificationTimeScreen />);
-
-      const quietHoursToggle = getByTestId('toggle-조용한 시간대 사용');
-      fireEvent.press(quietHoursToggle);
-
-      expect(quietHoursToggle).toBeTruthy();
-    });
-
-    it('handles error when weekdays toggle update fails', () => {
-      mockUseAuth.mockReturnValue({
-        user: createDefaultUser(),
-        firebaseUser: null,
-        loading: false,
-        signInAnonymously: jest.fn(),
-        signInWithEmail: jest.fn(),
-        signUpWithEmail: jest.fn(),
-        signOut: jest.fn(),
-        updateUserPreferences: jest.fn().mockRejectedValue(new Error('Update failed')),
-        resetPassword: jest.fn(),
-        changePassword: jest.fn(),
-      } as any);
-
-      const { getByTestId } = render(<NotificationTimeScreen />);
-
-      const weekdaysToggle = getByTestId('toggle-평일만 알림 받기');
-      fireEvent.press(weekdaysToggle);
-
-      expect(weekdaysToggle).toBeTruthy();
+      fireEvent.press(getByTestId('quiet-end'));
+      await waitFor(() =>
+        expect(update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            notificationSettings: expect.objectContaining({
+              quietHours: expect.objectContaining({ endTime: '23:30' }),
+            }),
+          })
+        )
+      );
     });
   });
 
-  describe('Edge Cases', () => {
-    it('handles undefined weekdays in commuteSchedule', () => {
-      mockUseAuth.mockReturnValue({
-        user: {
-          uid: 'test-uid',
-          preferences: {
-            notificationSettings: { quietHours: { enabled: false } },
-            commuteSchedule: { weekdays: undefined },
-          },
-        },
-        firebaseUser: null,
-        loading: false,
-        signInAnonymously: jest.fn(),
-        signInWithEmail: jest.fn(),
-        signUpWithEmail: jest.fn(),
-        signOut: jest.fn(),
-        updateUserPreferences: jest.fn(),
-        resetPassword: jest.fn(),
-        changePassword: jest.fn(),
-      } as any);
+  describe('Weekend silence (D2 honesty guard)', () => {
+    it('writes the WIRED weekdaysOnly field, not the unwired weekendsAlwaysSilent', async () => {
+      const update = mockAuth(createDefaultUser());
+      const { getByTestId } = renderScreen();
+      fireEvent.press(getByTestId('toggle-주말은 종일 무음'));
 
-      const { getByText } = render(<NotificationTimeScreen />);
+      await waitFor(() =>
+        expect(update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            notificationSettings: expect.objectContaining({ weekdaysOnly: true }),
+          })
+        )
+      );
 
-      expect(getByText('08:00')).toBeTruthy();
+      // Guard: the payload must NOT route through quietHours.weekendsAlwaysSilent.
+      const payload = update.mock.calls[0]![0] as {
+        notificationSettings?: { quietHours?: { weekendsAlwaysSilent?: boolean } };
+      };
+      expect(payload.notificationSettings?.quietHours?.weekendsAlwaysSilent).toBeUndefined();
     });
+  });
 
-    it('handles missing eveningCommute in schedule', () => {
-      mockUseAuth.mockReturnValue({
-        user: {
-          uid: 'test-uid',
-          preferences: {
-            notificationSettings: { quietHours: { enabled: false } },
-            commuteSchedule: {
-              weekdays: {
-                morningCommute: { departureTime: '08:00', stationId: 'st1', destinationStationId: 'st2', bufferMinutes: 10 },
-                eveningCommute: null,
-              },
-            },
-          },
-        },
-        firebaseUser: null,
-        loading: false,
-        signInAnonymously: jest.fn(),
-        signInWithEmail: jest.fn(),
-        signUpWithEmail: jest.fn(),
-        signOut: jest.fn(),
-        updateUserPreferences: jest.fn(),
-        resetPassword: jest.fn(),
-        changePassword: jest.fn(),
-      } as any);
+  describe('Header save action', () => {
+    it('registers a "저장" header button that pops back', () => {
+      jest.useFakeTimers();
+      try {
+        const nav = createNavigation();
+        renderScreen(nav);
 
-      const { getByText, queryByText } = render(<NotificationTimeScreen />);
+        const opts = nav.setOptions.mock.calls.at(-1)![0];
+        expect(opts.headerRight).toBeTruthy();
 
-      expect(getByText('아침 출근')).toBeTruthy();
-      // Still renders the evening section, shows placeholder
-      expect(queryByText('저녁 퇴근')).toBeTruthy();
-    });
+        const { getByText } = render(opts.headerRight());
+        fireEvent.press(getByText('저장'));
+        jest.advanceTimersByTime(900);
 
-    it('renders correctly with custom commute times', () => {
-      mockUseAuth.mockReturnValue({
-        user: {
-          uid: 'test-uid',
-          preferences: {
-            notificationSettings: { quietHours: { enabled: false, startTime: '22:00', endTime: '07:00' } },
-            commuteSchedule: {
-              weekdays: {
-                morningCommute: { departureTime: '07:15', stationId: 'st1', destinationStationId: 'st2', bufferMinutes: 10 },
-                eveningCommute: { departureTime: '17:45', stationId: 'st2', destinationStationId: 'st1', bufferMinutes: 10 },
-              },
-            },
-          },
-        },
-        firebaseUser: null,
-        loading: false,
-        signInAnonymously: jest.fn(),
-        signInWithEmail: jest.fn(),
-        signUpWithEmail: jest.fn(),
-        signOut: jest.fn(),
-        updateUserPreferences: jest.fn(),
-        resetPassword: jest.fn(),
-        changePassword: jest.fn(),
-      } as any);
-
-      const { getByText } = render(<NotificationTimeScreen />);
-
-      expect(getByText('07:15')).toBeTruthy();
-      expect(getByText('17:45')).toBeTruthy();
-    });
-
-    it('renders correctly with custom quiet hours times', () => {
-      mockUseAuth.mockReturnValue({
-        user: {
-          uid: 'test-uid',
-          preferences: {
-            notificationSettings: { quietHours: { enabled: true, startTime: '21:30', endTime: '06:30' } },
-            commuteSchedule: {
-              weekdays: {
-                morningCommute: { departureTime: '08:00', stationId: '', destinationStationId: '', bufferMinutes: 10 },
-                eveningCommute: { departureTime: '18:00', stationId: '', destinationStationId: '', bufferMinutes: 10 },
-              },
-            },
-          },
-        },
-        firebaseUser: null,
-        loading: false,
-        signInAnonymously: jest.fn(),
-        signInWithEmail: jest.fn(),
-        signUpWithEmail: jest.fn(),
-        signOut: jest.fn(),
-        updateUserPreferences: jest.fn(),
-        resetPassword: jest.fn(),
-        changePassword: jest.fn(),
-      } as any);
-
-      const { getByText } = render(<NotificationTimeScreen />);
-
-      expect(getByText('21:30')).toBeTruthy();
-      expect(getByText('06:30')).toBeTruthy();
+        expect(nav.goBack).toHaveBeenCalled();
+      } finally {
+        jest.useRealTimers();
+      }
     });
   });
 });
