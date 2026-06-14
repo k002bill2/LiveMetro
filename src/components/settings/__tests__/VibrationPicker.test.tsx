@@ -3,7 +3,7 @@ import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
 import { VibrationPicker } from '../VibrationPicker';
 import { VibrationPatternId } from '@/models/user';
-import { VibrationOption } from '@/services/sound/soundService';
+import { VibrationOption, soundService } from '@/services/sound/soundService';
 
 import { Smartphone } from 'lucide-react-native';
 
@@ -44,7 +44,15 @@ describe('VibrationPicker', () => {
   it('renders label and selected value', () => {
     const { getByText } = render(<VibrationPicker {...defaultProps} />);
     expect(getByText('진동 패턴')).toBeTruthy();
+    // Selected value '기본' shows on the right side of the trigger row.
     expect(getByText('기본')).toBeTruthy();
+  });
+
+  it('renders subtitle when provided', () => {
+    const { getByText } = render(
+      <VibrationPicker {...defaultProps} subtitle="알림 시 울릴 진동" />,
+    );
+    expect(getByText('알림 시 울릴 진동')).toBeTruthy();
   });
 
   it('opens modal and shows options when pressed', () => {
@@ -61,23 +69,34 @@ describe('VibrationPicker', () => {
       <VibrationPicker {...defaultProps} onValueChange={onValueChange} />,
     );
     fireEvent.press(getByText('진동 패턴'));
-    fireEvent.press(getByText('짧게'));
+    // Select via the description text (unique within the modal).
+    fireEvent.press(getByText('간단한 진동'));
     expect(onValueChange).toHaveBeenCalledWith('short');
     // Modal should close — description text no longer visible
     expect(queryByText('간단한 진동')).toBeNull();
   });
 
-  it('calls previewVibration when play button is pressed (non-none pattern)', () => {
-    const { getByText } = render(<VibrationPicker {...defaultProps} />);
+  it('calls previewVibration when the pattern glyph is pressed', () => {
+    const { getByText, getByTestId } = render(<VibrationPicker {...defaultProps} />);
     fireEvent.press(getByText('진동 패턴'));
-    // '없음' (none) has no play button; '기본' and '짧게' do
-    // Press the Smartphone icon next to '기본' by interacting through the row
-    // Use UNSAFE_getAllByType to find play buttons indirectly
-    const { getAllByText } = render(<VibrationPicker {...defaultProps} />);
-    // Open modal
-    fireEvent.press(getAllByText('진동 패턴')[0]);
-    // There should be Smartphone icons for non-none options
-    expect(getByText('표준 진동')).toBeTruthy();
+    fireEvent.press(getByTestId('vib-preview-default'));
+    expect(soundService.previewVibration).toHaveBeenCalledWith('default');
+  });
+
+  it('shows a pattern glyph for every option including "none"', () => {
+    const { getByText, getByTestId } = render(<VibrationPicker {...defaultProps} />);
+    fireEvent.press(getByText('진동 패턴'));
+    expect(getByTestId('vib-preview-default')).toBeTruthy();
+    expect(getByTestId('vib-preview-short')).toBeTruthy();
+    // 'none' now also has a glyph (previously had none).
+    expect(getByTestId('vib-preview-none')).toBeTruthy();
+  });
+
+  it('previews the "none" pattern when its glyph is pressed', () => {
+    const { getByText, getByTestId } = render(<VibrationPicker {...defaultProps} />);
+    fireEvent.press(getByText('진동 패턴'));
+    fireEvent.press(getByTestId('vib-preview-none'));
+    expect(soundService.previewVibration).toHaveBeenCalledWith('none');
   });
 
   it('does not open modal when disabled', () => {
@@ -103,18 +122,9 @@ describe('VibrationPicker', () => {
     expect(getAllByText('진동 패턴').length).toBeGreaterThanOrEqual(2);
   });
 
-  it('shows check mark for currently selected option', () => {
+  it('shows the selected value label on the trigger row', () => {
     const { getByText } = render(<VibrationPicker {...defaultProps} value="short" />);
-    // '짧게' should be visible as selected value
+    // '짧게' should be visible as the right-side selected value.
     expect(getByText('짧게')).toBeTruthy();
-  });
-
-  it('shows no play button for "none" pattern option', () => {
-    const { getByText, UNSAFE_getAllByType } = render(<VibrationPicker {...defaultProps} />);
-    fireEvent.press(getByText('진동 패턴'));
-    const { TouchableOpacity } = require('react-native');
-    const allTouchables = UNSAFE_getAllByType(TouchableOpacity);
-    // There are touchables for: main row, close btn, 기본 select, 기본 play, 짧게 select, 짧게 play, 없음 select (no play)
-    expect(allTouchables.length).toBeGreaterThan(0);
   });
 });

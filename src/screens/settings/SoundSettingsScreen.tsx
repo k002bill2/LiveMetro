@@ -1,27 +1,38 @@
 /**
  * Sound Settings Screen
- * Configure notification sound and vibration preferences.
+ * Configure notification alert mode, vibration, volume, sound, per-event
+ * delivery gates, and the email-notification channel — per the Wanted
+ * "소리 설정" handoff.
  *
- * Phase 46 — migrated from legacy COLORS/SPACING/RADIUS/TYPOGRAPHY API
- * to Wanted Design System tokens.
+ * Honesty notes (do not regress):
+ * - `soundId` is a stored preference only. Delivered notifications always use
+ *   the system default sound, so no copy claims the chosen sound plays.
+ * - There is no push toggle here: `pushNotifications` gated nothing (phantom).
+ * - `emailNotifications` does gate the Cloud Functions email digest, so the
+ *   email channel toggle stays.
+ *
+ * Phase 46 — migrated to Wanted Design System tokens.
  */
 
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSemanticTokens } from '@/services/theme';
 import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
-import { Activity, AlertTriangle, Bell, BellOff, BellRing, Mail, MessageCircle, Music, Smartphone, Train, Volume1, Volume2, type LucideIcon } from 'lucide-react-native';
+import { AlertTriangle, BellOff, BellRing, Mail, Megaphone, Smartphone, Train, Vibrate, Volume2, type LucideIcon } from 'lucide-react-native';
 import { useAuth } from '@/services/auth/AuthContext';
 
-import { useNotifications } from '@/hooks/useNotifications';
 import SettingSection from '@/components/settings/SettingSection';
 import SettingToggle from '@/components/settings/SettingToggle';
-import SettingSlider from '@/components/settings/SettingSlider';
-import SoundPicker from '@/components/settings/SoundPicker';
+import VolumeSlider from '@/components/settings/VolumeSlider';
+import SoundRadioList from '@/components/settings/SoundRadioList';
 import VibrationPicker from '@/components/settings/VibrationPicker';
 import { soundService, NOTIFICATION_SOUNDS, VIBRATION_PATTERNS } from '@/services/sound/soundService';
-import { NotificationSoundId, VibrationPatternId, SoundPreferences, type PerEventSoundOverrides } from '@/models/user';
-import { emailNotificationService } from '@/services/email/emailService';
+import {
+  NotificationSoundId,
+  VibrationPatternId,
+  SoundPreferences,
+  type PerEventSoundOverrides,
+} from '@/models/user';
 
 type AlertModeId = 'soundAndVibration' | 'soundOnly' | 'vibrationOnly' | 'silent';
 
@@ -50,7 +61,7 @@ const DEFAULT_PER_EVENT_SOUND: PerEventSoundOverrides = {
 // Default sound settings for fallback
 const DEFAULT_SOUND_SETTINGS: SoundPreferences = {
   soundEnabled: true,
-  soundId: 'default',
+  soundId: 'chime',
   volume: 80,
   vibrationEnabled: true,
   vibrationPattern: 'default',
@@ -58,34 +69,44 @@ const DEFAULT_SOUND_SETTINGS: SoundPreferences = {
 
 export const SoundSettingsScreen: React.FC = () => {
   const { user, updateUserPreferences } = useAuth();
-  const { sendTestNotification } = useNotifications();
   const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
   const [saving, setSaving] = useState(false);
-  const [sendingTestEmail, setSendingTestEmail] = useState(false);
 
-  // Check if email notifications can be enabled for this user
-  const canEnableEmail = user && !user.isAnonymous && !!user.email;
+  // Email notifications can be enabled only for a signed-in user with an email.
+  const canEnableEmail = !!user && !user.isAnonymous && !!user.email;
 
   const notificationSettings = user?.preferences.notificationSettings;
   const soundSettings = notificationSettings?.soundSettings || DEFAULT_SOUND_SETTINGS;
   const perEventSound = notificationSettings?.perEventSound ?? DEFAULT_PER_EVENT_SOUND;
 
+  // The two booleans the alert-mode grid drives. Volume + sound list gate on
+  // soundEnabled; the vibration row gates on vibrationEnabled.
+  const soundEnabled = soundSettings.soundEnabled;
+  const vibrationEnabled = soundSettings.vibrationEnabled;
+
   // Derive current alert mode from sound/vibration combo (4 modes from 2 booleans).
-  const currentAlertMode: AlertModeId = soundSettings.soundEnabled && soundSettings.vibrationEnabled
+  const currentAlertMode: AlertModeId = soundEnabled && vibrationEnabled
     ? 'soundAndVibration'
-    : soundSettings.soundEnabled
+    : soundEnabled
     ? 'soundOnly'
-    : soundSettings.vibrationEnabled
+    : vibrationEnabled
     ? 'vibrationOnly'
     : 'silent';
+
+  // Legacy soundId values (pre-4-id union) fall back to 'chime' gracefully.
+  const currentSoundId: NotificationSoundId = NOTIFICATION_SOUNDS.some(
+    (s) => s.id === soundSettings.soundId,
+  )
+    ? soundSettings.soundId
+    : 'chime';
 
   // Initialize sound service
   useEffect(() => {
     soundService.initialize();
 
     return () => {
-      soundService.cleanup();
+      void soundService.cleanup();
     };
   }, []);
 
@@ -112,58 +133,42 @@ export const SoundSettingsScreen: React.FC = () => {
         setSaving(false);
       }
     },
-    [user, soundSettings, updateUserPreferences]
+    [user, soundSettings, updateUserPreferences],
   );
 
-  const handleTogglePushNotifications = async (value: boolean): Promise<void> => {
-    if (!user) return;
+  const handleToggleEmailNotifications = useCallback(
+    async (value: boolean): Promise<void> => {
+      if (!user) return;
 
-    try {
-      setSaving(true);
-      await updateUserPreferences({
-        notificationSettings: {
-          ...user.preferences.notificationSettings,
-          pushNotifications: value,
-        },
-      });
-    } catch (error) {
-      console.error('Error updating push notifications:', error);
-      Alert.alert('오류', '설정 저장에 실패했습니다.');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleToggleEmailNotifications = async (value: boolean): Promise<void> => {
-    if (!user) return;
-
-    try {
-      setSaving(true);
-      await updateUserPreferences({
-        notificationSettings: {
-          ...user.preferences.notificationSettings,
-          emailNotifications: value,
-        },
-      });
-    } catch (error) {
-      console.error('Error updating email notifications:', error);
-      Alert.alert('오류', '설정 저장에 실패했습니다.');
-    } finally {
-      setSaving(false);
-    }
-  };
+      try {
+        setSaving(true);
+        await updateUserPreferences({
+          notificationSettings: {
+            ...user.preferences.notificationSettings,
+            emailNotifications: value,
+          },
+        });
+      } catch (error) {
+        console.error('Error updating email notifications:', error);
+        Alert.alert('오류', '설정 저장에 실패했습니다.');
+      } finally {
+        setSaving(false);
+      }
+    },
+    [user, updateUserPreferences],
+  );
 
   // Alert mode 4-grid handler — derives sound/vibration toggles atomically.
   const handleAlertModeChange = useCallback(
     (modeId: AlertModeId): void => {
       const mode = ALERT_MODES.find((m) => m.id === modeId);
       if (!mode) return;
-      updateSoundSettings({ soundEnabled: mode.sound, vibrationEnabled: mode.vibration });
+      void updateSoundSettings({ soundEnabled: mode.sound, vibrationEnabled: mode.vibration });
     },
     [updateSoundSettings],
   );
 
-  // Per-event sound override handler — toggles a single event's sound flag.
+  // Per-event sound override handler — toggles a single event's delivery gate.
   const handleTogglePerEvent = useCallback(
     async (key: keyof PerEventSoundOverrides, value: boolean): Promise<void> => {
       if (!user) return;
@@ -185,71 +190,31 @@ export const SoundSettingsScreen: React.FC = () => {
     [user, perEventSound, updateUserPreferences],
   );
 
-  // Sound settings handlers
-  const handleSoundEnabledChange = (value: boolean): void => {
-    updateSoundSettings({ soundEnabled: value });
-  };
-
-  const handleSoundChange = (soundId: NotificationSoundId): void => {
-    updateSoundSettings({ soundId });
-  };
+  const handleSoundChange = useCallback(
+    (soundId: NotificationSoundId): void => {
+      void updateSoundSettings({ soundId });
+    },
+    [updateSoundSettings],
+  );
 
   const handleVolumeChange = useCallback(
     (volume: number): void => {
-      // Debounce volume changes to avoid too many API calls
-      updateSoundSettings({ volume });
+      void updateSoundSettings({ volume });
     },
-    [updateSoundSettings]
+    [updateSoundSettings],
   );
 
-  const handleVibrationEnabledChange = (value: boolean): void => {
-    updateSoundSettings({ vibrationEnabled: value });
-  };
-
-  const handleVibrationPatternChange = (patternId: VibrationPatternId): void => {
-    updateSoundSettings({ vibrationPattern: patternId });
-  };
-
-  const handleTestNotification = async (): Promise<void> => {
-    try {
-      const success = await sendTestNotification();
-      if (success) {
-        Alert.alert('성공', '테스트 알림이 전송되었습니다.');
-      } else {
-        Alert.alert('실패', '알림 권한이 허용되지 않았습니다.');
-      }
-    } catch (error) {
-      console.error('Error sending test notification:', error);
-      Alert.alert('오류', '테스트 알림 전송에 실패했습니다.');
-    }
-  };
-
-  const handleTestEmail = async (): Promise<void> => {
-    if (!canEnableEmail) {
-      Alert.alert('안내', '이메일 알림을 사용하려면 이메일로 로그인해야 합니다.');
-      return;
-    }
-
-    try {
-      setSendingTestEmail(true);
-      const success = await emailNotificationService.sendTestEmail();
-      if (success) {
-        Alert.alert('성공', `테스트 이메일이 ${user?.email}로 전송되었습니다.`);
-      } else {
-        Alert.alert('실패', '이메일 전송에 실패했습니다. 잠시 후 다시 시도해주세요.');
-      }
-    } catch (error) {
-      console.error('Error sending test email:', error);
-      Alert.alert('오류', '이메일 전송 중 오류가 발생했습니다.');
-    } finally {
-      setSendingTestEmail(false);
-    }
-  };
+  const handleVibrationPatternChange = useCallback(
+    (patternId: VibrationPatternId): void => {
+      void updateSoundSettings({ vibrationPattern: patternId });
+    },
+    [updateSoundSettings],
+  );
 
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.content}>
-        {/* Alert Mode 4-grid — sound + vibration combo per Wanted handoff */}
+        {/* 1) Alert Mode 2×2 grid — sound + vibration combo */}
         <SettingSection title="알림 방식">
           <View style={styles.alertModeGrid}>
             {ALERT_MODES.map((mode) => {
@@ -262,22 +227,17 @@ export const SoundSettingsScreen: React.FC = () => {
                   accessibilityRole="button"
                   accessibilityLabel={mode.label}
                   accessibilityState={{ selected }}
-                  style={[
-                    styles.alertModeCard,
-                    selected
-                      ? { borderColor: WANTED_TOKENS.blue[500], backgroundColor: `${WANTED_TOKENS.blue[500]}0F` }
-                      : { borderColor: semantic.lineSubtle, backgroundColor: semantic.bgBase },
-                  ]}
+                  style={[styles.alertModeCard, selected ? styles.alertModeCardSelected : styles.alertModeCardUnselected]}
                 >
                   <mode.Icon
                     size={22}
-                    color={selected ? WANTED_TOKENS.blue[500] : semantic.labelAlt}
+                    color={selected ? '#FFFFFF' : semantic.labelAlt}
                     strokeWidth={2.2}
                   />
-                  <Text style={[styles.alertModeLabel, { color: selected ? WANTED_TOKENS.blue[500] : semantic.labelStrong }]}>
+                  <Text style={[styles.alertModeLabel, selected ? styles.alertModeTextSelected : styles.alertModeLabelUnselected]}>
                     {mode.label}
                   </Text>
-                  <Text style={[styles.alertModeSubtitle, { color: semantic.labelAlt }]}>
+                  <Text style={[styles.alertModeSubtitle, selected ? styles.alertModeTextSelected : styles.alertModeSubtitleUnselected]}>
                     {mode.subtitle}
                   </Text>
                 </TouchableOpacity>
@@ -286,96 +246,43 @@ export const SoundSettingsScreen: React.FC = () => {
           </View>
         </SettingSection>
 
-        {/* Notification Channels (renamed from "알림 방식" to avoid collision) */}
-        <SettingSection title="알림 채널">
-          <SettingToggle
-            icon={Bell}
-            label="푸시 알림"
-            subtitle="앱이 꺼져있어도 알림 받기"
-            value={notificationSettings?.pushNotifications || false}
-            onValueChange={handleTogglePushNotifications}
-            disabled={saving}
+        {/* 2) Vibration pattern (single row → bottom sheet) */}
+        <SettingSection title="진동">
+          <VibrationPicker
+            icon={Vibrate}
+            label="진동 패턴"
+            subtitle="알림이 울릴 때의 진동 세기"
+            options={VIBRATION_PATTERNS}
+            value={soundSettings.vibrationPattern}
+            onValueChange={handleVibrationPatternChange}
+            disabled={!vibrationEnabled || saving}
           />
-          <SettingToggle
-            icon={Mail}
-            label="이메일 알림"
-            subtitle={canEnableEmail ? "중요 업데이트 이메일로 수신" : "이메일 로그인 필요"}
-            value={notificationSettings?.emailNotifications || false}
-            onValueChange={handleToggleEmailNotifications}
-            disabled={saving || !canEnableEmail}
-          />
-          {notificationSettings?.emailNotifications && canEnableEmail && (
-            <TouchableOpacity
-              style={[styles.testEmailButton, sendingTestEmail && styles.testEmailButtonDisabled]}
-              onPress={handleTestEmail}
-              disabled={sendingTestEmail}
-            >
-              <Text style={styles.testEmailButtonText}>
-                {sendingTestEmail ? '전송 중...' : '테스트 이메일 보내기'}
-              </Text>
-            </TouchableOpacity>
-          )}
         </SettingSection>
 
-        {/* Sound Settings */}
-        <SettingSection title="알림 효과">
-          <SettingToggle
-            icon={Volume2}
-            label="알림음"
-            subtitle="알림 수신 시 소리 재생"
-            value={soundSettings.soundEnabled}
-            onValueChange={handleSoundEnabledChange}
-            disabled={saving}
+        {/* 3) Volume — percentage in the section header trailing slot */}
+        <SettingSection
+          title="알림 볼륨"
+          trailing={<Text style={styles.volumeValue}>{soundSettings.volume}%</Text>}
+        >
+          <VolumeSlider
+            value={soundSettings.volume}
+            onValueChange={handleVolumeChange}
+            disabled={!soundEnabled || saving}
           />
-
-          {soundSettings.soundEnabled && (
-            <>
-              <SoundPicker
-                icon={Music}
-                label="알림음 선택"
-                options={NOTIFICATION_SOUNDS}
-                value={soundSettings.soundId}
-                volume={soundSettings.volume}
-                onValueChange={handleSoundChange}
-                disabled={saving}
-              />
-
-              <SettingSlider
-                icon={Volume1}
-                label="볼륨"
-                subtitle="알림음 볼륨 조절"
-                value={soundSettings.volume}
-                minValue={0}
-                maxValue={100}
-                step={10}
-                unit="%"
-                onValueChange={handleVolumeChange}
-              />
-            </>
-          )}
-
-          <SettingToggle
-            icon={Smartphone}
-            label="진동"
-            subtitle="알림 수신 시 진동"
-            value={soundSettings.vibrationEnabled}
-            onValueChange={handleVibrationEnabledChange}
-            disabled={saving}
-          />
-
-          {soundSettings.vibrationEnabled && (
-            <VibrationPicker
-              icon={Activity}
-              label="진동 패턴"
-              options={VIBRATION_PATTERNS}
-              value={soundSettings.vibrationPattern}
-              onValueChange={handleVibrationPatternChange}
-              disabled={saving}
-            />
-          )}
         </SettingSection>
 
-        {/* Per-Event Sound Overrides — Wanted handoff "이벤트별" */}
+        {/* 4) Sound — inline radio list (not a modal) */}
+        <SettingSection title="알림음">
+          <SoundRadioList
+            options={NOTIFICATION_SOUNDS}
+            value={currentSoundId}
+            volume={soundSettings.volume}
+            onValueChange={handleSoundChange}
+            disabled={!soundEnabled || saving}
+          />
+        </SettingSection>
+
+        {/* 5) Per-event delivery gates — Wanted handoff "이벤트별" */}
         <SettingSection title="이벤트별">
           <SettingToggle
             icon={Train}
@@ -394,7 +301,7 @@ export const SoundSettingsScreen: React.FC = () => {
             disabled={saving}
           />
           <SettingToggle
-            icon={MessageCircle}
+            icon={Megaphone}
             label="실시간 제보"
             subtitle="검증된 제보 도착 시"
             value={perEventSound.communityReport}
@@ -403,30 +310,24 @@ export const SoundSettingsScreen: React.FC = () => {
           />
         </SettingSection>
 
-        {/* Test Notification */}
-        <View style={styles.section}>
-          <TouchableOpacity
-            style={styles.testButton}
-            onPress={handleTestNotification}
-          >
-            <Text style={styles.testButtonText}>테스트 알림 보내기</Text>
-          </TouchableOpacity>
-        </View>
+        {/* 6) Email channel — the only real delivery channel toggle here */}
+        <SettingSection title="알림 채널">
+          <SettingToggle
+            icon={Mail}
+            label="이메일 알림"
+            subtitle={canEnableEmail ? '중요 업데이트 이메일로 수신' : '이메일 로그인 필요'}
+            value={notificationSettings?.emailNotifications || false}
+            onValueChange={handleToggleEmailNotifications}
+            disabled={saving || !canEnableEmail}
+          />
+        </SettingSection>
 
-        {/* Info Box */}
-        <View style={styles.infoBox}>
-          <Text style={styles.infoText}>
-            ℹ️ 푸시 알림이 켜져 있어야 열차 지연 및 운행 중단 알림을 받을 수
-            있습니다.
-          </Text>
-        </View>
+        {/* 7) Footer */}
+        <Text style={styles.footer}>개별 이벤트마다 소리를 끄거나 켤 수 있어요.</Text>
       </ScrollView>
     </SafeAreaView>
   );
 };
-
-const INFO_FONT_SIZE = 13;
-const INFO_LINE_HEIGHT = INFO_FONT_SIZE * 1.6;
 
 const createStyles = (semantic: WantedSemanticTheme) =>
   StyleSheet.create({
@@ -436,54 +337,6 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     },
     content: {
       flex: 1,
-    },
-    section: {
-      marginBottom: WANTED_TOKENS.spacing.s5,
-      paddingHorizontal: WANTED_TOKENS.spacing.s4,
-    },
-    testButton: {
-      backgroundColor: WANTED_TOKENS.blue[500],
-      paddingVertical: WANTED_TOKENS.spacing.s4,
-      borderRadius: WANTED_TOKENS.radius.r8,
-      alignItems: 'center',
-    },
-    testButtonText: {
-      fontSize: 14,
-      fontFamily: weightToFontFamily('700'),
-      color: '#FFFFFF',
-    },
-    testEmailButton: {
-      backgroundColor: WANTED_TOKENS.blue[500],
-      paddingVertical: WANTED_TOKENS.spacing.s3,
-      paddingHorizontal: WANTED_TOKENS.spacing.s4,
-      borderRadius: WANTED_TOKENS.radius.r6,
-      marginTop: WANTED_TOKENS.spacing.s2,
-      marginHorizontal: WANTED_TOKENS.spacing.s4,
-      alignItems: 'center',
-    },
-    testEmailButtonDisabled: {
-      opacity: 0.6,
-    },
-    testEmailButtonText: {
-      fontSize: 13,
-      fontFamily: weightToFontFamily('500'),
-      color: '#FFFFFF',
-    },
-    infoBox: {
-      backgroundColor: 'rgba(0,102,255,0.10)',
-      paddingHorizontal: WANTED_TOKENS.spacing.s4,
-      paddingVertical: WANTED_TOKENS.spacing.s4,
-      marginHorizontal: WANTED_TOKENS.spacing.s4,
-      marginBottom: WANTED_TOKENS.spacing.s5,
-      borderRadius: WANTED_TOKENS.radius.r8,
-      borderWidth: 1,
-      borderColor: semantic.lineSubtle,
-    },
-    infoText: {
-      fontSize: INFO_FONT_SIZE,
-      fontFamily: weightToFontFamily('500'),
-      color: semantic.labelNeutral,
-      lineHeight: INFO_LINE_HEIGHT,
     },
     alertModeGrid: {
       flexDirection: 'row',
@@ -501,6 +354,14 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       alignItems: 'flex-start',
       gap: 6,
     },
+    alertModeCardSelected: {
+      backgroundColor: WANTED_TOKENS.blue[500],
+      borderColor: WANTED_TOKENS.blue[500],
+    },
+    alertModeCardUnselected: {
+      backgroundColor: semantic.bgBase,
+      borderColor: semantic.lineSubtle,
+    },
     alertModeLabel: {
       fontSize: 14,
       fontFamily: weightToFontFamily('800'),
@@ -509,6 +370,29 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     alertModeSubtitle: {
       fontSize: 11,
       fontFamily: weightToFontFamily('600'),
+    },
+    alertModeTextSelected: {
+      color: '#FFFFFF',
+    },
+    alertModeLabelUnselected: {
+      color: semantic.labelStrong,
+    },
+    alertModeSubtitleUnselected: {
+      color: semantic.labelAlt,
+    },
+    volumeValue: {
+      fontSize: 14,
+      fontFamily: weightToFontFamily('700'),
+      color: semantic.labelStrong,
+    },
+    footer: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelAlt,
+      textAlign: 'center',
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingTop: WANTED_TOKENS.spacing.s2,
+      paddingBottom: WANTED_TOKENS.spacing.s6,
     },
   });
 

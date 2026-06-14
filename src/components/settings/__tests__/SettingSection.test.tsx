@@ -52,4 +52,17 @@ describe('SettingSection', () => {
     expect(getByText('First')).toBeTruthy();
     expect(getByText('Second')).toBeTruthy();
   });
+
+  it('renders the title and a trailing node side by side', () => {
+    const { getByText, getByTestId } = render(
+      <SettingSection
+        title="볼륨"
+        trailing={<Text testID="trailing-pct">70%</Text>}
+      >
+        <Text>Content</Text>
+      </SettingSection>,
+    );
+    expect(getByText('볼륨')).toBeTruthy();
+    expect(getByTestId('trailing-pct')).toHaveTextContent('70%');
+  });
 });

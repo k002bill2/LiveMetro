@@ -62,7 +62,7 @@ describe('NotificationService', () => {
     emailNotifications: false,
     soundSettings: {
       soundEnabled: true,
-      soundId: 'default',
+      soundId: 'chime',
       volume: 80,
       vibrationEnabled: true,
       vibrationPattern: 'default',

@@ -8,15 +8,17 @@
 import React, { useMemo, useState } from 'react';
 import { useSemanticTokens } from '@/services/theme';
 import { View, Text, TouchableOpacity, Modal, StyleSheet, SafeAreaView, ScrollView } from 'react-native';
-import { ChevronRight, X, Check, Smartphone } from 'lucide-react-native';
+import { ChevronRight, X, Check } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 
 import { VibrationPatternId } from '@/models/user';
 import { VibrationOption, soundService } from '@/services/sound/soundService';
+import VibrationPatternGlyph from '@/components/settings/VibrationPatternGlyph';
 
 interface VibrationPickerProps {
   label: string;
+  subtitle?: string;
   options: readonly VibrationOption[];
   value: VibrationPatternId;
   onValueChange: (value: VibrationPatternId) => void;
@@ -26,6 +28,7 @@ interface VibrationPickerProps {
 
 export const VibrationPicker: React.FC<VibrationPickerProps> = ({
   label,
+  subtitle,
   options,
   value,
   onValueChange,
@@ -53,13 +56,19 @@ export const VibrationPicker: React.FC<VibrationPickerProps> = ({
         style={[styles.container, disabled && styles.disabled]}
         onPress={() => !disabled && setModalVisible(true)}
         disabled={disabled}
+        accessibilityRole="button"
+        accessibilityLabel={
+          selectedOption
+            ? `${label}, 현재 ${selectedOption.label}`
+            : label
+        }
       >
         <View style={styles.leftContent}>
           {IconComponent && (
             <View style={styles.iconContainer}>
               <IconComponent
                 size={20}
-                color={disabled ? semantic.labelDisabled : semantic.labelStrong}
+                color={disabled ? semantic.labelDisabled : WANTED_TOKENS.blue[500]}
                 strokeWidth={2}
               />
             </View>
@@ -68,12 +77,22 @@ export const VibrationPicker: React.FC<VibrationPickerProps> = ({
             <Text style={[styles.label, disabled && styles.disabledText]}>
               {label}
             </Text>
-            {selectedOption && (
-              <Text style={styles.selectedValue}>{selectedOption.label}</Text>
+            {subtitle && (
+              <Text
+                style={[styles.subtitle, disabled && styles.disabledText]}
+                numberOfLines={2}
+              >
+                {subtitle}
+              </Text>
             )}
           </View>
         </View>
-        <ChevronRight size={20} color={semantic.labelAlt} />
+        <View style={styles.rightContent}>
+          {selectedOption && (
+            <Text style={styles.selectedValue}>{selectedOption.label}</Text>
+          )}
+          <ChevronRight size={20} color={semantic.labelAlt} />
+        </View>
       </TouchableOpacity>
 
       <Modal
@@ -101,6 +120,9 @@ export const VibrationPicker: React.FC<VibrationPickerProps> = ({
                     <TouchableOpacity
                       style={styles.optionItem}
                       onPress={() => handleSelect(option.id)}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${option.label}, ${option.description}`}
+                      accessibilityState={{ selected: value === option.id }}
                     >
                       <View style={styles.optionContent}>
                         <Text style={styles.optionLabel}>{option.label}</Text>
@@ -108,25 +130,24 @@ export const VibrationPicker: React.FC<VibrationPickerProps> = ({
                           {option.description}
                         </Text>
                       </View>
-                      {value === option.id && (
-                        <Check
-                          size={24}
-                          color={WANTED_TOKENS.blue[500]}
-                        />
-                      )}
                     </TouchableOpacity>
 
-                    {option.id !== 'none' && (
+                    <View style={styles.optionTrailing}>
+                      <View style={styles.checkSlot}>
+                        {value === option.id && (
+                          <Check size={24} color={WANTED_TOKENS.blue[500]} />
+                        )}
+                      </View>
                       <TouchableOpacity
-                        style={styles.playButton}
+                        style={styles.glyphButton}
                         onPress={() => handlePreview(option.id)}
+                        testID={`vib-preview-${option.id}`}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${option.label} 진동 미리보기`}
                       >
-                        <Smartphone
-                          size={28}
-                          color={WANTED_TOKENS.blue[500]}
-                        />
+                        <VibrationPatternGlyph patternId={option.id} />
                       </TouchableOpacity>
-                    )}
+                    </View>
                   </View>
                 ))}
               </ScrollView>
@@ -161,8 +182,8 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     iconContainer: {
       width: 36,
       height: 36,
-      backgroundColor: semantic.bgSubtle,
-      borderRadius: WANTED_TOKENS.radius.pill,
+      backgroundColor: `${WANTED_TOKENS.blue[500]}1A`,
+      borderRadius: WANTED_TOKENS.radius.r6,
       justifyContent: 'center',
       alignItems: 'center',
       marginRight: WANTED_TOKENS.spacing.s3,
@@ -172,17 +193,27 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     },
     label: {
       fontSize: 14,
-      fontFamily: weightToFontFamily('600'),
+      fontFamily: weightToFontFamily('700'),
       color: semantic.labelStrong,
     },
-    disabledText: {
-      color: semantic.labelDisabled,
-    },
-    selectedValue: {
+    subtitle: {
       fontSize: 13,
       fontFamily: weightToFontFamily('500'),
       color: semantic.labelAlt,
       marginTop: 2,
+    },
+    disabledText: {
+      color: semantic.labelDisabled,
+    },
+    rightContent: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: WANTED_TOKENS.spacing.s2,
+    },
+    selectedValue: {
+      fontSize: 14,
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelAlt,
     },
     modalOverlay: {
       flex: 1,
@@ -225,8 +256,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingLeft: WANTED_TOKENS.spacing.s4,
       paddingVertical: WANTED_TOKENS.spacing.s4,
     },
     optionContent: {
@@ -244,9 +274,21 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       color: semantic.labelAlt,
       marginTop: 4,
     },
-    playButton: {
-      padding: WANTED_TOKENS.spacing.s3,
-      marginRight: WANTED_TOKENS.spacing.s2,
+    optionTrailing: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: WANTED_TOKENS.spacing.s2,
+      paddingRight: WANTED_TOKENS.spacing.s4,
+    },
+    checkSlot: {
+      width: 24,
+      alignItems: 'center',
+    },
+    glyphButton: {
+      minWidth: 44,
+      minHeight: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
   });
 
