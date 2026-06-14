@@ -13,7 +13,6 @@ import {
   TouchableOpacity,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Slider from '@react-native-community/slider';
 import { useAccessibility } from '@/contexts/AccessibilityContext';
 import { weightToFontFamily } from '@/styles/modernTheme';
 
@@ -22,19 +21,11 @@ import { weightToFontFamily } from '@/styles/modernTheme';
 // ============================================================================
 
 const AccessibilitySettingsScreen: React.FC = () => {
-  const { settings, updateSettings, resetSettings, isDarkMode, effectiveTextScale } =
-    useAccessibility();
+  const { settings, updateSettings, resetSettings } = useAccessibility();
 
   const handleToggle = useCallback(
     (key: keyof typeof settings) => async (value: boolean) => {
       await updateSettings({ [key]: value });
-    },
-    [updateSettings]
-  );
-
-  const handleTextScaleChange = useCallback(
-    async (value: number) => {
-      await updateSettings({ textScale: Math.round(value * 10) / 10 });
     },
     [updateSettings]
   );
@@ -94,76 +85,6 @@ const AccessibilitySettingsScreen: React.FC = () => {
             />
           </View>
 
-          <View style={styles.row}>
-            <View style={styles.rowContent}>
-              <Text style={styles.rowTitle}>큰 텍스트</Text>
-              <Text style={styles.rowDescription}>
-                텍스트 크기를 기본보다 크게 표시합니다
-              </Text>
-            </View>
-            <Switch
-              value={settings.largeTextEnabled}
-              onValueChange={handleToggle('largeTextEnabled')}
-              trackColor={{ false: '#E0E0E0', true: '#81D4FA' }}
-              thumbColor={settings.largeTextEnabled ? '#007AFF' : '#F5F5F5'}
-              accessibilityLabel="큰 텍스트"
-            />
-          </View>
-
-          <View style={styles.sliderSection}>
-            <View style={styles.sliderHeader}>
-              <Text style={styles.rowTitle}>텍스트 크기</Text>
-              <Text style={styles.sliderValue}>{(effectiveTextScale * 100).toFixed(0)}%</Text>
-            </View>
-            <Slider
-              style={styles.slider}
-              minimumValue={0.8}
-              maximumValue={2.0}
-              value={settings.textScale}
-              onSlidingComplete={handleTextScaleChange}
-              minimumTrackTintColor="#007AFF"
-              maximumTrackTintColor="#E0E0E0"
-              thumbTintColor="#007AFF"
-              accessibilityLabel="텍스트 크기 조절"
-              accessibilityHint={`현재 ${(effectiveTextScale * 100).toFixed(0)}퍼센트입니다`}
-            />
-            <View style={styles.sliderLabels}>
-              <Text style={styles.sliderLabel}>작게</Text>
-              <Text style={styles.sliderLabel}>크게</Text>
-            </View>
-          </View>
-
-          <View style={styles.row}>
-            <View style={styles.rowContent}>
-              <Text style={styles.rowTitle}>굵은 텍스트</Text>
-              <Text style={styles.rowDescription}>
-                모든 텍스트를 굵게 표시합니다
-              </Text>
-            </View>
-            <Switch
-              value={settings.boldTextEnabled}
-              onValueChange={handleToggle('boldTextEnabled')}
-              trackColor={{ false: '#E0E0E0', true: '#81D4FA' }}
-              thumbColor={settings.boldTextEnabled ? '#007AFF' : '#F5F5F5'}
-              accessibilityLabel="굵은 텍스트"
-            />
-          </View>
-
-          <View style={styles.row}>
-            <View style={styles.rowContent}>
-              <Text style={styles.rowTitle}>여백 늘리기</Text>
-              <Text style={styles.rowDescription}>
-                버튼과 요소 사이 간격을 넓힙니다
-              </Text>
-            </View>
-            <Switch
-              value={settings.increasedSpacing}
-              onValueChange={handleToggle('increasedSpacing')}
-              trackColor={{ false: '#E0E0E0', true: '#81D4FA' }}
-              thumbColor={settings.increasedSpacing ? '#007AFF' : '#F5F5F5'}
-              accessibilityLabel="여백 늘리기"
-            />
-          </View>
         </View>
 
         {/* Motion Settings */}
@@ -186,122 +107,6 @@ const AccessibilitySettingsScreen: React.FC = () => {
             />
           </View>
 
-          <View style={styles.row}>
-            <View style={styles.rowContent}>
-              <Text style={styles.rowTitle}>햅틱 피드백</Text>
-              <Text style={styles.rowDescription}>
-                버튼 터치 시 진동으로 알려줍니다
-              </Text>
-            </View>
-            <Switch
-              value={settings.hapticFeedbackEnabled}
-              onValueChange={handleToggle('hapticFeedbackEnabled')}
-              trackColor={{ false: '#E0E0E0', true: '#81D4FA' }}
-              thumbColor={settings.hapticFeedbackEnabled ? '#007AFF' : '#F5F5F5'}
-              accessibilityLabel="햅틱 피드백"
-            />
-          </View>
-        </View>
-
-        {/* Audio Settings */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>소리</Text>
-
-          <View style={styles.row}>
-            <View style={styles.rowContent}>
-              <Text style={styles.rowTitle}>음성 안내</Text>
-              <Text style={styles.rowDescription}>
-                알림을 음성으로 읽어줍니다
-              </Text>
-            </View>
-            <Switch
-              value={settings.voiceAnnouncementsEnabled}
-              onValueChange={handleToggle('voiceAnnouncementsEnabled')}
-              trackColor={{ false: '#E0E0E0', true: '#81D4FA' }}
-              thumbColor={settings.voiceAnnouncementsEnabled ? '#007AFF' : '#F5F5F5'}
-              accessibilityLabel="음성 안내"
-            />
-          </View>
-        </View>
-
-        {/* Theme Settings */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>테마</Text>
-
-          <View style={styles.row}>
-            <View style={styles.rowContent}>
-              <Text style={styles.rowTitle}>시스템 테마 사용</Text>
-              <Text style={styles.rowDescription}>
-                기기 설정에 따라 밝기/어두운 테마를 자동 적용
-              </Text>
-            </View>
-            <Switch
-              value={settings.useSystemTheme}
-              onValueChange={handleToggle('useSystemTheme')}
-              trackColor={{ false: '#E0E0E0', true: '#81D4FA' }}
-              thumbColor={settings.useSystemTheme ? '#007AFF' : '#F5F5F5'}
-              accessibilityLabel="시스템 테마 사용"
-            />
-          </View>
-
-          {!settings.useSystemTheme && (
-            <View style={styles.row}>
-              <View style={styles.rowContent}>
-                <Text style={styles.rowTitle}>다크 모드</Text>
-                <Text style={styles.rowDescription}>
-                  어두운 배경의 테마를 사용합니다
-                </Text>
-              </View>
-              <Switch
-                value={settings.forceDarkMode}
-                onValueChange={handleToggle('forceDarkMode')}
-                trackColor={{ false: '#E0E0E0', true: '#81D4FA' }}
-                thumbColor={settings.forceDarkMode ? '#007AFF' : '#F5F5F5'}
-                accessibilityLabel="다크 모드"
-              />
-            </View>
-          )}
-
-          <View style={styles.currentTheme}>
-            <Text style={styles.currentThemeLabel}>현재 테마:</Text>
-            <Text style={styles.currentThemeValue}>
-              {isDarkMode ? '🌙 다크 모드' : '☀️ 라이트 모드'}
-            </Text>
-          </View>
-        </View>
-
-        {/* Preview */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>미리보기</Text>
-          <View
-            style={[
-              styles.previewCard,
-              settings.highContrastEnabled && styles.previewCardHighContrast,
-            ]}
-          >
-            <Text
-              style={[
-                styles.previewTitle,
-                {
-                  fontSize: 18 * effectiveTextScale,
-                  fontWeight: settings.boldTextEnabled ? 'bold' : 'normal',
-                },
-              ]}
-            >
-              2호선 강남역
-            </Text>
-            <Text
-              style={[
-                styles.previewText,
-                {
-                  fontSize: 14 * effectiveTextScale,
-                  fontWeight: settings.boldTextEnabled ? '600' : 'normal',
-                },
-              ]}
-            >
-              외선순환 방면 3분 후 도착
-            </Text>
-          </View>
         </View>
 
         {/* Reset Button */}
@@ -320,7 +125,6 @@ const AccessibilitySettingsScreen: React.FC = () => {
           <Text style={styles.infoText}>
             • 화면 읽기 프로그램은 기기의 설정 앱에서 변경할 수 있습니다{'\n'}
             • 고대비 모드는 WCAG 2.1 AA 기준을 충족합니다{'\n'}
-            • 텍스트 크기는 200%까지 조절 가능합니다{'\n'}
             • 문제가 있으시면 설정 {'>'} 피드백에서 알려주세요
           </Text>
         </View>
@@ -415,69 +219,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#666',
     marginTop: 2,
-  },
-  sliderSection: {
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
-  },
-  sliderHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  slider: {
-    height: 40,
-    marginTop: 8,
-  },
-  sliderValue: {
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: weightToFontFamily('600'),
-    color: '#007AFF',
-  },
-  sliderLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  sliderLabel: {
-    fontSize: 12,
-    color: '#999',
-  },
-  currentTheme: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-  },
-  currentThemeLabel: {
-    fontSize: 14,
-    color: '#666',
-    marginRight: 8,
-  },
-  currentThemeValue: {
-    fontSize: 14,
-    fontWeight: '500',
-    fontFamily: weightToFontFamily('500'),
-    color: '#333',
-  },
-  previewCard: {
-    backgroundColor: '#F8F8F8',
-    padding: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-  },
-  previewCardHighContrast: {
-    backgroundColor: '#FFF',
-    borderColor: '#000',
-    borderWidth: 2,
-  },
-  previewTitle: {
-    color: '#007AFF',
-    marginBottom: 4,
-  },
-  previewText: {
-    color: '#333',
   },
   resetButton: {
     margin: 16,
