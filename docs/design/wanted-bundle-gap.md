@@ -205,6 +205,36 @@
 
 ---
 
+## 8. 알려진 한계 — 액센트 컬러가 WANTED_TOKENS 화면에 미반영 (다음 버전 과제)
+
+> 기록일: 2026-06-14 · 컨텍스트: 소리 설정(`SoundSettingsScreen`) 시안 재설계 중 테마 와이어링 검증에서 식별. 사용자 결정 = "테마 코드 유지 + 액센트 한계 문서화"(다음 버전 구현).
+
+### 무엇이 / 어디서
+
+ThemeSettings에서 사용자가 고르는 **액센트 컬러(`accentColorId`)가 모던 UI(WANTED 디자인 시스템으로 마이그레이션된 122개 파일)에 적용되지 않는다.** 소리 설정 화면을 포함한 거의 모든 화면이 영향받는 **app-wide 한계**이며, 특정 화면의 결함이 아니다.
+
+- 액센트 적용 경로: `src/services/theme/themeContext.tsx:298` `applyAccentToColors(base, accentColorId, isDark)` → **레거시 `colors` 객체(`useTheme()`/`useColors()` 소비)에만** 액센트를 합성한다 (`src/services/theme/accentColors.ts:80`).
+- 모던 화면 경로: `src/services/theme/useSemanticTokens.ts:37`는 `isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light`(+ 고대비 변형)를 반환할 뿐 `accentColorId`를 받지 않는다. 또한 브랜드 블루는 `WANTED_TOKENS.blue[500]` **고정 토큰**을 직접 참조한다 → `applyAccentToColors`를 우회.
+- 결과: 사용자가 액센트 컬러를 바꿔도 `accentColorId`는 저장되지만(write) 모던 화면 색은 변하지 않는다(no read). #229가 제거한 "저장만 되고 적용 안 되는 토글"과 같은 부류의 갭.
+
+### 무엇은 정상인가 (혼동 방지)
+
+- **다크 모드**: 정상 작동. `useSemanticTokens()`가 `useTheme().isDark`로 dark 토큰 반환 (`themeContext.tsx` `setThemeMode`→`resolvedTheme`→`isDark`, ThemeSettings + 일출/일몰 자동전환 실연동).
+- **고대비**: 정상 작동(#229가 "실제 작동하는 고대비"로 유지). `AccessibilityContext.highContrastEnabled`→HC 토큰.
+- 즉 **이 한계는 오직 "액센트 컬러 커스터마이즈" 차원**에 국한된다.
+
+### 다음 버전 구현 방향 (착수 포인트)
+
+데이터 모델(`accentColorId`)·선택 UI(`AccentColorSwatches`, ThemeSettings)·저장은 **이미 존재**한다. 비어 있는 것은 "모던 토큰에 액센트를 적용하는 레이어"뿐:
+
+1. `useSemanticTokens()`가 `accentColorId`(from `useTheme()`)를 받아 반환 토큰의 `blue` 스케일(또는 primary/accent 슬롯)을 선택 색으로 치환, **또는**
+2. `WANTED_TOKENS` 팔레트를 accent-aware factory로 전환(`applyAccentToColors`의 WANTED 버전)해 `blue[500]` 직접 참조를 대체.
+3. 착수 전 `WANTED_TOKENS.blue[500]` 직접 참조 지점(122파일 다수)의 치환 전략(코드모드 vs 토큰 간접화) 결정 필요 — 단순 find/replace는 brand-fixed 블루와 accent-가변 블루를 구분하지 못함.
+
+검증 방법(다음 버전): ThemeSettings에서 액센트 변경 → 소리 설정 등 모던 화면의 선택 카드/라디오/슬라이더 색이 따라 바뀌는지 시뮬레이터 확인.
+
+---
+
 ## 7. 부록: 시안 번들 위치
 
 ```
