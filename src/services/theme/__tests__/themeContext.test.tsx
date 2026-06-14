@@ -6,6 +6,7 @@ import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { ThemeProvider, useTheme, useColors } from '../themeContext';
+import AccessibilityContext from '@/contexts/AccessibilityContext';
 
 jest.mock('@react-native-async-storage/async-storage', () => ({
   getItem: jest.fn().mockResolvedValue(null),
@@ -25,6 +26,24 @@ const { isNightInSeoul } = require('@/utils/sunSchedule') as {
 const wrapper = ({ children }: { children: React.ReactNode }) => (
   <ThemeProvider>{children}</ThemeProvider>
 );
+
+// High-contrast wrapper: provides a controlled AccessibilityContext value so
+// ThemeProvider's `useContext(AccessibilityContext)` sees highContrastEnabled
+// (the value type is internal to AccessibilityContext, hence the cast).
+const hcWrapper =
+  (highContrastEnabled: boolean) =>
+  ({ children }: { children: React.ReactNode }) =>
+    (
+      <AccessibilityContext.Provider
+        value={
+          { settings: { highContrastEnabled } } as unknown as React.ContextType<
+            typeof AccessibilityContext
+          >
+        }
+      >
+        <ThemeProvider>{children}</ThemeProvider>
+      </AccessibilityContext.Provider>
+    );
 
 describe('themeContext', () => {
   beforeEach(() => {
@@ -342,5 +361,50 @@ describe('themeContext', () => {
       expect(result.current.success).toBeDefined();
       expect(result.current.error).toBeDefined();
     });
+  });
+});
+
+describe('themeContext — high contrast', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (AsyncStorage.getItem as jest.Mock).mockResolvedValue(null);
+    isNightInSeoul.mockReturnValue(false);
+  });
+
+  it('uses standard colors when high contrast is off (no provider → tolerant false)', async () => {
+    (AsyncStorage.getItem as jest.Mock).mockResolvedValue('light');
+    const { result } = renderHook(() => useTheme(), { wrapper });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.colors.textPrimary).toBe('#1A1A1A');
+  });
+
+  it('swaps to the high-contrast light palette when enabled in light mode', async () => {
+    (AsyncStorage.getItem as jest.Mock).mockResolvedValue('light');
+    const { result } = renderHook(() => useTheme(), { wrapper: hcWrapper(true) });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.colors.background).toBe('#FFFFFF');
+    expect(result.current.colors.textPrimary).toBe('#000000');
+    expect(result.current.colors.borderDark).toBe('#000000');
+  });
+
+  it('swaps to the high-contrast dark palette when enabled in dark mode', async () => {
+    (AsyncStorage.getItem as jest.Mock).mockResolvedValue('dark');
+    const { result } = renderHook(() => useTheme(), { wrapper: hcWrapper(true) });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    expect(result.current.colors.background).toBe('#000000');
+    expect(result.current.colors.textPrimary).toBe('#FFFFFF');
+    expect(result.current.colors.borderDark).toBe('#FFFFFF');
+  });
+
+  it('keeps every ThemeColors field defined under high contrast (spread preserves the rest)', async () => {
+    (AsyncStorage.getItem as jest.Mock).mockResolvedValue('light');
+    const { result } = renderHook(() => useTheme(), { wrapper: hcWrapper(true) });
+    await waitFor(() => expect(result.current.isLoading).toBe(false));
+    // spread-preserved fields (gray scale, shadow) survive alongside overrides
+    expect(result.current.colors.gray500).toBeDefined();
+    expect(result.current.colors.cardShadow).toBeDefined();
+    expect(
+      Object.values(result.current.colors).every((v) => v !== undefined),
+    ).toBe(true);
   });
 });

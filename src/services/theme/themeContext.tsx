@@ -8,6 +8,7 @@ import { useColorScheme } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import { isNightInSeoul } from '@/utils/sunSchedule';
+import AccessibilityContext from '@/contexts/AccessibilityContext';
 import {
   AccentColorId,
   DEFAULT_ACCENT_COLOR_ID,
@@ -140,6 +141,62 @@ const darkColors = {
 
 export type ThemeColors = typeof lightColors;
 
+// High-contrast palettes: spread the standard palette so every ThemeColors field
+// is present (the `: ThemeColors` annotation makes tsc enforce completeness), then
+// override the contrast-critical fields with the WCAG-tuned high-contrast values
+// (seeded from highContrastTheme.ts, whose own shape is incompatible with ThemeColors).
+const highContrastLightColors: ThemeColors = {
+  ...lightColors,
+  background: '#FFFFFF',
+  backgroundSecondary: '#FFFFFF',
+  surface: '#FFFFFF',
+  surfaceElevated: '#FFFFFF',
+  textPrimary: '#000000',
+  textSecondary: '#333333',
+  textTertiary: '#595959',
+  textDisabled: '#666666',
+  textInverse: '#FFFFFF',
+  borderLight: '#333333',
+  borderMedium: '#000000',
+  borderDark: '#000000',
+  primary: '#0056B3',
+  primaryHover: '#003D80',
+  primaryLight: '#CCE5FF',
+  blue: '#0056B3',
+  red: '#C62828',
+  success: '#2E7D32',
+  warning: '#E65100',
+  error: '#C62828',
+  info: '#1565C0',
+  overlay: 'rgba(0, 0, 0, 0.7)',
+};
+
+const highContrastDarkColors: ThemeColors = {
+  ...darkColors,
+  background: '#000000',
+  backgroundSecondary: '#000000',
+  surface: '#121212',
+  surfaceElevated: '#1A1A1A',
+  textPrimary: '#FFFFFF',
+  textSecondary: '#E0E0E0',
+  textTertiary: '#B0B0B0',
+  textDisabled: '#808080',
+  textInverse: '#000000',
+  borderLight: '#666666',
+  borderMedium: '#FFFFFF',
+  borderDark: '#FFFFFF',
+  primary: '#90CAF9',
+  primaryHover: '#64B5F6',
+  primaryLight: '#1A3A5C',
+  blue: '#90CAF9',
+  red: '#EF9A9A',
+  success: '#A5D6A7',
+  warning: '#FFCC80',
+  error: '#EF9A9A',
+  info: '#90CAF9',
+  overlay: 'rgba(0, 0, 0, 0.85)',
+};
+
 interface ThemeContextType {
   themeMode: ThemeMode;
   resolvedTheme: ResolvedTheme;
@@ -224,10 +281,22 @@ export const ThemeProvider: React.FC<ThemeProviderProps> = ({ children }) => {
   }, [autoSwitchEnabled, isNight, themeMode, systemColorScheme]);
 
   const isDark = resolvedTheme === 'dark';
-  const colors = useMemo(
-    () => applyAccentToColors(isDark ? darkColors : lightColors, accentColorId, isDark),
-    [isDark, accentColorId]
-  );
+  // High-contrast: read the accessibility setting tolerantly (ThemeProvider has
+  // its own tests that don't wrap AccessibilityProvider → fall back to false).
+  // When on, swap to the high-contrast palette before the accent overlay applies.
+  const accessibility = useContext(AccessibilityContext);
+  const highContrastEnabled =
+    accessibility?.settings.highContrastEnabled ?? false;
+  const colors = useMemo(() => {
+    const base = highContrastEnabled
+      ? isDark
+        ? highContrastDarkColors
+        : highContrastLightColors
+      : isDark
+        ? darkColors
+        : lightColors;
+    return applyAccentToColors(base, accentColorId, isDark);
+  }, [isDark, accentColorId, highContrastEnabled]);
 
   // Set theme and persist
   const setThemeMode = useCallback(async (mode: ThemeMode): Promise<void> => {
