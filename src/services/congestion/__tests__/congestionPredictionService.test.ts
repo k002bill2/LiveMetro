@@ -68,6 +68,24 @@ describe('CongestionPredictionService', () => {
       expect(result.confidence).toBeGreaterThanOrEqual(0);
       expect(result.confidence).toBeLessThanOrEqual(1);
     });
+
+    it('returns a finite 0-1 confidence when stored data has an out-of-range level (no NaN)', async () => {
+      // Regression: a malformed/legacy congestionLevel (not in the level map)
+      // made levelToNumber() return undefined, cascading to NaN avgLevel/stdDev
+      // and a NaN confidence that violated the 0-1 contract (and flaked CI only
+      // when the current clock slot happened to match the query window). Record
+      // one at the current slot on a dedicated station, then predict for the
+      // same slot so the bad point lands in the relevant-data window.
+      await congestionPredictionService.recordObservation(
+        'REGRESSION_NAN', '2', 'up', 999 as any
+      );
+      const result = await congestionPredictionService.predictCongestion(
+        'REGRESSION_NAN', '2', 'up', new Date()
+      );
+      expect(Number.isFinite(result.confidence)).toBe(true);
+      expect(result.confidence).toBeGreaterThanOrEqual(0);
+      expect(result.confidence).toBeLessThanOrEqual(1);
+    });
   });
 
   describe('getHourlyPattern', () => {
