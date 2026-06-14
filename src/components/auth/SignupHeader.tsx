@@ -7,6 +7,7 @@
  * hand-off (auth-signup-steps.jsx SignupHeader): segment bars, not dots.
  */
 import React from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
 import { ChevronLeft } from 'lucide-react-native';
 
@@ -31,7 +32,7 @@ export const SignupHeader: React.FC<SignupHeaderProps> = ({
   testID = 'signup-header',
 }) => {
   const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
 
   const segments = Array.from({ length: totalSteps }, (_, i) => i + 1);
 

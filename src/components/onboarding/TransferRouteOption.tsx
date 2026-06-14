@@ -13,6 +13,7 @@
  * "↔" connector for transfer routes or zap icon for direct routes.
  */
 import React from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Zap } from 'lucide-react-native';
 
@@ -47,7 +48,7 @@ export const TransferRouteOption: React.FC<TransferRouteOptionProps> = ({
   onPress,
   isDark,
 }) => {
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const hasMinutes = typeof option.minutes === 'number' && option.minutes > 0;
 
   return (

@@ -8,23 +8,12 @@
  */
 
 import React, { useEffect, useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  ScrollView,
-  TouchableOpacity,
-} from 'react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
 import { ChevronLeft, MoreHorizontal, MessageSquare, MapPin } from 'lucide-react-native';
 
-import { useTheme } from '@/services/theme';
 import { delayReportService } from '@/services/delay/delayReportService';
-import {
-  DelayReport,
-  ReportTypeLabels,
-  calculateCredibilityScore,
-} from '@/models/delayReport';
+import { DelayReport, ReportTypeLabels, calculateCredibilityScore } from '@/models/delayReport';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { getSubwayLineColor } from '@/utils/colorUtils';
 import { LineBadge, Pill, type LineId } from '@/components/design';
@@ -77,8 +66,7 @@ const synthesizeImpactRows = (report: DelayReport): { name: string; status: '정
 };
 
 export const ReportDetailScreen: React.FC<ReportDetailScreenProps> = ({ report, onBack, onOpenFeedback }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   const credibility = calculateCredibilityScore(report);

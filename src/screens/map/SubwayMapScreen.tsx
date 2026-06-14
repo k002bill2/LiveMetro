@@ -4,22 +4,9 @@
  */
 
 import React, { useState, useMemo, useCallback } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  TouchableOpacity,
-  StyleSheet,
-  Modal,
-  Alert,
-} from 'react-native';
-import {
-  ArrowRightLeft,
-  ChevronRight,
-  Heart,
-  Train,
-  X,
-} from 'lucide-react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, Alert } from 'react-native';
+import { ArrowRightLeft, ChevronRight, Heart, Train, X } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -29,8 +16,8 @@ import { getLocalStationsByLine } from '@services/data/stationsDataService';
 import { LineFavoritePicker } from '@components/map/LineFavoritePicker';
 import { resolveLineFavorites, type FavoriteDiff } from './lineFavoriteResolver';
 import { useFavorites } from '@hooks/useFavorites';
-import { useTheme } from '@services/theme';
-import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
+
+import { weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { LineBadge, type LineId } from '@/components/design';
 import type { Station } from '@models/train';
 import type { AppStackParamList } from '@/navigation/types';
@@ -114,8 +101,7 @@ type NavigationProp = NativeStackNavigationProp<AppStackParamList>;
 export const SubwayMapScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const { toggleFavorite, isFavorite, addFavorite, removeFavoriteByStationId } = useFavorites();
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
   const subwayLines = useMemo(() => buildSubwayLines(), []);
   const [selectedLine, setSelectedLine] = useState<string | null>('2');

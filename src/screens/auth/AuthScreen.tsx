@@ -23,18 +23,8 @@
  *   - TermsFooter      (ToS / privacy micro-copy)
  */
 import React, { useCallback, useEffect, useState } from 'react';
-import {
-  Alert,
-  Linking,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  ViewStyle,
-  TextStyle,
-} from 'react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { Alert, Linking, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View, ViewStyle, TextStyle } from 'react-native';
 import { ChevronRight, Eye, Mail } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
@@ -42,14 +32,9 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme/themeContext';
+
 import { useAuth } from '@/services/auth/AuthContext';
-import {
-  isBiometricAvailable,
-  isBiometricLoginEnabled,
-  getBiometricTypeName,
-  performBiometricLogin,
-} from '@/services/auth/biometricService';
+import { isBiometricAvailable, isBiometricLoginEnabled, getBiometricTypeName, performBiometricLogin } from '@/services/auth/biometricService';
 import { LoginHero } from '@/components/auth/LoginHero';
 import { FaceIDButton } from '@/components/auth/FaceIDButton';
 import { SocialButton, type SocialProvider } from '@/components/auth/SocialButton';
@@ -67,8 +52,7 @@ const PRIVACY_URL = 'https://livemetro.app/privacy';
 type Nav = NativeStackNavigationProp<AppStackParamList>;
 
 export const AuthScreen: React.FC = () => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const navigation = useNavigation<Nav>();
   const { signInWithEmail, signInAnonymously } = useAuth();
 

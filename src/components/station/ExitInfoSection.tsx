@@ -6,13 +6,10 @@
  */
 
 import React, { memo, useMemo } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { View, Text, StyleSheet, ScrollView } from 'react-native';
-import { useTheme } from '@/services/theme/themeContext';
-import {
-  WANTED_TOKENS,
-  weightToFontFamily,
-  type WantedSemanticTheme,
-} from '@/styles/modernTheme';
+
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import type { ExitInfo, LandmarkCategory } from '@/models/publicData';
 
 // ============================================================================
@@ -44,7 +41,6 @@ const CATEGORY_ICONS: Record<LandmarkCategory, string> = {
   park: '🌳',
   other: '📍',
 };
-
 
 // ============================================================================
 // Sub-components
@@ -106,8 +102,7 @@ ExitCard.displayName = 'ExitCard';
 
 export const ExitInfoSection: React.FC<ExitInfoSectionProps> = memo(
   ({ exitInfo, loading = false, testID }) => {
-    const { isDark } = useTheme();
-    const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+    const semantic = useSemanticTokens();
 
     if (loading) {
       return (

@@ -23,7 +23,7 @@ import {
   Bell,
   AlertTriangle,
 } from 'lucide-react-native';
-import { useTheme } from '@/services/theme';
+import { useSemanticTokens } from '@/services/theme';
 import {
   WANTED_TOKENS,
   weightToFontFamily,
@@ -69,8 +69,7 @@ export const CommuteInsightCard: React.FC<CommuteInsightCardProps> = ({
   onNotificationPress,
   style,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   if (!prediction && !pattern) {
@@ -226,8 +225,7 @@ export const PatternSummaryCard: React.FC<PatternSummaryCardProps> = ({
   onPress,
   style,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   if (patterns.length === 0) {

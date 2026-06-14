@@ -8,20 +8,11 @@
  */
 
 import React, { useMemo } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { View, Text, StyleSheet } from 'react-native';
-import {
-  GitBranch,
-  Clock,
-  ArrowLeftRight,
-  MapPin,
-  Flag
-} from 'lucide-react-native';
-import {
-  WANTED_TOKENS,
-  weightToFontFamily,
-  type WantedSemanticTheme,
-} from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme';
+import { GitBranch, Clock, ArrowLeftRight, MapPin, Flag } from 'lucide-react-native';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
+
 import { getSubwayLineColor } from '@/utils/colorUtils';
 import { routeToSteps, CommuteRoute } from '@/models/commute';
 
@@ -36,8 +27,7 @@ export const RoutePreview: React.FC<RoutePreviewProps> = ({
   showTime = true,
   compact = false,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
   const steps = routeToSteps(route);
   const hasRoute = steps.length >= 2;

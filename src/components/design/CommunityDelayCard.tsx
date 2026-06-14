@@ -11,9 +11,10 @@
  * (community sourced). Optional fields gracefully hide when absent.
  */
 import React, { memo } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { Pressable, StyleSheet, Text, View, ViewStyle } from 'react-native';
-import { useTheme } from '@/services/theme';
-import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
+
+import { weightToFontFamily } from '@/styles/modernTheme';
 import { LineBadge, type LineId } from './LineBadge';
 import { Pill } from './Pill';
 
@@ -47,8 +48,7 @@ const CommunityDelayCardImpl: React.FC<CommunityDelayCardProps> = ({
   style,
   testID,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const meta = [
     timestampLabel,
     typeof confirmCount === 'number' ? `${confirmCount}명 확인` : null,

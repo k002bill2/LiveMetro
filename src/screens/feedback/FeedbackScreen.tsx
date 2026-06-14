@@ -6,33 +6,14 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Switch,
-  Platform,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, TextInput, Switch, Platform, Alert, ActivityIndicator } from 'react-native';
 import { Star, X, Send, Info } from 'lucide-react-native';
 
 import { useAuth } from '@/services/auth/AuthContext';
-import { useTheme } from '@/services/theme';
+
 import { feedbackService } from '@/services/feedback/feedbackService';
-import {
-  FeedbackCategory,
-  FeedbackCategoryLabels,
-  FeedbackCategoryDescriptions,
-  FEEDBACK_TAGS,
-  FeedbackTag,
-  FeedbackDiagnostics,
-  isFeedbackSubmittable,
-} from '@/models/feedback';
+import { FeedbackCategory, FeedbackCategoryLabels, FeedbackCategoryDescriptions, FEEDBACK_TAGS, FeedbackTag, FeedbackDiagnostics, isFeedbackSubmittable } from '@/models/feedback';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 
 interface FeedbackScreenProps {
@@ -58,8 +39,7 @@ const buildDiagnostics = (): FeedbackDiagnostics => ({
 
 export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({ onClose, onSubmitSuccess }) => {
   const { user } = useAuth();
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   const [rating, setRating] = useState<number>(0);

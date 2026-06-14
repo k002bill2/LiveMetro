@@ -8,22 +8,10 @@
  */
 
 import React, { memo, useMemo, useState, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  Animated,
-  LayoutAnimation,
-  Platform,
-  UIManager,
-} from 'react-native';
-import { useTheme } from '@/services/theme/themeContext';
-import {
-  WANTED_TOKENS,
-  weightToFontFamily,
-  type WantedSemanticTheme,
-} from '@/styles/modernTheme';
+import { useSemanticTokens } from '@/services/theme';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, LayoutAnimation, Platform, UIManager } from 'react-native';
+
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import type { SubwayAlert, AlertType } from '@/models/publicData';
 
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -60,8 +48,7 @@ const getBannerColor = (type: AlertType, semantic: WantedSemanticTheme): string 
 
 export const AlertBanner: React.FC<AlertBannerProps> = memo(
   ({ alerts, onDismiss, testID }) => {
-    const { isDark } = useTheme();
-    const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+    const semantic = useSemanticTokens();
     const [expanded, setExpanded] = useState(false);
     const [dismissed, setDismissed] = useState(false);
 

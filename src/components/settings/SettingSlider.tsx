@@ -6,15 +6,11 @@
  */
 
 import React, { useMemo } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { View, Text, StyleSheet } from 'react-native';
 import Slider from '@react-native-community/slider';
 import type { LucideIcon } from 'lucide-react-native';
-import {
-  WANTED_TOKENS,
-  weightToFontFamily,
-  type WantedSemanticTheme,
-} from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 
 interface SettingSliderProps {
   label: string;
@@ -39,8 +35,7 @@ export const SettingSlider: React.FC<SettingSliderProps> = ({
   onValueChange,
   icon: IconComponent,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   return (

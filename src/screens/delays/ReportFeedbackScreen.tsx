@@ -6,39 +6,16 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Alert,
-  ActivityIndicator,
-} from 'react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { ChevronLeft, Bell, Send } from 'lucide-react-native';
 
 import { useAuth } from '@/services/auth/AuthContext';
-import { useTheme } from '@/services/theme';
+
 import { delayReportService } from '@/services/delay/delayReportService';
 import { reportCommentService } from '@/services/delay/reportCommentService';
-import {
-  DelayReport,
-  ReportTypeLabels,
-  REACTION_KINDS,
-  ReactionKind,
-  ReactionLabels,
-  ReactionCounts,
-  emptyReactionCounts,
-  totalReactions,
-} from '@/models/delayReport';
-import {
-  CommentSortMode,
-  CommentSortLabels,
-  ReportComment,
-  anonymizeDisplayName,
-} from '@/models/reportComment';
+import { DelayReport, ReportTypeLabels, REACTION_KINDS, ReactionKind, ReactionLabels, ReactionCounts, emptyReactionCounts, totalReactions } from '@/models/delayReport';
+import { CommentSortMode, CommentSortLabels, ReportComment, anonymizeDisplayName } from '@/models/reportComment';
 import { LineBadge, Pill, type LineId } from '@/components/design';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 
@@ -63,8 +40,7 @@ const formatMinAgo = (date: Date): string => {
 
 export const ReportFeedbackScreen: React.FC<ReportFeedbackScreenProps> = ({ report, onBack }) => {
   const { user } = useAuth();
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   const initialReactions: ReactionCounts = report.reactions ?? emptyReactionCounts();

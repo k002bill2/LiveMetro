@@ -7,21 +7,14 @@
  */
 
 import React, { memo, useCallback, useMemo } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { Download, FileText, Share2, Trash2 } from 'lucide-react-native';
 
-import { useTheme } from '@/services/theme';
 import { DelayCertificate } from '@/models/delayCertificate';
 import { truncateMinutes } from '@/utils/dateUtils';
-import {
-  formatIssuedDate,
-  toDate,
-} from '@/components/delays/certificate/delayCertFormat';
-import {
-  WANTED_TOKENS,
-  weightToFontFamily,
-  type WantedSemanticTheme,
-} from '@/styles/modernTheme';
+import { formatIssuedDate, toDate } from '@/components/delays/certificate/delayCertFormat';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 
 interface DelayCertIssuedRowProps {
   cert: DelayCertificate;
@@ -40,8 +33,7 @@ const DelayCertIssuedRowImpl: React.FC<DelayCertIssuedRowProps> = ({
   onShareText,
   onDelete,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   const handleSharePdf = useCallback(() => {

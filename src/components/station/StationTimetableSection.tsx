@@ -18,17 +18,13 @@
  */
 
 import { ChevronDown, ChevronUp, Clock } from 'lucide-react-native';
+import { useSemanticTokens } from '@/services/theme';
 import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-import {
-  useTrainSchedule,
-  getFirstTrain,
-  getLastTrain,
-  type DayTypeOverride,
-} from '@/hooks/useTrainSchedule';
+import { useTrainSchedule, getFirstTrain, getLastTrain, type DayTypeOverride } from '@/hooks/useTrainSchedule';
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme/themeContext';
+
 import { TimetableGrid } from './TimetableGrid';
 import { DestinationChipRow } from './DestinationChipRow';
 
@@ -82,8 +78,7 @@ const detectInitialDayType = (now: Date = new Date()): Exclude<DayTypeOverride, 
 
 export const StationTimetableSection: React.FC<StationTimetableSectionProps> = memo(
   ({ stationName, lineId, direction, enabled, testID }) => {
-    const { isDark } = useTheme();
-    const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+    const semantic = useSemanticTokens();
 
     // 사용자가 선택한 dayType. 초기값은 오늘 요일 자동 감지 결과 — useState
     // initializer 함수로 mount 시 1회만 평가.

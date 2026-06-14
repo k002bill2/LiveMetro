@@ -7,25 +7,11 @@
  */
 
 import React, { useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-} from 'react-native';
-import {
-  ArrowDown,
-  Clock,
-  ArrowRightLeft,
-  AlertTriangle,
-  CheckCircle,
-} from 'lucide-react-native';
-import { useTheme } from '@/services/theme';
-import {
-  WANTED_TOKENS,
-  weightToFontFamily,
-  type WantedSemanticTheme,
-} from '@/styles/modernTheme';
+import { useSemanticTokens } from '@/services/theme';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { ArrowDown, Clock, ArrowRightLeft, AlertTriangle, CheckCircle } from 'lucide-react-native';
+
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { getSubwayLineColor } from '@/utils/colorUtils';
 import { Route, RouteSegment, getLineName } from '@/models/route';
 
@@ -213,8 +199,7 @@ export const RouteComparisonView: React.FC<RouteComparisonViewProps> = ({
   alternativeRoute,
   affectedLineIds = [],
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   // Check if original route is affected

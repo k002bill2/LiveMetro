@@ -6,29 +6,12 @@
  */
 
 import React, { useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ViewStyle,
-} from 'react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { View, Text, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
 import { Users, AlertTriangle } from 'lucide-react-native';
-import { useTheme } from '@/services/theme';
-import {
-  WANTED_TOKENS,
-  weightToFontFamily,
-  type WantedSemanticTheme,
-} from '@/styles/modernTheme';
-import {
-  CongestionLevel,
-  CarCongestion,
-  TrainCongestionSummary,
-  getCongestionLevelName,
-  getCongestionLevelColor,
-  MIN_REPORTS_FOR_RELIABILITY,
-  createEmptyCarCongestions,
-} from '@/models/congestion';
+
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
+import { CongestionLevel, CarCongestion, TrainCongestionSummary, getCongestionLevelName, getCongestionLevelColor, MIN_REPORTS_FOR_RELIABILITY, createEmptyCarCongestions } from '@/models/congestion';
 
 interface TrainCongestionViewProps {
   congestion: TrainCongestionSummary | null;
@@ -129,8 +112,7 @@ export const TrainCongestionView: React.FC<TrainCongestionViewProps> = ({
   showLegend = true,
   compact = false,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   const cars = congestion?.cars || createEmptyCarCongestions();

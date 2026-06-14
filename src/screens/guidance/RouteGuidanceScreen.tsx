@@ -10,31 +10,18 @@
  * (useRealtimeTrains, 30초 폴링)을 구독해 다음 열차 ETA를 보여준다.
  */
 import React, { useCallback, useEffect, useMemo } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-import { useTheme } from '@/services/theme';
-import {
-  WANTED_TOKENS,
-  weightToFontFamily,
-  type WantedSemanticTheme,
-} from '@/styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { useRealtimeTrains } from '@/hooks/useRealtimeTrains';
 import { useGuidanceProgress } from '@/hooks/useGuidanceProgress';
 import { routeToGuidanceSteps } from '@/services/guidance/guidanceSteps';
-import {
-  clearGuidanceSession,
-  getGuidanceSession,
-} from '@/services/guidance/guidanceSessionStore';
-import {
-  GuidanceControls,
-  GuidanceHeader,
-  GuidanceNowCard,
-  GuidanceStepRow,
-  type GuidanceStepStatus,
-} from '@/components/guidance';
+import { clearGuidanceSession, getGuidanceSession } from '@/services/guidance/guidanceSessionStore';
+import { GuidanceControls, GuidanceHeader, GuidanceNowCard, GuidanceStepRow, type GuidanceStepStatus } from '@/components/guidance';
 import type { AppStackParamList } from '@/navigation/types';
 import type { GuidanceStep } from '@/models/guidance';
 import type { Train } from '@/models/train';
@@ -61,8 +48,7 @@ const nextLabelFor = (step: GuidanceStep | undefined, nextStep: GuidanceStep | u
 };
 
 export const RouteGuidanceScreen: React.FC = () => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
   const navigation = useNavigation<NavigationProp>();
   const isFocused = useIsFocused();

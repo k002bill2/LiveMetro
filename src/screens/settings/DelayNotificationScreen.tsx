@@ -13,36 +13,13 @@
  */
 
 import React, { useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  ScrollView,
-  Switch,
-  TouchableOpacity,
-  Alert,
-} from 'react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, Switch, TouchableOpacity, Alert } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import {
-  WANTED_TOKENS,
-  weightToFontFamily,
-  type WantedSemanticTheme,
-} from '@/styles/modernTheme';
-import {
-  AlertTriangle,
-  ArrowRightLeft,
-  Building2,
-  Check,
-  Megaphone,
-  Train,
-  Users,
-  XCircle,
-  Zap,
-  type LucideIcon,
-} from 'lucide-react-native';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
+import { AlertTriangle, ArrowRightLeft, Building2, Check, Megaphone, Train, Users, XCircle, Zap, type LucideIcon } from 'lucide-react-native';
 import { useAuth } from '@/services/auth/AuthContext';
-import { useTheme } from '@/services/theme';
+
 import { useNotifications } from '@/hooks/useNotifications';
 import { getSubwayLineColor } from '@/utils/colorUtils';
 import type { AlertSourcePreferences } from '@/models/user';
@@ -128,8 +105,7 @@ const ALERT_SOURCE_ROWS: readonly AlertSourceRowSpec[] = [
 export const DelayNotificationScreen: React.FC = () => {
   const { user, updateUserPreferences } = useAuth();
   const { sendTestNotification } = useNotifications();
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
   const [saving, setSaving] = useState(false);
 

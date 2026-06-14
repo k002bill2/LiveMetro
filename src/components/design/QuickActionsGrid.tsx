@@ -5,10 +5,11 @@
  * each with a centered Lucide icon above a short Korean label.
  */
 import React, { memo } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import type { LucideIcon } from 'lucide-react-native';
-import { useTheme } from '@/services/theme';
-import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
+
+import { weightToFontFamily } from '@/styles/modernTheme';
 
 export interface QuickAction {
   /** Stable id for keying & testID */
@@ -24,8 +25,7 @@ interface QuickActionsGridProps {
 }
 
 const QuickActionsGridImpl: React.FC<QuickActionsGridProps> = ({ actions, testID }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
 
   return (
     <View testID={testID ?? 'quick-actions-grid'} style={styles.row}>

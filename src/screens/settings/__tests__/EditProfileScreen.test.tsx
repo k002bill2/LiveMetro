@@ -23,6 +23,7 @@ jest.mock('@react-navigation/native-stack', () => ({
 // Phase 47 — screen now calls useTheme().isDark to drive WANTED_TOKENS
 // semantic selection. Force light variant for stable assertions.
 jest.mock('@/services/theme', () => ({
+  useSemanticTokens: jest.fn(() => jest.requireActual('@/styles/modernTheme').WANTED_TOKENS.light),
   useTheme: () => ({ isDark: false }),
 }));
 

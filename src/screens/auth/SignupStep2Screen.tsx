@@ -20,36 +20,14 @@
  * 강제. 미동의 시 CTA 비활성.
  */
 import React, { useCallback, useMemo, useState } from 'react';
-import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TextStyle,
-  TouchableOpacity,
-  View,
-  ViewStyle,
-} from 'react-native';
-import {
-  ArrowRight,
-  Check,
-  ChevronRight,
-  Eye,
-  EyeOff,
-  Lock,
-  Mail,
-  User as UserIcon,
-} from 'lucide-react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { Alert, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TextStyle, TouchableOpacity, View, ViewStyle } from 'react-native';
+import { ArrowRight, Check, ChevronRight, Eye, EyeOff, Lock, Mail, User as UserIcon } from 'lucide-react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme/themeContext';
+
 import { useAuth } from '@/services/auth/AuthContext';
 import { useOnboarding } from '@/contexts/OnboardingContext';
 import { SignupHeader } from '@/components/auth/SignupHeader';
@@ -118,8 +96,7 @@ const AGREEMENT_ROWS: readonly AgreementRow[] = [
 ];
 
 export const SignupStep2Screen: React.FC = () => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const navigation = useNavigation<Nav>();
   const { firebaseUser, linkEmailToCurrentUser } = useAuth();
   const { markTermsAgreed } = useOnboarding();

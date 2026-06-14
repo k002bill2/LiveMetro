@@ -7,14 +7,10 @@
  */
 
 import React, { useMemo } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { View, Text, Switch, StyleSheet } from 'react-native';
 import type { LucideIcon } from 'lucide-react-native';
-import {
-  WANTED_TOKENS,
-  weightToFontFamily,
-  type WantedSemanticTheme,
-} from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 
 interface SettingToggleProps {
   label: string;
@@ -33,8 +29,7 @@ export const SettingToggle: React.FC<SettingToggleProps> = ({
   disabled = false,
   icon: IconComponent,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   return (

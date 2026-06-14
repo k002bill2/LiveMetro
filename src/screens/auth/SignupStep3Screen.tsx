@@ -12,6 +12,7 @@
  * summary card, grouped icon checklist, dashed gradient bonus banner.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import {
   Alert,
   Animated,
@@ -80,7 +81,7 @@ const AVATAR_SIZE = 44;
 
 export const SignupStep3Screen: React.FC = () => {
   const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const navigation = useNavigation<Nav>();
   const { user, firebaseUser } = useAuth();
   const { markCelebrationSeen } = useOnboarding();

@@ -7,13 +7,10 @@
  */
 
 import React, { memo, useMemo } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { View, Text, StyleSheet } from 'react-native';
-import { useTheme } from '@/services/theme/themeContext';
-import {
-  WANTED_TOKENS,
-  weightToFontFamily,
-  type WantedSemanticTheme,
-} from '@/styles/modernTheme';
+
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import type { AccessibilityInfo } from '@/models/publicData';
 
 // ============================================================================
@@ -95,8 +92,7 @@ FacilityItem.displayName = 'FacilityItem';
 
 export const AccessibilitySection: React.FC<AccessibilitySectionProps> = memo(
   ({ info, loading = false, testID }) => {
-    const { isDark } = useTheme();
-    const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+    const semantic = useSemanticTokens();
 
     if (loading) {
       return (

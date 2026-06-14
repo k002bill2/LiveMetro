@@ -1,7 +1,8 @@
 import React from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { ArrowUpDown } from 'lucide-react-native';
-import { useTheme } from '@/services/theme';
+
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 
 interface StationLite {
@@ -24,8 +25,7 @@ export const StationSearchBar: React.FC<Props> = ({
   onPressTo,
   onSwap,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = createStyles(semantic);
 
   return (

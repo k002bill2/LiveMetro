@@ -5,6 +5,7 @@
  * nodes per line, a pulse pin marker, and a wordmark with brand badge.
  */
 import React, { memo } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { Text, View, StyleSheet, ViewStyle, TextStyle } from 'react-native';
 import Svg, { Path, Circle, G, Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
 import { TrainFront } from 'lucide-react-native';
@@ -27,7 +28,7 @@ const HERO_HEIGHT = 300;
 
 const LoginHeroImpl: React.FC<LoginHeroProps> = ({ testID }) => {
   const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
 
   const heroStyle: ViewStyle = {
     position: 'relative',

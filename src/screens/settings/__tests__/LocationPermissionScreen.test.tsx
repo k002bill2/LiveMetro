@@ -10,6 +10,7 @@ jest.mock('@react-navigation/native-stack', () => ({
 }));
 
 jest.mock('@/services/theme', () => ({
+  useSemanticTokens: jest.fn(() => jest.requireActual('@/styles/modernTheme').WANTED_TOKENS.light),
   useTheme: () => ({
     isDark: false,
     colors: {

@@ -16,19 +16,13 @@
  *     commit happens in FavoritesOnboarding via saveCommuteRoutes().
  */
 import React, { useCallback, useState } from 'react';
-import {
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { ArrowRight } from 'lucide-react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme/themeContext';
+
 import { OnbHeader } from '@/components/onboarding/OnbHeader';
 import { TimePickerCard } from '@/components/settings/TimePickerCard';
 import { useOnboardingCallbacks } from '@/navigation/OnboardingNavigator';
@@ -47,8 +41,7 @@ const EVENING_TIME_OPTIONS: readonly string[] = [
 const FALLBACK_EVENING_TIME = '18:30';
 
 export const CommuteTimeScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const { onSkip } = useOnboardingCallbacks();
 
   const [departureTime, setDepartureTime] = useState<string>(

@@ -4,15 +4,11 @@
  */
 
 import React, { useCallback, useMemo, useRef } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-} from 'react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { AlertCircle, Trash2, Bell, BellOff } from 'lucide-react-native';
 import { Swipeable } from 'react-native-gesture-handler';
-import { SPACING, RADIUS, TYPOGRAPHY, WANTED_TOKENS, WantedSemanticTheme, weightToFontFamily } from '../../styles/modernTheme';
+import { SPACING, RADIUS, TYPOGRAPHY, WantedSemanticTheme, weightToFontFamily } from '../../styles/modernTheme';
 import { useTheme, ThemeColors } from '../../services/theme';
 import { FavoriteWithDetails } from '../../hooks/useFavorites';
 import { useRealtimeTrains } from '../../hooks/useRealtimeTrains';
@@ -101,8 +97,8 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
     swipeableRef.current?.close();
     onRemove();
   }, [onRemove]);
-  const { colors, isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const { colors } = useTheme();
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(colors, semantic), [colors, semantic]);
   const { station } = favorite;
 

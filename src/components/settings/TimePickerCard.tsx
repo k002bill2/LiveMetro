@@ -22,10 +22,10 @@
  *     externally — this component doesn't persist.
  */
 import React from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme/themeContext';
 
 interface TimePickerCardProps {
   title: string;
@@ -52,8 +52,7 @@ export const TimePickerCard: React.FC<TimePickerCardProps> = ({
   disabled = false,
   testID,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const [hh, mm] = splitHHMM(value);
 
   return (

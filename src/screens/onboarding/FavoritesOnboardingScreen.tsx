@@ -21,21 +21,13 @@
  *      onComplete()
  */
 import React, { useCallback, useMemo, useState } from 'react';
-import {
-  Alert,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { ArrowRight, Check, Search, Star } from 'lucide-react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme/themeContext';
+
 import { useAuth } from '@/services/auth/AuthContext';
 import { OnbHeader } from '@/components/onboarding/OnbHeader';
 import { LineBadge } from '@/components/design/LineBadge';
@@ -109,8 +101,7 @@ const toStationModel = (rec: RecommendedStation | { stationId: string; stationNa
 };
 
 export const FavoritesOnboardingScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const { user } = useAuth();
   const { addFavorite } = useFavorites();
   const { onComplete, onSkip } = useOnboardingCallbacks();

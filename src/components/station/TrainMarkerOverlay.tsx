@@ -9,18 +9,15 @@
  * instead of unmounting/remounting across rows.
  */
 import React, { memo, useEffect, useMemo, useRef } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { ChevronDown, ChevronUp } from 'lucide-react-native';
 import { WANTED_TOKENS, typeStyle } from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme/themeContext';
+
 import { useShouldReduceMotion } from '@/contexts/AccessibilityContext';
 import type { TrainPosition } from '@/models/trainPosition';
 import { positionStatusToDisplay } from '@/models/trainPosition';
-import {
-  TIMELINE_ROW_HEIGHT,
-  RAIL_ZONE_WIDTH,
-  MARKER_ZONE_WIDTH,
-} from '@/components/station/StationTimelineRow';
+import { TIMELINE_ROW_HEIGHT, RAIL_ZONE_WIDTH, MARKER_ZONE_WIDTH } from '@/components/station/StationTimelineRow';
 
 /** Fixed card height — caption1(16) + caption2(14) + padding/borders. */
 export const TRAIN_MARKER_HEIGHT = 38;
@@ -148,8 +145,7 @@ const TrainMarkerCard: React.FC<TrainMarkerCardProps> = ({
   lineColor,
   testID,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
 
   // Start at the current target so the first render does not slide in from 0.
   const translateY = useRef(new Animated.Value(targetTop)).current;

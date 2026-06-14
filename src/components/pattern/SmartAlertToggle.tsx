@@ -6,21 +6,11 @@
  */
 
 import React, { useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  Switch,
-  TouchableOpacity,
-  ViewStyle,
-} from 'react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { View, Text, StyleSheet, Switch, TouchableOpacity, ViewStyle } from 'react-native';
 import { Bell, BellOff, ChevronRight, Sparkles } from 'lucide-react-native';
-import { useTheme } from '@/services/theme';
-import {
-  WANTED_TOKENS,
-  weightToFontFamily,
-  type WantedSemanticTheme,
-} from '@/styles/modernTheme';
+
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 
 // ============================================================================
 // Types
@@ -53,8 +43,7 @@ export const SmartAlertToggle: React.FC<SmartAlertToggleProps> = ({
   loading = false,
   style,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   return (

@@ -4,14 +4,12 @@
  */
 
 import React, { type ComponentType } from 'react';
-import {
-  createNativeStackNavigator,
-  type NativeStackScreenProps,
-} from '@react-navigation/native-stack';
+import { useSemanticTokens } from '@/services/theme';
+import { createNativeStackNavigator, type NativeStackScreenProps } from '@react-navigation/native-stack';
 
 import { SettingsStackParamList } from './types';
-import { useTheme } from '@/services/theme';
-import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
+
+import { weightToFontFamily } from '@/styles/modernTheme';
 
 // Import screens
 import SettingsScreen from '@/screens/settings/SettingsScreen';
@@ -37,8 +35,7 @@ import { OnboardingStationPickerScreen } from '@/screens/onboarding/OnboardingSt
 const SettingsStack = createNativeStackNavigator<SettingsStackParamList>();
 
 export const SettingsNavigator: React.FC = () => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
 
   return (
     <SettingsStack.Navigator

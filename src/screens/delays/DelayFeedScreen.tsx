@@ -4,21 +4,14 @@
  */
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  FlatList,
-  TouchableOpacity,
-  RefreshControl,
-  Modal,
-} from 'react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MessageSquare, Megaphone } from 'lucide-react-native';
 
 import { useNavigation } from '@react-navigation/native';
 import { useAuth } from '@/services/auth/AuthContext';
-import { useTheme } from '@/services/theme';
+
 import { useFavorites } from '@/hooks/useFavorites';
 import { delayReportService } from '@/services/delay/delayReportService';
 import { stashReport } from '@/services/delay/reportNavCache';
@@ -32,8 +25,7 @@ import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/s
 export const DelayFeedScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const { user } = useAuth();
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   // Memoize styles — feed re-renders on report stream updates (cross-review).
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 

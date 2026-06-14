@@ -16,37 +16,15 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  TextInput,
-  ScrollView,
-  SafeAreaView,
-  StyleSheet,
-} from 'react-native';
-import {
-  ArrowLeft,
-  ChevronRight,
-  Check,
-  Home,
-  Building2,
-  ArrowLeftRight,
-  Search,
-  Sparkles,
-  List,
-  X as XIcon,
-} from 'lucide-react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { View, Text, TouchableOpacity, TextInput, ScrollView, SafeAreaView, StyleSheet } from 'react-native';
+import { ArrowLeft, ChevronRight, Check, Home, Building2, ArrowLeftRight, Search, Sparkles, List, X as XIcon } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { NavigationProp, ParamListBase } from '@react-navigation/native';
 
-import {
-  WANTED_TOKENS,
-  weightToFontFamily,
-  type WantedSemanticTheme,
-} from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
+
 import { getSubwayLineColor } from '@/utils/colorUtils';
 import { getLocalStation, getLocalStationsByLine } from '@/services/data/stationsDataService';
 import { useFavorites } from '@/hooks/useFavorites';
@@ -110,8 +88,7 @@ export const OnboardingStationPickerScreen: React.FC<Props> = ({
   route,
 }) => {
   const { selectionType, excludeStationIds, currentName } = route.params;
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
   const { favoritesWithDetails } = useFavorites();
 

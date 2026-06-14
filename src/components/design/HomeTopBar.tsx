@@ -5,10 +5,11 @@
  * circular bell button on the right with a red "unread" dot.
  */
 import React, { memo } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Bell } from 'lucide-react-native';
-import { useTheme } from '@/services/theme';
-import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
+
+import { weightToFontFamily } from '@/styles/modernTheme';
 
 interface HomeTopBarProps {
   /** "지수님" — preferred display name */
@@ -28,8 +29,7 @@ const HomeTopBarImpl: React.FC<HomeTopBarProps> = ({
   onBellPress,
   testID,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
 
   const greeting = userName ? `안녕하세요, ${userName}님` : '안녕하세요';
 

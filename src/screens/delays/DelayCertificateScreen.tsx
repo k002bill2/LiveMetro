@@ -12,48 +12,26 @@
  */
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Alert,
-  FlatList,
-  RefreshControl,
-  SafeAreaView,
-  Share,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { Alert, FlatList, RefreshControl, SafeAreaView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { BadgeCheck, Download, FileText, History } from 'lucide-react-native';
 
 import { useAuth } from '@/services/auth/AuthContext';
-import { useTheme } from '@/services/theme';
+
 import { delayHistoryService } from '@/services/delay/delayHistoryService';
 import { pdfService } from '@/services/certificate/pdfService';
-import {
-  DelayCertificate,
-  DelayHistoryEntry,
-} from '@/models/delayCertificate';
+import { DelayCertificate, DelayHistoryEntry } from '@/models/delayCertificate';
 import { DelayCertHeroCard } from '@/components/delays/certificate/DelayCertHeroCard';
 import { DelayCertEligibleRow } from '@/components/delays/certificate/DelayCertEligibleRow';
 import { DelayCertIssuedRow } from '@/components/delays/certificate/DelayCertIssuedRow';
-import {
-  CERT_VALID_DAYS,
-  formatBoardTime,
-  isEntryExpired,
-  toDate,
-} from '@/components/delays/certificate/delayCertFormat';
-import {
-  WANTED_TOKENS,
-  weightToFontFamily,
-  type WantedSemanticTheme,
-} from '@/styles/modernTheme';
+import { CERT_VALID_DAYS, formatBoardTime, isEntryExpired, toDate } from '@/components/delays/certificate/delayCertFormat';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 
 type TabId = 'eligible' | 'issued';
 
 export const DelayCertificateScreen: React.FC = () => {
   const { user } = useAuth();
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   const [certificates, setCertificates] = useState<DelayCertificate[]>([]);

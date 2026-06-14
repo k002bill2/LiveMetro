@@ -20,7 +20,7 @@ import {
 import { Aperture, Contrast, MoonStar, Type } from 'lucide-react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
-import { useTheme, ThemeMode } from '@/services/theme';
+import { useTheme, ThemeMode, useSemanticTokens } from '@/services/theme';
 import {
   getAccentColorOption,
   type AccentColorId,
@@ -58,7 +58,7 @@ export const ThemeSettingsScreen: React.FC<Props> = () => {
     autoSwitchEnabled,
     setAutoSwitchEnabled,
   } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const { language } = useI18n();
   const { settings, updateSettings } = useAccessibility();
 

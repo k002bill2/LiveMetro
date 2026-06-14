@@ -33,6 +33,7 @@ jest.mock('@react-navigation/native', () => ({
   RouteProp: {},
 }));
 jest.mock('@/services/theme', () => ({
+  useSemanticTokens: jest.fn(() => jest.requireActual('@/styles/modernTheme').WANTED_TOKENS.light),
   useTheme: jest.fn(() => ({
     colors: {
       primary: '#007AFF',

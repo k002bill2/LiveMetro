@@ -17,6 +17,7 @@
  * after the change to reflect the chosen state.
  */
 import React from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
@@ -72,7 +73,7 @@ export const RouteWithTransfer: React.FC<Props> = ({
   testID = 'route-with-transfer',
 }) => {
   const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const directColor = semantic.statusPositive;
 
   return (

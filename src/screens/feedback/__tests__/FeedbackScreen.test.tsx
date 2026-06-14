@@ -14,6 +14,7 @@ jest.mock('lucide-react-native', () => ({
 }));
 
 jest.mock('@/services/theme', () => ({
+  useSemanticTokens: jest.fn(() => jest.requireActual('@/styles/modernTheme').WANTED_TOKENS.light),
   useTheme: () => ({ isDark: false }),
 }));
 

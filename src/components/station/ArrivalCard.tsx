@@ -13,16 +13,10 @@
  * via the `isFirst` prop. Per-car congestion is optional.
  */
 import React, { memo, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  Text,
-  TouchableOpacity,
-  View,
-  StyleSheet,
-  ViewStyle,
-  TextStyle,
-} from 'react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { Text, TouchableOpacity, View, StyleSheet, ViewStyle, TextStyle } from 'react-native';
 import { WANTED_TOKENS, typeStyle, weightToFontFamily } from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme/themeContext';
+
 import { LineBadge, Pill, congFromPct, CONG_TONE, type LineId } from '@/components/design';
 
 /** Tooltip auto-dismiss delay (ms). Long enough to read, short enough not
@@ -63,8 +57,7 @@ const ArrivalCardImpl: React.FC<ArrivalCardProps> = ({
   showEmptyCongestion = false,
   testID,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
 
   const totalSeconds = Math.max(0, Math.floor(minutes) * 60 + Math.max(0, Math.floor(seconds)));
   const showImminentOnly = totalSeconds === 0;

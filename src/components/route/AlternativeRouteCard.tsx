@@ -6,35 +6,14 @@
  */
 
 import React, { useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  TouchableOpacity,
-  ViewStyle,
-} from 'react-native';
-import {
-  ArrowRight,
-  Clock,
-  ArrowRightLeft,
-  TrendingUp,
-  TrendingDown,
-  Minus,
-} from 'lucide-react-native';
-import { useTheme } from '@/services/theme';
-import {
-  WANTED_TOKENS,
-  weightToFontFamily,
-  type WantedSemanticTheme,
-} from '@/styles/modernTheme';
+import { useSemanticTokens } from '@/services/theme';
+import { View, Text, StyleSheet, TouchableOpacity, ViewStyle } from 'react-native';
+import { ArrowRight, Clock, ArrowRightLeft, TrendingUp, TrendingDown, Minus } from 'lucide-react-native';
+
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { getSubwayLineColor } from '@/utils/colorUtils';
 import { JourneyStrip, type JourneyStripLeg } from '@/components/design';
-import {
-  AlternativeRoute,
-  Route,
-  formatTimeDifference,
-  getTimeDifferenceSeverity,
-} from '@/models/route';
+import { AlternativeRoute, Route, formatTimeDifference, getTimeDifferenceSeverity } from '@/models/route';
 
 /**
  * Map a domain Route into the JourneyStrip leg sequence.
@@ -189,8 +168,7 @@ export const AlternativeRouteCard: React.FC<AlternativeRouteCardProps> = ({
   style,
   isRecommended = false,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
   const { alternativeRoute, originalRoute, timeDifference, reason } = alternative;
 

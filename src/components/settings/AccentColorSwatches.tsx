@@ -9,7 +9,7 @@ import React, { memo, useCallback, useMemo } from 'react';
 import { StyleSheet, TouchableOpacity, View } from 'react-native';
 import { Check } from 'lucide-react-native';
 
-import { useTheme } from '@/services/theme';
+import { useTheme, useSemanticTokens } from '@/services/theme';
 import {
   ACCENT_COLORS,
   type AccentColorId,
@@ -60,7 +60,7 @@ const AccentColorSwatchesImpl: React.FC<AccentColorSwatchesProps> = ({
   onSelect,
 }) => {
   const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   return (

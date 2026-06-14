@@ -13,9 +13,9 @@
  */
 
 import React, { memo, useCallback } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { FlatList, ListRenderItem, Pressable, StyleSheet, Text } from 'react-native';
 
-import { useTheme } from '@/services/theme/themeContext';
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 
 export interface DestinationChipRowProps {
@@ -45,8 +45,7 @@ const buildChips = (destinations: readonly string[]): readonly ChipDatum[] => {
 
 export const DestinationChipRow: React.FC<DestinationChipRowProps> = memo(
   ({ destinations, selected, onSelect, testID }) => {
-    const { isDark } = useTheme();
-    const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+    const semantic = useSemanticTokens();
 
     const handlePress = useCallback(
       (value: string | null) => () => onSelect(value),

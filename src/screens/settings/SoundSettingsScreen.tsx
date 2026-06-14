@@ -7,54 +7,20 @@
  */
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  ScrollView,
-  TouchableOpacity,
-  Alert,
-} from 'react-native';
-import {
-  WANTED_TOKENS,
-  weightToFontFamily,
-  type WantedSemanticTheme,
-} from '@/styles/modernTheme';
-import {
-  Activity,
-  AlertTriangle,
-  Bell,
-  BellOff,
-  BellRing,
-  Mail,
-  MessageCircle,
-  Music,
-  Smartphone,
-  Train,
-  Volume1,
-  Volume2,
-  type LucideIcon,
-} from 'lucide-react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
+import { Activity, AlertTriangle, Bell, BellOff, BellRing, Mail, MessageCircle, Music, Smartphone, Train, Volume1, Volume2, type LucideIcon } from 'lucide-react-native';
 import { useAuth } from '@/services/auth/AuthContext';
-import { useTheme } from '@/services/theme';
+
 import { useNotifications } from '@/hooks/useNotifications';
 import SettingSection from '@/components/settings/SettingSection';
 import SettingToggle from '@/components/settings/SettingToggle';
 import SettingSlider from '@/components/settings/SettingSlider';
 import SoundPicker from '@/components/settings/SoundPicker';
 import VibrationPicker from '@/components/settings/VibrationPicker';
-import {
-  soundService,
-  NOTIFICATION_SOUNDS,
-  VIBRATION_PATTERNS,
-} from '@/services/sound/soundService';
-import {
-  NotificationSoundId,
-  VibrationPatternId,
-  SoundPreferences,
-  type PerEventSoundOverrides,
-} from '@/models/user';
+import { soundService, NOTIFICATION_SOUNDS, VIBRATION_PATTERNS } from '@/services/sound/soundService';
+import { NotificationSoundId, VibrationPatternId, SoundPreferences, type PerEventSoundOverrides } from '@/models/user';
 import { emailNotificationService } from '@/services/email/emailService';
 
 type AlertModeId = 'soundAndVibration' | 'soundOnly' | 'vibrationOnly' | 'silent';
@@ -93,8 +59,7 @@ const DEFAULT_SOUND_SETTINGS: SoundPreferences = {
 export const SoundSettingsScreen: React.FC = () => {
   const { user, updateUserPreferences } = useAuth();
   const { sendTestNotification } = useNotifications();
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
   const [saving, setSaving] = useState(false);
   const [sendingTestEmail, setSendingTestEmail] = useState(false);

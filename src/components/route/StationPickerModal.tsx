@@ -1,17 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import {
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  FlatList,
-  ActivityIndicator,
-} from 'react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { Modal, Pressable, StyleSheet, Text, TextInput, View, FlatList, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { X, Search } from 'lucide-react-native';
-import { useTheme } from '@/services/theme';
+
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { searchGraphStations } from '@/utils/subwayMapData';
 import { LineBadge } from '@/components/design/LineBadge';
@@ -38,8 +30,7 @@ export const StationPickerModal: React.FC<Props> = ({
   onSelect,
   recentStations = [],
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = createStyles(semantic);
 
   const [query, setQuery] = useState<string>(initialQuery);

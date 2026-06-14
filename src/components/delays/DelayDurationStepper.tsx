@@ -6,10 +6,10 @@
  */
 
 import React, { useMemo } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Minus, Plus } from 'lucide-react-native';
 
-import { useTheme } from '@/services/theme';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 
 interface DelayDurationStepperProps {
@@ -29,8 +29,7 @@ export const DelayDurationStepper: React.FC<DelayDurationStepperProps> = ({
   max = 60,
   quickPicks = DEFAULT_QUICK_PICKS,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   const canDecrement = value > min;

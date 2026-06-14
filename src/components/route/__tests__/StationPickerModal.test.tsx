@@ -12,6 +12,7 @@ jest.mock('react-native-safe-area-context', () => ({
 }));
 
 jest.mock('@/services/theme', () => ({
+  useSemanticTokens: jest.fn(() => jest.requireActual('@/styles/modernTheme').WANTED_TOKENS.light),
   useTheme: () => ({ isDark: false }),
 }));
 

@@ -20,10 +20,8 @@
  * be used inline without adding extra hit targets.
  */
 import React from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { StyleSheet, View, type ViewStyle } from 'react-native';
-
-import { WANTED_TOKENS } from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme/themeContext';
 
 export type RadioSize = 'sm' | 'md';
 
@@ -45,8 +43,7 @@ export const Radio: React.FC<RadioProps> = ({
   disabled = false,
   testID,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const { outer, inner } = SIZE_MAP[size];
 
   const outerStyle: ViewStyle = selected

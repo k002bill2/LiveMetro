@@ -7,6 +7,7 @@ import { render, fireEvent } from '@testing-library/react-native';
 import { DirectionToggle } from '../DirectionToggle';
 
 jest.mock('@/services/theme', () => ({
+  useSemanticTokens: jest.fn(() => jest.requireActual('@/styles/modernTheme').WANTED_TOKENS.light),
   useTheme: () => ({ isDark: false }),
 }));
 

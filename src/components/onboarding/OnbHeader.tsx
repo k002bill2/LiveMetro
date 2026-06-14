@@ -8,11 +8,11 @@
  * and skip — it is the entry screen.
  */
 import React from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { StyleSheet, Text, TouchableOpacity, View, ViewStyle } from 'react-native';
 import { ChevronLeft } from 'lucide-react-native';
 
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme/themeContext';
 
 export type OnbStep = 1 | 2 | 3 | 4 | 5;
 
@@ -36,8 +36,7 @@ export const OnbHeader: React.FC<OnbHeaderProps> = ({
   onSkip,
   testID = 'onb-header',
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
 
   const dots = Array.from({ length: totalSteps }, (_, i) => i + 1);
 

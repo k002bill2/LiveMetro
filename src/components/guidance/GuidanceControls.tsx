@@ -7,14 +7,11 @@
  * "환승 완료" rebase the tracking anchor).
  */
 import React, { memo, useMemo } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { ChevronLeft, Square } from 'lucide-react-native';
-import { useTheme } from '@/services/theme';
-import {
-  WANTED_TOKENS,
-  weightToFontFamily,
-  type WantedSemanticTheme,
-} from '@/styles/modernTheme';
+
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 
 interface GuidanceControlsProps {
   /** Contextual confirm label ("탑승했어요" 등); null hides the pair (journey end). */
@@ -32,8 +29,7 @@ const GuidanceControlsImpl: React.FC<GuidanceControlsProps> = ({
   onNext,
   onExit,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   return (

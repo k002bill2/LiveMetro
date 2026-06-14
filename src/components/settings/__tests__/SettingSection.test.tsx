@@ -4,6 +4,7 @@ import { Text } from 'react-native';
 import { SettingSection } from '../SettingSection';
 
 jest.mock('@/services/theme', () => ({
+  useSemanticTokens: jest.fn(() => jest.requireActual('@/styles/modernTheme').WANTED_TOKENS.light),
   useTheme: () => ({
     colors: {
       textSecondary: '#8E8E93',

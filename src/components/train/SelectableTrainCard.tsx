@@ -17,17 +17,11 @@
  * train alone to avoid N concurrent Firestore subscriptions.
  */
 import React, { memo, useMemo, useCallback } from 'react';
-import {
-  Text,
-  TouchableOpacity,
-  View,
-  StyleSheet,
-  ViewStyle,
-  TextStyle,
-} from 'react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { Text, TouchableOpacity, View, StyleSheet, ViewStyle, TextStyle } from 'react-native';
 import { Star } from 'lucide-react-native';
 import { WANTED_TOKENS, typeStyle, weightToFontFamily } from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme/themeContext';
+
 import { LineBadge, Pill, congFromPct, CONG_TONE, type LineId } from '@/components/design';
 import type { TrainType } from '@/models/train';
 
@@ -89,8 +83,7 @@ const SelectableTrainCardImpl: React.FC<SelectableTrainCardProps> = ({
   congestionLabel = null,
   testID,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
 
   const totalSeconds = Math.max(
     0,

@@ -11,35 +11,21 @@
  *   (buildStationNameToIdMap); rows that fail to join are skipped silently.
  */
 import React, { useCallback, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  StyleSheet,
-  Text,
-  TouchableOpacity,
-  View,
-  ListRenderItemInfo,
-} from 'react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { ActivityIndicator, FlatList, StyleSheet, Text, TouchableOpacity, View, ListRenderItemInfo } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RouteProp, useRoute, useIsFocused } from '@react-navigation/native';
 import { AlertCircle, Info, Moon } from 'lucide-react-native';
 
 import { AppStackParamList } from '../../navigation/types';
 import { WANTED_TOKENS, typeStyle } from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme/themeContext';
+
 import { useTrainPositions } from '@/hooks/useTrainPositions';
 import { DirectionSegment, type DirectionValue } from '@/components/station/DirectionSegment';
 import { StationTimelineRow, TIMELINE_ROW_HEIGHT } from '@/components/station/StationTimelineRow';
 import { TrainMarkerOverlay, type OverlayTrain } from '@/components/station/TrainMarkerOverlay';
 import { LineBadge, type LineId } from '@/components/design';
-import {
-  getLineBranches,
-  buildStationNameToIdMap,
-  resolveLineKey,
-  STATIONS,
-  LINE_COLORS,
-  type LineBranch,
-} from '@/utils/subwayMapData';
+import { getLineBranches, buildStationNameToIdMap, resolveLineKey, STATIONS, LINE_COLORS, type LineBranch } from '@/utils/subwayMapData';
 import { resolveInternalStationId } from '@/utils/stationIdResolver';
 import { directionToDisplay } from '@/models/route';
 import type { TrainPosition } from '@/models/trainPosition';
@@ -60,8 +46,7 @@ const TrainPositionScreen: React.FC = () => {
   const lineKey = resolveLineKey(lineId);
   const focusStationId = resolveInternalStationId(rawFocusStationId) ?? undefined;
 
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const lineColor = LINE_COLORS[lineKey] ?? semantic.primaryNormal;
 
   const isScreenFocused = useIsFocused();

@@ -19,6 +19,7 @@ jest.mock('lucide-react-native', () => new Proxy({}, { get: (_, name) => name })
 
 // useTheme — flat contract per src/services/theme/themeContext.tsx.
 jest.mock('@/services/theme', () => ({
+  useSemanticTokens: jest.fn(() => jest.requireActual('@/styles/modernTheme').WANTED_TOKENS.light),
   useTheme: () => ({ isDark: false }),
 }));
 

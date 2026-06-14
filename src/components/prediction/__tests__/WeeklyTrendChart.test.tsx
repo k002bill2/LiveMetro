@@ -17,6 +17,7 @@ declare module 'expect' {
 // useTheme — flat contract per src/services/theme/themeContext.tsx.
 // Component reads only `isDark` and resolves the WANTED_TOKENS palette itself.
 jest.mock('@/services/theme', () => ({
+  useSemanticTokens: jest.fn(() => jest.requireActual('@/styles/modernTheme').WANTED_TOKENS.light),
   useTheme: () => ({ isDark: false }),
 }));
 

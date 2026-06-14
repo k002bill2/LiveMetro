@@ -15,51 +15,21 @@ import React, {
   useRef,
   useEffect,
 } from 'react';
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  ScrollView,
-  Alert,
-  ActivityIndicator,
-  Switch,
-} from 'react-native';
-import {
-  ArrowRight,
-  BellRing,
-  Clock,
-  MapPin,
-  PlusCircle,
-  Route as RouteIcon,
-  Sparkles,
-  TrainFront,
-} from 'lucide-react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert, ActivityIndicator, Switch } from 'react-native';
+import { ArrowRight, BellRing, Clock, MapPin, PlusCircle, Route as RouteIcon, Sparkles, TrainFront } from 'lucide-react-native';
 import { Pill } from '@/components/design/Pill';
 import { LinearGradient } from 'expo-linear-gradient';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 
-import {
-  WANTED_TOKENS,
-  weightToFontFamily,
-  type WantedSemanticTheme,
-} from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
+
 import { SettingsStackParamList, OnboardingRouteData } from '@/navigation/types';
 import { useAuth } from '@/services/auth/AuthContext';
-import {
-  loadCommuteRoutes,
-  saveCommuteRoutes,
-  updateEveningEnabled,
-} from '@/services/commute/commuteService';
+import { loadCommuteRoutes, saveCommuteRoutes, updateEveningEnabled } from '@/services/commute/commuteService';
 import { useMLPrediction } from '@/hooks/useMLPrediction';
-import {
-  CommuteRoute,
-  DEFAULT_COMMUTE_NOTIFICATIONS,
-  DEFAULT_BUFFER_MINUTES,
-} from '@/models/commute';
+import { CommuteRoute, DEFAULT_COMMUTE_NOTIFICATIONS, DEFAULT_BUFFER_MINUTES } from '@/models/commute';
 import type { SmartFeatures } from '@/models/user';
 import SettingSection from '@/components/settings/SettingSection';
 import SettingToggle from '@/components/settings/SettingToggle';
@@ -147,8 +117,7 @@ const addMinutesToTime = (hhmm: string, minutes: number): string | null => {
 
 export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
   const { user, updateUserPreferences } = useAuth();
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   // ML prediction wiring for the Hero ETA card. baselineMinutes is the

@@ -1,7 +1,8 @@
 import React from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { ArrowLeftRight, Footprints } from 'lucide-react-native';
-import { useTheme } from '@/services/theme';
+
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { JourneyStrip, type JourneyStripLeg } from '@/components/design/JourneyStrip';
 import { LineBadge } from '@/components/design/LineBadge';
@@ -116,8 +117,7 @@ function singleLegSummary(route: Route): { lineId: string; from: string; to: str
 }
 
 export const RouteCard: React.FC<Props> = ({ route, expanded, onToggleExpand, recommended, activeSortTab }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = createStyles(semantic);
 
   const legs = routeToLegs(route);

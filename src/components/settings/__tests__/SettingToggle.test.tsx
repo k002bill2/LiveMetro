@@ -7,6 +7,7 @@ import { SettingToggle } from '../SettingToggle';
 // Wanted Design System semantic theme (light/dark variants of
 // WANTED_TOKENS). Force light in tests for stable assertions.
 jest.mock('@/services/theme', () => ({
+  useSemanticTokens: jest.fn(() => jest.requireActual('@/styles/modernTheme').WANTED_TOKENS.light),
   useTheme: () => ({ isDark: false }),
 }));
 

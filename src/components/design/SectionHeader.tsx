@@ -8,9 +8,9 @@
  *   └────────────────────────────────────────────────┘
  */
 import React, { memo, ReactNode } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { Text, View, StyleSheet, ViewStyle, TextStyle, StyleProp } from 'react-native';
 import { WANTED_TOKENS, typeStyle } from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme/themeContext';
 
 interface SectionHeaderProps {
   title: string;
@@ -29,8 +29,7 @@ const SectionHeaderImpl: React.FC<SectionHeaderProps> = ({
   style,
   testID,
 }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
 
   const titleStyle: TextStyle = {
     ...typeStyle('heading2'),

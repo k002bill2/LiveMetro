@@ -5,9 +5,10 @@
  * on `blue-50` + `blue-700` text, comma-joined landmark names beside.
  */
 import React, { memo, useMemo } from 'react';
+import { useSemanticTokens } from '@/services/theme';
 import { Text, View, StyleSheet, ViewStyle, TextStyle } from 'react-native';
 import { WANTED_TOKENS, typeStyle } from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme/themeContext';
+
 import type { ExitInfo } from '@/models/publicData';
 
 interface ExitInfoGridProps {
@@ -18,8 +19,7 @@ interface ExitInfoGridProps {
 }
 
 const ExitInfoGridImpl: React.FC<ExitInfoGridProps> = ({ exits, max, testID }) => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
 
   const visible = useMemo(
     () => (typeof max === 'number' ? exits.slice(0, max) : exits),

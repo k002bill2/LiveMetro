@@ -6,20 +6,8 @@
  * (AuthScreen) so it can stay light + biometric-first.
  */
 import React, { useCallback, useState } from 'react';
-import {
-  Alert,
-  KeyboardAvoidingView,
-  Platform,
-  SafeAreaView,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-  ViewStyle,
-  TextStyle,
-} from 'react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { Alert, KeyboardAvoidingView, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, ViewStyle, TextStyle } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';
 import { ChevronLeft } from 'lucide-react-native';
@@ -27,14 +15,9 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme/themeContext';
+
 import { useAuth } from '@/services/auth/AuthContext';
-import {
-  isBiometricAvailable,
-  isBiometricLoginEnabled,
-  getBiometricTypeName,
-  enableBiometricLogin,
-} from '@/services/auth/biometricService';
+import { isBiometricAvailable, isBiometricLoginEnabled, getBiometricTypeName, enableBiometricLogin } from '@/services/auth/biometricService';
 import { analyzeAuthError, printFirebaseDebugInfo } from '@/utils/firebaseDebug';
 import { AppStackParamList } from '@/navigation/types';
 
@@ -47,8 +30,7 @@ const isValidEmail = (value: string): boolean => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.te
 type Nav = NativeStackNavigationProp<AppStackParamList>;
 
 export const EmailLoginScreen: React.FC = () => {
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const navigation = useNavigation<Nav>();
   const { signInWithEmail, resetPassword } = useAuth();
 

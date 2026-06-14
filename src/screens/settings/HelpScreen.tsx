@@ -11,46 +11,14 @@
  */
 
 import React, { useState, useMemo, useCallback } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Linking,
-  Alert,
-  LayoutAnimation,
-  Platform,
-  UIManager,
-} from 'react-native';
-import {
-  ChevronDown,
-  ChevronRight,
-  ChevronUp,
-  Mail,
-  MessageSquare,
-  Phone,
-  Search,
-  ShieldCheck,
-  XCircle,
-  type LucideIcon,
-} from 'lucide-react-native';
+import { useSemanticTokens } from '@/services/theme';
+import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, TextInput, Linking, Alert, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { ChevronDown, ChevronRight, ChevronUp, Mail, MessageSquare, Phone, Search, ShieldCheck, XCircle, type LucideIcon } from 'lucide-react-native';
 import { useNavigation, type NavigationProp } from '@react-navigation/native';
-import {
-  WANTED_TOKENS,
-  weightToFontFamily,
-  type WantedSemanticTheme,
-} from '@/styles/modernTheme';
-import { useTheme } from '@/services/theme';
+import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
+
 import { SettingsStackParamList } from '@/navigation/types';
-import {
-  FAQ_DATA,
-  SUPPORT_EMAIL,
-  SUPPORT_PHONE,
-  FAQItem,
-} from '@/utils/helpContent';
+import { FAQ_DATA, SUPPORT_EMAIL, SUPPORT_PHONE, FAQItem } from '@/utils/helpContent';
 
 // Enable LayoutAnimation on Android
 if (
@@ -110,8 +78,7 @@ const CONTACT_CHANNELS: readonly ContactChannel[] = [
 
 export const HelpScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp<SettingsStackParamList>>();
-  const { isDark } = useTheme();
-  const semantic = isDark ? WANTED_TOKENS.dark : WANTED_TOKENS.light;
+  const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
   const [searchQuery, setSearchQuery] = useState('');
   const [openId, setOpenId] = useState<string | null>(null);
