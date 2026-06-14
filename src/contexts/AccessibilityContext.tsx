@@ -112,7 +112,6 @@ export const AccessibilityProvider: React.FC<AccessibilityProviderProps> = ({
 }) => {
   const systemColorScheme = useColorScheme();
   const [settings, setSettings] = useState<AccessibilitySettings>(DEFAULT_SETTINGS);
-  const [isInitialized, setIsInitialized] = useState(false);
 
   // Initialize settings
   useEffect(() => {
@@ -139,8 +138,6 @@ export const AccessibilityProvider: React.FC<AccessibilityProviderProps> = ({
       } catch {
         // Use defaults
       }
-
-      setIsInitialized(true);
     };
 
     initializeSettings();
@@ -262,10 +259,11 @@ export const AccessibilityProvider: React.FC<AccessibilityProviderProps> = ({
     ]
   );
 
-  if (!isInitialized) {
-    return null; // Or a loading indicator
-  }
-
+  // Render children immediately on DEFAULT_SETTINGS; the async effect above
+  // hydrates AsyncStorage + system values right after. Gating on an
+  // `isInitialized` flag here would blank the whole app for the ~500ms storage
+  // round-trip now that this provider sits near the top of the tree (above
+  // ThemeProvider) — ThemeProvider already follows this render-on-defaults pattern.
   return (
     <AccessibilityContext.Provider value={contextValue}>
       {children}
