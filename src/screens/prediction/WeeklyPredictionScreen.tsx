@@ -668,11 +668,14 @@ const createStyles = (semantic: ReturnType<typeof useSemanticTokens>) => {
       gap: 8,
     },
     bigNumber: {
-      fontSize: 96,
+      // lineHeight(84) >= fontSize(80): RN/iOS clips glyphs that overflow the
+      // lineHeight box, so the old 96/88 pair cut the top/bottom of the digits.
+      // Smaller font + lineHeight ≥ fontSize keeps "25"·"분" fully visible.
+      fontSize: 80,
       fontWeight: '800',
       fontFamily: weightToFontFamily('800'),
-      lineHeight: 88,
-      letterSpacing: -4.8,
+      lineHeight: 84,
+      letterSpacing: -4.0,
       fontVariant: ['tabular-nums'],
     },
     bigUnit: {
