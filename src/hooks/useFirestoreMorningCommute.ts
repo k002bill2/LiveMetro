@@ -28,6 +28,11 @@ import type { CommuteTime } from '@/models/user';
 
 export function useFirestoreMorningCommute(
   uid: string | undefined,
+  // Bump this to force the live subscription to tear down and re-establish —
+  // HomeScreen increments it on screen focus so a returning user always gets a
+  // fresh read even if the prior onSnapshot link went stale. No-op (re-delivers
+  // the same value) when the subscription was already healthy.
+  refreshNonce: number = 0,
 ): CommuteTime | null {
   const [value, setValue] = useState<CommuteTime | null>(null);
 
@@ -76,7 +81,8 @@ export function useFirestoreMorningCommute(
       });
     });
     return unsubscribe;
-  }, [uid]);
+    // refreshNonce is an intentional re-subscribe trigger (see param doc).
+  }, [uid, refreshNonce]);
 
   return value;
 }

@@ -175,4 +175,14 @@ describe('useCommuteHeroEstimate', () => {
     expect(result.current.commuteStationNames.destination).toBe('강남역');
     expect(result.current.commuteStationNames.originLineId).toBe('1');
   });
+
+  it('forwards refreshNonce to the live morning-commute subscription (HomeScreen focus re-read)', () => {
+    renderHook(() => useCommuteHeroEstimate(7));
+    expect(mockUseFirestoreMorningCommute).toHaveBeenCalledWith('u1', 7);
+  });
+
+  it('defaults refreshNonce to 0 for consumers that omit it', () => {
+    renderHook(() => useCommuteHeroEstimate());
+    expect(mockUseFirestoreMorningCommute).toHaveBeenCalledWith('u1', 0);
+  });
 });

@@ -74,7 +74,12 @@ export interface CommuteHeroEstimate {
   hasRealPrediction: boolean;
 }
 
-export function useCommuteHeroEstimate(): CommuteHeroEstimate {
+export function useCommuteHeroEstimate(
+  // Forwarded to useFirestoreMorningCommute's live subscription as a re-subscribe
+  // trigger. HomeScreen bumps it on focus so a returning user gets a fresh read;
+  // other consumers (CommuteSettings / WeeklyPrediction) omit it (default 0).
+  refreshNonce: number = 0,
+): CommuteHeroEstimate {
   const { user } = useAuth();
   const { prediction: mlPrediction, baselineMinutes } = useMLPrediction();
 
@@ -82,7 +87,7 @@ export function useCommuteHeroEstimate(): CommuteHeroEstimate {
   // Profile (#1) wins only when usable — NotificationTimeScreen can leave a
   // non-null morningCommute with empty station ids, and a plain `??` would let
   // that empty object shadow the valid onboarding data (#2).
-  const onboardingMorningCommute = useFirestoreMorningCommute(user?.id);
+  const onboardingMorningCommute = useFirestoreMorningCommute(user?.id, refreshNonce);
   const profileMorningCommute =
     user?.preferences.commuteSchedule?.weekdays?.morningCommute;
   const morningCommute =
