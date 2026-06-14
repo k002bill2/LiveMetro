@@ -30,6 +30,7 @@ import { useAuth } from '@/services/auth/AuthContext';
 import { loadCommuteRoutes, saveCommuteRoutes, updateEveningEnabled } from '@/services/commute/commuteService';
 import { useMLPrediction } from '@/hooks/useMLPrediction';
 import { useCommuteRouteSummary } from '@/hooks/useCommuteRouteSummary';
+import { truncateMinutes } from '@/utils/dateUtils';
 import { CommuteRoute, DEFAULT_COMMUTE_NOTIFICATIONS, DEFAULT_BUFFER_MINUTES } from '@/models/commute';
 import type { SmartFeatures } from '@/models/user';
 import SettingSection from '@/components/settings/SettingSection';
@@ -195,10 +196,14 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
     morningRoute?.departureStation.stationId,
     morningRoute?.arrivalStation.stationId,
   );
-  const heroEtaMinutes =
+  // truncateMinutes (not raw): graph rideMinutes can carry a float tail (e.g.
+  // 25.7) and every displayed minute in the app must be truncated — same SoT as
+  // Home / WeeklyPrediction (memory project_truncate_minutes_display_sot).
+  const heroEtaMinutes = truncateMinutes(
     baselineMinutes !== null
-      ? Math.round(baselineMinutes)
-      : heroRouteSummary.rideMinutes ?? HERO_ETA_PLACEHOLDER_MIN;
+      ? baselineMinutes
+      : heroRouteSummary.rideMinutes ?? HERO_ETA_PLACEHOLDER_MIN,
+  );
   const heroConfidenceMinutes = prediction
     ? confidenceToMinutes(prediction.confidence)
     : HERO_ETA_CONFIDENCE_MIN;
