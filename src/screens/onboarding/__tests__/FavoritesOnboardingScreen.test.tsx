@@ -52,6 +52,54 @@ jest.mock('@/components/design/LineBadge', () => ({
   LineBadge: 'LineBadge',
 }));
 
+// Full-DB station search is delegated to the app-wide StationSearchModal
+// (the same component the post-signup Favorites screen uses). Mock it with
+// two select buttons so we can drive both branches of the onboarding
+// onSelect handler without loading the real station dataset:
+//  - 신논현 (0925): a brand-new station not already in the list
+//  - 강남 (0222): collides BY NAME with the pre-selected route arrival
+//    station (stn-arr / 강남) — exercises the name-based duplicate guard.
+jest.mock('@/components/commute/StationSearchModal', () => ({
+  StationSearchModal: ({ visible, onSelect }: { visible: boolean; onSelect: (s: unknown) => void }) => {
+    const ReactLocal = require('react');
+    const { View, Text, TouchableOpacity } = require('react-native');
+    if (!visible) return null;
+    return ReactLocal.createElement(
+      View,
+      { testID: 'mock-station-search-modal' },
+      ReactLocal.createElement(
+        TouchableOpacity,
+        {
+          testID: 'mock-select-new',
+          onPress: () =>
+            onSelect({ stationId: '0925', stationName: '신논현', lineId: '신분당선', lineName: '신분당선' }),
+        },
+        ReactLocal.createElement(Text, null, '신논현 선택'),
+      ),
+      ReactLocal.createElement(
+        TouchableOpacity,
+        {
+          testID: 'mock-select-dup',
+          onPress: () => onSelect({ stationId: '0222', stationName: '강남', lineId: '2', lineName: '2호선' }),
+        },
+        ReactLocal.createElement(Text, null, '강남 선택'),
+      ),
+      ReactLocal.createElement(
+        TouchableOpacity,
+        {
+          testID: 'mock-select-rec',
+          // 사당 (station_cd 0433) — name collides with the UNSELECTED
+          // recommendation 사당 (slug stn-sadang), which the modal does not
+          // exclude (slug ≠ station_cd). Picking it must select the existing
+          // recommendation row, not silently drop the pick.
+          onPress: () => onSelect({ stationId: '0433', stationName: '사당', lineId: '4', lineName: '4호선' }),
+        },
+        ReactLocal.createElement(Text, null, '사당 선택'),
+      ),
+    );
+  },
+}));
+
 const baseRouteData = {
   departureTime: '08:00',
   departureStation: { stationId: 'stn-dep', stationName: '서울역', lineId: '1', lineName: '1호선' },
@@ -191,5 +239,131 @@ describe('FavoritesOnboardingScreen (step 4/4)', () => {
     });
     expect(mockContextAddFavorite).not.toHaveBeenCalled();
     expect(mockOnComplete).not.toHaveBeenCalled();
+  });
+
+  describe('full station search', () => {
+    it('search modal is hidden until the search bar is tapped', () => {
+      const { queryByTestId, getByTestId } = render(
+        <FavoritesOnboardingScreen navigation={baseNavigation} route={baseRoute} />,
+      );
+      expect(queryByTestId('mock-station-search-modal')).toBeNull();
+      fireEvent.press(getByTestId('favorites-search'));
+      expect(getByTestId('mock-station-search-modal')).toBeTruthy();
+    });
+
+    it('adds a searched station to the list, pre-selected, and counts it', () => {
+      const { getByTestId, queryByTestId } = render(
+        <FavoritesOnboardingScreen navigation={baseNavigation} route={baseRoute} />,
+      );
+      // No 신논현 row before searching.
+      expect(queryByTestId('favorite-row-0925')).toBeNull();
+
+      fireEvent.press(getByTestId('favorites-search'));
+      fireEvent.press(getByTestId('mock-select-new'));
+
+      // Modal closes, the searched station appears as a checked row, and the
+      // selected count rises from 2 (dep+arr) to 3.
+      expect(queryByTestId('mock-station-search-modal')).toBeNull();
+      const newRow = getByTestId('favorite-row-0925');
+      expect(newRow.props.accessibilityState.checked).toBe(true);
+      expect(getByTestId('favorites-selected-count')).toHaveTextContent('3개 선택됨');
+    });
+
+    it('saves a searched station as a favorite on complete (station_cd id)', async () => {
+      mockSaveCommuteRoutes.mockResolvedValue({ success: true });
+      mockContextAddFavorite.mockResolvedValue(undefined);
+
+      const { getByTestId } = render(
+        <FavoritesOnboardingScreen navigation={baseNavigation} route={baseRoute} />,
+      );
+      fireEvent.press(getByTestId('favorites-search'));
+      fireEvent.press(getByTestId('mock-select-new'));
+      fireEvent.press(getByTestId('favorites-cta'));
+
+      await waitFor(() => {
+        // 2 pre-selected route stations + 1 searched station.
+        expect(mockContextAddFavorite).toHaveBeenCalledTimes(3);
+        expect(mockOnComplete).toHaveBeenCalledTimes(1);
+      });
+      expect(mockContextAddFavorite).toHaveBeenCalledWith(
+        expect.objectContaining({ id: '0925', name: '신논현', lineId: '신분당선' }),
+        { isCommuteStation: false },
+      );
+    });
+
+    it('name-based duplicate guard: re-adding an already-listed station does not create a second row', async () => {
+      mockSaveCommuteRoutes.mockResolvedValue({ success: true });
+      mockContextAddFavorite.mockResolvedValue(undefined);
+
+      const { getByTestId, queryByTestId } = render(
+        <FavoritesOnboardingScreen navigation={baseNavigation} route={baseRoute} />,
+      );
+      // 강남 is already present as the route arrival (stn-arr). Selecting the
+      // search result 강남 (0222) must NOT add a separate 0222 row.
+      fireEvent.press(getByTestId('favorites-search'));
+      fireEvent.press(getByTestId('mock-select-dup'));
+
+      expect(queryByTestId('favorite-row-0222')).toBeNull();
+      expect(getByTestId('favorites-selected-count')).toHaveTextContent('2개 선택됨');
+
+      fireEvent.press(getByTestId('favorites-cta'));
+      await waitFor(() => {
+        expect(mockOnComplete).toHaveBeenCalledTimes(1);
+      });
+      // Still only the 2 route stations — no duplicate 강남.
+      expect(mockContextAddFavorite).toHaveBeenCalledTimes(2);
+    });
+
+    it('picking a search result whose name matches an UNSELECTED recommendation selects that recommendation (no silent drop)', async () => {
+      mockSaveCommuteRoutes.mockResolvedValue({ success: true });
+      mockContextAddFavorite.mockResolvedValue(undefined);
+
+      const { getByTestId, queryByTestId } = render(
+        <FavoritesOnboardingScreen navigation={baseNavigation} route={baseRoute} />,
+      );
+      // 사당 is a recommendation but NOT pre-selected.
+      expect(getByTestId('favorite-row-stn-sadang').props.accessibilityState.checked).toBe(false);
+
+      fireEvent.press(getByTestId('favorites-search'));
+      fireEvent.press(getByTestId('mock-select-rec'));
+
+      // The user's intent is honored: the existing 사당 recommendation row
+      // becomes checked, the count rises to 3, and no duplicate 0433 row is
+      // created.
+      expect(getByTestId('favorite-row-stn-sadang').props.accessibilityState.checked).toBe(true);
+      expect(queryByTestId('favorite-row-0433')).toBeNull();
+      expect(getByTestId('favorites-selected-count')).toHaveTextContent('3개 선택됨');
+
+      fireEvent.press(getByTestId('favorites-cta'));
+      await waitFor(() => {
+        expect(mockContextAddFavorite).toHaveBeenCalledTimes(3);
+      });
+      // The recommendation (slug id) is persisted — the pick was not dropped.
+      expect(mockContextAddFavorite).toHaveBeenCalledWith(
+        expect.objectContaining({ id: 'stn-sadang', name: '사당' }),
+        { isCommuteStation: false },
+      );
+    });
+
+    it('re-picking a previously deselected search-added station re-selects it instead of dropping', () => {
+      const { getByTestId } = render(
+        <FavoritesOnboardingScreen navigation={baseNavigation} route={baseRoute} />,
+      );
+      // Add 신논현 via search → checked, count 3.
+      fireEvent.press(getByTestId('favorites-search'));
+      fireEvent.press(getByTestId('mock-select-new'));
+      expect(getByTestId('favorite-row-0925').props.accessibilityState.checked).toBe(true);
+
+      // Deselect it → still rendered, count back to 2.
+      fireEvent.press(getByTestId('favorite-row-0925'));
+      expect(getByTestId('favorite-row-0925').props.accessibilityState.checked).toBe(false);
+      expect(getByTestId('favorites-selected-count')).toHaveTextContent('2개 선택됨');
+
+      // Re-pick it via search → re-selected, no duplicate row, count 3 again.
+      fireEvent.press(getByTestId('favorites-search'));
+      fireEvent.press(getByTestId('mock-select-new'));
+      expect(getByTestId('favorite-row-0925').props.accessibilityState.checked).toBe(true);
+      expect(getByTestId('favorites-selected-count')).toHaveTextContent('3개 선택됨');
+    });
   });
 });

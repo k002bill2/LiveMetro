@@ -8,9 +8,9 @@
  * Layout:
  *  - OnbHeader (step 4, back + skip)
  *  - Title + subtitle
- *  - Search field (filters the recommendation list — wires to a future
- *    full-text search; for now, a simple substring filter against the
- *    static recommendation set)
+ *  - Search bar — taps open the app-wide StationSearchModal (full station
+ *    DB, line filters). Picked stations are appended to the list, pre-
+ *    selected, and persisted alongside the recommendations on complete.
  *  - Recommended stations: 홍대입구 / 강남 / 잠실 / 서울역 / 신촌 / 합정.
  *    Departure + arrival from the previous step are pre-selected and
  *    annotated with their reason ("출발역" / "도착역") so the user sees
@@ -22,7 +22,7 @@
  */
 import React, { useCallback, useMemo, useState } from 'react';
 import { useSemanticTokens } from '@/services/theme';
-import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { ArrowRight, Check, Search, Star } from 'lucide-react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
@@ -36,7 +36,8 @@ import { useOnboardingCallbacks } from '@/navigation/OnboardingNavigator';
 import { OnboardingStackParamList } from '@/navigation/types';
 import { saveCommuteRoutes } from '@/services/commute/commuteService';
 import { useFavorites } from '@/hooks/useFavorites';
-import { CommuteRoute } from '@/models/commute';
+import { StationSearchModal } from '@/components/commute/StationSearchModal';
+import { CommuteRoute, StationSelection } from '@/models/commute';
 import type { OnboardingRouteData } from '@/navigation/types';
 import { Station } from '@/models/train';
 
@@ -122,7 +123,12 @@ export const FavoritesOnboardingScreen: React.FC<Props> = ({ navigation, route }
     return [...fromRoute, ...filtered];
   }, [route.params.route]);
 
-  const [query, setQuery] = useState('');
+  const [searchModalVisible, setSearchModalVisible] = useState(false);
+  // Stations added via the full-DB search modal (station_cd ids). Kept
+  // separate from the static recommendations so the save chain can persist
+  // them too — the recommendation slugs and search station_cds share one
+  // selection Set but distinct origin lists.
+  const [searchAdded, setSearchAdded] = useState<RecommendedStation[]>([]);
   // Pre-select departure + arrival.
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => {
     return new Set([
@@ -132,13 +138,15 @@ export const FavoritesOnboardingScreen: React.FC<Props> = ({ navigation, route }
   });
   const [submitting, setSubmitting] = useState(false);
 
-  const visible = useMemo(() => {
-    if (!query.trim()) return annotated;
-    const q = query.trim().toLowerCase();
-    return annotated.filter(
-      (s) => s.name.toLowerCase().includes(q) || s.nameEn.toLowerCase().includes(q),
-    );
-  }, [query, annotated]);
+  // Recommendations (incl. route stations) + search-added stations. This is
+  // the single pool the list renders and the save chain persists from.
+  const pool = useMemo<RecommendedStation[]>(
+    () => [...annotated, ...searchAdded],
+    [annotated, searchAdded],
+  );
+
+  // Already-listed station_cd ids hide their rows in the search modal.
+  const excludeIds = useMemo(() => Array.from(selectedIds), [selectedIds]);
 
   const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
@@ -151,6 +159,36 @@ export const FavoritesOnboardingScreen: React.FC<Props> = ({ navigation, route }
       return next;
     });
   }, []);
+
+  // Add a station picked from the full-DB search modal. Match against the
+  // pool by BOTH id and name: recommendations use slug ids while the search
+  // returns station_cd, so id alone misses cross-space collisions (mirrors
+  // OnboardingStationPicker's name-based exclude). On a match we SELECT the
+  // existing row rather than rejecting the pick — picking a station already
+  // shown (an unselected recommendation, a sibling-line transfer code, or a
+  // deselected search add) honors the user's intent without a duplicate row.
+  const handleSearchSelect = useCallback(
+    (selection: StationSelection) => {
+      setSearchModalVisible(false);
+      const match = pool.find(
+        (s) => s.id === selection.stationId || s.name === selection.stationName,
+      );
+      if (match) {
+        setSelectedIds((prev) => new Set(prev).add(match.id));
+        return;
+      }
+      const added: RecommendedStation = {
+        id: selection.stationId,
+        name: selection.stationName,
+        nameEn: '',
+        lineIds: [selection.lineId],
+        reason: '검색으로 추가',
+      };
+      setSearchAdded((prev) => [...prev, added]);
+      setSelectedIds((prev) => new Set(prev).add(selection.stationId));
+    },
+    [pool],
+  );
 
   const selectedCount = selectedIds.size;
   const canSubmit = selectedCount > 0 && !submitting;
@@ -196,7 +234,7 @@ export const FavoritesOnboardingScreen: React.FC<Props> = ({ navigation, route }
       //    reloads can race a not-yet-written sibling add out of the final
       //    state. Failures are logged but don't block onComplete — partial
       //    favorites are recoverable later from the Favorites screen.
-      const selected = annotated.filter((r) => selectedIds.has(r.id));
+      const selected = pool.filter((r) => selectedIds.has(r.id));
       for (const s of selected) {
         try {
           await addFavorite(toStationModel(s), {
@@ -222,7 +260,7 @@ export const FavoritesOnboardingScreen: React.FC<Props> = ({ navigation, route }
     user?.id,
     route.params.route,
     route.params.notifications,
-    annotated,
+    pool,
     selectedIds,
     addFavorite,
     onComplete,
@@ -259,25 +297,26 @@ export const FavoritesOnboardingScreen: React.FC<Props> = ({ navigation, route }
           홈 화면 상단에 빠르게 확인할 수 있어요.{'\n'}최소 1개 이상 선택해주세요.
         </Text>
 
-        <View
+        <TouchableOpacity
+          testID="favorites-search"
+          onPress={() => setSearchModalVisible(true)}
+          accessibilityRole="button"
+          accessibilityLabel="전체 역 검색"
           style={[
             styles.searchRow,
             { backgroundColor: semantic.bgSubtlePage, borderColor: semantic.lineSubtle },
           ]}
         >
           <Search size={16} color={semantic.labelAlt} strokeWidth={2} />
-          <TextInput
-            testID="favorites-search"
-            value={query}
-            onChangeText={setQuery}
-            placeholder="역 이름 검색"
-            placeholderTextColor={semantic.labelAlt}
+          <Text
             style={[
               styles.searchInput,
-              { color: semantic.labelStrong, fontFamily: weightToFontFamily('600') },
+              { color: semantic.labelAlt, fontFamily: weightToFontFamily('600') },
             ]}
-          />
-        </View>
+          >
+            전체 역 검색
+          </Text>
+        </TouchableOpacity>
 
         <View style={styles.sectionRow}>
           <Text
@@ -300,7 +339,7 @@ export const FavoritesOnboardingScreen: React.FC<Props> = ({ navigation, route }
         </View>
 
         <View style={styles.list} testID="favorites-list">
-          {visible.map((s) => {
+          {pool.map((s) => {
             const selected = selectedIds.has(s.id);
             const recommended = isRecommended(s.id);
             return (
@@ -429,6 +468,15 @@ export const FavoritesOnboardingScreen: React.FC<Props> = ({ navigation, route }
           ) : null}
         </TouchableOpacity>
       </ScrollView>
+
+      <StationSearchModal
+        visible={searchModalVisible}
+        onClose={() => setSearchModalVisible(false)}
+        onSelect={handleSearchSelect}
+        title="역 검색"
+        placeholder="자주 가는 역을 검색하세요"
+        excludeStationIds={excludeIds}
+      />
     </SafeAreaView>
   );
 };
