@@ -117,7 +117,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       emailNotifications: false,
       soundSettings: {
         soundEnabled: true,
-        soundId: 'default',
+        soundId: 'chime',
         volume: 80,
         vibrationEnabled: true,
         vibrationPattern: 'default',

@@ -10,6 +10,7 @@ import {
   VIBRATION_PATTERNS,
   getVibrationPattern,
 } from '../soundService';
+import type { NotificationSoundId } from '@/models/user';
 
 // Mock react-native
 jest.mock('react-native', () => ({
@@ -28,19 +29,23 @@ describe('SoundService', () => {
   });
 
   describe('NOTIFICATION_SOUNDS', () => {
-    it('should have 6 sound options', () => {
-      expect(NOTIFICATION_SOUNDS).toHaveLength(6);
+    it('should have 4 curated sound options', () => {
+      expect(NOTIFICATION_SOUNDS).toHaveLength(4);
     });
 
-    it('should include silent option', () => {
-      const silent = NOTIFICATION_SOUNDS.find(s => s.id === 'silent');
-      expect(silent).toBeDefined();
-      expect(silent?.label).toBe('무음');
+    it('should expose exactly the curated ids in order', () => {
+      expect(NOTIFICATION_SOUNDS.map(s => s.id)).toEqual([
+        'chime',
+        'doorbell',
+        'beep',
+        'wave',
+      ]);
     });
 
-    it('should include default option', () => {
-      const def = NOTIFICATION_SOUNDS.find(s => s.id === 'default');
-      expect(def).toBeDefined();
+    it('should include the chime option (default selection)', () => {
+      const chime = NOTIFICATION_SOUNDS.find(s => s.id === 'chime');
+      expect(chime).toBeDefined();
+      expect(chime?.label).toBe('차임');
     });
   });
 
@@ -94,18 +99,22 @@ describe('SoundService', () => {
   });
 
   describe('previewSound', () => {
-    it('should show alert for non-silent sound', async () => {
-      await soundService.previewSound('default', 0.5);
+    it('should show alert containing the selected sound label', async () => {
+      await soundService.previewSound('chime', 0.5);
       expect(Alert.alert).toHaveBeenCalledWith(
         '알림음 미리듣기',
-        expect.stringContaining('기본음'),
+        expect.stringContaining('차임'),
         expect.any(Array)
       );
     });
 
-    it('should not show alert for silent sound', async () => {
-      await soundService.previewSound('silent', 0.5);
-      expect(Alert.alert).not.toHaveBeenCalled();
+    it('should show alert for every curated sound (no silent early-return)', async () => {
+      await soundService.previewSound('beep', 0.5);
+      expect(Alert.alert).toHaveBeenCalledWith(
+        '알림음 미리듣기',
+        expect.stringContaining('비프'),
+        expect.any(Array)
+      );
     });
   });
 
@@ -149,15 +158,18 @@ describe('SoundService', () => {
   });
 
   describe('getSoundUrl', () => {
-    it('should return URL for known sound', () => {
-      const url = soundService.getSoundUrl('default');
+    it('should return URL for a known sound', () => {
+      const url = soundService.getSoundUrl('chime');
       expect(url).toContain('http');
     });
 
-    it('should return default URL for silent (fallback)', () => {
-      const url = soundService.getSoundUrl('silent');
-      // Silent maps to '' but getSoundUrl has || DEFAULT fallback
-      expect(typeof url).toBe('string');
+    it('should fall back to the default URL for a legacy/unknown id', () => {
+      // Persisted prefs may still hold pre-redesign ids (e.g. 'gentle_bell').
+      // getSoundUrl's `|| DEFAULT_SOUND_URL` keeps them crash-free.
+      const url = soundService.getSoundUrl(
+        'gentle_bell' as unknown as NotificationSoundId
+      );
+      expect(url).toContain('http');
     });
   });
 

@@ -1,6 +1,8 @@
 /**
  * SoundSettingsScreen Test Suite
- * Tests sound settings rendering and notification toggles
+ * Tests the Wanted "소리 설정" redesign: alert-mode grid, vibration row,
+ * volume, inline sound radio list, per-event gates, email channel, footer,
+ * and the sound/vibration gating (honesty: no push toggle, no test buttons).
  */
 
 // Mock modules BEFORE imports (Jest hoisting)
@@ -8,15 +10,13 @@ import React from 'react';
 import { render } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import { SoundSettingsScreen } from '../SoundSettingsScreen';
-import { useAuth } from '@/services/auth/AuthContext';
-import { soundService } from '@/services/sound/soundService';
 
 // Import actual React Testing Library utilities after mocks
 import { fireEvent, waitFor } from '@testing-library/react-native';
 
-// Proxy stubs every lucide icon name → its own string component. Post Wanted
-// handoff redesign, ALERT_MODES uses dynamic mode.Icon (BellRing / BellOff /
-// Volume2 / Smartphone) so an explicit-only mock would render undefined.
+// Proxy stubs every lucide icon name → its own string component. ALERT_MODES
+// uses dynamic mode.Icon (BellRing / Volume2 / Smartphone / BellOff) so an
+// explicit-only mock would render undefined.
 jest.mock('lucide-react-native', () =>
   new Proxy(
     {},
@@ -38,90 +38,50 @@ jest.mock('@react-navigation/native', () => ({
 }));
 
 jest.mock('@/services/auth/AuthContext', () => ({
-  useAuth: jest.fn(() => ({
-    user: {
-      uid: 'test-uid',
-      displayName: 'Test User',
-      email: 'test@example.com',
-      isAnonymous: false,
-      preferences: {
-        notificationSettings: {
-          pushNotifications: true,
-          emailNotifications: false,
-          soundSettings: {
-            soundEnabled: true,
-            soundId: 'default',
-            volume: 80,
-            vibrationEnabled: true,
-            vibrationPattern: 'default',
-          },
-        },
-      },
-    },
-    updateUserPreferences: jest.fn(() => Promise.resolve()),
-  })),
+  useAuth: jest.fn(),
 }));
 
 jest.mock('@/services/theme', () => ({
   useSemanticTokens: jest.fn(() => jest.requireActual('@/styles/modernTheme').WANTED_TOKENS.light),
-  useTheme: () => ({
-    colors: {
-      primary: '#007AFF',
-      background: '#FFFFFF',
-      backgroundSecondary: '#F2F2F7',
-      surface: '#FFFFFF',
-      textPrimary: '#000000',
-      textSecondary: '#8E8E93',
-      textTertiary: '#C7C7CC',
-      borderLight: '#E5E5EA',
-      borderMedium: '#D1D1D6',
-    },
-  }),
 }));
 
-jest.mock('@/hooks/useNotifications', () => ({
-  useNotifications: jest.fn(() => ({
-    sendTestNotification: jest.fn(() => Promise.resolve(true)),
-  })),
-}));
-
+// Real 4-id shape so the legacy-soundId fallback ('default' → 'chime') is
+// exercised correctly. Intentionally NO 'default' id here.
 jest.mock('@/services/sound/soundService', () => ({
   soundService: {
     initialize: jest.fn(),
-    cleanup: jest.fn(),
-    playSound: jest.fn(),
+    cleanup: jest.fn(() => Promise.resolve()),
+    previewSound: jest.fn(),
+    previewVibration: jest.fn(),
   },
   NOTIFICATION_SOUNDS: [
-    { id: 'default', name: '기본', file: 'default.mp3' },
-    { id: 'chime', name: '차임', file: 'chime.mp3' },
+    { id: 'chime', label: '차임', description: '부드러운 종소리' },
+    { id: 'doorbell', label: '도어벨', description: '지하철 안내음' },
+    { id: 'beep', label: '비프', description: '짧고 명료' },
+    { id: 'wave', label: '웨이브', description: '잔잔한 파도' },
   ],
   VIBRATION_PATTERNS: [
-    { id: 'default', name: '기본', pattern: [0, 250] },
-    { id: 'strong', name: '강하게', pattern: [0, 500] },
+    { id: 'default', label: '기본', description: '표준 진동', pattern: [0, 250] },
+    { id: 'short', label: '짧게', description: '간단한 진동', pattern: [0, 100] },
   ],
-}));
-
-jest.mock('@/services/email/emailService', () => ({
-  emailNotificationService: {
-    sendTestEmail: jest.fn(() => Promise.resolve(true)),
-  },
 }));
 
 jest.mock('@/components/settings/SettingSection', () => {
-  const React = require('react');
+  const ReactLocal = require('react');
   const { View, Text } = require('react-native');
   return {
     __esModule: true,
-    default: ({ title, children }: { title: string; children: React.ReactNode }) =>
-      React.createElement(View, { testID: `section-${title}` },
-        React.createElement(Text, null, title),
+    default: ({ title, trailing, children }: { title?: string; trailing?: React.ReactNode; children: React.ReactNode }) =>
+      ReactLocal.createElement(View, { testID: `section-${title}` },
+        title && ReactLocal.createElement(Text, null, title),
+        trailing,
         children,
       ),
   };
 });
 
 jest.mock('@/components/settings/SettingToggle', () => {
-  const React = require('react');
+  const ReactLocal = require('react');
   const { View, Text, Switch } = require('react-native');
   return {
     __esModule: true,
@@ -129,10 +89,10 @@ jest.mock('@/components/settings/SettingToggle', () => {
       label: string; subtitle?: string; value: boolean;
       onValueChange: (v: boolean) => void; disabled?: boolean;
     }) =>
-      React.createElement(View, { testID: `toggle-${label}` },
-        React.createElement(Text, null, label),
-        subtitle && React.createElement(Text, null, subtitle),
-        React.createElement(Switch, {
+      ReactLocal.createElement(View, { testID: `toggle-${label}` },
+        ReactLocal.createElement(Text, null, label),
+        subtitle && ReactLocal.createElement(Text, null, subtitle),
+        ReactLocal.createElement(Switch, {
           testID: `switch-${label}`,
           value,
           onValueChange,
@@ -142,267 +102,287 @@ jest.mock('@/components/settings/SettingToggle', () => {
   };
 });
 
-jest.mock('@/components/settings/SettingSlider', () => {
-  const React = require('react');
-  const { View, Text } = require('react-native');
+// Exposes a pressable control so handleVolumeChange is exercised.
+jest.mock('@/components/settings/VolumeSlider', () => {
+  const ReactLocal = require('react');
+  const { View, Text, TouchableOpacity } = require('react-native');
   return {
     __esModule: true,
-    default: ({ label, value }: { label: string; value: number }) =>
-      React.createElement(View, { testID: `slider-${label}` },
-        React.createElement(Text, null, label),
-        React.createElement(Text, null, `${value}`),
+    default: ({ value, onValueChange, disabled }: {
+      value: number; onValueChange: (v: number) => void; disabled?: boolean;
+    }) =>
+      ReactLocal.createElement(View, { testID: 'volume-slider', accessibilityState: { disabled: !!disabled } },
+        ReactLocal.createElement(Text, null, `${value}`),
+        ReactLocal.createElement(TouchableOpacity, {
+          testID: 'volume-set-40',
+          disabled,
+          onPress: () => onValueChange(40),
+        }),
       ),
   };
 });
 
-jest.mock('@/components/settings/SoundPicker', () => {
-  const React = require('react');
-  const { View, Text } = require('react-native');
+// Renders one pressable row per sound option (label + onValueChange) so both
+// the option labels (차임/도어벨/비프/웨이브) and selection writes are testable.
+jest.mock('@/components/settings/SoundRadioList', () => {
+  const ReactLocal = require('react');
+  const { View, Text, TouchableOpacity } = require('react-native');
   return {
     __esModule: true,
-    default: ({ label }: { label: string }) =>
-      React.createElement(View, { testID: `sound-picker-${label}` },
-        React.createElement(Text, null, label),
+    default: ({ options, value, onValueChange, disabled }: {
+      options: readonly { id: string; label: string }[];
+      value: string; onValueChange: (id: string) => void; disabled?: boolean;
+    }) =>
+      ReactLocal.createElement(View, { testID: 'sound-radio-list', accessibilityState: { disabled: !!disabled } },
+        ReactLocal.createElement(Text, { testID: 'sound-radio-value' }, value),
+        ...options.map((option) =>
+          ReactLocal.createElement(TouchableOpacity, {
+            key: option.id,
+            testID: `sound-option-${option.id}`,
+            disabled,
+            onPress: () => onValueChange(option.id),
+          },
+            ReactLocal.createElement(Text, { testID: `sound-option-label-${option.id}` }, option.label),
+          ),
+        ),
       ),
   };
 });
 
+// Exposes the selected option label (value), subtitle, and a pressable to fire onValueChange.
 jest.mock('@/components/settings/VibrationPicker', () => {
-  const React = require('react');
-  const { View, Text } = require('react-native');
+  const ReactLocal = require('react');
+  const { View, Text, TouchableOpacity } = require('react-native');
   return {
     __esModule: true,
-    default: ({ label }: { label: string }) =>
-      React.createElement(View, { testID: `vibration-picker-${label}` },
-        React.createElement(Text, null, label),
-      ),
+    default: ({ label, subtitle, options, value, onValueChange, disabled }: {
+      label: string; subtitle?: string;
+      options: readonly { id: string; label: string }[];
+      value: string; onValueChange: (id: string) => void; disabled?: boolean;
+    }) => {
+      const selected = options.find((o) => o.id === value);
+      return ReactLocal.createElement(View, { testID: 'vibration-picker', accessibilityState: { disabled: !!disabled } },
+        ReactLocal.createElement(Text, { testID: 'vibration-label' }, label),
+        subtitle && ReactLocal.createElement(Text, { testID: 'vibration-subtitle' }, subtitle),
+        ReactLocal.createElement(Text, { testID: 'vibration-value' }, selected ? selected.label : ''),
+        ReactLocal.createElement(TouchableOpacity, {
+          testID: 'vibration-set-short',
+          disabled,
+          onPress: () => onValueChange('short'),
+        }),
+      );
+    },
   };
+});
+
+const baseUser = (
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> => ({
+  uid: 'test-uid',
+  displayName: 'Test User',
+  email: 'test@example.com',
+  isAnonymous: false,
+  preferences: {
+    notificationSettings: {
+      pushNotifications: true,
+      emailNotifications: false,
+      soundSettings: {
+        soundEnabled: true,
+        soundId: 'chime',
+        volume: 70,
+        vibrationEnabled: true,
+        vibrationPattern: 'default',
+      },
+      perEventSound: {
+        trainArrival: true,
+        delayDetected: true,
+        communityReport: false,
+      },
+      ...((overrides.notificationSettings as object) ?? {}),
+    },
+  },
+  ...overrides,
 });
 
 describe('SoundSettingsScreen', () => {
   let mockUpdateUserPreferences: jest.Mock;
-  let mockSendTestNotification: jest.Mock;
-  let mockSendTestEmail: jest.Mock;
+  let mockUseAuth: jest.Mock;
+
+  const setUser = (user: unknown): void => {
+    mockUseAuth.mockReturnValue({ user, updateUserPreferences: mockUpdateUserPreferences });
+  };
 
   beforeEach(() => {
     jest.clearAllMocks();
     jest.spyOn(Alert, 'alert').mockImplementation(() => {});
 
     mockUpdateUserPreferences = jest.fn(() => Promise.resolve());
-    mockSendTestNotification = jest.fn(() => Promise.resolve(true));
-    mockSendTestEmail = jest.fn(() => Promise.resolve(true));
+    mockUseAuth = require('@/services/auth/AuthContext').useAuth as jest.Mock;
 
-    // Get the mocked useAuth and set return value
-    const { useAuth: mockUseAuth } = require('@/services/auth/AuthContext');
-    mockUseAuth.mockReturnValue({
-      user: {
-        uid: 'test-uid',
-        displayName: 'Test User',
-        email: 'test@example.com',
-        isAnonymous: false,
-        preferences: {
-          notificationSettings: {
-            pushNotifications: true,
-            emailNotifications: false,
-            soundSettings: {
-              soundEnabled: true,
-              soundId: 'default',
-              volume: 80,
-              vibrationEnabled: true,
-              vibrationPattern: 'default',
-            },
-          },
-        },
-      },
-      updateUserPreferences: mockUpdateUserPreferences,
-    });
-
-    // Get the mocked useNotifications and set return value
-    const { useNotifications: mockUseNotifications } = require('@/hooks/useNotifications');
-    mockUseNotifications.mockReturnValue({
-      sendTestNotification: mockSendTestNotification,
-    });
-
-    // Get the mocked emailNotificationService and set sendTestEmail
-    const { emailNotificationService } = require('@/services/email/emailService');
-    emailNotificationService.sendTestEmail = mockSendTestEmail;
+    setUser(baseUser());
   });
 
-  describe('Rendering', () => {
-    it('renders notification methods section', () => {
-      const { getByText } = render(<SoundSettingsScreen />);
-
-      expect(getByText('알림 방식')).toBeTruthy();
-      expect(getByText('푸시 알림')).toBeTruthy();
-      expect(getByText('이메일 알림')).toBeTruthy();
-    });
-
-    it('renders sound effects section', () => {
-      const { getByText } = render(<SoundSettingsScreen />);
-
-      expect(getByText('알림 효과')).toBeTruthy();
-      expect(getByText('알림음')).toBeTruthy();
-      expect(getByText('진동')).toBeTruthy();
-    });
-
-    it('shows sound picker and volume slider when sound is enabled', () => {
-      const { getByText } = render(<SoundSettingsScreen />);
-
-      expect(getByText('알림음 선택')).toBeTruthy();
-      expect(getByText('볼륨')).toBeTruthy();
-    });
-
-    it('shows vibration picker when vibration is enabled', () => {
-      const { getByText } = render(<SoundSettingsScreen />);
-
-      expect(getByText('진동 패턴')).toBeTruthy();
-    });
-
-    it('renders test notification button', () => {
-      const { getByText } = render(<SoundSettingsScreen />);
-
-      expect(getByText('테스트 알림 보내기')).toBeTruthy();
-    });
-
-    it('renders info box about push notifications', () => {
-      const { getByText } = render(<SoundSettingsScreen />);
-
-      expect(getByText(/푸시 알림이 켜져 있어야/)).toBeTruthy();
-    });
-
-    it('shows test email button when email notifications are enabled', () => {
-      const { useAuth: mockUseAuth } = require('@/services/auth/AuthContext');
-      mockUseAuth.mockReturnValueOnce({
-        user: {
-          uid: 'test-uid',
-          displayName: 'Test User',
-          email: 'test@example.com',
-          isAnonymous: false,
-          preferences: {
-            notificationSettings: {
-              pushNotifications: true,
-              emailNotifications: true,
-              soundSettings: {
-                soundEnabled: true,
-                soundId: 'default',
-                volume: 80,
-                vibrationEnabled: true,
-                vibrationPattern: 'default',
-              },
-            },
-          },
-        },
-        updateUserPreferences: mockUpdateUserPreferences,
-      });
-
-      const { getByText } = render(<SoundSettingsScreen />);
-
-      expect(getByText('테스트 이메일 보내기')).toBeTruthy();
-    });
-
-    it('renders disabled email toggle subtitle for anonymous users', () => {
-      const { useAuth: mockUseAuth } = require('@/services/auth/AuthContext');
-      mockUseAuth.mockReturnValueOnce({
-        user: {
-          uid: 'test-uid',
-          displayName: 'Anonymous User',
-          email: null,
-          isAnonymous: true,
-          preferences: {
-            notificationSettings: {
-              pushNotifications: true,
-              emailNotifications: false,
-              soundSettings: {
-                soundEnabled: true,
-                soundId: 'default',
-                volume: 80,
-                vibrationEnabled: true,
-                vibrationPattern: 'default',
-              },
-            },
-          },
-        },
-        updateUserPreferences: mockUpdateUserPreferences,
-      });
-
-      const { getByText } = render(<SoundSettingsScreen />);
-
-      expect(getByText('이메일 로그인 필요')).toBeTruthy();
-    });
-
-    it('renders disabled email toggle subtitle when user has no email', () => {
-      const { useAuth: mockUseAuth } = require('@/services/auth/AuthContext');
-      mockUseAuth.mockReturnValueOnce({
-        user: {
-          uid: 'test-uid',
-          displayName: 'Test User',
-          email: null,
-          isAnonymous: false,
-          preferences: {
-            notificationSettings: {
-              pushNotifications: true,
-              emailNotifications: false,
-              soundSettings: {
-                soundEnabled: true,
-                soundId: 'default',
-                volume: 80,
-                vibrationEnabled: true,
-                vibrationPattern: 'default',
-              },
-            },
-          },
-        },
-        updateUserPreferences: mockUpdateUserPreferences,
-      });
-
-      const { getByText } = render(<SoundSettingsScreen />);
-
-      expect(getByText('이메일 로그인 필요')).toBeTruthy();
-    });
-  });
-
-  describe('User Interactions - Push Notifications', () => {
-    it('toggles push notifications', async () => {
+  describe('Rendering — section structure', () => {
+    it('renders all six titled sections in the redesign order', () => {
       const { getByTestId } = render(<SoundSettingsScreen />);
 
-      const pushSwitch = getByTestId('switch-푸시 알림');
-      fireEvent(pushSwitch, 'valueChange', false);
+      // Section containers aggregate title + trailing + children text, so a
+      // regex (substring) assertion confirms each title is present.
+      expect(getByTestId('section-알림 방식')).toHaveTextContent(/알림 방식/);
+      expect(getByTestId('section-진동')).toHaveTextContent(/진동/);
+      expect(getByTestId('section-알림 볼륨')).toHaveTextContent(/알림 볼륨/);
+      expect(getByTestId('section-알림음')).toHaveTextContent(/알림음/);
+      expect(getByTestId('section-이벤트별')).toHaveTextContent(/이벤트별/);
+      expect(getByTestId('section-알림 채널')).toHaveTextContent(/알림 채널/);
+    });
+
+    it('renders the four alert-mode cards with their labels', () => {
+      // Card labels are queried via accessibilityLabel because '무음' is also
+      // a subtitle on the 진동만 card (duplicate-text collision otherwise).
+      const { getByLabelText } = render(<SoundSettingsScreen />);
+
+      expect(getByLabelText('소리 + 진동')).toHaveTextContent('소리 + 진동모든 채널');
+      expect(getByLabelText('소리만')).toHaveTextContent('소리만진동 없음');
+      expect(getByLabelText('진동만')).toHaveTextContent('진동만무음');
+      expect(getByLabelText('무음')).toHaveTextContent('무음배지만');
+    });
+
+    it('renders the vibration picker row with its label and subtitle', () => {
+      const { getByTestId } = render(<SoundSettingsScreen />);
+
+      expect(getByTestId('vibration-label')).toHaveTextContent('진동 패턴');
+      expect(getByTestId('vibration-subtitle')).toHaveTextContent('알림이 울릴 때의 진동 세기');
+    });
+
+    it('renders the vibration picker with the current pattern value (기본)', () => {
+      const { getByTestId } = render(<SoundSettingsScreen />);
+
+      expect(getByTestId('vibration-value')).toHaveTextContent('기본');
+    });
+
+    it('renders the volume slider with the current volume value', () => {
+      const { getByTestId } = render(<SoundSettingsScreen />);
+
+      expect(getByTestId('volume-slider')).toHaveTextContent('70');
+    });
+
+    it('renders the volume percentage in the section header trailing slot', () => {
+      const { getByText } = render(<SoundSettingsScreen />);
+
+      expect(getByText('70%')).toHaveTextContent('70%');
+    });
+
+    it('renders the inline sound radio list with all four sound options', () => {
+      const { getByTestId } = render(<SoundSettingsScreen />);
+
+      expect(getByTestId('sound-option-label-chime')).toHaveTextContent('차임');
+      expect(getByTestId('sound-option-label-doorbell')).toHaveTextContent('도어벨');
+      expect(getByTestId('sound-option-label-beep')).toHaveTextContent('비프');
+      expect(getByTestId('sound-option-label-wave')).toHaveTextContent('웨이브');
+    });
+
+    it('renders the three per-event toggles with their labels', () => {
+      const { getByTestId } = render(<SoundSettingsScreen />);
+
+      expect(getByTestId('toggle-열차 도착')).toHaveTextContent('열차 도착3분 전 알림');
+      expect(getByTestId('toggle-지연 발생')).toHaveTextContent('지연 발생실시간 지연');
+      expect(getByTestId('toggle-실시간 제보')).toHaveTextContent('실시간 제보검증된 제보 도착 시');
+    });
+
+    it('renders the email channel toggle with its label', () => {
+      const { getByTestId } = render(<SoundSettingsScreen />);
+
+      expect(getByTestId('toggle-이메일 알림')).toHaveTextContent('이메일 알림중요 업데이트 이메일로 수신');
+    });
+
+    it('renders the footer copy', () => {
+      const { getByText } = render(<SoundSettingsScreen />);
+
+      expect(getByText('개별 이벤트마다 소리를 끄거나 켤 수 있어요.')).toHaveTextContent('개별 이벤트마다 소리를 끄거나 켤 수 있어요.');
+    });
+  });
+
+  describe('Honesty — removed UI must NOT exist', () => {
+    it('does not render a push notifications toggle', () => {
+      const { queryByTestId } = render(<SoundSettingsScreen />);
+      expect(queryByTestId('toggle-푸시 알림')).toBeNull();
+    });
+
+    it('does not render any test buttons', () => {
+      const { queryByText } = render(<SoundSettingsScreen />);
+      expect(queryByText('테스트 알림 보내기')).toBeNull();
+      expect(queryByText('테스트 이메일 보내기')).toBeNull();
+    });
+
+    it('does not render the push-notification info box', () => {
+      const { queryByText } = render(<SoundSettingsScreen />);
+      expect(queryByText(/푸시 알림이 켜져 있어야/)).toBeNull();
+    });
+  });
+
+  describe('Legacy soundId fallback', () => {
+    it('falls back to chime when the stored soundId is not a known sound', () => {
+      setUser(baseUser({
+        notificationSettings: {
+          pushNotifications: true,
+          emailNotifications: false,
+          soundSettings: {
+            soundEnabled: true,
+            soundId: 'default',
+            volume: 70,
+            vibrationEnabled: true,
+            vibrationPattern: 'default',
+          },
+        },
+      }));
+
+      const { getByTestId } = render(<SoundSettingsScreen />);
+      expect(getByTestId('sound-radio-value')).toHaveTextContent('chime');
+    });
+
+    it('keeps a valid stored soundId unchanged', () => {
+      setUser(baseUser({
+        notificationSettings: {
+          pushNotifications: true,
+          emailNotifications: false,
+          soundSettings: {
+            soundEnabled: true,
+            soundId: 'beep',
+            volume: 70,
+            vibrationEnabled: true,
+            vibrationPattern: 'default',
+          },
+        },
+      }));
+
+      const { getByTestId } = render(<SoundSettingsScreen />);
+      expect(getByTestId('sound-radio-value')).toHaveTextContent('beep');
+    });
+  });
+
+  describe('Sound selection', () => {
+    it('selecting a sound writes the new soundId (doorbell ≠ current chime)', async () => {
+      const { getByTestId } = render(<SoundSettingsScreen />);
+
+      fireEvent.press(getByTestId('sound-option-doorbell'));
 
       await waitFor(() => {
         expect(mockUpdateUserPreferences).toHaveBeenCalledWith(
           expect.objectContaining({
             notificationSettings: expect.objectContaining({
-              pushNotifications: false,
+              soundSettings: expect.objectContaining({ soundId: 'doorbell' }),
             }),
-          })
+          }),
         );
       });
     });
 
-    it('preserves other notification settings when toggling push notifications', async () => {
-      const { getByTestId } = render(<SoundSettingsScreen />);
-
-      const pushSwitch = getByTestId('switch-푸시 알림');
-      fireEvent(pushSwitch, 'valueChange', false);
-
-      await waitFor(() => {
-        expect(mockUpdateUserPreferences).toHaveBeenCalledWith(
-          expect.objectContaining({
-            notificationSettings: expect.objectContaining({
-              emailNotifications: false,
-            }),
-          })
-        );
-      });
-    });
-
-    it('shows error alert when push notification toggle fails', async () => {
+    it('shows an error alert when the sound write fails', async () => {
       mockUpdateUserPreferences.mockRejectedValueOnce(new Error('Update failed'));
 
       const { getByTestId } = render(<SoundSettingsScreen />);
 
-      const pushSwitch = getByTestId('switch-푸시 알림');
-      fireEvent(pushSwitch, 'valueChange', false);
+      fireEvent.press(getByTestId('sound-option-wave'));
 
       await waitFor(() => {
         expect(Alert.alert).toHaveBeenCalledWith('오류', '설정 저장에 실패했습니다.');
@@ -410,61 +390,29 @@ describe('SoundSettingsScreen', () => {
     });
   });
 
-  describe('User Interactions - Email Notifications', () => {
-    it('toggles email notifications when user has email', async () => {
+  describe('Volume change', () => {
+    it('changing the volume writes the new volume value', async () => {
       const { getByTestId } = render(<SoundSettingsScreen />);
 
-      const emailSwitch = getByTestId('switch-이메일 알림');
-      fireEvent(emailSwitch, 'valueChange', true);
+      fireEvent.press(getByTestId('volume-set-40'));
 
       await waitFor(() => {
         expect(mockUpdateUserPreferences).toHaveBeenCalledWith(
           expect.objectContaining({
             notificationSettings: expect.objectContaining({
-              emailNotifications: true,
+              soundSettings: expect.objectContaining({ volume: 40 }),
             }),
-          })
+          }),
         );
       });
     });
 
-    it('does not toggle email notifications for anonymous users', async () => {
-      const { useAuth: mockUseAuth } = require('@/services/auth/AuthContext');
-      mockUseAuth.mockReturnValueOnce({
-        user: {
-          uid: 'test-uid',
-          email: null,
-          isAnonymous: true,
-          preferences: {
-            notificationSettings: {
-              pushNotifications: true,
-              emailNotifications: false,
-              soundSettings: {
-                soundEnabled: true,
-                soundId: 'default',
-                volume: 80,
-                vibrationEnabled: true,
-                vibrationPattern: 'default',
-              },
-            },
-          },
-        },
-        updateUserPreferences: mockUpdateUserPreferences,
-      });
-
-      const { getByTestId } = render(<SoundSettingsScreen />);
-
-      const emailSwitch = getByTestId('switch-이메일 알림');
-      expect(emailSwitch).toBeTruthy(); // Switch is rendered but disabled
-    });
-
-    it('shows error alert when email notification toggle fails', async () => {
+    it('shows an error alert when the volume write fails', async () => {
       mockUpdateUserPreferences.mockRejectedValueOnce(new Error('Update failed'));
 
       const { getByTestId } = render(<SoundSettingsScreen />);
 
-      const emailSwitch = getByTestId('switch-이메일 알림');
-      fireEvent(emailSwitch, 'valueChange', true);
+      fireEvent.press(getByTestId('volume-set-40'));
 
       await waitFor(() => {
         expect(Alert.alert).toHaveBeenCalledWith('오류', '설정 저장에 실패했습니다.');
@@ -472,12 +420,127 @@ describe('SoundSettingsScreen', () => {
     });
   });
 
-  describe('User Interactions - Sound Settings', () => {
-    it('toggles sound enabled', async () => {
+  describe('Vibration pattern change', () => {
+    it('changing the vibration pattern writes the new pattern id', async () => {
       const { getByTestId } = render(<SoundSettingsScreen />);
 
-      const soundSwitch = getByTestId('switch-알림음');
-      fireEvent(soundSwitch, 'valueChange', false);
+      fireEvent.press(getByTestId('vibration-set-short'));
+
+      await waitFor(() => {
+        expect(mockUpdateUserPreferences).toHaveBeenCalledWith(
+          expect.objectContaining({
+            notificationSettings: expect.objectContaining({
+              soundSettings: expect.objectContaining({ vibrationPattern: 'short' }),
+            }),
+          }),
+        );
+      });
+    });
+
+    it('shows an error alert when the vibration pattern write fails', async () => {
+      mockUpdateUserPreferences.mockRejectedValueOnce(new Error('Update failed'));
+
+      const { getByTestId } = render(<SoundSettingsScreen />);
+
+      fireEvent.press(getByTestId('vibration-set-short'));
+
+      await waitFor(() => {
+        expect(Alert.alert).toHaveBeenCalledWith('오류', '설정 저장에 실패했습니다.');
+      });
+    });
+  });
+
+  describe('Gating — sound off / vibration off', () => {
+    it('disables volume + sound list when sound is off (진동만 mode)', () => {
+      setUser(baseUser({
+        notificationSettings: {
+          pushNotifications: true,
+          emailNotifications: false,
+          soundSettings: {
+            soundEnabled: false,
+            soundId: 'chime',
+            volume: 70,
+            vibrationEnabled: true,
+            vibrationPattern: 'default',
+          },
+        },
+      }));
+
+      const { getByTestId } = render(<SoundSettingsScreen />);
+      expect(getByTestId('volume-slider').props.accessibilityState.disabled).toBe(true);
+      expect(getByTestId('sound-radio-list').props.accessibilityState.disabled).toBe(true);
+      // Vibration stays enabled.
+      expect(getByTestId('vibration-picker').props.accessibilityState.disabled).toBe(false);
+    });
+
+    it('disables the vibration row when vibration is off (소리만 mode)', () => {
+      setUser(baseUser({
+        notificationSettings: {
+          pushNotifications: true,
+          emailNotifications: false,
+          soundSettings: {
+            soundEnabled: true,
+            soundId: 'chime',
+            volume: 70,
+            vibrationEnabled: false,
+            vibrationPattern: 'default',
+          },
+        },
+      }));
+
+      const { getByTestId } = render(<SoundSettingsScreen />);
+      expect(getByTestId('vibration-picker').props.accessibilityState.disabled).toBe(true);
+      // Sound side stays enabled.
+      expect(getByTestId('volume-slider').props.accessibilityState.disabled).toBe(false);
+      expect(getByTestId('sound-radio-list').props.accessibilityState.disabled).toBe(false);
+    });
+
+    it('disables both sides in 무음 mode', () => {
+      setUser(baseUser({
+        notificationSettings: {
+          pushNotifications: true,
+          emailNotifications: false,
+          soundSettings: {
+            soundEnabled: false,
+            soundId: 'chime',
+            volume: 70,
+            vibrationEnabled: false,
+            vibrationPattern: 'default',
+          },
+        },
+      }));
+
+      const { getByTestId } = render(<SoundSettingsScreen />);
+      expect(getByTestId('volume-slider').props.accessibilityState.disabled).toBe(true);
+      expect(getByTestId('sound-radio-list').props.accessibilityState.disabled).toBe(true);
+      expect(getByTestId('vibration-picker').props.accessibilityState.disabled).toBe(true);
+    });
+  });
+
+  describe('Alert mode grid interactions', () => {
+    it('selects 소리만 mode → writes soundEnabled true / vibrationEnabled false', async () => {
+      const { getByLabelText } = render(<SoundSettingsScreen />);
+
+      fireEvent.press(getByLabelText('소리만'));
+
+      await waitFor(() => {
+        expect(mockUpdateUserPreferences).toHaveBeenCalledWith(
+          expect.objectContaining({
+            notificationSettings: expect.objectContaining({
+              soundSettings: expect.objectContaining({
+                soundEnabled: true,
+                vibrationEnabled: false,
+              }),
+            }),
+          }),
+        );
+      });
+    });
+
+    it('selects 무음 mode → writes both false', async () => {
+      const { getByLabelText } = render(<SoundSettingsScreen />);
+
+      fireEvent.press(getByLabelText('무음'));
 
       await waitFor(() => {
         expect(mockUpdateUserPreferences).toHaveBeenCalledWith(
@@ -485,143 +548,50 @@ describe('SoundSettingsScreen', () => {
             notificationSettings: expect.objectContaining({
               soundSettings: expect.objectContaining({
                 soundEnabled: false,
+                vibrationEnabled: false,
               }),
             }),
-          })
+          }),
         );
       });
     });
 
-    it('shows error alert when sound toggle fails', async () => {
+    it('shows an error alert when the alert-mode write fails', async () => {
       mockUpdateUserPreferences.mockRejectedValueOnce(new Error('Update failed'));
 
-      const { getByTestId } = render(<SoundSettingsScreen />);
+      const { getByLabelText } = render(<SoundSettingsScreen />);
 
-      const soundSwitch = getByTestId('switch-알림음');
-      fireEvent(soundSwitch, 'valueChange', false);
+      fireEvent.press(getByLabelText('진동만'));
 
       await waitFor(() => {
         expect(Alert.alert).toHaveBeenCalledWith('오류', '설정 저장에 실패했습니다.');
       });
     });
-
-    it('hides sound picker and volume slider when sound is disabled', () => {
-      const { useAuth: mockUseAuth } = require('@/services/auth/AuthContext');
-      mockUseAuth.mockReturnValueOnce({
-        user: {
-          uid: 'test-uid',
-          email: 'test@example.com',
-          isAnonymous: false,
-          preferences: {
-            notificationSettings: {
-              pushNotifications: true,
-              emailNotifications: false,
-              soundSettings: {
-                soundEnabled: false,
-                soundId: 'default',
-                volume: 80,
-                vibrationEnabled: true,
-                vibrationPattern: 'default',
-              },
-            },
-          },
-        },
-        updateUserPreferences: mockUpdateUserPreferences,
-      });
-
-      const { queryByText } = render(<SoundSettingsScreen />);
-
-      expect(queryByText('알림음 선택')).toBeNull();
-      expect(queryByText('볼륨')).toBeNull();
-    });
-
-    it('hides vibration picker when vibration is disabled', () => {
-      const { useAuth: mockUseAuth } = require('@/services/auth/AuthContext');
-      mockUseAuth.mockReturnValueOnce({
-        user: {
-          uid: 'test-uid',
-          email: 'test@example.com',
-          isAnonymous: false,
-          preferences: {
-            notificationSettings: {
-              pushNotifications: true,
-              emailNotifications: false,
-              soundSettings: {
-                soundEnabled: true,
-                soundId: 'default',
-                volume: 80,
-                vibrationEnabled: false,
-                vibrationPattern: 'default',
-              },
-            },
-          },
-        },
-        updateUserPreferences: mockUpdateUserPreferences,
-      });
-
-      const { queryByText } = render(<SoundSettingsScreen />);
-
-      expect(queryByText('진동 패턴')).toBeNull();
-    });
-
-    it('hides both sound picker and vibration picker when both disabled', () => {
-      const { useAuth: mockUseAuth } = require('@/services/auth/AuthContext');
-      mockUseAuth.mockReturnValueOnce({
-        user: {
-          uid: 'test-uid',
-          email: 'test@example.com',
-          isAnonymous: false,
-          preferences: {
-            notificationSettings: {
-              pushNotifications: true,
-              emailNotifications: false,
-              soundSettings: {
-                soundEnabled: false,
-                soundId: 'default',
-                volume: 80,
-                vibrationEnabled: false,
-                vibrationPattern: 'default',
-              },
-            },
-          },
-        },
-        updateUserPreferences: mockUpdateUserPreferences,
-      });
-
-      const { queryByText } = render(<SoundSettingsScreen />);
-
-      expect(queryByText('알림음 선택')).toBeNull();
-      expect(queryByText('진동 패턴')).toBeNull();
-    });
   });
 
-  describe('User Interactions - Vibration Settings', () => {
-    it('toggles vibration enabled', async () => {
+  describe('Per-event toggle interactions', () => {
+    it('toggles 열차 도착 off → writes perEventSound.trainArrival false', async () => {
       const { getByTestId } = render(<SoundSettingsScreen />);
 
-      const vibrationSwitch = getByTestId('switch-진동');
-      fireEvent(vibrationSwitch, 'valueChange', false);
+      fireEvent(getByTestId('switch-열차 도착'), 'valueChange', false);
 
       await waitFor(() => {
         expect(mockUpdateUserPreferences).toHaveBeenCalledWith(
           expect.objectContaining({
             notificationSettings: expect.objectContaining({
-              soundSettings: expect.objectContaining({
-                vibrationEnabled: false,
-              }),
+              perEventSound: expect.objectContaining({ trainArrival: false }),
             }),
-          })
+          }),
         );
       });
     });
 
-    it('shows error alert when vibration toggle fails', async () => {
+    it('shows an error alert when a per-event write fails', async () => {
       mockUpdateUserPreferences.mockRejectedValueOnce(new Error('Update failed'));
 
       const { getByTestId } = render(<SoundSettingsScreen />);
 
-      const vibrationSwitch = getByTestId('switch-진동');
-      fireEvent(vibrationSwitch, 'valueChange', false);
+      fireEvent(getByTestId('switch-지연 발생'), 'valueChange', false);
 
       await waitFor(() => {
         expect(Alert.alert).toHaveBeenCalledWith('오류', '설정 저장에 실패했습니다.');
@@ -629,8 +599,55 @@ describe('SoundSettingsScreen', () => {
     });
   });
 
-  describe('Service Lifecycle', () => {
-    it('initializes and cleans up sound service', () => {
+  describe('Email channel', () => {
+    it('toggles email notifications for a signed-in user with email', async () => {
+      const { getByTestId } = render(<SoundSettingsScreen />);
+
+      fireEvent(getByTestId('switch-이메일 알림'), 'valueChange', true);
+
+      await waitFor(() => {
+        expect(mockUpdateUserPreferences).toHaveBeenCalledWith(
+          expect.objectContaining({
+            notificationSettings: expect.objectContaining({ emailNotifications: true }),
+          }),
+        );
+      });
+    });
+
+    it('disables the email toggle and shows login subtitle for anonymous users', () => {
+      setUser(baseUser({ email: null, isAnonymous: true }));
+
+      const { getByTestId, getByText } = render(<SoundSettingsScreen />);
+
+      expect(getByText('이메일 로그인 필요')).toHaveTextContent('이메일 로그인 필요');
+      expect(getByTestId('switch-이메일 알림').props.disabled).toBe(true);
+    });
+
+    it('disables the email toggle when a signed-in user has no email', () => {
+      setUser(baseUser({ email: null }));
+
+      const { getByTestId, getByText } = render(<SoundSettingsScreen />);
+
+      expect(getByText('이메일 로그인 필요')).toHaveTextContent('이메일 로그인 필요');
+      expect(getByTestId('switch-이메일 알림').props.disabled).toBe(true);
+    });
+
+    it('shows an error alert when the email write fails', async () => {
+      mockUpdateUserPreferences.mockRejectedValueOnce(new Error('Update failed'));
+
+      const { getByTestId } = render(<SoundSettingsScreen />);
+
+      fireEvent(getByTestId('switch-이메일 알림'), 'valueChange', true);
+
+      await waitFor(() => {
+        expect(Alert.alert).toHaveBeenCalledWith('오류', '설정 저장에 실패했습니다.');
+      });
+    });
+  });
+
+  describe('Service lifecycle', () => {
+    it('initializes and cleans up the sound service', () => {
+      const { soundService } = require('@/services/sound/soundService');
       const { unmount } = render(<SoundSettingsScreen />);
 
       expect(soundService.initialize).toHaveBeenCalled();
@@ -640,321 +657,56 @@ describe('SoundSettingsScreen', () => {
     });
   });
 
-  describe('Test Notification Button', () => {
-    it('sends test notification and shows success alert', async () => {
-      const { getByText } = render(<SoundSettingsScreen />);
+  describe('Edge cases', () => {
+    it('renders with default settings when the user is null', () => {
+      setUser(null);
 
-      const testButton = getByText('테스트 알림 보내기');
-      fireEvent.press(testButton);
-
-      await waitFor(() => {
-        expect(mockSendTestNotification).toHaveBeenCalled();
-        expect(Alert.alert).toHaveBeenCalledWith('성공', '테스트 알림이 전송되었습니다.');
-      });
+      const { getByTestId } = render(<SoundSettingsScreen />);
+      expect(getByTestId('section-알림 방식')).toHaveTextContent(/알림 방식/);
     });
 
-    it('shows permission denied alert when test notification fails', async () => {
-      mockSendTestNotification.mockResolvedValueOnce(false);
-
-      const { getByText } = render(<SoundSettingsScreen />);
-
-      const testButton = getByText('테스트 알림 보내기');
-      fireEvent.press(testButton);
-
-      await waitFor(() => {
-        expect(Alert.alert).toHaveBeenCalledWith('실패', '알림 권한이 허용되지 않았습니다.');
-      });
-    });
-
-    it('shows error alert when test notification throws error', async () => {
-      mockSendTestNotification.mockRejectedValueOnce(new Error('Notification error'));
-
-      const { getByText } = render(<SoundSettingsScreen />);
-
-      const testButton = getByText('테스트 알림 보내기');
-      fireEvent.press(testButton);
-
-      await waitFor(() => {
-        expect(Alert.alert).toHaveBeenCalledWith('오류', '테스트 알림 전송에 실패했습니다.');
-      });
-    });
-  });
-
-  describe('Test Email Button', () => {
-    it('sends test email and shows success alert', async () => {
-      const { useAuth: mockUseAuth } = require('@/services/auth/AuthContext');
-      mockUseAuth.mockReturnValueOnce({
-        user: {
-          uid: 'test-uid',
-          displayName: 'Test User',
-          email: 'test@example.com',
-          isAnonymous: false,
-          preferences: {
-            notificationSettings: {
-              pushNotifications: true,
-              emailNotifications: true,
-              soundSettings: {
-                soundEnabled: true,
-                soundId: 'default',
-                volume: 80,
-                vibrationEnabled: true,
-                vibrationPattern: 'default',
-              },
-            },
-          },
-        },
-        updateUserPreferences: mockUpdateUserPreferences,
-      });
-
-      const { getByText } = render(<SoundSettingsScreen />);
-
-      const testEmailButton = getByText('테스트 이메일 보내기');
-      fireEvent.press(testEmailButton);
-
-      await waitFor(() => {
-        expect(mockSendTestEmail).toHaveBeenCalled();
-        expect(Alert.alert).toHaveBeenCalledWith(
-          '성공',
-          '테스트 이메일이 test@example.com로 전송되었습니다.'
-        );
-      });
-    });
-
-    it('shows error alert when test email fails', async () => {
-      const { useAuth: mockUseAuth } = require('@/services/auth/AuthContext');
-      mockUseAuth.mockReturnValueOnce({
-        user: {
-          uid: 'test-uid',
-          displayName: 'Test User',
-          email: 'test@example.com',
-          isAnonymous: false,
-          preferences: {
-            notificationSettings: {
-              pushNotifications: true,
-              emailNotifications: true,
-              soundSettings: {
-                soundEnabled: true,
-                soundId: 'default',
-                volume: 80,
-                vibrationEnabled: true,
-                vibrationPattern: 'default',
-              },
-            },
-          },
-        },
-        updateUserPreferences: mockUpdateUserPreferences,
-      });
-
-      mockSendTestEmail.mockResolvedValueOnce(false);
-
-      const { getByText } = render(<SoundSettingsScreen />);
-
-      const testEmailButton = getByText('테스트 이메일 보내기');
-      fireEvent.press(testEmailButton);
-
-      await waitFor(() => {
-        expect(Alert.alert).toHaveBeenCalledWith(
-          '실패',
-          '이메일 전송에 실패했습니다. 잠시 후 다시 시도해주세요.'
-        );
-      });
-    });
-
-    it('shows error alert when test email throws error', async () => {
-      const { useAuth: mockUseAuth } = require('@/services/auth/AuthContext');
-      mockUseAuth.mockReturnValueOnce({
-        user: {
-          uid: 'test-uid',
-          displayName: 'Test User',
-          email: 'test@example.com',
-          isAnonymous: false,
-          preferences: {
-            notificationSettings: {
-              pushNotifications: true,
-              emailNotifications: true,
-              soundSettings: {
-                soundEnabled: true,
-                soundId: 'default',
-                volume: 80,
-                vibrationEnabled: true,
-                vibrationPattern: 'default',
-              },
-            },
-          },
-        },
-        updateUserPreferences: mockUpdateUserPreferences,
-      });
-
-      mockSendTestEmail.mockRejectedValueOnce(new Error('Email service error'));
-
-      const { getByText } = render(<SoundSettingsScreen />);
-
-      const testEmailButton = getByText('테스트 이메일 보내기');
-      fireEvent.press(testEmailButton);
-
-      await waitFor(() => {
-        expect(Alert.alert).toHaveBeenCalledWith('오류', '이메일 전송 중 오류가 발생했습니다.');
-      });
-    });
-
-    it('shows alert when test email clicked without email permission', async () => {
-      const { useAuth: mockUseAuth } = require('@/services/auth/AuthContext');
-      mockUseAuth.mockReturnValueOnce({
-        user: {
-          uid: 'test-uid',
-          displayName: 'Anonymous User',
-          email: null,
-          isAnonymous: true,
-          preferences: {
-            notificationSettings: {
-              pushNotifications: true,
-              emailNotifications: false,
-              soundSettings: {
-                soundEnabled: true,
-                soundId: 'default',
-                volume: 80,
-                vibrationEnabled: true,
-                vibrationPattern: 'default',
-              },
-            },
-          },
-        },
-        updateUserPreferences: mockUpdateUserPreferences,
-      });
-
-      const { queryByText } = render(<SoundSettingsScreen />);
-
-      // Test email button should not exist since emailNotifications is false
-      expect(queryByText('테스트 이메일 보내기')).toBeNull();
-    });
-  });
-
-  describe('Edge Cases', () => {
-    it('handles missing user gracefully', () => {
-      const { useAuth: mockUseAuth } = require('@/services/auth/AuthContext');
-      mockUseAuth.mockReturnValueOnce({
-        user: null,
-        updateUserPreferences: mockUpdateUserPreferences,
-      });
-
-      const { getByText } = render(<SoundSettingsScreen />);
-
-      // Should still render the UI with default values
-      expect(getByText('알림 방식')).toBeTruthy();
-    });
-
-    it('handles missing notification settings gracefully', () => {
-      const { useAuth: mockUseAuth } = require('@/services/auth/AuthContext');
-      mockUseAuth.mockReturnValueOnce({
-        user: {
-          uid: 'test-uid',
-          displayName: 'Test User',
-          email: 'test@example.com',
-          isAnonymous: false,
-          preferences: {
-            notificationSettings: undefined,
-          },
-        },
-        updateUserPreferences: mockUpdateUserPreferences,
-      });
-
-      const { getByText } = render(<SoundSettingsScreen />);
-
-      expect(getByText('알림 방식')).toBeTruthy();
-    });
-
-    it('handles missing sound settings gracefully', () => {
-      const { useAuth: mockUseAuth } = require('@/services/auth/AuthContext');
-      mockUseAuth.mockReturnValueOnce({
-        user: {
-          uid: 'test-uid',
-          displayName: 'Test User',
-          email: 'test@example.com',
-          isAnonymous: false,
-          preferences: {
-            notificationSettings: {
-              pushNotifications: true,
-              emailNotifications: false,
-              soundSettings: undefined,
-            },
-          },
-        },
-        updateUserPreferences: mockUpdateUserPreferences,
-      });
-
-      const { getByText } = render(<SoundSettingsScreen />);
-
-      // Should use default settings
-      expect(getByText('알림 효과')).toBeTruthy();
-    });
-
-    it('does not call updateUserPreferences when user is null', async () => {
-      const { useAuth: mockUseAuth } = require('@/services/auth/AuthContext');
-      mockUseAuth.mockReturnValueOnce({
-        user: null,
-        updateUserPreferences: mockUpdateUserPreferences,
+    it('renders with default settings when notification settings are missing', () => {
+      setUser({
+        uid: 'test-uid',
+        email: 'test@example.com',
+        isAnonymous: false,
+        preferences: { notificationSettings: undefined },
       });
 
       const { getByTestId } = render(<SoundSettingsScreen />);
-
-      const pushSwitch = getByTestId('switch-푸시 알림');
-      fireEvent(pushSwitch, 'valueChange', false);
-
-      // Wait a moment for any updates
-      await new Promise(resolve => setTimeout(resolve, 100));
-
-      expect(mockUpdateUserPreferences).not.toHaveBeenCalled();
-    });
-  });
-
-  describe('State Management', () => {
-    it('preserves sound settings when updating volume', async () => {
-      const { getByTestId } = render(<SoundSettingsScreen />);
-
-      const volumeSlider = getByTestId('slider-볼륨');
-      expect(volumeSlider).toBeTruthy();
+      expect(getByTestId('section-알림음')).toHaveTextContent(/알림음/);
+      // Defaults flow through: default soundId 'chime' renders in the radio list.
+      expect(getByTestId('sound-radio-value')).toHaveTextContent('chime');
     });
 
-    it('shows correct current values in toggles', () => {
-      const { getByTestId } = render(<SoundSettingsScreen />);
-
-      const pushSwitch = getByTestId('switch-푸시 알림');
-      const soundSwitch = getByTestId('switch-알림음');
-      const vibrationSwitch = getByTestId('switch-진동');
-
-      expect(pushSwitch).toBeTruthy();
-      expect(soundSwitch).toBeTruthy();
-      expect(vibrationSwitch).toBeTruthy();
-    });
-
-    it('keeps sound settings in sync with user profile changes', () => {
-      const { rerender } = render(<SoundSettingsScreen />);
-
-      (useAuth as jest.Mock).mockReturnValueOnce({
-        user: {
-          uid: 'test-uid',
-          displayName: 'Test User',
-          email: 'test@example.com',
-          isAnonymous: false,
-          preferences: {
-            notificationSettings: {
-              pushNotifications: false,
-              emailNotifications: true,
-              soundSettings: {
-                soundEnabled: false,
-                soundId: 'chime',
-                volume: 50,
-                vibrationEnabled: false,
-                vibrationPattern: 'strong',
-              },
-            },
+    it('renders with default settings when sound settings are missing', () => {
+      setUser({
+        uid: 'test-uid',
+        email: 'test@example.com',
+        isAnonymous: false,
+        preferences: {
+          notificationSettings: {
+            pushNotifications: true,
+            emailNotifications: false,
+            soundSettings: undefined,
+            perEventSound: undefined,
           },
         },
-        updateUserPreferences: mockUpdateUserPreferences,
       });
 
-      rerender(<SoundSettingsScreen />);
+      const { getByTestId } = render(<SoundSettingsScreen />);
+      // DEFAULT_SOUND_SETTINGS: soundId 'chime', volume 80.
+      expect(getByTestId('sound-radio-value')).toHaveTextContent('chime');
+      expect(getByTestId('volume-slider')).toHaveTextContent('80');
+    });
 
+    it('does not write when the user is null', async () => {
+      setUser(null);
+
+      const { getByLabelText } = render(<SoundSettingsScreen />);
+      fireEvent.press(getByLabelText('무음'));
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
       expect(mockUpdateUserPreferences).not.toHaveBeenCalled();
     });
   });

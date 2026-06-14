@@ -85,12 +85,10 @@ export interface PerEventSoundOverrides {
 
 // Sound settings types
 export type NotificationSoundId =
-  | 'default'
-  | 'train_arrival'
-  | 'subway_chime'
-  | 'gentle_bell'
-  | 'urgent_alert'
-  | 'silent';
+  | 'chime'
+  | 'doorbell'
+  | 'beep'
+  | 'wave';
 
 export type VibrationPatternId =
   | 'default'

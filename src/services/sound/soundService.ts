@@ -27,12 +27,10 @@ export interface VibrationOption {
 
 // Available notification sounds
 export const NOTIFICATION_SOUNDS: readonly SoundOption[] = [
-  { id: 'default', label: '기본음', description: '시스템 기본 알림음' },
-  { id: 'train_arrival', label: '열차 도착', description: '지하철 도착 안내음' },
-  { id: 'subway_chime', label: '지하철 차임', description: '서울 지하철 도어 차임' },
-  { id: 'gentle_bell', label: '부드러운 벨', description: '조용한 알림음' },
-  { id: 'urgent_alert', label: '긴급 알림', description: '중요 알림용 강조음' },
-  { id: 'silent', label: '무음', description: '소리 없이 진동만' },
+  { id: 'chime', label: '차임', description: '부드러운 종소리' },
+  { id: 'doorbell', label: '도어벨', description: '지하철 안내음' },
+  { id: 'beep', label: '비프', description: '짧고 명료' },
+  { id: 'wave', label: '웨이브', description: '잔잔한 파도' },
 ] as const;
 
 // Available vibration patterns (durations in milliseconds)
@@ -57,12 +55,10 @@ export const getVibrationPattern = (patternId: VibrationPatternId): number[] => 
 // Sound URLs for preview
 const DEFAULT_SOUND_URL = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3';
 const SOUND_URLS: Record<NotificationSoundId, string> = {
-  default: DEFAULT_SOUND_URL,
-  train_arrival: 'https://assets.mixkit.co/active_storage/sfx/1900/1900-preview.mp3',
-  subway_chime: 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3',
-  gentle_bell: DEFAULT_SOUND_URL,
-  urgent_alert: 'https://assets.mixkit.co/active_storage/sfx/1977/1977-preview.mp3',
-  silent: '',
+  chime: DEFAULT_SOUND_URL,
+  doorbell: 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3',
+  beep: 'https://assets.mixkit.co/active_storage/sfx/1977/1977-preview.mp3',
+  wave: 'https://assets.mixkit.co/active_storage/sfx/1900/1900-preview.mp3',
 };
 
 class SoundService {
@@ -95,10 +91,6 @@ class SoundService {
    * Note: In Expo Go, this shows an info message since native audio is unavailable
    */
   async previewSound(soundId: NotificationSoundId, _volume: number): Promise<void> {
-    if (soundId === 'silent') {
-      return;
-    }
-
     await this.initialize();
 
     // Show informational message for Expo Go users
