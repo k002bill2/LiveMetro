@@ -2,8 +2,19 @@
 /**
  * Fetch Station Coordinates Script
  *
- * 서울 열린데이터광장 API에서 지하철역 좌표를 가져와
- * src/data/stationCoordinates.json 파일을 생성합니다.
+ * 서울 열린데이터광장 subwayStationMaster API에서 지하철역 좌표를 가져와
+ * src/data/stationCoordinates.json 을 생성/갱신합니다.
+ *
+ * API rows are keyed by BLDN_ID, which IS the station_cd used throughout the
+ * app — so coordinates map DIRECTLY with no name/line matching. The previous
+ * name-match + name-only fuzzy fallback mis-assigned ~350 stations' coordinates
+ * by up to ~12km (e.g. 도심 3·4호선: 서울역/을지로3가/충무로 …); see memory
+ * project_station_coordinates_line34_south_shift.
+ *
+ * The API (~784 rows) does NOT cover every Korail wide-area station the app
+ * tracks, so results are MERGED into the existing file: API values are
+ * authoritative for the station_cds it returns; station_cds absent from the API
+ * keep their existing coordinate so coverage never regresses.
  *
  * API: http://openapi.seoul.go.kr:8088/{API_KEY}/json/subwayStationMaster
  *
@@ -14,13 +25,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
-// Types for API response
-interface StationMasterRow {
-  STATN_ID: string;      // 역 ID
-  STATN_NM: string;      // 역 이름 (한글)
-  STLE_CO: string;       // 호선
-  LAT: string;           // 위도
-  LOT: string;           // 경도
+// subwayStationMaster row. BLDN_ID is the station_cd (e.g. "0150" = 서울역 1호선).
+export interface StationMasterRow {
+  BLDN_ID: string; // 역 코드 (= station_cd)
+  BLDN_NM: string; // 역 이름 (한글)
+  ROUTE: string;   // 호선 (예: "1호선")
+  LAT: string;     // 위도
+  LOT: string;     // 경도
 }
 
 interface SubwayStationMasterResponse {
@@ -34,211 +45,138 @@ interface SubwayStationMasterResponse {
   };
 }
 
-// Types for seoulStations.json
-interface SeoulStationData {
-  line_num: string;
-  station_nm: string;
-  station_nm_eng: string;
-  station_nm_chn: string;
-  station_nm_jpn: string;
-  station_cd: string;
-  fr_code: string;
-}
-
-interface SeoulStationsJson {
-  DESCRIPTION: Record<string, string>;
-  DATA: SeoulStationData[];
-}
-
-interface CoordinateData {
+export interface CoordinateData {
   latitude: number;
   longitude: number;
 }
 
-const API_KEY = process.env.SEOUL_API_KEY || process.env.EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY;
+export type CoordinateMap = Record<string, CoordinateData>;
 
-const normalizeStationName = (name: string): string => {
-  // Remove parenthetical info, spaces, and special chars for matching
-  return name
-    .replace(/\(.*?\)/g, '')
-    .replace(/\s+/g, '')
-    .replace(/역$/g, '')
-    .trim();
+const API_KEY = process.env.SEOUL_API_KEY || process.env.EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY;
+const PAGE_SIZE = 1000;
+
+/**
+ * Build a station_cd → coordinate map directly from API rows. Because BLDN_ID
+ * IS the station_cd, no name/line matching is needed (eliminating the cross-line
+ * mis-assignment that corrupted the old data). Rows with missing, zero, or
+ * non-numeric coordinates are skipped.
+ */
+export const buildApiCoordMap = (rows: StationMasterRow[]): CoordinateMap => {
+  const map: CoordinateMap = {};
+  for (const row of rows) {
+    const latitude = parseFloat(row.LAT);
+    const longitude = parseFloat(row.LOT);
+    if (
+      Number.isNaN(latitude) ||
+      Number.isNaN(longitude) ||
+      latitude === 0 ||
+      longitude === 0
+    ) {
+      continue;
+    }
+    map[row.BLDN_ID] = { latitude, longitude };
+  }
+  return map;
 };
 
-const fetchStationCoordinates = async (): Promise<Map<string, CoordinateData>> => {
+/**
+ * Merge freshly fetched API coordinates into the existing file. API values are
+ * authoritative for the station_cds they cover; station_cds present only in the
+ * existing file (Korail wide-area lines the API omits) are preserved so coverage
+ * never regresses. Existing key order is kept (API-only codes append) to keep
+ * the file diff minimal. Inputs are not mutated.
+ */
+export const mergeCoordinates = (
+  existing: CoordinateMap,
+  apiMap: CoordinateMap
+): CoordinateMap => {
+  return { ...existing, ...apiMap };
+};
+
+/**
+ * Serialize the map to JSON with keys in deterministic string-sorted order.
+ * A plain `JSON.stringify` reorders integer-like keys ("1001") ahead of
+ * leading-zero codes ("0150") per JS object semantics, which churns the whole
+ * file on every run. Building the string from sorted keys keeps the output
+ * stable (and diffs minimal) across regenerations. Per-entry format matches
+ * `JSON.stringify(value, null, 2)`.
+ */
+export const serializeCoordinateMap = (map: CoordinateMap): string => {
+  const entries = Object.keys(map)
+    .sort()
+    .map(
+      (key) =>
+        `  ${JSON.stringify(key)}: ${JSON.stringify(map[key], null, 2)
+          .split('\n')
+          .join('\n  ')}`
+    );
+  return `{\n${entries.join(',\n')}\n}`;
+};
+
+const fetchStationRows = async (): Promise<StationMasterRow[]> => {
   if (!API_KEY) {
-    throw new Error('SEOUL_API_KEY or EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY environment variable required');
+    throw new Error(
+      'SEOUL_API_KEY or EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY environment variable required'
+    );
   }
 
-  const coordinates = new Map<string, CoordinateData>();
-
-  // Fetch from subwayStationMaster API
-  // API returns max 1000 per request, we need to paginate
-  const pageSize = 1000;
+  const rows: StationMasterRow[] = [];
   let start = 1;
-  let hasMore = true;
 
-  console.log('Fetching station coordinates from Seoul Open Data API...');
+  console.log('Fetching station coordinates from Seoul Open Data (subwayStationMaster)...');
 
-  while (hasMore) {
-    const end = start + pageSize - 1;
+  // Paginate: the API returns up to PAGE_SIZE rows per request.
+  for (;;) {
+    const end = start + PAGE_SIZE - 1;
     const url = `http://openapi.seoul.go.kr:8088/${API_KEY}/json/subwayStationMaster/${start}/${end}/`;
-
     console.log(`  Fetching ${start} to ${end}...`);
 
-    try {
-      const response = await fetch(url);
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
-      }
-
-      const data = await response.json() as SubwayStationMasterResponse;
-
-      if (data.subwayStationMaster?.RESULT?.CODE !== 'INFO-000') {
-        console.warn(`  API Warning: ${data.subwayStationMaster?.RESULT?.MESSAGE}`);
-        hasMore = false;
-        continue;
-      }
-
-      const rows = data.subwayStationMaster.row || [];
-      console.log(`  Retrieved ${rows.length} stations`);
-
-      for (const row of rows) {
-        const lat = parseFloat(row.LAT);
-        const lot = parseFloat(row.LOT);
-
-        if (isNaN(lat) || isNaN(lot) || lat === 0 || lot === 0) {
-          continue;
-        }
-
-        const normalizedName = normalizeStationName(row.STATN_NM);
-        const key = `${normalizedName}_${row.STLE_CO}`;
-
-        coordinates.set(key, {
-          latitude: lat,
-          longitude: lot,
-        });
-      }
-
-      if (rows.length < pageSize) {
-        hasMore = false;
-      } else {
-        start = end + 1;
-      }
-    } catch (error) {
-      console.error(`  Error fetching page ${start}-${end}:`, error);
-      hasMore = false;
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
     }
+
+    const data = (await response.json()) as SubwayStationMasterResponse;
+    const result = data.subwayStationMaster?.RESULT;
+    if (result?.CODE !== 'INFO-000') {
+      throw new Error(`API error: ${result?.CODE} ${result?.MESSAGE}`);
+    }
+
+    const page = data.subwayStationMaster.row || [];
+    console.log(`  Retrieved ${page.length} stations`);
+    rows.push(...page);
+
+    if (page.length < PAGE_SIZE) {
+      break;
+    }
+    start = end + 1;
   }
 
-  console.log(`Total unique coordinates fetched: ${coordinates.size}`);
-  return coordinates;
-};
-
-const matchCoordinatesToStations = (
-  seoulStations: SeoulStationsJson,
-  apiCoordinates: Map<string, CoordinateData>
-): Record<string, CoordinateData> => {
-  const result: Record<string, CoordinateData> = {};
-  let matchedCount = 0;
-  const unmatchedStations: string[] = [];
-
-  const lineNumToCode: Record<string, string> = {
-    '01호선': '1',
-    '02호선': '2',
-    '03호선': '3',
-    '04호선': '4',
-    '05호선': '5',
-    '06호선': '6',
-    '07호선': '7',
-    '08호선': '8',
-    '09호선': '9',
-    '경의중앙선': '경의중앙',
-    '분당선': '분당',
-    '신분당선': '신분당',
-    '경춘선': '경춘',
-    '공항철도': '공항',
-    '수인선': '수인',
-    '우이신설경전철': '우이신설',
-  };
-
-  for (const station of seoulStations.DATA) {
-    const normalizedName = normalizeStationName(station.station_nm);
-    const lineCode = lineNumToCode[station.line_num] || station.line_num.replace('호선', '');
-
-    // Try different matching strategies
-    const keys = [
-      `${normalizedName}_${lineCode}호선`,
-      `${normalizedName}_${lineCode}`,
-      `${normalizedName}_0${lineCode}호선`,
-    ];
-
-    let matched = false;
-    for (const key of keys) {
-      const coords = apiCoordinates.get(key);
-      if (coords) {
-        result[station.station_cd] = coords;
-        matchedCount++;
-        matched = true;
-        break;
-      }
-    }
-
-    // Try fuzzy matching by name only if not matched
-    if (!matched) {
-      for (const [apiKey, coords] of apiCoordinates.entries()) {
-        if (apiKey.startsWith(normalizedName + '_')) {
-          result[station.station_cd] = coords;
-          matchedCount++;
-          matched = true;
-          break;
-        }
-      }
-    }
-
-    if (!matched) {
-      unmatchedStations.push(`${station.station_nm} (${station.line_num}, ${station.station_cd})`);
-    }
-  }
-
-  console.log(`\nMatched ${matchedCount} of ${seoulStations.DATA.length} stations`);
-  if (unmatchedStations.length > 0) {
-    console.log(`\nUnmatched stations (${unmatchedStations.length}):`);
-    unmatchedStations.slice(0, 20).forEach((s) => console.log(`  - ${s}`));
-    if (unmatchedStations.length > 20) {
-      console.log(`  ... and ${unmatchedStations.length - 20} more`);
-    }
-  }
-
-  return result;
+  console.log(`Total rows fetched: ${rows.length}`);
+  return rows;
 };
 
 const main = async (): Promise<void> => {
   try {
-    // Load seoulStations.json
-    const seoulStationsPath = path.join(__dirname, '../src/data/seoulStations.json');
-    const seoulStationsData = JSON.parse(
-      fs.readFileSync(seoulStationsPath, 'utf-8')
-    ) as SeoulStationsJson;
-
-    console.log(`Loaded ${seoulStationsData.DATA.length} stations from seoulStations.json\n`);
-
-    // Fetch coordinates from API
-    const apiCoordinates = await fetchStationCoordinates();
-
-    // Match coordinates to stations
-    const stationCoordinates = matchCoordinatesToStations(seoulStationsData, apiCoordinates);
-
-    // Write to file
     const outputPath = path.join(__dirname, '../src/data/stationCoordinates.json');
-    fs.writeFileSync(
-      outputPath,
-      JSON.stringify(stationCoordinates, null, 2),
-      'utf-8'
+    const existing = JSON.parse(fs.readFileSync(outputPath, 'utf-8')) as CoordinateMap;
+    console.log(`Loaded ${Object.keys(existing).length} existing coordinates`);
+
+    const rows = await fetchStationRows();
+    const apiMap = buildApiCoordMap(rows);
+    console.log(`Built ${Object.keys(apiMap).length} coordinates from API`);
+
+    const merged = mergeCoordinates(existing, apiMap);
+
+    const preserved = Object.keys(existing).filter((cd) => !apiMap[cd]).length;
+    const added = Object.keys(apiMap).filter((cd) => !existing[cd]).length;
+    console.log(
+      `Merged ${Object.keys(merged).length} total ` +
+      `(${Object.keys(apiMap).length} API-authoritative, ${preserved} existing preserved, ${added} new)`
     );
 
-    console.log(`\nWrote ${Object.keys(stationCoordinates).length} station coordinates to:`);
+    fs.writeFileSync(outputPath, serializeCoordinateMap(merged), 'utf-8');
+    console.log(`\nWrote ${Object.keys(merged).length} station coordinates to:`);
     console.log(`  ${outputPath}`);
   } catch (error) {
     console.error('Error:', error);
@@ -246,4 +184,9 @@ const main = async (): Promise<void> => {
   }
 };
 
-main();
+// Only run when invoked directly (so the pure functions above can be unit-tested
+// via `npx ts-node scripts/__tests__/fetchStationCoordinates.test.ts` without
+// triggering a live API fetch on import).
+if (require.main === module) {
+  main();
+}
