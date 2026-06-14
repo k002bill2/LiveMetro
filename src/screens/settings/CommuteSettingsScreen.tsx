@@ -29,6 +29,7 @@ import { SettingsStackParamList, OnboardingRouteData } from '@/navigation/types'
 import { useAuth } from '@/services/auth/AuthContext';
 import { loadCommuteRoutes, saveCommuteRoutes, updateEveningEnabled } from '@/services/commute/commuteService';
 import { useMLPrediction } from '@/hooks/useMLPrediction';
+import { useCommuteRouteSummary } from '@/hooks/useCommuteRouteSummary';
 import { CommuteRoute, DEFAULT_COMMUTE_NOTIFICATIONS, DEFAULT_BUFFER_MINUTES } from '@/models/commute';
 import type { SmartFeatures } from '@/models/user';
 import SettingSection from '@/components/settings/SettingSection';
@@ -88,12 +89,13 @@ const AUTO_DEPARTURE_OPTIONS: PickerOption[] = [
   { label: '꺼짐',     value: 'never',     description: '자동 감지 사용 안 함' },
 ];
 
-// Hero ETA fallbacks. When useMLPrediction has no baseline data yet
-// (new user, no commute logs), the card surfaces these placeholder values
-// instead of hiding the section — matches the Wanted handoff "예측 준비 중"
-// intent without leaving an empty hero.
+// Hero ETA last-resort fallbacks. The number now falls back to the shared
+// graph-search ride estimate for the configured route first (parity with
+// HomeScreen / WeeklyPredictionScreen — same useCommuteRouteSummary), so this
+// route-agnostic constant only shows when no route is resolvable yet. ±2
+// matches the band the other screens render.
 const HERO_ETA_PLACEHOLDER_MIN = 32;
-const HERO_ETA_CONFIDENCE_MIN = 3;
+const HERO_ETA_CONFIDENCE_MIN = 2;
 
 // Map ML confidence (0-1) to a ±N-minute interval. Higher confidence ↔
 // tighter interval. Tuned on the assumption that a confidence of 1.0
@@ -120,18 +122,12 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
   const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
-  // ML prediction wiring for the Hero ETA card. baselineMinutes is the
-  // average of the user's actual past commute durations; prediction.confidence
-  // (when available) tightens the ±N-minute interval. Both fall back to the
-  // hardcoded placeholders when there is no data yet.
+  // ML prediction wiring for the Hero ETA card. baselineMinutes is the average
+  // of the user's actual past commute durations; prediction.confidence (when
+  // available) tightens the ±N-minute interval. The hero ETA derivation lives
+  // below (after `morningRoute` is declared) so it can fall back to the shared
+  // graph-search estimate for the configured route.
   const { baselineMinutes, prediction } = useMLPrediction();
-  const heroEtaMinutes = baselineMinutes !== null
-    ? Math.round(baselineMinutes)
-    : HERO_ETA_PLACEHOLDER_MIN;
-  const heroConfidenceMinutes = prediction
-    ? confidenceToMinutes(prediction.confidence)
-    : HERO_ETA_CONFIDENCE_MIN;
-  const heroIsPlaceholder = baselineMinutes === null;
 
   // Toast feedback for the "저장" header action. Settings already persist
   // optimistically on each change, so the toast is an explicit confirmation
@@ -189,6 +185,27 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
   const [eveningEnabled, setEveningEnabled] = useState(true);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+
+  // Hero ETA — shared estimate parity with HomeScreen / WeeklyPredictionScreen.
+  // Prefer the user's learned baseline; otherwise use the SAME graph-search ride
+  // minutes those screens show (useCommuteRouteSummary on the configured route)
+  // so the route-agnostic "32분" constant no longer diverges from the 25분 shown
+  // elsewhere. The placeholder constant remains only when no route resolves yet.
+  const heroRouteSummary = useCommuteRouteSummary(
+    morningRoute?.departureStation.stationId,
+    morningRoute?.arrivalStation.stationId,
+  );
+  const heroEtaMinutes =
+    baselineMinutes !== null
+      ? Math.round(baselineMinutes)
+      : heroRouteSummary.rideMinutes ?? HERO_ETA_PLACEHOLDER_MIN;
+  const heroConfidenceMinutes = prediction
+    ? confidenceToMinutes(prediction.confidence)
+    : HERO_ETA_CONFIDENCE_MIN;
+  // "예측 준비 중" reflects ML readiness (no learned baseline yet), independent
+  // of whether the graph estimate is available — same honesty as HomeScreen's
+  // "데이터 수집중" shown alongside a real route number.
+  const heroIsPlaceholder = baselineMinutes === null;
 
   // Convert local CommuteRouteData (UI shape) into CommuteRoute (Firestore
   // shape). Adds default notifications + bufferMinutes; transferStations
@@ -612,7 +629,8 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Hero ETA gradient card — placeholder ETA, real wiring via useMLPrediction is follow-up */}
+        {/* Hero ETA gradient card — ETA = ML baseline ?? shared graph-search ride
+            (useCommuteRouteSummary, parity with Home/WeeklyPrediction) ?? placeholder */}
         <LinearGradient
           colors={['#0066FF', '#2C7BFF']}
           start={{ x: 0, y: 0 }}
@@ -626,7 +644,7 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
             </Text>
           </View>
           <View style={styles.heroEtaRow}>
-            <Text style={styles.heroEtaValue}>{heroEtaMinutes}</Text>
+            <Text style={styles.heroEtaValue} testID="commute-hero-eta-minutes">{heroEtaMinutes}</Text>
             <Text style={styles.heroEtaUnit}>분</Text>
             <View style={styles.heroEtaPill}>
               <Text style={styles.heroEtaPillText}>±{heroConfidenceMinutes}분</Text>
