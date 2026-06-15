@@ -177,4 +177,32 @@ describe('useFirestoreMorningCommute', () => {
     expect(mockedSubscribe).toHaveBeenCalledWith('uid-2', expect.any(Function));
     expect(mockedSubscribe).toHaveBeenCalledTimes(2);
   });
+
+  it('re-subscribes (fresh read) and unsubscribes the old listener when refreshNonce changes', () => {
+    // HomeScreen bumps refreshNonce on focus to force a fresh commute read; the
+    // hook must tear down the old onSnapshot link and re-establish it so a
+    // returning user recovers from any stale/dropped subscription.
+    const { rerender } = renderHook(
+      ({ nonce }: { nonce: number }) => useFirestoreMorningCommute('uid-1', nonce),
+      { initialProps: { nonce: 0 } },
+    );
+    expect(mockedSubscribe).toHaveBeenCalledTimes(1);
+
+    rerender({ nonce: 1 });
+    expect(mockUnsubscribe).toHaveBeenCalledTimes(1);
+    expect(mockedSubscribe).toHaveBeenCalledTimes(2);
+    expect(mockedSubscribe).toHaveBeenLastCalledWith('uid-1', expect.any(Function));
+  });
+
+  it('does not re-subscribe when refreshNonce is unchanged across rerenders', () => {
+    const { rerender } = renderHook(
+      ({ nonce }: { nonce: number }) => useFirestoreMorningCommute('uid-1', nonce),
+      { initialProps: { nonce: 3 } },
+    );
+    expect(mockedSubscribe).toHaveBeenCalledTimes(1);
+
+    rerender({ nonce: 3 });
+    expect(mockedSubscribe).toHaveBeenCalledTimes(1);
+    expect(mockUnsubscribe).not.toHaveBeenCalled();
+  });
 });

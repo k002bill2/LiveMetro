@@ -14,7 +14,7 @@
  * real-time TrainArrivalList were removed in Phase 56 — their data still
  * feeds CommunityDelayCard / the empty-state link / StationDetail.
  */
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSemanticTokens } from '@/services/theme';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -99,6 +99,23 @@ export const HomeScreen: React.FC = () => {
     enabled: false,
   });
 
+  // Force a fresh commute re-read whenever Home regains focus (e.g. returning
+  // from CommuteSettings after editing the route). The commute estimate is
+  // already live (useFirestoreMorningCommute → onSnapshot), so this is a
+  // belt-and-suspenders recovery for any stale/dropped subscription: bumping the
+  // nonce re-subscribes the listener. The initial mount focus is skipped (the
+  // subscription already runs on mount) to avoid a redundant double-subscribe.
+  const [commuteRefreshNonce, setCommuteRefreshNonce] = useState(0);
+  const didInitialFocusRef = useRef(false);
+  useEffect(() => {
+    if (!isFocused) return;
+    if (!didInitialFocusRef.current) {
+      didInitialFocusRef.current = true;
+      return;
+    }
+    setCommuteRefreshNonce((n) => n + 1);
+  }, [isFocused]);
+
   // Commute hero estimate — shared single source of truth with
   // WeeklyPredictionScreen via useCommuteHeroEstimate. This hook is the sole
   // caller of useMLPrediction / useFirestoreMorningCommute /
@@ -106,7 +123,8 @@ export const HomeScreen: React.FC = () => {
   // commute resolution included), so the home card and the prediction screen
   // can never show different numbers / departure times. The estimate chain (ML
   // door-to-door ?? registered-commute graph ride) and the isUsableCommuteTime
-  // gate now live in that hook (see its JSDoc).
+  // gate now live in that hook (see its JSDoc). `commuteRefreshNonce` re-reads
+  // the live subscription on focus.
   const {
     morningCommute,
     profileMorningCommute,
@@ -115,7 +133,7 @@ export const HomeScreen: React.FC = () => {
     commuteStationNames,
     effectiveHero,
     effectiveDepartureTime,
-  } = useCommuteHeroEstimate();
+  } = useCommuteHeroEstimate(commuteRefreshNonce);
 
   // Dev-only diagnostic (no-op in production/jest): logs stored commute ids
   // vs. resolved stations — see useCommuteDiagnostics for the failure shape
