@@ -134,6 +134,19 @@ describe('useCommuteHeroEstimate', () => {
     expect(result.current.effectiveDepartureTime).toBe('08:00');
   });
 
+  it('forwards the chosen transferStationId to useCommuteRouteSummary (via-constrained route)', () => {
+    mockUseFirestoreMorningCommute.mockReturnValue({
+      departureTime: '08:00',
+      stationId: '0150',
+      destinationStationId: '0220',
+      transferStationId: 'stn-via',
+    });
+
+    renderHook(() => useCommuteHeroEstimate());
+
+    expect(mockUseCommuteRouteSummary).toHaveBeenCalledWith('0150', '0220', 'stn-via');
+  });
+
   it('drops a non-null profile commute with empty station ids and uses store #2 (isUsableCommuteTime gate)', () => {
     // Profile (store #1) has a non-null morningCommute but empty station ids
     // (NotificationTimeScreen synthesis). A plain `??` would let it shadow the

@@ -8,7 +8,7 @@
  */
 
 import React from 'react';
-import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
+import { render, fireEvent, waitFor, act, within } from '@testing-library/react-native';
 import * as Location from 'expo-location';
 
 // ============================================================================
@@ -563,6 +563,42 @@ describe('HomeScreen', () => {
         screen: 'CommuteSettings',
         initial: false,
       });
+    });
+
+    it('wires the commute card mid-node line from the route summary, not the origin station line', async () => {
+      // Origin station (강남) is resolved on line '5'; the actual fastest route
+      // boards line '2'. The card mid-node must reflect the ROUTE's first line
+      // ('2호선'), not the origin station's first listed line ('5호선').
+      withMorningCommute();
+      mockGetStation.mockImplementation((id: string) =>
+        Promise.resolve(
+          id === 'gangnam'
+            ? { ...mockStation('gangnam', '강남'), lineId: '5' }
+            : id === 'jamsil'
+              ? { ...mockStation('jamsil', '잠실'), lineId: '2' }
+              : null,
+        ),
+      );
+      mockUseCommuteRouteSummary.mockReturnValue({
+        ready: true,
+        rideMinutes: 36,
+        transferCount: 2,
+        stationCount: 13,
+        fareKrw: 1500,
+        lineId: '2',
+      });
+
+      const { getByTestId } = render(<HomeScreen />);
+      await waitFor(
+        () => expect(getByTestId('home-commute-route-card')).toBeTruthy(),
+        { timeout: 5000 },
+      );
+
+      const card = within(getByTestId('home-commute-route-card'));
+      expect(card.getByText('2호선')).toBeTruthy();
+      expect(card.queryByText('5호선')).toBeNull();
+      // And the mid-node is honest about the 2 transfers (no fictional 직행).
+      expect(card.getByText('환승 2회')).toBeTruthy();
     });
 
     it('renders real CommuteRouteCard from registered endpoints even when route summary is unresolved', async () => {

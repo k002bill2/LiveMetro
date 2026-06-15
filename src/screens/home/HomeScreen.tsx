@@ -362,7 +362,7 @@ export const HomeScreen: React.FC = () => {
           <CommuteRouteCard
             origin={commuteStationNames.origin}
             destination={commuteStationNames.destination}
-            lineId={commuteStationNames.originLineId as LineId | undefined}
+            lineId={(routeSummary.lineId ?? commuteStationNames.originLineId) as LineId | undefined}
             departureTime={effectiveDepartureTime}
             arrivalTime={effectiveHero?.arrivalTime}
             rideMinutes={effectiveHero?.predictedMinutes}

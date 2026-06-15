@@ -195,4 +195,48 @@ describe('CommuteRouteScreen (step 2/4 redesign)', () => {
       expect.objectContaining({ selectionType: 'departure' }),
     );
   });
+
+  // Policy: 기본=최단. For a cross-line OD with no single-line 직행, the default
+  // selection must be the app's fastest route ("최단 경로 (자동)") — NOT an
+  // auto-forced first transfer (신도림) — and the hint must not falsely claim
+  // "직행이 가장 빨라요".
+  it('cross-line OD defaults to "최단 경로 (자동)" with an honest hint (no auto-forced transfer)', () => {
+    const editRoute = {
+      name: 'EditCommuteRoute',
+      params: {
+        kind: 'morning',
+        initial: {
+          departureTime: '08:30',
+          departureStation: {
+            stationId: 's_1032',
+            stationName: '신길',
+            lineId: '1',
+            lineName: '1호선',
+          },
+          arrivalStation: {
+            stationId: 'seolleung',
+            stationName: '선릉',
+            lineId: '2',
+            lineName: '2호선',
+          },
+          transferStations: [],
+        },
+      },
+    };
+
+    const { getAllByText, queryByText } = render(
+      <CommuteRouteScreen
+        navigation={mockNavigation as never}
+        route={editRoute as never}
+      />,
+    );
+
+    // "최단 경로 (자동)" appears as both the default gate value and a radio
+    // option — at least one proves the default is the fastest route.
+    expect(getAllByText('최단 경로 (자동)').length).toBeGreaterThan(0);
+    // The default must NOT auto-force the first transfer (신도림).
+    expect(queryByText('신도림 환승')).toBeNull();
+    // No false 직행 claim for a cross-line pair with no direct ride.
+    expect(queryByText(/직행이 가장 빨라요/)).toBeNull();
+  });
 });

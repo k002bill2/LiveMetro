@@ -245,11 +245,19 @@ const CommuteRouteCardImpl: React.FC<CommuteRouteCardProps> = ({
               {/^\d+$/.test(lineId) ? `${lineId}호선` : lineId}
             </Text>
           )}
-          {rideMinutes !== undefined && (
+          {/* Honest mid-node meta. "직행" is asserted ONLY for an affirmative
+              direct route (transferCount === 0). When transferCount is unknown
+              (undefined — graph search unresolved), we render nothing rather
+              than falsely claim a direct trip from the ML door-to-door minutes. */}
+          {transferCount !== undefined && transferCount > 0 ? (
+            <Text style={[styles.nodeMeta, { color: semantic.labelAlt }]}>
+              환승 {transferCount}회
+            </Text>
+          ) : transferCount === 0 && rideMinutes !== undefined ? (
             <Text style={[styles.nodeMeta, { color: semantic.labelAlt }]}>
               직행 {truncateMinutes(rideMinutes)}분
             </Text>
-          )}
+          ) : null}
         </View>
 
         {/* Ride leg */}

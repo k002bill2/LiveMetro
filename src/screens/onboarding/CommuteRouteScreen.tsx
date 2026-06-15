@@ -92,6 +92,10 @@ type StationSelectionType = 'departure' | 'arrival' | 'transfer';
 const DEFAULT_DEPARTURE_TIME = '08:00';
 const DEFAULT_EVENING_DEPARTURE_TIME = '18:30';
 const DIRECT_OPTION_ID = 'direct';
+// Cross-line OD has no single-line 직행. This synthetic default means "let the
+// app pick the fastest route" (no forced transfer) — saved as an empty
+// transferStations list, so home/ML render the globally fastest path.
+const FASTEST_OPTION_ID = 'fastest';
 const MAX_TRANSFER_OPTIONS = 4;
 
 // stations.json (used by routeService graph) is keyed by English-slug IDs
@@ -290,6 +294,18 @@ const buildRecommendations = (
       label: '직행 (환승 없음)',
       isDirect: true,
       minutes: Math.max(1, Math.round(directMinutes)),
+      recommended: true,
+      fastest: true,
+    });
+  } else {
+    // No single-line 직행 (cross-line OD). The recommended DEFAULT is the app's
+    // fastest route, NOT an auto-forced first transfer — `isDirect: true` so it
+    // persists an empty transferStations list (→ globally fastest path). The
+    // transfer candidates below remain available as explicit overrides.
+    result.push({
+      id: FASTEST_OPTION_ID,
+      label: '최단 경로 (자동)',
+      isDirect: true,
       recommended: true,
       fastest: true,
     });
@@ -734,10 +750,10 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
               </Text>
               <Text style={styles.transferGateValue} numberOfLines={1}>
                 {selectedOption?.isDirect
-                  ? '환승 없음 (직행)'
+                  ? (selectedOption.label ?? '직행 (환승 없음)')
                   : selectedOption?.label
                     ? `${selectedOption.label} 환승`
-                    : '환승 없음 (직행)'}
+                    : '최단 경로 (자동)'}
               </Text>
             </View>
           </View>
@@ -758,7 +774,9 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
           <View style={styles.recommendSection}>
             <Text style={styles.recommendTitle}>환승역 추천</Text>
             <Text style={styles.recommendHint}>
-              직행이 가장 빨라요. 필요시 환승역을 선택하세요
+              {recommendations.some((r) => r.id === DIRECT_OPTION_ID)
+                ? '직행이 가장 빨라요. 필요시 환승역을 선택하세요'
+                : '가장 빠른 경로로 안내해 드려요. 필요시 환승역을 선택하세요'}
             </Text>
 
             <View style={styles.searchRow}>

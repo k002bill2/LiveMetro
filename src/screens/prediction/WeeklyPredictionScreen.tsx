@@ -161,6 +161,7 @@ export const WeeklyPredictionScreen: React.FC = () => {
   const routeSteps = useCommuteRouteSteps(
     morningCommute?.stationId,
     morningCommute?.destinationStationId,
+    morningCommute?.transferStationId,
   );
 
   // Hero predictedMinutes — shared single source with HomeScreen via

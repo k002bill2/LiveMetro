@@ -22,6 +22,7 @@
  */
 import { useMemo } from 'react';
 import { fareService, getDiverseRoutes } from '@services/route';
+import { routeVia } from '@services/route/routeVia';
 import { resolveInternalStationId } from '@utils/stationIdResolver';
 
 export interface CommuteRouteSummary {
@@ -34,6 +35,12 @@ export interface CommuteRouteSummary {
   /** Estimated ride time in minutes from graph search (excludes walk). */
   rideMinutes?: number;
   /**
+   * Line id of the first boarded (non-transfer) segment. Drives the home
+   * card mid-node badge so it reflects the actual route's first line —
+   * not the origin station's first listed line.
+   */
+  lineId?: string;
+  /**
    * False until both station ids are provided AND a route is found.
    * Consumers can use `ready` to gate fact-grid rendering.
    */
@@ -45,6 +52,7 @@ const EMPTY: CommuteRouteSummary = { ready: false };
 export function useCommuteRouteSummary(
   fromStationId?: string,
   toStationId?: string,
+  viaTransferId?: string,
 ): CommuteRouteSummary {
   return useMemo<CommuteRouteSummary>(() => {
     if (!fromStationId || !toStationId || fromStationId === toStationId) {
@@ -76,12 +84,17 @@ export function useCommuteRouteSummary(
     }
     if (fromSlug === toSlug) return EMPTY;
     try {
-      // `getDiverseRoutes` runs Yen's K-shortest (K=15) then picks the
-      // fastest path under MAX_ROUTE_TRANSFERS≤2 with a 1.5× time-gap cap.
-      // This matches Naver's "최단시간" card semantics. Plain dijkstra (K=1)
-      // misses 산곡↔선릉 강남구청-via path which only surfaces at K≥11 — see
-      // memory note `Yen's signature-dedupe efficiency` (PR #91+#102).
-      const route = getDiverseRoutes(fromSlug, toSlug)[0] ?? null;
+      // Canonical route selection (single SSOT with useCommuteRouteSteps):
+      //   - via transfer chosen → `routeVia` constrains the path through it
+      //   - otherwise → `getDiverseRoutes[0]` = Yen's K-shortest fastest path
+      //     (K=15, ≤2 transfers, 1.5× time-gap cap; matches "최단시간" card).
+      // The via slug is normalized at this same boundary as from/to.
+      const viaSlug = viaTransferId
+        ? resolveInternalStationId(viaTransferId)
+        : null;
+      const route = viaSlug
+        ? routeVia(fromSlug, viaSlug, toSlug)
+        : getDiverseRoutes(fromSlug, toSlug)[0] ?? null;
       if (!route) {
         if (__DEV__) {
           console.warn('[useCommuteRouteSummary] getDiverseRoutes returned no path', {
@@ -94,12 +107,14 @@ export function useCommuteRouteSummary(
         return EMPTY;
       }
       const stationCount = route.segments.filter((s) => !s.isTransfer).length;
+      const lineId = route.segments.find((s) => !s.isTransfer)?.lineId;
       const fare = fareService.calculateFare(stationCount).totalFare;
       return {
         transferCount: route.transferCount,
         stationCount,
         fareKrw: fare,
         rideMinutes: route.totalMinutes,
+        lineId,
         ready: true,
       };
     } catch (error) {
@@ -112,7 +127,7 @@ export function useCommuteRouteSummary(
       }
       return EMPTY;
     }
-  }, [fromStationId, toStationId]);
+  }, [fromStationId, toStationId, viaTransferId]);
 }
 
 export default useCommuteRouteSummary;

@@ -54,17 +54,53 @@ describe('CommuteRouteCard', () => {
     expect(getByText('오늘의 출근 경로')).toBeTruthy();
   });
 
-  it('renders the line label and ride duration when lineId + rideMinutes provided', () => {
+  it('renders "직행 N분" only for an affirmative direct route (transferCount === 0)', () => {
     const { getByText } = render(
       <CommuteRouteCard
         origin="홍대입구"
         destination="강남"
         lineId="2"
         rideMinutes={18}
+        transferCount={0}
       />,
     );
     expect(getByText('2호선')).toBeTruthy();
     expect(getByText('직행 18분')).toBeTruthy();
+  });
+
+  it('does not claim "직행" when transferCount is unknown (route unresolved), even with rideMinutes', () => {
+    // Graph search failed but an ML door-to-door estimate exists → the card
+    // receives rideMinutes but no transferCount. Asserting "직행" here is a
+    // false claim about a route we could not resolve.
+    const { queryByText } = render(
+      <CommuteRouteCard
+        origin="신길"
+        destination="선릉"
+        lineId="1"
+        rideMinutes={36}
+        // transferCount intentionally omitted (unknown).
+      />,
+    );
+    expect(queryByText('직행 36분')).toBeNull();
+    expect(queryByText(/환승/)).toBeNull();
+  });
+
+  it('shows "환승 N회" (not "직행") in the mid-node when transferCount > 0', () => {
+    const { getByText, queryByText } = render(
+      <CommuteRouteCard
+        origin="신길"
+        destination="선릉"
+        lineId="1"
+        rideMinutes={36}
+        transferCount={2}
+        stationCount={13}
+      />,
+    );
+    // Mid-node meta must be honest about transfers, not a fictional "직행".
+    expect(getByText('환승 2회')).toBeTruthy();
+    expect(queryByText('직행 36분')).toBeNull();
+    // First boarded line still rendered.
+    expect(getByText('1호선')).toBeTruthy();
   });
 
   it('shows the edit link only when onPressEdit is provided and fires the handler', () => {
