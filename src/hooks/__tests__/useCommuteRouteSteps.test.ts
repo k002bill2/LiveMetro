@@ -10,6 +10,7 @@
  */
 import { renderHook } from '@testing-library/react-native';
 import { getDiverseRoutes } from '@services/route';
+import { routeVia } from '@services/route/routeVia';
 import { resolveInternalStationId } from '@utils/stationIdResolver';
 import { routeToGuidanceSteps } from '@/services/guidance/guidanceSteps';
 import type { GuidanceStep } from '@/models/guidance';
@@ -18,6 +19,8 @@ import { useCommuteRouteSteps } from '../useCommuteRouteSteps';
 jest.mock('@services/route', () => ({
   getDiverseRoutes: jest.fn(),
 }));
+
+jest.mock('@services/route/routeVia', () => ({ routeVia: jest.fn() }));
 
 // resolver is exercised by its own unit tests (stationIdResolver.test.ts).
 // Mock it as identity here so this file verifies the hook's contract without
@@ -34,6 +37,7 @@ jest.mock('@/services/guidance/guidanceSteps', () => ({
 }));
 
 const mockedDiverse = getDiverseRoutes as jest.Mock;
+const mockedRouteVia = routeVia as jest.Mock;
 const mockedResolve = resolveInternalStationId as jest.Mock;
 const mockedToSteps = routeToGuidanceSteps as jest.Mock;
 
@@ -128,6 +132,21 @@ describe('useCommuteRouteSteps', () => {
     // Only the fastest (index 0) route is reshaped.
     expect(mockedToSteps).toHaveBeenCalledTimes(1);
     expect(mockedToSteps).toHaveBeenCalledWith(ROUTE);
+  });
+
+  it('uses routeVia (constrained) and reshapes it when a via transfer id is provided', () => {
+    const viaRoute = { segments: [], totalMinutes: 40, transferCount: 1 };
+    mockedRouteVia.mockReturnValue(viaRoute);
+    mockedToSteps.mockReturnValue(SENTINEL_STEPS);
+
+    const { result } = renderHook(() =>
+      useCommuteRouteSteps('singil', 'seolleung', 'sindorim'),
+    );
+
+    expect(result.current).toBe(SENTINEL_STEPS);
+    expect(mockedRouteVia).toHaveBeenCalledWith('singil', 'sindorim', 'seolleung');
+    expect(mockedDiverse).not.toHaveBeenCalled();
+    expect(mockedToSteps).toHaveBeenCalledWith(viaRoute);
   });
 
   it('normalizes external station_cd to internal slug before route lookup', () => {

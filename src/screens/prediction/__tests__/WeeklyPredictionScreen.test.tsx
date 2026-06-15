@@ -8,7 +8,7 @@
  */
 
 import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { WeeklyPredictionScreen } from '../WeeklyPredictionScreen';
 import { useCommutePattern } from '@/hooks/useCommutePattern';
 import { useMLPrediction } from '@/hooks/useMLPrediction';
@@ -455,6 +455,22 @@ describe('WeeklyPredictionScreen', () => {
     expect(await findByTestId('commute-prediction-route-row')).toBeTruthy();
     // ...and the "set up your route" banner is gone.
     expect(queryByTestId('commute-prediction-route-setup')).toBeNull();
+  });
+
+  it('forwards the chosen transferStationId to useCommuteRouteSteps (via-constrained timeline)', async () => {
+    (useFirestoreMorningCommute as jest.Mock).mockReturnValue({
+      stationId: '0150',
+      destinationStationId: '0228',
+      departureTime: '08:00',
+      bufferMinutes: 0,
+      transferStationId: 'stn-via',
+    });
+
+    render(<WeeklyPredictionScreen />);
+
+    await waitFor(() =>
+      expect(useCommuteRouteSteps).toHaveBeenCalledWith('0150', '0228', 'stn-via'),
+    );
   });
 
   // Discriminates the isUsableCommuteTime GATE (not just the ?? fallback):

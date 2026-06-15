@@ -25,6 +25,7 @@
  */
 import { useMemo } from 'react';
 import { getDiverseRoutes } from '@services/route';
+import { routeVia } from '@services/route/routeVia';
 import { resolveInternalStationId } from '@utils/stationIdResolver';
 import { routeToGuidanceSteps } from '@/services/guidance/guidanceSteps';
 import type { GuidanceStep } from '@/models/guidance';
@@ -34,6 +35,7 @@ const EMPTY: readonly GuidanceStep[] = [];
 export function useCommuteRouteSteps(
   fromStationId?: string,
   toStationId?: string,
+  viaTransferId?: string,
 ): readonly GuidanceStep[] {
   return useMemo<readonly GuidanceStep[]>(() => {
     if (!fromStationId || !toStationId || fromStationId === toStationId) {
@@ -47,9 +49,16 @@ export function useCommuteRouteSteps(
     const toSlug = resolveInternalStationId(toStationId);
     if (!fromSlug || !toSlug || fromSlug === toSlug) return EMPTY;
     try {
-      // getDiverseRoutes[0] is the fastest path under MAX_ROUTE_TRANSFERS —
-      // same selection useCommuteRouteSummary uses for the home fact grid.
-      const route = getDiverseRoutes(fromSlug, toSlug)[0] ?? null;
+      // Canonical route selection — identical policy to useCommuteRouteSummary
+      // so the ML timeline and the home fact grid never diverge:
+      //   - via transfer chosen → `routeVia` constrains the path through it
+      //   - otherwise → `getDiverseRoutes[0]` = fastest path.
+      const viaSlug = viaTransferId
+        ? resolveInternalStationId(viaTransferId)
+        : null;
+      const route = viaSlug
+        ? routeVia(fromSlug, viaSlug, toSlug)
+        : getDiverseRoutes(fromSlug, toSlug)[0] ?? null;
       if (!route) return EMPTY;
       const steps = routeToGuidanceSteps(route);
       return steps.length > 0 ? steps : EMPTY;
@@ -63,7 +72,7 @@ export function useCommuteRouteSteps(
       }
       return EMPTY;
     }
-  }, [fromStationId, toStationId]);
+  }, [fromStationId, toStationId, viaTransferId]);
 }
 
 export default useCommuteRouteSteps;

@@ -78,6 +78,9 @@ export function useFirestoreMorningCommute(
         stationId: morning.departureStationId,
         destinationStationId: morning.arrivalStationId,
         bufferMinutes: morning.bufferMinutes ?? 0,
+        // First chosen transfer drives the via-constrained canonical route.
+        // Absent (no transfer saved) → undefined → globally fastest route.
+        transferStationId: morning.transferStations?.[0]?.stationId,
       });
     });
     return unsubscribe;

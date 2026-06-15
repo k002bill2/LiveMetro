@@ -146,6 +146,12 @@ export interface CommuteTime {
   readonly stationId: string;
   readonly destinationStationId: string;
   readonly bufferMinutes: number;
+  /**
+   * Optional user-chosen transfer station id. When present, the canonical
+   * commute route is constrained to pass through it (routeVia); when absent
+   * the route is the globally fastest path. Drives home card / ML timeline.
+   */
+  readonly transferStationId?: string;
 }
 
 /**

@@ -27,6 +27,9 @@ describe('useCommuteRouteSummary — integration (no service mocks)', () => {
     // 시간은 ±15% 가드. 알고리즘 출력 ~75.8min.
     expect(result.current.rideMinutes).toBeGreaterThan(65);
     expect(result.current.rideMinutes).toBeLessThan(90);
+    // lineId = 첫 탑승(비환승) segment 노선 — 산곡은 7호선에서 탑승. 실그래프로
+    // 검증해 mock-only 사각을 닫는다(home 카드 중앙 배지 소스).
+    expect(result.current.lineId).toBe('7');
   });
 
   it('산곡↔선릉 (internal slug 입력): boundary normalize도 동일 결과', () => {

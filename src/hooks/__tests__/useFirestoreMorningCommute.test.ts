@@ -123,6 +123,25 @@ describe('useFirestoreMorningCommute', () => {
     await waitFor(() => expect(result.current?.bufferMinutes).toBe(0));
   });
 
+  it('projects the first transferStation id as transferStationId (drives via route)', async () => {
+    const { result } = renderHook(() => useFirestoreMorningCommute('uid-1'));
+    emit(
+      settingsWith({
+        ...fullMorning,
+        transferStations: [
+          {
+            stationId: 'stn-via',
+            stationName: '신도림',
+            lineId: '2',
+            lineName: '',
+            order: 0,
+          },
+        ],
+      }),
+    );
+    await waitFor(() => expect(result.current?.transferStationId).toBe('stn-via'));
+  });
+
   it('updates the returned value when a later snapshot changes the route (reactive)', async () => {
     // The core B4 fix: a one-shot fetch could only ever reflect the first
     // value. A live subscription must apply the second snapshot too — this is

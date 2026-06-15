@@ -97,6 +97,7 @@ export function useCommuteHeroEstimate(
   const routeSummary = useCommuteRouteSummary(
     morningCommute?.stationId,
     morningCommute?.destinationStationId,
+    morningCommute?.transferStationId,
   );
 
   const [commuteStationNames, setCommuteStationNames] = useState<CommuteStationNames>({});

@@ -8,6 +8,7 @@
  */
 import { renderHook } from '@testing-library/react-native';
 import { fareService, getDiverseRoutes } from '@services/route';
+import { routeVia } from '@services/route/routeVia';
 import { resolveInternalStationId } from '@utils/stationIdResolver';
 import { useCommuteRouteSummary } from '../useCommuteRouteSummary';
 
@@ -18,6 +19,8 @@ jest.mock('@services/route', () => ({
   getDiverseRoutes: jest.fn(),
 }));
 
+jest.mock('@services/route/routeVia', () => ({ routeVia: jest.fn() }));
+
 // resolver is exercised by its own unit tests (stationIdResolver.test.ts).
 // Mock it as identity here so this file can verify the hook's contract
 // without coupling to which fixture slugs happen to exist in stations.json.
@@ -26,6 +29,7 @@ jest.mock('@utils/stationIdResolver', () => ({
 }));
 
 const mockedDiverse = getDiverseRoutes as jest.Mock;
+const mockedRouteVia = routeVia as jest.Mock;
 const mockedFare = fareService.calculateFare as jest.Mock;
 const mockedResolve = resolveInternalStationId as jest.Mock;
 
@@ -85,10 +89,10 @@ describe('useCommuteRouteSummary', () => {
     mockedDiverse.mockReturnValue([
       {
         segments: [
-          { isTransfer: false }, // station ride 1
-          { isTransfer: false }, // station ride 2
-          { isTransfer: true },  // transfer leg — excluded
-          { isTransfer: false }, // station ride 3
+          { isTransfer: false, lineId: '2' }, // station ride 1 (first boarded line)
+          { isTransfer: false, lineId: '2' }, // station ride 2
+          { isTransfer: true, lineId: '3' },  // transfer leg — excluded
+          { isTransfer: false, lineId: '3' }, // station ride 3
         ],
         totalMinutes: 28,
         transferCount: 1,
@@ -106,9 +110,57 @@ describe('useCommuteRouteSummary', () => {
       stationCount: 3,
       fareKrw: 1450,
       rideMinutes: 28,
+      lineId: '2',
       ready: true,
     });
     expect(mockedFare).toHaveBeenCalledWith(3);
+  });
+
+  it('uses routeVia (constrained) when a via transfer id is provided', () => {
+    mockedRouteVia.mockReturnValue({
+      segments: [
+        { isTransfer: false, lineId: '1' },
+        { isTransfer: true, lineId: '2' },
+        { isTransfer: false, lineId: '2' },
+      ],
+      totalMinutes: 40,
+      transferCount: 1,
+      lineIds: ['1', '2'],
+    });
+    mockedFare.mockReturnValue({ totalFare: 1500 });
+
+    const { result } = renderHook(() =>
+      useCommuteRouteSummary('singil', 'seolleung', 'sindorim'),
+    );
+
+    // via path bypasses the global-fastest getDiverseRoutes entirely.
+    expect(mockedRouteVia).toHaveBeenCalledWith('singil', 'sindorim', 'seolleung');
+    expect(mockedDiverse).not.toHaveBeenCalled();
+    expect(result.current.transferCount).toBe(1);
+    expect(result.current.lineId).toBe('1');
+    expect(result.current.ready).toBe(true);
+  });
+
+  it('exposes the first non-transfer segment lineId (not a transfer leg line)', () => {
+    mockedDiverse.mockReturnValue([
+      {
+        segments: [
+          { isTransfer: false, lineId: '1' }, // first boarded line
+          { isTransfer: true, lineId: '9' },  // transfer leg
+          { isTransfer: false, lineId: '9' },
+        ],
+        totalMinutes: 30,
+        transferCount: 1,
+        lineIds: ['1', '9'],
+      },
+    ]);
+    mockedFare.mockReturnValue({ totalFare: 1450 });
+
+    const { result } = renderHook(() =>
+      useCommuteRouteSummary('singil', 'seolleung'),
+    );
+
+    expect(result.current.lineId).toBe('1');
   });
 
   it('memoizes by station id pair (same inputs → no re-call)', () => {
