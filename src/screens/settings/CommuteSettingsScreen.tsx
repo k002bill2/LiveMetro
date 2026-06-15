@@ -11,7 +11,6 @@ import React, {
   useState,
   useCallback,
   useMemo,
-  useLayoutEffect,
   useRef,
   useEffect,
 } from 'react';
@@ -156,28 +155,46 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
     }, 900);
   }, [navigation, showSuccess]);
 
-  // "저장" header link per Wanted handoff. Settings persist optimistically
-  // on each toggle/picker change, so this button is a confirmation: it
-  // surfaces a success toast, then navigates back to the Settings index.
-  useLayoutEffect(() => {
-    navigation.setOptions({
-      headerRight: () => (
-        <TouchableOpacity
-          onPress={handleSavePress}
-          accessibilityRole="button"
-          accessibilityLabel="저장하고 돌아가기"
-          hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-        >
-          <Text style={{
-            color: WANTED_TOKENS.blue[500],
-            fontSize: 17,
-            fontFamily: weightToFontFamily('700'),
-            paddingRight: 4,
-          }}>저장</Text>
-        </TouchableOpacity>
-      ),
-    });
-  }, [navigation, handleSavePress]);
+  // Latest save handler + navigation in refs so the focus effect below has a
+  // STABLE callback (never re-subscribes on the unstable cross-stack nav prop).
+  const handleSavePressRef = useRef(handleSavePress);
+  handleSavePressRef.current = handleSavePress;
+  const navigationRef = useRef(navigation);
+  navigationRef.current = navigation;
+
+  // "저장" header button (Wanted handoff). Settings persist optimistically on
+  // each change, so this is a confirmation: success toast + back to Settings.
+  //
+  // Registered via setOptions ON FOCUS — NOT on mount. Entering this screen
+  // cross-stack from Home/예측 "경로 변경" — navigate('Profile', { screen:
+  // 'CommuteSettings', initial: false }) — mounts it in a transient state where
+  // calling setOptions synchronously REMOUNTS it → setOptions → remount →
+  // "Maximum update depth exceeded" (verified: removing setOptions stops the
+  // loop). useFocusEffect runs setOptions only after the transition settles
+  // (screen stable + focused), where it is benign — same as the normal "나" tab
+  // entry. Stable callback (refs for latest nav/handler) so focus never
+  // re-subscribes on the churning navigation prop.
+  useFocusEffect(
+    useCallback(() => {
+      navigationRef.current.setOptions({
+        headerRight: () => (
+          <TouchableOpacity
+            onPress={() => handleSavePressRef.current()}
+            accessibilityRole="button"
+            accessibilityLabel="저장하고 돌아가기"
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <Text style={{
+              color: WANTED_TOKENS.blue[500],
+              fontSize: 17,
+              fontFamily: weightToFontFamily('700'),
+              paddingRight: 4,
+            }}>저장</Text>
+          </TouchableOpacity>
+        ),
+      });
+    }, []),
+  );
 
   const [morningRoute, setMorningRoute] = useState<CommuteRouteData | null>(null);
   const [eveningRoute, setEveningRoute] = useState<CommuteRouteData | null>(null);

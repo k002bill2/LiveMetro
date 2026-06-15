@@ -437,4 +437,34 @@ describe('CommuteSettingsScreen', () => {
       { timeout: 2000 },
     );
   });
+
+  it('registers the header save button once and survives navigation-prop identity churn (cross-stack "경로 변경" loop guard)', () => {
+    // Repro of the Home "경로 변경" entry — navigate('Profile', { screen:
+    // 'CommuteSettings', initial: false }) hands this screen a NEW `navigation`
+    // prop identity on every render. The setOptions layout effect must NOT
+    // re-run on that churn: re-running looped setOptions → navigator re-render →
+    // new nav prop → setOptions → "Maximum update depth exceeded".
+    const setOptions = jest.fn();
+    const route = {
+      params: {},
+      key: 'CommuteSettings',
+      name: 'CommuteSettings' as const,
+    };
+    const makeNav = (): any => ({
+      navigate: jest.fn(),
+      goBack: jest.fn(),
+      canGoBack: jest.fn(() => true),
+      setOptions,
+    });
+
+    const { rerender } = render(
+      <CommuteSettingsScreen navigation={makeNav()} route={route as any} />,
+    );
+    rerender(<CommuteSettingsScreen navigation={makeNav()} route={route as any} />);
+    rerender(<CommuteSettingsScreen navigation={makeNav()} route={route as any} />);
+
+    // Once on mount, never again — even though the navigation prop identity
+    // changed on every render.
+    expect(setOptions).toHaveBeenCalledTimes(1);
+  });
 });
