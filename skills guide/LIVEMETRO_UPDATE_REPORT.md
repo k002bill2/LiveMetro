@@ -1,6 +1,6 @@
 # LiveMetro Skills Guide 자동 업데이트 보고서
 
-**업데이트 일시**: 2026-05-15 11:23:31
+**업데이트 일시**: 2026-06-15 15:15:51
 
 ## 📊 기술 스택 현황
 
@@ -46,8 +46,8 @@
   - 현재 버전: ^7.0.2
   - 권장 사항: 대체 패키지 검토 필요
 
-- **react-native-web** (마지막 업데이트: 6개월 이상 전)
-  - 현재 버전: ~0.19.6
+- **@testing-library/jest-native** (마지막 업데이트: 6개월 이상 전)
+  - 현재 버전: ^5.4.3
   - 권장 사항: 대체 패키지 검토 필요
 
 - **@types/jest** (마지막 업데이트: 6개월 이상 전)
@@ -60,10 +60,6 @@
 
 - **@types/react-native** (마지막 업데이트: 6개월 이상 전)
   - 현재 버전: ^0.72.8
-  - 권장 사항: 대체 패키지 검토 필요
-
-- **eslint-import-resolver-typescript** (마지막 업데이트: 6개월 이상 전)
-  - 현재 버전: ^3.5.5
   - 권장 사항: 대체 패키지 검토 필요
 
 - **eslint-plugin-react** (마지막 업데이트: 6개월 이상 전)
@@ -91,14 +87,14 @@
 다음 패키지들의 업데이트를 고려하세요:
 
 - @expo/ngrok: ^4.1.3 → 4.1.3
-- @react-native-async-storage/async-storage: 1.18.2 → 3.0.2
+- @react-native-async-storage/async-storage: 1.18.2 → 3.1.1
 - @react-native-community/datetimepicker: ^7.2.0 → 9.1.0
 - @react-native-community/slider: ^4.4.2 → 5.2.0
-- @react-navigation/bottom-tabs: ^6.5.11 → 7.16.1
+- @react-navigation/bottom-tabs: ^6.5.11 → 7.18.2
 
 ## 🔧 다음 업데이트
 
-다음 자동 업데이트는 **2026-06-14**에 실행됩니다.
+다음 자동 업데이트는 **2026-07-15**에 실행됩니다.
 
 ---
 *이 보고서는 `scripts/skillsGuideUpdater.ts`에 의해 자동 생성되었습니다.*
