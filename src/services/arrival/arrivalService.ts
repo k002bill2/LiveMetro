@@ -231,6 +231,11 @@ class ArrivalService {
         await this.pollAndNotify(trimmedName, options);
       }, pollInterval);
 
+      // 폴링 타이머가 Node/Jest 프로세스 종료를 막지 않도록 unref (구독 후
+      // unsubscribe 없는 테스트의 open handle 누수 방어). RN의 setInterval은
+      // number 반환이라 unref가 없어 가드로 프로덕션 동작은 보존된다.
+      (interval as { unref?: () => void }).unref?.();
+
       this.pollingIntervals.set(trimmedName, interval);
     }
 
