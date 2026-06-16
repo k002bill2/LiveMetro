@@ -58,12 +58,17 @@ module.exports = {
 
   coverageReporters: ['text', 'lcov', 'json-summary', 'clover'],
 
+  // SSOT for the PR-blocking coverage gate. Ratcheted from the initial
+  // 15/20/20/20 safety net to tier-1 targets after a measured full --coverage
+  // pass (stmt 84.8 / br 73.6 / fn 87.2 / lines 86.0 — all clear with headroom).
+  // Do NOT raise to the 85/80/70 final targets yet: statements sits at ~84.8%,
+  // so an 85 gate would fail the next run. See .claude/rules/coverage-thresholds.md.
   coverageThreshold: {
     global: {
-      branches: 15,
-      functions: 20,
-      lines: 20,
-      statements: 20,
+      branches: 60,
+      functions: 70,
+      lines: 75,
+      statements: 75,
     },
   },
 
