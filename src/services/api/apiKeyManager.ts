@@ -250,6 +250,12 @@ export class ApiKeyManager {
         state.usageCount = 0;
       });
     }, this.options.usageResetIntervalMs);
+
+    // 이 싱글톤 매니저의 사용량-리셋 타이머가 Node/Jest 프로세스 종료를 막지
+    // 않도록 unref. (모듈 import만으로 생성돼 테스트에서 open handle 누수 →
+    // "worker failed to exit gracefully" 유발) RN의 setInterval은 number를
+    // 반환해 unref가 없으므로 가드로 프로덕션 동작은 변하지 않는다.
+    (this.usageResetTimer as { unref?: () => void }).unref?.();
   }
 
   private maskKey(key: string): string {
