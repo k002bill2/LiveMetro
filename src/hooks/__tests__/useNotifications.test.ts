@@ -103,6 +103,36 @@ describe('useNotifications', () => {
     jest.useRealTimers();
   });
 
+  describe('monitorStationDelays concurrency (no orphan timers)', () => {
+    it('keeps exactly one live interval when the same station is set up concurrently', async () => {
+      // detectDelays resolves immediately but its `await` yields, opening the
+      // window between the clear-guard and the timer registration. Two
+      // concurrent setups for the same station must NOT leave an orphan interval.
+      const { result } = renderHook(() => useNotifications({ monitoredStations: [] }));
+
+      await waitFor(() => expect(result.current.hasPermission).toBe(true));
+
+      const setIntervalSpy = jest.spyOn(global, 'setInterval');
+      const clearIntervalSpy = jest.spyOn(global, 'clearInterval');
+
+      await act(async () => {
+        const p1 = result.current.monitorStationDelays('강남역');
+        const p2 = result.current.monitorStationDelays('강남역');
+        await Promise.all([p1, p2]);
+      });
+
+      // Live intervals = monitoring intervals created (60000ms) minus those cleared.
+      const created = setIntervalSpy.mock.calls.filter((c) => c[1] === 60000).length;
+      const cleared = clearIntervalSpy.mock.calls.length;
+      const live = created - cleared;
+
+      // Bug: 2 created, 0 cleared → 2 live (one orphan, unkillable). Fix: 2 created,
+      // 1 cleared → 1 live. (A received value of 0 would mean the setup is broken,
+      // not the bug — permission must be granted for monitoring to start.)
+      expect(live).toBe(1);
+    });
+  });
+
   describe('Initialization', () => {
     it('should initialize with loading true', () => {
       const { result } = renderHook(() => useNotifications());

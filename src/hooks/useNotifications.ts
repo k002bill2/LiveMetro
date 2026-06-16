@@ -217,14 +217,18 @@ export const useNotifications = (options: UseNotificationsOptions = {}) => {
       }
     };
 
-    // Initial check
-    await checkDelays();
-
-    // Set up periodic monitoring
+    // Register the periodic timer BEFORE the initial async check. The clear
+    // above and this registration form a synchronous critical section (no await
+    // between them), so concurrent setups for the same station always clear the
+    // previous timer first — eliminating the orphan-timer race that arose when
+    // registration happened after `await checkDelays()`.
     const timer = setInterval(checkDelays, 60000) as unknown as NodeJS.Timeout; // Check every minute
     monitoringRef.current.set(stationName, timer);
 
     console.log(`Started delay monitoring for ${stationName}`);
+
+    // Initial check (runs after registration; its result does not gate the timer)
+    await checkDelays();
   }, [enableDelayAlerts, enableEmergencyAlerts, state.hasPermission, delayThresholdMinutes, user]);
 
   /**
