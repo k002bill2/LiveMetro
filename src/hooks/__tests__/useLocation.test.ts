@@ -4,7 +4,7 @@
  */
 
 import { renderHook, act, waitFor } from '@testing-library/react-native';
-import { AppState } from 'react-native';
+import { AppState, AppStateStatus } from 'react-native';
 import { useLocation, useCurrentLocation } from '../useLocation';
 import { locationService, LocationCoordinates } from '../../services/location/locationService';
 
@@ -40,8 +40,12 @@ const mockLocationService = locationService as jest.Mocked<typeof locationServic
 // Mock AppState
 const mockRemove = jest.fn();
 
-jest.spyOn(AppState, 'addEventListener').mockImplementation((_, _callback) => {
-  // Callback stored for potential test usage
+// Capture the registered handler so foreground/background transition branches
+// in handleAppStateChange can be exercised directly.
+let capturedAppStateHandler: ((state: AppStateStatus) => void) | undefined;
+
+jest.spyOn(AppState, 'addEventListener').mockImplementation((_, handler) => {
+  capturedAppStateHandler = handler as (state: AppStateStatus) => void;
   return { remove: mockRemove };
 });
 
@@ -504,6 +508,203 @@ describe('useLocation', () => {
       expect(mockLocationService.startLocationTracking).toHaveBeenCalledWith(
         expect.any(Function),
         expect.objectContaining({ distanceInterval: 50 })
+      );
+    });
+  });
+
+  describe('Background Permission', () => {
+    it('requestBackgroundPermission should return true when service grants it', async () => {
+      mockLocationService.requestBackgroundPermission.mockResolvedValue(true);
+
+      const { result } = renderHook(() =>
+        useLocation({ showPermissionExplanation: false })
+      );
+
+      await waitFor(() => {
+        expect(result.current.hasPermission).toBe(true);
+      });
+
+      let granted = false;
+      await act(async () => {
+        granted = await result.current.requestBackgroundPermission();
+      });
+
+      expect(granted).toBe(true);
+      expect(mockLocationService.requestBackgroundPermission).toHaveBeenCalled();
+      expect(result.current.hasBackgroundPermission).toBe(true);
+    });
+
+    it('requestBackgroundPermission should return false when service denies it', async () => {
+      mockLocationService.requestBackgroundPermission.mockResolvedValue(false);
+
+      const { result } = renderHook(() =>
+        useLocation({ showPermissionExplanation: false })
+      );
+
+      await waitFor(() => {
+        expect(result.current.hasPermission).toBe(true);
+      });
+
+      let granted = true;
+      await act(async () => {
+        granted = await result.current.requestBackgroundPermission();
+      });
+
+      expect(granted).toBe(false);
+      expect(result.current.hasBackgroundPermission).toBe(false);
+    });
+
+    it('requestBackgroundPermission should initialize first and bail out when init fails', async () => {
+      const Location = require('expo-location');
+      Location.getForegroundPermissionsAsync.mockResolvedValue({ status: 'denied' });
+      mockLocationService.initialize.mockResolvedValue(false);
+
+      const { result } = renderHook(() =>
+        useLocation({ showPermissionExplanation: false })
+      );
+
+      await waitFor(() => {
+        expect(result.current.hasPermission).toBe(false);
+      });
+
+      mockLocationService.requestBackgroundPermission.mockClear();
+
+      let granted = true;
+      await act(async () => {
+        granted = await result.current.requestBackgroundPermission();
+      });
+
+      expect(granted).toBe(false);
+      // init failed → must short-circuit before requesting background permission
+      expect(mockLocationService.requestBackgroundPermission).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('App State Transitions', () => {
+    beforeEach(() => {
+      // appStateRef is seeded from AppState.currentState at mount; the test env
+      // leaves it undefined, so pin it to a realistic value before each render.
+      AppState.currentState = 'active';
+    });
+
+    it('should pause tracking when app goes to background (foreground-only mode)', async () => {
+      const { result } = renderHook(() =>
+        useLocation({ showPermissionExplanation: false })
+      );
+
+      await waitFor(() => {
+        expect(result.current.hasPermission).toBe(true);
+      });
+
+      await act(async () => {
+        await result.current.startTracking();
+      });
+      expect(result.current.isTracking).toBe(true);
+
+      expect(capturedAppStateHandler).toBeDefined();
+      mockLocationService.stopLocationTracking.mockClear();
+
+      // Normalize appState to 'active', then transition to background.
+      await act(async () => {
+        capturedAppStateHandler?.('active');
+      });
+      await act(async () => {
+        capturedAppStateHandler?.('background');
+      });
+
+      expect(mockLocationService.stopLocationTracking).toHaveBeenCalled();
+      expect(result.current.isTracking).toBe(false);
+    });
+
+    it('should NOT pause tracking on background when enableBackgroundLocation is true', async () => {
+      const { result } = renderHook(() =>
+        useLocation({
+          showPermissionExplanation: false,
+          enableBackgroundLocation: true,
+        })
+      );
+
+      await waitFor(() => {
+        expect(result.current.hasPermission).toBe(true);
+      });
+
+      await act(async () => {
+        await result.current.startTracking();
+      });
+      expect(result.current.isTracking).toBe(true);
+
+      mockLocationService.stopLocationTracking.mockClear();
+
+      await act(async () => {
+        capturedAppStateHandler?.('active');
+      });
+      await act(async () => {
+        capturedAppStateHandler?.('background');
+      });
+
+      expect(mockLocationService.stopLocationTracking).not.toHaveBeenCalled();
+      expect(result.current.isTracking).toBe(true);
+    });
+
+    it('should not start tracking on foreground when no session is active', async () => {
+      const { result } = renderHook(() =>
+        useLocation({ showPermissionExplanation: false })
+      );
+
+      await waitFor(() => {
+        expect(result.current.hasPermission).toBe(true);
+      });
+
+      mockLocationService.startLocationTracking.mockClear();
+
+      // background → active while not tracking: resume branch must be a no-op.
+      await act(async () => {
+        capturedAppStateHandler?.('background');
+      });
+      await act(async () => {
+        capturedAppStateHandler?.('active');
+      });
+
+      expect(mockLocationService.startLocationTracking).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Tracking Mode Shortcuts', () => {
+    it('startBatteryEfficientTracking should track in batteryEfficient mode', async () => {
+      const { result } = renderHook(() =>
+        useLocation({ showPermissionExplanation: false })
+      );
+
+      await waitFor(() => {
+        expect(result.current.hasPermission).toBe(true);
+      });
+
+      await act(async () => {
+        await result.current.startBatteryEfficientTracking();
+      });
+
+      expect(mockLocationService.startLocationTracking).toHaveBeenCalledWith(
+        expect.any(Function),
+        expect.objectContaining({ mode: 'batteryEfficient' })
+      );
+    });
+
+    it('startHighAccuracyTracking should track in highAccuracy mode', async () => {
+      const { result } = renderHook(() =>
+        useLocation({ showPermissionExplanation: false })
+      );
+
+      await waitFor(() => {
+        expect(result.current.hasPermission).toBe(true);
+      });
+
+      await act(async () => {
+        await result.current.startHighAccuracyTracking();
+      });
+
+      expect(mockLocationService.startLocationTracking).toHaveBeenCalledWith(
+        expect.any(Function),
+        expect.objectContaining({ mode: 'highAccuracy' })
       );
     });
   });
