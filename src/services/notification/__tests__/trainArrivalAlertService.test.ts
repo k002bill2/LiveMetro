@@ -490,4 +490,39 @@ describe('TrainArrivalAlertService', () => {
       expect(trainArrivalAlertService.getActiveSessions().length).toBe(0);
     });
   });
+
+  describe('alertsSent cleanup (no leak over time)', () => {
+    it('releases the sent-alert marker when a session stops after firing', async () => {
+      // Train within threshold → initial poll fires an alert and auto-stops.
+      mockSeoulSubwayApi.getRealtimeArrival.mockResolvedValue([
+        {
+          subwayId: '2',
+          updnLine: '상행',
+          arvlMsg2: '2분 후 도착',
+          btrainNo: '2001',
+          bstatnNm: '신도림',
+        },
+      ]);
+
+      await trainArrivalAlertService.startMonitoring('user-123', {
+        userId: 'user-123',
+        stationId: '강남',
+        lineId: '2',
+        direction: 'up',
+        alertMinutesBefore: 3,
+        pollingIntervalSeconds: 30,
+      });
+
+      // Alert fired and session stopped...
+      expect(mockNotificationService.sendLocalNotification).toHaveBeenCalledTimes(1);
+      expect(trainArrivalAlertService.getActiveSessions()).toHaveLength(0);
+
+      // ...so its composite alertsSent key
+      // (`${alertId}_${trainNumber}_${arrivalTime}`) must be released.
+      // stopMonitoring deleted by the bare alertId, which never matched the
+      // composite key — leaking one entry per fired alert and slowing the app
+      // over a long session.
+      expect(trainArrivalAlertService.getSentAlertKeys()).toHaveLength(0);
+    });
+  });
 });
