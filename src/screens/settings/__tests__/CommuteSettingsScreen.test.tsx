@@ -199,6 +199,82 @@ describe('CommuteSettingsScreen', () => {
     expect(getAllByText('편집').length).toBe(1);
   });
 
+  // Regression guard for the "편집" link wiring. RouteCard lives at module
+  // scope (hoisted out of the screen body) so a parent re-render — e.g. the
+  // nav-prop identity churn of a cross-stack "경로 변경" entry — re-renders it
+  // instead of remounting it, which is what kept these onPress handlers from
+  // firing on device. JSDOM can't reproduce the remount/touch-delivery race,
+  // but this proves both legs' press → navigate('EditCommuteRoute', …) contract.
+  it('pressing the morning/evening "편집" links navigates to EditCommuteRoute with the right leg', async () => {
+    const notifications = {
+      transferAlert: true,
+      arrivalAlert: true,
+      delayAlert: true,
+      incidentAlert: true,
+      alertMinutesBefore: 5,
+    };
+    mockLoadCommuteRoutes.mockResolvedValue({
+      morningRoute: {
+        departureTime: '08:30',
+        departureStationId: 's1',
+        departureStationName: '산곡',
+        departureLineId: '1',
+        arrivalStationId: 's2',
+        arrivalStationName: '선릉',
+        arrivalLineId: '2',
+        transferStations: [
+          { stationId: 's3', stationName: '강남구청', lineId: '7', lineName: '7호선', order: 1 },
+        ],
+        notifications,
+        bufferMinutes: 10,
+      },
+      eveningRoute: {
+        departureTime: '18:30',
+        departureStationId: 's2',
+        departureStationName: '선릉',
+        departureLineId: '2',
+        arrivalStationId: 's1',
+        arrivalStationName: '산곡',
+        arrivalLineId: '1',
+        transferStations: [],
+        notifications,
+        bufferMinutes: 10,
+      },
+      eveningEnabled: true,
+      createdAt: null,
+      updatedAt: null,
+    });
+
+    const props = createProps();
+    const { getByLabelText } = render(<CommuteSettingsScreen {...props} />);
+    await waitFor(() => {
+      expect(getByLabelText('경로 편집')).toBeTruthy();
+    });
+
+    fireEvent.press(getByLabelText('경로 편집'));
+    expect(props.navigation.navigate).toHaveBeenCalledWith(
+      'EditCommuteRoute',
+      expect.objectContaining({
+        kind: 'morning',
+        initial: expect.objectContaining({
+          departureStation: expect.objectContaining({ stationName: '산곡' }),
+          arrivalStation: expect.objectContaining({ stationName: '선릉' }),
+        }),
+      }),
+    );
+
+    fireEvent.press(getByLabelText('퇴근 경로 편집'));
+    expect(props.navigation.navigate).toHaveBeenCalledWith(
+      'EditCommuteRoute',
+      expect.objectContaining({
+        kind: 'evening',
+        initial: expect.objectContaining({
+          departureStation: expect.objectContaining({ stationName: '선릉' }),
+        }),
+      }),
+    );
+  });
+
   it('handles no user gracefully', async () => {
     mockUseAuth.mockReturnValue({
       user: null,
