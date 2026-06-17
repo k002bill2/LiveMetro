@@ -79,6 +79,36 @@ describe('useWeatherAlert', () => {
     );
   });
 
+  it('location 변경 시 폴링 interval을 재생성하지 않는다 (churn 방지)', async () => {
+    (useLocation as jest.Mock).mockReturnValue({
+      location: { latitude: 37.5, longitude: 127.0 },
+    });
+
+    const setIntervalSpy = jest.spyOn(global, 'setInterval');
+    const weatherIntervalCount = (): number =>
+      setIntervalSpy.mock.calls.filter((c) => c[1] === 30 * 60 * 1000).length;
+
+    const { rerender } = renderHook(
+      ({ enabled }: { enabled: boolean }) => useWeatherAlert({ enabled }),
+      { initialProps: { enabled: true } },
+    );
+
+    await waitFor(() => expect(weatherService.shouldAlertForWeather).toHaveBeenCalled());
+
+    const countAfterMount = weatherIntervalCount();
+    expect(countAfterMount).toBe(1);
+
+    // Location moves — the interval must NOT be torn down and recreated.
+    (useLocation as jest.Mock).mockReturnValue({
+      location: { latitude: 37.6, longitude: 127.1 },
+    });
+    rerender({ enabled: true });
+
+    expect(weatherIntervalCount()).toBe(countAfterMount);
+
+    setIntervalSpy.mockRestore();
+  });
+
   it('weatherService 실패 시 null 반환 (graceful)', async () => {
     (weatherService.shouldAlertForWeather as jest.Mock).mockRejectedValue(
       new Error('API down'),
