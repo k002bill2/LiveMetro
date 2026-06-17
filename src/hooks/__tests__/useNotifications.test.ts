@@ -133,6 +133,53 @@ describe('useNotifications', () => {
     });
   });
 
+  describe('monitoring effect stability (no churn on user identity change)', () => {
+    it('does not re-subscribe monitoring when only the user object identity changes', async () => {
+      // Stable reference so monitoredStations identity does NOT churn — isolates
+      // the user-identity dep as the only changing input.
+      const stations = ['강남역'];
+      mockUseAuth.mockReturnValue({
+        user: mockUser,
+        firebaseUser: null,
+        loading: false,
+        login: jest.fn(),
+        logout: jest.fn(),
+        signup: jest.fn(),
+        resetPassword: jest.fn(),
+      } as any);
+
+      const { result, rerender } = renderHook(
+        (_props: { tick: number }) => useNotifications({ monitoredStations: stations }),
+        { initialProps: { tick: 0 } },
+      );
+
+      await waitFor(() => expect(result.current.hasPermission).toBe(true));
+      await waitFor(() => expect(mockDataManager.detectDelays).toHaveBeenCalled());
+
+      const detectCallsBefore = mockDataManager.detectDelays.mock.calls.length;
+
+      // AuthContext re-renders, handing down a NEW user object of identical
+      // content. This must NOT tear down and re-subscribe monitoring (which
+      // would fire a fresh detectDelays network call).
+      mockUseAuth.mockReturnValue({
+        user: { ...mockUser },
+        firebaseUser: null,
+        loading: false,
+        login: jest.fn(),
+        logout: jest.fn(),
+        signup: jest.fn(),
+        resetPassword: jest.fn(),
+      } as any);
+
+      await act(async () => {
+        rerender({ tick: 1 });
+        await Promise.resolve();
+      });
+
+      expect(mockDataManager.detectDelays.mock.calls.length).toBe(detectCallsBefore);
+    });
+  });
+
   describe('Initialization', () => {
     it('should initialize with loading true', () => {
       const { result } = renderHook(() => useNotifications());

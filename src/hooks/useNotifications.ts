@@ -55,6 +55,18 @@ export const useNotifications = (options: UseNotificationsOptions = {}) => {
   const lastDelaysRef = useRef<Map<string, TrainDelay[]>>(new Map());
   const lastDisruptionsRef = useRef<Map<string, ServiceDisruption[]>>(new Map());
 
+  // Mutable values read inside the long-lived monitoring interval. Held in refs
+  // so monitorStationDelays does NOT depend on them — otherwise a new `user`
+  // object identity (from AuthContext re-renders) would churn the monitoring
+  // effect: tear down + re-subscribe + a fresh detectDelays network call on
+  // every render. The running interval always reads the latest via *.current.
+  const userRef = useRef(user);
+  userRef.current = user;
+  const delayThresholdRef = useRef(delayThresholdMinutes);
+  delayThresholdRef.current = delayThresholdMinutes;
+  const enableEmergencyRef = useRef(enableEmergencyAlerts);
+  enableEmergencyRef.current = enableEmergencyAlerts;
+
   const updateState = useCallback((updates: Partial<UseNotificationsState>) => {
     setState(prevState => ({ ...prevState, ...updates }));
   }, []);
@@ -141,7 +153,7 @@ export const useNotifications = (options: UseNotificationsOptions = {}) => {
 
         // Check for new or worsened delays
         for (const delay of delays) {
-          if (delay.delayMinutes >= delayThresholdMinutes) {
+          if (delay.delayMinutes >= delayThresholdRef.current) {
             const wasAlreadyReported = previousDelays.some(
               prevDelay => 
                 prevDelay.trainId === delay.trainId && 
@@ -149,12 +161,14 @@ export const useNotifications = (options: UseNotificationsOptions = {}) => {
             );
 
             if (!wasAlreadyReported) {
-              // Should send notification based on user settings
-              const shouldSend = user?.preferences?.notificationSettings ? 
-                notificationService.shouldSendNotification(
-                  user.preferences.notificationSettings,
-                  NotificationType.DELAY_ALERT
-                ) : true;
+              // Should send notification based on user settings (latest via ref)
+              const currentUser = userRef.current;
+              const shouldSend = currentUser?.preferences?.notificationSettings
+                ? notificationService.shouldSendNotification(
+                    currentUser.preferences.notificationSettings,
+                    NotificationType.DELAY_ALERT
+                  )
+                : true;
 
               if (shouldSend) {
                 await notificationService.sendDelayAlert(
@@ -170,7 +184,7 @@ export const useNotifications = (options: UseNotificationsOptions = {}) => {
 
         lastDelaysRef.current.set(stationName, delays);
 
-        if (enableEmergencyAlerts && state.hasPermission) {
+        if (enableEmergencyRef.current && state.hasPermission) {
           try {
             const disruptions = await dataManager.detectServiceDisruptions(stationName);
             const previousDisruptions = lastDisruptionsRef.current.get(stationName) || [];
@@ -181,11 +195,13 @@ export const useNotifications = (options: UseNotificationsOptions = {}) => {
                 continue;
               }
 
-              const shouldSendEmergency = user?.preferences?.notificationSettings ?
-                notificationService.shouldSendNotification(
-                  user.preferences.notificationSettings,
-                  NotificationType.EMERGENCY_ALERT
-                ) : true;
+              const currentUser = userRef.current;
+              const shouldSendEmergency = currentUser?.preferences?.notificationSettings
+                ? notificationService.shouldSendNotification(
+                    currentUser.preferences.notificationSettings,
+                    NotificationType.EMERGENCY_ALERT
+                  )
+                : true;
 
               if (!shouldSendEmergency) {
                 continue;
@@ -229,7 +245,10 @@ export const useNotifications = (options: UseNotificationsOptions = {}) => {
 
     // Initial check (runs after registration; its result does not gate the timer)
     await checkDelays();
-  }, [enableDelayAlerts, enableEmergencyAlerts, state.hasPermission, delayThresholdMinutes, user]);
+    // Deps intentionally exclude user / delayThresholdMinutes / enableEmergencyAlerts
+    // — they are read via refs above so the monitoring effect is not re-subscribed
+    // on every render. Only enableDelayAlerts / hasPermission gate (re)subscription.
+  }, [enableDelayAlerts, state.hasPermission]);
 
   /**
    * Stop monitoring a station
