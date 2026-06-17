@@ -21,7 +21,7 @@
  *   - onChange: invoked with the picked chip's time. Wrap in saving guard
  *     externally — this component doesn't persist.
  */
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useSemanticTokens } from '@/services/theme';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
@@ -54,6 +54,18 @@ export const TimePickerCard: React.FC<TimePickerCardProps> = ({
 }) => {
   const semantic = useSemanticTokens();
   const [hh, mm] = splitHHMM(value);
+
+  // Memoize the per-chip color variants (keyed on theme) so the chip row does
+  // not allocate fresh style objects for every chip on each parent re-render.
+  const chipVariants = useMemo(
+    () => ({
+      activeContainer: { backgroundColor: semantic.primaryNormal, borderColor: semantic.primaryNormal },
+      inactiveContainer: { backgroundColor: semantic.bgBase, borderColor: semantic.lineNormal },
+      activeText: { color: semantic.labelOnColor, fontFamily: weightToFontFamily('800') },
+      inactiveText: { color: semantic.labelStrong, fontFamily: weightToFontFamily('700') },
+    }),
+    [semantic]
+  );
 
   return (
     <View style={styles.section} testID={testID}>
@@ -151,25 +163,14 @@ export const TimePickerCard: React.FC<TimePickerCardProps> = ({
                 accessibilityLabel={opt}
                 style={[
                   styles.chip,
-                  active
-                    ? {
-                        backgroundColor: semantic.primaryNormal,
-                        borderColor: semantic.primaryNormal,
-                      }
-                    : {
-                        backgroundColor: semantic.bgBase,
-                        borderColor: semantic.lineNormal,
-                      },
-                  disabled ? { opacity: 0.5 } : null,
+                  active ? chipVariants.activeContainer : chipVariants.inactiveContainer,
+                  disabled ? styles.chipDisabled : null,
                 ]}
               >
                 <Text
                   style={[
                     styles.chipText,
-                    {
-                      color: active ? semantic.labelOnColor : semantic.labelStrong,
-                      fontFamily: weightToFontFamily(active ? '800' : '700'),
-                    },
+                    active ? chipVariants.activeText : chipVariants.inactiveText,
                   ]}
                 >
                   {opt}
@@ -254,6 +255,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontFamily: weightToFontFamily('700'),
     letterSpacing: -0.1,
+  },
+  chipDisabled: {
+    opacity: 0.5,
   },
 });
 

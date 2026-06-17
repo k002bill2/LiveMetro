@@ -127,7 +127,16 @@ class TrainArrivalAlertService {
     }
 
     this.activeSessions.delete(alertId);
-    this.alertsSent.delete(alertId);
+
+    // alertsSent keys are composite `${alertId}_${trainNumber}_${arrivalTime}`.
+    // Deleting by the bare alertId never matched, leaking one entry per fired
+    // alert (the Set grew unbounded over a session). Remove every key for this
+    // alertId. The trailing `_` prevents matching a different alertId by prefix.
+    for (const key of this.alertsSent) {
+      if (key === alertId || key.startsWith(`${alertId}_`)) {
+        this.alertsSent.delete(key);
+      }
+    }
     return true;
   }
 
@@ -303,6 +312,14 @@ class TrainArrivalAlertService {
    */
   getActiveSessions(): MonitoringSession[] {
     return Array.from(this.activeSessions.values());
+  }
+
+  /**
+   * Get the keys of alerts already sent (diagnostic; mirrors getActiveSessions).
+   * Used to verify sent-alert markers are released when a session stops.
+   */
+  getSentAlertKeys(): string[] {
+    return Array.from(this.alertsSent);
   }
 
   // ============================================================================

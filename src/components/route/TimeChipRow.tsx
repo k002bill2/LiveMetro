@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { useSemanticTokens } from '@/services/theme';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
@@ -24,7 +24,20 @@ function formatHm(d: Date): string {
 
 export const TimeChipRow: React.FC<Props> = ({ mode, time, onChangeMode, onChangeTime }) => {
   const semantic = useSemanticTokens();
-  const styles = createStyles(semantic);
+  // Memoize the StyleSheet and the chip color variants so they are not
+  // reallocated on every parent re-render (the row re-renders on each keystroke
+  // when departure mode/time change). Keyed on `semantic` (theme) only.
+  const styles = useMemo(() => createStyles(semantic), [semantic]);
+  const chipStyles = useMemo(
+    () => ({
+      active: { backgroundColor: semantic.primaryNormal, borderColor: semantic.primaryNormal },
+      inactive: { backgroundColor: semantic.bgBase, borderColor: semantic.lineNormal },
+      activeText: { color: semantic.labelOnColor },
+      inactiveText: { color: semantic.labelStrong },
+      activeFont: { fontFamily: weightToFontFamily('700') },
+    }),
+    [semantic]
+  );
   const [pickerVisible, setPickerVisible] = useState(false);
 
   const handleChipPress = useCallback(
@@ -43,12 +56,7 @@ export const TimeChipRow: React.FC<Props> = ({ mode, time, onChangeMode, onChang
       <Pressable
         onPress={(): void => handleChipPress(chipMode)}
         testID={testID}
-        style={[
-          styles.chip,
-          active
-            ? { backgroundColor: semantic.primaryNormal, borderColor: semantic.primaryNormal }
-            : { backgroundColor: semantic.bgBase, borderColor: semantic.lineNormal },
-        ]}
+        style={[styles.chip, active ? chipStyles.active : chipStyles.inactive]}
         accessibilityRole="button"
         accessibilityState={{ selected: active }}
         accessibilityLabel={label}
@@ -56,8 +64,8 @@ export const TimeChipRow: React.FC<Props> = ({ mode, time, onChangeMode, onChang
         <Text
           style={[
             styles.chipText,
-            { color: active ? semantic.labelOnColor : semantic.labelStrong },
-            active && { fontFamily: weightToFontFamily('700') },
+            active ? chipStyles.activeText : chipStyles.inactiveText,
+            active && chipStyles.activeFont,
           ]}
         >
           {label}

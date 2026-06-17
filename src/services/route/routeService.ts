@@ -199,6 +199,61 @@ const buildGraph = (
 };
 
 // ============================================================================
+// Graph Cache
+// ============================================================================
+
+// buildGraph reconstructs the entire station-line graph (nodes, edges, transfer
+// edges) on every call. The graph depends solely on (excludeLineIds,
+// congestionMultipliers); dijkstra and pathToSegments treat it as read-only, so
+// a cached instance is safe to share. The commute-route search flow calls
+// calculateRoute up to 12× per keystroke with default args, so without this the
+// same graph was rebuilt every keystroke (input lag). Bounded (FIFO) to avoid
+// unbounded growth from varying congestion multipliers.
+const GRAPH_CACHE_MAX = 16;
+const graphCache = new Map<string, Graph>();
+
+const graphCacheKey = (
+  excludeLineIds: readonly string[],
+  congestionMultipliers?: ReadonlyMap<string, number>,
+): string => {
+  const exclude = [...excludeLineIds].sort().join(',');
+  const congestion = congestionMultipliers
+    ? [...congestionMultipliers.entries()]
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([lineId, mult]) => `${lineId}:${mult}`)
+        .join(',')
+    : '';
+  return `${exclude}|${congestion}`;
+};
+
+const getCachedGraph = (
+  excludeLineIds: readonly string[] = [],
+  congestionMultipliers?: ReadonlyMap<string, number>,
+): Graph => {
+  const key = graphCacheKey(excludeLineIds, congestionMultipliers);
+  const cached = graphCache.get(key);
+  if (cached) return cached;
+
+  const graph = buildGraph(excludeLineIds, congestionMultipliers);
+
+  // FIFO eviction: drop the oldest entry when at capacity.
+  if (graphCache.size >= GRAPH_CACHE_MAX) {
+    const oldest = graphCache.keys().next().value;
+    if (oldest !== undefined) graphCache.delete(oldest);
+  }
+  graphCache.set(key, graph);
+  return graph;
+};
+
+/**
+ * Clear the memoized station-line graph cache. Call when the underlying station
+ * or line data changes (the graph would otherwise be stale).
+ */
+export const clearRouteGraphCache = (): void => {
+  graphCache.clear();
+};
+
+// ============================================================================
 // Pathfinding (Dijkstra)
 // ============================================================================
 
@@ -339,8 +394,8 @@ export const calculateRoute = (
   congestionMultipliers?: ReadonlyMap<string, number>,
   realtimeArrivals?: readonly RealtimeArrival[],
 ): Route | null => {
-  // Build graph
-  const graph = buildGraph(excludeLineIds, congestionMultipliers);
+  // Build graph (memoized — see getCachedGraph)
+  const graph = getCachedGraph(excludeLineIds, congestionMultipliers);
 
   // Get start and end keys
   const startKeys = getStationKeys(fromStationId, excludeLineIds);

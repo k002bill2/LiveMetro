@@ -14,7 +14,7 @@
  * weatherService 자체가 30분 internal cache + AsyncStorage 영속 캐시를
  * 갖고 있어 네트워크 부담은 적다.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { weatherService } from '@/services/weather/weatherService';
 import { useLocation } from '@/hooks/useLocation';
 import type { SubwayAlert } from '@/models/publicData';
@@ -45,6 +45,13 @@ export const useWeatherAlert = ({ enabled = true }: UseWeatherAlertOptions = {})
   const { location } = useLocation();
   const [weatherAlert, setWeatherAlert] = useState<SubwayAlert | null>(null);
 
+  // Keep the latest location in a ref so the polling interval (created once per
+  // `enabled`) reads fresh coords WITHOUT being torn down and recreated on every
+  // location change. Previously location was an effect dep, so frequent GPS
+  // updates churned the interval and re-fired evaluate() needlessly.
+  const locationRef = useRef(location);
+  locationRef.current = location;
+
   useEffect(() => {
     if (!enabled) {
       setWeatherAlert(null);
@@ -57,8 +64,9 @@ export const useWeatherAlert = ({ enabled = true }: UseWeatherAlertOptions = {})
       try {
         await weatherService.initialize();
         // location이 없어도 weatherService가 cache로 fallback 시도
-        const coords = location
-          ? { latitude: location.latitude, longitude: location.longitude }
+        const loc = locationRef.current;
+        const coords = loc
+          ? { latitude: loc.latitude, longitude: loc.longitude }
           : undefined;
         // weatherService의 cache hit이 대부분이라 네트워크 부담 적음
         await weatherService.getCurrentWeather(coords);
@@ -83,7 +91,7 @@ export const useWeatherAlert = ({ enabled = true }: UseWeatherAlertOptions = {})
       cancelled = true;
       clearInterval(intervalId);
     };
-  }, [enabled, location?.latitude, location?.longitude]);
+  }, [enabled]);
 
   return weatherAlert;
 };

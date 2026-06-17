@@ -6,7 +6,7 @@
  * now resolve through getSubwayLineColor utility.
  */
 
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useDeferredValue } from 'react';
 import { useSemanticTokens } from '@/services/theme';
 import { View, Text, TextInput, TouchableOpacity, FlatList, Modal, StyleSheet, SafeAreaView, ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
 import { Star, ChevronRight, Search, X, XCircle, AlertCircle, Check } from 'lucide-react-native';
@@ -106,6 +106,16 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
     }
   };
 
+  // Exclude lookups as Sets — O(1) membership vs O(m) Array.includes per
+  // station. The filter runs over ~700 stations on every keystroke, so the
+  // O(n·m) Array.includes scan dominated input latency.
+  const excludeIdSet = useMemo(() => new Set(excludeStationIds), [excludeStationIds]);
+  const excludeNameSet = useMemo(() => new Set(excludeStationNames), [excludeStationNames]);
+
+  // Defer the query so the TextInput stays responsive while the (potentially
+  // large) filtered+sorted list recomputes at lower priority.
+  const deferredQuery = useDeferredValue(searchQuery);
+
   // Filter stations based on search query and selected line
   const filteredStations = useMemo(() => {
     let result = stations;
@@ -114,23 +124,23 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
       result = result.filter((s) => s.lineId === selectedLine);
     }
 
-    if (searchQuery.trim()) {
-      const query = searchQuery.trim().toLowerCase();
+    if (deferredQuery.trim()) {
+      const query = deferredQuery.trim().toLowerCase();
       result = result.filter((s) =>
         s.name.toLowerCase().includes(query)
       );
     }
 
-    if (excludeStationIds.length > 0) {
-      result = result.filter((s) => !excludeStationIds.includes(s.id));
+    if (excludeIdSet.size > 0) {
+      result = result.filter((s) => !excludeIdSet.has(s.id));
     }
 
-    if (excludeStationNames.length > 0) {
-      result = result.filter((s) => !excludeStationNames.includes(s.name));
+    if (excludeNameSet.size > 0) {
+      result = result.filter((s) => !excludeNameSet.has(s.name));
     }
 
     return result.sort((a, b) => a.name.localeCompare(b.name, 'ko'));
-  }, [stations, searchQuery, selectedLine, excludeStationIds, excludeStationNames]);
+  }, [stations, deferredQuery, selectedLine, excludeIdSet, excludeNameSet]);
 
   const handleSelectStation = useCallback(
     (station: StationWithLine) => {
