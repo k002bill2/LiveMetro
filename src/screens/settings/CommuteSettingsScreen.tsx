@@ -117,6 +117,171 @@ const addMinutesToTime = (hhmm: string, minutes: number): string | null => {
   return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
 };
 
+interface RouteCardProps {
+  kind: 'morning' | 'evening';
+  route: CommuteRouteData | null;
+  onEdit: () => void;
+  enabled?: boolean;
+  onToggleEnabled?: (v: boolean) => void;
+  arrivalEtaMinutes?: number | null;
+  // styles/semantic are passed IN (not closed over) so RouteCard can live at
+  // module scope. Defining it inside CommuteSettingsScreen made it a NEW
+  // component type on every render → React remounted the whole subtree each
+  // parent re-render (e.g. the nav-prop identity churn of a cross-stack
+  // "경로 변경" entry), destroying the touch responders of the controls inside
+  // it (출근/퇴근 편집 링크 + 퇴근 토글) mid-gesture so their onPress never fired.
+  styles: ReturnType<typeof createStyles>;
+  semantic: WantedSemanticTheme;
+}
+
+const RouteCard: React.FC<RouteCardProps> = ({
+  kind,
+  route,
+  onEdit,
+  enabled,
+  onToggleEnabled,
+  arrivalEtaMinutes,
+  styles,
+  semantic,
+}) => {
+  const isMorning = kind === 'morning';
+  const arrivalTime = isMorning && route && arrivalEtaMinutes != null
+    ? addMinutesToTime(route.departureTime, arrivalEtaMinutes)
+    : null;
+  const transferCount = route?.transferStations.length ?? 0;
+  const dimmed = !isMorning && enabled === false;
+
+  return (
+    <View style={styles.routeCard}>
+      {/* Header — Pill + "평일 매일" + 편집 link / Toggle */}
+      <View style={styles.routeHeaderRow}>
+        <Pill tone={isMorning ? 'primary' : 'neutral'} size="sm">
+          {isMorning ? '출근' : '퇴근'}
+        </Pill>
+        <Text style={styles.routeWeekdayText}>평일 매일</Text>
+        <View style={{ flex: 1 }} />
+        {isMorning ? (
+          <TouchableOpacity
+            onPress={onEdit}
+            accessibilityRole="button"
+            accessibilityLabel="경로 편집"
+            // The 12px text alone is a ~24×16pt target — below the 44pt
+            // minimum. hitSlop can't help here: the parent SettingSection
+            // has overflow:hidden, which clips any hit area extending past
+            // the card edge (both iOS clipsToBounds and Android clipChildren).
+            // So we grow the REAL touch area via padding (stays inside the
+            // parent) and cancel the visual shift with negative margins that
+            // are absorbed by routeHeaderRow's own padding (14/10/16).
+            hitSlop={8}
+            style={styles.routeEditTouch}
+          >
+            <Text style={styles.routeEditLink}>편집</Text>
+          </TouchableOpacity>
+        ) : (
+          <>
+            {/* Evening: edit link only when a route exists (empty
+                state's emptyCta handles initial setup). Toggle stays
+                next to it so on/off + edit are both reachable from
+                the header — matches morning's edit affordance for
+                consistency. */}
+            {route ? (
+              <TouchableOpacity
+                onPress={onEdit}
+                accessibilityRole="button"
+                accessibilityLabel="퇴근 경로 편집"
+                // Same touch-area fix as morning, but the right side neighbors
+                // the Switch — so no negative right margin (would overlap the
+                // toggle's hit area). padding(8) + marginRight(4) preserves the
+                // original 12px gap to the Switch.
+                style={styles.routeEditTouchEvening}
+              >
+                <Text style={styles.routeEditLink}>편집</Text>
+              </TouchableOpacity>
+            ) : null}
+            <Switch
+              value={enabled ?? false}
+              onValueChange={onToggleEnabled}
+              // No evening route → nothing to enable; the toggle is inert.
+              disabled={!route}
+              accessibilityRole="switch"
+              accessibilityLabel="퇴근 경로 사용"
+              trackColor={{ false: semantic.lineNormal, true: WANTED_TOKENS.blue[500] }}
+              thumbColor="#fff"
+              ios_backgroundColor={semantic.lineNormal}
+              // Match SettingToggle's scale 0.85 for visual parity.
+              style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }}
+            />
+          </>
+        )}
+      </View>
+
+      {route ? (
+        <>
+          <View style={[styles.routeBody, dimmed && { opacity: 0.45 }]}>
+            {/* 출발 row */}
+            <View style={styles.routeBodyRow}>
+              <View style={[styles.routeDot, { backgroundColor: semantic.labelStrong }]} />
+              <Text style={styles.routeStationText}>{route.departureStation.stationName}</Text>
+              <View style={{ flex: 1 }} />
+              <Text style={styles.routeRoleText}>출발</Text>
+            </View>
+            <View style={styles.routeConnector}>
+              <View style={styles.routeConnectorDot} />
+              <View style={styles.routeConnectorDot} />
+              <View style={styles.routeConnectorDot} />
+            </View>
+            {/* 환승 row — read-only summary. Transfer changes are made
+                in the EditCommuteRoute editor (header "편집" link), so
+                the prior "환승 추가" CTA + StationSearchModal flow was
+                removed as a redundant entry point. */}
+            <View style={styles.routeBodyRow}>
+              <View style={[styles.routeDot, { backgroundColor: WANTED_TOKENS.status.green500 }]} />
+              <Text style={styles.routeMidText} numberOfLines={1}>
+                {transferCount === 0
+                  ? '직행 · 환승 없음'
+                  : `환승 ${transferCount}회 · ${route.transferStations
+                      .map((t) => t.stationName)
+                      .join(', ')}`}
+              </Text>
+              <View style={{ flex: 1 }} />
+            </View>
+            <View style={styles.routeConnector}>
+              <View style={styles.routeConnectorDot} />
+              <View style={styles.routeConnectorDot} />
+              <View style={styles.routeConnectorDot} />
+            </View>
+            {/* 도착 row */}
+            <View style={styles.routeBodyRow}>
+              <View style={[styles.routeDot, { backgroundColor: WANTED_TOKENS.blue[500] }]} />
+              <Text style={styles.routeStationText}>{route.arrivalStation.stationName}</Text>
+              <View style={{ flex: 1 }} />
+              <Text style={styles.routeRoleText}>도착</Text>
+            </View>
+          </View>
+
+          {/* Footer — clock + departure (+ arrival ETA for morning) */}
+          <View style={[styles.routeFooterRow, dimmed && { opacity: 0.45 }]}>
+            <Clock size={13} color={semantic.labelAlt} strokeWidth={2} />
+            <Text style={styles.routeFooterText}>{route.departureTime} 출발</Text>
+            {arrivalTime ? (
+              <Text style={styles.routeFooterTextSubtle}> · 도착 ~{arrivalTime}</Text>
+            ) : null}
+          </View>
+        </>
+      ) : (
+        <View style={styles.emptyContent}>
+          <PlusCircle size={48} color={semantic.lineNormal} strokeWidth={1.5} />
+          <Text style={styles.emptyText}>설정된 경로가 없습니다</Text>
+          <TouchableOpacity onPress={onEdit} style={styles.emptyCta} accessibilityRole="button">
+            <Text style={styles.emptyCtaText}>경로 설정하기</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+};
+RouteCard.displayName = 'RouteCard';
+
 export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
   const { user, updateUserPreferences } = useAuth();
   const semantic = useSemanticTokens();
@@ -491,152 +656,6 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
     },
     [navigation, morningRoute, eveningRoute],
   );
-
-  const RouteCard: React.FC<{
-    kind: 'morning' | 'evening';
-    route: CommuteRouteData | null;
-    onEdit: () => void;
-    enabled?: boolean;
-    onToggleEnabled?: (v: boolean) => void;
-    arrivalEtaMinutes?: number | null;
-  }> = ({ kind, route, onEdit, enabled, onToggleEnabled, arrivalEtaMinutes }) => {
-    const isMorning = kind === 'morning';
-    const arrivalTime = isMorning && route && arrivalEtaMinutes != null
-      ? addMinutesToTime(route.departureTime, arrivalEtaMinutes)
-      : null;
-    const transferCount = route?.transferStations.length ?? 0;
-    const dimmed = !isMorning && enabled === false;
-
-    return (
-      <View style={styles.routeCard}>
-        {/* Header — Pill + "평일 매일" + 편집 link / Toggle */}
-        <View style={styles.routeHeaderRow}>
-          <Pill tone={isMorning ? 'primary' : 'neutral'} size="sm">
-            {isMorning ? '출근' : '퇴근'}
-          </Pill>
-          <Text style={styles.routeWeekdayText}>평일 매일</Text>
-          <View style={{ flex: 1 }} />
-          {isMorning ? (
-            <TouchableOpacity
-              onPress={onEdit}
-              accessibilityRole="button"
-              accessibilityLabel="경로 편집"
-              // The 12px text alone is a ~24×16pt target — below the 44pt
-              // minimum. hitSlop can't help here: the parent SettingSection
-              // has overflow:hidden, which clips any hit area extending past
-              // the card edge (both iOS clipsToBounds and Android clipChildren).
-              // So we grow the REAL touch area via padding (stays inside the
-              // parent) and cancel the visual shift with negative margins that
-              // are absorbed by routeHeaderRow's own padding (14/10/16).
-              hitSlop={8}
-              style={styles.routeEditTouch}
-            >
-              <Text style={styles.routeEditLink}>편집</Text>
-            </TouchableOpacity>
-          ) : (
-            <>
-              {/* Evening: edit link only when a route exists (empty
-                  state's emptyCta handles initial setup). Toggle stays
-                  next to it so on/off + edit are both reachable from
-                  the header — matches morning's edit affordance for
-                  consistency. */}
-              {route ? (
-                <TouchableOpacity
-                  onPress={onEdit}
-                  accessibilityRole="button"
-                  accessibilityLabel="퇴근 경로 편집"
-                  // Same touch-area fix as morning, but the right side neighbors
-                  // the Switch — so no negative right margin (would overlap the
-                  // toggle's hit area). padding(8) + marginRight(4) preserves the
-                  // original 12px gap to the Switch.
-                  style={styles.routeEditTouchEvening}
-                >
-                  <Text style={styles.routeEditLink}>편집</Text>
-                </TouchableOpacity>
-              ) : null}
-              <Switch
-                value={enabled ?? false}
-                onValueChange={onToggleEnabled}
-                // No evening route → nothing to enable; the toggle is inert.
-                disabled={!route}
-                accessibilityRole="switch"
-                accessibilityLabel="퇴근 경로 사용"
-                trackColor={{ false: semantic.lineNormal, true: WANTED_TOKENS.blue[500] }}
-                thumbColor="#fff"
-                ios_backgroundColor={semantic.lineNormal}
-                // Match SettingToggle's scale 0.85 for visual parity.
-                style={{ transform: [{ scaleX: 0.85 }, { scaleY: 0.85 }] }}
-              />
-            </>
-          )}
-        </View>
-
-        {route ? (
-          <>
-            <View style={[styles.routeBody, dimmed && { opacity: 0.45 }]}>
-              {/* 출발 row */}
-              <View style={styles.routeBodyRow}>
-                <View style={[styles.routeDot, { backgroundColor: semantic.labelStrong }]} />
-                <Text style={styles.routeStationText}>{route.departureStation.stationName}</Text>
-                <View style={{ flex: 1 }} />
-                <Text style={styles.routeRoleText}>출발</Text>
-              </View>
-              <View style={styles.routeConnector}>
-                <View style={styles.routeConnectorDot} />
-                <View style={styles.routeConnectorDot} />
-                <View style={styles.routeConnectorDot} />
-              </View>
-              {/* 환승 row — read-only summary. Transfer changes are made
-                  in the EditCommuteRoute editor (header "편집" link), so
-                  the prior "환승 추가" CTA + StationSearchModal flow was
-                  removed as a redundant entry point. */}
-              <View style={styles.routeBodyRow}>
-                <View style={[styles.routeDot, { backgroundColor: WANTED_TOKENS.status.green500 }]} />
-                <Text style={styles.routeMidText} numberOfLines={1}>
-                  {transferCount === 0
-                    ? '직행 · 환승 없음'
-                    : `환승 ${transferCount}회 · ${route.transferStations
-                        .map((t) => t.stationName)
-                        .join(', ')}`}
-                </Text>
-                <View style={{ flex: 1 }} />
-              </View>
-              <View style={styles.routeConnector}>
-                <View style={styles.routeConnectorDot} />
-                <View style={styles.routeConnectorDot} />
-                <View style={styles.routeConnectorDot} />
-              </View>
-              {/* 도착 row */}
-              <View style={styles.routeBodyRow}>
-                <View style={[styles.routeDot, { backgroundColor: WANTED_TOKENS.blue[500] }]} />
-                <Text style={styles.routeStationText}>{route.arrivalStation.stationName}</Text>
-                <View style={{ flex: 1 }} />
-                <Text style={styles.routeRoleText}>도착</Text>
-              </View>
-            </View>
-
-            {/* Footer — clock + departure (+ arrival ETA for morning) */}
-            <View style={[styles.routeFooterRow, dimmed && { opacity: 0.45 }]}>
-              <Clock size={13} color={semantic.labelAlt} strokeWidth={2} />
-              <Text style={styles.routeFooterText}>{route.departureTime} 출발</Text>
-              {arrivalTime ? (
-                <Text style={styles.routeFooterTextSubtle}> · 도착 ~{arrivalTime}</Text>
-              ) : null}
-            </View>
-          </>
-        ) : (
-          <View style={styles.emptyContent}>
-            <PlusCircle size={48} color={semantic.lineNormal} strokeWidth={1.5} />
-            <Text style={styles.emptyText}>설정된 경로가 없습니다</Text>
-            <TouchableOpacity onPress={onEdit} style={styles.emptyCta} accessibilityRole="button">
-              <Text style={styles.emptyCtaText}>경로 설정하기</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-      </View>
-    );
-  };
-
   if (loading) {
     return (
       <SafeAreaView style={styles.container}>
@@ -705,6 +724,8 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
         <SettingSection title="경로">
           <RouteCard
             kind="morning"
+            styles={styles}
+            semantic={semantic}
             route={morningRoute}
             onEdit={() => handleEditRoute('morning')}
             arrivalEtaMinutes={baselineMinutes !== null ? Math.round(baselineMinutes) : null}
@@ -712,6 +733,8 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.routeDivider} />
           <RouteCard
             kind="evening"
+            styles={styles}
+            semantic={semantic}
             route={eveningRoute}
             onEdit={() => handleEditRoute('evening')}
             enabled={eveningRoute !== null && eveningEnabled}
