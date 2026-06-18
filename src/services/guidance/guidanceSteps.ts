@@ -145,7 +145,7 @@ export const routeToGuidanceSteps = (route: Route): GuidanceStep[] => {
 /** Snapshot of where the rider is within the step sequence. */
 export interface GuidanceProgress {
   readonly currentIndex: number;
-  /** True when auto-progress is parked on a board step (manual confirm only). */
+  /** True while parked on a board OR transfer step (auto-progress can't pass it). */
   readonly isHolding: boolean;
   /** Seconds spent inside the current step (waiting seconds while holding). */
   readonly elapsedInStepSec: number;
@@ -153,8 +153,11 @@ export interface GuidanceProgress {
 
 /**
  * Resolve the active step from a manual anchor + elapsed seconds since it.
- * Board steps block auto-progress (platform wait is realtime, not estimated);
- * the terminal alight step absorbs any overrun.
+ * Board AND transfer steps block auto-progress: waiting for the first/transfer
+ * train is realtime, not estimable, so time can never carry the rider past
+ * them (only a manual/soft confirm rebases the anchor). The known transfer-walk
+ * minutes still tick down in `computeRemainingSeconds`; only the unknown
+ * platform wait is excluded. The terminal alight step absorbs any overrun.
  */
 export const computeProgress = (
   steps: readonly GuidanceStep[],
@@ -168,7 +171,7 @@ export const computeProgress = (
   let remaining = Math.max(0, elapsedSec);
   for (; i < steps.length; i++) {
     const step = steps[i]!;
-    if (step.kind === 'board') {
+    if (step.kind === 'board' || step.kind === 'transfer') {
       return { currentIndex: i, isHolding: true, elapsedInStepSec: remaining };
     }
     if (step.kind === 'alight') {

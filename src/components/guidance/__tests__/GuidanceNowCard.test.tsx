@@ -1,5 +1,5 @@
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { render, fireEvent } from '@testing-library/react-native';
 import { GuidanceNowCard } from '../GuidanceNowCard';
 import type {
   AlightStep,
@@ -131,5 +131,68 @@ describe('GuidanceNowCard — alight (도착)', () => {
   it('tells the rider to get off', () => {
     const { getByText } = render(<GuidanceNowCard step={alight} elapsedInStepSec={0} />);
     expect(getByText('산곡 도착 · 하차하세요')).toBeTruthy();
+  });
+});
+
+describe('GuidanceNowCard — soft-confirm', () => {
+  it('does not render the soft-confirm row when the prop is absent', () => {
+    const { queryByTestId } = render(
+      <GuidanceNowCard step={board} elapsedInStepSec={0} liveWaitText={null} />
+    );
+    expect(queryByTestId('guidance-soft-confirm-yes')).toBeNull();
+  });
+
+  it('renders the boarding question with 예 / 아직이에요 on a board step', () => {
+    const { getByText, getByTestId } = render(
+      <GuidanceNowCard
+        step={board}
+        elapsedInStepSec={0}
+        liveWaitText="곧 도착"
+        softConfirm={{ onYes: jest.fn(), onNotYet: jest.fn() }}
+      />
+    );
+    expect(getByText('탑승하셨나요?')).toBeTruthy();
+    expect(getByTestId('guidance-soft-confirm-yes')).toBeTruthy();
+    expect(getByTestId('guidance-soft-confirm-notyet')).toBeTruthy();
+  });
+
+  it('renders the soft-confirm row on a transfer step too', () => {
+    const { getByTestId } = render(
+      <GuidanceNowCard
+        step={transfer}
+        elapsedInStepSec={0}
+        liveWaitText={null}
+        softConfirm={{ onYes: jest.fn(), onNotYet: jest.fn() }}
+      />
+    );
+    expect(getByTestId('guidance-soft-confirm-yes')).toBeTruthy();
+  });
+
+  it('fires onYes when 예 is pressed', () => {
+    const onYes = jest.fn();
+    const { getByTestId } = render(
+      <GuidanceNowCard
+        step={transfer}
+        elapsedInStepSec={0}
+        liveWaitText={null}
+        softConfirm={{ onYes, onNotYet: jest.fn() }}
+      />
+    );
+    fireEvent.press(getByTestId('guidance-soft-confirm-yes'));
+    expect(onYes).toHaveBeenCalledTimes(1);
+  });
+
+  it('fires onNotYet when 아직이에요 is pressed', () => {
+    const onNotYet = jest.fn();
+    const { getByTestId } = render(
+      <GuidanceNowCard
+        step={board}
+        elapsedInStepSec={0}
+        liveWaitText={null}
+        softConfirm={{ onYes: jest.fn(), onNotYet }}
+      />
+    );
+    fireEvent.press(getByTestId('guidance-soft-confirm-notyet'));
+    expect(onNotYet).toHaveBeenCalledTimes(1);
   });
 });

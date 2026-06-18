@@ -39,9 +39,36 @@ const hop = (
   isTransfer: false,
 });
 
+const transferSeg = (
+  stationId: string,
+  stationName: string,
+  toLineId: string,
+  minutes: number
+): RouteSegment => ({
+  fromStationId: stationId,
+  fromStationName: stationName,
+  toStationId: stationId,
+  toStationName: stationName,
+  lineId: toLineId,
+  lineName: `${toLineId}호선`,
+  estimatedMinutes: minutes,
+  isTransfer: true,
+});
+
 // [board, ride(5m: B 2m + C 3m), alight] on line 2
 const steps = routeToGuidanceSteps(
   createRoute([hop('s1', 'A', 's2', 'B', '2', 2), hop('s2', 'B', 's3', 'C', '2', 3)])
+);
+
+// [board, ride(5m), transfer(4m), ride(4m), alight] — line 2 → transfer at C → line 7
+const transferSteps = routeToGuidanceSteps(
+  createRoute([
+    hop('s1', 'A', 's2', 'B', '2', 2),
+    hop('s2', 'B', 's3', 'C', '2', 3),
+    transferSeg('s3', 'C', '7', 4),
+    hop('s3', 'C', 't2', 'D', '7', 2),
+    hop('t2', 'D', 't3', 'E', '7', 2),
+  ])
 );
 
 const T0 = 1_700_000_000_000;
@@ -85,6 +112,31 @@ describe('useGuidanceProgress', () => {
     });
     expect(result.current.currentIndex).toBe(2);
     expect(result.current.isAtEnd).toBe(true);
+  });
+
+  it('holds on a transfer step until goNext (does not auto-advance through it)', () => {
+    const { result } = renderHook(() =>
+      useGuidanceProgress(transferSteps, { startedAt: T0, enabled: true })
+    );
+    act(() => {
+      result.current.goNext(); // 탑승했어요 → ride
+    });
+    expect(result.current.currentIndex).toBe(1);
+
+    // Advance well past the 5min ride AND the 4min transfer walk.
+    act(() => {
+      jest.advanceTimersByTime(10 * 60_000);
+    });
+    // Parked (holds) on the transfer (index 2), never carried into the line-7 ride.
+    expect(result.current.currentIndex).toBe(2);
+    expect(result.current.isHolding).toBe(true);
+
+    // Only a manual / soft confirm advances past it.
+    act(() => {
+      result.current.goNext();
+    });
+    expect(result.current.currentIndex).toBe(3);
+    expect(result.current.isHolding).toBe(false);
   });
 
   it('counts down remainingSeconds inside the active ride', () => {

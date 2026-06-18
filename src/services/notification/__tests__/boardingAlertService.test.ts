@@ -72,6 +72,34 @@ describe('boardingAlertService', () => {
     );
   });
 
+  it('uses transfer copy (no destination) when variant is "transfer"', async () => {
+    await scheduleBoardingAlert({
+      stationName: '불광',
+      finalDestination: '오금',
+      arrivalTime: arrival,
+      variant: 'transfer',
+    });
+    expect(mockNotif.scheduleArrivalAlert).toHaveBeenCalledWith(
+      arrival,
+      expect.objectContaining({
+        title: expect.stringContaining('환승'),
+        body: expect.stringContaining('불광'),
+      })
+    );
+  });
+
+  it('defaults to destination-based board copy when variant is omitted', async () => {
+    await scheduleBoardingAlert({
+      stationName: '강남',
+      finalDestination: '잠실',
+      arrivalTime: arrival,
+    });
+    expect(mockNotif.scheduleArrivalAlert).toHaveBeenCalledWith(
+      arrival,
+      expect.objectContaining({ title: expect.stringContaining('잠실') })
+    );
+  });
+
   it('honors a custom secondsBefore', async () => {
     await scheduleBoardingAlert({
       stationName: '강남',
