@@ -204,7 +204,15 @@ export const useToast = () => {
   }, []);
 
   const hideToast = useCallback((): void => {
-    setToastConfig(prev => ({ ...prev, visible: false }));
+    // Guard: when already hidden, return the SAME state object so React bails out
+    // (Object.is) and skips the re-render. Without this, Toast's mount effect calls
+    // hideToast() whenever visible=false, creating a NEW {…, visible:false} object
+    // each time → useToast consumer re-renders → the inline ToastComponent gets a new
+    // identity → <ToastComponent/> remounts → its mount effect calls hideToast() again
+    // → infinite render loop. That loop saturated the JS thread (made 출퇴근설정 "편집"
+    // and the Home tab feel laggy/unresponsive and crashed React DevTools with
+    // "Children cannot be added or removed during a reorder operation").
+    setToastConfig(prev => (prev.visible ? { ...prev, visible: false } : prev));
   }, []);
 
   const showSuccess = useCallback((message: string, duration?: number): void => {
