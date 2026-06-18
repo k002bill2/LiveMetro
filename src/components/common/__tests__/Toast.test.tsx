@@ -249,4 +249,47 @@ describe('useToast Hook', () => {
 
     expect(result.current.ToastComponent).toBeDefined();
   });
+
+  // Regression: render-loop guard. Toast's mount effect calls hideToast() whenever
+  // visible=false. If hideToast() created a new state object every time, the useToast
+  // consumer would re-render → the inline ToastComponent would get a new identity →
+  // <ToastComponent/> would remount → its mount effect would call hideToast() again →
+  // infinite render loop (saturated the JS thread; made 출퇴근설정 "편집"/홈 laggy and
+  // crashed React DevTools). The fix returns the SAME state reference when already
+  // hidden so React bails out and skips the re-render.
+  it('does NOT re-render when hideToast() is called while already hidden (loop guard)', () => {
+    let renderCount = 0;
+    const { result } = renderHook(() => {
+      renderCount += 1;
+      return useToast();
+    });
+    const rendersBefore = renderCount;
+
+    // Toast starts hidden (visible:false). Calling hideToast() again must be a no-op.
+    act(() => {
+      result.current.hideToast();
+    });
+
+    expect(renderCount).toBe(rendersBefore);
+  });
+
+  it('still re-renders on a real dismiss (visible → hidden), so the guard does not suppress it', () => {
+    let renderCount = 0;
+    const { result } = renderHook(() => {
+      renderCount += 1;
+      return useToast();
+    });
+
+    act(() => {
+      result.current.showSuccess('Test');
+    });
+    const rendersAfterShow = renderCount;
+
+    // Now visible:true → hideToast() is a real state change and MUST re-render.
+    act(() => {
+      result.current.hideToast();
+    });
+
+    expect(renderCount).toBeGreaterThan(rendersAfterShow);
+  });
 });
