@@ -4,8 +4,9 @@
  * Subway GPS is unreliable underground, so progress is *estimated* from wall
  * clock time and *corrected* by the user: the hook keeps a manual anchor
  * (step index + the moment it was confirmed) and lets elapsed time flow the
- * rider forward through timed steps. Board steps hold until the user taps
- * "탑승했어요" (platform wait is realtime data, never estimated).
+ * rider forward through timed steps. Board AND transfer steps hold until the
+ * user (or the screen's soft-confirm) taps "탑승했어요"/"환승 열차에 탔어요"
+ * (the wait for that train is realtime data, never estimated).
  *
  * All math lives in pure functions (`guidanceSteps.ts`); this hook only owns
  * the 1Hz tick (focus-gated, cleaned up) and the anchor state.
@@ -26,7 +27,7 @@ interface UseGuidanceProgressOptions {
 
 export interface UseGuidanceProgressResult {
   readonly currentIndex: number;
-  /** True while parked on a board step (auto-progress cannot pass it). */
+  /** True while parked on a board or transfer step (auto-progress cannot pass it). */
   readonly isHolding: boolean;
   readonly elapsedInStepSec: number;
   /** Estimated seconds to destination (platform wait excluded while holding). */

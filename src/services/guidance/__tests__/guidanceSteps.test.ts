@@ -150,6 +150,7 @@ describe('routeToGuidanceSteps', () => {
 
 describe('computeProgress', () => {
   const steps: readonly GuidanceStep[] = routeToGuidanceSteps(transferRoute);
+  const directSteps: readonly GuidanceStep[] = routeToGuidanceSteps(directRoute);
   // kinds:    [board, ride(5m), transfer(4m), ride(4m), alight]
   // indices:  [0,     1,        2,            3,        4]
 
@@ -166,16 +167,27 @@ describe('computeProgress', () => {
     expect(p.elapsedInStepSec).toBe(120);
   });
 
-  it('auto-advances through ride and transfer into the next ride', () => {
-    // 5min ride + 4min transfer + 1min into second ride = 600s
+  it('holds on a transfer step instead of auto-advancing through it', () => {
+    // 5min ride consumed (300s) + 300s more; parks (holds) at the transfer
+    // (index 2), never carrying time past it — board-hold honesty for the
+    // unestimable transfer-train wait.
     const p = computeProgress(steps, 1, 600);
-    expect(p.currentIndex).toBe(3);
-    expect(p.elapsedInStepSec).toBe(60);
+    expect(p.currentIndex).toBe(2);
+    expect(p.isHolding).toBe(true);
+    expect(p.elapsedInStepSec).toBe(300);
   });
 
-  it('stops at the terminal alight step when elapsed exceeds everything', () => {
-    const p = computeProgress(steps, 1, 99_999);
-    expect(p.currentIndex).toBe(4);
+  it('holds at a transfer with the walk partially elapsed', () => {
+    // anchor directly on the transfer (index 2), 120s into the 240s walk
+    const p = computeProgress(steps, 2, 120);
+    expect(p.currentIndex).toBe(2);
+    expect(p.isHolding).toBe(true);
+    expect(p.elapsedInStepSec).toBe(120);
+  });
+
+  it('stops at the terminal alight step when elapsed exceeds everything (no-transfer route)', () => {
+    const p = computeProgress(directSteps, 1, 99_999);
+    expect(p.currentIndex).toBe(2);
   });
 
   it('clamps an out-of-range anchor index', () => {
@@ -194,6 +206,7 @@ describe('computeProgress', () => {
 
 describe('computeRemainingSeconds', () => {
   const steps: readonly GuidanceStep[] = routeToGuidanceSteps(transferRoute);
+  const directSteps: readonly GuidanceStep[] = routeToGuidanceSteps(directRoute);
 
   it('excludes unknown platform wait while holding on board', () => {
     const p = computeProgress(steps, 0, 300);
@@ -207,9 +220,22 @@ describe('computeRemainingSeconds', () => {
     expect(computeRemainingSeconds(steps, p)).toBe(11 * 60);
   });
 
-  it('returns 0 at the terminal step', () => {
-    const p = computeProgress(steps, 1, 99_999);
-    expect(computeRemainingSeconds(steps, p)).toBe(0);
+  it('counts the known transfer walk while holding, then downstream', () => {
+    // held at the transfer (index 2), 120s into the 240s walk
+    const p = computeProgress(steps, 2, 120);
+    // (4m - 2m) walk + 4m ride + alight(0) = 6m
+    expect(computeRemainingSeconds(steps, p)).toBe(6 * 60);
+  });
+
+  it('floors the transfer walk to zero once it fully elapses (unknown train wait excluded)', () => {
+    const p = computeProgress(steps, 2, 600); // 600s > 240s walk
+    // walk floored to 0 + 4m downstream ride = 4m
+    expect(computeRemainingSeconds(steps, p)).toBe(4 * 60);
+  });
+
+  it('returns 0 at the terminal step (no-transfer route)', () => {
+    const p = computeProgress(directSteps, 1, 99_999);
+    expect(computeRemainingSeconds(directSteps, p)).toBe(0);
   });
 });
 

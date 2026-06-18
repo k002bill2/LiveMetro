@@ -25,6 +25,8 @@ export interface BoardingAlertParams {
   readonly finalDestination: string;
   readonly arrivalTime: Date | null;
   readonly secondsBefore?: number;
+  /** Copy variant: 'board' (first train, default) or 'transfer' (transfer train). */
+  readonly variant?: 'board' | 'transfer';
 }
 
 /**
@@ -40,6 +42,7 @@ export const scheduleBoardingAlert = async (
     finalDestination,
     arrivalTime,
     secondsBefore = DEFAULT_SECONDS_BEFORE,
+    variant = 'board',
   } = params;
 
   // 명시적 null 체크 — Date는 falsy가 아니므로 안전하지만 의도 명확화.
@@ -52,11 +55,20 @@ export const scheduleBoardingAlert = async (
     // 다른 열차로 재탑승 시 이전 알림이 남지 않도록 먼저 취소.
     await cancelBoardingAlert();
 
+    // 환승은 종착역(finalDestination)이 대기 방향과 어긋날 수 있어 카피에서 생략.
+    const copy =
+      variant === 'transfer'
+        ? { title: '환승 열차 곧 도착', body: `${stationName} 환승 승강장으로 이동하세요` }
+        : {
+            title: `${finalDestination} 방면 곧 도착`,
+            body: `${stationName}역 승강장으로 이동할 시간이에요`,
+          };
+
     const id = await notificationService.scheduleArrivalAlert(arrivalTime, {
       secondsBefore,
-      title: `${finalDestination} 방면 곧 도착`,
-      body: `${stationName}역 승강장으로 이동할 시간이에요`,
-      data: { stationName, finalDestination },
+      title: copy.title,
+      body: copy.body,
+      data: { stationName, finalDestination, variant },
     });
 
     lastAlertId = id;

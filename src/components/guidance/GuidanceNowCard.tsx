@@ -9,7 +9,7 @@
  */
 import React, { memo, useMemo } from 'react';
 import { useSemanticTokens } from '@/services/theme';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { DoorOpen, Footprints, MapPin, TrainFront } from 'lucide-react-native';
 
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
@@ -17,12 +17,20 @@ import { getSubwayLineColor } from '@/utils/colorUtils';
 import { computeRideProgress } from '@/services/guidance/guidanceSteps';
 import type { GuidanceStep, RideStep } from '@/models/guidance';
 
+/** Callbacks for the "탑승하셨나요?" soft-confirm row. */
+export interface SoftConfirmHandlers {
+  readonly onYes: () => void;
+  readonly onNotYet: () => void;
+}
+
 interface GuidanceNowCardProps {
   step: GuidanceStep;
   /** Seconds spent inside the current step (drives ride countdown). */
   elapsedInStepSec: number;
   /** Live next-train text for waiting steps (e.g. "3분 24초 후 도착"), null when unknown. */
   liveWaitText?: string | null;
+  /** When set, renders the soft-confirm row (board/transfer waiting steps only). */
+  softConfirm?: SoftConfirmHandlers | null;
 }
 
 const formatMinSec = (totalSec: number): string => {
@@ -51,6 +59,7 @@ const GuidanceNowCardImpl: React.FC<GuidanceNowCardProps> = ({
   step,
   elapsedInStepSec,
   liveWaitText,
+  softConfirm,
 }) => {
   const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
@@ -118,6 +127,31 @@ const GuidanceNowCardImpl: React.FC<GuidanceNowCardProps> = ({
                 {liveWaitText ?? '실시간 도착 정보를 불러오는 중'}
               </Text>
             </View>
+            {softConfirm && (
+              <View style={styles.softConfirmRow} testID="guidance-soft-confirm">
+                <Text style={styles.softConfirmLabel}>탑승하셨나요?</Text>
+                <View style={styles.softConfirmButtons}>
+                  <Pressable
+                    onPress={softConfirm.onNotYet}
+                    style={styles.softConfirmNotYet}
+                    accessibilityRole="button"
+                    accessibilityLabel="아직 탑승하지 않았어요"
+                    testID="guidance-soft-confirm-notyet"
+                  >
+                    <Text style={styles.softConfirmNotYetText}>아직이에요</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={softConfirm.onYes}
+                    style={styles.softConfirmYes}
+                    accessibilityRole="button"
+                    accessibilityLabel="탑승했어요"
+                    testID="guidance-soft-confirm-yes"
+                  >
+                    <Text style={styles.softConfirmYesText}>예</Text>
+                  </Pressable>
+                </View>
+              </View>
+            )}
           </View>
         )}
 
@@ -448,6 +482,46 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       fontSize: 13,
       fontFamily: weightToFontFamily('700'),
       color: semantic.labelStrong,
+    },
+    softConfirmRow: {
+      marginTop: 14,
+      gap: 8,
+    },
+    softConfirmLabel: {
+      fontSize: 14,
+      fontFamily: weightToFontFamily('800'),
+      color: semantic.labelStrong,
+      letterSpacing: -0.14,
+    },
+    softConfirmButtons: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    softConfirmNotYet: {
+      flex: 1,
+      height: 44,
+      borderRadius: 12,
+      backgroundColor: semantic.bgSubtle,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    softConfirmNotYetText: {
+      fontSize: 14,
+      fontFamily: weightToFontFamily('700'),
+      color: semantic.labelNeutral,
+    },
+    softConfirmYes: {
+      flex: 1,
+      height: 44,
+      borderRadius: 12,
+      backgroundColor: semantic.primaryNormal,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    softConfirmYesText: {
+      fontSize: 14,
+      fontFamily: weightToFontFamily('800'),
+      color: semantic.labelOnColor,
     },
     arrivedRow: {
       flexDirection: 'row',

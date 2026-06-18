@@ -9,7 +9,7 @@
  * 수동 보정 버튼. 탑승/환승 대기 단계에서만 해당 역의 실시간 도착
  * (useRealtimeTrains, 30초 폴링)을 구독해 다음 열차 ETA를 보여준다.
  */
-import React, { useCallback, useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSemanticTokens } from '@/services/theme';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -20,6 +20,14 @@ import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/s
 import { useRealtimeTrains } from '@/hooks/useRealtimeTrains';
 import { useGuidanceProgress } from '@/hooks/useGuidanceProgress';
 import { routeToGuidanceSteps } from '@/services/guidance/guidanceSteps';
+import {
+  detectDeparture,
+  ARRIVING_ETA_THRESHOLD_SEC,
+} from '@/services/guidance/departureDetection';
+import {
+  scheduleBoardingAlert,
+  cancelBoardingAlert,
+} from '@/services/notification/boardingAlertService';
 import { clearGuidanceSession, getGuidanceSession } from '@/services/guidance/guidanceSessionStore';
 import { GuidanceControls, GuidanceHeader, GuidanceNowCard, GuidanceStepRow, type GuidanceStepStatus } from '@/components/guidance';
 import type { AppStackParamList } from '@/navigation/types';
@@ -27,6 +35,9 @@ import type { GuidanceStep } from '@/models/guidance';
 import type { Train } from '@/models/train';
 
 type NavigationProp = NativeStackNavigationProp<AppStackParamList>;
+
+/** Grace window before a detected departure auto-confirms boarding (dismissable). */
+const SOFT_CONFIRM_AUTO_MS = 4000;
 
 const formatWaitText = (totalSec: number): string => {
   const m = Math.floor(totalSec / 60);
@@ -69,7 +80,6 @@ export const RouteGuidanceScreen: React.FC = () => {
 
   const {
     currentIndex,
-    isHolding,
     elapsedInStepSec,
     remainingSeconds,
     etaMs,
@@ -102,21 +112,142 @@ export const RouteGuidanceScreen: React.FC = () => {
     refetchInterval: 30000,
   });
 
-  const liveWaitText = useMemo((): string | null => {
-    if (!isWaitingStep) return null;
+  // Travel-direction endpoint name for the waiting step (board/transfer have it).
+  const waitingDirection: string | null =
+    currentStep !== undefined && currentStep.kind !== 'alight' ? currentStep.direction : null;
+
+  // Numbered-line filter (transfer-station 다노선 혼입 방지) — mirrors
+  // TrainSelectionScreen. Extended lines keep all trains.
+  const filteredTrains = useMemo((): readonly Train[] => {
+    if (!isWaitingStep) return [];
     const all: readonly Train[] = trains ?? [];
-    // Numbered-line filter (transfer-station 다노선 혼입 방지) — mirrors
-    // TrainSelectionScreen. Extended lines keep all trains.
-    const filtered = /^[1-9]$/.test(waitingLineId)
-      ? all.filter(t => t.lineId === waitingLineId)
-      : all;
-    const etas = filtered
-      .map(t => (t.arrivalTime !== null ? Math.floor((t.arrivalTime.getTime() - nowMs) / 1000) : null))
-      .filter((sec): sec is number => sec !== null && sec >= 0)
-      .sort((a, b) => a - b);
-    const first = etas[0];
-    return first !== undefined ? formatWaitText(first) : null;
-  }, [isWaitingStep, trains, waitingLineId, nowMs]);
+    return /^[1-9]$/.test(waitingLineId) ? all.filter(t => t.lineId === waitingLineId) : all;
+  }, [isWaitingStep, trains, waitingLineId]);
+
+  // Earliest train still ahead — feeds both the live chip and the local alert.
+  const earliestTrain = useMemo((): Train | null => {
+    let best: { train: Train; ms: number } | null = null;
+    for (const t of filteredTrains) {
+      if (t.arrivalTime === null) continue;
+      const ms = t.arrivalTime.getTime();
+      if (ms - nowMs < 0) continue;
+      if (best === null || ms < best.ms) best = { train: t, ms };
+    }
+    return best?.train ?? null;
+  }, [filteredTrains, nowMs]);
+
+  const liveWaitText = useMemo((): string | null => {
+    if (!isWaitingStep || earliestTrain?.arrivalTime == null) return null;
+    const sec = Math.floor((earliestTrain.arrivalTime.getTime() - nowMs) / 1000);
+    return sec >= 0 ? formatWaitText(sec) : null;
+  }, [isWaitingStep, earliestTrain, nowMs]);
+
+  // ── Soft-confirm: auto-advance a board/transfer hold when the awaited train
+  // departs (inferred from id disappearance), so the rider rarely needs to tap.
+  const [softConfirm, setSoftConfirm] = useState<{ readonly trainId: string } | null>(null);
+  const prevTrainsRef = useRef<readonly Train[] | null>(null);
+  const firedForIndexRef = useRef<number | null>(null);
+  const cooldownTrainIdRef = useRef<string | null>(null);
+  const autoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const nowMsRef = useRef(nowMs);
+  nowMsRef.current = nowMs;
+
+  const clearAutoTimer = useCallback((): void => {
+    if (autoTimerRef.current !== null) {
+      clearTimeout(autoTimerRef.current);
+      autoTimerRef.current = null;
+    }
+  }, []);
+
+  // Single advance funnel — manual button, "예", and the auto timeout all route
+  // here, so a tap during the auto window can never double-advance.
+  const confirmBoarded = useCallback((): void => {
+    clearAutoTimer();
+    if (firedForIndexRef.current === currentIndex) return;
+    firedForIndexRef.current = currentIndex;
+    setSoftConfirm(null);
+    void cancelBoardingAlert();
+    goNext();
+  }, [clearAutoTimer, currentIndex, goNext]);
+
+  const dismissSoftConfirm = useCallback((): void => {
+    clearAutoTimer();
+    cooldownTrainIdRef.current = softConfirm?.trainId ?? null;
+    setSoftConfirm(null);
+  }, [clearAutoTimer, softConfirm]);
+
+  // Reset per-step guards whenever the active step changes (incl. undo via goPrev).
+  useEffect(() => {
+    clearAutoTimer();
+    setSoftConfirm(null);
+    firedForIndexRef.current = null;
+    cooldownTrainIdRef.current = null;
+    prevTrainsRef.current = null;
+  }, [currentIndex, clearAutoTimer]);
+
+  // Departure detection — compare successive fresh snapshots. `trains` only
+  // changes on a successful poll (error/stale keep the last array), so this is
+  // equivalent to an onDataReceived hook but stays mockable. nowMs is read via
+  // ref so the 1Hz tick doesn't re-run detection.
+  useEffect(() => {
+    if (!isWaitingStep) {
+      prevTrainsRef.current = null;
+      return;
+    }
+    const next = trains ?? [];
+    const result = detectDeparture({
+      prev: prevTrainsRef.current,
+      next,
+      awaited: { lineId: waitingLineId, directionName: waitingDirection },
+      nowMs: nowMsRef.current,
+      thresholdSec: ARRIVING_ETA_THRESHOLD_SEC,
+    });
+    prevTrainsRef.current = next;
+    if (
+      result.departed &&
+      result.trainId !== null &&
+      result.trainId !== cooldownTrainIdRef.current &&
+      firedForIndexRef.current !== currentIndex
+    ) {
+      setSoftConfirm({ trainId: result.trainId });
+      clearAutoTimer();
+      autoTimerRef.current = setTimeout(confirmBoarded, SOFT_CONFIRM_AUTO_MS);
+    }
+  }, [
+    trains,
+    isWaitingStep,
+    waitingLineId,
+    waitingDirection,
+    currentIndex,
+    confirmBoarded,
+    clearAutoTimer,
+  ]);
+
+  // Local-notification bridge — schedule/reschedule for the earliest train while
+  // waiting; boardingAlertService dedups (cancel-then-schedule). The screen is
+  // foreground when scheduling, so tapping the alert just returns here (no deep link).
+  useEffect(() => {
+    if (!isWaitingStep || earliestTrain?.arrivalTime == null) return;
+    void scheduleBoardingAlert({
+      stationName: waitingStationName,
+      finalDestination: earliestTrain.finalDestination,
+      arrivalTime: earliestTrain.arrivalTime,
+      variant: currentStep?.kind === 'transfer' ? 'transfer' : 'board',
+    });
+  }, [isWaitingStep, earliestTrain, waitingStationName, currentStep?.kind]);
+
+  // Cancel any pending alert / timer on unmount (subscription-cleanup rule).
+  useEffect(() => {
+    return () => {
+      clearAutoTimer();
+      void cancelBoardingAlert();
+    };
+  }, [clearAutoTimer]);
+
+  const softConfirmHandlers = useMemo(
+    () => (softConfirm !== null ? { onYes: confirmBoarded, onNotYet: dismissSoftConfirm } : null),
+    [softConfirm, confirmBoarded, dismissSoftConfirm]
+  );
 
   // Whole-journey progress for the header bar. Total excludes platform wait
   // (same basis as remainingSeconds), so the fraction is internally honest.
@@ -128,9 +259,11 @@ export const RouteGuidanceScreen: React.FC = () => {
     totalSeconds <= 0 ? 0 : isAtEnd ? 1 : (totalSeconds - remainingSeconds) / totalSeconds;
 
   const handleExit = useCallback((): void => {
+    clearAutoTimer();
+    void cancelBoardingAlert();
     clearGuidanceSession();
     navigation.goBack();
-  }, [navigation]);
+  }, [clearAutoTimer, navigation]);
 
   const renderStep = useCallback(
     ({ item, index }: { item: GuidanceStep; index: number }): React.ReactElement => {
@@ -168,8 +301,9 @@ export const RouteGuidanceScreen: React.FC = () => {
         <View style={styles.nowCardWrap}>
           <GuidanceNowCard
             step={currentStep}
-            elapsedInStepSec={isHolding ? 0 : elapsedInStepSec}
+            elapsedInStepSec={currentStep.kind === 'board' ? 0 : elapsedInStepSec}
             liveWaitText={liveWaitText}
+            softConfirm={softConfirmHandlers}
           />
         </View>
       )}
@@ -191,7 +325,7 @@ export const RouteGuidanceScreen: React.FC = () => {
         nextLabel={nextLabelFor(currentStep, steps[currentIndex + 1])}
         prevDisabled={currentIndex === 0}
         onPrev={goPrev}
-        onNext={goNext}
+        onNext={confirmBoarded}
         onExit={handleExit}
       />
     </SafeAreaView>
