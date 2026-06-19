@@ -109,6 +109,72 @@ interface Station {
 | **MAJOR** | 장애, 고장, 사고, 탈선, 화재 |
 | **MODERATE** | 지연, 혼잡, 서행 |
 
+> 탈선·화재는 위 표에서 **MAJOR**(사고/장애 계열)다 — SEVERE(전면 운행 중단)로 올려 적지 마라. SEVERE는 "노선이 멈췄다", MAJOR는 "사고는 났지만 운행은 한다"로 구분한다.
+
+### 장애 분류는 단일 SoT로 import — enum 재정의 금지
+
+이 키워드 표는 **severity 산출의 SoT**이고, 그 결과 severity 값의 **canonical enum은 `DelaySeverity`(`src/models/train.ts:86` = `minor`/`moderate`/`major`/`severe`)**다. 새 장애 처리 코드는 이 enum을 import해 쓰라. 자체 severity 스킴을 새로 정의하면 아래처럼 드리프트가 누적돼, 같은 "사고"가 화면마다 다른 등급으로 표시된다(실측 드리프트):
+
+| 위치 | 현재 스킴 | 문제 |
+|------|----------|------|
+| `models/train.ts:86` `DelaySeverity` | `minor`/`moderate`/`major`/`severe` | **canonical (이걸 import)** |
+| `dataManager.detectServiceDisruptions` | `DelaySeverity` 사용 | OK (정렬됨) |
+| `services/delay/officialDelayService.ts:46` | `info`/`warning`/`critical` | 3-tier 자체 정의 → enum과 매핑 불명 |
+| `api-integration` SKILL `detectServiceDisruptions` | flat 키워드 → `boolean` | severity 없이 "장애 있음/없음"만 |
+
+매핑 주의:
+- 키워드 표는 3행(SEVERE/MAJOR/MODERATE)뿐 — `DelaySeverity.MINOR`는 키워드로 안 잡히는 **경미한 지연(1~5분)** 전용이다. 키워드 매칭은 MODERATE 이상만 산출한다.
+- **혼잡도(congestion)는 severity가 아니다.** `CongestionLevel`(`src/models/publicData.ts:96` = `low`/`moderate`/`high`/`crowded`)은 "얼마나 붐비나"라는 **별개 축**이다. 장애 severity 표(`minor`/`moderate`/`major`/`severe`)와 값이 겹쳐 보여도 절대 같은 enum으로 합치지 마라.
+
+## BANNED (예외 없음)
+
+| 금지 | 대체 | 이유 |
+|------|------|------|
+| `seoulSubwayApi.getRealtimeArrival` 직접 호출(실시간 지연/도착 데이터) | `arrivalService.getArrivals` 경유 | 직접 호출은 공유 캐시·rate-limit을 우회 → rate-limit 키 오염으로 StationDetail이 30s 굶주린다 (PR #170, `useDelayDetection`이 같은 이유로 `arrivalService` 경유로 전환됨) |
+| 위치 API `updnLine` CODE('0'/'1')를 도착 API 한글('상행'/'하행')과 같은 분기로 처리 | 두 인코딩 분리 (아래 Real-Time Position 참조) | 한 분기가 다른 인코딩을 만나면 방향이 전부 뒤집힌다 |
+| 자체 disruption `severity` enum 신규 정의 | `DelaySeverity`(`models/train.ts`) import | severity 스킴이 3+곳으로 드리프트 (위 표) |
+
+## Real-Time Position Normalization (`realtimePosition`)
+
+위치 API(`realtimePosition`, 실시간 열차 위치)는 도착 API와 **인코딩 규약이 다르다**. 정규화는 `seoulSubwayApi.convertToTrainPosition`(`SeoulRealtimePosition` → `TrainPosition`)이 SoT다. 도착 API용 정규화기(한글 방향/메시지 파싱)를 위치 row에 재사용하지 마라.
+
+### `updnLine` — 위치 API는 CODE, 도착 API는 한글 (혼용 금지)
+
+| API | `updnLine` 값 | up | down |
+|-----|--------------|-----|------|
+| 도착(`getRealtimeArrival`) | 한글 | `상행`·`내선` | `하행`·`외선` |
+| **위치(`getRealtimePosition`)** | **CODE** | `'0'` (상행/내선) | `'1'` (하행/외선) |
+
+`convertToTrainPosition`은 `row.updnLine === '0' ? 'up' : 'down'`로 코드를 푼다. 같은 필드명이지만 값 도메인이 달라, 한글 분기(`=== '상행'`)를 위치 row에 쓰면 전부 `down`으로 떨어진다 — 그래서 두 변환기를 의도적으로 분리해 둔다.
+
+### `trainSttus` — 열차 상태 코드표
+
+`convertToTrainPosition`의 `statusMap`이 SoT (`TrainPositionStatus`로 정규화):
+
+| 코드 | 의미 | `TrainPositionStatus` |
+|------|------|----------------------|
+| `'0'` | 진입 | `entering` |
+| `'1'` | 도착 | `arrived` |
+| `'2'` | 출발 | `departed` |
+| `'3'` | 전역 출발 | `departed_prev` |
+| (그 외) | — | `unknown` (`?? 'unknown'` fallback) |
+
+부수 코드 플래그도 CODE다: `directAt === '1'` → 급행(`isExpress`), `lstcarAt === '1'` → 막차(`isLastTrain`).
+
+### 노선명 도메인 — 호출 입력은 정규화 책임 밖이지만 주의
+
+`getRealtimePosition`은 앱 `lineId`(`'경의선'`, `'인천2'`)가 아니라 **API 공식 노선명**을 받는다. 호출 전 `toSeoulApiLineName(lineId)`(`src/utils/formatUtils.ts:84`)로 변환하고 `null`이면 스킵하라(상세는 `api-integration` SKILL). `'인천2'`를 그대로 넣으면 숫자가 새어 `'2호선'` 데이터를 끌어온다.
+
+### schedule-vs-actual 지연 계산
+
+Seoul API는 **schedule deviation(지연 분)을 직접 주지 않는다.** 그래서 `dataManager.detectDelays`는 `@deprecated`로 빈 배열(`[]`)만 반환한다 — 과거 구현이 "도착까지 남은 시간"을 지연으로 오인해 거짓 알림을 냈기 때문(신뢰 훼손). 올바른 지연은 **두 소스 비교로만** 산출하라:
+
+1. **기준선** = `getStationTimetable`(published timetable, 예정 출발/도착)
+2. **실측** = `getRealtimeArrival`(`barvlDt` 잔여 초)
+3. `deviation = 실측 도착 시각 − 예정 시각` → `DelaySeverity`에 매핑
+
+기준선 없이 실측만으로 지연을 판단하는 코드는 작성 금지(`detectDelays`가 막힌 이유 그대로).
+
 ## Common Issues & Solutions
 
 ### Issue 1: Station Name Mismatch

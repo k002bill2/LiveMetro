@@ -15,6 +15,7 @@ description: "서울 지하철 역정보를 앱에서 조회/소비하는 가이
 - **Seoul API 원시 응답 파싱/정규화/타입 변환** (arvlDt 초 단위 처리, updnLine 방향 매핑, 응답 shape 정규화) → `subway-data-processor`
 - **외부 Seoul Open API 호출 자체** (fetch, rate-limit/backoff, timeout, API 키 관리, 429 처리) → `api-integration`
 - **경로 탐색·환승·요금 계산** (A*/K-shortest, 최단경로, 환승 시간, 요금 타입) → `route-fare-calculation`
+- **주변역의 GPS/정확도 메커니즘** (위치 권한, watchPosition, accuracy 게이트, 적응형 radius 확장 로직) → `location-services`. 이 스킬은 `useNearbyStations`의 **결과 소비만** 담당한다 (radius/maxStations 옵션을 넘기고 `nearbyStations`/`closestStation`을 화면에 쓰는 일). 트리거 키워드 "주변역/가까운역"이 두 스킬에 겹쳐 보이지만, 위치를 *어떻게 측정하느냐*는 `location-services`, 측정된 역 목록을 *어떻게 쓰느냐*가 여기다.
 - **이 스킬은 위 레이어를 호출해 결과를 소비할 뿐**, 그 내부 로직을 새로 작성/수정하지 않는다.
 
 ## 핵심 서비스 계층
@@ -60,7 +61,7 @@ const stations = await trainService.getStationsByLine('2');
 import { useNearbyStations } from '@/hooks/useNearbyStations';
 
 const { nearbyStations, closestStation, loading } = useNearbyStations({
-  radius: 1000,        // 1km
+  radius: 600,         // 기본값 600m (도심 도보 7-8분) — 생략 시 자동 적용
   maxStations: 10,
   autoUpdate: true,
   minUpdateInterval: 30000  // 30초
@@ -83,6 +84,26 @@ const timetable = await seoulSubwayApi.getStationTimetable(
   '1'       // inoutTag: '1'상행 '2'하행
 );
 ```
+
+### 열차위치 화면 소비 (이중 경계 정규화)
+
+`TrainPositionScreen`처럼 노선 전체 실시간 위치 피드를 소비할 때는 **lineId를 두 군데에 서로 다른 형태로 변환**해야 한다. 한쪽만 처리하면 다른 쪽이 빈 결과로 떨어져 "0대" 빈 화면이 된다 (PR #207 회귀).
+
+```typescript
+import { toSeoulApiLineName } from '@/utils/formatUtils';
+import { resolveLineKey, LINE_STATIONS, LINE_COLORS } from '@/utils/subwayMapData';
+
+// (1) API 입력 — Seoul realtimePosition 호출용 한글 노선명.
+//     커버 안 되는 노선은 null → 호출 자체를 건너뛴다(INFO-200 회피).
+const apiLineName = toSeoulApiLineName(lineId);  // 예: 'bundang' → '수인분당선', 미지원 → null
+
+// (2) 로컬 조회 — LINE_STATIONS / LINE_COLORS의 lines.json 슬러그 키.
+const lineKey = resolveLineKey(lineId);          // 예: '수인분당선' → 'bundang'
+const stations = LINE_STATIONS[lineKey];
+const color = LINE_COLORS[lineKey];
+```
+
+**왜 둘 다 필요한가**: `Station.lineId`는 비숫자 노선에서 Seoul API 한글명('수인분당선')으로 들어오는데, API 호출은 그 한글명을 원하고(`toSeoulApiLineName`), 로컬 역 목록/색상 테이블은 lines.json 슬러그('bundang')로 키잉되어 있다(`resolveLineKey`). 한쪽 함수만 쓰면 입력 도메인이 어긋나 조회가 silent-empty가 된다. 실제 wiring은 `useTrainPositions.ts`(API 쪽)와 `TrainPositionScreen.tsx:42-46`(로컬 쪽) 주석에 명시돼 있다.
 
 ## Station 모델
 
@@ -125,7 +146,11 @@ interface Station {
 | seoulSubwayApi | `src/services/api/seoulSubwayApi.ts` | Seoul API |
 | stationCacheService | `src/services/data/stationCacheService.ts` | 캐싱 |
 | locationService | `src/services/location/locationService.ts` | 위치/거리 |
-| useNearbyStations | `src/hooks/useNearbyStations.ts` | 주변역 훅 |
+| useNearbyStations | `src/hooks/useNearbyStations.ts` | 주변역 훅 (기본 radius 600m) |
+| useTrainPositions | `src/hooks/useTrainPositions.ts` | 실시간 열차위치 훅 (toSeoulApiLineName 경계) |
+| TrainPositionScreen | `src/screens/station/TrainPositionScreen.tsx` | 열차위치 화면 (resolveLineKey 경계) |
+| subwayMapData | `src/utils/subwayMapData.ts` | LINE_STATIONS / resolveLineKey |
+| formatUtils | `src/utils/formatUtils.ts` | toSeoulApiLineName |
 | useAdjacentStations | `src/hooks/useAdjacentStations.ts` | 이전/다음 역 |
 | useStationNavigation | `src/hooks/useStationNavigation.ts` | 노선 내 네비 |
 | train.ts | `src/models/train.ts` | 타입 정의 |
