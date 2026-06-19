@@ -34,9 +34,17 @@ jest.mock('@/services/notification/notificationService', () => ({
   },
 }));
 
+// seoulSubwayApi mock은 캐시-우회 방지 테스트(직접 호출되지 않음을 단언)를
+// 위해서만 유지한다. getLineDelays는 arrivalService.getArrivals를 경유한다.
 jest.mock('../../api/seoulSubwayApi', () => ({
   seoulSubwayApi: {
     getRealtimeArrival: jest.fn().mockResolvedValue([]),
+  },
+}));
+
+jest.mock('@/services/arrival/arrivalService', () => ({
+  arrivalService: {
+    getArrivals: jest.fn(),
   },
 }));
 
@@ -71,8 +79,33 @@ jest.mock('@/models/ml', () => ({
   generateAlertId: jest.fn().mockReturnValue('alert-123'),
 }));
 
+/**
+ * Build a normalized ArrivalInfo for arrivalService.getArrivals mock.
+ * Mirrors the shape arrivalService produces: lineId normalized to "1".."9",
+ * arvlMsg2 → arrivalMessage. stationName echoes the queried departure station.
+ */
+type DelayRow = { lineId: string; arrivalMessage: string };
+function makeArrivalInfo(rows: readonly DelayRow[]) {
+  return {
+    stationName: '강남역',
+    stationId: 'gangnam',
+    arrivals: rows.map((row, index) => ({
+      trainId: `t${index + 1}`,
+      lineId: row.lineId,
+      direction: 'up' as const,
+      destination: '성수',
+      arrivalSeconds: null,
+      arrivalMessage: row.arrivalMessage,
+      trainNumber: `${index + 1}`,
+    })),
+    lastUpdated: new Date(),
+    source: 'api' as const,
+  };
+}
+
 describe('DelayResponseAlertService', () => {
   let mockSeoulSubwayApi: any;
+  let mockArrivalService: any;
   let mockNotificationService: any;
   let mockModelService: any;
   let mockCommuteLogService: any;
@@ -93,13 +126,14 @@ describe('DelayResponseAlertService', () => {
     jest.useFakeTimers();
 
     mockSeoulSubwayApi = require('@/services/api/seoulSubwayApi').seoulSubwayApi;
+    mockArrivalService = require('@/services/arrival/arrivalService').arrivalService;
     mockNotificationService = require('@/services/notification/notificationService').notificationService;
     mockModelService = require('@/services/ml').modelService;
     mockCommuteLogService = require('@/services/pattern/commuteLogService').commuteLogService;
     mockGenerateAlertId = require('@/models/ml').generateAlertId;
 
     // Reset mocks with default values
-    mockSeoulSubwayApi.getRealtimeArrival.mockResolvedValue([]);
+    mockArrivalService.getArrivals.mockResolvedValue(makeArrivalInfo([]));
     mockNotificationService.sendLocalNotification.mockResolvedValue('notif-123');
     mockModelService.predict.mockResolvedValue({
       predictedDepartureTime: '08:00',
@@ -125,7 +159,7 @@ describe('DelayResponseAlertService', () => {
 
   describe('checkRouteDelays', () => {
     it('should check for no delays when arrivals are empty', async () => {
-      mockSeoulSubwayApi.getRealtimeArrival.mockResolvedValue([]);
+      mockArrivalService.getArrivals.mockResolvedValue(makeArrivalInfo([]));
       mockModelService.predict.mockResolvedValue({
         predictedDepartureTime: '08:00',
       });
@@ -139,14 +173,9 @@ describe('DelayResponseAlertService', () => {
     });
 
     it('should detect delays in arrival messages', async () => {
-      mockSeoulSubwayApi.getRealtimeArrival.mockResolvedValue([
-        {
-          subwayId: '2',
-          trainLineNm: '2호선',
-          statnNm: '강남',
-          arvlMsg2: '5분 지연 중입니다',
-        },
-      ]);
+      mockArrivalService.getArrivals.mockResolvedValue(
+        makeArrivalInfo([{ lineId: '2', arrivalMessage: '5분 지연 중입니다' }])
+      );
       mockModelService.predict.mockResolvedValue({
         predictedDepartureTime: '08:00',
       });
@@ -160,14 +189,9 @@ describe('DelayResponseAlertService', () => {
     });
 
     it('should extract delay minutes from message', async () => {
-      mockSeoulSubwayApi.getRealtimeArrival.mockResolvedValue([
-        {
-          subwayId: '2',
-          trainLineNm: '2호선',
-          statnNm: '강남',
-          arvlMsg2: '10분 지연',
-        },
-      ]);
+      mockArrivalService.getArrivals.mockResolvedValue(
+        makeArrivalInfo([{ lineId: '2', arrivalMessage: '10분 지연' }])
+      );
       mockModelService.predict.mockResolvedValue({
         predictedDepartureTime: '08:00',
       });
@@ -178,14 +202,9 @@ describe('DelayResponseAlertService', () => {
     });
 
     it('should ignore delays below minimum threshold (3 minutes)', async () => {
-      mockSeoulSubwayApi.getRealtimeArrival.mockResolvedValue([
-        {
-          subwayId: '2',
-          trainLineNm: '2호선',
-          statnNm: '강남',
-          arvlMsg2: '2분 지연',
-        },
-      ]);
+      mockArrivalService.getArrivals.mockResolvedValue(
+        makeArrivalInfo([{ lineId: '2', arrivalMessage: '2분 지연' }])
+      );
       mockModelService.predict.mockResolvedValue({
         predictedDepartureTime: '08:00',
       });
@@ -197,20 +216,12 @@ describe('DelayResponseAlertService', () => {
     });
 
     it('should find maximum delay among multiple lines', async () => {
-      mockSeoulSubwayApi.getRealtimeArrival.mockResolvedValue([
-        {
-          subwayId: '2',
-          trainLineNm: '2호선',
-          statnNm: '강남',
-          arvlMsg2: '5분 지연',
-        },
-        {
-          subwayId: '2',
-          trainLineNm: '2호선',
-          statnNm: '강남',
-          arvlMsg2: '15분 지연',
-        },
-      ]);
+      mockArrivalService.getArrivals.mockResolvedValue(
+        makeArrivalInfo([
+          { lineId: '2', arrivalMessage: '5분 지연' },
+          { lineId: '2', arrivalMessage: '15분 지연' },
+        ])
+      );
       mockModelService.predict.mockResolvedValue({
         predictedDepartureTime: '08:00',
       });
@@ -221,7 +232,7 @@ describe('DelayResponseAlertService', () => {
     });
 
     it('should handle error and return safe default', async () => {
-      mockSeoulSubwayApi.getRealtimeArrival.mockRejectedValue(new Error('API error'));
+      mockArrivalService.getArrivals.mockRejectedValue(new Error('API error'));
       mockModelService.predict.mockRejectedValue(new Error('Model error'));
 
       const result = await delayResponseAlertService.checkRouteDelays('user-1', mockRoute);
@@ -239,20 +250,12 @@ describe('DelayResponseAlertService', () => {
         lineIds: ['2', '3'],
       };
 
-      mockSeoulSubwayApi.getRealtimeArrival.mockResolvedValue([
-        {
-          subwayId: '2',
-          trainLineNm: '2호선',
-          statnNm: '강남',
-          arvlMsg2: '5분 지연',
-        },
-        {
-          subwayId: '3',
-          trainLineNm: '3호선',
-          statnNm: '강남',
-          arvlMsg2: '10분 지연',
-        },
-      ]);
+      mockArrivalService.getArrivals.mockResolvedValue(
+        makeArrivalInfo([
+          { lineId: '2', arrivalMessage: '5분 지연' },
+          { lineId: '3', arrivalMessage: '10분 지연' },
+        ])
+      );
       mockModelService.predict.mockResolvedValue({
         predictedDepartureTime: '08:00',
       });
@@ -264,14 +267,9 @@ describe('DelayResponseAlertService', () => {
     });
 
     it('should include delay reasons in details', async () => {
-      mockSeoulSubwayApi.getRealtimeArrival.mockResolvedValue([
-        {
-          subwayId: '2',
-          trainLineNm: '2호선',
-          statnNm: '강남',
-          arvlMsg2: '10분 사고로 인한 지연',
-        },
-      ]);
+      mockArrivalService.getArrivals.mockResolvedValue(
+        makeArrivalInfo([{ lineId: '2', arrivalMessage: '10분 사고로 인한 지연' }])
+      );
       mockModelService.predict.mockResolvedValue({
         predictedDepartureTime: '08:00',
       });
@@ -282,7 +280,7 @@ describe('DelayResponseAlertService', () => {
     });
 
     it('should call modelService.predict with correct parameters', async () => {
-      mockSeoulSubwayApi.getRealtimeArrival.mockResolvedValue([]);
+      mockArrivalService.getArrivals.mockResolvedValue(makeArrivalInfo([]));
       mockModelService.predict.mockResolvedValue({
         predictedDepartureTime: '09:00',
       });
@@ -290,6 +288,20 @@ describe('DelayResponseAlertService', () => {
       await delayResponseAlertService.checkRouteDelays('user-1', mockRoute);
 
       expect(mockModelService.predict).toHaveBeenCalled();
+    });
+
+    it('should fetch via arrivalService and never call seoulSubwayApi directly (cache-bypass prevention, PR #170)', async () => {
+      // getLineDelays must route through the shared-cache/rate-limit layer
+      // (arrivalService.getArrivals), not hit seoulSubwayApi.getRealtimeArrival
+      // directly. A direct call starves StationDetail's per-station rate-limit.
+      mockArrivalService.getArrivals.mockResolvedValue(
+        makeArrivalInfo([{ lineId: '2', arrivalMessage: '5분 지연' }])
+      );
+
+      await delayResponseAlertService.checkRouteDelays('user-1', mockRoute);
+
+      expect(mockArrivalService.getArrivals).toHaveBeenCalled();
+      expect(mockSeoulSubwayApi.getRealtimeArrival).not.toHaveBeenCalled();
     });
   });
 
@@ -405,7 +417,7 @@ describe('DelayResponseAlertService', () => {
     });
 
     it('should set up monitoring without throwing', () => {
-      mockSeoulSubwayApi.getRealtimeArrival.mockResolvedValue([]);
+      mockArrivalService.getArrivals.mockResolvedValue(makeArrivalInfo([]));
       mockModelService.predict.mockResolvedValue({
         predictedDepartureTime: '08:00',
       });
@@ -680,7 +692,7 @@ describe('DelayResponseAlertService', () => {
 
       try {
         const callback = jest.fn();
-        mockSeoulSubwayApi.getRealtimeArrival.mockResolvedValue([]);
+        mockArrivalService.getArrivals.mockResolvedValue(makeArrivalInfo([]));
         mockModelService.predict.mockResolvedValue({
           predictedDepartureTime: '08:00',
         });
@@ -704,7 +716,7 @@ describe('DelayResponseAlertService', () => {
 
       try {
         const callback = jest.fn();
-        mockSeoulSubwayApi.getRealtimeArrival.mockResolvedValue([]);
+        mockArrivalService.getArrivals.mockResolvedValue(makeArrivalInfo([]));
         mockModelService.predict.mockResolvedValue({
           predictedDepartureTime: '08:00',
         });
@@ -735,7 +747,7 @@ describe('DelayResponseAlertService', () => {
 
       try {
         const callback = jest.fn();
-        mockSeoulSubwayApi.getRealtimeArrival.mockResolvedValue([]);
+        mockArrivalService.getArrivals.mockResolvedValue(makeArrivalInfo([]));
         mockModelService.predict.mockResolvedValue({
           predictedDepartureTime: '08:00',
         });
@@ -874,14 +886,10 @@ describe('DelayResponseAlertService', () => {
 
   describe('Edge cases and error handling', () => {
     it('should handle missing arrival message', async () => {
-      mockSeoulSubwayApi.getRealtimeArrival.mockResolvedValue([
-        {
-          subwayId: '2',
-          trainLineNm: '2호선',
-          statnNm: '강남',
-          // arvlMsg2 is missing
-        },
-      ]);
+      // arrivalService normalizes a missing arvlMsg2 to an empty arrivalMessage.
+      mockArrivalService.getArrivals.mockResolvedValue(
+        makeArrivalInfo([{ lineId: '2', arrivalMessage: '' }])
+      );
       mockModelService.predict.mockResolvedValue({
         predictedDepartureTime: '08:00',
       });
@@ -891,22 +899,18 @@ describe('DelayResponseAlertService', () => {
       expect(result.hasDelays).toBe(false);
     });
 
-    it('should handle missing station name in arrival', async () => {
-      mockSeoulSubwayApi.getRealtimeArrival.mockResolvedValue([
-        {
-          subwayId: '2',
-          trainLineNm: '2호선',
-          // statnNm is missing
-          arvlMsg2: '5분 지연',
-        },
-      ]);
+    it('should use queried station name from arrivalService result', async () => {
+      // arrivalService.getArrivals echoes the queried departure station name
+      // into ArrivalInfo.stationName, so DelayDetail.stationName reflects it.
+      mockArrivalService.getArrivals.mockResolvedValue(
+        makeArrivalInfo([{ lineId: '2', arrivalMessage: '5분 지연' }])
+      );
       mockModelService.predict.mockResolvedValue({
         predictedDepartureTime: '08:00',
       });
 
       const result = await delayResponseAlertService.checkRouteDelays('user-1', mockRoute);
 
-      // Should use fallback to departureStationName
       expect(result.delayDetails[0]!.stationName).toBe('강남역');
     });
 
@@ -921,14 +925,9 @@ describe('DelayResponseAlertService', () => {
 
       for (const testCase of testCases) {
         jest.clearAllMocks();
-        mockSeoulSubwayApi.getRealtimeArrival.mockResolvedValue([
-          {
-            subwayId: '2',
-            trainLineNm: '2호선',
-            statnNm: '강남',
-            arvlMsg2: testCase.message,
-          },
-        ]);
+        mockArrivalService.getArrivals.mockResolvedValue(
+          makeArrivalInfo([{ lineId: '2', arrivalMessage: testCase.message }])
+        );
         mockModelService.predict.mockResolvedValue({
           predictedDepartureTime: '08:00',
         });
@@ -942,14 +941,9 @@ describe('DelayResponseAlertService', () => {
     });
 
     it('should default to 5 minutes if delay amount not specified', async () => {
-      mockSeoulSubwayApi.getRealtimeArrival.mockResolvedValue([
-        {
-          subwayId: '2',
-          trainLineNm: '2호선',
-          statnNm: '강남',
-          arvlMsg2: '지연 발생',
-        },
-      ]);
+      mockArrivalService.getArrivals.mockResolvedValue(
+        makeArrivalInfo([{ lineId: '2', arrivalMessage: '지연 발생' }])
+      );
       mockModelService.predict.mockResolvedValue({
         predictedDepartureTime: '08:00',
       });
@@ -959,15 +953,12 @@ describe('DelayResponseAlertService', () => {
       expect(result.maxDelayMinutes).toBe(5);
     });
 
-    it('should match line by both subwayId and trainLineNm', async () => {
-      mockSeoulSubwayApi.getRealtimeArrival.mockResolvedValue([
-        {
-          subwayId: '999', // Different subwayId
-          trainLineNm: '2호선', // But contains lineId
-          statnNm: '강남',
-          arvlMsg2: '5분 지연',
-        },
-      ]);
+    it('should match line by normalized lineId from arrivalService', async () => {
+      // arrivalService normalizes lineId to "1".."9"; getLineDelays compares
+      // arrival.lineId === lineId directly (no raw subwayId/trainLineNm).
+      mockArrivalService.getArrivals.mockResolvedValue(
+        makeArrivalInfo([{ lineId: '2', arrivalMessage: '5분 지연' }])
+      );
       mockModelService.predict.mockResolvedValue({
         predictedDepartureTime: '08:00',
       });
@@ -978,14 +969,9 @@ describe('DelayResponseAlertService', () => {
     });
 
     it('should respect alert cooldown for repeated checks', async () => {
-      mockSeoulSubwayApi.getRealtimeArrival.mockResolvedValue([
-        {
-          subwayId: '2',
-          trainLineNm: '2호선',
-          statnNm: '강남',
-          arvlMsg2: '10분 지연',
-        },
-      ]);
+      mockArrivalService.getArrivals.mockResolvedValue(
+        makeArrivalInfo([{ lineId: '2', arrivalMessage: '10분 지연' }])
+      );
       mockModelService.predict.mockResolvedValue({
         predictedDepartureTime: '08:00',
       });
@@ -999,14 +985,9 @@ describe('DelayResponseAlertService', () => {
 
       // Clear mocks after initial check
       jest.clearAllMocks();
-      mockSeoulSubwayApi.getRealtimeArrival.mockResolvedValue([
-        {
-          subwayId: '2',
-          trainLineNm: '2호선',
-          statnNm: '강남',
-          arvlMsg2: '10분 지연',
-        },
-      ]);
+      mockArrivalService.getArrivals.mockResolvedValue(
+        makeArrivalInfo([{ lineId: '2', arrivalMessage: '10분 지연' }])
+      );
       mockModelService.predict.mockResolvedValue({
         predictedDepartureTime: '08:00',
       });
@@ -1025,7 +1006,7 @@ describe('DelayResponseAlertService', () => {
     });
 
     it('should handle modelService.predict error gracefully', async () => {
-      mockSeoulSubwayApi.getRealtimeArrival.mockResolvedValue([]);
+      mockArrivalService.getArrivals.mockResolvedValue(makeArrivalInfo([]));
       mockModelService.predict.mockRejectedValue(new Error('Prediction failed'));
 
       const result = await delayResponseAlertService.checkRouteDelays('user-1', mockRoute);
@@ -1044,15 +1025,12 @@ describe('DelayResponseAlertService', () => {
 
       for (const testCase of testCases) {
         jest.clearAllMocks();
-        mockSeoulSubwayApi.getRealtimeArrival.mockResolvedValue(
-          testCase.delay === 0 ? [] : [
-            {
-              subwayId: '2',
-              trainLineNm: '2호선',
-              statnNm: '강남',
-              arvlMsg2: `${testCase.delay}분 지연`,
-            },
-          ]
+        mockArrivalService.getArrivals.mockResolvedValue(
+          makeArrivalInfo(
+            testCase.delay === 0
+              ? []
+              : [{ lineId: '2', arrivalMessage: `${testCase.delay}분 지연` }]
+          )
         );
         mockModelService.predict.mockResolvedValue({
           predictedDepartureTime: '08:00',

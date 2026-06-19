@@ -61,6 +61,24 @@ describe('OfficialDelayService', () => {
         expect(['delayed', 'suspended']).toContain(delay.status);
       });
     });
+
+    it('does not fabricate delays even when Math.random would trigger them', async () => {
+      // 구버그: fetchOfficialDelays가 Math.random()<delayChance 로 가짜 지연을 만들어
+      // ML 예측 UI에 허구 공식 지연을 노출했다. Math.random을 0으로 고정하면 구코드는
+      // 전 노선을 'delayed'로 날조한다. 정직한 구현은 실소스 미통합 시 항상 [] 여야 한다.
+      const randomSpy = jest.spyOn(Math, 'random').mockReturnValue(0);
+      try {
+        // 싱글톤 캐시 공유를 피하려 cold 캐시 fresh 인스턴스를 격리 로드한다.
+        let svc!: typeof officialDelayService;
+        jest.isolateModules(() => {
+          svc = require('../officialDelayService').officialDelayService;
+        });
+        const delays = await svc.getActiveDelays();
+        expect(delays).toHaveLength(0);
+      } finally {
+        randomSpy.mockRestore();
+      }
+    });
   });
 
   describe('hasActiveDelay', () => {

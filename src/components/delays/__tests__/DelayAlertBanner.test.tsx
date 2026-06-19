@@ -79,6 +79,18 @@ describe('DelayAlertBanner', () => {
     expect(getByText('2호선 +10분')).toBeTruthy();
   });
 
+  it('renders "지연" without fabricated minutes when duration is unknown (0)', () => {
+    // delayMinutes 0 = 분 미상. "+0분"으로 거짓 정밀도를 보이면 안 된다.
+    const unknownDuration: DelayInfo[] = [
+      { lineId: '2', lineName: '2호선', delayMinutes: 0, reason: '운행 지연' },
+    ];
+    const { getByText, queryByText } = render(
+      <DelayAlertBanner delays={unknownDuration} />,
+    );
+    expect(getByText('2호선 지연')).toBeTruthy();
+    expect(queryByText('2호선 +0분')).toBeNull();
+  });
+
   it('renders delay summary sorted by delay minutes descending', () => {
     const { getByText } = render(
       <DelayAlertBanner delays={multipleDelays} />,

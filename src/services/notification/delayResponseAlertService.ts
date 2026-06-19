@@ -4,7 +4,8 @@
  */
 
 import { notificationService, NotificationType } from './notificationService';
-import { seoulSubwayApi } from '@/services/api/seoulSubwayApi';
+import { arrivalService } from '@/services/arrival/arrivalService';
+import { getLineName } from '@/models/route';
 import { modelService } from '@/services/ml';
 import { commuteLogService } from '@/services/pattern/commuteLogService';
 import {
@@ -342,26 +343,29 @@ class DelayResponseAlertService {
     stationName: string
   ): Promise<DelayDetail[]> {
     try {
-      const arrivals = await seoulSubwayApi.getRealtimeArrival(stationName);
+      // arrivalService.getArrivals를 경유한다(seoulSubwayApi.getRealtimeArrival
+      // 직접 호출 금지). 직접 호출은 StationDetail과 같은 per-station rate-limit
+      // 키를 캐시 공유 없이 우회해, background 모니터링이 매 틱 직접 API를 때려
+      // 상세 화면을 throttle로 굶주리게 만든다. 공유 캐시 계층(arrivalService)을
+      // 경유하면 30초 윈도 안의 중복 요청은 캐시로 흡수된다 (PR #170 패턴).
+      const info = await arrivalService.getArrivals(stationName);
       const delays: DelayDetail[] = [];
 
-      for (const arrival of arrivals) {
-        // Check if this is the right line
-        const isCorrectLine =
-          arrival.subwayId === lineId || arrival.trainLineNm?.includes(lineId);
-        if (!isCorrectLine) continue;
+      // arrivalService는 lineId를 "1".."9"로 정규화하므로 직접 비교한다.
+      const lineArrivals = info.arrivals.filter((a) => a.lineId === lineId);
 
+      for (const arrival of lineArrivals) {
         // Check for delay keywords
-        const message = arrival.arvlMsg2 || '';
+        const message = arrival.arrivalMessage;
         const delayInfo = this.extractDelayInfo(message);
 
         if (delayInfo.hasDelay) {
           delays.push({
             lineId,
-            lineName: arrival.trainLineNm || lineId,
+            lineName: getLineName(lineId),
             delayMinutes: delayInfo.minutes,
             reason: delayInfo.reason,
-            stationName: arrival.statnNm || stationName,
+            stationName: info.stationName,
           });
         }
       }

@@ -166,7 +166,9 @@ describe('usePredictionFactors', () => {
     expect(congestion?.value).toMatch(/↑/);
   });
 
-  it('reports delay as positive "정시 운행" when no active delays', async () => {
+  it('reports delay as neutral "지연 정보 없음" when no official source (no false on-time claim)', async () => {
+    // 공식 지연 실소스(data.go.kr 등) 미통합 상태에서는 빈 결과를 '정시 운행'으로
+    // 단정하면 안 된다(거짓 확신). 정직한 표시는 neutral '지연 정보 없음'.
     const { result } = renderHook(() =>
       usePredictionFactors({ lineId: '2', direction: 'up', dayOfWeek: WEDNESDAY })
     );
@@ -175,9 +177,9 @@ describe('usePredictionFactors', () => {
 
     const delay = result.current.factors.find(f => f.id === 'delay');
     expect(delay).toMatchObject({
-      label: '지연 없음',
-      value: '정시 운행',
-      impact: 'positive',
+      label: '지연 정보 없음',
+      value: '-',
+      impact: 'neutral',
     });
   });
 

@@ -82,9 +82,12 @@ function detectDelayFromArrival(message: string): {
     return { isDelayed: false, delayMinutes: 0 };
   }
 
-  // 지연 시간 추출 시도 (예: "약 10분 지연")
+  // 지연 시간 추출 시도 (예: "약 10분 지연"). 정규식은 "N분 지연/서행"만 좁게 매칭한다
+  // (도착시간 "2분후" 같은 숫자를 지연 시간으로 오추출하지 않기 위함).
+  // 분 추출 실패 시 거짓 "5분"을 단정하지 않고 0(시간 미상)으로 둔다 — 중대 장애를
+  // 약하게 표시할 위험을 제거. 표시 레이어가 0을 "지연(분 미상)"으로 정직하게 렌더한다.
   const minuteMatch = message.match(/(\d+)\s*분\s*(지연|서행)/);
-  const delayMinutes = minuteMatch && minuteMatch[1] ? parseInt(minuteMatch[1], 10) : 5; // 기본값 5분
+  const delayMinutes = minuteMatch && minuteMatch[1] ? parseInt(minuteMatch[1], 10) : 0;
 
   // 지연 원인 추출
   let reason: string | undefined;

@@ -92,7 +92,8 @@ export const DelayAlertBanner: React.FC<DelayAlertBannerProps> = ({
   // Format delay summary
   const delaySummary = sortedDelays
     .slice(0, 3)
-    .map((d) => `${d.lineId}호선 +${d.delayMinutes}분`)
+    // delayMinutes 0 = 분 미상. 거짓 "+0분" 대신 "지연"으로 정직하게 표시한다.
+    .map((d) => `${d.lineId}호선 ${d.delayMinutes > 0 ? `+${d.delayMinutes}분` : '지연'}`)
     .join(', ');
 
   const moreCount = sortedDelays.length - 3;
