@@ -306,6 +306,18 @@ export function useCommutePattern(): UseCommutePatternReturn {
       setLoading(true);
       setError(null);
 
+      // Compute-before-read: the read-only getters below only ever return
+      // the precomputed `commutePatterns` docs. Nothing else recomputes them,
+      // so without this call the collection stays empty and predictions are
+      // permanently null. Recompute first, then read the fresh result.
+      // Graceful degrade: a compute failure must not blank the screen — the
+      // reads still run, so we swallow it (console only, no setError).
+      try {
+        await patternAnalysisService.analyzeAndUpdatePatterns(user.id);
+      } catch (computeErr) {
+        console.error('Pattern compute failed (graceful degrade):', computeErr);
+      }
+
       const [patternsData, prediction, weekPreds, logs, settings, notification] =
         await Promise.all([
           patternAnalysisService.getPatterns(user.id),
