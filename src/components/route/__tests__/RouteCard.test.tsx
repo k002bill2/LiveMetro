@@ -19,8 +19,10 @@ jest.mock('@/components/design/LineBadge', () => {
 jest.mock('@/components/design/JourneyStrip', () => {
   const { Text: RNText } = jest.requireActual('react-native');
   return {
-    JourneyStrip: ({ legs }: { legs: readonly unknown[] }) => (
-      <RNText testID="journey-strip">{`legs:${legs.length}`}</RNText>
+    JourneyStrip: ({ legs }: { legs: readonly { type: string; minutes?: number }[] }) => (
+      <RNText testID="journey-strip">
+        {legs.map((l) => (l.type === 'train' ? `t${l.minutes}` : l.type)).join(',')}
+      </RNText>
     ),
   };
 });
@@ -195,6 +197,25 @@ describe('RouteCard', () => {
     const { getByTestId } = render(
       <RouteCard route={route} expanded={false} onToggleExpand={() => {}} />,
     );
+    expect(getByTestId('route-card-boarding-wait')).toHaveTextContent('다음 열차 4분');
+  });
+
+  it('shows ride time only in the first leg — boarding wait lives in the pill, not double-counted', () => {
+    // 불변: applyRealtimeBoardingWait가 첫 segment estimatedMinutes에 wait를 합산
+    // (25 ride + 4 wait = 29)하고 boardingWaitMinutes=4를 세팅한다. 카드는 첫 leg에서
+    // 그 4분을 빼 ride(25)만 보여야 한다(대기는 pill로 별도). 총시간 29는 불변.
+    const route: RouteWithMLMeta = {
+      ...baseRoute,
+      segments: [{ ...baseRoute.segments[0], estimatedMinutes: 29 }] as never,
+      totalMinutes: 29,
+      boardingWaitMinutes: 4,
+    };
+    const { getByTestId } = render(
+      <RouteCard route={route} expanded={false} onToggleExpand={() => {}} />,
+    );
+    // 첫 train leg = 25(ride), not 29(ride+wait) — 이중계산 방지
+    expect(getByTestId('journey-strip')).toHaveTextContent('t25');
+    // 대기는 pill로만 표시
     expect(getByTestId('route-card-boarding-wait')).toHaveTextContent('다음 열차 4분');
   });
 
