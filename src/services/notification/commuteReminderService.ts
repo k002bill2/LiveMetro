@@ -120,6 +120,34 @@ class CommuteReminderService {
     await storageUtils.setItem(storageKey(uid), scheduled);
     return scheduled;
   }
+
+  /**
+   * Idempotent reconcile: ensure the OS-side reminder set matches the user's
+   * current intent. Schedules when alerts are on AND a departure time exists,
+   * otherwise cancels. Safe to call on app launch / settings focus — it
+   * cancels-before-schedules so it never accumulates duplicates. Does NOT
+   * request permission (the explicit toggle owns that interaction); a schedule
+   * without permission simply won't display until permission is granted.
+   */
+  async reconcileCommuteReminders(
+    uid: string,
+    params: {
+      alertEnabled: boolean;
+      departureTime?: string;
+      activeDays: readonly boolean[];
+      leadMinutes?: number;
+    },
+  ): Promise<void> {
+    if (params.alertEnabled && params.departureTime) {
+      await this.scheduleCommuteReminders(uid, {
+        departureTime: params.departureTime,
+        activeDays: params.activeDays,
+        leadMinutes: params.leadMinutes,
+      });
+    } else {
+      await this.cancelCommuteReminders(uid);
+    }
+  }
 }
 
 export const commuteReminderService = new CommuteReminderService();

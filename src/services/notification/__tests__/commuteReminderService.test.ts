@@ -161,3 +161,41 @@ describe('commuteReminderService.scheduleCommuteReminders', () => {
     expect(result).toEqual([{ weekday: 2, notificationId: 'id-2', time: '08:15' }]);
   });
 });
+
+describe('commuteReminderService.reconcileCommuteReminders', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (storageUtils.getItem as jest.Mock).mockResolvedValue(null);
+    (notificationService.scheduleWeeklyReminder as jest.Mock).mockResolvedValue('id-x');
+  });
+
+  it('schedules when alertEnabled and departureTime present', async () => {
+    await commuteReminderService.reconcileCommuteReminders('user-1', {
+      alertEnabled: true,
+      departureTime: '08:15',
+      activeDays: [true, false, false, false, false, false, false],
+    });
+    expect(notificationService.scheduleWeeklyReminder).toHaveBeenCalledTimes(1);
+    expect(storageUtils.setItem).toHaveBeenCalled();
+  });
+
+  it('cancels (no schedule) when alertEnabled is false', async () => {
+    await commuteReminderService.reconcileCommuteReminders('user-1', {
+      alertEnabled: false,
+      departureTime: '08:15',
+      activeDays: [true, false, false, false, false, false, false],
+    });
+    expect(notificationService.scheduleWeeklyReminder).not.toHaveBeenCalled();
+    expect(storageUtils.removeItem).toHaveBeenCalledWith('@livemetro_commute_reminders:user-1');
+  });
+
+  it('cancels (no schedule) when departureTime is missing', async () => {
+    await commuteReminderService.reconcileCommuteReminders('user-1', {
+      alertEnabled: true,
+      departureTime: undefined,
+      activeDays: [true, false, false, false, false, false, false],
+    });
+    expect(notificationService.scheduleWeeklyReminder).not.toHaveBeenCalled();
+    expect(storageUtils.removeItem).toHaveBeenCalledWith('@livemetro_commute_reminders:user-1');
+  });
+});
