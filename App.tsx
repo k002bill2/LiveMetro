@@ -18,6 +18,7 @@ import { I18nProvider } from './src/services/i18n';
 import { ThemeProvider, useTheme } from './src/services/theme';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { useCommuteReminderSync } from './src/hooks/useCommuteReminderSync';
+import { usePushRegistration } from './src/hooks/usePushRegistration';
 import { ErrorBoundary } from './src/components/common/ErrorBoundary';
 import { installWebAlertPolyfill } from './src/utils/webAlertPolyfill';
 
@@ -39,6 +40,9 @@ const AppContent: React.FC = () => {
   // App-wide reconcile so already-enabled users get commute reminders scheduled
   // on launch (not only on toggle), and edits never leave stale reminders.
   useCommuteReminderSync();
+  // Persist the Expo push token + subscribed lines so the server can target
+  // real-time push (delay alerts) while the app is closed.
+  usePushRegistration();
 
   return (
     <NavigationContainer theme={isDark ? DarkTheme : DefaultTheme}>
