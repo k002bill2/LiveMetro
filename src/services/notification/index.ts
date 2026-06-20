@@ -9,6 +9,9 @@ export { notificationStorageService } from './notificationStorageService';
 
 export { departureAlertService } from './departureAlertService';
 
+export { commuteReminderService } from './commuteReminderService';
+export type { CommuteReminderConfig, ScheduledReminder } from './commuteReminderService';
+
 export { delayResponseAlertService } from './delayResponseAlertService';
 
 export { trainArrivalAlertService } from './trainArrivalAlertService';

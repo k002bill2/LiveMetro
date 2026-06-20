@@ -84,6 +84,42 @@ class CommuteReminderService {
     }
     await storageUtils.removeItem(storageKey(uid));
   }
+
+  /**
+   * Schedule one weekly local notification per active day at (departureTime -
+   * leadMinutes), persisting the ids. Cancels any existing reminders first so
+   * repeated calls are idempotent. Persists only the schedules that succeeded.
+   */
+  async scheduleCommuteReminders(
+    uid: string,
+    config: CommuteReminderConfig,
+  ): Promise<ScheduledReminder[]> {
+    await this.cancelCommuteReminders(uid); // cancel-before-schedule (멱등)
+
+    const leadMinutes = config.leadMinutes ?? 0;
+    const title = '출발 시간이에요';
+    const body = '지금 출발하세요';
+    const scheduled: ScheduledReminder[] = [];
+
+    for (let index = 0; index < config.activeDays.length; index++) {
+      if (!config.activeDays[index]) continue;
+      const spec = computeWeeklyTrigger(config.departureTime, leadMinutes, index);
+      if (!spec) continue;
+      const id = await notificationService.scheduleWeeklyReminder(
+        spec.weekday,
+        spec.hour,
+        spec.minute,
+        title,
+        body,
+      );
+      if (id) {
+        scheduled.push({ weekday: spec.weekday, notificationId: id, time: spec.time });
+      }
+    }
+
+    await storageUtils.setItem(storageKey(uid), scheduled);
+    return scheduled;
+  }
 }
 
 export const commuteReminderService = new CommuteReminderService();

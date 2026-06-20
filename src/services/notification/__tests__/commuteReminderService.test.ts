@@ -91,3 +91,73 @@ describe('commuteReminderService cancel/get', () => {
     expect(storageUtils.removeItem).toHaveBeenCalledWith('@livemetro_commute_reminders:user-1');
   });
 });
+
+describe('commuteReminderService.scheduleCommuteReminders', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (storageUtils.getItem as jest.Mock).mockResolvedValue(null); // no existing
+    (notificationService.scheduleWeeklyReminder as jest.Mock).mockImplementation(
+      async (weekday: number) => `id-${weekday}`,
+    );
+  });
+
+  it('schedules one reminder per active day (Mon/Wed) and persists them', async () => {
+    // activeDays index 0=Mon..6=Sun → Mon(true), Wed(true) only
+    const activeDays = [true, false, true, false, false, false, false];
+
+    const result = await commuteReminderService.scheduleCommuteReminders('user-1', {
+      departureTime: '08:15',
+      activeDays,
+    });
+
+    // Mon→expo 2, Wed→expo 4
+    expect(notificationService.scheduleWeeklyReminder).toHaveBeenCalledTimes(2);
+    expect(notificationService.scheduleWeeklyReminder).toHaveBeenCalledWith(2, 8, 15, expect.any(String), expect.any(String));
+    expect(notificationService.scheduleWeeklyReminder).toHaveBeenCalledWith(4, 8, 15, expect.any(String), expect.any(String));
+    expect(result).toEqual([
+      { weekday: 2, notificationId: 'id-2', time: '08:15' },
+      { weekday: 4, notificationId: 'id-4', time: '08:15' },
+    ]);
+    expect(storageUtils.setItem).toHaveBeenCalledWith('@livemetro_commute_reminders:user-1', result);
+  });
+
+  it('cancels existing reminders before scheduling (idempotent reschedule)', async () => {
+    (storageUtils.getItem as jest.Mock).mockResolvedValueOnce([
+      { weekday: 6, notificationId: 'old', time: '07:00' },
+    ]);
+
+    await commuteReminderService.scheduleCommuteReminders('user-1', {
+      departureTime: '08:15',
+      activeDays: [true, false, false, false, false, false, false],
+    });
+
+    expect(notificationService.cancelNotification).toHaveBeenCalledWith('old');
+    // cancel happened before the new schedule
+    const cancelOrder = (notificationService.cancelNotification as jest.Mock).mock.invocationCallOrder[0];
+    const scheduleOrder = (notificationService.scheduleWeeklyReminder as jest.Mock).mock.invocationCallOrder[0];
+    expect(cancelOrder).toBeDefined();
+    expect(scheduleOrder).toBeDefined();
+    expect(cancelOrder).toBeLessThan(scheduleOrder as number);
+  });
+
+  it('schedules nothing when no active days', async () => {
+    const result = await commuteReminderService.scheduleCommuteReminders('user-1', {
+      departureTime: '08:15',
+      activeDays: [false, false, false, false, false, false, false],
+    });
+    expect(notificationService.scheduleWeeklyReminder).not.toHaveBeenCalled();
+    expect(result).toEqual([]);
+    expect(storageUtils.setItem).toHaveBeenCalledWith('@livemetro_commute_reminders:user-1', []);
+  });
+
+  it('persists only successful schedules (skips nulls)', async () => {
+    (notificationService.scheduleWeeklyReminder as jest.Mock)
+      .mockResolvedValueOnce('id-2') // Mon ok
+      .mockResolvedValueOnce(null); // Tue fails
+    const result = await commuteReminderService.scheduleCommuteReminders('user-1', {
+      departureTime: '08:15',
+      activeDays: [true, true, false, false, false, false, false],
+    });
+    expect(result).toEqual([{ weekday: 2, notificationId: 'id-2', time: '08:15' }]);
+  });
+});
