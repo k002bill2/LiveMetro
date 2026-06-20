@@ -355,6 +355,35 @@ class NotificationService {
   }
 
   /**
+   * Schedule a repeating WEEKLY local notification at a given weekday/time.
+   * weekday는 expo 규약(1=일..7=토). 출근 시각 자동 리마인더를 위해 사용.
+   * Returns the identifier for later cancellation, or null on error.
+   */
+  async scheduleWeeklyReminder(
+    weekday: number,
+    hour: number,
+    minute: number,
+    title: string,
+    body: string,
+  ): Promise<string | null> {
+    try {
+      const identifier = await Notifications.scheduleNotificationAsync({
+        content: {
+          title,
+          body,
+          data: { type: NotificationType.COMMUTE_REMINDER },
+          sound: 'default',
+        },
+        trigger: { weekday, hour, minute, repeats: true },
+      });
+      return identifier;
+    } catch (error) {
+      console.error('Error scheduling weekly reminder:', error);
+      return null;
+    }
+  }
+
+  /**
    * Cancel notification by identifier
    */
   async cancelNotification(identifier: string): Promise<void> {
