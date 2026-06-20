@@ -4,26 +4,18 @@
  */
 
 import * as functions from 'firebase-functions';
+import { onDocumentWritten } from 'firebase-functions/v2/firestore';
 import * as admin from 'firebase-admin';
 import { pushNotificationService } from '../services/pushNotificationService';
 import { tokenManagementService } from '../services/tokenManagementService';
+import { expoPushService } from '../services/expoPushService';
+import { processDelayReport, DelayReportData } from './delayPushLogic';
 
 const db = admin.firestore();
 
 // ============================================================================
 // Types
 // ============================================================================
-
-interface DelayReport {
-  lineId: string;
-  lineName: string;
-  stationId: string;
-  stationName: string;
-  delayMinutes: number;
-  reason?: string;
-  status: string;
-  createdAt: admin.firestore.Timestamp;
-}
 
 interface DelayCertificate {
   userId: string;
@@ -62,52 +54,41 @@ interface CommuteSchedule {
 // ============================================================================
 
 /**
- * Trigger when a delay report is verified
- * Notifies users subscribed to that line
+ * Trigger when a delay report is verified → push to users subscribed to the
+ * line (pushTokens.lines array-contains). v2 (onDocumentWritten) + reportId
+ * idempotency (pushDedup). Logic lives in `processDelayReport` (delayPushLogic);
+ * this wrapper only injects the Firestore/Expo implementations.
  */
-export const onDelayReportVerified = functions
-  .region('asia-northeast3')
-  .firestore.document('delayReports/{reportId}')
-  .onUpdate(async (change, context) => {
-    const before = change.before.data() as DelayReport;
-    const after = change.after.data() as DelayReport;
+export const onDelayReportVerified = onDocumentWritten(
+  { document: 'delayReports/{reportId}', region: 'asia-northeast3' },
+  async (event) => {
+    const reportId = event.params.reportId;
+    const before = event.data?.before.data() as DelayReportData | undefined;
+    const after = event.data?.after.data() as DelayReportData | undefined;
 
-    // Only trigger when status changes to verified
-    if (before.status === after.status || after.status !== 'verified') {
-      return null;
-    }
-
-    // Check if delay is significant (>= 5 minutes)
-    if (after.delayMinutes < 5) {
-      console.log(`Delay too small (${after.delayMinutes}min), skipping notification`);
-      return null;
-    }
-
-    // Get users subscribed to this line's topic
-    const topicName = `line_${after.lineId}`;
-
-    try {
-      const result = await pushNotificationService.send(
-        { type: 'topic', topic: topicName },
-        {
-          title: `⚠️ ${after.lineName} 지연 알림`,
-          body: `${after.stationName} 부근 약 ${after.delayMinutes}분 지연${after.reason ? ` (${after.reason})` : ''}`,
-          data: {
-            type: 'delay_alert',
-            reportId: context.params.reportId,
-            lineId: after.lineId,
-            delayMinutes: after.delayMinutes.toString(),
-          },
-        }
-      );
-
-      console.log(`Delay notification sent to topic ${topicName}:`, result);
-      return result;
-    } catch (error) {
-      console.error('Failed to send delay notification:', error);
-      return null;
-    }
-  });
+    await processDelayReport(reportId, before, after, {
+      queryTokensByLine: async (lineId) => {
+        const snap = await db
+          .collection('pushTokens')
+          .where('lines', 'array-contains', lineId)
+          .get();
+        return snap.docs.map((d) => d.data().token as string).filter(Boolean);
+      },
+      alreadySent: async (rid) => (await db.collection('pushDedup').doc(rid).get()).exists,
+      markSent: async (rid) => {
+        await db
+          .collection('pushDedup')
+          .doc(rid)
+          .set({ sentAt: admin.firestore.FieldValue.serverTimestamp() });
+      },
+      send: (tokens, message) => expoPushService.sendToTokens(tokens, message),
+      invalidate: async (token) => {
+        const snap = await db.collection('pushTokens').where('token', '==', token).get();
+        await Promise.all(snap.docs.map((d) => d.ref.delete()));
+      },
+    });
+  },
+);
 
 // ============================================================================
 // Certificate Triggers
