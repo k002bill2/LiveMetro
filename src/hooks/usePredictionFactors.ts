@@ -198,14 +198,16 @@ function buildDelayFactor(
     };
   }
   const lineDelays = result.value.filter(d => d.lineId === lineId);
-  // No per-line delays AND no global delays: treat as on-time.
+  // 공식 지연 실소스(data.go.kr 등)가 아직 미통합이라 빈 결과를 '정시 운행'으로
+  // 단정하면 거짓 확신이 된다. 정직하게 neutral '지연 정보 없음'으로 표시한다.
+  // 실소스 통합 시 genuine all-normal을 positive '정시 운행'으로 복원할 것.
   if (result.value.length === 0 || lineDelays.length === 0) {
     return {
       id: 'delay',
       icon: Check,
-      label: '지연 없음',
-      value: '정시 운행',
-      impact: 'positive',
+      label: '지연 정보 없음',
+      value: '-',
+      impact: 'neutral',
     };
   }
   return {

@@ -197,7 +197,7 @@ describe('useDelayDetection', () => {
       });
     });
 
-    it('should detect delays with 운행중지 keyword', async () => {
+    it('should detect delays with 운행중지 keyword but unknown duration (no fabricated minutes)', async () => {
       mockArrivalsByLine({ '2': [makeArrival('2', '약 10분 운행중지')] });
 
       const { result } = renderHook(() => useDelayDetection({ autoPolling: false }));
@@ -205,8 +205,9 @@ describe('useDelayDetection', () => {
       await flushAll();
 
       expect(result.current.delays).toHaveLength(1);
-      // Regex only extracts "N분 지연/서행", so 운행중지 falls back to default 5 min
-      expect(result.current.delays[0]!.delayMinutes).toBe(5);
+      // 정규식은 "N분 지연/서행"만 추출한다(도착시간 "2분후" 숫자 오추출 방지 위해 유지).
+      // "운행중지"는 분 추출 불가 → 거짓 5분을 단정하지 않고 0(시간 미상)으로 둔다.
+      expect(result.current.delays[0]!.delayMinutes).toBe(0);
     });
 
     it('should detect delays with 고장 keyword and set reason', async () => {
@@ -250,14 +251,16 @@ describe('useDelayDetection', () => {
       expect(result.current.delays).toHaveLength(0);
     });
 
-    it('should use default 5 minutes when delay time not extractable', async () => {
+    it('reports unknown duration as 0 (not a fabricated 5) when delay time not extractable', async () => {
       mockArrivalsByLine({ '1': [makeArrival('1', '곧 도착 장애 발생')] });
 
       const { result } = renderHook(() => useDelayDetection({ autoPolling: false }));
 
       await flushAll();
 
-      expect(result.current.delays[0]!.delayMinutes).toBe(5);
+      // 중대 장애("장애 발생")를 거짓 "5분 지연"으로 약하게 표시하면 안 된다 → 0(시간 미상).
+      expect(result.current.delays[0]!.delayMinutes).toBe(0);
+      expect(result.current.delays[0]!.reason).toBe('운행 지연');
     });
 
     it('should ignore arrivals without delay keywords', async () => {

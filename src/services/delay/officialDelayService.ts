@@ -269,60 +269,11 @@ class OfficialDelayService {
    * Fetch official delays from API
    */
   private async fetchOfficialDelays(): Promise<OfficialDelay[]> {
-    // In production, this would call the actual Seoul Metro API
-    // For now, we simulate with mock data that occasionally has delays
-
-    const now = new Date();
-    const hour = now.getHours();
-
-    // Simulate occasional delays during peak hours
-    const delays: OfficialDelay[] = [];
-
-    for (const [lineId, lineName] of Object.entries(LINE_NAMES)) {
-      // Random chance of delay (higher during peak hours)
-      const delayChance = (hour >= 8 && hour <= 9) || (hour >= 18 && hour <= 19)
-        ? 0.15 : 0.05;
-
-      const hasDelay = Math.random() < delayChance;
-
-      if (hasDelay) {
-        const delayMinutes = Math.floor(Math.random() * 15) + 5;
-        delays.push({
-          lineId,
-          lineName,
-          status: 'delayed',
-          delayMinutes,
-          reason: this.getRandomDelayReason(),
-          updatedAt: now,
-          source: 'seoul_metro',
-        });
-      } else {
-        delays.push({
-          lineId,
-          lineName,
-          status: 'normal',
-          updatedAt: now,
-          source: 'seoul_metro',
-        });
-      }
-    }
-
-    return delays;
-  }
-
-  /**
-   * Get random delay reason
-   */
-  private getRandomDelayReason(): string {
-    const reasons = [
-      '혼잡으로 인한 지연',
-      '차량 점검 중',
-      '신호 장애',
-      '승객 안전 확인',
-      '선로 점검',
-      '열차 간격 조정',
-    ];
-    return reasons[Math.floor(Math.random() * reasons.length)] ?? reasons[0]!;
+    // 공식 지연 실소스(서울교통공사 공식 지연 API)는 아직 통합되지 않았다.
+    // 이전 구현은 Math.random()으로 가짜 지연을 생성해 ML 예측 UI에 허구 공식
+    // 지연을 노출했다(정확성 위반). 실소스 통합 전까지는 날조 없이 전 노선 정상을
+    // 반환한다. 실데이터(data.go.kr ntceList → 장애 분류) 통합 시 이 메서드를 교체한다.
+    return this.getDefaultLineStatuses();
   }
 
   /**
