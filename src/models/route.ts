@@ -120,6 +120,15 @@ export interface Route {
    * to `deriveFare(route)`. Drives the 'min-fare' sort tab.
    */
   readonly fare?: number;
+  /**
+   * Realtime "next train" boarding wait (minutes) folded into the first
+   * segment's `estimatedMinutes` and `totalMinutes` by
+   * {@link applyRealtimeBoardingWait}. Set only when a positive wait was
+   * applied (`> 0`); absent/undefined means no realtime adjustment (no data,
+   * non-matching line, or imminent arrival). Drives the "다음 열차 N분" card
+   * label. NOT baked into the structural route cache — re-derived per search.
+   */
+  readonly boardingWaitMinutes?: number;
 }
 
 /**

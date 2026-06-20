@@ -189,4 +189,27 @@ describe('RouteCard', () => {
     );
     expect(getByText('엘리베이터 우선')).toBeTruthy();
   });
+
+  it('shows the "다음 열차 N분" boarding-wait label when boardingWaitMinutes > 0', () => {
+    const route: RouteWithMLMeta = { ...baseRoute, boardingWaitMinutes: 4 };
+    const { getByTestId } = render(
+      <RouteCard route={route} expanded={false} onToggleExpand={() => {}} />,
+    );
+    expect(getByTestId('route-card-boarding-wait')).toHaveTextContent('다음 열차 4분');
+  });
+
+  it('hides the boarding-wait label when boardingWaitMinutes is absent', () => {
+    const { queryByTestId } = render(
+      <RouteCard route={baseRoute} expanded={false} onToggleExpand={() => {}} />,
+    );
+    expect(queryByTestId('route-card-boarding-wait')).toBeNull();
+  });
+
+  it('hides the boarding-wait label when boardingWaitMinutes is 0', () => {
+    const route: RouteWithMLMeta = { ...baseRoute, boardingWaitMinutes: 0 };
+    const { queryByTestId } = render(
+      <RouteCard route={route} expanded={false} onToggleExpand={() => {}} />,
+    );
+    expect(queryByTestId('route-card-boarding-wait')).toBeNull();
+  });
 });

@@ -176,6 +176,18 @@ export const RouteCard: React.FC<Props> = ({ route, expanded, onToggleExpand, re
         </View>
       </View>
 
+      {typeof route.boardingWaitMinutes === 'number' && route.boardingWaitMinutes > 0 && (
+        <View
+          style={[styles.boardingWait, { backgroundColor: semantic.bgSubtle }]}
+          testID="route-card-boarding-wait"
+          accessibilityLabel={`다음 열차 ${route.boardingWaitMinutes}분 후 도착`}
+        >
+          <Text style={[styles.boardingWaitText, { color: semantic.primaryNormal }]}>
+            {`다음 열차 ${route.boardingWaitMinutes}분`}
+          </Text>
+        </View>
+      )}
+
       <JourneyStrip legs={legs} />
 
       {summary && (
@@ -263,6 +275,17 @@ const createStyles = (semantic: WantedSemanticTheme): ReturnType<typeof StyleShe
       fontSize: WANTED_TOKENS.type.body2.size,
       fontFamily: weightToFontFamily('500'),
       color: semantic.labelAlt,
+    },
+    boardingWait: {
+      alignSelf: 'flex-start',
+      paddingHorizontal: WANTED_TOKENS.spacing.s3,
+      paddingVertical: 4,
+      borderRadius: WANTED_TOKENS.radius.pill,
+      marginBottom: WANTED_TOKENS.spacing.s3,
+    },
+    boardingWaitText: {
+      fontSize: WANTED_TOKENS.type.caption1.size,
+      fontFamily: weightToFontFamily('600'),
     },
     inlineLegRow: {
       flexDirection: 'row',
