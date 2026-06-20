@@ -10,6 +10,9 @@
  *   - expo weekday:      1=Sun..7=Sat (WeeklyTriggerInput)
  */
 
+import { storageUtils } from '@/utils/storageUtils';
+import { notificationService } from './notificationService';
+
 export interface CommuteReminderConfig {
   readonly departureTime: string; // "HH:mm" (morning leg)
   readonly activeDays: readonly boolean[]; // 7-element [Mon..Sun]
@@ -62,3 +65,26 @@ export function computeWeeklyTrigger(
 
   return { weekday, hour, minute, time };
 }
+
+const STORAGE_PREFIX = '@livemetro_commute_reminders:';
+const storageKey = (uid: string): string => `${STORAGE_PREFIX}${uid}`;
+
+class CommuteReminderService {
+  /** Read the persisted reminders for a user (empty when none). */
+  async getCommuteReminders(uid: string): Promise<ScheduledReminder[]> {
+    const stored = await storageUtils.getItem<ScheduledReminder[]>(storageKey(uid));
+    return stored ?? [];
+  }
+
+  /** Cancel every persisted reminder for a user and clear storage. */
+  async cancelCommuteReminders(uid: string): Promise<void> {
+    const existing = await this.getCommuteReminders(uid);
+    for (const reminder of existing) {
+      await notificationService.cancelNotification(reminder.notificationId);
+    }
+    await storageUtils.removeItem(storageKey(uid));
+  }
+}
+
+export const commuteReminderService = new CommuteReminderService();
+export default commuteReminderService;

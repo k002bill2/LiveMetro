@@ -1,7 +1,20 @@
 /**
  * commuteReminderService Tests
  */
-import { computeWeeklyTrigger } from '../commuteReminderService';
+import { storageUtils } from '@/utils/storageUtils';
+import { notificationService } from '../notificationService';
+import { computeWeeklyTrigger, commuteReminderService } from '../commuteReminderService';
+
+jest.mock('@/utils/storageUtils', () => ({
+  storageUtils: { getItem: jest.fn(), setItem: jest.fn(), removeItem: jest.fn() },
+}));
+jest.mock('../notificationService', () => ({
+  notificationService: {
+    cancelNotification: jest.fn(),
+    scheduleWeeklyReminder: jest.fn(),
+    requestPermissions: jest.fn(),
+  },
+}));
 
 describe('computeWeeklyTrigger', () => {
   // activeDays index 0=Mon..6=Sun  →  expo weekday 1=Sun..7=Sat
@@ -37,5 +50,44 @@ describe('computeWeeklyTrigger', () => {
 
   it('returns null on malformed departureTime', () => {
     expect(computeWeeklyTrigger('xx:yy', 0, 0)).toBeNull();
+  });
+});
+
+describe('commuteReminderService cancel/get', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('getCommuteReminders reads the stored array for the uid', async () => {
+    const stored = [{ weekday: 2, notificationId: 'n1', time: '08:15' }];
+    (storageUtils.getItem as jest.Mock).mockResolvedValue(stored);
+
+    const result = await commuteReminderService.getCommuteReminders('user-1');
+
+    expect(storageUtils.getItem).toHaveBeenCalledWith('@livemetro_commute_reminders:user-1');
+    expect(result).toEqual(stored);
+  });
+
+  it('getCommuteReminders returns [] when nothing stored', async () => {
+    (storageUtils.getItem as jest.Mock).mockResolvedValue(null);
+    expect(await commuteReminderService.getCommuteReminders('user-1')).toEqual([]);
+  });
+
+  it('cancelCommuteReminders cancels every stored id then clears storage', async () => {
+    (storageUtils.getItem as jest.Mock).mockResolvedValue([
+      { weekday: 2, notificationId: 'n1', time: '08:15' },
+      { weekday: 3, notificationId: 'n2', time: '08:15' },
+    ]);
+
+    await commuteReminderService.cancelCommuteReminders('user-1');
+
+    expect(notificationService.cancelNotification).toHaveBeenCalledWith('n1');
+    expect(notificationService.cancelNotification).toHaveBeenCalledWith('n2');
+    expect(storageUtils.removeItem).toHaveBeenCalledWith('@livemetro_commute_reminders:user-1');
+  });
+
+  it('cancelCommuteReminders is a no-op (still clears) when nothing stored', async () => {
+    (storageUtils.getItem as jest.Mock).mockResolvedValue(null);
+    await commuteReminderService.cancelCommuteReminders('user-1');
+    expect(notificationService.cancelNotification).not.toHaveBeenCalled();
+    expect(storageUtils.removeItem).toHaveBeenCalledWith('@livemetro_commute_reminders:user-1');
   });
 });
