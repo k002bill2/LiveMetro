@@ -19,6 +19,7 @@ interface SettingToggleProps {
   onValueChange: (value: boolean) => void;
   disabled?: boolean;
   icon?: LucideIcon;
+  testID?: string;
 }
 
 export const SettingToggle: React.FC<SettingToggleProps> = ({
@@ -28,6 +29,7 @@ export const SettingToggle: React.FC<SettingToggleProps> = ({
   onValueChange,
   disabled = false,
   icon: IconComponent,
+  testID,
 }) => {
   const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
@@ -52,6 +54,7 @@ export const SettingToggle: React.FC<SettingToggleProps> = ({
         </View>
       </View>
       <Switch
+        testID={testID}
         value={value}
         onValueChange={onValueChange}
         disabled={disabled}
