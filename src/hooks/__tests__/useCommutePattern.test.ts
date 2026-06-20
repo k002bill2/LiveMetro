@@ -314,6 +314,7 @@ describe('useCommutePattern', () => {
     (patternAnalysisService.getPatterns as jest.Mock).mockResolvedValue([]);
     (patternAnalysisService.predictCommute as jest.Mock).mockResolvedValue(null);
     (patternAnalysisService.getWeekPredictions as jest.Mock).mockResolvedValue([]);
+    (patternAnalysisService.analyzeAndUpdatePatterns as jest.Mock).mockResolvedValue([]);
     (commuteLogService.getRecentLogsForAnalysis as jest.Mock).mockResolvedValue([]);
     (smartNotificationService.getSettings as jest.Mock).mockResolvedValue(null);
     (smartNotificationService.getTodayNotification as jest.Mock).mockResolvedValue(null);
@@ -444,5 +445,80 @@ describe('useCommutePattern', () => {
 
     // Called twice: once on mount, once on refresh
     expect(patternAnalysisService.getPatterns).toHaveBeenCalledTimes(2);
+  });
+
+  it('should compute (analyze) patterns on mount before reading', async () => {
+    const { result } = renderHook(() => useCommutePattern());
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    // The precompute that populates the `commutePatterns` collection must run
+    // on mount — without it the read-only getters return empty forever (결함 B).
+    expect(patternAnalysisService.analyzeAndUpdatePatterns).toHaveBeenCalledWith('user-1');
+  });
+
+  it('should populate predictions via compute-before-read ordering', async () => {
+    const mockPrediction = { confidence: 0.9 };
+    let computed = false;
+    // Compute flips the flag; the reads only return data once compute has run,
+    // so a populated result proves compute executed BEFORE the reads.
+    (patternAnalysisService.analyzeAndUpdatePatterns as jest.Mock).mockImplementation(async () => {
+      computed = true;
+      return [{ id: 'p1' }];
+    });
+    (patternAnalysisService.predictCommute as jest.Mock).mockImplementation(async () =>
+      computed ? mockPrediction : null,
+    );
+    (patternAnalysisService.getWeekPredictions as jest.Mock).mockImplementation(async () =>
+      computed ? [mockPrediction] : [],
+    );
+
+    const { result } = renderHook(() => useCommutePattern());
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.todayPrediction).toEqual(mockPrediction);
+    expect(result.current.weekPredictions).toEqual([mockPrediction]);
+  });
+
+  it('should degrade gracefully when compute throws (no user-facing error)', async () => {
+    const consoleSpy = jest.spyOn(console, 'error').mockImplementation();
+    (patternAnalysisService.analyzeAndUpdatePatterns as jest.Mock).mockRejectedValue(
+      new Error('compute failed'),
+    );
+    // Reads still succeed despite the compute failure.
+    (patternAnalysisService.getPatterns as jest.Mock).mockResolvedValue([{ id: 'p1' }]);
+
+    const { result } = renderHook(() => useCommutePattern());
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    // Compute failure is swallowed: no setError, reads still populate state.
+    expect(result.current.error).toBeFalsy();
+    expect(result.current.patterns).toEqual([{ id: 'p1' }]);
+    expect(consoleSpy).toHaveBeenCalled();
+    consoleSpy.mockRestore();
+  });
+
+  it('should not compute patterns without user', async () => {
+    (useAuth as jest.Mock).mockReturnValue({ user: null });
+
+    const { result } = renderHook(() => useCommutePattern());
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(patternAnalysisService.analyzeAndUpdatePatterns).not.toHaveBeenCalled();
+  });
+
+  it('should surface empty pattern state without error', async () => {
+    // compute + reads all empty (e.g. fewer than MIN_LOGS_FOR_PATTERN logs) —
+    // an empty result is a normal "collecting data" state, not an error.
+    const { result } = renderHook(() => useCommutePattern());
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    expect(result.current.patterns).toEqual([]);
+    expect(result.current.weekPredictions).toEqual([]);
+    expect(result.current.error).toBeNull();
   });
 });

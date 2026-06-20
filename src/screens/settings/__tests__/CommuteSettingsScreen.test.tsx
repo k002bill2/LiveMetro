@@ -11,6 +11,15 @@ import {
   updateEveningEnabled,
 } from '@/services/commute/commuteService';
 import { useCommuteRouteSummary } from '@/hooks/useCommuteRouteSummary';
+import { commuteReminderService, notificationService } from '@/services/notification';
+
+jest.mock('@/services/notification', () => ({
+  commuteReminderService: {
+    scheduleCommuteReminders: jest.fn(),
+    cancelCommuteReminders: jest.fn(),
+  },
+  notificationService: { requestPermissions: jest.fn() },
+}));
 
 jest.mock('@react-navigation/native', () => ({
   useFocusEffect: (cb: () => void) => {
@@ -542,5 +551,97 @@ describe('CommuteSettingsScreen', () => {
     // Once on mount, never again — even though the navigation prop identity
     // changed on every render.
     expect(setOptions).toHaveBeenCalledTimes(1);
+  });
+
+  // ── 출근 시각 자동 알림 배선 (commuteReminderService) ──────────────
+  const signedInUserWithSchedule = (alertEnabled: boolean): any => ({
+    user: {
+      id: 'user-1',
+      displayName: 'Test',
+      email: 'test@test.com',
+      preferences: {
+        commuteSchedule: { alertEnabled, activeDays: [true, true, true, true, true, false, false] },
+      },
+    },
+    firebaseUser: null,
+    loading: false,
+    signInAnonymously: jest.fn(),
+    signInWithEmail: jest.fn(),
+    signUpWithEmail: jest.fn(),
+    signOut: jest.fn(),
+    updateUserPreferences: jest.fn().mockResolvedValue(undefined),
+    resetPassword: jest.fn(),
+    changePassword: jest.fn(),
+  });
+
+  const morningOnlyRoutes = (): any => ({
+    morningRoute: {
+      departureTime: '08:00',
+      departureStationId: 's1',
+      departureStationName: '강남',
+      departureLineId: '2',
+      arrivalStationId: 's2',
+      arrivalStationName: '시청',
+      arrivalLineId: '1',
+      transferStations: [],
+      notifications: {
+        transferAlert: true,
+        arrivalAlert: true,
+        delayAlert: true,
+        incidentAlert: true,
+        alertMinutesBefore: 5,
+      },
+      bufferMinutes: 10,
+    },
+    eveningRoute: null,
+    eveningEnabled: true,
+    createdAt: null,
+    updatedAt: null,
+  });
+
+  it('알림 토글 ON + 권한 granted → scheduleCommuteReminders 호출', async () => {
+    mockUseAuth.mockReturnValue(signedInUserWithSchedule(false));
+    mockLoadCommuteRoutes.mockResolvedValue(morningOnlyRoutes());
+    (notificationService.requestPermissions as jest.Mock).mockResolvedValue({ granted: true });
+
+    const { getByTestId, getAllByText } = render(<CommuteSettingsScreen {...createProps()} />);
+    await waitFor(() => expect(getAllByText('08:00 출발').length).toBeGreaterThan(0));
+
+    fireEvent(getByTestId('commute-alert-toggle'), 'valueChange', true);
+
+    await waitFor(() =>
+      expect(commuteReminderService.scheduleCommuteReminders).toHaveBeenCalledWith(
+        'user-1',
+        expect.objectContaining({ departureTime: '08:00', activeDays: expect.any(Array) }),
+      ),
+    );
+  });
+
+  it('알림 토글 ON + 권한 denied → schedule 미호출', async () => {
+    mockUseAuth.mockReturnValue(signedInUserWithSchedule(false));
+    mockLoadCommuteRoutes.mockResolvedValue(morningOnlyRoutes());
+    (notificationService.requestPermissions as jest.Mock).mockResolvedValue({ granted: false });
+
+    const { getByTestId, getAllByText } = render(<CommuteSettingsScreen {...createProps()} />);
+    await waitFor(() => expect(getAllByText('08:00 출발').length).toBeGreaterThan(0));
+
+    fireEvent(getByTestId('commute-alert-toggle'), 'valueChange', true);
+
+    await waitFor(() => expect(notificationService.requestPermissions).toHaveBeenCalled());
+    expect(commuteReminderService.scheduleCommuteReminders).not.toHaveBeenCalled();
+  });
+
+  it('알림 토글 OFF → cancelCommuteReminders 호출', async () => {
+    mockUseAuth.mockReturnValue(signedInUserWithSchedule(true));
+    mockLoadCommuteRoutes.mockResolvedValue(morningOnlyRoutes());
+
+    const { getByTestId, getAllByText } = render(<CommuteSettingsScreen {...createProps()} />);
+    await waitFor(() => expect(getAllByText('08:00 출발').length).toBeGreaterThan(0));
+
+    fireEvent(getByTestId('commute-alert-toggle'), 'valueChange', false);
+
+    await waitFor(() =>
+      expect(commuteReminderService.cancelCommuteReminders).toHaveBeenCalledWith('user-1'),
+    );
   });
 });

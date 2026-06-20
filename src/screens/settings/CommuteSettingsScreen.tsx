@@ -27,6 +27,7 @@ import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/s
 import { SettingsStackParamList, OnboardingRouteData } from '@/navigation/types';
 import { useAuth } from '@/services/auth/AuthContext';
 import { loadCommuteRoutes, saveCommuteRoutes, updateEveningEnabled } from '@/services/commute/commuteService';
+import { commuteReminderService, notificationService } from '@/services/notification';
 import { useMLPrediction } from '@/hooks/useMLPrediction';
 import { useCommuteRouteSummary } from '@/hooks/useCommuteRouteSummary';
 import { truncateMinutes } from '@/utils/dateUtils';
@@ -448,17 +449,42 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
   );
 
   const handleToggleAlertEnabled = useCallback(
-    (value: boolean): Promise<void> => updateCommuteSchedule({ alertEnabled: value }),
-    [updateCommuteSchedule],
+    async (value: boolean): Promise<void> => {
+      if (!user) return;
+      if (value) {
+        // 권한 게이트: 거부 시 예약하지 않고 토글 OFF 유지(alertEnabled 미변경).
+        const permission = await notificationService.requestPermissions();
+        if (!permission.granted) {
+          Alert.alert('알림 권한 필요', '설정에서 알림을 허용해 주세요.');
+          return;
+        }
+        await updateCommuteSchedule({ alertEnabled: true });
+        const departureTime = morningRoute?.departureTime;
+        if (departureTime) {
+          await commuteReminderService.scheduleCommuteReminders(user.id, { departureTime, activeDays });
+        }
+      } else {
+        await updateCommuteSchedule({ alertEnabled: false });
+        await commuteReminderService.cancelCommuteReminders(user.id);
+      }
+    },
+    [user, updateCommuteSchedule, morningRoute, activeDays],
   );
 
   const handleToggleDay = useCallback(
-    (index: number): Promise<void> => {
+    async (index: number): Promise<void> => {
       const next = [...activeDays];
       next[index] = !next[index];
-      return updateCommuteSchedule({ activeDays: next });
+      await updateCommuteSchedule({ activeDays: next });
+      // 알림이 켜져 있으면 새 요일 집합으로 재예약.
+      if (alertEnabled && user && morningRoute?.departureTime) {
+        await commuteReminderService.scheduleCommuteReminders(user.id, {
+          departureTime: morningRoute.departureTime,
+          activeDays: next,
+        });
+      }
     },
-    [activeDays, updateCommuteSchedule],
+    [activeDays, updateCommuteSchedule, alertEnabled, user, morningRoute],
   );
 
   const handleToggleSmartFeature = useCallback(
@@ -506,6 +532,12 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
           setMorningRoute(prevMorning);
           setEveningRoute(prevEvening);
           Alert.alert('저장 실패', result.error ?? '시간 저장에 실패했습니다.');
+        } else if (kind === 'morning' && alertEnabled) {
+          // 출발시각이 바뀌면 알림이 켜져 있는 동안 새 시각으로 재예약.
+          await commuteReminderService.scheduleCommuteReminders(user.id, {
+            departureTime: newTime,
+            activeDays,
+          });
         }
       } catch (error) {
         setMorningRoute(prevMorning);
@@ -516,7 +548,7 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
         setSaving(false);
       }
     },
-    [user, morningRoute, eveningRoute, routeDataToCommuteRoute],
+    [user, morningRoute, eveningRoute, routeDataToCommuteRoute, alertEnabled, activeDays],
   );
 
   /**
@@ -711,6 +743,7 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
         {/* 1. Master switch */}
         <SettingSection title="출퇴근 알림">
           <SettingToggle
+            testID="commute-alert-toggle"
             icon={BellRing}
             label="출퇴근 알림 사용"
             subtitle="설정한 시간에 출발 정보를 알려드려요"
