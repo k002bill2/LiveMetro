@@ -74,6 +74,21 @@ function routeToLegs(route: Route): JourneyStripLeg[] {
       legs.push({ type: 'train', lineId: seg.lineId, minutes: seg.estimatedMinutes });
     }
   }
+  // 첫 탑승 대기(boardingWaitMinutes)는 위 pill로 별도 표시되고, 첫 segment의
+  // estimatedMinutes에 이미 합산돼 있다(applyRealtimeBoardingWait). 첫 train leg
+  // 시간에서 그 대기를 빼 ride 시간만 보이게 한다 — 빼지 않으면 leg가 ride+wait를
+  // 무표시로 보여 pill의 대기와 이중계산으로 읽힌다. 총시간(totalMinutes)은 불변.
+  const wait = route.boardingWaitMinutes ?? 0;
+  if (wait > 0) {
+    const firstTrainIdx = legs.findIndex(l => l.type === 'train');
+    const firstTrain = legs[firstTrainIdx];
+    if (firstTrain && firstTrain.type === 'train') {
+      legs[firstTrainIdx] = {
+        ...firstTrain,
+        minutes: Math.max(0, firstTrain.minutes - wait),
+      };
+    }
+  }
   return legs;
 }
 
