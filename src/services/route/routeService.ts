@@ -431,6 +431,52 @@ export const calculateRoute = (
 };
 
 /**
+ * Fold each route's realtime "next train" boarding wait into its first
+ * segment — a post-path overlay on the structural {@link getDiverseRoutes}
+ * pool (the K-shortest graph never sees realtime). Mirrors the per-route
+ * adjustment {@link calculateRoute} applies inline (L418-428), but for the
+ * whole diverse-route pool.
+ *
+ * Scope (옵션 가, "거친 라벨 + 1회 조회"):
+ *  - 출발역 첫 탑승 대기만 반영 (segments[0].lineId 기준). 환승역 대기는 X.
+ *  - 각 route: `estimatedMinutes`(첫 segment) += wait, `totalMinutes` += wait.
+ *  - `boardingWaitMinutes`는 양수 wait일 때만 세팅(라벨용).
+ *  - wait가 null(데이터 없음/노선 불일치) 또는 0(도착 임박) → 해당 route 무변경.
+ *
+ * Ordering is intentionally NOT performed here. The caller (RoutesTabScreen)
+ * pipes the result through {@link sortRoutesByTab}, which reads the adjusted
+ * `totalMinutes`/`fare`: the 'fastest'/'optimal' order then reflects realtime
+ * time, while 'min-transfer'/'min-fare' keep their primary key (transferCount
+ * / fare) with adjusted time as a deterministic tiebreak. Sorting here would
+ * be redundant and tab-unaware.
+ *
+ * Immutable: returns new route objects with new segment arrays; inputs
+ * untouched.
+ */
+export const applyRealtimeBoardingWait = (
+  routes: readonly Route[],
+  realtimeArrivals: readonly RealtimeArrival[],
+): Route[] => {
+  if (realtimeArrivals.length === 0) return [...routes];
+  return routes.map((route) => {
+    const first = route.segments[0];
+    if (!first) return route;
+    const wait = getNextTrainWaitMinutes(realtimeArrivals, first.lineId);
+    if (wait === null || wait === 0) return route;
+    const adjustedSegments: readonly RouteSegment[] = [
+      { ...first, estimatedMinutes: first.estimatedMinutes + wait },
+      ...route.segments.slice(1),
+    ];
+    return {
+      ...route,
+      segments: adjustedSegments,
+      totalMinutes: route.totalMinutes + wait,
+      boardingWaitMinutes: wait,
+    };
+  });
+};
+
+/**
  * Find alternative routes excluding specified lines
  */
 export const findAlternativeRoutes = (
@@ -630,6 +676,7 @@ export const routeService = {
   getLineColor,
   getDiverseRoutes,
   sortRoutesByTab,
+  applyRealtimeBoardingWait,
 };
 
 export default routeService;

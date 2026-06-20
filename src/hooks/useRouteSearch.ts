@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { routeService } from '@/services/route';
 import { useDelayDetection } from '@/hooks/useDelayDetection';
+import { arrivalService } from '@/services/arrival/arrivalService';
+import { getStationById } from '@/utils/subwayMapData';
 import type { Route } from '@/models/route';
+import type { RealtimeArrival } from '@/services/route/realtimeWeightOverride';
 
 export type DepartureMode = 'now' | 'depart' | 'arrive';
 
@@ -38,7 +41,12 @@ const TIME_BUCKET_MS = 300_000;
 const DEBOUNCE_MS = 300;
 
 interface CacheEntry {
-  routes: RouteWithMLMeta[];
+  /**
+   * Structural diverse-route pool (realtime-free). Realtime boarding wait is
+   * re-applied per fetch on top of these — never baked into the cache — so a
+   * cached structural result can still pick up a fresh "next train" wait.
+   */
+  baseRoutes: Route[];
   fetchedAt: number;
 }
 
@@ -55,6 +63,30 @@ function buildCacheKey(input: UseRouteSearchInput): string {
 function calcEtaConfidence(transferCount: number, delayLineCount: number): number {
   const raw = 2 + transferCount + delayLineCount * 2;
   return Math.min(8, Math.max(2, raw));
+}
+
+/**
+ * 출발역 실시간 도착을 1회 조회해 `RealtimeArrival[]`로 매핑한다(폴링 없음).
+ *
+ * CRITICAL — null-drop: `TrainArrival.arrivalSeconds`가 null인 행은 filter로
+ * 버린다. null→0으로 강제하면 "곧 도착"을 위조해 그 노선이 거짓 1위가 된다
+ * (seoul-api-limits: `arrivalTime ? ...` 금지). 0초는 유효한 "도착"이므로 유지.
+ *
+ * 역 미발견/조회 실패 → 빈 배열(graceful). applyRealtimeBoardingWait가 빈 배열을
+ * 무변경으로 처리하므로 baseRoutes가 그대로 쓰인다.
+ */
+async function fetchBoardingArrivals(fromId: string): Promise<RealtimeArrival[]> {
+  const station = getStationById(fromId);
+  if (!station) return [];
+  try {
+    const info = await arrivalService.getArrivals(station.name);
+    return info.arrivals
+      .filter((a) => a.arrivalSeconds !== null)
+      .map((a) => ({ lineId: a.lineId, secondsUntilArrival: a.arrivalSeconds! }));
+  } catch (err) {
+    console.error('useRouteSearch realtime fetch failed', err);
+    return [];
+  }
 }
 
 function enrichRoute(route: Route, index: number, delayedLineIds: Set<string>): RouteWithMLMeta {
@@ -89,39 +121,48 @@ export function useRouteSearch(input: UseRouteSearchInput): UseRouteSearchResult
   const cacheKey = buildCacheKey(input);
 
   const performFetch = useCallback(
-    (forceFresh: boolean): void => {
-      if (!input.fromId || !input.toId) {
+    async (forceFresh: boolean): Promise<void> => {
+      const fromId = input.fromId;
+      const toId = input.toId;
+      if (!fromId || !toId) {
         setRoutes([]);
         setError(null);
         setLoading(false);
         return;
       }
 
-      if (input.fromId === input.toId) {
+      if (fromId === toId) {
         setRoutes([]);
         setError('출발역과 도착역이 같습니다');
         setLoading(false);
         return;
       }
 
-      const cached = cacheRef.current.get(cacheKey);
-      if (!forceFresh && cached && Date.now() - cached.fetchedAt < CACHE_TTL_MS) {
-        setRoutes(cached.routes);
-        setError(null);
-        setLoading(false);
-        return;
-      }
-
       const myRequestId = ++requestIdRef.current;
-      setLoading(true);
       setError(null);
 
       try {
-        const baseRoutes = routeService.getDiverseRoutes(input.fromId, input.toId);
+        // Structural pool: cached (realtime-free) or freshly computed.
+        const cached = cacheRef.current.get(cacheKey);
+        const isWarm = !forceFresh && cached !== undefined && Date.now() - cached.fetchedAt < CACHE_TTL_MS;
+        // Only show the loading state on a genuine structural miss. On a warm
+        // path (cache hit / delay-poll-triggered re-overlay) the cards are
+        // already rendered — flipping `loading` true would briefly invalidate
+        // downstream `loading`-gated layout (RoutesTabScreen `hasRoutes`) on
+        // every poll. The realtime overlay still re-runs; only the spinner is
+        // suppressed.
+        if (!isWarm) setLoading(true);
+        const baseRoutes = isWarm ? cached!.baseRoutes : routeService.getDiverseRoutes(fromId, toId);
+        if (myRequestId !== requestIdRef.current) return;
+        cacheRef.current.set(cacheKey, { baseRoutes, fetchedAt: Date.now() });
+
+        // Realtime boarding-wait overlay — 1회 조회, structural 캐시에 안 굽는다.
+        const realtimeArrivals = await fetchBoardingArrivals(fromId);
+        // Re-check AFTER the await: a newer search may have superseded this one.
         if (myRequestId !== requestIdRef.current) return;
 
-        const enriched = baseRoutes.map((route, idx) => enrichRoute(route, idx, delayedLineIds));
-        cacheRef.current.set(cacheKey, { routes: enriched, fetchedAt: Date.now() });
+        const adjusted = routeService.applyRealtimeBoardingWait(baseRoutes, realtimeArrivals);
+        const enriched = adjusted.map((route, idx) => enrichRoute(route, idx, delayedLineIds));
 
         setRoutes(enriched);
         setLoading(false);
