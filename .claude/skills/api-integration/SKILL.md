@@ -52,6 +52,67 @@ Parameters:
 - INOUT_TAG: '1' (Up/Inner), '2' (Down/Outer)
 ```
 
+## 정확성 캐비엇 (Accuracy Caveats) — 호출 *전* 가드 필수
+
+아래 3종은 코드(`seoulSubwayApi.ts`)가 흡수한 실측 교훈이다. 가드를 빠뜨리면 정상 동작처럼 보이는 거짓 빈 화면(false empty state)이 생기고, 그 원인이 INFO-200 한 줄에 묻혀 디버깅이 길어진다. 스킬만 보고 구현해도 재현되지 않도록 본문에 승격한다.
+
+### (a) 시간표 커버리지 — 1~9호선 whitelist로 호출 전 차단
+
+`SearchSTNTimeTableByID`(8088 포털)는 **서울교통공사 숫자 1~9호선만** 보유한다. Korail/사철이 운영하는 광역·경전철 노선(경의중앙선·수인분당선·공항철도·신분당선·경춘선·GTX·인천1/2호선·신림선·우이신설·용인/의정부경전철 등)은 **역코드를 어떻게 넣어도 INFO-200("해당 데이터 없음")**을 반환한다. 라이브 probe로 커버리지 경계가 운영사가 아니라 "노선 번호 브랜딩"과 일치함을 확인했다(예: Korail 운영 평택지제도 `01호선`으로 브랜딩돼 시간표를 반환).
+
+```typescript
+import { isSeoulMetroTimetableLine } from '@/utils/timetableCoverage';
+
+// 호출 전에 차단 — INFO-200 빈 배열을 빈 화면으로 오인하지 않도록 정직한 '미제공' 안내
+if (!isSeoulMetroTimetableLine(lineNumber)) {
+  return; // UI는 "이 노선은 시간표 미제공" 안내, API 호출 자체를 하지 않음
+}
+const rows = await seoulSubwayApi.getStationTimetable(stationCode, weekTag, inoutTag);
+```
+
+- whitelist(`/^0?[1-9](호선)?$/`)다 — blacklist 금지. 미래에 새 광역 노선이 추가돼도 자동 false → 버그 오인 없음.
+- 호출 *후* 빈 배열로 거르면 사용자는 "경의선 시간표 빈 화면"을 본다. 반드시 호출 *전* 게이트.
+
+### (b) 두 응답 구조 트랩 — `extractSeoulApiErrorCode`로 정규화
+
+Seoul API는 **성공도 실패도 HTTP 200**으로 오며, 같은 200 안에 **서로 다른 JSON 구조**가 섞여 온다. `errorMessage.code`만 보면 top-level 실패가 **silent `[]`로 삼켜진다**(만료된 키가 "도착 정보 없음"으로 둔갑 → 인증 에러를 영원히 못 본다).
+
+| 구조 | 어디서 | 트리거 |
+|------|--------|--------|
+| Wrapped: `{ errorMessage: {code, message}, ...List }` | 실시간 API 성공 + 문서화된 에러 | 성공은 `errorMessage.code === 'INFO-000'` |
+| Top-level: `{ status, code, message }` (wrapper 없음, payload 없음) | 실시간/역검색 게이트웨이 실패 | auth `INFO-100`, unmatched `INFO-200`, quota `ERROR-3xx` |
+| Top-level RESULT: `{ RESULT: { CODE, MESSAGE } }` (service wrapper 없음) | **8088 시간표** 포털 게이트웨이 실패 | 위와 동일 카테고리, 다른 봉투 |
+
+```typescript
+// 세 구조를 단일 헬퍼로 정규화. null = 에러코드 없음(=성공 후보).
+const apiError = extractSeoulApiErrorCode(data); // { code, message } | null
+if (apiError && apiError.code !== 'INFO-000') {
+  // INFO-200은 '운행 종료/조회 결과 없음'(no-data)으로 별도 분류, 그 외는 에러로 throw
+  ...
+}
+```
+
+- 성공 wrapped 응답도 `errorMessage.code === 'INFO-000'`을 갖는다 → 반환 코드를 반드시 `'INFO-000'`과 비교.
+- 시간표는 세 번째 구조(`{RESULT:{CODE,MESSAGE}}`)까지 본다 — `data.RESULT?.CODE ?? data.code`로 폴백.
+
+### (c) realtimePosition 노선명 도메인 — 미지원 노선은 호출 스킵
+
+`realtimePosition` 엔드포인트는 앱의 `lineId`(예: `'경의선'`, `'인천2'`)가 아니라 **API 공식 노선명**을 받는다. 도메인을 안 맞추면 INFO-200을 받고, 더 나쁘게는 `'인천2'`가 `'2호선'`으로 숫자가 새어 **다른 노선 데이터**를 끌어온다.
+
+```typescript
+import { toSeoulApiLineName } from '@/utils/formatUtils';
+
+const lineName = toSeoulApiLineName(lineId); // 'string' | null
+if (lineName === null) {
+  return; // 약 5종(김포·용인·의정부·인천1/2)은 API 미제공 → 호출 스킵, UI는 'unsupported'
+}
+// rate-limit 키는 'position:{lineName}'으로 분리 — 도착('realtime:{station}')과 충돌 방지
+```
+
+- `toSeoulApiLineName`이 매핑하는 변환: `경의선 → 경의중앙선`, `우이신설경전철 → 우이신설선` 등. 그대로 넘기면 미매칭.
+- INFO-200이 **'운행 중 0대'처럼 보이는 거짓 빈 화면**으로 나오면 노선명 도메인부터 의심하라(off-hours 실제 0대와 구분 안 됨).
+- rate-limit 키를 도착과 같은 prefix로 쓰면 한쪽 호출이 다른 쪽을 굶긴다 → `position:` prefix로 분리 필수.
+
 ## Core Patterns
 
 ### Error Handling with Retry
@@ -140,6 +201,9 @@ stationNameProp → trainService.getStation() (Firebase) → getLocalStation() (
 - [ ] 에러와 빈 데이터 미구분 (사용자에게 동일하게 "데이터 없음" 표시)
 - [ ] 시간표 API를 HTTPS 페이지에서 호출 (mixed content 차단)
 - [ ] rate limit 없이 연속 API 호출 (키 비활성화)
+- [ ] 광역·경전철에 시간표 호출 (1~9호선만 커버 — `isSeoulMetroTimetableLine` 미사용, 캐비엇 a)
+- [ ] top-level/RESULT 응답 구조 미정규화 (`errorMessage`만 봐 silent `[]`, 캐비엇 b)
+- [ ] realtimePosition에 `lineId` 직접 전달 (`toSeoulApiLineName` 미사용, 캐비엇 c)
 
 ## BANNED Patterns (Hard Failures)
 
@@ -156,6 +220,9 @@ Seoul API 연동 시 아래 패턴은 장애를 유발합니다. 예외 없음.
 | `barvlDt` 무시 → `arvlMsg2`만 파싱 | `barvlDt` 우선, 텍스트는 fallback | 초 단위 정확도 손실 |
 | stationId("0222")를 역명으로 전달 | stationName("강남") 사용 | 검색 결과 없음 |
 | 실시간 키로 시간표 API 호출 | 별도 `DATA_PORTAL_API_KEY` 사용 | 인증 실패 |
+| 광역·경전철에 시간표 API 호출 | `isSeoulMetroTimetableLine()`로 호출 *전* 차단 | 1~9호선만 커버, 그 외 INFO-200 빈 화면 (캐비엇 a) |
+| `lineId`를 realtimePosition에 그대로 전달 | `toSeoulApiLineName(lineId)`, `null`이면 스킵 | 노선명 도메인 미스매치 → INFO-200/숫자 누출 (캐비엇 c) |
+| position·도착 rate-limit 키 공유 | `position:{lineName}` vs `realtime:{station}` 분리 | 한쪽 호출이 다른 쪽 굶김 (캐비엇 c) |
 
 ### 데이터 처리 Patterns
 | BANNED | USE INSTEAD |
@@ -169,6 +236,7 @@ Seoul API 연동 시 아래 패턴은 장애를 유발합니다. 예외 없음.
 | BANNED | REQUIRED |
 |--------|----------|
 | response.json() 직접 사용 | `errorMessage.code === 'INFO-000'` 확인 후 사용 |
+| `errorMessage.code`만 체크 | `extractSeoulApiErrorCode(data)`로 wrapped/top-level/RESULT 세 구조 정규화 (캐비엇 b) |
 | `realtimeArrivalList` 그대로 반환 | `convertToAppTrain()`으로 정규화 후 반환 |
 | HTTP 상태코드만 확인 | API 자체 에러코드 (`ERROR-500`, `ERROR-501`) 분기 처리 |
 

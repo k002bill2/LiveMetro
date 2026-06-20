@@ -86,7 +86,12 @@ const alts = routeService.findAlternativeRoutes('gangnam', 'jongno3ga');
 
 ### 실시간 지연/대기 반영
 
-실시간 지연·다음 열차 대기는 `realtimeWeightOverride.ts`(예: `getNextTrainWaitMinutes`)로 그래프 가중치를 조정해 반영한다.
+두 메커니즘을 구분한다 (혼동 주의):
+
+- **`congestionMultipliers`** (그래프 가중치 조정): 엣지 weight에 노선 혼잡 배수를 곱한다. `calculateRoute`와 `getDiverseRoutes` **양쪽에 배선**돼 있다.
+- **`realtimeWeightOverride.ts`의 `getNextTrainWaitMinutes`** (다음 열차 대기): 그래프 가중치가 아니라 path 확정 **후** 첫 segment의 `estimatedMinutes`에 대기 분 수를 더하는 후처리 bump다(`routeService.ts:416-428`). `calculateRoute`에만 파라미터가 있고, 현재 어떤 호출자도 라이브 도착을 공급하지 않아 dormant이며, 메인 UI 엔진 `getDiverseRoutes`엔 파라미터조차 없다.
+
+→ 두 엔진의 격리·미배선과 OD 회귀 디버깅은 [references/routing-debugging.md](references/routing-debugging.md) 참조 (수정 전 필독).
 
 ## K-Shortest Path (Yen's Algorithm)
 
@@ -331,4 +336,5 @@ interface AlternativeRouteOptions {
 
 ## Reference Documentation
 
-상세 API 레퍼런스: [references/api_reference.md](references/api_reference.md)
+- 상세 API 레퍼런스: [references/api_reference.md](references/api_reference.md)
+- **Routing 호출 토폴로지 + OD 회귀 디버깅 체크리스트**: [references/routing-debugging.md](references/routing-debugging.md) — 경로 탐색 코드 **수정 전** 또는 특정 OD 경로/환승 회귀 디버깅 시 필독. dual-Dijkstra 격리(`calculateRoute` vs `getDiverseRoutes`가 다른 그래프를 빌드), 실시간 다음-열차-대기 미배선, multi-source origin·U-turn 판별·line-level weighting 천장 3대 함정.
