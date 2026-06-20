@@ -12,6 +12,8 @@ export { departureAlertService } from './departureAlertService';
 export { commuteReminderService } from './commuteReminderService';
 export type { CommuteReminderConfig, ScheduledReminder } from './commuteReminderService';
 
+export { pushTokenService } from './pushTokenService';
+
 export { delayResponseAlertService } from './delayResponseAlertService';
 
 export { trainArrivalAlertService } from './trainArrivalAlertService';
