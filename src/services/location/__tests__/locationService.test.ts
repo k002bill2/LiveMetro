@@ -242,6 +242,68 @@ describe('LocationService', () => {
       expect(surakEntries).toHaveLength(1);
     });
 
+    it('dedups same-location stations with different names (서울/서울역, within ~100m)', () => {
+      // The 서울역 complex registers '서울역' (1호선) and '서울' (GTX-A) ~89m
+      // apart under different names; name-only dedup left both as separate
+      // cards. Coordinate-proximity dedup collapses them into one.
+      const sameComplex: Station[] = [
+        {
+          id: 'seoul-station-1',
+          name: '서울역',
+          nameEn: 'Seoul Station',
+          lineId: '1',
+          coordinates: { latitude: 37.5547, longitude: 126.9707 },
+          transfers: ['4'],
+        },
+        {
+          id: 'seoul-gtxa',
+          name: '서울',
+          nameEn: 'Seoul',
+          lineId: 'GTX-A',
+          coordinates: { latitude: 37.5555, longitude: 126.9707 }, // ~89m from 서울역
+          transfers: [],
+        },
+        {
+          id: 'sicheong',
+          name: '시청역',
+          nameEn: 'City Hall',
+          lineId: '1',
+          coordinates: { latitude: 37.5577, longitude: 126.9707 }, // ~333m from 서울역
+          transfers: ['2'],
+        },
+      ];
+
+      const location: LocationCoordinates = { latitude: 37.5547, longitude: 126.9707 };
+      const result = locationService.findNearbyStations(location, sameComplex, 2000);
+
+      // 서울역/서울 collapse to one (the closest), 시청역 stays separate.
+      expect(result).toHaveLength(2);
+      expect(result[0]?.name).toBe('서울역');
+      expect(result.some(s => s.name === '시청역')).toBe(true);
+    });
+
+    it('does not merge distinct nearby stations more than ~100m apart', () => {
+      // Safety guard: the proximity threshold must not collapse genuinely
+      // distinct adjacent stations (Seoul metro stations are ~300m+ apart).
+      const distinctStations: Station[] = [
+        {
+          id: 'a', name: '역A', nameEn: 'A', lineId: '2',
+          coordinates: { latitude: 37.5, longitude: 127.0 },
+          transfers: [],
+        },
+        {
+          id: 'b', name: '역B', nameEn: 'B', lineId: '2',
+          coordinates: { latitude: 37.503, longitude: 127.0 }, // ~333m away
+          transfers: [],
+        },
+      ];
+
+      const location: LocationCoordinates = { latitude: 37.5, longitude: 127.0 };
+      const result = locationService.findNearbyStations(location, distinctStations, 2000);
+
+      expect(result).toHaveLength(2);
+    });
+
     it('should use default radius of 1000 meters', () => {
       // This station is very close (0 distance)
       const exactLocation: LocationCoordinates = {
@@ -717,6 +779,65 @@ describe('LocationService', () => {
         accuracy: Location.Accuracy.Balanced,
       });
     });
+
+    it('prefers a good last-known fix and skips the slow live request entirely', async () => {
+      // Reorder: a recent, sufficiently-accurate cached fix (gated to ≤100m by
+      // getLastKnownLocation) should short-circuit the chain so the first render
+      // is not blocked on a cold-start GPS fix.
+      mockLocation.getLastKnownPositionAsync.mockResolvedValue({
+        coords: {
+          latitude: 37.5,
+          longitude: 127.0,
+          accuracy: 50,
+          altitude: 0,
+          altitudeAccuracy: 0,
+          heading: 0,
+          speed: 0,
+        },
+        timestamp: Date.now(),
+      });
+
+      const location = await locationService.getCurrentLocation();
+
+      expect(location?.accuracy).toBe(50);
+      expect(mockLocation.getCurrentPositionAsync).not.toHaveBeenCalled();
+    });
+
+    it('bounds a hanging live fix with a timeout and falls through to the Balanced retry', async () => {
+      // getCurrentPositionAsync has no timeout option, so a cold/indoor GPS fix
+      // can hang forever. The live attempt must be bounded so the chain advances.
+      jest.useFakeTimers();
+      try {
+        mockLocation.getLastKnownPositionAsync.mockResolvedValue(null);
+        mockLocation.getCurrentPositionAsync
+          .mockReturnValueOnce(
+            new Promise<Location.LocationObject>(() => {
+              /* never resolves — cold/indoor GPS */
+            })
+          )
+          .mockResolvedValueOnce({
+            coords: {
+              latitude: 37.5,
+              longitude: 127.0,
+              accuracy: 120,
+              altitude: 0,
+              altitudeAccuracy: 0,
+              heading: 0,
+              speed: 0,
+            },
+            timestamp: 0,
+          });
+
+        const pending = locationService.getCurrentLocation(true);
+        await jest.advanceTimersByTimeAsync(8000);
+        const location = await pending;
+
+        expect(location?.accuracy).toBe(120);
+        expect(mockLocation.getCurrentPositionAsync).toHaveBeenCalledTimes(2);
+      } finally {
+        jest.useRealTimers();
+      }
+    }, 10000);
   });
 
   describe('accuracy gating (coarse-fix rejection)', () => {
@@ -982,6 +1103,45 @@ describe('LocationService', () => {
       const enabled = await locationService.isLocationServicesEnabled();
 
       expect(enabled).toBe(false);
+    });
+  });
+
+  describe('startLocationTracking accuracy preservation', () => {
+    beforeEach(async () => {
+      mockLocation.getForegroundPermissionsAsync.mockResolvedValue({
+        status: 'granted',
+        granted: true,
+        canAskAgain: true,
+        expires: 'never',
+      } as Location.PermissionResponse);
+      mockLocation.getBackgroundPermissionsAsync.mockResolvedValue({
+        status: 'undetermined',
+        granted: false,
+        canAskAgain: true,
+        expires: 'never',
+      } as Location.PermissionResponse);
+      await locationService.initialize();
+      await locationService.stopLocationTracking();
+    });
+
+    it('preserves a precise (accuracy 0) fix from the watch callback instead of mangling it to undefined', async () => {
+      // Regression: `location.coords.accuracy || undefined` coerced a precise 0
+      // fix to undefined, so a perfect tracked fix was reported as "unknown".
+      let watchCallback:
+        | ((location: { coords: { latitude: number; longitude: number; accuracy: number } }) => void)
+        | undefined;
+      (mockLocation.watchPositionAsync as jest.Mock).mockImplementation((_opts, cb) => {
+        watchCallback = cb;
+        return Promise.resolve({ remove: jest.fn() });
+      });
+
+      const received: LocationCoordinates[] = [];
+      await locationService.startLocationTracking((coords) => received.push(coords));
+
+      watchCallback?.({ coords: { latitude: 37.5, longitude: 127.0, accuracy: 0 } });
+
+      expect(received).toHaveLength(1);
+      expect(received[0]?.accuracy).toBe(0);
     });
   });
 });

@@ -5,7 +5,7 @@
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useLocation } from './useLocation';
-import { locationService, NearbyStation, LocationCoordinates, AdaptiveRadiusResult } from '../services/location/locationService';
+import { locationService, NearbyStation, LocationCoordinates, AdaptiveRadiusResult, LAST_KNOWN_REQUIRED_ACCURACY_M } from '../services/location/locationService';
 import {
   getNearbyAutoSearchEnabled,
   subscribeNearbyAutoSearch,
@@ -95,10 +95,20 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
   // lines (the 2x "Loaded 24 subway lines" residual after the deps fix).
   const loadAllStationsPromiseRef = useRef<Promise<Station[]> | null>(null);
 
+  // Guards the one-shot GPS fallback (see the fallback effect below). Declared
+  // here, not at the effect, so refresh() can re-arm it — a manual refresh then
+  // recovers from a stuck null-fix cold-start where the guard never re-arms on
+  // its own (gpsLocation stays null forever).
+  const oneShotFallbackAttemptedRef = useRef(false);
+
   // Use mockLocation in test mode, otherwise use real GPS
   // Skip onLocationUpdate when external location is provided (parent handles tracking)
   const { location: gpsLocation, loading: locationLoading, error: locationError, getCurrentLocation } = useLocation({
-    enableHighAccuracy: true,
+    // Balanced (wifi/cell), not High (GPS-only): the nearby search only needs to
+    // place the user among ~500m-spaced stations, so a GPS-only cold-start fix
+    // buys unused precision at a large latency cost. getCurrentLocation still
+    // degrades High→Balanced internally if a caller ever needs High elsewhere.
+    enableHighAccuracy: false,
     distanceFilter: 20, // 600m 반경에서 50m 오차는 8% — 20m로 줄여 정확도 유지
     onLocationUpdate: autoUpdate && !mockLocation && !externalLocation ? handleLocationUpdate : undefined,
   });
@@ -256,8 +266,14 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
    */
   const refresh = useCallback(() => {
     lastUpdateTimeRef.current = 0; // Reset throttle (sync, no re-render)
-    findNearbyStations();
-  }, [findNearbyStations]);
+    // Re-acquire a fresh fix instead of re-running the search on the stale
+    // closure location: the new fix flows through the location effect, which
+    // re-runs findNearbyStations with the user's current position. Re-arming
+    // the one-shot guard also recovers from a stuck null-fix cold-start
+    // dead-end (the guard never re-arms on its own while gpsLocation is null).
+    oneShotFallbackAttemptedRef.current = false;
+    getCurrentLocation();
+  }, [getCurrentLocation]);
 
   /**
    * Get station by distance category
@@ -309,7 +325,6 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
   // from both the Home and Routes tabs at once). The guard re-arms whenever a
   // location source (mock/external/GPS) is present, so the one-shot can fire
   // again if every source later goes away.
-  const oneShotFallbackAttemptedRef = useRef(false);
   useEffect(() => {
     if (!autoSearchEnabled) {
       return;
@@ -344,6 +359,14 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
   // When external or mock location is provided, ignore internal locationLoading
   const effectiveLocationLoading = (externalLocation != null || mockLocation != null) ? false : locationLoading;
 
+  // A live fix is accepted up to MAX_ACCEPTABLE_ACCURACY_M (500m), so an
+  // accepted fix can still be 100–500m coarse. Flag derived UI as estimated
+  // when the fix is coarser than the last-known confidence bound (or unknown),
+  // so the screen avoids asserting "nearest station" off a low-confidence fix.
+  const isEstimated =
+    location != null &&
+    (location.accuracy == null || location.accuracy > LAST_KNOWN_REQUIRED_ACCURACY_M);
+
   return {
     ...state,
     loading: state.loading || effectiveLocationLoading,
@@ -352,6 +375,7 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
     isAtStation,
     getFormattedStations,
     hasLocation: !!location,
+    isEstimated,
     searchRadius: state.effectiveRadius ?? radius,
     radiusExpanded: state.radiusExpanded,
   };

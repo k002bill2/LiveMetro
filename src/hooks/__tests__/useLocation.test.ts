@@ -152,6 +152,25 @@ describe('useLocation', () => {
       expect(result.current.accuracy).toBe(25);
     });
 
+    it('getCurrentLocation preserves a precise (accuracy 0) fix instead of coercing it to null', async () => {
+      // Regression: `location.accuracy || null` mangled a precise 0 fix into null,
+      // so a perfect fix was reported downstream as "unknown accuracy".
+      const mockLocation = createMockLocation({ accuracy: 0 });
+      mockLocationService.getCurrentLocation.mockResolvedValue(mockLocation);
+
+      const { result } = renderHook(() => useLocation());
+
+      await waitFor(() => {
+        expect(result.current.hasPermission).toBe(true);
+      });
+
+      await act(async () => {
+        await result.current.getCurrentLocation();
+      });
+
+      expect(result.current.accuracy).toBe(0);
+    });
+
     it('getCurrentLocation should initialize if no permission', async () => {
       // Setup: Already have permission from expo-location mock, so hasPermission is true
       // Test that when permission is true, getCurrentLocation works without calling initialize again

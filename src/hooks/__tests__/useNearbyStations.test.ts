@@ -288,20 +288,122 @@ describe('useNearbyStations', () => {
   });
 
   describe('Refresh', () => {
-    it('refresh should reset throttle and update', async () => {
+    it('refresh re-acquires a fresh GPS fix instead of reusing the stale closure location', async () => {
+      // Before the fix, refresh() called findNearbyStations() with no args, so it
+      // reused the closure `location` — the nearby list stayed pinned to the first
+      // one-shot fix and a pull-to-refresh (or the user moving) never updated it.
+      // refresh() must re-acquire a fresh fix via getCurrentLocation().
+      const mockGetCurrentLocation = jest.fn();
+      mockUseLocation.mockReturnValue({
+        location: createMockLocation(),
+        loading: false,
+        error: null,
+        hasPermission: true,
+        hasBackgroundPermission: false,
+        isTracking: false,
+        trackingMode: 'normal',
+        accuracy: 10,
+        getCurrentLocation: mockGetCurrentLocation,
+        startTracking: jest.fn(),
+        startBatteryEfficientTracking: jest.fn(),
+        startHighAccuracyTracking: jest.fn(),
+        stopTracking: jest.fn(),
+        checkLocationServices: jest.fn(),
+        initializeLocation: jest.fn(),
+        requestBackgroundPermission: jest.fn(),
+      });
+
       const { result } = renderHook(() => useNearbyStations());
 
       await waitFor(() => {
         expect(result.current.loading).toBe(false);
       });
 
-      mockLocationService.findNearbyStationsAdaptive.mockClear();
+      // location is present, so the one-shot auto-fallback never fired on mount.
+      expect(mockGetCurrentLocation).not.toHaveBeenCalled();
 
       await act(async () => {
         result.current.refresh();
       });
 
-      expect(mockLocationService.findNearbyStationsAdaptive).toHaveBeenCalled();
+      // refresh requests a fresh fix so the list reflects the user's current
+      // position, not the first one-shot fix it was pinned to.
+      expect(mockGetCurrentLocation).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('Estimated accuracy', () => {
+    const mockUseLocationWith = (
+      location: LocationCoordinates | null,
+      accuracy: number | null
+    ): void => {
+      mockUseLocation.mockReturnValue({
+        location,
+        loading: false,
+        error: null,
+        hasPermission: true,
+        hasBackgroundPermission: false,
+        isTracking: false,
+        trackingMode: 'normal',
+        accuracy,
+        getCurrentLocation: jest.fn(),
+        startTracking: jest.fn(),
+        startBatteryEfficientTracking: jest.fn(),
+        startHighAccuracyTracking: jest.fn(),
+        stopTracking: jest.fn(),
+        checkLocationServices: jest.fn(),
+        initializeLocation: jest.fn(),
+        requestBackgroundPermission: jest.fn(),
+      });
+    };
+
+    it('marks results as estimated when the fix is coarse (accuracy > 100m)', async () => {
+      mockUseLocationWith({ latitude: 37.5665, longitude: 126.978, accuracy: 250 }, 250);
+
+      const { result } = renderHook(() => useNearbyStations());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      expect(result.current.isEstimated).toBe(true);
+    });
+
+    it('does not mark results as estimated when the fix is precise (accuracy <= 100m)', async () => {
+      mockUseLocationWith({ latitude: 37.5665, longitude: 126.978, accuracy: 30 }, 30);
+
+      const { result } = renderHook(() => useNearbyStations());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      expect(result.current.isEstimated).toBe(false);
+    });
+
+    it('marks results as estimated when accuracy is unknown', async () => {
+      mockUseLocationWith({ latitude: 37.5665, longitude: 126.978 }, null);
+
+      const { result } = renderHook(() => useNearbyStations());
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      expect(result.current.isEstimated).toBe(true);
+    });
+  });
+
+  describe('Location accuracy request', () => {
+    it('requests a Balanced (not High) primary fix so the cold-start nearby search is fast', () => {
+      // The nearby search only needs to place the user among ~500m-spaced
+      // stations (accuracy gate is 500m), so forcing GPS-only High accuracy
+      // buys precision the search never uses while paying a slow cold-start fix.
+      renderHook(() => useNearbyStations());
+
+      expect(mockUseLocation).toHaveBeenCalledWith(
+        expect.objectContaining({ enableHighAccuracy: false })
+      );
     });
   });
 
