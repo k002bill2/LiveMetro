@@ -136,6 +136,7 @@ const mockUseNearbyStations = jest.fn(() => ({
   isAtStation: false,
   getFormattedStations: [],
   hasLocation: false,
+  isEstimated: false,
   searchRadius: 2000,
 }));
 jest.mock('@/hooks/useNearbyStations', () => ({
@@ -456,6 +457,7 @@ describe('HomeScreen', () => {
       isAtStation: false,
       getFormattedStations: [],
       hasLocation: false,
+      isEstimated: false,
       searchRadius: 2000,
     });
     // Reset route summary to the unresolved default (clearAllMocks keeps the
@@ -690,6 +692,7 @@ describe('HomeScreen', () => {
         isAtStation: false,
         getFormattedStations: [],
         hasLocation: true,
+        isEstimated: false,
         searchRadius: 2000,
       });
 
@@ -698,6 +701,57 @@ describe('HomeScreen', () => {
         expect(getByTestId('station-card-nearby-1')).toBeTruthy();
         expect(getByTestId('station-card-nearby-2')).toBeTruthy();
       });
+    });
+
+    it('labels the nearby section as estimated when the fix is low-confidence', async () => {
+      mockLocationRequest.mockResolvedValue({ status: 'granted' });
+      mockUseNearbyStations.mockReturnValue({
+        nearbyStations: [
+          { ...mockStation('nearby-1', '서울역'), distance: 150, bearing: 90 },
+        ],
+        loading: false,
+        error: null,
+        closestStation: { ...mockStation('nearby-1', '서울역'), distance: 150, bearing: 90 },
+        lastUpdated: new Date(),
+        refresh: mockRefreshNearby,
+        getStationsByCategory: { 'very-close': [], 'close': [], 'nearby': [], 'far': [] },
+        isAtStation: false,
+        getFormattedStations: [],
+        hasLocation: true,
+        isEstimated: true,
+        searchRadius: 500,
+      });
+
+      const { getByTestId } = render(<HomeScreen />);
+      await waitFor(() => {
+        expect(getByTestId('home-nearby-estimated-note')).toBeTruthy();
+      });
+    });
+
+    it('does not label the nearby section as estimated when the fix is precise', async () => {
+      mockLocationRequest.mockResolvedValue({ status: 'granted' });
+      mockUseNearbyStations.mockReturnValue({
+        nearbyStations: [
+          { ...mockStation('nearby-1', '서울역'), distance: 150, bearing: 90 },
+        ],
+        loading: false,
+        error: null,
+        closestStation: { ...mockStation('nearby-1', '서울역'), distance: 150, bearing: 90 },
+        lastUpdated: new Date(),
+        refresh: mockRefreshNearby,
+        getStationsByCategory: { 'very-close': [], 'close': [], 'nearby': [], 'far': [] },
+        isAtStation: false,
+        getFormattedStations: [],
+        hasLocation: true,
+        isEstimated: false,
+        searchRadius: 500,
+      });
+
+      const { getByTestId, queryByTestId } = render(<HomeScreen />);
+      await waitFor(() => {
+        expect(getByTestId('home-stations-section')).toBeTruthy();
+      });
+      expect(queryByTestId('home-nearby-estimated-note')).toBeNull();
     });
   });
 

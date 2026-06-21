@@ -71,7 +71,7 @@ export const useLocation = (options: UseLocationOptions = {}) => {
       location,
       loading: false,
       error: null,
-      accuracy: location.accuracy || null,
+      accuracy: location.accuracy ?? null,
     });
 
     if (onLocationUpdate) {

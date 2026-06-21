@@ -81,6 +81,7 @@ export const HomeScreen: React.FC = () => {
     nearbyStations: hookNearbyStations,
     refresh: refreshNearby,
     closestStation: nearbyClosestStation,
+    isEstimated: nearbyIsEstimated,
   } = useNearbyStations({
     radius: 500,
     maxRadius: 500, // 도보권 역만 노출 — 적응형 확장 비활성화 (반경 고정)
@@ -395,12 +396,21 @@ export const HomeScreen: React.FC = () => {
         <View style={styles.sectionHeaderRow}>
           <View style={styles.sectionHeaderTitle}>
             <SectionHeader
-              title={locationPermission ? '주변 역' : '즐겨찾기'}
+              title={
+                locationPermission
+                  ? nearbyIsEstimated
+                    ? '주변 역 (추정)'
+                    : '주변 역'
+                  : '즐겨찾기'
+              }
               subtitle={locationPermission ? 'GPS 기반 · 도보 거리순' : undefined}
               testID="home-stations-section"
             />
           </View>
-          {locationPermission && nearbyClosestStation && (
+          {/* Suppress the definitive "OO 인근" proximity claim on a coarse fix:
+              at >100m uncertainty the nearest-station pick is a guess, not fact
+              (location-services skill BP#5). */}
+          {locationPermission && nearbyClosestStation && !nearbyIsEstimated && (
             <View style={styles.locationBadgeWrap}>
               <Pill tone="pos" size="sm">
                 {`${nearbyClosestStation.name} 인근`}
@@ -408,6 +418,12 @@ export const HomeScreen: React.FC = () => {
             </View>
           )}
         </View>
+
+        {locationPermission && nearbyIsEstimated && showNearbySection && (
+          <Text style={styles.estimatedNote} testID="home-nearby-estimated-note">
+            위치 정확도가 낮아 추정 결과예요
+          </Text>
+        )}
 
         {!showNearbySection ? (
           // Empty state — see feedback_empty_state_and_skeleton.md.
@@ -624,6 +640,13 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       color: semantic.labelAlt,
       marginTop: WANTED_TOKENS.spacing.s2,
       textAlign: 'center',
+    },
+    estimatedNote: {
+      fontSize: WANTED_TOKENS.type.caption1.size,
+      lineHeight: WANTED_TOKENS.type.caption1.lh * 1.4,
+      color: semantic.labelAlt,
+      marginTop: WANTED_TOKENS.spacing.s2,
+      marginBottom: WANTED_TOKENS.spacing.s2,
     },
     permissionLink: {
       fontSize: WANTED_TOKENS.type.label1.size,

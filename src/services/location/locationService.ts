@@ -43,7 +43,20 @@ const MAX_ACCEPTABLE_ACCURACY_M = 500;
  * alone bounds staleness but not quality: a fresh-but-coarse cached fix would
  * otherwise pass. Asking expo-location for this bound makes it return null for
  * coarse cached fixes, so the chain advances to a live retry. */
-const LAST_KNOWN_REQUIRED_ACCURACY_M = 100;
+export const LAST_KNOWN_REQUIRED_ACCURACY_M = 100;
+
+/** Distance (meters) under which two nearby-search results are treated as the
+ * same physical station and merged. The same complex can register under
+ * different names (e.g. '서울'/'서울역', ~94m apart), which name-only dedup
+ * left as two separate cards. Kept well below Seoul metro's ~300m+ station
+ * spacing so genuinely distinct adjacent stations are never collapsed. */
+const DEDUP_PROXIMITY_M = 100;
+
+/** Upper bound (ms) for a single live `getCurrentPositionAsync` attempt.
+ * expo-location's LocationOptions has no timeout, so a cold/indoor GPS fix can
+ * hang indefinitely and block the first render. After this, the attempt is
+ * treated as a transient miss so the chain advances to the Balanced retry. */
+const LIVE_FIX_TIMEOUT_MS = 8000;
 
 export interface GeofenceRegion {
   identifier: string;
@@ -188,7 +201,18 @@ class LocationService {
       return null;
     }
 
-    // Primary attempt. Use High (not BestForNavigation) even for the
+    // Prefer a recent, sufficiently-accurate cached fix first. getLastKnownLocation
+    // is gated by requiredAccuracy (100m), so it returns null for coarse caches and
+    // only short-circuits when a good fix is instantly available. expo's own
+    // guidance is to try the last-known fix before a (slow) live one when a fast
+    // response matters and high precision does not — exactly the nearby-station
+    // case. This keeps the fast path from being trapped behind a cold-start fix.
+    const lastKnown = await this.getLastKnownLocation();
+    if (lastKnown) {
+      return lastKnown;
+    }
+
+    // No good cache — take a live fix. Use High (not BestForNavigation) for the
     // high-accuracy path: navigation-grade fixes are GPS-only and the slowest /
     // most failure-prone on a cold start, while ~10m is ample for nearby stations.
     const primaryAccuracy = highAccuracy ? Location.Accuracy.High : Location.Accuracy.Balanced;
@@ -197,16 +221,9 @@ class LocationService {
       return primary;
     }
 
-    // The live fix missed (e.g. iOS kCLErrorLocationUnknown on a cold GPS).
-    // Prefer a recent cached fix over surfacing "no location".
-    const lastKnown = await this.getLastKnownLocation();
-    if (lastKnown) {
-      return lastKnown;
-    }
-
-    // No cached fix either — retry once at Balanced accuracy, which can resolve
-    // via wifi/cell positioning (fast, works indoors) where a GPS-grade fix
-    // could not. This is the real-device cold-start recovery path.
+    // Live fix missed (e.g. iOS kCLErrorLocationUnknown on a cold GPS, or it
+    // timed out) — retry once at Balanced accuracy, which can resolve via
+    // wifi/cell positioning (fast, works indoors) where a GPS-grade fix could not.
     if (primaryAccuracy !== Location.Accuracy.Balanced) {
       const balanced = await this.tryGetPosition(Location.Accuracy.Balanced);
       if (balanced) {
@@ -227,8 +244,28 @@ class LocationService {
   private async tryGetPosition(
     accuracy: Location.Accuracy
   ): Promise<LocationCoordinates | null> {
+    let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
     try {
-      const location = await Location.getCurrentPositionAsync({ accuracy });
+      // Bound the live fix: getCurrentPositionAsync has no timeout option, so a
+      // cold/indoor GPS request can hang indefinitely. Race it against a timer;
+      // if the timer wins, treat it as a transient miss (null) so the caller can
+      // fall through to a Balanced retry instead of blocking the UI forever.
+      const location = await Promise.race([
+        Location.getCurrentPositionAsync({ accuracy }),
+        new Promise<null>((resolve) => {
+          timeoutHandle = setTimeout(() => resolve(null), LIVE_FIX_TIMEOUT_MS);
+        }),
+      ]);
+
+      if (!location) {
+        if (__DEV__) {
+          console.warn(
+            `getCurrentPositionAsync(accuracy=${accuracy}) timed out after ${LIVE_FIX_TIMEOUT_MS}ms; treating as a miss`
+          );
+        }
+        return null;
+      }
+
       const coordinates = this.toCoordinates(location.coords);
 
       // Reject a fix whose reported uncertainty is too large to place the user
@@ -254,6 +291,10 @@ class LocationService {
         console.warn(`getCurrentPositionAsync(accuracy=${accuracy}) failed:`, error);
       }
       return null;
+    } finally {
+      if (timeoutHandle) {
+        clearTimeout(timeoutHandle);
+      }
     }
   }
 
@@ -336,7 +377,7 @@ class LocationService {
           const coordinates: LocationCoordinates = {
             latitude: location.coords.latitude,
             longitude: location.coords.longitude,
-            accuracy: location.coords.accuracy || undefined,
+            accuracy: location.coords.accuracy ?? undefined,
           };
 
           this.currentLocation = coordinates;
@@ -486,15 +527,29 @@ class LocationService {
     // Sort by distance
     nearbyStations.sort((a, b) => a.distance - b.distance);
 
-    // Dedup transfer stations: keep closest entry per station name
-    const seen = new Map<string, NearbyStation>();
+    // Dedup co-located stations. The list is distance-sorted, so keep the
+    // closest entry and drop any later one that is either the same name OR
+    // within DEDUP_PROXIMITY_M of an already-kept entry. Name-only dedup left
+    // the same physical complex under different names (e.g. '서울'/'서울역',
+    // ~94m apart) as two separate cards.
+    const deduped: NearbyStation[] = [];
     for (const station of nearbyStations) {
-      if (!seen.has(station.name)) {
-        seen.set(station.name, station);
+      const isDuplicate = deduped.some(
+        kept =>
+          kept.name === station.name ||
+          this.calculateDistance(
+            kept.coordinates.latitude,
+            kept.coordinates.longitude,
+            station.coordinates.latitude,
+            station.coordinates.longitude
+          ) < DEDUP_PROXIMITY_M
+      );
+      if (!isDuplicate) {
+        deduped.push(station);
       }
     }
 
-    return Array.from(seen.values());
+    return deduped;
   }
 
   /**
