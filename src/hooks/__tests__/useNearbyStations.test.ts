@@ -142,6 +142,96 @@ describe('useNearbyStations', () => {
       // Guard: the fallback must NOT re-fire on the loading true→false settle.
       expect(getCurrentLocation).toHaveBeenCalledTimes(1);
     });
+
+    it('auto-retries the fix once after a delay when a cold-start failure keeps location null', async () => {
+      // Cold-start dead-end: the one-shot fallback fires, fails, and gpsLocation
+      // stays null while useLocation toggles loading true→false. Without an auto
+      // retry the user is stuck on an empty "주변 역" until a manual refresh. A
+      // single delayed retry must re-attempt automatically — and only once.
+      const getCurrentLocation = jest.fn().mockResolvedValue(null);
+      let loading = false;
+
+      mockUseLocation.mockImplementation(() => ({
+        location: null,
+        loading,
+        error: loading ? null : '현재 위치를 가져올 수 없습니다.',
+        hasPermission: true,
+        hasBackgroundPermission: false,
+        isTracking: false,
+        trackingMode: 'normal',
+        accuracy: null,
+        getCurrentLocation,
+        startTracking: jest.fn(),
+        startBatteryEfficientTracking: jest.fn(),
+        startHighAccuracyTracking: jest.fn(),
+        stopTracking: jest.fn(),
+        checkLocationServices: jest.fn(),
+        initializeLocation: jest.fn(),
+        requestBackgroundPermission: jest.fn(),
+      }));
+
+      const { rerender } = renderHook(() => useNearbyStations());
+
+      // One-shot fires once on mount.
+      await waitFor(() => expect(getCurrentLocation).toHaveBeenCalledTimes(1));
+
+      // The failed attempt settles (loading true→false), location still null.
+      // The pending retry timer must survive this churn (not be cancelled).
+      loading = true;
+      rerender({});
+      loading = false;
+      rerender({});
+      expect(getCurrentLocation).toHaveBeenCalledTimes(1);
+
+      // Advance past the auto-retry delay → exactly one more attempt.
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(6000);
+      });
+      expect(getCurrentLocation).toHaveBeenCalledTimes(2);
+
+      // It must not keep retrying forever.
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(60000);
+      });
+      expect(getCurrentLocation).toHaveBeenCalledTimes(2);
+    });
+
+    it('cancels the pending auto-retry on unmount (no retry after teardown)', async () => {
+      // subscription-cleanup: the scheduled retry timer must be cleared on
+      // unmount, or it fires getCurrentLocation against a torn-down hook.
+      const getCurrentLocation = jest.fn().mockResolvedValue(null);
+
+      mockUseLocation.mockReturnValue({
+        location: null,
+        loading: false,
+        error: null,
+        hasPermission: true,
+        hasBackgroundPermission: false,
+        isTracking: false,
+        trackingMode: 'normal',
+        accuracy: null,
+        getCurrentLocation,
+        startTracking: jest.fn(),
+        startBatteryEfficientTracking: jest.fn(),
+        startHighAccuracyTracking: jest.fn(),
+        stopTracking: jest.fn(),
+        checkLocationServices: jest.fn(),
+        initializeLocation: jest.fn(),
+        requestBackgroundPermission: jest.fn(),
+      });
+
+      const { unmount } = renderHook(() => useNearbyStations());
+
+      await waitFor(() => expect(getCurrentLocation).toHaveBeenCalledTimes(1));
+
+      unmount();
+
+      await act(async () => {
+        await jest.advanceTimersByTimeAsync(60000);
+      });
+
+      expect(getCurrentLocation).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('Initialization', () => {

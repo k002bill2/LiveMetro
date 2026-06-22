@@ -829,7 +829,7 @@ describe('LocationService', () => {
           });
 
         const pending = locationService.getCurrentLocation(true);
-        await jest.advanceTimersByTimeAsync(8000);
+        await jest.advanceTimersByTimeAsync(15000);
         const location = await pending;
 
         expect(location?.accuracy).toBe(120);
@@ -958,6 +958,57 @@ describe('LocationService', () => {
 
       expect(location?.latitude).toBe(37.5);
       expect(location?.accuracy).toBe(500);
+    });
+
+    it('returns a coarse live fix as a last resort instead of null when no accurate fix is available', async () => {
+      // Real-device cold start indoors: the only fixes available are coarse
+      // (>500m via wifi/cell) and there is no usable cached fix. Returning null
+      // here renders an empty "주변 역" section. Accept the coarse fix as a last
+      // resort so downstream can show approximate stations flagged 추정 —
+      // "빈 데이터 금지" beats a blank screen.
+      mockLocation.getLastKnownPositionAsync.mockResolvedValue(null);
+      mockLocation.getCurrentPositionAsync.mockResolvedValue({
+        coords: {
+          latitude: 37.5,
+          longitude: 127.0,
+          accuracy: 1200,
+          altitude: 0,
+          altitudeAccuracy: 0,
+          heading: 0,
+          speed: 0,
+        },
+        timestamp: Date.now(),
+      });
+
+      const location = await locationService.getCurrentLocation();
+
+      expect(location).not.toBeNull();
+      expect(location?.latitude).toBe(37.5);
+      expect(location?.accuracy).toBe(1200);
+    });
+
+    it('still rejects an absurdly coarse fix beyond the last-resort ceiling (returns null)', async () => {
+      // The last-resort accepts a coarse fix, but not an unbounded one: a ~5km
+      // fix is too vague to drive a "주변 역" list even when flagged 추정 (a wrong
+      // definitive-looking nearest station, location-services BP#5). Past the
+      // ceiling, an honest empty screen beats a confidently-misplaced list.
+      mockLocation.getLastKnownPositionAsync.mockResolvedValue(null);
+      mockLocation.getCurrentPositionAsync.mockResolvedValue({
+        coords: {
+          latitude: 37.5,
+          longitude: 127.0,
+          accuracy: 5000,
+          altitude: 0,
+          altitudeAccuracy: 0,
+          heading: 0,
+          speed: 0,
+        },
+        timestamp: Date.now(),
+      });
+
+      const location = await locationService.getCurrentLocation();
+
+      expect(location).toBeNull();
     });
 
     it('preserves a reported accuracy of 0 instead of dropping it to undefined', async () => {

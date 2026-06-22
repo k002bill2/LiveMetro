@@ -83,8 +83,10 @@ export const HomeScreen: React.FC = () => {
     closestStation: nearbyClosestStation,
     isEstimated: nearbyIsEstimated,
   } = useNearbyStations({
-    radius: 500,
-    maxRadius: 500, // 도보권 역만 노출 — 적응형 확장 비활성화 (반경 고정)
+    radius: 500, // 도보권 500m 우선 — 하지만 캡(maxRadius)은 두지 않는다
+    // maxRadius 미지정 → 500m 안에 3개 미만이면 600→1000→1500m로 적응형 확장
+    // (locationService.ADAPTIVE_RADIUS_STEPS). 역 희소 지역에서 "주변 역"이 비는
+    // 것을 막는다. 도심에선 500m로 충분해 확장은 거의 일어나지 않음.
     maxStations: 5,
     autoUpdate: true,
     minUpdateInterval: 30000,
