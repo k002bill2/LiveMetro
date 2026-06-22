@@ -1,0 +1,45 @@
+# Pre-push: catch package.json <-> package-lock.json desync the way CI's
+# quality-gate does, BEFORE push — closes the local↔CI gap that let two
+# functions-lockfile EUSAGE failures reach CI (PR #257 → #258).
+#
+# WHY a pinned npm: the machine-default npm resolves floating optional deps
+# (e.g. @emnapi via unrs-resolver) differently than CI's npm, so a bare
+# `npm ci --dry-run` gives a FALSE green locally — the exact trap we hit. We
+# must run the check with the CI-pinned npm. `corepack npm@X` is finicky for
+# npm, so we use `npx npm@<CI version>`, which is the same "explicit pinned npm"
+# guarantee. `npm ci --dry-run` does the in-sync check (EUSAGE on mismatch)
+# without installing; --no-audit/--no-fund keep it fast.
+#
+# Keep this in pre-push (not pre-commit): it needs the network on first run and
+# is heavier than a commit-time check. It degrades gracefully when the pinned
+# npm can't be fetched — CI remains the hard gate. Escape hatch: git push --no-verify.
+
+CI_NPM="npm@10.8.2"
+
+if ! npx --yes "$CI_NPM" --version >/dev/null 2>&1; then
+  echo "ℹ️  pre-push: $CI_NPM 사용 불가(오프라인?) — lockfile sync 검사 건너뜀 (CI가 최종 게이트)"
+  exit 0
+fi
+
+lm_check_lockfile() {
+  lm_dir="$1"
+  lm_out="$( cd "$lm_dir" && npx --yes "$CI_NPM" ci --dry-run --no-audit --no-fund 2>&1 )"
+  if printf '%s' "$lm_out" | grep -q "EUSAGE"; then
+    echo "❌ pre-push: '$lm_dir' package.json ↔ package-lock.json 비동기화 ($CI_NPM 기준)"
+    printf '%s\n' "$lm_out" | grep -E "Missing:|Invalid:" | head -5
+    echo "   고치기: ( cd $lm_dir && npx $CI_NPM install ) 후 lockfile 커밋"
+    echo "   (불가피하면 git push --no-verify — 단 CI quality-gate에서 동일하게 차단됨)"
+    return 1
+  fi
+  return 0
+}
+
+lm_fail=0
+for lm_d in . functions; do
+  lm_check_lockfile "$lm_d" || lm_fail=1
+done
+
+if [ "$lm_fail" -eq 0 ]; then
+  echo "✅ pre-push: lockfile sync OK (root + functions, $CI_NPM)"
+fi
+exit "$lm_fail"
