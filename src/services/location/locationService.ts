@@ -39,6 +39,14 @@ const LAST_KNOWN_MAX_AGE_MS = 60_000;
  * retry instead of rendering a wrong station as definitive. */
 const MAX_ACCEPTABLE_ACCURACY_M = 500;
 
+/** Relaxed ceiling (meters) for the explicit last-resort `acceptCoarse` attempt.
+ * When every accuracy-gated attempt has missed, a roughly-right fix (≤3km, ~city
+ * district) shown as 추정 beats an empty screen. But the accept is still bounded:
+ * a fix coarser than this (e.g. ~10km metro-wide) is too vague to drive a "주변
+ * 역" list even when flagged, so it is rejected and the screen stays honestly
+ * empty rather than confidently misplacing the user (location-services BP#5). */
+const MAX_COARSE_FALLBACK_ACCURACY_M = 3000;
+
 /** Required accuracy (meters) for the last-known-position fallback. `maxAge`
  * alone bounds staleness but not quality: a fresh-but-coarse cached fix would
  * otherwise pass. Asking expo-location for this bound makes it return null for
@@ -55,8 +63,11 @@ const DEDUP_PROXIMITY_M = 100;
 /** Upper bound (ms) for a single live `getCurrentPositionAsync` attempt.
  * expo-location's LocationOptions has no timeout, so a cold/indoor GPS fix can
  * hang indefinitely and block the first render. After this, the attempt is
- * treated as a transient miss so the chain advances to the Balanced retry. */
-const LIVE_FIX_TIMEOUT_MS = 8000;
+ * treated as a transient miss so the chain advances to the Balanced retry.
+ * 15s (not 8s): a real-device cold GPS first-lock outdoors can legitimately
+ * take 10-15s; a tighter bound dropped those valid-but-slow fixes, leaving the
+ * "주변 역" section empty on the very first launch. */
+const LIVE_FIX_TIMEOUT_MS = 15000;
 
 export interface GeofenceRegion {
   identifier: string;
@@ -231,6 +242,19 @@ class LocationService {
       }
     }
 
+    // Last resort: every accuracy-gated attempt missed (rejected a coarse fix or
+    // timed out). Rather than returning null — which renders an empty "주변 역"
+    // section on a real-device cold start indoors — accept a coarse fix here.
+    // Downstream gates it as 추정 (useNearbyStations.isEstimated > 100m), so the
+    // user sees approximate nearby stations instead of a blank screen. The normal
+    // attempts above still prefer an accurate fix; this only fires when none exists.
+    const coarse = await this.tryGetPosition(Location.Accuracy.Balanced, {
+      acceptCoarse: true,
+    });
+    if (coarse) {
+      return coarse;
+    }
+
     return null;
   }
 
@@ -242,8 +266,10 @@ class LocationService {
    * miss from becoming red error noise on every poll.
    */
   private async tryGetPosition(
-    accuracy: Location.Accuracy
+    accuracy: Location.Accuracy,
+    options: { acceptCoarse?: boolean } = {}
   ): Promise<LocationCoordinates | null> {
+    const { acceptCoarse = false } = options;
     let timeoutHandle: ReturnType<typeof setTimeout> | undefined;
     try {
       // Bound the live fix: getCurrentPositionAsync has no timeout option, so a
@@ -272,13 +298,20 @@ class LocationService {
       // among nearby stations. Treat it like a transient miss (return null) so
       // the caller can fall through to the last-known fix or a Balanced retry,
       // rather than caching/returning a coarse fix as if it were definitive.
+      // `acceptCoarse` relaxes the ceiling for the explicit last-resort attempt
+      // (≤3km, shown as 추정 downstream beats an empty screen) but does NOT
+      // remove it: a ~10km fix is still rejected so the screen stays honestly
+      // empty rather than confidently misplacing the user.
+      const accuracyCeiling = acceptCoarse
+        ? MAX_COARSE_FALLBACK_ACCURACY_M
+        : MAX_ACCEPTABLE_ACCURACY_M;
       if (
         coordinates.accuracy != null &&
-        coordinates.accuracy > MAX_ACCEPTABLE_ACCURACY_M
+        coordinates.accuracy > accuracyCeiling
       ) {
         if (__DEV__) {
           console.warn(
-            `getCurrentPositionAsync(accuracy=${accuracy}) returned a coarse fix (${coordinates.accuracy}m > ${MAX_ACCEPTABLE_ACCURACY_M}m); rejecting`
+            `getCurrentPositionAsync(accuracy=${accuracy}) returned a coarse fix (${coordinates.accuracy}m > ${accuracyCeiling}m); rejecting`
           );
         }
         return null;

@@ -36,6 +36,11 @@ interface UseNearbyStationsOptions {
   externalLocation?: LocationCoordinates | null; // Use location from parent hook instead of creating new tracking
 }
 
+// Delay (ms) before a single automatic retry when a cold-start fix never
+// arrives. Long enough for a slow first GPS/cell lock to settle, short enough
+// that the user isn't stranded on an empty screen for long.
+const COLD_START_RETRY_DELAY_MS = 6000;
+
 /**
  * Hook for managing nearby stations based on user location
  */
@@ -100,6 +105,13 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
   // recovers from a stuck null-fix cold-start where the guard never re-arms on
   // its own (gpsLocation stays null forever).
   const oneShotFallbackAttemptedRef = useRef(false);
+
+  // Guards a single delayed auto-retry of the cold-start fix (see the auto-retry
+  // effect below). The timer handle lives in a ref — not effect cleanup — so it
+  // survives the locationLoading true→false churn each getCurrentLocation() emits;
+  // clearing it on every dep change would cancel the retry before it ever fires.
+  const autoRetryAttemptedRef = useRef(false);
+  const autoRetryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Use mockLocation in test mode, otherwise use real GPS
   // Skip onLocationUpdate when external location is provided (parent handles tracking)
@@ -272,6 +284,13 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
     // the one-shot guard also recovers from a stuck null-fix cold-start
     // dead-end (the guard never re-arms on its own while gpsLocation is null).
     oneShotFallbackAttemptedRef.current = false;
+    // Re-arm the auto-retry too: a manual refresh restarts the recovery cycle, so
+    // if this fresh fix also fails the delayed retry can fire again.
+    autoRetryAttemptedRef.current = false;
+    if (autoRetryTimerRef.current) {
+      clearTimeout(autoRetryTimerRef.current);
+      autoRetryTimerRef.current = null;
+    }
     getCurrentLocation();
   }, [getCurrentLocation]);
 
@@ -338,6 +357,45 @@ export const useNearbyStations = (options: UseNearbyStationsOptions = {}) => {
       getCurrentLocation();
     }
   }, [autoSearchEnabled, mockLocation, externalLocation, gpsLocation, locationLoading, getCurrentLocation]);
+
+  // Auto-recover from a cold-start dead-end: the one-shot above fires only once,
+  // so when it fails and no location source ever arrives, gpsLocation stays null
+  // forever (previously only a manual refresh re-armed it). Schedule exactly one
+  // delayed retry so the "주변 역" section recovers on its own. Guarded against
+  // the loading churn: schedule only when no timer is pending and none has fired,
+  // cancel only when a location arrives or on unmount.
+  useEffect(() => {
+    if (!autoSearchEnabled) {
+      return;
+    }
+    if (mockLocation || externalLocation || gpsLocation) {
+      // A fix arrived — drop any pending retry and re-arm for a future loss.
+      if (autoRetryTimerRef.current) {
+        clearTimeout(autoRetryTimerRef.current);
+        autoRetryTimerRef.current = null;
+      }
+      autoRetryAttemptedRef.current = false;
+      return;
+    }
+    if (!locationLoading && !autoRetryAttemptedRef.current && !autoRetryTimerRef.current) {
+      autoRetryTimerRef.current = setTimeout(() => {
+        autoRetryTimerRef.current = null;
+        autoRetryAttemptedRef.current = true;
+        getCurrentLocation();
+      }, COLD_START_RETRY_DELAY_MS);
+    }
+  }, [autoSearchEnabled, mockLocation, externalLocation, gpsLocation, locationLoading, getCurrentLocation]);
+
+  // Clear the pending retry timer on unmount (subscription-cleanup).
+  useEffect(
+    () => () => {
+      if (autoRetryTimerRef.current) {
+        clearTimeout(autoRetryTimerRef.current);
+        autoRetryTimerRef.current = null;
+      }
+    },
+    []
+  );
 
   // Find nearby stations when location is available
   useEffect(() => {
