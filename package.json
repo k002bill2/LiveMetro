@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "실시간 전철 알림 - Real-time subway notification app for Seoul metropolitan area",
   "main": "index.js",
+  "engines": {
+    "node": "20"
+  },
   "scripts": {
     "prepare": "husky",
     "postinstall": "patch-package",
