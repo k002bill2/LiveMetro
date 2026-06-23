@@ -753,6 +753,37 @@ describe('HomeScreen', () => {
       });
       expect(queryByTestId('home-nearby-estimated-note')).toBeNull();
     });
+
+    it('renders nearby stations from the hook even when the screen permission state never resolved granted', async () => {
+      // Device repro: the hook independently acquires a fix (logs "Location: ..."
+      // and finds stations) while HomeScreen's separate locationPermission state
+      // stays false — the two permission requests fired concurrently on mount
+      // diverge. The nearby section must follow the hook's actual location state
+      // (hasLocation), not the screen's stale flag, or found stations render as
+      // an empty "데이터가 없습니다.".
+      mockLocationRequest.mockResolvedValue({ status: 'denied' });
+      mockUseNearbyStations.mockReturnValue({
+        nearbyStations: [
+          { ...mockStation('nearby-1', '서울역'), distance: 150, bearing: 90 },
+        ],
+        loading: false,
+        error: null,
+        closestStation: { ...mockStation('nearby-1', '서울역'), distance: 150, bearing: 90 },
+        lastUpdated: new Date(),
+        refresh: mockRefreshNearby,
+        getStationsByCategory: { 'very-close': [], 'close': [], 'nearby': [], 'far': [] },
+        isAtStation: false,
+        getFormattedStations: [],
+        hasLocation: true,
+        isEstimated: false,
+        searchRadius: 1000,
+      });
+
+      const { getByTestId } = render(<HomeScreen />);
+      await waitFor(() => {
+        expect(getByTestId('nearby-station-card-서울역')).toBeTruthy();
+      });
+    });
   });
 
   // ---------- Location Permission ----------

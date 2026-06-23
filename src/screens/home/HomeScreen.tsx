@@ -82,6 +82,7 @@ export const HomeScreen: React.FC = () => {
     refresh: refreshNearby,
     closestStation: nearbyClosestStation,
     isEstimated: nearbyIsEstimated,
+    hasLocation: nearbyHasLocation,
   } = useNearbyStations({
     radius: 500, // 도보권 500m 우선 — 하지만 캡(maxRadius)은 두지 않는다
     // maxRadius 미지정 → 500m 안에 3개 미만이면 600→1000→1500m로 적응형 확장
@@ -91,6 +92,14 @@ export const HomeScreen: React.FC = () => {
     autoUpdate: true,
     minUpdateInterval: 30000,
   });
+
+  // 주변 역 섹션의 단일 표시 기준. HomeScreen의 locationPermission state는 마운트
+  // 시 useLocation 훅과 별도로 requestForegroundPermissions를 호출해 두 권한 결과가
+  // 갈라질 수 있다(동시 요청 race). 훅이 실제로 위치를 얻었으면(hasLocation) 그
+  // 사실이 우선 — 안 그러면 훅이 찾은 주변 역이 빈 화면("데이터가 없습니다.")으로
+  // 가려진다(디바이스 repro). 권한 *요청* 흐름(initializeScreen 등)은 그대로
+  // locationPermission을 쓴다.
+  const locationActive = locationPermission || nearbyHasLocation;
 
   // 지연 배너 비활성화: 1~9호선 "대표역" 9곳을 1분마다 폴링해 Seoul API
   // rate budget(일 1,000회)을 소진하고, per-station throttle 누적으로 즐겨찾기
@@ -234,7 +243,7 @@ export const HomeScreen: React.FC = () => {
   const onRefresh = useCallback(async (): Promise<void> => {
     setRefreshing(true);
     try {
-      if (locationPermission) {
+      if (locationActive) {
         refreshNearby();
       }
       // Always re-pull favorites from Firestore. The prior code skipped this
@@ -244,14 +253,14 @@ export const HomeScreen: React.FC = () => {
     } finally {
       setRefreshing(false);
     }
-  }, [locationPermission, refreshNearby, refreshFavorites]);
+  }, [locationActive, refreshNearby, refreshFavorites]);
 
   useEffect(() => {
     initializeScreen();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const nearbyList = locationPermission ? hookNearbyStations : favoriteStations;
+  const nearbyList = locationActive ? hookNearbyStations : favoriteStations;
 
   const showNearbySection = nearbyList.length > 0;
   const showFavoritesSection = favoriteStations.length > 0;
@@ -399,20 +408,20 @@ export const HomeScreen: React.FC = () => {
           <View style={styles.sectionHeaderTitle}>
             <SectionHeader
               title={
-                locationPermission
+                locationActive
                   ? nearbyIsEstimated
                     ? '주변 역 (추정)'
                     : '주변 역'
                   : '즐겨찾기'
               }
-              subtitle={locationPermission ? 'GPS 기반 · 도보 거리순' : undefined}
+              subtitle={locationActive ? 'GPS 기반 · 도보 거리순' : undefined}
               testID="home-stations-section"
             />
           </View>
           {/* Suppress the definitive "OO 인근" proximity claim on a coarse fix:
               at >100m uncertainty the nearest-station pick is a guess, not fact
               (location-services skill BP#5). */}
-          {locationPermission && nearbyClosestStation && !nearbyIsEstimated && (
+          {locationActive && nearbyClosestStation && !nearbyIsEstimated && (
             <View style={styles.locationBadgeWrap}>
               <Pill tone="pos" size="sm">
                 {`${nearbyClosestStation.name} 인근`}
@@ -421,7 +430,7 @@ export const HomeScreen: React.FC = () => {
           )}
         </View>
 
-        {locationPermission && nearbyIsEstimated && showNearbySection && (
+        {locationActive && nearbyIsEstimated && showNearbySection && (
           <Text style={styles.estimatedNote} testID="home-nearby-estimated-note">
             위치 정확도가 낮아 추정 결과예요
           </Text>
@@ -433,11 +442,11 @@ export const HomeScreen: React.FC = () => {
             <TrainFront size={48} color={semantic.labelAlt} />
             <Text style={styles.emptyText}>데이터가 없습니다.</Text>
             <Text style={styles.emptySubtext}>
-              {locationPermission
+              {locationActive
                 ? '다른 위치에서 시도해보세요'
                 : '설정에서 자주 이용하는 역을 추가해보세요'}
             </Text>
-            {!locationPermission && (
+            {!locationActive && (
               <Text
                 style={styles.permissionLink}
                 onPress={requestLocationPermission}
