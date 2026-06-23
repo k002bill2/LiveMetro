@@ -8,7 +8,7 @@ inputs:
   node-version:
     description: Node.js version
     required: false
-    default: '18'
+    default: '20'
   run-expo-doctor:
     description: Whether to run expo-doctor (skip on hotfix branches if needed)
     required: false

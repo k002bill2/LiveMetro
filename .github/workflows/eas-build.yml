@@ -35,7 +35,7 @@ jobs:
       - name: Quality gate (no Functions rebuild — already verified on main)
         uses: ./.github/actions/quality-gate
         with:
-          node-version: '18'
+          node-version: '20'
           run-functions-build: 'false'
 
   build:

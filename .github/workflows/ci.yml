@@ -20,7 +20,7 @@ jobs:
       - name: Run quality gate
         uses: ./.github/actions/quality-gate
         with:
-          node-version: '18'
+          node-version: '20'
           run-expo-doctor: 'true'
           run-functions-build: 'true'
 
