@@ -1,7 +1,10 @@
 /**
  * expoPushService Tests
  */
-jest.mock('expo-server-sdk', () => {
+// expoPushService loads the (ESM-only) Expo class through expoSdkLoader via a
+// `new Function`-created native import() that bypasses jest's module registry —
+// so mock the loader boundary, not the `expo-server-sdk` package itself.
+jest.mock('../expoSdkLoader', () => {
   const chunkPushNotifications = jest.fn((msgs: unknown[]) => [msgs]);
   const sendPushNotificationsAsync = jest.fn(async () => [{ status: 'ok', id: 't1' }]);
   class Expo {
@@ -11,7 +14,7 @@ jest.mock('expo-server-sdk', () => {
     chunkPushNotifications = chunkPushNotifications;
     sendPushNotificationsAsync = sendPushNotificationsAsync;
   }
-  return { Expo };
+  return { loadExpo: jest.fn(async () => Expo) };
 });
 
 import { expoPushService } from '../expoPushService';

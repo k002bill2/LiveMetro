@@ -6,7 +6,8 @@
  * Chunks messages (Expo caps at 100/request) and reports tokens Expo rejects as
  * invalid so callers can prune them.
  */
-import { Expo, ExpoPushMessage, ExpoPushTicket } from 'expo-server-sdk';
+import type { ExpoPushMessage, ExpoPushTicket } from 'expo-server-sdk';
+import { loadExpo } from './expoSdkLoader';
 
 interface PushMessage {
   title: string;
@@ -20,9 +21,23 @@ interface SendResult {
 }
 
 class ExpoPushService {
-  private expo = new Expo();
+  // Cache the (lazily ESM-loaded) Expo class so we import the SDK once, not per
+  // send. Loading is deferred to first use — importing this module must NOT pull
+  // in expo-server-sdk eagerly, or `firebase deploy` discovery re-hits
+  // ERR_REQUIRE_ESM (see expoSdkLoader).
+  private expoClassPromise?: ReturnType<typeof loadExpo>;
+
+  private getExpoClass(): ReturnType<typeof loadExpo> {
+    if (!this.expoClassPromise) {
+      this.expoClassPromise = loadExpo();
+    }
+    return this.expoClassPromise;
+  }
 
   async sendToTokens(tokens: string[], message: PushMessage): Promise<SendResult> {
+    const Expo = await this.getExpoClass();
+    const expo = new Expo();
+
     const valid: string[] = [];
     const invalidTokens: string[] = [];
     for (const t of tokens) {
@@ -45,9 +60,9 @@ class ExpoPushService {
     }));
 
     const tickets: ExpoPushTicket[] = [];
-    for (const chunk of this.expo.chunkPushNotifications(messages)) {
+    for (const chunk of expo.chunkPushNotifications(messages)) {
       try {
-        const receipts = await this.expo.sendPushNotificationsAsync(chunk);
+        const receipts = await expo.sendPushNotificationsAsync(chunk);
         tickets.push(...receipts);
       } catch (error) {
         console.error('Expo push chunk failed:', error);
