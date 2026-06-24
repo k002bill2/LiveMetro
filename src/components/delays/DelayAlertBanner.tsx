@@ -52,34 +52,39 @@ export const DelayAlertBanner: React.FC<DelayAlertBannerProps> = ({
   const opacityAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    if (delays.length > 0) {
-      Animated.parallel([
-        Animated.spring(slideAnim, {
-          toValue: 0,
-          useNativeDriver: true,
-          tension: 50,
-          friction: 8,
-        }),
-        Animated.timing(opacityAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    } else {
-      Animated.parallel([
-        Animated.timing(slideAnim, {
-          toValue: -100,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-        Animated.timing(opacityAnim, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }),
-      ]).start();
-    }
+    const animation =
+      delays.length > 0
+        ? Animated.parallel([
+            Animated.spring(slideAnim, {
+              toValue: 0,
+              useNativeDriver: true,
+              tension: 50,
+              friction: 8,
+            }),
+            Animated.timing(opacityAnim, {
+              toValue: 1,
+              duration: 300,
+              useNativeDriver: true,
+            }),
+          ])
+        : Animated.parallel([
+            Animated.timing(slideAnim, {
+              toValue: -100,
+              duration: 200,
+              useNativeDriver: true,
+            }),
+            Animated.timing(opacityAnim, {
+              toValue: 0,
+              duration: 200,
+              useNativeDriver: true,
+            }),
+          ]);
+    animation.start();
+    // Stop the animation on unmount / before the next run so its async completion
+    // callback can't fire into a torn-down tree — that surfaced as 136 "accessing
+    // ... after it has been torn down" errors in DelayAlertBanner.test, and is an
+    // orphaned native-driver animation in the app. (subscription-cleanup rule.)
+    return () => animation.stop();
   }, [delays.length, slideAnim, opacityAnim]);
 
   if (delays.length === 0) {
