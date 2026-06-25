@@ -7,6 +7,14 @@ import {
   API_BASE_URL,
 } from '../officialDelayService';
 
+// 실데이터 소스(data.go.kr)를 mock해 단위 테스트를 결정론적으로 유지(네트워크 차단).
+// 기본 []는 무장애 → 전 노선 정상 baseline.
+jest.mock('@/services/api', () => ({
+  publicDataApi: {
+    getActiveAlerts: jest.fn().mockResolvedValue([]),
+  },
+}));
+
 describe('OfficialDelayService', () => {
   describe('getAllLineStatuses', () => {
     it('should return line statuses', async () => {
