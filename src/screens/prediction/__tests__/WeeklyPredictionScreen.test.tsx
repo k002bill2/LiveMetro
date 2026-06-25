@@ -95,6 +95,10 @@ jest.mock('@/hooks/useMLPrediction', () => ({
 // route; individual tests override to exercise the store-#1 ?? store-#2 path.
 jest.mock('@/hooks/useFirestoreMorningCommute', () => ({
   useFirestoreMorningCommute: jest.fn(() => null),
+  // useCommuteHeroEstimate now also resolves the evening leg via this hook
+  // (gated to enabled=false in direction='morning'); export it so the call
+  // doesn't throw. WeeklyPrediction stays on the morning leg (no behavior change).
+  useFirestoreCommuteLeg: jest.fn(() => null),
 }));
 
 // useCommuteHeroEstimate (the new shared single source of truth for the
