@@ -24,6 +24,8 @@ description: Firebase integration for authentication, Firestore database, and re
 | `congestionData/` | 차량별 혼잡도 | public read |
 | `users/` | 사용자 설정 / 즐겨찾기 | uid-scoped write |
 
+> 위 표는 자주 쓰는 컬렉션 발췌이며 전체가 아니다. `delayReports/`(+ `comments/` 서브컬렉션)·`congestionReports/`·`congestionSummary/`·`favorites/`·`commuteSettings/`·`commutePatterns/`·`commuteLogs/`·`smartNotificationSettings/`·`pushTokens/`·`pushDedup/` 등도 존재한다. **전체 컬렉션·권한 모델의 SSOT는 `firestore.rules`** — 권한 가정 전 반드시 해당 파일을 확인할 것.
+
 ## 작업별 진입점
 
 | 하고 싶은 일 | 참고 |

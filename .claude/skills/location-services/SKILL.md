@@ -1,6 +1,6 @@
 ---
 name: location-services
-description: Location services, GPS tracking, and geolocation features using Expo Location. Use when implementing location-based functionality like finding nearby stations.
+description: Expo Location 기반 위치/GPS 작업. 위치 권한 요청, 현재 위치(cold-start degradation chain) 획득, 주변역 찾기, Haversine 거리 계산, 거리 포맷팅, 오프라인 last-known fix 게이팅을 구현할 때 사용. 단, 좌표를 받은 뒤의 역 조회/검색/실시간 도착정보 소비는 station-info, Seoul API 원시 응답 정규화는 subway-data-processor 소관.
 ---
 
 # Location Services Guidelines
@@ -86,11 +86,15 @@ const distance = locationService.calculateDistance(
 ```
 
 ### Distance Formatting
+Do **not** hand-roll a formatter — the service already exposes the same
+m/km rounding (`<1000 → round+'m'`, else `(m/1000).toFixed(1)+'km'`).
+Reuse it so every label stays on one formula
+(`locationService.formatDistance`, locationService.ts:802):
+
 ```typescript
-const formatDistance = (meters: number): string => {
-  if (meters < 1000) return `${Math.round(meters)}m`;
-  return `${(meters / 1000).toFixed(1)}km`;
-};
+import { locationService } from '@services/location/locationService';
+
+const label = locationService.formatDistance(distance); // e.g. "850m" / "1.2km"
 ```
 
 ## Accuracy Levels

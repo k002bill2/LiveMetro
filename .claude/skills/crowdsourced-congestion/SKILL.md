@@ -1,6 +1,6 @@
 ---
 name: crowdsourced-congestion
-description: "혼잡도 크라우드소싱 시스템. Firebase 기반 혼잡도 리포팅, 히트맵 생성, 예측 모델, 데이터 품질 검증. Use when: (1) 혼잡도 데이터 수집/표시, (2) 히트맵/차트 구현, (3) congestion 관련 코드 작성, (4) 데이터 품질 검증 로직. 트리거: 혼잡도, congestion, 히트맵, heatmap, 밀집도."
+description: "혼잡도 크라우드소싱 시스템. Firebase 기반 혼잡도 리포팅, 히트맵 생성, 예측 모델, 데이터 품질 검증. Use when: (1) 혼잡도 데이터 수집/표시, (2) 히트맵/차트 구현, (3) congestion 관련 코드 작성, (4) 데이터 품질 검증 로직. 트리거: 혼잡도, congestion, 히트맵, heatmap, 밀집도. 단, 원시 Seoul API 응답 정규화는 subway-data-processor, 일반 RN 컴포넌트/화면 골격은 react-native-development 소관 — 이 스킬은 congestion 도메인(제보·집계·예측·품질) 전용."
 ---
 
 # Crowdsourced Congestion System
@@ -9,6 +9,7 @@ description: "혼잡도 크라우드소싱 시스템. Firebase 기반 혼잡도 
 
 - `scripts/validate-congestion-data.py` - 혼잡도 리포트 데이터 검증
 - `assets/congestion-levels.json` - 혼잡도 레벨 정의, 색상, 히트맵 그래디언트
+- `references/api_reference.md` - 서비스 메서드 상세 시그니처/API 레퍼런스
 
 ## Architecture Overview
 
@@ -79,6 +80,8 @@ interface CarCongestion {
 | `congestionSummary` | `{lineId}_{direction}_{trainId}` | 열차별 집계 요약 |
 
 ## Service Layer
+
+> 실제 앱 규약은 deep path import (예: `import { congestionService } from '@/services/congestion/congestionService'`). 배럴도 동작하나 기존 소비처는 deep path.
 
 ### 1. CongestionService (핵심)
 

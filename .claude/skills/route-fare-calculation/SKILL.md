@@ -114,7 +114,7 @@ const result = findKShortestPaths('gangnam', 'hongdae', 3);
 // 다양성 카드 (환승역 signature 그룹화, maxRoutes 1-5)
 const diverse = getDiverseRoutes('gangnam', 'hongdae', 5);
 // → Route[] (최대 5개, fastest + min-transfer + via-station 카드)
-//   내부: findKShortestPaths(K_SHORTEST_CANDIDATES=30) 후 buildTransferSignature 로 그룹화
+//   내부: findKShortestPaths(K_SHORTEST_CANDIDATES=15) 후 buildTransferSignature 로 그룹화
 ```
 
 ### Route Diversity

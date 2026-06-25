@@ -1,6 +1,6 @@
 ---
 name: user-trust-reputation
-description: "사용자 신뢰도 및 평판 시스템. 신뢰도 점수 관리, 뱃지 시스템, 사기 탐지, 리포트 검증. Use when: (1) 신뢰도 점수 계산/업데이트, (2) 뱃지 획득 조건, (3) 부정행위 탐지, (4) 사용자 평판 표시. 트리거: 신뢰도, trust, 평판, reputation, 뱃지, badge, 사기탐지, fraud, 검증, verification."
+description: "사용자 신뢰도 및 평판 시스템. 신뢰도 점수 관리, 뱃지 시스템, 사기 탐지, 리포트 검증. Use when: (1) 신뢰도 점수 계산/업데이트, (2) 뱃지 획득 조건, (3) 부정행위 탐지, (4) 사용자 평판 표시. 트리거: 신뢰도, trust, 평판, reputation, 뱃지, badge, 사기탐지, fraud, 검증, verification. 단, 지연 제보 저장/조회 자체는 delayReportService(subway-data-processor 인접) 소관이며, 이 스킬은 신뢰도 점수·뱃지·사기탐지 로직에만 해당."
 ---
 
 # User Trust & Reputation System

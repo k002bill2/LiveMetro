@@ -1,6 +1,6 @@
 ---
 name: cc-feature-implementer-main
-description: Creates phase-based feature plans with quality gates and incremental delivery structure. Use when planning features, organizing work, breaking down tasks, creating roadmaps, or structuring development strategy. Keywords: plan, planning, phases, breakdown, strategy, roadmap, organize, structure, outline.
+description: Creates a phase-based feature PLAN DOCUMENT with quality gates and incremental delivery structure (planning step only, before any code). Use when planning features, organizing work, breaking down tasks, creating roadmaps, or structuring development strategy. Does NOT implement code, run tests, or execute the plan — implementation/testing belong to the domain skills and test-automation; this skill produces the plan document only. Keywords: plan, planning, phases, breakdown, strategy, roadmap.
 ---
 
 # Feature Planner
@@ -78,7 +78,7 @@ TDD 절차 디테일: [references/tdd-and-testing.md](references/tdd-and-testing
 **TDD**
 - [ ] 테스트가 production 코드보다 먼저 작성됨
 - [ ] Red-Green-Refactor 사이클 준수
-- [ ] Unit test: 비즈니스 로직 ≥80%
+- [ ] Unit test: 비즈니스 로직 커버리지는 프로젝트 SSOT(jest.config.js coverageThreshold) 준수 — 하드코딩 금지
 - [ ] Integration test: 핵심 user flow 검증
 - [ ] 테스트 suite <5분 실행
 

@@ -94,15 +94,16 @@ const timetable = await seoulSubwayApi.getStationTimetable(
 
 ```typescript
 import { toSeoulApiLineName } from '@/utils/formatUtils';
-import { resolveLineKey, LINE_STATIONS, LINE_COLORS } from '@/utils/subwayMapData';
+import { resolveLineKey, getLineBranches, LINE_COLORS } from '@/utils/subwayMapData';
 
 // (1) API 입력 — Seoul realtimePosition 호출용 한글 노선명.
 //     커버 안 되는 노선은 null → 호출 자체를 건너뛴다(INFO-200 회피).
-const apiLineName = toSeoulApiLineName(lineId);  // 예: 'bundang' → '수인분당선', 미지원 → null
+const apiLineName = toSeoulApiLineName(lineId);  // 입력 = Station.lineId 한글명. 예: 수인분당선 → 수인분당선(API), 미지원 → null
+//     API 입력 노선명 변환(toSeoulApiLineName)의 SoT는 api-integration 참조. resolveLineKey(로컬 슬러그)는 소비 레이어 고유.
 
-// (2) 로컬 조회 — LINE_STATIONS / LINE_COLORS의 lines.json 슬러그 키.
+// (2) 로컬 조회 — getLineBranches / LINE_COLORS의 lines.json 슬러그 키.
 const lineKey = resolveLineKey(lineId);          // 예: '수인분당선' → 'bundang'
-const stations = LINE_STATIONS[lineKey];
+const branches = getLineBranches(lineKey);       // 노선 서비스 분기들(LineBranch[]). LINE_STATIONS 직접 접근은 readonly string[][](분기 중첩)
 const color = LINE_COLORS[lineKey];
 ```
 

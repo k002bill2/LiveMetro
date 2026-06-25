@@ -1,6 +1,6 @@
 ---
 name: audio-accessibility
-description: "음성 합성(TTS), 알림음, 진동, 접근성 서비스 통합. Expo Speech, 사운드 재생, 화면 읽기, 움직임 감소 설정. Use when: (1) TTS 음성 안내, (2) 알림음/진동 구현, (3) 접근성 기능 개발, (4) VoiceOver/TalkBack 지원. 트리거: TTS, 음성, voice, 사운드, sound, 진동, vibration, 접근성, accessibility, 화면읽기, screen reader."
+description: "음성 합성(TTS), 알림음, 진동, 접근성 서비스 통합. Expo Speech, 사운드 재생, 화면 읽기, 움직임 감소 설정. Use when: (1) TTS 음성 안내, (2) 알림음/진동 구현, (3) 접근성 기능 개발, (4) VoiceOver/TalkBack 지원. 트리거: TTS, 음성, voice, 사운드, sound, 진동, vibration, 접근성, accessibility, 화면읽기, screen reader. 단, 테마/다크모드/고대비 색상·글자크기는 theme-i18n-system, 푸시 알림 전송/스케줄은 notification-system 소관 (이 스킬은 TTS 발화·알림음/진동·AccessibilityInfo 감지·접근성 라벨에 한정)."
 ---
 
 # Audio & Accessibility Skill
@@ -229,7 +229,7 @@ accessibilityService.formatTimeForScreenReader('14:30'); // "14시 30분"
 accessibilityService.formatDurationForScreenReader(95);  // "1시간 35분"
 
 // 혼잡도 설명
-accessibilityService.getCongestionDescription(7); // "약간 혼잡"
+accessibilityService.getCongestionDescription(7); // "혼잡"
 
 // 설정 변경 구독 (cleanup 필수!)
 useEffect(() => {
@@ -291,7 +291,7 @@ if (accessibilityService.shouldUseHapticFeedback()) { /* 햅틱 실행 */ }
 | `src/models/user.ts` | `NotificationSoundId`, `VibrationPatternId`, `SoundPreferences` |
 | `src/screens/settings/VoiceSettingsScreen.tsx` | TTS 설정 UI (음성 선택, pitch/rate/volume) |
 | `src/screens/settings/SoundSettingsScreen.tsx` | 알림음/진동 설정 UI |
-| `src/components/settings/SoundPicker.tsx` | 알림음 선택 컴포넌트 |
+| `src/components/settings/SoundRadioList.tsx` | 알림음 선택(라디오 리스트) |
 | `src/components/settings/VibrationPicker.tsx` | 진동 패턴 선택 컴포넌트 |
 
 상세 API 레퍼런스: `references/api_reference.md`

@@ -119,7 +119,7 @@ interface Station {
 |------|----------|------|
 | `models/train.ts:86` `DelaySeverity` | `minor`/`moderate`/`major`/`severe` | **canonical (이걸 import)** |
 | `dataManager.detectServiceDisruptions` | `DelaySeverity` 사용 | OK (정렬됨) |
-| `services/delay/officialDelayService.ts:46` | `info`/`warning`/`critical` | 3-tier 자체 정의 → enum과 매핑 불명 |
+| `services/delay/officialDelayService.ts:52` | `info`/`warning`/`critical` | 3-tier 자체 정의 → enum과 매핑 불명 |
 | `api-integration` SKILL `detectServiceDisruptions` | flat 키워드 → `boolean` | severity 없이 "장애 있음/없음"만 |
 
 매핑 주의:
@@ -163,7 +163,7 @@ interface Station {
 
 ### 노선명 도메인 — 호출 입력은 정규화 책임 밖이지만 주의
 
-`getRealtimePosition`은 앱 `lineId`(`'경의선'`, `'인천2'`)가 아니라 **API 공식 노선명**을 받는다. 호출 전 `toSeoulApiLineName(lineId)`(`src/utils/formatUtils.ts:84`)로 변환하고 `null`이면 스킵하라(상세는 `api-integration` SKILL). `'인천2'`를 그대로 넣으면 숫자가 새어 `'2호선'` 데이터를 끌어온다.
+`getRealtimePosition`은 앱 `lineId`(`'경의선'`, `'인천2'`)가 아니라 **API 공식 노선명**을 받는다. 호출 전 `toSeoulApiLineName(lineId)`(`src/utils/formatUtils.ts:84`)로 변환하고 `null`이면 스킵하라(**API 입력 노선명 변환 SoT는 `api-integration` 참조** — 변환 규칙·미지원 노선 목록·함정은 거기서 관리). `'인천2'`를 그대로 넣으면 숫자가 새어 `'2호선'` 데이터를 끌어온다.
 
 ### schedule-vs-actual 지연 계산
 

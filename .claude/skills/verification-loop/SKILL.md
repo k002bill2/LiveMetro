@@ -1,7 +1,7 @@
 ---
 name: verification-loop
 description: Boris Cherny style verification feedback loop automation. Run type check, lint, test, and build verification. Use after completing a feature/refactor/bugfix and BEFORE declaring completion or opening a PR — enforces fresh-run evidence. NOT for CI/hook 작성(update-config), 테스트 작성(test-automation), 빌드 에러 수정(build-error-resolver).
-allowed-tools: Bash(npm run*), Bash(npx tsc*), Bash(npx jest*), Bash(npx eslint*)
+allowed-tools: Bash(npm run*), Bash(npx tsc*), Bash(npx jest*), Bash(npx eslint*), Bash(npx expo*)
 ---
 
 # Verification Loop Skill
@@ -46,15 +46,17 @@ npm test
 - 타입 + 린트 + 테스트
 - 기능 구현 완료 시
 
-### Level 3: Full Check (5분 이상)
+### Level 3: Full Check (로컬, 5분 이내)
 ```bash
 npm run type-check
 npm run lint
 npm test -- --coverage
-npm run build:development
+npx expo-doctor      # Expo SDK 호환성 (로컬)
+npx expo export      # 번들 export 검증 (로컬)
 ```
-- 전체 검증
+- 전체 검증 (로컬 피드백 루프)
 - PR 생성 전 필수
+- 실제 EAS 빌드(`npm run build:development` = `eas build`, EAS 클라우드 10-20분·인증/크레딧 필요)는 로컬 검증이 아니라 **CI/배포 파이프라인**에서 수행 (`.github/workflows/eas-build.yml`). 로컬 루프에서는 `expo-doctor`/`expo export`로 대체.
 
 ## 검증 기준
 
@@ -72,11 +74,7 @@ npm run build:development
 | 경고 10개 미만 | 권장 |
 
 ### 테스트 커버리지
-| 지표 | 목표 |
-|------|------|
-| Statements | ≥75% |
-| Functions | ≥70% |
-| Branches | ≥60% |
+`jest.config.js`의 `coverageThreshold`가 강제 게이트의 SSOT다 (`npm test -- --coverage`로 강제, 미달 시 PR 차단). 숫자를 여기 하드코딩하면 드리프트가 발생하므로 적지 않는다. 목표·상향(ratchet) 정책은 [`.claude/rules/coverage-thresholds.md`](../../rules/coverage-thresholds.md) 참조.
 
 ### 빌드
 | 기준 | 상태 |

@@ -192,7 +192,7 @@ stationNameProp → trainService.getStation() (Firebase) → getLocalStation() (
 | 데이터 타입 | TTL | 저장소 | 비고 |
 |------------|-----|--------|------|
 | 실시간 도착 | 60초 | 메모리 | 폴링 주기와 동일 |
-| 시간표 | 24시간 | AsyncStorage | 일 단위 변경, `timetable:{code}:{weekTag}:{dir}` |
+| 시간표 | 24시간 | AsyncStorage | 일 단위 변경, `timetable:{code}:{lineNumber}:{weekTag}:{dir}` |
 | 역정보 | 영구 | 로컬 JSON | `stationsDataService` |
 
 ## 흔한 실수 체크리스트
@@ -232,6 +232,8 @@ Seoul API 연동 시 아래 패턴은 장애를 유발합니다. 예외 없음.
 | `arrivalTime ? ... : fallback` (0 = falsy) | `arrivalTime !== null ? ...` |
 | 캐시 없이 매번 API 호출 | SWR 패턴 (캐시 반환 → 백그라운드 갱신) |
 | API 에러와 빈 데이터 동일 처리 | 에러 = retry, 빈 데이터 = "운행 종료" |
+
+> `updnLine` 방향·`arrivalTime`·`convertToAppTrain` 등 페이로드 정규화 규칙의 SoT는 `subway-data-processor` 소관(L18) — 위 정규화 행은 호출 레이어 함정 환기용 요약이며, 정본은 거기 참조.
 
 ### Response 검증 Patterns
 | BANNED | REQUIRED |

@@ -186,7 +186,7 @@ it('subscribes to Firestore and cleans up on unmount', () => {
 ```javascript
 module.exports = {
   preset: 'jest-expo',
-  setupFilesAfterSetup: ['./jest.setup.js'],
+  setupFilesAfterEnv: ['<rootDir>/src/__tests__/setup.ts'],
   coverageThreshold: {
     global: {
       statements: 75,
@@ -199,6 +199,8 @@ module.exports = {
     '^@/(.*)$': '<rootDir>/src/$1',
     '^@components/(.*)$': '<rootDir>/src/components/$1',
     '^@services/(.*)$': '<rootDir>/src/services/$1',
+    '^@utils/(.*)$': '<rootDir>/src/utils/$1',
+    '^@hooks/(.*)$': '<rootDir>/src/hooks/$1',
   },
 };
 ```
