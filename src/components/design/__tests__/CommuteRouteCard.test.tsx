@@ -154,4 +154,24 @@ describe('CommuteRouteCard', () => {
     expect(getByText('이동')).toBeTruthy();
     expect(getByText('요금')).toBeTruthy();
   });
+
+  it('hides the 길안내 시작 CTA when onStartGuidance is not provided', () => {
+    const { queryByTestId } = render(
+      <CommuteRouteCard origin="홍대입구" destination="강남" />,
+    );
+    expect(queryByTestId('commute-route-card-start')).toBeNull();
+  });
+
+  it('shows the 길안내 시작 CTA and fires onStartGuidance when tapped', () => {
+    const onStartGuidance = jest.fn();
+    const { getByTestId } = render(
+      <CommuteRouteCard
+        origin="홍대입구"
+        destination="강남"
+        onStartGuidance={onStartGuidance}
+      />,
+    );
+    fireEvent.press(getByTestId('commute-route-card-start'));
+    expect(onStartGuidance).toHaveBeenCalledTimes(1);
+  });
 });

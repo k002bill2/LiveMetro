@@ -32,6 +32,7 @@ import {
   ChevronRight,
   Footprints,
   Home as HomeIcon,
+  Navigation,
   Route as RouteIcon,
   TrainFront,
 } from 'lucide-react-native';
@@ -66,6 +67,12 @@ interface CommuteRouteCardProps {
   fareKrw?: number;
   /** Tap handler for the "경로 변경" link — typically navigates to settings. */
   onPressEdit?: () => void;
+  /**
+   * Tap handler for the "이 경로로 길안내 시작" CTA. When provided, the CTA
+   * renders below the fact grid; when absent (e.g. route unresolved), it is
+   * hidden — never offer an action that would dead-end.
+   */
+  onStartGuidance?: () => void;
   style?: ViewStyle;
   testID?: string;
 }
@@ -85,6 +92,7 @@ const CommuteRouteCardImpl: React.FC<CommuteRouteCardProps> = ({
   transferCount,
   fareKrw,
   onPressEdit,
+  onStartGuidance,
   style,
   testID,
 }) => {
@@ -363,6 +371,20 @@ const CommuteRouteCardImpl: React.FC<CommuteRouteCardProps> = ({
           </View>
         </View>
       )}
+
+      {onStartGuidance && (
+        <Pressable
+          testID="commute-route-card-start"
+          onPress={onStartGuidance}
+          accessibilityRole="button"
+          accessibilityLabel={`${origin}에서 ${destination}까지 이 경로로 길안내 시작`}
+          hitSlop={4}
+          style={[styles.startCta, { backgroundColor: WANTED_TOKENS.blue[500] }]}
+        >
+          <Navigation size={14} color="#FFFFFF" strokeWidth={2.4} />
+          <Text style={styles.startCtaText}>이 경로로 길안내 시작</Text>
+        </Pressable>
+      )}
     </View>
   );
 };
@@ -586,5 +608,20 @@ const styles = StyleSheet.create({
     marginTop: 1,
     fontSize: 10.5,
     fontFamily: weightToFontFamily('700'),
+  },
+  startCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    minHeight: 44,
+    marginTop: 12,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+  },
+  startCtaText: {
+    color: '#FFFFFF',
+    fontSize: 14,
+    fontFamily: weightToFontFamily('600'),
   },
 });
