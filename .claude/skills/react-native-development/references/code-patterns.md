@@ -107,19 +107,19 @@ try {
 ## 6. Responsive Design
 
 ```tsx
-import { Dimensions, Platform } from 'react-native';
+import { useWindowDimensions } from 'react-native';
 
-const { width, height } = Dimensions.get('window');
+function ResponsiveCard(): JSX.Element {
+  // 1순위: 회전·분할화면에 반응하는 훅 (SKILL.md BANNED: 모듈 레벨 Dimensions.get)
+  const { width } = useWindowDimensions();
 
-const styles = StyleSheet.create({
-  container: {
-    width: width * 0.9,
-    padding: width < 375 ? 12 : 16,
-  },
-});
+  return (
+    <View style={[styles.container, { width: width * 0.9, padding: width < 375 ? 12 : 16 }]} />
+  );
+}
 ```
 
-> **주의**: 모듈 레벨 `Dimensions.get`은 회전 시 갱신 안 됨. 컴포넌트 내부에서 회전 대응이 필요하면 `useWindowDimensions()` 훅 사용.
+> **예외 — 정적 레이아웃**: 회전 대응이 불필요한 1회성 상수(예: 스플래시 고정 비율)에 한해 모듈 레벨 `Dimensions.get('window')`을 쓸 수 있다. 그 외 동적 레이아웃은 항상 `useWindowDimensions()` (모듈 레벨은 회전 시 갱신 안 됨 → SKILL.md Hard Failure).
 
 ## 7. Platform-Specific Styles
 

@@ -1,6 +1,6 @@
 ---
 name: react-native-development
-description: React Native component development with TypeScript, Expo, and React Navigation. Use when creating UI components, screens, or implementing navigation flows.
+description: React Native component development with TypeScript, Expo, and React Navigation. Use when creating UI components, screens, or implementing navigation flows. 단, 순수 데이터/서비스 로직은 subway-data-processor·station-info·api-integration, 테스트 생성은 test-automation, 테마 시스템 자체 구축은 theme-i18n-system 소관.
 ---
 
 # React Native Development (LiveMetro)
@@ -59,12 +59,12 @@ src/
 | `fontWeight: '700'` 단독 | `weightToFontFamily('700')` | Pretendard PostScript name 매칭 — pre-commit `lint:typography` 차단 |
 
 ### Architecture
-| BANNED | USE INSTEAD |
-|--------|-------------|
-| 한 파일에 다중 export | 컴포넌트당 1파일 |
-| 800줄 초과 파일 | 유틸/서브컴포넌트로 분리 |
-| Props drilling 3단계+ | Context 또는 composition |
-| 컴포넌트에 비동기 로직 직접 | 커스텀 훅 추출 |
+| BANNED | USE INSTEAD | WHY |
+|--------|-------------|-----|
+| 한 파일에 다중 export | 컴포넌트당 1파일 | tree-shaking 저해 |
+| 800줄 초과 파일 | 유틸/서브컴포넌트로 분리 | 응집도 저하 (golden-principles 파일 한도) |
+| Props drilling 3단계+ | Context 또는 composition | 중간 컴포넌트 결합 → 리팩토링 취약 |
+| 컴포넌트에 비동기 로직 직접 | 커스텀 훅 추출 | 렌더 책임 혼재 → 테스트/재사용 어려움 |
 
 ## Pre-Output Checklist
 

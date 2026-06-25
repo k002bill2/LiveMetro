@@ -45,6 +45,8 @@ Phase 단위로 기능을 분할할 때 각 phase가 따라야 하는 Red-Green-
 | API / Controller | ≥70% (endpoints) |
 | UI / Presentation | 통합 테스트 우선 (coverage보다) |
 
+> 위 표는 generic 가이드. LiveMetro에서는 프로젝트 게이트(jest.config.js coverageThreshold)가 우선 — 강제 임계값의 SSOT다.
+
 ## Coverage Commands (생태계별)
 
 ```bash

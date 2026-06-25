@@ -5,7 +5,7 @@
 ## Firebase
 
 ```typescript
-jest.mock('@/config/firebase', () => ({
+jest.mock('@/services/firebase/config', () => ({
   auth: {
     currentUser: { uid: 'test-uid', email: 'test@test.com' },
     onAuthStateChanged: jest.fn((callback) => {
@@ -13,7 +13,7 @@ jest.mock('@/config/firebase', () => ({
       return jest.fn(); // unsubscribe
     }),
   },
-  db: {},
+  firestore: {},
 }));
 
 jest.mock('firebase/firestore', () => ({
@@ -62,10 +62,12 @@ jest.mock('@react-navigation/native', () => ({
 ## Seoul API (trainService)
 
 ```typescript
-jest.mock('@/services/trainService', () => ({
-  getRealtimeArrivals: jest.fn().mockResolvedValue([
-    { trainLineNm: '2호선', arvlMsg2: '3분 후 도착', statnNm: '강남' },
-  ]),
+jest.mock('@/services/train/trainService', () => ({
+  trainService: {
+    getStation: jest.fn().mockResolvedValue(null),
+    getNearbyStations: jest.fn().mockResolvedValue([]),
+    subscribeToTrainUpdates: jest.fn(() => jest.fn()), // returns unsubscribe
+  },
 }));
 ```
 

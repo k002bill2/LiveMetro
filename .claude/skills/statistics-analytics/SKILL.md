@@ -1,6 +1,6 @@
 ---
 name: statistics-analytics
-description: "지하철 이용 통계 및 분석 시스템. 일일/주간 통계 계산, 차트 컴포넌트, 지연 분석, 노선 사용량. Use when: (1) 통계 데이터 집계/표시, (2) 차트 컴포넌트 구현, (3) 분석 대시보드 개발, (4) 통계 관련 서비스 작성. 트리거: 통계, statistics, 차트, chart, 분석, analytics, 집계, 대시보드."
+description: "지하철 이용 통계 및 분석 시스템. 일일/주간 통계 계산, 차트 컴포넌트, 지연 분석, 노선 사용량. Use when: (1) 통계 데이터 집계/표시, (2) 차트 컴포넌트 구현, (3) 분석 대시보드 개발, (4) 통계 관련 서비스 작성. 트리거: 통계, statistics, 차트, chart, 분석, analytics, 집계, 대시보드. 단, 앱 런타임 성능/헬스(렌더/API 응답시간/메모리/크래시)는 monitoring-observability 소관 — 이 스킬은 지하철 이용 통계/차트만."
 ---
 
 # Statistics Analytics

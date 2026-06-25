@@ -21,6 +21,7 @@ import { useCommuteReminderSync } from './src/hooks/useCommuteReminderSync';
 import { usePushRegistration } from './src/hooks/usePushRegistration';
 import { useWatchedLineIds } from './src/hooks/useWatchedLineIds';
 import { useCommuteDelayAlerts } from './src/hooks/useCommuteDelayAlerts';
+import { hydrateGuidanceSession } from './src/services/guidance/guidanceSessionStore';
 import { ErrorBoundary } from './src/components/common/ErrorBoundary';
 import { installWebAlertPolyfill } from './src/utils/webAlertPolyfill';
 
@@ -49,6 +50,11 @@ const AppContent: React.FC = () => {
   // when one of the user's watched (favorited) lines has an official delay.
   const watchedLineIds = useWatchedLineIds();
   useCommuteDelayAlerts(watchedLineIds);
+  // Restore an in-progress guidance session (with TTL guard) so a commute
+  // survives an app kill mid-journey and the "안내 중" banner reappears.
+  useEffect(() => {
+    void hydrateGuidanceSession();
+  }, []);
 
   return (
     <NavigationContainer theme={isDark ? DarkTheme : DefaultTheme}>

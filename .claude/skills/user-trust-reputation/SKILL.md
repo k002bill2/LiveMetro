@@ -1,6 +1,6 @@
 ---
 name: user-trust-reputation
-description: "사용자 신뢰도 및 평판 시스템. 신뢰도 점수 관리, 뱃지 시스템, 사기 탐지, 리포트 검증. Use when: (1) 신뢰도 점수 계산/업데이트, (2) 뱃지 획득 조건, (3) 부정행위 탐지, (4) 사용자 평판 표시. 트리거: 신뢰도, trust, 평판, reputation, 뱃지, badge, 사기탐지, fraud, 검증, verification."
+description: "사용자 신뢰도 및 평판 시스템. 신뢰도 점수 관리, 뱃지 시스템, 사기 탐지, 리포트 검증. Use when: (1) 신뢰도 점수 계산/업데이트, (2) 뱃지 획득 조건, (3) 부정행위 탐지, (4) 사용자 평판 표시. 트리거: 신뢰도, trust, 평판, reputation, 뱃지, badge, 사기탐지, fraud, 검증, verification. 단, 지연 제보 저장/조회 자체는 delayReportService(subway-data-processor 인접) 소관이며, 이 스킬은 신뢰도 점수·뱃지·사기탐지 로직에만 해당."
 ---
 
 # User Trust & Reputation System
@@ -12,22 +12,22 @@ description: "사용자 신뢰도 및 평판 시스템. 신뢰도 점수 관리,
 
 ## Overview
 
-사용자의 지연 제보 정확도를 기반으로 신뢰도 점수(0-100)를 관리하고, 뱃지를 수여하며, 부정행위를 탐지하는 시스템. 클라이언트(AsyncStorage) + 서버(Firestore) 이중 저장 구조.
+사용자의 지연 제보 정확도를 기반으로 신뢰도 점수(0-100)를 관리하고, 뱃지를 수여하며, 부정행위를 탐지하는 시스템. 트러스트 프로필은 **AsyncStorage 전용**으로 저장된다 (`userTrustService`는 Firestore에 쓰지 않음).
+
+> **주의 — 미배선(unwired):** `userTrustService`/`fraudDetectionService`는 현재 production 진입점에 연결되어 있지 않다. `DelayReportForm`은 `delayReportService`만 사용한다. 아래 Architecture/통합 코드는 **권장 패턴이며 아직 배선되지 않았다** — 살아있다고 가정해 수정하면 실효가 없다.
 
 ## Architecture
 
 ```
+# 권장 통합 패턴 — 아직 미배선(unwired). 실제 DelayReportForm은 delayReportService만 사용.
 DelayReportForm → userTrustService.recordReportSubmission()
                 → fraudDetectionService.analyzeReport()
                      ↓
-              Firestore: delay_reports (status: pending)
-                     ↓
-              reportVerification (Cloud Function)
-                ├── autoVerifyReports (5분 스케줄)
-                ├── onDelayReportCreated (커뮤니티 교차검증)
-                └── verifyDelayReport (관리자 수동)
-                     ↓
-              userTrustService.processVerification()
+              Firestore: delayReports (status: pending)
+
+# 서버 검증 파이프라인(reportVerification/autoVerifyReports/onDelayReportCreated/
+# verifyDelayReport)은 #221에서 제거됨 — processVerification()을 자동 호출하던 서버 경로 없음.
+# userTrustService.processVerification()은 여전히 존재하나 수동 호출용.
                 ├── 점수 갱신 → TrustLevel 재계산
                 ├── 뱃지 확인 → 신규 뱃지 수여
                 └── notificationTriggers.onBadgeEarned()
@@ -180,32 +180,20 @@ if (!allowed) {
 
 | 컬렉션 | 문서 ID | 주요 필드 |
 |--------|---------|----------|
-| `user_trust_profiles` | `{userId}` | trustScore, trustLevel, totalReports, verifiedReports, rejectedReports, badges[] |
-| `delay_reports` | auto | userId, lineId, stationId, delayMinutes, status, verifiedBy, verifiedAt |
-| `verification_log` | auto | reportId, adminId, action, reason, timestamp |
+| `user_trust_profiles` | `{userId}` | trustScore, trustLevel, totalReports, verifiedReports, rejectedReports, badges[] **(현재 writer 없음 — `userTrustService`는 AsyncStorage만 씀)** |
+| `delayReports` | auto | userId, lineId, stationId, delayMinutes, status, verifiedBy, verifiedAt |
 
 ### Cloud Functions (asia-northeast3)
 
 | 함수 | 트리거 | 역할 |
 |------|--------|------|
-| `verifyDelayReport` | HTTPS callable | 관리자 수동 검증/거부 |
-| `autoVerifyReports` | 5분 스케줄 | 신뢰 사용자(60+) 자동 검증 |
-| `onDelayReportCreated` | Firestore onCreate | 2+ 유사 제보 시 커뮤니티 교차 검증 |
-| `onBadgeEarned` | Firestore onUpdate | 새 뱃지 → 푸시 알림 |
+| `onBadgeEarned` | Firestore onUpdate (`user_trust_profiles/{userId}`) | 새 뱃지 → 푸시 알림. **현재 미발화** — `userTrustService`가 `user_trust_profiles`를 Firestore에 쓰지 않아 onUpdate 이벤트가 발생하지 않는다. |
 
-### 자동 검증 조건 (autoVerifyReports)
+> 서버 측 검증 함수(`verifyDelayReport`/`autoVerifyReports`/`onDelayReportCreated`)는 #221에서 제거됨 — 현재 제보 검증을 호출하는 Cloud Function 없음.
 
-```typescript
-const DEFAULT_AUTO_CONFIG = {
-  minTrustScore: 60,        // verified 이상
-  maxDelayMinutes: 30,      // 30분 이내 지연만
-  requireLocationMatch: false,
-  minSimilarReports: 2,     // 동일 노선 10분 내 2건+
-};
-```
+### 자동 검증 (제거됨)
 
-- trustScore >= 80 (expert) → 유사 제보 없이도 자동 검증
-- trustScore >= 60 + 유사 제보 2건+ → 자동 검증
+`autoVerifyReports`(5분 스케줄 자동 검증)는 #221에서 서버 검증 파이프라인과 함께 제거되었다. 현재 제보는 클라이언트 `userTrustService` 경로만 거치며, **서버 측 자동 검증은 없다**. 자동 검증을 재도입하려면 Cloud Function을 새로 구현해야 한다.
 
 ## 테스트 패턴
 
@@ -232,8 +220,7 @@ expect(result.allowed).toBe(false);
 | `src/services/user/index.ts` | 타입/서비스 재Export |
 | `src/services/delay/fraudDetectionService.ts` | 부정행위 탐지 엔진 |
 | `src/models/user.ts` | User, UserPreferences 모델 (trust 타입은 서비스에 정의) |
-| `functions/src/admin/reportVerification.ts` | 서버 검증 Cloud Functions |
-| `functions/src/triggers/notificationTriggers.ts` | 뱃지 알림 트리거 |
+| `functions/src/triggers/notificationTriggers.ts` | 뱃지 알림 트리거 (`onBadgeEarned`) |
 | `src/services/user/__tests__/userTrustService.test.ts` | Trust 서비스 테스트 |
 | `src/services/delay/__tests__/fraudDetectionService.test.ts` | Fraud 서비스 테스트 |
 

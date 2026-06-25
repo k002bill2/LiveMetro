@@ -78,6 +78,7 @@ test/
 └── e2e/
     └── [user_flows]/
 ```
+> 위 `test/unit|integration|e2e` 트리는 generic 다생태계 예시. **LiveMetro 관례는 colocation**: 테스트를 소스 옆 `__tests__/` 또는 `*.test.ts(x)`로 배치한다 (예: `src/services/foo/__tests__/foo.test.ts`). 아래 Phase 태스크의 `test/unit/...` 경로 예시도 LiveMetro에선 colocated 경로로 채울 것.
 
 ### Coverage Requirements by Phase
 - **Phase 1 (Foundation)**: Unit tests for core models/entities (≥80%)

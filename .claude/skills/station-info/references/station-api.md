@@ -53,8 +53,8 @@ interface SeoulTimetableRow {
 | `searchLocalStations` | `query: string` | `Station[]` | 부분 매칭 검색 |
 | `getAllLocalStations` | - | `Station[]` | 전체 역 |
 | `getLocalStationsByLine` | `lineId: string` | `Station[]` | 노선별 역 (fr_code 순) |
-| `getStationsWithLineInfo` | - | `StationWithLine[]` | 노선 정보 포함 |
-| `searchStationsWithLineInfo` | `query: string` | `StationWithLine[]` | 노선 포함 검색 |
+| `getStationsWithLineInfo` | - | `StationWithLineInfo[]` | 노선 정보 포함 |
+| `searchStationsWithLineInfo` | `query: string` | `StationWithLineInfo[]` | 노선 포함 검색 |
 | `findStationCdByNameAndLine` | `name, lineId` | `string \| null` | station_cd 역조회 |
 
 ## trainService 함수 목록

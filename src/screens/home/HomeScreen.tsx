@@ -26,10 +26,13 @@ import { useAuth } from '../../services/auth/AuthContext';
 import { useNearbyStations } from '../../hooks/useNearbyStations';
 import { useDelayDetection } from '../../hooks/useDelayDetection';
 import { useCommuteHeroEstimate } from '../../hooks/useCommuteHeroEstimate';
+import { useStartCommuteGuidance } from '../../hooks/useStartCommuteGuidance';
+import { useGuidanceSession } from '../../hooks/useGuidanceSession';
 import { useFavorites } from '../../hooks/useFavorites';
 import { LoadingScreen } from '../../components/common/LoadingScreen';
 import { CommunityDelayCard, CommuteRouteCard, CommuteRouteCardPlaceholder, HomeTopBar, MLHeroCard, MLHeroCardPlaceholder, NearbyStationCard, Pill, QuickActionsGrid, SectionHeader } from '../../components/design';
 import type { LineId } from '../../components/design';
+import { GuidanceActiveBanner } from '../../components/guidance/GuidanceActiveBanner';
 import { useToast } from '../../components/common/Toast';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '../../styles/modernTheme';
 
@@ -198,6 +201,24 @@ export const HomeScreen: React.FC = () => {
     navigation.navigate('WeeklyPrediction');
   }, [navigation]);
 
+  // One-tap "내 출근 경로로 길안내 시작" — null when the registered commute
+  // can't resolve a route or endpoint names, so the CTA stays hidden rather
+  // than dead-ending. Reuses the same guidance handoff as the route-search tab.
+  const startCommuteGuidance = useStartCommuteGuidance({
+    fromStationId: morningCommute?.stationId,
+    toStationId: morningCommute?.destinationStationId,
+    viaTransferId: morningCommute?.transferStationId,
+    fromStationName: commuteStationNames.origin,
+    toStationName: commuteStationNames.destination,
+  });
+
+  // Re-entry into an in-progress guidance journey from the "안내 중" banner.
+  // Gated on an active session so the banner slot occupies zero space when idle.
+  const guidanceSession = useGuidanceSession();
+  const handleResumeGuidance = useCallback((): void => {
+    navigation.navigate('RouteGuidance');
+  }, [navigation]);
+
   // Opens CommuteSettings (출퇴근 경로 등록/변경). Every "set up your commute"
   // affordance funnels here regardless of whether a commute already exists:
   //   - ML hero placeholder CTA ("지금 설정하기")
@@ -339,6 +360,13 @@ export const HomeScreen: React.FC = () => {
         onBellPress={onPressBell}
       />
 
+      {/* Resume banner — only while a guidance journey is in progress. */}
+      {guidanceSession && (
+        <View style={styles.guidanceBannerWrap}>
+          <GuidanceActiveBanner onPress={handleResumeGuidance} />
+        </View>
+      )}
+
       {/* 2. ML hero — MLHeroCard when a prediction is available, otherwise the
           gradient placeholder. The placeholder shows whenever effectiveHero is
           null (no ML prediction yet) — INCLUDING when a commute is registered
@@ -382,6 +410,7 @@ export const HomeScreen: React.FC = () => {
             stationCount={routeSummary.stationCount}
             fareKrw={routeSummary.fareKrw}
             onPressEdit={handleOpenCommuteSettings}
+            onStartGuidance={startCommuteGuidance ?? undefined}
             testID="home-commute-route-card"
           />
         ) : (
@@ -582,6 +611,10 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     container: {
       flex: 1,
       backgroundColor: semantic.bgSubtlePage,
+    },
+    guidanceBannerWrap: {
+      paddingHorizontal: WANTED_TOKENS.spacing.s5,
+      paddingBottom: WANTED_TOKENS.spacing.s4,
     },
     heroWrap: {
       paddingHorizontal: WANTED_TOKENS.spacing.s5,

@@ -5,7 +5,7 @@ LiveMetro에서 검증된 Firebase 클라이언트 패턴 모음. SKILL.md에서
 ## 1. Authentication Pattern
 
 ```typescript
-import { auth } from '@/config/firebase';
+import { auth } from '@/services/firebase/config';
 import {
   signInAnonymously,
   onAuthStateChanged
@@ -35,7 +35,7 @@ onAuthStateChanged(auth, (user) => {
 ## 2. Firestore Query Pattern
 
 ```typescript
-import { firestore } from '@/config/firebase';
+import { firestore } from '@/services/firebase/config';
 import {
   collection,
   query,
@@ -111,22 +111,27 @@ useEffect(() => {
 
 ## 4. Error Handling
 
+서비스 함수는 throw 대신 **catch 후 `console.error` + 빈 배열(`[]`)/`null` 반환**한다 (`error-handling.md` 규칙). `FirebaseError` 코드는 사용자 친화 메시지 매핑에만 사용한다 — `handleFirebaseError` 같은 헬퍼는 코드베이스에 없으므로 catch 블록 안에서 직접 분기한다.
+
 ```typescript
 import { FirebaseError } from 'firebase/app';
 
-const handleFirebaseError = (error: unknown): string => {
-  if (error instanceof FirebaseError) {
-    switch (error.code) {
-      case 'permission-denied':
-        return 'You do not have permission to access this data';
-      case 'unavailable':
-        return 'Firebase service is temporarily unavailable';
-      case 'unauthenticated':
-        return 'Please sign in to continue';
-      default:
-        return error.message;
-    }
+const getStations = async (lineId: string): Promise<Station[]> => {
+  try {
+    // ...query...
+    return stations;
+  } catch (error) {
+    // FirebaseError 코드 → 사용자 메시지 (로깅/UI용)
+    const message =
+      error instanceof FirebaseError
+        ? error.code === 'permission-denied'
+          ? '데이터 접근 권한이 없습니다'
+          : error.code === 'unavailable'
+            ? 'Firebase 서비스가 일시적으로 불안정합니다'
+            : error.message
+        : '예기치 못한 오류가 발생했습니다';
+    console.error('Firestore query error:', message, error);
+    return []; // 빈 배열 반환 (throw 금지)
   }
-  return 'An unexpected error occurred';
 };
 ```

@@ -12,13 +12,6 @@ Squash-merge the current worktree branch back into the target branch with a comp
 
 **RELATED:** `superpowers:finishing-a-development-branch`
 
-## Current Context
-
-- Git dir: `!git rev-parse --git-dir`
-- Current branch: `!git branch --show-current`
-- Recent commits: `!git log --oneline -20`
-- Working tree status: `!git status --short`
-
 ## Instructions
 
 Follow these phases exactly, in order. Do NOT skip phases.
@@ -27,13 +20,15 @@ Follow these phases exactly, in order. Do NOT skip phases.
 
 ### Phase 1: Validation
 
+> Run the git inspection commands in this phase directly with the Bash tool (git dir, current branch, recent commits, status) — do not rely on any pre-injected context.
+
 1. **Verify worktree**: Check if the current git directory is a worktree. The output of `git rev-parse --git-dir` must contain `/worktrees/`. If it does not, **stop immediately** and tell the user:
-   > "This skill must be run from inside a git worktree. Use `/worktree` to create one first."
+   > "This skill must be run from inside a git worktree. Use `superpowers:using-git-worktrees` to create one first."
 
 2. **Identify current branch**: Get the worktree branch name from `git branch --show-current`.
 
 3. **Resolve target branch**:
-   - If `$ARGUMENTS` is provided and non-empty, use it as the target branch.
+   - If the user named a target branch in their request, use it as the target branch.
    - Otherwise, detect the default branch: check if `main` exists, else check `master`. If neither exists, stop and ask the user.
 
 4. **Identify the original repo path**: Parse the original repo root from the git-dir path. Use `git rev-parse --git-common-dir` to find it, then derive the original repo working directory (its parent).
@@ -114,7 +109,7 @@ Changes:
 - <grouped bullet points of what changed>
 - <use sub-bullets for details within a group>
 
-Co-Authored-By: Claude Opus 4.6 (1M context) <noreply@anthropic.com>
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>
 ```
 
 **Rules:**
