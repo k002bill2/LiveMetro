@@ -585,6 +585,14 @@ describe('HomeScreen', () => {
       });
     });
 
+    it('내 위치 quick action navigates to the current-location map', async () => {
+      const { getByTestId } = render(<HomeScreen />);
+      await waitFor(() => expect(getByTestId('quick-action-mylocation')).toBeTruthy());
+
+      fireEvent.press(getByTestId('quick-action-mylocation'));
+      expect(mockNavigate).toHaveBeenCalledWith('CurrentLocationMap');
+    });
+
     it('renders the 길안내 시작 CTA and invokes the start handler when tapped', async () => {
       withMorningCommute();
       mockGetStation.mockImplementation((id: string) =>

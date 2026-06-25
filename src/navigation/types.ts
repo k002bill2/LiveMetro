@@ -154,6 +154,7 @@ export type AppStackParamList = {
   // Phase 56: top-level routes still navigable via QuickActionsGrid
   // (노선도) and HomeTopBar (Bell) after their tabs were removed.
   SubwayMap: undefined;
+  CurrentLocationMap: undefined;
   Alerts: undefined;
 
   // ML Prediction screens
