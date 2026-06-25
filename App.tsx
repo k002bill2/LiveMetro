@@ -19,6 +19,8 @@ import { ThemeProvider, useTheme } from './src/services/theme';
 import { RootNavigator } from './src/navigation/RootNavigator';
 import { useCommuteReminderSync } from './src/hooks/useCommuteReminderSync';
 import { usePushRegistration } from './src/hooks/usePushRegistration';
+import { useWatchedLineIds } from './src/hooks/useWatchedLineIds';
+import { useCommuteDelayAlerts } from './src/hooks/useCommuteDelayAlerts';
 import { ErrorBoundary } from './src/components/common/ErrorBoundary';
 import { installWebAlertPolyfill } from './src/utils/webAlertPolyfill';
 
@@ -43,6 +45,10 @@ const AppContent: React.FC = () => {
   // Persist the Expo push token + subscribed lines so the server can target
   // real-time push (delay alerts) while the app is closed.
   usePushRegistration();
+  // Foreground delay alerts: while the app is open, fire a local notification
+  // when one of the user's watched (favorited) lines has an official delay.
+  const watchedLineIds = useWatchedLineIds();
+  useCommuteDelayAlerts(watchedLineIds);
 
   return (
     <NavigationContainer theme={isDark ? DarkTheme : DefaultTheme}>
