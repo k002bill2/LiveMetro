@@ -198,9 +198,10 @@ function buildDelayFactor(
     };
   }
   const lineDelays = result.value.filter(d => d.lineId === lineId);
-  // 공식 지연 실소스(data.go.kr 등)가 아직 미통합이라 빈 결과를 '정시 운행'으로
-  // 단정하면 거짓 확신이 된다. 정직하게 neutral '지연 정보 없음'으로 표시한다.
-  // 실소스 통합 시 genuine all-normal을 positive '정시 운행'으로 복원할 것.
+  // 실소스(data.go.kr ntce)는 A2에서 통합됐다. 그래도 빈 결과를 positive '정시 운행'으로
+  // 복원하지 않는다(YAGNI): 이 레이어는 getActiveDelays만 받아 genuine-normal과
+  // web/실패의 unknown을 구분할 신호가 없어, 빈 결과는 정직하게 neutral '지연 정보 없음'을
+  // 유지한다. 실제 지연/사고는 아래 negative 분기로 드러난다.
   if (result.value.length === 0 || lineDelays.length === 0) {
     return {
       id: 'delay',

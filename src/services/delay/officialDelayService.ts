@@ -1,7 +1,13 @@
 /**
  * Official Delay Service
- * Fetches official delay information from Seoul Metro API
+ * 공식 지연 정보를 data.go.kr 서울교통공사 지하철알림(ntce)에서 받아 OfficialDelay로
+ * 정규화한다. 분류/매핑은 아래 순수 헬퍼(classifyAlertStatus / lineNameToLineId /
+ * mergeWithBaseline)가 담당하고, fetch·rate-limit·timeout은 publicDataApi가 소유한다.
  */
+
+import { Platform } from 'react-native';
+import { publicDataApi } from '@/services/api';
+import type { AlertType } from '@/models/publicData';
 
 // ============================================================================
 // Types
@@ -70,11 +76,67 @@ const LINE_NAMES: Record<string, string> = {
   '9': '9호선',
 };
 
+/** `"2호선" → "2"` 역매핑 (1~9호선 한정, 본 서비스 도메인). */
+const LINE_NAME_TO_ID: Record<string, string> = Object.fromEntries(
+  Object.entries(LINE_NAMES).map(([lineId, lineName]) => [lineName, lineId])
+);
+
+// ============================================================================
+// Pure mapping helpers (data.go.kr 알림 → OfficialDelay)
+// ============================================================================
+
+/**
+ * 알림 타입을 지연 상태로 분류한다.
+ * `delay`/`accident`만 장애로 본다(`integratedAlertService`의 `['delay','accident']`
+ * SoT와 정합). accident는 MAJOR(운행 지속)이라 `suspended`(운행 중단=SEVERE)로 올리지
+ * 않는다 — free-text 미파싱 상태에서 정지는 과단정이므로 `delayed`로 보수 분류한다.
+ * maintenance(계획 공사)·crowded(별개 축)·weather·other는 장애 아님(`null`).
+ */
+export function classifyAlertStatus(alertType: AlertType): DelayStatus | null {
+  switch (alertType) {
+    case 'delay':
+    case 'accident':
+      return 'delayed';
+    default:
+      return null;
+  }
+}
+
+/** 알림 노선명을 lineId로 역매핑. 1~9호선만 매핑, 그 외(경의중앙선 등)는 `null`. */
+export function lineNameToLineId(lineName: string): string | null {
+  return LINE_NAME_TO_ID[lineName] ?? null;
+}
+
+/**
+ * 1~9호선 all-normal 기준선에 장애를 오버레이한다. 동일 노선 다중 장애는 첫 항목 유지
+ * (현재 status는 `delayed` 단일이라 동일). 비-1~9 lineId는 무시된다.
+ */
+export function mergeWithBaseline(
+  disruptions: readonly OfficialDelay[]
+): OfficialDelay[] {
+  const byLine = new Map<string, OfficialDelay>();
+  for (const disruption of disruptions) {
+    if (!byLine.has(disruption.lineId)) {
+      byLine.set(disruption.lineId, disruption);
+    }
+  }
+  return Object.entries(LINE_NAMES).map(
+    ([lineId, lineName]): OfficialDelay =>
+      byLine.get(lineId) ?? {
+        lineId,
+        lineName,
+        status: 'normal',
+        updatedAt: new Date(),
+        source: 'internal',
+      }
+  );
+}
+
 // ============================================================================
 // Service
 // ============================================================================
 
-class OfficialDelayService {
+export class OfficialDelayService {
   private cache: {
     data: LineStatusResponse | null;
     timestamp: number;
@@ -269,24 +331,43 @@ class OfficialDelayService {
    * Fetch official delays from API
    */
   private async fetchOfficialDelays(): Promise<OfficialDelay[]> {
-    // 공식 지연 실소스(서울교통공사 공식 지연 API)는 아직 통합되지 않았다.
-    // 이전 구현은 Math.random()으로 가짜 지연을 생성해 ML 예측 UI에 허구 공식
-    // 지연을 노출했다(정확성 위반). 실소스 통합 전까지는 날조 없이 전 노선 정상을
-    // 반환한다. 실데이터(data.go.kr ntceList → 장애 분류) 통합 시 이 메서드를 교체한다.
-    return this.getDefaultLineStatuses();
+    // 웹/비지원 플랫폼: data.go.kr ntce API는 CORS 미지원이라 getActiveAlerts가 조용히
+    // []를 반환한다. 그 []를 "전 노선 정상"으로 굳히면 거짓 realtime-normal(정직성 위반)이
+    // 된다. 실데이터를 받을 수 없는 플랫폼에서는 throw해 caller가 isRealtime:false로 폴백한다.
+    if (Platform.OS === 'web') {
+      throw new Error('Official delay source unavailable on web (CORS)');
+    }
+
+    const alerts = await publicDataApi.getActiveAlerts();
+    const disruptions: OfficialDelay[] = [];
+    for (const alert of alerts) {
+      const status = classifyAlertStatus(alert.alertType);
+      const lineId = lineNameToLineId(alert.lineName);
+      if (status === null || lineId === null) {
+        continue; // 장애 아님(maintenance 등) 또는 1~9호선 밖 → drop
+      }
+      disruptions.push({
+        lineId,
+        lineName: LINE_NAMES[lineId] ?? alert.lineName,
+        status,
+        // delayMinutes는 의도적으로 미설정(undefined): SubwayAlert에 구조화된 분이 없고
+        // free-text content에서 분을 파싱하면 "거짓 5분"(#252 제거 버그) 재발.
+        reason: alert.title || alert.content || undefined,
+        affectedStations: alert.affectedStations,
+        startTime: alert.startTime,
+        estimatedEndTime: alert.endTime ?? undefined,
+        updatedAt: new Date(),
+        source: 'seoul_metro',
+      });
+    }
+    return mergeWithBaseline(disruptions);
   }
 
   /**
    * Get default line statuses
    */
   private getDefaultLineStatuses(): OfficialDelay[] {
-    return Object.entries(LINE_NAMES).map(([lineId, lineName]) => ({
-      lineId,
-      lineName,
-      status: 'normal' as DelayStatus,
-      updatedAt: new Date(),
-      source: 'internal' as const,
-    }));
+    return mergeWithBaseline([]);
   }
 
   /**
