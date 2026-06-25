@@ -138,12 +138,10 @@ interface VibrationOption {
 
 | ID | URL |
 |----|-----|
-| `default` | mixkit sfx 2869 |
-| `train_arrival` | mixkit sfx 1900 |
-| `subway_chime` | mixkit sfx 2571 |
-| `gentle_bell` | mixkit sfx 2869 (= default) |
-| `urgent_alert` | mixkit sfx 1977 |
-| `silent` | (빈 문자열) |
+| `chime` | mixkit sfx 2869 (= DEFAULT_SOUND_URL) |
+| `doorbell` | mixkit sfx 2571 |
+| `beep` | mixkit sfx 1977 |
+| `wave` | mixkit sfx 1900 |
 
 ---
 
@@ -192,7 +190,7 @@ interface VibrationOption {
 
 ### `NotificationSoundId` (union type)
 
-`'default' | 'train_arrival' | 'subway_chime' | 'gentle_bell' | 'urgent_alert' | 'silent'`
+`'chime' | 'doorbell' | 'beep' | 'wave'`
 
 ### `VibrationPatternId` (union type)
 

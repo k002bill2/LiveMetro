@@ -111,14 +111,12 @@ interface TTSSettings {
 
 ### 알림음 ID (`NotificationSoundId`)
 
-| ID | 라벨 |
-|----|------|
-| `default` | 기본음 |
-| `train_arrival` | 열차 도착 |
-| `subway_chime` | 지하철 차임 |
-| `gentle_bell` | 부드러운 벨 |
-| `urgent_alert` | 긴급 알림 |
-| `silent` | 무음 |
+| ID | 라벨 | 설명 |
+|----|------|------|
+| `chime` | 차임 | 부드러운 종소리 |
+| `doorbell` | 도어벨 | 지하철 안내음 |
+| `beep` | 비프 | 짧고 명료 |
+| `wave` | 웨이브 | 잔잔한 파도 |
 
 ### 진동 패턴 ID (`VibrationPatternId`)
 
@@ -146,7 +144,7 @@ useEffect(() => {
 }, []);
 
 // 알림음 미리듣기 (Expo Go에서는 Alert 표시)
-await soundService.previewSound('train_arrival', 80);
+await soundService.previewSound('chime', 80);
 
 // 진동 실행
 soundService.triggerVibration('double');
@@ -167,14 +165,11 @@ interface SoundPreferences {
   readonly vibrationPattern: VibrationPatternId;
 }
 
-// SoundSettingsScreen에서 updateUserProfile로 저장
-await updateUserProfile({
-  preferences: {
-    ...user.preferences,
-    notificationSettings: {
-      ...user.preferences.notificationSettings,
-      soundSettings: { ...soundSettings, soundId: 'subway_chime' },
-    },
+// SoundSettingsScreen에서 updateUserPreferences로 저장 (preferences 부분쓰기 — 전체 스프레드는 즐겨찾기 등 롤백 위험)
+await updateUserPreferences({
+  notificationSettings: {
+    ...notificationSettings,
+    soundSettings: { ...soundSettings, soundId: 'chime' },
   },
 });
 ```

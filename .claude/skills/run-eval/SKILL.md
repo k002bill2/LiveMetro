@@ -53,8 +53,9 @@ Systematically evaluate AI agent performance and compute pass@k metrics. Provide
 `.claude/evals/tasks/` 디렉토리에서 YAML 파일을 읽습니다:
 
 ```bash
-# 단일 태스크
-cat .claude/evals/tasks/task_ui_001.yaml
+# 단일 태스크 — 파일명 ≠ 내부 id (예: id task_ui_001 → 파일 ui-component-creation.yaml)
+# 이므로 직접 cat 금지. 내부 id로 파일을 찾아 로드한다:
+cat "$(grep -rl "id: $TASK_ID" .claude/evals/tasks/*.yaml)"
 
 # 카테고리별
 grep -l "category: ui_component" .claude/evals/tasks/*.yaml

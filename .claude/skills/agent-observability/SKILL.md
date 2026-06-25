@@ -87,8 +87,8 @@ during concurrent agent execution.
 
 ## How It Works
 
-Events are appended to `events.jsonl` via hooks that intercept agent lifecycle events.
-Duration is calculated by cross-referencing `parallel-state.json` start times.
+Events are append-only JSONL at `.temp/traces/sessions/{sessionId}/events.jsonl` (emitted by the agent/workflow runtime — there is no `.claude/hooks/` script producing them).
+`duration_ms` is recorded directly on each `agent_completed` event; there is no `parallel-state.json` cross-reference.
 
 ## Common Mistakes
 
@@ -104,4 +104,4 @@ Duration is calculated by cross-referencing `parallel-state.json` start times.
 
 - Parallel state: `.claude/coordination/parallel-state.json`
 - Failure diagnosis: `.claude/skills/agent-improvement/SKILL.md`
-- **REQUIRED:** Use `superpowers:agent-improvement` for failure pattern analysis
+- **REQUIRED:** Use the `agent-improvement` skill (`.claude/skills/agent-improvement/SKILL.md`) for failure pattern analysis (local skill — no `superpowers:` prefix)
