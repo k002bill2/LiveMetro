@@ -24,9 +24,7 @@
  *   - any thrown error during calculation
  */
 import { useMemo } from 'react';
-import { getDiverseRoutes } from '@services/route';
-import { routeVia } from '@services/route/routeVia';
-import { resolveInternalStationId } from '@utils/stationIdResolver';
+import { selectCommuteRoute } from '@services/route/selectCommuteRoute';
 import { routeToGuidanceSteps } from '@/services/guidance/guidanceSteps';
 import type { GuidanceStep } from '@/models/guidance';
 
@@ -38,33 +36,16 @@ export function useCommuteRouteSteps(
   viaTransferId?: string,
 ): readonly GuidanceStep[] {
   return useMemo<readonly GuidanceStep[]>(() => {
-    if (!fromStationId || !toStationId || fromStationId === toStationId) {
-      return EMPTY;
-    }
-    // Storage layer (onboarding / Firestore) may persist Seoul Metro
-    // station_cd codes ("0220", "3762") while the graph keys on internal
-    // slugs ("seolleung"). Normalize at the boundary so the graph stays
-    // slug-only — same treatment as useCommuteRouteSummary.
-    const fromSlug = resolveInternalStationId(fromStationId);
-    const toSlug = resolveInternalStationId(toStationId);
-    if (!fromSlug || !toSlug || fromSlug === toSlug) return EMPTY;
+    // Canonical route selection (single SSOT — see selectCommuteRoute) so the
+    // ML timeline and the home fact grid never diverge.
+    const route = selectCommuteRoute(fromStationId, toStationId, viaTransferId);
+    if (!route) return EMPTY;
     try {
-      // Canonical route selection — identical policy to useCommuteRouteSummary
-      // so the ML timeline and the home fact grid never diverge:
-      //   - via transfer chosen → `routeVia` constrains the path through it
-      //   - otherwise → `getDiverseRoutes[0]` = fastest path.
-      const viaSlug = viaTransferId
-        ? resolveInternalStationId(viaTransferId)
-        : null;
-      const route = viaSlug
-        ? routeVia(fromSlug, viaSlug, toSlug)
-        : getDiverseRoutes(fromSlug, toSlug)[0] ?? null;
-      if (!route) return EMPTY;
       const steps = routeToGuidanceSteps(route);
       return steps.length > 0 ? steps : EMPTY;
     } catch (error) {
       if (__DEV__) {
-        console.warn('[useCommuteRouteSteps] calculation threw', {
+        console.warn('[useCommuteRouteSteps] reshape threw', {
           fromStationId,
           toStationId,
           error: error instanceof Error ? error.message : String(error),

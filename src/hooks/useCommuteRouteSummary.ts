@@ -21,9 +21,8 @@
  * 8-stop morning commute through a single line the count is 8.
  */
 import { useMemo } from 'react';
-import { fareService, getDiverseRoutes } from '@services/route';
-import { routeVia } from '@services/route/routeVia';
-import { resolveInternalStationId } from '@utils/stationIdResolver';
+import { fareService } from '@services/route';
+import { selectCommuteRoute } from '@services/route/selectCommuteRoute';
 
 export interface CommuteRouteSummary {
   /** Number of transfers between origin and destination. */
@@ -55,78 +54,22 @@ export function useCommuteRouteSummary(
   viaTransferId?: string,
 ): CommuteRouteSummary {
   return useMemo<CommuteRouteSummary>(() => {
-    if (!fromStationId || !toStationId || fromStationId === toStationId) {
-      if (__DEV__ && (fromStationId || toStationId)) {
-        console.warn('[useCommuteRouteSummary] skipped — invalid id pair', {
-          fromStationId,
-          toStationId,
-        });
-      }
-      return EMPTY;
-    }
-    // Storage layer (onboarding / Firestore) may persist Seoul Metro
-    // station_cd codes ("0220", "3762") while the graph layer keys on
-    // internal slugs ("seolleung", "s_ec82b0ea"). Normalize at the boundary
-    // so the graph stays slug-only and callers don't have to know which
-    // universe their ids came from.
-    const fromSlug = resolveInternalStationId(fromStationId);
-    const toSlug = resolveInternalStationId(toStationId);
-    if (!fromSlug || !toSlug) {
-      if (__DEV__) {
-        console.warn('[useCommuteRouteSummary] unresolved station id', {
-          fromStationId,
-          toStationId,
-          fromSlug,
-          toSlug,
-        });
-      }
-      return EMPTY;
-    }
-    if (fromSlug === toSlug) return EMPTY;
-    try {
-      // Canonical route selection (single SSOT with useCommuteRouteSteps):
-      //   - via transfer chosen → `routeVia` constrains the path through it
-      //   - otherwise → `getDiverseRoutes[0]` = Yen's K-shortest fastest path
-      //     (K=15, ≤2 transfers, 1.5× time-gap cap; matches "최단시간" card).
-      // The via slug is normalized at this same boundary as from/to.
-      const viaSlug = viaTransferId
-        ? resolveInternalStationId(viaTransferId)
-        : null;
-      const route = viaSlug
-        ? routeVia(fromSlug, viaSlug, toSlug)
-        : getDiverseRoutes(fromSlug, toSlug)[0] ?? null;
-      if (!route) {
-        if (__DEV__) {
-          console.warn('[useCommuteRouteSummary] getDiverseRoutes returned no path', {
-            fromStationId,
-            toStationId,
-            fromSlug,
-            toSlug,
-          });
-        }
-        return EMPTY;
-      }
-      const stationCount = route.segments.filter((s) => !s.isTransfer).length;
-      const lineId = route.segments.find((s) => !s.isTransfer)?.lineId;
-      const fare = fareService.calculateFare(stationCount).totalFare;
-      return {
-        transferCount: route.transferCount,
-        stationCount,
-        fareKrw: fare,
-        rideMinutes: route.totalMinutes,
-        lineId,
-        ready: true,
-      };
-    } catch (error) {
-      if (__DEV__) {
-        console.warn('[useCommuteRouteSummary] calculation threw', {
-          fromStationId,
-          toStationId,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-      return EMPTY;
-    }
+    // Canonical route selection (single SSOT — see selectCommuteRoute):
+    // id normalization + routeVia/getDiverseRoutes[0] selection + graceful
+    // null on any failure (missing/same id, unresolved slug, no path, throw).
+    const route = selectCommuteRoute(fromStationId, toStationId, viaTransferId);
+    if (!route) return EMPTY;
+    const stationCount = route.segments.filter((s) => !s.isTransfer).length;
+    const lineId = route.segments.find((s) => !s.isTransfer)?.lineId;
+    const fare = fareService.calculateFare(stationCount).totalFare;
+    return {
+      transferCount: route.transferCount,
+      stationCount,
+      fareKrw: fare,
+      rideMinutes: route.totalMinutes,
+      lineId,
+      ready: true,
+    };
   }, [fromStationId, toStationId, viaTransferId]);
 }
 
