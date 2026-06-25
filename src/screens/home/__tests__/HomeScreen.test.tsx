@@ -16,6 +16,7 @@ import * as Location from 'expo-location';
 // ============================================================================
 
 import { HomeScreen } from '../HomeScreen';
+import type { GuidanceSession } from '@/models/guidance';
 
 // ============================================================================
 // Mocks
@@ -176,6 +177,18 @@ jest.mock('@/hooks/useCommuteRouteSummary', () => ({
   useCommuteRouteSummary: () => mockUseCommuteRouteSummary(),
 }));
 
+// Commute → guidance link (selectCommuteRoute graph search is real, so mock the
+// handler hook to stay deterministic) + the reactive session read for the banner.
+const mockUseStartCommuteGuidance = jest.fn<(() => void) | null, []>(() => null);
+jest.mock('@/hooks/useStartCommuteGuidance', () => ({
+  useStartCommuteGuidance: () => mockUseStartCommuteGuidance(),
+}));
+
+const mockUseGuidanceSession = jest.fn<GuidanceSession | null, []>(() => null);
+jest.mock('@/hooks/useGuidanceSession', () => ({
+  useGuidanceSession: () => mockUseGuidanceSession(),
+}));
+
 // Phase 2 — HomeScreen now consumes useMLPrediction for the gradient hero card.
 jest.mock('@/hooks/useMLPrediction', () => ({
   useMLPrediction: jest.fn(() => ({
@@ -264,6 +277,8 @@ jest.mock('lucide-react-native', () => ({
   ArrowRight: () => null,
   // CommuteRouteCard + CommuteRouteCardPlaceholder icons
   Route: () => null, Home: () => null, Building2: () => null, Footprints: () => null,
+  // Commute guidance CTA + 안내 중 banner
+  Navigation: () => null,
 }));
 
 // expo-linear-gradient is used by MLHeroCard
@@ -466,6 +481,9 @@ describe('HomeScreen', () => {
     // Reset favorites context to the empty default. clearAllMocks keeps the
     // implementation but not a prior test's mockReturnValue override.
     mockUseFavorites.mockReturnValue(favoritesMockBase);
+    // Reset guidance link mocks to their inactive defaults.
+    mockUseStartCommuteGuidance.mockReturnValue(null);
+    mockUseGuidanceSession.mockReturnValue(null);
   });
 
   // ---------- Rendering ----------
@@ -565,6 +583,84 @@ describe('HomeScreen', () => {
         screen: 'CommuteSettings',
         initial: false,
       });
+    });
+
+    it('renders the 길안내 시작 CTA and invokes the start handler when tapped', async () => {
+      withMorningCommute();
+      mockGetStation.mockImplementation((id: string) =>
+        Promise.resolve(
+          id === 'gangnam'
+            ? { ...mockStation('gangnam', '강남'), lineId: '2' }
+            : id === 'jamsil'
+              ? { ...mockStation('jamsil', '잠실'), lineId: '2' }
+              : null,
+        ),
+      );
+      mockUseCommuteRouteSummary.mockReturnValue({
+        ready: true,
+        rideMinutes: 18,
+        transferCount: 0,
+        stationCount: 8,
+        fareKrw: 1450,
+      });
+      const startHandler = jest.fn();
+      mockUseStartCommuteGuidance.mockReturnValue(startHandler);
+
+      const { getByTestId } = render(<HomeScreen />);
+      await waitFor(
+        () => expect(getByTestId('commute-route-card-start')).toBeTruthy(),
+        { timeout: 5000 },
+      );
+
+      fireEvent.press(getByTestId('commute-route-card-start'));
+      expect(startHandler).toHaveBeenCalledTimes(1);
+    });
+
+    it('hides the 길안내 시작 CTA when no route resolves (handler null)', async () => {
+      withMorningCommute();
+      mockGetStation.mockImplementation((id: string) =>
+        Promise.resolve(
+          id === 'gangnam'
+            ? { ...mockStation('gangnam', '강남'), lineId: '2' }
+            : id === 'jamsil'
+              ? { ...mockStation('jamsil', '잠실'), lineId: '2' }
+              : null,
+        ),
+      );
+      mockUseCommuteRouteSummary.mockReturnValue({
+        ready: true,
+        rideMinutes: 18,
+        transferCount: 0,
+        stationCount: 8,
+        fareKrw: 1450,
+      });
+      mockUseStartCommuteGuidance.mockReturnValue(null);
+
+      const { getByTestId, queryByTestId } = render(<HomeScreen />);
+      await waitFor(
+        () => expect(getByTestId('home-commute-route-card')).toBeTruthy(),
+        { timeout: 5000 },
+      );
+
+      expect(queryByTestId('commute-route-card-start')).toBeNull();
+    });
+
+    it('shows the 안내 중 banner and resumes guidance when a session is active', async () => {
+      mockUseGuidanceSession.mockReturnValue({
+        route: { segments: [], totalMinutes: 18, transferCount: 0, lineIds: ['2'] },
+        fromStationName: '강남',
+        toStationName: '잠실',
+        startedAt: 1_700_000_000_000,
+      });
+
+      const { getByTestId } = render(<HomeScreen />);
+      await waitFor(
+        () => expect(getByTestId('guidance-active-banner')).toBeTruthy(),
+        { timeout: 5000 },
+      );
+
+      fireEvent.press(getByTestId('guidance-active-banner'));
+      expect(mockNavigate).toHaveBeenCalledWith('RouteGuidance');
     });
 
     it('wires the commute card mid-node line from the route summary, not the origin station line', async () => {
