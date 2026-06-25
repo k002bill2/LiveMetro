@@ -4,8 +4,7 @@
  * Reads the active guidance session reactively (useGuidanceSession). When a
  * journey is in progress, surfaces a tap target that returns the rider to the
  * live guidance screen — the re-entry point the store docs flagged as future
- * work. Renders nothing when no session is active or when explicitly `hidden`
- * (e.g. while the guidance screen itself is on top).
+ * work. Renders nothing when no session is active.
  *
  * Self-colored (blue accent + white text) so it reads as a persistent status
  * affordance regardless of theme.
@@ -19,18 +18,15 @@ import { useGuidanceSession } from '@/hooks/useGuidanceSession';
 interface GuidanceActiveBannerProps {
   /** Tap handler — typically navigates back to the RouteGuidance screen. */
   onPress: () => void;
-  /** Suppress rendering even when a session is active (e.g. on the guidance screen). */
-  hidden?: boolean;
   testID?: string;
 }
 
 const GuidanceActiveBannerImpl: React.FC<GuidanceActiveBannerProps> = ({
   onPress,
-  hidden,
   testID,
 }) => {
   const session = useGuidanceSession();
-  if (!session || hidden) return null;
+  if (!session) return null;
 
   const routeLabel = `${session.fromStationName} → ${session.toStationName}`;
 

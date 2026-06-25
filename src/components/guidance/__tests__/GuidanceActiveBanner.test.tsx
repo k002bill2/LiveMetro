@@ -59,12 +59,4 @@ describe('GuidanceActiveBanner', () => {
     fireEvent.press(getByTestId('guidance-active-banner'));
     expect(onPress).toHaveBeenCalledTimes(1);
   });
-
-  it('renders nothing when hidden, even with an active session', () => {
-    mockedUseGuidanceSession.mockReturnValue(SESSION);
-    const { queryByTestId } = render(
-      <GuidanceActiveBanner onPress={jest.fn()} hidden />,
-    );
-    expect(queryByTestId('guidance-active-banner')).toBeNull();
-  });
 });
