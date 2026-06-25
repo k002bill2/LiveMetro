@@ -161,7 +161,17 @@ jest.mock('@/hooks/useIntegratedAlerts', () => ({
 // act() warning even though assertions pass.
 jest.mock('@/hooks/useFirestoreMorningCommute', () => ({
   useFirestoreMorningCommute: jest.fn(() => null),
+  useFirestoreCommuteLeg: jest.fn(() => null),
 }));
+
+// resolveActiveCommuteType reads the wall clock; mock it so the home card's
+// morning/evening switch is deterministic in tests (default 'morning' keeps the
+// existing morning-commute assertions stable regardless of the run time).
+jest.mock('@/utils/commuteSchedule', () => ({
+  resolveActiveCommuteType: jest.fn(() => 'morning'),
+}));
+const mockResolveActiveCommuteType =
+  require('@/utils/commuteSchedule').resolveActiveCommuteType as jest.Mock;
 
 // useCommuteRouteSummary wraps routeService/fareService (graph search). Mock it
 // so tests can drive the registeredCommuteHero fallback chain deterministically
@@ -443,6 +453,32 @@ const withMorningCommute = (): void => {
   useAuth.mockImplementation(() => ({ ...baseMock, user: overriddenUser }));
 };
 
+/** Sets a usable evening commute on the profile (morning left null). */
+const withEveningCommute = (): void => {
+  const { useAuth } = require('@/services/auth/AuthContext');
+  if (!originalAuthImpl) originalAuthImpl = useAuth.getMockImplementation();
+  const baseMock = originalAuthImpl() as { user: { preferences: Record<string, unknown> } };
+  const overriddenUser = {
+    ...baseMock.user,
+    preferences: {
+      ...baseMock.user.preferences,
+      commuteSchedule: {
+        ...(baseMock.user.preferences.commuteSchedule as object),
+        weekdays: {
+          morningCommute: null,
+          eveningCommute: {
+            departureTime: '19:00',
+            stationId: 'jamsil',
+            destinationStationId: 'gangnam',
+            bufferMinutes: 5,
+          },
+        },
+      },
+    },
+  };
+  useAuth.mockImplementation(() => ({ ...baseMock, user: overriddenUser }));
+};
+
 describe('HomeScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -484,6 +520,9 @@ describe('HomeScreen', () => {
     // Reset guidance link mocks to their inactive defaults.
     mockUseStartCommuteGuidance.mockReturnValue(null);
     mockUseGuidanceSession.mockReturnValue(null);
+    // Reset the morning/evening switch to morning (clearAllMocks keeps the
+    // factory impl but not a prior test's 'evening' override).
+    mockResolveActiveCommuteType.mockReturnValue('morning');
   });
 
   // ---------- Rendering ----------
@@ -545,6 +584,44 @@ describe('HomeScreen', () => {
         screen: 'CommuteSettings',
         initial: false,
       });
+    });
+
+    it("evening 활성 시 통근 카드 제목이 '오늘의 퇴근 경로'", async () => {
+      withEveningCommute();
+      mockResolveActiveCommuteType.mockReturnValue('evening');
+      mockGetStation.mockImplementation((id: string) =>
+        Promise.resolve(
+          id === 'jamsil'
+            ? { ...mockStation('jamsil', '잠실'), lineId: '2' }
+            : id === 'gangnam'
+              ? { ...mockStation('gangnam', '강남'), lineId: '2' }
+              : null,
+        ),
+      );
+      mockUseCommuteRouteSummary.mockReturnValue({
+        ready: true,
+        rideMinutes: 18,
+        transferCount: 0,
+        stationCount: 8,
+        fareKrw: 1450,
+      });
+
+      const { getByText } = render(<HomeScreen />);
+      await waitFor(() => expect(getByText('오늘의 퇴근 경로')).toBeTruthy(), {
+        timeout: 5000,
+      });
+    });
+
+    it('evening 미설정 시 퇴근 경로 placeholder 노출', async () => {
+      // activeLeg='evening' but no evening commute (profile null + onboarding null)
+      // → activeCommute null → endpoints empty → placeholder, titled for 퇴근.
+      mockResolveActiveCommuteType.mockReturnValue('evening');
+
+      const { getByTestId, getByText } = render(<HomeScreen />);
+      await waitFor(() =>
+        expect(getByTestId('commute-route-card-placeholder')).toBeTruthy(),
+      );
+      expect(getByText('오늘의 퇴근 경로')).toBeTruthy();
     });
 
     it('real CommuteRouteCard "경로 변경" link navigates to CommuteSettings', async () => {
