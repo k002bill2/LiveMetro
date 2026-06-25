@@ -174,4 +174,18 @@ describe('CommuteRouteCard', () => {
     fireEvent.press(getByTestId('commute-route-card-start'));
     expect(onStartGuidance).toHaveBeenCalledTimes(1);
   });
+
+  it('renders the provided title (퇴근) in the header', () => {
+    const { getByText } = render(
+      <CommuteRouteCard origin="잠실" destination="홍대입구" title="오늘의 퇴근 경로" />,
+    );
+    expect(getByText('오늘의 퇴근 경로')).toBeTruthy();
+  });
+
+  it("defaults the title to '오늘의 출근 경로' when omitted", () => {
+    const { getByText } = render(
+      <CommuteRouteCard origin="홍대입구" destination="잠실" />,
+    );
+    expect(getByText('오늘의 출근 경로')).toBeTruthy();
+  });
 });

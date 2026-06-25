@@ -43,6 +43,8 @@ import { truncateMinutes } from '@/utils/dateUtils';
 import { LineBadge, type LineId } from './LineBadge';
 
 interface CommuteRouteCardProps {
+  /** Card header label. Defaults to the morning copy ("오늘의 출근 경로"). */
+  title?: string;
   /** Origin station name (e.g. "홍대입구"). Card hides if missing. */
   origin?: string;
   /** Destination station name (e.g. "강남"). Card hides if missing. */
@@ -80,6 +82,7 @@ interface CommuteRouteCardProps {
 const formatKrw = (n: number): string => n.toLocaleString('ko-KR');
 
 const CommuteRouteCardImpl: React.FC<CommuteRouteCardProps> = ({
+  title = '오늘의 출근 경로',
   origin,
   destination,
   departureTime,
@@ -120,7 +123,7 @@ const CommuteRouteCardImpl: React.FC<CommuteRouteCardProps> = ({
     fareKrw !== undefined;
 
   const accessibilityLabel = [
-    '오늘의 출근 경로',
+    title,
     `${origin}에서 ${destination}`,
     departureTime && arrivalTime ? `${departureTime}부터 ${arrivalTime}` : null,
     lineId ? `${lineId}호선 이용` : null,
@@ -144,7 +147,7 @@ const CommuteRouteCardImpl: React.FC<CommuteRouteCardProps> = ({
         <View style={styles.headerLeft}>
           <RouteIcon size={12} color={semantic.labelAlt} strokeWidth={2.2} />
           <Text style={[styles.headerLabel, { color: semantic.labelAlt }]}>
-            오늘의 출근 경로
+            {title}
           </Text>
         </View>
         {onPressEdit && (
