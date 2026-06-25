@@ -34,29 +34,66 @@ describe('StationCard', () => {
 ## Hook Test 템플릿
 
 ```typescript
-import { renderHook, act, waitFor } from '@testing-library/react-native';
-import { useTrainData } from '../useTrainData';
+import { renderHook, act } from '@testing-library/react-native';
+import { useRealtimeTrains } from '@/hooks/useRealtimeTrains';
+import { dataManager, RealtimeTrainData } from '@/services/data/dataManager';
 
-describe('useTrainData', () => {
-  it('fetches train data on mount', async () => {
-    const { result } = renderHook(() => useTrainData('ST001'));
-    expect(result.current.loading).toBe(true);
+// useRealtimeTrains는 dataManager.subscribeToRealtimeUpdates(stationName, callback, interval)로
+// 구독한다. 콜백이 RealtimeTrainData(성공) 또는 null(실패)을 받아 상태를 갱신하므로
+// fetch 함수를 직접 모킹하지 말고 구독 콜백을 캡처해 데이터/에러를 주입한다.
+jest.mock('@/services/data/dataManager', () => ({
+  dataManager: { subscribeToRealtimeUpdates: jest.fn() },
+}));
 
-    await waitFor(() => {
-      expect(result.current.loading).toBe(false);
-    });
-    expect(result.current.arrivals).toBeDefined();
+const mockDataManager = dataManager as jest.Mocked<typeof dataManager>;
+
+describe('useRealtimeTrains', () => {
+  let dataCallback: ((data: RealtimeTrainData | null) => void) | null = null;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    dataCallback = null;
+    mockDataManager.subscribeToRealtimeUpdates.mockImplementation(
+      (_station, callback) => {
+        dataCallback = callback;
+        return jest.fn(); // unsubscribe
+      }
+    );
   });
 
-  it('handles errors gracefully', async () => {
-    const mockError = new Error('API Error');
-    (getRealtimeArrivals as jest.Mock).mockRejectedValueOnce(mockError);
+  it('subscribes on mount with stationName + interval', () => {
+    const { result } = renderHook(() => useRealtimeTrains('강남역', { enabled: true }));
+    expect(result.current.loading).toBe(true);
+    expect(mockDataManager.subscribeToRealtimeUpdates).toHaveBeenCalledWith(
+      '강남역', expect.any(Function), 30000
+    );
+  });
 
-    const { result } = renderHook(() => useTrainData('invalid'));
-    await waitFor(() => {
-      expect(result.current.error).toBeTruthy();
-      expect(result.current.arrivals).toEqual([]);
+  it('updates trains when subscription delivers data', async () => {
+    const { result } = renderHook(() => useRealtimeTrains('강남역'));
+
+    await act(async () => {
+      dataCallback?.({
+        stationId: '강남역',
+        trains: [{ id: 'train-1' }] as never,
+        lastUpdated: new Date(),
+      } as RealtimeTrainData);
     });
+
+    expect(result.current.loading).toBe(false);
+    expect(result.current.trains).toHaveLength(1);
+  });
+
+  it('surfaces error after exhausting retries (null payloads)', async () => {
+    const { result } = renderHook(() => useRealtimeTrains('강남역', { retryAttempts: 1 }));
+
+    // null = 실패 → retryAttempts 도달 시 error 설정, trains는 빈 배열 유지
+    await act(async () => {
+      dataCallback?.(null);
+    });
+
+    expect(result.current.error).toBeTruthy();
+    expect(result.current.trains).toEqual([]);
   });
 });
 ```
@@ -64,28 +101,42 @@ describe('useTrainData', () => {
 ## Service Test 템플릿 (Multi-tier fallback)
 
 ```typescript
-describe('dataManager', () => {
+import { dataManager } from '@/services/data/dataManager';
+import { seoulSubwayApi } from '@/services/api/seoulSubwayApi';
+
+const mockSeoulApi = seoulSubwayApi as jest.Mocked<typeof seoulSubwayApi>;
+
+describe('dataManager.getRealtimeTrains', () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it('fetches from Seoul API first', async () => {
-    const data = await dataManager.getTrainArrivals('ST001');
-    expect(seoulApi.fetchArrivals).toHaveBeenCalledWith('ST001');
-    expect(data).toBeDefined();
+  it('fetches from Seoul API when cache is empty', async () => {
+    mockSeoulApi.getRealtimeArrival.mockResolvedValue([{ statnNm: '강남역' }] as never);
+
+    const result = await dataManager.getRealtimeTrains('강남역');
+
+    expect(mockSeoulApi.getRealtimeArrival).toHaveBeenCalledWith('강남역');
+    expect(result).not.toBeNull();
   });
 
-  it('falls back to Firebase on API failure', async () => {
-    (seoulApi.fetchArrivals as jest.Mock).mockRejectedValue(new Error('API Error'));
-    const data = await dataManager.getTrainArrivals('ST001');
-    expect(trainService.getTrainsByStation).toHaveBeenCalledWith('ST001');
+  it('returns null when Seoul API fails (no fresh cache)', async () => {
+    mockSeoulApi.getRealtimeArrival.mockRejectedValue(new Error('API Error'));
+
+    const result = await dataManager.getRealtimeTrains('강남역');
+
+    // 에러 시 빈 배열이 아닌 null 반환 → 호출부는 retry로 구분 (error-handling 규칙)
+    expect(result).toBeNull();
+    expect(mockSeoulApi.getRealtimeArrival).toHaveBeenCalled();
   });
 
-  it('uses cache when available and fresh', async () => {
-    (AsyncStorage.getItem as jest.Mock).mockResolvedValue(
-      JSON.stringify({ data: mockData, timestamp: Date.now() })
-    );
-    const data = await dataManager.getTrainArrivals('ST001');
-    expect(seoulApi.fetchArrivals).not.toHaveBeenCalled();
-    expect(data).toEqual(mockData);
+  it('serves cached data immediately on a warm cache (stale-while-revalidate)', async () => {
+    mockSeoulApi.getRealtimeArrival.mockResolvedValue([{ statnNm: '강남역' }] as never);
+    await dataManager.getRealtimeTrains('강남역'); // 1차 호출로 캐시 워밍
+    mockSeoulApi.getRealtimeArrival.mockClear();
+
+    const result = await dataManager.getRealtimeTrains('강남역');
+
+    // 캐시 히트는 즉시 반환하고 백그라운드에서만 갱신한다
+    expect(result).not.toBeNull();
   });
 });
 ```

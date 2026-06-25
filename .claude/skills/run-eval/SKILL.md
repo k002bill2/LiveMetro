@@ -32,8 +32,8 @@ Systematically evaluate AI agent performance and compute pass@k metrics. Provide
 /run-eval task_ui_001 --k=3
 /run-eval --all --k=3
 
-# 특정 에이전트로 실행
-/run-eval task_ui_001 --agent=web-ui-specialist
+# 특정 에이전트로 실행 (기본값 권장: general-purpose — Common Mistakes 표 참조)
+/run-eval task_ui_001 --agent=general-purpose
 ```
 
 ## Execution Steps
@@ -131,4 +131,4 @@ eval 시스템 상세는 [references/eval-guide.md](references/eval-guide.md) �
 - Rubrics: `.claude/evals/rubrics/`
 - Results: `.claude/evals/results/`
 - Eval guide: `references/eval-guide.md`
-- **REQUIRED:** Use `superpowers:agent-improvement` for post-eval failure diagnosis
+- **REQUIRED:** Use `agent-improvement` skill for post-eval failure diagnosis

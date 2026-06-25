@@ -1,6 +1,6 @@
 ---
 name: verification-loop
-description: Boris Cherny style verification feedback loop automation. Run type check, lint, test, and build verification.
+description: Boris Cherny style verification feedback loop automation. Run type check, lint, test, and build verification. Use after completing a feature/refactor/bugfix and BEFORE declaring completion or opening a PR — enforces fresh-run evidence. NOT for CI/hook 작성(update-config), 테스트 작성(test-automation), 빌드 에러 수정(build-error-resolver).
 allowed-tools: Bash(npm run*), Bash(npx tsc*), Bash(npx jest*), Bash(npx eslint*)
 ---
 
@@ -89,18 +89,19 @@ npm run build:development
 ### PostToolUse 훅 (선택사항)
 ```json
 {
-  "event": "PostToolUse",
+  "matcher": "Edit|Write",
   "hooks": [{
-    "matcher": "Edit|Write",
-    "commands": ["npm run type-check 2>&1 | head -5"]
+    "type": "command",
+    "command": "npm run type-check 2>&1 | head -5",
+    "timeout": 30
   }]
 }
 ```
 
-### background-verifier 에이전트
+### quality-validator 에이전트
 복잡한 작업 완료 후 백그라운드에서 자동 검증:
 ```
-Task(subagent_type="background-verifier", run_in_background=true)
+Task(subagent_type="quality-validator", run_in_background=true)
 ```
 
 ## 실패 시 대응
@@ -164,6 +165,6 @@ npm run type-check && npm test
 
 ## 관련 리소스
 
-- [background-verifier 에이전트](../../agents/background-verifier.md)
+- [quality-validator 에이전트](../../agents/quality-validator.md)
 - [/verify-app 커맨드](../../commands/verify-app.md)
 - [/check-health 커맨드](../../commands/check-health.md)

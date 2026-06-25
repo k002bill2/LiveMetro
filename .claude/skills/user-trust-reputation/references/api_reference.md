@@ -194,25 +194,10 @@ interface UserFraudProfile {
 
 ## Cloud Functions (asia-northeast3)
 
-### verifyDelayReport (HTTPS Callable)
-```typescript
-// Request
-{ reportId: string; action: 'verify' | 'reject'; reason?: string }
-// Response
-{ success: boolean; message: string }
-```
-관리자 전용. `context.auth.uid`로 admin 역할 확인.
-
-### autoVerifyReports (PubSub Schedule: every 5 minutes)
-pending 제보 최대 50건 처리. 자동 검증 조건:
-- trustScore >= 60 + 유사 제보 2건+
-- trustScore >= 80 (expert) → 무조건 검증
-
-### onDelayReportCreated (Firestore onCreate: delay_reports)
-동일 노선 10분 내 pending 제보 2건+ → 지연 차이 10분 이내 시 일괄 community 검증.
+> **#221에서 제거됨:** `verifyDelayReport`/`autoVerifyReports`/`onDelayReportCreated` 서버 검증 파이프라인은 삭제되었다 (`functions/src/admin/` 디렉토리 부재). 현재 제보 검증을 수행하는 Cloud Function은 없다 — 검증은 클라이언트 `userTrustService` 경로만 거친다.
 
 ### onBadgeEarned (Firestore onUpdate: user_trust_profiles)
-before/after 뱃지 비교 → 새 뱃지 발견 시 FCM 푸시 알림.
+before/after 뱃지 비교 → 새 뱃지 발견 시 FCM 푸시 알림. **현재 미발화** — `userTrustService`가 `user_trust_profiles`를 Firestore에 쓰지 않아 onUpdate 이벤트가 발생하지 않는다.
 
 ---
 
@@ -273,8 +258,7 @@ const MIN_TRUST_SCORE = 20;              // isUserTrusted 기준
 
 ### Firestore Collections
 ```typescript
-'user_trust_profiles'  // 문서 ID: userId
-'delay_reports'        // auto ID
-'verification_log'     // auto ID
+'user_trust_profiles'  // 문서 ID: userId (현재 writer 없음 — userTrustService는 AsyncStorage만 사용)
+'delayReports'         // auto ID (실제 컬렉션명은 camelCase, delayReportService.ts:33)
 'users'                // 문서 ID: userId (role/isAdmin 필드)
 ```

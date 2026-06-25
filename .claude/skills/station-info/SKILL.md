@@ -69,11 +69,14 @@ const { nearbyStations, closestStation, loading } = useNearbyStations({
 ```
 
 ### 실시간 도착정보
-```typescript
-import { seoulSubwayApi } from '@/services/api/seoulSubwayApi';
+실시간 도착은 **반드시 `arrivalService.getArrivals` 경유** — `seoulSubwayApi.getRealtimeArrival` 직접 호출 금지(공유 캐시·rate-limit 우회로 StationDetail을 30초 굶김, PR #170). 진입점 규칙 SoT는 subway-data-processor BANNED 표.
 
-const arrivals = await seoulSubwayApi.getRealtimeArrival('강남');
-// Rate limit: 30초 최소 간격 자동 적용
+```typescript
+import { arrivalService } from '@/services/arrival/arrivalService';
+
+const info = await arrivalService.getArrivals('강남');
+const arrivals = info.arrivals;  // readonly TrainArrival[]
+// 공유 캐시·rate limit(30초 최소 간격)이 서비스 내부에서 자동 적용
 ```
 
 ### 시간표 조회

@@ -28,17 +28,17 @@ Handle Seoul subway data transformations, API response parsing, and data normali
 ## Data Types
 
 ### TrainArrival
+실제 시그니처는 `src/services/arrival/arrivalService.ts:18` (이걸 import — 아래는 illustrative 아님, 정본 복제):
 ```typescript
-interface TrainArrival {
-  trainNo: string;
-  stationName: string;
-  direction: 'up' | 'down';
-  arrivalTime: number;     // Seconds until arrival
-  destinationName: string;
-  lineId: string;
-  status: 'NORMAL' | 'DELAYED' | 'SUSPENDED' | 'EMERGENCY';
-  congestion?: 'RELAXED' | 'NORMAL' | 'CROWDED' | 'VERY_CROWDED';
-  updatedAt: Date;
+export interface TrainArrival {
+  readonly trainId: string;
+  readonly lineId: string;
+  readonly direction: 'up' | 'down';
+  readonly destination: string;
+  readonly arrivalSeconds: number | null;  // null = 운행정보 없음
+  readonly arrivalMessage: string;
+  readonly trainNumber: string;
+  readonly trainType?: TrainType;
 }
 ```
 
@@ -99,7 +99,7 @@ interface Station {
 | `신분당선` | `sinbundang` |
 | `경의중앙선` | `gyeongui` |
 | `공항철도` | `airport` |
-| `수인분당선` | `suin` |
+| `수인분당선` | `bundang` |
 
 ## Service Disruption Keywords
 
@@ -194,6 +194,8 @@ Seoul API는 **schedule deviation(지연 분)을 직접 주지 않는다.** 그�
 **Solution**: Always include `lineId` in queries
 
 ## Data Fetching Priority
+
+> fetch 우선순위·캐시 TTL의 SoT는 api-integration — 아래는 정규화 레이어 입력 맥락 참고용.
 
 ```
 1. AsyncStorage Cache (TTL: 30s)

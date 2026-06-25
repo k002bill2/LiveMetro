@@ -140,6 +140,7 @@ async function fetchWithRetry<T>(
 
 ### Service Disruption Detection
 ```typescript
+// SoT: 장애 severity 분류는 subway-data-processor(DelaySeverity, models/train.ts:86) 소관. 아래는 boolean 간이 체크.
 const detectServiceDisruptions = (messages: string[]): boolean => {
   const keywords = ['운행중단', '전면중단', '장애', '고장', '사고', '탈선', '화재'];
   return messages.some(msg => keywords.some(kw => msg.includes(kw)));
@@ -245,12 +246,12 @@ Seoul API 연동 시 아래 패턴은 장애를 유발합니다. 예외 없음.
 - Always implement fallback to Firebase/cache
 - Handle Korean encoding properly
 - Monitor API health and switch sources if needed
-- Export service as singleton: `export const seoulSubwayApi = new SeoulSubwayApi()`
+- Export service as singleton: `export const seoulSubwayApi = new SeoulSubwayApiService()`
 
 ## Reference Documentation
 
 For complete code examples, see [references/api-examples.md](references/api-examples.md):
-- Full SeoulSubwayApi class implementation
+- Full SeoulSubwayApiService class implementation
 - DataManager with multi-tier fallback
 - PollingManager pattern
 - Jest mock examples

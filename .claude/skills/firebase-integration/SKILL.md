@@ -1,6 +1,6 @@
 ---
 name: firebase-integration
-description: Firebase integration for authentication, Firestore database, and real-time data synchronization. Use when working with Firebase services in the LiveMetro app.
+description: Firebase integration for authentication, Firestore database, and real-time data synchronization. Use when wiring Firebase Auth, querying/subscribing to Firestore (onSnapshot), or mapping FirebaseError in LiveMetro. 단, Seoul API 원시 fetch/정규화는 api-integration·subway-data-processor 소관.
 ---
 
 # Firebase Integration
@@ -32,7 +32,7 @@ description: Firebase integration for authentication, Firestore database, and re
 | Firestore 쿼리 (where/orderBy/limit) | [references/patterns.md](references/patterns.md) §2 |
 | 실시간 구독 + cleanup | [references/patterns.md](references/patterns.md) §3 |
 | FirebaseError 매핑 / 사용자 메시지 | [references/patterns.md](references/patterns.md) §4 |
-| Service 클래스 / Singleton 구조 | [references/architecture.md](references/architecture.md) §1 |
+| Service 클래스 / 모듈 인스턴스 구조 | [references/architecture.md](references/architecture.md) §1 |
 | Seoul API → Firebase → 캐시 fallback | [references/architecture.md](references/architecture.md) §2 |
 | Firestore Security Rules 작성 | [references/architecture.md](references/architecture.md) §3 |
 | Batch / Offline 처리 | [references/architecture.md](references/architecture.md) §4-5 |
@@ -45,7 +45,7 @@ description: Firebase integration for authentication, Firestore database, and re
 | `firestore` 직접 import | `trainService` 등 singleton 경유 | 캐싱·에러 처리 우회 |
 | `where + orderBy` 조합에 인덱스 미등록 | `firestore.indexes.json` 갱신 | 콘솔 경고 + 느린 쿼리 |
 | Firebase config 클라이언트에 하드코딩 | `EXPO_PUBLIC_FIREBASE_*` env | 보안 사고 |
-| `permission-denied` 무처리 | `handleFirebaseError(err)` | 빈 화면 / 사용자 혼란 |
+| `permission-denied` 무처리 | catch 후 `console.error` + 빈 배열(`[]`)/`null` 반환 (사용자 친화 메시지) | 빈 화면 / 사용자 혼란 |
 | collection 전체 fetch | `limit + startAfter` 페이지네이션 | 비용 폭증 |
 
 ## Testing Quick Checklist

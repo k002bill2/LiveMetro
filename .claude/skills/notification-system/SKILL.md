@@ -1,6 +1,6 @@
 ---
 name: notification-system
-description: Push notification system using Expo Notifications for train arrival alerts and service disruption notifications. Use when implementing notification features.
+description: Expo Notifications 기반 푸시 알림 시스템. Use when 도착 리마인더 스케줄링, 장애/지연 알림 발사, quietHours severity override(긴급 장애는 무음 우회), dedup/쿨다운, 알림 권한·preferences(alertTypes·perEventSound) 처리. 단, Seoul API 원시 응답 정규화는 subway-data-processor, 외부 API fetch/rate-limit은 api-integration, 이메일 발송은 emailService 소관.
 ---
 
 # Notification System Guidelines
@@ -112,7 +112,7 @@ await Notifications.scheduleNotificationAsync({
 
 ### (a) quietHours vs 긴급 장애 — severity-gated override
 
-**문제(실코드에 존재):** `notificationService.shouldSendNotification()`(`src/services/notification/notificationService.ts` L382~454)는 quietHours 안이면 타입 분기보다 **먼저** `return false`(L411~415) 한다. 그래서 `EMERGENCY_ALERT`(=`alertTypes.suspensions`)조차 무음 시간대에 통째로 누락된다. references의 `DisruptionNotificationManager`(notification-examples.md L329)도 동일하게 `isQuietHours(prefs)`로 장애를 일괄 묵음한다.
+**문제(실코드에 존재):** `notificationService.shouldSendNotification()`(`src/services/notification/notificationService.ts` L411)는 quietHours 안이면 타입 분기보다 **먼저** `return false`(L437~446: quietHours return false. 타입 switch는 L473~481이라 그보다 먼저 차단) 한다. perEventSound 게이트(L463~470)도 quietHours와 switch 사이에서 추가로 묵음시킬 수 있다. 그래서 `EMERGENCY_ALERT`(=`alertTypes.suspensions`)조차 무음 시간대에 통째로 누락된다. references의 `DisruptionNotificationManager`(notification-examples.md L329)도 동일하게 `isQuietHours(prefs)`로 장애를 일괄 묵음한다.
 
 **규칙:** quietHours gate에 **심각도 기준 carve-out**을 둔다. "장애는 무조건 override"가 아니다 — 그러면 2분 지연으로 새벽 3시에 깨운다.
 

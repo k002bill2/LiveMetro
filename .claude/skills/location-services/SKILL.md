@@ -50,7 +50,7 @@ const requestPermission = async (): Promise<boolean> => {
 A bare `getCurrentPositionAsync({ Balanced })` is **wrong** for this app — on a cold
 GPS / indoors / simulator it throws `kCLErrorLocationUnknown` and the UI renders
 "현재 위치를 가져올 수 없습니다". Use the service, which encodes a degradation chain
-(`locationService.getCurrentLocation`, locationService.ts:183-218):
+(`locationService.getCurrentLocation`, locationService.ts:207):
 
 ```typescript
 import { locationService } from '@services/location/locationService';
@@ -60,8 +60,11 @@ import { locationService } from '@services/location/locationService';
 const location = await locationService.getCurrentLocation(highAccuracy);
 ```
 
-Chain: primary fix (High or Balanced) → on miss, recent **last-known** fix →
-on miss, retry once at **Balanced** (resolves via wifi/cell where GPS could not).
+Chain (code order, `getCurrentLocation:207`): recent **last-known** fix first
+(maxAge 60s · requiredAccuracy 100m gate) → on miss, **primary fix** (High or
+Balanced) → on miss, retry once at **Balanced** (resolves via wifi/cell where GPS
+could not) → on miss, **coarse last-resort** fix (`acceptCoarse`, ≤3km via
+`MAX_COARSE_FALLBACK_ACCURACY_M`; label derived UI as 추정/estimated).
 Each attempt returns `null` (not throw) on a transient miss so the next link runs.
 A `null` result means *all* links failed — surface it, don't crash.
 
@@ -69,7 +72,7 @@ A `null` result means *all* links failed — surface it, don't crash.
 Do **not** reach for `geolib` — the app already ships a Haversine implementation on
 the service. Reusing it keeps every distance (nearby search, geofence, vicinity)
 on one formula. Note the signature is **four scalars, not coordinate objects**
-(`locationService.calculateDistance`, locationService.ts:411):
+(`locationService.calculateDistance`, locationService.ts:485):
 
 ```typescript
 import { locationService } from '@services/location/locationService';
@@ -141,7 +144,7 @@ const handleLocationError = (error: unknown): string => {
      quality, so a fresh-but-coarse cell-tower fix would slip through and place
      the user at the wrong station. The service gates on **both**:
      `getLastKnownPositionAsync({ maxAge: 60s, requiredAccuracy: 100m })`
-     (locationService.ts:267-270, constants `LAST_KNOWN_MAX_AGE_MS` /
+     (locationService.ts:341-343, constants `LAST_KNOWN_MAX_AGE_MS` /
      `LAST_KNOWN_REQUIRED_ACCURACY_M`). `requiredAccuracy` makes expo-location
      return `null` for coarse cached fixes, so the chain advances to a live retry.
    - Never hand a coarse last-known fix to nearby-station logic as if it were live.
@@ -160,8 +163,8 @@ const handleLocationError = (error: unknown): string => {
 
 | 금지 | 대체 | 이유 |
 |------|------|------|
-| `coords.accuracy \|\| undefined` | `coords.accuracy ?? undefined` | accuracy `0`(정밀 fix)이 falsy라 `\|\|`는 undefined로 뭉갬 → 다운스트림 게이트가 "정밀 0"과 "unknown"을 구분 못 함. 옳은 형태는 toCoordinates(locationService.ts:297). 잔여 위반 locationService.ts:339 |
-| `location.accuracy \|\| null` | `location.accuracy ?? null` | 동일한 0-falsy. accuracy `0`이 null로 보고됨 → 정밀도 표시·신뢰도 게이트 오작동. 잔여 위반 useLocation.ts:74 |
+| `coords.accuracy \|\| undefined` | `coords.accuracy ?? undefined` | accuracy `0`(정밀 fix)이 falsy라 `\|\|`는 undefined로 뭉갬 → 다운스트림 게이트가 "정밀 0"과 "unknown"을 구분 못 함. 옳은 형태는 toCoordinates(locationService.ts:364, `accuracy ?? undefined`). |
+| `location.accuracy \|\| null` | `location.accuracy ?? null` | 동일한 0-falsy. accuracy `0`이 null로 보고됨 → 정밀도 표시·신뢰도 게이트 오작동. |
 | 좌표 생성을 역명 fuzzy 매칭으로 | BLDN_ID(=station_cd) 직접 매핑 | 옛 생성기의 name-only fuzzy fallback이 354역을 9–12km 오배정(PR #241로 재작성 해결) |
 
 > accuracy 0-falsy 금지는 `seoul-api-limits.md`의 `arrivalTime ? …`(0초 도착이 null

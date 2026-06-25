@@ -39,7 +39,7 @@
 - 장애 우회 엔진(`calculateRoute`)엔 **있으나 dormant** (아무도 라이브 도착을 안 먹임)
 - 메인 검색 엔진(`getDiverseRoutes`)엔 **파라미터조차 없음**
 
-→ **실시간 다음 열차 대기를 라이브 경로 카드에 반영하려면 두 가지가 모두 필요하다:** (a) `getDiverseRoutes`(및 `findKShortestPaths`)에 `realtimeArrivals` 파라미터 추가, (b) `useRouteSearch` 등 호출자가 정규화된 라이브 도착을 실제로 공급. 한쪽만 하면 무효.
+→ **단, 라이브 경로 카드 반영은 PR #254에서 별도 메커니즘으로 shipped:** `applyRealtimeBoardingWait`(`routeService.ts:456`)가 path 확정 후 첫 segment에 대기 분을 덧씌우는 후처리 overlay이며 `useRouteSearch.ts:164`에서 호출된다 — `getDiverseRoutes` 파라미터 추가 없이. 위 dormant 진단은 `calculateRoute`의 5번째 param 한정이다.
 
 ---
 

@@ -4,70 +4,63 @@
 
 ### seoulSubwayApi.ts Full Structure
 ```typescript
-import axios, { AxiosInstance } from 'axios';
-
-class SeoulSubwayApi {
-  private client: AxiosInstance;
+// 실제 서비스는 axios가 아니라 native fetch + AbortController를 사용한다.
+// (앱 전역에 axios 의존성 없음 — grep axios src/ → EMPTY)
+class SeoulSubwayApiService {
   private readonly API_KEY: string;
   private readonly BASE_URL: string;
-  private readonly TIMEOUT = 5000; // 5 seconds
+  private readonly TIMEOUT = 10000; // 10 seconds (AbortController)
 
   constructor() {
     this.API_KEY = process.env.SEOUL_SUBWAY_API_KEY || '';
     this.BASE_URL = process.env.SEOUL_SUBWAY_API_BASE_URL || '';
-
-    this.client = axios.create({
-      baseURL: this.BASE_URL,
-      timeout: this.TIMEOUT,
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-
-    this.setupInterceptors();
   }
 
-  private setupInterceptors(): void {
-    // Request interceptor
-    this.client.interceptors.request.use(
-      (config) => {
-        console.log(`[API] Request: ${config.url}`);
-        return config;
-      },
-      (error) => Promise.reject(error)
-    );
+  /** Fetch with 10s timeout via AbortController */
+  private async fetchWithTimeout(url: string): Promise<Response> {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), this.TIMEOUT);
 
-    // Response interceptor
-    this.client.interceptors.response.use(
-      (response) => {
-        console.log(`[API] Response: ${response.status}`);
-        return response;
-      },
-      (error) => {
-        console.error(`[API] Error: ${error.message}`);
-        return Promise.reject(error);
+    try {
+      const response = await fetch(url, {
+        signal: controller.signal,
+        headers: { Accept: 'application/json' },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP Error: ${response.status} ${response.statusText}`);
       }
-    );
+
+      return response;
+    } catch (error) {
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('API 요청 시간이 초과되었습니다.');
+      }
+      throw error;
+    } finally {
+      clearTimeout(timeoutId);
+    }
   }
 
   async getRealtimeArrival(stationName: string): Promise<ArrivalData[]> {
     try {
-      const url = `/${this.API_KEY}/json/realtimeStationArrival/1/10/${stationName}`;
-      const response = await this.client.get(url);
+      const url = `${this.BASE_URL}/${this.API_KEY}/json/realtimeStationArrival/1/10/${stationName}`;
+      const response = await this.fetchWithTimeout(url);
+      const data = await response.json();
 
       // Handle Seoul API error responses
-      if (response.data.RESULT?.CODE !== 'INFO-000') {
-        throw new Error(response.data.RESULT?.MESSAGE || 'API Error');
+      if (data.RESULT?.CODE !== 'INFO-000') {
+        throw new Error(data.RESULT?.MESSAGE || 'API Error');
       }
 
-      return this.parseArrivalData(response.data.realtimeArrivalList);
+      return this.parseArrivalData(data.realtimeArrivalList);
     } catch (error) {
       console.error('Failed to fetch arrival data:', error);
       throw error;
     }
   }
 
-  private parseArrivalData(rawData: any[]): ArrivalData[] {
+  private parseArrivalData(rawData: unknown[]): ArrivalData[] {
     if (!Array.isArray(rawData)) {
       return [];
     }
@@ -83,7 +76,7 @@ class SeoulSubwayApi {
   }
 }
 
-export const seoulSubwayApi = new SeoulSubwayApi();
+export const seoulSubwayApi = new SeoulSubwayApiService();
 ```
 
 ---
@@ -205,26 +198,31 @@ class PollingManager {
 ### Mock API Responses
 ```typescript
 // __tests__/seoulSubwayApi.test.ts
-jest.mock('axios');
+// 서비스가 native fetch를 쓰므로 global.fetch를 모킹한다 (axios 아님).
+const okPayload = {
+  RESULT: { CODE: 'INFO-000' },
+  realtimeArrivalList: [
+    {
+      btrainNo: '1234',
+      updnLine: '상행',
+      arvlMsg2: '2분후[1번째전]',
+      bstatnNm: '당고개',
+      trainLineNm: '4호선',
+      recptnDt: '2025-01-03 14:30:00'
+    }
+  ]
+};
 
-const mockResponse = {
-  data: {
-    RESULT: { CODE: 'INFO-000' },
-    realtimeArrivalList: [
-      {
-        btrainNo: '1234',
-        updnLine: '상행',
-        arvlMsg2: '2분후[1번째전]',
-        bstatnNm: '당고개',
-        trainLineNm: '4호선',
-        recptnDt: '2025-01-03 14:30:00'
-      }
-    ]
-  }
+const mockFetch = (payload: unknown): void => {
+  global.fetch = jest.fn().mockResolvedValue({
+    ok: true,
+    status: 200,
+    json: async () => payload,
+  } as Response);
 };
 
 test('should fetch arrival data', async () => {
-  (axios.get as jest.Mock).mockResolvedValue(mockResponse);
+  mockFetch(okPayload);
 
   const data = await seoulSubwayApi.getRealtimeArrival('강남');
 
@@ -233,12 +231,7 @@ test('should fetch arrival data', async () => {
 });
 
 test('should handle API errors', async () => {
-  const errorResponse = {
-    data: {
-      RESULT: { CODE: 'ERROR-500', MESSAGE: 'Server error' }
-    }
-  };
-  (axios.get as jest.Mock).mockResolvedValue(errorResponse);
+  mockFetch({ RESULT: { CODE: 'ERROR-500', MESSAGE: 'Server error' } });
 
   await expect(seoulSubwayApi.getRealtimeArrival('강남'))
     .rejects.toThrow('Server error');

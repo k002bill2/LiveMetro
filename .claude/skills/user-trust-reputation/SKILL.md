@@ -23,7 +23,7 @@ description: "사용자 신뢰도 및 평판 시스템. 신뢰도 점수 관리,
 DelayReportForm → userTrustService.recordReportSubmission()
                 → fraudDetectionService.analyzeReport()
                      ↓
-              Firestore: delay_reports (status: pending)
+              Firestore: delayReports (status: pending)
 
 # 서버 검증 파이프라인(reportVerification/autoVerifyReports/onDelayReportCreated/
 # verifyDelayReport)은 #221에서 제거됨 — processVerification()을 자동 호출하던 서버 경로 없음.
@@ -180,15 +180,14 @@ if (!allowed) {
 
 | 컬렉션 | 문서 ID | 주요 필드 |
 |--------|---------|----------|
-| `user_trust_profiles` | `{userId}` | trustScore, trustLevel, totalReports, verifiedReports, rejectedReports, badges[] |
-| `delay_reports` | auto | userId, lineId, stationId, delayMinutes, status, verifiedBy, verifiedAt |
-| `verification_log` | auto | reportId, adminId, action, reason, timestamp |
+| `user_trust_profiles` | `{userId}` | trustScore, trustLevel, totalReports, verifiedReports, rejectedReports, badges[] **(현재 writer 없음 — `userTrustService`는 AsyncStorage만 씀)** |
+| `delayReports` | auto | userId, lineId, stationId, delayMinutes, status, verifiedBy, verifiedAt |
 
 ### Cloud Functions (asia-northeast3)
 
 | 함수 | 트리거 | 역할 |
 |------|--------|------|
-| `onBadgeEarned` | Firestore onUpdate | 새 뱃지 → 푸시 알림 |
+| `onBadgeEarned` | Firestore onUpdate (`user_trust_profiles/{userId}`) | 새 뱃지 → 푸시 알림. **현재 미발화** — `userTrustService`가 `user_trust_profiles`를 Firestore에 쓰지 않아 onUpdate 이벤트가 발생하지 않는다. |
 
 > 서버 측 검증 함수(`verifyDelayReport`/`autoVerifyReports`/`onDelayReportCreated`)는 #221에서 제거됨 — 현재 제보 검증을 호출하는 Cloud Function 없음.
 
