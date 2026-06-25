@@ -111,35 +111,6 @@
       ]
     }
   },
-  "seoul-api-patterns": {
-    "type": "skill",
-    "enforcement": "require",
-    "priority": "high",
-    "description": "Seoul Open Data API 통합 (30초 폴링 제한)",
-    "skillFile": ".claude/skills/api-integration/SKILL.md",
-    "promptTriggers": {
-      "keywords": [
-        "seoul",
-        "metro",
-        "subway",
-        "api",
-        "실시간",
-        "지하철",
-        "도착"
-      ],
-      "intentPatterns": [
-        "(seoul|metro|subway).*?(api|data)",
-        "실시간.*?도착"
-      ]
-    },
-    "fileTriggers": {
-      "pathPatterns": [
-        "src/services/train/**",
-        "src/services/api/seoul*.ts"
-      ]
-    },
-    "reminder": "30초 최소 폴링 간격 준수"
-  },
   "subway-data-processor": {
     "type": "skill",
     "enforcement": "suggest",
@@ -419,8 +390,8 @@
   },
   "api-integration": {
     "type": "skill",
-    "enforcement": "suggest",
-    "priority": "normal",
+    "enforcement": "require",
+    "priority": "high",
     "description": "Seoul Open Data API integration for real-time subway arrival data and timetables",
     "skillFile": ".claude/skills/api-integration/SKILL.md",
     "promptTriggers": {
@@ -429,17 +400,29 @@
         "openapi",
         "open data",
         "지하철 api",
-        "공공데이터"
+        "공공데이터",
+        "seoul",
+        "metro",
+        "subway",
+        "api",
+        "실시간",
+        "지하철",
+        "도착"
       ],
       "intentPatterns": [
-        "(call|fetch|integrate).*?(seoul|metro|subway).*?api"
+        "(call|fetch|integrate).*?(seoul|metro|subway).*?api",
+        "(seoul|metro|subway).*?(api|data)",
+        "실시간.*?도착"
       ]
     },
     "fileTriggers": {
       "pathPatterns": [
-        "**/services/api/**"
+        "**/services/api/**",
+        "src/services/train/**",
+        "src/services/api/seoul*.ts"
       ]
-    }
+    },
+    "reminder": "30초 최소 폴링 간격 준수"
   },
   "audio-accessibility": {
     "type": "skill",
@@ -624,6 +607,68 @@
       "intentPatterns": [
         "(calculate|update).*?(trust|reputation|badge)",
         "(신뢰도|평판|뱃지).*?(계산|부여|표시)"
+      ]
+    }
+  },
+  "run-eval": {
+    "type": "skill",
+    "enforcement": "suggest",
+    "priority": "normal",
+    "description": "AI 에이전트 평가 태스크 실행 및 pass@k 지표 계산",
+    "skillFile": ".claude/skills/run-eval/SKILL.md",
+    "promptTriggers": {
+      "keywords": [
+        "run-eval",
+        "eval",
+        "평가",
+        "pass@k",
+        "루브릭",
+        "에이전트 평가"
+      ],
+      "intentPatterns": [
+        "(run|execute|실행)\\s+.*?eval",
+        "에이전트\\s*평가"
+      ]
+    }
+  },
+  "merge-worktree": {
+    "type": "skill",
+    "enforcement": "suggest",
+    "priority": "normal",
+    "description": "git worktree 브랜치를 메인으로 머지하는 워크플로우",
+    "skillFile": ".claude/skills/merge-worktree/SKILL.md",
+    "promptTriggers": {
+      "keywords": [
+        "worktree",
+        "merge worktree",
+        "워크트리",
+        "워크트리 머지"
+      ],
+      "intentPatterns": [
+        "(merge|머지)\\s*.*?worktree",
+        "worktree\\s*.*?(merge|머지|정리)"
+      ]
+    }
+  },
+  "agent-observability": {
+    "type": "skill",
+    "enforcement": "suggest",
+    "priority": "normal",
+    "description": "에이전트 트레이싱/메트릭 수집 — 실행시간, 도구호출, KPI 대시보드 (.temp/traces 분석)",
+    "skillFile": ".claude/skills/agent-observability/SKILL.md",
+    "promptTriggers": {
+      "keywords": [
+        "tracing",
+        "트레이싱",
+        "observability",
+        "agent metrics",
+        "에이전트 메트릭",
+        "에이전트 실행 시간",
+        "KPI"
+      ],
+      "intentPatterns": [
+        "(trace|monitor|measure)\\s*.*?(agent|latency)",
+        "에이전트\\s*.*?(트레이싱|메트릭|실행\\s*시간)"
       ]
     }
   }

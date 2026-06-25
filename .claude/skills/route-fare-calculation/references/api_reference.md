@@ -213,7 +213,7 @@ getDiverseRoutes(
 ): Route[]
 ```
 
-- 내부: `findKShortestPaths(from, to, K_SHORTEST_CANDIDATES=30)` 후 `buildTransferSignature`로 그룹화
+- 내부: `findKShortestPaths(from, to, K_SHORTEST_CANDIDATES=15)` 후 `buildTransferSignature`로 그룹화
 - 카드 카테고리: `fastest` + 옵션 `min-transfer` + 나머지 `via-station` (viaTags: ['{역} 경유'])
 - 1.5x 시간 cap, 환승 ≤2 hard cap 적용
 - K=30 근거: 산곡→선릉 강남구청 경유 경로가 Yen's 자연 탐색 #25 부근 — K=15에서는 후보 set 진입 못 함 (PR #58: 10→15, PR #68: 15→30)

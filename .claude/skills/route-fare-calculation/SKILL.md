@@ -89,7 +89,7 @@ const alts = routeService.findAlternativeRoutes('gangnam', 'jongno3ga');
 두 메커니즘을 구분한다 (혼동 주의):
 
 - **`congestionMultipliers`** (그래프 가중치 조정): 엣지 weight에 노선 혼잡 배수를 곱한다. `calculateRoute`와 `getDiverseRoutes` **양쪽에 배선**돼 있다.
-- **`realtimeWeightOverride.ts`의 `getNextTrainWaitMinutes`** (다음 열차 대기): 그래프 가중치가 아니라 path 확정 **후** 첫 segment의 `estimatedMinutes`에 대기 분 수를 더하는 후처리 bump다(`routeService.ts:416-428`). `calculateRoute`에만 파라미터가 있고, 현재 어떤 호출자도 라이브 도착을 공급하지 않아 dormant이며, 메인 UI 엔진 `getDiverseRoutes`엔 파라미터조차 없다.
+- **`realtimeWeightOverride.ts`의 `getNextTrainWaitMinutes`** (다음 열차 대기): 그래프 가중치가 아니라 path 확정 **후** 첫 segment의 `estimatedMinutes`에 대기 분 수를 더하는 후처리 bump다. 라이브 경로는 `applyRealtimeBoardingWait`(`useRouteSearch.ts:164`, PR #254)로 배선돼 있다. 단 `calculateRoute`의 5번째 `realtimeArrivals` 파라미터(`routeService.ts:416-428`)는 미사용이고, 메인 UI 엔진 `getDiverseRoutes`엔 파라미터조차 없다.
 
 → 두 엔진의 격리·미배선과 OD 회귀 디버깅은 [references/routing-debugging.md](references/routing-debugging.md) 참조 (수정 전 필독).
 
@@ -114,7 +114,7 @@ const result = findKShortestPaths('gangnam', 'hongdae', 3);
 // 다양성 카드 (환승역 signature 그룹화, maxRoutes 1-5)
 const diverse = getDiverseRoutes('gangnam', 'hongdae', 5);
 // → Route[] (최대 5개, fastest + min-transfer + via-station 카드)
-//   내부: findKShortestPaths(K_SHORTEST_CANDIDATES=30) 후 buildTransferSignature 로 그룹화
+//   내부: findKShortestPaths(K_SHORTEST_CANDIDATES=15) 후 buildTransferSignature 로 그룹화
 ```
 
 ### Route Diversity

@@ -85,7 +85,7 @@ Seoul API는 **성공도 실패도 HTTP 200**으로 오며, 같은 200 안에 **
 
 ```typescript
 // 세 구조를 단일 헬퍼로 정규화. null = 에러코드 없음(=성공 후보).
-const apiError = extractSeoulApiErrorCode(data); // { code, message } | null
+const apiError = extractSeoulApiErrorCode(data); // seoulSubwayApi.ts 내부 헬퍼(module-private) — 새 파일에선 seoulSubwayApi 메서드 경유. { code, message } | null
 if (apiError && apiError.code !== 'INFO-000') {
   // INFO-200은 '운행 종료/조회 결과 없음'(no-data)으로 별도 분류, 그 외는 에러로 throw
   ...
@@ -140,6 +140,7 @@ async function fetchWithRetry<T>(
 
 ### Service Disruption Detection
 ```typescript
+// SoT: 장애 severity 분류는 subway-data-processor(DelaySeverity, models/train.ts:86) 소관. 아래는 boolean 간이 체크.
 const detectServiceDisruptions = (messages: string[]): boolean => {
   const keywords = ['운행중단', '전면중단', '장애', '고장', '사고', '탈선', '화재'];
   return messages.some(msg => keywords.some(kw => msg.includes(kw)));
@@ -169,8 +170,8 @@ Priority Order:
    ```
 
 2. **Response Validation**
-   - Check `RESULT.CODE === 'INFO-000'` for success
-   - Handle empty `realtimeArrivalList` gracefully
+   - 실시간/역검색 성공은 `errorMessage.code === 'INFO-000'`으로 판정 (캐비엇 b) — `RESULT.CODE`는 8088 시간표 게이트웨이 봉투 전용
+   - Handle empty `realtimeArrivalList` gracefully (INFO-200 = no-data → `convertToAppTrain()` 정규화 후 빈 배열)
 
 3. **Logging**
    - Log all API calls with timestamp
@@ -191,7 +192,7 @@ stationNameProp → trainService.getStation() (Firebase) → getLocalStation() (
 | 데이터 타입 | TTL | 저장소 | 비고 |
 |------------|-----|--------|------|
 | 실시간 도착 | 60초 | 메모리 | 폴링 주기와 동일 |
-| 시간표 | 24시간 | AsyncStorage | 일 단위 변경, `timetable:{code}:{weekTag}:{dir}` |
+| 시간표 | 24시간 | AsyncStorage | 일 단위 변경, `timetable:{code}:{lineNumber}:{weekTag}:{dir}` |
 | 역정보 | 영구 | 로컬 JSON | `stationsDataService` |
 
 ## 흔한 실수 체크리스트
@@ -232,11 +233,13 @@ Seoul API 연동 시 아래 패턴은 장애를 유발합니다. 예외 없음.
 | 캐시 없이 매번 API 호출 | SWR 패턴 (캐시 반환 → 백그라운드 갱신) |
 | API 에러와 빈 데이터 동일 처리 | 에러 = retry, 빈 데이터 = "운행 종료" |
 
+> `updnLine` 방향·`arrivalTime`·`convertToAppTrain` 등 페이로드 정규화 규칙의 SoT는 `subway-data-processor` 소관(L18) — 위 정규화 행은 호출 레이어 함정 환기용 요약이며, 정본은 거기 참조.
+
 ### Response 검증 Patterns
 | BANNED | REQUIRED |
 |--------|----------|
 | response.json() 직접 사용 | `errorMessage.code === 'INFO-000'` 확인 후 사용 |
-| `errorMessage.code`만 체크 | `extractSeoulApiErrorCode(data)`로 wrapped/top-level/RESULT 세 구조 정규화 (캐비엇 b) |
+| `errorMessage.code`만 체크 | `seoulSubwayApi` 메서드 경유 호출 (내부 `extractSeoulApiErrorCode`가 wrapped/top-level/RESULT 3구조 정규화 — module-private, 직접 import 불가) |
 | `realtimeArrivalList` 그대로 반환 | `convertToAppTrain()`으로 정규화 후 반환 |
 | HTTP 상태코드만 확인 | API 자체 에러코드 (`ERROR-500`, `ERROR-501`) 분기 처리 |
 
@@ -245,12 +248,12 @@ Seoul API 연동 시 아래 패턴은 장애를 유발합니다. 예외 없음.
 - Always implement fallback to Firebase/cache
 - Handle Korean encoding properly
 - Monitor API health and switch sources if needed
-- Export service as singleton: `export const seoulSubwayApi = new SeoulSubwayApi()`
+- Export service as singleton: `export const seoulSubwayApi = new SeoulSubwayApiService()`
 
 ## Reference Documentation
 
 For complete code examples, see [references/api-examples.md](references/api-examples.md):
-- Full SeoulSubwayApi class implementation
+- Full SeoulSubwayApiService class implementation
 - DataManager with multi-tier fallback
 - PollingManager pattern
 - Jest mock examples

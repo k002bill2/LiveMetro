@@ -32,8 +32,8 @@ Systematically evaluate AI agent performance and compute pass@k metrics. Provide
 /run-eval task_ui_001 --k=3
 /run-eval --all --k=3
 
-# 특정 에이전트로 실행
-/run-eval task_ui_001 --agent=web-ui-specialist
+# 특정 에이전트로 실행 (기본값 권장: general-purpose — Common Mistakes 표 참조)
+/run-eval task_ui_001 --agent=general-purpose
 ```
 
 ## Execution Steps
@@ -53,8 +53,9 @@ Systematically evaluate AI agent performance and compute pass@k metrics. Provide
 `.claude/evals/tasks/` 디렉토리에서 YAML 파일을 읽습니다:
 
 ```bash
-# 단일 태스크
-cat .claude/evals/tasks/task_ui_001.yaml
+# 단일 태스크 — 파일명 ≠ 내부 id (예: id task_ui_001 → 파일 ui-component-creation.yaml)
+# 이므로 직접 cat 금지. 내부 id로 파일을 찾아 로드한다:
+cat "$(grep -rl "id: $TASK_ID" .claude/evals/tasks/*.yaml)"
 
 # 카테고리별
 grep -l "category: ui_component" .claude/evals/tasks/*.yaml
@@ -130,4 +131,4 @@ eval 시스템 상세는 [references/eval-guide.md](references/eval-guide.md) �
 - Rubrics: `.claude/evals/rubrics/`
 - Results: `.claude/evals/results/`
 - Eval guide: `references/eval-guide.md`
-- **REQUIRED:** Use `superpowers:agent-improvement` for post-eval failure diagnosis
+- **REQUIRED:** Use `agent-improvement` skill for post-eval failure diagnosis

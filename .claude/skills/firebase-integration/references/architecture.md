@@ -2,22 +2,15 @@
 
 Firebase 통합의 상위 구조 결정 가이드. SKILL.md의 "When to use this skill"에서 캐싱·보안·서비스 계층 결정이 필요할 때 이 파일을 참조한다.
 
-## 1. Service Layer Pattern (Singleton)
+## 1. Service Layer Pattern (Module Instance)
 
-LiveMetro의 모든 Firebase 접근은 service 클래스 singleton을 거친다. 직접 firestore 호출 금지.
+LiveMetro의 모든 Firebase 접근은 service 클래스의 단일 모듈 인스턴스를 거친다. 직접 firestore 호출 금지. (getInstance 싱글톤 보일러플레이트는 쓰지 않는다 — 파일 끝에서 `new`로 한 번 인스턴스화해 export.)
 
 ```typescript
 class TrainService {
-  private static instance: TrainService;
+  private unsubscribeCallbacks: Map<string, () => void> = new Map();
 
-  static getInstance(): TrainService {
-    if (!TrainService.instance) {
-      TrainService.instance = new TrainService();
-    }
-    return TrainService.instance;
-  }
-
-  async getTrainsByStation(stationId: string): Promise<Train[]> {
+  async getStationsByLine(lineId: string): Promise<Station[]> {
     // Implementation
   }
 
@@ -29,7 +22,7 @@ class TrainService {
   }
 }
 
-export const trainService = TrainService.getInstance();
+export const trainService = new TrainService();
 ```
 
 ## 2. Multi-tier Fallback (캐싱 전략)
@@ -122,5 +115,5 @@ import { enableNetwork, disableNetwork } from 'firebase/firestore';
 | 구독 cleanup 누락 | 메모리 누수 | `useEffect` return + `unsubscribe()` |
 | 인덱스 없는 쿼리 | 슬로우 + Firebase 콘솔 경고 | `where + orderBy` 조합 검증 후 `firestore.indexes.json` 등록 |
 | 클라이언트에 Firebase config 노출 | 보안 사고 | `.env`로 분리 + Rules로 권한 통제 |
-| permission-denied 미처리 | 사용자 혼란 | `handleFirebaseError` 사용 (`references/patterns.md` §4) |
+| permission-denied 미처리 | 사용자 혼란 | catch 후 `console.error` + 빈 배열(`[]`)/`null` 반환 (`references/patterns.md` §4) |
 | 페이지네이션 없이 컬렉션 전체 fetch | 비용 폭증 | `limit + startAfter` 강제 |

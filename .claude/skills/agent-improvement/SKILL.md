@@ -29,7 +29,7 @@ Diagnose agent failures and propose targeted improvements. Closes the feedback l
    └─> Generate specific, actionable improvement proposals
 ```
 
-**REQUIRED:** Use `superpowers:agent-observability` for reading trace data and understanding event formats.
+**REQUIRED:** Use `agent-observability` for reading trace data and understanding event formats.
 
 ## Improvement Targets
 
@@ -71,12 +71,10 @@ Diagnosis ──> Proposal ──> Apply ──> Re-evaluate
 | Fixing symptoms instead of root causes (e.g., adding retries for XML tool output) | Trace back to why the failure happens — use `general-purpose` subagent_type, not retries |
 | Skipping re-evaluation after applying fixes | Always run `/run-eval` or a trial agent task to verify the improvement works |
 | Analyzing only the latest session when the pattern is intermittent | Check multiple sessions in `.temp/traces/sessions/` to confirm patterns |
-| Changing agent prompts without updating quality-reference.md | Keep agent prompts and shared quality standards in sync |
 
 ## References
 
 - Trace data: `.temp/traces/sessions/*/events.jsonl`
 - Eval results: `.claude/evals/results/`
 - Agent definitions: `.claude/agents/*.md`
-- Quality reference: `.claude/agents/shared/quality-reference.md`
 - Observability skill: `.claude/skills/agent-observability/SKILL.md`

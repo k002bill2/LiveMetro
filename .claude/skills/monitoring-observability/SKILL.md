@@ -1,6 +1,6 @@
 ---
 name: monitoring-observability
-description: "앱 성능 모니터링, 헬스체크, 크래시 리포팅 시스템. 렌더링 시간, API 응답시간, 메모리 사용, 프레임 드롭 감지. Use when: (1) 성능 측정/최적화, (2) 헬스체크 구현, (3) 크래시 리포팅, (4) 메트릭 수집/분석. 트리거: 성능, performance, 모니터링, monitoring, 헬스체크, health check, 크래시, crash, 메트릭, metrics."
+description: "앱 성능 모니터링, 헬스체크, 크래시 리포팅 시스템. 렌더링 시간, API 응답시간, 메모리 사용, 프레임 드롭 감지. Use when: (1) 성능 측정/최적화, (2) 헬스체크 구현, (3) 크래시 리포팅, (4) 메트릭 수집/분석. 트리거: 성능, performance, 모니터링, monitoring, 헬스체크, health check, 크래시, crash, 메트릭, metrics. 단, AI 에이전트/하네스 실행 추적·토큰/도구호출 메트릭·KPI 대시보드는 agent-observability 소관, 통계 집계/지표 분석은 statistics-analytics 소관 — 이 스킬은 LiveMetro 앱 런타임(렌더/API/메모리/크래시) 모니터링만."
 ---
 
 # Monitoring & Observability
@@ -261,7 +261,7 @@ monitoringManager.setCurrentScreen('HomeScreen');
 2. 6가지 체크를 `Promise.allSettled`로 병렬 실행
 3. 하나라도 `unhealthy` -> 전체 `unhealthy`
 4. 하나라도 `degraded` (나머지 healthy) -> 전체 `degraded`
-5. 결과를 `healthHistory`에 저장 (최대 100건, LIFO)
+5. 결과를 `healthHistory`에 저장 (최대 100건, 최신 우선·초과 시 오래된 항목부터 축출)
 6. `errorRate`는 최근 10건 체크 중 unhealthy 비율
 
 ## 크래시 리포팅 흐름
@@ -274,7 +274,7 @@ monitoringManager.setCurrentScreen('HomeScreen');
         ↓
   CrashReport 생성 (id, timestamp, error, context, device)
         ↓
-  reportQueue에 추가 (최대 50건, LIFO)
+  reportQueue에 추가 (최대 50건, 최신 우선·초과 시 오래된 리포트 축출)
         ↓
   AsyncStorage에 영속화 (@crash_reports_queue)
         ↓
@@ -290,7 +290,7 @@ monitoringManager.setCurrentScreen('HomeScreen');
   ├── recordMemoryUsage() → JS 힙 체크
   └── createMetricsSnapshot() → 평균 메트릭 계산
         ↓
-  metricsQueue에 추가 (최대 100건, LIFO)
+  metricsQueue에 추가 (최대 100건, 최신 우선·초과 시 오래된 항목부터 축출)
         ↓
   AsyncStorage에 영속화 (@performance_metrics_queue)
         ↓

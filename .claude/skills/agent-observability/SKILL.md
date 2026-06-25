@@ -1,6 +1,6 @@
 ---
 name: agent-observability
-description: "에이전트 트레이싱/메트릭 수집 전문 스킬. 에이전트 실행 시간, 토큰 사용량, 도구 호출 횟수 모니터링, KPI 대시보드, .temp/traces/ 분석, background vs foreground 성능 비교 등에 사용. '에이전트 성능 모니터링', '실행 시간 확인', '토큰 사용량 분석', 'KPI 확인', '트레이싱 설정', '메트릭 수집' 등의 요청에 트리거. 실패 원인 진단(agent-improvement)이 아닌, 정량적 성능 데이터 수집과 시각화에 특화."
+description: "에이전트 트레이싱/메트릭 수집 전문 스킬. 에이전트 실행 시간, 도구 호출 횟수 모니터링, KPI 대시보드, .temp/traces/ 분석, background vs foreground 성능 비교 등에 사용. '에이전트 성능 모니터링', '실행 시간 확인', 'KPI 확인', '트레이싱 설정', '에이전트 메트릭 수집' 등의 요청에 트리거. 실패 원인 진단(agent-improvement)이 아닌, 정량적 성능 데이터 수집과 시각화에 특화."
 user-invocable: false
 ---
 
@@ -11,6 +11,19 @@ user-invocable: false
 Trace agent behavior for diagnosis and improvement. Records structured events for every agent spawn and completion, enabling performance analysis and failure pattern detection.
 
 ## Event Types
+
+`events.jsonl` records 8 event types. Each line has `event`, `timestamp`, `session_id`, and a `data` object (keys vary by event). Full JSON examples below cover the two agent lifecycle events; the rest follow the same envelope.
+
+| `event` | When | `data` keys |
+|---------|------|-------------|
+| `session_started` | Session begins | `task_type`, `complexity_assessment`, `planned_agents`, `estimated_duration_min` |
+| `agent_spawned` | Task tool call initiated (no `tool_response`) | `agent_type`, `description`, `model`, `run_in_background` |
+| `decision_made` | Orchestrator picks an agent/approach | `decision_type`, `choice`, `alternatives_considered`, `confidence`, `task_analysis` |
+| `tool_called` | A tool invocation completes | `tool_name`, `duration_ms`, `success` |
+| `result_received` | Agent returns its result | `agent_id`, `status`, `files_created` |
+| `agent_completed` | Task tool call returns (`tool_response` present) | `agent_type`, `description`, `duration_ms`, `success` |
+| `error_occurred` | A recoverable/unrecoverable error is caught | `error_type`, `agent_id`, `recoverable`, `recovery_action` |
+| `session_ended` | Session finishes | `status`, `deliverables_count`, `quality_gates_passed` |
 
 ### `agent_spawned`
 
@@ -87,8 +100,8 @@ during concurrent agent execution.
 
 ## How It Works
 
-Events are appended to `events.jsonl` via hooks that intercept agent lifecycle events.
-Duration is calculated by cross-referencing `parallel-state.json` start times.
+Events are append-only JSONL at `.temp/traces/sessions/{sessionId}/events.jsonl` (emitted by the agent/workflow runtime — there is no `.claude/hooks/` script producing them).
+`duration_ms` is recorded directly on each `agent_completed` event; there is no `parallel-state.json` cross-reference.
 
 ## Common Mistakes
 
@@ -102,6 +115,5 @@ Duration is calculated by cross-referencing `parallel-state.json` start times.
 
 ## References
 
-- Parallel state: `.claude/coordination/parallel-state.json`
 - Failure diagnosis: `.claude/skills/agent-improvement/SKILL.md`
-- **REQUIRED:** Use `superpowers:agent-improvement` for failure pattern analysis
+- **REQUIRED:** Use the `agent-improvement` skill (`.claude/skills/agent-improvement/SKILL.md`) for failure pattern analysis (local skill — no `superpowers:` prefix)
