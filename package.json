@@ -35,6 +35,8 @@
     "skills:update": "ts-node scripts/skillsGuideUpdater.ts",
     "skills:update:force": "ts-node scripts/skillsGuideUpdater.ts --force",
     "skills:check": "ts-node scripts/skillsGuideUpdater.ts --check-only",
+    "codex:sync-prompts": "node scripts/sync-codex-command-prompts.mjs",
+    "codex:install-commands-skill": "node scripts/sync-codex-command-prompts.mjs --install-user-skill",
     "upload:stations": "ts-node scripts/uploadStationsToFirebase.ts",
     "backup:claude": "ts-node scripts/backupClaudeConfig.ts",
     "restore:claude": "ts-node scripts/restoreClaudeConfig.ts",
