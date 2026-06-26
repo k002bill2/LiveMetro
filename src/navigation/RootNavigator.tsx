@@ -24,6 +24,7 @@ import { SignupStep2Screen } from '../screens/auth/SignupStep2Screen';
 import { SignupStep3Screen } from '../screens/auth/SignupStep3Screen';
 import { HomeScreen } from '../screens/home/HomeScreen';
 import { SubwayMapScreen } from '../screens/map/SubwayMapScreen';
+import { CurrentLocationMapScreen } from '../screens/map/CurrentLocationMapScreen';
 import { FavoritesScreen } from '../screens/favorites/FavoritesScreen';
 import { AlertsScreen } from '../screens/alerts/AlertsScreen';
 import { SettingsNavigator } from './SettingsNavigator';
@@ -103,6 +104,7 @@ export type RootStackParamList = {
   // QuickActionsGrid '노선도' button + HomeTopBar Bell still navigate here,
   // so they must remain reachable through the outer Stack.
   SubwayMap: undefined;
+  CurrentLocationMap: undefined;
   Alerts: undefined;
   WeeklyPrediction: undefined;
 };
@@ -376,6 +378,14 @@ const RootNavigatorContent: React.FC = () => {
         options={{
           headerShown: true,
           title: '노선도',
+        }}
+      />
+      <Stack.Screen
+        name="CurrentLocationMap"
+        component={CurrentLocationMapScreen}
+        options={{
+          headerShown: true,
+          title: '내 위치 노선도',
         }}
       />
       <Stack.Screen

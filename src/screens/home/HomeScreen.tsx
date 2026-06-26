@@ -18,7 +18,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSemanticTokens } from '@/services/theme';
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { FileText, Map as MapIcon, Megaphone, Search, TrainFront } from 'lucide-react-native';
+import { FileText, Map as MapIcon, MapPin, Megaphone, Search, TrainFront } from 'lucide-react-native';
 import * as Location from 'expo-location';
 import { NavigationProp, useIsFocused, useNavigation } from '@react-navigation/native';
 
@@ -309,6 +309,10 @@ export const HomeScreen: React.FC = () => {
     () => navigation.navigate('SubwayMap'),
     [navigation],
   );
+  const onPressCurrentLocationMap = useCallback(
+    () => navigation.navigate('CurrentLocationMap'),
+    [navigation],
+  );
   const onPressReport = useCallback(
     () => navigation.navigate('DelayFeed'),
     [navigation],
@@ -424,6 +428,7 @@ export const HomeScreen: React.FC = () => {
           actions={[
             { id: 'route', Icon: Search, label: '경로검색', onPress: onPressRouteSearch },
             { id: 'map', Icon: MapIcon, label: '노선도', onPress: onPressMap },
+            { id: 'mylocation', Icon: MapPin, label: '내 위치', onPress: onPressCurrentLocationMap },
             { id: 'report', Icon: Megaphone, label: '제보', onPress: onPressReport },
             { id: 'cert', Icon: FileText, label: '증명서', onPress: onPressCert },
           ]}
