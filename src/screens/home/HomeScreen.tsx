@@ -144,11 +144,18 @@ export const HomeScreen: React.FC = () => {
     morningCommute,
     profileMorningCommute,
     onboardingMorningCommute,
+    activeCommute,
+    activeCommuteType,
     routeSummary,
     commuteStationNames,
     effectiveHero,
     effectiveDepartureTime,
-  } = useCommuteHeroEstimate(commuteRefreshNonce);
+  } = useCommuteHeroEstimate(commuteRefreshNonce, 'auto');
+
+  // Card label follows the time-resolved active leg (출근 in the morning window,
+  // 퇴근 in the afternoon/evening) — drives both the real card and placeholder.
+  const commuteCardTitle =
+    activeCommuteType === 'evening' ? '오늘의 퇴근 경로' : '오늘의 출근 경로';
 
   // Dev-only diagnostic (no-op in production/jest): logs stored commute ids
   // vs. resolved stations — see useCommuteDiagnostics for the failure shape
@@ -201,13 +208,14 @@ export const HomeScreen: React.FC = () => {
     navigation.navigate('WeeklyPrediction');
   }, [navigation]);
 
-  // One-tap "내 출근 경로로 길안내 시작" — null when the registered commute
-  // can't resolve a route or endpoint names, so the CTA stays hidden rather
-  // than dead-ending. Reuses the same guidance handoff as the route-search tab.
+  // One-tap "이 경로로 길안내 시작" for the active leg (출근 in the morning, 퇴근
+  // in the afternoon/evening) — null when the registered commute can't resolve a
+  // route or endpoint names, so the CTA stays hidden rather than dead-ending.
+  // Reuses the same guidance handoff as the route-search tab.
   const startCommuteGuidance = useStartCommuteGuidance({
-    fromStationId: morningCommute?.stationId,
-    toStationId: morningCommute?.destinationStationId,
-    viaTransferId: morningCommute?.transferStationId,
+    fromStationId: activeCommute?.stationId,
+    toStationId: activeCommute?.destinationStationId,
+    viaTransferId: activeCommute?.transferStationId,
     fromStationName: commuteStationNames.origin,
     toStationName: commuteStationNames.destination,
   });
@@ -404,6 +412,7 @@ export const HomeScreen: React.FC = () => {
       <View style={styles.routeCardWrap}>
         {commuteStationNames.origin && commuteStationNames.destination ? (
           <CommuteRouteCard
+            title={commuteCardTitle}
             origin={commuteStationNames.origin}
             destination={commuteStationNames.destination}
             lineId={(routeSummary.lineId ?? commuteStationNames.originLineId) as LineId | undefined}
@@ -418,7 +427,10 @@ export const HomeScreen: React.FC = () => {
             testID="home-commute-route-card"
           />
         ) : (
-          <CommuteRouteCardPlaceholder onPress={handleOpenCommuteSettings} />
+          <CommuteRouteCardPlaceholder
+            title={commuteCardTitle}
+            onPress={handleOpenCommuteSettings}
+          />
         )}
       </View>
 

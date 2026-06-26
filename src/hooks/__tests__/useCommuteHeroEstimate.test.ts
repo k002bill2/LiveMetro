@@ -12,8 +12,12 @@ import { renderHook, waitFor } from '@testing-library/react-native';
 
 import { useCommuteHeroEstimate } from '@/hooks/useCommuteHeroEstimate';
 import { useMLPrediction } from '@/hooks/useMLPrediction';
-import { useFirestoreMorningCommute } from '@/hooks/useFirestoreMorningCommute';
+import {
+  useFirestoreMorningCommute,
+  useFirestoreCommuteLeg,
+} from '@/hooks/useFirestoreMorningCommute';
 import { useCommuteRouteSummary } from '@/hooks/useCommuteRouteSummary';
+import { resolveActiveCommuteType } from '@/utils/commuteSchedule';
 import { useAuth } from '@/services/auth/AuthContext';
 import { trainService } from '@/services/train/trainService';
 
@@ -23,6 +27,11 @@ jest.mock('@/hooks/useMLPrediction', () => ({
 
 jest.mock('@/hooks/useFirestoreMorningCommute', () => ({
   useFirestoreMorningCommute: jest.fn(() => null),
+  useFirestoreCommuteLeg: jest.fn(() => null),
+}));
+
+jest.mock('@/utils/commuteSchedule', () => ({
+  resolveActiveCommuteType: jest.fn(() => 'morning'),
 }));
 
 jest.mock('@/hooks/useCommuteRouteSummary', () => ({
@@ -41,6 +50,8 @@ jest.mock('@/services/train/trainService', () => ({
 
 const mockUseMLPrediction = useMLPrediction as jest.Mock;
 const mockUseFirestoreMorningCommute = useFirestoreMorningCommute as jest.Mock;
+const mockUseFirestoreCommuteLeg = useFirestoreCommuteLeg as jest.Mock;
+const mockResolveActiveCommuteType = resolveActiveCommuteType as jest.Mock;
 const mockUseCommuteRouteSummary = useCommuteRouteSummary as jest.Mock;
 const mockUseAuth = useAuth as jest.Mock;
 const mockGetStation = trainService.getStation as jest.Mock;
@@ -59,6 +70,8 @@ describe('useCommuteHeroEstimate', () => {
     jest.clearAllMocks();
     mockUseMLPrediction.mockReturnValue({ prediction: null, baselineMinutes: null });
     mockUseFirestoreMorningCommute.mockReturnValue(null);
+    mockUseFirestoreCommuteLeg.mockReturnValue(null);
+    mockResolveActiveCommuteType.mockReturnValue('morning');
     mockUseCommuteRouteSummary.mockReturnValue({ ready: false });
     mockUseAuth.mockReturnValue({ user: { id: 'u1', preferences: {} } });
     mockGetStation.mockResolvedValue(null);
@@ -197,5 +210,116 @@ describe('useCommuteHeroEstimate', () => {
   it('defaults refreshNonce to 0 for consumers that omit it', () => {
     renderHook(() => useCommuteHeroEstimate());
     expect(mockUseFirestoreMorningCommute).toHaveBeenCalledWith('u1', 0);
+  });
+});
+
+describe('useCommuteHeroEstimate direction=auto (evening switch)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockUseMLPrediction.mockReturnValue({ prediction: null, baselineMinutes: null });
+    mockUseFirestoreMorningCommute.mockReturnValue(null);
+    mockUseFirestoreCommuteLeg.mockReturnValue(null);
+    mockResolveActiveCommuteType.mockReturnValue('morning');
+    mockUseCommuteRouteSummary.mockReturnValue({ ready: false });
+    mockUseAuth.mockReturnValue({ user: { id: 'u1', preferences: {} } });
+    mockGetStation.mockResolvedValue(null);
+  });
+
+  it("PM + 퇴근설정 → activeCommuteType='evening', 그래프 추정치(ML 무시)", async () => {
+    mockResolveActiveCommuteType.mockReturnValue('evening');
+    // Evening leg resolves (work→home) via useFirestoreCommuteLeg('evening').
+    mockUseFirestoreCommuteLeg.mockReturnValue({
+      departureTime: '19:00',
+      stationId: '0220',
+      destinationStationId: '0150',
+    });
+    mockUseCommuteRouteSummary.mockReturnValue({
+      ready: true,
+      rideMinutes: 24,
+      transferCount: 1,
+      stationCount: 7,
+      fareKrw: 1400,
+    });
+    mockGetStation.mockImplementation(async (id: string) =>
+      id === '0220'
+        ? { id: '0220', name: '강남역', lineId: '2' }
+        : { id: '0150', name: '서울역', lineId: '1' },
+    );
+    // ML prediction is present (morning-only model) — must be IGNORED for evening.
+    mockUseMLPrediction.mockReturnValue({
+      prediction: {
+        predictedDepartureTime: '08:00',
+        predictedArrivalTime: '08:30',
+        confidence: 0.9,
+      },
+      baselineMinutes: 30,
+    });
+
+    const { result } = renderHook(() => useCommuteHeroEstimate(0, 'auto'));
+
+    expect(result.current.activeCommuteType).toBe('evening');
+    expect(result.current.activeCommute?.stationId).toBe('0220');
+    await waitFor(() =>
+      expect(result.current.effectiveHero?.predictedMinutes).toBe(24),
+    );
+    // Evening must NOT reuse the morning ML number.
+    expect(result.current.hasRealPrediction).toBe(false);
+    expect(result.current.effectiveHero?.confidence).toBeUndefined();
+    // arrival = 19:00 + 24min = 19:24, departure from evening commute.
+    expect(result.current.effectiveHero?.arrivalTime).toBe('19:24');
+    expect(result.current.effectiveDepartureTime).toBe('19:00');
+  });
+
+  it("AM + 출근설정 → activeCommuteType='morning', ML 적용(오늘과 동일)", () => {
+    mockResolveActiveCommuteType.mockReturnValue('morning');
+    mockUseFirestoreMorningCommute.mockReturnValue({
+      departureTime: '08:00',
+      stationId: '0150',
+      destinationStationId: '0220',
+    });
+    mockUseMLPrediction.mockReturnValue({
+      prediction: {
+        predictedDepartureTime: '08:00',
+        predictedArrivalTime: '08:28',
+        confidence: 0.8,
+      },
+      baselineMinutes: 31,
+    });
+
+    const { result } = renderHook(() => useCommuteHeroEstimate(0, 'auto'));
+
+    expect(result.current.activeCommuteType).toBe('morning');
+    expect(result.current.activeCommute?.stationId).toBe('0150');
+    expect(result.current.hasRealPrediction).toBe(true);
+  });
+
+  it('PM + 퇴근 미설정 → activeCommute null', () => {
+    mockResolveActiveCommuteType.mockReturnValue('evening');
+    mockUseFirestoreCommuteLeg.mockReturnValue(null); // evening not set / toggled off
+
+    const { result } = renderHook(() => useCommuteHeroEstimate(0, 'auto'));
+
+    expect(result.current.activeCommuteType).toBe('evening');
+    expect(result.current.activeCommute).toBeNull();
+  });
+
+  it("default direction='morning' → activeCommuteType='morning' (회귀, Weekly 보호)", () => {
+    // Would mislead if the resolver were consulted — it must not be.
+    mockResolveActiveCommuteType.mockReturnValue('evening');
+
+    const { result } = renderHook(() => useCommuteHeroEstimate());
+
+    expect(result.current.activeCommuteType).toBe('morning');
+    expect(mockResolveActiveCommuteType).not.toHaveBeenCalled();
+  });
+
+  it("evening leg subscription disabled in direction='morning' (enabled=false)", () => {
+    renderHook(() => useCommuteHeroEstimate());
+    expect(mockUseFirestoreCommuteLeg).toHaveBeenCalledWith('u1', 'evening', 0, false);
+  });
+
+  it("evening leg subscription enabled in direction='auto'", () => {
+    renderHook(() => useCommuteHeroEstimate(0, 'auto'));
+    expect(mockUseFirestoreCommuteLeg).toHaveBeenCalledWith('u1', 'evening', 0, true);
   });
 });
