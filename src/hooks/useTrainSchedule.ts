@@ -21,6 +21,7 @@ const TIMETABLE_UNSUPPORTED_LINE_MESSAGE = '이 노선의 시간표는 제공되
 
 /** 시간표 캐시 TTL: 24시간 (시간표는 일 단위 변경) */
 const TIMETABLE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const TIMETABLE_CACHE_SCHEMA = 'full-day-v1';
 
 interface TimetableCacheEntry {
   data: SeoulTimetableRow[];
@@ -28,7 +29,7 @@ interface TimetableCacheEntry {
 }
 
 const getTimetableCacheKey = (stationCode: string, lineNumber: string, weekTag: string, direction: string): string =>
-  `timetable:${stationCode}:${lineNumber}:${weekTag}:${direction}`;
+  `timetable:${TIMETABLE_CACHE_SCHEMA}:${stationCode}:${lineNumber}:${weekTag}:${direction}`;
 
 const getCachedTimetable = async (cacheKey: string): Promise<SeoulTimetableRow[] | null> => {
   try {

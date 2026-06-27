@@ -8,9 +8,9 @@
  * new station, the card slides to the new row offset via Animated.timing
  * instead of unmounting/remounting across rows.
  */
-import React, { memo, useEffect, useMemo, useRef } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSemanticTokens } from '@/services/theme';
-import { Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { ChevronDown, ChevronUp } from 'lucide-react-native';
 import { WANTED_TOKENS, typeStyle } from '@/styles/modernTheme';
 
@@ -18,6 +18,7 @@ import { useShouldReduceMotion } from '@/contexts/AccessibilityContext';
 import type { TrainPosition } from '@/models/trainPosition';
 import { positionStatusToDisplay } from '@/models/trainPosition';
 import { TIMELINE_ROW_HEIGHT, RAIL_ZONE_WIDTH, MARKER_ZONE_WIDTH } from '@/components/station/StationTimelineRow';
+import { addAlpha } from '@/utils/colorUtils';
 
 /** Fixed card height — caption1(16) + caption2(14) + padding/borders. */
 export const TRAIN_MARKER_HEIGHT = 38;
@@ -26,6 +27,10 @@ const STACK_GAP = 2;
 const SLIDE_DURATION_MS = 600;
 const FADE_IN_DURATION_MS = 250;
 const ARROW_SIZE = 14;
+const ARROW_BADGE_SIZE = 22;
+const ARROW_CARD_GAP = 3;
+const ARROW_TINT_ALPHA = 0.48;
+const ARROW_STROKE_WIDTH = 2.5;
 const ARROW_TRAVEL = 4;
 const ARROW_LOOP_MS = 900;
 
@@ -64,14 +69,16 @@ const isBetweenStatus = (train: TrainPosition): boolean =>
 const isMoving = (train: TrainPosition): boolean => train.status !== 'arrived';
 
 /**
- * Looping chevron on the rail beside the card — continuous "이동 중" cue
+ * Looping chevron above/below the card — continuous "이동 중" cue
  * between the 30s polls (cards themselves only slide when a poll moves them).
  */
-const MovingArrow: React.FC<{ direction: TrainPosition['direction']; lineColor: string; testID?: string }> = ({
-  direction,
-  lineColor,
-  testID,
-}) => {
+const MovingArrow: React.FC<{
+  direction: TrainPosition['direction'];
+  lineColor: string;
+  backgroundColor: string;
+  cardWidth: number | null;
+  testID?: string;
+}> = ({ direction, lineColor, backgroundColor, cardWidth, testID }) => {
   const shouldReduceMotion = useShouldReduceMotion();
   const phase = useRef(new Animated.Value(0)).current;
 
@@ -91,16 +98,28 @@ const MovingArrow: React.FC<{ direction: TrainPosition['direction']; lineColor: 
   }, [phase, shouldReduceMotion]);
 
   const Chevron = direction === 'up' ? ChevronUp : ChevronDown;
+  const arrowPlacementStyle = direction === 'up' ? styles.movingArrowUp : styles.movingArrowDown;
+  const arrowCenterStyle =
+    cardWidth === null
+      ? styles.movingArrowCenterFallback
+      : { left: Math.max(0, (cardWidth - ARROW_BADGE_SIZE) / 2) };
+  const arrowTintColor = addAlpha(lineColor, ARROW_TINT_ALPHA);
+  const arrowBaseStyle = [
+    styles.movingArrow,
+    arrowPlacementStyle,
+    arrowCenterStyle,
+    { backgroundColor, borderColor: arrowTintColor },
+  ];
 
   // Reduce motion: the animated opacity rests at 0 (invisible), so a stopped loop
   // would erase the direction cue. Render a fixed-opacity static chevron instead.
   if (shouldReduceMotion) {
     return (
       <Animated.View
-        style={[styles.movingArrow, { opacity: 0.5 }]}
+        style={[...arrowBaseStyle, { opacity: 0.72 }]}
         testID={testID}
       >
-        <Chevron size={ARROW_SIZE} color={lineColor} strokeWidth={3} />
+        <Chevron size={ARROW_SIZE} color={arrowTintColor} strokeWidth={ARROW_STROKE_WIDTH} />
       </Animated.View>
     );
   }
@@ -117,10 +136,10 @@ const MovingArrow: React.FC<{ direction: TrainPosition['direction']; lineColor: 
 
   return (
     <Animated.View
-      style={[styles.movingArrow, { opacity, transform: [{ translateY }] }]}
+      style={[...arrowBaseStyle, { opacity, transform: [{ translateY }] }]}
       testID={testID}
     >
-      <Chevron size={ARROW_SIZE} color={lineColor} strokeWidth={3} />
+      <Chevron size={ARROW_SIZE} color={arrowTintColor} strokeWidth={ARROW_STROKE_WIDTH} />
     </Animated.View>
   );
 };
@@ -146,6 +165,7 @@ const TrainMarkerCard: React.FC<TrainMarkerCardProps> = ({
   testID,
 }) => {
   const semantic = useSemanticTokens();
+  const [cardWidth, setCardWidth] = useState<number | null>(null);
 
   // Start at the current target so the first render does not slide in from 0.
   const translateY = useRef(new Animated.Value(targetTop)).current;
@@ -172,6 +192,11 @@ const TrainMarkerCard: React.FC<TrainMarkerCardProps> = ({
     return () => slide.stop();
   }, [targetTop, translateY]);
 
+  const handleLayout = useCallback((event: LayoutChangeEvent) => {
+    const nextWidth = event.nativeEvent.layout.width;
+    setCardWidth((currentWidth) => (currentWidth === nextWidth ? currentWidth : nextWidth));
+  }, []);
+
   return (
     <Animated.View
       style={[
@@ -183,12 +208,15 @@ const TrainMarkerCard: React.FC<TrainMarkerCardProps> = ({
           transform: [{ translateY }],
         },
       ]}
+      onLayout={handleLayout}
       testID={testID}
     >
       {isMoving(train) ? (
         <MovingArrow
           direction={train.direction}
           lineColor={lineColor}
+          backgroundColor={semantic.bgBase}
+          cardWidth={cardWidth}
           testID={testID ? `${testID}-moving` : undefined}
         />
       ) : null}
@@ -255,16 +283,31 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderRadius: WANTED_TOKENS.radius.r4,
     paddingHorizontal: WANTED_TOKENS.spacing.s2,
+    overflow: 'visible',
   },
   movingArrow: {
     position: 'absolute',
-    // Centered on the rail line, to the left of the card.
-    left: -(RAIL_ZONE_WIDTH / 2 + ARROW_SIZE / 2 + WANTED_TOKENS.spacing.s1),
-    top: (TRAIN_MARKER_HEIGHT - ARROW_SIZE) / 2,
-    width: ARROW_SIZE,
-    height: ARROW_SIZE,
+    width: ARROW_BADGE_SIZE,
+    height: ARROW_BADGE_SIZE,
+    borderWidth: 1.5,
+    borderRadius: ARROW_BADGE_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#000000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.14,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  movingArrowUp: {
+    top: -(ARROW_BADGE_SIZE + ARROW_CARD_GAP),
+  },
+  movingArrowDown: {
+    bottom: -(ARROW_BADGE_SIZE + ARROW_CARD_GAP),
+  },
+  movingArrowCenterFallback: {
+    left: '50%',
+    marginLeft: -(ARROW_BADGE_SIZE / 2),
   },
   markerTrainNo: {
     ...typeStyle('caption1', '700'),

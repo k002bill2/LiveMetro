@@ -8,6 +8,7 @@ import { CommuteSettingsScreen } from '../CommuteSettingsScreen';
 import { useAuth } from '@/services/auth/AuthContext';
 import {
   loadCommuteRoutes,
+  saveCommuteRoutes,
   updateEveningEnabled,
 } from '@/services/commute/commuteService';
 import { useCommuteRouteSummary } from '@/hooks/useCommuteRouteSummary';
@@ -54,6 +55,7 @@ jest.mock('@/components/design/LineBadge', () => ({
 
 jest.mock('@/services/commute/commuteService', () => ({
   loadCommuteRoutes: jest.fn(),
+  saveCommuteRoutes: jest.fn(),
   updateEveningEnabled: jest.fn(),
 }));
 
@@ -106,6 +108,7 @@ jest.mock('@/hooks/useCommuteRouteSummary', () => ({
 
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const mockLoadCommuteRoutes = loadCommuteRoutes as jest.MockedFunction<typeof loadCommuteRoutes>;
+const mockSaveCommuteRoutes = saveCommuteRoutes as jest.MockedFunction<typeof saveCommuteRoutes>;
 const mockUpdateEveningEnabled = updateEveningEnabled as jest.MockedFunction<
   typeof updateEveningEnabled
 >;
@@ -139,6 +142,7 @@ describe('CommuteSettingsScreen', () => {
       changePassword: jest.fn(),
     } as any);
     mockLoadCommuteRoutes.mockResolvedValue(null);
+    mockSaveCommuteRoutes.mockResolvedValue({ success: true });
     mockUpdateEveningEnabled.mockResolvedValue({ success: true });
     (useCommuteRouteSummary as jest.Mock).mockReturnValue({ ready: false });
   });
@@ -642,6 +646,24 @@ describe('CommuteSettingsScreen', () => {
 
     await waitFor(() =>
       expect(commuteReminderService.cancelCommuteReminders).toHaveBeenCalledWith('user-1'),
+    );
+  });
+
+  it('출근 시간 분 증가 버튼으로 정해진 preset 외 1분 단위 시간을 저장한다', async () => {
+    mockUseAuth.mockReturnValue(signedInUserWithSchedule(false));
+    mockLoadCommuteRoutes.mockResolvedValue(morningOnlyRoutes());
+
+    const { getByTestId, getAllByText } = render(<CommuteSettingsScreen {...createProps()} />);
+    await waitFor(() => expect(getAllByText('08:00 출발').length).toBeGreaterThan(0));
+
+    fireEvent.press(getByTestId('morning-time-picker-minute-increment'));
+
+    await waitFor(() =>
+      expect(mockSaveCommuteRoutes).toHaveBeenCalledWith(
+        'user-1',
+        expect.objectContaining({ departureTime: '08:01' }),
+        expect.any(Object),
+      ),
     );
   });
 });

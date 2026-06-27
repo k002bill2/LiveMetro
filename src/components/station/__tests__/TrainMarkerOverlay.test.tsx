@@ -3,8 +3,8 @@
  * marker identity across position updates, and accessibility hiding.
  */
 import React from 'react';
-import { Animated } from 'react-native';
-import { render } from '@testing-library/react-native';
+import { Animated, StyleSheet, type StyleProp, type ViewStyle } from 'react-native';
+import { act, render } from '@testing-library/react-native';
 import {
   TrainMarkerOverlay,
   computeMarkerTop,
@@ -23,6 +23,9 @@ jest.mock('@/contexts/AccessibilityContext', () => ({
 }));
 
 const mockReduceMotion = useShouldReduceMotion as jest.Mock;
+
+const flattenViewStyle = (style: StyleProp<ViewStyle>): ViewStyle =>
+  StyleSheet.flatten(style) ?? {};
 
 // Animated.timing ticks via setTimeout in the jest env; fake timers keep the
 // frames from firing outside act() after each test finishes.
@@ -131,6 +134,56 @@ describe('TrainMarkerOverlay', () => {
     expect(getByTestId('overlay-marker-7003-moving', { includeHiddenElements: true })).toBeTruthy();
   });
 
+  it('places an upward moving arrow above the train-number card', () => {
+    const { getByTestId } = render(
+      <TrainMarkerOverlay
+        trains={[overlayTrain(1, { trainNo: '7005', status: 'departed', direction: 'up' })]}
+        lineColor="#00A84D"
+        testID="overlay"
+      />
+    );
+    const marker = getByTestId('overlay-marker-7005', { includeHiddenElements: true });
+    act(() => {
+      marker.props.onLayout({
+        nativeEvent: { layout: { x: 0, y: 0, width: 142, height: TRAIN_MARKER_HEIGHT } },
+      });
+    });
+    const arrow = getByTestId('overlay-marker-7005-moving', { includeHiddenElements: true });
+    const style = flattenViewStyle(arrow.props.style as StyleProp<ViewStyle>);
+
+    expect(typeof style.top).toBe('number');
+    expect(style.top as number).toBeLessThan(0);
+    expect(style.bottom).toBeUndefined();
+    expect(style.left).toBe(60);
+    expect(style.marginLeft).toBeUndefined();
+    expect(style.borderColor).toBe('rgba(0, 168, 77, 0.48)');
+  });
+
+  it('places a downward moving arrow below the train-number card', () => {
+    const { getByTestId } = render(
+      <TrainMarkerOverlay
+        trains={[overlayTrain(1, { trainNo: '7006', status: 'departed', direction: 'down' })]}
+        lineColor="#00A84D"
+        testID="overlay"
+      />
+    );
+    const marker = getByTestId('overlay-marker-7006', { includeHiddenElements: true });
+    act(() => {
+      marker.props.onLayout({
+        nativeEvent: { layout: { x: 0, y: 0, width: 142, height: TRAIN_MARKER_HEIGHT } },
+      });
+    });
+    const arrow = getByTestId('overlay-marker-7006-moving', { includeHiddenElements: true });
+    const style = flattenViewStyle(arrow.props.style as StyleProp<ViewStyle>);
+
+    expect(style.top).toBeUndefined();
+    expect(typeof style.bottom).toBe('number');
+    expect(style.bottom as number).toBeLessThan(0);
+    expect(style.left).toBe(60);
+    expect(style.marginLeft).toBeUndefined();
+    expect(style.borderColor).toBe('rgba(0, 168, 77, 0.48)');
+  });
+
   it('hides the moving arrow for trains stopped at a station (도착)', () => {
     const { queryByTestId } = render(
       <TrainMarkerOverlay
@@ -186,8 +239,9 @@ describe('TrainMarkerOverlay', () => {
       includeHiddenElements: true,
     });
     // RN flattens the style array into one merged object; the static path pins
-    // opacity to a fixed visible 0.5 (vs the animated interpolation that rests at 0).
-    expect(arrow.props.style.opacity).toBe(0.5);
+    // opacity to a fixed visible value (vs the animated interpolation that rests at 0).
+    const style = flattenViewStyle(arrow.props.style as StyleProp<ViewStyle>);
+    expect(style.opacity).toBe(0.72);
     loopSpy.mockRestore();
   });
 });

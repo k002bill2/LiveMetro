@@ -192,6 +192,54 @@ describe('DelayReportForm', () => {
     expect(getByTestId('station-recommend-여의도')).toBeTruthy();
   });
 
+  it('switches recommendations to major stations on the selected line', () => {
+    const { getByTestId, queryByTestId } = render(<DelayReportForm />);
+
+    fireEvent.press(getByTestId('line-select-3'));
+
+    expect(getByTestId('station-recommend-고속터미널')).toBeTruthy();
+    expect(getByTestId('station-recommend-교대')).toBeTruthy();
+    expect(queryByTestId('station-recommend-홍대입구')).toBeNull();
+  });
+
+  it('corrects a prefilled station when it is not on the selected line', async () => {
+    const { getByDisplayValue, queryByDisplayValue, getByTestId } = render(
+      <DelayReportForm lineId="3" stationName="홍대입구" />,
+    );
+
+    await waitFor(() => {
+      expect(getByDisplayValue('고속터미널')).toBeTruthy();
+    });
+
+    expect(queryByDisplayValue('홍대입구')).toBeNull();
+    expect(getByTestId('line-station-banner').props.accessibilityLabel).toBe(
+      '제보 대상 3호선 고속터미널역',
+    );
+  });
+
+  it('filters station chips by the selected line search query', () => {
+    const { getByTestId, getByPlaceholderText, queryByTestId, getByDisplayValue } = render(<DelayReportForm />);
+
+    fireEvent.press(getByTestId('line-select-3'));
+    fireEvent.changeText(getByPlaceholderText('예: 강남, 홍대입구'), '수서');
+
+    expect(getByTestId('station-recommend-수서')).toBeTruthy();
+    expect(queryByTestId('station-recommend-홍대입구')).toBeNull();
+
+    fireEvent.press(getByTestId('station-recommend-수서'));
+    expect(getByDisplayValue('수서')).toBeTruthy();
+  });
+
+  it('shows an empty result message when search has no station on the selected line', () => {
+    const { getByTestId, getByPlaceholderText, getByText, queryByTestId } = render(<DelayReportForm />);
+
+    fireEvent.press(getByTestId('line-select-3'));
+    fireEvent.changeText(getByPlaceholderText('예: 강남, 홍대입구'), '홍대');
+
+    expect(getByText('선택한 노선에서 일치하는 역이 없습니다')).toBeTruthy();
+    expect(queryByTestId('station-recommend-홍대입구')).toBeNull();
+  });
+
   it('fills station name when a recommended chip is pressed', () => {
     const { getByTestId, getByDisplayValue } = render(<DelayReportForm />);
     fireEvent.press(getByTestId('station-recommend-잠실'));
@@ -238,9 +286,9 @@ describe('DelayReportForm', () => {
   });
 
   it('hides direction segment when station is not on the selected line', () => {
-    const { getByTestId, queryByTestId } = render(<DelayReportForm />);
+    const { getByTestId, queryByTestId, getByPlaceholderText } = render(<DelayReportForm />);
     fireEvent.press(getByTestId('line-select-9'));
-    fireEvent.press(getByTestId('station-recommend-강남')); // 강남은 9호선에 없음
+    fireEvent.changeText(getByPlaceholderText('예: 강남, 홍대입구'), '강남'); // 강남은 9호선에 없음
     expect(queryByTestId('direction-toggle')).toBeNull();
   });
 

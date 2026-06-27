@@ -3,7 +3,7 @@
  * 실시간 지연 제보 입력 폼 — 시안 #2 풀매칭
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSemanticTokens } from '@/services/theme';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, ScrollView, Alert, ActivityIndicator, Switch, SafeAreaView } from 'react-native';
 import { Clock, AlertTriangle, Users, Radio, Ban, MoreHorizontal, Send, X, Bookmark, Image as ImageIcon, Camera, Mic, Info, Search, MapPin, ShieldCheck } from 'lucide-react-native';
@@ -12,6 +12,10 @@ import type { LucideIcon } from 'lucide-react-native';
 import { useAuth } from '@/services/auth/AuthContext';
 
 import { delayReportService } from '@/services/delay/delayReportService';
+import {
+  findStationCdByNameAndLine,
+  getLocalStationsByLine,
+} from '@/services/data/stationsDataService';
 import { ReportType, ReportTypeLabels, ReportSeverity } from '@/models/delayReport';
 import { getSubwayLineColor } from '@/utils/colorUtils';
 import { getDirectionOptions } from '@/utils/directionOptions';
@@ -33,7 +37,68 @@ interface DelayReportFormProps {
 }
 
 const LINES = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
-const RECOMMENDED_STATIONS = ['강남', '홍대입구', '잠실', '서울역', '사당', '신도림', '여의도', '왕십리'];
+const DEFAULT_RECOMMENDED_STATIONS = ['강남', '홍대입구', '잠실', '서울역', '사당', '신도림', '여의도', '왕십리'];
+const MAX_STATION_SUGGESTIONS = 12;
+
+const PRIORITY_STATIONS_BY_LINE: Record<string, readonly string[]> = {
+  '1': ['서울역', '시청', '종로3가', '신도림', '구로', '용산', '노량진', '금정', '청량리', '회기'],
+  '2': ['강남', '잠실', '홍대입구', '신도림', '사당', '왕십리', '건대입구', '교대', '선릉', '종합운동장'],
+  '3': ['고속터미널', '교대', '종로3가', '을지로3가', '충무로', '양재', '수서', '연신내', '불광', '압구정'],
+  '4': ['서울역', '사당', '동대문', '동대문역사문화공원', '충무로', '명동', '혜화', '노원', '창동', '이촌'],
+  '5': ['여의도', '광화문', '공덕', '왕십리', '군자', '종로3가', '신길', '김포공항', '오목교', '올림픽공원'],
+  '6': ['공덕', '합정', '삼각지', '약수', '태릉입구', '불광', '연신내', '석계', '응암', '디지털미디어시티'],
+  '7': ['고속터미널', '건대입구', '강남구청', '대림', '가산디지털단지', '이수', '상봉', '노원', '온수', '군자'],
+  '8': ['잠실', '가락시장', '석촌', '천호', '몽촌토성', '복정', '남위례', '장지', '문정', '모란'],
+  '9': ['여의도', '김포공항', '고속터미널', '노량진', '당산', '종합운동장', '봉은사', '선정릉', '신논현', '중앙보훈병원'],
+};
+
+interface StationSuggestion {
+  readonly name: string;
+  readonly nameEn: string;
+}
+
+const normalizeStationText = (value: string): string => value.trim().toLowerCase();
+
+const getLineStationSuggestions = (lineId: string): StationSuggestion[] => {
+  const seenNames = new Set<string>();
+
+  return getLocalStationsByLine(lineId).reduce<StationSuggestion[]>((acc, station) => {
+    if (!station.name || seenNames.has(station.name)) {
+      return acc;
+    }
+
+    seenNames.add(station.name);
+    acc.push({ name: station.name, nameEn: station.nameEn });
+    return acc;
+  }, []);
+};
+
+const getRecommendedStations = (
+  lineId: string,
+  stationOptions: readonly StationSuggestion[],
+): string[] => {
+  if (!lineId) {
+    return DEFAULT_RECOMMENDED_STATIONS;
+  }
+
+  const stationNames = new Set(stationOptions.map(station => station.name));
+  const priorityStations = (PRIORITY_STATIONS_BY_LINE[lineId] ?? [])
+    .filter(name => stationNames.has(name));
+  const fallbackStations = stationOptions
+    .map(station => station.name)
+    .filter(name => !priorityStations.includes(name));
+
+  return [...priorityStations, ...fallbackStations].slice(0, MAX_STATION_SUGGESTIONS);
+};
+
+const getFirstRecommendedStationForLine = (lineId: string): string => {
+  const stationOptions = getLineStationSuggestions(lineId);
+  return getRecommendedStations(lineId, stationOptions)[0] ?? '';
+};
+
+const isStationOnLine = (lineId: string, name: string): boolean => (
+  getLineStationSuggestions(lineId).some(station => station.name === name)
+);
 
 /**
  * 유형 그리드 메타 — 시안 #2의 컬러 원형 아이콘. accent는 라이트/다크 공용
@@ -76,6 +141,7 @@ export const DelayReportForm: React.FC<DelayReportFormProps> = ({
 
   const [selectedLine, setSelectedLine] = useState<string>(initialLineId || '');
   const [stationName, setStationName] = useState(initialStationName || '');
+  const [stationSearchQuery, setStationSearchQuery] = useState(initialStationName || '');
   const [direction, setDirection] = useState<string | null>(null);
   const [reportType, setReportType] = useState<ReportType | null>(null);
   const [description, setDescription] = useState('');
@@ -83,6 +149,85 @@ export const DelayReportForm: React.FC<DelayReportFormProps> = ({
   const [anonymous, setAnonymous] = useState<boolean>(true);
   const [bookmarked, setBookmarked] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState(false);
+  const previousLineRef = useRef<string | null>(null);
+
+  const stationOptions = useMemo(
+    () => (selectedLine ? getLineStationSuggestions(selectedLine) : []),
+    [selectedLine],
+  );
+  const recommendedStations = useMemo(
+    () => getRecommendedStations(selectedLine, stationOptions),
+    [selectedLine, stationOptions],
+  );
+  const displayedStations = useMemo(() => {
+    const query = normalizeStationText(stationSearchQuery);
+
+    if (!selectedLine || !query) {
+      return recommendedStations;
+    }
+
+    return stationOptions
+      .filter(station => (
+        station.name.toLowerCase().includes(query) ||
+        station.nameEn.toLowerCase().includes(query)
+      ))
+      .map(station => station.name)
+      .slice(0, MAX_STATION_SUGGESTIONS);
+  }, [recommendedStations, selectedLine, stationOptions, stationSearchQuery]);
+
+  const selectStation = useCallback((name: string) => {
+    setStationName(name);
+    setStationSearchQuery(name);
+  }, []);
+
+  const handleStationSearchChange = useCallback((value: string) => {
+    setStationSearchQuery(value);
+    const trimmedValue = value.trim();
+
+    if (!trimmedValue) {
+      setStationName('');
+      return;
+    }
+
+    if (!selectedLine) {
+      setStationName(trimmedValue);
+      return;
+    }
+
+    const normalizedQuery = normalizeStationText(trimmedValue);
+    const exactMatch = stationOptions.find(station => (
+      normalizeStationText(station.name) === normalizedQuery ||
+      normalizeStationText(station.nameEn) === normalizedQuery
+    ));
+
+    setStationName(exactMatch?.name ?? '');
+  }, [selectedLine, stationOptions]);
+
+  const handleLineSelect = useCallback((line: string) => {
+    setSelectedLine(line);
+    setDirection(null);
+
+    if (stationName && !isStationOnLine(line, stationName)) {
+      const nextStation = getFirstRecommendedStationForLine(line);
+      if (nextStation) {
+        selectStation(nextStation);
+      }
+    }
+  }, [selectStation, stationName]);
+
+  useEffect(() => {
+    const lineChanged = previousLineRef.current !== selectedLine;
+    previousLineRef.current = selectedLine;
+
+    if (!lineChanged || !selectedLine || !stationName || isStationOnLine(selectedLine, stationName)) {
+      return;
+    }
+
+    const nextStation = recommendedStations[0] ?? '';
+    if (nextStation) {
+      selectStation(nextStation);
+    }
+  }, [recommendedStations, selectStation, selectedLine, stationName]);
 
   // 노선·역이 정해지면 lines.json 인접성으로 방면 옵션 도출 (시안 #2 세그먼트)
   const directionOptions = useMemo(
@@ -145,7 +290,9 @@ export const DelayReportForm: React.FC<DelayReportFormProps> = ({
         userId: user.id,
         userDisplayName: user.displayName || '익명',
         lineId: selectedLine,
-        stationId: initialStationId || `station_${selectedLine}_unknown`,
+        stationId: findStationCdByNameAndLine(stationName, selectedLine)
+          ?? (initialLineId === selectedLine && initialStationName === stationName ? initialStationId : undefined)
+          ?? `station_${selectedLine}_unknown`,
         stationName: stationName || '알 수 없음',
         reportType,
         severity: getSeverityFromType(reportType),
@@ -159,8 +306,7 @@ export const DelayReportForm: React.FC<DelayReportFormProps> = ({
 
       Alert.alert('제보 완료', '소중한 제보 감사합니다!');
       onSubmitSuccess?.();
-    } catch (error) {
-      console.error('Failed to submit report:', error);
+    } catch {
       Alert.alert('오류', '제보 전송에 실패했습니다. 다시 시도해주세요.');
     } finally {
       setSubmitting(false);
@@ -174,6 +320,8 @@ export const DelayReportForm: React.FC<DelayReportFormProps> = ({
     estimatedDelay,
     direction,
     initialStationId,
+    initialLineId,
+    initialStationName,
     onSubmitSuccess,
   ]);
 
@@ -242,7 +390,7 @@ export const DelayReportForm: React.FC<DelayReportFormProps> = ({
                     ? { backgroundColor: lineColor, borderColor: lineColor }
                     : null,
                 ]}
-                onPress={() => setSelectedLine(line)}
+                onPress={() => handleLineSelect(line)}
               >
                 <Text
                   style={[
@@ -267,23 +415,25 @@ export const DelayReportForm: React.FC<DelayReportFormProps> = ({
             style={styles.stationInput}
             placeholder="예: 강남, 홍대입구"
             placeholderTextColor={semantic.labelAlt}
-            value={stationName}
-            onChangeText={setStationName}
+            value={stationSearchQuery}
+            onChangeText={handleStationSearchChange}
             maxLength={20}
+            accessibilityLabel="역 검색"
           />
           <MapPin size={20} color={semantic.primaryNormal} />
         </View>
         <View style={styles.recommendedRow}>
-          {RECOMMENDED_STATIONS.map(name => {
+          {displayedStations.map(name => {
             const isSelected = stationName === name;
             return (
               <TouchableOpacity
                 key={name}
                 testID={`station-recommend-${name}`}
-                onPress={() => setStationName(name)}
+                onPress={() => selectStation(name)}
                 style={[styles.recommendChip, isSelected && styles.recommendChipSelected]}
                 accessibilityRole="button"
-                accessibilityLabel={`추천 역 ${name}`}
+                accessibilityLabel={`${selectedLine ? `${selectedLine}호선 ` : ''}역 ${name} 선택`}
+                accessibilityState={{ selected: isSelected }}
               >
                 <Text style={[styles.recommendChipText, isSelected && styles.recommendChipTextSelected]}>
                   {name}
@@ -292,6 +442,9 @@ export const DelayReportForm: React.FC<DelayReportFormProps> = ({
             );
           })}
         </View>
+        {selectedLine && stationSearchQuery.trim() && displayedStations.length === 0 ? (
+          <Text style={styles.stationEmptyText}>선택한 노선에서 일치하는 역이 없습니다</Text>
+        ) : null}
 
         {/* 방면 세그먼트 — lines.json 인접역 기반 (시안의 더미 역명 대신 실데이터) */}
         {directionOptions.length > 0 && (
@@ -607,6 +760,11 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       color: semantic.primaryNormal,
       fontWeight: '600',
       fontFamily: weightToFontFamily('600'),
+    },
+    stationEmptyText: {
+      marginTop: WANTED_TOKENS.spacing.s2,
+      fontSize: WANTED_TOKENS.type.caption1.size,
+      color: semantic.labelAlt,
     },
     directionWrap: {
       marginTop: WANTED_TOKENS.spacing.s3,

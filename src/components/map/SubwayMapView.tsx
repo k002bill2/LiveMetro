@@ -5,6 +5,9 @@
 
 import React, { useState, useRef, useCallback } from 'react';
 import {
+  Animated,
+  Easing,
+  Image,
   View,
   StyleSheet,
   TouchableOpacity,
@@ -12,9 +15,14 @@ import {
   PanResponder,
   GestureResponderEvent,
   PanResponderGestureState,
+  Dimensions,
+  LayoutChangeEvent,
 } from 'react-native';
-import Svg, { G, Line, Circle, Text as SvgText } from 'react-native-svg';
+import Svg, { Circle } from 'react-native-svg';
+import { SvgUri } from 'react-native-svg';
 import { weightToFontFamily } from '@/styles/modernTheme';
+
+const subwayLineSvgAsset = require('../../../docs/subway_line.svg');
 
 // ============================================================================
 // Types
@@ -46,26 +54,73 @@ interface SubwayMapViewProps {
   initialScale?: number;
 }
 
+interface MapBounds {
+  minX: number;
+  minY: number;
+  width: number;
+  height: number;
+}
+
+interface ViewportSize {
+  width: number;
+  height: number;
+}
+
 // ============================================================================
 // Constants
 // ============================================================================
 
-const MAP_WIDTH = 1200;
-const MAP_HEIGHT = 900;
+const FALLBACK_MAP_WIDTH = 1200;
+const FALLBACK_MAP_HEIGHT = 900;
+const SVG_MAP_WIDTH = 1525;
+const SVG_MAP_HEIGHT = 1000;
+const SOURCE_MAP_WIDTH = 4900;
+const SOURCE_MAP_HEIGHT = 4400;
 const MIN_SCALE = 0.5;
 const MAX_SCALE = 3.0;
+const RECENTER_ANIMATION_MS = 420;
+const OFFSET_EPSILON = 0.5;
+const SHOULD_ANIMATE_RECENTER = process.env.NODE_ENV !== 'test';
 
-const LINE_COLORS: Record<string, string> = {
-  '1': '#0052A4',
-  '2': '#00A84D',
-  '3': '#EF7C1C',
-  '4': '#00A5DE',
-  '5': '#996CAC',
-  '6': '#CD7C2F',
-  '7': '#747F00',
-  '8': '#E6186C',
-  '9': '#BDB092',
+const getMapBounds = (): MapBounds => {
+  return {
+    minX: 0,
+    minY: 0,
+    width: Math.max(SVG_MAP_WIDTH, FALLBACK_MAP_WIDTH),
+    height: Math.max(SVG_MAP_HEIGHT, FALLBACK_MAP_HEIGHT),
+  };
 };
+
+const projectStationToSvg = (station: Station): { x: number; y: number } => ({
+  x: (station.x / SOURCE_MAP_WIDTH) * SVG_MAP_WIDTH,
+  y: (station.y / SOURCE_MAP_HEIGHT) * SVG_MAP_HEIGHT,
+});
+
+const getCenteredOffset = (
+  stations: readonly Station[],
+  selectedStation: string | undefined,
+  bounds: MapBounds,
+  viewport: ViewportSize,
+  scale: number,
+): { x: number; y: number } => {
+  const station = selectedStation ? stations.find(s => s.id === selectedStation) : undefined;
+  const projectedStation = station ? projectStationToSvg(station) : undefined;
+  const focusX = projectedStation ? projectedStation.x - bounds.minX : bounds.width / 2;
+  const focusY = projectedStation ? projectedStation.y - bounds.minY : bounds.height / 2;
+
+  return {
+    x: viewport.width / 2 - focusX * scale,
+    y: viewport.height / 2 - focusY * scale,
+  };
+};
+
+const areOffsetsEqual = (
+  a: { x: number; y: number },
+  b: { x: number; y: number },
+): boolean =>
+  Math.abs(a.x - b.x) < OFFSET_EPSILON && Math.abs(a.y - b.y) < OFFSET_EPSILON;
+
+const subwayLineSvgUri = Image.resolveAssetSource(subwayLineSvgAsset)?.uri ?? null;
 
 // ============================================================================
 // Component
@@ -73,23 +128,66 @@ const LINE_COLORS: Record<string, string> = {
 
 const SubwayMapView: React.FC<SubwayMapViewProps> = ({
   stations,
-  lines,
   selectedStation,
-  highlightedLine,
   onStationPress,
-  showLabels = true,
   initialScale = 1.0,
 }) => {
+  const mapBounds = React.useMemo(() => getMapBounds(), []);
+  const initialViewport = useRef(Dimensions.get('window')).current;
   const [scale, setScale] = useState(initialScale);
-  const [offsetX, setOffsetX] = useState(0);
-  const [offsetY, setOffsetY] = useState(0);
+  const [viewport, setViewport] = useState<ViewportSize>({
+    width: initialViewport.width,
+    height: initialViewport.height,
+  });
+  const initialOffset = React.useMemo(
+    () => getCenteredOffset(stations, selectedStation, mapBounds, initialViewport, initialScale),
+    [initialScale, initialViewport, mapBounds, selectedStation, stations],
+  );
+  const animatedOffset = useRef(new Animated.ValueXY(initialOffset)).current;
   const lastScaleRef = useRef(scale);
-  const lastOffset = useRef({ x: offsetX, y: offsetY });
+  const lastOffset = useRef(initialOffset);
+
+  const animateToOffset = useCallback((offset: { x: number; y: number }) => {
+    if (areOffsetsEqual(lastOffset.current, offset)) {
+      return;
+    }
+    lastOffset.current = offset;
+    if (!SHOULD_ANIMATE_RECENTER) {
+      animatedOffset.setValue(offset);
+      return;
+    }
+    Animated.timing(animatedOffset, {
+      toValue: offset,
+      duration: RECENTER_ANIMATION_MS,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [animatedOffset]);
 
   // Update lastScaleRef when scale changes
   React.useEffect(() => {
     lastScaleRef.current = scale;
   }, [scale]);
+
+  React.useEffect(() => {
+    const centered = getCenteredOffset(
+      stations,
+      selectedStation,
+      mapBounds,
+      viewport,
+      lastScaleRef.current
+    );
+    animateToOffset(centered);
+  }, [animateToOffset, mapBounds, selectedStation, stations, viewport]);
+
+  const handleMapLayout = useCallback((event: LayoutChangeEvent) => {
+    const { width, height } = event.nativeEvent.layout;
+    if (width > 0 && height > 0) {
+      setViewport(prev => (
+        prev.width === width && prev.height === height ? prev : { width, height }
+      ));
+    }
+  }, []);
 
   const handleZoomIn = useCallback(() => {
     setScale(prev => Math.min(prev * 1.25, MAX_SCALE));
@@ -100,27 +198,35 @@ const SubwayMapView: React.FC<SubwayMapViewProps> = ({
   }, []);
 
   const handleReset = useCallback(() => {
-    setScale(1.0);
-    setOffsetX(0);
-    setOffsetY(0);
-  }, []);
+    const resetScale = 1.0;
+    const centered = getCenteredOffset(stations, selectedStation, mapBounds, viewport, resetScale);
+    setScale(resetScale);
+    animateToOffset(centered);
+  }, [animateToOffset, mapBounds, selectedStation, stations, viewport]);
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
-        lastOffset.current = { x: offsetX, y: offsetY };
+        animatedOffset.stopAnimation((value: { x: number; y: number }) => {
+          lastOffset.current = value;
+        });
       },
       onPanResponderMove: (
         _event: GestureResponderEvent,
         gestureState: PanResponderGestureState
       ) => {
-        setOffsetX(lastOffset.current.x + gestureState.dx);
-        setOffsetY(lastOffset.current.y + gestureState.dy);
+        const nextOffset = {
+          x: lastOffset.current.x + gestureState.dx,
+          y: lastOffset.current.y + gestureState.dy,
+        };
+        animatedOffset.setValue(nextOffset);
       },
       onPanResponderRelease: () => {
-        lastOffset.current = { x: offsetX, y: offsetY };
+        animatedOffset.stopAnimation((value: { x: number; y: number }) => {
+          lastOffset.current = value;
+        });
       },
     })
   ).current;
@@ -131,89 +237,71 @@ const SubwayMapView: React.FC<SubwayMapViewProps> = ({
     return 5;
   };
 
-  const getStationColor = (station: Station): string => {
-    if (station.id === selectedStation) return '#FF5722';
-    if (station.isTransfer) return '#FFFFFF';
-    const primaryLine = station.lineIds[0];
-    return primaryLine ? LINE_COLORS[primaryLine] ?? '#888888' : '#888888';
-  };
-
-  const getLineOpacity = (lineId: string): number => {
-    if (!highlightedLine) return 1;
-    return lineId === highlightedLine ? 1 : 0.3;
-  };
+  const selectedStationData = selectedStation
+    ? stations.find(station => station.id === selectedStation)
+    : undefined;
+  const selectedStationPoint = selectedStationData
+    ? projectStationToSvg(selectedStationData)
+    : undefined;
 
   return (
     <View style={styles.container}>
       {/* Map Area */}
       <View
         style={styles.mapContainer}
+        onLayout={handleMapLayout}
         {...panResponder.panHandlers}
       >
-        <Svg
-          width={MAP_WIDTH * scale}
-          height={MAP_HEIGHT * scale}
-          viewBox={`0 0 ${MAP_WIDTH} ${MAP_HEIGHT}`}
-          style={{
-            transform: [
-              { translateX: offsetX },
-              { translateY: offsetY },
-            ],
-          }}
+        <Animated.View
+          style={[
+            styles.mapCanvas,
+            {
+              transform: animatedOffset.getTranslateTransform(),
+            },
+          ]}
         >
-          <G>
-            {/* Draw line segments */}
-            {lines.map((segment, index) => {
-              const fromStation = stations.find(s => s.id === segment.fromStation);
-              const toStation = stations.find(s => s.id === segment.toStation);
-
-              if (!fromStation || !toStation) return null;
-
-              return (
-                <Line
-                  key={`line-${index}`}
-                  x1={fromStation.x}
-                  y1={fromStation.y}
-                  x2={toStation.x}
-                  y2={toStation.y}
-                  stroke={segment.color || LINE_COLORS[segment.lineId] || '#888'}
-                  strokeWidth={4}
-                  opacity={getLineOpacity(segment.lineId)}
-                />
-              );
-            })}
-
-            {/* Draw stations */}
-            {stations.map(station => (
-              <G key={station.id}>
-                {/* Station circle */}
+          <SvgUri
+            uri={subwayLineSvgUri}
+            width={SVG_MAP_WIDTH * scale}
+            height={SVG_MAP_HEIGHT * scale}
+          />
+          <Svg
+            width={mapBounds.width * scale}
+            height={mapBounds.height * scale}
+            viewBox={`${mapBounds.minX} ${mapBounds.minY} ${mapBounds.width} ${mapBounds.height}`}
+            style={styles.overlaySvg}
+          >
+            {selectedStationPoint && selectedStationData && (
+              <>
                 <Circle
-                  cx={station.x}
-                  cy={station.y}
-                  r={getStationRadius(station)}
-                  fill={getStationColor(station)}
-                  stroke={station.isTransfer ? '#333' : '#FFF'}
-                  strokeWidth={station.isTransfer ? 2 : 1}
-                  onPress={() => onStationPress?.(station.id)}
+                  cx={selectedStationPoint.x}
+                  cy={selectedStationPoint.y}
+                  r={20}
+                  fill="#FF5722"
+                  opacity={0.18}
                 />
-
-                {/* Station label */}
-                {showLabels && (
-                  <SvgText
-                    x={station.x}
-                    y={station.y + 18}
-                    fontSize={10}
-                    fill="#333"
-                    textAnchor="middle"
-                    fontWeight={station.id === selectedStation ? 'bold' : 'normal'}
-                  >
-                    {station.name}
-                  </SvgText>
-                )}
-              </G>
-            ))}
-          </G>
-        </Svg>
+                <Circle
+                  cx={selectedStationPoint.x}
+                  cy={selectedStationPoint.y}
+                  r={getStationRadius(selectedStationData) + 7}
+                  fill="none"
+                  stroke="#FF5722"
+                  strokeWidth={3}
+                  opacity={0.75}
+                />
+                <Circle
+                  cx={selectedStationPoint.x}
+                  cy={selectedStationPoint.y}
+                  r={getStationRadius(selectedStationData)}
+                  fill="#FF5722"
+                  stroke="#FFFFFF"
+                  strokeWidth={2}
+                  onPress={() => onStationPress?.(selectedStationData.id)}
+                />
+              </>
+            )}
+          </Svg>
+        </Animated.View>
       </View>
 
       {/* Zoom Controls */}
@@ -278,6 +366,16 @@ const styles = StyleSheet.create({
   mapContainer: {
     flex: 1,
     overflow: 'hidden',
+  },
+  mapCanvas: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+  },
+  overlaySvg: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
   },
   controls: {
     position: 'absolute',

@@ -180,6 +180,10 @@ describe('StationTimetableSection', () => {
       makeScheduleItem({ trainNumber: 'T-07', arrivalTime: '07:00:00' }),
       makeScheduleItem({ trainNumber: 'T-08', arrivalTime: '08:00:00' }),
       makeScheduleItem({ trainNumber: 'T-09', arrivalTime: '09:00:00' }),
+      makeScheduleItem({ trainNumber: 'T-12', arrivalTime: '12:00:00' }),
+      makeScheduleItem({ trainNumber: 'T-18', arrivalTime: '18:00:00' }),
+      makeScheduleItem({ trainNumber: 'T-23', arrivalTime: '23:00:00' }),
+      makeScheduleItem({ trainNumber: 'T-00', arrivalTime: '00:30:00' }),
     ];
 
     it('renders 전체 시간표 보기 CTA when schedules present (default collapsed)', () => {
@@ -247,16 +251,20 @@ describe('StationTimetableSection', () => {
       mockUseTrainSchedule.mockReturnValue(
         makeHookResult({ schedules: makeMultiHourFixture(), isViewingToday: false }),
       );
-      const { getByTestId, getByText } = render(
+      const { getByLabelText, getByTestId, getByText } = render(
         <StationTimetableSection {...defaultProps} testID="tt" />,
       );
       fireEvent.press(getByTestId('tt-toggle'));
-      // 모든 hour 노출
+      // 전체보기는 API가 받아온 하루치 시간대를 모두 노출해야 한다.
       expect(getByText('05')).toBeTruthy();
       expect(getByText('06')).toBeTruthy();
       expect(getByText('07')).toBeTruthy();
       expect(getByText('08')).toBeTruthy();
       expect(getByText('09')).toBeTruthy();
+      expect(getByText('12')).toBeTruthy();
+      expect(getByText('18')).toBeTruthy();
+      expect(getByText('23')).toBeTruthy();
+      expect(getByLabelText('00시')).toBeTruthy();
     });
 
     // Gemini #142 followup: toggle 노출 조건 강화 — uniqueHourCount가

@@ -101,6 +101,7 @@ const mockedUseRealtimeTrains = useRealtimeTrains as jest.Mock;
 const mockedUseFavorites = useFavorites as jest.Mock;
 const mockedUsePublicData = usePublicDataForStation as jest.Mock;
 const mockedSearchStations = mapCacheService.searchStations as jest.Mock;
+const defaultRouteParams = { stationId: 'gangnam', stationName: '강남', lineId: '2' };
 
 const buildTrain = (overrides: Partial<{ id: string; finalDestination: string; minutesAway: number; direction: 'up' | 'down'; lineId: string; directionLabel: string }> = {}) => {
   const minutesAway = overrides.minutesAway ?? 2;
@@ -122,6 +123,7 @@ const buildTrain = (overrides: Partial<{ id: string; finalDestination: string; m
 describe('StationDetailScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    (useRoute as jest.Mock).mockReturnValue({ params: defaultRouteParams });
     clearBoardingSelection();
     mockedUseRealtimeTrains.mockReturnValue({
       trains: [],
@@ -380,7 +382,52 @@ describe('StationDetailScreen', () => {
     });
     const { getByTestId } = render(<StationDetailScreen />);
     fireEvent.press(getByTestId('station-detail-header-favorite'));
-    await waitFor(() => expect(toggleFavorite).toHaveBeenCalled());
+    await waitFor(() => expect(toggleFavorite).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: '0222',
+        name: '강남',
+        lineId: '2',
+      }),
+    ));
+  });
+
+  it('renders the favorite star selected using the station_cd favorite key', () => {
+    const isFavorite = jest.fn((stationId: string) => stationId === '0222');
+    mockedUseFavorites.mockReturnValue({
+      isFavorite,
+      toggleFavorite: jest.fn(),
+    });
+
+    const { getByTestId } = render(<StationDetailScreen />);
+
+    expect(isFavorite).toHaveBeenCalledWith('0222');
+    expect(getByTestId('station-detail-header-favorite').props.accessibilityState.selected).toBe(true);
+  });
+
+  it('normalizes legacy numeric line ids before adding or removing favorites', async () => {
+    (useRoute as jest.Mock).mockReturnValue({
+      params: {
+        stationId: 'legacy-gasan',
+        stationName: '가산디지털단지',
+        lineId: 'line-7',
+      },
+    });
+    const toggleFavorite = jest.fn().mockResolvedValue(undefined);
+    mockedUseFavorites.mockReturnValue({
+      isFavorite: jest.fn(() => false),
+      toggleFavorite,
+    });
+
+    const { getByTestId } = render(<StationDetailScreen />);
+    fireEvent.press(getByTestId('station-detail-header-favorite'));
+
+    await waitFor(() => expect(toggleFavorite).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: '2748',
+        name: '가산디지털단지',
+        lineId: '7',
+      }),
+    ));
   });
 
   it('renders ExitInfoGrid with public data exits', () => {

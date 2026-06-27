@@ -17,7 +17,7 @@
  */
 import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { useSemanticTokens } from '@/services/theme';
-import { ActivityIndicator, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, ScrollView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { RouteProp, useRoute, useNavigation, useIsFocused } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -46,6 +46,7 @@ import type { Station, Train } from '@/models/train';
 import { directionToDisplay } from '@/models/route';
 import type { LineId } from '@/components/design';
 import { mapCacheService, type CachedStation } from '@/services/map/mapCacheService';
+import { findStationCdByNameAndLine } from '@/services/data/stationsDataService';
 
 /**
  * 서울 지하철 운행 종료 시간대 휴리스틱.
@@ -73,6 +74,26 @@ const isOperatingEndHours = (now: Date): boolean => {
  */
 const toAlertLineName = (lineId: string): string =>
   /^[1-9]$/.test(lineId) ? `${lineId}호선` : lineId;
+
+/**
+ * StationDetail can be reached from older surfaces that still carry legacy
+ * numeric-line formats (`line-7`, `1007`, `07호선`). Favorites are keyed by
+ * station_cd, so normalize only Seoul numeric-line aliases before resolving
+ * the station code. Do not extract digits from names like `인천2`.
+ */
+const normalizeStationDetailLineId = (rawLineId: string): string => {
+  const trimmed = rawLineId.trim();
+  const direct = trimmed.match(/^0?([1-9])(?:호선)?$/);
+  if (direct?.[1]) return direct[1];
+
+  const legacy = trimmed.match(/^line-([1-9])$/i);
+  if (legacy?.[1]) return legacy[1];
+
+  const subwayId = trimmed.match(/^100([1-9])$/);
+  if (subwayId?.[1]) return subwayId[1];
+
+  return trimmed;
+};
 
 type StationDetailRouteProp = RouteProp<AppStackParamList, 'StationDetail'>;
 type StationDetailNavProp = NativeStackNavigationProp<AppStackParamList>;
@@ -301,16 +322,25 @@ const StationDetailScreen: React.FC = () => {
     [trainsByDirection.down, lineId]
   );
 
+  const favoriteLineId = useMemo(() => normalizeStationDetailLineId(lineId), [lineId]);
+  const favoriteStationId = useMemo(
+    () =>
+      findStationCdByNameAndLine(stationName, favoriteLineId)
+      ?? stationId
+      ?? `${stationName}-${favoriteLineId}`,
+    [stationId, stationName, favoriteLineId],
+  );
+
   const stationLike: Station = useMemo(
     () => ({
-      id: stationId || `${stationName}-${lineId}`,
+      id: favoriteStationId,
       name: stationName,
       nameEn: '',
-      lineId,
+      lineId: favoriteLineId,
       coordinates: { latitude: 0, longitude: 0 },
       transfers: [],
     }),
-    [stationId, stationName, lineId]
+    [favoriteStationId, stationName, favoriteLineId]
   );
 
   const isCurrentlyFavorite = isFavorite(stationLike.id);
@@ -347,8 +377,8 @@ const StationDetailScreen: React.FC = () => {
   const handleToggleFavorite = useCallback(async () => {
     try {
       await toggleFavorite(stationLike);
-    } catch (err) {
-      console.error('Failed to toggle favorite:', err);
+    } catch {
+      Alert.alert('오류', '즐겨찾기 변경에 실패했습니다. 다시 시도해주세요.');
     }
   }, [toggleFavorite, stationLike]);
 

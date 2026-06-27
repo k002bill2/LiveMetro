@@ -3,6 +3,7 @@
  */
 
 import { renderHook, act, waitFor } from '@testing-library/react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useTrainSchedule, getFirstTrain, getLastTrain } from '../useTrainSchedule';
 import { seoulSubwayApi, TimetableUnsupportedOnWebError } from '@/services/api/seoulSubwayApi';
 import { findStationCdByNameAndLine } from '@/services/data/stationsDataService';
@@ -191,6 +192,25 @@ describe('useTrainSchedule', () => {
       expect.any(String),
       '2'
     );
+  });
+
+  it('uses a full-day cache namespace so stale 30-row caches are bypassed', async () => {
+    jest.useFakeTimers();
+    jest.setSystemTime(new Date(2026, 3, 27, 10, 0, 0));
+    (seoulSubwayApi.getStationTimetable as jest.Mock).mockResolvedValue([]);
+
+    const { result } = renderHook(() =>
+      useTrainSchedule({ stationName: '강남', lineNumber: '2', direction: '1' })
+    );
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(AsyncStorage.getItem).toHaveBeenCalledWith(
+      'timetable:full-day-v1:0222:2:1:1'
+    );
+    jest.useRealTimers();
   });
 
   describe('C1 — midnight rollover (regression)', () => {

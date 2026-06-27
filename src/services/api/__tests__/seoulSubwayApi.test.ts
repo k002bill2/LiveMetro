@@ -646,6 +646,28 @@ describe('SeoulSubwayApiService', () => {
       expect(result[0]?.ARRIVETIME).toBe('05:30:00');
     });
 
+    it('requests a full-day timetable range, not only the first 30 rows', async () => {
+      const mockData = {
+        SearchSTNTimeTableByIDService: {
+          list_total_count: 0,
+          RESULT: { CODE: 'INFO-000', MESSAGE: 'OK' },
+          row: [],
+        },
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve(mockData),
+      });
+
+      await seoulSubwayApi.getStationTimetable('0222', '1', '1');
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining('/SearchSTNTimeTableByIDService/1/500/0222/1/1/'),
+        expect.any(Object)
+      );
+    });
+
     it('should return empty array for INFO-200 (no data)', async () => {
       const mockData = {
         SearchSTNTimeTableByIDService: {

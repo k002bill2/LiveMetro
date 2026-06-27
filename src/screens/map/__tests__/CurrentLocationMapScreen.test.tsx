@@ -21,10 +21,11 @@ jest.mock('@components/map', () => {
   const ReactRef = require('react');
   const { View } = require('react-native');
   return {
-    SubwayMapView: (props: { selectedStation?: string }) =>
+    SubwayMapView: (props: { selectedStation?: string; initialScale?: number }) =>
       ReactRef.createElement(View, {
         testID: 'subway-map-view',
         accessibilityLabel: props.selectedStation ?? 'none',
+        initialScale: props.initialScale,
       }),
   };
 });
@@ -43,6 +44,7 @@ describe('CurrentLocationMapScreen', () => {
     });
     const { getByTestId, getByText } = render(<CurrentLocationMapScreen />);
     expect(getByTestId('subway-map-view').props.accessibilityLabel).toBe('gangnam');
+    expect(getByTestId('subway-map-view').props.initialScale).toBe(2.2);
     expect(getByText(/강남/)).toBeTruthy();
   });
 

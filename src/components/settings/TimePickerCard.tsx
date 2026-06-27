@@ -7,10 +7,9 @@
  *   - Card (subtle gray background) holds a big "HH 시 | MM 분 출발"
  *     display + a chip row of common departure times.
  *
- * The control is chip-only by design — the Wanted spec doesn't surface a
- * freeform time dialog, and the chip set covers ~95% of commute times in
- * 30-minute increments. Custom values via DateTimePicker can be added in
- * a follow-up if user research shows a need.
+ * The large HH/MM display is directly adjustable with compact steppers:
+ * hour changes in 1-hour steps and minute changes in 1-minute steps. Preset
+ * chips remain as quick picks for common commute times.
  *
  * Props:
  *   - value: "HH:MM" — current selected time. If not in `options`, the chip
@@ -24,6 +23,7 @@
 import React, { useMemo } from 'react';
 import { useSemanticTokens } from '@/services/theme';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Minus, Plus } from 'lucide-react-native';
 
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 
@@ -38,9 +38,32 @@ interface TimePickerCardProps {
 }
 
 const splitHHMM = (hhmm: string): [string, string] => {
+  const parsed = parseHHMM(hhmm);
+  if (!parsed) return ['--', '--'];
+  return [String(parsed.hour).padStart(2, '0'), String(parsed.minute).padStart(2, '0')];
+};
+
+const parseHHMM = (hhmm: string): { hour: number; minute: number } | null => {
   const m = /^(\d{1,2}):(\d{2})$/.exec(hhmm.trim());
-  if (!m) return ['--', '--'];
-  return [m[1]!.padStart(2, '0'), m[2]!];
+  if (!m) return null;
+  const hour = Number(m[1]);
+  const minute = Number(m[2]);
+  if (Number.isNaN(hour) || Number.isNaN(minute)) return null;
+  if (hour < 0 || hour > 23 || minute < 0 || minute > 59) return null;
+  return { hour, minute };
+};
+
+const formatTotalMinutes = (totalMinutes: number): string => {
+  const minutesInDay = 24 * 60;
+  const wrapped = ((totalMinutes % minutesInDay) + minutesInDay) % minutesInDay;
+  const hour = Math.floor(wrapped / 60);
+  const minute = wrapped % 60;
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+};
+
+const shiftTime = (hhmm: string, deltaMinutes: number): string => {
+  const parsed = parseHHMM(hhmm) ?? { hour: 0, minute: 0 };
+  return formatTotalMinutes(parsed.hour * 60 + parsed.minute + deltaMinutes);
 };
 
 export const TimePickerCard: React.FC<TimePickerCardProps> = ({
@@ -54,6 +77,7 @@ export const TimePickerCard: React.FC<TimePickerCardProps> = ({
 }) => {
   const semantic = useSemanticTokens();
   const [hh, mm] = splitHHMM(value);
+  const baseTestID = testID ?? 'time-picker';
 
   // Memoize the per-chip color variants (keyed on theme) so the chip row does
   // not allocate fresh style objects for every chip on each parent re-render.
@@ -66,6 +90,21 @@ export const TimePickerCard: React.FC<TimePickerCardProps> = ({
     }),
     [semantic]
   );
+
+  const stepperStyle = [
+    styles.stepperButton,
+    { backgroundColor: semantic.bgBase, borderColor: semantic.lineNormal },
+    disabled ? styles.stepperButtonDisabled : null,
+  ];
+  const stepperIconColor = disabled ? semantic.labelAlt : semantic.primaryNormal;
+
+  const adjustHour = (delta: 1 | -1): void => {
+    onChange(shiftTime(value, delta * 60));
+  };
+
+  const adjustMinute = (delta: 1 | -1): void => {
+    onChange(shiftTime(value, delta));
+  };
 
   return (
     <View style={styles.section} testID={testID}>
@@ -108,7 +147,7 @@ export const TimePickerCard: React.FC<TimePickerCardProps> = ({
                   fontFamily: weightToFontFamily('800'),
                 },
               ]}
-              testID={`${testID ?? 'time-picker'}-hh`}
+              testID={`${baseTestID}-hh`}
             >
               {hh}
             </Text>
@@ -133,7 +172,7 @@ export const TimePickerCard: React.FC<TimePickerCardProps> = ({
                   fontFamily: weightToFontFamily('800'),
                 },
               ]}
-              testID={`${testID ?? 'time-picker'}-mm`}
+              testID={`${baseTestID}-mm`}
             >
               {mm}
             </Text>
@@ -148,6 +187,62 @@ export const TimePickerCard: React.FC<TimePickerCardProps> = ({
           </View>
         </View>
 
+        <View style={styles.stepperRow}>
+          <View style={styles.stepperGroup}>
+            <TouchableOpacity
+              testID={`${baseTestID}-hour-decrement`}
+              onPress={() => adjustHour(-1)}
+              disabled={disabled}
+              accessibilityRole="button"
+              accessibilityLabel={`${title} 시간 1시간 감소`}
+              accessibilityState={{ disabled }}
+              hitSlop={8}
+              style={stepperStyle}
+            >
+              <Minus size={16} color={stepperIconColor} strokeWidth={2.6} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              testID={`${baseTestID}-hour-increment`}
+              onPress={() => adjustHour(1)}
+              disabled={disabled}
+              accessibilityRole="button"
+              accessibilityLabel={`${title} 시간 1시간 증가`}
+              accessibilityState={{ disabled }}
+              hitSlop={8}
+              style={stepperStyle}
+            >
+              <Plus size={16} color={stepperIconColor} strokeWidth={2.6} />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.stepperDividerSpacer} />
+          <View style={styles.stepperGroup}>
+            <TouchableOpacity
+              testID={`${baseTestID}-minute-decrement`}
+              onPress={() => adjustMinute(-1)}
+              disabled={disabled}
+              accessibilityRole="button"
+              accessibilityLabel={`${title} 분 1분 감소`}
+              accessibilityState={{ disabled }}
+              hitSlop={8}
+              style={stepperStyle}
+            >
+              <Minus size={16} color={stepperIconColor} strokeWidth={2.6} />
+            </TouchableOpacity>
+            <TouchableOpacity
+              testID={`${baseTestID}-minute-increment`}
+              onPress={() => adjustMinute(1)}
+              disabled={disabled}
+              accessibilityRole="button"
+              accessibilityLabel={`${title} 분 1분 증가`}
+              accessibilityState={{ disabled }}
+              hitSlop={8}
+              style={stepperStyle}
+            >
+              <Plus size={16} color={stepperIconColor} strokeWidth={2.6} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
         {/* Chip row — wraps to multiple lines when count > 4-5 */}
         <View style={styles.chipsWrap}>
           {options.map((opt) => {
@@ -155,7 +250,7 @@ export const TimePickerCard: React.FC<TimePickerCardProps> = ({
             return (
               <TouchableOpacity
                 key={opt}
-                testID={`${testID ?? 'time-picker'}-chip-${opt}`}
+                testID={`${baseTestID}-chip-${opt}`}
                 onPress={() => onChange(opt)}
                 disabled={disabled}
                 accessibilityRole="radio"
@@ -234,6 +329,34 @@ const styles = StyleSheet.create({
     width: 1,
     height: 36,
     opacity: 0.6,
+  },
+  stepperRow: {
+    marginTop: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 14,
+  },
+  stepperGroup: {
+    width: 92,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+  },
+  stepperDividerSpacer: {
+    width: 1,
+    height: 30,
+  },
+  stepperButton: {
+    width: 36,
+    height: 32,
+    borderRadius: 16,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepperButtonDisabled: {
+    opacity: 0.45,
   },
   chipsWrap: {
     marginTop: 18,

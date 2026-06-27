@@ -15,6 +15,7 @@ jest.mock('react-native-svg', () => {
     __esModule: true,
     default: mockComponent('Svg'),
     Svg: mockComponent('Svg'),
+    SvgUri: mockComponent('SvgUri'),
     G: mockComponent('G'),
     Line: mockComponent('Line'),
     Circle: mockComponent('Circle'),
@@ -91,12 +92,58 @@ describe('SubwayMapView', () => {
     expect(getByText('100%')).toBeTruthy();
   });
 
-  it('renders station labels when showLabels is true (default)', () => {
-    const { getByText } = render(
+  it('renders the provided SVG route map as the base layer', () => {
+    const { getByTestId } = render(
       <SubwayMapView stations={mockStations} lines={mockLines} />,
     );
-    expect(getByText('강남')).toBeTruthy();
-    expect(getByText('역삼')).toBeTruthy();
-    expect(getByText('교대')).toBeTruthy();
+    expect(getByTestId('SvgUri').props.width).toBe(1525);
+    expect(getByTestId('SvgUri').props.height).toBe(1000);
+  });
+
+  it('renders current-station overlay markers when a station is selected', () => {
+    const { getAllByTestId } = render(
+      <SubwayMapView stations={mockStations} lines={mockLines} selectedStation="st1" />,
+    );
+    const circles = getAllByTestId('Circle');
+    expect(circles).toHaveLength(3);
+    expect(circles[0]?.props).toMatchObject({
+      cx: 100 / 4900 * 1525,
+      cy: 200 / 4400 * 1000,
+      r: 20,
+      fill: '#FF5722',
+    });
+  });
+
+  it('uses the SVG map viewBox for the overlay layer', () => {
+    const farStations = [
+      ...mockStations,
+      {
+        id: 'seoul',
+        name: '서울역',
+        x: 2143,
+        y: 1711,
+        lineIds: ['1', '4'],
+        isTransfer: true,
+      },
+    ] as const as readonly any[];
+
+    const { getByTestId } = render(
+      <SubwayMapView stations={farStations} lines={mockLines} selectedStation="seoul" />,
+    );
+
+    const parts = String(getByTestId('Svg').props.viewBox)
+      .split(' ')
+      .map(Number);
+    expect(parts).toHaveLength(4);
+
+    const minX = parts[0]!;
+    const minY = parts[1]!;
+    const width = parts[2]!;
+    const height = parts[3]!;
+
+    expect(minX).toBe(0);
+    expect(minY).toBe(0);
+    expect(width).toBe(1525);
+    expect(height).toBe(1000);
   });
 });

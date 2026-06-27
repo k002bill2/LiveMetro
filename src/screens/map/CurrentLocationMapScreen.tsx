@@ -58,7 +58,7 @@ const CurrentLocationMapScreenImpl: React.FC = () => {
           stations={SUBWAY_MAP_STATIONS}
           lines={SUBWAY_MAP_LINES}
           selectedStation={currentStationId ?? undefined}
-          showLabels
+          initialScale={2.2}
         />
       </View>
     </View>

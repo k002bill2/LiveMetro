@@ -198,6 +198,8 @@ export class TimetableUnsupportedOnWebError extends Error {
   }
 }
 
+const TIMETABLE_FULL_DAY_END_INDEX = 500;
+
 /**
  * Seoul Open Data Portal error categories.
  *
@@ -878,7 +880,7 @@ class SeoulSubwayApiService {
       try {
         // Note: Timetable API uses HTTP (not HTTPS) - only works on native platforms
         const generalBaseUrl = process.env.SEOUL_OPEN_API_BASE_URL || 'http://openapi.seoul.go.kr:8088';
-        const url = `${generalBaseUrl}/${apiKey}/json/SearchSTNTimeTableByIDService/1/30/${stationCode}/${weekTag}/${inoutTag}/`;
+        const url = `${generalBaseUrl}/${apiKey}/json/SearchSTNTimeTableByIDService/1/${TIMETABLE_FULL_DAY_END_INDEX}/${stationCode}/${weekTag}/${inoutTag}/`;
 
         const response = await this.fetchWithTimeout(url);
 
