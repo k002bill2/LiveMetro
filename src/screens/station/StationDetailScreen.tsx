@@ -135,6 +135,7 @@ const StationDetailScreen: React.FC = () => {
   } = route.params || {};
 
   const [direction, setDirection] = useState<'up' | 'down'>('up');
+  const [directionManuallySelected, setDirectionManuallySelected] = useState(false);
   const [stationMeta, setStationMeta] = useState<CachedStation | null>(null);
 
   // Fetch station meta (nameEn, stationCode, transfer line ids) for the
@@ -157,6 +158,15 @@ const StationDetailScreen: React.FC = () => {
       cancelled = true;
     };
   }, [stationName]);
+
+  // A previous station's selected direction should not leak into the next
+  // StationDetail route. Start from the nominal up direction, then let the
+  // initial data-driven direction effect below switch once if only down trains
+  // are currently available.
+  useEffect(() => {
+    setDirection('up');
+    setDirectionManuallySelected(false);
+  }, [stationId, stationName, lineId]);
 
   const isFocused = useIsFocused();
 
@@ -229,6 +239,42 @@ const StationDetailScreen: React.FC = () => {
     return { up, down };
   }, [lineFilteredTrains]);
 
+  // Transfer/terminal-like stations can have realtime rows only in one
+  // direction for the current snapshot. If the default direction is empty but
+  // the opposite direction has trains, show the available train list on initial
+  // load instead of presenting a misleading empty state.
+  useEffect(() => {
+    if (directionManuallySelected || trainsLoading) return;
+
+    const currentHasTrains =
+      direction === 'up'
+        ? trainsByDirection.up.length > 0
+        : trainsByDirection.down.length > 0;
+    if (currentHasTrains) return;
+
+    const nextDirection =
+      trainsByDirection.up.length > 0
+        ? 'up'
+        : trainsByDirection.down.length > 0
+          ? 'down'
+          : null;
+
+    if (nextDirection && nextDirection !== direction) {
+      setDirection(nextDirection);
+    }
+  }, [
+    direction,
+    directionManuallySelected,
+    trainsLoading,
+    trainsByDirection.up.length,
+    trainsByDirection.down.length,
+  ]);
+
+  const handleDirectionChange = useCallback((next: 'up' | 'down') => {
+    setDirectionManuallySelected(true);
+    setDirection(next);
+  }, []);
+
   // 탑승 시작한 선택을 이 화면의 reactive state로 끌어올린다. 매칭되면 (1) 해당
   // 방향으로 전환하고 (2) store를 즉시 비운다(consume-on-read). 두 가지를 한다:
   //   - clear: module 싱글턴이 세션 내내 살아남아 이후 무관한 재방문 때 stale하게
@@ -245,6 +291,7 @@ const StationDetailScreen: React.FC = () => {
     const sel = getBoardingSelection();
     if (!boardingSelectionMatches(sel, { stationId, stationName, lineId })) return;
     clearBoardingSelection();
+    setDirectionManuallySelected(true);
     setBoardingTarget({ direction: sel.direction, finalDestination: sel.finalDestination });
     setDirection(sel.direction);
   }, [isFocused, stationId, stationName, lineId]);
@@ -433,7 +480,7 @@ const StationDetailScreen: React.FC = () => {
           value={direction}
           upLabel={upLabel}
           downLabel={downLabel}
-          onChange={setDirection}
+          onChange={handleDirectionChange}
           testID="station-detail-direction"
         />
       </View>
