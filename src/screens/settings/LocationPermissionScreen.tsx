@@ -543,7 +543,7 @@ const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
     marginTop: 6,
   },
   heroSub: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: weightToFontFamily('600'),
     color: semantic.labelAlt,
     marginTop: 2,
@@ -614,7 +614,7 @@ const createStyles = (semantic: WantedSemanticTheme) => StyleSheet.create({
     color: semantic.labelStrong,
   },
   purposeSub: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: weightToFontFamily('500'),
     color: semantic.labelAlt,
     lineHeight: 16,

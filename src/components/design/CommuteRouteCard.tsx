@@ -504,7 +504,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   headerLabel: {
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: weightToFontFamily('800'),
     letterSpacing: 0.5,
   },
@@ -514,7 +514,7 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   editText: {
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: weightToFontFamily('700'),
   },
   timeline: {
@@ -536,12 +536,12 @@ const styles = StyleSheet.create({
   },
   nodeLabel: {
     marginTop: 6,
-    fontSize: 11.5,
+    fontSize: 12,
     fontFamily: weightToFontFamily('800'),
   },
   nodeMeta: {
     marginTop: 1,
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: weightToFontFamily('600'),
   },
   leg: {
@@ -581,7 +581,7 @@ const styles = StyleSheet.create({
   },
   legSubLabel: {
     marginTop: 4,
-    fontSize: 9.5,
+    fontSize: 12,
     fontFamily: weightToFontFamily('700'),
   },
   factGrid: {
@@ -604,12 +604,12 @@ const styles = StyleSheet.create({
     letterSpacing: -0.1,
   },
   factCurrency: {
-    fontSize: 10,
+    fontSize: 12,
     marginLeft: 1,
   },
   factLabel: {
     marginTop: 1,
-    fontSize: 10.5,
+    fontSize: 12,
     fontFamily: weightToFontFamily('700'),
   },
   startCta: {

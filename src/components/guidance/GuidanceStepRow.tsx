@@ -222,7 +222,7 @@ const createStyles = (semantic: WantedSemanticTheme): ReturnType<typeof StyleShe
     },
     meta: {
       marginLeft: 'auto',
-      fontSize: 11,
+      fontSize: 12,
       fontFamily: weightToFontFamily('800'),
     },
     metaActive: {

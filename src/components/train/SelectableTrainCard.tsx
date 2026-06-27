@@ -353,7 +353,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   tierText: {
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: weightToFontFamily('700'),
   },
   timeBlock: {
@@ -366,7 +366,7 @@ const styles = StyleSheet.create({
   },
   recoHint: {
     marginTop: 2,
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: weightToFontFamily('700'),
   },
   congestionWrap: {
@@ -381,11 +381,11 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   congestionLabel: {
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: weightToFontFamily('700'),
   },
   congestionAxis: {
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: weightToFontFamily('600'),
   },
   barRow: {
@@ -414,7 +414,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   barNum: {
-    fontSize: 9,
+    fontSize: 12,
     fontFamily: weightToFontFamily('700'),
   },
   recoBanner: {
@@ -434,7 +434,7 @@ const styles = StyleSheet.create({
     fontFamily: weightToFontFamily('600'),
   },
   recoHintText: {
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: weightToFontFamily('500'),
   },
   emptyText: {
@@ -443,7 +443,7 @@ const styles = StyleSheet.create({
   },
   emptyHint: {
     marginTop: 2,
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: weightToFontFamily('500'),
   },
 });

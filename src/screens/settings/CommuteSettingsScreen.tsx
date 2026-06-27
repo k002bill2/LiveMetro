@@ -1036,7 +1036,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       opacity: 0.85,
     },
     heroEyebrowText: {
-      fontSize: 11,
+      fontSize: 12,
       fontFamily: weightToFontFamily('800'),
       color: '#fff',
       letterSpacing: 0.44,
@@ -1067,7 +1067,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       backgroundColor: 'rgba(255,255,255,0.18)',
     },
     heroEtaPillText: {
-      fontSize: 11,
+      fontSize: 12,
       fontFamily: weightToFontFamily('700'),
       color: '#fff',
     },

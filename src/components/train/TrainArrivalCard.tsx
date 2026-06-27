@@ -467,7 +467,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     alignSelf: 'center',
   },
   trainTypeText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: 'bold',
     fontFamily: weightToFontFamily('bold'),
     textAlign: 'center',
@@ -517,7 +517,7 @@ const createStyles = (colors: ThemeColors) => StyleSheet.create({
     borderRadius: 12,
   },
   statusText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
     fontFamily: weightToFontFamily('600'),
     color: colors.textInverse,

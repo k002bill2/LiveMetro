@@ -152,12 +152,12 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   trainLabel: {
-    fontSize: 10,
+    fontSize: 12,
     color: '#FFFFFF',
     fontFamily: weightToFontFamily('800'),
   },
   trainMinutes: {
-    fontSize: 10,
+    fontSize: 12,
     color: 'rgba(255,255,255,0.85)',
     fontFamily: weightToFontFamily('700'),
   },
@@ -170,7 +170,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
   },
   walkText: {
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: weightToFontFamily('700'),
   },
 });

@@ -132,7 +132,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       letterSpacing: -0.08,
     },
     native: {
-      fontSize: 11.5,
+      fontSize: 12,
       fontFamily: weightToFontFamily('600'),
       color: semantic.labelAlt,
       marginTop: 2,
@@ -157,10 +157,10 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       marginTop: -WANTED_TOKENS.spacing.s4,
       marginBottom: WANTED_TOKENS.spacing.s5,
       paddingHorizontal: WANTED_TOKENS.spacing.s5,
-      fontSize: 11.5,
+      fontSize: 12,
       fontFamily: weightToFontFamily('500'),
       color: semantic.labelAlt,
-      lineHeight: 11.5 * 1.45,
+      lineHeight: 12 * 1.45,
     },
   });
 

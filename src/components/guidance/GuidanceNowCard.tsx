@@ -314,7 +314,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       backgroundColor: WANTED_TOKENS.light.labelOnColor,
     },
     cardHeaderBadgeText: {
-      fontSize: 11.5,
+      fontSize: 12,
       fontFamily: weightToFontFamily('800'),
       color: WANTED_TOKENS.light.labelOnColor,
     },
@@ -348,7 +348,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       borderRadius: WANTED_TOKENS.radius.pill,
     },
     alightBadgeText: {
-      fontSize: 11,
+      fontSize: 12,
       fontFamily: weightToFontFamily('800'),
       color: semantic.primaryNormal,
     },
@@ -366,7 +366,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       letterSpacing: -0.44,
     },
     countdownCaption: {
-      fontSize: 11,
+      fontSize: 12,
       fontFamily: weightToFontFamily('700'),
       color: semantic.labelAlt,
       marginTop: 1,
@@ -424,7 +424,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       backgroundColor: semantic.primaryNormal,
     },
     railStopName: {
-      fontSize: 11,
+      fontSize: 12,
       fontFamily: weightToFontFamily('600'),
       color: semantic.labelAlt,
     },

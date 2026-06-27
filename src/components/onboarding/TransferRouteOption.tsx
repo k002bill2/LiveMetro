@@ -223,7 +223,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   tagText: {
-    fontSize: 10.5,
+    fontSize: 12,
     fontWeight: '800',
     fontFamily: weightToFontFamily('800'),
     letterSpacing: 0.2,

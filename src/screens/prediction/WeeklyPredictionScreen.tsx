@@ -637,7 +637,7 @@ const createStyles = (semantic: ReturnType<typeof useSemanticTokens>) => {
       gap: 4,
     },
     tagText: {
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: '800',
       fontFamily: weightToFontFamily('800'),
       letterSpacing: 0.4,
@@ -703,12 +703,12 @@ const createStyles = (semantic: ReturnType<typeof useSemanticTokens>) => {
       marginBottom: 6,
     },
     rangeLabelSide: {
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: '700',
       fontFamily: weightToFontFamily('700'),
     },
     rangeLabelCenter: {
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: '700',
       fontFamily: weightToFontFamily('700'),
     },
@@ -781,7 +781,7 @@ const createStyles = (semantic: ReturnType<typeof useSemanticTokens>) => {
       fontVariant: ['tabular-nums'],
     },
     confidenceMeta: {
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: '600',
       fontFamily: weightToFontFamily('600'),
     },

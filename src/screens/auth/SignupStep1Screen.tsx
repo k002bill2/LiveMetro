@@ -578,7 +578,7 @@ const styles = StyleSheet.create({
   },
   stepCaption: {
     marginTop: WANTED_TOKENS.spacing.s4,
-    fontSize: 11,
+    fontSize: 12,
     letterSpacing: 0.44,
     textTransform: 'uppercase',
     fontWeight: '800',
@@ -606,7 +606,7 @@ const styles = StyleSheet.create({
     marginBottom: WANTED_TOKENS.spacing.s2,
   },
   fieldHint: {
-    fontSize: 11.5,
+    fontSize: 12,
     fontWeight: '500',
     fontFamily: weightToFontFamily('500'),
   },
@@ -648,7 +648,7 @@ const styles = StyleSheet.create({
   },
   infoText: {
     flex: 1,
-    fontSize: 11.5,
+    fontSize: 12,
     lineHeight: 17,
     fontWeight: '500',
     fontFamily: weightToFontFamily('500'),

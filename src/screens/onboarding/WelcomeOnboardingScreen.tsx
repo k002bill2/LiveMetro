@@ -215,7 +215,7 @@ const styles = StyleSheet.create({
   },
   stepEyebrow: {
     marginTop: WANTED_TOKENS.spacing.s4,
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
     fontFamily: weightToFontFamily('800'),
     letterSpacing: 0.55,
@@ -281,7 +281,7 @@ const styles = StyleSheet.create({
   },
   privacyText: {
     flex: 1,
-    fontSize: 11.5,
+    fontSize: 12,
     lineHeight: 16,
     fontWeight: '500',
     fontFamily: weightToFontFamily('500'),

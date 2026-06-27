@@ -164,7 +164,7 @@ const MainTabNavigator: React.FC = () => {
           paddingTop: 8,
         },
         tabBarLabelStyle: {
-          fontSize: 10,
+          fontSize: 12,
           // '600' matches WANTED_TOKENS.type.caption2 weight; '700' was a
           // mismatch noted in cross-review.
           fontWeight: '600',

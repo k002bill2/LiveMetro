@@ -368,7 +368,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       letterSpacing: -0.14,
     },
     alertModeSubtitle: {
-      fontSize: 11,
+      fontSize: 12,
       fontFamily: weightToFontFamily('600'),
     },
     alertModeTextSelected: {

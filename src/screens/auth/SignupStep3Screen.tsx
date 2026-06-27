@@ -546,7 +546,7 @@ const styles = StyleSheet.create({
   },
   summaryEmail: {
     marginTop: 2,
-    fontSize: 11.5,
+    fontSize: 12,
     fontWeight: '600',
     fontFamily: weightToFontFamily('600'),
   },
@@ -559,7 +559,7 @@ const styles = StyleSheet.create({
     borderRadius: WANTED_TOKENS.radius.pill,
   },
   verifyText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     fontFamily: weightToFontFamily('700'),
   },
@@ -601,7 +601,7 @@ const styles = StyleSheet.create({
   },
   checklistSub: {
     marginTop: 1,
-    fontSize: 11.5,
+    fontSize: 12,
     fontWeight: '600',
     fontFamily: weightToFontFamily('600'),
   },
@@ -611,7 +611,7 @@ const styles = StyleSheet.create({
     borderRadius: WANTED_TOKENS.radius.pill,
   },
   nowPillLabel: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     fontFamily: weightToFontFamily('700'),
   },

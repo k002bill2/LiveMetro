@@ -74,7 +74,7 @@ const LoginHeroImpl: React.FC<LoginHeroProps> = ({ testID }) => {
   };
 
   const taglineText: TextStyle = {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     fontFamily: weightToFontFamily('700'),
     letterSpacing: 0.44,

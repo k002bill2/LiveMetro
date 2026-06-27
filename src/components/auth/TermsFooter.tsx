@@ -18,7 +18,7 @@ const TermsFooterImpl: React.FC<TermsFooterProps> = ({ onTermsPress, onPrivacyPr
   const semantic = useSemanticTokens();
 
   const baseText: TextStyle = {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '500',
     fontFamily: weightToFontFamily('500'),
     lineHeight: 17,

@@ -131,7 +131,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       opacity: 0.85,
     },
     heroEyebrow: {
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: '800',
       fontFamily: weightToFontFamily('800'),
       color: '#FFFFFF',
@@ -166,7 +166,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       backgroundColor: 'rgba(255,255,255,0.18)',
     },
     heroDatePillText: {
-      fontSize: 11.5,
+      fontSize: 12,
       fontWeight: '700',
       fontFamily: weightToFontFamily('700'),
       color: '#FFFFFF',
@@ -200,7 +200,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     },
     heroBoardTime: {
       marginLeft: 'auto',
-      fontSize: 11.5,
+      fontSize: 12,
       fontWeight: '600',
       fontFamily: weightToFontFamily('600'),
       color: 'rgba(255,255,255,0.85)',

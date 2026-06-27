@@ -166,7 +166,7 @@ export const getResponsiveFontSize = (base: keyof typeof TYPOGRAPHY.sizes): numb
   const fontSize = TYPOGRAPHY.sizes[base];
   
   if (DEVICE.isSmall) {
-    return Math.max(10, fontSize * 0.9);
+    return Math.max(12, fontSize * 0.9);
   }
   
   if (DEVICE.isLarge) {

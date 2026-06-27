@@ -94,14 +94,14 @@ export const TYPOGRAPHY = {
     medium: 'System',
     bold: 'System',
   },
-  // Scale updated from designStyle.json:
-  // h1: 32, h2: 24, h3: 20, body_large: 16, body_medium: 14, caption: 12
+  // Scale updated from designStyle.json, then lifted for LiveMetro mobile
+  // readability: body/label text should not feel cramped on transit screens.
   fontSize: {
-    xs: 12,   // caption
-    sm: 13,   // body_small
-    base: 14, // body_medium
-    lg: 16,   // body_large
-    xl: 20,   // h3
+    xs: 12,   // caption / minimum readable text
+    sm: 14,   // body_small
+    base: 15, // body_medium
+    lg: 17,   // body_large
+    xl: 21,   // h3
     '2xl': 24, // h2
     '3xl': 32, // h1
     '4xl': 36, // large display
@@ -373,12 +373,12 @@ export const WANTED_TOKENS = {
     heading2:  { size: 20, lh: 28, tracking: -0.012,  weight: '700' as const },
     headline1: { size: 18, lh: 26, tracking: -0.002,  weight: '600' as const },
     headline2: { size: 17, lh: 24, tracking: 0,       weight: '600' as const },
-    body1:     { size: 16, lh: 24, tracking: 0.0057,  weight: '500' as const },
-    body2:     { size: 15, lh: 22, tracking: 0.0096,  weight: '500' as const },
-    label1:    { size: 14, lh: 20, tracking: 0.0145,  weight: '600' as const },
-    label2:    { size: 13, lh: 18, tracking: 0.0194,  weight: '600' as const },
-    caption1:  { size: 12, lh: 16, tracking: 0.0252,  weight: '600' as const },
-    caption2:  { size: 11, lh: 14, tracking: 0.0311,  weight: '600' as const },
+    body1:     { size: 17, lh: 25, tracking: 0.0057,  weight: '500' as const },
+    body2:     { size: 16, lh: 24, tracking: 0.0096,  weight: '500' as const },
+    label1:    { size: 15, lh: 21, tracking: 0.0145,  weight: '600' as const },
+    label2:    { size: 14, lh: 20, tracking: 0.0194,  weight: '600' as const },
+    caption1:  { size: 13, lh: 18, tracking: 0.0252,  weight: '600' as const },
+    caption2:  { size: 12, lh: 16, tracking: 0.0311,  weight: '600' as const },
   },
 
   /* Spacing — 8px base */

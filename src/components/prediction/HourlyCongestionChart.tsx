@@ -289,7 +289,7 @@ const createStyles = (
       borderColor: semantic.labelNormal,
     },
     currentMarker: {
-      fontSize: 11,
+      fontSize: 12,
       fontFamily: weightToFontFamily('700'),
       color: semantic.labelOnColor,
       backgroundColor: semantic.labelNormal,
@@ -299,7 +299,7 @@ const createStyles = (
       marginBottom: 4,
     },
     percentLabel: {
-      fontSize: 11,
+      fontSize: 12,
       fontFamily: weightToFontFamily('500'),
       color: semantic.labelAlt,
       marginBottom: 4,
@@ -309,7 +309,7 @@ const createStyles = (
       fontFamily: weightToFontFamily('700'),
     },
     timeLabel: {
-      fontSize: 11,
+      fontSize: 12,
       fontFamily: weightToFontFamily('500'),
       color: semantic.labelAlt,
       marginTop: 6,

@@ -148,7 +148,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       backgroundColor: semantic.primaryNormal,
     },
     pdfMiniBadgeText: {
-      fontSize: 9,
+      fontSize: 12,
       fontWeight: '800',
       fontFamily: weightToFontFamily('800'),
       color: semantic.labelOnColor,
@@ -166,7 +166,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       flexShrink: 1,
     },
     rowSub: {
-      fontSize: 11.5,
+      fontSize: 12,
       fontWeight: '600',
       fontFamily: weightToFontFamily('600'),
       color: semantic.labelAlt,

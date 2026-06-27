@@ -129,7 +129,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   counter: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
     fontFamily: weightToFontFamily('800'),
     letterSpacing: 0.22,

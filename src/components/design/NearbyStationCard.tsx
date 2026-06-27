@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
     columnGap: 3,
   },
   distanceText: {
-    fontSize: 10.5,
+    fontSize: 12,
     fontFamily: weightToFontFamily('700'),
     fontVariant: ['tabular-nums'],
   },
@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
     columnGap: 4,
   },
   walkMeta: {
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: weightToFontFamily('600'),
     flexShrink: 1,
   },
@@ -283,7 +283,7 @@ const styles = StyleSheet.create({
   arrivalDest: {
     flex: 1,
     minWidth: 0,
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: weightToFontFamily('600'),
   },
   arrivalMinutes: {
@@ -293,7 +293,7 @@ const styles = StyleSheet.create({
     fontVariant: ['tabular-nums'],
   },
   arrivalUnit: {
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: weightToFontFamily('700'),
   },
   congRow: {
@@ -308,11 +308,11 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   congLabel: {
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: weightToFontFamily('700'),
   },
   trailingLabel: {
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: weightToFontFamily('600'),
     marginLeft: 6,
   },

@@ -803,7 +803,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       marginLeft: WANTED_TOKENS.spacing.s2,
     },
     devSectionLabel: {
-      fontSize: 11,
+      fontSize: 12,
       letterSpacing: 0.44,
       textTransform: 'uppercase',
       fontWeight: '800',

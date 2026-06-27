@@ -615,7 +615,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       textTransform: 'uppercase',
     },
     groupLabelHint: {
-      fontSize: 11,
+      fontSize: 12,
       fontFamily: weightToFontFamily('700'),
       color: semantic.labelAlt,
     },
@@ -630,7 +630,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       overflow: 'hidden',
     },
     groupFooter: {
-      fontSize: 11.5,
+      fontSize: 12,
       fontFamily: weightToFontFamily('500'),
       color: semantic.labelAlt,
       lineHeight: 17,
@@ -650,7 +650,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       marginBottom: WANTED_TOKENS.spacing.s2,
     },
     sliderLabel: {
-      fontSize: 11,
+      fontSize: 12,
       fontFamily: weightToFontFamily('700'),
       color: semantic.labelAlt,
     },
@@ -736,7 +736,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       alignItems: 'center',
     },
     lineBadgeText: {
-      fontSize: 11,
+      fontSize: 12,
       fontFamily: weightToFontFamily('800'),
       color: '#FFFFFF',
     },
@@ -774,7 +774,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       color: semantic.labelStrong,
     },
     sourceSub: {
-      fontSize: 11.5,
+      fontSize: 12,
       fontFamily: weightToFontFamily('500'),
       color: semantic.labelAlt,
       lineHeight: 16,
@@ -821,7 +821,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       paddingHorizontal: WANTED_TOKENS.spacing.s4,
       paddingTop: WANTED_TOKENS.spacing.s3,
       paddingBottom: WANTED_TOKENS.spacing.s2,
-      fontSize: 11,
+      fontSize: 12,
       fontFamily: weightToFontFamily('500'),
       color: semantic.labelAlt,
       lineHeight: 16,

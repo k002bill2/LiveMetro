@@ -344,7 +344,7 @@ const createStyles = (colors: ThemeColors, semantic: WantedSemanticTheme) => {
     fontFamily: weightToFontFamily('700'),
   },
   pillText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     fontFamily: weightToFontFamily('700'),
     color: semantic.primaryPress,

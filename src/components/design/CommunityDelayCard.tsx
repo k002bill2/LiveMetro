@@ -142,7 +142,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   meta: {
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: weightToFontFamily('600'),
     marginTop: 6,
   },
