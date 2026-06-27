@@ -155,7 +155,7 @@ export const RouteCard: React.FC<Props> = ({ route, expanded, onToggleExpand, re
       onPress={onToggleExpand}
       style={[
         styles.card,
-        (expanded || recommended || route.category === 'fastest') && {
+        expanded && {
           borderColor: semantic.primaryNormal,
           borderWidth: 2,
         },

@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 import { RouteCard } from '../RouteCard';
 import type { RouteWithMLMeta } from '@/hooks/useRouteSearch';
 
@@ -102,6 +103,31 @@ describe('RouteCard', () => {
       <RouteCard route={baseRoute} expanded={true} onToggleExpand={() => {}} />
     );
     expect(getByTestId('route-card-details')).toBeTruthy();
+  });
+
+  it('uses the primary border only for the expanded card, not merely recommended or fastest', () => {
+    const fastestRoute: RouteWithMLMeta = { ...baseRoute, category: 'fastest' };
+    const { getByTestId, rerender } = render(
+      <RouteCard
+        route={fastestRoute}
+        expanded={false}
+        onToggleExpand={() => {}}
+        recommended
+      />
+    );
+
+    expect(StyleSheet.flatten(getByTestId('route-card').props.style).borderWidth).toBe(1);
+
+    rerender(
+      <RouteCard
+        route={fastestRoute}
+        expanded
+        onToggleExpand={() => {}}
+        recommended
+      />
+    );
+
+    expect(StyleSheet.flatten(getByTestId('route-card').props.style).borderWidth).toBe(2);
   });
 
   it('shows "추천" + "최단" tags when route.category is "fastest"', () => {
