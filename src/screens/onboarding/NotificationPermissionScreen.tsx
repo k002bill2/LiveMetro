@@ -418,7 +418,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   previewEyebrow: {
-    fontSize: 11,
+    fontSize: 12,
     letterSpacing: 0.44,
     textTransform: 'uppercase',
     fontWeight: '800',
@@ -461,7 +461,7 @@ const styles = StyleSheet.create({
     fontFamily: weightToFontFamily('800'),
   },
   previewWhen: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '600',
     fontFamily: weightToFontFamily('600'),
     marginLeft: 'auto',
@@ -475,7 +475,7 @@ const styles = StyleSheet.create({
   },
   previewBody: {
     marginTop: 2,
-    fontSize: 11.5,
+    fontSize: 12,
     lineHeight: 16,
     fontWeight: '500',
     fontFamily: weightToFontFamily('500'),

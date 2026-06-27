@@ -211,7 +211,7 @@ export const SignupStep2Screen: React.FC = () => {
   };
 
   const hintStyle: TextStyle = {
-    fontSize: 11.5,
+    fontSize: 12,
     fontWeight: '500',
     fontFamily: weightToFontFamily('500'),
     color: semantic.labelAlt,
@@ -548,7 +548,7 @@ const styles = StyleSheet.create({
   strengthBars: { flex: 1, flexDirection: 'row', gap: 4 },
   strengthBar: { flex: 1, height: 4, borderRadius: 2 },
   strengthLabel: {
-    fontSize: 11, fontWeight: '700', fontFamily: weightToFontFamily('700'),
+    fontSize: 12, fontWeight: '700', fontFamily: weightToFontFamily('700'),
     minWidth: 30, textAlign: 'right',
   },
   matchBadge: {

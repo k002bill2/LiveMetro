@@ -215,7 +215,7 @@ const TIMETABLE_FULL_DAY_END_INDEX = 500;
  */
 export type SeoulApiErrorCategory =
   | 'auth'        // INFO-100, ERROR-331, ERROR-332 — key invalid/expired
-  | 'quota'       // INFO-300, ERROR-334, ERROR-500, ERROR-501 — rate limit / server overload
+  | 'quota'       // INFO-300, ERROR-334, ERROR-337, ERROR-500, ERROR-501 — rate limit / server overload
   | 'transient'   // ERROR-335, ERROR-336 — partial / dispatcher hiccup, retry-friendly
   | 'client'      // ERROR-300, ERROR-301, ERROR-310, ERROR-333 — bad request / unauthorized
   | 'no-data'     // INFO-200 — empty result for this query right now; NOT an error
@@ -231,6 +231,7 @@ function categorizeSeoulApiError(errorCode: string): SeoulApiErrorCategory {
   if (
     errorCode === 'INFO-300' ||
     errorCode === 'ERROR-334' ||
+    errorCode === 'ERROR-337' ||
     errorCode === 'ERROR-500' ||
     errorCode === 'ERROR-501'
   ) {

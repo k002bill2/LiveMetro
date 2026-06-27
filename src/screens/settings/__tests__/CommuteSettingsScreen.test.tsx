@@ -53,6 +53,26 @@ jest.mock('@/components/design/LineBadge', () => ({
   LineBadge: 'LineBadge',
 }));
 
+jest.mock('@react-native-community/datetimepicker', () => {
+  const ReactLocal = require('react');
+  const { Pressable } = require('react-native');
+
+  return {
+    __esModule: true,
+    default: ({
+      testID,
+      onChange,
+    }: {
+      testID?: string;
+      onChange: (event: { type: 'set' }, selectedDate?: Date) => void;
+    }) =>
+      ReactLocal.createElement(Pressable, {
+        testID,
+        onPress: () => onChange({ type: 'set' }, new Date(2020, 0, 1, 8, 1)),
+      }),
+  };
+});
+
 jest.mock('@/services/commute/commuteService', () => ({
   loadCommuteRoutes: jest.fn(),
   saveCommuteRoutes: jest.fn(),
@@ -649,14 +669,15 @@ describe('CommuteSettingsScreen', () => {
     );
   });
 
-  it('출근 시간 분 증가 버튼으로 정해진 preset 외 1분 단위 시간을 저장한다', async () => {
+  it('출근 시간 선택기로 정해진 preset 외 1분 단위 시간을 저장한다', async () => {
     mockUseAuth.mockReturnValue(signedInUserWithSchedule(false));
     mockLoadCommuteRoutes.mockResolvedValue(morningOnlyRoutes());
 
     const { getByTestId, getAllByText } = render(<CommuteSettingsScreen {...createProps()} />);
     await waitFor(() => expect(getAllByText('08:00 출발').length).toBeGreaterThan(0));
 
-    fireEvent.press(getByTestId('morning-time-picker-minute-increment'));
+    fireEvent.press(getByTestId('morning-time-picker-display'));
+    fireEvent.press(getByTestId('morning-time-picker-native-picker'));
 
     await waitFor(() =>
       expect(mockSaveCommuteRoutes).toHaveBeenCalledWith(

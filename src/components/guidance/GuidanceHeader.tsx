@@ -210,7 +210,7 @@ const createStyles = (semantic: WantedSemanticTheme): ReturnType<typeof StyleShe
       color: semantic.primaryNormal,
     },
     remainCaption: {
-      fontSize: 11.5,
+      fontSize: 12,
       fontFamily: weightToFontFamily('700'),
       color: semantic.labelAlt,
       marginTop: 2,
@@ -248,7 +248,7 @@ const createStyles = (semantic: WantedSemanticTheme): ReturnType<typeof StyleShe
       marginTop: 7,
     },
     progressLabel: {
-      fontSize: 11,
+      fontSize: 12,
       fontFamily: weightToFontFamily('700'),
       color: semantic.labelAlt,
     },

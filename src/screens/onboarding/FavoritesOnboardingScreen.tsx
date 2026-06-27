@@ -494,7 +494,7 @@ const styles = StyleSheet.create({
     paddingBottom: WANTED_TOKENS.spacing.s8,
   },
   stepEyebrow: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
     fontFamily: weightToFontFamily('800'),
     letterSpacing: 0.55,
@@ -544,7 +544,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   sectionCount: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     fontFamily: weightToFontFamily('700'),
   },
@@ -588,7 +588,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   rowReason: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
     fontFamily: weightToFontFamily('600'),
     marginLeft: 4,

@@ -48,7 +48,7 @@ const CongestionMeterImpl: React.FC<CongestionMeterProps> = ({
           <Text
             style={{
               color: '#FFFFFF',
-              fontSize: 11,
+              fontSize: 12,
               fontFamily: weightToFontFamily('800'),
               lineHeight: 14,
             }}
@@ -71,7 +71,7 @@ const CongestionMeterImpl: React.FC<CongestionMeterProps> = ({
         <Text
           style={{
             color: tone.color,
-            fontSize: 11,
+            fontSize: 12,
             fontFamily: weightToFontFamily('700'),
             lineHeight: 14,
           }}

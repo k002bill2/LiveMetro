@@ -595,7 +595,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       borderBottomColor: semantic.lineSubtle,
     },
     browseHeaderText: {
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: '700',
       fontFamily: weightToFontFamily('700'),
       color: semantic.labelAlt,
@@ -647,7 +647,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       paddingTop: WANTED_TOKENS.spacing.s3,
     },
     recommendLabel: {
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: '700',
       fontFamily: weightToFontFamily('700'),
       color: semantic.labelAlt,

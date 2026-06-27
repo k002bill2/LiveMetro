@@ -314,7 +314,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     },
     label: {
       position: 'absolute',
-      fontSize: 10,
+      fontSize: 12,
       fontFamily: weightToFontFamily('700'),
       color: semantic.primaryHover,
       paddingLeft: 4,
@@ -348,7 +348,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       marginTop: WANTED_TOKENS.spacing.s2,
     },
     tick: {
-      fontSize: 10,
+      fontSize: 12,
       fontFamily: weightToFontFamily('700'),
       color: semantic.labelAlt,
     },

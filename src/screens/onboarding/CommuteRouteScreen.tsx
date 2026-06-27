@@ -863,7 +863,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       paddingBottom: WANTED_TOKENS.spacing.s8,
     },
     eyebrow: {
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: '800',
       fontFamily: weightToFontFamily('800'),
       color: semantic.primaryNormal,
@@ -956,7 +956,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       minWidth: 0,
     },
     stationLabel: {
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: '700',
       fontFamily: weightToFontFamily('700'),
       color: semantic.labelAlt,
@@ -1023,7 +1023,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     recommendSubtitle: {
       marginTop: WANTED_TOKENS.spacing.s4,
       marginBottom: WANTED_TOKENS.spacing.s2,
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: '800',
       fontFamily: weightToFontFamily('800'),
       color: semantic.labelAlt,

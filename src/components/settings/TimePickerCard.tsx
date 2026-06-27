@@ -7,9 +7,8 @@
  *   - Card (subtle gray background) holds a big "HH 시 | MM 분 출발"
  *     display + a chip row of common departure times.
  *
- * The large HH/MM display is directly adjustable with compact steppers:
- * hour changes in 1-hour steps and minute changes in 1-minute steps. Preset
- * chips remain as quick picks for common commute times.
+ * Tapping the large HH/MM display opens the native time picker. Preset chips
+ * remain as quick picks for common commute times.
  *
  * Props:
  *   - value: "HH:MM" — current selected time. If not in `options`, the chip
@@ -17,13 +16,15 @@
  *     parsed value, so user-set custom times don't visually disappear.
  *   - options: readonly time strings to render as chips. Caller controls
  *     ordering and count.
- *   - onChange: invoked with the picked chip's time. Wrap in saving guard
- *     externally — this component doesn't persist.
+ *   - onChange: invoked with the selected time. Wrap in saving guard
+ *     externally; this component doesn't persist.
  */
-import React, { useMemo } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { useSemanticTokens } from '@/services/theme';
-import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Minus, Plus } from 'lucide-react-native';
+import { Platform, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import DateTimePicker, {
+  type DateTimePickerEvent,
+} from '@react-native-community/datetimepicker';
 
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 
@@ -53,17 +54,17 @@ const parseHHMM = (hhmm: string): { hour: number; minute: number } | null => {
   return { hour, minute };
 };
 
-const formatTotalMinutes = (totalMinutes: number): string => {
-  const minutesInDay = 24 * 60;
-  const wrapped = ((totalMinutes % minutesInDay) + minutesInDay) % minutesInDay;
-  const hour = Math.floor(wrapped / 60);
-  const minute = wrapped % 60;
-  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+const timeToDate = (hhmm: string): Date => {
+  const parsed = parseHHMM(hhmm) ?? { hour: 0, minute: 0 };
+  const date = new Date();
+  date.setHours(parsed.hour, parsed.minute, 0, 0);
+  return date;
 };
 
-const shiftTime = (hhmm: string, deltaMinutes: number): string => {
-  const parsed = parseHHMM(hhmm) ?? { hour: 0, minute: 0 };
-  return formatTotalMinutes(parsed.hour * 60 + parsed.minute + deltaMinutes);
+const dateToHHMM = (date: Date): string => {
+  const hour = date.getHours().toString().padStart(2, '0');
+  const minute = date.getMinutes().toString().padStart(2, '0');
+  return `${hour}:${minute}`;
 };
 
 export const TimePickerCard: React.FC<TimePickerCardProps> = ({
@@ -76,8 +77,10 @@ export const TimePickerCard: React.FC<TimePickerCardProps> = ({
   testID,
 }) => {
   const semantic = useSemanticTokens();
+  const [pickerVisible, setPickerVisible] = useState(false);
   const [hh, mm] = splitHHMM(value);
   const baseTestID = testID ?? 'time-picker';
+  const pickerValue = useMemo(() => timeToDate(value), [value]);
 
   // Memoize the per-chip color variants (keyed on theme) so the chip row does
   // not allocate fresh style objects for every chip on each parent re-render.
@@ -91,20 +94,31 @@ export const TimePickerCard: React.FC<TimePickerCardProps> = ({
     [semantic]
   );
 
-  const stepperStyle = [
-    styles.stepperButton,
-    { backgroundColor: semantic.bgBase, borderColor: semantic.lineNormal },
-    disabled ? styles.stepperButtonDisabled : null,
-  ];
-  const stepperIconColor = disabled ? semantic.labelAlt : semantic.primaryNormal;
+  const openPicker = useCallback((): void => {
+    if (!disabled) setPickerVisible(true);
+  }, [disabled]);
 
-  const adjustHour = (delta: 1 | -1): void => {
-    onChange(shiftTime(value, delta * 60));
-  };
+  const closePicker = useCallback((): void => {
+    setPickerVisible(false);
+  }, []);
 
-  const adjustMinute = (delta: 1 | -1): void => {
-    onChange(shiftTime(value, delta));
-  };
+  const handlePickerChange = useCallback(
+    (event: DateTimePickerEvent, selectedDate?: Date): void => {
+      if (event.type === 'dismissed' || event.type === 'neutralButtonPressed') {
+        setPickerVisible(false);
+        return;
+      }
+
+      if (selectedDate) {
+        onChange(dateToHHMM(selectedDate));
+      }
+
+      if (Platform.OS !== 'ios') {
+        setPickerVisible(false);
+      }
+    },
+    [onChange]
+  );
 
   return (
     <View style={styles.section} testID={testID}>
@@ -137,111 +151,115 @@ export const TimePickerCard: React.FC<TimePickerCardProps> = ({
         ]}
       >
         {/* Big HH | MM display */}
-        <View style={styles.displayRow}>
-          <View style={styles.displayCol}>
-            <Text
-              style={[
-                styles.displayDigits,
-                {
-                  color: semantic.primaryNormal,
-                  fontFamily: weightToFontFamily('800'),
-                },
-              ]}
-              testID={`${baseTestID}-hh`}
-            >
-              {hh}
-            </Text>
-            <Text
-              style={[
-                styles.displayUnit,
-                { color: semantic.labelAlt, fontFamily: weightToFontFamily('600') },
-              ]}
-            >
-              시
-            </Text>
+        <TouchableOpacity
+          testID={`${baseTestID}-display`}
+          onPress={openPicker}
+          disabled={disabled}
+          accessibilityRole="button"
+          accessibilityLabel={`${title} ${hh}시 ${mm}분 선택`}
+          accessibilityState={{ disabled, expanded: pickerVisible }}
+          activeOpacity={0.82}
+          style={styles.displayButton}
+        >
+          <View style={styles.displayRow}>
+            <View style={styles.displayCol}>
+              <Text
+                style={[
+                  styles.displayDigits,
+                  {
+                    color: semantic.primaryNormal,
+                    fontFamily: weightToFontFamily('800'),
+                  },
+                ]}
+                testID={`${baseTestID}-hh`}
+              >
+                {hh}
+              </Text>
+              <Text
+                style={[
+                  styles.displayUnit,
+                  { color: semantic.labelAlt, fontFamily: weightToFontFamily('600') },
+                ]}
+              >
+                시
+              </Text>
+            </View>
+            <View
+              style={[styles.displayDivider, { backgroundColor: semantic.lineNormal }]}
+            />
+            <View style={styles.displayCol}>
+              <Text
+                style={[
+                  styles.displayDigits,
+                  {
+                    color: semantic.primaryNormal,
+                    fontFamily: weightToFontFamily('800'),
+                  },
+                ]}
+                testID={`${baseTestID}-mm`}
+              >
+                {mm}
+              </Text>
+              <Text
+                style={[
+                  styles.displayUnit,
+                  { color: semantic.labelAlt, fontFamily: weightToFontFamily('600') },
+                ]}
+              >
+                분 출발
+              </Text>
+            </View>
           </View>
-          <View
-            style={[styles.displayDivider, { backgroundColor: semantic.lineNormal }]}
-          />
-          <View style={styles.displayCol}>
-            <Text
-              style={[
-                styles.displayDigits,
-                {
-                  color: semantic.primaryNormal,
-                  fontFamily: weightToFontFamily('800'),
-                },
-              ]}
-              testID={`${baseTestID}-mm`}
-            >
-              {mm}
-            </Text>
-            <Text
-              style={[
-                styles.displayUnit,
-                { color: semantic.labelAlt, fontFamily: weightToFontFamily('600') },
-              ]}
-            >
-              분 출발
-            </Text>
-          </View>
-        </View>
+        </TouchableOpacity>
 
-        <View style={styles.stepperRow}>
-          <View style={styles.stepperGroup}>
-            <TouchableOpacity
-              testID={`${baseTestID}-hour-decrement`}
-              onPress={() => adjustHour(-1)}
-              disabled={disabled}
-              accessibilityRole="button"
-              accessibilityLabel={`${title} 시간 1시간 감소`}
-              accessibilityState={{ disabled }}
-              hitSlop={8}
-              style={stepperStyle}
-            >
-              <Minus size={16} color={stepperIconColor} strokeWidth={2.6} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              testID={`${baseTestID}-hour-increment`}
-              onPress={() => adjustHour(1)}
-              disabled={disabled}
-              accessibilityRole="button"
-              accessibilityLabel={`${title} 시간 1시간 증가`}
-              accessibilityState={{ disabled }}
-              hitSlop={8}
-              style={stepperStyle}
-            >
-              <Plus size={16} color={stepperIconColor} strokeWidth={2.6} />
-            </TouchableOpacity>
+        {pickerVisible && !disabled ? (
+          <View
+            testID={`${baseTestID}-picker-container`}
+            style={[
+              styles.pickerContainer,
+              { backgroundColor: semantic.bgBase, borderColor: semantic.lineSubtle },
+            ]}
+          >
+            {Platform.OS === 'ios' ? (
+              <View
+                style={[
+                  styles.pickerHeader,
+                  { borderBottomColor: semantic.lineSubtle },
+                ]}
+              >
+                <TouchableOpacity
+                  testID={`${baseTestID}-picker-done`}
+                  onPress={closePicker}
+                  accessibilityRole="button"
+                  accessibilityLabel="시간 선택 완료"
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <Text
+                    style={[
+                      styles.pickerDoneText,
+                      {
+                        color: semantic.primaryNormal,
+                        fontFamily: weightToFontFamily('700'),
+                      },
+                    ]}
+                  >
+                    완료
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            ) : null}
+            <DateTimePicker
+              testID={`${baseTestID}-native-picker`}
+              value={pickerValue}
+              mode="time"
+              is24Hour
+              minuteInterval={1}
+              display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+              onChange={handlePickerChange}
+              style={Platform.OS === 'ios' ? styles.iosPicker : undefined}
+            />
           </View>
-          <View style={styles.stepperDividerSpacer} />
-          <View style={styles.stepperGroup}>
-            <TouchableOpacity
-              testID={`${baseTestID}-minute-decrement`}
-              onPress={() => adjustMinute(-1)}
-              disabled={disabled}
-              accessibilityRole="button"
-              accessibilityLabel={`${title} 분 1분 감소`}
-              accessibilityState={{ disabled }}
-              hitSlop={8}
-              style={stepperStyle}
-            >
-              <Minus size={16} color={stepperIconColor} strokeWidth={2.6} />
-            </TouchableOpacity>
-            <TouchableOpacity
-              testID={`${baseTestID}-minute-increment`}
-              onPress={() => adjustMinute(1)}
-              disabled={disabled}
-              accessibilityRole="button"
-              accessibilityLabel={`${title} 분 1분 증가`}
-              accessibilityState={{ disabled }}
-              hitSlop={8}
-              style={stepperStyle}
-            >
-              <Plus size={16} color={stepperIconColor} strokeWidth={2.6} />
-            </TouchableOpacity>
-          </View>
-        </View>
+        ) : null}
 
         {/* Chip row — wraps to multiple lines when count > 4-5 */}
         <View style={styles.chipsWrap}>
@@ -315,7 +333,7 @@ const styles = StyleSheet.create({
   displayDigits: {
     fontSize: 40,
     lineHeight: 44,
-    letterSpacing: -1.2,
+    letterSpacing: 0,
     fontWeight: '800',
     fontFamily: weightToFontFamily('800'),
   },
@@ -330,33 +348,31 @@ const styles = StyleSheet.create({
     height: 36,
     opacity: 0.6,
   },
-  stepperRow: {
-    marginTop: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 14,
+  displayButton: {
+    alignSelf: 'stretch',
+    borderRadius: 12,
+    paddingVertical: 2,
   },
-  stepperGroup: {
-    width: 92,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 8,
-  },
-  stepperDividerSpacer: {
-    width: 1,
-    height: 30,
-  },
-  stepperButton: {
-    width: 36,
-    height: 32,
-    borderRadius: 16,
+  pickerContainer: {
+    marginTop: 12,
     borderWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: 12,
+    overflow: 'hidden',
   },
-  stepperButtonDisabled: {
-    opacity: 0.45,
+  pickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    borderBottomWidth: 1,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+  },
+  pickerDoneText: {
+    fontSize: 14,
+    fontWeight: '700',
+    fontFamily: weightToFontFamily('700'),
+  },
+  iosPicker: {
+    alignSelf: 'stretch',
   },
   chipsWrap: {
     marginTop: 18,
@@ -377,7 +393,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     fontFamily: weightToFontFamily('700'),
-    letterSpacing: -0.1,
+    letterSpacing: 0,
   },
   chipDisabled: {
     opacity: 0.5,

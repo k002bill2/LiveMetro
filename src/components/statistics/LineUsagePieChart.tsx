@@ -210,7 +210,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   totalLabel: {
-    fontSize: 10,
+    fontSize: 12,
     color: '#999',
   },
   totalValue: {
@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   totalUnit: {
-    fontSize: 10,
+    fontSize: 12,
     color: '#999',
   },
   legend: {
@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   legendText: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#666',
   },
 });

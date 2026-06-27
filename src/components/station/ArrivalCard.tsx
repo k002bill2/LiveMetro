@@ -313,11 +313,11 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   congestionLabel: {
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: weightToFontFamily('700'),
   },
   congestionAxis: {
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: weightToFontFamily('600'),
   },
   barRow: {
@@ -328,7 +328,7 @@ const styles = StyleSheet.create({
   /* Phase 53b: tooltip text rendered IN the header row when active —
      no absolute positioning, no overlap/clipping risk. */
   tooltipText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '700',
     fontFamily: weightToFontFamily('700'),
     flex: 1,
@@ -349,7 +349,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   barNum: {
-    fontSize: 9,
+    fontSize: 12,
     fontFamily: weightToFontFamily('700'),
   },
   /* Phase 55: empty state row */
@@ -363,7 +363,7 @@ const styles = StyleSheet.create({
     fontFamily: weightToFontFamily('700'),
   },
   emptyHint: {
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: '500',
     fontFamily: weightToFontFamily('500'),
     marginTop: 2,

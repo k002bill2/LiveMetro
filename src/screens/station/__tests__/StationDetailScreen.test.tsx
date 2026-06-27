@@ -264,6 +264,25 @@ describe('StationDetailScreen', () => {
     expect(queryByText('서울대입구행')).toBeNull();
   });
 
+  it('initially switches to the direction that has trains when the default direction is empty', async () => {
+    (useRoute as jest.Mock).mockReturnValue({
+      params: { stationId: '412', stationName: '김포공항', lineId: '9' },
+    });
+    mockedUseRealtimeTrains.mockReturnValue({
+      trains: [
+        buildTrain({ id: 'd1', finalDestination: '개화', direction: 'down', lineId: '9', directionLabel: '하행' }),
+      ],
+      loading: false,
+      error: null,
+      refetch: jest.fn(),
+    });
+
+    const { getByText, queryByTestId } = render(<StationDetailScreen />);
+
+    await waitFor(() => expect(getByText('개화행')).toBeTruthy());
+    expect(queryByTestId('station-detail-empty')).toBeNull();
+  });
+
   // 2호선 순환선 방면 라벨: train.directionLabel(API 원본)이 최우선,
   // 없으면 directionToDisplay(lineId) fallback — 둘 다 '내선순환/외선순환'.
   describe('direction segment labels (Line 2 circular)', () => {

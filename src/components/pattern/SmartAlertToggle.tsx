@@ -166,7 +166,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       backgroundColor: 'rgba(0,102,255,0.10)',
     },
     aiBadgeText: {
-      fontSize: 10,
+      fontSize: 12,
       fontFamily: weightToFontFamily('700'),
       color: WANTED_TOKENS.blue[500],
     },

@@ -1302,8 +1302,8 @@ describe('SeoulSubwayApiService', () => {
   // 등 (etc.) per the guide. SeoulApiError preserves errorCode and category
   // so UI callers can branch (transient → cached fallback, auth → key swap).
   describe('SeoulApiError categorization', () => {
-    it('categorizes ERROR-500 / ERROR-501 / ERROR-334 / INFO-300 as quota (retryable)', () => {
-      for (const code of ['ERROR-500', 'ERROR-501', 'ERROR-334', 'INFO-300']) {
+    it('categorizes ERROR-500 / ERROR-501 / ERROR-334 / ERROR-337 / INFO-300 as quota (retryable)', () => {
+      for (const code of ['ERROR-500', 'ERROR-501', 'ERROR-334', 'ERROR-337', 'INFO-300']) {
         const err = new SeoulApiError(code, 'sample');
         expect(err.category).toBe('quota');
         expect(err.retryable).toBe(true);

@@ -3,12 +3,30 @@ import { fireEvent, render } from '@testing-library/react-native';
 
 import { TimePickerCard } from '../TimePickerCard';
 
-jest.mock('lucide-react-native', () => new Proxy({}, { get: (_, name) => name }));
-
 jest.mock('@/services/theme', () => ({
   useSemanticTokens: jest.fn(() => jest.requireActual('@/styles/modernTheme').WANTED_TOKENS.light),
   useTheme: () => ({ isDark: false }),
 }));
+
+jest.mock('@react-native-community/datetimepicker', () => {
+  const ReactLocal = require('react');
+  const { Pressable } = require('react-native');
+
+  return {
+    __esModule: true,
+    default: ({
+      testID,
+      onChange,
+    }: {
+      testID?: string;
+      onChange: (event: { type: 'set' }, selectedDate?: Date) => void;
+    }) =>
+      ReactLocal.createElement(Pressable, {
+        testID,
+        onPress: () => onChange({ type: 'set' }, new Date(2020, 0, 1, 8, 1)),
+      }),
+  };
+});
 
 describe('TimePickerCard', () => {
   const defaultProps = {
@@ -33,30 +51,15 @@ describe('TimePickerCard', () => {
     expect(getByTestId('time-mm')).toHaveTextContent('17');
   });
 
-  it('increments and decrements minutes by one minute', () => {
+  it('opens the native time picker from the display and applies the selected minute', () => {
     const onChange = jest.fn();
     const { getByTestId } = render(
       <TimePickerCard {...defaultProps} onChange={onChange} />,
     );
 
-    fireEvent.press(getByTestId('time-minute-increment'));
-    expect(onChange).toHaveBeenLastCalledWith('08:01');
-
-    fireEvent.press(getByTestId('time-minute-decrement'));
-    expect(onChange).toHaveBeenLastCalledWith('07:59');
-  });
-
-  it('increments and decrements hours by one hour', () => {
-    const onChange = jest.fn();
-    const { getByTestId } = render(
-      <TimePickerCard {...defaultProps} value="00:15" onChange={onChange} />,
-    );
-
-    fireEvent.press(getByTestId('time-hour-increment'));
-    expect(onChange).toHaveBeenLastCalledWith('01:15');
-
-    fireEvent.press(getByTestId('time-hour-decrement'));
-    expect(onChange).toHaveBeenLastCalledWith('23:15');
+    fireEvent.press(getByTestId('time-display'));
+    fireEvent.press(getByTestId('time-native-picker'));
+    expect(onChange).toHaveBeenCalledWith('08:01');
   });
 
   it('keeps preset chips as quick picks', () => {
@@ -71,13 +74,13 @@ describe('TimePickerCard', () => {
 
   it('does not change time while disabled', () => {
     const onChange = jest.fn();
-    const { getByTestId } = render(
+    const { getByTestId, queryByTestId } = render(
       <TimePickerCard {...defaultProps} disabled onChange={onChange} />,
     );
 
-    fireEvent.press(getByTestId('time-minute-increment'));
-    fireEvent.press(getByTestId('time-hour-increment'));
+    fireEvent.press(getByTestId('time-display'));
 
+    expect(queryByTestId('time-native-picker')).toBeNull();
     expect(onChange).not.toHaveBeenCalled();
   });
 });

@@ -152,7 +152,7 @@ const styles = StyleSheet.create({
     paddingBottom: WANTED_TOKENS.spacing.s8,
   },
   eyebrow: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '800',
     fontFamily: weightToFontFamily('800'),
     letterSpacing: 0.55,

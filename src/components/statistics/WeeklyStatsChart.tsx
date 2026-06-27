@@ -141,7 +141,7 @@ const styles = StyleSheet.create({
     width: 40,
   },
   yAxisLabel: {
-    fontSize: 10,
+    fontSize: 12,
     color: '#999',
     textAlign: 'right',
   },
@@ -173,7 +173,7 @@ const styles = StyleSheet.create({
     minHeight: 24,
   },
   barValue: {
-    fontSize: 9,
+    fontSize: 12,
     fontWeight: '600',
     fontFamily: weightToFontFamily('600'),
     color: '#FFF',
@@ -187,13 +187,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   xAxisLabel: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#666',
     fontWeight: '500',
     fontFamily: weightToFontFamily('500'),
   },
   xAxisSubLabel: {
-    fontSize: 9,
+    fontSize: 12,
     color: '#999',
     marginTop: 2,
   },
@@ -214,7 +214,7 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   legendText: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#666',
   },
 });

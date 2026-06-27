@@ -40,7 +40,7 @@ const TONES: Record<PillTone, { bg: string; fg: string }> = {
 };
 
 const SIZES: Record<PillSize, { paddingV: number; paddingH: number; fontSize: number; height: number }> = {
-  sm: { paddingV: 2, paddingH: 8,  fontSize: 11, height: 20 },
+  sm: { paddingV: 2, paddingH: 8,  fontSize: 12, height: 20 },
   md: { paddingV: 4, paddingH: 10, fontSize: 12, height: 24 },
   lg: { paddingV: 6, paddingH: 12, fontSize: 13, height: 28 },
 };

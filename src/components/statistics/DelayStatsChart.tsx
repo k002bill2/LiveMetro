@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
     minHeight: 4,
   },
   barValue: {
-    fontSize: 10,
+    fontSize: 12,
     color: '#666',
     marginBottom: 4,
     fontWeight: '500',
@@ -179,7 +179,7 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   legendText: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#666',
   },
 });

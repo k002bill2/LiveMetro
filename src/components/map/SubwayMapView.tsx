@@ -441,7 +441,7 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   legendText: {
-    fontSize: 11,
+    fontSize: 12,
     color: '#666',
   },
 });

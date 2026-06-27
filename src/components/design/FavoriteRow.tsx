@@ -202,7 +202,7 @@ const styles = StyleSheet.create({
     gap: 3,
   },
   commutePillText: {
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: weightToFontFamily('700'),
   },
   stationName: {
@@ -250,7 +250,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
   },
   imminentText: {
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: weightToFontFamily('700'),
   },
 });

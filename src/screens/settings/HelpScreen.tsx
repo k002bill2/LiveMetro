@@ -410,7 +410,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       letterSpacing: -0.07,
     },
     contactSub: {
-      fontSize: 11,
+      fontSize: 12,
       fontFamily: weightToFontFamily('600'),
       color: semantic.labelAlt,
       marginTop: 2,
@@ -431,7 +431,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       textTransform: 'uppercase',
     },
     groupLabelHint: {
-      fontSize: 11,
+      fontSize: 12,
       fontFamily: weightToFontFamily('700'),
       color: semantic.labelAlt,
     },
@@ -470,7 +470,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       backgroundColor: NEUTRAL_TINT,
     },
     qaBadgeText: {
-      fontSize: 11,
+      fontSize: 12,
       fontFamily: weightToFontFamily('800'),
     },
     qBadgeTextOpen: {
@@ -552,7 +552,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       color: semantic.labelStrong,
     },
     miscSub: {
-      fontSize: 11.5,
+      fontSize: 12,
       fontFamily: weightToFontFamily('500'),
       color: semantic.labelAlt,
       marginTop: 2,

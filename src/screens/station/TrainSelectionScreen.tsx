@@ -431,7 +431,7 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   liveText: {
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: weightToFontFamily('700'),
   },
   heroSubtitle: {

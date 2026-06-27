@@ -250,10 +250,10 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     footerCaption: {
       paddingHorizontal: WANTED_TOKENS.spacing.s4,
       paddingTop: WANTED_TOKENS.spacing.s2,
-      fontSize: 11.5,
+      fontSize: 12,
       fontFamily: weightToFontFamily('500'),
       color: semantic.labelAlt,
-      lineHeight: 11.5 * 1.45,
+      lineHeight: 12 * 1.45,
     },
     sectionTight: {
       marginBottom: WANTED_TOKENS.spacing.s2,
@@ -261,10 +261,10 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     sectionCaption: {
       paddingHorizontal: WANTED_TOKENS.spacing.s4,
       marginBottom: WANTED_TOKENS.spacing.s5,
-      fontSize: 11.5,
+      fontSize: 12,
       fontFamily: weightToFontFamily('500'),
       color: semantic.labelAlt,
-      lineHeight: 11.5 * 1.45,
+      lineHeight: 12 * 1.45,
     },
     accentSection: {
       marginHorizontal: WANTED_TOKENS.spacing.s4,

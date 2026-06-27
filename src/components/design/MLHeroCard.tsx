@@ -238,7 +238,7 @@ const styles = StyleSheet.create({
   tagText: {
     color: '#FFFFFF',
     opacity: 0.85,
-    fontSize: 11,
+    fontSize: 12,
     fontFamily: weightToFontFamily('800'),
     letterSpacing: 0.5,
   },

@@ -133,7 +133,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       alignItems: 'center',
     },
     dateColMonthDay: {
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: '700',
       fontFamily: weightToFontFamily('700'),
       color: semantic.labelAlt,
@@ -163,7 +163,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       flexShrink: 1,
     },
     rowSub: {
-      fontSize: 11.5,
+      fontSize: 12,
       fontWeight: '600',
       fontFamily: weightToFontFamily('600'),
       color: semantic.labelAlt,
@@ -185,12 +185,12 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       letterSpacing: -0.4,
     },
     rowDelayUnit: {
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: '700',
       fontFamily: weightToFontFamily('700'),
     },
     rowExpiredLabel: {
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: '700',
       fontFamily: weightToFontFamily('700'),
       color: semantic.labelAlt,
@@ -204,7 +204,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       backgroundColor: semantic.bgSubtle,
     },
     rowIssuedBadgeText: {
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: '800',
       fontFamily: weightToFontFamily('800'),
       color: semantic.labelAlt,
@@ -217,7 +217,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       backgroundColor: semantic.primaryBg,
     },
     rowIssuePillText: {
-      fontSize: 11,
+      fontSize: 12,
       fontWeight: '800',
       fontFamily: weightToFontFamily('800'),
       color: semantic.primaryNormal,
