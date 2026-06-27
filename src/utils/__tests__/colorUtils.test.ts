@@ -126,6 +126,15 @@ describe('colorUtils', () => {
       expect(getSubwayLineColor('airport-express')).toBe('#0090D2');
     });
 
+    it('should handle non-numeric Korean line names used by local station data', () => {
+      expect(getSubwayLineColor('신림선')).toBe(SUBWAY_LINE_COLORS.sillim);
+      expect(getSubwayLineColor('용인경전철')).toBe(SUBWAY_LINE_COLORS.ever);
+      expect(getSubwayLineColor('의정부경전철')).toBe(SUBWAY_LINE_COLORS.uijeongbu);
+      expect(getSubwayLineColor('인천선')).toBe(SUBWAY_LINE_COLORS.incheon1);
+      expect(getSubwayLineColor('인천2')).toBe(SUBWAY_LINE_COLORS.incheon2);
+      expect(getSubwayLineColor('GTX-A')).toBe(SUBWAY_LINE_COLORS.gtx_a);
+    });
+
     it('should extract numeric line from Korean format', () => {
       expect(getSubwayLineColor('1호선')).toBe('#0052A4');
       expect(getSubwayLineColor('2호선')).toBe('#00A84D');

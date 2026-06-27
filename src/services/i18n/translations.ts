@@ -26,7 +26,7 @@ export interface Translations {
     favorites: string;
     routes: string;
     reports: string;
-    me: string;
+    settings: string;
   };
   // Settings
   settings: {
@@ -197,7 +197,7 @@ export const translations: Record<Language, Translations> = {
       favorites: '즐겨찾기',
       routes: '경로',
       reports: '제보',
-      me: '나',
+      settings: '설정',
     },
     settings: {
       title: '설정',
@@ -350,7 +350,7 @@ export const translations: Record<Language, Translations> = {
       favorites: 'Favorites',
       routes: 'Routes',
       reports: 'Reports',
-      me: 'Me',
+      settings: 'Settings',
     },
     settings: {
       title: 'Settings',

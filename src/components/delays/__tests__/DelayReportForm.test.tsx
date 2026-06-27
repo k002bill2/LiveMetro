@@ -104,11 +104,13 @@ describe('DelayReportForm', () => {
     expect(getByTestId('draft-save-button')).toBeTruthy();
   });
 
-  it('renders all line selection circles (number-only chips)', () => {
-    const { getByTestId } = render(<DelayReportForm />);
+  it('renders line chips from local station data, including non-numeric lines', () => {
+    const { getByText, getByTestId } = render(<DelayReportForm />);
     expect(getByTestId('line-select-1')).toBeTruthy();
     expect(getByTestId('line-select-2')).toBeTruthy();
     expect(getByTestId('line-select-9')).toBeTruthy();
+    expect(getByTestId('line-select-신분당선')).toBeTruthy();
+    expect(getByText('신분당')).toBeTruthy();
   });
 
   it('marks the pressed line circle as selected', () => {
@@ -228,6 +230,16 @@ describe('DelayReportForm', () => {
 
     fireEvent.press(getByTestId('station-recommend-수서'));
     expect(getByDisplayValue('수서')).toBeTruthy();
+  });
+
+  it('shows recommended stations for non-numeric line selections', () => {
+    const { getByTestId, queryByTestId } = render(<DelayReportForm />);
+
+    fireEvent.press(getByTestId('line-select-신분당선'));
+
+    expect(getByTestId('station-recommend-강남')).toBeTruthy();
+    expect(getByTestId('station-recommend-정자')).toBeTruthy();
+    expect(queryByTestId('station-recommend-홍대입구')).toBeNull();
   });
 
   it('shows an empty result message when search has no station on the selected line', () => {

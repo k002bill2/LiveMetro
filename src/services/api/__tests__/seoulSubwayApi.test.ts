@@ -109,6 +109,54 @@ describe('SeoulSubwayApiService', () => {
       expect(result[0]?.arvlMsg2).toBe('2분후[1번째전]');
     });
 
+    it.each([
+      ['오목교', '오목교(목동운동장앞)'],
+      ['신정', '신정(은행정)'],
+      ['군자', '군자(능동)'],
+    ])('uses the Seoul realtime alias for %s station', async (inputName, apiName) => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: () => Promise.resolve({
+          realtimeArrivalList: [
+            {
+              rowNum: '1',
+              selectedCount: '1',
+              totalCount: '1',
+              subwayId: '1005',
+              updnLine: '상행',
+              trainLineNm: '방화행 - 목동방면',
+              subwayHeading: '',
+              statnFid: '',
+              statnTid: '',
+              statnId: '1005000521',
+              statnNm: apiName,
+              trainCo: '',
+              ordkey: '01',
+              subwayList: '',
+              statnList: '',
+              btrainSttus: '일반',
+              barvlDt: '60',
+              btrainNo: '5164',
+              bstatnId: '',
+              bstatnNm: '방화',
+              recptnDt: '2026-06-27 23:01:00',
+              arvlMsg2: `${apiName} 진입`,
+              arvlMsg3: '',
+              arvlCd: '0',
+            },
+          ],
+        }),
+      });
+
+      const result = await seoulSubwayApi.getRealtimeArrival(inputName);
+
+      expect(result).toHaveLength(1);
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining(encodeURIComponent(apiName)),
+        expect.anything(),
+      );
+    });
+
     it('should return empty array when no arrival data', async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,

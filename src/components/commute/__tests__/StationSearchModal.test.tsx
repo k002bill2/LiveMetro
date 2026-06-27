@@ -17,6 +17,7 @@ jest.mock('@/services/data/stationsDataService', () => ({
     { id: '0150', name: '서울역', nameEn: 'Seoul Station', lineId: '1', lineName: '1호선' },
     { id: '0239', name: '홍대입구', nameEn: 'Hongik Univ.', lineId: '2', lineName: '2호선' },
     { id: '0415', name: '명동', nameEn: 'Myeong-dong', lineId: '4', lineName: '4호선' },
+    { id: '4306', name: '신논현', nameEn: 'Sinnonhyeon', lineId: '신분당선', lineName: '신분당선' },
   ]),
 }));
 
@@ -75,7 +76,7 @@ describe('StationSearchModal', () => {
   it('displays result count', async () => {
     const { getByText } = render(<StationSearchModal {...defaultProps} />);
     await waitFor(() => {
-      expect(getByText('4개의 역')).toBeTruthy();
+      expect(getByText('5개의 역')).toBeTruthy();
     });
   });
 
@@ -172,13 +173,27 @@ describe('StationSearchModal', () => {
     expect((tree as { props: { visible: boolean } }).props.visible).toBe(false);
   });
 
-  it('renders line filter buttons for all 9 lines', async () => {
-    const { getAllByText } = render(<StationSearchModal {...defaultProps} />);
+  it('renders line filter buttons from station data, including non-numeric lines', async () => {
+    const { getAllByText, getByTestId } = render(<StationSearchModal {...defaultProps} />);
     await waitFor(() => {
       // Line names appear in both the filter and station list, so use getAllByText
       expect(getAllByText('1호선').length).toBeGreaterThanOrEqual(1);
       expect(getAllByText('2호선').length).toBeGreaterThanOrEqual(1);
-      expect(getAllByText('9호선').length).toBeGreaterThanOrEqual(1);
+      expect(getByTestId('station-line-filter-신분당선')).toBeTruthy();
+    });
+  });
+
+  it('filters station results by a non-numeric line chip', async () => {
+    const { getByTestId, getByText, queryByText } = render(<StationSearchModal {...defaultProps} />);
+    await waitFor(() => {
+      expect(getByText('신논현')).toBeTruthy();
+    });
+
+    fireEvent.press(getByTestId('station-line-filter-신분당선'));
+
+    await waitFor(() => {
+      expect(getByText('신논현')).toBeTruthy();
+      expect(queryByText('강남')).toBeNull();
     });
   });
 });

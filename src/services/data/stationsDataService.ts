@@ -279,6 +279,45 @@ const LINE_NAMES: Record<string, string> = {
   '9': '9호선',
 };
 
+const compareLineIds = (a: string, b: string): number => {
+  const aNumeric = /^\d+$/.test(a);
+  const bNumeric = /^\d+$/.test(b);
+
+  if (aNumeric && bNumeric) {
+    return Number(a) - Number(b);
+  }
+
+  if (aNumeric) {
+    return -1;
+  }
+
+  if (bNumeric) {
+    return 1;
+  }
+
+  return a.localeCompare(b, 'ko-KR', { numeric: true });
+};
+
+/**
+ * Get all line ids that have station data in the local cache.
+ *
+ * Numeric Seoul lines stay first for the familiar 1-9 ordering; all other
+ * metro/rail lines follow from the same station dataset instead of a form-local
+ * hardcoded allowlist.
+ */
+export const getAvailableLocalLineIds = (): string[] => {
+  try {
+    initializeCache();
+
+    return Array.from(stationsByLineCache!.entries())
+      .filter(([, stations]) => stations.length > 0)
+      .map(([lineId]) => lineId)
+      .sort(compareLineIds);
+  } catch {
+    return [];
+  }
+};
+
 /**
  * Station with line info for search modal
  */
@@ -286,9 +325,13 @@ export interface StationWithLineInfo {
   readonly id: string;       // station_cd (seoulStations.json)
   readonly name: string;     // Korean name
   readonly nameEn: string;   // English name
-  readonly lineId: string;   // Line ID (1-9)
-  readonly lineName: string; // Line name (1호선, 2호선, etc.)
+  readonly lineId: string;   // Line ID from local station data
+  readonly lineName: string; // Display line name
 }
+
+const getLineDisplayName = (lineId: string): string => (
+  LINE_NAMES[lineId] || (/^\d+$/.test(lineId) ? `${lineId}호선` : lineId)
+);
 
 /**
  * Get all stations with line info for search modal
@@ -301,23 +344,15 @@ export const getStationsWithLineInfo = (): StationWithLineInfo[] => {
     const jsonData = seoulStationsData as SeoulStationsJson;
     const result: StationWithLineInfo[] = [];
 
-    // Only include lines 1-9
-    const validLines = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
-
     jsonData.DATA.forEach((stationData) => {
       const lineId = convertLineNumToLineId(stationData.line_num);
-
-      // Skip non-numeric lines (경의중앙선, 분당선, etc.)
-      if (!validLines.includes(lineId)) {
-        return;
-      }
 
       result.push({
         id: stationData.station_cd,           // station_cd for unique identification
         name: stationData.station_nm,
         nameEn: stationData.station_nm_eng,
         lineId,
-        lineName: LINE_NAMES[lineId] || `${lineId}호선`,
+        lineName: getLineDisplayName(lineId),
       });
     });
 

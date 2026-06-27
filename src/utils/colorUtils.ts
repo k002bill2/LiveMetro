@@ -135,7 +135,7 @@ export const getSubwayLineColor = (lineId: string): string => {
   if (normalizedId.includes('의정부')) {
     return SUBWAY_LINE_COLORS.uijeongbu;
   }
-  if (normalizedId.includes('에버') || normalizedId.includes('ever')) {
+  if (normalizedId.includes('에버') || normalizedId.includes('용인') || normalizedId.includes('ever')) {
     return SUBWAY_LINE_COLORS.ever;
   }
   if (normalizedId.includes('서해')) {
@@ -152,6 +152,18 @@ export const getSubwayLineColor = (lineId: string): string => {
   }
   if (normalizedId.includes('경강')) {
     return SUBWAY_LINE_COLORS.gyeonggang;
+  }
+  if (normalizedId.includes('신림') || normalizedId.includes('sillim')) {
+    return SUBWAY_LINE_COLORS.sillim;
+  }
+  if (normalizedId.includes('인천2') || normalizedId.includes('incheon2')) {
+    return SUBWAY_LINE_COLORS.incheon2;
+  }
+  if (normalizedId.includes('인천') || normalizedId.includes('incheon1')) {
+    return SUBWAY_LINE_COLORS.incheon1;
+  }
+  if (normalizedId.includes('gtx')) {
+    return SUBWAY_LINE_COLORS.gtx_a;
   }
   
   // Extract numeric line (e.g., "1호선" -> "1")

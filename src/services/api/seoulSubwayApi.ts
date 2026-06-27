@@ -437,6 +437,20 @@ interface SeoulTimetableResponse {
   message?: string;
 }
 
+const REALTIME_STATION_NAME_ALIASES: Record<string, string> = {
+  // Seoul realtime arrival API uses the parenthesized official name here.
+  // Querying the plain local display names returns INFO-200 even while trains are running.
+  오목교: '오목교(목동운동장앞)',
+  신정: '신정(은행정)',
+  군자: '군자(능동)',
+};
+
+const resolveRealtimeStationQueryName = (stationName: string): string => {
+  const trimmed = stationName.trim();
+  const withoutStationSuffix = trimmed.replace(/역$/, '');
+  return REALTIME_STATION_NAME_ALIASES[withoutStationSuffix] ?? trimmed;
+};
+
 class SeoulSubwayApiService {
   private readonly baseUrl: string;
   private readonly timeout: number = 10000;
@@ -504,14 +518,16 @@ class SeoulSubwayApiService {
    * Uses ApiKeyManager for automatic key rotation and failover
    */
   async getRealtimeArrival(stationName: string): Promise<SeoulRealtimeArrival[]> {
+    const queryStationName = resolveRealtimeStationQueryName(stationName);
+
     // Request deduplication: reuse in-flight request for same station
-    const dedupKey = `arrival:${stationName}`;
+    const dedupKey = `arrival:${queryStationName}`;
     const inflight = this.inflightRequests.get(dedupKey);
     if (inflight) {
       return inflight;
     }
 
-    const promise = this.fetchRealtimeArrival(stationName);
+    const promise = this.fetchRealtimeArrival(queryStationName);
 
     this.inflightRequests.set(dedupKey, promise);
     // Use .then with both handlers to avoid unhandled rejection from .finally()

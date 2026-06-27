@@ -21,29 +21,92 @@ interface FileSystemModule {
   moveAsync(options: { from: string; to: string }): Promise<void>;
 }
 
+type NativeModuleRegistry = Record<string, unknown>;
+
+interface ExpoNativeGlobals {
+  readonly expo?: {
+    readonly modules?: NativeModuleRegistry;
+  };
+  readonly ExpoModules?: NativeModuleRegistry;
+}
+
+interface ExpoModulesCoreModule {
+  readonly NativeModulesProxy?: NativeModuleRegistry;
+}
+
 // Lazy load modules
 let Print: PrintModule | null = null;
 let Sharing: SharingModule | null = null;
 let FileSystem: FileSystemModule | null = null;
 
-async function loadModules(): Promise<boolean> {
-  try {
-    if (!Print) {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      Print = require('expo-print') as PrintModule;
-    }
-    if (!Sharing) {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      Sharing = require('expo-sharing') as SharingModule;
-    }
-    if (!FileSystem) {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports
-      FileSystem = require('expo-file-system') as FileSystemModule;
-    }
+function hasRegisteredNativeModule(nativeModuleName: string): boolean {
+  const nativeGlobals = globalThis as typeof globalThis & ExpoNativeGlobals;
+  if (nativeGlobals.expo?.modules?.[nativeModuleName]) {
     return true;
+  }
+  if (nativeGlobals.ExpoModules?.[nativeModuleName]) {
+    return true;
+  }
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { NativeModulesProxy } = require('expo-modules-core') as ExpoModulesCoreModule;
+    return Boolean(NativeModulesProxy?.[nativeModuleName]);
   } catch {
     return false;
   }
+}
+
+function loadPrintModule(): PrintModule | null {
+  if (Print) {
+    return Print;
+  }
+  if (!hasRegisteredNativeModule('ExpoPrint')) {
+    return null;
+  }
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    Print = require('expo-print') as PrintModule;
+    return Print;
+  } catch {
+    return null;
+  }
+}
+
+function loadSharingModule(): SharingModule | null {
+  if (Sharing) {
+    return Sharing;
+  }
+  if (!hasRegisteredNativeModule('ExpoSharing')) {
+    return null;
+  }
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    Sharing = require('expo-sharing') as SharingModule;
+    return Sharing;
+  } catch {
+    return null;
+  }
+}
+
+function loadFileSystemModule(): FileSystemModule | null {
+  if (FileSystem) {
+    return FileSystem;
+  }
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    FileSystem = require('expo-file-system') as FileSystemModule;
+    return FileSystem;
+  } catch {
+    return null;
+  }
+}
+
+function loadPdfModules(): boolean {
+  return Boolean(loadPrintModule() && loadFileSystemModule());
 }
 
 // ============================================================================
@@ -117,7 +180,7 @@ class PdfService {
   ): Promise<PdfGenerationResult> {
     const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
 
-    const modulesLoaded = await loadModules();
+    const modulesLoaded = loadPdfModules();
     if (!modulesLoaded || !Print || !FileSystem) {
       return {
         success: false,
@@ -163,8 +226,8 @@ class PdfService {
       return false;
     }
 
-    const modulesLoaded = await loadModules();
-    if (!modulesLoaded || !Sharing) {
+    const sharingLoaded = Boolean(loadSharingModule());
+    if (!sharingLoaded || !Sharing) {
       return false;
     }
 
@@ -196,8 +259,8 @@ class PdfService {
   ): Promise<boolean> {
     const mergedOptions = { ...DEFAULT_OPTIONS, ...options };
 
-    const modulesLoaded = await loadModules();
-    if (!modulesLoaded || !Print) {
+    const printLoaded = Boolean(loadPrintModule());
+    if (!printLoaded || !Print) {
       return false;
     }
 
@@ -214,8 +277,8 @@ class PdfService {
    * Check if sharing is available
    */
   async isSharingAvailable(): Promise<boolean> {
-    const modulesLoaded = await loadModules();
-    if (!modulesLoaded || !Sharing) {
+    const sharingLoaded = Boolean(loadSharingModule());
+    if (!sharingLoaded || !Sharing) {
       return false;
     }
     return Sharing.isAvailableAsync();

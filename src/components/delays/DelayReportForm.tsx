@@ -14,9 +14,11 @@ import { useAuth } from '@/services/auth/AuthContext';
 import { delayReportService } from '@/services/delay/delayReportService';
 import {
   findStationCdByNameAndLine,
+  getAvailableLocalLineIds,
   getLocalStationsByLine,
 } from '@/services/data/stationsDataService';
 import { ReportType, ReportTypeLabels, ReportSeverity } from '@/models/delayReport';
+import { getLineShortLabel } from '@/components/design/LineBadge';
 import { getSubwayLineColor } from '@/utils/colorUtils';
 import { getDirectionOptions } from '@/utils/directionOptions';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
@@ -36,9 +38,17 @@ interface DelayReportFormProps {
   onCancel?: () => void;
 }
 
-const LINES = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
+const FALLBACK_LINE_IDS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'];
 const DEFAULT_RECOMMENDED_STATIONS = ['강남', '홍대입구', '잠실', '서울역', '사당', '신도림', '여의도', '왕십리'];
 const MAX_STATION_SUGGESTIONS = 12;
+
+const LINE_LABEL_OVERRIDES: Record<string, string> = {
+  'GTX-A': 'GTX-A',
+  '인천선': '인천1',
+  '인천2': '인천2',
+  '용인경전철': '용인',
+  '의정부경전철': '의정부',
+};
 
 const PRIORITY_STATIONS_BY_LINE: Record<string, readonly string[]> = {
   '1': ['서울역', '시청', '종로3가', '신도림', '구로', '용산', '노량진', '금정', '청량리', '회기'],
@@ -100,6 +110,23 @@ const isStationOnLine = (lineId: string, name: string): boolean => (
   getLineStationSuggestions(lineId).some(station => station.name === name)
 );
 
+const getLineChipLabel = (lineId: string): string => {
+  if (/^\d+$/.test(lineId)) {
+    return lineId;
+  }
+
+  const knownLabel = getLineShortLabel(lineId) ?? LINE_LABEL_OVERRIDES[lineId];
+  if (knownLabel) {
+    return knownLabel;
+  }
+
+  return lineId.replace(/도시철도|경전철|철도|선$/g, '') || lineId;
+};
+
+const getLineSelectAccessibilityLabel = (lineId: string): string => (
+  /^\d+$/.test(lineId) ? `${lineId}호선 선택` : `${lineId} 선택`
+);
+
 /**
  * 유형 그리드 메타 — 시안 #2의 컬러 원형 아이콘. accent는 라이트/다크 공용
  * 브랜드성 상태색(기존 getSeverityColor 전례와 동일하게 컴포넌트 상수).
@@ -150,6 +177,15 @@ export const DelayReportForm: React.FC<DelayReportFormProps> = ({
   const [bookmarked, setBookmarked] = useState<boolean>(false);
   const [submitting, setSubmitting] = useState(false);
   const previousLineRef = useRef<string | null>(null);
+
+  const lineOptions = useMemo(() => {
+    const availableLineIds = getAvailableLocalLineIds();
+    const baseLineIds = availableLineIds.length > 0 ? availableLineIds : FALLBACK_LINE_IDS;
+
+    return initialLineId && !baseLineIds.includes(initialLineId)
+      ? [initialLineId, ...baseLineIds]
+      : baseLineIds;
+  }, [initialLineId]);
 
   const stationOptions = useMemo(
     () => (selectedLine ? getLineStationSuggestions(selectedLine) : []),
@@ -373,19 +409,22 @@ export const DelayReportForm: React.FC<DelayReportFormProps> = ({
           showsHorizontalScrollIndicator={false}
           style={styles.lineSelector}
         >
-          {LINES.map(line => {
+          {lineOptions.map(line => {
             const lineColor = getSubwayLineColor(line);
             const isSelected = selectedLine === line;
+            const lineLabel = getLineChipLabel(line);
+            const isLongLabel = lineLabel.length > 1;
 
             return (
               <TouchableOpacity
                 key={line}
                 testID={`line-select-${line}`}
                 accessibilityRole="button"
-                accessibilityLabel={`${line}호선 선택`}
+                accessibilityLabel={getLineSelectAccessibilityLabel(line)}
                 accessibilityState={{ selected: isSelected }}
                 style={[
                   styles.lineCircle,
+                  isLongLabel && styles.linePill,
                   isSelected
                     ? { backgroundColor: lineColor, borderColor: lineColor }
                     : null,
@@ -393,12 +432,16 @@ export const DelayReportForm: React.FC<DelayReportFormProps> = ({
                 onPress={() => handleLineSelect(line)}
               >
                 <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.78}
                   style={[
                     styles.lineCircleText,
+                    isLongLabel && styles.linePillText,
                     { color: isSelected ? WANTED_TOKENS.light.labelOnColor : lineColor },
                   ]}
                 >
-                  {line}
+                  {lineLabel}
                 </Text>
               </TouchableOpacity>
             );
@@ -701,7 +744,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       flexDirection: 'row',
     },
     lineCircle: {
-      width: 52,
+      minWidth: 52,
       height: 52,
       borderRadius: 9999,
       alignItems: 'center',
@@ -711,10 +754,20 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       borderColor: semantic.lineSubtle,
       marginRight: WANTED_TOKENS.spacing.s3,
     },
+    linePill: {
+      minWidth: 68,
+      paddingHorizontal: WANTED_TOKENS.spacing.s3,
+    },
     lineCircleText: {
       fontSize: 18,
       fontWeight: '700',
       fontFamily: weightToFontFamily('700'),
+    },
+    linePillText: {
+      fontSize: 14,
+      lineHeight: 18,
+      maxWidth: 86,
+      textAlign: 'center',
     },
     stationInputWrap: {
       flexDirection: 'row',

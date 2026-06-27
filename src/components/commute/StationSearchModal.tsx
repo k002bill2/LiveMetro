@@ -43,11 +43,32 @@ const LINE_NAMES: Record<string, string> = {
   '9': '9호선',
 };
 
-const LINE_IDS = ['1', '2', '3', '4', '5', '6', '7', '8', '9'] as const;
-
 // Use StationWithLineInfo from stationsDataService
 // which provides station_cd (seoulStations.json) for consistent ID format
 type StationWithLine = StationWithLineInfo;
+
+const compareLineIds = (a: string, b: string): number => {
+  const aNumeric = /^\d+$/.test(a);
+  const bNumeric = /^\d+$/.test(b);
+
+  if (aNumeric && bNumeric) {
+    return Number(a) - Number(b);
+  }
+
+  if (aNumeric) {
+    return -1;
+  }
+
+  if (bNumeric) {
+    return 1;
+  }
+
+  return a.localeCompare(b, 'ko-KR', { numeric: true });
+};
+
+const getLineDisplayName = (lineId: string): string => (
+  LINE_NAMES[lineId] || (/^\d+$/.test(lineId) ? `${lineId}호선` : lineId)
+);
 
 export const StationSearchModal: React.FC<StationSearchModalProps> = ({
   visible,
@@ -84,6 +105,11 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
   const favoriteStationIds = useMemo(() => {
     return new Set(favoritesWithDetails.map((fav) => fav.stationId));
   }, [favoritesWithDetails]);
+
+  const lineFilterIds = useMemo(
+    () => Array.from(new Set(stations.map((station) => station.lineId))).sort(compareLineIds),
+    [stations],
+  );
 
   // Load all stations on mount
   useEffect(() => {
@@ -171,7 +197,7 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
         stationId: favorite.stationId,
         stationName: favorite.station.name,
         lineId: favorite.lineId,
-        lineName: LINE_NAMES[favorite.lineId] || `${favorite.lineId}호선`,
+        lineName: getLineDisplayName(favorite.lineId),
       });
       setSearchQuery('');
       setSelectedLine(null);
@@ -214,7 +240,7 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
                   {fav.station?.name}역
                 </Text>
                 <Text style={styles.favoriteLineName}>
-                  {LINE_NAMES[fav.lineId] || `${fav.lineId}호선`}
+                  {getLineDisplayName(fav.lineId)}
                 </Text>
               </View>
             </TouchableOpacity>
@@ -229,11 +255,15 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
       <FlatList
         horizontal
         showsHorizontalScrollIndicator={false}
-        data={LINE_IDS as unknown as string[]}
+        data={lineFilterIds}
         keyExtractor={(item) => item}
         contentContainerStyle={styles.lineFilterContent}
         renderItem={({ item }) => (
           <TouchableOpacity
+            testID={`station-line-filter-${item}`}
+            accessibilityRole="button"
+            accessibilityLabel={`${getLineDisplayName(item)} 필터`}
+            accessibilityState={{ selected: selectedLine === item }}
             style={[
               styles.lineFilterButton,
               selectedLine === item && styles.lineFilterButtonActive,
@@ -255,7 +285,7 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
                 selectedLine === item && styles.lineFilterTextActive,
               ]}
             >
-              {LINE_NAMES[item]}
+              {getLineDisplayName(item)}
             </Text>
           </TouchableOpacity>
         )}

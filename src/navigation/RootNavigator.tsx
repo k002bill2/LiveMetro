@@ -7,7 +7,7 @@ import React from 'react';
 import { useSemanticTokens } from '@/services/theme';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Home, Star, Route as RouteIcon, Megaphone, User, CircleHelp } from 'lucide-react-native';
+import { Home, Star, Route as RouteIcon, Megaphone, Settings, CircleHelp } from 'lucide-react-native';
 
 import { useAuth } from '../services/auth/AuthContext';
 import { useTranslation } from '../services/i18n';
@@ -147,7 +147,7 @@ const MainTabNavigator: React.FC = () => {
             case 'DelayFeed':
               return <Megaphone size={size} color={color} strokeWidth={strokeWidth} fill="none" />;
             case 'Profile':
-              return <User size={size} color={color} strokeWidth={strokeWidth} fill="none" />;
+              return <Settings size={size} color={color} strokeWidth={strokeWidth} fill="none" />;
             default:
               return <CircleHelp size={size} color={color} strokeWidth={strokeWidth} fill="none" />;
           }
@@ -213,8 +213,8 @@ const MainTabNavigator: React.FC = () => {
         name="Profile"
         component={SettingsNavigator}
         options={{
-          title: t.navigation.me,
-          tabBarLabel: t.navigation.me,
+          title: t.navigation.settings,
+          tabBarLabel: t.navigation.settings,
           headerShown: false, // SettingsNavigator has its own header
         }}
       />

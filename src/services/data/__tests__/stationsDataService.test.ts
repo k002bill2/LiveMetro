@@ -8,6 +8,7 @@ import {
   searchLocalStations,
   getAllLocalStations,
   getLocalStationsByLine,
+  getAvailableLocalLineIds,
   getStationsWithLineInfo,
   searchStationsWithLineInfo,
   findStationCdByNameAndLine,
@@ -117,6 +118,17 @@ describe('stationsDataService', () => {
     });
   });
 
+  describe('getAvailableLocalLineIds', () => {
+    it('returns data-backed line ids including non-numeric subway lines', () => {
+      const lineIds = getAvailableLocalLineIds();
+
+      expect(lineIds.slice(0, 9)).toEqual(['1', '2', '3', '4', '5', '6', '7', '8', '9']);
+      expect(lineIds).toContain('신분당선');
+      expect(lineIds).toContain('공항철도');
+      expect(lineIds).toContain('GTX-A');
+    });
+  });
+
   describe('getStationsWithLineInfo', () => {
     it('should return stations with line info', () => {
       const stations = getStationsWithLineInfo();
@@ -129,13 +141,13 @@ describe('stationsDataService', () => {
       expect(stations[0]?.lineName).toMatch(/^\d호선$/);
     });
 
-    it('should only include lines 1-9', () => {
+    it('should include non-numeric lines from the local station dataset', () => {
       const stations = getStationsWithLineInfo();
       const lineIds = new Set(stations.map(s => s.lineId));
 
-      lineIds.forEach(lineId => {
-        expect(['1', '2', '3', '4', '5', '6', '7', '8', '9']).toContain(lineId);
-      });
+      expect(lineIds).toContain('2');
+      expect(lineIds).toContain('신분당선');
+      expect(lineIds).toContain('공항철도');
     });
   });
 
