@@ -125,7 +125,6 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       borderRadius: WANTED_TOKENS.radius.pill,
       borderWidth: 1,
       borderColor: semantic.lineSubtle,
-      marginRight: WANTED_TOKENS.spacing.s2,
       backgroundColor: semantic.bgBase,
     },
     filterButtonSelected: {

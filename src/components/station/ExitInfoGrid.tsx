@@ -1,8 +1,9 @@
 /**
- * ExitInfoGrid — 2-column exit landmarks grid (Wanted Design System).
+ * ExitInfoGrid — full-width exit landmark rows (Wanted Design System).
  *
- * Mirrors the design handoff: white card with subtle border, exit-number badge
- * on `blue-50` + `blue-700` text, comma-joined landmark names beside.
+ * White card with subtle border, then one block row per exit. Each row keeps
+ * the exit-number badge on `blue-50` + `blue-700` text and comma-joined
+ * landmark names beside it.
  */
 import React, { memo, useMemo } from 'react';
 import { useSemanticTokens } from '@/services/theme';
@@ -56,18 +57,23 @@ const ExitInfoGridImpl: React.FC<ExitInfoGridProps> = ({ exits, max, testID }) =
   };
 
   const landmarkText: TextStyle = {
-    ...typeStyle('caption1'),
+    ...typeStyle('body2', '600'),
     color: semantic.labelNeutral,
     flexShrink: 1,
+    flex: 1,
   };
 
   return (
     <View testID={testID} style={cardStyle}>
-      <View style={styles.grid}>
+      <View style={styles.list}>
         {visible.map((exit) => {
           const names = exit.landmarks.map((l) => l.landmarkName).join(', ');
           return (
-            <View key={exit.exitNumber} style={styles.row}>
+            <View
+              key={exit.exitNumber}
+              testID={testID ? `${testID}-exit-${exit.exitNumber}` : undefined}
+              style={[styles.exitBlock, { backgroundColor: semantic.bgSubtle }]}
+            >
               <View style={badgeStyle}>
                 <Text style={badgeText}>{exit.exitNumber}</Text>
               </View>
@@ -96,16 +102,17 @@ const styles = StyleSheet.create({
   emptyText: {
     ...typeStyle('body2'),
   },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  row: {
-    width: '50%',
-    flexDirection: 'row',
-    alignItems: 'center',
+  list: {
     gap: WANTED_TOKENS.spacing.s2,
-    paddingVertical: WANTED_TOKENS.spacing.s1,
+  },
+  exitBlock: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: WANTED_TOKENS.spacing.s3,
+    paddingVertical: WANTED_TOKENS.spacing.s3,
+    paddingHorizontal: WANTED_TOKENS.spacing.s3,
+    borderRadius: WANTED_TOKENS.radius.r4,
   },
   badge: {
     width: 28,

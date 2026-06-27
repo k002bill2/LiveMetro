@@ -1,7 +1,8 @@
 /**
- * ExitInfoGrid Tests — Wanted Design System 2-column exit grid.
+ * ExitInfoGrid Tests — Wanted Design System full-width exit blocks.
  */
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { render } from '@testing-library/react-native';
 import { ExitInfoGrid } from '../ExitInfoGrid';
 import type { ExitInfo } from '@/models/publicData';
@@ -37,6 +38,16 @@ describe('ExitInfoGrid', () => {
     const { getByText } = render(<ExitInfoGrid exits={exits} />);
     expect(getByText('강남역사거리, GFC')).toBeTruthy();
     expect(getByText('뉴욕제과')).toBeTruthy();
+  });
+
+  it('renders each exit as a full-width row block', () => {
+    const { getByTestId } = render(<ExitInfoGrid exits={exits} testID="exit-grid" />);
+    const firstExitStyle = StyleSheet.flatten(getByTestId('exit-grid-exit-1').props.style);
+    const secondExitStyle = StyleSheet.flatten(getByTestId('exit-grid-exit-6').props.style);
+
+    expect(firstExitStyle.width).toBe('100%');
+    expect(firstExitStyle.flexDirection).toBe('row');
+    expect(secondExitStyle.width).toBe('100%');
   });
 
   it('renders empty state when no exits provided', () => {

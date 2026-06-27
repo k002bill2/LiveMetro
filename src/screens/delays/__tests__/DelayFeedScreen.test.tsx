@@ -5,6 +5,7 @@
 
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 import { DelayFeedScreen } from '../DelayFeedScreen';
 
 import { delayReportService } from '@/services/delay/delayReportService';
@@ -218,6 +219,9 @@ describe('DelayFeedScreen', () => {
       expect(getByText('신호장애')).toBeTruthy();
       expect(getByText('혼잡')).toBeTruthy();
       expect(getByText('내 노선만')).toBeTruthy();
+      expect(
+        StyleSheet.flatten(getByTestId('report-filter-delay').props.style).marginRight ?? 0,
+      ).toBe(0);
       // my-lines toggle is disabled when no favorites
       expect(getByTestId('report-filter-my-lines').props.accessibilityState.disabled).toBe(true);
     });
