@@ -21,6 +21,13 @@ export interface Translations {
     retry: string;
     ok: string;
   };
+  navigation: {
+    home: string;
+    favorites: string;
+    routes: string;
+    reports: string;
+    me: string;
+  };
   // Settings
   settings: {
     title: string;
@@ -87,10 +94,48 @@ export interface Translations {
   // Home
   home: {
     title: string;
+    greeting: (name: string) => string;
+    greetingAnonymous: string;
+    loadingNearby: string;
+    morningRouteTitle: string;
+    eveningRouteTitle: string;
     nearbyStations: string;
+    nearbyStationsEstimated: string;
+    nearbySubtitle: string;
+    nearbySuffix: string;
+    lowAccuracyNote: string;
+    favoriteStations: string;
+    realtimeArrivals: string;
+    viewAll: string;
+    liveReports: string;
+    nearbyLines: string;
+    noData: string;
+    tryAnotherLocation: string;
+    addFrequentStations: string;
+    allowLocation: string;
+    noNearbyReports: string;
+    quickActions: {
+      routeSearch: string;
+      subwayMap: string;
+      myLocation: string;
+      report: string;
+      certificate: string;
+    };
     recentStations: string;
     searchPlaceholder: string;
     noStationsFound: string;
+  };
+  routes: {
+    title: string;
+    emptyTitle: string;
+    emptyBody: string;
+    loading: string;
+    retry: string;
+    noRoutes: string;
+    currentRoute: string;
+    suggestedRoutes: string;
+    startGuidance: string;
+    startGuidanceA11y: string;
   };
   // Favorites
   favorites: {
@@ -146,6 +191,13 @@ export const translations: Record<Language, Translations> = {
       error: '오류',
       retry: '다시 시도',
       ok: '확인',
+    },
+    navigation: {
+      home: '홈',
+      favorites: '즐겨찾기',
+      routes: '경로',
+      reports: '제보',
+      me: '나',
     },
     settings: {
       title: '설정',
@@ -204,10 +256,48 @@ export const translations: Record<Language, Translations> = {
     },
     home: {
       title: '홈',
+      greeting: (name: string) => `안녕하세요, ${name}님`,
+      greetingAnonymous: '안녕하세요',
+      loadingNearby: '주변 역 정보를 가져오고 있습니다...',
+      morningRouteTitle: '오늘의 출근 경로',
+      eveningRouteTitle: '오늘의 퇴근 경로',
       nearbyStations: '주변 역',
+      nearbyStationsEstimated: '주변 역 (추정)',
+      nearbySubtitle: 'GPS 기반 · 도보 거리순',
+      nearbySuffix: '인근',
+      lowAccuracyNote: '위치 정확도가 낮아 추정 결과예요',
+      favoriteStations: '즐겨찾는 역',
+      realtimeArrivals: '실시간 도착',
+      viewAll: '전체 보기 ›',
+      liveReports: '실시간 제보',
+      nearbyLines: '근처 노선',
+      noData: '데이터가 없습니다.',
+      tryAnotherLocation: '다른 위치에서 시도해보세요',
+      addFrequentStations: '자주 이용하는 역을 즐겨찾기에 추가해보세요',
+      allowLocation: '위치 권한 허용하기',
+      noNearbyReports: '근처 노선에 제보된 지연이 없습니다',
+      quickActions: {
+        routeSearch: '경로검색',
+        subwayMap: '노선도',
+        myLocation: '내 위치',
+        report: '제보',
+        certificate: '증명서',
+      },
       recentStations: '최근 본 역',
       searchPlaceholder: '역 이름 검색',
       noStationsFound: '검색 결과가 없습니다',
+    },
+    routes: {
+      title: '경로 검색',
+      emptyTitle: '경로를 검색해 보세요',
+      emptyBody: '출발역과 도착역을 선택하면 가장 빠른 경로를 비교해드려요.',
+      loading: '경로를 계산 중...',
+      retry: '다시 시도',
+      noRoutes: '이 시간대에 가능한 경로가 없습니다',
+      currentRoute: '현재 이동 경로',
+      suggestedRoutes: '제안 노선',
+      startGuidance: '이 경로로 길안내 시작',
+      startGuidanceA11y: '선택한 경로로 길안내 시작',
     },
     favorites: {
       title: '즐겨찾기',
@@ -254,6 +344,13 @@ export const translations: Record<Language, Translations> = {
       error: 'Error',
       retry: 'Retry',
       ok: 'OK',
+    },
+    navigation: {
+      home: 'Home',
+      favorites: 'Favorites',
+      routes: 'Routes',
+      reports: 'Reports',
+      me: 'Me',
     },
     settings: {
       title: 'Settings',
@@ -312,10 +409,48 @@ export const translations: Record<Language, Translations> = {
     },
     home: {
       title: 'Home',
+      greeting: (name: string) => `Hello, ${name}`,
+      greetingAnonymous: 'Hello',
+      loadingNearby: 'Loading nearby stations...',
+      morningRouteTitle: "Today's Morning Route",
+      eveningRouteTitle: "Today's Evening Route",
       nearbyStations: 'Nearby Stations',
+      nearbyStationsEstimated: 'Nearby Stations (Estimated)',
+      nearbySubtitle: 'GPS based · walking distance',
+      nearbySuffix: 'nearby',
+      lowAccuracyNote: 'Location accuracy is low, so these results are estimated.',
+      favoriteStations: 'Favorite Stations',
+      realtimeArrivals: 'Live arrivals',
+      viewAll: 'View all ›',
+      liveReports: 'Live Reports',
+      nearbyLines: 'Nearby lines',
+      noData: 'No data available.',
+      tryAnotherLocation: 'Try again from another location',
+      addFrequentStations: 'Add frequently used stations to favorites',
+      allowLocation: 'Allow location access',
+      noNearbyReports: 'No delay reports on nearby lines',
+      quickActions: {
+        routeSearch: 'Routes',
+        subwayMap: 'Map',
+        myLocation: 'My Location',
+        report: 'Report',
+        certificate: 'Certificate',
+      },
       recentStations: 'Recent Stations',
       searchPlaceholder: 'Search station',
       noStationsFound: 'No stations found',
+    },
+    routes: {
+      title: 'Route Search',
+      emptyTitle: 'Search for a route',
+      emptyBody: 'Choose a departure and destination station to compare the fastest routes.',
+      loading: 'Calculating route...',
+      retry: 'Retry',
+      noRoutes: 'No routes are available at this time',
+      currentRoute: 'Current Route',
+      suggestedRoutes: 'Suggested Routes',
+      startGuidance: 'Start Guidance',
+      startGuidanceA11y: 'Start guidance with the selected route',
     },
     favorites: {
       title: 'Favorites',

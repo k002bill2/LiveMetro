@@ -12,11 +12,26 @@ jest.mock('@/services/theme', () => ({
 }));
 
 const mockNavigate = jest.fn();
+const mockRouteParams: { current: Record<string, unknown> | undefined } = { current: undefined };
 
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({ navigate: mockNavigate, goBack: jest.fn() }),
   useIsFocused: () => true,
+  useRoute: () => ({ params: mockRouteParams.current }),
 }));
+
+jest.mock('@/services/i18n', () => {
+  const { translations } = jest.requireActual('@/services/i18n/translations');
+  return {
+    useTranslation: jest.fn(() => translations.ko),
+    useI18n: jest.fn(() => ({
+      language: 'ko',
+      t: translations.ko,
+      setLanguage: jest.fn(),
+      isLoading: false,
+    })),
+  };
+});
 
 jest.mock('@/hooks/useNearbyStations', () => ({
   useNearbyStations: () => ({
@@ -81,6 +96,7 @@ jest.mock('@/components/route/StationPickerModal', () => {
 describe('RoutesTabScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    mockRouteParams.current = undefined;
     mockUseRouteSearch.mockReturnValue({
       routes: [],
       loading: false,
@@ -154,6 +170,52 @@ describe('RoutesTabScreen', () => {
     fireEvent.press(getByTestId('picker'));
     await waitFor(() => expect(getByTestId('route-r1')).toBeTruthy());
     expect(getByTestId('route-r2')).toBeTruthy();
+  });
+
+  it('uses the commute route params as defaults and shows suggested routes below', async () => {
+    mockRouteParams.current = {
+      fromStationId: 'gangnam',
+      toStationId: 'jamsil',
+      fromStationName: '강남',
+      toStationName: '잠실',
+      preferredLineId: '7',
+      source: 'commute',
+    };
+    mockUseRouteSearch.mockReturnValue({
+      routes: [
+        {
+          id: 'r1',
+          etaMinutes: 25,
+          etaConfidenceMinutes: 3,
+          delayRiskLineIds: [],
+          transferCount: 0,
+          segments: [],
+          lineIds: ['2'],
+          totalMinutes: 25,
+        },
+        {
+          id: 'r2',
+          etaMinutes: 30,
+          etaConfidenceMinutes: 4,
+          delayRiskLineIds: [],
+          transferCount: 1,
+          segments: [],
+          lineIds: ['7'],
+          totalMinutes: 30,
+        },
+      ],
+      loading: false,
+      error: null,
+      refetch: jest.fn(),
+    });
+
+    const { getByText, getByTestId, getAllByTestId } = render(<RoutesTabScreen />);
+
+    expect(getByTestId('from-row').props.children).toBe('강남');
+    expect(getByTestId('to-row').props.children).toBe('잠실');
+    expect(getByText('현재 이동 경로')).toBeTruthy();
+    expect(getByText('제안 노선')).toBeTruthy();
+    expect(getAllByTestId(/^route-r\d$/)[0]?.props.testID).toBe('route-r2');
   });
 
   it('reorders cards when a different sort tab is selected', async () => {

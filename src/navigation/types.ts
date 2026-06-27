@@ -16,6 +16,15 @@ export type AppTabParamList = {
   Settings: undefined;
 };
 
+export interface RouteSearchInitialParams {
+  fromStationId?: string;
+  toStationId?: string;
+  fromStationName?: string;
+  toStationName?: string;
+  preferredLineId?: string;
+  source?: 'commute';
+}
+
 export type SettingsStackParamList = {
   SettingsHome: undefined;
   EditProfile: undefined;

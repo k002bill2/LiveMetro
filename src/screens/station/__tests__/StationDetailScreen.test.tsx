@@ -5,7 +5,7 @@
  * exercised in their own __tests__ folders.
  */
 import React from 'react';
-import { Share } from 'react-native';
+import { Alert, Share } from 'react-native';
 import { render, fireEvent, waitFor, act, within } from '@testing-library/react-native';
 import StationDetailScreen from '../StationDetailScreen';
 import { useIsFocused, useRoute } from '@react-navigation/native';
@@ -123,6 +123,7 @@ const buildTrain = (overrides: Partial<{ id: string; finalDestination: string; m
 describe('StationDetailScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
     (useRoute as jest.Mock).mockReturnValue({ params: defaultRouteParams });
     clearBoardingSelection();
     mockedUseRealtimeTrains.mockReturnValue({
@@ -402,6 +403,40 @@ describe('StationDetailScreen', () => {
 
     expect(isFavorite).toHaveBeenCalledWith('0222');
     expect(getByTestId('station-detail-header-favorite').props.accessibilityState.selected).toBe(true);
+  });
+
+  it('asks for confirmation before removing a favorite from the header star', async () => {
+    const toggleFavorite = jest.fn().mockResolvedValue(undefined);
+    mockedUseFavorites.mockReturnValue({
+      isFavorite: jest.fn((stationId: string) => stationId === '0222'),
+      toggleFavorite,
+    });
+
+    const { getByTestId } = render(<StationDetailScreen />);
+    fireEvent.press(getByTestId('station-detail-header-favorite'));
+
+    expect(Alert.alert).toHaveBeenCalledWith(
+      '즐겨찾기 해제',
+      '강남역을 즐겨찾기에서 해제하시겠습니까?',
+      expect.arrayContaining([
+        expect.objectContaining({ text: '취소', style: 'cancel' }),
+        expect.objectContaining({ text: '해제', style: 'destructive' }),
+      ]),
+    );
+    expect(toggleFavorite).not.toHaveBeenCalled();
+
+    const buttons = (Alert.alert as jest.Mock).mock.calls.at(-1)?.[2];
+    await act(async () => {
+      buttons?.[1]?.onPress?.();
+    });
+
+    expect(toggleFavorite).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: '0222',
+        name: '강남',
+        lineId: '2',
+      }),
+    );
   });
 
   it('normalizes legacy numeric line ids before adding or removing favorites', async () => {

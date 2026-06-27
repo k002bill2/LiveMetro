@@ -114,6 +114,19 @@ jest.mock('@/services/theme', () => ({
   ThemeColors: {},
 }));
 
+jest.mock('@/services/i18n', () => {
+  const { translations } = jest.requireActual('@/services/i18n/translations');
+  return {
+    useI18n: jest.fn(() => ({
+      language: 'ko',
+      t: translations.ko,
+      setLanguage: jest.fn(),
+      isLoading: false,
+    })),
+    useTranslation: jest.fn(() => translations.ko),
+  };
+});
+
 jest.mock('@/services/train/trainService', () => ({
   trainService: {
     getNearbyStations: jest.fn().mockResolvedValue([]),
@@ -1354,19 +1367,37 @@ describe('HomeScreen', () => {
       await waitFor(() => expect(queryByTestId('delay-banner')).toBeNull());
     });
 
-    it('alt route button shows when station selected', async () => {
-      // Load a station so selectedStation is not null
-      mockGetStation
-        .mockResolvedValueOnce(mockStation('fav-1', 'Station A'))
-        .mockResolvedValueOnce(null);
+    it('route search opens Routes tab with the current commute as initial route', async () => {
+      withMorningCommute();
+      mockGetStation.mockImplementation((id: string) =>
+        Promise.resolve(
+          id === 'gangnam'
+            ? { ...mockStation('gangnam', '강남'), lineId: '2' }
+            : id === 'jamsil'
+              ? { ...mockStation('jamsil', '잠실'), lineId: '2' }
+              : null,
+        ),
+      );
+      mockUseCommuteRouteSummary.mockReturnValue({
+        ready: true,
+        lineId: '2',
+        rideMinutes: 18,
+        transferCount: 0,
+        stationCount: 8,
+        fareKrw: 1450,
+      });
 
       const { getByTestId } = render(<HomeScreen />);
-      await waitFor(() => expect(getByTestId('alt-route-press')).toBeTruthy());
+      await waitFor(() => expect(getByTestId('quick-action-route')).toBeTruthy());
 
-      fireEvent.press(getByTestId('alt-route-press'));
-      expect(mockNavigate).toHaveBeenCalledWith('AlternativeRoutes', {
-        fromStationId: 'fav-1', toStationId: 'gangnam',
-        fromStationName: 'Station A', toStationName: '강남',
+      fireEvent.press(getByTestId('quick-action-route'));
+      expect(mockNavigate).toHaveBeenCalledWith('Routes', {
+        fromStationId: 'gangnam',
+        toStationId: 'jamsil',
+        fromStationName: '강남',
+        toStationName: '잠실',
+        preferredLineId: '2',
+        source: 'commute',
       });
     });
 

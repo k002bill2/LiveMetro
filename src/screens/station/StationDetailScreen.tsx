@@ -375,12 +375,32 @@ const StationDetailScreen: React.FC = () => {
   }, [stationName, lineId]);
 
   const handleToggleFavorite = useCallback(async () => {
+    if (isCurrentlyFavorite) {
+      Alert.alert(
+        '즐겨찾기 해제',
+        `${stationName}역을 즐겨찾기에서 해제하시겠습니까?`,
+        [
+          { text: '취소', style: 'cancel' },
+          {
+            text: '해제',
+            style: 'destructive',
+            onPress: () => {
+              void toggleFavorite(stationLike).catch(() => {
+                Alert.alert('오류', '즐겨찾기 변경에 실패했습니다. 다시 시도해주세요.');
+              });
+            },
+          },
+        ],
+      );
+      return;
+    }
+
     try {
       await toggleFavorite(stationLike);
     } catch {
       Alert.alert('오류', '즐겨찾기 변경에 실패했습니다. 다시 시도해주세요.');
     }
-  }, [toggleFavorite, stationLike]);
+  }, [isCurrentlyFavorite, stationName, toggleFavorite, stationLike]);
 
   return (
     <SafeAreaView

@@ -14,17 +14,20 @@ import { useSemanticTokens } from '@/services/theme';
 import { Pressable, ScrollView, StyleSheet, Text, View, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search } from 'lucide-react-native';
-import { useIsFocused, useNavigation } from '@react-navigation/native';
+import { useIsFocused, useNavigation, useRoute } from '@react-navigation/native';
+import type { RouteProp } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
+import { useTranslation } from '@/services/i18n';
 import { useNearbyStations } from '@/hooks/useNearbyStations';
-import { useRouteSearch, type DepartureMode } from '@/hooks/useRouteSearch';
+import { useRouteSearch, type DepartureMode, type RouteWithMLMeta } from '@/hooks/useRouteSearch';
 import { routeService } from '@/services/route';
 import { setGuidanceSession } from '@/services/guidance/guidanceSessionStore';
-import type { AppStackParamList } from '@/navigation/types';
+import type { AppStackParamList, RouteSearchInitialParams } from '@/navigation/types';
 import type { RouteSortTab } from '@/models/route';
 import { STATIONS as GRAPH_STATIONS, isRoutableStation } from '@/utils/subwayMapData';
+import { resolveInternalStationId } from '@/utils/stationIdResolver';
 import { StationSearchBar } from '@/components/route/StationSearchBar';
 import { TimeChipRow } from '@/components/route/TimeChipRow';
 import { StationPickerModal } from '@/components/route/StationPickerModal';
@@ -37,11 +40,43 @@ interface StationLite {
 }
 
 type NavigationProp = NativeStackNavigationProp<AppStackParamList>;
+type RoutesTabRouteProp = RouteProp<{ Routes: RouteSearchInitialParams | undefined }, 'Routes'>;
+
+const resolveRoutableInitialStationId = (stationId: string, stationName: string): string | null => {
+  const resolvedId = resolveInternalStationId(stationId);
+  if (resolvedId && isRoutableStation(resolvedId)) return resolvedId;
+
+  const graphMatch = Object.values(GRAPH_STATIONS).find(
+    (station) => station.name === stationName && isRoutableStation(station.id)
+  );
+  return graphMatch?.id ?? null;
+};
 
 export const RoutesTabScreen: React.FC = () => {
   const semantic = useSemanticTokens();
+  const t = useTranslation();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
   const navigation = useNavigation<NavigationProp>();
+  const route = useRoute<RoutesTabRouteProp>();
+  const initialParams = route.params;
+  const preferredLineId = initialParams?.preferredLineId;
+
+  const initialFromStation = useMemo<StationLite | null>(() => {
+    if (!initialParams?.fromStationId || !initialParams.fromStationName) return null;
+    const id = resolveRoutableInitialStationId(initialParams.fromStationId, initialParams.fromStationName);
+    return id
+      ? { id, name: initialParams.fromStationName }
+      : null;
+  }, [initialParams?.fromStationId, initialParams?.fromStationName]);
+
+  const initialToStation = useMemo<StationLite | null>(() => {
+    if (!initialParams?.toStationId || !initialParams.toStationName) return null;
+    const id = resolveRoutableInitialStationId(initialParams.toStationId, initialParams.toStationName);
+    return id
+      ? { id, name: initialParams.toStationName }
+      : null;
+  }, [initialParams?.toStationId, initialParams?.toStationName]);
+  const hasInitialCommuteRoute = initialParams?.source === 'commute' && !!initialFromStation && !!initialToStation;
 
   // 비포커스 탭에서 useRouteSearch 내부 useDelayDetection의 9개 대표역 폴링을
   // 멈춘다 — bottom-tab은 blur 시 unmount되지 않아 게이트가 없으면 영구 폴링한다.
@@ -54,14 +89,27 @@ export const RoutesTabScreen: React.FC = () => {
     minUpdateInterval: 30000,
   });
 
-  const [fromStation, setFromStation] = useState<StationLite | null>(null);
-  const [toStation, setToStation] = useState<StationLite | null>(null);
+  const [fromStation, setFromStation] = useState<StationLite | null>(initialFromStation);
+  const [toStation, setToStation] = useState<StationLite | null>(initialToStation);
   const [departureMode, setDepartureMode] = useState<DepartureMode>('now');
   const [departureTime, setDepartureTime] = useState<Date | null>(null);
   const [pickerSlot, setPickerSlot] = useState<'from' | 'to' | null>(null);
   const [expandedRouteId, setExpandedRouteId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [sortTab, setSortTab] = useState<RouteSortTab>('optimal');
+
+  useEffect(() => {
+    if (initialParams && !initialFromStation && !initialToStation) {
+      setFromStation(null);
+      setToStation(null);
+      setExpandedRouteId(null);
+      return;
+    }
+    if (!initialFromStation && !initialToStation) return;
+    setFromStation(initialFromStation);
+    setToStation(initialToStation);
+    setExpandedRouteId(null);
+  }, [initialParams, initialFromStation, initialToStation]);
 
   // Seed closest station to fromStation when it first becomes available.
   // Only seeds while fromStation is null — user explicit clears stick.
@@ -70,7 +118,7 @@ export const RoutesTabScreen: React.FC = () => {
   // If the closest station isn't in the graph, skip seeding rather than
   // populating a non-routable id.
   useEffect(() => {
-    if (!fromStation && closestStation) {
+    if (!fromStation && !initialFromStation && closestStation) {
       const graphMatch = Object.values(GRAPH_STATIONS).find(
         (s) => s.name === closestStation.name
       );
@@ -81,7 +129,7 @@ export const RoutesTabScreen: React.FC = () => {
         setFromStation({ id: graphMatch.id, name: graphMatch.name });
       }
     }
-  }, [closestStation, fromStation]);
+  }, [closestStation, fromStation, initialFromStation]);
 
   const { routes, loading, error, refetch } = useRouteSearch({
     fromId: fromStation?.id,
@@ -97,6 +145,24 @@ export const RoutesTabScreen: React.FC = () => {
     () => routeService.sortRoutesByTab(routes, sortTab),
     [routes, sortTab]
   );
+
+  const routeSections = useMemo((): {
+    currentRoute: RouteWithMLMeta | null;
+    suggestedRoutes: RouteWithMLMeta[];
+  } => {
+    if (!hasInitialCommuteRoute || sortedRoutes.length === 0) {
+      return { currentRoute: null, suggestedRoutes: sortedRoutes };
+    }
+    const preferredIndex = preferredLineId
+      ? sortedRoutes.findIndex((candidate) => candidate.lineIds.includes(preferredLineId))
+      : -1;
+    const currentIndex = preferredIndex >= 0 ? preferredIndex : 0;
+    const currentRoute = sortedRoutes[currentIndex] ?? null;
+    return {
+      currentRoute,
+      suggestedRoutes: sortedRoutes.filter((_, index) => index !== currentIndex),
+    };
+  }, [hasInitialCommuteRoute, preferredLineId, sortedRoutes]);
 
   const handleSwap = useCallback((): void => {
     setFromStation(toStation);
@@ -152,9 +218,9 @@ export const RoutesTabScreen: React.FC = () => {
       return (
         <View style={styles.emptyHint} testID="routes-empty-hint">
           <Search size={36} color={semantic.labelAlt} strokeWidth={1.5} />
-          <Text style={styles.emptyTitle}>경로를 검색해 보세요</Text>
+          <Text style={styles.emptyTitle}>{t.routes.emptyTitle}</Text>
           <Text style={styles.emptyBody}>
-            출발역과 도착역을 선택하면 가장 빠른 경로를 비교해드려요.
+            {t.routes.emptyBody}
           </Text>
         </View>
       );
@@ -164,7 +230,7 @@ export const RoutesTabScreen: React.FC = () => {
       return (
         <View style={styles.center}>
           <ActivityIndicator color={semantic.primaryNormal} />
-          <Text style={styles.loadingText}>경로를 계산 중...</Text>
+          <Text style={styles.loadingText}>{t.routes.loading}</Text>
         </View>
       );
     }
@@ -174,7 +240,7 @@ export const RoutesTabScreen: React.FC = () => {
         <View style={styles.center}>
           <Text style={[styles.errorText, { color: semantic.statusNegative }]}>{error}</Text>
           <Pressable style={styles.retry} onPress={refetch} accessibilityRole="button">
-            <Text style={[styles.retryText, { color: semantic.primaryNormal }]}>다시 시도</Text>
+            <Text style={[styles.retryText, { color: semantic.primaryNormal }]}>{t.routes.retry}</Text>
           </Pressable>
         </View>
       );
@@ -183,24 +249,37 @@ export const RoutesTabScreen: React.FC = () => {
     if (routes.length === 0) {
       return (
         <View style={styles.center}>
-          <Text style={styles.emptyTitle}>이 시간대에 가능한 경로가 없습니다</Text>
+          <Text style={styles.emptyTitle}>{t.routes.noRoutes}</Text>
         </View>
       );
     }
 
+    const renderRouteCard = (routeItem: RouteWithMLMeta, recommended: boolean): React.ReactElement => (
+      <RouteCard
+        key={routeItem.id}
+        route={routeItem}
+        expanded={expandedRouteId === routeItem.id}
+        recommended={recommended}
+        activeSortTab={sortTab}
+        onToggleExpand={(): void => handleToggleExpand(routeItem.id)}
+      />
+    );
+
     return (
       <View>
         <RouteSortTabs value={sortTab} onChange={setSortTab} testID="route-sort-tabs" />
-        {sortedRoutes.map((route, idx) => (
-          <RouteCard
-            key={route.id}
-            route={route}
-            expanded={expandedRouteId === route.id}
-            recommended={idx === 0}
-            activeSortTab={sortTab}
-            onToggleExpand={(): void => handleToggleExpand(route.id)}
-          />
-        ))}
+        {routeSections.currentRoute ? (
+          <>
+            <Text style={styles.sectionTitle}>{t.routes.currentRoute}</Text>
+            {renderRouteCard(routeSections.currentRoute, true)}
+            {routeSections.suggestedRoutes.length > 0 && (
+              <Text style={styles.sectionTitle}>{t.routes.suggestedRoutes}</Text>
+            )}
+            {routeSections.suggestedRoutes.map((routeItem) => renderRouteCard(routeItem, false))}
+          </>
+        ) : (
+          routeSections.suggestedRoutes.map((routeItem, idx) => renderRouteCard(routeItem, idx === 0))
+        )}
       </View>
     );
   };
@@ -220,7 +299,7 @@ export const RoutesTabScreen: React.FC = () => {
         }
         testID="routes-tab-screen"
       >
-        <Text style={styles.title}>경로 검색</Text>
+        <Text style={styles.title}>{t.routes.title}</Text>
 
         <StationSearchBar
           fromStation={fromStation}
@@ -246,10 +325,10 @@ export const RoutesTabScreen: React.FC = () => {
             style={[styles.ctaButton, { backgroundColor: semantic.primaryNormal }]}
             onPress={handleStartGuidance}
             accessibilityRole="button"
-            accessibilityLabel="선택한 경로로 길안내 시작"
+            accessibilityLabel={t.routes.startGuidanceA11y}
             testID="route-start-cta"
           >
-            <Text style={styles.ctaText}>이 경로로 길안내 시작</Text>
+            <Text style={styles.ctaText}>{t.routes.startGuidance}</Text>
           </Pressable>
         </View>
       )}
@@ -315,6 +394,14 @@ const createStyles = (semantic: WantedSemanticTheme): ReturnType<typeof StyleShe
       textAlign: 'center',
     },
     center: { alignItems: 'center', paddingVertical: WANTED_TOKENS.spacing.s8 },
+    sectionTitle: {
+      fontSize: WANTED_TOKENS.type.label1.size,
+      lineHeight: WANTED_TOKENS.type.label1.lh,
+      fontFamily: weightToFontFamily('700'),
+      color: semantic.labelAlt,
+      marginBottom: WANTED_TOKENS.spacing.s2,
+      marginTop: WANTED_TOKENS.spacing.s2,
+    },
     loadingText: {
       marginTop: WANTED_TOKENS.spacing.s2,
       fontSize: WANTED_TOKENS.type.body2.size,

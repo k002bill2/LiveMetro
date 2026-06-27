@@ -23,6 +23,7 @@ import * as Location from 'expo-location';
 import { NavigationProp, useIsFocused, useNavigation } from '@react-navigation/native';
 
 import { useAuth } from '../../services/auth/AuthContext';
+import { useI18n } from '../../services/i18n';
 import { useNearbyStations } from '../../hooks/useNearbyStations';
 import { useDelayDetection } from '../../hooks/useDelayDetection';
 import { useCommuteHeroEstimate } from '../../hooks/useCommuteHeroEstimate';
@@ -37,7 +38,7 @@ import { useToast } from '../../components/common/Toast';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '../../styles/modernTheme';
 
 import { Station } from '../../models/train';
-import { AppStackParamList } from '../../navigation/types';
+import { AppStackParamList, type RouteSearchInitialParams } from '../../navigation/types';
 import { HomeFavoriteRow } from './HomeFavoriteRow';
 import { useCommuteDiagnostics } from './useCommuteDiagnostics';
 import { formatDateTimeLabel, formatRelativeKorean } from './homeTimeFormat';
@@ -49,6 +50,7 @@ export const HomeScreen: React.FC = () => {
   const isFocused = useIsFocused();
   const { user } = useAuth();
   const semantic = useSemanticTokens();
+  const { t } = useI18n();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
   const { showError, showSuccess, showInfo, ToastComponent } = useToast();
 
@@ -155,7 +157,7 @@ export const HomeScreen: React.FC = () => {
   // Card label follows the time-resolved active leg (출근 in the morning window,
   // 퇴근 in the afternoon/evening) — drives both the real card and placeholder.
   const commuteCardTitle =
-    activeCommuteType === 'evening' ? '오늘의 퇴근 경로' : '오늘의 출근 경로';
+    activeCommuteType === 'evening' ? t.home.eveningRouteTitle : t.home.morningRouteTitle;
 
   // Dev-only diagnostic (no-op in production/jest): logs stored commute ids
   // vs. resolved stations — see useCommuteDiagnostics for the failure shape
@@ -296,22 +298,33 @@ export const HomeScreen: React.FC = () => {
   const firstDelay = activeDelays[0];
 
   const onPressRouteSearch = useCallback((): void => {
-    if (nearbyClosestStation) {
-      navigation.navigate('AlternativeRoutes', {
-        fromStationId: nearbyClosestStation.id,
-        toStationId: 'gangnam',
-        fromStationName: nearbyClosestStation.name,
-        toStationName: '강남',
-      });
-    } else {
-      navigation.navigate('AlternativeRoutes', {
-        fromStationId: '',
-        toStationId: '',
-        fromStationName: '',
-        toStationName: '',
-      });
+    const navigateToRoutes = navigation.navigate as unknown as (
+      screen: 'Routes',
+      params: RouteSearchInitialParams,
+    ) => void;
+    if (activeCommute && commuteStationNames.origin && commuteStationNames.destination) {
+      const params: RouteSearchInitialParams = {
+        fromStationId: activeCommute.stationId,
+        toStationId: activeCommute.destinationStationId,
+        fromStationName: commuteStationNames.origin,
+        toStationName: commuteStationNames.destination,
+        preferredLineId: routeSummary.lineId ?? commuteStationNames.originLineId,
+        source: 'commute',
+      };
+      navigateToRoutes('Routes', params);
+      return;
     }
-  }, [nearbyClosestStation, navigation]);
+
+    const params: RouteSearchInitialParams = {
+      fromStationId: undefined,
+      toStationId: undefined,
+      fromStationName: undefined,
+      toStationName: undefined,
+      preferredLineId: undefined,
+      source: undefined,
+    };
+    navigateToRoutes('Routes', params);
+  }, [activeCommute, commuteStationNames, navigation, routeSummary.lineId]);
 
   const onPressMap = useCallback(
     () => navigation.navigate('SubwayMap'),
@@ -346,7 +359,7 @@ export const HomeScreen: React.FC = () => {
   );
 
   if (loading) {
-    return <LoadingScreen message="주변 역 정보를 가져오고 있습니다..." />;
+    return <LoadingScreen message={t.home.loadingNearby} />;
   }
 
   return (
@@ -367,8 +380,10 @@ export const HomeScreen: React.FC = () => {
       {/* 1. Top bar */}
       <HomeTopBar
         userName={user?.displayName ?? undefined}
+        greeting={user?.displayName ? t.home.greeting(user.displayName) : t.home.greetingAnonymous}
         dateTime={dateTimeLabel}
         hasUnread={activeDelays.length > 0}
+        alertLabel={t.alerts.title}
         onBellPress={onPressBell}
       />
 
@@ -438,11 +453,11 @@ export const HomeScreen: React.FC = () => {
       <View style={styles.quickActionsWrap}>
         <QuickActionsGrid
           actions={[
-            { id: 'route', Icon: Search, label: '경로검색', onPress: onPressRouteSearch },
-            { id: 'map', Icon: MapIcon, label: '노선도', onPress: onPressMap },
-            { id: 'mylocation', Icon: MapPin, label: '내 위치', onPress: onPressCurrentLocationMap },
-            { id: 'report', Icon: Megaphone, label: '제보', onPress: onPressReport },
-            { id: 'cert', Icon: FileText, label: '증명서', onPress: onPressCert },
+            { id: 'route', Icon: Search, label: t.home.quickActions.routeSearch, onPress: onPressRouteSearch },
+            { id: 'map', Icon: MapIcon, label: t.home.quickActions.subwayMap, onPress: onPressMap },
+            { id: 'mylocation', Icon: MapPin, label: t.home.quickActions.myLocation, onPress: onPressCurrentLocationMap },
+            { id: 'report', Icon: Megaphone, label: t.home.quickActions.report, onPress: onPressReport },
+            { id: 'cert', Icon: FileText, label: t.home.quickActions.certificate, onPress: onPressCert },
           ]}
         />
       </View>
@@ -456,11 +471,11 @@ export const HomeScreen: React.FC = () => {
               title={
                 locationActive
                   ? nearbyIsEstimated
-                    ? '주변 역 (추정)'
-                    : '주변 역'
-                  : '즐겨찾기'
+                    ? t.home.nearbyStationsEstimated
+                    : t.home.nearbyStations
+                  : t.favorites.title
               }
-              subtitle={locationActive ? 'GPS 기반 · 도보 거리순' : undefined}
+              subtitle={locationActive ? t.home.nearbySubtitle : undefined}
               testID="home-stations-section"
             />
           </View>
@@ -470,7 +485,7 @@ export const HomeScreen: React.FC = () => {
           {locationActive && nearbyClosestStation && !nearbyIsEstimated && (
             <View style={styles.locationBadgeWrap}>
               <Pill tone="pos" size="sm">
-                {`${nearbyClosestStation.name} 인근`}
+                {`${nearbyClosestStation.name} ${t.home.nearbySuffix}`}
               </Pill>
             </View>
           )}
@@ -478,7 +493,7 @@ export const HomeScreen: React.FC = () => {
 
         {locationActive && nearbyIsEstimated && showNearbySection && (
           <Text style={styles.estimatedNote} testID="home-nearby-estimated-note">
-            위치 정확도가 낮아 추정 결과예요
+            {t.home.lowAccuracyNote}
           </Text>
         )}
 
@@ -486,20 +501,20 @@ export const HomeScreen: React.FC = () => {
           // Empty state — see feedback_empty_state_and_skeleton.md.
           <View style={styles.emptyState}>
             <TrainFront size={48} color={semantic.labelAlt} />
-            <Text style={styles.emptyText}>데이터가 없습니다.</Text>
+            <Text style={styles.emptyText}>{t.home.noData}</Text>
             <Text style={styles.emptySubtext}>
               {locationActive
-                ? '다른 위치에서 시도해보세요'
-                : '설정에서 자주 이용하는 역을 추가해보세요'}
+                ? t.home.tryAnotherLocation
+                : t.home.addFrequentStations}
             </Text>
             {!locationActive && (
               <Text
                 style={styles.permissionLink}
                 onPress={requestLocationPermission}
                 accessibilityRole="link"
-                accessibilityLabel="위치 권한 허용"
+                accessibilityLabel={t.home.allowLocation}
               >
-                위치 권한 허용하기
+                {t.home.allowLocation}
               </Text>
             )}
           </View>
@@ -536,24 +551,24 @@ export const HomeScreen: React.FC = () => {
           reserved per the empty-state policy. */}
       <View style={styles.section}>
         <SectionHeader
-          title="즐겨찾는 역"
-          subtitle="실시간 도착"
+          title={t.home.favoriteStations}
+          subtitle={t.home.realtimeArrivals}
           action={
             <Text
               style={styles.allLink}
               onPress={onPressFavoritesAll}
               accessibilityRole="link"
-              accessibilityLabel="즐겨찾는 역 전체 보기"
+              accessibilityLabel={`${t.home.favoriteStations} ${t.home.viewAll.replace(' ›', '')}`}
             >
-              전체 보기 ›
+              {t.home.viewAll}
             </Text>
           }
         />
         {!showFavoritesSection ? (
           <View style={styles.sectionEmpty}>
-            <Text style={styles.emptyText}>데이터가 없습니다.</Text>
+            <Text style={styles.emptyText}>{t.home.noData}</Text>
             <Text style={styles.emptySubtext}>
-              자주 이용하는 역을 즐겨찾기에 추가해보세요
+              {t.home.addFrequentStations}
             </Text>
           </View>
         ) : (
@@ -583,12 +598,12 @@ export const HomeScreen: React.FC = () => {
 
       {/* 7. 실시간 제보 — real activeDelays only. */}
       <View style={styles.section}>
-        <SectionHeader title="실시간 제보" subtitle="근처 노선" />
+        <SectionHeader title={t.home.liveReports} subtitle={t.home.nearbyLines} />
         {!firstDelay ? (
           <View style={styles.sectionEmpty}>
-            <Text style={styles.emptyText}>데이터가 없습니다.</Text>
+            <Text style={styles.emptyText}>{t.home.noData}</Text>
             <Text style={styles.emptySubtext}>
-              근처 노선에 제보된 지연이 없습니다
+              {t.home.noNearbyReports}
             </Text>
           </View>
         ) : (

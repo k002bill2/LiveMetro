@@ -10,6 +10,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { Home, Star, Route as RouteIcon, Megaphone, User, CircleHelp } from 'lucide-react-native';
 
 import { useAuth } from '../services/auth/AuthContext';
+import { useTranslation } from '../services/i18n';
 
 import { weightToFontFamily } from '../styles/modernTheme';
 import { LoadingScreen } from '../components/common/LoadingScreen';
@@ -41,6 +42,7 @@ import { AlternativeRoutesScreen } from '../screens/route/AlternativeRoutesScree
 import { RouteGuidanceScreen } from '../screens/guidance/RouteGuidanceScreen';
 import { RoutesTabScreen } from '../screens/route/RoutesTabScreen';
 import { WeeklyPredictionScreen } from '../screens/prediction';
+import type { RouteSearchInitialParams } from './types';
 
 // DEBUG: Set to true to always show onboarding screen during development
 const DEBUG_FORCE_ONBOARDING = __DEV__ && false;
@@ -116,7 +118,7 @@ export type RootStackParamList = {
 export type MainTabParamList = {
   Home: undefined;
   Favorites: undefined;
-  Routes: undefined;
+  Routes: RouteSearchInitialParams | undefined;
   DelayFeed: undefined;
   Profile: undefined;
 };
@@ -126,6 +128,7 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 
 const MainTabNavigator: React.FC = () => {
   const semantic = useSemanticTokens();
+  const t = useTranslation();
 
   return (
     <Tab.Navigator
@@ -178,40 +181,40 @@ const MainTabNavigator: React.FC = () => {
         name="Home"
         component={HomeScreen}
         options={{
-          title: '홈',
-          tabBarLabel: '홈',
+          title: t.navigation.home,
+          tabBarLabel: t.navigation.home,
         }}
       />
       <Tab.Screen
         name="Favorites"
         component={FavoritesScreen}
         options={{
-          title: '즐겨찾기',
-          tabBarLabel: '즐겨찾기',
+          title: t.navigation.favorites,
+          tabBarLabel: t.navigation.favorites,
         }}
       />
       <Tab.Screen
         name="Routes"
         component={RoutesTabScreen}
         options={{
-          title: '경로',
-          tabBarLabel: '경로',
+          title: t.navigation.routes,
+          tabBarLabel: t.navigation.routes,
         }}
       />
       <Tab.Screen
         name="DelayFeed"
         component={DelayFeedScreen}
         options={{
-          title: '제보',
-          tabBarLabel: '제보',
+          title: t.navigation.reports,
+          tabBarLabel: t.navigation.reports,
         }}
       />
       <Tab.Screen
         name="Profile"
         component={SettingsNavigator}
         options={{
-          title: '나',
-          tabBarLabel: '나',
+          title: t.navigation.me,
+          tabBarLabel: t.navigation.me,
           headerShown: false, // SettingsNavigator has its own header
         }}
       />

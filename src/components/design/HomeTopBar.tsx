@@ -18,6 +18,10 @@ interface HomeTopBarProps {
   dateTime?: string;
   /** Whether to show the unread alert dot */
   hasUnread?: boolean;
+  /** Localized greeting. Defaults to the Korean copy used before i18n wiring. */
+  greeting?: string;
+  /** Localized accessibility label for the bell button. */
+  alertLabel?: string;
   onBellPress?: () => void;
   testID?: string;
 }
@@ -26,12 +30,14 @@ const HomeTopBarImpl: React.FC<HomeTopBarProps> = ({
   userName,
   dateTime,
   hasUnread = false,
+  greeting,
+  alertLabel = '알림',
   onBellPress,
   testID,
 }) => {
   const semantic = useSemanticTokens();
 
-  const greeting = userName ? `안녕하세요, ${userName}님` : '안녕하세요';
+  const greetingText = greeting ?? (userName ? `안녕하세요, ${userName}님` : '안녕하세요');
 
   return (
     <View testID={testID ?? 'home-top-bar'} style={styles.row}>
@@ -39,13 +45,13 @@ const HomeTopBarImpl: React.FC<HomeTopBarProps> = ({
         {dateTime && (
           <Text style={[styles.date, { color: semantic.labelAlt }]}>{dateTime}</Text>
         )}
-        <Text style={[styles.greeting, { color: semantic.labelStrong }]}>{greeting}</Text>
+        <Text style={[styles.greeting, { color: semantic.labelStrong }]}>{greetingText}</Text>
       </View>
 
       <Pressable
         onPress={onBellPress}
         accessibilityRole="button"
-        accessibilityLabel="알림"
+        accessibilityLabel={alertLabel}
         style={({ pressed }) => [
           styles.bellWrap,
           {
