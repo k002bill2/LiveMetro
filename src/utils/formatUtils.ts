@@ -41,6 +41,94 @@ export const formatLineName = (lineId: string): string => {
   return specialLines[normalized] || lineId;
 };
 
+const SEOUL_REALTIME_SUBWAY_ID_TO_LINE_ID: Record<string, string> = {
+  '1001': '1',
+  '1002': '2',
+  '1003': '3',
+  '1004': '4',
+  '1005': '5',
+  '1006': '6',
+  '1007': '7',
+  '1008': '8',
+  '1009': '9',
+  '1061': '경의선',
+  '1063': '경의선',
+  '1065': '공항철도',
+  '1067': '경춘선',
+  '1071': '수인분당선',
+  '1075': '수인분당선',
+  '1077': '신분당선',
+  '1081': '경강선',
+  '1092': '우이신설경전철',
+  '1093': '서해선',
+  '1094': '신림선',
+  '1032': 'GTX-A',
+};
+
+const APP_LINE_ID_ALIASES: Record<string, string> = {
+  gyeongui: '경의선',
+  jungang: '경의선',
+  '경의중앙선': '경의선',
+  '경의중앙': '경의선',
+  bundang: '수인분당선',
+  suin: '수인분당선',
+  '분당선': '수인분당선',
+  '수인선': '수인분당선',
+  '수인분당': '수인분당선',
+  sinbundang: '신분당선',
+  shinbundang: '신분당선',
+  '신분당': '신분당선',
+  airport: '공항철도',
+  gyeongchun: '경춘선',
+  gyeonggang: '경강선',
+  seohaeline: '서해선',
+  seohae: '서해선',
+  sillim: '신림선',
+  wooyisinseol: '우이신설경전철',
+  '우이신설': '우이신설경전철',
+  '우이신설선': '우이신설경전철',
+  gimpo: '김포도시철도',
+  '김포골드': '김포도시철도',
+  '김포골드라인': '김포도시철도',
+  yongin: '용인경전철',
+  ever: '용인경전철',
+  everline: '용인경전철',
+  '에버라인': '용인경전철',
+  uijeongbu: '의정부경전철',
+  incheon1: '인천선',
+  '인천1호선': '인천선',
+  '인천1': '인천선',
+  incheon2: '인천2',
+  '인천2호선': '인천2',
+  gtx_a: 'GTX-A',
+  'gtx-a': 'GTX-A',
+  gtxa: 'GTX-A',
+};
+
+/**
+ * Normalize Seoul realtime `subwayId`, app line slugs, and display names to
+ * the app's canonical line id.
+ *
+ * Do not extract digits from mixed-name lines like `인천2`; those are distinct
+ * app line ids and must not be mistaken for Seoul Line 2.
+ */
+export const normalizeSeoulLineId = (rawLineId: string): string => {
+  const trimmed = rawLineId.trim();
+  const subwayId = SEOUL_REALTIME_SUBWAY_ID_TO_LINE_ID[trimmed];
+  if (subwayId) return subwayId;
+
+  const direct = trimmed.match(/^0?([1-9])(?:호선)?$/);
+  if (direct?.[1]) return direct[1];
+
+  const legacy = trimmed.match(/^line-([1-9])$/i);
+  if (legacy?.[1]) return legacy[1];
+
+  const alias = APP_LINE_ID_ALIASES[trimmed] ?? APP_LINE_ID_ALIASES[trimmed.toLowerCase()];
+  if (alias) return alias;
+
+  return trimmed;
+};
+
 /**
  * App lineId → Seoul `realtimePosition` API official line name.
  *

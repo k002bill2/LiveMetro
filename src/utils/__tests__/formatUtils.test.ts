@@ -5,6 +5,7 @@
 import {
   formatStationName,
   formatLineName,
+  normalizeSeoulLineId,
   toSeoulApiLineName,
   formatPhoneNumber,
   formatNumber,
@@ -56,6 +57,58 @@ describe('formatUtils', () => {
 
     it('should return original if unknown', () => {
       expect(formatLineName('unknown')).toBe('unknown');
+    });
+  });
+
+  describe('normalizeSeoulLineId', () => {
+    it('normalizes Seoul realtime subwayId values for numeric lines', () => {
+      expect(normalizeSeoulLineId('1001')).toBe('1');
+      expect(normalizeSeoulLineId('1005')).toBe('5');
+      expect(normalizeSeoulLineId('1009')).toBe('9');
+    });
+
+    it('normalizes Seoul realtime subwayId values for supported non-numeric lines', () => {
+      expect(normalizeSeoulLineId('1063')).toBe('경의선');
+      expect(normalizeSeoulLineId('1065')).toBe('공항철도');
+      expect(normalizeSeoulLineId('1067')).toBe('경춘선');
+      expect(normalizeSeoulLineId('1075')).toBe('수인분당선');
+      expect(normalizeSeoulLineId('1077')).toBe('신분당선');
+      expect(normalizeSeoulLineId('1081')).toBe('경강선');
+      expect(normalizeSeoulLineId('1092')).toBe('우이신설경전철');
+      expect(normalizeSeoulLineId('1093')).toBe('서해선');
+      expect(normalizeSeoulLineId('1094')).toBe('신림선');
+    });
+
+    it('normalizes legacy numeric display forms', () => {
+      expect(normalizeSeoulLineId('line-7')).toBe('7');
+      expect(normalizeSeoulLineId('09호선')).toBe('9');
+      expect(normalizeSeoulLineId(' 5 ')).toBe('5');
+    });
+
+    it('normalizes app line slugs to canonical display line ids', () => {
+      expect(normalizeSeoulLineId('airport')).toBe('공항철도');
+      expect(normalizeSeoulLineId('gyeongui')).toBe('경의선');
+      expect(normalizeSeoulLineId('경의중앙')).toBe('경의선');
+      expect(normalizeSeoulLineId('bundang')).toBe('수인분당선');
+      expect(normalizeSeoulLineId('수인분당')).toBe('수인분당선');
+      expect(normalizeSeoulLineId('sinbundang')).toBe('신분당선');
+      expect(normalizeSeoulLineId('신분당')).toBe('신분당선');
+      expect(normalizeSeoulLineId('seohaeline')).toBe('서해선');
+      expect(normalizeSeoulLineId('wooyisinseol')).toBe('우이신설경전철');
+      expect(normalizeSeoulLineId('gimpo')).toBe('김포도시철도');
+      expect(normalizeSeoulLineId('김포골드')).toBe('김포도시철도');
+      expect(normalizeSeoulLineId('김포골드라인')).toBe('김포도시철도');
+      expect(normalizeSeoulLineId('에버라인')).toBe('용인경전철');
+      expect(normalizeSeoulLineId('incheon1')).toBe('인천선');
+      expect(normalizeSeoulLineId('인천1호선')).toBe('인천선');
+      expect(normalizeSeoulLineId('gtx_a')).toBe('GTX-A');
+      expect(normalizeSeoulLineId('gtx-a')).toBe('GTX-A');
+    });
+
+    it('does not extract digits from non-Seoul numeric-line names', () => {
+      expect(normalizeSeoulLineId('인천2')).toBe('인천2');
+      expect(normalizeSeoulLineId('인천2호선')).toBe('인천2');
+      expect(normalizeSeoulLineId('김포도시철도')).toBe('김포도시철도');
     });
   });
 

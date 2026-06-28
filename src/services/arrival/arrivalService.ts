@@ -7,6 +7,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { seoulSubwayApi, SeoulRealtimeArrival } from '@/services/api/seoulSubwayApi';
 import type { TrainType } from '@/models/train';
+import { normalizeSeoulLineId } from '@/utils/formatUtils';
 
 // ============================================================================
 // Types
@@ -429,19 +430,7 @@ class ArrivalService {
    * Normalize line ID to standard format
    */
   private normalizeLineId(lineId: string): string {
-    // Extract line number from formats like "1001" (line 1), "1002" (line 2)
-    const match = lineId.match(/100(\d)/);
-    if (match?.[1]) {
-      return match[1];
-    }
-
-    // Handle direct line numbers
-    const directMatch = lineId.match(/^(\d)$/);
-    if (directMatch?.[1]) {
-      return directMatch[1];
-    }
-
-    return lineId;
+    return normalizeSeoulLineId(lineId);
   }
 
   /**

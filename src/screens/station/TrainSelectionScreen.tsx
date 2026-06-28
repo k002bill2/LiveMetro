@@ -38,6 +38,7 @@ import { scheduleBoardingAlert } from '@/services/notification/boardingAlertServ
 import { notificationService } from '@/services/notification/notificationService';
 import type { Train } from '@/models/train';
 import { directionToDisplay } from '@/models/route';
+import { normalizeSeoulLineId } from '@/utils/formatUtils';
 
 type TrainSelectionRouteProp = RouteProp<AppStackParamList, 'TrainSelection'>;
 type TrainSelectionNavProp = NativeStackNavigationProp<AppStackParamList>;
@@ -97,12 +98,11 @@ const TrainSelectionScreen: React.FC = () => {
     retryAttempts: 3,
   });
 
-  // Numbered-line filtering (transfer-station多노선 혼입 방지) — mirrors
-  // StationDetailScreen. Extended lines keep all trains (subwayId 정규화 차이).
+  // Transfer-station line filtering — mirrors StationDetailScreen.
   const lineFilteredTrains = useMemo<Train[]>(() => {
     const all = trains ?? [];
-    if (!/^[1-9]$/.test(lineId)) return all;
-    return all.filter((t) => t.lineId === lineId);
+    const normalizedLineId = normalizeSeoulLineId(lineId);
+    return all.filter((t) => normalizeSeoulLineId(t.lineId) === normalizedLineId);
   }, [trains, lineId]);
 
   const trainsByDirection = useMemo(() => {

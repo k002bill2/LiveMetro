@@ -841,5 +841,55 @@ describe('DataManager', () => {
       const data = await dataManager.getRealtimeTrains('노량진');
       expect(data?.trains[0]?.trainType).toBe('express');
     });
+
+    it('A4: convertSeoulToTrain normalizes Seoul subwayId line ids for StationDetail filtering', async () => {
+      mockSeoulApi.getRealtimeArrival.mockResolvedValue([
+        {
+          rowNum: '1', selectedCount: '1', totalCount: '1',
+          subwayId: '1005', updnLine: '상행', trainLineNm: '방화행 - 목동방면',
+          subwayHeading: '상행', statnFid: '2520', statnTid: '2522',
+          statnId: '2521', statnNm: '오목교(목동운동장앞)', trainCo: '서울교통공사',
+          ordkey: '00001', subwayList: '1005', statnList: '2521',
+          btrainSttus: '일반', barvlDt: '240', btrainNo: '5092',
+          bstatnId: '2511', bstatnNm: '방화', recptnDt: '2026-06-28 15:14:54',
+          arvlMsg2: '4분 후 (영등포시장)', arvlMsg3: '오목교역', arvlCd: '99',
+        },
+      ]);
+      mockSeoulApi.convertToAppTrain.mockReturnValue({
+        lineId: '1005', stationId: '2521', stationName: '오목교',
+        direction: 'up', arrivalMessage: '4분 후 (영등포시장)', arrivalTime: 240,
+        trainNumber: '5092', destinationStation: '방화',
+        trainType: 'normal', lastUpdated: new Date(),
+      });
+
+      const data = await dataManager.getRealtimeTrains('오목교');
+
+      expect(data?.trains[0]?.lineId).toBe('5');
+    });
+
+    it('A5: convertSeoulToTrain normalizes non-numeric Seoul subwayId line ids', async () => {
+      mockSeoulApi.getRealtimeArrival.mockResolvedValue([
+        {
+          rowNum: '1', selectedCount: '1', totalCount: '1',
+          subwayId: '1065', updnLine: '상행', trainLineNm: '인천공항2터미널행 - 계양방면',
+          subwayHeading: '상행', statnFid: '4202', statnTid: '4204',
+          statnId: '4203', statnNm: '홍대입구', trainCo: '공항철도',
+          ordkey: '00001', subwayList: '1065', statnList: '4203',
+          btrainSttus: '일반', barvlDt: '180', btrainNo: 'A1027',
+          bstatnId: '4215', bstatnNm: '인천공항2터미널', recptnDt: '2026-06-28 15:14:54',
+          arvlMsg2: '3분 후', arvlMsg3: '홍대입구역', arvlCd: '99',
+        },
+      ]);
+      mockSeoulApi.convertToAppTrain.mockReturnValue({
+        lineId: '1065', stationId: '4203', stationName: '홍대입구',
+        direction: 'up', arrivalMessage: '3분 후', arrivalTime: 180,
+        trainNumber: 'A1027', destinationStation: '인천공항2터미널',
+        trainType: 'normal', lastUpdated: new Date(),
+      });
+
+      const data = await dataManager.getRealtimeTrains('홍대입구');
+
+      expect(data?.trains[0]?.lineId).toBe('공항철도');
+    });
   });
 });

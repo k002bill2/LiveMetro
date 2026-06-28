@@ -10,6 +10,7 @@ import { trainService } from '../train/trainService';
 import { Train, Station, TrainDelay, DelaySeverity, TrainStatus, ServiceDisruption } from '../../models/train';
 import { updnLineToDisplay } from '@/models/route';
 import { getLocalStationByName } from './stationsDataService';
+import { normalizeSeoulLineId } from '@/utils/formatUtils';
 
 interface CachedData<T> {
   data: T;
@@ -503,7 +504,7 @@ class DataManager {
     const stableKey = arrival.btrainNo || arrival.ordkey || arrival.statnId;
     return {
       id: `train_${stableKey}_${arrival.statnId}`,
-      lineId: converted.lineId,
+      lineId: normalizeSeoulLineId(converted.lineId),
       currentStationId: converted.stationId,
       nextStationId: null,
       finalDestination: converted.destinationStation || '종착역 미확인',

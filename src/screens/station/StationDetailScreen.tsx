@@ -47,6 +47,7 @@ import { directionToDisplay } from '@/models/route';
 import type { LineId } from '@/components/design';
 import { mapCacheService, type CachedStation } from '@/services/map/mapCacheService';
 import { findStationCdByNameAndLine } from '@/services/data/stationsDataService';
+import { normalizeSeoulLineId } from '@/utils/formatUtils';
 
 /**
  * 서울 지하철 운행 종료 시간대 휴리스틱.
@@ -77,23 +78,12 @@ const toAlertLineName = (lineId: string): string =>
 
 /**
  * StationDetail can be reached from older surfaces that still carry legacy
- * numeric-line formats (`line-7`, `1007`, `07호선`). Favorites are keyed by
- * station_cd, so normalize only Seoul numeric-line aliases before resolving
- * the station code. Do not extract digits from names like `인천2`.
+ * numeric-line formats (`line-7`, `1007`, `07호선`) and graph slugs
+ * (`airport`, `sinbundang`). Favorites are keyed by station_cd, so normalize
+ * line aliases before resolving the station code. Do not extract digits from
+ * names like `인천2`.
  */
-const normalizeStationDetailLineId = (rawLineId: string): string => {
-  const trimmed = rawLineId.trim();
-  const direct = trimmed.match(/^0?([1-9])(?:호선)?$/);
-  if (direct?.[1]) return direct[1];
-
-  const legacy = trimmed.match(/^line-([1-9])$/i);
-  if (legacy?.[1]) return legacy[1];
-
-  const subwayId = trimmed.match(/^100([1-9])$/);
-  if (subwayId?.[1]) return subwayId[1];
-
-  return trimmed;
-};
+const normalizeStationDetailLineId = normalizeSeoulLineId;
 
 type StationDetailRouteProp = RouteProp<AppStackParamList, 'StationDetail'>;
 type StationDetailNavProp = NativeStackNavigationProp<AppStackParamList>;
@@ -220,13 +210,12 @@ const StationDetailScreen: React.FC = () => {
   // 노선의 열차를 반환한다. 이 화면은 한 노선(lineId)의 상세이므로 해당 노선
   // 열차만 남겨 타 노선이 섞여 표시되는 것을 막는다.
   //
-  // lineId가 1–9 숫자 노선일 때만 필터한다 — 연장·광역 노선(분당선 등)은
-  // realtime subwayId 정규화 형식이 route lineId와 달라 strict 비교가 화면을
-  // 통째로 비울 수 있으므로 그 경우 기존 동작(전체 표시)을 보존한다.
+  // 환승역(예: 김포공항 — 5·9·공항·김포·서해)에서 다른 노선 열차가 섞이지
+  // 않도록 route lineId와 realtime subwayId를 같은 표준값으로 정규화해 비교한다.
   const lineFilteredTrains = useMemo<Train[]>(() => {
     const all = trains ?? [];
-    if (!/^[1-9]$/.test(lineId)) return all;
-    return all.filter((t) => t.lineId === lineId);
+    const normalizedLineId = normalizeStationDetailLineId(lineId);
+    return all.filter((t) => normalizeStationDetailLineId(t.lineId) === normalizedLineId);
   }, [trains, lineId]);
 
   // Split trains by direction once and reuse across views.
