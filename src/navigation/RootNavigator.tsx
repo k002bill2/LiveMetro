@@ -12,7 +12,7 @@ import { Home, Star, Route as RouteIcon, Megaphone, Settings, CircleHelp } from 
 import { useAuth } from '../services/auth/AuthContext';
 import { useTranslation } from '../services/i18n';
 
-import { weightToFontFamily } from '../styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily } from '../styles/modernTheme';
 import { LoadingScreen } from '../components/common/LoadingScreen';
 import { OnboardingProvider, useOnboarding } from '../contexts/OnboardingContext';
 
@@ -164,7 +164,7 @@ const MainTabNavigator: React.FC = () => {
           paddingTop: 8,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
+          fontSize: WANTED_TOKENS.type.caption2.size,
           // '600' matches WANTED_TOKENS.type.caption2 weight; '700' was a
           // mismatch noted in cross-review.
           fontWeight: '600',

@@ -21,7 +21,7 @@ import StationNavigatorScreen from '@screens/station/StationNavigatorScreen';
 import { WeeklyPredictionScreen } from '@screens/prediction';
 import { AuthScreen } from '../screens/auth/AuthScreen';
 import { AppTabParamList, AppStackParamList } from './types';
-import { weightToFontFamily } from '@/styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 
 const Tab = createBottomTabNavigator<AppTabParamList>();
 const Stack = createNativeStackNavigator<AppStackParamList>();
@@ -55,7 +55,7 @@ const MainTabs: React.FC = () => {
           paddingTop: 8,
         },
         tabBarLabelStyle: {
-          fontSize: 12,
+          fontSize: WANTED_TOKENS.type.caption2.size,
           fontWeight: '600',
           fontFamily: weightToFontFamily('600'),
         },
@@ -67,7 +67,7 @@ const MainTabs: React.FC = () => {
           shadowOpacity: 0,
         },
         headerTitleStyle: {
-          fontSize: 18,
+          fontSize: WANTED_TOKENS.type.headline1.size,
           fontWeight: 'bold',
           fontFamily: weightToFontFamily('bold'),
           color: colors.textPrimary,
@@ -138,7 +138,7 @@ const AppNavigator: React.FC = () => {
                 backgroundColor: colors.surface,
               },
               headerTitleStyle: {
-                fontSize: 18,
+                fontSize: WANTED_TOKENS.type.headline1.size,
                 fontWeight: 'bold',
                 fontFamily: weightToFontFamily('bold'),
                 color: colors.textPrimary,
@@ -155,7 +155,7 @@ const AppNavigator: React.FC = () => {
                 backgroundColor: colors.surface,
               },
               headerTitleStyle: {
-                fontSize: 18,
+                fontSize: WANTED_TOKENS.type.headline1.size,
                 fontWeight: 'bold',
                 fontFamily: weightToFontFamily('bold'),
                 color: colors.textPrimary,

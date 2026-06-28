@@ -9,7 +9,7 @@ import { createNativeStackNavigator, type NativeStackScreenProps } from '@react-
 
 import { SettingsStackParamList } from './types';
 
-import { weightToFontFamily } from '@/styles/modernTheme';
+import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 
 // Import screens
 import SettingsScreen from '@/screens/settings/SettingsScreen';
@@ -46,7 +46,7 @@ export const SettingsNavigator: React.FC = () => {
         },
         headerTitleAlign: 'center',
         headerTitleStyle: {
-          fontSize: 17,
+          fontSize: WANTED_TOKENS.type.headline2.size,
           fontWeight: '700',
           fontFamily: weightToFontFamily('700'),
           color: semantic.labelStrong,
