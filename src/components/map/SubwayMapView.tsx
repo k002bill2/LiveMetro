@@ -66,6 +66,11 @@ interface ViewportSize {
   height: number;
 }
 
+interface SvgPoint {
+  x: number;
+  y: number;
+}
+
 // ============================================================================
 // Constants
 // ============================================================================
@@ -81,6 +86,25 @@ const MAX_SCALE = 3.0;
 const RECENTER_ANIMATION_MS = 420;
 const OFFSET_EPSILON = 0.5;
 const SHOULD_ANIMATE_RECENTER = process.env.NODE_ENV !== 'test';
+const SVG_STATION_ANCHORS_BY_ID: Record<string, SvgPoint> = {
+  // 7호선 서쪽 구간은 docs/subway_line.svg의 역점 좌표를 직접 사용한다.
+  s_3763: { x: 40, y: 580 }, // 석남
+  s_ec82b0ea: { x: 100, y: 605 }, // 산곡
+  bupyeong_gu: { x: 140, y: 605 }, // 부평구청
+  s_eab5b4ed: { x: 195, y: 550 }, // 굴포천
+  s_3759: { x: 210, y: 535 }, // 삼산체육관
+  s_ec8381eb: { x: 210, y: 515 }, // 상동
+  s_ebb680ec: { x: 240, y: 495 }, // 부천시청
+  s_3756: { x: 270, y: 500 }, // 신중동
+  s_ecb698ec: { x: 285, y: 515 }, // 춘의
+  s_3754: { x: 290, y: 542.5 }, // 부천종합운동장
+  s_eab98cec: { x: 290, y: 565 }, // 까치울
+  s_1821: { x: 325, y: 600 }, // 온수
+  s_ecb29cec: { x: 340, y: 615 }, // 천왕
+  gwangmyeong_sageo: { x: 355, y: 630 }, // 광명사거리
+  cheolsan: { x: 390, y: 640 }, // 철산
+  gasan_digital: { x: 415, y: 640 }, // 가산디지털단지
+};
 
 const getMapBounds = (): MapBounds => {
   return {
@@ -91,10 +115,11 @@ const getMapBounds = (): MapBounds => {
   };
 };
 
-const projectStationToSvg = (station: Station): { x: number; y: number } => ({
-  x: (station.x / SOURCE_MAP_WIDTH) * SVG_MAP_WIDTH,
-  y: (station.y / SOURCE_MAP_HEIGHT) * SVG_MAP_HEIGHT,
-});
+const projectStationToSvg = (station: Station): SvgPoint =>
+  SVG_STATION_ANCHORS_BY_ID[station.id] ?? {
+    x: (station.x / SOURCE_MAP_WIDTH) * SVG_MAP_WIDTH,
+    y: (station.y / SOURCE_MAP_HEIGHT) * SVG_MAP_HEIGHT,
+  };
 
 const getCenteredOffset = (
   stations: readonly Station[],
