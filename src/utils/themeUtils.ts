@@ -6,8 +6,6 @@
 import { Dimensions, Platform } from 'react-native';
 
 const { width, height } = Dimensions.get('window');
-const READABILITY_FONT_DELTA = 2;
-const readableFontSize = (value: number): number => value + READABILITY_FONT_DELTA;
 
 /**
  * Design Tokens - Spacing
@@ -27,13 +25,13 @@ export const SPACING = {
  */
 export const TYPOGRAPHY = {
   sizes: {
-    xs: readableFontSize(12),
-    sm: readableFontSize(14),
-    base: readableFontSize(16),
-    lg: readableFontSize(18),
-    xl: readableFontSize(20),
-    xxl: readableFontSize(24),
-    xxxl: readableFontSize(32),
+    xs: 12,
+    sm: 14,
+    base: 17,
+    lg: 20,
+    xl: 22,
+    xxl: 28,
+    xxxl: 34,
   },
   weights: {
     normal: '400' as const,
@@ -168,11 +166,11 @@ export const getResponsiveFontSize = (base: keyof typeof TYPOGRAPHY.sizes): numb
   const fontSize = TYPOGRAPHY.sizes[base];
   
   if (DEVICE.isSmall) {
-    return Math.max(TYPOGRAPHY.sizes.xs, fontSize * 0.9);
+    return Math.max(TYPOGRAPHY.sizes.xs, Math.round(fontSize * 0.95));
   }
   
   if (DEVICE.isLarge) {
-    return fontSize * 1.1;
+    return Math.round(fontSize * 1.1);
   }
   
   return fontSize;

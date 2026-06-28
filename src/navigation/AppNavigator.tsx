@@ -54,8 +54,9 @@ const MainTabs: React.FC = () => {
           paddingBottom: 8,
           paddingTop: 8,
         },
+        tabBarAllowFontScaling: true,
         tabBarLabelStyle: {
-          fontSize: WANTED_TOKENS.type.caption2.size,
+          fontSize: WANTED_TOKENS.type.caption1.size,
           fontWeight: '600',
           fontFamily: weightToFontFamily('600'),
         },

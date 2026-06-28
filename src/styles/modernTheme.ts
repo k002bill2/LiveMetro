@@ -1,6 +1,3 @@
-const READABILITY_FONT_DELTA = 2;
-const readableFontSize = (value: number): number => value + READABILITY_FONT_DELTA;
-
 /**
  * Modern Design System
  * Updated based on designStyle.json - Blue/Indigo Primary (#546FFF)
@@ -97,17 +94,17 @@ export const TYPOGRAPHY = {
     medium: 'System',
     bold: 'System',
   },
-  // Scale updated from designStyle.json, then lifted for LiveMetro mobile
-  // readability: body/label text should not feel cramped on transit screens.
+  // iOS-readable scale: body 17pt, controls 16-17pt, supporting text
+  // 13-15pt, and captions no smaller than 12pt.
   fontSize: {
-    xs: readableFontSize(12),   // caption / minimum readable text
-    sm: readableFontSize(14),   // body_small
-    base: readableFontSize(15), // body_medium
-    lg: readableFontSize(17),   // body_large
-    xl: readableFontSize(21),   // h3
-    '2xl': readableFontSize(24), // h2
-    '3xl': readableFontSize(32), // h1
-    '4xl': readableFontSize(36), // large display
+    xs: 12,   // caption / minimum readable text
+    sm: 14,   // supporting text
+    base: 17, // body
+    lg: 20,   // section title
+    xl: 22,   // section title large
+    '2xl': 24, // screen title small
+    '3xl': 32, // screen title
+    '4xl': 34, // large screen title
   },
   fontWeight: {
     regular: '400' as const,
@@ -367,21 +364,21 @@ export const WANTED_TOKENS = {
 
   /* Type scale (size, lineHeight, letterSpacing-em, weight) */
   type: {
-    display2:  { size: readableFontSize(40), lh: readableFontSize(52), tracking: -0.0282, weight: '700' as const },
-    display3:  { size: readableFontSize(36), lh: readableFontSize(48), tracking: -0.027,  weight: '700' as const },
-    title1:    { size: readableFontSize(32), lh: readableFontSize(44), tracking: -0.0253, weight: '700' as const },
-    title2:    { size: readableFontSize(28), lh: readableFontSize(38), tracking: -0.0236, weight: '700' as const },
-    title3:    { size: readableFontSize(24), lh: readableFontSize(32), tracking: -0.023,  weight: '700' as const },
-    heading1:  { size: readableFontSize(22), lh: readableFontSize(30), tracking: -0.0194, weight: '700' as const },
-    heading2:  { size: readableFontSize(20), lh: readableFontSize(28), tracking: -0.012,  weight: '700' as const },
-    headline1: { size: readableFontSize(18), lh: readableFontSize(26), tracking: -0.002,  weight: '600' as const },
-    headline2: { size: readableFontSize(17), lh: readableFontSize(24), tracking: 0,       weight: '600' as const },
-    body1:     { size: readableFontSize(17), lh: readableFontSize(25), tracking: 0.0057,  weight: '500' as const },
-    body2:     { size: readableFontSize(16), lh: readableFontSize(24), tracking: 0.0096,  weight: '500' as const },
-    label1:    { size: readableFontSize(15), lh: readableFontSize(21), tracking: 0.0145,  weight: '600' as const },
-    label2:    { size: readableFontSize(14), lh: readableFontSize(20), tracking: 0.0194,  weight: '600' as const },
-    caption1:  { size: readableFontSize(13), lh: readableFontSize(18), tracking: 0.0252,  weight: '600' as const },
-    caption2:  { size: readableFontSize(12), lh: readableFontSize(16), tracking: 0.0311,  weight: '600' as const },
+    display2:  { size: 34, lh: 42, tracking: -0.0282, weight: '700' as const },
+    display3:  { size: 32, lh: 40, tracking: -0.027,  weight: '700' as const },
+    title1:    { size: 30, lh: 38, tracking: -0.0253, weight: '700' as const },
+    title2:    { size: 28, lh: 36, tracking: -0.0236, weight: '700' as const },
+    title3:    { size: 24, lh: 32, tracking: -0.023,  weight: '700' as const },
+    heading1:  { size: 22, lh: 30, tracking: -0.0194, weight: '700' as const },
+    heading2:  { size: 20, lh: 28, tracking: -0.012,  weight: '700' as const },
+    headline1: { size: 18, lh: 26, tracking: -0.002,  weight: '600' as const },
+    headline2: { size: 17, lh: 24, tracking: 0,       weight: '600' as const },
+    body1:     { size: 17, lh: 25, tracking: 0.0057,  weight: '500' as const },
+    body2:     { size: 16, lh: 24, tracking: 0.0096,  weight: '500' as const },
+    label1:    { size: 17, lh: 24, tracking: 0.0145,  weight: '600' as const },
+    label2:    { size: 16, lh: 22, tracking: 0.0194,  weight: '600' as const },
+    caption1:  { size: 14, lh: 20, tracking: 0.0252,  weight: '600' as const },
+    caption2:  { size: 12, lh: 16, tracking: 0.0311,  weight: '600' as const },
   },
 
   /* Spacing — 8px base */
