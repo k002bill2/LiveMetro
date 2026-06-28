@@ -10,7 +10,11 @@
 import React, { memo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { SubwayMapView } from '@components/map';
-import { SUBWAY_MAP_STATIONS, SUBWAY_MAP_LINES } from '@components/map/subwayMapViewData';
+import {
+  SUBWAY_MAP_LINES,
+  SUBWAY_MAP_STATION_ANCHORS_BY_ID,
+  SUBWAY_MAP_STATIONS,
+} from '@components/map/subwayMapViewData';
 import { useCurrentStationId } from '@hooks/useCurrentStationId';
 import { useSemanticTokens } from '@/services/theme';
 import { weightToFontFamily } from '@/styles/modernTheme';
@@ -57,6 +61,7 @@ const CurrentLocationMapScreenImpl: React.FC = () => {
         <SubwayMapView
           stations={SUBWAY_MAP_STATIONS}
           lines={SUBWAY_MAP_LINES}
+          stationAnchorsById={SUBWAY_MAP_STATION_ANCHORS_BY_ID}
           selectedStation={currentStationId ?? undefined}
           initialScale={2.2}
         />

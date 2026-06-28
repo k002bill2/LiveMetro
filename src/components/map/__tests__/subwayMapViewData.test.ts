@@ -3,7 +3,12 @@
  * LINE_STATIONS / LINE_COLORS) into the shape SubwayMapView expects. Pure
  * module constants, so we assert on the produced data.
  */
-import { SUBWAY_MAP_STATIONS, SUBWAY_MAP_LINES } from '../subwayMapViewData';
+import {
+  SUBWAY_MAP_LINES,
+  SUBWAY_MAP_STATION_ANCHORS_BY_ID,
+  SUBWAY_MAP_STATIONS,
+} from '../subwayMapViewData';
+import { SUBWAY_LINE_SVG_ANCHORS_BY_ID } from '../subwayLineSvgAnchors';
 
 describe('subwayMapViewData', () => {
   it('maps STATIONS into SubwayMapView station shape with schematic coords', () => {
@@ -33,5 +38,29 @@ describe('subwayMapViewData', () => {
 
   it('produces a non-empty station set', () => {
     expect(SUBWAY_MAP_STATIONS.length).toBeGreaterThan(0);
+  });
+
+  it('creates a SVG anchor for every station used by the map view', () => {
+    const missing = SUBWAY_MAP_STATIONS.filter(
+      (station) => SUBWAY_MAP_STATION_ANCHORS_BY_ID[station.id] == null,
+    );
+
+    expect(missing).toEqual([]);
+  });
+
+  it('has every station id explicitly present in the generated SVG anchor table', () => {
+    const missing = SUBWAY_MAP_STATIONS.filter(
+      (station) => SUBWAY_LINE_SVG_ANCHORS_BY_ID[station.id] == null,
+    );
+
+    expect(missing).toEqual([]);
+    expect(Object.keys(SUBWAY_LINE_SVG_ANCHORS_BY_ID)).toHaveLength(SUBWAY_MAP_STATIONS.length);
+  });
+
+  it('keeps verified SVG coordinates in the global anchor table', () => {
+    expect(SUBWAY_MAP_STATION_ANCHORS_BY_ID.s_ec82b0ea).toEqual({
+      x: 100,
+      y: 605,
+    });
   });
 });

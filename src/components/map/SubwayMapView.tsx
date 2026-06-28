@@ -21,6 +21,15 @@ import {
 import Svg, { Circle } from 'react-native-svg';
 import { SvgUri } from 'react-native-svg';
 import { weightToFontFamily } from '@/styles/modernTheme';
+import {
+  FALLBACK_MAP_HEIGHT,
+  FALLBACK_MAP_WIDTH,
+  SVG_MAP_HEIGHT,
+  SVG_MAP_WIDTH,
+  createSubwayLineSvgAnchorMap,
+  resolveSubwayLineSvgAnchor,
+  type SvgPoint,
+} from '@components/map/subwayLineSvgAnchors';
 
 const subwayLineSvgAsset = require('../../../docs/subway_line.svg');
 
@@ -47,6 +56,7 @@ interface LineSegment {
 interface SubwayMapViewProps {
   stations: readonly Station[];
   lines: readonly LineSegment[];
+  stationAnchorsById?: Readonly<Record<string, SvgPoint>>;
   selectedStation?: string;
   highlightedLine?: string;
   onStationPress?: (stationId: string) => void;
@@ -66,45 +76,15 @@ interface ViewportSize {
   height: number;
 }
 
-interface SvgPoint {
-  x: number;
-  y: number;
-}
-
 // ============================================================================
 // Constants
 // ============================================================================
 
-const FALLBACK_MAP_WIDTH = 1200;
-const FALLBACK_MAP_HEIGHT = 900;
-const SVG_MAP_WIDTH = 1525;
-const SVG_MAP_HEIGHT = 1000;
-const SOURCE_MAP_WIDTH = 4900;
-const SOURCE_MAP_HEIGHT = 4400;
 const MIN_SCALE = 0.5;
 const MAX_SCALE = 3.0;
 const RECENTER_ANIMATION_MS = 420;
 const OFFSET_EPSILON = 0.5;
 const SHOULD_ANIMATE_RECENTER = process.env.NODE_ENV !== 'test';
-const SVG_STATION_ANCHORS_BY_ID: Record<string, SvgPoint> = {
-  // 7호선 서쪽 구간은 docs/subway_line.svg의 역점 좌표를 직접 사용한다.
-  s_3763: { x: 40, y: 580 }, // 석남
-  s_ec82b0ea: { x: 100, y: 605 }, // 산곡
-  bupyeong_gu: { x: 140, y: 605 }, // 부평구청
-  s_eab5b4ed: { x: 195, y: 550 }, // 굴포천
-  s_3759: { x: 210, y: 535 }, // 삼산체육관
-  s_ec8381eb: { x: 210, y: 515 }, // 상동
-  s_ebb680ec: { x: 240, y: 495 }, // 부천시청
-  s_3756: { x: 270, y: 500 }, // 신중동
-  s_ecb698ec: { x: 285, y: 515 }, // 춘의
-  s_3754: { x: 290, y: 542.5 }, // 부천종합운동장
-  s_eab98cec: { x: 290, y: 565 }, // 까치울
-  s_1821: { x: 325, y: 600 }, // 온수
-  s_ecb29cec: { x: 340, y: 615 }, // 천왕
-  gwangmyeong_sageo: { x: 355, y: 630 }, // 광명사거리
-  cheolsan: { x: 390, y: 640 }, // 철산
-  gasan_digital: { x: 415, y: 640 }, // 가산디지털단지
-};
 
 const getMapBounds = (): MapBounds => {
   return {
@@ -115,21 +95,21 @@ const getMapBounds = (): MapBounds => {
   };
 };
 
-const projectStationToSvg = (station: Station): SvgPoint =>
-  SVG_STATION_ANCHORS_BY_ID[station.id] ?? {
-    x: (station.x / SOURCE_MAP_WIDTH) * SVG_MAP_WIDTH,
-    y: (station.y / SOURCE_MAP_HEIGHT) * SVG_MAP_HEIGHT,
-  };
+const getStationSvgAnchor = (
+  station: Station,
+  stationAnchorsById: Readonly<Record<string, SvgPoint>>,
+): SvgPoint => stationAnchorsById[station.id] ?? resolveSubwayLineSvgAnchor(station);
 
 const getCenteredOffset = (
   stations: readonly Station[],
   selectedStation: string | undefined,
+  stationAnchorsById: Readonly<Record<string, SvgPoint>>,
   bounds: MapBounds,
   viewport: ViewportSize,
   scale: number,
 ): { x: number; y: number } => {
   const station = selectedStation ? stations.find(s => s.id === selectedStation) : undefined;
-  const projectedStation = station ? projectStationToSvg(station) : undefined;
+  const projectedStation = station ? getStationSvgAnchor(station, stationAnchorsById) : undefined;
   const focusX = projectedStation ? projectedStation.x - bounds.minX : bounds.width / 2;
   const focusY = projectedStation ? projectedStation.y - bounds.minY : bounds.height / 2;
 
@@ -153,20 +133,39 @@ const subwayLineSvgUri = Image.resolveAssetSource(subwayLineSvgAsset)?.uri ?? nu
 
 const SubwayMapView: React.FC<SubwayMapViewProps> = ({
   stations,
+  stationAnchorsById,
   selectedStation,
   onStationPress,
   initialScale = 1.0,
 }) => {
   const mapBounds = React.useMemo(() => getMapBounds(), []);
   const initialViewport = useRef(Dimensions.get('window')).current;
+  const resolvedStationAnchorsById = React.useMemo(
+    () => stationAnchorsById ?? createSubwayLineSvgAnchorMap(stations),
+    [stationAnchorsById, stations],
+  );
   const [scale, setScale] = useState(initialScale);
   const [viewport, setViewport] = useState<ViewportSize>({
     width: initialViewport.width,
     height: initialViewport.height,
   });
   const initialOffset = React.useMemo(
-    () => getCenteredOffset(stations, selectedStation, mapBounds, initialViewport, initialScale),
-    [initialScale, initialViewport, mapBounds, selectedStation, stations],
+    () => getCenteredOffset(
+      stations,
+      selectedStation,
+      resolvedStationAnchorsById,
+      mapBounds,
+      initialViewport,
+      initialScale,
+    ),
+    [
+      initialScale,
+      initialViewport,
+      mapBounds,
+      resolvedStationAnchorsById,
+      selectedStation,
+      stations,
+    ],
   );
   const animatedOffset = useRef(new Animated.ValueXY(initialOffset)).current;
   const lastScaleRef = useRef(scale);
@@ -198,12 +197,20 @@ const SubwayMapView: React.FC<SubwayMapViewProps> = ({
     const centered = getCenteredOffset(
       stations,
       selectedStation,
+      resolvedStationAnchorsById,
       mapBounds,
       viewport,
       lastScaleRef.current
     );
     animateToOffset(centered);
-  }, [animateToOffset, mapBounds, selectedStation, stations, viewport]);
+  }, [
+    animateToOffset,
+    mapBounds,
+    resolvedStationAnchorsById,
+    selectedStation,
+    stations,
+    viewport,
+  ]);
 
   const handleMapLayout = useCallback((event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
@@ -224,10 +231,24 @@ const SubwayMapView: React.FC<SubwayMapViewProps> = ({
 
   const handleReset = useCallback(() => {
     const resetScale = 1.0;
-    const centered = getCenteredOffset(stations, selectedStation, mapBounds, viewport, resetScale);
+    const centered = getCenteredOffset(
+      stations,
+      selectedStation,
+      resolvedStationAnchorsById,
+      mapBounds,
+      viewport,
+      resetScale,
+    );
     setScale(resetScale);
     animateToOffset(centered);
-  }, [animateToOffset, mapBounds, selectedStation, stations, viewport]);
+  }, [
+    animateToOffset,
+    mapBounds,
+    resolvedStationAnchorsById,
+    selectedStation,
+    stations,
+    viewport,
+  ]);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -266,7 +287,7 @@ const SubwayMapView: React.FC<SubwayMapViewProps> = ({
     ? stations.find(station => station.id === selectedStation)
     : undefined;
   const selectedStationPoint = selectedStationData
-    ? projectStationToSvg(selectedStationData)
+    ? getStationSvgAnchor(selectedStationData, resolvedStationAnchorsById)
     : undefined;
 
   return (

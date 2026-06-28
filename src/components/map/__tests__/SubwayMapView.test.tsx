@@ -139,6 +139,24 @@ describe('SubwayMapView', () => {
     });
   });
 
+  it('uses the provided global SVG anchor table before schematic fallback', () => {
+    const { getAllByTestId } = render(
+      <SubwayMapView
+        stations={mockStations}
+        lines={mockLines}
+        stationAnchorsById={{ st1: { x: 321, y: 654 } }}
+        selectedStation="st1"
+      />,
+    );
+
+    const circles = getAllByTestId('Circle');
+    expect(circles[0]?.props).toMatchObject({
+      cx: 321,
+      cy: 654,
+      fill: '#FF5722',
+    });
+  });
+
   it('uses the SVG map viewBox for the overlay layer', () => {
     const farStations = [
       ...mockStations,

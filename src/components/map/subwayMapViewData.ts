@@ -8,6 +8,10 @@
  * load.
  */
 import { STATIONS, LINE_COLORS, LINE_STATIONS } from '@/utils/subwayMapData';
+import {
+  createSubwayLineSvgAnchorMap,
+  type SvgPoint,
+} from '@components/map/subwayLineSvgAnchors';
 
 export interface SubwayMapStation {
   readonly id: string;
@@ -35,6 +39,9 @@ export const SUBWAY_MAP_STATIONS: readonly SubwayMapStation[] = Object.values(ST
     isTransfer: s.lines.length > 1,
   }),
 );
+
+export const SUBWAY_MAP_STATION_ANCHORS_BY_ID: Readonly<Record<string, SvgPoint>> =
+  createSubwayLineSvgAnchorMap(SUBWAY_MAP_STATIONS);
 
 export const SUBWAY_MAP_LINES: readonly SubwayMapLineSegment[] = (() => {
   const segments: SubwayMapLineSegment[] = [];
