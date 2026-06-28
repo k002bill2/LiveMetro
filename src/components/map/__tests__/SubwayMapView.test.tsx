@@ -114,6 +114,31 @@ describe('SubwayMapView', () => {
     });
   });
 
+  it('uses SVG station anchors when the selected station has a verified SVG point', () => {
+    const stations = [
+      ...mockStations,
+      {
+        id: 's_ec82b0ea',
+        name: '산곡',
+        x: 784,
+        y: 1947,
+        lineIds: ['7'],
+        isTransfer: false,
+      },
+    ] as const as readonly any[];
+
+    const { getAllByTestId } = render(
+      <SubwayMapView stations={stations} lines={mockLines} selectedStation="s_ec82b0ea" />,
+    );
+
+    const circles = getAllByTestId('Circle');
+    expect(circles[0]?.props).toMatchObject({
+      cx: 100,
+      cy: 605,
+      fill: '#FF5722',
+    });
+  });
+
   it('uses the SVG map viewBox for the overlay layer', () => {
     const farStations = [
       ...mockStations,
