@@ -32,9 +32,9 @@ describe('themeUtils', () => {
 
   describe('TYPOGRAPHY', () => {
     it('should have correct font sizes', () => {
-      expect(TYPOGRAPHY.sizes.xs).toBe(12);
-      expect(TYPOGRAPHY.sizes.base).toBe(16);
-      expect(TYPOGRAPHY.sizes.xxxl).toBe(32);
+      expect(TYPOGRAPHY.sizes.xs).toBe(14);
+      expect(TYPOGRAPHY.sizes.base).toBe(18);
+      expect(TYPOGRAPHY.sizes.xxxl).toBe(34);
     });
 
     it('should have correct font weights', () => {

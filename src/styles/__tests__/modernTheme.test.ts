@@ -5,8 +5,9 @@ describe('modernTheme typography', () => {
     const legacySizes = Object.values(TYPOGRAPHY.fontSize);
     const wantedSizes = Object.values(WANTED_TOKENS.type).map((token) => token.size);
 
-    expect(Math.min(...legacySizes)).toBeGreaterThanOrEqual(12);
-    expect(Math.min(...wantedSizes)).toBeGreaterThanOrEqual(12);
-    expect(typeStyle('caption2').fontSize).toBe(12);
+    expect(Math.min(...legacySizes)).toBeGreaterThanOrEqual(14);
+    expect(Math.min(...wantedSizes)).toBeGreaterThanOrEqual(14);
+    expect(typeStyle('caption2').fontSize).toBe(14);
+    expect(typeStyle('caption2').lineHeight).toBe(18);
   });
 });
