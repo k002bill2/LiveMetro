@@ -29,6 +29,8 @@ import {
   cancelBoardingAlert,
 } from '@/services/notification/boardingAlertService';
 import { clearGuidanceSession, getGuidanceSession } from '@/services/guidance/guidanceSessionStore';
+import { completeGuidanceCommuteLog } from '@/services/guidance/guidanceCommuteLogService';
+import { useAuth } from '@/services/auth/AuthContext';
 import { GuidanceControls, GuidanceHeader, GuidanceNowCard, GuidanceStepRow, type GuidanceStepStatus } from '@/components/guidance';
 import type { AppStackParamList } from '@/navigation/types';
 import type { GuidanceStep } from '@/models/guidance';
@@ -63,6 +65,7 @@ export const RouteGuidanceScreen: React.FC = () => {
   const styles = useMemo(() => createStyles(semantic), [semantic]);
   const navigation = useNavigation<NavigationProp>();
   const isFocused = useIsFocused();
+  const { user } = useAuth();
 
   // Session is set by the CTA right before navigating; read once per mount.
   const session = useMemo(() => getGuidanceSession(), []);
@@ -249,6 +252,22 @@ export const RouteGuidanceScreen: React.FC = () => {
     [softConfirm, confirmBoarded, dismissSoftConfirm]
   );
 
+  const completedLogKeyRef = useRef<string | null>(null);
+
+  const persistCompletion = useCallback((completedAt: number = Date.now()): void => {
+    if (!session || !user?.id || session.commuteLogCompletedAt) return;
+    const key = `${user.id}:${session.startedAt}`;
+    if (completedLogKeyRef.current === key) return;
+    completedLogKeyRef.current = key;
+    completeGuidanceCommuteLog(user.id, session, completedAt).catch((error) => {
+      completedLogKeyRef.current = null;
+      if (__DEV__) {
+        // eslint-disable-next-line no-console
+        console.warn('[RouteGuidanceScreen] commute log completion failed:', error);
+      }
+    });
+  }, [session, user?.id]);
+
   // Whole-journey progress for the header bar. Total excludes platform wait
   // (same basis as remainingSeconds), so the fraction is internally honest.
   const totalSeconds = useMemo(
@@ -258,12 +277,21 @@ export const RouteGuidanceScreen: React.FC = () => {
   const progress =
     totalSeconds <= 0 ? 0 : isAtEnd ? 1 : (totalSeconds - remainingSeconds) / totalSeconds;
 
+  useEffect(() => {
+    if (isAtEnd) {
+      persistCompletion();
+    }
+  }, [isAtEnd, persistCompletion]);
+
   const handleExit = useCallback((): void => {
     clearAutoTimer();
     void cancelBoardingAlert();
+    if (isAtEnd) {
+      persistCompletion();
+    }
     clearGuidanceSession();
     navigation.goBack();
-  }, [clearAutoTimer, navigation]);
+  }, [clearAutoTimer, isAtEnd, persistCompletion, navigation]);
 
   const renderStep = useCallback(
     ({ item, index }: { item: GuidanceStep; index: number }): React.ReactElement => {

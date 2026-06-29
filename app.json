@@ -16,9 +16,7 @@
     "description": "Real-time Seoul subway notifications with delay alerts and alternative route suggestions for seamless commuting.",
     "primaryColor": "#1976d2",
     "splash": {
-      "image": "./assets/splash.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#1976d2"
+      "backgroundColor": "#ffffff"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -95,7 +93,8 @@
         {
           "locationAlwaysAndWhenInUsePermission": "LiveMetro uses your location to provide personalized subway alerts and nearby station information for the Seoul metropolitan area.",
           "isIosBackgroundLocationEnabled": true,
-          "isAndroidBackgroundLocationEnabled": true
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
         }
       ],
       [

@@ -11,6 +11,7 @@ import {
   scheduleBoardingAlert,
   cancelBoardingAlert,
 } from '@/services/notification/boardingAlertService';
+import { completeGuidanceCommuteLog } from '@/services/guidance/guidanceCommuteLogService';
 import {
   setGuidanceSession,
   clearGuidanceSession,
@@ -34,6 +35,10 @@ jest.mock('@/services/theme', () => ({
   useTheme: jest.fn(() => ({ isDark: false })),
 }));
 
+jest.mock('@/services/auth/AuthContext', () => ({
+  useAuth: jest.fn(() => ({ user: { id: 'user-1' } })),
+}));
+
 jest.mock('@/hooks/useRealtimeTrains', () => ({
   useRealtimeTrains: jest.fn(),
 }));
@@ -43,6 +48,10 @@ jest.mock('@/hooks/useRealtimeTrains', () => ({
 jest.mock('@/services/notification/boardingAlertService', () => ({
   scheduleBoardingAlert: jest.fn(() => Promise.resolve('alert-id')),
   cancelBoardingAlert: jest.fn(() => Promise.resolve()),
+}));
+
+jest.mock('@/services/guidance/guidanceCommuteLogService', () => ({
+  completeGuidanceCommuteLog: jest.fn(() => Promise.resolve()),
 }));
 
 jest.mock('lucide-react-native', () => ({
@@ -168,6 +177,7 @@ describe('RouteGuidanceScreen', () => {
     mockGoBack.mockClear();
     (scheduleBoardingAlert as jest.Mock).mockClear();
     (cancelBoardingAlert as jest.Mock).mockClear();
+    (completeGuidanceCommuteLog as jest.Mock).mockClear();
     mockedUseRealtimeTrains.mockReturnValue({
       trains: [],
       loading: false,
@@ -241,6 +251,23 @@ describe('RouteGuidanceScreen', () => {
     expect(getByText('산곡 도착 · 하차하세요')).toBeTruthy();
     // Correction pair hidden at the end; only 안내 종료 remains.
     expect(queryByTestId('guidance-next')).toBeNull();
+  });
+
+  it('records arrival when the guidance reaches the destination', () => {
+    seedSession();
+    const { getByTestId } = render(<RouteGuidanceScreen />);
+    fireEvent.press(getByTestId('guidance-next'));
+    act(() => {
+      jest.advanceTimersByTime(5 * 60_000 + 1_000);
+    });
+    expect(completeGuidanceCommuteLog).toHaveBeenCalledWith(
+      'user-1',
+      expect.objectContaining({
+        fromStationName: '을지로3가',
+        toStationName: '산곡',
+      }),
+      expect.any(Number)
+    );
   });
 
   it('clears the session and goes back on 안내 종료', () => {
