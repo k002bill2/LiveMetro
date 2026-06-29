@@ -57,7 +57,19 @@ describe('subwayMapViewData', () => {
     expect(Object.keys(SUBWAY_LINE_SVG_ANCHORS_BY_ID)).toHaveLength(SUBWAY_MAP_STATIONS.length);
   });
 
-  it('keeps verified SVG coordinates in the global anchor table', () => {
+  it('keeps official Seoul Metro SVG coordinates in the global anchor table', () => {
+    expect(SUBWAY_MAP_STATION_ANCHORS_BY_ID.seoul).toEqual({
+      x: 655,
+      y: 410,
+    });
+    expect(SUBWAY_MAP_STATION_ANCHORS_BY_ID.s_2523).toEqual({
+      x: 395,
+      y: 460,
+    });
+    expect(SUBWAY_MAP_STATION_ANCHORS_BY_ID.yangpyeong_gyeongui).toEqual({
+      x: 1325,
+      y: 375,
+    });
     expect(SUBWAY_MAP_STATION_ANCHORS_BY_ID.s_ec82b0ea).toEqual({
       x: 100,
       y: 605,
