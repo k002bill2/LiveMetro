@@ -74,10 +74,13 @@
     "expo-local-authentication": "~13.4.1",
     "expo-location": "~16.1.0",
     "expo-notifications": "~0.20.1",
+    "expo-print": "~12.4.2",
     "expo-secure-store": "~12.3.1",
     "expo-sharing": "~11.5.0",
     "expo-splash-screen": "~0.20.5",
     "expo-status-bar": "~1.6.0",
+    "expo-task-manager": "~11.3.0",
+    "expo-updates": "~0.18.19",
     "firebase": "^10.7.1",
     "lucide-react-native": "^0.562.0",
     "react": "18.2.0",
@@ -91,9 +94,7 @@
     "react-native-screens": "~3.22.0",
     "react-native-svg": "13.9.0",
     "react-native-web": "~0.19.6",
-    "react-native-webview": "^13.2.2",
-    "expo-updates": "~0.18.19",
-    "expo-print": "~12.4.2"
+    "react-native-webview": "^13.2.2"
   },
   "devDependencies": {
     "@babel/core": "^7.20.0",
