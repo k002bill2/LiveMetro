@@ -16,6 +16,8 @@
     "description": "Real-time Seoul subway notifications with delay alerts and alternative route suggestions for seamless commuting.",
     "primaryColor": "#1976d2",
     "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
     "assetBundlePatterns": [
