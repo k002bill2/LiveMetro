@@ -4,6 +4,7 @@
  */
 
 import { renderHook, act } from '@testing-library/react-native';
+import { Animated } from 'react-native';
 import { useDragReorder } from '../useDragReorder';
 
 interface TestItem {
@@ -23,6 +24,17 @@ describe('useDragReorder', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.spyOn(Animated, 'timing').mockReturnValue({
+      start: (callback?: Animated.EndCallback) => {
+        callback?.({ finished: true });
+      },
+      stop: jest.fn(),
+      reset: jest.fn(),
+    } as Animated.CompositeAnimation);
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
   describe('Initial State', () => {
