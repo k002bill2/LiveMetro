@@ -42,6 +42,7 @@ export interface CreateCommuteLogInput {
   lineIds: string[];
   departureTime?: string; // Defaults to current time
   arrivalTime?: string;
+  loggedAt?: Date; // Defaults to now; used for date/day/createdAt.
   wasDelayed?: boolean;
   delayMinutes?: number;
   isManual?: boolean;
@@ -59,7 +60,7 @@ class CommuteLogService {
     userId: string,
     input: CreateCommuteLogInput
   ): Promise<CommuteLog> {
-    const now = new Date();
+    const now = input.loggedAt ?? new Date();
     const date = formatDateString(now);
     const dayOfWeek = getDayOfWeek(now);
     const departureTime = input.departureTime || getCurrentTimeString();

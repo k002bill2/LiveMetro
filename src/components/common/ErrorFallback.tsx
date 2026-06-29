@@ -58,7 +58,7 @@ const CATEGORY_COPY: Record<SeoulApiErrorCategory, FallbackCopy> = {
   // "자동 복구" 같은 약속 회피 (사용자 신뢰).
   quota:  {
     title: '서버가 잠시 바빠요',
-    description: '응답이 제한되고 있어요. 잠시 후 다시 시도해주세요.',
+    description: '요청이 몰려 잠시 제한되고 있어요. 잠시 후 다시 시도해주세요.',
     showRetry: true,
     Icon: AlertTriangle,
     iconColor: COLORS.semantic.warning,

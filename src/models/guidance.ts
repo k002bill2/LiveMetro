@@ -83,4 +83,8 @@ export interface GuidanceSession {
   readonly toStationName: string;
   /** Epoch ms when the user tapped "이 경로로 길안내 시작". */
   readonly startedAt: number;
+  /** Firestore commute log id created for this active guidance session. */
+  readonly commuteLogId?: string;
+  /** Epoch ms when the destination arrival was persisted to the commute log. */
+  readonly commuteLogCompletedAt?: number;
 }

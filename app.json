@@ -95,7 +95,8 @@
         {
           "locationAlwaysAndWhenInUsePermission": "LiveMetro uses your location to provide personalized subway alerts and nearby station information for the Seoul metropolitan area.",
           "isIosBackgroundLocationEnabled": true,
-          "isAndroidBackgroundLocationEnabled": true
+          "isAndroidBackgroundLocationEnabled": true,
+          "isAndroidForegroundServiceEnabled": true
         }
       ],
       [

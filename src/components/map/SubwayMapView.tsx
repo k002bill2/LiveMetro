@@ -8,6 +8,7 @@ import {
   Animated,
   Easing,
   Image,
+  Platform,
   View,
   StyleSheet,
   TouchableOpacity,
@@ -18,8 +19,8 @@ import {
   Dimensions,
   LayoutChangeEvent,
 } from 'react-native';
-import Svg, { Circle } from 'react-native-svg';
-import { SvgUri } from 'react-native-svg';
+import { Asset } from 'expo-asset';
+import { Circle, Svg, SvgUri } from 'react-native-svg';
 import { weightToFontFamily } from '@/styles/modernTheme';
 import {
   FALLBACK_MAP_HEIGHT,
@@ -125,7 +126,7 @@ const areOffsetsEqual = (
 ): boolean =>
   Math.abs(a.x - b.x) < OFFSET_EPSILON && Math.abs(a.y - b.y) < OFFSET_EPSILON;
 
-const subwayLineSvgUri = Image.resolveAssetSource(subwayLineSvgAsset)?.uri ?? null;
+const subwayLineSvgUri = Asset.fromModule(subwayLineSvgAsset).uri;
 
 // ============================================================================
 // Component
@@ -289,6 +290,12 @@ const SubwayMapView: React.FC<SubwayMapViewProps> = ({
   const selectedStationPoint = selectedStationData
     ? getStationSvgAnchor(selectedStationData, resolvedStationAnchorsById)
     : undefined;
+  const handleSelectedStationPress = selectedStationData && onStationPress
+    ? (): void => onStationPress(selectedStationData.id)
+    : undefined;
+  const selectedStationPressProps = handleSelectedStationPress
+    ? { onPress: handleSelectedStationPress }
+    : {};
 
   return (
     <View style={styles.container}>
@@ -306,11 +313,25 @@ const SubwayMapView: React.FC<SubwayMapViewProps> = ({
             },
           ]}
         >
-          <SvgUri
-            uri={subwayLineSvgUri}
-            width={SVG_MAP_WIDTH * scale}
-            height={SVG_MAP_HEIGHT * scale}
-          />
+          {Platform.OS === 'web' ? (
+            <Image
+              source={{ uri: subwayLineSvgUri }}
+              style={[
+                styles.mapImage,
+                {
+                  width: SVG_MAP_WIDTH * scale,
+                  height: SVG_MAP_HEIGHT * scale,
+                },
+              ]}
+              resizeMode="contain"
+            />
+          ) : (
+            <SvgUri
+              uri={subwayLineSvgUri}
+              width={SVG_MAP_WIDTH * scale}
+              height={SVG_MAP_HEIGHT * scale}
+            />
+          )}
           <Svg
             width={mapBounds.width * scale}
             height={mapBounds.height * scale}
@@ -342,7 +363,7 @@ const SubwayMapView: React.FC<SubwayMapViewProps> = ({
                   fill="#FF5722"
                   stroke="#FFFFFF"
                   strokeWidth={2}
-                  onPress={() => onStationPress?.(selectedStationData.id)}
+                  {...selectedStationPressProps}
                 />
               </>
             )}
@@ -414,6 +435,11 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   mapCanvas: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+  },
+  mapImage: {
     position: 'absolute',
     left: 0,
     top: 0,
