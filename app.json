@@ -59,7 +59,7 @@
       "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#1976d2"
+        "backgroundColor": "#ffffff"
       },
       "versionCode": 6,
       "playStoreUrl": "https://play.google.com/store/apps/details?id=com.livemetro.app",
