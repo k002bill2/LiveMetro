@@ -71,11 +71,16 @@ export const focalZoom = (
   };
 };
 
+type TransformEntry =
+  | { translateX: number }
+  | { translateY: number }
+  | { scale: number };
+
 export const toTransform = (
   scale: number,
   translate: Vec2,
   content: Size,
-): ReadonlyArray<{ translateX: number } | { translateY: number } | { scale: number }> => {
+): TransformEntry[] => {
   'worklet';
   // RN scales about the view center; convert the top-left-origin translate
   // into the array RN needs by subtracting (size/2)*(1-scale).

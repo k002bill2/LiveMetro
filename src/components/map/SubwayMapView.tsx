@@ -1,24 +1,30 @@
 /**
  * Subway Map View
- * Interactive Seoul subway map viewer with pan and zoom
+ * Interactive Seoul subway map viewer with pinch-zoom and pan.
+ *
+ * Rendering: the base SVG + overlay are drawn ONCE at their base size; all
+ * zoom/pan happens on the GPU via a single reanimated transform on the wrapping
+ * Animated.View. Pinch (Gesture.Pinch) and drag (Gesture.Pan) run simultaneously.
  */
 
 import React, { useState, useRef, useCallback } from 'react';
 import {
-  Animated,
-  Easing,
   Image,
   Platform,
   View,
   StyleSheet,
   TouchableOpacity,
   Text,
-  PanResponder,
-  GestureResponderEvent,
-  PanResponderGestureState,
   Dimensions,
   LayoutChangeEvent,
 } from 'react-native';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withTiming,
+  runOnJS,
+} from 'react-native-reanimated';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { Asset } from 'expo-asset';
 import { Circle, Svg, SvgXml } from 'react-native-svg';
 import { useSubwayLineSvgXml } from '@hooks/useSubwayLineSvgXml';
@@ -32,6 +38,13 @@ import {
   resolveSubwayLineSvgAnchor,
   type SvgPoint,
 } from '@components/map/subwayLineSvgAnchors';
+import {
+  clampScale,
+  clampTranslate,
+  focalZoom,
+  toTransform,
+  type Size,
+} from '@components/map/subwayMapGestureMath';
 
 const subwayLineSvgAsset = require('../../../docs/subway_line.svg');
 
@@ -79,23 +92,15 @@ interface ViewportSize {
 }
 
 // ============================================================================
-// Constants
+// Constants / helpers
 // ============================================================================
 
-const MIN_SCALE = 0.5;
-const MAX_SCALE = 3.0;
-const RECENTER_ANIMATION_MS = 420;
-const OFFSET_EPSILON = 0.5;
-const SHOULD_ANIMATE_RECENTER = process.env.NODE_ENV !== 'test';
-
-const getMapBounds = (): MapBounds => {
-  return {
-    minX: 0,
-    minY: 0,
-    width: Math.max(SVG_MAP_WIDTH, FALLBACK_MAP_WIDTH),
-    height: Math.max(SVG_MAP_HEIGHT, FALLBACK_MAP_HEIGHT),
-  };
-};
+const getMapBounds = (): MapBounds => ({
+  minX: 0,
+  minY: 0,
+  width: Math.max(SVG_MAP_WIDTH, FALLBACK_MAP_WIDTH),
+  height: Math.max(SVG_MAP_HEIGHT, FALLBACK_MAP_HEIGHT),
+});
 
 const getStationSvgAnchor = (
   station: Station,
@@ -114,20 +119,14 @@ const getCenteredOffset = (
   const projectedStation = station ? getStationSvgAnchor(station, stationAnchorsById) : undefined;
   const focusX = projectedStation ? projectedStation.x - bounds.minX : bounds.width / 2;
   const focusY = projectedStation ? projectedStation.y - bounds.minY : bounds.height / 2;
-
   return {
     x: viewport.width / 2 - focusX * scale,
     y: viewport.height / 2 - focusY * scale,
   };
 };
 
-const areOffsetsEqual = (
-  a: { x: number; y: number },
-  b: { x: number; y: number },
-): boolean =>
-  Math.abs(a.x - b.x) < OFFSET_EPSILON && Math.abs(a.y - b.y) < OFFSET_EPSILON;
-
 const subwayLineSvgUri = Asset.fromModule(subwayLineSvgAsset).uri;
+const SHOULD_ANIMATE = process.env.NODE_ENV !== 'test';
 
 // ============================================================================
 // Component
@@ -141,144 +140,142 @@ const SubwayMapView: React.FC<SubwayMapViewProps> = ({
   initialScale = 1.0,
 }) => {
   const mapBounds = React.useMemo(() => getMapBounds(), []);
+  const content: Size = React.useMemo(
+    () => ({ width: mapBounds.width, height: mapBounds.height }),
+    [mapBounds],
+  );
   const baseSvgXml = useSubwayLineSvgXml(subwayLineSvgAsset);
   const initialViewport = useRef(Dimensions.get('window')).current;
   const resolvedStationAnchorsById = React.useMemo(
     () => stationAnchorsById ?? createSubwayLineSvgAnchorMap(stations),
     [stationAnchorsById, stations],
   );
+
+  const initialOffset = React.useMemo(
+    () => getCenteredOffset(
+      stations, selectedStation, resolvedStationAnchorsById, mapBounds, initialViewport, initialScale,
+    ),
+    [initialScale, initialViewport, mapBounds, resolvedStationAnchorsById, selectedStation, stations],
+  );
+
+  // React state drives the "%" label + buttons (synchronous → tests stable).
   const [scale, setScale] = useState(initialScale);
   const [viewport, setViewport] = useState<ViewportSize>({
     width: initialViewport.width,
     height: initialViewport.height,
   });
-  const initialOffset = React.useMemo(
-    () => getCenteredOffset(
-      stations,
-      selectedStation,
-      resolvedStationAnchorsById,
-      mapBounds,
-      initialViewport,
-      initialScale,
-    ),
-    [
-      initialScale,
-      initialViewport,
-      mapBounds,
-      resolvedStationAnchorsById,
-      selectedStation,
-      stations,
-    ],
-  );
-  const animatedOffset = useRef(new Animated.ValueXY(initialOffset)).current;
-  const lastScaleRef = useRef(scale);
-  const lastOffset = useRef(initialOffset);
 
-  const animateToOffset = useCallback((offset: { x: number; y: number }) => {
-    if (areOffsetsEqual(lastOffset.current, offset)) {
+  // Shared values drive the GPU transform.
+  const scaleSV = useSharedValue(initialScale);
+  const translateX = useSharedValue(initialOffset.x);
+  const translateY = useSharedValue(initialOffset.y);
+  const savedScale = useSharedValue(initialScale);
+  const savedTranslateX = useSharedValue(initialOffset.x);
+  const savedTranslateY = useSharedValue(initialOffset.y);
+  const viewportSV = useSharedValue<Size>({
+    width: initialViewport.width,
+    height: initialViewport.height,
+  });
+
+  // Skip the recenter effect on first mount (initial values already set).
+  const didMount = useRef(false);
+  React.useEffect(() => {
+    if (!didMount.current) {
+      didMount.current = true;
       return;
     }
-    lastOffset.current = offset;
-    if (!SHOULD_ANIMATE_RECENTER) {
-      animatedOffset.setValue(offset);
-      return;
-    }
-    Animated.timing(animatedOffset, {
-      toValue: offset,
-      duration: RECENTER_ANIMATION_MS,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
-  }, [animatedOffset]);
-
-  // Update lastScaleRef when scale changes
-  React.useEffect(() => {
-    lastScaleRef.current = scale;
-  }, [scale]);
-
-  React.useEffect(() => {
     const centered = getCenteredOffset(
-      stations,
-      selectedStation,
-      resolvedStationAnchorsById,
-      mapBounds,
-      viewport,
-      lastScaleRef.current
+      stations, selectedStation, resolvedStationAnchorsById, mapBounds, viewport, scale,
     );
-    animateToOffset(centered);
-  }, [
-    animateToOffset,
-    mapBounds,
-    resolvedStationAnchorsById,
-    selectedStation,
-    stations,
-    viewport,
-  ]);
+    if (SHOULD_ANIMATE) {
+      translateX.value = withTiming(centered.x);
+      translateY.value = withTiming(centered.y);
+    } else {
+      translateX.value = centered.x;
+      translateY.value = centered.y;
+    }
+    // Recenter only when the selected station changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedStation]);
 
   const handleMapLayout = useCallback((event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
     if (width > 0 && height > 0) {
-      setViewport(prev => (
-        prev.width === width && prev.height === height ? prev : { width, height }
-      ));
+      setViewport(prev => (prev.width === width && prev.height === height ? prev : { width, height }));
+      viewportSV.value = { width, height };
     }
-  }, []);
+  }, [viewportSV]);
 
-  const handleZoomIn = useCallback(() => {
-    setScale(prev => Math.min(prev * 1.25, MAX_SCALE));
-  }, []);
+  const panGesture = Gesture.Pan()
+    .onStart(() => {
+      savedTranslateX.value = translateX.value;
+      savedTranslateY.value = translateY.value;
+    })
+    .onUpdate(event => {
+      const next = clampTranslate(
+        { x: savedTranslateX.value + event.translationX, y: savedTranslateY.value + event.translationY },
+        scaleSV.value,
+        content,
+        viewportSV.value,
+      );
+      translateX.value = next.x;
+      translateY.value = next.y;
+    });
 
-  const handleZoomOut = useCallback(() => {
-    setScale(prev => Math.max(prev / 1.25, MIN_SCALE));
-  }, []);
+  const pinchGesture = Gesture.Pinch()
+    .onStart(() => {
+      savedScale.value = scaleSV.value;
+      savedTranslateX.value = translateX.value;
+      savedTranslateY.value = translateY.value;
+    })
+    .onUpdate(event => {
+      const nextScale = clampScale(savedScale.value * event.scale);
+      const zoomed = focalZoom(
+        { x: event.focalX, y: event.focalY },
+        savedScale.value,
+        nextScale,
+        { x: savedTranslateX.value, y: savedTranslateY.value },
+      );
+      const clamped = clampTranslate(zoomed, nextScale, content, viewportSV.value);
+      scaleSV.value = nextScale;
+      translateX.value = clamped.x;
+      translateY.value = clamped.y;
+    })
+    .onEnd(() => {
+      runOnJS(setScale)(scaleSV.value);
+    });
+
+  const composedGesture = Gesture.Simultaneous(panGesture, pinchGesture);
+
+  const animatedStyle = useAnimatedStyle(() => ({
+    transform: toTransform(scaleSV.value, { x: translateX.value, y: translateY.value }, content),
+  }));
+
+  const applyScale = useCallback((nextRaw: number) => {
+    const next = clampScale(nextRaw);
+    setScale(next);
+    scaleSV.value = SHOULD_ANIMATE ? withTiming(next) : next;
+  }, [scaleSV]);
+
+  const handleZoomIn = useCallback(() => applyScale(scale * 1.25), [applyScale, scale]);
+  const handleZoomOut = useCallback(() => applyScale(scale / 1.25), [applyScale, scale]);
 
   const handleReset = useCallback(() => {
     const resetScale = 1.0;
     const centered = getCenteredOffset(
-      stations,
-      selectedStation,
-      resolvedStationAnchorsById,
-      mapBounds,
-      viewport,
-      resetScale,
+      stations, selectedStation, resolvedStationAnchorsById, mapBounds, viewport, resetScale,
     );
     setScale(resetScale);
-    animateToOffset(centered);
-  }, [
-    animateToOffset,
-    mapBounds,
-    resolvedStationAnchorsById,
-    selectedStation,
-    stations,
-    viewport,
-  ]);
-
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        animatedOffset.stopAnimation((value: { x: number; y: number }) => {
-          lastOffset.current = value;
-        });
-      },
-      onPanResponderMove: (
-        _event: GestureResponderEvent,
-        gestureState: PanResponderGestureState
-      ) => {
-        const nextOffset = {
-          x: lastOffset.current.x + gestureState.dx,
-          y: lastOffset.current.y + gestureState.dy,
-        };
-        animatedOffset.setValue(nextOffset);
-      },
-      onPanResponderRelease: () => {
-        animatedOffset.stopAnimation((value: { x: number; y: number }) => {
-          lastOffset.current = value;
-        });
-      },
-    })
-  ).current;
+    if (SHOULD_ANIMATE) {
+      scaleSV.value = withTiming(resetScale);
+      translateX.value = withTiming(centered.x);
+      translateY.value = withTiming(centered.y);
+    } else {
+      scaleSV.value = resetScale;
+      translateX.value = centered.x;
+      translateY.value = centered.y;
+    }
+  }, [mapBounds, resolvedStationAnchorsById, scaleSV, selectedStation, stations, translateX, translateY, viewport]);
 
   const getStationRadius = (station: Station): number => {
     if (station.isTransfer) return 8;
@@ -301,77 +298,57 @@ const SubwayMapView: React.FC<SubwayMapViewProps> = ({
 
   return (
     <View style={styles.container}>
-      {/* Map Area */}
-      <View
-        style={styles.mapContainer}
-        onLayout={handleMapLayout}
-        {...panResponder.panHandlers}
-      >
-        <Animated.View
-          style={[
-            styles.mapCanvas,
-            {
-              transform: animatedOffset.getTranslateTransform(),
-            },
-          ]}
-        >
-          {Platform.OS === 'web' ? (
-            <Image
-              source={{ uri: subwayLineSvgUri }}
-              style={[
-                styles.mapImage,
-                {
-                  width: SVG_MAP_WIDTH * scale,
-                  height: SVG_MAP_HEIGHT * scale,
-                },
-              ]}
-              resizeMode="contain"
-            />
-          ) : baseSvgXml ? (
-            <SvgXml
-              xml={baseSvgXml}
-              width={SVG_MAP_WIDTH * scale}
-              height={SVG_MAP_HEIGHT * scale}
-            />
-          ) : null}
-          <Svg
-            width={mapBounds.width * scale}
-            height={mapBounds.height * scale}
-            viewBox={`${mapBounds.minX} ${mapBounds.minY} ${mapBounds.width} ${mapBounds.height}`}
-            style={styles.overlaySvg}
-          >
-            {selectedStationPoint && selectedStationData && (
-              <>
-                <Circle
-                  cx={selectedStationPoint.x}
-                  cy={selectedStationPoint.y}
-                  r={20}
-                  fill="#FF5722"
-                  opacity={0.18}
-                />
-                <Circle
-                  cx={selectedStationPoint.x}
-                  cy={selectedStationPoint.y}
-                  r={getStationRadius(selectedStationData) + 7}
-                  fill="none"
-                  stroke="#FF5722"
-                  strokeWidth={3}
-                  opacity={0.75}
-                />
-                <Circle
-                  cx={selectedStationPoint.x}
-                  cy={selectedStationPoint.y}
-                  r={getStationRadius(selectedStationData)}
-                  fill="#FF5722"
-                  stroke="#FFFFFF"
-                  strokeWidth={2}
-                  {...selectedStationPressProps}
-                />
-              </>
-            )}
-          </Svg>
-        </Animated.View>
-      </View>
+      <GestureDetector gesture={composedGesture}>
+        <View style={styles.mapContainer} onLayout={handleMapLayout}>
+          <Animated.View style={[styles.mapCanvas, animatedStyle]}>
+            {Platform.OS === 'web' ? (
+              <Image
+                source={{ uri: subwayLineSvgUri }}
+                style={[styles.mapImage, { width: SVG_MAP_WIDTH, height: SVG_MAP_HEIGHT }]}
+                resizeMode="contain"
+              />
+            ) : baseSvgXml ? (
+              <SvgXml xml={baseSvgXml} width={SVG_MAP_WIDTH} height={SVG_MAP_HEIGHT} />
+            ) : null}
+            <Svg
+              width={mapBounds.width}
+              height={mapBounds.height}
+              viewBox={`${mapBounds.minX} ${mapBounds.minY} ${mapBounds.width} ${mapBounds.height}`}
+              style={styles.overlaySvg}
+            >
+              {selectedStationPoint && selectedStationData && (
+                <>
+                  <Circle
+                    cx={selectedStationPoint.x}
+                    cy={selectedStationPoint.y}
+                    r={20}
+                    fill="#FF5722"
+                    opacity={0.18}
+                  />
+                  <Circle
+                    cx={selectedStationPoint.x}
+                    cy={selectedStationPoint.y}
+                    r={getStationRadius(selectedStationData) + 7}
+                    fill="none"
+                    stroke="#FF5722"
+                    strokeWidth={3}
+                    opacity={0.75}
+                  />
+                  <Circle
+                    cx={selectedStationPoint.x}
+                    cy={selectedStationPoint.y}
+                    r={getStationRadius(selectedStationData)}
+                    fill="#FF5722"
+                    stroke="#FFFFFF"
+                    strokeWidth={2}
+                    {...selectedStationPressProps}
+                  />
+                </>
+              )}
+            </Svg>
+          </Animated.View>
+        </View>
+      </GestureDetector>
 
       {/* Zoom Controls */}
       <View style={styles.controls}>
@@ -428,29 +405,11 @@ const SubwayMapView: React.FC<SubwayMapViewProps> = ({
 // ============================================================================
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
-  mapContainer: {
-    flex: 1,
-    overflow: 'hidden',
-  },
-  mapCanvas: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-  },
-  mapImage: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-  },
-  overlaySvg: {
-    position: 'absolute',
-    left: 0,
-    top: 0,
-  },
+  container: { flex: 1, backgroundColor: '#F5F5F5' },
+  mapContainer: { flex: 1, overflow: 'hidden' },
+  mapCanvas: { position: 'absolute', left: 0, top: 0 },
+  mapImage: { position: 'absolute', left: 0, top: 0 },
+  overlaySvg: { position: 'absolute', left: 0, top: 0 },
   controls: {
     position: 'absolute',
     right: 16,
@@ -473,14 +432,10 @@ const styles = StyleSheet.create({
   },
   controlButtonText: {
     fontSize: 24,
-    fontWeight: '300',
     fontFamily: weightToFontFamily('300'),
     color: '#333',
   },
-  controlButtonTextSmall: {
-    fontSize: 20,
-    color: '#333',
-  },
+  controlButtonTextSmall: { fontSize: 20, color: '#333' },
   scaleIndicator: {
     position: 'absolute',
     left: 16,
@@ -490,10 +445,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 4,
   },
-  scaleText: {
-    fontSize: 12,
-    color: '#666',
-  },
+  scaleText: { fontSize: 12, color: '#666' },
   legend: {
     position: 'absolute',
     left: 16,
@@ -504,20 +456,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 16,
   },
-  legendItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  legendCircle: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    marginRight: 6,
-  },
-  legendText: {
-    fontSize: 12,
-    color: '#666',
-  },
+  legendItem: { flexDirection: 'row', alignItems: 'center' },
+  legendCircle: { width: 12, height: 12, borderRadius: 6, marginRight: 6 },
+  legendText: { fontSize: 12, color: '#666' },
 });
 
 export default SubwayMapView;
