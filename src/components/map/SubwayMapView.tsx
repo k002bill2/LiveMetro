@@ -194,9 +194,12 @@ const SubwayMapView: React.FC<SubwayMapViewProps> = ({
       translateX.value = centered.x;
       translateY.value = centered.y;
     }
-    // Recenter only when the selected station changes.
+    // Recenter when the selected station changes, and once the real viewport
+    // is measured on layout (fixes the initial header-height offset). Viewport
+    // only changes on layout/rotation — never mid-gesture — so this never yanks
+    // the user back after they pan or zoom.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedStation]);
+  }, [selectedStation, viewport]);
 
   const handleMapLayout = useCallback((event: LayoutChangeEvent) => {
     const { width, height } = event.nativeEvent.layout;
