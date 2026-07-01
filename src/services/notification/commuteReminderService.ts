@@ -70,18 +70,38 @@ const STORAGE_PREFIX = '@livemetro_commute_reminders:';
 const storageKey = (uid: string): string => `${STORAGE_PREFIX}${uid}`;
 
 class CommuteReminderService {
+  // Serialize all schedule/cancel work. The app-wide reconcile can fire several
+  // times in quick succession while auth/Firestore hydrate; un-awaited overlap
+  // would let two runs both schedule before either persists, leaving untracked
+  // duplicates that fire every week. Tasks run strictly one at a time.
+  private queue: Promise<unknown> = Promise.resolve();
+
+  private enqueue<T>(task: () => Promise<T>): Promise<T> {
+    const run = this.queue.then(task, task); // chain regardless of prior outcome
+    this.queue = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
+
   /** Read the persisted reminders for a user (empty when none). */
   async getCommuteReminders(uid: string): Promise<ScheduledReminder[]> {
     const stored = await storageUtils.getItem<ScheduledReminder[]>(storageKey(uid));
     return stored ?? [];
   }
 
-  /** Cancel every persisted reminder for a user and clear storage. */
+  /**
+   * Cancel the user's commute reminders and clear storage. Orphan-safe: sweeps
+   * every weekly commute reminder off the OS queue (not just our tracked ids)
+   * so a reminder left behind by an earlier race can never keep firing.
+   */
   async cancelCommuteReminders(uid: string): Promise<void> {
-    const existing = await this.getCommuteReminders(uid);
-    for (const reminder of existing) {
-      await notificationService.cancelNotification(reminder.notificationId);
-    }
+    return this.enqueue(() => this.doCancel(uid));
+  }
+
+  private async doCancel(uid: string): Promise<void> {
+    await notificationService.cancelScheduledCommuteReminders();
     await storageUtils.removeItem(storageKey(uid));
   }
 
@@ -94,7 +114,16 @@ class CommuteReminderService {
     uid: string,
     config: CommuteReminderConfig,
   ): Promise<ScheduledReminder[]> {
-    await this.cancelCommuteReminders(uid); // cancel-before-schedule (멱등)
+    return this.enqueue(() => this.doSchedule(uid, config));
+  }
+
+  private async doSchedule(
+    uid: string,
+    config: CommuteReminderConfig,
+  ): Promise<ScheduledReminder[]> {
+    // Orphan-safe cancel-before-schedule: sweep the whole OS queue so nothing
+    // accumulates, then write the fresh set (setItem overwrites storage below).
+    await notificationService.cancelScheduledCommuteReminders();
 
     const leadMinutes = config.leadMinutes ?? 0;
     const title = '출발 시간이에요';
@@ -138,15 +167,17 @@ class CommuteReminderService {
       leadMinutes?: number;
     },
   ): Promise<void> {
-    if (params.alertEnabled && params.departureTime) {
-      await this.scheduleCommuteReminders(uid, {
-        departureTime: params.departureTime,
-        activeDays: params.activeDays,
-        leadMinutes: params.leadMinutes,
-      });
-    } else {
-      await this.cancelCommuteReminders(uid);
-    }
+    return this.enqueue(async () => {
+      if (params.alertEnabled && params.departureTime) {
+        await this.doSchedule(uid, {
+          departureTime: params.departureTime,
+          activeDays: params.activeDays,
+          leadMinutes: params.leadMinutes,
+        });
+      } else {
+        await this.doCancel(uid);
+      }
+    });
   }
 }
 
