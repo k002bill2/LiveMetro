@@ -1,5 +1,6 @@
 import React from 'react';
 import { render, fireEvent } from '@testing-library/react-native';
+import { useSubwayLineSvgXml } from '@hooks/useSubwayLineSvgXml';
 import SubwayMapView from '../SubwayMapView';
 
 jest.mock('react-native-svg', () => {
@@ -16,6 +17,7 @@ jest.mock('react-native-svg', () => {
     default: mockComponent('Svg'),
     Svg: mockComponent('Svg'),
     SvgUri: mockComponent('SvgUri'),
+    SvgXml: mockComponent('SvgXml'),
     G: mockComponent('G'),
     Line: mockComponent('Line'),
     Circle: mockComponent('Circle'),
@@ -23,6 +25,13 @@ jest.mock('react-native-svg', () => {
       React.createElement(RNText, props, props.children),
   };
 });
+
+// The base map is loaded as raw xml on native via this hook; keep it synchronous
+// in tests so the <SvgXml> base layer is present on the first render.
+jest.mock('@hooks/useSubwayLineSvgXml', () => ({
+  __esModule: true,
+  useSubwayLineSvgXml: jest.fn(() => '<svg>ROUTE_MAP</svg>'),
+}));
 
 const mockStations = [
   { id: 'st1', name: '강남', x: 100, y: 200, lineIds: ['2'], isTransfer: false },
@@ -92,12 +101,22 @@ describe('SubwayMapView', () => {
     expect(getByText('100%')).toBeTruthy();
   });
 
-  it('renders the provided SVG route map as the base layer', () => {
+  it('renders the loaded SVG route map xml as the base layer', () => {
     const { getByTestId } = render(
       <SubwayMapView stations={mockStations} lines={mockLines} />,
     );
-    expect(getByTestId('SvgUri').props.width).toBe(1525);
-    expect(getByTestId('SvgUri').props.height).toBe(1000);
+    const base = getByTestId('SvgXml');
+    expect(base.props.xml).toBe('<svg>ROUTE_MAP</svg>');
+    expect(base.props.width).toBe(1525);
+    expect(base.props.height).toBe(1000);
+  });
+
+  it('omits the base layer while the SVG xml is still loading', () => {
+    (useSubwayLineSvgXml as jest.Mock).mockReturnValueOnce(null);
+    const { queryByTestId } = render(
+      <SubwayMapView stations={mockStations} lines={mockLines} />,
+    );
+    expect(queryByTestId('SvgXml')).toBeNull();
   });
 
   it('renders current-station overlay markers when a station is selected', () => {
