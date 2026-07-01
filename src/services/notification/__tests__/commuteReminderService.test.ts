@@ -11,6 +11,7 @@ jest.mock('@/utils/storageUtils', () => ({
 jest.mock('../notificationService', () => ({
   notificationService: {
     cancelNotification: jest.fn(),
+    cancelScheduledCommuteReminders: jest.fn(),
     scheduleWeeklyReminder: jest.fn(),
     requestPermissions: jest.fn(),
   },
@@ -71,23 +72,21 @@ describe('commuteReminderService cancel/get', () => {
     expect(await commuteReminderService.getCommuteReminders('user-1')).toEqual([]);
   });
 
-  it('cancelCommuteReminders cancels every stored id then clears storage', async () => {
-    (storageUtils.getItem as jest.Mock).mockResolvedValue([
-      { weekday: 2, notificationId: 'n1', time: '08:15' },
-      { weekday: 3, notificationId: 'n2', time: '08:15' },
-    ]);
-
+  it('cancelCommuteReminders sweeps every weekly commute reminder then clears storage', async () => {
+    // Orphan-safe: cancellation no longer depends on stored ids — it sweeps the
+    // whole OS queue via notificationService so untracked orphans die too.
     await commuteReminderService.cancelCommuteReminders('user-1');
 
-    expect(notificationService.cancelNotification).toHaveBeenCalledWith('n1');
-    expect(notificationService.cancelNotification).toHaveBeenCalledWith('n2');
+    expect(notificationService.cancelScheduledCommuteReminders).toHaveBeenCalledTimes(1);
     expect(storageUtils.removeItem).toHaveBeenCalledWith('@livemetro_commute_reminders:user-1');
   });
 
-  it('cancelCommuteReminders is a no-op (still clears) when nothing stored', async () => {
+  it('cancelCommuteReminders still sweeps when nothing is stored (orphan cleanup)', async () => {
     (storageUtils.getItem as jest.Mock).mockResolvedValue(null);
     await commuteReminderService.cancelCommuteReminders('user-1');
-    expect(notificationService.cancelNotification).not.toHaveBeenCalled();
+    // Even with an empty storage record there may be untracked orphans on the
+    // device, so the sweep must always run.
+    expect(notificationService.cancelScheduledCommuteReminders).toHaveBeenCalledTimes(1);
     expect(storageUtils.removeItem).toHaveBeenCalledWith('@livemetro_commute_reminders:user-1');
   });
 });
@@ -121,23 +120,21 @@ describe('commuteReminderService.scheduleCommuteReminders', () => {
     expect(storageUtils.setItem).toHaveBeenCalledWith('@livemetro_commute_reminders:user-1', result);
   });
 
-  it('cancels existing reminders before scheduling (idempotent reschedule)', async () => {
-    (storageUtils.getItem as jest.Mock).mockResolvedValueOnce([
-      { weekday: 6, notificationId: 'old', time: '07:00' },
-    ]);
-
+  it('sweeps existing reminders before scheduling (orphan-safe idempotent reschedule)', async () => {
     await commuteReminderService.scheduleCommuteReminders('user-1', {
       departureTime: '08:15',
       activeDays: [true, false, false, false, false, false, false],
     });
 
-    expect(notificationService.cancelNotification).toHaveBeenCalledWith('old');
-    // cancel happened before the new schedule
-    const cancelOrder = (notificationService.cancelNotification as jest.Mock).mock.invocationCallOrder[0];
-    const scheduleOrder = (notificationService.scheduleWeeklyReminder as jest.Mock).mock.invocationCallOrder[0];
-    expect(cancelOrder).toBeDefined();
+    expect(notificationService.cancelScheduledCommuteReminders).toHaveBeenCalledTimes(1);
+    // sweep happened before the new schedule
+    const sweepOrder = (notificationService.cancelScheduledCommuteReminders as jest.Mock).mock
+      .invocationCallOrder[0];
+    const scheduleOrder = (notificationService.scheduleWeeklyReminder as jest.Mock).mock
+      .invocationCallOrder[0];
+    expect(sweepOrder).toBeDefined();
     expect(scheduleOrder).toBeDefined();
-    expect(cancelOrder).toBeLessThan(scheduleOrder as number);
+    expect(sweepOrder).toBeLessThan(scheduleOrder as number);
   });
 
   it('schedules nothing when no active days', async () => {
@@ -197,5 +194,46 @@ describe('commuteReminderService.reconcileCommuteReminders', () => {
     });
     expect(notificationService.scheduleWeeklyReminder).not.toHaveBeenCalled();
     expect(storageUtils.removeItem).toHaveBeenCalledWith('@livemetro_commute_reminders:user-1');
+  });
+});
+
+describe('commuteReminderService serialization (no overlap)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (storageUtils.getItem as jest.Mock).mockResolvedValue(null);
+    (notificationService.scheduleWeeklyReminder as jest.Mock).mockResolvedValue('id-x');
+  });
+
+  it('runs overlapping schedule calls one at a time (prevents duplicate accumulation)', async () => {
+    // Hold the first sweep open so the two calls genuinely overlap in time.
+    let releaseFirstSweep!: () => void;
+    const firstSweep = new Promise<void>(resolve => {
+      releaseFirstSweep = resolve;
+    });
+    (notificationService.cancelScheduledCommuteReminders as jest.Mock)
+      .mockReturnValueOnce(firstSweep)
+      .mockResolvedValue(undefined);
+
+    const activeDays = [true, false, false, false, false, false, false];
+    const p1 = commuteReminderService.scheduleCommuteReminders('user-1', {
+      departureTime: '08:00',
+      activeDays,
+    });
+    const p2 = commuteReminderService.scheduleCommuteReminders('user-1', {
+      departureTime: '09:00',
+      activeDays,
+    });
+
+    // Flush microtasks: the first call has started its (pending) sweep, the
+    // second is queued strictly behind it and must NOT have begun yet.
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(notificationService.cancelScheduledCommuteReminders).toHaveBeenCalledTimes(1);
+
+    // Only after the first fully completes may the second proceed.
+    releaseFirstSweep();
+    await p1;
+    await p2;
+    expect(notificationService.cancelScheduledCommuteReminders).toHaveBeenCalledTimes(2);
   });
 });

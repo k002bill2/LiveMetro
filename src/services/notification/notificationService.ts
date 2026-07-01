@@ -33,6 +33,22 @@ interface NotificationPayload {
   channelId?: string;
 }
 
+/**
+ * True when a scheduled trigger is a WEEKLY reminder. Android reports it as
+ * `'weekly'`; iOS collapses the same input into a `'calendar'` trigger carrying
+ * a `weekday` but no concrete calendar `day`. The ML departure alert uses a date
+ * trigger (a concrete day), so this predicate deliberately excludes it.
+ */
+const isWeeklyTrigger = (trigger: Notifications.NotificationTrigger | null): boolean => {
+  if (!trigger) return false;
+  if (trigger.type === 'weekly') return true;
+  if (trigger.type === 'calendar') {
+    const components = trigger.dateComponents;
+    return components?.weekday != null && components.day == null;
+  }
+  return false;
+};
+
 class NotificationService {
   private expoPushToken: string | null = null;
   private isInitialized: boolean = false;
@@ -380,6 +396,28 @@ class NotificationService {
     } catch (error) {
       console.error('Error scheduling weekly reminder:', error);
       return null;
+    }
+  }
+
+  /**
+   * Cancel every WEEKLY commute reminder currently scheduled on the OS queue —
+   * including "orphans" whose ids we no longer track (left behind by an earlier
+   * reconcile race or app version). Scoped to weekly triggers so it never
+   * cancels the ML departure alert, which shares the COMMUTE_REMINDER type but
+   * fires on a date trigger. Never throws.
+   */
+  async cancelScheduledCommuteReminders(): Promise<void> {
+    try {
+      const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+      for (const request of scheduled) {
+        const isCommuteReminder =
+          request.content?.data?.type === NotificationType.COMMUTE_REMINDER;
+        if (isCommuteReminder && isWeeklyTrigger(request.trigger)) {
+          await Notifications.cancelScheduledNotificationAsync(request.identifier);
+        }
+      }
+    } catch (error) {
+      console.error('Error cancelling scheduled commute reminders:', error);
     }
   }
 
