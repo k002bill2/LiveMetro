@@ -20,7 +20,8 @@ import {
   LayoutChangeEvent,
 } from 'react-native';
 import { Asset } from 'expo-asset';
-import { Circle, Svg, SvgUri } from 'react-native-svg';
+import { Circle, Svg, SvgXml } from 'react-native-svg';
+import { useSubwayLineSvgXml } from '@hooks/useSubwayLineSvgXml';
 import { weightToFontFamily } from '@/styles/modernTheme';
 import {
   FALLBACK_MAP_HEIGHT,
@@ -140,6 +141,7 @@ const SubwayMapView: React.FC<SubwayMapViewProps> = ({
   initialScale = 1.0,
 }) => {
   const mapBounds = React.useMemo(() => getMapBounds(), []);
+  const baseSvgXml = useSubwayLineSvgXml(subwayLineSvgAsset);
   const initialViewport = useRef(Dimensions.get('window')).current;
   const resolvedStationAnchorsById = React.useMemo(
     () => stationAnchorsById ?? createSubwayLineSvgAnchorMap(stations),
@@ -325,13 +327,13 @@ const SubwayMapView: React.FC<SubwayMapViewProps> = ({
               ]}
               resizeMode="contain"
             />
-          ) : (
-            <SvgUri
-              uri={subwayLineSvgUri}
+          ) : baseSvgXml ? (
+            <SvgXml
+              xml={baseSvgXml}
               width={SVG_MAP_WIDTH * scale}
               height={SVG_MAP_HEIGHT * scale}
             />
-          )}
+          ) : null}
           <Svg
             width={mapBounds.width * scale}
             height={mapBounds.height * scale}
