@@ -307,6 +307,115 @@ describe('CommuteLogService', () => {
     });
   });
 
+  describe('autoLogCommuteRoute', () => {
+    const mockRoute = {
+      departureTime: '08:00',
+      departureStationId: 'sindorim',
+      departureStationName: '신도림',
+      departureLineId: '2',
+      transferStations: [],
+      arrivalStationId: 'gangnam',
+      arrivalStationName: '강남',
+      arrivalLineId: '2',
+      notifications: {
+        transferAlert: false,
+        arrivalAlert: false,
+        delayAlert: false,
+        incidentAlert: false,
+        alertMinutesBefore: 5,
+      },
+      bufferMinutes: 10,
+    };
+
+    const noArrivalLogDoc = {
+      id: 'log-123',
+      data: () => ({
+        ...mockLogDoc.data(),
+        arrivalTime: undefined,
+      }),
+    };
+
+    it('should create a full-route log for departure when no log exists today', async () => {
+      mockGetDocs.mockResolvedValue({ empty: true, docs: [] });
+      mockAddDoc.mockResolvedValue({ id: 'route-log-id' });
+
+      const result = await commuteLogService.autoLogCommuteRoute(
+        'user-123',
+        mockRoute,
+        'departure'
+      );
+
+      expect(result).not.toBeNull();
+      expect(mockAddDoc).toHaveBeenCalledTimes(1);
+      const payload = mockAddDoc.mock.calls[0][1];
+      expect(payload.departureStationId).toBe('sindorim');
+      expect(payload.arrivalStationId).toBe('gangnam');
+      expect(payload.lineIds).toEqual(['2']);
+      expect(payload.isManual).toBe(false);
+    });
+
+    it('should not create a departure log if already logged today', async () => {
+      mockGetDocs.mockResolvedValue({ empty: false, docs: [mockLogDoc] });
+
+      const result = await commuteLogService.autoLogCommuteRoute(
+        'user-123',
+        mockRoute,
+        'departure'
+      );
+
+      expect(result).toBeNull();
+      expect(mockAddDoc).not.toHaveBeenCalled();
+    });
+
+    it('should fill arrivalTime on today\'s log for arrival', async () => {
+      mockGetDocs.mockResolvedValue({ empty: false, docs: [noArrivalLogDoc] });
+      mockUpdateDoc.mockResolvedValue(undefined);
+
+      const result = await commuteLogService.autoLogCommuteRoute(
+        'user-123',
+        mockRoute,
+        'arrival'
+      );
+
+      expect(result).not.toBeNull();
+      expect(result?.arrivalTime).toBe('08:30'); // mocked current time
+      expect(mockUpdateDoc).toHaveBeenCalledTimes(1);
+      expect(mockAddDoc).not.toHaveBeenCalled();
+    });
+
+    it('should create a new log for arrival when nothing was logged today', async () => {
+      mockGetDocs.mockResolvedValue({ empty: true, docs: [] });
+      mockAddDoc.mockResolvedValue({ id: 'evening-log-id' });
+
+      const result = await commuteLogService.autoLogCommuteRoute(
+        'user-123',
+        mockRoute,
+        'arrival'
+      );
+
+      expect(result).not.toBeNull();
+      expect(mockAddDoc).toHaveBeenCalledTimes(1);
+      const payload = mockAddDoc.mock.calls[0][1];
+      expect(payload.departureStationId).toBe('sindorim');
+      expect(payload.isManual).toBe(false);
+      expect(mockUpdateDoc).not.toHaveBeenCalled();
+    });
+
+    it('should do nothing for arrival when today\'s log already has arrivalTime', async () => {
+      mockGetDocs.mockResolvedValue({ empty: false, docs: [mockLogDoc] });
+
+      const result = await commuteLogService.autoLogCommuteRoute(
+        'user-123',
+        mockRoute,
+        'arrival'
+      );
+
+      expect(result).toBeNull();
+      expect(mockUpdateDoc).not.toHaveBeenCalled();
+      expect(mockAddDoc).not.toHaveBeenCalled();
+    });
+  });
+
   describe('cleanupOldLogs', () => {
     it('should delete old logs', async () => {
       const mockDocRefs = [

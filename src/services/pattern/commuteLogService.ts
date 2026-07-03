@@ -27,6 +27,7 @@ import {
   MAX_LOG_AGE_DAYS,
   fromCommuteLogDoc,
 } from '@/models/pattern';
+import type { CommuteRoute } from '@/models/commute';
 
 const COLLECTION_NAME = 'commuteLogs';
 
@@ -274,6 +275,46 @@ class CommuteLogService {
       };
     }
 
+    return null;
+  }
+
+  /**
+   * Auto-log a commute from the user's configured commuteSettings route.
+   * Fired on app open/foreground during commute windows, so home-screen-only
+   * users (who never open a station detail or start guidance) still
+   * accumulate logs. Unlike autoLogIfAppropriate, the full route is known,
+   * so both departure and arrival stations are recorded.
+   */
+  async autoLogCommuteRoute(
+    userId: string,
+    route: CommuteRoute,
+    commuteType: 'departure' | 'arrival'
+  ): Promise<CommuteLog | null> {
+    const todayLog = await this.getTodayLog(userId);
+    const routeInput: CreateCommuteLogInput = {
+      departureStationId: route.departureStationId,
+      departureStationName: route.departureStationName,
+      arrivalStationId: route.arrivalStationId,
+      arrivalStationName: route.arrivalStationName,
+      lineIds: [...new Set([route.departureLineId, route.arrivalLineId])].filter(Boolean),
+      isManual: false,
+    };
+
+    if (commuteType === 'departure') {
+      // One auto log per day — mirrors autoLogIfAppropriate's dedup.
+      if (todayLog) return null;
+      return this.logCommute(userId, routeInput);
+    }
+
+    // arrival (퇴근): fill today's open log, or start an evening-only log.
+    if (!todayLog) {
+      return this.logCommute(userId, routeInput);
+    }
+    if (!todayLog.arrivalTime) {
+      const arrivalTime = getCurrentTimeString();
+      await this.updateLog(userId, todayLog.id, { arrivalTime });
+      return { ...todayLog, arrivalTime };
+    }
     return null;
   }
 
