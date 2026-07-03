@@ -22,6 +22,7 @@ import { usePushRegistration } from './src/hooks/usePushRegistration';
 import { useWatchedLineIds } from './src/hooks/useWatchedLineIds';
 import { useCommuteDelayAlerts } from './src/hooks/useCommuteDelayAlerts';
 import { useGuidanceCommuteLogSync } from './src/hooks/useGuidanceCommuteLogSync';
+import { useCommuteSettingsAutoLog } from './src/hooks/useCommuteSettingsAutoLog';
 import { useGuidanceBackgroundLocationSync } from './src/hooks/useGuidanceBackgroundLocationSync';
 import { hydrateGuidanceSession } from './src/services/guidance/guidanceSessionStore';
 import './src/services/guidance/guidanceBackgroundLocationTask';
@@ -57,6 +58,10 @@ const AppContent: React.FC = () => {
   // the app is later backgrounded or restarted before the rider arrives.
   useGuidanceCommuteLogSync();
   useGuidanceBackgroundLocationSync();
+  // App opens during commute windows are commute signals too — log via the
+  // configured commuteSettings route so home-screen-only users (no station
+  // detail visits, no guidance sessions) still accumulate commute records.
+  useCommuteSettingsAutoLog();
   // Restore an in-progress guidance session (with TTL guard) so a commute
   // survives an app kill mid-journey and the "안내 중" banner reappears.
   useEffect(() => {
