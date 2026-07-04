@@ -9,6 +9,7 @@
 import { renderHook, act } from '@testing-library/react-native';
 import { selectCommuteRoute } from '@services/route/selectCommuteRoute';
 import { setGuidanceSession } from '@services/guidance/guidanceSessionStore';
+import { notificationService } from '@services/notification/notificationService';
 import type { Route } from '@/models/route';
 import { useStartCommuteGuidance } from '../useStartCommuteGuidance';
 
@@ -22,9 +23,15 @@ jest.mock('@services/route/selectCommuteRoute', () => ({
 jest.mock('@services/guidance/guidanceSessionStore', () => ({
   setGuidanceSession: jest.fn(),
 }));
+jest.mock('@services/notification/notificationService', () => ({
+  notificationService: {
+    cancelScheduledMlDepartureAlerts: jest.fn(() => Promise.resolve()),
+  },
+}));
 
 const mockedSelect = selectCommuteRoute as jest.Mock;
 const mockedSet = setGuidanceSession as jest.Mock;
+const mockedCancelMl = notificationService.cancelScheduledMlDepartureAlerts as jest.Mock;
 
 const ROUTE = {
   segments: [],
@@ -81,6 +88,15 @@ describe('useStartCommuteGuidance', () => {
       }),
     );
     expect(mockNavigate).toHaveBeenCalledWith('RouteGuidance');
+  });
+
+  it('cancels the scheduled ML departure alert when guidance starts (이미 이동 중)', () => {
+    mockedSelect.mockReturnValue(ROUTE);
+    const { result } = renderHook(() => useStartCommuteGuidance(args()));
+    act(() => {
+      result.current?.();
+    });
+    expect(mockedCancelMl).toHaveBeenCalledTimes(1);
   });
 
   it('returns null when no route can be computed', () => {

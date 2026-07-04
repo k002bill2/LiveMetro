@@ -6,14 +6,24 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import { NotificationSettings } from '../../models/user';
+import { getGuidanceSession } from '@/services/guidance/guidanceSessionStore';
 
-// Configure notification handler
+// Configure notification handler.
+// 길안내 세션이 활성인 동안 포그라운드로 도착한 출퇴근 리마인더("지금
+// 출발하세요" 주간 알림 등)는 이미 이동 중인 사용자에게 순수 소음 — 배너와
+// 사운드를 억제한다. 주간 반복 트리거는 OS 큐에서 '오늘 발사분'만 선별
+// 취소할 수 없어, 포그라운드 표출 시점이 유일한 억제 지점이다.
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: false,
-  }),
+  handleNotification: async (notification) => {
+    const dataType = notification?.request?.content?.data?.type;
+    const suppress =
+      dataType === NotificationType.COMMUTE_REMINDER && getGuidanceSession() !== null;
+    return {
+      shouldShowAlert: !suppress,
+      shouldPlaySound: !suppress,
+      shouldSetBadge: false,
+    };
+  },
 });
 
 export enum NotificationType {
@@ -418,6 +428,28 @@ class NotificationService {
       }
     } catch (error) {
       console.error('Error cancelling scheduled commute reminders:', error);
+    }
+  }
+
+  /**
+   * Cancel the scheduled ML departure alert(s) — COMMUTE_REMINDER entries on a
+   * concrete DATE trigger. Exact complement of
+   * {@link cancelScheduledCommuteReminders}: weekly reminders are preserved.
+   * 길안내 시작 시 호출 — 사용자가 이미 출발했으므로 오늘 예약된 "출발
+   * 알림"은 발사 전에 제거한다. Never throws.
+   */
+  async cancelScheduledMlDepartureAlerts(): Promise<void> {
+    try {
+      const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+      for (const request of scheduled) {
+        const isCommuteReminder =
+          request.content?.data?.type === NotificationType.COMMUTE_REMINDER;
+        if (isCommuteReminder && !isWeeklyTrigger(request.trigger)) {
+          await Notifications.cancelScheduledNotificationAsync(request.identifier);
+        }
+      }
+    } catch (error) {
+      console.error('Error cancelling scheduled ML departure alerts:', error);
     }
   }
 

@@ -136,12 +136,12 @@ const transferSegAt = (
 });
 
 /** A train on line 2 arriving `etaSec` from T0, keyed by a poll-stable id. */
-const trainOf = (id: string, etaSec: number) => ({
+const trainOf = (id: string, etaSec: number, finalDestination = '산곡') => ({
   id,
   lineId: '2',
   direction: 'up' as const,
   arrivalTime: new Date(T0 + etaSec * 1000),
-  finalDestination: '산곡',
+  finalDestination,
 });
 
 const seedSession = (): void => {
@@ -382,11 +382,51 @@ describe('RouteGuidanceScreen', () => {
       error: null,
     });
     const { getByTestId } = render(<RouteGuidanceScreen />);
+    // trainId는 발사 이력 dedup 키 — 반드시 함께 전달돼야 한다.
     expect(scheduleBoardingAlert).toHaveBeenCalledWith(
-      expect.objectContaining({ stationName: '을지로3가', variant: 'board' })
+      expect.objectContaining({ stationName: '을지로3가', variant: 'board', trainId: 'T1' })
     );
     fireEvent.press(getByTestId('guidance-exit'));
     expect(cancelBoardingAlert).toHaveBeenCalled();
+  });
+
+  // ── 방향(방면) 우선 필터: 반대 방향 열차가 더 먼저 와도 칩/알림은 진행
+  // 방향(을지로3가→시청 = '산곡' 방면) 열차 기준이어야 한다.
+  it('prefers the travel-direction train over a sooner opposite-direction train', () => {
+    seedSession();
+    mockedUseRealtimeTrains.mockReturnValue({
+      trains: [
+        trainOf('OPP', 60, '을지로3가'), // 반대 방향 — 더 먼저 도착
+        trainOf('T1', 90, '산곡'), // 진행 방향
+      ],
+      loading: false,
+      error: null,
+    });
+    const { getByText } = render(<RouteGuidanceScreen />);
+    // 칩은 진행 방향 열차(90초) 기준 — 반대 방향(60초)이 아님
+    expect(getByText('다음 열차 1분 30초 후 도착')).toBeTruthy();
+    expect(scheduleBoardingAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ trainId: 'T1', finalDestination: '산곡' })
+    );
+    expect(scheduleBoardingAlert).not.toHaveBeenCalledWith(
+      expect.objectContaining({ trainId: 'OPP' })
+    );
+  });
+
+  it('falls back to line-filtered trains when no train matches the direction name (단축운행 종착 대비)', () => {
+    seedSession();
+    mockedUseRealtimeTrains.mockReturnValue({
+      // 진행 방향이지만 단축 운행이라 종착역명이 방면명('산곡')과 다른 경우 —
+      // 하드 필터였다면 칩/알림이 전멸했을 상황. 폴백으로 유지돼야 한다.
+      trains: [trainOf('SHORT', 60, '시청')],
+      loading: false,
+      error: null,
+    });
+    const { getByText } = render(<RouteGuidanceScreen />);
+    expect(getByText('다음 열차 1분 00초 후 도착')).toBeTruthy();
+    expect(scheduleBoardingAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ trainId: 'SHORT' })
+    );
   });
 
   it('holds at a transfer step with a ticking (not frozen) walk countdown', () => {
