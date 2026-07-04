@@ -71,6 +71,52 @@ export const focalZoom = (
   };
 };
 
+export interface GestureFrame {
+  scale: number;
+  translate: Vec2;
+}
+
+/**
+ * Per-frame incremental pan: compose the frame delta onto the CURRENT
+ * translate (which pinch may have just updated), then clamp.
+ * Delta-based so simultaneous pinch/pan writes compose instead of stomping.
+ */
+export const panFrame = (
+  frame: GestureFrame,
+  change: Vec2,
+  content: Size,
+  viewport: Size,
+): Vec2 => {
+  'worklet';
+  return clampTranslate(
+    { x: frame.translate.x + change.x, y: frame.translate.y + change.y },
+    frame.scale,
+    content,
+    viewport,
+  );
+};
+
+/**
+ * Per-frame incremental focal zoom: scale by this frame's ratio anchored on
+ * the CURRENT state, keeping the content under the focal point fixed.
+ * Focal movement itself is handled by the simultaneous two-finger pan.
+ */
+export const pinchFrame = (
+  frame: GestureFrame,
+  focal: Vec2,
+  scaleChange: number,
+  content: Size,
+  viewport: Size,
+): GestureFrame => {
+  'worklet';
+  const nextScale = clampScale(frame.scale * scaleChange);
+  const zoomed = focalZoom(focal, frame.scale, nextScale, frame.translate);
+  return {
+    scale: nextScale,
+    translate: clampTranslate(zoomed, nextScale, content, viewport),
+  };
+};
+
 type TransformEntry =
   | { translateX: number }
   | { translateY: number }
