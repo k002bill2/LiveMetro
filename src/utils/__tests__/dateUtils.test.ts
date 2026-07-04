@@ -80,7 +80,10 @@ describe('dateUtils', () => {
     });
 
     it('should handle Date objects', () => {
-      const futureDate = new Date(Date.now() + 3 * 60 * 1000);
+      // 3분 30초 뒤 — 함수 내부의 `new Date()` 재호출로 수 ms가 흘러도
+      // floor(초→분)가 3분 버킷에 안착하도록 여유를 둔다. 정확히 3*60초로
+      // 잡으면 elapsed-ms 드리프트로 179초 → "2분후"가 되어 플래키.
+      const futureDate = new Date(Date.now() + (3 * 60 + 30) * 1000);
       expect(formatArrivalTime(futureDate)).toBe('3분후');
     });
   });
