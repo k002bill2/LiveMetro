@@ -40,8 +40,8 @@ import {
 } from '@components/map/subwayLineSvgAnchors';
 import {
   clampScale,
-  clampTranslate,
-  focalZoom,
+  panFrame,
+  pinchFrame,
   toTransform,
   type Size,
 } from '@components/map/subwayMapGestureMath';
@@ -169,9 +169,6 @@ const SubwayMapView: React.FC<SubwayMapViewProps> = ({
   const scaleSV = useSharedValue(initialScale);
   const translateX = useSharedValue(initialOffset.x);
   const translateY = useSharedValue(initialOffset.y);
-  const savedScale = useSharedValue(initialScale);
-  const savedTranslateX = useSharedValue(initialOffset.x);
-  const savedTranslateY = useSharedValue(initialOffset.y);
   const viewportSV = useSharedValue<Size>({
     width: initialViewport.width,
     height: initialViewport.height,
@@ -209,15 +206,16 @@ const SubwayMapView: React.FC<SubwayMapViewProps> = ({
     }
   }, [viewportSV]);
 
+  // Both gestures apply per-frame DELTAS onto the current shared values.
+  // Pan and pinch run simultaneously; absolute (gesture-start-anchored)
+  // updates would overwrite each other every frame and yank the map away
+  // from the finger midpoint. Focal movement itself arrives as the pan
+  // delta (two-finger pan tracks the pointer average = the focal point).
   const panGesture = Gesture.Pan()
-    .onStart(() => {
-      savedTranslateX.value = translateX.value;
-      savedTranslateY.value = translateY.value;
-    })
-    .onUpdate(event => {
-      const next = clampTranslate(
-        { x: savedTranslateX.value + event.translationX, y: savedTranslateY.value + event.translationY },
-        scaleSV.value,
+    .onChange(event => {
+      const next = panFrame(
+        { scale: scaleSV.value, translate: { x: translateX.value, y: translateY.value } },
+        { x: event.changeX, y: event.changeY },
         content,
         viewportSV.value,
       );
@@ -226,23 +224,17 @@ const SubwayMapView: React.FC<SubwayMapViewProps> = ({
     });
 
   const pinchGesture = Gesture.Pinch()
-    .onStart(() => {
-      savedScale.value = scaleSV.value;
-      savedTranslateX.value = translateX.value;
-      savedTranslateY.value = translateY.value;
-    })
-    .onUpdate(event => {
-      const nextScale = clampScale(savedScale.value * event.scale);
-      const zoomed = focalZoom(
+    .onChange(event => {
+      const next = pinchFrame(
+        { scale: scaleSV.value, translate: { x: translateX.value, y: translateY.value } },
         { x: event.focalX, y: event.focalY },
-        savedScale.value,
-        nextScale,
-        { x: savedTranslateX.value, y: savedTranslateY.value },
+        event.scaleChange,
+        content,
+        viewportSV.value,
       );
-      const clamped = clampTranslate(zoomed, nextScale, content, viewportSV.value);
-      scaleSV.value = nextScale;
-      translateX.value = clamped.x;
-      translateY.value = clamped.y;
+      scaleSV.value = next.scale;
+      translateX.value = next.translate.x;
+      translateY.value = next.translate.y;
     })
     .onEnd(() => {
       runOnJS(setScale)(scaleSV.value);
