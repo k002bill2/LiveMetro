@@ -13,6 +13,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { selectCommuteRoute } from '@services/route/selectCommuteRoute';
 import { setGuidanceSession } from '@services/guidance/guidanceSessionStore';
+import { notificationService } from '@services/notification/notificationService';
 import type { AppStackParamList } from '@/navigation/types';
 
 interface StartCommuteGuidanceArgs {
@@ -44,6 +45,9 @@ export function useStartCommuteGuidance(
       toStationName,
       startedAt: Date.now(),
     });
+    // 이미 이동을 시작했으므로 오늘 예약된 ML "출발 알림"은 발사 전에 제거
+    // (fire-and-forget — 실패해도 길안내 시작을 막지 않는다).
+    void notificationService.cancelScheduledMlDepartureAlerts();
     navigation.navigate('RouteGuidance');
   }, [route, fromStationName, toStationName, navigation]);
 

@@ -120,12 +120,20 @@ export const RouteGuidanceScreen: React.FC = () => {
     currentStep !== undefined && currentStep.kind !== 'alight' ? currentStep.direction : null;
 
   // Numbered-line filter (transfer-station 다노선 혼입 방지) — mirrors
-  // TrainSelectionScreen. Extended lines keep all trains.
+  // TrainSelectionScreen. Extended lines keep all trains. 이후 진행 방향(방면)
+  // 매칭 열차를 우선한다 — 반대 방향 열차 기준의 칩/알림 방지. 단축 운행
+  // 종착역은 방면명과 정당하게 다를 수 있어(detectDeparture와 같은 원칙)
+  // 매칭이 전무하면 노선 필터 결과로 폴백한다.
   const filteredTrains = useMemo((): readonly Train[] => {
     if (!isWaitingStep) return [];
     const all: readonly Train[] = trains ?? [];
-    return /^[1-9]$/.test(waitingLineId) ? all.filter(t => t.lineId === waitingLineId) : all;
-  }, [isWaitingStep, trains, waitingLineId]);
+    const onLine = /^[1-9]$/.test(waitingLineId)
+      ? all.filter(t => t.lineId === waitingLineId)
+      : all;
+    if (waitingDirection === null) return onLine;
+    const matched = onLine.filter(t => t.finalDestination === waitingDirection);
+    return matched.length > 0 ? matched : onLine;
+  }, [isWaitingStep, trains, waitingLineId, waitingDirection]);
 
   // Earliest train still ahead — feeds both the live chip and the local alert.
   const earliestTrain = useMemo((): Train | null => {
@@ -227,17 +235,22 @@ export const RouteGuidanceScreen: React.FC = () => {
   ]);
 
   // Local-notification bridge — schedule/reschedule for the earliest train while
-  // waiting; boardingAlertService dedups (cancel-then-schedule). The screen is
-  // foreground when scheduling, so tapping the alert just returns here (no deep link).
+  // waiting. 폴링마다 earliestTrain 참조가 갱신되어 effect가 재실행되므로,
+  // boardingAlertService가 trainId 발사-이력 dedup으로 같은 열차의 중복 발사를
+  // 막는다(발사된 알림은 취소 불가 — pending만 cancel-then-schedule). The screen
+  // is foreground when scheduling, so tapping the alert just returns here.
+  const notificationSettings = user?.preferences?.notificationSettings ?? null;
   useEffect(() => {
     if (!isWaitingStep || earliestTrain?.arrivalTime == null) return;
     void scheduleBoardingAlert({
       stationName: waitingStationName,
       finalDestination: earliestTrain.finalDestination,
       arrivalTime: earliestTrain.arrivalTime,
+      trainId: earliestTrain.id,
+      settings: notificationSettings,
       variant: currentStep?.kind === 'transfer' ? 'transfer' : 'board',
     });
-  }, [isWaitingStep, earliestTrain, waitingStationName, currentStep?.kind]);
+  }, [isWaitingStep, earliestTrain, waitingStationName, currentStep?.kind, notificationSettings]);
 
   // Cancel any pending alert / timer on unmount (subscription-cleanup rule).
   useEffect(() => {
