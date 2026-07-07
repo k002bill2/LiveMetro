@@ -66,15 +66,21 @@ export const scheduleAlightAlert = async (
       return null;
     }
 
+    // 발사 시각 기준으로 quiet-hours/weekdaysOnly를 평가한다 — pending은 예약 시각이 아닌
+    // fireAtMs에 발사되므로, 승차가 조용한 시간 경계를 걸치면 예약 시각 평가는 틀린다.
+    const fireAtMs = arrivalAtMs - prefs.leadMinutes * 60_000;
     if (
       settings != null &&
-      !notificationService.shouldSendNotification(settings, NotificationType.ARRIVAL_REMINDER)
+      !notificationService.shouldSendNotification(
+        settings,
+        NotificationType.ARRIVAL_REMINDER,
+        new Date(fireAtMs)
+      )
     ) {
       await cancelAlightAlert();
       return null;
     }
 
-    const fireAtMs = arrivalAtMs - prefs.leadMinutes * 60_000;
     if (fireAtMs - Date.now() < MIN_SCHEDULE_LEAD_MS) return null;
 
     if (

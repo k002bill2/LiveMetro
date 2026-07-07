@@ -155,6 +155,16 @@ describe('scheduleAlightAlert', () => {
     expect(notif.scheduleArrivalAlert).not.toHaveBeenCalled();
   });
 
+  it('evaluates shouldSendNotification at the fire time, not the schedule time (조용한 시간 경계)', async () => {
+    await svc.scheduleAlightAlert(baseParams);
+    // leadMinutes 2분 → fireAt = arrivalAt - 2분. 게이트는 예약 시각(now)이 아닌 발사 시각으로 평가한다.
+    expect(notif.shouldSendNotification).toHaveBeenCalledWith(
+      baseParams.settings,
+      'arrival_reminder',
+      new Date(baseParams.arrivalAtMs - 2 * 60_000)
+    );
+  });
+
   it('cancels pending when a re-call is gated by shouldSendNotification (음소거 전환)', async () => {
     await svc.scheduleAlightAlert(baseParams);
     notif.scheduleArrivalAlert.mockClear();
