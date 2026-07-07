@@ -180,6 +180,12 @@ export const RouteGuidanceScreen: React.FC = () => {
   const [softConfirm, setSoftConfirm] = useState<{ readonly trainId: string } | null>(null);
   const [trainSelectContext, setTrainSelectContext] = useState<TrainSelectContext | null>(null);
   const prevTrainsRef = useRef<readonly Train[] | null>(null);
+  // Identity of the last `trains` value the detection effect actually processed.
+  // Guards against non-poll re-runs (step transitions) seeding prevTrainsRef with
+  // a stale snapshot — useRealtimeTrains keeps the previous station's array until
+  // the new subscription delivers, and enforcing this makes the effect a true
+  // onDataReceived hook. NOT reset on step change (it marks the stale array).
+  const lastSeenTrainsRef = useRef<readonly Train[] | null | undefined>(null);
   const firedForIndexRef = useRef<number | null>(null);
   const cooldownTrainIdRef = useRef<string | null>(null);
   const autoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -290,6 +296,12 @@ export const RouteGuidanceScreen: React.FC = () => {
       prevTrainsRef.current = null;
       return;
     }
+    // Only act on a genuine poll update. A step transition (or other dep change)
+    // re-runs this effect with the same (possibly stale) `trains` reference —
+    // processing it would seed prevTrainsRef with the previous station's array
+    // and mis-detect all of it as departures on the next fresh snapshot.
+    if (lastSeenTrainsRef.current === trains) return;
+    lastSeenTrainsRef.current = trains;
     const next = trains ?? [];
     const result = detectDeparture({
       prev: prevTrainsRef.current,

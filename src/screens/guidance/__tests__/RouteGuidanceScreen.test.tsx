@@ -176,6 +176,20 @@ const seedTransferSession = (): void => {
   });
 };
 
+/** board(line2) → ride(line2) → transfer@왕십리 to an EXTENDED line → ride → alight. */
+const seedExtendedTransferSession = (): void => {
+  setGuidanceSession({
+    route: createRoute([
+      hop('s1', '을지로3가', 's2', '왕십리', 2),
+      transferSegAt('s2', '왕십리', '경의중앙선', 4),
+      lineHop('s2', '왕십리', 's3', '중랑', '경의중앙선', 3),
+    ]),
+    fromStationName: '을지로3가',
+    toStationName: '중랑',
+    startedAt: T0,
+  });
+};
+
 describe('RouteGuidanceScreen', () => {
   beforeEach(() => {
     jest.useFakeTimers();
@@ -562,6 +576,29 @@ describe('RouteGuidanceScreen', () => {
       rerender(<RouteGuidanceScreen />);
     });
     expect(queryByTestId('guidance-soft-confirm')).toBeNull();
+  });
+
+  it('does not record previous-station trains as departures when a stale snapshot seeds a transfer step', () => {
+    seedExtendedTransferSession();
+    // Previous-station snapshot (extended line passes the numbered filter) —
+    // useRealtimeTrains keeps this stale array until the new subscription delivers.
+    const stale = { trains: [trainOf('STALE', 10, '천안')], loading: false, error: null };
+    mockedUseRealtimeTrains.mockReturnValue(stale);
+    const { getByTestId, queryByTestId, rerender } = render(<RouteGuidanceScreen />);
+    // board → ride → transfer via manual next (no clock advance; stale array kept).
+    fireEvent.press(getByTestId('guidance-next')); // board → ride
+    fireEvent.press(getByTestId('guidance-next')); // ride → transfer (왕십리)
+    // Fresh snapshot for the NEW station arrives — different identity, empty.
+    mockedUseRealtimeTrains.mockReturnValue({ trains: [], loading: false, error: null });
+    act(() => {
+      rerender(<RouteGuidanceScreen />);
+    });
+    // Open the sheet at the transfer: the stale train must NOT appear as a
+    // 왕십리 departure (only the fallback exists).
+    fireEvent.press(getByTestId('guidance-open-train-select'));
+    expect(getByTestId('train-select-sheet')).toBeTruthy();
+    expect(queryByTestId('train-select-item-STALE')).toBeNull();
+    expect(getByTestId('train-select-now')).toBeTruthy();
   });
 
   it('opens the train-select sheet from the soft-confirm 다른 열차 link', () => {
