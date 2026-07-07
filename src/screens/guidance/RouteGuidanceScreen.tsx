@@ -212,13 +212,15 @@ export const RouteGuidanceScreen: React.FC = () => {
     setSoftConfirm(null);
   }, [clearAutoTimer, softConfirm]);
 
-  const openTrainSelect = useCallback((): void => setTrainSelectVisible(true), []);
-  const closeTrainSelect = useCallback((): void => setTrainSelectVisible(false), []);
-
-  const handleSoftConfirmOther = useCallback((): void => {
+  // Opening the sheet always dismisses any pending soft-confirm first, so its
+  // 4s auto-advance can never fire behind the sheet. dismissSoftConfirm is a
+  // no-op (bar cooldown bookkeeping) when nothing is pending. Shared by the
+  // waiting-card link and the soft-confirm "다른 열차예요" action.
+  const openTrainSelect = useCallback((): void => {
     dismissSoftConfirm();
     setTrainSelectVisible(true);
   }, [dismissSoftConfirm]);
+  const closeTrainSelect = useCallback((): void => setTrainSelectVisible(false), []);
 
   // Rebase to the picked departure: retroactive board while waiting, or an
   // in-place anchor swap (index kept) while riding.
@@ -321,9 +323,9 @@ export const RouteGuidanceScreen: React.FC = () => {
   const softConfirmHandlers = useMemo(
     () =>
       softConfirm !== null
-        ? { onYes: confirmBoarded, onNotYet: dismissSoftConfirm, onOther: handleSoftConfirmOther }
+        ? { onYes: confirmBoarded, onNotYet: dismissSoftConfirm, onOther: openTrainSelect }
         : null,
-    [softConfirm, confirmBoarded, dismissSoftConfirm, handleSoftConfirmOther]
+    [softConfirm, confirmBoarded, dismissSoftConfirm, openTrainSelect]
   );
 
   // Candidates for the sheet: recent departures at the current step's station on

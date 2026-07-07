@@ -485,6 +485,31 @@ describe('RouteGuidanceScreen', () => {
     expect(getByTestId('train-select-item-FRESH')).toBeTruthy();
   });
 
+  it('cancels the pending soft-confirm auto-advance when the train-select link opens the sheet', () => {
+    seedSession();
+    mockedUseRealtimeTrains.mockReturnValue({
+      trains: [trainOf('T1', 10)],
+      loading: false,
+      error: null,
+    });
+    const { getByTestId, getByText, queryByTestId, rerender } = render(<RouteGuidanceScreen />);
+    // second snapshot: train gone → soft-confirm prompt appears (auto timer armed)
+    mockedUseRealtimeTrains.mockReturnValue({ trains: [], loading: false, error: null });
+    act(() => {
+      rerender(<RouteGuidanceScreen />);
+    });
+    expect(getByTestId('guidance-soft-confirm')).toBeTruthy();
+    // Open the sheet via the waiting-card link while the grace timer is pending.
+    fireEvent.press(getByTestId('guidance-open-train-select'));
+    expect(getByTestId('train-select-sheet')).toBeTruthy();
+    // Past the 4s grace window: the auto-advance must NOT fire behind the sheet.
+    act(() => {
+      jest.advanceTimersByTime(5000);
+    });
+    expect(queryByTestId('guidance-soft-confirm')).toBeNull();
+    expect(getByText('탑승 대기')).toBeTruthy(); // still on the board step, not riding
+  });
+
   it('opens the train-select sheet from the soft-confirm 다른 열차 link', () => {
     seedSession();
     mockedUseRealtimeTrains.mockReturnValue({
