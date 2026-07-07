@@ -17,7 +17,11 @@ import {
   clearGuidanceSession,
   getGuidanceSession,
 } from '@/services/guidance/guidanceSessionStore';
-import { clearDepartedTrainLog } from '@/services/guidance/departedTrainLog';
+import {
+  appendDepartedTrains,
+  clearDepartedTrainLog,
+  type DepartedTrainEntry,
+} from '@/services/guidance/departedTrainLog';
 import { createRoute, type RouteSegment } from '@/models/route';
 
 const mockGoBack = jest.fn();
@@ -443,6 +447,42 @@ describe('RouteGuidanceScreen', () => {
     // "방금 출발했어요" fallback advances to riding (same as 탑승했어요, now-anchored).
     fireEvent.press(getByTestId('train-select-now'));
     expect(getByText('탑승 중')).toBeTruthy();
+  });
+
+  const logEntry = (trainId: string, departedAtMs: number): DepartedTrainEntry => ({
+    trainId,
+    finalDestination: '산곡',
+    lineId: '2',
+    stationName: '을지로3가',
+    departedAtMs,
+    confidence: 'observed',
+  });
+
+  it('hides log entries older than the retention window at read time', () => {
+    seedSession(); // startedAt = T0, boarding station 을지로3가 (line 2)
+    // Injected at T0 (not pruned on insert). After 16min the wall clock is
+    // T0+16min → retention cutoff = T0+1min, so this T0+30s entry is stale.
+    appendDepartedTrains([logEntry('STALE', T0 + 30_000)], T0);
+    const { getByTestId, queryByTestId } = render(<RouteGuidanceScreen />);
+    act(() => {
+      jest.advanceTimersByTime(16 * 60_000); // still holding on the board step
+    });
+    fireEvent.press(getByTestId('guidance-open-train-select'));
+    expect(getByTestId('train-select-sheet')).toBeTruthy();
+    expect(queryByTestId('train-select-item-STALE')).toBeNull();
+    expect(getByTestId('train-select-now')).toBeTruthy(); // fallback always present
+  });
+
+  it('shows a log entry still within the retention window at read time', () => {
+    seedSession();
+    // T0+2min: past the T0+1min cutoff after 16min elapsed → still visible.
+    appendDepartedTrains([logEntry('FRESH', T0 + 2 * 60_000)], T0);
+    const { getByTestId } = render(<RouteGuidanceScreen />);
+    act(() => {
+      jest.advanceTimersByTime(16 * 60_000);
+    });
+    fireEvent.press(getByTestId('guidance-open-train-select'));
+    expect(getByTestId('train-select-item-FRESH')).toBeTruthy();
   });
 
   it('opens the train-select sheet from the soft-confirm 다른 열차 link', () => {

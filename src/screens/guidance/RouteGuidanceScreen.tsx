@@ -30,6 +30,7 @@ import {
   collectEstimates,
   getDepartedTrainLog,
   clearDepartedTrainLog,
+  DEPARTED_LOG_RETENTION_MS,
   type DepartedTrainEntry,
 } from '@/services/guidance/departedTrainLog';
 import {
@@ -338,12 +339,15 @@ export const RouteGuidanceScreen: React.FC = () => {
     if (station === null) return [];
     const lineId = isWaitingStep ? waitingLineId : currentStep.kind === 'ride' ? currentStep.lineId : '';
     const numbered = /^[1-9]$/.test(lineId);
+    // Store prune only runs on non-empty appends, so a long ride without new
+    // departures can leave stale entries — filter the retention window here too.
     return getDepartedTrainLog().filter(
       (e) =>
         e.stationName === station &&
         (!numbered || e.lineId === lineId) &&
         e.departedAtMs <= nowMs &&
-        e.departedAtMs >= session.startedAt
+        e.departedAtMs >= session.startedAt &&
+        e.departedAtMs >= nowMs - DEPARTED_LOG_RETENTION_MS
     );
   }, [session, trainSelectVisible, isWaitingStep, currentStep, waitingLineId, nowMs]);
 
