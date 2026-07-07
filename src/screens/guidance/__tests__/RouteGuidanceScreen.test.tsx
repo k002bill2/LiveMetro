@@ -528,6 +528,42 @@ describe('RouteGuidanceScreen', () => {
     expect(getByText('환승 중')).toBeTruthy();
   });
 
+  it('preserves the soft-confirm cooldown when the sheet is opened while inactive', () => {
+    seedSession();
+    mockedUseRealtimeTrains.mockReturnValue({
+      trains: [trainOf('T1', 10)],
+      loading: false,
+      error: null,
+    });
+    const { getByTestId, queryByTestId, rerender } = render(<RouteGuidanceScreen />);
+    mockedUseRealtimeTrains.mockReturnValue({ trains: [], loading: false, error: null });
+    act(() => {
+      rerender(<RouteGuidanceScreen />);
+    });
+    // dismiss on 아직이에요 → cooldown keyed to T1
+    fireEvent.press(getByTestId('guidance-soft-confirm-notyet'));
+    expect(queryByTestId('guidance-soft-confirm')).toBeNull();
+    // open the sheet while the soft-confirm is INACTIVE, then close it —
+    // must not wipe the existing cooldown.
+    fireEvent.press(getByTestId('guidance-open-train-select'));
+    expect(getByTestId('train-select-sheet')).toBeTruthy();
+    fireEvent.press(getByTestId('train-select-close'));
+    // T1 re-appears arriving, then departs again — cooldown must still suppress.
+    mockedUseRealtimeTrains.mockReturnValue({
+      trains: [trainOf('T1', 10)],
+      loading: false,
+      error: null,
+    });
+    act(() => {
+      rerender(<RouteGuidanceScreen />);
+    });
+    mockedUseRealtimeTrains.mockReturnValue({ trains: [], loading: false, error: null });
+    act(() => {
+      rerender(<RouteGuidanceScreen />);
+    });
+    expect(queryByTestId('guidance-soft-confirm')).toBeNull();
+  });
+
   it('opens the train-select sheet from the soft-confirm 다른 열차 link', () => {
     seedSession();
     mockedUseRealtimeTrains.mockReturnValue({

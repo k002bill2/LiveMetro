@@ -220,7 +220,11 @@ export const RouteGuidanceScreen: React.FC = () => {
 
   const dismissSoftConfirm = useCallback((): void => {
     clearAutoTimer();
-    cooldownTrainIdRef.current = softConfirm?.trainId ?? null;
+    // Only key the cooldown when an active prompt is being dismissed — opening
+    // the sheet while inactive must not wipe an existing cooldown to null.
+    if (softConfirm !== null) {
+      cooldownTrainIdRef.current = softConfirm.trainId;
+    }
     setSoftConfirm(null);
   }, [clearAutoTimer, softConfirm]);
 
