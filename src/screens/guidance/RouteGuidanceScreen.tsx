@@ -57,6 +57,8 @@ interface TrainSelectContext {
   readonly stepIndex: number;
   readonly stationName: string;
   readonly lineId: string;
+  /** Travel-direction endpoint name for the captured step, or null. */
+  readonly direction: string | null;
 }
 
 /** Grace window before a detected departure auto-confirms boarding (dismissable). */
@@ -249,6 +251,7 @@ export const RouteGuidanceScreen: React.FC = () => {
         stepIndex: currentIndex,
         stationName: currentStep.stationName,
         lineId: waitingLineId,
+        direction: currentStep.direction,
       });
     } else if (currentStep.kind === 'ride') {
       setTrainSelectContext({
@@ -256,6 +259,7 @@ export const RouteGuidanceScreen: React.FC = () => {
         stepIndex: currentIndex,
         stationName: currentStep.fromStationName,
         lineId: currentStep.lineId,
+        direction: currentStep.direction,
       });
     }
   }, [dismissSoftConfirm, currentStep, currentIndex, waitingLineId]);
@@ -384,11 +388,11 @@ export const RouteGuidanceScreen: React.FC = () => {
   // in the future.
   const trainSelectEntries = useMemo((): readonly DepartedTrainEntry[] => {
     if (!session || trainSelectContext === null) return [];
-    const { stationName, lineId } = trainSelectContext;
+    const { stationName, lineId, direction } = trainSelectContext;
     const numbered = /^[1-9]$/.test(lineId);
     // Store prune only runs on non-empty appends, so a long ride without new
     // departures can leave stale entries — filter the retention window here too.
-    return getDepartedTrainLog().filter(
+    const base = getDepartedTrainLog().filter(
       (e) =>
         e.stationName === stationName &&
         (!numbered || e.lineId === lineId) &&
@@ -396,6 +400,12 @@ export const RouteGuidanceScreen: React.FC = () => {
         e.departedAtMs >= session.startedAt &&
         e.departedAtMs >= nowMs - DEPARTED_LOG_RETENTION_MS
     );
+    // Direction preference + fallback — same principle as filteredTrains: the log
+    // records both directions, so prefer travel-direction matches, but keep all
+    // when none match (단축 운행 종착역명이 방면명과 다를 수 있음).
+    if (direction === null) return base;
+    const matched = base.filter((e) => e.finalDestination === direction);
+    return matched.length > 0 ? matched : base;
   }, [session, trainSelectContext, nowMs]);
 
   const completedLogKeyRef = useRef<string | null>(null);

@@ -190,6 +190,16 @@ const seedExtendedTransferSession = (): void => {
   });
 };
 
+/** Board on an EXTENDED line absent from the map mock → step.direction is null. */
+const seedExtendedBoardSession = (): void => {
+  setGuidanceSession({
+    route: createRoute([lineHop('s1', '대곡', 's2', '능곡', '경의중앙선', 3)]),
+    fromStationName: '대곡',
+    toStationName: '능곡',
+    startedAt: T0,
+  });
+};
+
 describe('RouteGuidanceScreen', () => {
   beforeEach(() => {
     jest.useFakeTimers();
@@ -497,6 +507,50 @@ describe('RouteGuidanceScreen', () => {
     });
     fireEvent.press(getByTestId('guidance-open-train-select'));
     expect(getByTestId('train-select-item-FRESH')).toBeTruthy();
+  });
+
+  const dirEntry = (
+    trainId: string,
+    finalDestination: string,
+    stationName = '을지로3가',
+    lineId = '2'
+  ): DepartedTrainEntry => ({
+    trainId,
+    finalDestination,
+    lineId,
+    stationName,
+    departedAtMs: T0,
+    confidence: 'observed',
+  });
+
+  it('shows only travel-direction matches among sheet candidates when a direction is known', () => {
+    seedSession(); // board direction = 산곡 (line 2, s1→s2 endpoint in the map mock)
+    appendDepartedTrains([dirEntry('MATCH', '산곡'), dirEntry('OPP', '을지로3가')], T0);
+    const { getByTestId, queryByTestId } = render(<RouteGuidanceScreen />);
+    fireEvent.press(getByTestId('guidance-open-train-select'));
+    expect(getByTestId('train-select-item-MATCH')).toBeTruthy();
+    expect(queryByTestId('train-select-item-OPP')).toBeNull();
+  });
+
+  it('falls back to all sheet candidates when none match the direction (단축운행 종착)', () => {
+    seedSession();
+    appendDepartedTrains([dirEntry('SHORT1', '시청'), dirEntry('SHORT2', '충정로')], T0);
+    const { getByTestId } = render(<RouteGuidanceScreen />);
+    fireEvent.press(getByTestId('guidance-open-train-select'));
+    expect(getByTestId('train-select-item-SHORT1')).toBeTruthy();
+    expect(getByTestId('train-select-item-SHORT2')).toBeTruthy();
+  });
+
+  it('does not filter sheet candidates by direction when the step direction is unknown', () => {
+    seedExtendedBoardSession(); // board on 경의중앙선 → direction null
+    appendDepartedTrains(
+      [dirEntry('A', '문산', '대곡', '경의중앙선'), dirEntry('B', '지평', '대곡', '경의중앙선')],
+      T0
+    );
+    const { getByTestId } = render(<RouteGuidanceScreen />);
+    fireEvent.press(getByTestId('guidance-open-train-select'));
+    expect(getByTestId('train-select-item-A')).toBeTruthy();
+    expect(getByTestId('train-select-item-B')).toBeTruthy();
   });
 
   it('cancels the pending soft-confirm auto-advance when the train-select link opens the sheet', () => {
