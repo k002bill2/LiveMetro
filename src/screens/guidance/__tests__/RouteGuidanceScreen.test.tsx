@@ -510,6 +510,24 @@ describe('RouteGuidanceScreen', () => {
     expect(getByText('탑승 대기')).toBeTruthy(); // still on the board step, not riding
   });
 
+  it('auto-closes the sheet and does not skip the transfer when the ride ends while it is open', () => {
+    seedTransferSession(); // board → ride(line2, 2m) → transfer@시청(4m) → ride(line7) → alight
+    const { getByText, getByTestId, queryByTestId, rerender } = render(<RouteGuidanceScreen />);
+    fireEvent.press(getByText('탑승했어요')); // board → ride (index 1)
+    expect(getByText('탑승 중')).toBeTruthy();
+    // Open the mid-ride "열차 변경" sheet (context captured at ride, stepIndex 1).
+    fireEvent.press(getByTestId('guidance-change-train'));
+    expect(getByTestId('train-select-sheet')).toBeTruthy();
+    // Ride is 2min — advance past it so the 1Hz tick flips the step to transfer.
+    act(() => {
+      jest.advanceTimersByTime(2 * 60_000 + 1_000);
+      rerender(<RouteGuidanceScreen />);
+    });
+    // Sheet auto-closes on the step change; parked on the transfer (NOT skipped).
+    expect(queryByTestId('train-select-sheet')).toBeNull();
+    expect(getByText('환승 중')).toBeTruthy();
+  });
+
   it('opens the train-select sheet from the soft-confirm 다른 열차 link', () => {
     seedSession();
     mockedUseRealtimeTrains.mockReturnValue({
