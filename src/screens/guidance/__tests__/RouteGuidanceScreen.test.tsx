@@ -20,6 +20,7 @@ import {
 import {
   appendDepartedTrains,
   clearDepartedTrainLog,
+  getDepartedTrainLog,
   type DepartedTrainEntry,
 } from '@/services/guidance/departedTrainLog';
 import { createRoute, type RouteSegment } from '@/models/route';
@@ -551,6 +552,29 @@ describe('RouteGuidanceScreen', () => {
     fireEvent.press(getByTestId('guidance-open-train-select'));
     expect(getByTestId('train-select-item-A')).toBeTruthy();
     expect(getByTestId('train-select-item-B')).toBeTruthy();
+  });
+
+  it('does not record estimated departures with an empty station when confirming a non-waiting (ride) step', () => {
+    seedSession();
+    mockedUseRealtimeTrains.mockReturnValue({
+      trains: [trainOf('T1', 10)],
+      loading: false,
+      error: null,
+    });
+    const { getByTestId, rerender } = render(<RouteGuidanceScreen />);
+    fireEvent.press(getByTestId('guidance-next')); // board → ride (confirm at 을지로3가)
+    // useRealtimeTrains keeps a non-empty array even after boarding (disabled) —
+    // a DISTINCT train so any '' entry can't be masked by trainId dedup.
+    mockedUseRealtimeTrains.mockReturnValue({
+      trains: [trainOf('T2', 10)],
+      loading: false,
+      error: null,
+    });
+    act(() => {
+      rerender(<RouteGuidanceScreen />);
+    });
+    fireEvent.press(getByTestId('guidance-next')); // ride → alight (must NOT log at '')
+    expect(getDepartedTrainLog().some((e) => e.stationName === '')).toBe(false);
   });
 
   it('does not arm the soft-confirm auto-advance while the train-select sheet is open', () => {

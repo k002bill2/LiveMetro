@@ -136,23 +136,26 @@ const pickWinner = (a: DepartedTrainEntry, b: DepartedTrainEntry): DepartedTrain
 };
 
 /**
- * Merge `incoming` into `log`: trainId dedup (see {@link pickWinner}), prune
- * entries older than the retention window, sort newest-first. Inputs are never
- * mutated (new array returned).
+ * Merge `incoming` into `log`: trainId+station dedup (see {@link pickWinner}),
+ * prune entries older than the retention window, sort newest-first. Inputs are
+ * never mutated (new array returned).
  */
 export const mergeLog = (
   log: readonly DepartedTrainEntry[],
   incoming: readonly DepartedTrainEntry[],
   nowMs: number
 ): DepartedTrainEntry[] => {
-  const byId = new Map<string, DepartedTrainEntry>();
+  // Dedup key includes the station so the same train logged at two stations
+  // (e.g. board station vs a later stop) doesn't push out a valid candidate.
+  const byKey = new Map<string, DepartedTrainEntry>();
   for (const e of [...log, ...incoming]) {
-    const existing = byId.get(e.trainId);
-    byId.set(e.trainId, existing === undefined ? e : pickWinner(existing, e));
+    const key = `${e.trainId}|${e.stationName}`;
+    const existing = byKey.get(key);
+    byKey.set(key, existing === undefined ? e : pickWinner(existing, e));
   }
 
   const cutoff = nowMs - DEPARTED_LOG_RETENTION_MS;
-  return Array.from(byId.values())
+  return Array.from(byKey.values())
     .filter(e => e.departedAtMs >= cutoff)
     .sort((a, b) => b.departedAtMs - a.departedAtMs);
 };

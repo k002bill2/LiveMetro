@@ -212,17 +212,21 @@ export const RouteGuidanceScreen: React.FC = () => {
     void cancelBoardingAlert();
     // Polling stops after boarding, so the last snapshot's approaching trains
     // are kept as estimated departures for the ride-time "change train" case.
-    appendDepartedTrains(
-      collectEstimates({
-        trains: trains ?? [],
-        lineId: waitingLineId,
-        stationName: waitingStationName,
-        nowMs: Date.now(),
-      }),
-      Date.now()
-    );
+    // Only when confirming a WAITING step — otherwise waitingLineId/StationName
+    // are '' and the (stale) trains would be logged with an empty station.
+    if (isWaitingStep) {
+      appendDepartedTrains(
+        collectEstimates({
+          trains: trains ?? [],
+          lineId: waitingLineId,
+          stationName: waitingStationName,
+          nowMs: Date.now(),
+        }),
+        Date.now()
+      );
+    }
     goNextAt(atMs);
-  }, [clearAutoTimer, currentIndex, goNextAt, trains, waitingLineId, waitingStationName]);
+  }, [clearAutoTimer, currentIndex, goNextAt, isWaitingStep, trains, waitingLineId, waitingStationName]);
 
   const confirmBoarded = useCallback((): void => confirmBoardedAt(Date.now()), [confirmBoardedAt]);
 
