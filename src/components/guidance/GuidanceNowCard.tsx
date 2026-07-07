@@ -21,6 +21,8 @@ import type { GuidanceStep, RideStep } from '@/models/guidance';
 export interface SoftConfirmHandlers {
   readonly onYes: () => void;
   readonly onNotYet: () => void;
+  /** "다른 열차에 탔어요" → 열차 선택 시트 열기 (미전달 시 링크 숨김). */
+  readonly onOther?: () => void;
 }
 
 interface GuidanceNowCardProps {
@@ -31,6 +33,8 @@ interface GuidanceNowCardProps {
   liveWaitText?: string | null;
   /** When set, renders the soft-confirm row (board/transfer waiting steps only). */
   softConfirm?: SoftConfirmHandlers | null;
+  /** 열차 선택 시트 열기 — 대기(이미 탔어요)/ride(열차 변경) 두 문맥 공용. 미전달 시 링크 숨김. */
+  onOpenTrainSelect?: () => void;
 }
 
 const formatMinSec = (totalSec: number): string => {
@@ -60,6 +64,7 @@ const GuidanceNowCardImpl: React.FC<GuidanceNowCardProps> = ({
   elapsedInStepSec,
   liveWaitText,
   softConfirm,
+  onOpenTrainSelect,
 }) => {
   const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
@@ -127,6 +132,19 @@ const GuidanceNowCardImpl: React.FC<GuidanceNowCardProps> = ({
                 {liveWaitText ?? '실시간 도착 정보를 불러오는 중'}
               </Text>
             </View>
+            {onOpenTrainSelect && (
+              <Pressable
+                onPress={onOpenTrainSelect}
+                style={styles.trainSelectLink}
+                accessibilityRole="button"
+                accessibilityLabel="이미 탑승했어요, 열차 선택"
+                testID="guidance-open-train-select"
+              >
+                <Text style={styles.trainSelectLinkText}>
+                  이미 탑승하셨나요? <Text style={styles.trainSelectLinkStrong}>열차 선택</Text>
+                </Text>
+              </Pressable>
+            )}
             {softConfirm && (
               <View style={styles.softConfirmRow} testID="guidance-soft-confirm">
                 <Text style={styles.softConfirmLabel}>탑승하셨나요?</Text>
@@ -150,6 +168,17 @@ const GuidanceNowCardImpl: React.FC<GuidanceNowCardProps> = ({
                     <Text style={styles.softConfirmYesText}>예</Text>
                   </Pressable>
                 </View>
+                {softConfirm.onOther && (
+                  <Pressable
+                    onPress={softConfirm.onOther}
+                    style={styles.softConfirmOther}
+                    accessibilityRole="button"
+                    accessibilityLabel="다른 열차에 탔어요"
+                    testID="guidance-soft-confirm-other"
+                  >
+                    <Text style={styles.softConfirmOtherText}>다른 열차에 탔어요</Text>
+                  </Pressable>
+                )}
               </View>
             )}
           </View>
@@ -162,6 +191,7 @@ const GuidanceNowCardImpl: React.FC<GuidanceNowCardProps> = ({
             lineColor={lineColor}
             semantic={semantic}
             styles={styles}
+            onOpenTrainSelect={onOpenTrainSelect}
           />
         )}
       </View>
@@ -175,6 +205,7 @@ interface RideBodyProps {
   lineColor: string;
   semantic: WantedSemanticTheme;
   styles: ReturnType<typeof createStyles>;
+  onOpenTrainSelect?: () => void;
 }
 
 const RideBody: React.FC<RideBodyProps> = ({
@@ -183,6 +214,7 @@ const RideBody: React.FC<RideBodyProps> = ({
   lineColor,
   semantic,
   styles,
+  onOpenTrainSelect,
 }) => {
   const { nextHopIndex, secToNextStop } = computeRideProgress(step, elapsedInStepSec);
   const stopsLeft = step.hops.length - nextHopIndex;
@@ -268,6 +300,18 @@ const RideBody: React.FC<RideBodyProps> = ({
           {` · 약 ${Math.max(1, Math.ceil(remainingRideSec / 60))}분`}
         </Text>
       </View>
+
+      {onOpenTrainSelect && (
+        <Pressable
+          onPress={onOpenTrainSelect}
+          style={styles.trainSelectLink}
+          accessibilityRole="button"
+          accessibilityLabel="열차 변경, 시간 보정"
+          testID="guidance-change-train"
+        >
+          <Text style={styles.trainSelectLinkText}>열차 변경 · 시간 보정</Text>
+        </Pressable>
+      )}
     </View>
   );
 };
@@ -482,6 +526,30 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       fontSize: 13,
       fontFamily: weightToFontFamily('700'),
       color: semantic.labelStrong,
+    },
+    trainSelectLink: {
+      minHeight: 44,
+      justifyContent: 'center',
+      marginTop: 12,
+    },
+    trainSelectLinkText: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('700'),
+      color: semantic.labelAlt,
+    },
+    trainSelectLinkStrong: {
+      fontFamily: weightToFontFamily('800'),
+      color: semantic.primaryNormal,
+    },
+    softConfirmOther: {
+      minHeight: 44,
+      justifyContent: 'center',
+      alignItems: 'center',
+    },
+    softConfirmOtherText: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('700'),
+      color: semantic.labelAlt,
     },
     softConfirmRow: {
       marginTop: 14,

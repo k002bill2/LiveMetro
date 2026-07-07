@@ -17,6 +17,7 @@ import {
   clearGuidanceSession,
   getGuidanceSession,
 } from '@/services/guidance/guidanceSessionStore';
+import { clearDepartedTrainLog } from '@/services/guidance/departedTrainLog';
 import { createRoute, type RouteSegment } from '@/models/route';
 
 const mockGoBack = jest.fn();
@@ -65,6 +66,7 @@ jest.mock('lucide-react-native', () => ({
   MoveRight: 'MoveRight',
   Square: 'Square',
   TrainFront: 'TrainFront',
+  X: 'X',
 }));
 
 jest.mock('@/components/design/LineBadge', () => ({
@@ -187,6 +189,7 @@ describe('RouteGuidanceScreen', () => {
 
   afterEach(() => {
     clearGuidanceSession();
+    clearDepartedTrainLog();
     jest.useRealTimers();
   });
 
@@ -427,6 +430,36 @@ describe('RouteGuidanceScreen', () => {
     expect(scheduleBoardingAlert).toHaveBeenCalledWith(
       expect.objectContaining({ trainId: 'SHORT' })
     );
+  });
+
+  it('opens the train-select sheet from the waiting link and boards via the fallback', () => {
+    seedSession();
+    const { getByTestId, getByText, queryByTestId } = render(<RouteGuidanceScreen />);
+    // Sheet is closed initially.
+    expect(queryByTestId('train-select-sheet')).toBeNull();
+    // "이미 탑승하셨나요? 열차 선택" opens it.
+    fireEvent.press(getByTestId('guidance-open-train-select'));
+    expect(getByTestId('train-select-sheet')).toBeTruthy();
+    // "방금 출발했어요" fallback advances to riding (same as 탑승했어요, now-anchored).
+    fireEvent.press(getByTestId('train-select-now'));
+    expect(getByText('탑승 중')).toBeTruthy();
+  });
+
+  it('opens the train-select sheet from the soft-confirm 다른 열차 link', () => {
+    seedSession();
+    mockedUseRealtimeTrains.mockReturnValue({
+      trains: [trainOf('T1', 10)],
+      loading: false,
+      error: null,
+    });
+    const { getByTestId, rerender } = render(<RouteGuidanceScreen />);
+    // second snapshot: train gone → soft-confirm prompt appears
+    mockedUseRealtimeTrains.mockReturnValue({ trains: [], loading: false, error: null });
+    act(() => {
+      rerender(<RouteGuidanceScreen />);
+    });
+    fireEvent.press(getByTestId('guidance-soft-confirm-other'));
+    expect(getByTestId('train-select-sheet')).toBeTruthy();
   });
 
   it('holds at a transfer step with a ticking (not frozen) walk countdown', () => {
