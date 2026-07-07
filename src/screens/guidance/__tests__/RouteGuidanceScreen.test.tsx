@@ -675,7 +675,7 @@ describe('RouteGuidanceScreen', () => {
       expect((scheduleAlightAlert as jest.Mock).mock.calls.length).toBe(callsAfterEntry);
     });
 
-    it('board/transfer 대기 스텝에서는 예약하지 않고 cancelAlightAlert를 호출한다', () => {
+    it('board 대기 스텝에서는 예약하지 않고 cancelAlightAlert를 호출한다', () => {
       seedSession();
       render(<RouteGuidanceScreen />);
       // board 홀드 상태 — ride가 아니므로 예약 없이 이전 pending을 취소한다.

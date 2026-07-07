@@ -155,6 +155,26 @@ describe('scheduleAlightAlert', () => {
     expect(notif.scheduleArrivalAlert).not.toHaveBeenCalled();
   });
 
+  it('cancels pending when a re-call is gated by shouldSendNotification (음소거 전환)', async () => {
+    await svc.scheduleAlightAlert(baseParams);
+    notif.scheduleArrivalAlert.mockClear();
+    notif.shouldSendNotification.mockReturnValue(false);
+    const id = await svc.scheduleAlightAlert(baseParams);
+    expect(id).toBeNull();
+    expect(notif.cancelNotification).toHaveBeenCalledWith('alert-1');
+    expect(notif.scheduleArrivalAlert).not.toHaveBeenCalled();
+  });
+
+  it('cancels pending when a re-call is denied permission (권한 회수)', async () => {
+    await svc.scheduleAlightAlert(baseParams);
+    notif.scheduleArrivalAlert.mockClear();
+    notif.requestPermissions.mockResolvedValue({ granted: false });
+    const id = await svc.scheduleAlightAlert(baseParams);
+    expect(id).toBeNull();
+    expect(notif.cancelNotification).toHaveBeenCalledWith('alert-1');
+    expect(notif.scheduleArrivalAlert).not.toHaveBeenCalled();
+  });
+
   it('never throws — returns null on scheduling error', async () => {
     const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
     notif.scheduleArrivalAlert.mockRejectedValue(new Error('boom'));

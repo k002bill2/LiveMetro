@@ -57,13 +57,19 @@ export const scheduleAlightAlert = async (
       return null;
     }
 
+    // 게이트로 막힌 시점(권한 회수/음소거 전환)에 직전 pending이 남으면 그대로
+    // 발사되므로, 모든 "예약하지 않음" 경로가 pending 취소로 수렴하게 한다.
     const permission = await notificationService.requestPermissions();
-    if (!permission.granted) return null;
+    if (!permission.granted) {
+      await cancelAlightAlert();
+      return null;
+    }
 
     if (
       settings != null &&
       !notificationService.shouldSendNotification(settings, NotificationType.ARRIVAL_REMINDER)
     ) {
+      await cancelAlightAlert();
       return null;
     }
 
