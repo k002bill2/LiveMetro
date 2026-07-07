@@ -35,6 +35,12 @@ export interface DepartedTrainEntry {
 export const DEPARTED_LOG_RETENTION_MS = 15 * 60 * 1000;
 /** 추정 항목의 도착→출발 정차 가산치 */
 export const ESTIMATED_DWELL_MS = 30 * 1000;
+/**
+ * prev 스냅샷 촬영 시점과 판정 시점(nowMs) 사이의 폴링 간격 보정. 30초 폴링에서
+ * prev의 ETA≈0 열차는 nowMs엔 ETA가 음수가 되므로, 이 구간(직전 주기 30s + 여유)
+ * 안의 "이미 도착이 지난" 열차도 관측 출발 후보로 살린다.
+ */
+export const OBSERVED_ETA_LOOKBACK_SEC = 60;
 
 const isNumberedLine = (lineId: string): boolean => /^[1-9]$/.test(lineId);
 
@@ -66,14 +72,22 @@ export const collectDepartures = (input: CollectDeparturesInput): DepartedTrainE
   for (const t of prev) {
     if (numbered && t.lineId !== lineId) continue;
     const eta = etaSeconds(t, nowMs);
-    if (eta === null || eta < 0 || eta > thresholdSec) continue;
+    // Lookback keeps trains that arrived within the last poll interval — their
+    // ETA has gone negative by nowMs but they only just left the platform.
+    if (eta === null || eta < -OBSERVED_ETA_LOOKBACK_SEC || eta > thresholdSec) continue;
     if (nextIds.has(t.id)) continue;
+    // Refine the departure time for already-arrived trains (arrival + dwell),
+    // but never allow a future departedAtMs (invariant: ≤ nowMs).
+    const departedAtMs =
+      eta <= 0 && t.arrivalTime !== null
+        ? Math.min(t.arrivalTime.getTime() + ESTIMATED_DWELL_MS, nowMs)
+        : nowMs;
     result.push({
       trainId: t.id,
       finalDestination: t.finalDestination,
       lineId: t.lineId,
       stationName,
-      departedAtMs: nowMs,
+      departedAtMs,
       confidence: 'observed',
     });
   }

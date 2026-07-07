@@ -145,6 +145,57 @@ describe('collectDepartures', () => {
     expect(result.map(e => e.trainId)).toEqual(['A', 'B']);
     expect(result.every(e => e.confidence === 'observed')).toBe(true);
   });
+
+  // 30초 폴링에서 prev의 ETA≈0 열차는 nowMs 시점엔 ETA가 음수가 된다 —
+  // lookback으로 후보를 살리고 출발 시각을 arrival+dwell로 정밀화한다.
+  it('records a train that had already arrived (eta -40s) and refines departedAtMs to arrival + dwell', () => {
+    const result = collectDepartures({
+      prev: [arriving('A', -40)], // arrived 40s ago
+      next: [],
+      lineId: '2',
+      stationName: STATION,
+      nowMs: NOW,
+    });
+    expect(result).toHaveLength(1);
+    // arrival(NOW-40s) + dwell(30s) = NOW-10s ≤ nowMs → used as-is
+    expect(result[0]?.departedAtMs).toBe(NOW - 40_000 + ESTIMATED_DWELL_MS);
+    expect(result[0]?.confidence).toBe('observed');
+  });
+
+  it('clamps departedAtMs to nowMs when arrival + dwell would land in the future', () => {
+    const result = collectDepartures({
+      prev: [arriving('A', -20)], // arrived 20s ago → arrival+dwell = NOW+10s
+      next: [],
+      lineId: '2',
+      stationName: STATION,
+      nowMs: NOW,
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0]?.departedAtMs).toBe(NOW);
+  });
+
+  it('excludes a train whose arrival is older than the lookback window (eta -70s)', () => {
+    const result = collectDepartures({
+      prev: [arriving('A', -70)],
+      next: [],
+      lineId: '2',
+      stationName: STATION,
+      nowMs: NOW,
+    });
+    expect(result).toEqual([]);
+  });
+
+  it('keeps departedAtMs = nowMs for a still-approaching train (eta 20s) that vanished', () => {
+    const result = collectDepartures({
+      prev: [arriving('A', 20)],
+      next: [],
+      lineId: '2',
+      stationName: STATION,
+      nowMs: NOW,
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0]?.departedAtMs).toBe(NOW);
+  });
 });
 
 describe('collectEstimates', () => {
