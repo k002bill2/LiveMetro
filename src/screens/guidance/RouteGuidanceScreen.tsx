@@ -37,6 +37,10 @@ import {
   scheduleBoardingAlert,
   cancelBoardingAlert,
 } from '@/services/notification/boardingAlertService';
+import {
+  scheduleAlightAlert,
+  cancelAlightAlert,
+} from '@/services/notification/alightAlertService';
 import { clearGuidanceSession, getGuidanceSession } from '@/services/guidance/guidanceSessionStore';
 import { completeGuidanceCommuteLog } from '@/services/guidance/guidanceCommuteLogService';
 import { useAuth } from '@/services/auth/AuthContext';
@@ -363,11 +367,42 @@ export const RouteGuidanceScreen: React.FC = () => {
     });
   }, [isWaitingStep, earliestTrain, waitingStationName, currentStep?.kind, notificationSettings]);
 
+  // 하차 임박 알림 — ride 스텝의 도착 예정 시각으로 pending 알림을 예약한다.
+  // `nowMs - elapsedInStepSec*1000`은 현재 스텝의 시작 시각(anchor 파생)이라
+  // 1Hz 틱에 불변 → 이 값이 바뀌는 건 anchor 보정(goNextAt/rebaseAt)이나 스텝
+  // 전환뿐이므로, effect 재실행 = 재예약 필요 시점과 정확히 일치한다.
+  const rideAlightAtMs =
+    currentStep?.kind === 'ride'
+      ? Math.round(nowMs - elapsedInStepSec * 1000 + currentStep.durationMinutes * 60_000)
+      : null;
+  const nextStep = steps[currentIndex + 1];
+  useEffect(() => {
+    if (
+      rideAlightAtMs === null ||
+      nextStep === undefined ||
+      (nextStep.kind !== 'transfer' && nextStep.kind !== 'alight')
+    ) {
+      // ride가 아닌 스텝(대기/도착)으로 이동 — 이전 ride의 pending은 더는 유효하지 않다.
+      void cancelAlightAlert();
+      return;
+    }
+    if (!session) return;
+    void scheduleAlightAlert({
+      stationName: nextStep.stationName,
+      nextKind: nextStep.kind,
+      toLineName: nextStep.kind === 'transfer' ? nextStep.toLineName : undefined,
+      arrivalAtMs: rideAlightAtMs,
+      stepKey: `${session.startedAt}:${currentIndex}`,
+      settings: notificationSettings,
+    });
+  }, [rideAlightAtMs, nextStep, currentIndex, session, notificationSettings]);
+
   // Cancel any pending alert / timer on unmount (subscription-cleanup rule).
   useEffect(() => {
     return () => {
       clearAutoTimer();
       void cancelBoardingAlert();
+      void cancelAlightAlert();
     };
   }, [clearAutoTimer]);
 
@@ -432,6 +467,7 @@ export const RouteGuidanceScreen: React.FC = () => {
   const handleExit = useCallback((): void => {
     clearAutoTimer();
     void cancelBoardingAlert();
+    void cancelAlightAlert();
     if (isAtEnd) {
       persistCompletion();
     }
