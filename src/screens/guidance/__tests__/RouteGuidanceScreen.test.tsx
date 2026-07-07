@@ -553,6 +553,34 @@ describe('RouteGuidanceScreen', () => {
     expect(getByTestId('train-select-item-B')).toBeTruthy();
   });
 
+  it('does not arm the soft-confirm auto-advance while the train-select sheet is open', () => {
+    seedSession();
+    mockedUseRealtimeTrains.mockReturnValue({
+      trains: [trainOf('T1', 10)],
+      loading: false,
+      error: null,
+    });
+    const { getByTestId, getByText, queryByTestId, rerender } = render(<RouteGuidanceScreen />);
+    // Open the sheet first (context captured on the board step).
+    fireEvent.press(getByTestId('guidance-open-train-select'));
+    expect(getByTestId('train-select-sheet')).toBeTruthy();
+    // Next poll: T1 departs while the sheet is open.
+    mockedUseRealtimeTrains.mockReturnValue({ trains: [], loading: false, error: null });
+    act(() => {
+      rerender(<RouteGuidanceScreen />);
+    });
+    // Soft-confirm must NOT arm behind the modal.
+    expect(queryByTestId('guidance-soft-confirm')).toBeNull();
+    // Past the grace window: no auto-advance — still on board, sheet still open.
+    act(() => {
+      jest.advanceTimersByTime(5000);
+    });
+    expect(getByText('탑승 대기')).toBeTruthy();
+    expect(getByTestId('train-select-sheet')).toBeTruthy();
+    // The newly observed departure is still logged and appears in the open sheet.
+    expect(getByTestId('train-select-item-T1')).toBeTruthy();
+  });
+
   it('cancels the pending soft-confirm auto-advance when the train-select link opens the sheet', () => {
     seedSession();
     mockedUseRealtimeTrains.mockReturnValue({

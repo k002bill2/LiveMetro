@@ -328,11 +328,15 @@ export const RouteGuidanceScreen: React.FC = () => {
       nowMsRef.current
     );
     prevTrainsRef.current = next;
+    // Keep logging departures even while the sheet is open (real-time list), but
+    // never arm the soft-confirm auto-advance behind the modal — that would
+    // advance the journey and force-close the sheet under the user.
     if (
       result.departed &&
       result.trainId !== null &&
       result.trainId !== cooldownTrainIdRef.current &&
-      firedForIndexRef.current !== currentIndex
+      firedForIndexRef.current !== currentIndex &&
+      trainSelectContext === null
     ) {
       setSoftConfirm({ trainId: result.trainId });
       clearAutoTimer();
@@ -347,6 +351,7 @@ export const RouteGuidanceScreen: React.FC = () => {
     currentIndex,
     confirmBoarded,
     clearAutoTimer,
+    trainSelectContext,
   ]);
 
   // Local-notification bridge — schedule/reschedule for the earliest train while
