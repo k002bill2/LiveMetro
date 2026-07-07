@@ -39,6 +39,10 @@ export interface UseGuidanceProgressResult {
   readonly isAtEnd: boolean;
   /** Manual correction: confirm the current step is done (rebases the anchor). */
   readonly goNext: () => void;
+  /** goNext와 동일하되 anchor 시각을 지정(과거 허용, 미래는 now로 clamp). */
+  readonly goNextAt: (atMs: number) => void;
+  /** 현재 스텝 인덱스는 유지하고 anchor 시각만 교체 (ride 중 열차 변경용). */
+  readonly rebaseAt: (atMs: number) => void;
   /** Manual correction: step back (rebases the anchor). */
   readonly goPrev: () => void;
 }
@@ -78,12 +82,23 @@ export const useGuidanceProgress = (
   // callbacks never depend on tick-churned state (no per-second re-creation).
   const lastIndex = Math.max(0, steps.length - 1);
 
-  const goNext = useCallback(() => {
+  const goNextAt = useCallback((atMs: number): void => {
+    const clamped = Math.min(atMs, Date.now());
     setAnchor(prev => {
       const cur = computeProgress(steps, prev.index, (Date.now() - prev.atMs) / 1000);
-      return { index: Math.min(cur.currentIndex + 1, lastIndex), atMs: Date.now() };
+      return { index: Math.min(cur.currentIndex + 1, lastIndex), atMs: clamped };
     });
   }, [steps, lastIndex]);
+
+  const goNext = useCallback((): void => goNextAt(Date.now()), [goNextAt]);
+
+  const rebaseAt = useCallback((atMs: number): void => {
+    const clamped = Math.min(atMs, Date.now());
+    setAnchor(prev => {
+      const cur = computeProgress(steps, prev.index, (Date.now() - prev.atMs) / 1000);
+      return { index: cur.currentIndex, atMs: clamped };
+    });
+  }, [steps]);
 
   const goPrev = useCallback(() => {
     setAnchor(prev => {
@@ -101,6 +116,8 @@ export const useGuidanceProgress = (
     nowMs,
     isAtEnd: steps.length > 0 && progress.currentIndex === steps.length - 1,
     goNext,
+    goNextAt,
+    rebaseAt,
     goPrev,
   };
 };

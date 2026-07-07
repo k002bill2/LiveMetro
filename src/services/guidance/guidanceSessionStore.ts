@@ -20,6 +20,7 @@
  * sets the in-memory value synchronously before navigating.
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { clearDepartedTrainLog } from '@/services/guidance/departedTrainLog';
 import type { GuidanceSession } from '@/models/guidance';
 
 const STORAGE_KEY = '@livemetro/guidance_session';
@@ -54,6 +55,12 @@ export const isSessionExpired = (session: GuidanceSession, nowMs: number): boole
 
 /** Record the session (stored as a copy to defend against mutation) + persist. */
 export const setGuidanceSession = (session: GuidanceSession): void => {
+  // A genuinely new journey (different startedAt) must not inherit the previous
+  // journey's departed-train log — same-session updates (e.g. attaching
+  // commuteLogId) keep startedAt and preserve the log.
+  if (current?.startedAt !== session.startedAt) {
+    clearDepartedTrainLog();
+  }
   current = { ...session };
   emit();
   AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(current)).catch((error) => {

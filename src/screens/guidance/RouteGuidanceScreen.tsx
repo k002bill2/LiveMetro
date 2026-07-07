@@ -25,18 +25,39 @@ import {
   ARRIVING_ETA_THRESHOLD_SEC,
 } from '@/services/guidance/departureDetection';
 import {
+  appendDepartedTrains,
+  collectDepartures,
+  collectEstimates,
+  getDepartedTrainLog,
+  clearDepartedTrainLog,
+  DEPARTED_LOG_RETENTION_MS,
+  type DepartedTrainEntry,
+} from '@/services/guidance/departedTrainLog';
+import {
   scheduleBoardingAlert,
   cancelBoardingAlert,
 } from '@/services/notification/boardingAlertService';
 import { clearGuidanceSession, getGuidanceSession } from '@/services/guidance/guidanceSessionStore';
 import { completeGuidanceCommuteLog } from '@/services/guidance/guidanceCommuteLogService';
 import { useAuth } from '@/services/auth/AuthContext';
-import { GuidanceControls, GuidanceHeader, GuidanceNowCard, GuidanceStepRow, type GuidanceStepStatus } from '@/components/guidance';
+import { GuidanceControls, GuidanceHeader, GuidanceNowCard, GuidanceStepRow, TrainSelectSheet, type GuidanceStepStatus } from '@/components/guidance';
 import type { AppStackParamList } from '@/navigation/types';
 import type { GuidanceStep } from '@/models/guidance';
 import type { Train } from '@/models/train';
 
 type NavigationProp = NativeStackNavigationProp<AppStackParamList>;
+
+/**
+ * Snapshot of the step the train-select sheet was opened on. Captured at open
+ * time so a 1Hz tick advancing the step behind the modal can't misroute the
+ * pick (waiting=confirm/retroactive board, ride=rebase/in-place anchor swap).
+ */
+interface TrainSelectContext {
+  readonly mode: 'confirm' | 'rebase';
+  readonly stepIndex: number;
+  readonly stationName: string;
+  readonly lineId: string;
+}
 
 /** Grace window before a detected departure auto-confirms boarding (dismissable). */
 const SOFT_CONFIRM_AUTO_MS = 4000;
@@ -88,7 +109,8 @@ export const RouteGuidanceScreen: React.FC = () => {
     etaMs,
     nowMs,
     isAtEnd,
-    goNext,
+    goNextAt,
+    rebaseAt,
     goPrev,
   } = useGuidanceProgress(steps, {
     startedAt: session?.startedAt ?? 0,
@@ -156,7 +178,14 @@ export const RouteGuidanceScreen: React.FC = () => {
   // ── Soft-confirm: auto-advance a board/transfer hold when the awaited train
   // departs (inferred from id disappearance), so the rider rarely needs to tap.
   const [softConfirm, setSoftConfirm] = useState<{ readonly trainId: string } | null>(null);
+  const [trainSelectContext, setTrainSelectContext] = useState<TrainSelectContext | null>(null);
   const prevTrainsRef = useRef<readonly Train[] | null>(null);
+  // Identity of the last `trains` value the detection effect actually processed.
+  // Guards against non-poll re-runs (step transitions) seeding prevTrainsRef with
+  // a stale snapshot — useRealtimeTrains keeps the previous station's array until
+  // the new subscription delivers, and enforcing this makes the effect a true
+  // onDataReceived hook. NOT reset on step change (it marks the stale array).
+  const lastSeenTrainsRef = useRef<readonly Train[] | null | undefined>(null);
   const firedForIndexRef = useRef<number | null>(null);
   const cooldownTrainIdRef = useRef<string | null>(null);
   const autoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -170,27 +199,89 @@ export const RouteGuidanceScreen: React.FC = () => {
     }
   }, []);
 
-  // Single advance funnel — manual button, "예", and the auto timeout all route
-  // here, so a tap during the auto window can never double-advance.
-  const confirmBoarded = useCallback((): void => {
+  // Single advance funnel — manual button, "예", the auto timeout, and a
+  // train-select pick all route here, so a tap during the auto window can never
+  // double-advance. `atMs` is the boarding anchor (past for a retroactive pick).
+  const confirmBoardedAt = useCallback((atMs: number): void => {
     clearAutoTimer();
     if (firedForIndexRef.current === currentIndex) return;
     firedForIndexRef.current = currentIndex;
     setSoftConfirm(null);
     void cancelBoardingAlert();
-    goNext();
-  }, [clearAutoTimer, currentIndex, goNext]);
+    // Polling stops after boarding, so the last snapshot's approaching trains
+    // are kept as estimated departures for the ride-time "change train" case.
+    appendDepartedTrains(
+      collectEstimates({
+        trains: trains ?? [],
+        lineId: waitingLineId,
+        stationName: waitingStationName,
+        nowMs: Date.now(),
+      }),
+      Date.now()
+    );
+    goNextAt(atMs);
+  }, [clearAutoTimer, currentIndex, goNextAt, trains, waitingLineId, waitingStationName]);
+
+  const confirmBoarded = useCallback((): void => confirmBoardedAt(Date.now()), [confirmBoardedAt]);
 
   const dismissSoftConfirm = useCallback((): void => {
     clearAutoTimer();
-    cooldownTrainIdRef.current = softConfirm?.trainId ?? null;
+    // Only key the cooldown when an active prompt is being dismissed — opening
+    // the sheet while inactive must not wipe an existing cooldown to null.
+    if (softConfirm !== null) {
+      cooldownTrainIdRef.current = softConfirm.trainId;
+    }
     setSoftConfirm(null);
   }, [clearAutoTimer, softConfirm]);
 
-  // Reset per-step guards whenever the active step changes (incl. undo via goPrev).
+  // Opening the sheet always dismisses any pending soft-confirm first, so its
+  // 4s auto-advance can never fire behind the sheet. It also captures the step
+  // context at open time (mode/index/station/line) so a tick advancing the step
+  // behind the modal can't misroute the pick. dismissSoftConfirm is a no-op (bar
+  // cooldown bookkeeping) when nothing is pending. Shared by the waiting-card
+  // link and the soft-confirm "다른 열차예요" action; alight → no-op.
+  const openTrainSelect = useCallback((): void => {
+    dismissSoftConfirm();
+    if (currentStep === undefined) return;
+    if (currentStep.kind === 'board' || currentStep.kind === 'transfer') {
+      setTrainSelectContext({
+        mode: 'confirm',
+        stepIndex: currentIndex,
+        stationName: currentStep.stationName,
+        lineId: waitingLineId,
+      });
+    } else if (currentStep.kind === 'ride') {
+      setTrainSelectContext({
+        mode: 'rebase',
+        stepIndex: currentIndex,
+        stationName: currentStep.fromStationName,
+        lineId: currentStep.lineId,
+      });
+    }
+  }, [dismissSoftConfirm, currentStep, currentIndex, waitingLineId]);
+
+  const closeTrainSelect = useCallback((): void => setTrainSelectContext(null), []);
+
+  // Route the pick by the captured context, not the live step. If the step
+  // changed underfoot (currentIndex ≠ captured), just close — never act on a
+  // stale target.
+  const handleTrainSelected = useCallback((departedAtMs: number): void => {
+    const ctx = trainSelectContext;
+    setTrainSelectContext(null);
+    if (ctx === null || currentIndex !== ctx.stepIndex) return;
+    if (ctx.mode === 'confirm') {
+      confirmBoardedAt(departedAtMs);
+    } else {
+      rebaseAt(departedAtMs);
+    }
+  }, [trainSelectContext, currentIndex, confirmBoardedAt, rebaseAt]);
+
+  // Reset per-step guards whenever the active step changes (incl. undo via
+  // goPrev). Also auto-closes the sheet so a stale-step pick is impossible.
   useEffect(() => {
     clearAutoTimer();
     setSoftConfirm(null);
+    setTrainSelectContext(null);
     firedForIndexRef.current = null;
     cooldownTrainIdRef.current = null;
     prevTrainsRef.current = null;
@@ -205,6 +296,12 @@ export const RouteGuidanceScreen: React.FC = () => {
       prevTrainsRef.current = null;
       return;
     }
+    // Only act on a genuine poll update. A step transition (or other dep change)
+    // re-runs this effect with the same (possibly stale) `trains` reference —
+    // processing it would seed prevTrainsRef with the previous station's array
+    // and mis-detect all of it as departures on the next fresh snapshot.
+    if (lastSeenTrainsRef.current === trains) return;
+    lastSeenTrainsRef.current = trains;
     const next = trains ?? [];
     const result = detectDeparture({
       prev: prevTrainsRef.current,
@@ -213,6 +310,19 @@ export const RouteGuidanceScreen: React.FC = () => {
       nowMs: nowMsRef.current,
       thresholdSec: ARRIVING_ETA_THRESHOLD_SEC,
     });
+    // Log every train that departed between snapshots (all candidates, no
+    // direction filter — that happens at the sheet). Must read prev BEFORE
+    // reassigning prevTrainsRef.
+    appendDepartedTrains(
+      collectDepartures({
+        prev: prevTrainsRef.current,
+        next,
+        lineId: waitingLineId,
+        stationName: waitingStationName,
+        nowMs: nowMsRef.current,
+      }),
+      nowMsRef.current
+    );
     prevTrainsRef.current = next;
     if (
       result.departed &&
@@ -228,6 +338,7 @@ export const RouteGuidanceScreen: React.FC = () => {
     trains,
     isWaitingStep,
     waitingLineId,
+    waitingStationName,
     waitingDirection,
     currentIndex,
     confirmBoarded,
@@ -261,9 +372,31 @@ export const RouteGuidanceScreen: React.FC = () => {
   }, [clearAutoTimer]);
 
   const softConfirmHandlers = useMemo(
-    () => (softConfirm !== null ? { onYes: confirmBoarded, onNotYet: dismissSoftConfirm } : null),
-    [softConfirm, confirmBoarded, dismissSoftConfirm]
+    () =>
+      softConfirm !== null
+        ? { onYes: confirmBoarded, onNotYet: dismissSoftConfirm, onOther: openTrainSelect }
+        : null,
+    [softConfirm, confirmBoarded, dismissSoftConfirm, openTrainSelect]
   );
+
+  // Candidates for the sheet: recent departures at the station/line captured
+  // when the sheet was opened (not the live step), within this session and not
+  // in the future.
+  const trainSelectEntries = useMemo((): readonly DepartedTrainEntry[] => {
+    if (!session || trainSelectContext === null) return [];
+    const { stationName, lineId } = trainSelectContext;
+    const numbered = /^[1-9]$/.test(lineId);
+    // Store prune only runs on non-empty appends, so a long ride without new
+    // departures can leave stale entries — filter the retention window here too.
+    return getDepartedTrainLog().filter(
+      (e) =>
+        e.stationName === stationName &&
+        (!numbered || e.lineId === lineId) &&
+        e.departedAtMs <= nowMs &&
+        e.departedAtMs >= session.startedAt &&
+        e.departedAtMs >= nowMs - DEPARTED_LOG_RETENTION_MS
+    );
+  }, [session, trainSelectContext, nowMs]);
 
   const completedLogKeyRef = useRef<string | null>(null);
 
@@ -302,6 +435,7 @@ export const RouteGuidanceScreen: React.FC = () => {
     if (isAtEnd) {
       persistCompletion();
     }
+    clearDepartedTrainLog();
     clearGuidanceSession();
     navigation.goBack();
   }, [clearAutoTimer, isAtEnd, persistCompletion, navigation]);
@@ -345,6 +479,7 @@ export const RouteGuidanceScreen: React.FC = () => {
             elapsedInStepSec={currentStep.kind === 'board' ? 0 : elapsedInStepSec}
             liveWaitText={liveWaitText}
             softConfirm={softConfirmHandlers}
+            onOpenTrainSelect={openTrainSelect}
           />
         </View>
       )}
@@ -368,6 +503,12 @@ export const RouteGuidanceScreen: React.FC = () => {
         onPrev={goPrev}
         onNext={confirmBoarded}
         onExit={handleExit}
+      />
+      <TrainSelectSheet
+        visible={trainSelectContext !== null}
+        entries={trainSelectEntries}
+        onSelect={handleTrainSelected}
+        onClose={closeTrainSelect}
       />
     </SafeAreaView>
   );

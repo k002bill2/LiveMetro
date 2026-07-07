@@ -17,6 +17,11 @@ import {
   clearGuidanceSession,
   getGuidanceSession,
 } from '@/services/guidance/guidanceSessionStore';
+import {
+  appendDepartedTrains,
+  clearDepartedTrainLog,
+  type DepartedTrainEntry,
+} from '@/services/guidance/departedTrainLog';
 import { createRoute, type RouteSegment } from '@/models/route';
 
 const mockGoBack = jest.fn();
@@ -65,6 +70,7 @@ jest.mock('lucide-react-native', () => ({
   MoveRight: 'MoveRight',
   Square: 'Square',
   TrainFront: 'TrainFront',
+  X: 'X',
 }));
 
 jest.mock('@/components/design/LineBadge', () => ({
@@ -170,6 +176,20 @@ const seedTransferSession = (): void => {
   });
 };
 
+/** board(line2) → ride(line2) → transfer@왕십리 to an EXTENDED line → ride → alight. */
+const seedExtendedTransferSession = (): void => {
+  setGuidanceSession({
+    route: createRoute([
+      hop('s1', '을지로3가', 's2', '왕십리', 2),
+      transferSegAt('s2', '왕십리', '경의중앙선', 4),
+      lineHop('s2', '왕십리', 's3', '중랑', '경의중앙선', 3),
+    ]),
+    fromStationName: '을지로3가',
+    toStationName: '중랑',
+    startedAt: T0,
+  });
+};
+
 describe('RouteGuidanceScreen', () => {
   beforeEach(() => {
     jest.useFakeTimers();
@@ -187,6 +207,7 @@ describe('RouteGuidanceScreen', () => {
 
   afterEach(() => {
     clearGuidanceSession();
+    clearDepartedTrainLog();
     jest.useRealTimers();
   });
 
@@ -427,6 +448,174 @@ describe('RouteGuidanceScreen', () => {
     expect(scheduleBoardingAlert).toHaveBeenCalledWith(
       expect.objectContaining({ trainId: 'SHORT' })
     );
+  });
+
+  it('opens the train-select sheet from the waiting link and boards via the fallback', () => {
+    seedSession();
+    const { getByTestId, getByText, queryByTestId } = render(<RouteGuidanceScreen />);
+    // Sheet is closed initially.
+    expect(queryByTestId('train-select-sheet')).toBeNull();
+    // "이미 탑승하셨나요? 열차 선택" opens it.
+    fireEvent.press(getByTestId('guidance-open-train-select'));
+    expect(getByTestId('train-select-sheet')).toBeTruthy();
+    // "방금 출발했어요" fallback advances to riding (same as 탑승했어요, now-anchored).
+    fireEvent.press(getByTestId('train-select-now'));
+    expect(getByText('탑승 중')).toBeTruthy();
+  });
+
+  const logEntry = (trainId: string, departedAtMs: number): DepartedTrainEntry => ({
+    trainId,
+    finalDestination: '산곡',
+    lineId: '2',
+    stationName: '을지로3가',
+    departedAtMs,
+    confidence: 'observed',
+  });
+
+  it('hides log entries older than the retention window at read time', () => {
+    seedSession(); // startedAt = T0, boarding station 을지로3가 (line 2)
+    // Injected at T0 (not pruned on insert). After 16min the wall clock is
+    // T0+16min → retention cutoff = T0+1min, so this T0+30s entry is stale.
+    appendDepartedTrains([logEntry('STALE', T0 + 30_000)], T0);
+    const { getByTestId, queryByTestId } = render(<RouteGuidanceScreen />);
+    act(() => {
+      jest.advanceTimersByTime(16 * 60_000); // still holding on the board step
+    });
+    fireEvent.press(getByTestId('guidance-open-train-select'));
+    expect(getByTestId('train-select-sheet')).toBeTruthy();
+    expect(queryByTestId('train-select-item-STALE')).toBeNull();
+    expect(getByTestId('train-select-now')).toBeTruthy(); // fallback always present
+  });
+
+  it('shows a log entry still within the retention window at read time', () => {
+    seedSession();
+    // T0+2min: past the T0+1min cutoff after 16min elapsed → still visible.
+    appendDepartedTrains([logEntry('FRESH', T0 + 2 * 60_000)], T0);
+    const { getByTestId } = render(<RouteGuidanceScreen />);
+    act(() => {
+      jest.advanceTimersByTime(16 * 60_000);
+    });
+    fireEvent.press(getByTestId('guidance-open-train-select'));
+    expect(getByTestId('train-select-item-FRESH')).toBeTruthy();
+  });
+
+  it('cancels the pending soft-confirm auto-advance when the train-select link opens the sheet', () => {
+    seedSession();
+    mockedUseRealtimeTrains.mockReturnValue({
+      trains: [trainOf('T1', 10)],
+      loading: false,
+      error: null,
+    });
+    const { getByTestId, getByText, queryByTestId, rerender } = render(<RouteGuidanceScreen />);
+    // second snapshot: train gone → soft-confirm prompt appears (auto timer armed)
+    mockedUseRealtimeTrains.mockReturnValue({ trains: [], loading: false, error: null });
+    act(() => {
+      rerender(<RouteGuidanceScreen />);
+    });
+    expect(getByTestId('guidance-soft-confirm')).toBeTruthy();
+    // Open the sheet via the waiting-card link while the grace timer is pending.
+    fireEvent.press(getByTestId('guidance-open-train-select'));
+    expect(getByTestId('train-select-sheet')).toBeTruthy();
+    // Past the 4s grace window: the auto-advance must NOT fire behind the sheet.
+    act(() => {
+      jest.advanceTimersByTime(5000);
+    });
+    expect(queryByTestId('guidance-soft-confirm')).toBeNull();
+    expect(getByText('탑승 대기')).toBeTruthy(); // still on the board step, not riding
+  });
+
+  it('auto-closes the sheet and does not skip the transfer when the ride ends while it is open', () => {
+    seedTransferSession(); // board → ride(line2, 2m) → transfer@시청(4m) → ride(line7) → alight
+    const { getByText, getByTestId, queryByTestId, rerender } = render(<RouteGuidanceScreen />);
+    fireEvent.press(getByText('탑승했어요')); // board → ride (index 1)
+    expect(getByText('탑승 중')).toBeTruthy();
+    // Open the mid-ride "열차 변경" sheet (context captured at ride, stepIndex 1).
+    fireEvent.press(getByTestId('guidance-change-train'));
+    expect(getByTestId('train-select-sheet')).toBeTruthy();
+    // Ride is 2min — advance past it so the 1Hz tick flips the step to transfer.
+    act(() => {
+      jest.advanceTimersByTime(2 * 60_000 + 1_000);
+      rerender(<RouteGuidanceScreen />);
+    });
+    // Sheet auto-closes on the step change; parked on the transfer (NOT skipped).
+    expect(queryByTestId('train-select-sheet')).toBeNull();
+    expect(getByText('환승 중')).toBeTruthy();
+  });
+
+  it('preserves the soft-confirm cooldown when the sheet is opened while inactive', () => {
+    seedSession();
+    mockedUseRealtimeTrains.mockReturnValue({
+      trains: [trainOf('T1', 10)],
+      loading: false,
+      error: null,
+    });
+    const { getByTestId, queryByTestId, rerender } = render(<RouteGuidanceScreen />);
+    mockedUseRealtimeTrains.mockReturnValue({ trains: [], loading: false, error: null });
+    act(() => {
+      rerender(<RouteGuidanceScreen />);
+    });
+    // dismiss on 아직이에요 → cooldown keyed to T1
+    fireEvent.press(getByTestId('guidance-soft-confirm-notyet'));
+    expect(queryByTestId('guidance-soft-confirm')).toBeNull();
+    // open the sheet while the soft-confirm is INACTIVE, then close it —
+    // must not wipe the existing cooldown.
+    fireEvent.press(getByTestId('guidance-open-train-select'));
+    expect(getByTestId('train-select-sheet')).toBeTruthy();
+    fireEvent.press(getByTestId('train-select-close'));
+    // T1 re-appears arriving, then departs again — cooldown must still suppress.
+    mockedUseRealtimeTrains.mockReturnValue({
+      trains: [trainOf('T1', 10)],
+      loading: false,
+      error: null,
+    });
+    act(() => {
+      rerender(<RouteGuidanceScreen />);
+    });
+    mockedUseRealtimeTrains.mockReturnValue({ trains: [], loading: false, error: null });
+    act(() => {
+      rerender(<RouteGuidanceScreen />);
+    });
+    expect(queryByTestId('guidance-soft-confirm')).toBeNull();
+  });
+
+  it('does not record previous-station trains as departures when a stale snapshot seeds a transfer step', () => {
+    seedExtendedTransferSession();
+    // Previous-station snapshot (extended line passes the numbered filter) —
+    // useRealtimeTrains keeps this stale array until the new subscription delivers.
+    const stale = { trains: [trainOf('STALE', 10, '천안')], loading: false, error: null };
+    mockedUseRealtimeTrains.mockReturnValue(stale);
+    const { getByTestId, queryByTestId, rerender } = render(<RouteGuidanceScreen />);
+    // board → ride → transfer via manual next (no clock advance; stale array kept).
+    fireEvent.press(getByTestId('guidance-next')); // board → ride
+    fireEvent.press(getByTestId('guidance-next')); // ride → transfer (왕십리)
+    // Fresh snapshot for the NEW station arrives — different identity, empty.
+    mockedUseRealtimeTrains.mockReturnValue({ trains: [], loading: false, error: null });
+    act(() => {
+      rerender(<RouteGuidanceScreen />);
+    });
+    // Open the sheet at the transfer: the stale train must NOT appear as a
+    // 왕십리 departure (only the fallback exists).
+    fireEvent.press(getByTestId('guidance-open-train-select'));
+    expect(getByTestId('train-select-sheet')).toBeTruthy();
+    expect(queryByTestId('train-select-item-STALE')).toBeNull();
+    expect(getByTestId('train-select-now')).toBeTruthy();
+  });
+
+  it('opens the train-select sheet from the soft-confirm 다른 열차 link', () => {
+    seedSession();
+    mockedUseRealtimeTrains.mockReturnValue({
+      trains: [trainOf('T1', 10)],
+      loading: false,
+      error: null,
+    });
+    const { getByTestId, rerender } = render(<RouteGuidanceScreen />);
+    // second snapshot: train gone → soft-confirm prompt appears
+    mockedUseRealtimeTrains.mockReturnValue({ trains: [], loading: false, error: null });
+    act(() => {
+      rerender(<RouteGuidanceScreen />);
+    });
+    fireEvent.press(getByTestId('guidance-soft-confirm-other'));
+    expect(getByTestId('train-select-sheet')).toBeTruthy();
   });
 
   it('holds at a transfer step with a ticking (not frozen) walk countdown', () => {

@@ -195,4 +195,65 @@ describe('GuidanceNowCard — soft-confirm', () => {
     fireEvent.press(getByTestId('guidance-soft-confirm-notyet'));
     expect(onNotYet).toHaveBeenCalledTimes(1);
   });
+
+  it('does not render the 다른 열차에 탔어요 link when onOther is absent', () => {
+    const { queryByTestId } = render(
+      <GuidanceNowCard
+        step={board}
+        elapsedInStepSec={0}
+        liveWaitText={null}
+        softConfirm={{ onYes: jest.fn(), onNotYet: jest.fn() }}
+      />
+    );
+    expect(queryByTestId('guidance-soft-confirm-other')).toBeNull();
+  });
+
+  it('fires onOther when 다른 열차에 탔어요 is pressed', () => {
+    const onOther = jest.fn();
+    const { getByTestId } = render(
+      <GuidanceNowCard
+        step={board}
+        elapsedInStepSec={0}
+        liveWaitText={null}
+        softConfirm={{ onYes: jest.fn(), onNotYet: jest.fn(), onOther }}
+      />
+    );
+    fireEvent.press(getByTestId('guidance-soft-confirm-other'));
+    expect(onOther).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('GuidanceNowCard — train select entry points', () => {
+  it('renders the waiting train-select link on a board step and fires it', () => {
+    const onOpen = jest.fn();
+    const { getByTestId } = render(
+      <GuidanceNowCard
+        step={board}
+        elapsedInStepSec={0}
+        liveWaitText={null}
+        onOpenTrainSelect={onOpen}
+      />
+    );
+    fireEvent.press(getByTestId('guidance-open-train-select'));
+    expect(onOpen).toHaveBeenCalledTimes(1);
+  });
+
+  it('renders the change-train link on a ride step and fires it', () => {
+    const onOpen = jest.fn();
+    const { getByTestId } = render(
+      <GuidanceNowCard step={ride} elapsedInStepSec={60} onOpenTrainSelect={onOpen} />
+    );
+    fireEvent.press(getByTestId('guidance-change-train'));
+    expect(onOpen).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not render any train-select link when the handler is absent', () => {
+    const boardCard = render(
+      <GuidanceNowCard step={board} elapsedInStepSec={0} liveWaitText={null} />
+    );
+    expect(boardCard.queryByTestId('guidance-open-train-select')).toBeNull();
+
+    const rideCard = render(<GuidanceNowCard step={ride} elapsedInStepSec={60} />);
+    expect(rideCard.queryByTestId('guidance-change-train')).toBeNull();
+  });
 });
