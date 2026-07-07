@@ -19,6 +19,12 @@ import {
   isSessionExpired,
   GUIDANCE_SESSION_TTL_MS,
 } from '../guidanceSessionStore';
+import {
+  appendDepartedTrains,
+  getDepartedTrainLog,
+  clearDepartedTrainLog,
+  type DepartedTrainEntry,
+} from '../departedTrainLog';
 import { createRoute } from '@/models/route';
 import type { GuidanceSession } from '@/models/guidance';
 
@@ -58,7 +64,12 @@ describe('guidanceSessionStore', () => {
     mockSetItem.mockResolvedValue(undefined);
     mockRemoveItem.mockResolvedValue(undefined);
     clearGuidanceSession();
+    clearDepartedTrainLog();
     mockRemoveItem.mockClear();
+  });
+
+  afterEach(() => {
+    clearDepartedTrainLog();
   });
 
   // --- v1 handoff behavior (preserved) ---
@@ -90,6 +101,33 @@ describe('guidanceSessionStore', () => {
     setGuidanceSession(makeSession());
     setGuidanceSession({ ...makeSession(), toStationName: 'C' });
     expect(getGuidanceSession()?.toStationName).toBe('C');
+  });
+
+  // --- departed-train log isolation across sessions ---
+
+  const departedEntry: DepartedTrainEntry = {
+    trainId: 'T1',
+    finalDestination: '성수',
+    lineId: '2',
+    stationName: 'A',
+    departedAtMs: 1_700_000_000_000,
+    confidence: 'observed',
+  };
+
+  it('clears the departed-train log when a new session (different startedAt) starts', () => {
+    setGuidanceSession(makeSession(1_700_000_000_000));
+    appendDepartedTrains([departedEntry], 1_700_000_000_000);
+    expect(getDepartedTrainLog()).toHaveLength(1);
+    setGuidanceSession(makeSession(1_700_000_000_000 + 1000)); // fresh startedAt
+    expect(getDepartedTrainLog()).toEqual([]);
+  });
+
+  it('keeps the departed-train log when the same session is updated (same startedAt)', () => {
+    setGuidanceSession(makeSession(1_700_000_000_000));
+    appendDepartedTrains([departedEntry], 1_700_000_000_000);
+    // Session-update call (e.g. attaching commuteLogId) — same startedAt.
+    setGuidanceSession({ ...makeSession(1_700_000_000_000), commuteLogId: 'log-1' });
+    expect(getDepartedTrainLog()).toHaveLength(1);
   });
 
   // --- v2 persistence ---
