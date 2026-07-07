@@ -53,6 +53,7 @@ export interface NotificationSettings {
   readonly lineFilter?: readonly string[];        // optional: filter delay alerts by selected line ids. Accepts numeric short codes ('1'..'9') AND full Korean line names ('신분당선', '경의중앙선', '공항철도', '수인분당선', etc) registered in LINE_LABELS aliases (PR #34). undefined/empty = all lines.
   readonly alertSources?: AlertSourcePreferences; // optional: source-based alert toggles (official/community/urgent).
   readonly perEventSound?: PerEventSoundOverrides; // optional: per-event delivery gates for the Wanted handoff "이벤트별" section
+  readonly alightAlert?: AlightAlertPreferences;  // optional: 길안내 하차 임박 알림. undefined = 기본값(켜짐, 2분 전) — 기존 Firestore 문서 하위호환.
 }
 
 export interface AlertSourcePreferences {
@@ -82,6 +83,26 @@ export interface PerEventSoundOverrides {
   readonly delayDetected: boolean;
   readonly communityReport: boolean;
 }
+
+/**
+ * 길안내 하차 임박 알림 설정 — ride 구간에서 다음 하차 지점(환승역/목적지)
+ * 도착 `leadMinutes`분 전에 로컬 알림을 발사한다. Firestore 문서에 필드가
+ * 없는 기존 사용자는 {@link DEFAULT_ALIGHT_ALERT}로 해석한다 —
+ * `resolveAlightAlertPreferences`를 통해서만 읽을 것.
+ */
+export interface AlightAlertPreferences {
+  readonly enabled: boolean;
+  readonly leadMinutes: 1 | 2 | 3;
+}
+
+export const DEFAULT_ALIGHT_ALERT: AlightAlertPreferences = Object.freeze({
+  enabled: true,
+  leadMinutes: 2,
+});
+
+export const resolveAlightAlertPreferences = (
+  settings: Pick<NotificationSettings, 'alightAlert'> | null | undefined
+): AlightAlertPreferences => settings?.alightAlert ?? DEFAULT_ALIGHT_ALERT;
 
 // Sound settings types
 export type NotificationSoundId =
