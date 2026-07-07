@@ -524,13 +524,15 @@ describe('RouteGuidanceScreen', () => {
     confidence: 'observed',
   });
 
-  it('shows only travel-direction matches among sheet candidates when a direction is known', () => {
+  it('ranks travel-direction matches first but keeps same-direction short-turns (no drop)', () => {
     seedSession(); // board direction = 산곡 (line 2, s1→s2 endpoint in the map mock)
-    appendDepartedTrains([dirEntry('MATCH', '산곡'), dirEntry('OPP', '을지로3가')], T0);
-    const { getByTestId, queryByTestId } = render(<RouteGuidanceScreen />);
+    // Append SHORT before MATCH so base order is [SHORT, MATCH] — ranking must
+    // reorder MATCH to the front WITHOUT dropping the short-turn candidate.
+    appendDepartedTrains([dirEntry('SHORT', '시청'), dirEntry('MATCH', '산곡')], T0);
+    const { getByTestId, getAllByTestId } = render(<RouteGuidanceScreen />);
     fireEvent.press(getByTestId('guidance-open-train-select'));
-    expect(getByTestId('train-select-item-MATCH')).toBeTruthy();
-    expect(queryByTestId('train-select-item-OPP')).toBeNull();
+    const ids = getAllByTestId(/^train-select-item-/).map((n) => n.props.testID);
+    expect(ids).toEqual(['train-select-item-MATCH', 'train-select-item-SHORT']);
   });
 
   it('falls back to all sheet candidates when none match the direction (단축운행 종착)', () => {
