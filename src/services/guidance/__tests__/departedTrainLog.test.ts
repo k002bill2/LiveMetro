@@ -304,6 +304,14 @@ describe('mergeLog', () => {
     expect(result).toHaveLength(1);
     expect(result[0]?.departedAtMs).toBe(NOW - 1000);
   });
+
+  it('keeps entries with the same trainId at different stations (station-scoped dedup)', () => {
+    const atX: DepartedTrainEntry = { ...observed('T', NOW - 1000), stationName: '역X' };
+    const atY: DepartedTrainEntry = { ...observed('T', NOW - 2000), stationName: '역Y' };
+    const result = mergeLog([atX], [atY], NOW);
+    expect(result).toHaveLength(2);
+    expect(result.map(e => e.stationName).sort()).toEqual(['역X', '역Y']);
+  });
 });
 
 describe('departedTrainLog heap store', () => {

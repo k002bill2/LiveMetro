@@ -57,6 +57,8 @@ interface TrainSelectContext {
   readonly stepIndex: number;
   readonly stationName: string;
   readonly lineId: string;
+  /** Travel-direction endpoint name for the captured step, or null. */
+  readonly direction: string | null;
 }
 
 /** Grace window before a detected departure auto-confirms boarding (dismissable). */
@@ -210,17 +212,21 @@ export const RouteGuidanceScreen: React.FC = () => {
     void cancelBoardingAlert();
     // Polling stops after boarding, so the last snapshot's approaching trains
     // are kept as estimated departures for the ride-time "change train" case.
-    appendDepartedTrains(
-      collectEstimates({
-        trains: trains ?? [],
-        lineId: waitingLineId,
-        stationName: waitingStationName,
-        nowMs: Date.now(),
-      }),
-      Date.now()
-    );
+    // Only when confirming a WAITING step — otherwise waitingLineId/StationName
+    // are '' and the (stale) trains would be logged with an empty station.
+    if (isWaitingStep) {
+      appendDepartedTrains(
+        collectEstimates({
+          trains: trains ?? [],
+          lineId: waitingLineId,
+          stationName: waitingStationName,
+          nowMs: Date.now(),
+        }),
+        Date.now()
+      );
+    }
     goNextAt(atMs);
-  }, [clearAutoTimer, currentIndex, goNextAt, trains, waitingLineId, waitingStationName]);
+  }, [clearAutoTimer, currentIndex, goNextAt, isWaitingStep, trains, waitingLineId, waitingStationName]);
 
   const confirmBoarded = useCallback((): void => confirmBoardedAt(Date.now()), [confirmBoardedAt]);
 
@@ -249,6 +255,7 @@ export const RouteGuidanceScreen: React.FC = () => {
         stepIndex: currentIndex,
         stationName: currentStep.stationName,
         lineId: waitingLineId,
+        direction: currentStep.direction,
       });
     } else if (currentStep.kind === 'ride') {
       setTrainSelectContext({
@@ -256,6 +263,7 @@ export const RouteGuidanceScreen: React.FC = () => {
         stepIndex: currentIndex,
         stationName: currentStep.fromStationName,
         lineId: currentStep.lineId,
+        direction: currentStep.direction,
       });
     }
   }, [dismissSoftConfirm, currentStep, currentIndex, waitingLineId]);
@@ -324,11 +332,15 @@ export const RouteGuidanceScreen: React.FC = () => {
       nowMsRef.current
     );
     prevTrainsRef.current = next;
+    // Keep logging departures even while the sheet is open (real-time list), but
+    // never arm the soft-confirm auto-advance behind the modal — that would
+    // advance the journey and force-close the sheet under the user.
     if (
       result.departed &&
       result.trainId !== null &&
       result.trainId !== cooldownTrainIdRef.current &&
-      firedForIndexRef.current !== currentIndex
+      firedForIndexRef.current !== currentIndex &&
+      trainSelectContext === null
     ) {
       setSoftConfirm({ trainId: result.trainId });
       clearAutoTimer();
@@ -343,6 +355,7 @@ export const RouteGuidanceScreen: React.FC = () => {
     currentIndex,
     confirmBoarded,
     clearAutoTimer,
+    trainSelectContext,
   ]);
 
   // Local-notification bridge — schedule/reschedule for the earliest train while
@@ -384,11 +397,11 @@ export const RouteGuidanceScreen: React.FC = () => {
   // in the future.
   const trainSelectEntries = useMemo((): readonly DepartedTrainEntry[] => {
     if (!session || trainSelectContext === null) return [];
-    const { stationName, lineId } = trainSelectContext;
+    const { stationName, lineId, direction } = trainSelectContext;
     const numbered = /^[1-9]$/.test(lineId);
     // Store prune only runs on non-empty appends, so a long ride without new
     // departures can leave stale entries — filter the retention window here too.
-    return getDepartedTrainLog().filter(
+    const base = getDepartedTrainLog().filter(
       (e) =>
         e.stationName === stationName &&
         (!numbered || e.lineId === lineId) &&
@@ -396,6 +409,14 @@ export const RouteGuidanceScreen: React.FC = () => {
         e.departedAtMs >= session.startedAt &&
         e.departedAtMs >= nowMs - DEPARTED_LOG_RETENTION_MS
     );
+    // Direction ranking (no drop) — the log records both directions, so surface
+    // travel-direction matches first, but keep everything so a same-direction
+    // short-turn (종착역명이 방면명과 다름) the rider actually took stays selectable.
+    // Stable within each group (base is already departedAtMs desc).
+    if (direction === null) return base;
+    const matched = base.filter((e) => e.finalDestination === direction);
+    const rest = base.filter((e) => e.finalDestination !== direction);
+    return [...matched, ...rest];
   }, [session, trainSelectContext, nowMs]);
 
   const completedLogKeyRef = useRef<string | null>(null);

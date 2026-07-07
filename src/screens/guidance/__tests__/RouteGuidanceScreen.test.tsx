@@ -20,6 +20,7 @@ import {
 import {
   appendDepartedTrains,
   clearDepartedTrainLog,
+  getDepartedTrainLog,
   type DepartedTrainEntry,
 } from '@/services/guidance/departedTrainLog';
 import { createRoute, type RouteSegment } from '@/models/route';
@@ -186,6 +187,16 @@ const seedExtendedTransferSession = (): void => {
     ]),
     fromStationName: '을지로3가',
     toStationName: '중랑',
+    startedAt: T0,
+  });
+};
+
+/** Board on an EXTENDED line absent from the map mock → step.direction is null. */
+const seedExtendedBoardSession = (): void => {
+  setGuidanceSession({
+    route: createRoute([lineHop('s1', '대곡', 's2', '능곡', '경의중앙선', 3)]),
+    fromStationName: '대곡',
+    toStationName: '능곡',
     startedAt: T0,
   });
 };
@@ -497,6 +508,103 @@ describe('RouteGuidanceScreen', () => {
     });
     fireEvent.press(getByTestId('guidance-open-train-select'));
     expect(getByTestId('train-select-item-FRESH')).toBeTruthy();
+  });
+
+  const dirEntry = (
+    trainId: string,
+    finalDestination: string,
+    stationName = '을지로3가',
+    lineId = '2'
+  ): DepartedTrainEntry => ({
+    trainId,
+    finalDestination,
+    lineId,
+    stationName,
+    departedAtMs: T0,
+    confidence: 'observed',
+  });
+
+  it('ranks travel-direction matches first but keeps same-direction short-turns (no drop)', () => {
+    seedSession(); // board direction = 산곡 (line 2, s1→s2 endpoint in the map mock)
+    // Append SHORT before MATCH so base order is [SHORT, MATCH] — ranking must
+    // reorder MATCH to the front WITHOUT dropping the short-turn candidate.
+    appendDepartedTrains([dirEntry('SHORT', '시청'), dirEntry('MATCH', '산곡')], T0);
+    const { getByTestId, getAllByTestId } = render(<RouteGuidanceScreen />);
+    fireEvent.press(getByTestId('guidance-open-train-select'));
+    const ids = getAllByTestId(/^train-select-item-/).map((n) => n.props.testID);
+    expect(ids).toEqual(['train-select-item-MATCH', 'train-select-item-SHORT']);
+  });
+
+  it('falls back to all sheet candidates when none match the direction (단축운행 종착)', () => {
+    seedSession();
+    appendDepartedTrains([dirEntry('SHORT1', '시청'), dirEntry('SHORT2', '충정로')], T0);
+    const { getByTestId } = render(<RouteGuidanceScreen />);
+    fireEvent.press(getByTestId('guidance-open-train-select'));
+    expect(getByTestId('train-select-item-SHORT1')).toBeTruthy();
+    expect(getByTestId('train-select-item-SHORT2')).toBeTruthy();
+  });
+
+  it('does not filter sheet candidates by direction when the step direction is unknown', () => {
+    seedExtendedBoardSession(); // board on 경의중앙선 → direction null
+    appendDepartedTrains(
+      [dirEntry('A', '문산', '대곡', '경의중앙선'), dirEntry('B', '지평', '대곡', '경의중앙선')],
+      T0
+    );
+    const { getByTestId } = render(<RouteGuidanceScreen />);
+    fireEvent.press(getByTestId('guidance-open-train-select'));
+    expect(getByTestId('train-select-item-A')).toBeTruthy();
+    expect(getByTestId('train-select-item-B')).toBeTruthy();
+  });
+
+  it('does not record estimated departures with an empty station when confirming a non-waiting (ride) step', () => {
+    seedSession();
+    mockedUseRealtimeTrains.mockReturnValue({
+      trains: [trainOf('T1', 10)],
+      loading: false,
+      error: null,
+    });
+    const { getByTestId, rerender } = render(<RouteGuidanceScreen />);
+    fireEvent.press(getByTestId('guidance-next')); // board → ride (confirm at 을지로3가)
+    // useRealtimeTrains keeps a non-empty array even after boarding (disabled) —
+    // a DISTINCT train so any '' entry can't be masked by trainId dedup.
+    mockedUseRealtimeTrains.mockReturnValue({
+      trains: [trainOf('T2', 10)],
+      loading: false,
+      error: null,
+    });
+    act(() => {
+      rerender(<RouteGuidanceScreen />);
+    });
+    fireEvent.press(getByTestId('guidance-next')); // ride → alight (must NOT log at '')
+    expect(getDepartedTrainLog().some((e) => e.stationName === '')).toBe(false);
+  });
+
+  it('does not arm the soft-confirm auto-advance while the train-select sheet is open', () => {
+    seedSession();
+    mockedUseRealtimeTrains.mockReturnValue({
+      trains: [trainOf('T1', 10)],
+      loading: false,
+      error: null,
+    });
+    const { getByTestId, getByText, queryByTestId, rerender } = render(<RouteGuidanceScreen />);
+    // Open the sheet first (context captured on the board step).
+    fireEvent.press(getByTestId('guidance-open-train-select'));
+    expect(getByTestId('train-select-sheet')).toBeTruthy();
+    // Next poll: T1 departs while the sheet is open.
+    mockedUseRealtimeTrains.mockReturnValue({ trains: [], loading: false, error: null });
+    act(() => {
+      rerender(<RouteGuidanceScreen />);
+    });
+    // Soft-confirm must NOT arm behind the modal.
+    expect(queryByTestId('guidance-soft-confirm')).toBeNull();
+    // Past the grace window: no auto-advance — still on board, sheet still open.
+    act(() => {
+      jest.advanceTimersByTime(5000);
+    });
+    expect(getByText('탑승 대기')).toBeTruthy();
+    expect(getByTestId('train-select-sheet')).toBeTruthy();
+    // The newly observed departure is still logged and appears in the open sheet.
+    expect(getByTestId('train-select-item-T1')).toBeTruthy();
   });
 
   it('cancels the pending soft-confirm auto-advance when the train-select link opens the sheet', () => {
