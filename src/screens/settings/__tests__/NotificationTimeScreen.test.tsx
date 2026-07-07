@@ -485,6 +485,74 @@ describe('NotificationTimeScreen', () => {
     });
   });
 
+  describe('하차 임박 알림 설정', () => {
+    it('기본값으로 토글 ON + 2분 전이 선택되어 렌더된다 (alightAlert 필드 없는 기존 사용자)', () => {
+      // Default user has no alightAlert field → resolves to { enabled: true, leadMinutes: 2 }.
+      const { getByTestId } = renderScreen();
+      // Toggle ON → chips render.
+      expect(getByTestId('alight-lead-1')).toBeTruthy();
+      expect(getByTestId('alight-lead-2')).toBeTruthy();
+      expect(getByTestId('alight-lead-3')).toBeTruthy();
+      // 2분 chip is the active selection; the others are not.
+      expect(getByTestId('alight-lead-2').props.accessibilityState.selected).toBe(true);
+      expect(getByTestId('alight-lead-1').props.accessibilityState.selected).toBe(false);
+      expect(getByTestId('alight-lead-3').props.accessibilityState.selected).toBe(false);
+    });
+
+    it('토글 OFF 시 updateUserPreferences를 alightAlert 부분으로 호출한다', async () => {
+      const update = mockAuth(createDefaultUser());
+      const { getByTestId } = renderScreen();
+      // Mock SettingToggle press flips the current value (true → false).
+      fireEvent.press(getByTestId('toggle-하차 임박 알림'));
+      await waitFor(() =>
+        expect(update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            notificationSettings: expect.objectContaining({
+              alightAlert: { enabled: false, leadMinutes: 2 },
+            }),
+          })
+        )
+      );
+      // Partial write guard: sibling notification fields must survive.
+      const payload = update.mock.calls[0]![0] as {
+        notificationSettings?: { pushNotifications?: boolean };
+      };
+      expect(payload.notificationSettings?.pushNotifications).toBe(true);
+    });
+
+    it('사전 시간 칩(3분) 선택 시 leadMinutes를 저장한다', async () => {
+      const update = mockAuth(createDefaultUser());
+      const { getByTestId } = renderScreen();
+      fireEvent.press(getByTestId('alight-lead-3'));
+      await waitFor(() =>
+        expect(update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            notificationSettings: expect.objectContaining({
+              alightAlert: { enabled: true, leadMinutes: 3 },
+            }),
+          })
+        )
+      );
+    });
+
+    it('토글 OFF 상태에서는 사전 시간 칩이 렌더되지 않는다', () => {
+      mockAuth(
+        createDefaultUser({
+          notificationSettings: {
+            pushNotifications: true,
+            weekdaysOnly: false,
+            quietHours: { enabled: false, startTime: '23:00', endTime: '07:00' },
+            alightAlert: { enabled: false, leadMinutes: 2 },
+          },
+        })
+      );
+      const { queryByTestId } = renderScreen();
+      expect(queryByTestId('alight-lead-1')).toBeNull();
+      expect(queryByTestId('alight-lead-2')).toBeNull();
+      expect(queryByTestId('alight-lead-3')).toBeNull();
+    });
+  });
+
   describe('Header save action', () => {
     it('registers a "저장" header button that pops back', () => {
       jest.useFakeTimers();
