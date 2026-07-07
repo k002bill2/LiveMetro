@@ -60,6 +60,12 @@ const steps = routeToGuidanceSteps(
   createRoute([hop('s1', 'A', 's2', 'B', '2', 2), hop('s2', 'B', 's3', 'C', '2', 3)])
 );
 
+// [board, ride(10m: B 4m + C 6m), alight] — long enough that 5min elapsed lands
+// mid-ride (proves a past anchor took effect without reaching alight).
+const longRideSteps = routeToGuidanceSteps(
+  createRoute([hop('s1', 'A', 's2', 'B', '2', 4), hop('s2', 'B', 's3', 'C', '2', 6)])
+);
+
 // [board, ride(5m), transfer(4m), ride(4m), alight] — line 2 → transfer at C → line 7
 const transferSteps = routeToGuidanceSteps(
   createRoute([
@@ -211,5 +217,57 @@ describe('useGuidanceProgress', () => {
     expect(result.current.currentIndex).toBe(0);
     expect(result.current.remainingSeconds).toBe(0);
     expect(result.current.isAtEnd).toBe(false);
+  });
+
+  describe('goNextAt / rebaseAt (past-anchor rebase)', () => {
+    it('goNextAt(now - 5min) advances into the ride and reflects 5min elapsed', () => {
+      const { result } = renderHook(() =>
+        useGuidanceProgress(longRideSteps, { startedAt: T0, enabled: true })
+      );
+      act(() => {
+        result.current.goNextAt(T0 - 5 * 60_000); // boarded 5min ago
+      });
+      expect(result.current.currentIndex).toBe(1); // still in the 10min ride, not alight
+      expect(result.current.isHolding).toBe(false);
+      expect(Math.round(result.current.elapsedInStepSec)).toBe(300);
+    });
+
+    it('goNextAt(now - 30min) does not punch through a transfer hold', () => {
+      const { result } = renderHook(() =>
+        useGuidanceProgress(transferSteps, { startedAt: T0, enabled: true })
+      );
+      act(() => {
+        result.current.goNextAt(T0 - 30 * 60_000); // far past the 5min ride
+      });
+      // Carried through the ride but PARKED on the transfer (index 2).
+      expect(result.current.currentIndex).toBe(2);
+      expect(result.current.isHolding).toBe(true);
+    });
+
+    it('goNextAt(now + 10min) clamps a future anchor to now (no jump)', () => {
+      const { result } = renderHook(() =>
+        useGuidanceProgress(longRideSteps, { startedAt: T0, enabled: true })
+      );
+      act(() => {
+        result.current.goNextAt(T0 + 10 * 60_000);
+      });
+      expect(result.current.currentIndex).toBe(1);
+      expect(result.current.elapsedInStepSec).toBeLessThan(5);
+    });
+
+    it('rebaseAt(now - 3min) keeps the current index and sets elapsed to ~180s', () => {
+      const { result } = renderHook(() =>
+        useGuidanceProgress(longRideSteps, { startedAt: T0, enabled: true })
+      );
+      act(() => {
+        result.current.goNext(); // board → ride
+      });
+      expect(result.current.currentIndex).toBe(1);
+      act(() => {
+        result.current.rebaseAt(T0 - 3 * 60_000);
+      });
+      expect(result.current.currentIndex).toBe(1); // index unchanged
+      expect(Math.round(result.current.elapsedInStepSec)).toBe(180);
+    });
   });
 });
