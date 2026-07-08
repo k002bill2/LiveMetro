@@ -11,6 +11,10 @@ import {
   scheduleBoardingAlert,
   cancelBoardingAlert,
 } from '@/services/notification/boardingAlertService';
+import {
+  scheduleAlightAlert,
+  cancelAlightAlert,
+} from '@/services/notification/alightAlertService';
 import { completeGuidanceCommuteLog } from '@/services/guidance/guidanceCommuteLogService';
 import {
   setGuidanceSession,
@@ -54,6 +58,11 @@ jest.mock('@/hooks/useRealtimeTrains', () => ({
 jest.mock('@/services/notification/boardingAlertService', () => ({
   scheduleBoardingAlert: jest.fn(() => Promise.resolve('alert-id')),
   cancelBoardingAlert: jest.fn(() => Promise.resolve()),
+}));
+
+jest.mock('@/services/notification/alightAlertService', () => ({
+  scheduleAlightAlert: jest.fn(() => Promise.resolve('alight-1')),
+  cancelAlightAlert: jest.fn(() => Promise.resolve()),
 }));
 
 jest.mock('@/services/guidance/guidanceCommuteLogService', () => ({
@@ -208,6 +217,8 @@ describe('RouteGuidanceScreen', () => {
     mockGoBack.mockClear();
     (scheduleBoardingAlert as jest.Mock).mockClear();
     (cancelBoardingAlert as jest.Mock).mockClear();
+    (scheduleAlightAlert as jest.Mock).mockClear();
+    (cancelAlightAlert as jest.Mock).mockClear();
     (completeGuidanceCommuteLog as jest.Mock).mockClear();
     mockedUseRealtimeTrains.mockReturnValue({
       trains: [],
@@ -745,5 +756,48 @@ describe('RouteGuidanceScreen', () => {
     });
     expect(getByText('환승 중')).toBeTruthy();
     expect(getByText('환승 도보 약 4분 — 2분 59초 남음')).toBeTruthy();
+  });
+
+  describe('하차 임박 알림 (alight alert)', () => {
+    it('ride 스텝 진입 시 다음 하차 지점 정보로 scheduleAlightAlert를 호출한다', () => {
+      seedSession(); // board → ride(line2, 5m) → alight@산곡
+      const { getByTestId } = render(<RouteGuidanceScreen />);
+      // board 홀드에서는 아직 예약 없음.
+      expect(scheduleAlightAlert).not.toHaveBeenCalled();
+      // 탑승 확인 → ride 스텝 진입 → 다음 하차 지점(산곡)으로 예약.
+      fireEvent.press(getByTestId('guidance-next'));
+      expect(scheduleAlightAlert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          nextKind: expect.stringMatching(/^(transfer|alight)$/),
+          stationName: '산곡',
+          arrivalAtMs: expect.any(Number),
+          stepKey: expect.stringMatching(/^\d+:\d+$/),
+        })
+      );
+      // 도착 시각(rideAlightAtMs)은 1Hz 틱에 불변 → effect가 매초 재실행되지
+      // 않는다: ride 안에서 시간이 흘러도 재예약이 발생하지 않아야 한다.
+      const callsAfterEntry = (scheduleAlightAlert as jest.Mock).mock.calls.length;
+      act(() => {
+        jest.advanceTimersByTime(2000);
+      });
+      expect((scheduleAlightAlert as jest.Mock).mock.calls.length).toBe(callsAfterEntry);
+    });
+
+    it('board 대기 스텝에서는 예약하지 않고 cancelAlightAlert를 호출한다', () => {
+      seedSession();
+      render(<RouteGuidanceScreen />);
+      // board 홀드 상태 — ride가 아니므로 예약 없이 이전 pending을 취소한다.
+      expect(scheduleAlightAlert).not.toHaveBeenCalled();
+      expect(cancelAlightAlert).toHaveBeenCalled();
+    });
+
+    it('길안내 종료(handleExit) 시 cancelAlightAlert를 호출한다', () => {
+      seedSession();
+      const { getByTestId } = render(<RouteGuidanceScreen />);
+      // 마운트 시 board 홀드의 취소 호출을 지워 handleExit 경로만 격리한다.
+      (cancelAlightAlert as jest.Mock).mockClear();
+      fireEvent.press(getByTestId('guidance-exit'));
+      expect(cancelAlightAlert).toHaveBeenCalled();
+    });
   });
 });

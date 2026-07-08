@@ -8,11 +8,12 @@
  */
 
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import { NotificationTimeScreen } from '../NotificationTimeScreen';
 import { useAuth } from '@/services/auth/AuthContext';
 import { useFirestoreCommuteRoutes } from '@/hooks/useFirestoreCommuteRoutes';
+import { cancelAlightAlert } from '@/services/notification/alightAlertService';
 
 jest.mock('@/services/theme', () => ({
   useSemanticTokens: jest.fn(() =>
@@ -163,6 +164,14 @@ jest.mock('@/components/settings/SettingToggle', () => {
   };
 });
 
+jest.mock('@/services/notification/alightAlertService', () => ({
+  __esModule: true,
+  cancelAlightAlert: jest.fn().mockResolvedValue(undefined),
+}));
+
+const mockCancelAlightAlert = cancelAlightAlert as jest.MockedFunction<
+  typeof cancelAlightAlert
+>;
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const mockFsRoutes = useFirestoreCommuteRoutes as jest.MockedFunction<
   typeof useFirestoreCommuteRoutes
@@ -482,6 +491,157 @@ describe('NotificationTimeScreen', () => {
         notificationSettings?: { quietHours?: { weekendsAlwaysSilent?: boolean } };
       };
       expect(payload.notificationSettings?.quietHours?.weekendsAlwaysSilent).toBeUndefined();
+    });
+  });
+
+  describe('하차 임박 알림 설정', () => {
+    it('기본값으로 토글 ON + 2분 전이 선택되어 렌더된다 (alightAlert 필드 없는 기존 사용자)', () => {
+      // Default user has no alightAlert field → resolves to { enabled: true, leadMinutes: 2 }.
+      const { getByTestId } = renderScreen();
+      // Toggle ON → chips render.
+      expect(getByTestId('alight-lead-1')).toBeTruthy();
+      expect(getByTestId('alight-lead-2')).toBeTruthy();
+      expect(getByTestId('alight-lead-3')).toBeTruthy();
+      // 2분 chip is the active selection; the others are not.
+      expect(getByTestId('alight-lead-2').props.accessibilityState.selected).toBe(true);
+      expect(getByTestId('alight-lead-1').props.accessibilityState.selected).toBe(false);
+      expect(getByTestId('alight-lead-3').props.accessibilityState.selected).toBe(false);
+    });
+
+    it('토글 OFF 시 updateUserPreferences를 alightAlert 부분으로 호출한다', async () => {
+      const update = mockAuth(createDefaultUser());
+      const { getByTestId } = renderScreen();
+      // Mock SettingToggle press flips the current value (true → false).
+      fireEvent.press(getByTestId('toggle-하차 임박 알림'));
+      await waitFor(() =>
+        expect(update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            notificationSettings: expect.objectContaining({
+              alightAlert: { enabled: false, leadMinutes: 2 },
+            }),
+          })
+        )
+      );
+      // Partial write guard: sibling notification fields must survive.
+      const payload = update.mock.calls[0]![0] as {
+        notificationSettings?: { pushNotifications?: boolean };
+      };
+      expect(payload.notificationSettings?.pushNotifications).toBe(true);
+    });
+
+    it('사전 시간 칩(3분) 선택 시 leadMinutes를 저장한다', async () => {
+      const update = mockAuth(createDefaultUser());
+      const { getByTestId } = renderScreen();
+      fireEvent.press(getByTestId('alight-lead-3'));
+      await waitFor(() =>
+        expect(update).toHaveBeenCalledWith(
+          expect.objectContaining({
+            notificationSettings: expect.objectContaining({
+              alightAlert: { enabled: true, leadMinutes: 3 },
+            }),
+          })
+        )
+      );
+    });
+
+    it('형제(주말) 저장 in-flight 동안 alight 토글이 게이트되어 stale 스프레드를 막는다', async () => {
+      // Sibling save leaves saving=true (pending). While in flight, the alight
+      // toggle must be disabled — otherwise it spreads a pre-save
+      // notificationSettings snapshot and clobbers the just-written weekdaysOnly.
+      let resolveUpdate!: () => void;
+      const update = jest.fn().mockReturnValue(
+        new Promise<void>((res) => {
+          resolveUpdate = () => res();
+        })
+      );
+      mockAuth(createDefaultUser(), update);
+      const { getByTestId } = renderScreen();
+
+      fireEvent.press(getByTestId('toggle-주말은 종일 무음'));
+      expect(update).toHaveBeenCalledTimes(1);
+
+      // Alight toggle is gated while the sibling save is in flight.
+      fireEvent.press(getByTestId('toggle-하차 임박 알림'));
+      expect(update).toHaveBeenCalledTimes(1);
+
+      // Cleanup: resolve the pending save so saving resets to false.
+      await act(async () => {
+        resolveUpdate();
+      });
+    });
+
+    it('형제(주말) 저장 in-flight 동안 lead 칩이 게이트된다', async () => {
+      let resolveUpdate!: () => void;
+      const update = jest.fn().mockReturnValue(
+        new Promise<void>((res) => {
+          resolveUpdate = () => res();
+        })
+      );
+      mockAuth(createDefaultUser(), update);
+      const { getByTestId } = renderScreen();
+
+      fireEvent.press(getByTestId('toggle-주말은 종일 무음'));
+      expect(update).toHaveBeenCalledTimes(1);
+
+      // Lead chip is disabled while the sibling save is in flight.
+      fireEvent.press(getByTestId('alight-lead-3'));
+      expect(update).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        resolveUpdate();
+      });
+    });
+
+    it('토글 OFF 시 pending/고아 알림을 취소한다 (cancelAlightAlert 호출)', async () => {
+      // Firestore write alone can't stop an already-scheduled local alert when
+      // RouteGuidanceScreen is unmounted — cancel must fire on OFF.
+      const update = mockAuth(createDefaultUser());
+      const { getByTestId } = renderScreen();
+      fireEvent.press(getByTestId('toggle-하차 임박 알림'));
+      await waitFor(() => expect(update).toHaveBeenCalled());
+      expect(mockCancelAlightAlert).toHaveBeenCalledTimes(1);
+    });
+
+    it('토글 ON(꺼짐 상태에서 켤 때) 시에는 취소하지 않는다', async () => {
+      const update = mockAuth(
+        createDefaultUser({
+          notificationSettings: {
+            pushNotifications: true,
+            weekdaysOnly: false,
+            quietHours: { enabled: false, startTime: '23:00', endTime: '07:00' },
+            alightAlert: { enabled: false, leadMinutes: 2 },
+          },
+        })
+      );
+      const { getByTestId } = renderScreen();
+      fireEvent.press(getByTestId('toggle-하차 임박 알림'));
+      await waitFor(() => expect(update).toHaveBeenCalled());
+      expect(mockCancelAlightAlert).not.toHaveBeenCalled();
+    });
+
+    it('lead 칩 변경(계속 켜짐) 시에는 취소하지 않는다', async () => {
+      const update = mockAuth(createDefaultUser());
+      const { getByTestId } = renderScreen();
+      fireEvent.press(getByTestId('alight-lead-3'));
+      await waitFor(() => expect(update).toHaveBeenCalled());
+      expect(mockCancelAlightAlert).not.toHaveBeenCalled();
+    });
+
+    it('토글 OFF 상태에서는 사전 시간 칩이 렌더되지 않는다', () => {
+      mockAuth(
+        createDefaultUser({
+          notificationSettings: {
+            pushNotifications: true,
+            weekdaysOnly: false,
+            quietHours: { enabled: false, startTime: '23:00', endTime: '07:00' },
+            alightAlert: { enabled: false, leadMinutes: 2 },
+          },
+        })
+      );
+      const { queryByTestId } = renderScreen();
+      expect(queryByTestId('alight-lead-1')).toBeNull();
+      expect(queryByTestId('alight-lead-2')).toBeNull();
+      expect(queryByTestId('alight-lead-3')).toBeNull();
     });
   });
 

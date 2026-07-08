@@ -45,8 +45,14 @@ import {
 } from '@/styles/modernTheme';
 import { useAuth } from '@/services/auth/AuthContext';
 import { useToast } from '@/components/common/Toast';
-import { isUsableCommuteTime, type CommuteTime } from '@/models/user';
+import {
+  isUsableCommuteTime,
+  resolveAlightAlertPreferences,
+  type CommuteTime,
+  type AlightAlertPreferences,
+} from '@/models/user';
 import { useFirestoreCommuteRoutes } from '@/hooks/useFirestoreCommuteRoutes';
+import { cancelAlightAlert } from '@/services/notification/alightAlertService';
 import type { SettingsStackParamList } from '@/navigation/types';
 
 import SettingSection from '@/components/settings/SettingSection';
@@ -81,6 +87,7 @@ export const NotificationTimeScreen: React.FC<Props> = ({ navigation }) => {
   const [saving, setSaving] = useState(false);
 
   const notificationSettings = user?.preferences.notificationSettings;
+  const alightPrefs = resolveAlightAlertPreferences(notificationSettings);
   const commuteSchedule = user?.preferences.commuteSchedule;
 
   // The commute lives in one of two stores: the user profile (#1) or the
@@ -276,6 +283,53 @@ export const NotificationTimeScreen: React.FC<Props> = ({ navigation }) => {
     [user, updateUserPreferences]
   );
 
+  // 하차 임박 알림 (길안내). Partial write: spread current notificationSettings
+  // and replace only `alightAlert` so sibling fields (quietHours, weekdaysOnly,
+  // pushNotifications) survive. Shares the sibling `saving` gate so the alight
+  // controls are disabled while another notificationSettings write is in flight
+  // — otherwise this would spread a pre-save snapshot and roll back the just-
+  // written quietHours/weekdaysOnly (the "stale spread clobbers" race class).
+  const updateAlightAlert = useCallback(
+    async (next: AlightAlertPreferences): Promise<void> => {
+      if (!user) return;
+      try {
+        setSaving(true);
+        // Turning it OFF: cancel any already-scheduled/orphaned local alert now.
+        // A Firestore-only write can't stop a pending OS notification when
+        // RouteGuidanceScreen is unmounted (e.g. after an app restart), so the
+        // fired alert would ignore the disabled setting. cancelAlightAlert is
+        // never-throw and also sweeps kind-marked orphans.
+        if (!next.enabled) void cancelAlightAlert();
+        await updateUserPreferences({
+          notificationSettings: {
+            ...user.preferences.notificationSettings,
+            alightAlert: next,
+          },
+        });
+      } catch (error) {
+        console.error('Error updating alight alert preferences:', error);
+        Alert.alert('오류', '설정 저장에 실패했습니다.');
+      } finally {
+        setSaving(false);
+      }
+    },
+    [user, updateUserPreferences]
+  );
+
+  const handleAlightToggle = useCallback(
+    (enabled: boolean): void => {
+      void updateAlightAlert({ ...alightPrefs, enabled });
+    },
+    [alightPrefs, updateAlightAlert]
+  );
+
+  const handleAlightLeadChange = useCallback(
+    (leadMinutes: AlightAlertPreferences['leadMinutes']): void => {
+      void updateAlightAlert({ ...alightPrefs, leadMinutes });
+    },
+    [alightPrefs, updateAlightAlert]
+  );
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView style={styles.content} contentContainerStyle={styles.contentInner}>
@@ -357,6 +411,49 @@ export const NotificationTimeScreen: React.FC<Props> = ({ navigation }) => {
           />
         </SettingSection>
 
+        {/* 길안내 하차 임박 알림 */}
+        <SettingSection title="길안내 알림">
+          <SettingToggle
+            label="하차 임박 알림"
+            subtitle="길안내 중 환승·하차 역 도착 전에 미리 알려드려요"
+            value={alightPrefs.enabled}
+            onValueChange={handleAlightToggle}
+            disabled={saving}
+            testID="alight-alert-toggle"
+          />
+          {alightPrefs.enabled && (
+            <View style={styles.leadRow}>
+              <Text style={styles.leadLabel}>알림 시점</Text>
+              <View style={styles.leadChips}>
+                {([1, 2, 3] as const).map((m) => {
+                  const active = alightPrefs.leadMinutes === m;
+                  return (
+                    <TouchableOpacity
+                      key={m}
+                      testID={`alight-lead-${m}`}
+                      style={[styles.leadChip, active && styles.leadChipActive]}
+                      onPress={() => handleAlightLeadChange(m)}
+                      disabled={saving}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: active, disabled: saving }}
+                      accessibilityLabel={`도착 ${m}분 전 알림`}
+                    >
+                      <Text
+                        style={[
+                          styles.leadChipText,
+                          active && styles.leadChipTextActive,
+                        ]}
+                      >
+                        {m}분 전
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+        </SettingSection>
+
         <Text style={styles.footerText}>
           방해 금지 시간에는 긴급 지연 알림도 무음으로 와요.
         </Text>
@@ -397,6 +494,43 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       fontSize: 16,
       fontFamily: weightToFontFamily('600'),
       color: semantic.labelAlt,
+    },
+    leadRow: {
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s3,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+    },
+    leadLabel: {
+      fontSize: 14,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelNeutral,
+    },
+    leadChips: {
+      flexDirection: 'row',
+      gap: WANTED_TOKENS.spacing.s2,
+    },
+    leadChip: {
+      minHeight: 44,
+      minWidth: 44,
+      paddingHorizontal: 14,
+      borderRadius: 8,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: semantic.bgSubtle,
+    },
+    leadChipActive: {
+      backgroundColor: semantic.primaryNormal,
+    },
+    leadChipText: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('500'),
+      color: semantic.labelNeutral,
+    },
+    leadChipTextActive: {
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.labelOnColor,
     },
     footerText: {
       fontSize: WANTED_TOKENS.type.caption1.size,
