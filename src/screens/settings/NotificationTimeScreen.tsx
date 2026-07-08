@@ -52,6 +52,7 @@ import {
   type AlightAlertPreferences,
 } from '@/models/user';
 import { useFirestoreCommuteRoutes } from '@/hooks/useFirestoreCommuteRoutes';
+import { cancelAlightAlert } from '@/services/notification/alightAlertService';
 import type { SettingsStackParamList } from '@/navigation/types';
 
 import SettingSection from '@/components/settings/SettingSection';
@@ -293,6 +294,12 @@ export const NotificationTimeScreen: React.FC<Props> = ({ navigation }) => {
       if (!user) return;
       try {
         setSaving(true);
+        // Turning it OFF: cancel any already-scheduled/orphaned local alert now.
+        // A Firestore-only write can't stop a pending OS notification when
+        // RouteGuidanceScreen is unmounted (e.g. after an app restart), so the
+        // fired alert would ignore the disabled setting. cancelAlightAlert is
+        // never-throw and also sweeps kind-marked orphans.
+        if (!next.enabled) void cancelAlightAlert();
         await updateUserPreferences({
           notificationSettings: {
             ...user.preferences.notificationSettings,

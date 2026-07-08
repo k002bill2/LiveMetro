@@ -13,6 +13,7 @@ import { Alert } from 'react-native';
 import { NotificationTimeScreen } from '../NotificationTimeScreen';
 import { useAuth } from '@/services/auth/AuthContext';
 import { useFirestoreCommuteRoutes } from '@/hooks/useFirestoreCommuteRoutes';
+import { cancelAlightAlert } from '@/services/notification/alightAlertService';
 
 jest.mock('@/services/theme', () => ({
   useSemanticTokens: jest.fn(() =>
@@ -163,6 +164,14 @@ jest.mock('@/components/settings/SettingToggle', () => {
   };
 });
 
+jest.mock('@/services/notification/alightAlertService', () => ({
+  __esModule: true,
+  cancelAlightAlert: jest.fn().mockResolvedValue(undefined),
+}));
+
+const mockCancelAlightAlert = cancelAlightAlert as jest.MockedFunction<
+  typeof cancelAlightAlert
+>;
 const mockUseAuth = useAuth as jest.MockedFunction<typeof useAuth>;
 const mockFsRoutes = useFirestoreCommuteRoutes as jest.MockedFunction<
   typeof useFirestoreCommuteRoutes
@@ -581,6 +590,41 @@ describe('NotificationTimeScreen', () => {
       await act(async () => {
         resolveUpdate();
       });
+    });
+
+    it('토글 OFF 시 pending/고아 알림을 취소한다 (cancelAlightAlert 호출)', async () => {
+      // Firestore write alone can't stop an already-scheduled local alert when
+      // RouteGuidanceScreen is unmounted — cancel must fire on OFF.
+      const update = mockAuth(createDefaultUser());
+      const { getByTestId } = renderScreen();
+      fireEvent.press(getByTestId('toggle-하차 임박 알림'));
+      await waitFor(() => expect(update).toHaveBeenCalled());
+      expect(mockCancelAlightAlert).toHaveBeenCalledTimes(1);
+    });
+
+    it('토글 ON(꺼짐 상태에서 켤 때) 시에는 취소하지 않는다', async () => {
+      const update = mockAuth(
+        createDefaultUser({
+          notificationSettings: {
+            pushNotifications: true,
+            weekdaysOnly: false,
+            quietHours: { enabled: false, startTime: '23:00', endTime: '07:00' },
+            alightAlert: { enabled: false, leadMinutes: 2 },
+          },
+        })
+      );
+      const { getByTestId } = renderScreen();
+      fireEvent.press(getByTestId('toggle-하차 임박 알림'));
+      await waitFor(() => expect(update).toHaveBeenCalled());
+      expect(mockCancelAlightAlert).not.toHaveBeenCalled();
+    });
+
+    it('lead 칩 변경(계속 켜짐) 시에는 취소하지 않는다', async () => {
+      const update = mockAuth(createDefaultUser());
+      const { getByTestId } = renderScreen();
+      fireEvent.press(getByTestId('alight-lead-3'));
+      await waitFor(() => expect(update).toHaveBeenCalled());
+      expect(mockCancelAlightAlert).not.toHaveBeenCalled();
     });
 
     it('토글 OFF 상태에서는 사전 시간 칩이 렌더되지 않는다', () => {
