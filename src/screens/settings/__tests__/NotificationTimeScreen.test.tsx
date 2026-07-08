@@ -8,7 +8,7 @@
  */
 
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import { NotificationTimeScreen } from '../NotificationTimeScreen';
 import { useAuth } from '@/services/auth/AuthContext';
@@ -533,6 +533,54 @@ describe('NotificationTimeScreen', () => {
           })
         )
       );
+    });
+
+    it('형제(주말) 저장 in-flight 동안 alight 토글이 게이트되어 stale 스프레드를 막는다', async () => {
+      // Sibling save leaves saving=true (pending). While in flight, the alight
+      // toggle must be disabled — otherwise it spreads a pre-save
+      // notificationSettings snapshot and clobbers the just-written weekdaysOnly.
+      let resolveUpdate!: () => void;
+      const update = jest.fn().mockReturnValue(
+        new Promise<void>((res) => {
+          resolveUpdate = () => res();
+        })
+      );
+      mockAuth(createDefaultUser(), update);
+      const { getByTestId } = renderScreen();
+
+      fireEvent.press(getByTestId('toggle-주말은 종일 무음'));
+      expect(update).toHaveBeenCalledTimes(1);
+
+      // Alight toggle is gated while the sibling save is in flight.
+      fireEvent.press(getByTestId('toggle-하차 임박 알림'));
+      expect(update).toHaveBeenCalledTimes(1);
+
+      // Cleanup: resolve the pending save so saving resets to false.
+      await act(async () => {
+        resolveUpdate();
+      });
+    });
+
+    it('형제(주말) 저장 in-flight 동안 lead 칩이 게이트된다', async () => {
+      let resolveUpdate!: () => void;
+      const update = jest.fn().mockReturnValue(
+        new Promise<void>((res) => {
+          resolveUpdate = () => res();
+        })
+      );
+      mockAuth(createDefaultUser(), update);
+      const { getByTestId } = renderScreen();
+
+      fireEvent.press(getByTestId('toggle-주말은 종일 무음'));
+      expect(update).toHaveBeenCalledTimes(1);
+
+      // Lead chip is disabled while the sibling save is in flight.
+      fireEvent.press(getByTestId('alight-lead-3'));
+      expect(update).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        resolveUpdate();
+      });
     });
 
     it('토글 OFF 상태에서는 사전 시간 칩이 렌더되지 않는다', () => {

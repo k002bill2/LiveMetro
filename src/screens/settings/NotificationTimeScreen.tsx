@@ -282,14 +282,17 @@ export const NotificationTimeScreen: React.FC<Props> = ({ navigation }) => {
     [user, updateUserPreferences]
   );
 
-  // 하차 임박 알림 (길안내). Optimistic like DelayNotificationScreen's chips —
-  // no `saving` gate. Partial write: spread current notificationSettings and
-  // replace only `alightAlert` so sibling fields (quietHours, weekdaysOnly,
-  // pushNotifications) survive.
+  // 하차 임박 알림 (길안내). Partial write: spread current notificationSettings
+  // and replace only `alightAlert` so sibling fields (quietHours, weekdaysOnly,
+  // pushNotifications) survive. Shares the sibling `saving` gate so the alight
+  // controls are disabled while another notificationSettings write is in flight
+  // — otherwise this would spread a pre-save snapshot and roll back the just-
+  // written quietHours/weekdaysOnly (the "stale spread clobbers" race class).
   const updateAlightAlert = useCallback(
     async (next: AlightAlertPreferences): Promise<void> => {
       if (!user) return;
       try {
+        setSaving(true);
         await updateUserPreferences({
           notificationSettings: {
             ...user.preferences.notificationSettings,
@@ -299,6 +302,8 @@ export const NotificationTimeScreen: React.FC<Props> = ({ navigation }) => {
       } catch (error) {
         console.error('Error updating alight alert preferences:', error);
         Alert.alert('오류', '설정 저장에 실패했습니다.');
+      } finally {
+        setSaving(false);
       }
     },
     [user, updateUserPreferences]
@@ -406,6 +411,7 @@ export const NotificationTimeScreen: React.FC<Props> = ({ navigation }) => {
             subtitle="길안내 중 환승·하차 역 도착 전에 미리 알려드려요"
             value={alightPrefs.enabled}
             onValueChange={handleAlightToggle}
+            disabled={saving}
             testID="alight-alert-toggle"
           />
           {alightPrefs.enabled && (
@@ -420,8 +426,9 @@ export const NotificationTimeScreen: React.FC<Props> = ({ navigation }) => {
                       testID={`alight-lead-${m}`}
                       style={[styles.leadChip, active && styles.leadChipActive]}
                       onPress={() => handleAlightLeadChange(m)}
+                      disabled={saving}
                       accessibilityRole="button"
-                      accessibilityState={{ selected: active }}
+                      accessibilityState={{ selected: active, disabled: saving }}
                       accessibilityLabel={`도착 ${m}분 전 알림`}
                     >
                       <Text
