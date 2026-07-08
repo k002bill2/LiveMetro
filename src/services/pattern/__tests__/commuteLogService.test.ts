@@ -120,6 +120,26 @@ describe('CommuteLogService', () => {
 
       expect(result.departureTime).toBe('08:30'); // mocked current time
     });
+
+    it('should not write undefined field values to Firestore', async () => {
+      mockAddDoc.mockResolvedValue({ id: 'new-log-id' });
+
+      // Omit optional arrivalTime and delayMinutes entirely.
+      await commuteLogService.logCommute('user-123', {
+        departureStationId: 'gangnam',
+        departureStationName: '강남',
+        arrivalStationId: 'jamsil',
+        arrivalStationName: '잠실',
+        lineIds: ['2'],
+        isManual: false,
+      });
+
+      const payload = mockAddDoc.mock.calls[0][1];
+      const undefinedKeys = Object.entries(payload)
+        .filter(([, v]) => v === undefined)
+        .map(([k]) => k);
+      expect(undefinedKeys).toEqual([]);
+    });
   });
 
   describe('getCommuteLogs', () => {
@@ -352,6 +372,11 @@ describe('CommuteLogService', () => {
       expect(payload.arrivalStationId).toBe('gangnam');
       expect(payload.lineIds).toEqual(['2']);
       expect(payload.isManual).toBe(false);
+
+      const undefinedKeys = Object.entries(payload)
+        .filter(([, v]) => v === undefined)
+        .map(([k]) => k);
+      expect(undefinedKeys).toEqual([]);
     });
 
     it('should not create a departure log if already logged today', async () => {
@@ -399,6 +424,11 @@ describe('CommuteLogService', () => {
       expect(payload.departureStationId).toBe('sindorim');
       expect(payload.isManual).toBe(false);
       expect(mockUpdateDoc).not.toHaveBeenCalled();
+
+      const undefinedKeys = Object.entries(payload)
+        .filter(([, v]) => v === undefined)
+        .map(([k]) => k);
+      expect(undefinedKeys).toEqual([]);
     });
 
     it('should do nothing for arrival when today\'s log already has arrivalTime', async () => {
