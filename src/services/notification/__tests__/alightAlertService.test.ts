@@ -12,6 +12,13 @@ jest.mock('../notificationService', () => ({
   NotificationType: { ARRIVAL_REMINDER: 'arrival_reminder' },
 }));
 
+// cancelAlightAlert가 OS 큐를 직접 훑어 고아 하차 알림(kind 마커)을 sweep하므로
+// expo-notifications를 직접 mock한다 (notificationService에 alight 도메인 지식을 새지 않기 위함).
+jest.mock('expo-notifications', () => ({
+  getAllScheduledNotificationsAsync: jest.fn(),
+  cancelScheduledNotificationAsync: jest.fn(),
+}));
+
 import type { NotificationSettings } from '@models/user';
 
 const NOW = 1_750_000_000_000;
@@ -22,6 +29,10 @@ type MockNotif = {
   shouldSendNotification: jest.Mock;
   scheduleArrivalAlert: jest.Mock;
   cancelNotification: jest.Mock;
+};
+type MockExpo = {
+  getAllScheduledNotificationsAsync: jest.Mock;
+  cancelScheduledNotificationAsync: jest.Mock;
 };
 
 // alightAlert만 실려 있으면 되므로 최소 형태로 캐스팅 (resolve/게이트 경로만 사용).
@@ -39,16 +50,20 @@ const baseParams = {
 
 let svc: Svc;
 let notif: MockNotif;
+let expo: MockExpo;
 
 beforeEach(() => {
   jest.resetModules();
   jest.spyOn(Date, 'now').mockReturnValue(NOW);
   svc = require('../alightAlertService');
   notif = require('../notificationService').notificationService;
+  expo = require('expo-notifications');
   notif.requestPermissions.mockResolvedValue({ granted: true });
   notif.shouldSendNotification.mockReturnValue(true);
   notif.scheduleArrivalAlert.mockResolvedValue('alert-1');
   notif.cancelNotification.mockResolvedValue(undefined);
+  expo.getAllScheduledNotificationsAsync.mockResolvedValue([]);
+  expo.cancelScheduledNotificationAsync.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -65,7 +80,7 @@ describe('scheduleAlightAlert', () => {
         secondsBefore: 120,
         title: '곧 신도림역 도착',
         body: '2호선 환승을 준비하세요',
-        data: { variant: 'transfer', stationName: '신도림' },
+        data: { kind: 'alight-alert', variant: 'transfer', stationName: '신도림' },
       })
     );
   });
@@ -74,7 +89,7 @@ describe('scheduleAlightAlert', () => {
     await svc.scheduleAlightAlert({ ...baseParams, nextKind: 'alight', toLineName: undefined });
     expect(notif.scheduleArrivalAlert).toHaveBeenCalledWith(
       expect.any(Date),
-      expect.objectContaining({ body: '내릴 준비를 하세요', data: expect.objectContaining({ variant: 'alight' }) })
+      expect.objectContaining({ body: '내릴 준비를 하세요', data: expect.objectContaining({ kind: 'alight-alert', variant: 'alight' }) })
     );
   });
 
@@ -129,6 +144,26 @@ describe('scheduleAlightAlert', () => {
     const id = await svc.scheduleAlightAlert({ ...baseParams, stepKey: '1000:3' });
     expect(notif.cancelNotification).toHaveBeenCalledWith('alert-1');
     expect(id).toBe('alert-2');
+  });
+
+  it('supersede: imminent re-call whose fireAt has shifted cancels the stale pending (더 이른 열차 rebase)', async () => {
+    await svc.scheduleAlightAlert(baseParams); // alert-1, fireAt = NOW+8분 (미래)
+    const id = await svc.scheduleAlightAlert({
+      ...baseParams,
+      arrivalAtMs: NOW + 2 * 60_000 + 3_000, // fireAt = NOW+3s < 5s 임박, 기존과 크게 이동
+    });
+    expect(notif.cancelNotification).toHaveBeenCalledWith('alert-1');
+    expect(id).toBeNull();
+  });
+
+  it('preserves the valid pending when an imminent re-call is the same schedule (허용오차 내)', async () => {
+    await svc.scheduleAlightAlert(baseParams); // alert-1, fireAt = NOW+8분
+    notif.cancelNotification.mockClear();
+    // 발사 3초 전으로 시간을 전진 — 동일 예약이지만 이제 임박 경로를 탄다.
+    (Date.now as jest.Mock).mockReturnValue(baseParams.arrivalAtMs - 2 * 60_000 - 3_000);
+    const id = await svc.scheduleAlightAlert(baseParams); // 동일 arrivalAtMs·동일 stepKey
+    expect(notif.cancelNotification).not.toHaveBeenCalled();
+    expect(id).toBeNull();
   });
 
   it('returns null and cancels pending when the setting is disabled', async () => {
@@ -201,6 +236,41 @@ describe('cancelAlightAlert', () => {
     await svc.cancelAlightAlert();
     expect(notif.cancelNotification).toHaveBeenCalledWith('alert-1');
     // 두 번째 호출은 no-op (추적 해제 확인)
+    notif.cancelNotification.mockClear();
+    await svc.cancelAlightAlert();
+    expect(notif.cancelNotification).not.toHaveBeenCalled();
+  });
+
+  it('sweeps orphaned alight alerts off the OS queue, sparing boarding alerts (재시작 복원 고아)', async () => {
+    expo.getAllScheduledNotificationsAsync.mockResolvedValue([
+      { identifier: 'orphan-1', content: { data: { kind: 'alight-alert' } } },
+      {
+        identifier: 'boarding-1',
+        content: { data: { variant: 'transfer', stationName: 'x', finalDestination: 'y' } },
+      },
+    ]);
+    await svc.cancelAlightAlert(); // 추적 상태 없음 — sweep만 수행
+    expect(expo.cancelScheduledNotificationAsync).toHaveBeenCalledWith('orphan-1');
+    expect(expo.cancelScheduledNotificationAsync).not.toHaveBeenCalledWith('boarding-1');
+  });
+});
+
+describe('serialization (Codex P2 — 늦은 완료 레이스)', () => {
+  it('a cancel awaiting an in-flight schedule cancels the late-resolved id', async () => {
+    let resolveSchedule: (id: string) => void = () => undefined;
+    notif.scheduleArrivalAlert.mockReturnValue(
+      new Promise<string>((resolve) => {
+        resolveSchedule = resolve;
+      })
+    );
+    const p = svc.scheduleAlightAlert(baseParams); // in-flight — schedule await 중
+    const c = svc.cancelAlightAlert(); // 큐에 직렬화되어 p 완료 후 실행
+    resolveSchedule('alert-9');
+    await p;
+    await c;
+    // 직렬화가 없으면 cancel이 trackedId=null일 때 지나가고 'alert-9'가 고아로 남는다.
+    expect(notif.cancelNotification).toHaveBeenCalledWith('alert-9');
+    // 추적 상태가 비워졌는지 — 후속 cancel은 no-op.
     notif.cancelNotification.mockClear();
     await svc.cancelAlightAlert();
     expect(notif.cancelNotification).not.toHaveBeenCalled();

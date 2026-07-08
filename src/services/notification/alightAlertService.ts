@@ -11,7 +11,15 @@
  *
  * 추적 상태는 모듈 스코프(JS-heap) — boardingAlertService와 같은 이유로 화면
  * 라이프사이클과 분리한다. 서비스 함수는 throw하지 않는다.
+ *
+ * 강건성(Codex P2 3건):
+ *   - 공개 API를 직렬화 큐로 감싸 await 도중 끼어드는 cancel/schedule의 늦은-완료
+ *     레이스를 원천 차단한다 (commuteReminderService의 직렬화 큐 선례),
+ *   - 예약에 전용 `kind` 마커를 심고 취소 시 OS 큐를 sweep — 앱/JS 재시작으로
+ *     추적이 끊긴 고아 알림까지 청소한다,
+ *   - 임박-생략 경로에서 새 요청이 기존 예약을 대체하면 구식 pending을 취소한다.
  */
+import * as Notifications from 'expo-notifications';
 import { notificationService, NotificationType } from './notificationService';
 import { resolveAlightAlertPreferences } from '@models/user';
 import type { NotificationSettings } from '@models/user';
@@ -21,9 +29,30 @@ const MIN_SCHEDULE_LEAD_MS = 5_000;
 /** 같은 스텝에서 이 이내의 fireAt 변동은 틱 잡음으로 보고 재예약하지 않는다. */
 const RESCHEDULE_TOLERANCE_MS = 15_000;
 
+/**
+ * 예약 data에 심는 하차 알림 전용 식별자. boarding 알림이 같은
+ * NotificationType.ARRIVAL_REMINDER + variant:'board'|'transfer'를 쓰므로 variant로는
+ * 구분 불가('transfer' 충돌) — sweep은 이 `kind`로만 하차 알림을 특정한다.
+ */
+export const ALIGHT_ALERT_KIND = 'alight-alert';
+
 let trackedId: string | null = null;
 let trackedStepKey: string | null = null;
 let trackedFireAtMs: number | null = null;
+
+// 공개 API 호출을 도착 순서대로 직렬화한다. await 도중 끼어드는 cancel/schedule이
+// 추적 상태를 엇갈리게 읽는 레이스(늦은 완료가 취소를 덮어씀)를 원천 차단한다
+// (commuteReminderService의 직렬화 큐 선례).
+let opQueue: Promise<unknown> = Promise.resolve();
+
+const enqueue = <T>(op: () => Promise<T>): Promise<T> => {
+  const run = opQueue.then(op, op);
+  opQueue = run.then(
+    () => undefined,
+    () => undefined
+  );
+  return run;
+};
 
 export interface AlightAlertParams {
   /** 하차할 역 이름 (다음 스텝의 stationName). */
@@ -43,9 +72,13 @@ export interface AlightAlertParams {
 /**
  * 하차 임박 알림을 예약한다. 예약된 identifier를, 게이트/임박/에러로 예약하지
  * 않은 경우 null을 반환한다. 설정이 꺼져 있으면 기존 pending도 취소한다.
- * Never throws.
+ * 공개 함수는 직렬화 큐를 통해 순차 실행된다. Never throws.
  */
-export const scheduleAlightAlert = async (
+export const scheduleAlightAlert = (
+  params: AlightAlertParams
+): Promise<string | null> => enqueue(() => scheduleAlightAlertInner(params));
+
+const scheduleAlightAlertInner = async (
   params: AlightAlertParams
 ): Promise<string | null> => {
   const { stationName, nextKind, toLineName, arrivalAtMs, stepKey, settings } = params;
@@ -53,16 +86,15 @@ export const scheduleAlightAlert = async (
   try {
     const prefs = resolveAlightAlertPreferences(settings);
     if (!prefs.enabled) {
-      await cancelAlightAlert();
+      await cancelAlightAlertInner();
       return null;
     }
 
     // 게이트(설정/권한/전역 알림 게이트)로 막힌 예약 요청은 직전 pending도 취소한다
-    // — 권한 회수/음소거 전환에 옛 예약이 발사되면 안 되기 때문. 임박-발사 생략 경로는
-    //   제외(유효한 기존 예약을 유지한다).
+    // — 권한 회수/음소거 전환에 옛 예약이 발사되면 안 되기 때문.
     const permission = await notificationService.requestPermissions();
     if (!permission.granted) {
-      await cancelAlightAlert();
+      await cancelAlightAlertInner();
       return null;
     }
 
@@ -77,11 +109,25 @@ export const scheduleAlightAlert = async (
         new Date(fireAtMs)
       )
     ) {
-      await cancelAlightAlert();
+      await cancelAlightAlertInner();
       return null;
     }
 
-    if (fireAtMs - Date.now() < MIN_SCHEDULE_LEAD_MS) return null;
+    if (fireAtMs - Date.now() < MIN_SCHEDULE_LEAD_MS) {
+      // 새 요청이 기존 예약을 대체하는 경우(다른 스텝이거나 발사 시각이 크게
+      // 이동 — 예: 더 이른 열차로 rebase)에는 구식 pending을 지운다. 같은
+      // 스텝·같은 시각(허용오차 내)의 재호출이면 곧 발사될 유효 예약을 지키기
+      // 위해 취소하지 않는다.
+      const supersedesTracked =
+        trackedId !== null &&
+        !(
+          stepKey === trackedStepKey &&
+          trackedFireAtMs !== null &&
+          Math.abs(fireAtMs - trackedFireAtMs) <= RESCHEDULE_TOLERANCE_MS
+        );
+      if (supersedesTracked) await cancelAlightAlertInner();
+      return null;
+    }
 
     if (
       trackedId !== null &&
@@ -92,7 +138,7 @@ export const scheduleAlightAlert = async (
       return trackedId;
     }
 
-    await cancelAlightAlert();
+    await cancelAlightAlertInner();
 
     const copy =
       nextKind === 'transfer'
@@ -103,7 +149,7 @@ export const scheduleAlightAlert = async (
       secondsBefore: prefs.leadMinutes * 60,
       title: copy.title,
       body: copy.body,
-      data: { variant: nextKind, stationName },
+      data: { kind: ALIGHT_ALERT_KIND, variant: nextKind, stationName },
     });
 
     if (id !== null) {
@@ -118,16 +164,35 @@ export const scheduleAlightAlert = async (
   }
 };
 
-/** 추적 중인 하차 임박 알림을 취소한다. 없으면 no-op. Never throws. */
-export const cancelAlightAlert = async (): Promise<void> => {
-  if (trackedId === null) return;
+/**
+ * 추적 중인 하차 임박 알림을 취소하고, OS 큐에 남은 하차 알림 고아까지 sweep한다.
+ * 공개 함수는 직렬화 큐를 통해 순차 실행된다. Never throws.
+ */
+export const cancelAlightAlert = (): Promise<void> =>
+  enqueue(() => cancelAlightAlertInner());
+
+const cancelAlightAlertInner = async (): Promise<void> => {
   const id = trackedId;
   trackedId = null;
   trackedStepKey = null;
   trackedFireAtMs = null;
+  if (id !== null) {
+    try {
+      await notificationService.cancelNotification(id);
+    } catch (error) {
+      console.error('Error cancelling alight alert:', error);
+    }
+  }
+  // OS 큐를 훑어 kind 마커가 붙은 하차 알림을 전부 취소한다 — 앱/JS 재시작으로
+  // 추적이 끊긴 고아까지 청소한다. boarding 알림(kind 없음)은 건드리지 않는다.
   try {
-    await notificationService.cancelNotification(id);
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    for (const request of scheduled) {
+      if (request.content?.data?.kind === ALIGHT_ALERT_KIND) {
+        await Notifications.cancelScheduledNotificationAsync(request.identifier);
+      }
+    }
   } catch (error) {
-    console.error('Error cancelling alight alert:', error);
+    console.error('Error sweeping alight alerts:', error);
   }
 };
