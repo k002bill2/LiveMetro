@@ -12,6 +12,7 @@ import {
   updateEveningEnabled,
 } from '@/services/commute/commuteService';
 import { useCommuteRouteSummary } from '@/hooks/useCommuteRouteSummary';
+import { selectCommuteRoute } from '@/services/route/selectCommuteRoute';
 import { commuteReminderService, notificationService } from '@/services/notification';
 
 jest.mock('@/services/notification', () => ({
@@ -77,6 +78,18 @@ jest.mock('@/services/commute/commuteService', () => ({
   loadCommuteRoutes: jest.fn(),
   saveCommuteRoutes: jest.fn(),
   updateEveningEnabled: jest.fn(),
+}));
+
+// The RouteCard transfer summary now prefers the SSOT-derived route
+// (selectCommuteRoute → routeToGuidanceSteps, via useCommuteRouteSteps) over
+// the stored transferStations field. Mock the pure selectCommuteRoute seam so
+// tests deterministically drive the derivation: null → stored-field fallback,
+// a real Route fixture → the reshape runs and derived names win. Default null
+// in beforeEach so every existing test hits the stored-field path unchanged.
+jest.mock('@/services/route/selectCommuteRoute', () => ({
+  __esModule: true,
+  selectCommuteRoute: jest.fn(() => null),
+  default: jest.fn(() => null),
 }));
 
 // Mock the Toast hook so the "저장" confirmation can be asserted without
@@ -165,6 +178,9 @@ describe('CommuteSettingsScreen', () => {
     mockSaveCommuteRoutes.mockResolvedValue({ success: true });
     mockUpdateEveningEnabled.mockResolvedValue({ success: true });
     (useCommuteRouteSummary as jest.Mock).mockReturnValue({ ready: false });
+    // Default: derivation yields nothing → RouteCard falls back to the stored
+    // transferStations field (preserves every pre-existing test's expectation).
+    (selectCommuteRoute as jest.Mock).mockReturnValue(null);
   });
 
   it('renders loading state initially', () => {
@@ -380,6 +396,239 @@ describe('CommuteSettingsScreen', () => {
     await waitFor(() => {
       expect(getByText('환승 1회 · 신도림')).toBeTruthy();
     });
+  });
+
+  // Task 1: RouteCard prefers the SSOT-derived transfer stations
+  // (selectCommuteRoute → routeToGuidanceSteps) over the stored field, so
+  // legacy/auto-saved docs with an empty transferStations field still show the
+  // real transfer instead of "직행 · 환승 없음".
+  it('SSOT 유도 환승역명을 카드에 표시한다 (저장 transferStations가 비어 있어도)', async () => {
+    mockLoadCommuteRoutes.mockResolvedValue({
+      morningRoute: {
+        departureTime: '08:30',
+        departureStationId: 's1',
+        departureStationName: '잠실',
+        departureLineId: '2',
+        arrivalStationId: 's3',
+        arrivalStationName: '홍대입구',
+        arrivalLineId: '1',
+        // Stored field is empty (legacy / auto-saved doc).
+        transferStations: [],
+        notifications: {
+          transferAlert: true,
+          arrivalAlert: true,
+          delayAlert: true,
+          incidentAlert: true,
+          alertMinutesBefore: 5,
+        },
+        bufferMinutes: 10,
+      },
+      eveningRoute: null,
+      eveningEnabled: true,
+      createdAt: null,
+      updatedAt: null,
+    });
+    // A concrete Route with a transfer at 신도림 (ride 2호선 → transfer →
+    // ride 1호선). The real routeToGuidanceSteps runs and yields a transfer
+    // step whose stationName is the transfer segment's fromStationName.
+    (selectCommuteRoute as jest.Mock).mockReturnValue({
+      segments: [
+        {
+          fromStationId: '10',
+          fromStationName: '잠실',
+          toStationId: '20',
+          toStationName: '신도림',
+          lineId: '2',
+          lineName: '2호선',
+          estimatedMinutes: 10,
+          isTransfer: false,
+        },
+        {
+          fromStationId: '20',
+          fromStationName: '신도림',
+          toStationId: '20',
+          toStationName: '신도림',
+          lineId: '1',
+          lineName: '1호선',
+          estimatedMinutes: 4,
+          isTransfer: true,
+        },
+        {
+          fromStationId: '20',
+          fromStationName: '신도림',
+          toStationId: '30',
+          toStationName: '홍대입구',
+          lineId: '1',
+          lineName: '1호선',
+          estimatedMinutes: 10,
+          isTransfer: false,
+        },
+      ],
+      totalMinutes: 24,
+      transferCount: 1,
+      lineIds: ['2', '1'],
+    });
+
+    const { getByText } = render(<CommuteSettingsScreen {...createProps()} />);
+    await waitFor(() => {
+      expect(getByText('환승 1회 · 신도림')).toBeTruthy();
+    });
+  });
+
+  // Round 2: the Hero summary and the morning RouteCard must derive their
+  // transfer count from the SAME source (derived-preferred + stored-fallback),
+  // so a legacy doc with an empty stored field never shows "직행 · 환승 0회" in
+  // the Hero while the card below shows "환승 1회 · 신도림".
+  it('저장 transferStations=[]+유도 성공 시 히어로와 RouteCard가 같은 환승 횟수를 표시한다', async () => {
+    mockLoadCommuteRoutes.mockResolvedValue({
+      morningRoute: {
+        departureTime: '08:30',
+        departureStationId: 's1',
+        departureStationName: '잠실',
+        departureLineId: '2',
+        arrivalStationId: 's3',
+        arrivalStationName: '홍대입구',
+        arrivalLineId: '1',
+        transferStations: [],
+        notifications: {
+          transferAlert: true,
+          arrivalAlert: true,
+          delayAlert: true,
+          incidentAlert: true,
+          alertMinutesBefore: 5,
+        },
+        bufferMinutes: 10,
+      },
+      eveningRoute: null,
+      eveningEnabled: true,
+      createdAt: null,
+      updatedAt: null,
+    });
+    (selectCommuteRoute as jest.Mock).mockReturnValue({
+      segments: [
+        {
+          fromStationId: '10',
+          fromStationName: '잠실',
+          toStationId: '20',
+          toStationName: '신도림',
+          lineId: '2',
+          lineName: '2호선',
+          estimatedMinutes: 10,
+          isTransfer: false,
+        },
+        {
+          fromStationId: '20',
+          fromStationName: '신도림',
+          toStationId: '20',
+          toStationName: '신도림',
+          lineId: '1',
+          lineName: '1호선',
+          estimatedMinutes: 4,
+          isTransfer: true,
+        },
+        {
+          fromStationId: '20',
+          fromStationName: '신도림',
+          toStationId: '30',
+          toStationName: '홍대입구',
+          lineId: '1',
+          lineName: '1호선',
+          estimatedMinutes: 10,
+          isTransfer: false,
+        },
+      ],
+      totalMinutes: 24,
+      transferCount: 1,
+      lineIds: ['2', '1'],
+    });
+
+    const { getByText } = render(<CommuteSettingsScreen {...createProps()} />);
+    await waitFor(() => {
+      // RouteCard: derived name + count.
+      expect(getByText('환승 1회 · 신도림')).toBeTruthy();
+    });
+    // Hero: same derived count (NOT the empty stored field's "환승 0회").
+    expect(getByText('평일 08:30 출발 · 환승 1회')).toBeTruthy();
+  });
+
+  // Task 1 fallback: derivation fails (selectCommuteRoute → null) but a stored
+  // transferStations value exists → the stored value is still shown (no
+  // regression vs the pre-change behavior).
+  it('유도 실패(null)면 저장된 transferStations를 표시한다', async () => {
+    mockLoadCommuteRoutes.mockResolvedValue({
+      morningRoute: {
+        departureTime: '08:30',
+        departureStationId: 's1',
+        departureStationName: '잠실',
+        departureLineId: '2',
+        arrivalStationId: 's3',
+        arrivalStationName: '홍대입구',
+        arrivalLineId: '2',
+        transferStations: [
+          { stationId: 's2', stationName: '신도림', lineId: '1', lineName: '1호선', order: 1 },
+        ],
+        notifications: {
+          transferAlert: true,
+          arrivalAlert: true,
+          delayAlert: true,
+          incidentAlert: true,
+          alertMinutesBefore: 5,
+        },
+        bufferMinutes: 10,
+      },
+      eveningRoute: null,
+      eveningEnabled: true,
+      createdAt: null,
+      updatedAt: null,
+    });
+    (selectCommuteRoute as jest.Mock).mockReturnValue(null);
+
+    const { getByText } = render(<CommuteSettingsScreen {...createProps()} />);
+    await waitFor(() => {
+      expect(getByText('환승 1회 · 신도림')).toBeTruthy();
+    });
+  });
+
+  // Task 2: a legacy route document with NO transferStations field must not
+  // crash when opening the editor (handleEditRoute maps over the field).
+  it('transferStations 필드가 없는 레거시 route로 편집 진입 시 크래시하지 않는다', async () => {
+    const legacyMorning = {
+      departureTime: '08:30',
+      departureStationId: 's1',
+      departureStationName: '잠실',
+      departureLineId: '2',
+      arrivalStationId: 's3',
+      arrivalStationName: '홍대입구',
+      arrivalLineId: '2',
+      // transferStations field intentionally absent (legacy doc).
+      notifications: {
+        transferAlert: true,
+        arrivalAlert: true,
+        delayAlert: true,
+        incidentAlert: true,
+        alertMinutesBefore: 5,
+      },
+      bufferMinutes: 10,
+    };
+    mockLoadCommuteRoutes.mockResolvedValue({
+      morningRoute: legacyMorning as any,
+      eveningRoute: null,
+      eveningEnabled: true,
+      createdAt: null,
+      updatedAt: null,
+    });
+
+    const props = createProps();
+    const { getByLabelText } = render(<CommuteSettingsScreen {...props} />);
+    await waitFor(() => {
+      expect(getByLabelText('경로 편집')).toBeTruthy();
+    });
+
+    expect(() => fireEvent.press(getByLabelText('경로 편집'))).not.toThrow();
+    expect(props.navigation.navigate).toHaveBeenCalledWith(
+      'EditCommuteRoute',
+      expect.objectContaining({ kind: 'morning' }),
+    );
   });
 
   it('hero ETA shows the shared graph ride estimate (parity with Home/WeeklyPrediction), not the placeholder', async () => {

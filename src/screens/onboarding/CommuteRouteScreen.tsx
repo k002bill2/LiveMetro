@@ -567,7 +567,7 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
             arrivalStationId: otherLegSrc.arrivalStation.stationId,
             arrivalStationName: otherLegSrc.arrivalStation.stationName,
             arrivalLineId: otherLegSrc.arrivalStation.lineId,
-            transferStations: otherLegSrc.transferStations.map((t, i) => ({
+            transferStations: (otherLegSrc.transferStations || []).map((t, i) => ({
               stationId: t.stationId,
               stationName: t.stationName,
               lineId: t.lineId,

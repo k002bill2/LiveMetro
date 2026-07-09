@@ -30,6 +30,8 @@ import { loadCommuteRoutes, saveCommuteRoutes, updateEveningEnabled } from '@/se
 import { commuteReminderService, notificationService } from '@/services/notification';
 import { useMLPrediction } from '@/hooks/useMLPrediction';
 import { useCommuteRouteSummary } from '@/hooks/useCommuteRouteSummary';
+import { useCommuteRouteSteps } from '@/hooks/useCommuteRouteSteps';
+import type { TransferStep } from '@/models/guidance';
 import { truncateMinutes } from '@/utils/dateUtils';
 import { CommuteRoute, DEFAULT_COMMUTE_NOTIFICATIONS, DEFAULT_BUFFER_MINUTES } from '@/models/commute';
 import type { SmartFeatures } from '@/models/user';
@@ -118,6 +120,23 @@ const addMinutesToTime = (hhmm: string, minutes: number): string | null => {
   return `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
 };
 
+/**
+ * Choose the transfer station names to display for a leg: the SSOT-derived
+ * names (selectCommuteRoute → routeToGuidanceSteps) when derivation succeeds,
+ * otherwise the stored transferStations field. Shared by RouteCard and the
+ * Hero summary so the two summaries on one screen never disagree (a legacy doc
+ * with an empty stored field must not show "직행" in one and "환승 1회" in the
+ * other). Pure — count is `.length` of the returned list.
+ */
+const resolveTransferNames = (
+  derived: readonly string[] | undefined,
+  stored: readonly { readonly stationName: string }[] | undefined,
+): readonly string[] => {
+  const derivedNames = derived ?? [];
+  if (derivedNames.length > 0) return derivedNames;
+  return (stored ?? []).map((t) => t.stationName);
+};
+
 interface RouteCardProps {
   kind: 'morning' | 'evening';
   route: CommuteRouteData | null;
@@ -125,6 +144,12 @@ interface RouteCardProps {
   enabled?: boolean;
   onToggleEnabled?: (v: boolean) => void;
   arrivalEtaMinutes?: number | null;
+  // SSOT-derived transfer station names (selectCommuteRoute →
+  // routeToGuidanceSteps). Preferred over the stored transferStations field so
+  // legacy / auto-saved docs (which often persist an empty field) still show
+  // the real transfer. Computed in the screen body (hook call) — see notes on
+  // RouteCard living at module scope. Empty ⇒ fall back to the stored field.
+  transferStationNames?: readonly string[];
   // styles/semantic are passed IN (not closed over) so RouteCard can live at
   // module scope. Defining it inside CommuteSettingsScreen made it a NEW
   // component type on every render → React remounted the whole subtree each
@@ -142,6 +167,7 @@ const RouteCard: React.FC<RouteCardProps> = ({
   enabled,
   onToggleEnabled,
   arrivalEtaMinutes,
+  transferStationNames,
   styles,
   semantic,
 }) => {
@@ -149,7 +175,12 @@ const RouteCard: React.FC<RouteCardProps> = ({
   const arrivalTime = isMorning && route && arrivalEtaMinutes != null
     ? addMinutesToTime(route.departureTime, arrivalEtaMinutes)
     : null;
-  const transferCount = route?.transferStations.length ?? 0;
+  // Prefer the SSOT-derived transfer names; fall back to the stored field only
+  // when derivation yields nothing (graph failed / ids unresolved). Count and
+  // names must come from the SAME source so they never disagree — shared with
+  // the Hero summary via resolveTransferNames.
+  const transferNames = resolveTransferNames(transferStationNames, route?.transferStations);
+  const transferCount = transferNames.length;
   const dimmed = !isMorning && enabled === false;
 
   return (
@@ -240,9 +271,7 @@ const RouteCard: React.FC<RouteCardProps> = ({
               <Text style={styles.routeMidText} numberOfLines={1}>
                 {transferCount === 0
                   ? '직행 · 환승 없음'
-                  : `환승 ${transferCount}회 · ${route.transferStations
-                      .map((t) => t.stationName)
-                      .join(', ')}`}
+                  : `환승 ${transferCount}회 · ${transferNames.join(', ')}`}
               </Text>
               <View style={{ flex: 1 }} />
             </View>
@@ -394,6 +423,43 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
   // of whether the graph estimate is available — same honesty as HomeScreen's
   // "데이터 수집중" shown alongside a real route number.
   const heroIsPlaceholder = baselineMinutes === null;
+
+  // SSOT-derived transfer stations for each leg. selectCommuteRoute (path SSOT,
+  // same seam Home/ML use) → routeToGuidanceSteps yields the transfer steps;
+  // their station names drive the RouteCard summary. This fixes legacy /
+  // auto-saved docs whose stored transferStations field is empty from rendering
+  // "직행 · 환승 없음". Hooks run in the screen body (RouteCard is module-scope
+  // memo). Empty result ⇒ RouteCard falls back to the stored field.
+  const morningSteps = useCommuteRouteSteps(
+    morningRoute?.departureStation.stationId,
+    morningRoute?.arrivalStation.stationId,
+    morningRoute?.transferStations[0]?.stationId,
+  );
+  const eveningSteps = useCommuteRouteSteps(
+    eveningRoute?.departureStation.stationId,
+    eveningRoute?.arrivalStation.stationId,
+    eveningRoute?.transferStations[0]?.stationId,
+  );
+  const morningTransferNames = useMemo<readonly string[]>(
+    () =>
+      morningSteps
+        .filter((s): s is TransferStep => s.kind === 'transfer')
+        .map((s) => s.stationName),
+    [morningSteps],
+  );
+  const eveningTransferNames = useMemo<readonly string[]>(
+    () =>
+      eveningSteps
+        .filter((s): s is TransferStep => s.kind === 'transfer')
+        .map((s) => s.stationName),
+    [eveningSteps],
+  );
+  // Hero summary transfer count — same derived-preferred + stored-fallback
+  // source as the morning RouteCard so the two morning summaries never diverge.
+  const heroTransferCount = resolveTransferNames(
+    morningTransferNames,
+    morningRoute?.transferStations,
+  ).length;
 
   // Convert local CommuteRouteData (UI shape) into CommuteRoute (Firestore
   // shape). Adds default notifications + bufferMinutes; transferStations
@@ -665,7 +731,7 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
               // 1-based `order` matches routeDataToCommuteRoute helper
               // and the Firestore `CommuteRoute` convention. Drifting to
               // 0-based here would cause off-by-one on the editor save.
-              transferStations: data.transferStations.map((t, i) => ({
+              transferStations: (data.transferStations || []).map((t, i) => ({
                 stationId: t.stationId,
                 stationName: t.stationName,
                 lineId: t.lineId,
@@ -732,9 +798,9 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
               </View>
               <Text style={styles.heroDetailText}>
                 평일 {morningRoute.departureTime} 출발 ·{' '}
-                {morningRoute.transferStations.length === 0
+                {heroTransferCount === 0
                   ? '직행 · 환승 0회'
-                  : `환승 ${morningRoute.transferStations.length}회`}
+                  : `환승 ${heroTransferCount}회`}
               </Text>
             </>
           ) : null}
@@ -762,6 +828,7 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
             route={morningRoute}
             onEdit={() => handleEditRoute('morning')}
             arrivalEtaMinutes={baselineMinutes !== null ? Math.round(baselineMinutes) : null}
+            transferStationNames={morningTransferNames}
           />
           <View style={styles.routeDivider} />
           <RouteCard
@@ -772,6 +839,7 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
             onEdit={() => handleEditRoute('evening')}
             enabled={eveningRoute !== null && eveningEnabled}
             onToggleEnabled={handleToggleEveningEnabled}
+            transferStationNames={eveningTransferNames}
           />
         </SettingSection>
 
