@@ -10,6 +10,7 @@ import {
   computeProgress,
   computeRemainingSeconds,
   computeRideProgress,
+  cumulativeRideSecondsTo,
 } from '../guidanceSteps';
 import { getLegDirection, getRouteDirection } from '@/services/route/routeMeta';
 import { createRoute, type RouteSegment } from '@/models/route';
@@ -254,6 +255,29 @@ describe('computeRideProgress', () => {
 
   it('clamps to the last hop with 0 seconds when elapsed overruns', () => {
     expect(computeRideProgress(ride, 9_999)).toEqual({ nextHopIndex: 1, secToNextStop: 0 });
+  });
+});
+
+describe('cumulativeRideSecondsTo', () => {
+  const steps = routeToGuidanceSteps(transferRoute);
+  const ride = steps[1] as RideStep; // from A(s1); hops B(s2, 2m), C(s3, 3m)
+
+  it('returns 0 at the ride origin station', () => {
+    expect(cumulativeRideSecondsTo(ride, 's1')).toBe(0);
+  });
+
+  it('returns the cumulative hop seconds at an intermediate stop', () => {
+    expect(cumulativeRideSecondsTo(ride, 's2')).toBe(120);
+  });
+
+  it('returns the full ride duration at the final (하차) station', () => {
+    // last hop → sum of all hop minutes (2+3) × 60 = durationMinutes × 60
+    expect(cumulativeRideSecondsTo(ride, 's3')).toBe(ride.durationMinutes * 60);
+    expect(cumulativeRideSecondsTo(ride, 's3')).toBe(300);
+  });
+
+  it('returns null for a station not on the ride step', () => {
+    expect(cumulativeRideSecondsTo(ride, 'nope')).toBeNull();
   });
 });
 
