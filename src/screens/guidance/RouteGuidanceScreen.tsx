@@ -19,7 +19,11 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { useRealtimeTrains } from '@/hooks/useRealtimeTrains';
 import { useGuidanceProgress } from '@/hooks/useGuidanceProgress';
-import { routeToGuidanceSteps } from '@/services/guidance/guidanceSteps';
+import {
+  routeToGuidanceSteps,
+  computeRideProgress,
+  cumulativeRideSecondsTo,
+} from '@/services/guidance/guidanceSteps';
 import {
   detectDeparture,
   ARRIVING_ETA_THRESHOLD_SEC,
@@ -45,8 +49,9 @@ import { clearGuidanceSession, getGuidanceSession } from '@/services/guidance/gu
 import { completeGuidanceCommuteLog } from '@/services/guidance/guidanceCommuteLogService';
 import { useAuth } from '@/services/auth/AuthContext';
 import { GuidanceControls, GuidanceHeader, GuidanceNowCard, GuidanceStepRow, TrainSelectSheet, type GuidanceStepStatus } from '@/components/guidance';
+import { StationRebaseSheet } from '@/components/guidance/StationRebaseSheet';
 import type { AppStackParamList } from '@/navigation/types';
-import type { GuidanceStep } from '@/models/guidance';
+import type { GuidanceStep, RideStep } from '@/models/guidance';
 import type { Train } from '@/models/train';
 
 type NavigationProp = NativeStackNavigationProp<AppStackParamList>;
@@ -63,6 +68,18 @@ interface TrainSelectContext {
   readonly lineId: string;
   /** Travel-direction endpoint name for the captured step, or null. */
   readonly direction: string | null;
+}
+
+/**
+ * Snapshot of the ride step the station-rebase sheet was opened on. Only the
+ * tick-stable step (from the `steps` memo) + its index are frozen here — the
+ * current-position marker is computed live and passed as a prop, never stored,
+ * so it can move per tick without churning this context (predictions stay
+ * tick-invariant per the guidance pattern).
+ */
+interface StationRebaseContext {
+  readonly stepIndex: number;
+  readonly step: RideStep;
 }
 
 /** Grace window before a detected departure auto-confirms boarding (dismissable). */
@@ -185,6 +202,7 @@ export const RouteGuidanceScreen: React.FC = () => {
   // departs (inferred from id disappearance), so the rider rarely needs to tap.
   const [softConfirm, setSoftConfirm] = useState<{ readonly trainId: string } | null>(null);
   const [trainSelectContext, setTrainSelectContext] = useState<TrainSelectContext | null>(null);
+  const [stationRebaseContext, setStationRebaseContext] = useState<StationRebaseContext | null>(null);
   const prevTrainsRef = useRef<readonly Train[] | null>(null);
   // Identity of the last `trains` value the detection effect actually processed.
   // Guards against non-poll re-runs (step transitions) seeding prevTrainsRef with
@@ -288,12 +306,45 @@ export const RouteGuidanceScreen: React.FC = () => {
     }
   }, [trainSelectContext, currentIndex, confirmBoardedAt, rebaseAt]);
 
+  // Estimated current position for the sheet marker — the last station the
+  // train has reached (NOT the next stop), so picking it can't over-advance.
+  // Live (recomputes per tick); NOT frozen in context.
+  const rideCurrentStationId = useMemo((): string | null => {
+    if (currentStep?.kind !== 'ride') return null;
+    const { nextHopIndex } = computeRideProgress(currentStep, elapsedInStepSec);
+    return nextHopIndex === 0
+      ? currentStep.fromStationId
+      : currentStep.hops[nextHopIndex - 1]?.toStationId ?? currentStep.fromStationId;
+  }, [currentStep, elapsedInStepSec]);
+
+  // Ride-only time correction: freeze the active ride step so a tick advancing
+  // it behind the modal can't change the list, mirroring trainSelectContext.
+  const openStationRebase = useCallback((): void => {
+    if (currentStep?.kind !== 'ride') return;
+    setStationRebaseContext({ stepIndex: currentIndex, step: currentStep });
+  }, [currentStep, currentIndex]);
+
+  const closeStationRebase = useCallback((): void => setStationRebaseContext(null), []);
+
+  // Rebase the anchor to "my train is at station X": now − cumulative ride
+  // seconds to that station. Route by the captured context, guarded on the
+  // step not changing underfoot — never act on a stale ride.
+  const handleStationRebaseSelected = useCallback((stationId: string): void => {
+    const ctx = stationRebaseContext;
+    setStationRebaseContext(null);
+    if (ctx === null || currentIndex !== ctx.stepIndex) return;
+    const sec = cumulativeRideSecondsTo(ctx.step, stationId);
+    if (sec === null) return;
+    rebaseAt(Date.now() - sec * 1000);
+  }, [stationRebaseContext, currentIndex, rebaseAt]);
+
   // Reset per-step guards whenever the active step changes (incl. undo via
   // goPrev). Also auto-closes the sheet so a stale-step pick is impossible.
   useEffect(() => {
     clearAutoTimer();
     setSoftConfirm(null);
     setTrainSelectContext(null);
+    setStationRebaseContext(null);
     firedForIndexRef.current = null;
     cooldownTrainIdRef.current = null;
     prevTrainsRef.current = null;
@@ -537,6 +588,7 @@ export const RouteGuidanceScreen: React.FC = () => {
             liveWaitText={liveWaitText}
             softConfirm={softConfirmHandlers}
             onOpenTrainSelect={openTrainSelect}
+            onOpenStationRebase={openStationRebase}
           />
         </View>
       )}
@@ -567,6 +619,15 @@ export const RouteGuidanceScreen: React.FC = () => {
         onSelect={handleTrainSelected}
         onClose={closeTrainSelect}
       />
+      {stationRebaseContext !== null && (
+        <StationRebaseSheet
+          visible
+          step={stationRebaseContext.step}
+          currentStationId={rideCurrentStationId}
+          onSelect={handleStationRebaseSelected}
+          onClose={closeStationRebase}
+        />
+      )}
     </SafeAreaView>
   );
 };

@@ -35,6 +35,8 @@ interface GuidanceNowCardProps {
   softConfirm?: SoftConfirmHandlers | null;
   /** 열차 선택 시트 열기 — 대기(이미 탔어요)/ride(열차 변경) 두 문맥 공용. 미전달 시 링크 숨김. */
   onOpenTrainSelect?: () => void;
+  /** ride 문맥 전용: 역 선택 시간 보정 시트 열기. 전달 시 ride 링크가 "열차 변경"·"시간 보정" 두 개로 분리됨. */
+  onOpenStationRebase?: () => void;
 }
 
 const formatMinSec = (totalSec: number): string => {
@@ -65,6 +67,7 @@ const GuidanceNowCardImpl: React.FC<GuidanceNowCardProps> = ({
   liveWaitText,
   softConfirm,
   onOpenTrainSelect,
+  onOpenStationRebase,
 }) => {
   const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
@@ -192,6 +195,7 @@ const GuidanceNowCardImpl: React.FC<GuidanceNowCardProps> = ({
             semantic={semantic}
             styles={styles}
             onOpenTrainSelect={onOpenTrainSelect}
+            onOpenStationRebase={onOpenStationRebase}
           />
         )}
       </View>
@@ -206,6 +210,7 @@ interface RideBodyProps {
   semantic: WantedSemanticTheme;
   styles: ReturnType<typeof createStyles>;
   onOpenTrainSelect?: () => void;
+  onOpenStationRebase?: () => void;
 }
 
 const RideBody: React.FC<RideBodyProps> = ({
@@ -215,6 +220,7 @@ const RideBody: React.FC<RideBodyProps> = ({
   semantic,
   styles,
   onOpenTrainSelect,
+  onOpenStationRebase,
 }) => {
   const { nextHopIndex, secToNextStop } = computeRideProgress(step, elapsedInStepSec);
   const stopsLeft = step.hops.length - nextHopIndex;
@@ -301,17 +307,34 @@ const RideBody: React.FC<RideBodyProps> = ({
         </Text>
       </View>
 
-      {onOpenTrainSelect && (
-        <Pressable
-          onPress={onOpenTrainSelect}
-          style={styles.trainSelectLink}
-          accessibilityRole="button"
-          accessibilityLabel="열차 변경, 시간 보정"
-          testID="guidance-change-train"
-        >
-          <Text style={styles.trainSelectLinkText}>열차 변경 · 시간 보정</Text>
-        </Pressable>
-      )}
+      <View style={styles.rideLinkRow}>
+        {onOpenTrainSelect && (
+          <Pressable
+            onPress={onOpenTrainSelect}
+            style={styles.trainSelectLink}
+            accessibilityRole="button"
+            accessibilityLabel={onOpenStationRebase ? '열차 변경' : '열차 변경, 시간 보정'}
+            testID="guidance-change-train"
+          >
+            <Text style={styles.trainSelectLinkText}>
+              {onOpenStationRebase ? '열차 변경' : '열차 변경 · 시간 보정'}
+            </Text>
+          </Pressable>
+        )}
+        {onOpenStationRebase && (
+          <Pressable
+            onPress={onOpenStationRebase}
+            style={styles.trainSelectLink}
+            accessibilityRole="button"
+            accessibilityLabel="시간 보정, 내 열차 위치 선택"
+            testID="guidance-rebase-station"
+          >
+            <Text style={styles.trainSelectLinkText}>
+              <Text style={styles.trainSelectLinkStrong}>시간 보정</Text>
+            </Text>
+          </Pressable>
+        )}
+      </View>
     </View>
   );
 };
@@ -526,6 +549,11 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       fontSize: 13,
       fontFamily: weightToFontFamily('700'),
       color: semantic.labelStrong,
+    },
+    rideLinkRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: WANTED_TOKENS.spacing.s5,
     },
     trainSelectLink: {
       minHeight: 44,

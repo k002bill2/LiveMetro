@@ -758,6 +758,54 @@ describe('RouteGuidanceScreen', () => {
     expect(getByText('환승 도보 약 4분 — 2분 59초 남음')).toBeTruthy();
   });
 
+  describe('시간 보정 — 역 선택 (station rebase)', () => {
+    it('opens the station-rebase sheet from the ride 시간 보정 link and rebases the next stop to the picked station', () => {
+      seedSession(); // board → ride(을지로3가→시청 2m→산곡 3m) → alight
+      const { getByTestId, queryByTestId } = render(<RouteGuidanceScreen />);
+      fireEvent.press(getByTestId('guidance-next')); // board → ride
+      // Right after boarding the next stop is 시청.
+      expect(getByTestId('guidance-next-station')).toHaveTextContent('시청');
+      // Sheet closed until the link is pressed.
+      expect(queryByTestId('station-rebase-sheet')).toBeNull();
+      fireEvent.press(getByTestId('guidance-rebase-station'));
+      expect(getByTestId('station-rebase-sheet')).toBeTruthy();
+      // "내 열차는 지금 시청" → anchor rebased so 시청 is passed, next stop is 산곡.
+      fireEvent.press(getByTestId('station-rebase-item-s2'));
+      expect(getByTestId('guidance-next-station')).toHaveTextContent('산곡');
+      // Sheet closes after the pick.
+      expect(queryByTestId('station-rebase-sheet')).toBeNull();
+    });
+
+    it('marks the estimated current position (last-reached station) with a 지금 여기 badge', () => {
+      seedSession();
+      const { getByTestId, queryByTestId } = render(<RouteGuidanceScreen />);
+      fireEvent.press(getByTestId('guidance-next')); // board → ride (elapsed 0)
+      fireEvent.press(getByTestId('guidance-rebase-station'));
+      // Just boarded → current position is the origin (을지로3가, s1), NOT the
+      // next stop 시청 — picking the marked station must never over-advance.
+      expect(getByTestId('station-rebase-here-s1')).toBeTruthy();
+      expect(queryByTestId('station-rebase-here-s2')).toBeNull();
+    });
+
+    it('does not expose the station-rebase link while waiting on a board step', () => {
+      seedSession();
+      const { queryByTestId } = render(<RouteGuidanceScreen />);
+      // Board hold — no ride body, so no station-rebase entry point.
+      expect(queryByTestId('guidance-rebase-station')).toBeNull();
+    });
+
+    it('reaches the destination once when the 하차역 is picked for rebase (no double completion)', () => {
+      seedSession();
+      const { getByTestId, getByText } = render(<RouteGuidanceScreen />);
+      fireEvent.press(getByTestId('guidance-next')); // board → ride
+      fireEvent.press(getByTestId('guidance-rebase-station'));
+      // Pick the final 하차역 (산곡, s3) → full ride duration → advances to alight.
+      fireEvent.press(getByTestId('station-rebase-item-s3'));
+      expect(getByText('산곡 도착 · 하차하세요')).toBeTruthy();
+      expect(completeGuidanceCommuteLog).toHaveBeenCalledTimes(1);
+    });
+  });
+
   describe('하차 임박 알림 (alight alert)', () => {
     it('ride 스텝 진입 시 다음 하차 지점 정보로 scheduleAlightAlert를 호출한다', () => {
       seedSession(); // board → ride(line2, 5m) → alight@산곡

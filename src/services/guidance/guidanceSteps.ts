@@ -225,3 +225,20 @@ export const computeRideProgress = (step: RideStep, elapsedInStepSec: number): R
   }
   return { nextHopIndex: Math.max(0, step.hops.length - 1), secToNextStop: 0 };
 };
+
+/**
+ * Ride seconds elapsed when the rider's train is at `stationId`: 0 at the ride
+ * origin, cumulative hop minutes ×60 at each stop (the final 하차역 returns the
+ * full ride duration ×60), and `null` if the station isn't on this ride. Powers
+ * "내 열차가 지금 어느 역" time correction — the screen rebases the anchor to
+ * `now − returnedSeconds×1000`.
+ */
+export const cumulativeRideSecondsTo = (step: RideStep, stationId: string): number | null => {
+  if (step.fromStationId === stationId) return 0;
+  let acc = 0;
+  for (const hop of step.hops) {
+    acc += hop.minutes;
+    if (hop.toStationId === stationId) return acc * 60;
+  }
+  return null;
+};

@@ -256,4 +256,50 @@ describe('GuidanceNowCard — train select entry points', () => {
     const rideCard = render(<GuidanceNowCard step={ride} elapsedInStepSec={60} />);
     expect(rideCard.queryByTestId('guidance-change-train')).toBeNull();
   });
+
+  it('keeps a single change-train link on a ride step when onOpenStationRebase is absent', () => {
+    const onOpen = jest.fn();
+    const { getByTestId, queryByTestId } = render(
+      <GuidanceNowCard step={ride} elapsedInStepSec={60} onOpenTrainSelect={onOpen} />
+    );
+    // No rebase entry point → the single change-train link stays.
+    expect(queryByTestId('guidance-rebase-station')).toBeNull();
+    fireEvent.press(getByTestId('guidance-change-train'));
+    expect(onOpen).toHaveBeenCalledTimes(1);
+  });
+
+  it('splits into 열차 변경 and 시간 보정 when onOpenStationRebase is present', () => {
+    const onOpenTrainSelect = jest.fn();
+    const onOpenStationRebase = jest.fn();
+    const { getByTestId } = render(
+      <GuidanceNowCard
+        step={ride}
+        elapsedInStepSec={60}
+        onOpenTrainSelect={onOpenTrainSelect}
+        onOpenStationRebase={onOpenStationRebase}
+      />
+    );
+    fireEvent.press(getByTestId('guidance-change-train'));
+    expect(onOpenTrainSelect).toHaveBeenCalledTimes(1);
+    expect(onOpenStationRebase).not.toHaveBeenCalled();
+
+    fireEvent.press(getByTestId('guidance-rebase-station'));
+    expect(onOpenStationRebase).toHaveBeenCalledTimes(1);
+    expect(onOpenTrainSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not render the rebase link on a ride step without onOpenTrainSelect', () => {
+    // onOpenStationRebase alone (no train-select) still shows the rebase link.
+    const onOpenStationRebase = jest.fn();
+    const { getByTestId, queryByTestId } = render(
+      <GuidanceNowCard
+        step={ride}
+        elapsedInStepSec={60}
+        onOpenStationRebase={onOpenStationRebase}
+      />
+    );
+    expect(queryByTestId('guidance-change-train')).toBeNull();
+    fireEvent.press(getByTestId('guidance-rebase-station'));
+    expect(onOpenStationRebase).toHaveBeenCalledTimes(1);
+  });
 });
