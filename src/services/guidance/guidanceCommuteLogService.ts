@@ -7,7 +7,11 @@
  * the guidance flow reaches the destination. This gives ML/statistics usable
  * accumulated duration data without relying on station-detail screen visits.
  */
-import { commuteLogService, type CreateCommuteLogInput } from '@/services/pattern/commuteLogService';
+import {
+  commuteLogService,
+  findAdoptableOpenLog,
+  type CreateCommuteLogInput,
+} from '@/services/pattern/commuteLogService';
 import {
   getGuidanceSession,
   setGuidanceSession,
@@ -59,13 +63,42 @@ export const startGuidanceCommuteLog = async (
   const input = buildGuidanceCommuteLogInput(session);
   if (!input) return null;
 
-  const log = await commuteLogService.logCommute(userId, input);
+  // Settings auto-logging may have already opened a log for this same leg
+  // (matched by departureStationName — the two paths use different stationId
+  // domains). Adopt it instead of creating a duplicate doc.
+  const legLogs = await commuteLogService.getTodayLogsByDeparture(
+    userId,
+    input.departureStationName
+  );
+  const adoptable = findAdoptableOpenLog(legLogs, input.arrivalStationName);
+
+  let commuteLogId: string;
+  if (adoptable) {
+    // Guidance departure time is measured (not estimated), so refresh it. A
+    // destination-less stub (autoLogIfAppropriate) also gets its route repaired.
+    const repair: Partial<CreateCommuteLogInput> = adoptable.needsRepair
+      ? {
+          arrivalStationId: input.arrivalStationId,
+          arrivalStationName: input.arrivalStationName,
+          lineIds: input.lineIds,
+        }
+      : {};
+    await commuteLogService.updateLog(userId, adoptable.log.id, {
+      departureTime: input.departureTime,
+      ...repair,
+    });
+    commuteLogId = adoptable.log.id;
+  } else {
+    const log = await commuteLogService.logCommute(userId, input);
+    commuteLogId = log.id;
+  }
+
   const current = getGuidanceSession();
   if (!current || current.startedAt !== session.startedAt) return null;
 
   const updated: GuidanceSession = {
     ...current,
-    commuteLogId: log.id,
+    commuteLogId,
   };
   setGuidanceSession(updated);
   return updated;
@@ -76,15 +109,44 @@ export const completeGuidanceCommuteLog = async (
   session: GuidanceSession,
   completedAt: number = Date.now()
 ): Promise<void> => {
-  if (session.commuteLogCompletedAt) return;
+  // The screen may hold a frozen session snapshot taken before commuteLogId was
+  // attached asynchronously; consult the live store (same journey) too.
+  const live = getGuidanceSession();
+  const liveSession =
+    live !== null && live.startedAt === session.startedAt ? live : null;
+
+  if (session.commuteLogCompletedAt || liveSession?.commuteLogCompletedAt) return;
 
   const input = buildGuidanceCommuteLogInput(session, completedAt);
   if (!input) return;
 
-  let commuteLogId = session.commuteLogId;
+  let commuteLogId = session.commuteLogId ?? liveSession?.commuteLogId;
+  let repair: Partial<CreateCommuteLogInput> = {};
+  if (!commuteLogId) {
+    // Neither snapshot has the id — fall back to a same-leg open log created by
+    // settings auto-logging or the departure step, before creating a new doc.
+    // A destination-less stub also gets its route repaired.
+    const legLogs = await commuteLogService.getTodayLogsByDeparture(
+      userId,
+      input.departureStationName
+    );
+    const adoptable = findAdoptableOpenLog(legLogs, input.arrivalStationName);
+    if (adoptable) {
+      commuteLogId = adoptable.log.id;
+      if (adoptable.needsRepair) {
+        repair = {
+          arrivalStationId: input.arrivalStationId,
+          arrivalStationName: input.arrivalStationName,
+          lineIds: input.lineIds,
+        };
+      }
+    }
+  }
+
   if (commuteLogId) {
     await commuteLogService.updateLog(userId, commuteLogId, {
       arrivalTime: input.arrivalTime,
+      ...repair,
     });
   } else {
     const log = await commuteLogService.logCommute(userId, input);
