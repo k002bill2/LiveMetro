@@ -12,15 +12,31 @@ import {
 import { commuteLogService } from '@/services/pattern/commuteLogService';
 import type { GuidanceSession } from '@/models/guidance';
 
+// findAdoptableOpenLog is a pure helper; reimplement it inline rather than
+// requireActual (which would load the real firebase config module side effects).
 jest.mock('@/services/pattern/commuteLogService', () => ({
   commuteLogService: {
     logCommute: jest.fn(),
     updateLog: jest.fn(),
+    getTodayLogsByDeparture: jest.fn(),
+  },
+  findAdoptableOpenLog: (
+    logs: readonly { arrivalStationName?: string; arrivalTime?: string }[],
+    arrivalStationName: string
+  ) => {
+    const open = logs.filter((log) => !log.arrivalTime);
+    const exact = open.find((log) => log.arrivalStationName === arrivalStationName);
+    if (exact) return { log: exact, needsRepair: false };
+    const stub = open.find((log) => log.arrivalStationName === '');
+    if (stub) return { log: stub, needsRepair: true };
+    return null;
   },
 }));
 
 const mockedLogCommute = commuteLogService.logCommute as jest.Mock;
 const mockedUpdateLog = commuteLogService.updateLog as jest.Mock;
+const mockedGetTodayLogsByDeparture =
+  commuteLogService.getTodayLogsByDeparture as jest.Mock;
 
 const hop = (
   fromStationId: string,
@@ -70,6 +86,8 @@ describe('guidanceCommuteLogService', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     clearGuidanceSession();
+    // Default: no pre-existing same-leg log (leg-aware adoption lookup).
+    mockedGetTodayLogsByDeparture.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -142,5 +160,117 @@ describe('guidanceCommuteLogService', () => {
       })
     );
     expect(getGuidanceSession()?.commuteLogId).toBe('log-2');
+  });
+
+  it('adopts an existing same-leg open log instead of creating a duplicate (bug1)', async () => {
+    const session = makeSession();
+    setGuidanceSession(session);
+    // Settings auto-log already created an open log for this leg (시청→건대입구),
+    // with a different id domain but the same departure and destination.
+    mockedGetTodayLogsByDeparture.mockResolvedValue([
+      {
+        id: 'auto-log',
+        departureStationName: '시청',
+        arrivalStationName: '건대입구',
+        arrivalTime: undefined,
+      },
+    ]);
+    mockedUpdateLog.mockResolvedValue(undefined);
+
+    await startGuidanceCommuteLog('user-1', session);
+
+    expect(mockedGetTodayLogsByDeparture).toHaveBeenCalledWith('user-1', '시청');
+    // No new doc — adopt the existing one and refresh its measured departure.
+    // Exact destination match → only departureTime is touched (no route repair).
+    expect(mockedLogCommute).not.toHaveBeenCalled();
+    expect(mockedUpdateLog).toHaveBeenCalledWith('user-1', 'auto-log', {
+      departureTime: '08:07',
+    });
+    expect(getGuidanceSession()?.commuteLogId).toBe('auto-log');
+  });
+
+  it('repairs a destination-less stub on adoption (departure + route fields)', async () => {
+    const session = makeSession();
+    setGuidanceSession(session);
+    // autoLogIfAppropriate stub: same departure, empty destination, still open.
+    mockedGetTodayLogsByDeparture.mockResolvedValue([
+      {
+        id: 'stub-log',
+        departureStationName: '시청',
+        arrivalStationId: '',
+        arrivalStationName: '',
+        arrivalTime: undefined,
+      },
+    ]);
+    mockedUpdateLog.mockResolvedValue(undefined);
+
+    await startGuidanceCommuteLog('user-1', session);
+
+    expect(mockedLogCommute).not.toHaveBeenCalled();
+    expect(mockedUpdateLog).toHaveBeenCalledWith('user-1', 'stub-log', {
+      departureTime: '08:07',
+      arrivalStationId: '0702',
+      arrivalStationName: '건대입구',
+      lineIds: ['2', '7'],
+    });
+    expect(getGuidanceSession()?.commuteLogId).toBe('stub-log');
+  });
+
+  it('does not adopt a same-departure open log heading elsewhere (leg match)', async () => {
+    const session = makeSession();
+    setGuidanceSession(session);
+    // Same departure (시청) but a different destination than this session.
+    mockedGetTodayLogsByDeparture.mockResolvedValue([
+      {
+        id: 'other-dest-log',
+        departureStationName: '시청',
+        arrivalStationName: '왕십리',
+        arrivalTime: undefined,
+      },
+    ]);
+    mockedLogCommute.mockResolvedValue({ id: 'log-new' });
+
+    await startGuidanceCommuteLog('user-1', session);
+
+    // The other-destination log is left untouched; a fresh log is created.
+    expect(mockedUpdateLog).not.toHaveBeenCalled();
+    expect(mockedLogCommute).toHaveBeenCalledTimes(1);
+    expect(getGuidanceSession()?.commuteLogId).toBe('log-new');
+  });
+
+  it('uses the live store session commuteLogId when the arg session lacks it (bug2)', async () => {
+    // Screen froze a session snapshot without commuteLogId; the store gained it
+    // asynchronously (same startedAt).
+    const argSession = makeSession();
+    setGuidanceSession(makeSession({ commuteLogId: 'log-live' }));
+    mockedUpdateLog.mockResolvedValue(undefined);
+
+    await completeGuidanceCommuteLog('user-1', argSession, COMPLETED_AT);
+
+    expect(mockedUpdateLog).toHaveBeenCalledWith('user-1', 'log-live', {
+      arrivalTime: '08:42',
+    });
+    expect(mockedLogCommute).not.toHaveBeenCalled();
+  });
+
+  it('adopts a same-leg open log on complete when no session id is present', async () => {
+    const session = makeSession();
+    setGuidanceSession(session);
+    mockedGetTodayLogsByDeparture.mockResolvedValue([
+      {
+        id: 'open-log',
+        departureStationName: '시청',
+        arrivalStationName: '건대입구',
+        arrivalTime: undefined,
+      },
+    ]);
+    mockedUpdateLog.mockResolvedValue(undefined);
+
+    await completeGuidanceCommuteLog('user-1', session, COMPLETED_AT);
+
+    expect(mockedUpdateLog).toHaveBeenCalledWith('user-1', 'open-log', {
+      arrivalTime: '08:42',
+    });
+    expect(mockedLogCommute).not.toHaveBeenCalled();
   });
 });

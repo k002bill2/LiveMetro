@@ -50,6 +50,46 @@ export interface CreateCommuteLogInput {
 }
 
 // ============================================================================
+// Leg matching
+// ============================================================================
+
+/**
+ * True when `log` belongs to the same commute leg as a route arriving at
+ * `arrivalStationName`. A destination-less stub (arrivalStationName === '',
+ * created by autoLogIfAppropriate) counts as a match because it can still be
+ * repaired to this destination. A log heading somewhere *else* is a different
+ * leg and must never be adopted — filling it would corrupt route statistics.
+ */
+export const matchesLeg = (
+  log: Pick<CommuteLog, 'arrivalStationName'>,
+  arrivalStationName: string
+): boolean =>
+  log.arrivalStationName === arrivalStationName || log.arrivalStationName === '';
+
+export interface AdoptableOpenLog {
+  readonly log: CommuteLog;
+  /** true when the adopted log is a destination-less stub needing repair. */
+  readonly needsRepair: boolean;
+}
+
+/**
+ * From same-departure logs, pick the open (no arrivalTime) one that belongs to
+ * this leg. An exact-destination match wins over a stub; a stub is adoptable
+ * but flagged for repair. Returns null when no open log matches this leg.
+ */
+export const findAdoptableOpenLog = (
+  logs: readonly CommuteLog[],
+  arrivalStationName: string
+): AdoptableOpenLog | null => {
+  const openLogs = logs.filter((log) => !log.arrivalTime);
+  const exact = openLogs.find((log) => log.arrivalStationName === arrivalStationName);
+  if (exact) return { log: exact, needsRepair: false };
+  const stub = openLogs.find((log) => log.arrivalStationName === '');
+  if (stub) return { log: stub, needsRepair: true };
+  return null;
+};
+
+// ============================================================================
 // Service
 // ============================================================================
 
@@ -181,6 +221,15 @@ class CommuteLogService {
     if (updates.arrivalTime !== undefined) {
       updateData.arrivalTime = updates.arrivalTime;
     }
+    if (updates.arrivalStationId !== undefined) {
+      updateData.arrivalStationId = updates.arrivalStationId;
+    }
+    if (updates.arrivalStationName !== undefined) {
+      updateData.arrivalStationName = updates.arrivalStationName;
+    }
+    if (updates.lineIds !== undefined) {
+      updateData.lineIds = updates.lineIds;
+    }
     if (updates.wasDelayed !== undefined) {
       updateData.wasDelayed = updates.wasDelayed;
     }
@@ -239,6 +288,36 @@ class CommuteLogService {
   }
 
   /**
+   * Get today's logs filtered to a specific departure station (leg-aware).
+   *
+   * A single date-equality query (no orderBy → no composite index required,
+   * mirroring getCommuteLogs' "filter in memory" pattern) fetches the day's
+   * logs, then departureStationName is matched in memory. This lets callers
+   * distinguish the morning leg from the evening leg — they share the same date
+   * but differ by departure station, so a limit(1) date query cannot tell them
+   * apart.
+   */
+  async getTodayLogsByDeparture(
+    userId: string,
+    departureStationName: string
+  ): Promise<CommuteLog[]> {
+    const today = formatDateString(new Date());
+
+    const userLogsRef = collection(db, COLLECTION_NAME, userId, 'logs');
+    // limit(50) matches getCommuteLogs' default cap: high enough that a
+    // same-leg open log is never paged out of view (which would let a duplicate
+    // slip through), while still bounded — unbounded fetches are banned.
+    const q = query(userLogsRef, where('date', '==', today), limit(50));
+
+    const snapshot = await getDocs(q);
+    return snapshot.docs
+      .map((docSnap) =>
+        fromCommuteLogDoc(docSnap.id, userId, docSnap.data() as CommuteLogDoc)
+      )
+      .filter((log) => log.departureStationName === departureStationName);
+  }
+
+  /**
    * Auto-log commute based on favorite stations and current time
    * Called when user views a favorite station during commute hours
    */
@@ -290,7 +369,9 @@ class CommuteLogService {
     route: CommuteRoute,
     commuteType: 'departure' | 'arrival'
   ): Promise<CommuteLog | null> {
-    const todayLog = await this.getTodayLog(userId);
+    // Leg-aware: only this departure station's logs. A different leg (e.g. the
+    // morning commute) must never be read or mutated by the evening leg.
+    const legLogs = await this.getTodayLogsByDeparture(userId, route.departureStationName);
     const routeInput: CreateCommuteLogInput = {
       departureStationId: route.departureStationId,
       departureStationName: route.departureStationName,
@@ -301,21 +382,38 @@ class CommuteLogService {
     };
 
     if (commuteType === 'departure') {
-      // One auto log per day — mirrors autoLogIfAppropriate's dedup.
-      if (todayLog) return null;
+      // One auto log per leg per day. A same-leg log (this destination, or a
+      // repairable stub) — open or completed — means this leg is already
+      // recorded; a log to a different destination is a separate leg.
+      if (legLogs.some((log) => matchesLeg(log, routeInput.arrivalStationName))) {
+        return null;
+      }
       return this.logCommute(userId, routeInput);
     }
 
-    // arrival (퇴근): fill today's open log, or start an evening-only log.
-    if (!todayLog) {
-      return this.logCommute(userId, routeInput);
-    }
-    if (!todayLog.arrivalTime) {
+    // arrival (퇴근): fill this leg's open log, or start an evening-only log.
+    const adoptable = findAdoptableOpenLog(legLogs, routeInput.arrivalStationName);
+    if (adoptable) {
       const arrivalTime = getCurrentTimeString();
-      await this.updateLog(userId, todayLog.id, { arrivalTime });
-      return { ...todayLog, arrivalTime };
+      const repair: Partial<CreateCommuteLogInput> = adoptable.needsRepair
+        ? {
+            arrivalStationId: routeInput.arrivalStationId,
+            arrivalStationName: routeInput.arrivalStationName,
+            lineIds: routeInput.lineIds,
+          }
+        : {};
+      await this.updateLog(userId, adoptable.log.id, { arrivalTime, ...repair });
+      return { ...adoptable.log, arrivalTime, ...repair };
     }
-    return null;
+    // No open log to adopt. If this leg is already completed — same destination
+    // OR a filled stub — do nothing; otherwise (no match, or only
+    // different-destination logs) start a standalone evening log. Uses the same
+    // matchesLeg predicate as adoption/departure so all three stay consistent.
+    const legAlreadyCompleted = legLogs.some(
+      (log) => log.arrivalTime && matchesLeg(log, routeInput.arrivalStationName)
+    );
+    if (legAlreadyCompleted) return null;
+    return this.logCommute(userId, routeInput);
   }
 
   /**
