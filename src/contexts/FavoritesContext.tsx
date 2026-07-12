@@ -44,6 +44,7 @@ export interface FavoritesContextValue {
     options?: { alias?: string; direction?: 'up' | 'down' | 'both'; isCommuteStation?: boolean }
   ) => Promise<void>;
   removeFavorite: (favoriteId: string) => Promise<void>;
+  removeFavorites: (favoriteIds: readonly string[]) => Promise<void>;
   removeFavoriteByStationId: (stationId: string) => Promise<void>;
   updateFavorite: (
     favoriteId: string,
@@ -331,6 +332,25 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   );
 
   /**
+   * Bulk-remove favorites in one write (edit-mode action bar). A single
+   * bulk lock key guards against action-bar double-taps; per-station keys
+   * are unnecessary because the whole batch lands in one Firestore write.
+   */
+  const removeFavorites = useCallback(
+    async (favoriteIds: readonly string[]): Promise<void> =>
+      runExclusive('bulk:remove', () =>
+        runMutation('removing favorites', async (userId) => {
+          if (favoriteIds.length === 0) {
+            return false; // nothing to do — skip the reload
+          }
+          await favoritesService.removeFavorites(userId, favoriteIds);
+          return true; // reload so consumers see the removal
+        }),
+      ),
+    [runExclusive, runMutation],
+  );
+
+  /**
    * Reorder favorites
    */
   const reorderFavorites = useCallback(
@@ -364,6 +384,7 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       error: state.error,
       addFavorite,
       removeFavorite,
+      removeFavorites,
       removeFavoriteByStationId,
       updateFavorite,
       setNotificationEnabled,
@@ -377,6 +398,7 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       state,
       addFavorite,
       removeFavorite,
+      removeFavorites,
       removeFavoriteByStationId,
       updateFavorite,
       setNotificationEnabled,

@@ -19,6 +19,7 @@ jest.mock('../../services/favorites/favoritesService', () => ({
     getFavorites: jest.fn(),
     addFavorite: jest.fn(),
     removeFavorite: jest.fn(),
+    removeFavorites: jest.fn(),
     updateFavorite: jest.fn(),
     reorderFavorites: jest.fn(),
     getFavoriteByStationId: jest.fn(),
@@ -265,6 +266,79 @@ describe('useFavorites', () => {
 
       expect(mockFavoritesService.getFavoriteByStationId).toHaveBeenCalledWith(mockUser.id, 'station-1');
       expect(mockFavoritesService.removeFavorite).toHaveBeenCalledWith(mockUser.id, 'fav-1');
+    });
+  });
+
+  describe('removeFavorites', () => {
+    it('서비스를 호출하고 목록을 다시 로드한다', async () => {
+      mockFavoritesService.removeFavorites.mockResolvedValue(undefined);
+
+      const { result } = renderHook(() => useFavorites(), { wrapper });
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      mockFavoritesService.getFavorites.mockClear();
+
+      await act(async () => {
+        await result.current.removeFavorites(['fav_1', 'fav_2']);
+      });
+
+      expect(mockFavoritesService.removeFavorites).toHaveBeenCalledWith(mockUser.id, ['fav_1', 'fav_2']);
+      // reload 발생: getFavorites가 (초기 로드 이후) 한 번 더 호출됨
+      expect(mockFavoritesService.getFavorites).toHaveBeenCalledTimes(1);
+    });
+
+    it('빈 배열이면 서비스 호출·reload를 생략한다', async () => {
+      const { result } = renderHook(() => useFavorites(), { wrapper });
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      mockFavoritesService.getFavorites.mockClear();
+
+      await act(async () => {
+        await result.current.removeFavorites([]);
+      });
+
+      expect(mockFavoritesService.removeFavorites).not.toHaveBeenCalled();
+      expect(mockFavoritesService.getFavorites).not.toHaveBeenCalled();
+    });
+
+    it('미로그인 상태면 throw한다', async () => {
+      mockUseAuth.mockReturnValue({
+        user: null,
+        firebaseUser: null,
+        loading: false,
+      } as any);
+
+      const { result } = renderHook(() => useFavorites(), { wrapper });
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      await expect(
+        act(async () => {
+          await result.current.removeFavorites(['fav_1']);
+        }),
+      ).rejects.toThrow('로그인이 필요합니다.');
+    });
+
+    it('서비스 에러를 rethrow한다', async () => {
+      mockFavoritesService.removeFavorites.mockRejectedValue(
+        new Error('즐겨찾기 삭제에 실패했습니다.'),
+      );
+
+      const { result } = renderHook(() => useFavorites(), { wrapper });
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false);
+      });
+
+      await expect(
+        act(async () => {
+          await result.current.removeFavorites(['fav_1']);
+        }),
+      ).rejects.toThrow('즐겨찾기 삭제에 실패했습니다.');
     });
   });
 
