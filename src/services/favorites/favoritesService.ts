@@ -3,7 +3,7 @@
  * Manages user's favorite stations with Firebase Firestore integration
  */
 
-import { doc, getDoc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, runTransaction } from 'firebase/firestore';
 import { firestore } from '../firebase/config';
 import { FavoriteStation } from '../../models/user';
 import { Station } from '../../models/train';
@@ -24,7 +24,7 @@ export interface AddFavoriteParams {
 export interface UpdateFavoriteParams {
   userId: string;
   favoriteId: string;
-  alias?: string;
+  alias?: string | null;
   direction?: 'up' | 'down' | 'both';
   isCommuteStation?: boolean;
   notificationEnabled?: boolean;
@@ -240,18 +240,26 @@ class FavoritesService {
 
     try {
       const userRef = doc(firestore, 'users', userId);
-      const favorites = await this.getFavorites(userId);
-
-      const idsToRemove = new Set(favoriteIds);
-      const remaining = favorites.filter(fav => !idsToRemove.has(fav.id));
-
-      if (remaining.length === favorites.length) {
-        return;
-      }
-
-      await updateDoc(userRef, {
-        'preferences.favoriteStations': remaining,
-        lastActiveAt: new Date(),
+      // Transaction (not read-then-updateDoc): a concurrent add/edit/reorder
+      // rewriting the favorites array retriggers the transaction with fresh
+      // data instead of being clobbered by last-write-wins. A failed read
+      // now throws instead of dissolving into a silent no-match success.
+      await runTransaction(firestore, async (transaction) => {
+        const snapshot = await transaction.get(userRef);
+        if (!snapshot.exists()) {
+          return;
+        }
+        const favorites: FavoriteStation[] =
+          snapshot.data()?.preferences?.favoriteStations ?? [];
+        const idsToRemove = new Set(favoriteIds);
+        const remaining = favorites.filter(fav => !idsToRemove.has(fav.id));
+        if (remaining.length === favorites.length) {
+          return;
+        }
+        transaction.update(userRef, {
+          'preferences.favoriteStations': remaining,
+          lastActiveAt: new Date(),
+        });
       });
     } catch (error) {
       console.error('Error removing favorites:', error);

@@ -150,4 +150,25 @@ describe('DraggableFavoriteItem', () => {
       expect(queryByTestId('favorite-edit-pencil')).toBeNull();
     });
   });
+
+  describe('station 하이드레이션 실패 (에러 카드)', () => {
+    const brokenFavorite: FavoriteWithDetails = { ...baseFavorite, station: null };
+
+    it('선택 모드에서 에러 카드에도 체크박스를 렌더하고 onSelectToggle을 호출한다', () => {
+      const onSelectToggle = jest.fn();
+      const { getByTestId } = renderItem({
+        favorite: brokenFavorite,
+        isSelectMode: true,
+        onSelectToggle,
+      });
+
+      fireEvent.press(getByTestId('favorite-select-checkbox'));
+      expect(onSelectToggle).toHaveBeenCalledTimes(1);
+    });
+
+    it('일반 모드에서는 에러 카드에 체크박스가 없다', () => {
+      const { queryByTestId } = renderItem({ favorite: brokenFavorite });
+      expect(queryByTestId('favorite-select-checkbox')).toBeNull();
+    });
+  });
 });

@@ -18,6 +18,9 @@ const mockUpdateDoc = jest.fn();
 const mockDoc = jest.fn();
 const mockArrayUnion = jest.fn();
 const mockArrayRemove = jest.fn();
+const mockRunTransaction = jest.fn();
+const mockTxGet = jest.fn();
+const mockTxUpdate = jest.fn();
 
 jest.mock('firebase/firestore', () => ({
   doc: (...args: unknown[]) => mockDoc(...args),
@@ -25,6 +28,7 @@ jest.mock('firebase/firestore', () => ({
   updateDoc: (...args: unknown[]) => mockUpdateDoc(...args),
   arrayUnion: (...args: unknown[]) => mockArrayUnion(...args),
   arrayRemove: (...args: unknown[]) => mockArrayRemove(...args),
+  runTransaction: (...args: unknown[]) => mockRunTransaction(...args),
 }));
 
 // Mock stationsDataService
@@ -297,6 +301,29 @@ describe('FavoritesService', () => {
         | undefined;
       expect(writePayload?.['preferences.favoriteStations']?.[0]?.notificationEnabled).toBe(false);
     });
+
+    it('should store null when the alias is explicitly cleared', async () => {
+      mockGetDoc.mockResolvedValue({
+        exists: () => true,
+        data: () => ({
+          preferences: {
+            favoriteStations: [{ ...mockFavorite, alias: '집' }],
+          },
+        }),
+      });
+      mockUpdateDoc.mockResolvedValue(undefined);
+
+      await favoritesService.updateFavorite({
+        userId: 'user-123',
+        favoriteId: 'fav_123',
+        alias: null,
+      });
+
+      const writePayload = mockUpdateDoc.mock.calls[0]?.[1] as
+        | { 'preferences.favoriteStations': FavoriteStation[] }
+        | undefined;
+      expect(writePayload?.['preferences.favoriteStations']?.[0]?.alias).toBeNull();
+    });
   });
 
   describe('setNotificationEnabled', () => {
@@ -472,24 +499,30 @@ describe('FavoritesService', () => {
       addedAt: new Date('2024-01-01'),
     });
 
+    // Drives the transaction read (transaction.get) — the write path now runs
+    // inside runTransaction, so mockGetDoc/mockUpdateDoc are dead here.
     const seedFavorites = (favorites: FavoriteStation[]): void => {
-      mockGetDoc.mockResolvedValue({
+      mockTxGet.mockResolvedValue({
         exists: () => true,
         data: () => ({ preferences: { favoriteStations: favorites } }),
       });
-      // clearAllMocks() clears call records but not implementations, so a
-      // prior describe's mockRejectedValue can leak in. Reset to a resolved
-      // write here (the error case overrides this afterward).
-      mockUpdateDoc.mockResolvedValue(undefined);
     };
 
-    it('should remove targeted favorites in a single updateDoc write', async () => {
+    beforeEach(() => {
+      // Default: runTransaction invokes its callback with a live tx handle.
+      // Re-applied each test because the outer beforeEach clears call records.
+      mockRunTransaction.mockImplementation(async (_db, fn) =>
+        fn({ get: mockTxGet, update: mockTxUpdate }),
+      );
+    });
+
+    it('should remove targeted favorites in a single transaction update', async () => {
       seedFavorites([fav('fav_1', 'gangnam'), fav('fav_2', 'seoul'), fav('fav_3', 'hongdae')]);
 
       await favoritesService.removeFavorites('user-123', ['fav_1', 'fav_3']);
 
-      expect(mockUpdateDoc).toHaveBeenCalledTimes(1);
-      const payload = mockUpdateDoc.mock.calls[0]?.[1] as {
+      expect(mockTxUpdate).toHaveBeenCalledTimes(1);
+      const payload = mockTxUpdate.mock.calls[0]?.[1] as {
         'preferences.favoriteStations': FavoriteStation[];
       };
       const remaining = payload['preferences.favoriteStations'];
@@ -502,18 +535,17 @@ describe('FavoritesService', () => {
 
       await favoritesService.removeFavorites('user-123', ['fav_2', 'fav_ghost']);
 
-      expect(mockUpdateDoc).toHaveBeenCalledTimes(1);
-      const payload = mockUpdateDoc.mock.calls[0]?.[1] as {
+      expect(mockTxUpdate).toHaveBeenCalledTimes(1);
+      const payload = mockTxUpdate.mock.calls[0]?.[1] as {
         'preferences.favoriteStations': FavoriteStation[];
       };
       expect(payload['preferences.favoriteStations'].map((f) => f.id)).toEqual(['fav_1']);
     });
 
-    it('should be a no-op (no read, no write) for an empty id list', async () => {
+    it('should be a no-op (no transaction) for an empty id list', async () => {
       await favoritesService.removeFavorites('user-123', []);
 
-      expect(mockGetDoc).not.toHaveBeenCalled();
-      expect(mockUpdateDoc).not.toHaveBeenCalled();
+      expect(mockRunTransaction).not.toHaveBeenCalled();
     });
 
     it('should skip the write when nothing matches', async () => {
@@ -521,15 +553,35 @@ describe('FavoritesService', () => {
 
       await favoritesService.removeFavorites('user-123', ['fav_ghost']);
 
-      expect(mockUpdateDoc).not.toHaveBeenCalled();
+      expect(mockTxUpdate).not.toHaveBeenCalled();
     });
 
-    it('should throw a user-friendly error when Firestore write fails', async () => {
-      seedFavorites([fav('fav_1', 'gangnam')]);
-      mockUpdateDoc.mockRejectedValue(new Error('Firestore error'));
+    it('should succeed without writing when the user document is missing', async () => {
+      mockTxGet.mockResolvedValue({ exists: () => false });
 
       await expect(
-        favoritesService.removeFavorites('user-123', ['fav_1'])
+        favoritesService.removeFavorites('user-123', ['fav_1']),
+      ).resolves.toBeUndefined();
+
+      expect(mockTxUpdate).not.toHaveBeenCalled();
+    });
+
+    it('should throw (not silently succeed) when the transaction read fails', async () => {
+      mockTxGet.mockRejectedValue(new Error('Firestore read error'));
+
+      await expect(
+        favoritesService.removeFavorites('user-123', ['fav_1']),
+      ).rejects.toThrow('즐겨찾기 삭제에 실패했습니다.');
+
+      expect(mockTxUpdate).not.toHaveBeenCalled();
+    });
+
+    it('should throw a user-friendly error when the transaction commit fails', async () => {
+      seedFavorites([fav('fav_1', 'gangnam')]);
+      mockRunTransaction.mockRejectedValue(new Error('Firestore commit error'));
+
+      await expect(
+        favoritesService.removeFavorites('user-123', ['fav_1']),
       ).rejects.toThrow('즐겨찾기 삭제에 실패했습니다.');
     });
   });

@@ -74,6 +74,10 @@ export const FavoritesScreen: React.FC = () => {
   // Global edit mode (Phase B): multi-select + bulk delete + always-on reorder
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
+  // In-flight guard for the bulk delete so a second confirm can't slip past
+  // the context's runExclusive lock and clear the selection out from under
+  // the still-running delete (Codex review).
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   const handleEditModeToggle = useCallback(() => {
     if (!isEditMode) {
@@ -101,7 +105,7 @@ export const FavoritesScreen: React.FC = () => {
 
   const handleBulkDelete = useCallback(() => {
     const count = selectedIds.size;
-    if (count === 0) return;
+    if (count === 0 || isBulkDeleting) return;
     Alert.alert(
       '즐겨찾기 삭제',
       `선택한 ${count}개 역을 즐겨찾기에서 삭제하시겠습니까?`,
@@ -111,17 +115,20 @@ export const FavoritesScreen: React.FC = () => {
           text: '삭제',
           style: 'destructive',
           onPress: async () => {
+            setIsBulkDeleting(true);
             try {
               await removeFavorites([...selectedIds]);
               setSelectedIds(new Set());
             } catch {
               Alert.alert('오류', '즐겨찾기 삭제에 실패했습니다.');
+            } finally {
+              setIsBulkDeleting(false);
             }
           },
         },
       ],
     );
-  }, [selectedIds, removeFavorites]);
+  }, [selectedIds, removeFavorites, isBulkDeleting]);
 
   // Leave edit mode automatically when the last favorite disappears
   // (bulk delete of everything, or removal from another screen).
@@ -224,11 +231,10 @@ export const FavoritesScreen: React.FC = () => {
       }
     ) => {
       try {
-        // Convert null to undefined for type compatibility
-        await updateFavorite(favoriteId, {
-          ...updates,
-          alias: updates.alias ?? undefined,
-        });
+        // Pass updates through as-is: alias:null means "clear the alias".
+        // Collapsing null→undefined here made the service keep the old alias,
+        // silently ignoring a clear (Codex review).
+        await updateFavorite(favoriteId, updates);
         setEditingFavoriteId(null);
       } catch (error) {
         Alert.alert('오류', '즐겨찾기 수정에 실패했습니다.');
@@ -605,12 +611,12 @@ export const FavoritesScreen: React.FC = () => {
           <TouchableOpacity
             style={[
               styles.bulkDeleteButton,
-              selectedIds.size === 0 && styles.bulkDeleteButtonDisabled,
+              (selectedIds.size === 0 || isBulkDeleting) && styles.bulkDeleteButtonDisabled,
             ]}
             onPress={handleBulkDelete}
-            disabled={selectedIds.size === 0}
+            disabled={selectedIds.size === 0 || isBulkDeleting}
             accessibilityRole="button"
-            accessibilityState={{ disabled: selectedIds.size === 0 }}
+            accessibilityState={{ disabled: selectedIds.size === 0 || isBulkDeleting }}
             accessibilityLabel={`선택한 ${selectedIds.size}개 즐겨찾기 삭제`}
             testID="favorites-bulk-delete-button"
           >

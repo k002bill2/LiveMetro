@@ -48,7 +48,7 @@ export interface FavoritesContextValue {
   removeFavoriteByStationId: (stationId: string) => Promise<void>;
   updateFavorite: (
     favoriteId: string,
-    updates: { alias?: string; direction?: 'up' | 'down' | 'both'; isCommuteStation?: boolean }
+    updates: { alias?: string | null; direction?: 'up' | 'down' | 'both'; isCommuteStation?: boolean }
   ) => Promise<void>;
   setNotificationEnabled: (favoriteId: string, enabled: boolean) => Promise<void>;
   isFavorite: (stationId: string) => boolean;
@@ -271,7 +271,7 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     async (
       favoriteId: string,
       updates: {
-        alias?: string;
+        alias?: string | null;
         direction?: 'up' | 'down' | 'both';
         isCommuteStation?: boolean;
       }

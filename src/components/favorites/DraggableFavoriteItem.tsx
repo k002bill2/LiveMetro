@@ -197,6 +197,22 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
   if (!station) {
     return (
       <View style={styles.errorCard}>
+        {isSelectMode && (
+          <TouchableOpacity
+            style={styles.selectCheckbox}
+            onPress={onSelectToggle}
+            accessibilityRole="checkbox"
+            accessibilityState={{ checked: isSelected }}
+            accessibilityLabel="역 정보를 불러올 수 없는 즐겨찾기 선택"
+            testID="favorite-select-checkbox"
+          >
+            {isSelected ? (
+              <CheckCircle2 size={24} color={semantic.primaryNormal} />
+            ) : (
+              <Circle size={24} color={semantic.labelAlt} />
+            )}
+          </TouchableOpacity>
+        )}
         <View style={styles.errorContent}>
           <AlertCircle size={24} color={colors.textSecondary} />
           <View style={styles.errorTextContainer}>
