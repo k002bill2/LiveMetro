@@ -163,11 +163,21 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   }, [user]);
 
+  // Client-side total order for favorites mutations. Every mutation chains
+  // onto the previous one, so an in-flight update/reorder can never commit
+  // its whole-array write after a later bulk delete and resurrect rows.
+  // (Codex R3: UI freezing alone cannot stop writes that already started.)
+  const mutationChainRef = useRef<Promise<void>>(Promise.resolve());
+
   /**
    * Shared mutation pipeline: require auth, run the service call, then
    * reload favorites so every consumer sees the new state. Errors are
    * logged with the given label and rethrown for the caller's UI.
    * A task may return `false` to skip the reload (no-op mutation).
+   *
+   * Mutations are serialized through mutationChainRef so their Firestore
+   * writes commit in call order (prevents a slow update/reorder landing
+   * after a bulk delete).
    */
   const runMutation = useCallback(
     async (
@@ -177,11 +187,19 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (!user) {
         throw new Error('로그인이 필요합니다.');
       }
-      try {
+      const run = mutationChainRef.current.then(async () => {
         const changed = await task(user.id);
         if (changed !== false) {
           await loadFavorites();
         }
+      });
+      // Keep the chain alive after a failure so the next mutation still runs.
+      mutationChainRef.current = run.then(
+        () => undefined,
+        () => undefined,
+      );
+      try {
+        await run;
       } catch (error) {
         console.error(`Error ${label}:`, error);
         throw error;

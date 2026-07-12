@@ -342,6 +342,61 @@ describe('useFavorites', () => {
     });
   });
 
+  describe('mutation 직렬화 (순서 보장)', () => {
+    it('진행 중 updateFavorite가 끝나기 전에는 removeFavorites 서비스가 호출되지 않는다', async () => {
+      let resolveUpdate!: () => void;
+      // Once (not persistent): jest.clearAllMocks() clears calls but not
+      // implementations, so a persistent deferred would leak into later tests.
+      mockFavoritesService.updateFavorite.mockImplementationOnce(
+        () => new Promise<void>((resolve) => { resolveUpdate = resolve; }),
+      );
+      mockFavoritesService.removeFavorites.mockResolvedValueOnce(undefined);
+
+      const { result } = renderHook(() => useFavorites(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      let updatePromise!: Promise<void>;
+      let removePromise!: Promise<void>;
+      await act(async () => {
+        updatePromise = result.current.updateFavorite('fav_1', { alias: 'x' });
+        removePromise = result.current.removeFavorites(['fav_1']);
+      });
+
+      // update is in flight (pending); remove must be queued behind it so its
+      // whole-array write can never land after the (later) bulk delete.
+      expect(mockFavoritesService.updateFavorite).toHaveBeenCalledTimes(1);
+      expect(mockFavoritesService.removeFavorites).not.toHaveBeenCalled();
+
+      await act(async () => {
+        resolveUpdate();
+        await updatePromise;
+        await removePromise;
+      });
+
+      expect(mockFavoritesService.removeFavorites).toHaveBeenCalledWith('user-123', ['fav_1']);
+    });
+
+    it('한 mutation이 실패해도 이후 mutation이 정상 실행된다 (체인 유지)', async () => {
+      mockFavoritesService.updateFavorite.mockRejectedValueOnce(new Error('boom'));
+      mockFavoritesService.removeFavorites.mockResolvedValueOnce(undefined);
+
+      const { result } = renderHook(() => useFavorites(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => {
+        await expect(
+          result.current.updateFavorite('fav_1', { alias: 'x' }),
+        ).rejects.toThrow('boom');
+      });
+
+      await act(async () => {
+        await result.current.removeFavorites(['fav_1']);
+      });
+
+      expect(mockFavoritesService.removeFavorites).toHaveBeenCalledWith('user-123', ['fav_1']);
+    });
+  });
+
   describe('Notification toggle', () => {
     it('setNotificationEnabled forwards to service with correct args', async () => {
       const mockFavorite = createMockFavorite('fav-1', 'station-1');
