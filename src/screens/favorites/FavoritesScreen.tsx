@@ -115,6 +115,9 @@ export const FavoritesScreen: React.FC = () => {
           text: '삭제',
           style: 'destructive',
           onPress: async () => {
+            // Close any open inline edit form so a pending save can't fire an
+            // updateFavorite with a stale array over the delete (Codex review).
+            setEditingFavoriteId(null);
             setIsBulkDeleting(true);
             try {
               await removeFavorites([...selectedIds]);
@@ -395,13 +398,16 @@ export const FavoritesScreen: React.FC = () => {
 
   const handleDragEnd = useCallback(
     ({ data }: { data: typeof favoritesWithDetails }) => {
-      if (!isReorderable) return;
+      // Also bail while a bulk delete is in flight: a drag that started just
+      // before the freeze and ended after it would otherwise persist a stale
+      // full array over the delete (Codex review).
+      if (!isReorderable || isBulkDeleting) return;
       // Strip FavoriteWithDetails → FavoriteStation. The `station` lookup
       // is hydrated client-side and must not be persisted to Firestore.
       const reordered = data.map(({ station: _station, ...fav }) => fav);
       void reorderFavorites(reordered);
     },
-    [isReorderable, reorderFavorites],
+    [isReorderable, reorderFavorites, isBulkDeleting],
   );
 
   const renderFavoriteItem = useCallback(
@@ -425,12 +431,16 @@ export const FavoritesScreen: React.FC = () => {
             Alert.alert('오류', '알림 설정을 변경할 수 없습니다.');
           }
         }}
-        drag={isReorderable ? drag : undefined}
+        drag={isReorderable && !isBulkDeleting ? drag : undefined}
         isActive={isActive}
         isSelectMode={isEditMode}
         isSelected={selectedIds.has(item.id)}
         onSelectToggle={() => handleSelectToggle(item.id)}
-        onEditPress={() => handleEditToggle(item.id)}
+        // Freeze reorder + inline edit while a bulk delete is in flight:
+        // a late drag/edit would fire reorderFavorites/updateFavorite with a
+        // stale full array, landing after the delete transaction and reviving
+        // the removed favorites (Codex review).
+        onEditPress={isBulkDeleting ? undefined : () => handleEditToggle(item.id)}
         arrivalsEnabled={isFocused && !isEditMode}
       />
     ),
@@ -448,6 +458,7 @@ export const FavoritesScreen: React.FC = () => {
       isEditMode,
       selectedIds,
       handleSelectToggle,
+      isBulkDeleting,
     ],
   );
 

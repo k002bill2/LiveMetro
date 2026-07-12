@@ -908,6 +908,35 @@ describe('FavoritesScreen', () => {
       });
     });
 
+    it('bulk 삭제 진행 중에는 행 드래그·편집이 동결된다 (drag·onEditPress undefined)', async () => {
+      let resolveRemove!: () => void;
+      mockRemoveFavorites.mockImplementation(
+        () => new Promise<void>((resolve) => { resolveRemove = resolve; }),
+      );
+      const { getByTestId, getAllByTestId } = renderEditMode();
+      const { DraggableFavoriteItem } = require('@/components/favorites/DraggableFavoriteItem');
+
+      fireEvent.press(getByTestId('favorites-edit-button'));
+      fireEvent.press(getAllByTestId('favorite-select-checkbox')[0]);
+      fireEvent.press(getByTestId('favorites-bulk-delete-button'));
+
+      // Leave removeFavorites pending → screen re-renders with isBulkDeleting.
+      const buttons = (Alert.alert as jest.Mock).mock.calls.at(-1)?.[2];
+      await act(async () => {
+        buttons?.[1]?.onPress?.();
+      });
+
+      // The most recent render must freeze reorder + inline edit so a
+      // late drag/edit can't land a stale array after the delete.
+      const lastProps = (DraggableFavoriteItem as jest.Mock).mock.calls.at(-1)?.[0];
+      expect(lastProps?.drag).toBeUndefined();
+      expect(lastProps?.onEditPress).toBeUndefined();
+
+      await act(async () => {
+        resolveRemove();
+      });
+    });
+
     it('완료 탭 → 편집 모드 종료, 선택 상태 초기화', () => {
       const { getByTestId, getAllByTestId } = renderEditMode();
 
