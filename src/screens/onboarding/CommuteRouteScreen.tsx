@@ -70,6 +70,8 @@ import {
   CommuteRoute,
   DEFAULT_COMMUTE_NOTIFICATIONS,
   DEFAULT_BUFFER_MINUTES,
+  DEFAULT_MORNING_DEPARTURE_TIME,
+  reverseCommuteRoute,
 } from '@/models/commute';
 import { useAuth } from '@/services/auth/AuthContext';
 import { saveCommuteRoutes } from '@/services/commute/commuteService';
@@ -89,7 +91,8 @@ type Props =
 
 type StationSelectionType = 'departure' | 'arrival' | 'transfer';
 
-const DEFAULT_DEPARTURE_TIME = '08:00';
+// Aliased to the model constant (single source of truth) to avoid drift.
+const DEFAULT_DEPARTURE_TIME = DEFAULT_MORNING_DEPARTURE_TIME;
 const DEFAULT_EVENING_DEPARTURE_TIME = '18:30';
 const DIRECT_OPTION_ID = 'direct';
 // Cross-line OD has no single-line 직행. This synthetic default means "let the
@@ -532,9 +535,10 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
     if (isEditMode && editParams && user) {
       // Edit mode: persist immediately, then return to CommuteSettings.
       // Preserve the untouched leg via `otherLeg`; when missing (e.g. user
-      // had no evening leg), reuse the edited leg for both slots to
-      // satisfy saveCommuteRoutes' two-leg signature — matches the
-      // CommuteSettingsScreen.handleSelectTransferStation degenerate path.
+      // had no evening leg), materialise the opposite leg by REVERSING the
+      // edited leg (reverseCommuteRoute) — endpoints swapped + transfer chain
+      // reversed — with the opposite direction's default departure time, so
+      // the two slots are genuine return trips rather than identical copies.
       //
       // notifications/bufferMinutes are threaded from the params (loaded
       // from Firestore by CommuteSettings) so customized alert windows
@@ -577,7 +581,12 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
             notifications: otherLegSrc.notifications ?? DEFAULT_COMMUTE_NOTIFICATIONS,
             bufferMinutes: otherLegSrc.bufferMinutes ?? DEFAULT_BUFFER_MINUTES,
           }
-        : editedLeg;
+        : reverseCommuteRoute(
+            editedLeg,
+            editParams.kind === 'morning'
+              ? DEFAULT_EVENING_DEPARTURE_TIME
+              : DEFAULT_DEPARTURE_TIME,
+          );
       const morning = editParams.kind === 'morning' ? editedLeg : otherLeg;
       const evening = editParams.kind === 'evening' ? editedLeg : otherLeg;
 
