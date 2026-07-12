@@ -77,6 +77,14 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // so the second tap sees the first tap's lock without waiting for a render.
   const inFlightRef = useRef<Set<string>>(new Set());
 
+  // Auth generation guard: a job enqueued for user A must not run after
+  // logout or an account switch to user B — the stale closure would write
+  // to A's document and rehydrate the provider with A's favorites.
+  const currentUserIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    currentUserIdRef.current = user?.id ?? null;
+  }, [user]);
+
   const runExclusive = useCallback(
     async (key: string, task: () => Promise<void>): Promise<void> => {
       if (inFlightRef.current.has(key)) {
@@ -187,9 +195,17 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (!user) {
         throw new Error('로그인이 필요합니다.');
       }
+      const jobUserId = user.id;
       const run = mutationChainRef.current.then(async () => {
-        const changed = await task(user.id);
-        if (changed !== false) {
+        // Re-check the account right before running: a job queued behind a
+        // slow write must not execute after logout/account switch.
+        if (currentUserIdRef.current !== jobUserId) {
+          throw new Error('로그인이 필요합니다.');
+        }
+        const changed = await task(jobUserId);
+        // Re-check again before reload: the account may have changed while the
+        // task was awaiting, and reloading would rehydrate a stale account.
+        if (changed !== false && currentUserIdRef.current === jobUserId) {
           await loadFavorites();
         }
       });

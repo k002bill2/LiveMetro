@@ -142,6 +142,19 @@ export const FavoritesScreen: React.FC = () => {
     }
   }, [isEditMode, favoritesWithDetails.length]);
 
+  // Drop selections whose favorites disappeared (error-row trash button or a
+  // removal from another screen) so the delete count and enabled state stay
+  // truthful. Returns prev unchanged when nothing was pruned to avoid an
+  // extra render.
+  useEffect(() => {
+    if (!isEditMode) return;
+    const aliveIds = new Set(favoritesWithDetails.map((f) => f.id));
+    setSelectedIds((prev) => {
+      const next = new Set([...prev].filter((id) => aliveIds.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [isEditMode, favoritesWithDetails]);
+
   /**
    * Unique lineIds present in the user's favorites — drives the line filter
    * chip row. Empty when the user has no favorites yet, so the chips

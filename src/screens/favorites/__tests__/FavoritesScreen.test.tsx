@@ -982,6 +982,51 @@ describe('FavoritesScreen', () => {
     });
   });
 
+  describe('소멸 항목 선택 정리', () => {
+    const favMock = (favs: unknown[]) => ({
+      favoritesWithDetails: favs,
+      loading: false,
+      error: null,
+      removeFavorite: mockRemoveFavorite,
+      removeFavorites: mockRemoveFavorites,
+      updateFavorite: mockUpdateFavorite,
+      addFavorite: mockAddFavorite,
+      setNotificationEnabled: jest.fn(),
+      reorderFavorites: jest.fn(),
+      refresh: mockRefresh,
+    });
+
+    it('편집 모드 중 항목이 사라지면 해당 선택이 자동 정리된다', () => {
+      (useFavorites as jest.Mock).mockReturnValue(favMock([mockFavorite1, mockFavorite2]));
+      const { getByTestId, getAllByTestId, rerender } = render(<FavoritesScreen />);
+
+      fireEvent.press(getByTestId('favorites-edit-button'));
+      fireEvent.press(getAllByTestId('favorite-select-checkbox')[0]);
+      fireEvent.press(getAllByTestId('favorite-select-checkbox')[1]);
+      expect(getByTestId('favorites-bulk-delete-button')).toHaveTextContent('삭제 (2)');
+
+      // fav2 removed elsewhere → list shrinks; its dead id must drop out.
+      (useFavorites as jest.Mock).mockReturnValue(favMock([mockFavorite1]));
+      rerender(<FavoritesScreen />);
+
+      expect(getByTestId('favorites-bulk-delete-button')).toHaveTextContent('삭제 (1)');
+    });
+
+    it('편집 모드 중 모든 항목이 사라지면 편집 모드가 종료된다 (기존 동작 유지)', () => {
+      (useFavorites as jest.Mock).mockReturnValue(favMock([mockFavorite1, mockFavorite2]));
+      const { getByTestId, queryByTestId, rerender } = render(<FavoritesScreen />);
+
+      fireEvent.press(getByTestId('favorites-edit-button'));
+      expect(getByTestId('favorites-edit-button')).toHaveTextContent('완료');
+
+      (useFavorites as jest.Mock).mockReturnValue(favMock([]));
+      rerender(<FavoritesScreen />);
+
+      expect(queryByTestId('favorites-edit-button')).toBeNull();
+      expect(queryByTestId('favorites-bulk-delete-button')).toBeNull();
+    });
+  });
+
   describe('Edge Cases', () => {
     it('handles favorite with direction "both"', () => {
       const favoriteWithBoth = {

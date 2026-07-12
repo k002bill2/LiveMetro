@@ -395,6 +395,47 @@ describe('useFavorites', () => {
 
       expect(mockFavoritesService.removeFavorites).toHaveBeenCalledWith('user-123', ['fav_1']);
     });
+
+    it('큐잉된 mutation은 실행 직전 로그아웃되면 서비스를 호출하지 않고 reject된다', async () => {
+      let resolveUpdate!: () => void;
+      mockFavoritesService.updateFavorite.mockImplementationOnce(
+        () => new Promise<void>((resolve) => { resolveUpdate = resolve; }),
+      );
+      mockFavoritesService.removeFavorites.mockResolvedValueOnce(undefined);
+
+      const { result, rerender } = renderHook(() => useFavorites(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      let updatePromise!: Promise<void>;
+      let removePromise!: Promise<void>;
+      await act(async () => {
+        updatePromise = result.current.updateFavorite('fav_1', { alias: 'x' });
+        removePromise = result.current.removeFavorites(['fav_1']);
+      });
+
+      // A (update) is in flight; B (remove) is queued behind it.
+      expect(mockFavoritesService.updateFavorite).toHaveBeenCalledTimes(1);
+      expect(mockFavoritesService.removeFavorites).not.toHaveBeenCalled();
+
+      // Log out before the queue drains to B.
+      mockUseAuth.mockReturnValue({
+        user: null,
+        firebaseUser: null,
+        loading: false,
+      } as any);
+      await act(async () => {
+        rerender(undefined);
+      });
+
+      await act(async () => {
+        resolveUpdate();
+        await updatePromise;
+        await expect(removePromise).rejects.toThrow('로그인이 필요합니다.');
+      });
+
+      // B must never touch the previous account's document.
+      expect(mockFavoritesService.removeFavorites).not.toHaveBeenCalled();
+    });
   });
 
   describe('Notification toggle', () => {
