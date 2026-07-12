@@ -18,6 +18,9 @@ const mockUpdateDoc = jest.fn();
 const mockDoc = jest.fn();
 const mockArrayUnion = jest.fn();
 const mockArrayRemove = jest.fn();
+const mockRunTransaction = jest.fn();
+const mockTxGet = jest.fn();
+const mockTxUpdate = jest.fn();
 
 jest.mock('firebase/firestore', () => ({
   doc: (...args: unknown[]) => mockDoc(...args),
@@ -25,6 +28,7 @@ jest.mock('firebase/firestore', () => ({
   updateDoc: (...args: unknown[]) => mockUpdateDoc(...args),
   arrayUnion: (...args: unknown[]) => mockArrayUnion(...args),
   arrayRemove: (...args: unknown[]) => mockArrayRemove(...args),
+  runTransaction: (...args: unknown[]) => mockRunTransaction(...args),
 }));
 
 // Mock stationsDataService
@@ -297,6 +301,82 @@ describe('FavoritesService', () => {
         | undefined;
       expect(writePayload?.['preferences.favoriteStations']?.[0]?.notificationEnabled).toBe(false);
     });
+
+    it('should store null when the alias is explicitly cleared', async () => {
+      mockGetDoc.mockResolvedValue({
+        exists: () => true,
+        data: () => ({
+          preferences: {
+            favoriteStations: [{ ...mockFavorite, alias: '집' }],
+          },
+        }),
+      });
+      mockUpdateDoc.mockResolvedValue(undefined);
+
+      await favoritesService.updateFavorite({
+        userId: 'user-123',
+        favoriteId: 'fav_123',
+        alias: null,
+      });
+
+      const writePayload = mockUpdateDoc.mock.calls[0]?.[1] as
+        | { 'preferences.favoriteStations': FavoriteStation[] }
+        | undefined;
+      expect(writePayload?.['preferences.favoriteStations']?.[0]?.alias).toBeNull();
+    });
+
+    it('should omit notificationEnabled for a legacy favorite that lacks it', async () => {
+      const legacyFavorite: FavoriteStation = {
+        id: 'fav_123',
+        stationId: 'gangnam',
+        lineId: '2',
+        alias: null,
+        direction: 'both',
+        isCommuteStation: false,
+        addedAt: new Date('2024-01-01'),
+        // no notificationEnabled field (legacy record)
+      };
+      mockGetDoc.mockResolvedValue({
+        exists: () => true,
+        data: () => ({ preferences: { favoriteStations: [legacyFavorite] } }),
+      });
+      mockUpdateDoc.mockResolvedValue(undefined);
+
+      await favoritesService.updateFavorite({
+        userId: 'user-123',
+        favoriteId: 'fav_123',
+        alias: '집',
+      });
+
+      const writePayload = mockUpdateDoc.mock.calls[0]?.[1] as
+        | { 'preferences.favoriteStations': FavoriteStation[] }
+        | undefined;
+      const updated = writePayload?.['preferences.favoriteStations']?.[0];
+      // Firestore rejects an explicit `undefined` nested in an array element,
+      // so the key must be absent entirely (not present-with-undefined).
+      expect(updated ? 'notificationEnabled' in updated : true).toBe(false);
+      expect(updated?.alias).toBe('집');
+    });
+
+    it('should keep notificationEnabled when the favorite already has it', async () => {
+      const favWithFlag: FavoriteStation = { ...mockFavorite, notificationEnabled: true };
+      mockGetDoc.mockResolvedValue({
+        exists: () => true,
+        data: () => ({ preferences: { favoriteStations: [favWithFlag] } }),
+      });
+      mockUpdateDoc.mockResolvedValue(undefined);
+
+      await favoritesService.updateFavorite({
+        userId: 'user-123',
+        favoriteId: 'fav_123',
+        alias: '집',
+      });
+
+      const writePayload = mockUpdateDoc.mock.calls[0]?.[1] as
+        | { 'preferences.favoriteStations': FavoriteStation[] }
+        | undefined;
+      expect(writePayload?.['preferences.favoriteStations']?.[0]?.notificationEnabled).toBe(true);
+    });
   });
 
   describe('setNotificationEnabled', () => {
@@ -458,6 +538,190 @@ describe('FavoritesService', () => {
       const result = await favoritesService.isFavorite('user-123', 'gangnam');
 
       expect(result).toBe(false);
+    });
+  });
+
+  describe('removeFavorites', () => {
+    const fav = (id: string, stationId: string): FavoriteStation => ({
+      id,
+      stationId,
+      lineId: '2',
+      alias: null,
+      direction: 'both',
+      isCommuteStation: false,
+      addedAt: new Date('2024-01-01'),
+    });
+
+    // Drives the transaction read (transaction.get) — the write path now runs
+    // inside runTransaction, so mockGetDoc/mockUpdateDoc are dead here.
+    const seedFavorites = (favorites: FavoriteStation[]): void => {
+      mockTxGet.mockResolvedValue({
+        exists: () => true,
+        data: () => ({ preferences: { favoriteStations: favorites } }),
+      });
+    };
+
+    beforeEach(() => {
+      // Default: runTransaction invokes its callback with a live tx handle.
+      // Re-applied each test because the outer beforeEach clears call records.
+      mockRunTransaction.mockImplementation(async (_db, fn) =>
+        fn({ get: mockTxGet, update: mockTxUpdate }),
+      );
+    });
+
+    it('should remove targeted favorites in a single transaction update', async () => {
+      seedFavorites([fav('fav_1', 'gangnam'), fav('fav_2', 'seoul'), fav('fav_3', 'hongdae')]);
+
+      await favoritesService.removeFavorites('user-123', ['fav_1', 'fav_3']);
+
+      expect(mockTxUpdate).toHaveBeenCalledTimes(1);
+      const payload = mockTxUpdate.mock.calls[0]?.[1] as {
+        'preferences.favoriteStations': FavoriteStation[];
+      };
+      const remaining = payload['preferences.favoriteStations'];
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0]?.id).toBe('fav_2');
+    });
+
+    it('should ignore unknown ids and still remove known ones', async () => {
+      seedFavorites([fav('fav_1', 'gangnam'), fav('fav_2', 'seoul')]);
+
+      await favoritesService.removeFavorites('user-123', ['fav_2', 'fav_ghost']);
+
+      expect(mockTxUpdate).toHaveBeenCalledTimes(1);
+      const payload = mockTxUpdate.mock.calls[0]?.[1] as {
+        'preferences.favoriteStations': FavoriteStation[];
+      };
+      expect(payload['preferences.favoriteStations'].map((f) => f.id)).toEqual(['fav_1']);
+    });
+
+    it('should be a no-op (no transaction) for an empty id list', async () => {
+      await favoritesService.removeFavorites('user-123', []);
+
+      expect(mockRunTransaction).not.toHaveBeenCalled();
+    });
+
+    it('should skip the write when nothing matches', async () => {
+      seedFavorites([fav('fav_1', 'gangnam')]);
+
+      await favoritesService.removeFavorites('user-123', ['fav_ghost']);
+
+      expect(mockTxUpdate).not.toHaveBeenCalled();
+    });
+
+    it('should succeed without writing when the user document is missing', async () => {
+      mockTxGet.mockResolvedValue({ exists: () => false });
+
+      await expect(
+        favoritesService.removeFavorites('user-123', ['fav_1']),
+      ).resolves.toBeUndefined();
+
+      expect(mockTxUpdate).not.toHaveBeenCalled();
+    });
+
+    it('should throw (not silently succeed) when the transaction read fails', async () => {
+      mockTxGet.mockRejectedValue(new Error('Firestore read error'));
+
+      await expect(
+        favoritesService.removeFavorites('user-123', ['fav_1']),
+      ).rejects.toThrow('즐겨찾기 삭제에 실패했습니다.');
+
+      expect(mockTxUpdate).not.toHaveBeenCalled();
+    });
+
+    it('should throw a user-friendly error when the transaction commit fails', async () => {
+      seedFavorites([fav('fav_1', 'gangnam')]);
+      mockRunTransaction.mockRejectedValue(new Error('Firestore commit error'));
+
+      await expect(
+        favoritesService.removeFavorites('user-123', ['fav_1']),
+      ).rejects.toThrow('즐겨찾기 삭제에 실패했습니다.');
+    });
+  });
+
+  describe('reorderFavoritesByIds', () => {
+    const fav = (id: string, extra: Partial<FavoriteStation> = {}): FavoriteStation => ({
+      id,
+      stationId: `stn_${id}`,
+      lineId: '2',
+      alias: null,
+      direction: 'both',
+      isCommuteStation: false,
+      addedAt: new Date('2024-01-01'),
+      ...extra,
+    });
+
+    const seedFavorites = (favorites: FavoriteStation[]): void => {
+      mockTxGet.mockResolvedValue({
+        exists: () => true,
+        data: () => ({ preferences: { favoriteStations: favorites } }),
+      });
+    };
+
+    beforeEach(() => {
+      mockRunTransaction.mockImplementation(async (_db, fn) =>
+        fn({ get: mockTxGet, update: mockTxUpdate }),
+      );
+    });
+
+    it('reorders by id and preserves the latest stored field values', async () => {
+      // Stored 'a' already carries a freshly-saved alias — a stale drag
+      // payload must not revert it.
+      seedFavorites([fav('a', { alias: '회사' }), fav('b'), fav('c')]);
+
+      await favoritesService.reorderFavoritesByIds('user-123', ['c', 'a', 'b']);
+
+      expect(mockTxUpdate).toHaveBeenCalledTimes(1);
+      const payload = mockTxUpdate.mock.calls[0]?.[1] as {
+        'preferences.favoriteStations': FavoriteStation[];
+      };
+      const next = payload['preferences.favoriteStations'];
+      expect(next.map((f) => f.id)).toEqual(['c', 'a', 'b']);
+      expect(next.find((f) => f.id === 'a')?.alias).toBe('회사');
+    });
+
+    it('keeps favorites missing from orderedIds at the tail', async () => {
+      seedFavorites([fav('a'), fav('b'), fav('c')]);
+
+      await favoritesService.reorderFavoritesByIds('user-123', ['b', 'a']);
+
+      const payload = mockTxUpdate.mock.calls[0]?.[1] as {
+        'preferences.favoriteStations': FavoriteStation[];
+      };
+      expect(payload['preferences.favoriteStations'].map((f) => f.id)).toEqual(['b', 'a', 'c']);
+    });
+
+    it('ignores unknown ids', async () => {
+      seedFavorites([fav('a'), fav('b')]);
+
+      await favoritesService.reorderFavoritesByIds('user-123', ['b', 'ghost', 'a']);
+
+      const payload = mockTxUpdate.mock.calls[0]?.[1] as {
+        'preferences.favoriteStations': FavoriteStation[];
+      };
+      expect(payload['preferences.favoriteStations'].map((f) => f.id)).toEqual(['b', 'a']);
+    });
+
+    it('skips the write when the resulting order is unchanged', async () => {
+      seedFavorites([fav('a'), fav('b')]);
+
+      await favoritesService.reorderFavoritesByIds('user-123', ['a', 'b']);
+
+      expect(mockTxUpdate).not.toHaveBeenCalled();
+    });
+
+    it('is a no-op (no transaction) for an empty id list', async () => {
+      await favoritesService.reorderFavoritesByIds('user-123', []);
+
+      expect(mockRunTransaction).not.toHaveBeenCalled();
+    });
+
+    it('throws when the transaction read fails', async () => {
+      mockTxGet.mockRejectedValue(new Error('Firestore read error'));
+
+      await expect(
+        favoritesService.reorderFavoritesByIds('user-123', ['a']),
+      ).rejects.toThrow('즐겨찾기 순서 변경에 실패했습니다.');
     });
   });
 });

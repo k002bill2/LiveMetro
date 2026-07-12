@@ -44,10 +44,11 @@ export interface FavoritesContextValue {
     options?: { alias?: string; direction?: 'up' | 'down' | 'both'; isCommuteStation?: boolean }
   ) => Promise<void>;
   removeFavorite: (favoriteId: string) => Promise<void>;
+  removeFavorites: (favoriteIds: readonly string[]) => Promise<void>;
   removeFavoriteByStationId: (stationId: string) => Promise<void>;
   updateFavorite: (
     favoriteId: string,
-    updates: { alias?: string; direction?: 'up' | 'down' | 'both'; isCommuteStation?: boolean }
+    updates: { alias?: string | null; direction?: 'up' | 'down' | 'both'; isCommuteStation?: boolean }
   ) => Promise<void>;
   setNotificationEnabled: (favoriteId: string, enabled: boolean) => Promise<void>;
   isFavorite: (stationId: string) => boolean;
@@ -76,19 +77,46 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // so the second tap sees the first tap's lock without waiting for a render.
   const inFlightRef = useRef<Set<string>>(new Set());
 
+  // Auth generation: bumped on every account *transition* (login, logout,
+  // switch) — but NOT on same-account user-object churn from AuthContext's
+  // onSnapshot (each favorites write refreshes the user doc and mints a new
+  // object). Queue rotation and stale-job rejection both key off this.
+  const authGenerationRef = useRef(0);
+
+  // Client-side total order for favorites mutations. Every mutation chains
+  // onto the previous one, so an in-flight update/reorder can never commit
+  // its whole-array write after a later bulk delete and resurrect rows.
+  // (Codex R3: UI freezing alone cannot stop writes that already started.)
+  const mutationChainRef = useRef<Promise<void>>(Promise.resolve());
+
+  // Depend on the primitive id, not the user object: same-account churn must
+  // not bump the generation or rotate the chain (that would let a later bulk
+  // delete overtake an already-queued reorder/update).
+  const userId = user?.id ?? null;
+  useEffect(() => {
+    authGenerationRef.current += 1;
+    // Rotate the chain: jobs from the previous auth generation are orphaned
+    // and will be rejected by the generation check below.
+    mutationChainRef.current = Promise.resolve();
+  }, [userId]);
+
   const runExclusive = useCallback(
     async (key: string, task: () => Promise<void>): Promise<void> => {
-      if (inFlightRef.current.has(key)) {
+      // User-scoped key: user A's in-flight lock must not swallow user B's
+      // same-named mutation after an account switch, and A's finally-cleanup
+      // must not release a lock B has since taken.
+      const scopedKey = `${user?.id ?? 'anon'}:${key}`;
+      if (inFlightRef.current.has(scopedKey)) {
         return;
       }
-      inFlightRef.current.add(key);
+      inFlightRef.current.add(scopedKey);
       try {
         await task();
       } finally {
-        inFlightRef.current.delete(key);
+        inFlightRef.current.delete(scopedKey);
       }
     },
-    [],
+    [user],
   );
 
   /**
@@ -167,6 +195,10 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
    * reload favorites so every consumer sees the new state. Errors are
    * logged with the given label and rethrown for the caller's UI.
    * A task may return `false` to skip the reload (no-op mutation).
+   *
+   * Mutations are serialized through mutationChainRef so their Firestore
+   * writes commit in call order (prevents a slow update/reorder landing
+   * after a bulk delete).
    */
   const runMutation = useCallback(
     async (
@@ -176,11 +208,28 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (!user) {
         throw new Error('로그인이 필요합니다.');
       }
-      try {
-        const changed = await task(user.id);
-        if (changed !== false) {
+      const jobUserId = user.id;
+      const jobGeneration = authGenerationRef.current;
+      const run = mutationChainRef.current.then(async () => {
+        // Reject jobs from a superseded auth generation (logout / account
+        // switch / re-login cycle) before they touch Firestore.
+        if (authGenerationRef.current !== jobGeneration) {
+          throw new Error('로그인이 필요합니다.');
+        }
+        const changed = await task(jobUserId);
+        // Re-check again before reload: the account may have changed while the
+        // task was awaiting, and reloading would rehydrate a stale account.
+        if (changed !== false && authGenerationRef.current === jobGeneration) {
           await loadFavorites();
         }
+      });
+      // Keep the chain alive after a failure so the next mutation still runs.
+      mutationChainRef.current = run.then(
+        () => undefined,
+        () => undefined,
+      );
+      try {
+        await run;
       } catch (error) {
         console.error(`Error ${label}:`, error);
         throw error;
@@ -270,7 +319,7 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     async (
       favoriteId: string,
       updates: {
-        alias?: string;
+        alias?: string | null;
         direction?: 'up' | 'down' | 'both';
         isCommuteStation?: boolean;
       }
@@ -331,13 +380,37 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   );
 
   /**
-   * Reorder favorites
+   * Bulk-remove favorites in one write (edit-mode action bar). A single
+   * bulk lock key guards against action-bar double-taps; per-station keys
+   * are unnecessary because the whole batch lands in one Firestore write.
+   */
+  const removeFavorites = useCallback(
+    async (favoriteIds: readonly string[]): Promise<void> =>
+      runExclusive('bulk:remove', () =>
+        runMutation('removing favorites', async (userId) => {
+          if (favoriteIds.length === 0) {
+            return false; // nothing to do — skip the reload
+          }
+          await favoritesService.removeFavorites(userId, favoriteIds);
+          return true; // reload so consumers see the removal
+        }),
+      ),
+    [runExclusive, runMutation],
+  );
+
+  /**
+   * Reorder favorites. Captures only the intended id order at drag time and
+   * rebases it onto the latest stored array when the queued job runs — so a
+   * drag that lands behind an in-flight alias/notification save can no longer
+   * write a stale whole-array payload and revert that save (Codex R9).
    */
   const reorderFavorites = useCallback(
-    async (reorderedFavorites: FavoriteStation[]): Promise<void> =>
-      runMutation('reordering favorites', async (userId) => {
-        await favoritesService.reorderFavorites(userId, reorderedFavorites);
-      }),
+    async (reorderedFavorites: FavoriteStation[]): Promise<void> => {
+      const orderedIds = reorderedFavorites.map(fav => fav.id);
+      return runMutation('reordering favorites', async (userId) => {
+        await favoritesService.reorderFavoritesByIds(userId, orderedIds);
+      });
+    },
     [runMutation]
   );
 
@@ -364,6 +437,7 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       error: state.error,
       addFavorite,
       removeFavorite,
+      removeFavorites,
       removeFavoriteByStationId,
       updateFavorite,
       setNotificationEnabled,
@@ -377,6 +451,7 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       state,
       addFavorite,
       removeFavorite,
+      removeFavorites,
       removeFavoriteByStationId,
       updateFavorite,
       setNotificationEnabled,

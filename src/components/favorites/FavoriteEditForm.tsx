@@ -44,27 +44,22 @@ export const FavoriteEditForm: React.FC<FavoriteEditFormProps> = ({
   const [isCommute, setIsCommute] = useState(favorite.isCommuteStation);
   const [saving, setSaving] = useState(false);
 
-  // Animation
-  const heightAnim = useRef(new Animated.Value(0)).current;
+  // Animation — fade only. The form is conditionally mounted, so no
+  // height/maxHeight animation is needed; the old fixed 350pt maxHeight cap
+  // (with overflow:hidden) clipped the lower controls / save button under
+  // large font scaling or narrow screens (Codex review).
   const opacityAnim = useRef(new Animated.Value(0)).current;
 
   /**
-   * Animate expand/collapse
+   * Fade in/out on expand toggle.
    */
   useEffect(() => {
-    Animated.parallel([
-      Animated.timing(heightAnim, {
-        toValue: isExpanded ? 1 : 0,
-        duration: 300,
-        useNativeDriver: false, // height/maxHeight requires non-native driver
-      }),
-      Animated.timing(opacityAnim, {
-        toValue: isExpanded ? 1 : 0,
-        duration: 300,
-        useNativeDriver: false, // Must match heightAnim to avoid parentNode error
-      }),
-    ]).start();
-  }, [isExpanded, heightAnim, opacityAnim]);
+    Animated.timing(opacityAnim, {
+      toValue: isExpanded ? 1 : 0,
+      duration: 300,
+      useNativeDriver: false,
+    }).start();
+  }, [isExpanded, opacityAnim]);
 
   /**
    * Reset form when favorite changes
@@ -107,20 +102,10 @@ export const FavoriteEditForm: React.FC<FavoriteEditFormProps> = ({
     onCancel();
   };
 
-  const maxHeight = heightAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0, 350], // Approximate max height
-  });
-
   return (
     <Animated.View
-      style={[
-        styles.container,
-        {
-          maxHeight,
-          opacity: opacityAnim,
-        },
-      ]}
+      testID="favorite-edit-form"
+      style={[styles.container, { opacity: opacityAnim }]}
       pointerEvents={isExpanded ? 'auto' : 'none'}
     >
       <View style={styles.content}>
@@ -263,7 +248,6 @@ export const FavoriteEditForm: React.FC<FavoriteEditFormProps> = ({
 
 const createStyles = (colors: ThemeColors) => StyleSheet.create({
   container: {
-    overflow: 'hidden',
     marginTop: SPACING.sm,
   },
   content: {

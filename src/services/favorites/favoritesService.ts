@@ -3,7 +3,7 @@
  * Manages user's favorite stations with Firebase Firestore integration
  */
 
-import { doc, getDoc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { doc, getDoc, updateDoc, arrayUnion, arrayRemove, runTransaction } from 'firebase/firestore';
 import { firestore } from '../firebase/config';
 import { FavoriteStation } from '../../models/user';
 import { Station } from '../../models/train';
@@ -24,7 +24,7 @@ export interface AddFavoriteParams {
 export interface UpdateFavoriteParams {
   userId: string;
   favoriteId: string;
-  alias?: string;
+  alias?: string | null;
   direction?: 'up' | 'down' | 'both';
   isCommuteStation?: boolean;
   notificationEnabled?: boolean;
@@ -138,18 +138,25 @@ class FavoritesService {
 
       // Update fields explicitly
       const currentFavorite = favorites[favoriteIndex]!; // Safe because we checked above
+      const resolvedNotification =
+        notificationEnabled !== undefined
+          ? notificationEnabled
+          : currentFavorite.notificationEnabled;
       const updatedFavorite: FavoriteStation = {
         id: currentFavorite.id,
         stationId: currentFavorite.stationId,
         lineId: currentFavorite.lineId,
         alias: alias !== undefined ? alias : currentFavorite.alias,
         direction: direction !== undefined ? direction : currentFavorite.direction,
-        isCommuteStation: isCommuteStation !== undefined ? isCommuteStation : currentFavorite.isCommuteStation,
+        isCommuteStation:
+          isCommuteStation !== undefined ? isCommuteStation : currentFavorite.isCommuteStation,
         addedAt: currentFavorite.addedAt,
-        notificationEnabled:
-          notificationEnabled !== undefined
-            ? notificationEnabled
-            : currentFavorite.notificationEnabled,
+        // Omit when absent: Firestore rejects an explicit `undefined` nested in
+        // an array element (plain getFirestore, no ignoreUndefinedProperties),
+        // which previously blocked editing legacy favorites without this flag.
+        ...(resolvedNotification !== undefined
+          ? { notificationEnabled: resolvedNotification }
+          : {}),
       };
 
       // Replace entire array with updated version
@@ -225,6 +232,91 @@ class FavoritesService {
     } catch (error) {
       console.error('Error reordering favorites:', error);
       throw new Error('즐겨찾기 순서 변경에 실패했습니다.');
+    }
+  }
+
+  /**
+   * Reorder by intent (ordered ids), rebased onto the latest stored array
+   * inside a transaction. A queued drag can never resurrect stale field
+   * values because only the *order* is captured at drag time — the data is
+   * whatever is current when the write executes. Ids missing from the
+   * stored array are ignored; stored favorites missing from `orderedIds`
+   * (e.g. added concurrently) keep their relative order at the tail.
+   */
+  async reorderFavoritesByIds(userId: string, orderedIds: readonly string[]): Promise<void> {
+    if (orderedIds.length === 0) {
+      return;
+    }
+
+    try {
+      const userRef = doc(firestore, 'users', userId);
+      await runTransaction(firestore, async (transaction) => {
+        const snapshot = await transaction.get(userRef);
+        if (!snapshot.exists()) {
+          return;
+        }
+        const favorites: FavoriteStation[] =
+          snapshot.data()?.preferences?.favoriteStations ?? [];
+        const byId = new Map(favorites.map(fav => [fav.id, fav]));
+        const ordered = orderedIds
+          .map(id => byId.get(id))
+          .filter((fav): fav is FavoriteStation => fav !== undefined);
+        const orderedIdSet = new Set(orderedIds);
+        const tail = favorites.filter(fav => !orderedIdSet.has(fav.id));
+        const next = [...ordered, ...tail];
+        const unchanged =
+          next.length === favorites.length &&
+          next.every((fav, i) => fav.id === favorites[i]?.id);
+        if (unchanged) {
+          return;
+        }
+        transaction.update(userRef, {
+          'preferences.favoriteStations': next,
+          lastActiveAt: new Date(),
+        });
+      });
+    } catch (error) {
+      console.error('Error reordering favorites:', error);
+      throw new Error('즐겨찾기 순서 변경에 실패했습니다.');
+    }
+  }
+
+  /**
+   * Remove multiple favorites in one Firestore write (edit-mode bulk
+   * delete). Unknown ids are ignored; an empty input or zero matches
+   * skips the write entirely so no-op taps cost nothing.
+   */
+  async removeFavorites(userId: string, favoriteIds: readonly string[]): Promise<void> {
+    if (favoriteIds.length === 0) {
+      return;
+    }
+
+    try {
+      const userRef = doc(firestore, 'users', userId);
+      // Transaction (not read-then-updateDoc): a concurrent add/edit/reorder
+      // rewriting the favorites array retriggers the transaction with fresh
+      // data instead of being clobbered by last-write-wins. A failed read
+      // now throws instead of dissolving into a silent no-match success.
+      await runTransaction(firestore, async (transaction) => {
+        const snapshot = await transaction.get(userRef);
+        if (!snapshot.exists()) {
+          return;
+        }
+        const favorites: FavoriteStation[] =
+          snapshot.data()?.preferences?.favoriteStations ?? [];
+        const idsToRemove = new Set(favoriteIds);
+        const remaining = favorites.filter(fav => !idsToRemove.has(fav.id));
+        if (remaining.length === favorites.length) {
+          return;
+        }
+        transaction.update(userRef, {
+          'preferences.favoriteStations': remaining,
+          lastActiveAt: new Date(),
+        });
+      });
+    } catch (error) {
+      console.error('Error removing favorites:', error);
+      throw new Error('즐겨찾기 삭제에 실패했습니다.');
     }
   }
 }

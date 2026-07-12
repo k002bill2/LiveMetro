@@ -3,10 +3,10 @@
  * Wraps StationCard with edit and drag functionality
  */
 
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useSemanticTokens } from '@/services/theme';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { AlertCircle, Trash2, Bell, BellOff } from 'lucide-react-native';
+import { AlertCircle, Trash2, Bell, BellOff, CheckCircle2, Circle, Pencil } from 'lucide-react-native';
 import { Swipeable } from 'react-native-gesture-handler';
 import { SPACING, RADIUS, TYPOGRAPHY, WantedSemanticTheme, weightToFontFamily } from '../../styles/modernTheme';
 import { useTheme, ThemeColors } from '../../services/theme';
@@ -52,6 +52,14 @@ interface DraggableFavoriteItemProps {
    * Pass `useIsFocused()` from the parent screen.
    */
   arrivalsEnabled?: boolean;
+  /** Global edit mode active — shows the select checkbox + ✎ button. */
+  isSelectMode?: boolean;
+  /** Whether this row is currently selected (drives the checkbox state). */
+  isSelected?: boolean;
+  /** Checkbox / row tap in select mode → toggle this row's selection. */
+  onSelectToggle?: () => void;
+  /** ✎ button → open this favorite's edit form. */
+  onEditPress?: () => void;
 }
 
 /**
@@ -83,6 +91,10 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
   isActive = false,
   isDragEnabled: _isDragEnabled = false,
   arrivalsEnabled = true,
+  isSelectMode = false,
+  isSelected = false,
+  onSelectToggle,
+  onEditPress,
 }) => {
   // Imperatively close the swipe drawer after an action so the row snaps
   // back to its resting position once the user has decided.
@@ -97,6 +109,16 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
     swipeableRef.current?.close();
     onRemove();
   }, [onRemove]);
+
+  // Entering selection mode must also retract an already-open swipe drawer:
+  // `enabled={false}` only blocks future pan gestures, it does not reset the
+  // current translation, so mute/delete would stay exposed and tappable.
+  useEffect(() => {
+    if (isSelectMode) {
+      swipeableRef.current?.close();
+    }
+  }, [isSelectMode]);
+
   const { colors } = useTheme();
   const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(colors, semantic), [colors, semantic]);
@@ -184,22 +206,62 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
    */
   if (!station) {
     return (
-      <View style={styles.errorCard}>
-        <View style={styles.errorContent}>
-          <AlertCircle size={24} color={colors.textSecondary} />
-          <View style={styles.errorTextContainer}>
-            <Text style={styles.errorText}>역 정보를 불러올 수 없습니다</Text>
-            <Text style={styles.errorSubtext}>
-              역 ID: {favorite.stationId}
-            </Text>
+      <View style={styles.container}>
+        <View style={styles.errorCard}>
+          {isSelectMode && (
+            <TouchableOpacity
+              style={styles.selectCheckbox}
+              onPress={onSelectToggle}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: isSelected }}
+              accessibilityLabel="역 정보를 불러올 수 없는 즐겨찾기 선택"
+              testID="favorite-select-checkbox"
+            >
+              {isSelected ? (
+                <CheckCircle2 size={24} color={semantic.primaryNormal} />
+              ) : (
+                <Circle size={24} color={semantic.labelAlt} />
+              )}
+            </TouchableOpacity>
+          )}
+          <View style={styles.errorContent}>
+            <AlertCircle size={24} color={colors.textSecondary} />
+            <View style={styles.errorTextContainer}>
+              <Text style={styles.errorText}>역 정보를 불러올 수 없습니다</Text>
+              <Text style={styles.errorSubtext}>
+                역 ID: {favorite.stationId}
+              </Text>
+            </View>
           </View>
+          {isSelectMode && (
+            <TouchableOpacity
+              style={styles.editPencil}
+              onPress={onEditPress}
+              accessibilityRole="button"
+              accessibilityLabel="역 정보를 불러올 수 없는 즐겨찾기 편집"
+              testID="favorite-edit-pencil"
+            >
+              <Pencil size={20} color={semantic.labelNeutral} />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={styles.deleteIconButton}
+            onPress={onRemove}
+          >
+            <Trash2 size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          style={styles.deleteIconButton}
-          onPress={onRemove}
-        >
-          <Trash2 size={20} color={colors.textSecondary} />
-        </TouchableOpacity>
+
+        {/* Edit form is reachable even for a broken row: alias/direction/
+            isCommuteStation are independent of the (missing) station data. */}
+        {isEditing && (
+          <FavoriteEditForm
+            favorite={favorite}
+            isExpanded={isEditing}
+            onSave={onSaveEdit}
+            onCancel={onEditToggle}
+          />
+        )}
       </View>
     );
   }
@@ -215,44 +277,73 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
         containerStyle={styles.swipeableContainer}
         // Disable swipe while a drag is in flight so the two gestures don't
         // fight over the same touch — users almost never want to mute and
-        // reorder simultaneously.
-        enabled={!isActive}
+        // reorder simultaneously. Also disabled in select mode so the swipe
+        // drawer doesn't fight the checkbox tap.
+        enabled={!isActive && !isSelectMode}
       >
         <View style={styles.cardInner}>
-          <FavoriteRow
-            lines={linesForRow}
-            stationName={station.name}
-            nickname={favorite.alias ?? undefined}
-            isCommute={favorite.isCommuteStation}
-            destinationLabel={directionToLabel(favorite.direction)}
-            nextMinutes={nextMinutes}
-            showDragHandle
-            onPress={onPress}
-          />
-          {drag && (
+          {isSelectMode && (
             <TouchableOpacity
-              style={styles.dragHandleArea}
-              onLongPress={drag}
-              // Short tap on the handle area should still navigate the
-              // user to StationDetail — without forwarding onPress here
-              // the overlay would silently swallow taps on the card's
-              // left edge (Gemini cross-review catch).
-              onPress={onPress}
-              delayLongPress={150}
-              accessibilityRole="button"
-              accessibilityLabel={`${station.name}역 순서 이동 (꾹 누르고 드래그)`}
-              testID="favorite-drag-handle"
+              style={styles.selectCheckbox}
+              onPress={onSelectToggle}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: isSelected }}
+              accessibilityLabel={`${station.name}역 선택`}
+              testID="favorite-select-checkbox"
+            >
+              {isSelected ? (
+                <CheckCircle2 size={24} color={semantic.primaryNormal} />
+              ) : (
+                <Circle size={24} color={semantic.labelAlt} />
+              )}
+            </TouchableOpacity>
+          )}
+          <View style={styles.rowWrapper}>
+            <FavoriteRow
+              lines={linesForRow}
+              stationName={station.name}
+              nickname={favorite.alias ?? undefined}
+              isCommute={favorite.isCommuteStation}
+              destinationLabel={directionToLabel(favorite.direction)}
+              nextMinutes={nextMinutes}
+              showDragHandle
+              onPress={isSelectMode ? onSelectToggle ?? onPress : onPress}
             />
+            {drag && (
+              <TouchableOpacity
+                style={styles.dragHandleArea}
+                onLongPress={drag}
+                // Short tap on the handle area should still navigate the
+                // user to StationDetail — without forwarding onPress here
+                // the overlay would silently swallow taps on the card's
+                // left edge (Gemini cross-review catch). In select mode the
+                // short tap toggles selection instead of navigating.
+                onPress={isSelectMode ? onSelectToggle ?? onPress : onPress}
+                delayLongPress={150}
+                accessibilityRole="button"
+                accessibilityLabel={`${station.name}역 순서 이동 (꾹 누르고 드래그)`}
+                testID="favorite-drag-handle"
+              />
+            )}
+          </View>
+          {isSelectMode && (
+            <TouchableOpacity
+              style={styles.editPencil}
+              onPress={onEditPress}
+              accessibilityRole="button"
+              accessibilityLabel={`${station.name}역 편집`}
+              testID="favorite-edit-pencil"
+            >
+              <Pencil size={20} color={semantic.labelNeutral} />
+            </TouchableOpacity>
           )}
         </View>
       </Swipeable>
 
-      {/* Edit Form — entered via the upcoming global "편집" mode (Phase B+).
-          Mounted only while editing so a collapsed (maxHeight:0) form does not
-          leave an invisible 8px-margin spacer between every card. isEditing is
-          currently never true post-overlay removal, but the integration point
-          stays so the per-favorite edit UI re-plumbs cleanly when the global
-          mode lands. */}
+      {/* Edit Form — entered via the global "편집" mode's per-row ✎ button
+          (onEditPress → parent sets editingFavoriteId → isEditing). Mounted
+          only while editing so a collapsed (maxHeight:0) form does not leave
+          an invisible 8px-margin spacer between every card. */}
       {isEditing && (
         <FavoriteEditForm
           favorite={favorite}
@@ -282,6 +373,24 @@ const createStyles = (colors: ThemeColors, semantic: WantedSemanticTheme) => {
   },
   cardInner: {
     position: 'relative',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  rowWrapper: {
+    flex: 1,
+    position: 'relative',
+  },
+  selectCheckbox: {
+    width: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editPencil: {
+    width: 44,
+    minHeight: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   dragHandleArea: {
     // Invisible touch overlay sized to FavoriteRow's left padding (16) +
@@ -393,7 +502,6 @@ const createStyles = (colors: ThemeColors, semantic: WantedSemanticTheme) => {
     backgroundColor: colors.surface,
     padding: SPACING.lg,
     borderRadius: RADIUS.lg,
-    marginBottom: SPACING.md,
     borderWidth: 1,
     borderColor: colors.borderMedium,
   },

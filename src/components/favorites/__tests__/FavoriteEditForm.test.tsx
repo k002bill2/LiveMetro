@@ -1,4 +1,5 @@
 import React from 'react';
+import { StyleSheet } from 'react-native';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { FavoriteEditForm } from '../FavoriteEditForm';
 import { FavoriteWithDetails } from '@/hooks/useFavorites';
@@ -131,5 +132,24 @@ describe('FavoriteEditForm', () => {
       <FavoriteEditForm {...defaultProps} />,
     );
     expect(getByText('1/20')).toBeTruthy();
+  });
+
+  it('does not clip the form with a fixed maxHeight cap', () => {
+    const { getByTestId } = render(<FavoriteEditForm {...defaultProps} />);
+    const flattened = StyleSheet.flatten(getByTestId('favorite-edit-form').props.style);
+    // The hardcoded 350pt cap clipped controls under large font scaling.
+    expect(flattened.maxHeight).toBeUndefined();
+  });
+
+  it('renders every control including the save button (no clipping)', () => {
+    const { getByText, getByDisplayValue } = render(
+      <FavoriteEditForm {...defaultProps} />,
+    );
+    expect(getByDisplayValue('집')).toBeTruthy();
+    expect(getByText('상행')).toBeTruthy();
+    expect(getByText('하행')).toBeTruthy();
+    expect(getByText('출퇴근 역으로 설정')).toBeTruthy();
+    expect(getByText('취소')).toBeTruthy();
+    expect(getByText('저장')).toBeTruthy();
   });
 });
