@@ -138,18 +138,25 @@ class FavoritesService {
 
       // Update fields explicitly
       const currentFavorite = favorites[favoriteIndex]!; // Safe because we checked above
+      const resolvedNotification =
+        notificationEnabled !== undefined
+          ? notificationEnabled
+          : currentFavorite.notificationEnabled;
       const updatedFavorite: FavoriteStation = {
         id: currentFavorite.id,
         stationId: currentFavorite.stationId,
         lineId: currentFavorite.lineId,
         alias: alias !== undefined ? alias : currentFavorite.alias,
         direction: direction !== undefined ? direction : currentFavorite.direction,
-        isCommuteStation: isCommuteStation !== undefined ? isCommuteStation : currentFavorite.isCommuteStation,
+        isCommuteStation:
+          isCommuteStation !== undefined ? isCommuteStation : currentFavorite.isCommuteStation,
         addedAt: currentFavorite.addedAt,
-        notificationEnabled:
-          notificationEnabled !== undefined
-            ? notificationEnabled
-            : currentFavorite.notificationEnabled,
+        // Omit when absent: Firestore rejects an explicit `undefined` nested in
+        // an array element (plain getFirestore, no ignoreUndefinedProperties),
+        // which previously blocked editing legacy favorites without this flag.
+        ...(resolvedNotification !== undefined
+          ? { notificationEnabled: resolvedNotification }
+          : {}),
       };
 
       // Replace entire array with updated version

@@ -48,9 +48,13 @@ jest.mock('@/hooks/useRealtimeTrains', () => ({
   useRealtimeTrains: jest.fn(() => ({ trains: [] })),
 }));
 
-jest.mock('../FavoriteEditForm', () => ({
-  FavoriteEditForm: () => null,
-}));
+jest.mock('../FavoriteEditForm', () => {
+  const ReactModule = require('react');
+  const { View } = require('react-native');
+  return {
+    FavoriteEditForm: () => ReactModule.createElement(View, { testID: 'favorite-edit-form' }),
+  };
+});
 
 jest.mock('@/services/theme', () => ({
   useSemanticTokens: jest.fn(
@@ -192,6 +196,28 @@ describe('DraggableFavoriteItem', () => {
     it('일반 모드에서는 에러 카드에 체크박스가 없다', () => {
       const { queryByTestId } = renderItem({ favorite: brokenFavorite });
       expect(queryByTestId('favorite-select-checkbox')).toBeNull();
+    });
+
+    it('선택 모드에서 에러 카드에도 ✎ 버튼을 렌더하고 onEditPress를 호출한다', () => {
+      const onEditPress = jest.fn();
+      const { getByTestId } = renderItem({
+        favorite: brokenFavorite,
+        isSelectMode: true,
+        onEditPress,
+      });
+
+      fireEvent.press(getByTestId('favorite-edit-pencil'));
+      expect(onEditPress).toHaveBeenCalledTimes(1);
+    });
+
+    it('에러 카드도 isEditing이면 편집 폼을 렌더한다 (alias/방향/출퇴근은 station 무관)', () => {
+      const { getByTestId } = renderItem({ favorite: brokenFavorite, isEditing: true });
+      expect(getByTestId('favorite-edit-form')).toBeTruthy();
+    });
+
+    it('일반 모드에서는 에러 카드에 ✎ 버튼이 없다', () => {
+      const { queryByTestId } = renderItem({ favorite: brokenFavorite });
+      expect(queryByTestId('favorite-edit-pencil')).toBeNull();
     });
   });
 });

@@ -324,6 +324,59 @@ describe('FavoritesService', () => {
         | undefined;
       expect(writePayload?.['preferences.favoriteStations']?.[0]?.alias).toBeNull();
     });
+
+    it('should omit notificationEnabled for a legacy favorite that lacks it', async () => {
+      const legacyFavorite: FavoriteStation = {
+        id: 'fav_123',
+        stationId: 'gangnam',
+        lineId: '2',
+        alias: null,
+        direction: 'both',
+        isCommuteStation: false,
+        addedAt: new Date('2024-01-01'),
+        // no notificationEnabled field (legacy record)
+      };
+      mockGetDoc.mockResolvedValue({
+        exists: () => true,
+        data: () => ({ preferences: { favoriteStations: [legacyFavorite] } }),
+      });
+      mockUpdateDoc.mockResolvedValue(undefined);
+
+      await favoritesService.updateFavorite({
+        userId: 'user-123',
+        favoriteId: 'fav_123',
+        alias: '집',
+      });
+
+      const writePayload = mockUpdateDoc.mock.calls[0]?.[1] as
+        | { 'preferences.favoriteStations': FavoriteStation[] }
+        | undefined;
+      const updated = writePayload?.['preferences.favoriteStations']?.[0];
+      // Firestore rejects an explicit `undefined` nested in an array element,
+      // so the key must be absent entirely (not present-with-undefined).
+      expect(updated ? 'notificationEnabled' in updated : true).toBe(false);
+      expect(updated?.alias).toBe('집');
+    });
+
+    it('should keep notificationEnabled when the favorite already has it', async () => {
+      const favWithFlag: FavoriteStation = { ...mockFavorite, notificationEnabled: true };
+      mockGetDoc.mockResolvedValue({
+        exists: () => true,
+        data: () => ({ preferences: { favoriteStations: [favWithFlag] } }),
+      });
+      mockUpdateDoc.mockResolvedValue(undefined);
+
+      await favoritesService.updateFavorite({
+        userId: 'user-123',
+        favoriteId: 'fav_123',
+        alias: '집',
+      });
+
+      const writePayload = mockUpdateDoc.mock.calls[0]?.[1] as
+        | { 'preferences.favoriteStations': FavoriteStation[] }
+        | undefined;
+      expect(writePayload?.['preferences.favoriteStations']?.[0]?.notificationEnabled).toBe(true);
+    });
   });
 
   describe('setNotificationEnabled', () => {

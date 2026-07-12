@@ -206,38 +206,62 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
    */
   if (!station) {
     return (
-      <View style={styles.errorCard}>
-        {isSelectMode && (
-          <TouchableOpacity
-            style={styles.selectCheckbox}
-            onPress={onSelectToggle}
-            accessibilityRole="checkbox"
-            accessibilityState={{ checked: isSelected }}
-            accessibilityLabel="역 정보를 불러올 수 없는 즐겨찾기 선택"
-            testID="favorite-select-checkbox"
-          >
-            {isSelected ? (
-              <CheckCircle2 size={24} color={semantic.primaryNormal} />
-            ) : (
-              <Circle size={24} color={semantic.labelAlt} />
-            )}
-          </TouchableOpacity>
-        )}
-        <View style={styles.errorContent}>
-          <AlertCircle size={24} color={colors.textSecondary} />
-          <View style={styles.errorTextContainer}>
-            <Text style={styles.errorText}>역 정보를 불러올 수 없습니다</Text>
-            <Text style={styles.errorSubtext}>
-              역 ID: {favorite.stationId}
-            </Text>
+      <View style={styles.container}>
+        <View style={styles.errorCard}>
+          {isSelectMode && (
+            <TouchableOpacity
+              style={styles.selectCheckbox}
+              onPress={onSelectToggle}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: isSelected }}
+              accessibilityLabel="역 정보를 불러올 수 없는 즐겨찾기 선택"
+              testID="favorite-select-checkbox"
+            >
+              {isSelected ? (
+                <CheckCircle2 size={24} color={semantic.primaryNormal} />
+              ) : (
+                <Circle size={24} color={semantic.labelAlt} />
+              )}
+            </TouchableOpacity>
+          )}
+          <View style={styles.errorContent}>
+            <AlertCircle size={24} color={colors.textSecondary} />
+            <View style={styles.errorTextContainer}>
+              <Text style={styles.errorText}>역 정보를 불러올 수 없습니다</Text>
+              <Text style={styles.errorSubtext}>
+                역 ID: {favorite.stationId}
+              </Text>
+            </View>
           </View>
+          {isSelectMode && (
+            <TouchableOpacity
+              style={styles.editPencil}
+              onPress={onEditPress}
+              accessibilityRole="button"
+              accessibilityLabel="역 정보를 불러올 수 없는 즐겨찾기 편집"
+              testID="favorite-edit-pencil"
+            >
+              <Pencil size={20} color={semantic.labelNeutral} />
+            </TouchableOpacity>
+          )}
+          <TouchableOpacity
+            style={styles.deleteIconButton}
+            onPress={onRemove}
+          >
+            <Trash2 size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          style={styles.deleteIconButton}
-          onPress={onRemove}
-        >
-          <Trash2 size={20} color={colors.textSecondary} />
-        </TouchableOpacity>
+
+        {/* Edit form is reachable even for a broken row: alias/direction/
+            isCommuteStation are independent of the (missing) station data. */}
+        {isEditing && (
+          <FavoriteEditForm
+            favorite={favorite}
+            isExpanded={isEditing}
+            onSave={onSaveEdit}
+            onCancel={onEditToggle}
+          />
+        )}
       </View>
     );
   }
@@ -478,7 +502,6 @@ const createStyles = (colors: ThemeColors, semantic: WantedSemanticTheme) => {
     backgroundColor: colors.surface,
     padding: SPACING.lg,
     borderRadius: RADIUS.lg,
-    marginBottom: SPACING.md,
     borderWidth: 1,
     borderColor: colors.borderMedium,
   },

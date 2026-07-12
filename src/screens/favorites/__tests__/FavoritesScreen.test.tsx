@@ -937,6 +937,37 @@ describe('FavoritesScreen', () => {
       });
     });
 
+    it('bulk 삭제 진행 중에는 편집 버튼이 disabled되고 모드 전환이 차단된다', async () => {
+      let resolveRemove!: () => void;
+      mockRemoveFavorites.mockImplementation(
+        () => new Promise<void>((resolve) => { resolveRemove = resolve; }),
+      );
+      const { getByTestId, getAllByTestId } = renderEditMode();
+
+      fireEvent.press(getByTestId('favorites-edit-button'));
+      fireEvent.press(getAllByTestId('favorite-select-checkbox')[0]);
+      fireEvent.press(getByTestId('favorites-bulk-delete-button'));
+
+      const buttons = (Alert.alert as jest.Mock).mock.calls.at(-1)?.[2];
+      await act(async () => {
+        buttons?.[1]?.onPress?.();
+      });
+
+      // Disabled while the delete is in flight.
+      expect(getByTestId('favorites-edit-button').props.accessibilityState).toEqual(
+        expect.objectContaining({ disabled: true }),
+      );
+
+      // Tapping must not exit edit mode (a new session could clear the
+      // in-flight delete's selection out from under it).
+      fireEvent.press(getByTestId('favorites-edit-button'));
+      expect(getByTestId('favorites-edit-button')).toHaveTextContent('완료');
+
+      await act(async () => {
+        resolveRemove();
+      });
+    });
+
     it('완료 탭 → 편집 모드 종료, 선택 상태 초기화', () => {
       const { getByTestId, getAllByTestId } = renderEditMode();
 

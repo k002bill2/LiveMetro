@@ -80,6 +80,9 @@ export const FavoritesScreen: React.FC = () => {
   const [isBulkDeleting, setIsBulkDeleting] = useState(false);
 
   const handleEditModeToggle = useCallback(() => {
+    // Block leaving/re-entering edit mode mid-delete: a new session's
+    // selection could be cleared by the still-running delete's callback.
+    if (isBulkDeleting) return;
     if (!isEditMode) {
       // Entering: clear search/filters so the full list is visible and
       // isReorderable stays true for the whole edit session.
@@ -89,7 +92,7 @@ export const FavoritesScreen: React.FC = () => {
     setSelectedIds(new Set());
     setEditingFavoriteId(null);
     setIsEditMode(!isEditMode);
-  }, [isEditMode]);
+  }, [isEditMode, isBulkDeleting]);
 
   const handleSelectToggle = useCallback((favoriteId: string) => {
     setSelectedIds(prev => {
@@ -534,9 +537,11 @@ export const FavoritesScreen: React.FC = () => {
         <View style={styles.headerActions}>
           {!hasNoFavorites && (
             <TouchableOpacity
-              style={styles.editButton}
+              style={[styles.editButton, isBulkDeleting && styles.editButtonDisabled]}
               accessibilityLabel={isEditMode ? '편집 완료' : '편집'}
               accessibilityRole="button"
+              accessibilityState={{ disabled: isBulkDeleting }}
+              disabled={isBulkDeleting}
               testID="favorites-edit-button"
               onPress={handleEditModeToggle}
             >
@@ -691,6 +696,9 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       borderColor: semantic.lineSubtle,
       justifyContent: 'center',
       alignItems: 'center',
+    },
+    editButtonDisabled: {
+      opacity: 0.4,
     },
     editButtonText: {
       fontSize: 14,
