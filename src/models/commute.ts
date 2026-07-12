@@ -133,6 +133,16 @@ export const DEFAULT_COMMUTE_NOTIFICATIONS: CommuteNotifications = {
 export const DEFAULT_BUFFER_MINUTES = 10;
 
 /**
+ * Default departure time for the morning (출근) leg, HH:mm.
+ */
+export const DEFAULT_MORNING_DEPARTURE_TIME = '08:00';
+
+/**
+ * Default departure time for the evening (퇴근) leg, HH:mm.
+ */
+export const DEFAULT_EVENING_DEPARTURE_TIME = '18:30';
+
+/**
  * Maximum number of transfer stations allowed
  */
 export const MAX_TRANSFER_STATIONS = 3;
@@ -184,6 +194,58 @@ export const createCommuteRoute = (data: {
   notifications: data.notifications,
   bufferMinutes: data.bufferMinutes,
 });
+
+/**
+ * Build the reverse (return) leg of a commute route.
+ *
+ * The evening (퇴근) leg is the morning (출근) leg travelled backwards, so we
+ * swap the departure/arrival endpoints and walk the transfer chain in reverse.
+ *
+ * `TransferStation.lineId` means "the line ridden INTO that transfer station"
+ * (a transfer's lineId is the `fromLineId` of the leg that reaches it — see
+ * CommuteRouteScreen). Reversing direction therefore shifts each transfer's
+ * incoming line by one hop:
+ *  - The first reversed transfer (the original LAST transfer) is now entered
+ *    from the original arrival, so its incoming line is `route.arrivalLineId`.
+ *    `lineName` becomes '' because the model carries no `arrivalLineName`.
+ *  - Every later reversed transfer inherits the incoming line of the transfer
+ *    that PRECEDES it in the reversed order (= its original "next" transfer),
+ *    which is the line physically ridden between the two when travelling back.
+ * `order` is re-assigned 1-based to match the CommuteRoute convention.
+ *
+ * Pure: the input `route` is never mutated; a new route/array is returned.
+ */
+export const reverseCommuteRoute = (
+  route: CommuteRoute,
+  departureTime: string,
+): CommuteRoute => {
+  const reversed = [...route.transferStations].reverse();
+  const transferStations: TransferStation[] = reversed.map((station, index) => {
+    // `prev` is undefined only when index === 0 (no earlier reversed
+    // transfer); the truthy guard narrows it for the later positions.
+    const prev = reversed[index - 1];
+    return {
+      stationId: station.stationId,
+      stationName: station.stationName,
+      lineId: prev ? prev.lineId : route.arrivalLineId,
+      lineName: prev ? prev.lineName : '',
+      order: index + 1,
+    };
+  });
+
+  return {
+    departureTime,
+    departureStationId: route.arrivalStationId,
+    departureStationName: route.arrivalStationName,
+    departureLineId: route.arrivalLineId,
+    transferStations,
+    arrivalStationId: route.departureStationId,
+    arrivalStationName: route.departureStationName,
+    arrivalLineId: route.departureLineId,
+    notifications: route.notifications,
+    bufferMinutes: route.bufferMinutes,
+  };
+};
 
 /**
  * Create initial onboarding state

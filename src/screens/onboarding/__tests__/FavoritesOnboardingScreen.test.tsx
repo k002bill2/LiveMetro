@@ -366,4 +366,70 @@ describe('FavoritesOnboardingScreen (step 4/4)', () => {
       expect(getByTestId('favorites-selected-count')).toHaveTextContent('3개 선택됨');
     });
   });
+
+  describe('evening leg reversal', () => {
+    it('saves the evening leg as the reversed morning leg with the default evening time when unspecified', async () => {
+      mockSaveCommuteRoutes.mockResolvedValue({ success: true });
+      mockContextAddFavorite.mockResolvedValue(undefined);
+
+      const { getByTestId } = render(
+        <FavoritesOnboardingScreen navigation={baseNavigation} route={baseRoute} />,
+      );
+      fireEvent.press(getByTestId('favorites-cta'));
+
+      await waitFor(() => expect(mockSaveCommuteRoutes).toHaveBeenCalledTimes(1));
+
+      // Morning leg is the forward direction straight from the route params;
+      // evening leg is its reverse — endpoints swapped, default evening time
+      // '18:30' (baseRoute carries no eveningDepartureTime).
+      expect(mockSaveCommuteRoutes).toHaveBeenCalledWith(
+        'uid-1',
+        expect.objectContaining({
+          departureTime: '08:00',
+          departureStationId: 'stn-dep',
+          departureStationName: '서울역',
+          departureLineId: '1',
+          arrivalStationId: 'stn-arr',
+          arrivalStationName: '강남',
+          arrivalLineId: '2',
+          transferStations: [],
+        }),
+        expect.objectContaining({
+          departureTime: '18:30',
+          departureStationId: 'stn-arr',
+          departureStationName: '강남',
+          departureLineId: '2',
+          arrivalStationId: 'stn-dep',
+          arrivalStationName: '서울역',
+          arrivalLineId: '1',
+          transferStations: [],
+        }),
+      );
+    });
+
+    it('reflects the configured eveningDepartureTime on the reversed evening leg', async () => {
+      mockSaveCommuteRoutes.mockResolvedValue({ success: true });
+      mockContextAddFavorite.mockResolvedValue(undefined);
+
+      const routeWithEveningTime = {
+        ...baseRoute,
+        params: {
+          ...baseRoute.params,
+          route: { ...baseRouteData, eveningDepartureTime: '19:00' },
+        },
+      } as unknown as React.ComponentProps<typeof FavoritesOnboardingScreen>['route'];
+
+      const { getByTestId } = render(
+        <FavoritesOnboardingScreen navigation={baseNavigation} route={routeWithEveningTime} />,
+      );
+      fireEvent.press(getByTestId('favorites-cta'));
+
+      await waitFor(() => expect(mockSaveCommuteRoutes).toHaveBeenCalledTimes(1));
+      expect(mockSaveCommuteRoutes).toHaveBeenCalledWith(
+        'uid-1',
+        expect.objectContaining({ departureTime: '08:00' }),
+        expect.objectContaining({ departureTime: '19:00', departureStationName: '강남' }),
+      );
+    });
+  });
 });

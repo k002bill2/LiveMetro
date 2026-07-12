@@ -33,7 +33,14 @@ import { useCommuteRouteSummary } from '@/hooks/useCommuteRouteSummary';
 import { useCommuteRouteSteps } from '@/hooks/useCommuteRouteSteps';
 import type { TransferStep } from '@/models/guidance';
 import { truncateMinutes } from '@/utils/dateUtils';
-import { CommuteRoute, DEFAULT_COMMUTE_NOTIFICATIONS, DEFAULT_BUFFER_MINUTES } from '@/models/commute';
+import {
+  CommuteRoute,
+  DEFAULT_COMMUTE_NOTIFICATIONS,
+  DEFAULT_BUFFER_MINUTES,
+  DEFAULT_MORNING_DEPARTURE_TIME,
+  DEFAULT_EVENING_DEPARTURE_TIME,
+  reverseCommuteRoute,
+} from '@/models/commute';
 import type { SmartFeatures } from '@/models/user';
 import SettingSection from '@/components/settings/SettingSection';
 import SettingToggle from '@/components/settings/SettingToggle';
@@ -565,11 +572,14 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
   /**
    * Persist a new departureTime for the morning or evening leg.
    *
-   * `saveCommuteRoutes` requires both legs, so when only one leg exists we
-   * mirror the updated leg into the other slot — same pattern as
-   * `handleSelectTransferStation` and the FavoritesOnboarding finaliser.
-   * The local state updates optimistically; on Firestore failure we revert
-   * and surface the error.
+   * `saveCommuteRoutes` requires both legs. When the relative leg already
+   * exists we persist it unchanged; when it's missing we materialise it by
+   * REVERSING the updated leg (reverseCommuteRoute) with the opposite
+   * direction's default departure time — the same reversal the onboarding
+   * finaliser and the EditCommuteRoute editor use — so the two legs are
+   * genuine return trips rather than identical copies. The local state
+   * updates optimistically; on Firestore failure we revert and surface the
+   * error.
    */
   const handleChangeDepartureTime = useCallback(
     async (kind: 'morning' | 'evening', newTime: string): Promise<void> => {
@@ -586,13 +596,21 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
 
       try {
         setSaving(true);
-        const morningForSave = kind === 'morning' ? next : morningRoute;
-        const eveningForSave = kind === 'evening' ? next : eveningRoute;
-        const result = await saveCommuteRoutes(
-          user.id,
-          routeDataToCommuteRoute(morningForSave ?? next),
-          routeDataToCommuteRoute(eveningForSave ?? morningForSave ?? next),
-        );
+        // The relative leg is preserved when it exists; when absent it is
+        // reversed from the edited leg so morning/evening stay genuine return
+        // trips (opposite direction's default departure time).
+        const targetForSave = routeDataToCommuteRoute(next);
+        const morningForSave = kind === 'morning'
+          ? targetForSave
+          : morningRoute
+            ? routeDataToCommuteRoute(morningRoute)
+            : reverseCommuteRoute(targetForSave, DEFAULT_MORNING_DEPARTURE_TIME);
+        const eveningForSave = kind === 'evening'
+          ? targetForSave
+          : eveningRoute
+            ? routeDataToCommuteRoute(eveningRoute)
+            : reverseCommuteRoute(targetForSave, DEFAULT_EVENING_DEPARTURE_TIME);
+        const result = await saveCommuteRoutes(user.id, morningForSave, eveningForSave);
         if (!result.success) {
           // Revert
           setMorningRoute(prevMorning);

@@ -936,4 +936,115 @@ describe('CommuteSettingsScreen', () => {
       ),
     );
   });
+
+  // Degenerate path: only a morning leg exists. Changing the morning time must
+  // materialise the missing evening leg by REVERSING the morning leg (endpoints
+  // swapped, default evening time '18:30') — not by mirroring the morning leg.
+  it('상대 leg 부재 시 출근 시각 변경이 퇴근 leg를 역방향으로 생성한다', async () => {
+    mockUseAuth.mockReturnValue(signedInUserWithSchedule(false));
+    mockLoadCommuteRoutes.mockResolvedValue(morningOnlyRoutes());
+
+    const { getByTestId, getAllByText } = render(<CommuteSettingsScreen {...createProps()} />);
+    await waitFor(() => expect(getAllByText('08:00 출발').length).toBeGreaterThan(0));
+
+    fireEvent.press(getByTestId('morning-time-picker-display'));
+    fireEvent.press(getByTestId('morning-time-picker-native-picker'));
+
+    await waitFor(() =>
+      expect(mockSaveCommuteRoutes).toHaveBeenCalledWith(
+        'user-1',
+        expect.objectContaining({
+          departureTime: '08:01',
+          departureStationId: 's1',
+          departureStationName: '강남',
+          arrivalStationId: 's2',
+          arrivalStationName: '시청',
+        }),
+        // Reversed morning leg: 시청 → 강남, default evening time.
+        expect.objectContaining({
+          departureTime: '18:30',
+          departureStationId: 's2',
+          departureStationName: '시청',
+          departureLineId: '1',
+          arrivalStationId: 's1',
+          arrivalStationName: '강남',
+          arrivalLineId: '2',
+          transferStations: [],
+        }),
+      ),
+    );
+  });
+
+  // The relative leg is preserved (never reversed) when it already exists:
+  // changing the morning time keeps the stored evening leg — including its own
+  // time and transfer — intact.
+  it('상대 leg 존재 시 출근 시각 변경이 기존 퇴근 leg를 보존한다 (역방향 미생성)', async () => {
+    mockUseAuth.mockReturnValue(signedInUserWithSchedule(false));
+    mockLoadCommuteRoutes.mockResolvedValue({
+      morningRoute: {
+        departureTime: '08:00',
+        departureStationId: 's1',
+        departureStationName: '강남',
+        departureLineId: '2',
+        arrivalStationId: 's2',
+        arrivalStationName: '시청',
+        arrivalLineId: '1',
+        transferStations: [],
+        notifications: {
+          transferAlert: true,
+          arrivalAlert: true,
+          delayAlert: true,
+          incidentAlert: true,
+          alertMinutesBefore: 5,
+        },
+        bufferMinutes: 10,
+      },
+      eveningRoute: {
+        departureTime: '18:00',
+        departureStationId: 's2',
+        departureStationName: '시청',
+        departureLineId: '1',
+        arrivalStationId: 's1',
+        arrivalStationName: '강남',
+        arrivalLineId: '2',
+        transferStations: [
+          { stationId: 's3', stationName: '신도림', lineId: '1', lineName: '1호선', order: 1 },
+        ],
+        notifications: {
+          transferAlert: true,
+          arrivalAlert: true,
+          delayAlert: true,
+          incidentAlert: true,
+          alertMinutesBefore: 5,
+        },
+        bufferMinutes: 10,
+      },
+      eveningEnabled: true,
+      createdAt: null,
+      updatedAt: null,
+    });
+
+    const { getByTestId, getAllByText } = render(<CommuteSettingsScreen {...createProps()} />);
+    await waitFor(() => expect(getAllByText('08:00 출발').length).toBeGreaterThan(0));
+
+    fireEvent.press(getByTestId('morning-time-picker-display'));
+    fireEvent.press(getByTestId('morning-time-picker-native-picker'));
+
+    await waitFor(() =>
+      expect(mockSaveCommuteRoutes).toHaveBeenCalledWith(
+        'user-1',
+        expect.objectContaining({ departureTime: '08:01' }),
+        // Existing evening leg is preserved: its own 18:00 time and 신도림
+        // transfer survive (a reverse of the morning leg would be 18:30 / []).
+        expect.objectContaining({
+          departureTime: '18:00',
+          departureStationId: 's2',
+          arrivalStationId: 's1',
+          transferStations: [
+            expect.objectContaining({ stationId: 's3', stationName: '신도림' }),
+          ],
+        }),
+      ),
+    );
+  });
 });

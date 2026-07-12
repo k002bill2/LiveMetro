@@ -7,8 +7,9 @@
  */
 
 import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
+import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { CommuteRouteScreen } from '../CommuteRouteScreen';
+import { saveCommuteRoutes } from '@/services/commute/commuteService';
 
 jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
 jest.mock('lucide-react-native', () => ({
@@ -238,5 +239,71 @@ describe('CommuteRouteScreen (step 2/4 redesign)', () => {
     expect(queryByText('신도림 환승')).toBeNull();
     // No false 직행 claim for a cross-line pair with no direct ride.
     expect(queryByText(/직행이 가장 빨라요/)).toBeNull();
+  });
+
+  // Edit-mode degenerate path: when the edited leg has no counterpart
+  // (`otherLeg` absent), the opposite slot is materialised by REVERSING the
+  // edited leg — endpoints swapped + transfer chain reversed — with the
+  // opposite direction's default departure time ('18:30' for the evening slot
+  // when editing morning), not a duplicate of the edited leg.
+  it('edit mode without otherLeg reverses the edited leg into the opposite slot', async () => {
+    (saveCommuteRoutes as jest.Mock).mockReset();
+    (saveCommuteRoutes as jest.Mock).mockResolvedValue({ success: true });
+
+    const editRoute = {
+      name: 'EditCommuteRoute',
+      params: {
+        kind: 'morning',
+        initial: {
+          departureTime: '08:30',
+          departureStation: {
+            stationId: 'dep-id',
+            stationName: '신길',
+            lineId: '1',
+            lineName: '1호선',
+          },
+          arrivalStation: {
+            stationId: 'arr-id',
+            stationName: '선릉',
+            lineId: '2',
+            lineName: '2호선',
+          },
+          transferStations: [],
+        },
+        // otherLeg intentionally absent → the evening slot is reversed.
+      },
+    };
+
+    const { getByTestId } = render(
+      <CommuteRouteScreen
+        navigation={mockNavigation as never}
+        route={editRoute as never}
+      />,
+    );
+    fireEvent.press(getByTestId('commute-next'));
+
+    await waitFor(() => expect(saveCommuteRoutes).toHaveBeenCalledTimes(1));
+    expect(saveCommuteRoutes).toHaveBeenCalledWith(
+      'test-uid',
+      // morning slot = edited leg (unchanged direction + time).
+      expect.objectContaining({
+        departureTime: '08:30',
+        departureStationId: 'dep-id',
+        departureStationName: '신길',
+        arrivalStationId: 'arr-id',
+        arrivalStationName: '선릉',
+      }),
+      // evening slot = reversed edited leg with the default evening time.
+      expect.objectContaining({
+        departureTime: '18:30',
+        departureStationId: 'arr-id',
+        departureStationName: '선릉',
+        departureLineId: '2',
+        arrivalStationId: 'dep-id',
+        arrivalStationName: '신길',
+        arrivalLineId: '1',
+        transferStations: [],
+      }),
+    );
   });
 });

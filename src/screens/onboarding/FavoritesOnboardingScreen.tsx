@@ -16,7 +16,8 @@
  *    annotated with their reason ("출발역" / "도착역") so the user sees
  *    why they're already toggled on.
  *  - "완료 ({n})" CTA — disabled when n=0. Tap →
- *      saveCommuteRoutes(uid, route, route)  // single-route bridge
+ *      saveCommuteRoutes(uid, morning, reverseCommuteRoute(morning))
+ *                                            // evening = reversed morning leg
  *      addFavorite(...) per selection        // via FavoritesContext (SSOT)
  *      onComplete()
  */
@@ -37,7 +38,12 @@ import { OnboardingStackParamList } from '@/navigation/types';
 import { saveCommuteRoutes } from '@/services/commute/commuteService';
 import { useFavorites } from '@/hooks/useFavorites';
 import { StationSearchModal } from '@/components/commute/StationSearchModal';
-import { CommuteRoute, StationSelection } from '@/models/commute';
+import {
+  CommuteRoute,
+  StationSelection,
+  reverseCommuteRoute,
+  DEFAULT_EVENING_DEPARTURE_TIME,
+} from '@/models/commute';
 import type { OnboardingRouteData } from '@/navigation/types';
 import { Station } from '@/models/train';
 
@@ -64,17 +70,14 @@ const RECOMMENDATIONS: readonly RecommendedStation[] = [
   { id: 'stn-gangnam',  name: '강남',   nameEn: 'Gangnam',  lineIds: ['2', '신분당선'],   reason: '주변 역' },
 ];
 
-// `time` overrides data.departureTime so the same OnboardingRouteData can
-// produce both the morning leg (with data.departureTime) and the evening
-// leg (with data.eveningDepartureTime). Stations remain identical because
-// onboarding doesn't model evening reversal yet — that's a follow-up.
-const FALLBACK_EVENING_TIME = '18:30';
+// Materialises the morning (출근) leg from the collected OnboardingRouteData.
+// The evening (퇴근) leg is derived separately by reversing this morning leg
+// (reverseCommuteRoute), so this helper only ever emits the forward direction.
 const toCommuteRoute = (
   data: OnboardingRouteData,
   notifications: CommuteRoute['notifications'],
-  time: string = data.departureTime,
 ): CommuteRoute => ({
-  departureTime: time,
+  departureTime: data.departureTime,
   departureStationId: data.departureStation.stationId,
   departureStationName: data.departureStation.stationName,
   departureLineId: data.departureStation.lineId,
@@ -210,19 +213,19 @@ export const FavoritesOnboardingScreen: React.FC<Props> = ({ navigation, route }
         return;
       }
 
-      // 1. Save commute route — morning + evening legs share stations
-      // (no reversal modelling yet) but carry distinct times when the user
-      // configured them in CommuteTime. eveningDepartureTime falls back
-      // to FALLBACK_EVENING_TIME for legacy callers that skipped that step.
+      // 1. Save commute route — the morning (출근) leg comes straight from the
+      // collected route; the evening (퇴근) leg is its reverse
+      // (reverseCommuteRoute): endpoints swapped and the transfer chain walked
+      // backwards, carrying the evening departure time. eveningDepartureTime
+      // falls back to DEFAULT_EVENING_DEPARTURE_TIME for legacy callers that
+      // skipped the CommuteTime step.
       const morningRoute = toCommuteRoute(
         route.params.route,
         route.params.notifications,
-        route.params.route.departureTime,
       );
-      const eveningRoute = toCommuteRoute(
-        route.params.route,
-        route.params.notifications,
-        route.params.route.eveningDepartureTime ?? FALLBACK_EVENING_TIME,
+      const eveningRoute = reverseCommuteRoute(
+        morningRoute,
+        route.params.route.eveningDepartureTime ?? DEFAULT_EVENING_DEPARTURE_TIME,
       );
       const saveResult = await saveCommuteRoutes(uid, morningRoute, eveningRoute);
       if (!saveResult.success) {
