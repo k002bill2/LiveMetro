@@ -438,6 +438,95 @@ describe('useFavorites', () => {
     });
   });
 
+  describe('계정 전환 시 동기화 상태 격리', () => {
+    const userB = { id: 'user-B', email: 'b@test.com' };
+
+    it('큐를 회전한다: B의 mutation이 A의 미해결 작업을 기다리지 않는다', async () => {
+      let resolveA!: () => void;
+      mockFavoritesService.updateFavorite.mockImplementationOnce(
+        () => new Promise<void>((resolve) => { resolveA = resolve; }),
+      );
+
+      const { result, rerender } = renderHook(() => useFavorites(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      // A's update stays pending, holding the mutation chain.
+      let aPromise!: Promise<void>;
+      await act(async () => {
+        aPromise = result.current.updateFavorite('fav_A', { alias: 'x' });
+      });
+      expect(mockFavoritesService.updateFavorite).toHaveBeenCalledTimes(1);
+
+      // Switch to user B.
+      mockUseAuth.mockReturnValue({
+        user: userB,
+        firebaseUser: null,
+        loading: false,
+      } as any);
+      await act(async () => {
+        rerender(undefined);
+      });
+
+      // B's mutation must run immediately (chain rotated), not wait for A.
+      mockFavoritesService.addFavorite.mockResolvedValueOnce(
+        createMockFavorite('fav_B', 'stn-B'),
+      );
+      let bPromise!: Promise<void>;
+      await act(async () => {
+        bPromise = result.current.addFavorite(createMockStation('stn-B', 'B역'));
+      });
+      expect(mockFavoritesService.addFavorite).toHaveBeenCalled();
+
+      await act(async () => {
+        resolveA();
+        await aPromise.catch(() => undefined);
+        await bPromise.catch(() => undefined);
+      });
+    });
+
+    it('락을 사용자별로 격리한다: B의 removeFavorites가 A의 락에 삼켜지지 않는다', async () => {
+      let resolveA!: () => void;
+      mockFavoritesService.removeFavorites.mockImplementationOnce(
+        () => new Promise<void>((resolve) => { resolveA = resolve; }),
+      );
+
+      const { result, rerender } = renderHook(() => useFavorites(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      // A's bulk delete stays pending, holding the runExclusive lock.
+      let aPromise!: Promise<void>;
+      await act(async () => {
+        aPromise = result.current.removeFavorites(['fav_A']);
+      });
+      expect(mockFavoritesService.removeFavorites).toHaveBeenCalledTimes(1);
+
+      // Switch to user B.
+      mockUseAuth.mockReturnValue({
+        user: userB,
+        firebaseUser: null,
+        loading: false,
+      } as any);
+      await act(async () => {
+        rerender(undefined);
+      });
+
+      // B's removeFavorites must reach the service (its own lock scope), not
+      // be silently swallowed by A's still-held 'bulk:remove' lock.
+      mockFavoritesService.removeFavorites.mockResolvedValueOnce(undefined);
+      let bPromise!: Promise<void>;
+      await act(async () => {
+        bPromise = result.current.removeFavorites(['fav_B']);
+      });
+      expect(mockFavoritesService.removeFavorites).toHaveBeenCalledWith('user-B', ['fav_B']);
+
+      await act(async () => {
+        resolveA();
+        await aPromise.catch(() => undefined);
+        await bPromise.catch(() => undefined);
+      });
+    });
+  });
+
   describe('Notification toggle', () => {
     it('setNotificationEnabled forwards to service with correct args', async () => {
       const mockFavorite = createMockFavorite('fav-1', 'station-1');

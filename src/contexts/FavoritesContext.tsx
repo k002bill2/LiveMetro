@@ -81,23 +81,38 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // logout or an account switch to user B — the stale closure would write
   // to A's document and rehydrate the provider with A's favorites.
   const currentUserIdRef = useRef<string | null>(null);
+
+  // Client-side total order for favorites mutations. Every mutation chains
+  // onto the previous one, so an in-flight update/reorder can never commit
+  // its whole-array write after a later bulk delete and resurrect rows.
+  // (Codex R3: UI freezing alone cannot stop writes that already started.)
+  const mutationChainRef = useRef<Promise<void>>(Promise.resolve());
+
   useEffect(() => {
     currentUserIdRef.current = user?.id ?? null;
+    // Rotate the mutation chain on account change: user B must not queue
+    // behind user A's unresolved writes. A's orphaned jobs still run but the
+    // auth-generation guard rejects them before touching Firestore.
+    mutationChainRef.current = Promise.resolve();
   }, [user]);
 
   const runExclusive = useCallback(
     async (key: string, task: () => Promise<void>): Promise<void> => {
-      if (inFlightRef.current.has(key)) {
+      // User-scoped key: user A's in-flight lock must not swallow user B's
+      // same-named mutation after an account switch, and A's finally-cleanup
+      // must not release a lock B has since taken.
+      const scopedKey = `${user?.id ?? 'anon'}:${key}`;
+      if (inFlightRef.current.has(scopedKey)) {
         return;
       }
-      inFlightRef.current.add(key);
+      inFlightRef.current.add(scopedKey);
       try {
         await task();
       } finally {
-        inFlightRef.current.delete(key);
+        inFlightRef.current.delete(scopedKey);
       }
     },
-    [],
+    [user],
   );
 
   /**
@@ -170,12 +185,6 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       }));
     }
   }, [user]);
-
-  // Client-side total order for favorites mutations. Every mutation chains
-  // onto the previous one, so an in-flight update/reorder can never commit
-  // its whole-array write after a later bulk delete and resurrect rows.
-  // (Codex R3: UI freezing alone cannot stop writes that already started.)
-  const mutationChainRef = useRef<Promise<void>>(Promise.resolve());
 
   /**
    * Shared mutation pipeline: require auth, run the service call, then
