@@ -585,6 +585,92 @@ describe('FavoritesService', () => {
       ).rejects.toThrow('즐겨찾기 삭제에 실패했습니다.');
     });
   });
+
+  describe('reorderFavoritesByIds', () => {
+    const fav = (id: string, extra: Partial<FavoriteStation> = {}): FavoriteStation => ({
+      id,
+      stationId: `stn_${id}`,
+      lineId: '2',
+      alias: null,
+      direction: 'both',
+      isCommuteStation: false,
+      addedAt: new Date('2024-01-01'),
+      ...extra,
+    });
+
+    const seedFavorites = (favorites: FavoriteStation[]): void => {
+      mockTxGet.mockResolvedValue({
+        exists: () => true,
+        data: () => ({ preferences: { favoriteStations: favorites } }),
+      });
+    };
+
+    beforeEach(() => {
+      mockRunTransaction.mockImplementation(async (_db, fn) =>
+        fn({ get: mockTxGet, update: mockTxUpdate }),
+      );
+    });
+
+    it('reorders by id and preserves the latest stored field values', async () => {
+      // Stored 'a' already carries a freshly-saved alias — a stale drag
+      // payload must not revert it.
+      seedFavorites([fav('a', { alias: '회사' }), fav('b'), fav('c')]);
+
+      await favoritesService.reorderFavoritesByIds('user-123', ['c', 'a', 'b']);
+
+      expect(mockTxUpdate).toHaveBeenCalledTimes(1);
+      const payload = mockTxUpdate.mock.calls[0]?.[1] as {
+        'preferences.favoriteStations': FavoriteStation[];
+      };
+      const next = payload['preferences.favoriteStations'];
+      expect(next.map((f) => f.id)).toEqual(['c', 'a', 'b']);
+      expect(next.find((f) => f.id === 'a')?.alias).toBe('회사');
+    });
+
+    it('keeps favorites missing from orderedIds at the tail', async () => {
+      seedFavorites([fav('a'), fav('b'), fav('c')]);
+
+      await favoritesService.reorderFavoritesByIds('user-123', ['b', 'a']);
+
+      const payload = mockTxUpdate.mock.calls[0]?.[1] as {
+        'preferences.favoriteStations': FavoriteStation[];
+      };
+      expect(payload['preferences.favoriteStations'].map((f) => f.id)).toEqual(['b', 'a', 'c']);
+    });
+
+    it('ignores unknown ids', async () => {
+      seedFavorites([fav('a'), fav('b')]);
+
+      await favoritesService.reorderFavoritesByIds('user-123', ['b', 'ghost', 'a']);
+
+      const payload = mockTxUpdate.mock.calls[0]?.[1] as {
+        'preferences.favoriteStations': FavoriteStation[];
+      };
+      expect(payload['preferences.favoriteStations'].map((f) => f.id)).toEqual(['b', 'a']);
+    });
+
+    it('skips the write when the resulting order is unchanged', async () => {
+      seedFavorites([fav('a'), fav('b')]);
+
+      await favoritesService.reorderFavoritesByIds('user-123', ['a', 'b']);
+
+      expect(mockTxUpdate).not.toHaveBeenCalled();
+    });
+
+    it('is a no-op (no transaction) for an empty id list', async () => {
+      await favoritesService.reorderFavoritesByIds('user-123', []);
+
+      expect(mockRunTransaction).not.toHaveBeenCalled();
+    });
+
+    it('throws when the transaction read fails', async () => {
+      mockTxGet.mockRejectedValue(new Error('Firestore read error'));
+
+      await expect(
+        favoritesService.reorderFavoritesByIds('user-123', ['a']),
+      ).rejects.toThrow('즐겨찾기 순서 변경에 실패했습니다.');
+    });
+  });
 });
 
 describe('migrateFavoritesToNewFormat', () => {

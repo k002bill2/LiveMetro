@@ -229,6 +229,52 @@ class FavoritesService {
   }
 
   /**
+   * Reorder by intent (ordered ids), rebased onto the latest stored array
+   * inside a transaction. A queued drag can never resurrect stale field
+   * values because only the *order* is captured at drag time — the data is
+   * whatever is current when the write executes. Ids missing from the
+   * stored array are ignored; stored favorites missing from `orderedIds`
+   * (e.g. added concurrently) keep their relative order at the tail.
+   */
+  async reorderFavoritesByIds(userId: string, orderedIds: readonly string[]): Promise<void> {
+    if (orderedIds.length === 0) {
+      return;
+    }
+
+    try {
+      const userRef = doc(firestore, 'users', userId);
+      await runTransaction(firestore, async (transaction) => {
+        const snapshot = await transaction.get(userRef);
+        if (!snapshot.exists()) {
+          return;
+        }
+        const favorites: FavoriteStation[] =
+          snapshot.data()?.preferences?.favoriteStations ?? [];
+        const byId = new Map(favorites.map(fav => [fav.id, fav]));
+        const ordered = orderedIds
+          .map(id => byId.get(id))
+          .filter((fav): fav is FavoriteStation => fav !== undefined);
+        const orderedIdSet = new Set(orderedIds);
+        const tail = favorites.filter(fav => !orderedIdSet.has(fav.id));
+        const next = [...ordered, ...tail];
+        const unchanged =
+          next.length === favorites.length &&
+          next.every((fav, i) => fav.id === favorites[i]?.id);
+        if (unchanged) {
+          return;
+        }
+        transaction.update(userRef, {
+          'preferences.favoriteStations': next,
+          lastActiveAt: new Date(),
+        });
+      });
+    } catch (error) {
+      console.error('Error reordering favorites:', error);
+      throw new Error('즐겨찾기 순서 변경에 실패했습니다.');
+    }
+  }
+
+  /**
    * Remove multiple favorites in one Firestore write (edit-mode bulk
    * delete). Unknown ids are ignored; an empty input or zero matches
    * skips the write entirely so no-op taps cost nothing.

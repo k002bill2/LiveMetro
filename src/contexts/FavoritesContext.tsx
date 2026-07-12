@@ -399,13 +399,18 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   );
 
   /**
-   * Reorder favorites
+   * Reorder favorites. Captures only the intended id order at drag time and
+   * rebases it onto the latest stored array when the queued job runs — so a
+   * drag that lands behind an in-flight alias/notification save can no longer
+   * write a stale whole-array payload and revert that save (Codex R9).
    */
   const reorderFavorites = useCallback(
-    async (reorderedFavorites: FavoriteStation[]): Promise<void> =>
-      runMutation('reordering favorites', async (userId) => {
-        await favoritesService.reorderFavorites(userId, reorderedFavorites);
-      }),
+    async (reorderedFavorites: FavoriteStation[]): Promise<void> => {
+      const orderedIds = reorderedFavorites.map(fav => fav.id);
+      return runMutation('reordering favorites', async (userId) => {
+        await favoritesService.reorderFavoritesByIds(userId, orderedIds);
+      });
+    },
     [runMutation]
   );
 

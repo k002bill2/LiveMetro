@@ -22,6 +22,7 @@ jest.mock('../../services/favorites/favoritesService', () => ({
     removeFavorites: jest.fn(),
     updateFavorite: jest.fn(),
     reorderFavorites: jest.fn(),
+    reorderFavoritesByIds: jest.fn(),
     getFavoriteByStationId: jest.fn(),
     setNotificationEnabled: jest.fn(),
   },
@@ -877,7 +878,47 @@ describe('useFavorites', () => {
         await result.current.reorderFavorites(reordered);
       });
 
-      expect(mockFavoritesService.reorderFavorites).toHaveBeenCalledWith(mockUser.id, reordered);
+      // Reorder is now an id-intent + execution-time rebase: only the ordered
+      // ids are sent, not the (potentially stale) full favorite objects.
+      expect(mockFavoritesService.reorderFavoritesByIds).toHaveBeenCalledWith(
+        mockUser.id,
+        reordered.map((f) => f.id),
+      );
+      expect(mockFavoritesService.reorderFavorites).not.toHaveBeenCalled();
+    });
+
+    it('편집 저장 진행 중 드래그가 끝나도 reorder는 ID 배열만 전달한다 (stale 페이로드 방지)', async () => {
+      let resolveUpdate!: () => void;
+      mockFavoritesService.updateFavorite.mockImplementationOnce(
+        () => new Promise<void>((resolve) => { resolveUpdate = resolve; }),
+      );
+      mockFavoritesService.reorderFavoritesByIds.mockResolvedValueOnce(undefined);
+
+      const { result } = renderHook(() => useFavorites(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      const reordered = [
+        createMockFavorite('fav-2', 'station-2'),
+        createMockFavorite('fav-1', 'station-1'),
+      ];
+      let updateP!: Promise<void>;
+      let reorderP!: Promise<void>;
+      await act(async () => {
+        updateP = result.current.updateFavorite('fav-1', { alias: '회사' });
+        reorderP = result.current.reorderFavorites(reordered);
+      });
+
+      await act(async () => {
+        resolveUpdate();
+        await updateP;
+        await reorderP;
+      });
+
+      expect(mockFavoritesService.reorderFavoritesByIds).toHaveBeenCalledWith(
+        mockUser.id,
+        ['fav-2', 'fav-1'],
+      );
+      expect(mockFavoritesService.reorderFavorites).not.toHaveBeenCalled();
     });
 
     it('reorderFavorites should reload after', async () => {
