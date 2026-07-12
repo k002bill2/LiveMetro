@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import { FavoritesScreen } from '../FavoritesScreen';
 import { useFavorites } from '@/hooks/useFavorites';
@@ -99,11 +99,33 @@ jest.mock('@/components/favorites/DraggableFavoriteItem', () => {
       onSetStart,
       onSetEnd,
       onSaveEdit: _onSaveEdit,
+      onEditPress,
+      onSelectToggle,
+      isSelectMode,
+      isSelected,
       favorite,
     }) =>
       React.createElement(
         View,
         { testID: `favorite-item-${favorite.id}` },
+        isSelectMode
+          ? React.createElement(
+              TouchableOpacity,
+              {
+                testID: 'favorite-select-checkbox',
+                accessibilityState: { checked: !!isSelected },
+                onPress: onSelectToggle,
+              },
+              React.createElement(Text, null, isSelected ? '☑' : '☐')
+            )
+          : null,
+        isSelectMode
+          ? React.createElement(
+              TouchableOpacity,
+              { testID: `edit-pencil-${favorite.id}`, onPress: onEditPress },
+              React.createElement(Text, null, 'Pencil')
+            )
+          : null,
         React.createElement(
           TouchableOpacity,
           { testID: `edit-btn-${favorite.id}`, onPress: onEditToggle },
@@ -167,6 +189,7 @@ jest.mock('@/components/commute/StationSearchModal', () => {
 
 describe('FavoritesScreen', () => {
   let mockRemoveFavorite: jest.Mock;
+  let mockRemoveFavorites: jest.Mock;
   let mockUpdateFavorite: jest.Mock;
   let mockAddFavorite: jest.Mock;
   let mockRefresh: jest.Mock;
@@ -230,6 +253,7 @@ describe('FavoritesScreen', () => {
       changePassword: jest.fn(),
     });
     mockRemoveFavorite = jest.fn();
+    mockRemoveFavorites = jest.fn().mockResolvedValue(undefined);
     mockUpdateFavorite = jest.fn();
     mockAddFavorite = jest.fn();
     mockRefresh = jest.fn();
@@ -240,8 +264,11 @@ describe('FavoritesScreen', () => {
       loading: false,
       error: null,
       removeFavorite: mockRemoveFavorite,
+      removeFavorites: mockRemoveFavorites,
       updateFavorite: mockUpdateFavorite,
       addFavorite: mockAddFavorite,
+      setNotificationEnabled: jest.fn(),
+      reorderFavorites: jest.fn(),
       refresh: mockRefresh,
     });
 
@@ -265,6 +292,19 @@ describe('FavoritesScreen', () => {
     });
 
     it('displays header with title and add/edit buttons (Phase A redesign)', () => {
+      // Edit button is gated behind having ≥1 favorite (global edit mode),
+      // so render with a favorite to see both header buttons.
+      (useFavorites as jest.Mock).mockReturnValue({
+        favoritesWithDetails: [mockFavorite1],
+        loading: false,
+        error: null,
+        removeFavorite: mockRemoveFavorite,
+        removeFavorites: mockRemoveFavorites,
+        updateFavorite: mockUpdateFavorite,
+        addFavorite: mockAddFavorite,
+        refresh: mockRefresh,
+      });
+
       const { getByText, getByTestId } = render(<FavoritesScreen />);
       expect(getByText('즐겨찾기')).toBeTruthy();
       expect(getByTestId('favorites-add-button')).toBeTruthy();
@@ -741,6 +781,112 @@ describe('FavoritesScreen', () => {
       // Edit mode toggled - component internal state
       // Verify by checking if the button was pressed
       expect(editBtn).toBeTruthy();
+    });
+  });
+
+  describe('편집 모드', () => {
+    const renderEditMode = () => {
+      (useFavorites as jest.Mock).mockReturnValue({
+        favoritesWithDetails: [mockFavorite1, mockFavorite2],
+        loading: false,
+        error: null,
+        removeFavorite: mockRemoveFavorite,
+        removeFavorites: mockRemoveFavorites,
+        updateFavorite: mockUpdateFavorite,
+        addFavorite: mockAddFavorite,
+        setNotificationEnabled: jest.fn(),
+        reorderFavorites: jest.fn(),
+        refresh: mockRefresh,
+      });
+      return render(<FavoritesScreen />);
+    };
+
+    const confirmBulkDelete = async () => {
+      const buttons = (Alert.alert as jest.Mock).mock.calls.at(-1)?.[2];
+      await act(async () => {
+        await buttons?.[1]?.onPress?.();
+      });
+    };
+
+    it('편집 버튼 탭 → 라벨이 "완료"로 바뀌고 검색바가 숨는다', () => {
+      const { getByTestId, queryByTestId } = renderEditMode();
+
+      fireEvent.press(getByTestId('favorites-edit-button'));
+
+      expect(getByTestId('favorites-edit-button')).toHaveTextContent('완료');
+      expect(queryByTestId('search-bar')).toBeNull();
+    });
+
+    it('행 선택 토글 → 삭제 버튼 카운트가 갱신된다', () => {
+      const { getByTestId, getAllByTestId } = renderEditMode();
+
+      fireEvent.press(getByTestId('favorites-edit-button'));
+      fireEvent.press(getAllByTestId('favorite-select-checkbox')[0]);
+
+      expect(getByTestId('favorites-bulk-delete-button')).toHaveTextContent('삭제 (1)');
+    });
+
+    it('선택 0개면 삭제 버튼이 disabled다', () => {
+      const { getByTestId } = renderEditMode();
+
+      fireEvent.press(getByTestId('favorites-edit-button'));
+
+      expect(
+        getByTestId('favorites-bulk-delete-button').props.accessibilityState,
+      ).toEqual(expect.objectContaining({ disabled: true }));
+    });
+
+    it('삭제 버튼 → 확인 Alert → 확정 시 removeFavorites 호출 + 선택 초기화', async () => {
+      const { getByTestId, getAllByTestId } = renderEditMode();
+
+      fireEvent.press(getByTestId('favorites-edit-button'));
+      fireEvent.press(getAllByTestId('favorite-select-checkbox')[0]);
+      fireEvent.press(getByTestId('favorites-bulk-delete-button'));
+
+      expect(Alert.alert).toHaveBeenCalledWith(
+        '즐겨찾기 삭제',
+        expect.stringContaining('1개'),
+        expect.any(Array),
+      );
+
+      await confirmBulkDelete();
+
+      await waitFor(() =>
+        expect(mockRemoveFavorites).toHaveBeenCalledWith(['fav1']),
+      );
+      expect(getByTestId('favorites-bulk-delete-button')).toHaveTextContent('삭제 (0)');
+    });
+
+    it('removeFavorites 실패 시 오류 Alert를 띄운다', async () => {
+      mockRemoveFavorites.mockRejectedValueOnce(new Error('실패'));
+      const { getByTestId, getAllByTestId } = renderEditMode();
+
+      fireEvent.press(getByTestId('favorites-edit-button'));
+      fireEvent.press(getAllByTestId('favorite-select-checkbox')[0]);
+      fireEvent.press(getByTestId('favorites-bulk-delete-button'));
+
+      await confirmBulkDelete();
+
+      await waitFor(() =>
+        expect(Alert.alert).toHaveBeenCalledWith('오류', '즐겨찾기 삭제에 실패했습니다.'),
+      );
+    });
+
+    it('완료 탭 → 편집 모드 종료, 선택 상태 초기화', () => {
+      const { getByTestId, getAllByTestId } = renderEditMode();
+
+      fireEvent.press(getByTestId('favorites-edit-button')); // 진입
+      fireEvent.press(getAllByTestId('favorite-select-checkbox')[0]); // 1개 선택
+      fireEvent.press(getByTestId('favorites-edit-button')); // 완료 → 종료
+      fireEvent.press(getByTestId('favorites-edit-button')); // 재진입
+
+      expect(getByTestId('favorites-bulk-delete-button')).toHaveTextContent('삭제 (0)');
+    });
+
+    it('즐겨찾기가 0개면 편집 버튼이 렌더되지 않는다', () => {
+      // 기본 mock = 빈 즐겨찾기
+      const { queryByTestId } = render(<FavoritesScreen />);
+      expect(queryByTestId('favorites-edit-button')).toBeNull();
     });
   });
 

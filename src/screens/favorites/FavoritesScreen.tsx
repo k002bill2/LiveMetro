@@ -18,7 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import DraggableFlatList, {
   type RenderItemParams,
 } from 'react-native-draggable-flatlist';
-import { Heart, Search, AlertCircle, LogIn, Plus } from 'lucide-react-native';
+import { Heart, Search, AlertCircle, LogIn, Plus, Trash2 } from 'lucide-react-native';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -49,6 +49,7 @@ export const FavoritesScreen: React.FC = () => {
     loading,
     error,
     removeFavorite,
+    removeFavorites,
     updateFavorite,
     addFavorite,
     setNotificationEnabled,
@@ -69,6 +70,67 @@ export const FavoritesScreen: React.FC = () => {
 
   // Edit state
   const [editingFavoriteId, setEditingFavoriteId] = useState<string | null>(null);
+
+  // Global edit mode (Phase B): multi-select + bulk delete + always-on reorder
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(new Set());
+
+  const handleEditModeToggle = useCallback(() => {
+    if (!isEditMode) {
+      // Entering: clear search/filters so the full list is visible and
+      // isReorderable stays true for the whole edit session.
+      setSearchQuery('');
+      setActiveFilters({});
+    }
+    setSelectedIds(new Set());
+    setEditingFavoriteId(null);
+    setIsEditMode(!isEditMode);
+  }, [isEditMode]);
+
+  const handleSelectToggle = useCallback((favoriteId: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(favoriteId)) {
+        next.delete(favoriteId);
+      } else {
+        next.add(favoriteId);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleBulkDelete = useCallback(() => {
+    const count = selectedIds.size;
+    if (count === 0) return;
+    Alert.alert(
+      '즐겨찾기 삭제',
+      `선택한 ${count}개 역을 즐겨찾기에서 삭제하시겠습니까?`,
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '삭제',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await removeFavorites([...selectedIds]);
+              setSelectedIds(new Set());
+            } catch {
+              Alert.alert('오류', '즐겨찾기 삭제에 실패했습니다.');
+            }
+          },
+        },
+      ],
+    );
+  }, [selectedIds, removeFavorites]);
+
+  // Leave edit mode automatically when the last favorite disappears
+  // (bulk delete of everything, or removal from another screen).
+  useEffect(() => {
+    if (isEditMode && favoritesWithDetails.length === 0) {
+      setIsEditMode(false);
+      setSelectedIds(new Set());
+    }
+  }, [isEditMode, favoritesWithDetails.length]);
 
   /**
    * Unique lineIds present in the user's favorites — drives the line filter
@@ -359,7 +421,11 @@ export const FavoritesScreen: React.FC = () => {
         }}
         drag={isReorderable ? drag : undefined}
         isActive={isActive}
-        arrivalsEnabled={isFocused}
+        isSelectMode={isEditMode}
+        isSelected={selectedIds.has(item.id)}
+        onSelectToggle={() => handleSelectToggle(item.id)}
+        onEditPress={() => handleEditToggle(item.id)}
+        arrivalsEnabled={isFocused && !isEditMode}
       />
     ),
     [
@@ -373,6 +439,9 @@ export const FavoritesScreen: React.FC = () => {
       setNotificationEnabled,
       isReorderable,
       isFocused,
+      isEditMode,
+      selectedIds,
+      handleSelectToggle,
     ],
   );
 
@@ -433,20 +502,17 @@ export const FavoritesScreen: React.FC = () => {
           즐겨찾기
         </Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity
-            style={styles.editButton}
-            accessibilityLabel="편집"
-            accessibilityRole="button"
-            testID="favorites-edit-button"
-            onPress={() => {
-              // Phase B will wire this to a global edit/reorder mode that
-              // exposes drag handles + bulk delete. For now the button is
-              // present so the header layout matches the design contract.
-              Alert.alert('편집', '편집 모드는 곧 제공될 예정입니다.');
-            }}
-          >
-            <Text style={styles.editButtonText}>편집</Text>
-          </TouchableOpacity>
+          {!hasNoFavorites && (
+            <TouchableOpacity
+              style={styles.editButton}
+              accessibilityLabel={isEditMode ? '편집 완료' : '편집'}
+              accessibilityRole="button"
+              testID="favorites-edit-button"
+              onPress={handleEditModeToggle}
+            >
+              <Text style={styles.editButtonText}>{isEditMode ? '완료' : '편집'}</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity
             style={styles.addButton}
             accessibilityLabel="즐겨찾기 추가"
@@ -459,8 +525,8 @@ export const FavoritesScreen: React.FC = () => {
         </View>
       </View>
 
-      {/* Search Bar */}
-      {!hasNoFavorites && (
+      {/* Search Bar — hidden in edit mode so the full list stays reorderable */}
+      {!hasNoFavorites && !isEditMode && (
         <FavoritesSearchBar
           searchQuery={searchQuery}
           onSearchChange={setSearchQuery}
@@ -472,7 +538,7 @@ export const FavoritesScreen: React.FC = () => {
 
       {/* Line filter chips — derived from the user's own favorites so the
           row is empty (and naturally hidden) when there are no favorites. */}
-      {availableLineIds.length > 0 && (
+      {availableLineIds.length > 0 && !isEditMode && (
         <FavoritesLineChips
           lineIds={availableLineIds}
           selectedLineId={activeFilters.lineId}
@@ -531,6 +597,27 @@ export const FavoritesScreen: React.FC = () => {
           // dragHandleArea). DraggableFlatList itself only animates.
           activationDistance={20}
         />
+      )}
+
+      {/* Edit-mode action bar: bulk delete for the current selection */}
+      {isEditMode && (
+        <View style={styles.editActionBar}>
+          <TouchableOpacity
+            style={[
+              styles.bulkDeleteButton,
+              selectedIds.size === 0 && styles.bulkDeleteButtonDisabled,
+            ]}
+            onPress={handleBulkDelete}
+            disabled={selectedIds.size === 0}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: selectedIds.size === 0 }}
+            accessibilityLabel={`선택한 ${selectedIds.size}개 즐겨찾기 삭제`}
+            testID="favorites-bulk-delete-button"
+          >
+            <Trash2 size={18} color="#FFFFFF" />
+            <Text style={styles.bulkDeleteText}>삭제 ({selectedIds.size})</Text>
+          </TouchableOpacity>
+        </View>
       )}
 
       {/* Station Search Modal */}
@@ -606,6 +693,30 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     },
     listContainer: {
       padding: WANTED_TOKENS.spacing.s4,
+    },
+    editActionBar: {
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingVertical: WANTED_TOKENS.spacing.s3,
+      borderTopWidth: 1,
+      borderTopColor: semantic.lineSubtle,
+      backgroundColor: semantic.bgBase,
+    },
+    bulkDeleteButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: WANTED_TOKENS.spacing.s2,
+      height: 48,
+      borderRadius: WANTED_TOKENS.radius.r5,
+      backgroundColor: '#FF3B30',
+    },
+    bulkDeleteButtonDisabled: {
+      opacity: 0.4,
+    },
+    bulkDeleteText: {
+      fontSize: WANTED_TOKENS.type.label1.size,
+      color: '#FFFFFF',
+      fontFamily: weightToFontFamily('700'),
     },
     favoriteItemContainer: {
       marginBottom: WANTED_TOKENS.spacing.s5,
