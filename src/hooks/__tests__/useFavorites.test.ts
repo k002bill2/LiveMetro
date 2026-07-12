@@ -525,6 +525,95 @@ describe('useFavorites', () => {
         await bPromise.catch(() => undefined);
       });
     });
+
+    it('동일 계정 user 객체 churn에도 큐가 유지된다 (B가 A를 추월하지 않음)', async () => {
+      let resolveA!: () => void;
+      mockFavoritesService.updateFavorite.mockImplementationOnce(
+        () => new Promise<void>((resolve) => { resolveA = resolve; }),
+      );
+
+      const { result, rerender } = renderHook(() => useFavorites(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      // A (update) stays pending, holding the mutation chain.
+      let aPromise!: Promise<void>;
+      await act(async () => {
+        aPromise = result.current.updateFavorite('fav_A', { alias: 'x' });
+      });
+      expect(mockFavoritesService.updateFavorite).toHaveBeenCalledTimes(1);
+
+      // Same account, but AuthContext mints a NEW user object (onSnapshot
+      // churn from the favorites write itself) — the chain must NOT rotate.
+      mockUseAuth.mockReturnValue({
+        user: { id: 'user-123', email: 'test@test.com' },
+        firebaseUser: null,
+        loading: false,
+      } as any);
+      await act(async () => {
+        rerender(undefined);
+      });
+
+      // B must remain queued behind A (no overtaking on same-account churn).
+      mockFavoritesService.removeFavorites.mockResolvedValueOnce(undefined);
+      let bPromise!: Promise<void>;
+      await act(async () => {
+        bPromise = result.current.removeFavorites(['fav_B']);
+      });
+      expect(mockFavoritesService.removeFavorites).not.toHaveBeenCalled();
+
+      await act(async () => {
+        resolveA();
+        await aPromise;
+        await bPromise;
+      });
+      expect(mockFavoritesService.removeFavorites).toHaveBeenCalledWith('user-123', ['fav_B']);
+    });
+
+    it('로그아웃 후 같은 id로 재로그인해도 이전 세대의 큐 job은 reject된다', async () => {
+      let resolveA!: () => void;
+      mockFavoritesService.updateFavorite.mockImplementationOnce(
+        () => new Promise<void>((resolve) => { resolveA = resolve; }),
+      );
+
+      const { result, rerender } = renderHook(() => useFavorites(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      // A pending (gen N), B queued behind A (also gen N).
+      let aPromise!: Promise<void>;
+      let bPromise!: Promise<void>;
+      await act(async () => {
+        aPromise = result.current.updateFavorite('fav_A', { alias: 'x' });
+        bPromise = result.current.removeFavorites(['fav_B']);
+      });
+      expect(mockFavoritesService.updateFavorite).toHaveBeenCalledTimes(1);
+      expect(mockFavoritesService.removeFavorites).not.toHaveBeenCalled();
+
+      // Logout then re-login the SAME id: userId comparison would let the
+      // stale B through, but the generation counter bumps twice.
+      mockUseAuth.mockReturnValue({
+        user: null,
+        firebaseUser: null,
+        loading: false,
+      } as any);
+      await act(async () => {
+        rerender(undefined);
+      });
+      mockUseAuth.mockReturnValue({
+        user: { id: 'user-123', email: 'test@test.com' },
+        firebaseUser: null,
+        loading: false,
+      } as any);
+      await act(async () => {
+        rerender(undefined);
+      });
+
+      await act(async () => {
+        resolveA();
+        await aPromise.catch(() => undefined);
+        await expect(bPromise).rejects.toThrow('로그인이 필요합니다.');
+      });
+      expect(mockFavoritesService.removeFavorites).not.toHaveBeenCalled();
+    });
   });
 
   describe('Notification toggle', () => {

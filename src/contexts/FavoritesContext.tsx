@@ -77,10 +77,11 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // so the second tap sees the first tap's lock without waiting for a render.
   const inFlightRef = useRef<Set<string>>(new Set());
 
-  // Auth generation guard: a job enqueued for user A must not run after
-  // logout or an account switch to user B — the stale closure would write
-  // to A's document and rehydrate the provider with A's favorites.
-  const currentUserIdRef = useRef<string | null>(null);
+  // Auth generation: bumped on every account *transition* (login, logout,
+  // switch) — but NOT on same-account user-object churn from AuthContext's
+  // onSnapshot (each favorites write refreshes the user doc and mints a new
+  // object). Queue rotation and stale-job rejection both key off this.
+  const authGenerationRef = useRef(0);
 
   // Client-side total order for favorites mutations. Every mutation chains
   // onto the previous one, so an in-flight update/reorder can never commit
@@ -88,13 +89,16 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   // (Codex R3: UI freezing alone cannot stop writes that already started.)
   const mutationChainRef = useRef<Promise<void>>(Promise.resolve());
 
+  // Depend on the primitive id, not the user object: same-account churn must
+  // not bump the generation or rotate the chain (that would let a later bulk
+  // delete overtake an already-queued reorder/update).
+  const userId = user?.id ?? null;
   useEffect(() => {
-    currentUserIdRef.current = user?.id ?? null;
-    // Rotate the mutation chain on account change: user B must not queue
-    // behind user A's unresolved writes. A's orphaned jobs still run but the
-    // auth-generation guard rejects them before touching Firestore.
+    authGenerationRef.current += 1;
+    // Rotate the chain: jobs from the previous auth generation are orphaned
+    // and will be rejected by the generation check below.
     mutationChainRef.current = Promise.resolve();
-  }, [user]);
+  }, [userId]);
 
   const runExclusive = useCallback(
     async (key: string, task: () => Promise<void>): Promise<void> => {
@@ -205,16 +209,17 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         throw new Error('로그인이 필요합니다.');
       }
       const jobUserId = user.id;
+      const jobGeneration = authGenerationRef.current;
       const run = mutationChainRef.current.then(async () => {
-        // Re-check the account right before running: a job queued behind a
-        // slow write must not execute after logout/account switch.
-        if (currentUserIdRef.current !== jobUserId) {
+        // Reject jobs from a superseded auth generation (logout / account
+        // switch / re-login cycle) before they touch Firestore.
+        if (authGenerationRef.current !== jobGeneration) {
           throw new Error('로그인이 필요합니다.');
         }
         const changed = await task(jobUserId);
         // Re-check again before reload: the account may have changed while the
         // task was awaiting, and reloading would rehydrate a stale account.
-        if (changed !== false && currentUserIdRef.current === jobUserId) {
+        if (changed !== false && authGenerationRef.current === jobGeneration) {
           await loadFavorites();
         }
       });
