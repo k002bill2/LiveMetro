@@ -15,12 +15,16 @@ import { FavoriteWithDetails } from '@/hooks/useFavorites';
 jest.mock('lucide-react-native', () => new Proxy({}, { get: (_, name) => name }));
 
 // Capture Swipeable props so we can assert `enabled` toggles with select mode.
+// Expose a `close` method on the ref so we can assert the drawer is retracted
+// when edit mode is entered.
 const mockSwipeableProps = jest.fn();
+const mockSwipeableClose = jest.fn();
 jest.mock('react-native-gesture-handler', () => {
   const ReactModule = require('react');
   return {
-    Swipeable: ReactModule.forwardRef((props: { children?: React.ReactNode }, _ref: unknown) => {
+    Swipeable: ReactModule.forwardRef((props: { children?: React.ReactNode }, ref: unknown) => {
       mockSwipeableProps(props);
+      ReactModule.useImperativeHandle(ref, () => ({ close: mockSwipeableClose }), []);
       return props.children ?? null;
     }),
   };
@@ -142,6 +146,25 @@ describe('DraggableFavoriteItem', () => {
       renderItem({ isSelectMode: true });
       const lastProps = mockSwipeableProps.mock.lastCall?.[0] as { enabled?: boolean } | undefined;
       expect(lastProps?.enabled).toBe(false);
+    });
+
+    it('선택 모드 진입 시 열린 스와이프 드로어를 닫는다 (close 호출)', () => {
+      const props: ItemProps = {
+        favorite: baseFavorite,
+        index: 0,
+        isEditing: false,
+        onEditToggle: jest.fn(),
+        onRemove: jest.fn(),
+        onPress: jest.fn(),
+        onSaveEdit: jest.fn().mockResolvedValue(undefined),
+        drag: jest.fn(),
+        isSelectMode: false,
+      };
+      const { rerender } = render(<DraggableFavoriteItem {...props} />);
+      expect(mockSwipeableClose).not.toHaveBeenCalled();
+
+      rerender(<DraggableFavoriteItem {...props} isSelectMode={true} />);
+      expect(mockSwipeableClose).toHaveBeenCalledTimes(1);
     });
 
     it('일반 모드(기본값)에서는 체크박스·✎가 렌더되지 않는다', () => {

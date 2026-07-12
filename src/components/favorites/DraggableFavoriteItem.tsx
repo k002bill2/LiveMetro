@@ -3,7 +3,7 @@
  * Wraps StationCard with edit and drag functionality
  */
 
-import React, { useCallback, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useSemanticTokens } from '@/services/theme';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { AlertCircle, Trash2, Bell, BellOff, CheckCircle2, Circle, Pencil } from 'lucide-react-native';
@@ -109,6 +109,16 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
     swipeableRef.current?.close();
     onRemove();
   }, [onRemove]);
+
+  // Entering selection mode must also retract an already-open swipe drawer:
+  // `enabled={false}` only blocks future pan gestures, it does not reset the
+  // current translation, so mute/delete would stay exposed and tappable.
+  useEffect(() => {
+    if (isSelectMode) {
+      swipeableRef.current?.close();
+    }
+  }, [isSelectMode]);
+
   const { colors } = useTheme();
   const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(colors, semantic), [colors, semantic]);
