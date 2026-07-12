@@ -227,6 +227,37 @@ class FavoritesService {
       throw new Error('즐겨찾기 순서 변경에 실패했습니다.');
     }
   }
+
+  /**
+   * Remove multiple favorites in one Firestore write (edit-mode bulk
+   * delete). Unknown ids are ignored; an empty input or zero matches
+   * skips the write entirely so no-op taps cost nothing.
+   */
+  async removeFavorites(userId: string, favoriteIds: readonly string[]): Promise<void> {
+    if (favoriteIds.length === 0) {
+      return;
+    }
+
+    try {
+      const userRef = doc(firestore, 'users', userId);
+      const favorites = await this.getFavorites(userId);
+
+      const idsToRemove = new Set(favoriteIds);
+      const remaining = favorites.filter(fav => !idsToRemove.has(fav.id));
+
+      if (remaining.length === favorites.length) {
+        return;
+      }
+
+      await updateDoc(userRef, {
+        'preferences.favoriteStations': remaining,
+        lastActiveAt: new Date(),
+      });
+    } catch (error) {
+      console.error('Error removing favorites:', error);
+      throw new Error('즐겨찾기 삭제에 실패했습니다.');
+    }
+  }
 }
 
 /**

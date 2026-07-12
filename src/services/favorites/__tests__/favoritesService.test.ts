@@ -460,6 +460,79 @@ describe('FavoritesService', () => {
       expect(result).toBe(false);
     });
   });
+
+  describe('removeFavorites', () => {
+    const fav = (id: string, stationId: string): FavoriteStation => ({
+      id,
+      stationId,
+      lineId: '2',
+      alias: null,
+      direction: 'both',
+      isCommuteStation: false,
+      addedAt: new Date('2024-01-01'),
+    });
+
+    const seedFavorites = (favorites: FavoriteStation[]): void => {
+      mockGetDoc.mockResolvedValue({
+        exists: () => true,
+        data: () => ({ preferences: { favoriteStations: favorites } }),
+      });
+      // clearAllMocks() clears call records but not implementations, so a
+      // prior describe's mockRejectedValue can leak in. Reset to a resolved
+      // write here (the error case overrides this afterward).
+      mockUpdateDoc.mockResolvedValue(undefined);
+    };
+
+    it('should remove targeted favorites in a single updateDoc write', async () => {
+      seedFavorites([fav('fav_1', 'gangnam'), fav('fav_2', 'seoul'), fav('fav_3', 'hongdae')]);
+
+      await favoritesService.removeFavorites('user-123', ['fav_1', 'fav_3']);
+
+      expect(mockUpdateDoc).toHaveBeenCalledTimes(1);
+      const payload = mockUpdateDoc.mock.calls[0]?.[1] as {
+        'preferences.favoriteStations': FavoriteStation[];
+      };
+      const remaining = payload['preferences.favoriteStations'];
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0]?.id).toBe('fav_2');
+    });
+
+    it('should ignore unknown ids and still remove known ones', async () => {
+      seedFavorites([fav('fav_1', 'gangnam'), fav('fav_2', 'seoul')]);
+
+      await favoritesService.removeFavorites('user-123', ['fav_2', 'fav_ghost']);
+
+      expect(mockUpdateDoc).toHaveBeenCalledTimes(1);
+      const payload = mockUpdateDoc.mock.calls[0]?.[1] as {
+        'preferences.favoriteStations': FavoriteStation[];
+      };
+      expect(payload['preferences.favoriteStations'].map((f) => f.id)).toEqual(['fav_1']);
+    });
+
+    it('should be a no-op (no read, no write) for an empty id list', async () => {
+      await favoritesService.removeFavorites('user-123', []);
+
+      expect(mockGetDoc).not.toHaveBeenCalled();
+      expect(mockUpdateDoc).not.toHaveBeenCalled();
+    });
+
+    it('should skip the write when nothing matches', async () => {
+      seedFavorites([fav('fav_1', 'gangnam')]);
+
+      await favoritesService.removeFavorites('user-123', ['fav_ghost']);
+
+      expect(mockUpdateDoc).not.toHaveBeenCalled();
+    });
+
+    it('should throw a user-friendly error when Firestore write fails', async () => {
+      seedFavorites([fav('fav_1', 'gangnam')]);
+      mockUpdateDoc.mockRejectedValue(new Error('Firestore error'));
+
+      await expect(
+        favoritesService.removeFavorites('user-123', ['fav_1'])
+      ).rejects.toThrow('즐겨찾기 삭제에 실패했습니다.');
+    });
+  });
 });
 
 describe('migrateFavoritesToNewFormat', () => {
