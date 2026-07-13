@@ -42,6 +42,20 @@ describe('GuidanceActiveBanner', () => {
     expect(queryByTestId('guidance-active-banner')).toBeNull();
   });
 
+  it('renders nothing for a locally-completed session (Y1 — persisted localCompletedAt)', () => {
+    // A non-null session that already arrived must not read as "안내 중" or offer
+    // re-entry into a finished journey.
+    mockedUseGuidanceSession.mockReturnValue({ ...SESSION, localCompletedAt: 1_700_000_050_000 });
+    const { queryByTestId } = render(<GuidanceActiveBanner onPress={jest.fn()} />);
+    expect(queryByTestId('guidance-active-banner')).toBeNull();
+  });
+
+  it('renders nothing for a remotely-completed session (commuteLogCompletedAt)', () => {
+    mockedUseGuidanceSession.mockReturnValue({ ...SESSION, commuteLogCompletedAt: 1_700_000_050_000 });
+    const { queryByTestId } = render(<GuidanceActiveBanner onPress={jest.fn()} />);
+    expect(queryByTestId('guidance-active-banner')).toBeNull();
+  });
+
   it('shows the 안내 중 label and the route endpoints when active', () => {
     mockedUseGuidanceSession.mockReturnValue(SESSION);
     const { getByTestId, getByText } = render(

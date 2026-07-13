@@ -14,6 +14,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { ChevronRight, Navigation } from 'lucide-react-native';
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { useGuidanceSession } from '@/hooks/useGuidanceSession';
+import { isActiveGuidanceSession } from '@/services/guidance/guidanceSessionStore';
 
 interface GuidanceActiveBannerProps {
   /** Tap handler — typically navigates back to the RouteGuidance screen. */
@@ -26,7 +27,10 @@ const GuidanceActiveBannerImpl: React.FC<GuidanceActiveBannerProps> = ({
   testID,
 }) => {
   const session = useGuidanceSession();
-  if (!session) return null;
+  // 활성 정의 SSOT(18R/W1) — 로컬 완주(localCompletedAt)·원격 완료
+  // (commuteLogCompletedAt) 세션은 non-null이어도 "안내 중"으로 표시하지 않는다.
+  // 선행 `!session`은 아래 JSX를 위한 타입 내로잉 역할도 겸한다.
+  if (!session || !isActiveGuidanceSession(session)) return null;
 
   const routeLabel = `${session.fromStationName} → ${session.toStationName}`;
 
