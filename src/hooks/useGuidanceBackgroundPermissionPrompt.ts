@@ -19,7 +19,10 @@ import { AppState, Linking, Platform, type AppStateStatus } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { locationService } from '@/services/location/locationService';
-import { startGuidanceBackgroundLocation } from '@/services/guidance/guidanceBackgroundLocationTask';
+import {
+  startGuidanceBackgroundLocation,
+  stopGuidanceBackgroundLocation,
+} from '@/services/guidance/guidanceBackgroundLocationTask';
 import { getGuidanceSession } from '@/services/guidance/guidanceSessionStore';
 
 /**
@@ -31,10 +34,18 @@ const hasActiveGuidanceSession = (): boolean => {
   return session !== null && !session.commuteLogCompletedAt;
 };
 
-/** 활성 세션이 남아있을 때만 백그라운드 위치 추적을 시작한다. */
+/**
+ * 활성 세션이 남아있을 때만 백그라운드 위치 추적을 시작한다. start await(네이티브
+ * 권한 체크/태스크 등록) 동안 세션이 종료됐을 수 있는데, 그 경우 앱 레벨 sync 훅의
+ * stop이 태스크 등록 *전에* 실행됐을 수 있어 세션 없는 추적이 남는다 — 시작이 true로
+ * 완료된 직후 세션을 재확인해 비활성이면 즉시 되돌린다(L1). 이 시점 이후의 종료는
+ * sync 훅의 활성 전이 stop이 정상 커버한다.
+ */
 const startBackgroundLocationIfSessionActive = async (): Promise<void> => {
-  if (hasActiveGuidanceSession()) {
-    await startGuidanceBackgroundLocation();
+  if (!hasActiveGuidanceSession()) return;
+  const started = await startGuidanceBackgroundLocation();
+  if (started && !hasActiveGuidanceSession()) {
+    await stopGuidanceBackgroundLocation();
   }
 };
 
@@ -70,7 +81,14 @@ export const useGuidanceBackgroundPermissionPrompt =
           const dismissed = await AsyncStorage.getItem(GUIDANCE_BG_PERM_PROMPT_DISMISSED_KEY);
           if (dismissed !== null) return;
           const permission = await Location.getBackgroundPermissionsAsync();
-          if (permission.status === 'granted') return;
+          if (permission.status === 'granted') {
+            // 세션 중 외부(설정/권한 화면)에서 Always를 켜고 돌아온 경우, sync 훅은
+            // 세션 키 불변이라 재시도하지 않는다 — 초기 resolver가 배너를 숨기면서
+            // 백그라운드 추적도 시작한다(멱등: 이미 시작된 태스크는 no-op). L1의
+            // 사후 재확인이 이 경로에도 그대로 적용된다(L2).
+            await startBackgroundLocationIfSessionActive();
+            return;
+          }
           if (mountedRef.current) {
             // 이미 영구 거부(canAskAgain=false)면 in-app "허용하기"는 헛탭이므로
             // 바로 설정 모드로 시작한다 (설정 앱 딥링크로 유도).

@@ -12,7 +12,10 @@ import { AppState, Platform, Linking, type AppStateStatus } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { locationService } from '@/services/location/locationService';
-import { startGuidanceBackgroundLocation } from '@/services/guidance/guidanceBackgroundLocationTask';
+import {
+  startGuidanceBackgroundLocation,
+  stopGuidanceBackgroundLocation,
+} from '@/services/guidance/guidanceBackgroundLocationTask';
 import { getGuidanceSession } from '@/services/guidance/guidanceSessionStore';
 import type { GuidanceSession } from '@/models/guidance';
 import {
@@ -37,6 +40,7 @@ jest.mock('@/services/location/locationService', () => ({
 
 jest.mock('@/services/guidance/guidanceBackgroundLocationTask', () => ({
   startGuidanceBackgroundLocation: jest.fn(() => Promise.resolve(true)),
+  stopGuidanceBackgroundLocation: jest.fn(() => Promise.resolve()),
 }));
 
 jest.mock('@/services/guidance/guidanceSessionStore', () => ({
@@ -48,6 +52,7 @@ const mockSetItem = AsyncStorage.setItem as jest.Mock;
 const mockGetBgPerm = Location.getBackgroundPermissionsAsync as jest.Mock;
 const mockRequestBgPerm = locationService.requestBackgroundPermission as jest.Mock;
 const mockStartBgLocation = startGuidanceBackgroundLocation as jest.Mock;
+const mockStopBgLocation = stopGuidanceBackgroundLocation as jest.Mock;
 const mockGetGuidanceSession = getGuidanceSession as jest.Mock;
 const activeSession = { startedAt: 1000 } as unknown as GuidanceSession;
 
@@ -62,6 +67,7 @@ describe('useGuidanceBackgroundPermissionPrompt', () => {
     mockGetBgPerm.mockResolvedValue({ status: 'undetermined' });
     mockRequestBgPerm.mockResolvedValue(false);
     mockStartBgLocation.mockResolvedValue(true);
+    mockStopBgLocation.mockResolvedValue(undefined);
     mockGetGuidanceSession.mockReturnValue(activeSession); // 기본: 활성 세션
     jest.spyOn(Linking, 'openSettings').mockResolvedValue(undefined);
   });
@@ -80,6 +86,7 @@ describe('useGuidanceBackgroundPermissionPrompt', () => {
       });
       expect(result.current.status).toBe('hidden');
       expect(mockGetItem).not.toHaveBeenCalled();
+      expect(mockStartBgLocation).not.toHaveBeenCalled(); // web hidden 경로 → start 없음
     });
 
     it('stays hidden when the user previously dismissed it', async () => {
@@ -88,6 +95,14 @@ describe('useGuidanceBackgroundPermissionPrompt', () => {
       await waitFor(() => expect(mockGetItem).toHaveBeenCalled());
       expect(result.current.status).toBe('hidden');
       expect(mockGetBgPerm).not.toHaveBeenCalled();
+      expect(mockStartBgLocation).not.toHaveBeenCalled(); // dismissed hidden 경로 → start 없음
+    });
+
+    it('starts background location on mount when permission is already granted mid-session (L2)', async () => {
+      mockGetBgPerm.mockResolvedValue({ status: 'granted' });
+      const { result } = renderHook(() => useGuidanceBackgroundPermissionPrompt());
+      await waitFor(() => expect(mockStartBgLocation).toHaveBeenCalled());
+      expect(result.current.status).toBe('hidden');
     });
 
     it('stays hidden when background permission is already granted', async () => {
@@ -177,6 +192,37 @@ describe('useGuidanceBackgroundPermissionPrompt', () => {
       });
 
       expect(mockStartBgLocation).not.toHaveBeenCalled();
+    });
+
+    it('stops background location when the session ends during the start await (L1)', async () => {
+      mockRequestBgPerm.mockResolvedValue(true);
+      mockStartBgLocation.mockResolvedValue(true);
+      // 시작 전 체크는 활성, 시작 완료 후 체크는 종료됨 (start await 도중 종료 모사).
+      mockGetGuidanceSession.mockReturnValueOnce(activeSession).mockReturnValue(null);
+      const { result } = renderHook(() => useGuidanceBackgroundPermissionPrompt());
+      await waitFor(() => expect(result.current.status).toBe('prompt'));
+
+      await act(async () => {
+        await result.current.requestPermission();
+      });
+
+      expect(mockStartBgLocation).toHaveBeenCalledTimes(1);
+      expect(mockStopBgLocation).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not stop background location when the session stays active through the start', async () => {
+      mockRequestBgPerm.mockResolvedValue(true);
+      mockStartBgLocation.mockResolvedValue(true);
+      // 기본 getGuidanceSession = activeSession (시작 전/후 모두 활성).
+      const { result } = renderHook(() => useGuidanceBackgroundPermissionPrompt());
+      await waitFor(() => expect(result.current.status).toBe('prompt'));
+
+      await act(async () => {
+        await result.current.requestPermission();
+      });
+
+      expect(mockStartBgLocation).toHaveBeenCalledTimes(1);
+      expect(mockStopBgLocation).not.toHaveBeenCalled();
     });
 
     it('hides silently when the request throws', async () => {
