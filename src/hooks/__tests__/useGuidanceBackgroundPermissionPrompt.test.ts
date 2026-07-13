@@ -556,5 +556,42 @@ describe('useGuidanceBackgroundPermissionPrompt', () => {
       await waitFor(() => expect(mockStartBgLocation).toHaveBeenCalled());
       expect(result.current.status).toBe('hidden');
     });
+
+    it('start await 중 suspended가 켜지면 시작 후 즉시 stop한다 (T4)', async () => {
+      mockRequestBgPerm.mockResolvedValue(true);
+      mockGetGuidanceSession.mockReturnValue(activeSession); // 세션 활성 유지(원격 미기록)
+      // start를 in-flight로 멈춰 그 사이 suspended 전이를 모사한다.
+      let resolveStart: (v: boolean) => void = () => undefined;
+      mockStartBgLocation.mockReturnValue(
+        new Promise<boolean>((r) => {
+          resolveStart = r;
+        })
+      );
+      const { result, rerender } = renderHook(
+        ({ suspended }: { suspended: boolean }) =>
+          useGuidanceBackgroundPermissionPrompt({ suspended }),
+        { initialProps: { suspended: false } }
+      );
+      await waitFor(() => expect(result.current.status).toBe('prompt'));
+
+      let reqP: Promise<void> = Promise.resolve();
+      await act(async () => {
+        reqP = result.current.requestPermission();
+        // requestBackgroundPermission + start await 진입까지 microtask flush.
+        await Promise.resolve();
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      // start가 in-flight인 동안 로컬 완료로 suspended 전이.
+      act(() => {
+        rerender({ suspended: true });
+      });
+      await act(async () => {
+        resolveStart(true);
+        await reqP;
+      });
+
+      expect(mockStopBgLocation).toHaveBeenCalled();
+    });
   });
 });

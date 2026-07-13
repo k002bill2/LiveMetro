@@ -99,6 +99,12 @@ export const useGuidanceBackgroundPermissionPrompt = (
     const startTrackingIfEligible = useCallback(async (): Promise<void> => {
       if (suspendedRef.current) return;
       await startBackgroundLocationIfSessionActive();
+      // T4: start await(권한/네이티브 등록) 동안 로컬 완료로 suspended가 켜졌을 수 있다.
+      // 완료 effect의 stop이 등록 완료 *전*에 실행됐을 수 있고, L1의 세션 사후 확인은
+      // 원격 미기록 시 세션을 여전히 활성으로 봐 못 잡는다 → 시작 후 suspended면 즉시 중지.
+      if (suspendedRef.current) {
+        await stopGuidanceBackgroundLocation();
+      }
     }, []);
 
     // Resolve initial visibility once on mount.

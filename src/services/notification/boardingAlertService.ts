@@ -153,9 +153,10 @@ const scheduleBoardingAlertInner = async (
 
     // 다른 열차로 재탑승 시 이전 알림이 남지 않도록 먼저 취소. 이미 큐 안에서
     // 실행 중이므로 inner를 직접 호출한다(공개 cancelBoardingAlert 재진입 = 데드락).
-    // respectContextIsolation:false — 교체 dedup은 K1 격리를 적용하지 않고 기존 의미
-    // (추적 슬롯을 새 예약으로 덮기 전 이전 것 취소)를 유지한다.
-    await cancelBoardingAlertInner({ respectContextIsolation: false });
+    // scheduleContext=이번 예약 context — (a) 추적 ID는 같은 컨텍스트 교체분만 취소,
+    // (b) kind sweep은 guidance 예약일 때만 실행한다. standalone 예약이 마커 없는
+    // 자기 알림만 교체하고 남의(guidance) 알림을 오취소하지 않게 한다(T1).
+    await cancelBoardingAlertInner({ scheduleContext: params.context });
 
     // 환승은 종착역(finalDestination)이 대기 방향과 어긋날 수 있어 카피에서 생략.
     const copy =
@@ -223,33 +224,45 @@ export const cancelBoardingAlert = (
 ): Promise<void> => enqueue(() => cancelBoardingAlertInner(options));
 
 const cancelBoardingAlertInner = async (
-  options?: { readonly keepSessionKey?: string; readonly respectContextIsolation?: boolean }
+  options?: {
+    readonly keepSessionKey?: string;
+    readonly respectContextIsolation?: boolean;
+    readonly scheduleContext?: 'guidance' | 'standalone';
+  }
 ): Promise<void> => {
   const keepSessionKey = options?.keepSessionKey;
-  // 기본(공개 = guidance 수명주기 진입점)은 컨텍스트 격리를 지킨다(K1). 내부 dedup만
-  // false로 기존 동작(무조건 추적 취소)을 유지한다.
-  const respectContextIsolation = options?.respectContextIsolation !== false;
-  const skipStandaloneTracked = respectContextIsolation && trackedContext === 'standalone';
-  if (!skipStandaloneTracked) {
+  const scheduleContext = options?.scheduleContext;
+  // 추적 ID 취소 판정. 내부 dedup(scheduleContext 지정)은 같은 컨텍스트 교체분만
+  // 취소한다(T1). 공개 lifecycle cancel(scheduleContext 미지정)은 K1 격리 + keep 필터.
+  let cancelTracked: boolean;
+  if (scheduleContext !== undefined) {
+    cancelTracked = trackedContext === scheduleContext;
+  } else {
+    const respectContextIsolation = options?.respectContextIsolation !== false;
+    const skipStandaloneTracked = respectContextIsolation && trackedContext === 'standalone';
     const keptByFilter =
       keepSessionKey !== undefined && trackedSessionKey === keepSessionKey;
-    if (!keptByFilter) {
-      const id = lastAlertId;
-      lastAlertId = null;
-      trackedContext = null;
-      trackedSessionKey = null;
-      if (id !== null) {
-        try {
-          await notificationService.cancelNotification(id);
-        } catch (error) {
-          console.error('Error cancelling boarding alert:', error);
-        }
+    cancelTracked = !skipStandaloneTracked && !keptByFilter;
+  }
+  if (cancelTracked) {
+    const id = lastAlertId;
+    lastAlertId = null;
+    trackedContext = null;
+    trackedSessionKey = null;
+    if (id !== null) {
+      try {
+        await notificationService.cancelNotification(id);
+      } catch (error) {
+        console.error('Error cancelling boarding alert:', error);
       }
     }
   }
   // OS 큐를 훑어 kind 마커가 붙은 탑승 알림을 취소한다 — 앱/JS 재시작으로 추적이
   // 끊긴 고아까지 청소한다. alight 알림(kind=ALIGHT_ALERT_KIND)은 상수가 달라
-  // 건드리지 않는다. keepSessionKey 세션 알림은 보존한다.
+  // 건드리지 않는다. keepSessionKey 세션 알림은 보존한다. 단, 내부 dedup의 kind
+  // sweep은 guidance 예약일 때만 실행한다 — standalone 예약이 남의 guidance 알림을
+  // 오취소하지 않게 한다(T1).
+  if (scheduleContext !== undefined && scheduleContext !== 'guidance') return;
   try {
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
     for (const request of scheduled) {

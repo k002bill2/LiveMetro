@@ -1063,6 +1063,22 @@ describe('RouteGuidanceScreen', () => {
       render(<RouteGuidanceScreen />);
       expect(stopGuidanceBackgroundLocation).not.toHaveBeenCalled();
     });
+
+    it('isAtEnd=true로 복원된 첫 렌더에서 stop을 1회 호출한다 (T2)', () => {
+      // ride를 10분 전에 탑승한 것으로 복원 → 5분 ride 초과 → 첫 렌더부터 isAtEnd(alight).
+      setGuidanceSession({
+        route: createRoute([
+          hop('s1', '을지로3가', 's2', '시청', 2),
+          hop('s2', '시청', 's3', '산곡', 3),
+        ]),
+        fromStationName: '을지로3가',
+        toStationName: '산곡',
+        startedAt: T0,
+        progressAnchor: { stepIndex: 1, atMs: T0 - 10 * 60_000 },
+      });
+      render(<RouteGuidanceScreen />);
+      expect(stopGuidanceBackgroundLocation).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('백그라운드 권한 유도 배너 (background permission banner)', () => {

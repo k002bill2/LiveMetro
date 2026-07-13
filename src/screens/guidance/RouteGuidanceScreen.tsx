@@ -231,16 +231,23 @@ export const RouteGuidanceScreen: React.FC = () => {
   // logged-out, which would otherwise keep the Android foreground service alive
   // (killServiceOnDestroy:false) after arrival (S1, same class as the wake lock).
   // A goPrev correction (true→false) symmetrically retries (permission-checked).
-  const prevIsAtEndRef = useRef(isAtEnd);
+  // T2: prev를 false로 초기화 — 오프라인 완주(isAtEnd=true) 상태로 복원된 세션도 첫
+  // 렌더에서 false→true로 인식돼 stop이 1회 발동한다(전이 미감지로 서비스 잔존 방지).
+  const prevIsAtEndRef = useRef(false);
   useEffect(() => {
     const prev = prevIsAtEndRef.current;
     prevIsAtEndRef.current = isAtEnd;
     if (isAtEnd && !prev) {
       void stopGuidanceBackgroundLocation();
-    } else if (!isAtEnd && prev) {
+    } else if (!isAtEnd && prev && isGuidanceActive) {
+      // 복구(재시도) 분기: true→false는 현 UI 기본 컨트롤(종점에서 GuidanceControls가
+      // prev/next 쌍을 숨김)로는 미도달 — 종점 상태에서 역 재베이스로 anchor가 뒤로
+      // 돌아가는 경로 대비 defensive. 세션이 여전히 활성일 때만 재시작한다 — 원격 완료가
+      // 이미 기록됐으면(비활성) 앱 레벨 sync가 inactive 전이를 소진해 다시 stop하지
+      // 않으므로 여기서 start하면 안 된다(T3).
       void startGuidanceBackgroundLocation();
     }
-  }, [isAtEnd]);
+  }, [isAtEnd, isGuidanceActive]);
 
   const currentStep = steps[currentIndex];
   const isWaitingStep =

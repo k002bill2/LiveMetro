@@ -497,4 +497,56 @@ describe('boardingAlertService', () => {
       expect(mockNotif.scheduleArrivalAlert).toHaveBeenCalled();
     });
   });
+
+  // ── 예약 경로 컨텍스트 격리 (T1): standalone 예약의 사전 dedup이 guidance 마커
+  // 알림을 sweep하지 않는다(standalone은 마커가 없어 sweep이 남의 것만 지우는 역설).
+  describe('예약 경로 컨텍스트 격리 (T1)', () => {
+    it('standalone 예약은 guidance 알림을 sweep하지 않는다', async () => {
+      mockGetAllScheduled.mockResolvedValue([
+        { identifier: 'guidance-pending', content: { data: { kind: BOARDING_ALERT_KIND, sessionKey: 'g' } } },
+      ]);
+      await scheduleBoardingAlert({
+        context: 'standalone',
+        stationName: '강남',
+        finalDestination: '잠실',
+        arrivalTime: arrival,
+      });
+      // standalone 예약의 사전 dedup은 kind sweep을 돌리지 않는다 → guidance 알림 생존.
+      expect(mockCancelScheduled).not.toHaveBeenCalledWith('guidance-pending');
+    });
+
+    it('guidance 예약은 사전 dedup에서 guidance kind를 sweep한다 (회귀)', async () => {
+      mockGetAllScheduled.mockResolvedValue([
+        { identifier: 'old-guidance', content: { data: { kind: BOARDING_ALERT_KIND, sessionKey: 'old' } } },
+      ]);
+      await scheduleBoardingAlert({
+        context: 'guidance',
+        sessionKey: 'new',
+        stationName: '강남',
+        finalDestination: '잠실',
+        arrivalTime: arrival,
+      });
+      expect(mockCancelScheduled).toHaveBeenCalledWith('old-guidance');
+    });
+
+    it('standalone 예약은 guidance 추적 ID를 취소하지 않는다 (같은 컨텍스트만)', async () => {
+      // guidance 알림을 먼저 추적시킨 뒤 standalone 예약 → guidance 추적 ID 미취소.
+      mockNotif.scheduleArrivalAlert.mockResolvedValueOnce('g-tracked');
+      await scheduleBoardingAlert({
+        context: 'guidance',
+        sessionKey: 'g',
+        stationName: '강남',
+        finalDestination: '잠실',
+        arrivalTime: arrival,
+      });
+      mockNotif.cancelNotification.mockClear();
+      await scheduleBoardingAlert({
+        context: 'standalone',
+        stationName: '강남',
+        finalDestination: '잠실',
+        arrivalTime: arrival,
+      });
+      expect(mockNotif.cancelNotification).not.toHaveBeenCalledWith('g-tracked');
+    });
+  });
 });
