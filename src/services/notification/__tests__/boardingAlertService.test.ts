@@ -5,6 +5,12 @@ import {
   BOARDING_ALERT_KIND,
 } from '../boardingAlertService';
 import { notificationService } from '../notificationService';
+import { getGuidanceSession } from '@/services/guidance/guidanceSessionStore';
+
+// 세션 키 스탬프용 — 서비스가 직접 읽는 활성 세션을 제어한다 (기본 null).
+jest.mock('@/services/guidance/guidanceSessionStore', () => ({
+  getGuidanceSession: jest.fn(() => null),
+}));
 
 // notificationService는 expo-notifications를 감싸므로 통째로 mock —
 // boardingAlertService의 오케스트레이션(권한 게이트 + dedup)만 검증한다.
@@ -28,6 +34,7 @@ jest.mock('expo-notifications', () => ({
 const mockNotif = notificationService as jest.Mocked<typeof notificationService>;
 const mockGetAllScheduled = Notifications.getAllScheduledNotificationsAsync as jest.Mock;
 const mockCancelScheduled = Notifications.cancelScheduledNotificationAsync as jest.Mock;
+const mockGetSession = getGuidanceSession as jest.Mock;
 
 const arrival = new Date('2026-05-19T11:05:00.000Z');
 
@@ -47,6 +54,7 @@ describe('boardingAlertService', () => {
     mockNotif.shouldSendNotification.mockReturnValue(true);
     mockGetAllScheduled.mockResolvedValue([]);
     mockCancelScheduled.mockResolvedValue(undefined);
+    mockGetSession.mockReturnValue(null);
   });
 
   it('returns null and does not schedule when arrivalTime is null', async () => {
@@ -353,6 +361,64 @@ describe('boardingAlertService', () => {
     it('getAllScheduled가 throw해도 호출자에게 던지지 않는다', async () => {
       mockGetAllScheduled.mockRejectedValue(new Error('os queue read failed'));
       await expect(cancelBoardingAlert()).resolves.toBeUndefined();
+    });
+  });
+
+  // ── 세션 키 스탬프 + 교체 정리 keep-필터 (G3): 세션 교체 시 이전 세션의 늦은
+  // 정리가 새 세션이 방금 예약한 알림을 지우는 레이스를 차단한다.
+  describe('세션 키 스탬프 + keep-필터 (G3)', () => {
+    it('활성 세션이 있으면 data에 sessionKey를 스탬프한다', async () => {
+      mockGetSession.mockReturnValue({ startedAt: 1234 });
+      await scheduleBoardingAlert({
+        stationName: '강남',
+        finalDestination: '잠실',
+        arrivalTime: arrival,
+      });
+      expect(mockNotif.scheduleArrivalAlert).toHaveBeenCalledWith(
+        arrival,
+        expect.objectContaining({
+          data: expect.objectContaining({ sessionKey: '1234' }),
+        })
+      );
+    });
+
+    it('세션이 없으면 sessionKey 필드를 생략한다', async () => {
+      mockGetSession.mockReturnValue(null);
+      await scheduleBoardingAlert({
+        stationName: '강남',
+        finalDestination: '잠실',
+        arrivalTime: arrival,
+      });
+      expect(mockNotif.scheduleArrivalAlert).toHaveBeenCalledWith(
+        arrival,
+        expect.objectContaining({
+          data: expect.not.objectContaining({ sessionKey: expect.anything() }),
+        })
+      );
+    });
+
+    it('keepSessionKey 지정 시 그 세션 알림은 보존하고 나머지 kind 매칭만 취소한다', async () => {
+      mockGetAllScheduled.mockResolvedValue([
+        { identifier: 'keep-new', content: { data: { kind: BOARDING_ALERT_KIND, sessionKey: 'new' } } },
+        { identifier: 'drop-old', content: { data: { kind: BOARDING_ALERT_KIND, sessionKey: 'old' } } },
+        { identifier: 'drop-nokey', content: { data: { kind: BOARDING_ALERT_KIND } } },
+      ]);
+      await cancelBoardingAlert({ keepSessionKey: 'new' });
+      expect(mockCancelScheduled).toHaveBeenCalledWith('drop-old');
+      expect(mockCancelScheduled).toHaveBeenCalledWith('drop-nokey');
+      expect(mockCancelScheduled).not.toHaveBeenCalledWith('keep-new');
+    });
+
+    it('keepSessionKey 지정 시 추적 중 ID는 취소하지 않는다 (새 세션 것일 수 있음)', async () => {
+      mockNotif.scheduleArrivalAlert.mockResolvedValueOnce('tracked-new');
+      await scheduleBoardingAlert({
+        stationName: '강남',
+        finalDestination: '잠실',
+        arrivalTime: arrival,
+      });
+      mockNotif.cancelNotification.mockClear();
+      await cancelBoardingAlert({ keepSessionKey: 'new' });
+      expect(mockNotif.cancelNotification).not.toHaveBeenCalled();
     });
   });
 });

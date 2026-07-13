@@ -95,6 +95,9 @@ describe('useGuidanceAlertCleanupSync', () => {
       mockUseGuidanceSession.mockReturnValue(null);
       rerender(undefined);
 
+      // End (→null) = full cancel, no keepSessionKey.
+      expect(mockCancelBoarding).toHaveBeenCalledWith(undefined);
+      expect(mockCancelAlight).toHaveBeenCalledWith(undefined);
       expect(mockCancelBoarding).toHaveBeenCalledTimes(1);
       expect(mockCancelAlight).toHaveBeenCalledTimes(1);
     });
@@ -124,16 +127,17 @@ describe('useGuidanceAlertCleanupSync', () => {
       expect(mockCancelAlight).not.toHaveBeenCalled();
     });
 
-    it('cancels when one active session is replaced by another (key change, no explicit end)', () => {
+    it('cancels with keepSessionKey (new key) when one active session replaces another', () => {
       mockUseGuidanceSession.mockReturnValue(makeSession({ startedAt: 1_000 }));
       const { rerender } = renderHook(() => useGuidanceAlertCleanupSync());
 
-      // A different journey (new startedAt) starts without ending the old one.
+      // A different journey (new startedAt) starts without ending the old one —
+      // the new session's just-scheduled alerts must be preserved.
       mockUseGuidanceSession.mockReturnValue(makeSession({ startedAt: 2_000 }));
       rerender(undefined);
 
-      expect(mockCancelBoarding).toHaveBeenCalledTimes(1);
-      expect(mockCancelAlight).toHaveBeenCalledTimes(1);
+      expect(mockCancelBoarding).toHaveBeenCalledWith({ keepSessionKey: '2000' });
+      expect(mockCancelAlight).toHaveBeenCalledWith({ keepSessionKey: '2000' });
     });
   });
 

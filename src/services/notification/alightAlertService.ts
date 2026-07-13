@@ -21,6 +21,7 @@
  */
 import * as Notifications from 'expo-notifications';
 import { notificationService, NotificationType } from './notificationService';
+import { getGuidanceSession } from '@/services/guidance/guidanceSessionStore';
 import { resolveAlightAlertPreferences } from '@models/user';
 import type { NotificationSettings } from '@models/user';
 
@@ -145,11 +146,20 @@ const scheduleAlightAlertInner = async (
         ? { title: `곧 ${stationName}역 도착`, body: `${toLineName ?? ''} 환승을 준비하세요`.trim() }
         : { title: `곧 ${stationName}역 도착`, body: '내릴 준비를 하세요' };
 
+    // 활성 세션 키 스탬프 — 세션 교체 정리 sweep의 keep-필터 근거 (boarding과 동일).
+    const session = getGuidanceSession();
+    const sessionKey = session !== null ? String(session.startedAt) : undefined;
+
     const id = await notificationService.scheduleArrivalAlert(new Date(arrivalAtMs), {
       secondsBefore: prefs.leadMinutes * 60,
       title: copy.title,
       body: copy.body,
-      data: { kind: ALIGHT_ALERT_KIND, variant: nextKind, stationName },
+      data: {
+        kind: ALIGHT_ALERT_KIND,
+        variant: nextKind,
+        stationName,
+        ...(sessionKey !== undefined ? { sessionKey } : {}),
+      },
     });
 
     if (id !== null) {
@@ -166,32 +176,41 @@ const scheduleAlightAlertInner = async (
 
 /**
  * 추적 중인 하차 임박 알림을 취소하고, OS 큐에 남은 하차 알림 고아까지 sweep한다.
- * 공개 함수는 직렬화 큐를 통해 순차 실행된다. Never throws.
+ * 공개 함수는 직렬화 큐를 통해 순차 실행된다. `options.keepSessionKey` 지정 시
+ * (세션 교체 정리) 추적 ID는 건드리지 않고, sweep에서 그 세션 알림을 보존한다 —
+ * 이전 세션의 늦은 정리가 새 세션 알림을 지우지 않게 한다. Never throws.
  */
-export const cancelAlightAlert = (): Promise<void> =>
-  enqueue(() => cancelAlightAlertInner());
+export const cancelAlightAlert = (
+  options?: { readonly keepSessionKey?: string }
+): Promise<void> => enqueue(() => cancelAlightAlertInner(options));
 
-const cancelAlightAlertInner = async (): Promise<void> => {
-  const id = trackedId;
-  trackedId = null;
-  trackedStepKey = null;
-  trackedFireAtMs = null;
-  if (id !== null) {
-    try {
-      await notificationService.cancelNotification(id);
-    } catch (error) {
-      console.error('Error cancelling alight alert:', error);
+const cancelAlightAlertInner = async (
+  options?: { readonly keepSessionKey?: string }
+): Promise<void> => {
+  const keepSessionKey = options?.keepSessionKey;
+  if (keepSessionKey === undefined) {
+    const id = trackedId;
+    trackedId = null;
+    trackedStepKey = null;
+    trackedFireAtMs = null;
+    if (id !== null) {
+      try {
+        await notificationService.cancelNotification(id);
+      } catch (error) {
+        console.error('Error cancelling alight alert:', error);
+      }
     }
   }
-  // OS 큐를 훑어 kind 마커가 붙은 하차 알림을 전부 취소한다 — 앱/JS 재시작으로
-  // 추적이 끊긴 고아까지 청소한다. boarding 알림(kind=BOARDING_ALERT_KIND)은
-  // 상수가 달라 건드리지 않는다.
+  // OS 큐를 훑어 kind 마커가 붙은 하차 알림을 취소한다 — 앱/JS 재시작으로 추적이
+  // 끊긴 고아까지 청소한다. boarding 알림(kind=BOARDING_ALERT_KIND)은 상수가 달라
+  // 건드리지 않는다. keepSessionKey 세션 알림은 보존한다.
   try {
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
     for (const request of scheduled) {
-      if (request.content?.data?.kind === ALIGHT_ALERT_KIND) {
-        await Notifications.cancelScheduledNotificationAsync(request.identifier);
-      }
+      const data = request.content?.data;
+      if (data?.kind !== ALIGHT_ALERT_KIND) continue;
+      if (keepSessionKey !== undefined && data?.sessionKey === keepSessionKey) continue;
+      await Notifications.cancelScheduledNotificationAsync(request.identifier);
     }
   } catch (error) {
     console.error('Error sweeping alight alerts:', error);

@@ -54,7 +54,11 @@ export const useGuidanceBackgroundPermissionPrompt =
           if (dismissed !== null) return;
           const permission = await Location.getBackgroundPermissionsAsync();
           if (permission.status === 'granted') return;
-          if (mountedRef.current) setStatus('prompt');
+          if (mountedRef.current) {
+            // 이미 영구 거부(canAskAgain=false)면 in-app "허용하기"는 헛탭이므로
+            // 바로 설정 모드로 시작한다 (설정 앱 딥링크로 유도).
+            setStatus(permission.canAskAgain === false ? 'settings' : 'prompt');
+          }
         } catch {
           // 조용히 숨김 유지 — 권한/스토리지 조회 실패는 배너를 띄우지 않는다.
         }

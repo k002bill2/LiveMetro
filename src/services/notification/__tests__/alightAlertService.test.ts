@@ -19,6 +19,11 @@ jest.mock('expo-notifications', () => ({
   cancelScheduledNotificationAsync: jest.fn(),
 }));
 
+// 세션 키 스탬프용 — 서비스가 직접 읽는 활성 세션을 제어한다 (기본 null).
+jest.mock('@/services/guidance/guidanceSessionStore', () => ({
+  getGuidanceSession: jest.fn(() => null),
+}));
+
 import type { NotificationSettings } from '@models/user';
 
 const NOW = 1_750_000_000_000;
@@ -51,6 +56,7 @@ const baseParams = {
 let svc: Svc;
 let notif: MockNotif;
 let expo: MockExpo;
+let store: { getGuidanceSession: jest.Mock };
 
 beforeEach(() => {
   jest.resetModules();
@@ -58,12 +64,14 @@ beforeEach(() => {
   svc = require('../alightAlertService');
   notif = require('../notificationService').notificationService;
   expo = require('expo-notifications');
+  store = require('@/services/guidance/guidanceSessionStore');
   notif.requestPermissions.mockResolvedValue({ granted: true });
   notif.shouldSendNotification.mockReturnValue(true);
   notif.scheduleArrivalAlert.mockResolvedValue('alert-1');
   notif.cancelNotification.mockResolvedValue(undefined);
   expo.getAllScheduledNotificationsAsync.mockResolvedValue([]);
   expo.cancelScheduledNotificationAsync.mockResolvedValue(undefined);
+  store.getGuidanceSession.mockReturnValue(null);
 });
 
 afterEach(() => {
@@ -273,6 +281,50 @@ describe('serialization (Codex P2 — 늦은 완료 레이스)', () => {
     // 추적 상태가 비워졌는지 — 후속 cancel은 no-op.
     notif.cancelNotification.mockClear();
     await svc.cancelAlightAlert();
+    expect(notif.cancelNotification).not.toHaveBeenCalled();
+  });
+});
+
+// ── 세션 키 스탬프 + 교체 정리 keep-필터 (G3, boarding과 대칭)
+describe('세션 키 스탬프 + keep-필터 (G3)', () => {
+  it('활성 세션이 있으면 data에 sessionKey를 스탬프한다', async () => {
+    store.getGuidanceSession.mockReturnValue({ startedAt: 1234 });
+    await svc.scheduleAlightAlert(baseParams);
+    expect(notif.scheduleArrivalAlert).toHaveBeenCalledWith(
+      expect.any(Date),
+      expect.objectContaining({
+        data: expect.objectContaining({ sessionKey: '1234' }),
+      })
+    );
+  });
+
+  it('세션이 없으면 sessionKey 필드를 생략한다', async () => {
+    store.getGuidanceSession.mockReturnValue(null);
+    await svc.scheduleAlightAlert(baseParams);
+    expect(notif.scheduleArrivalAlert).toHaveBeenCalledWith(
+      expect.any(Date),
+      expect.objectContaining({
+        data: expect.not.objectContaining({ sessionKey: expect.anything() }),
+      })
+    );
+  });
+
+  it('keepSessionKey 지정 시 그 세션 알림은 보존하고 나머지 kind 매칭만 취소한다', async () => {
+    expo.getAllScheduledNotificationsAsync.mockResolvedValue([
+      { identifier: 'keep-new', content: { data: { kind: 'alight-alert', sessionKey: 'new' } } },
+      { identifier: 'drop-old', content: { data: { kind: 'alight-alert', sessionKey: 'old' } } },
+      { identifier: 'drop-nokey', content: { data: { kind: 'alight-alert' } } },
+    ]);
+    await svc.cancelAlightAlert({ keepSessionKey: 'new' });
+    expect(expo.cancelScheduledNotificationAsync).toHaveBeenCalledWith('drop-old');
+    expect(expo.cancelScheduledNotificationAsync).toHaveBeenCalledWith('drop-nokey');
+    expect(expo.cancelScheduledNotificationAsync).not.toHaveBeenCalledWith('keep-new');
+  });
+
+  it('keepSessionKey 지정 시 추적 중 ID는 취소하지 않는다', async () => {
+    await svc.scheduleAlightAlert(baseParams); // trackedId='alert-1'
+    notif.cancelNotification.mockClear();
+    await svc.cancelAlightAlert({ keepSessionKey: 'new' });
     expect(notif.cancelNotification).not.toHaveBeenCalled();
   });
 });

@@ -93,6 +93,18 @@ describe('useGuidanceBackgroundPermissionPrompt', () => {
       await waitFor(() => expect(result.current.status).toBe('prompt'));
     });
 
+    it('starts in settings mode when permission is permanently denied (canAskAgain=false)', async () => {
+      mockGetBgPerm.mockResolvedValue({ status: 'denied', canAskAgain: false });
+      const { result } = renderHook(() => useGuidanceBackgroundPermissionPrompt());
+      await waitFor(() => expect(result.current.status).toBe('settings'));
+    });
+
+    it('starts in prompt mode when the OS can still ask (canAskAgain=true)', async () => {
+      mockGetBgPerm.mockResolvedValue({ status: 'undetermined', canAskAgain: true });
+      const { result } = renderHook(() => useGuidanceBackgroundPermissionPrompt());
+      await waitFor(() => expect(result.current.status).toBe('prompt'));
+    });
+
     it('stays hidden when the permission check throws', async () => {
       mockGetBgPerm.mockRejectedValue(new Error('permission read failed'));
       const { result } = renderHook(() => useGuidanceBackgroundPermissionPrompt());

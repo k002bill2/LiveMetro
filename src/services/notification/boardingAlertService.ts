@@ -16,6 +16,7 @@
  */
 import * as Notifications from 'expo-notifications';
 import { notificationService, NotificationType } from './notificationService';
+import { getGuidanceSession } from '@/services/guidance/guidanceSessionStore';
 import type { NotificationSettings } from '@models/user';
 
 const DEFAULT_SECONDS_BEFORE = 30;
@@ -113,11 +114,22 @@ export const scheduleBoardingAlert = async (
             body: `${stationName}역 승강장으로 이동할 시간이에요`,
           };
 
+    // 활성 세션 키를 스탬프 — 세션 교체 정리(cleanup 훅)가 새 세션의 방금 예약한
+    // 알림을 실행 순서와 무관하게 보존하도록 sweep keep-필터의 근거가 된다.
+    const session = getGuidanceSession();
+    const sessionKey = session !== null ? String(session.startedAt) : undefined;
+
     const id = await notificationService.scheduleArrivalAlert(arrivalTime, {
       secondsBefore,
       title: copy.title,
       body: copy.body,
-      data: { kind: BOARDING_ALERT_KIND, stationName, finalDestination, variant },
+      data: {
+        kind: BOARDING_ALERT_KIND,
+        stationName,
+        finalDestination,
+        variant,
+        ...(sessionKey !== undefined ? { sessionKey } : {}),
+      },
     });
 
     lastAlertId = id;
@@ -137,27 +149,38 @@ export const scheduleBoardingAlert = async (
  * 프로세스 재시작으로 모듈 스코프 lastAlertId가 소실된 경우까지 커버한다.
  * 마커 없는 구버전 잔여 알림은 sweep 대상이 아니다 — boardingAlertService의
  * 발사 이력 dedup + 발사시각 게이트가 중복 발사를 완화한다(known-limit).
- * Never throws.
+ *
+ * `options.keepSessionKey` 지정 시(세션 교체 정리): (a) 추적 중 ID는 건드리지
+ * 않는다(최신 스케줄이 새 세션 것일 수 있음), (b) OS sweep에서 kind 매칭이라도
+ * `data.sessionKey === keepSessionKey`면 보존한다 — 이전 세션의 늦은 정리가 새
+ * 세션이 방금 예약한 알림을 실행 순서와 무관하게 지키지 않게 한다. 미지정 시
+ * (종료/고아 정리) 전량 취소. Never throws.
  */
-export const cancelBoardingAlert = async (): Promise<void> => {
-  const id = lastAlertId;
-  lastAlertId = null;
-  if (id !== null) {
-    try {
-      await notificationService.cancelNotification(id);
-    } catch (error) {
-      console.error('Error cancelling boarding alert:', error);
+export const cancelBoardingAlert = async (
+  options?: { readonly keepSessionKey?: string }
+): Promise<void> => {
+  const keepSessionKey = options?.keepSessionKey;
+  if (keepSessionKey === undefined) {
+    const id = lastAlertId;
+    lastAlertId = null;
+    if (id !== null) {
+      try {
+        await notificationService.cancelNotification(id);
+      } catch (error) {
+        console.error('Error cancelling boarding alert:', error);
+      }
     }
   }
-  // OS 큐를 훑어 kind 마커가 붙은 탑승 알림을 전부 취소한다 — 앱/JS 재시작으로
-  // 추적이 끊긴 고아까지 청소한다. alight 알림(kind=ALIGHT_ALERT_KIND)은 상수가
-  // 달라 건드리지 않는다.
+  // OS 큐를 훑어 kind 마커가 붙은 탑승 알림을 취소한다 — 앱/JS 재시작으로 추적이
+  // 끊긴 고아까지 청소한다. alight 알림(kind=ALIGHT_ALERT_KIND)은 상수가 달라
+  // 건드리지 않는다. keepSessionKey 세션 알림은 보존한다.
   try {
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
     for (const request of scheduled) {
-      if (request.content?.data?.kind === BOARDING_ALERT_KIND) {
-        await Notifications.cancelScheduledNotificationAsync(request.identifier);
-      }
+      const data = request.content?.data;
+      if (data?.kind !== BOARDING_ALERT_KIND) continue;
+      if (keepSessionKey !== undefined && data?.sessionKey === keepSessionKey) continue;
+      await Notifications.cancelScheduledNotificationAsync(request.identifier);
     }
   } catch (error) {
     console.error('Error sweeping boarding alerts:', error);

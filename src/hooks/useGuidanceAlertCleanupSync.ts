@@ -29,9 +29,10 @@ import {
 import { cancelBoardingAlert } from '@/services/notification/boardingAlertService';
 import { cancelAlightAlert } from '@/services/notification/alightAlertService';
 
-const cancelGuidanceAlerts = (): void => {
-  void cancelBoardingAlert();
-  void cancelAlightAlert();
+const cancelGuidanceAlerts = (keepSessionKey?: string): void => {
+  const options = keepSessionKey !== undefined ? { keepSessionKey } : undefined;
+  void cancelBoardingAlert(options);
+  void cancelAlightAlert(options);
 };
 
 export const useGuidanceAlertCleanupSync = (): void => {
@@ -48,7 +49,10 @@ export const useGuidanceAlertCleanupSync = (): void => {
   const prevKeyRef = useRef<string | null>(activeKey);
   useEffect(() => {
     if (prevKeyRef.current !== null && prevKeyRef.current !== activeKey) {
-      cancelGuidanceAlerts();
+      // →null(종료)이면 전량 취소; →다른 key(교체)이면 새 세션이 방금 예약한
+      // 알림은 보존(keepSessionKey) — 늦게 도는 이전 세션 정리가 새 알림을 지우는
+      // 레이스를 실행 순서와 무관하게 차단한다.
+      cancelGuidanceAlerts(activeKey ?? undefined);
     }
     prevKeyRef.current = activeKey;
   }, [activeKey]);
