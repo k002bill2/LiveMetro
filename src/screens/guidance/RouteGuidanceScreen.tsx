@@ -11,9 +11,9 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSemanticTokens } from '@/services/theme';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Platform, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useKeepAwake } from 'expo-keep-awake';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -92,6 +92,9 @@ interface StationRebaseContext {
 /** Grace window before a detected departure auto-confirms boarding (dismissable). */
 const SOFT_CONFIRM_AUTO_MS = 4000;
 
+/** expo-keep-awake tag scoping this screen's wake lock (activate/deactivate pair). */
+const KEEP_AWAKE_TAG = 'route-guidance';
+
 const formatWaitText = (totalSec: number): string => {
   const m = Math.floor(totalSec / 60);
   const s = totalSec % 60;
@@ -119,8 +122,21 @@ export const RouteGuidanceScreen: React.FC = () => {
   const { user } = useAuth();
 
   // Keep the screen awake during live guidance so auto-lock doesn't cut tracking.
-  // Released automatically when the screen unmounts — no manual cleanup needed.
-  useKeepAwake();
+  // expo-keep-awake's useKeepAwake calls request() on web with no Wake Lock
+  // availability check and swallows no rejection → unhandled rejection on web (a
+  // supported platform). Guard it: web is a no-op; native activates on mount and
+  // releases on unmount. Branch inside the effect (never a conditional hook call).
+  useEffect(() => {
+    if (Platform.OS === 'web') return undefined;
+    void activateKeepAwakeAsync(KEEP_AWAKE_TAG).catch(() => undefined);
+    return () => {
+      try {
+        void deactivateKeepAwake(KEEP_AWAKE_TAG).catch(() => undefined);
+      } catch {
+        /* no-op — deactivating an already-released tag is harmless */
+      }
+    };
+  }, []);
 
   // One-time "Always" location nudge — without background permission, guidance
   // and alerts stop when the phone locks.

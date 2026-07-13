@@ -13,6 +13,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { locationService } from '@/services/location/locationService';
 import { startGuidanceBackgroundLocation } from '@/services/guidance/guidanceBackgroundLocationTask';
+import { getGuidanceSession } from '@/services/guidance/guidanceSessionStore';
+import type { GuidanceSession } from '@/models/guidance';
 import {
   useGuidanceBackgroundPermissionPrompt,
   GUIDANCE_BG_PERM_PROMPT_DISMISSED_KEY,
@@ -37,11 +39,17 @@ jest.mock('@/services/guidance/guidanceBackgroundLocationTask', () => ({
   startGuidanceBackgroundLocation: jest.fn(() => Promise.resolve(true)),
 }));
 
+jest.mock('@/services/guidance/guidanceSessionStore', () => ({
+  getGuidanceSession: jest.fn(),
+}));
+
 const mockGetItem = AsyncStorage.getItem as jest.Mock;
 const mockSetItem = AsyncStorage.setItem as jest.Mock;
 const mockGetBgPerm = Location.getBackgroundPermissionsAsync as jest.Mock;
 const mockRequestBgPerm = locationService.requestBackgroundPermission as jest.Mock;
 const mockStartBgLocation = startGuidanceBackgroundLocation as jest.Mock;
+const mockGetGuidanceSession = getGuidanceSession as jest.Mock;
+const activeSession = { startedAt: 1000 } as unknown as GuidanceSession;
 
 describe('useGuidanceBackgroundPermissionPrompt', () => {
   const originalOS = Platform.OS;
@@ -54,6 +62,7 @@ describe('useGuidanceBackgroundPermissionPrompt', () => {
     mockGetBgPerm.mockResolvedValue({ status: 'undetermined' });
     mockRequestBgPerm.mockResolvedValue(false);
     mockStartBgLocation.mockResolvedValue(true);
+    mockGetGuidanceSession.mockReturnValue(activeSession); // 기본: 활성 세션
     jest.spyOn(Linking, 'openSettings').mockResolvedValue(undefined);
   });
 
@@ -138,6 +147,36 @@ describe('useGuidanceBackgroundPermissionPrompt', () => {
 
       expect(mockStartBgLocation).not.toHaveBeenCalled();
       expect(result.current.status).toBe('settings');
+    });
+
+    it('does not start background location when the session ended during the permission await (J1)', async () => {
+      mockRequestBgPerm.mockResolvedValue(true);
+      mockGetGuidanceSession.mockReturnValue(null); // 안내가 종료됨
+      const { result } = renderHook(() => useGuidanceBackgroundPermissionPrompt());
+      await waitFor(() => expect(result.current.status).toBe('prompt'));
+
+      await act(async () => {
+        await result.current.requestPermission();
+      });
+
+      expect(mockStartBgLocation).not.toHaveBeenCalled();
+      expect(result.current.status).toBe('hidden');
+    });
+
+    it('does not start background location when the session is already completed', async () => {
+      mockRequestBgPerm.mockResolvedValue(true);
+      mockGetGuidanceSession.mockReturnValue({
+        startedAt: 1000,
+        commuteLogCompletedAt: 5,
+      } as unknown as GuidanceSession);
+      const { result } = renderHook(() => useGuidanceBackgroundPermissionPrompt());
+      await waitFor(() => expect(result.current.status).toBe('prompt'));
+
+      await act(async () => {
+        await result.current.requestPermission();
+      });
+
+      expect(mockStartBgLocation).not.toHaveBeenCalled();
     });
 
     it('hides silently when the request throws', async () => {
@@ -232,6 +271,28 @@ describe('useGuidanceBackgroundPermissionPrompt', () => {
 
       await waitFor(() => expect(result.current.status).toBe('hidden'));
       expect(mockStartBgLocation).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not start tracking on return from Settings when the session already ended (J1)', async () => {
+      mockRequestBgPerm.mockResolvedValue(false); // denial → settings mode
+      const { getHandler } = spyAppState(jest.fn());
+      const { result } = renderHook(() => useGuidanceBackgroundPermissionPrompt());
+      await waitFor(() => expect(result.current.status).toBe('prompt'));
+      await act(async () => {
+        await result.current.requestPermission();
+      });
+      expect(result.current.status).toBe('settings');
+
+      // 권한은 켜졌지만 안내가 종료됨 → 추적 재시작 금지.
+      mockGetBgPerm.mockResolvedValue({ status: 'granted' });
+      mockGetGuidanceSession.mockReturnValue(null);
+      await act(async () => {
+        goBackgroundThenActive(getHandler());
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(mockStartBgLocation).not.toHaveBeenCalled();
     });
 
     it('keeps the settings banner when permission is still not granted on return', async () => {

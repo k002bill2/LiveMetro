@@ -27,8 +27,9 @@ import {
   getDepartedTrainLog,
   type DepartedTrainEntry,
 } from '@/services/guidance/departedTrainLog';
+import { Platform } from 'react-native';
 import { createRoute, type RouteSegment } from '@/models/route';
-import { useKeepAwake } from 'expo-keep-awake';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useGuidanceBackgroundPermissionPrompt } from '@/hooks/useGuidanceBackgroundPermissionPrompt';
 
 const mockGoBack = jest.fn();
@@ -72,7 +73,8 @@ jest.mock('@/services/guidance/guidanceCommuteLogService', () => ({
 }));
 
 jest.mock('expo-keep-awake', () => ({
-  useKeepAwake: jest.fn(),
+  activateKeepAwakeAsync: jest.fn(() => Promise.resolve()),
+  deactivateKeepAwake: jest.fn(() => Promise.resolve()),
 }));
 
 // The bg-permission hook pulls in the native background-location task chain
@@ -941,10 +943,37 @@ describe('RouteGuidanceScreen', () => {
   });
 
   describe('화면 꺼짐 방지 (keep-awake)', () => {
-    it('길안내 화면이 렌더되는 동안 자동 잠금을 막는다', () => {
+    it('네이티브에서 길안내 렌더 시 activateKeepAwakeAsync를 호출한다', () => {
       seedSession();
       render(<RouteGuidanceScreen />);
-      expect(useKeepAwake).toHaveBeenCalledTimes(1);
+      expect(activateKeepAwakeAsync).toHaveBeenCalledTimes(1);
+    });
+
+    it('언마운트 시 deactivateKeepAwake로 wake lock을 해제한다', () => {
+      seedSession();
+      const { unmount } = render(<RouteGuidanceScreen />);
+      (deactivateKeepAwake as jest.Mock).mockClear();
+      unmount();
+      expect(deactivateKeepAwake).toHaveBeenCalled();
+    });
+
+    it('웹에서는 wake lock을 걸지 않는다 (unhandled rejection 방지)', () => {
+      const originalOS = Platform.OS;
+      (Platform as { OS: string }).OS = 'web';
+      try {
+        seedSession();
+        render(<RouteGuidanceScreen />);
+        expect(activateKeepAwakeAsync).not.toHaveBeenCalled();
+      } finally {
+        (Platform as { OS: string }).OS = originalOS;
+      }
+    });
+
+    it('activate가 reject해도 화면이 크래시하지 않는다', () => {
+      (activateKeepAwakeAsync as jest.Mock).mockRejectedValueOnce(new Error('no wake lock'));
+      seedSession();
+      const { getByTestId } = render(<RouteGuidanceScreen />);
+      expect(getByTestId('route-guidance-screen')).toBeTruthy();
     });
   });
 

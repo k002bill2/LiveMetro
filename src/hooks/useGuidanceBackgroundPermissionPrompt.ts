@@ -20,6 +20,23 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { locationService } from '@/services/location/locationService';
 import { startGuidanceBackgroundLocation } from '@/services/guidance/guidanceBackgroundLocationTask';
+import { getGuidanceSession } from '@/services/guidance/guidanceSessionStore';
+
+/**
+ * 백그라운드 추적을 시작하기 직전 활성 세션 여부를 재확인한다. 허용 continuation이
+ * await 중일 때 사용자가 안내를 종료했을 수 있으므로(세션 종료 후 추적 되살아남 방지, J1).
+ */
+const hasActiveGuidanceSession = (): boolean => {
+  const session = getGuidanceSession();
+  return session !== null && !session.commuteLogCompletedAt;
+};
+
+/** 활성 세션이 남아있을 때만 백그라운드 위치 추적을 시작한다. */
+const startBackgroundLocationIfSessionActive = async (): Promise<void> => {
+  if (hasActiveGuidanceSession()) {
+    await startGuidanceBackgroundLocation();
+  }
+};
 
 /** AsyncStorage key recording that the user dismissed the nudge (never re-ask). */
 export const GUIDANCE_BG_PERM_PROMPT_DISMISSED_KEY =
@@ -78,7 +95,8 @@ export const useGuidanceBackgroundPermissionPrompt =
         try {
           const permission = await Location.getBackgroundPermissionsAsync();
           if (permission.status === 'granted') {
-            await startGuidanceBackgroundLocation();
+            // 설정 왕복 await 도중 안내가 종료됐을 수 있어 시작 직전 세션 재확인(J1).
+            await startBackgroundLocationIfSessionActive();
             if (mountedRef.current) setStatus('hidden');
           }
         } catch {
@@ -103,8 +121,9 @@ export const useGuidanceBackgroundPermissionPrompt =
         const granted = await locationService.requestBackgroundPermission();
         if (granted) {
           // useGuidanceBackgroundLocationSync는 세션 키 변경에만 반응하므로,
-          // 미드세션에 방금 얻은 권한으로 백그라운드 위치를 즉시 시작한다.
-          await startGuidanceBackgroundLocation();
+          // 미드세션에 방금 얻은 권한으로 백그라운드 위치를 즉시 시작한다. 단,
+          // 권한 요청 await 도중 안내가 종료됐을 수 있어 시작 직전 세션을 재확인한다(J1).
+          await startBackgroundLocationIfSessionActive();
           if (mountedRef.current) setStatus('hidden');
         } else if (mountedRef.current) {
           setStatus('settings');
