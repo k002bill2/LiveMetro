@@ -21,7 +21,6 @@
  */
 import * as Notifications from 'expo-notifications';
 import { notificationService, NotificationType } from './notificationService';
-import { getGuidanceSession } from '@/services/guidance/guidanceSessionStore';
 import { resolveAlightAlertPreferences } from '@models/user';
 import type { NotificationSettings } from '@models/user';
 
@@ -66,6 +65,13 @@ export interface AlightAlertParams {
   readonly arrivalAtMs: number;
   /** `${session.startedAt}:${stepIndex}` — 스텝 단위 dedup 키. */
   readonly stepKey: string;
+  /**
+   * 세션 키(`String(session.startedAt)`). 하차 알림은 길안내 전용이므로 필수.
+   * 호출 시점에 화면이 고정 read한 세션의 키여야 한다 — 서비스가 await 이후 스토어를
+   * 다시 읽지 않는다(in-flight 세션 교체 오스탬프 방지, H2). 세션 교체 정리 sweep의
+   * keep-필터가 이 값으로 새 세션 알림을 보존한다.
+   */
+  readonly sessionKey: string;
   /** 사용자 알림 설정 — 없으면 기본값(켜짐, 2분 전)으로 해석. */
   readonly settings?: NotificationSettings | null;
 }
@@ -82,7 +88,7 @@ export const scheduleAlightAlert = (
 const scheduleAlightAlertInner = async (
   params: AlightAlertParams
 ): Promise<string | null> => {
-  const { stationName, nextKind, toLineName, arrivalAtMs, stepKey, settings } = params;
+  const { stationName, nextKind, toLineName, arrivalAtMs, stepKey, sessionKey, settings } = params;
 
   try {
     const prefs = resolveAlightAlertPreferences(settings);
@@ -146,10 +152,8 @@ const scheduleAlightAlertInner = async (
         ? { title: `곧 ${stationName}역 도착`, body: `${toLineName ?? ''} 환승을 준비하세요`.trim() }
         : { title: `곧 ${stationName}역 도착`, body: '내릴 준비를 하세요' };
 
-    // 활성 세션 키 스탬프 — 세션 교체 정리 sweep의 keep-필터 근거 (boarding과 동일).
-    const session = getGuidanceSession();
-    const sessionKey = session !== null ? String(session.startedAt) : undefined;
-
+    // 세션 키 스탬프 — 호출자 param이 유일 소스(서비스는 스토어를 다시 읽지 않는다,
+    // H2). 세션 교체 정리 sweep의 keep-필터 근거 (boarding과 동일).
     const id = await notificationService.scheduleArrivalAlert(new Date(arrivalAtMs), {
       secondsBefore: prefs.leadMinutes * 60,
       title: copy.title,
@@ -158,7 +162,7 @@ const scheduleAlightAlertInner = async (
         kind: ALIGHT_ALERT_KIND,
         variant: nextKind,
         stationName,
-        ...(sessionKey !== undefined ? { sessionKey } : {}),
+        sessionKey,
       },
     });
 

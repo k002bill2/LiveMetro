@@ -5,12 +5,6 @@ import {
   BOARDING_ALERT_KIND,
 } from '../boardingAlertService';
 import { notificationService } from '../notificationService';
-import { getGuidanceSession } from '@/services/guidance/guidanceSessionStore';
-
-// 세션 키 스탬프용 — 서비스가 직접 읽는 활성 세션을 제어한다 (기본 null).
-jest.mock('@/services/guidance/guidanceSessionStore', () => ({
-  getGuidanceSession: jest.fn(() => null),
-}));
 
 // notificationService는 expo-notifications를 감싸므로 통째로 mock —
 // boardingAlertService의 오케스트레이션(권한 게이트 + dedup)만 검증한다.
@@ -34,7 +28,6 @@ jest.mock('expo-notifications', () => ({
 const mockNotif = notificationService as jest.Mocked<typeof notificationService>;
 const mockGetAllScheduled = Notifications.getAllScheduledNotificationsAsync as jest.Mock;
 const mockCancelScheduled = Notifications.cancelScheduledNotificationAsync as jest.Mock;
-const mockGetSession = getGuidanceSession as jest.Mock;
 
 const arrival = new Date('2026-05-19T11:05:00.000Z');
 
@@ -54,11 +47,10 @@ describe('boardingAlertService', () => {
     mockNotif.shouldSendNotification.mockReturnValue(true);
     mockGetAllScheduled.mockResolvedValue([]);
     mockCancelScheduled.mockResolvedValue(undefined);
-    mockGetSession.mockReturnValue(null);
   });
 
   it('returns null and does not schedule when arrivalTime is null', async () => {
-    const id = await scheduleBoardingAlert({
+    const id = await scheduleBoardingAlert({ context: 'standalone',
       stationName: '강남',
       finalDestination: '잠실',
       arrivalTime: null,
@@ -71,7 +63,7 @@ describe('boardingAlertService', () => {
     mockNotif.requestPermissions.mockResolvedValue({ granted: false } as Awaited<
       ReturnType<typeof notificationService.requestPermissions>
     >);
-    const id = await scheduleBoardingAlert({
+    const id = await scheduleBoardingAlert({ context: 'standalone',
       stationName: '강남',
       finalDestination: '잠실',
       arrivalTime: arrival,
@@ -81,7 +73,7 @@ describe('boardingAlertService', () => {
   });
 
   it('schedules with station/destination copy when permission is granted', async () => {
-    const id = await scheduleBoardingAlert({
+    const id = await scheduleBoardingAlert({ context: 'standalone',
       stationName: '강남',
       finalDestination: '잠실',
       arrivalTime: arrival,
@@ -99,7 +91,7 @@ describe('boardingAlertService', () => {
   });
 
   it('uses transfer copy (no destination) when variant is "transfer"', async () => {
-    await scheduleBoardingAlert({
+    await scheduleBoardingAlert({ context: 'standalone',
       stationName: '불광',
       finalDestination: '오금',
       arrivalTime: arrival,
@@ -115,7 +107,7 @@ describe('boardingAlertService', () => {
   });
 
   it('defaults to destination-based board copy when variant is omitted', async () => {
-    await scheduleBoardingAlert({
+    await scheduleBoardingAlert({ context: 'standalone',
       stationName: '강남',
       finalDestination: '잠실',
       arrivalTime: arrival,
@@ -127,7 +119,7 @@ describe('boardingAlertService', () => {
   });
 
   it('honors a custom secondsBefore', async () => {
-    await scheduleBoardingAlert({
+    await scheduleBoardingAlert({ context: 'standalone',
       stationName: '강남',
       finalDestination: '잠실',
       arrivalTime: arrival,
@@ -141,19 +133,19 @@ describe('boardingAlertService', () => {
 
   it('cancels the previously scheduled boarding alert before scheduling a new one', async () => {
     mockNotif.scheduleArrivalAlert.mockResolvedValueOnce('first-id');
-    await scheduleBoardingAlert({ stationName: '강남', finalDestination: '잠실', arrivalTime: arrival });
+    await scheduleBoardingAlert({ context: 'standalone', stationName: '강남', finalDestination: '잠실', arrivalTime: arrival });
     // 첫 예약 시점엔 취소할 이전 알림 없음
     expect(mockNotif.cancelNotification).not.toHaveBeenCalled();
 
     mockNotif.scheduleArrivalAlert.mockResolvedValueOnce('second-id');
-    await scheduleBoardingAlert({ stationName: '강남', finalDestination: '성수', arrivalTime: arrival });
+    await scheduleBoardingAlert({ context: 'standalone', stationName: '강남', finalDestination: '성수', arrivalTime: arrival });
     // 두 번째 예약 전, 첫 알림(first-id)을 취소
     expect(mockNotif.cancelNotification).toHaveBeenCalledWith('first-id');
   });
 
   it('cancelBoardingAlert cancels the tracked id once and is a no-op afterwards', async () => {
     mockNotif.scheduleArrivalAlert.mockResolvedValueOnce('tracked-id');
-    await scheduleBoardingAlert({ stationName: '강남', finalDestination: '잠실', arrivalTime: arrival });
+    await scheduleBoardingAlert({ context: 'standalone', stationName: '강남', finalDestination: '잠실', arrivalTime: arrival });
 
     await cancelBoardingAlert();
     expect(mockNotif.cancelNotification).toHaveBeenCalledWith('tracked-id');
@@ -165,7 +157,7 @@ describe('boardingAlertService', () => {
 
   it('returns null when scheduling rejects (never throws to caller)', async () => {
     mockNotif.scheduleArrivalAlert.mockRejectedValue(new Error('boom'));
-    const id = await scheduleBoardingAlert({
+    const id = await scheduleBoardingAlert({ context: 'standalone',
       stationName: '강남',
       finalDestination: '잠실',
       arrivalTime: arrival,
@@ -180,7 +172,7 @@ describe('boardingAlertService', () => {
     it('skips re-scheduling when the same train alert has already fired', async () => {
       // 도착 10초 전 → fireAt(도착-30초)은 이미 과거 = 스케줄 즉시 발사됨
       const imminent = new Date(Date.now() + 10_000);
-      const first = await scheduleBoardingAlert({
+      const first = await scheduleBoardingAlert({ context: 'standalone',
         stationName: '강남',
         finalDestination: '잠실',
         arrivalTime: imminent,
@@ -188,7 +180,7 @@ describe('boardingAlertService', () => {
       });
       expect(first).toBe('alert-id');
 
-      const second = await scheduleBoardingAlert({
+      const second = await scheduleBoardingAlert({ context: 'standalone',
         stationName: '강남',
         finalDestination: '잠실',
         arrivalTime: new Date(Date.now() + 8_000),
@@ -201,7 +193,7 @@ describe('boardingAlertService', () => {
     it('re-schedules (cancel-then-schedule) while the same train alert is still pending', async () => {
       // 도착 120초 전 → fireAt은 90초 뒤 = 아직 pending → 갱신 허용
       mockNotif.scheduleArrivalAlert.mockResolvedValueOnce('pending-1');
-      await scheduleBoardingAlert({
+      await scheduleBoardingAlert({ context: 'standalone',
         stationName: '강남',
         finalDestination: '잠실',
         arrivalTime: new Date(Date.now() + 120_000),
@@ -209,7 +201,7 @@ describe('boardingAlertService', () => {
       });
 
       mockNotif.scheduleArrivalAlert.mockResolvedValueOnce('pending-2');
-      const second = await scheduleBoardingAlert({
+      const second = await scheduleBoardingAlert({ context: 'standalone',
         stationName: '강남',
         finalDestination: '잠실',
         arrivalTime: new Date(Date.now() + 115_000),
@@ -221,13 +213,13 @@ describe('boardingAlertService', () => {
     });
 
     it('schedules a different train even after a previous train alert fired', async () => {
-      await scheduleBoardingAlert({
+      await scheduleBoardingAlert({ context: 'standalone',
         stationName: '강남',
         finalDestination: '잠실',
         arrivalTime: new Date(Date.now() + 10_000),
         trainId: 'train-a',
       });
-      const other = await scheduleBoardingAlert({
+      const other = await scheduleBoardingAlert({ context: 'standalone',
         stationName: '강남',
         finalDestination: '잠실',
         arrivalTime: new Date(Date.now() + 10_000),
@@ -241,7 +233,7 @@ describe('boardingAlertService', () => {
       jest.useFakeTimers();
       try {
         jest.setSystemTime(new Date('2026-07-04T08:00:00.000Z'));
-        await scheduleBoardingAlert({
+        await scheduleBoardingAlert({ context: 'standalone',
           stationName: '강남',
           finalDestination: '잠실',
           arrivalTime: new Date(Date.now() + 10_000),
@@ -249,7 +241,7 @@ describe('boardingAlertService', () => {
         });
         // 11분 뒤 — 같은 id라도 억제 창(10분)을 벗어나면 새 알림 허용
         jest.setSystemTime(new Date('2026-07-04T08:11:00.000Z'));
-        const later = await scheduleBoardingAlert({
+        const later = await scheduleBoardingAlert({ context: 'standalone',
           stationName: '강남',
           finalDestination: '잠실',
           arrivalTime: new Date(Date.now() + 10_000),
@@ -263,12 +255,12 @@ describe('boardingAlertService', () => {
     });
 
     it('does not dedup callers that omit trainId (기존 호출자 행동 불변)', async () => {
-      await scheduleBoardingAlert({
+      await scheduleBoardingAlert({ context: 'standalone',
         stationName: '강남',
         finalDestination: '잠실',
         arrivalTime: new Date(Date.now() + 10_000),
       });
-      const second = await scheduleBoardingAlert({
+      const second = await scheduleBoardingAlert({ context: 'standalone',
         stationName: '강남',
         finalDestination: '잠실',
         arrivalTime: new Date(Date.now() + 10_000),
@@ -287,7 +279,7 @@ describe('boardingAlertService', () => {
 
     it('returns null and does not schedule when settings disallow the alert', async () => {
       mockNotif.shouldSendNotification.mockReturnValue(false);
-      const id = await scheduleBoardingAlert({
+      const id = await scheduleBoardingAlert({ context: 'standalone',
         stationName: '강남',
         finalDestination: '잠실',
         arrivalTime: arrival,
@@ -301,7 +293,7 @@ describe('boardingAlertService', () => {
 
     it('schedules when settings allow the alert', async () => {
       mockNotif.shouldSendNotification.mockReturnValue(true);
-      const id = await scheduleBoardingAlert({
+      const id = await scheduleBoardingAlert({ context: 'standalone',
         stationName: '강남',
         finalDestination: '잠실',
         arrivalTime: arrival,
@@ -312,7 +304,7 @@ describe('boardingAlertService', () => {
     });
 
     it('skips the gate entirely when settings are omitted (backward compat)', async () => {
-      const id = await scheduleBoardingAlert({
+      const id = await scheduleBoardingAlert({ context: 'standalone',
         stationName: '강남',
         finalDestination: '잠실',
         arrivalTime: arrival,
@@ -325,8 +317,10 @@ describe('boardingAlertService', () => {
   // ── OS 큐 sweep: 프로세스 재시작으로 모듈 스코프 추적 ID가 소실돼도 kind 마커로
   // pending 탑승 알림 고아를 청소한다 (alightAlertService 패턴 이식).
   describe('OS 큐 sweep (재시작 고아 정리)', () => {
-    it('schedule 시 data에 BOARDING_ALERT_KIND 마커를 포함한다', async () => {
+    it('guidance 예약은 data에 BOARDING_ALERT_KIND 마커 + sessionKey를 포함한다', async () => {
       await scheduleBoardingAlert({
+        context: 'guidance',
+        sessionKey: '1000',
         stationName: '강남',
         finalDestination: '잠실',
         arrivalTime: arrival,
@@ -334,7 +328,22 @@ describe('boardingAlertService', () => {
       expect(mockNotif.scheduleArrivalAlert).toHaveBeenCalledWith(
         arrival,
         expect.objectContaining({
-          data: expect.objectContaining({ kind: BOARDING_ALERT_KIND }),
+          data: expect.objectContaining({ kind: BOARDING_ALERT_KIND, sessionKey: '1000' }),
+        })
+      );
+    });
+
+    it('standalone 예약은 kind·sessionKey 마커가 없어 guidance 고아 sweep 대상이 아니다 (H1)', async () => {
+      await scheduleBoardingAlert({
+        context: 'standalone',
+        stationName: '강남',
+        finalDestination: '잠실',
+        arrivalTime: arrival,
+      });
+      expect(mockNotif.scheduleArrivalAlert).toHaveBeenCalledWith(
+        arrival,
+        expect.objectContaining({
+          data: expect.not.objectContaining({ kind: expect.anything() }),
         })
       );
     });
@@ -364,12 +373,13 @@ describe('boardingAlertService', () => {
     });
   });
 
-  // ── 세션 키 스탬프 + 교체 정리 keep-필터 (G3): 세션 교체 시 이전 세션의 늦은
-  // 정리가 새 세션이 방금 예약한 알림을 지우는 레이스를 차단한다.
-  describe('세션 키 스탬프 + keep-필터 (G3)', () => {
-    it('활성 세션이 있으면 data에 sessionKey를 스탬프한다', async () => {
-      mockGetSession.mockReturnValue({ startedAt: 1234 });
+  // ── 세션 키 스탬프(호출자 param) + 교체 정리 keep-필터 (G3/H2): 세션 교체 시
+  // 이전 세션의 늦은 정리가 새 세션이 방금 예약한 알림을 지우는 레이스를 차단한다.
+  describe('세션 키 스탬프 + keep-필터 (G3/H2)', () => {
+    it('guidance 예약은 호출자 sessionKey를 data에 스탬프한다 (서비스는 스토어를 읽지 않음)', async () => {
       await scheduleBoardingAlert({
+        context: 'guidance',
+        sessionKey: 'sess-xyz',
         stationName: '강남',
         finalDestination: '잠실',
         arrivalTime: arrival,
@@ -377,22 +387,7 @@ describe('boardingAlertService', () => {
       expect(mockNotif.scheduleArrivalAlert).toHaveBeenCalledWith(
         arrival,
         expect.objectContaining({
-          data: expect.objectContaining({ sessionKey: '1234' }),
-        })
-      );
-    });
-
-    it('세션이 없으면 sessionKey 필드를 생략한다', async () => {
-      mockGetSession.mockReturnValue(null);
-      await scheduleBoardingAlert({
-        stationName: '강남',
-        finalDestination: '잠실',
-        arrivalTime: arrival,
-      });
-      expect(mockNotif.scheduleArrivalAlert).toHaveBeenCalledWith(
-        arrival,
-        expect.objectContaining({
-          data: expect.not.objectContaining({ sessionKey: expect.anything() }),
+          data: expect.objectContaining({ sessionKey: 'sess-xyz' }),
         })
       );
     });
@@ -412,6 +407,8 @@ describe('boardingAlertService', () => {
     it('keepSessionKey 지정 시 추적 중 ID는 취소하지 않는다 (새 세션 것일 수 있음)', async () => {
       mockNotif.scheduleArrivalAlert.mockResolvedValueOnce('tracked-new');
       await scheduleBoardingAlert({
+        context: 'guidance',
+        sessionKey: 'new',
         stationName: '강남',
         finalDestination: '잠실',
         arrivalTime: arrival,

@@ -16,7 +16,6 @@
  */
 import * as Notifications from 'expo-notifications';
 import { notificationService, NotificationType } from './notificationService';
-import { getGuidanceSession } from '@/services/guidance/guidanceSessionStore';
 import type { NotificationSettings } from '@models/user';
 
 const DEFAULT_SECONDS_BEFORE = 30;
@@ -43,7 +42,7 @@ let lastAlertId: string | null = null;
 let lastScheduledTrainId: string | null = null;
 let lastScheduledFireAtMs: number | null = null;
 
-export interface BoardingAlertParams {
+interface BoardingAlertParamsBase {
   readonly stationName: string;
   readonly finalDestination: string;
   readonly arrivalTime: Date | null;
@@ -55,6 +54,30 @@ export interface BoardingAlertParams {
   /** 사용자 알림 설정 — 제공 시 shouldSendNotification 게이트를 통과해야 예약. */
   readonly settings?: NotificationSettings | null;
 }
+
+/**
+ * 길안내 세션 소속 탑승 알림. kind 마커 + `sessionKey`를 예약 data에 심어 세션
+ * 종료/교체 정리와 재시작 고아 sweep의 대상이 된다. `sessionKey`는 호출 시점에
+ * 화면이 고정 read한 세션의 키여야 한다 — 서비스가 await 이후 스토어를 다시 읽으면
+ * in-flight 교체 시 새 startedAt으로 오스탬프되어 stale 알림이 keep 필터로 보존되는
+ * 레이스가 생긴다(Codex 3R H2). 그래서 키의 유일 소스는 이 param이다.
+ */
+export interface GuidanceBoardingAlertParams extends BoardingAlertParamsBase {
+  readonly context: 'guidance';
+  readonly sessionKey: string;
+}
+
+/**
+ * 세션 무관 단독 탑승 알림(TrainSelectionScreen). kind 마커가 없어 길안내 고아
+ * sweep의 대상이 아니다 — 다음 부팅 정리가 유효한 단독 알림을 오취소하지 않는다.
+ */
+export interface StandaloneBoardingAlertParams extends BoardingAlertParamsBase {
+  readonly context: 'standalone';
+}
+
+export type BoardingAlertParams =
+  | GuidanceBoardingAlertParams
+  | StandaloneBoardingAlertParams;
 
 /**
  * Schedule a 30s-before-arrival local notification for the boarded train.
@@ -114,21 +137,23 @@ export const scheduleBoardingAlert = async (
             body: `${stationName}역 승강장으로 이동할 시간이에요`,
           };
 
-    // 활성 세션 키를 스탬프 — 세션 교체 정리(cleanup 훅)가 새 세션의 방금 예약한
-    // 알림을 실행 순서와 무관하게 보존하도록 sweep keep-필터의 근거가 된다.
-    const session = getGuidanceSession();
-    const sessionKey = session !== null ? String(session.startedAt) : undefined;
+    // 길안내 소속 알림만 kind 마커 + 세션 키를 심는다(세션 정리/고아 sweep 대상).
+    // 단독 알림은 마커 없음. sessionKey는 호출자 param이 유일 소스 — 서비스는 스토어를
+    // 다시 읽지 않는다(await 이후 in-flight 세션 교체 오스탬프 방지, H2).
+    const guidanceMarker =
+      params.context === 'guidance'
+        ? { kind: BOARDING_ALERT_KIND, sessionKey: params.sessionKey }
+        : {};
 
     const id = await notificationService.scheduleArrivalAlert(arrivalTime, {
       secondsBefore,
       title: copy.title,
       body: copy.body,
       data: {
-        kind: BOARDING_ALERT_KIND,
         stationName,
         finalDestination,
         variant,
-        ...(sessionKey !== undefined ? { sessionKey } : {}),
+        ...guidanceMarker,
       },
     });
 

@@ -450,9 +450,16 @@ describe('RouteGuidanceScreen', () => {
       error: null,
     });
     const { getByTestId } = render(<RouteGuidanceScreen />);
-    // trainId는 발사 이력 dedup 키 — 반드시 함께 전달돼야 한다.
+    // trainId는 발사 이력 dedup 키 — 반드시 함께 전달돼야 한다. context='guidance' +
+    // sessionKey(고정 세션 키)는 세션 정리/고아 sweep 대상임을 표시한다(H1/H2).
     expect(scheduleBoardingAlert).toHaveBeenCalledWith(
-      expect.objectContaining({ stationName: '을지로3가', variant: 'board', trainId: 'T1' })
+      expect.objectContaining({
+        context: 'guidance',
+        sessionKey: String(T0),
+        stationName: '을지로3가',
+        variant: 'board',
+        trainId: 'T1',
+      })
     );
     fireEvent.press(getByTestId('guidance-exit'));
     expect(cancelBoardingAlert).toHaveBeenCalled();
@@ -845,6 +852,7 @@ describe('RouteGuidanceScreen', () => {
           stationName: '산곡',
           arrivalAtMs: expect.any(Number),
           stepKey: expect.stringMatching(/^\d+:\d+$/),
+          sessionKey: String(T0),
         })
       );
       // 도착 시각(rideAlightAtMs)은 1Hz 틱에 불변 → effect가 매초 재실행되지

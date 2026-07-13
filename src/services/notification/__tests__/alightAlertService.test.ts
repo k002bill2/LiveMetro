@@ -19,11 +19,6 @@ jest.mock('expo-notifications', () => ({
   cancelScheduledNotificationAsync: jest.fn(),
 }));
 
-// 세션 키 스탬프용 — 서비스가 직접 읽는 활성 세션을 제어한다 (기본 null).
-jest.mock('@/services/guidance/guidanceSessionStore', () => ({
-  getGuidanceSession: jest.fn(() => null),
-}));
-
 import type { NotificationSettings } from '@models/user';
 
 const NOW = 1_750_000_000_000;
@@ -50,13 +45,13 @@ const baseParams = {
   toLineName: '2호선',
   arrivalAtMs: NOW + 10 * 60_000, // 10분 뒤 도착
   stepKey: '1000:1',
+  sessionKey: '1000', // 호출자가 전달 — stepKey의 startedAt 부분과 일치
   settings: settingsWith({ enabled: true, leadMinutes: 2 }),
 };
 
 let svc: Svc;
 let notif: MockNotif;
 let expo: MockExpo;
-let store: { getGuidanceSession: jest.Mock };
 
 beforeEach(() => {
   jest.resetModules();
@@ -64,14 +59,12 @@ beforeEach(() => {
   svc = require('../alightAlertService');
   notif = require('../notificationService').notificationService;
   expo = require('expo-notifications');
-  store = require('@/services/guidance/guidanceSessionStore');
   notif.requestPermissions.mockResolvedValue({ granted: true });
   notif.shouldSendNotification.mockReturnValue(true);
   notif.scheduleArrivalAlert.mockResolvedValue('alert-1');
   notif.cancelNotification.mockResolvedValue(undefined);
   expo.getAllScheduledNotificationsAsync.mockResolvedValue([]);
   expo.cancelScheduledNotificationAsync.mockResolvedValue(undefined);
-  store.getGuidanceSession.mockReturnValue(null);
 });
 
 afterEach(() => {
@@ -88,7 +81,7 @@ describe('scheduleAlightAlert', () => {
         secondsBefore: 120,
         title: '곧 신도림역 도착',
         body: '2호선 환승을 준비하세요',
-        data: { kind: 'alight-alert', variant: 'transfer', stationName: '신도림' },
+        data: { kind: 'alight-alert', variant: 'transfer', stationName: '신도림', sessionKey: '1000' },
       })
     );
   });
@@ -285,26 +278,14 @@ describe('serialization (Codex P2 — 늦은 완료 레이스)', () => {
   });
 });
 
-// ── 세션 키 스탬프 + 교체 정리 keep-필터 (G3, boarding과 대칭)
-describe('세션 키 스탬프 + keep-필터 (G3)', () => {
-  it('활성 세션이 있으면 data에 sessionKey를 스탬프한다', async () => {
-    store.getGuidanceSession.mockReturnValue({ startedAt: 1234 });
-    await svc.scheduleAlightAlert(baseParams);
+// ── 세션 키 스탬프(호출자 param) + 교체 정리 keep-필터 (G3/H2, boarding과 대칭)
+describe('세션 키 스탬프 + keep-필터 (G3/H2)', () => {
+  it('호출자가 전달한 sessionKey를 data에 스탬프한다 (서비스는 스토어를 읽지 않음)', async () => {
+    await svc.scheduleAlightAlert({ ...baseParams, sessionKey: 'sess-xyz' });
     expect(notif.scheduleArrivalAlert).toHaveBeenCalledWith(
       expect.any(Date),
       expect.objectContaining({
-        data: expect.objectContaining({ sessionKey: '1234' }),
-      })
-    );
-  });
-
-  it('세션이 없으면 sessionKey 필드를 생략한다', async () => {
-    store.getGuidanceSession.mockReturnValue(null);
-    await svc.scheduleAlightAlert(baseParams);
-    expect(notif.scheduleArrivalAlert).toHaveBeenCalledWith(
-      expect.any(Date),
-      expect.objectContaining({
-        data: expect.not.objectContaining({ sessionKey: expect.anything() }),
+        data: expect.objectContaining({ sessionKey: 'sess-xyz' }),
       })
     );
   });
@@ -326,5 +307,23 @@ describe('세션 키 스탬프 + keep-필터 (G3)', () => {
     notif.cancelNotification.mockClear();
     await svc.cancelAlightAlert({ keepSessionKey: 'new' });
     expect(notif.cancelNotification).not.toHaveBeenCalled();
+  });
+
+  it('스케줄 도중 스토어 세션이 교체돼도 스탬프는 param 키를 유지한다 (H2 in-flight 레이스)', async () => {
+    // schedule을 in-flight로 멈춰두고, 완료 전에 다른 세션이 시작된 상황을 모사.
+    // 서비스가 스토어를 다시 읽지 않으므로 스탬프는 최초 param('sess-a')이어야 한다.
+    let resolveSchedule: (id: string) => void = () => undefined;
+    notif.scheduleArrivalAlert.mockReturnValue(
+      new Promise<string>((resolve) => {
+        resolveSchedule = resolve;
+      })
+    );
+    const p = svc.scheduleAlightAlert({ ...baseParams, sessionKey: 'sess-a' });
+    resolveSchedule('alert-a');
+    await p;
+    expect(notif.scheduleArrivalAlert).toHaveBeenCalledWith(
+      expect.any(Date),
+      expect.objectContaining({ data: expect.objectContaining({ sessionKey: 'sess-a' }) })
+    );
   });
 });

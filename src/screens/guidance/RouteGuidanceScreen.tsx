@@ -467,8 +467,12 @@ export const RouteGuidanceScreen: React.FC = () => {
   // is foreground when scheduling, so tapping the alert just returns here.
   const notificationSettings = user?.preferences?.notificationSettings ?? null;
   useEffect(() => {
-    if (!isWaitingStep || earliestTrain?.arrivalTime == null) return;
+    if (!session || !isWaitingStep || earliestTrain?.arrivalTime == null) return;
     void scheduleBoardingAlert({
+      context: 'guidance',
+      // 화면 마운트 시 고정 read한 세션의 키 — 서비스가 스토어를 다시 읽지 않게
+      // 호출자가 전달한다(in-flight 세션 교체 오스탬프 방지, H2).
+      sessionKey: String(session.startedAt),
       stationName: waitingStationName,
       finalDestination: earliestTrain.finalDestination,
       arrivalTime: earliestTrain.arrivalTime,
@@ -476,7 +480,7 @@ export const RouteGuidanceScreen: React.FC = () => {
       settings: notificationSettings,
       variant: currentStep?.kind === 'transfer' ? 'transfer' : 'board',
     });
-  }, [isWaitingStep, earliestTrain, waitingStationName, currentStep?.kind, notificationSettings]);
+  }, [session, isWaitingStep, earliestTrain, waitingStationName, currentStep?.kind, notificationSettings]);
 
   // 하차 임박 알림 — ride 스텝의 도착 예정 시각으로 pending 알림을 예약한다.
   // `nowMs - elapsedInStepSec*1000`은 현재 스텝의 시작 시각(anchor 파생)이라
@@ -504,6 +508,7 @@ export const RouteGuidanceScreen: React.FC = () => {
       toLineName: nextStep.kind === 'transfer' ? nextStep.toLineName : undefined,
       arrivalAtMs: rideAlightAtMs,
       stepKey: `${session.startedAt}:${currentIndex}`,
+      sessionKey: String(session.startedAt),
       settings: notificationSettings,
     });
   }, [rideAlightAtMs, nextStep, currentIndex, session, notificationSettings]);

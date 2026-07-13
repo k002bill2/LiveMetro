@@ -263,8 +263,9 @@ describe('TrainSelectionScreen', () => {
     fireEvent.press(getByTestId('train-selection-cta-button'));
 
     expect(mockScheduleBoardingAlert).toHaveBeenCalledTimes(1);
+    // 세션 무관 단독 알림 — context='standalone'(길안내 고아 sweep 비대상, H1).
     expect(mockScheduleBoardingAlert).toHaveBeenCalledWith(
-      expect.objectContaining({ stationName: '강남', finalDestination: '잠실' })
+      expect.objectContaining({ context: 'standalone', stationName: '강남', finalDestination: '잠실' })
     );
   });
 
