@@ -15,7 +15,7 @@
  * that completes after unmount can't setState.
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Linking, Platform } from 'react-native';
+import { AppState, Linking, Platform, type AppStateStatus } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Location from 'expo-location';
 import { locationService } from '@/services/location/locationService';
@@ -61,6 +61,38 @@ export const useGuidanceBackgroundPermissionPrompt =
       };
       void resolve();
     }, []);
+
+    // Re-check on return from the OS Settings app. When the nudge is visible
+    // (esp. 'settings' mode), the user may grant "Always" in Settings and come
+    // back — nothing else re-checks (useGuidanceBackgroundLocationSync only
+    // reacts to a changed session key), so background→active must re-poll and,
+    // if granted, start background location + dismiss the now-stale banner.
+    useEffect(() => {
+      if (status === 'hidden') return undefined;
+      const appStateRef = { current: AppState.currentState };
+      const recheck = async (): Promise<void> => {
+        try {
+          const permission = await Location.getBackgroundPermissionsAsync();
+          if (permission.status === 'granted') {
+            await startGuidanceBackgroundLocation();
+            if (mountedRef.current) setStatus('hidden');
+          }
+        } catch {
+          // 재확인 실패 시 현 상태를 유지한다 (배너를 강제로 숨기지 않는다).
+        }
+      };
+      const subscription = AppState.addEventListener(
+        'change',
+        (nextState: AppStateStatus) => {
+          const prev = appStateRef.current;
+          appStateRef.current = nextState;
+          if ((prev === 'background' || prev === 'inactive') && nextState === 'active') {
+            void recheck();
+          }
+        }
+      );
+      return () => subscription.remove();
+    }, [status]);
 
     const requestPermission = useCallback(async (): Promise<void> => {
       try {
