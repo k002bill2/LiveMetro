@@ -1,6 +1,8 @@
+import * as Notifications from 'expo-notifications';
 import {
   scheduleBoardingAlert,
   cancelBoardingAlert,
+  BOARDING_ALERT_KIND,
 } from '../boardingAlertService';
 import { notificationService } from '../notificationService';
 
@@ -16,14 +18,25 @@ jest.mock('../notificationService', () => ({
   NotificationType: { ARRIVAL_REMINDER: 'arrival_reminder' },
 }));
 
+// cancelBoardingAlert가 OS 큐를 직접 훑어 고아 탑승 알림(kind 마커)을 sweep하므로
+// expo-notifications를 직접 mock한다 (재시작 시 추적 ID 소실 커버).
+jest.mock('expo-notifications', () => ({
+  getAllScheduledNotificationsAsync: jest.fn(() => Promise.resolve([])),
+  cancelScheduledNotificationAsync: jest.fn(() => Promise.resolve()),
+}));
+
 const mockNotif = notificationService as jest.Mocked<typeof notificationService>;
+const mockGetAllScheduled = Notifications.getAllScheduledNotificationsAsync as jest.Mock;
+const mockCancelScheduled = Notifications.cancelScheduledNotificationAsync as jest.Mock;
 
 const arrival = new Date('2026-05-19T11:05:00.000Z');
 
 describe('boardingAlertService', () => {
   beforeEach(async () => {
     mockNotif.cancelNotification.mockResolvedValue(undefined);
-    // 이전 테스트의 모듈 레벨 lastId 잔재 제거
+    // 이전 테스트가 남긴 sweep 구현 잔재를 비운 뒤 모듈 레벨 lastId 잔재 제거.
+    mockGetAllScheduled.mockResolvedValue([]);
+    mockCancelScheduled.mockResolvedValue(undefined);
     await cancelBoardingAlert();
     jest.clearAllMocks();
     mockNotif.requestPermissions.mockResolvedValue({ granted: true } as Awaited<
@@ -32,6 +45,8 @@ describe('boardingAlertService', () => {
     mockNotif.scheduleArrivalAlert.mockResolvedValue('alert-id');
     mockNotif.cancelNotification.mockResolvedValue(undefined);
     mockNotif.shouldSendNotification.mockReturnValue(true);
+    mockGetAllScheduled.mockResolvedValue([]);
+    mockCancelScheduled.mockResolvedValue(undefined);
   });
 
   it('returns null and does not schedule when arrivalTime is null', async () => {
@@ -296,6 +311,48 @@ describe('boardingAlertService', () => {
       });
       expect(id).toBe('alert-id');
       expect(mockNotif.shouldSendNotification).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── OS 큐 sweep: 프로세스 재시작으로 모듈 스코프 추적 ID가 소실돼도 kind 마커로
+  // pending 탑승 알림 고아를 청소한다 (alightAlertService 패턴 이식).
+  describe('OS 큐 sweep (재시작 고아 정리)', () => {
+    it('schedule 시 data에 BOARDING_ALERT_KIND 마커를 포함한다', async () => {
+      await scheduleBoardingAlert({
+        stationName: '강남',
+        finalDestination: '잠실',
+        arrivalTime: arrival,
+      });
+      expect(mockNotif.scheduleArrivalAlert).toHaveBeenCalledWith(
+        arrival,
+        expect.objectContaining({
+          data: expect.objectContaining({ kind: BOARDING_ALERT_KIND }),
+        })
+      );
+    });
+
+    it('추적 ID가 없어도(재시작 시뮬) OS 큐의 kind 매칭 탑승 알림을 취소한다', async () => {
+      mockGetAllScheduled.mockResolvedValue([
+        { identifier: 'os-board-1', content: { data: { kind: BOARDING_ALERT_KIND } } },
+        { identifier: 'os-other', content: { data: { kind: 'something-else' } } },
+      ]);
+      // lastAlertId는 이미 null (beforeEach cancel) → 재시작 후 상태를 모사.
+      await cancelBoardingAlert();
+      expect(mockCancelScheduled).toHaveBeenCalledWith('os-board-1');
+      expect(mockCancelScheduled).not.toHaveBeenCalledWith('os-other');
+    });
+
+    it('alight kind 알림은 sweep 대상이 아니다 (상수 불일치)', async () => {
+      mockGetAllScheduled.mockResolvedValue([
+        { identifier: 'os-alight', content: { data: { kind: 'alight-alert' } } },
+      ]);
+      await cancelBoardingAlert();
+      expect(mockCancelScheduled).not.toHaveBeenCalled();
+    });
+
+    it('getAllScheduled가 throw해도 호출자에게 던지지 않는다', async () => {
+      mockGetAllScheduled.mockRejectedValue(new Error('os queue read failed'));
+      await expect(cancelBoardingAlert()).resolves.toBeUndefined();
     });
   });
 });

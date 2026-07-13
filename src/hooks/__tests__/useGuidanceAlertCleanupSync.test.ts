@@ -123,6 +123,18 @@ describe('useGuidanceAlertCleanupSync', () => {
       expect(mockCancelBoarding).not.toHaveBeenCalled();
       expect(mockCancelAlight).not.toHaveBeenCalled();
     });
+
+    it('cancels when one active session is replaced by another (key change, no explicit end)', () => {
+      mockUseGuidanceSession.mockReturnValue(makeSession({ startedAt: 1_000 }));
+      const { rerender } = renderHook(() => useGuidanceAlertCleanupSync());
+
+      // A different journey (new startedAt) starts without ending the old one.
+      mockUseGuidanceSession.mockReturnValue(makeSession({ startedAt: 2_000 }));
+      rerender(undefined);
+
+      expect(mockCancelBoarding).toHaveBeenCalledTimes(1);
+      expect(mockCancelAlight).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('orphan cleanup (hydration-gated one-shot)', () => {

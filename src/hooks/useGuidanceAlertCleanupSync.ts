@@ -9,10 +9,11 @@
  * inactive.
  *
  * Two triggers:
- *   1. Transition cleanup — cancel when the active flag goes true→false. Keyed on
- *      the boolean (NOT session identity): progress-anchor persistence now emits
- *      on every rebase, so identity churns mid-journey while active stays true;
- *      those same-active emits must be no-ops.
+ *   1. Transition cleanup — cancel when the active session's identity key
+ *      (startedAt) changes: end (→null) OR replacement by a new route without an
+ *      explicit end. Keyed on identity (not a boolean) so progress-anchor churn
+ *      (same key, frequent emits) is a no-op, while a genuine session swap still
+ *      cancels the previous route's alerts.
  *   2. Orphan cleanup — a one-shot sweep for OS alerts left by a session that was
  *      dropped on a previous run (TTL expiry / app kill). Gated behind boot
  *      hydration ({@link isGuidanceSessionHydrated}) so a cold-start sweep can't
@@ -35,16 +36,22 @@ const cancelGuidanceAlerts = (): void => {
 
 export const useGuidanceAlertCleanupSync = (): void => {
   const session = useGuidanceSession();
-  const active = session !== null && !session.commuteLogCompletedAt;
+  // Identity key of the active session (its startedAt), or null when inactive.
+  const activeKey =
+    session !== null && !session.commuteLogCompletedAt ? String(session.startedAt) : null;
 
-  // Transition cleanup: fire only on active true→false.
-  const prevActiveRef = useRef<boolean>(active);
+  // Transition cleanup: fire when the active session ends (→null) OR is replaced
+  // by a DIFFERENT session (key change) without an explicit end — starting a new
+  // route from the screen leaves the old one's alerts otherwise. Keyed on the
+  // session identity (not a boolean) so anchor-persistence churn (same key) stays
+  // a no-op, but a genuine session swap still cancels the previous route's alerts.
+  const prevKeyRef = useRef<string | null>(activeKey);
   useEffect(() => {
-    if (prevActiveRef.current && !active) {
+    if (prevKeyRef.current !== null && prevKeyRef.current !== activeKey) {
       cancelGuidanceAlerts();
     }
-    prevActiveRef.current = active;
-  }, [active]);
+    prevKeyRef.current = activeKey;
+  }, [activeKey]);
 
   // One-shot orphan cleanup, deferred until hydration completes. Runs whether
   // this hook mounts before hydration (via the subscription) or after (via the

@@ -184,7 +184,8 @@ const cancelAlightAlertInner = async (): Promise<void> => {
     }
   }
   // OS 큐를 훑어 kind 마커가 붙은 하차 알림을 전부 취소한다 — 앱/JS 재시작으로
-  // 추적이 끊긴 고아까지 청소한다. boarding 알림(kind 없음)은 건드리지 않는다.
+  // 추적이 끊긴 고아까지 청소한다. boarding 알림(kind=BOARDING_ALERT_KIND)은
+  // 상수가 달라 건드리지 않는다.
   try {
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
     for (const request of scheduled) {

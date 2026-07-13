@@ -14,10 +14,19 @@
  * unmounts (goBack) right after scheduling. A screen-ref + unmount-cleanup would
  * cancel the very alert we just scheduled; module-level dedup avoids that trap.
  */
+import * as Notifications from 'expo-notifications';
 import { notificationService, NotificationType } from './notificationService';
 import type { NotificationSettings } from '@models/user';
 
 const DEFAULT_SECONDS_BEFORE = 30;
+
+/**
+ * 예약 data에 심는 탑승 알림 전용 식별자. 프로세스 재시작으로 모듈 스코프
+ * 추적 ID(lastAlertId)가 소실돼도 OS 큐를 이 마커로 sweep해 고아 탑승 알림을
+ * 청소한다. alightAlertService의 ALIGHT_ALERT_KIND와 절대 겹치지 않아 두
+ * 서비스의 sweep이 서로를 건드리지 않는다.
+ */
+export const BOARDING_ALERT_KIND = 'boarding-alert';
 
 /**
  * 같은 열차 재알림 억제 창. 열차 번호(btrainNo)는 다른 날 재사용될 수 있어
@@ -108,7 +117,7 @@ export const scheduleBoardingAlert = async (
       secondsBefore,
       title: copy.title,
       body: copy.body,
-      data: { stationName, finalDestination, variant },
+      data: { kind: BOARDING_ALERT_KIND, stationName, finalDestination, variant },
     });
 
     lastAlertId = id;
@@ -123,10 +132,34 @@ export const scheduleBoardingAlert = async (
   }
 };
 
-/** Cancel the currently tracked boarding alert, if any. No-op when none. */
+/**
+ * 추적 중인 탑승 알림을 취소하고, OS 큐에 남은 탑승 알림 고아까지 sweep한다.
+ * 프로세스 재시작으로 모듈 스코프 lastAlertId가 소실된 경우까지 커버한다.
+ * 마커 없는 구버전 잔여 알림은 sweep 대상이 아니다 — boardingAlertService의
+ * 발사 이력 dedup + 발사시각 게이트가 중복 발사를 완화한다(known-limit).
+ * Never throws.
+ */
 export const cancelBoardingAlert = async (): Promise<void> => {
-  if (lastAlertId === null) return;
   const id = lastAlertId;
   lastAlertId = null;
-  await notificationService.cancelNotification(id);
+  if (id !== null) {
+    try {
+      await notificationService.cancelNotification(id);
+    } catch (error) {
+      console.error('Error cancelling boarding alert:', error);
+    }
+  }
+  // OS 큐를 훑어 kind 마커가 붙은 탑승 알림을 전부 취소한다 — 앱/JS 재시작으로
+  // 추적이 끊긴 고아까지 청소한다. alight 알림(kind=ALIGHT_ALERT_KIND)은 상수가
+  // 달라 건드리지 않는다.
+  try {
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    for (const request of scheduled) {
+      if (request.content?.data?.kind === BOARDING_ALERT_KIND) {
+        await Notifications.cancelScheduledNotificationAsync(request.identifier);
+      }
+    }
+  } catch (error) {
+    console.error('Error sweeping boarding alerts:', error);
+  }
 };
