@@ -420,4 +420,34 @@ describe('boardingAlertService', () => {
       expect(mockNotif.cancelNotification).not.toHaveBeenCalled();
     });
   });
+
+  // ── 직렬화 큐 (J2): 전량 cancel의 무필터 sweep이 진행 중일 때 다른 세션 schedule이
+  // 끼어들어 sweep 스냅샷에 잡혀 취소되는 레이스를, 순차 실행으로 차단한다.
+  describe('직렬화 큐 (J2)', () => {
+    it('전량 cancel이 진행 중이면 후속 schedule은 cancel 완료 후에야 예약한다', async () => {
+      let resolveSweep: (v: unknown[]) => void = () => undefined;
+      mockGetAllScheduled.mockReturnValueOnce(
+        new Promise<unknown[]>((resolve) => {
+          resolveSweep = resolve;
+        })
+      );
+      const cancelP = cancelBoardingAlert(); // 전량 sweep — getAllScheduled에서 멈춤
+      const scheduleP = scheduleBoardingAlert({
+        context: 'guidance',
+        sessionKey: 'B',
+        stationName: '강남',
+        finalDestination: '잠실',
+        arrivalTime: arrival,
+      });
+      // cancel이 sweep에서 대기 중 — schedule은 큐 뒤에서 대기, 아직 예약 안 됨.
+      await Promise.resolve();
+      await Promise.resolve();
+      expect(mockNotif.scheduleArrivalAlert).not.toHaveBeenCalled();
+      // cancel의 sweep 완료 → 이후 schedule 실행 → B 예약(취소되지 않음).
+      resolveSweep([]);
+      await cancelP;
+      await scheduleP;
+      expect(mockNotif.scheduleArrivalAlert).toHaveBeenCalled();
+    });
+  });
 });

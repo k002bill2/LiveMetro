@@ -79,12 +79,32 @@ export type BoardingAlertParams =
   | GuidanceBoardingAlertParams
   | StandaloneBoardingAlertParams;
 
+// 공개 API 호출을 도착 순서대로 직렬화한다 — cancel의 무필터 OS sweep이 진행 중일 때
+// 다른 세션의 schedule이 끼어들면, sweep 스냅샷에 방금 예약된 알림이 포함돼 잘못
+// 취소되는 레이스(J2)를 원천 차단한다. alightAlertService의 직렬화 큐 패턴 복제 —
+// 두 서비스는 독립 큐라 서로 대기하지 않는다(surgical).
+let opQueue: Promise<unknown> = Promise.resolve();
+
+const enqueue = <T>(op: () => Promise<T>): Promise<T> => {
+  const run = opQueue.then(op, op);
+  opQueue = run.then(
+    () => undefined,
+    () => undefined
+  );
+  return run;
+};
+
 /**
  * Schedule a 30s-before-arrival local notification for the boarded train.
  * Returns the scheduled identifier, or null when not scheduled (no arrival time,
- * permission denied, or an error). Never throws.
+ * permission denied, or an error). 공개 함수는 직렬화 큐를 통해 순차 실행된다.
+ * Never throws.
  */
-export const scheduleBoardingAlert = async (
+export const scheduleBoardingAlert = (
+  params: BoardingAlertParams
+): Promise<string | null> => enqueue(() => scheduleBoardingAlertInner(params));
+
+const scheduleBoardingAlertInner = async (
   params: BoardingAlertParams
 ): Promise<string | null> => {
   const {
@@ -125,8 +145,9 @@ export const scheduleBoardingAlert = async (
       if (alreadyFired) return null;
     }
 
-    // 다른 열차로 재탑승 시 이전 알림이 남지 않도록 먼저 취소.
-    await cancelBoardingAlert();
+    // 다른 열차로 재탑승 시 이전 알림이 남지 않도록 먼저 취소. 이미 큐 안에서
+    // 실행 중이므로 inner를 직접 호출한다(공개 cancelBoardingAlert 재진입 = 데드락).
+    await cancelBoardingAlertInner();
 
     // 환승은 종착역(finalDestination)이 대기 방향과 어긋날 수 있어 카피에서 생략.
     const copy =
@@ -179,9 +200,13 @@ export const scheduleBoardingAlert = async (
  * 않는다(최신 스케줄이 새 세션 것일 수 있음), (b) OS sweep에서 kind 매칭이라도
  * `data.sessionKey === keepSessionKey`면 보존한다 — 이전 세션의 늦은 정리가 새
  * 세션이 방금 예약한 알림을 실행 순서와 무관하게 지키지 않게 한다. 미지정 시
- * (종료/고아 정리) 전량 취소. Never throws.
+ * (종료/고아 정리) 전량 취소. 공개 함수는 직렬화 큐를 통해 순차 실행된다. Never throws.
  */
-export const cancelBoardingAlert = async (
+export const cancelBoardingAlert = (
+  options?: { readonly keepSessionKey?: string }
+): Promise<void> => enqueue(() => cancelBoardingAlertInner(options));
+
+const cancelBoardingAlertInner = async (
   options?: { readonly keepSessionKey?: string }
 ): Promise<void> => {
   const keepSessionKey = options?.keepSessionKey;
