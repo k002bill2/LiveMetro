@@ -123,29 +123,10 @@ export const RouteGuidanceScreen: React.FC = () => {
   const { user } = useAuth();
 
   // Reactive session for the wake-lock gate — the frozen mount snapshot (below)
-  // can't observe a completion (commuteLogCompletedAt) transition.
+  // can't observe a completion (commuteLogCompletedAt) transition. (The keep-awake
+  // effect lives after useGuidanceProgress so it can also read local completion.)
   const liveSession = useGuidanceSession();
   const isGuidanceActive = liveSession !== null && !liveSession.commuteLogCompletedAt;
-
-  // Keep the screen awake ONLY while this screen is focused AND a guidance journey
-  // is actively in progress (P1'). Otherwise (no/complete session, or blurred by a
-  // pushed screen) the wake lock must release so the device can auto-lock.
-  // expo-keep-awake's useKeepAwake calls request() on web with no Wake Lock
-  // availability check and swallows no rejection → unhandled rejection on web (a
-  // supported platform). So web is a no-op; native activates/deactivates. Branch
-  // inside the effect (never a conditional hook call).
-  useEffect(() => {
-    if (Platform.OS === 'web') return undefined;
-    if (!(isFocused && isGuidanceActive)) return undefined;
-    void activateKeepAwakeAsync(KEEP_AWAKE_TAG).catch(() => undefined);
-    return () => {
-      try {
-        void deactivateKeepAwake(KEEP_AWAKE_TAG).catch(() => undefined);
-      } catch {
-        /* no-op — deactivating an already-released tag is harmless */
-      }
-    };
-  }, [isFocused, isGuidanceActive]);
 
   // One-time "Always" location nudge — without background permission, guidance
   // and alerts stop when the phone locks.
@@ -217,6 +198,28 @@ export const RouteGuidanceScreen: React.FC = () => {
     initialAnchor,
     onAnchorChange: handleAnchorChange,
   });
+
+  // Keep the screen awake ONLY while focused AND a guidance journey is actively in
+  // progress (P1') AND not yet at the destination (R1). `isAtEnd` is the LOCAL
+  // completion signal: commuteLogCompletedAt is set only after a successful remote
+  // (Firestore) write, so relying on it alone would hold the wake lock forever if
+  // the rider finishes offline/underground where that write can't land. Otherwise
+  // (no/complete session, blurred, or arrived) release so the device can auto-lock.
+  // expo-keep-awake's useKeepAwake requests on web with no Wake Lock check (→
+  // unhandled rejection), so web is a no-op; native activates/deactivates. Branch
+  // inside the effect (never a conditional hook call).
+  useEffect(() => {
+    if (Platform.OS === 'web') return undefined;
+    if (!(isFocused && isGuidanceActive && !isAtEnd)) return undefined;
+    void activateKeepAwakeAsync(KEEP_AWAKE_TAG).catch(() => undefined);
+    return () => {
+      try {
+        void deactivateKeepAwake(KEEP_AWAKE_TAG).catch(() => undefined);
+      } catch {
+        /* no-op — deactivating an already-released tag is harmless */
+      }
+    };
+  }, [isFocused, isGuidanceActive, isAtEnd]);
 
   const currentStep = steps[currentIndex];
   const isWaitingStep =

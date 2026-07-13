@@ -992,6 +992,23 @@ describe('RouteGuidanceScreen', () => {
       expect(deactivateKeepAwake).toHaveBeenCalled();
     });
 
+    it('로컬 완료(isAtEnd) 도달 시 원격 기록과 무관하게 wake lock을 해제한다 (R1)', () => {
+      // completeGuidanceCommuteLog는 mocked(resolve)라 commuteLogCompletedAt이
+      // 설정되지 않는다 → 세션은 여전히 활성이지만 로컬 isAtEnd로 해제돼야 한다
+      // (오프라인/지하 완주 시 원격 완료 write가 안 떨어지는 시나리오).
+      seedSession();
+      const { getByTestId } = render(<RouteGuidanceScreen />);
+      expect(activateKeepAwakeAsync).toHaveBeenCalled();
+      (deactivateKeepAwake as jest.Mock).mockClear();
+      fireEvent.press(getByTestId('guidance-next')); // board → ride
+      act(() => {
+        jest.advanceTimersByTime(5 * 60_000 + 1_000); // ride 5분 경과 → isAtEnd
+      });
+      // 세션은 활성 유지(원격 기록 미도착)인데도 로컬 완료로 해제.
+      expect(getGuidanceSession()?.commuteLogCompletedAt).toBeUndefined();
+      expect(deactivateKeepAwake).toHaveBeenCalled();
+    });
+
     it('언마운트 시 deactivateKeepAwake로 wake lock을 해제한다', () => {
       seedSession();
       const { unmount } = render(<RouteGuidanceScreen />);
