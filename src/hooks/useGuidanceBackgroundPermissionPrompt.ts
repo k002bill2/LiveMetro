@@ -66,13 +66,22 @@ export interface UseGuidanceBackgroundPermissionPromptResult {
   readonly openSettings: () => void;
 }
 
-export const useGuidanceBackgroundPermissionPrompt =
-  (): UseGuidanceBackgroundPermissionPromptResult => {
+export const useGuidanceBackgroundPermissionPrompt = (
+  options?: { readonly suspended?: boolean }
+): UseGuidanceBackgroundPermissionPromptResult => {
     const [status, setStatus] = useState<GuidanceBackgroundPermissionStatus>('hidden');
     const mountedRef = useRef(true);
     useEffect(() => () => {
       mountedRef.current = false;
     }, []);
+
+    // 화면-로컬 완주 신호(isAtEnd 전파). 원격 완료(commuteLogCompletedAt)가 오프라인/
+    // 비로그인으로 안 올 수 있으므로, suspended=true면 배너·모든 start 경로를 중지한다
+    // (S1, R1 wake-lock과 동일 클래스). ref로도 보관해 async continuation(module 경계
+    // start 호출)이 최신 값을 읽게 한다.
+    const suspended = options?.suspended ?? false;
+    const suspendedRef = useRef(suspended);
+    suspendedRef.current = suspended;
 
     // 세션을 반응형으로 구독 — 여정이 완료(commuteLogCompletedAt)되거나 종료되면
     // 배너를 즉시 숨긴다(N1). 화면은 완료 후에도 mount를 유지하므로, 훅이 세션 전이를
@@ -80,10 +89,17 @@ export const useGuidanceBackgroundPermissionPrompt =
     const session = useGuidanceSession();
     const sessionActive = session !== null && !session.commuteLogCompletedAt;
     useEffect(() => {
-      if (!sessionActive && mountedRef.current) {
+      if ((!sessionActive || suspended) && mountedRef.current) {
         setStatus('hidden');
       }
-    }, [sessionActive]);
+    }, [sessionActive, suspended]);
+
+    // 활성 세션 + 미-suspended일 때만 백그라운드 추적을 시작한다(S1). 세션 재확인 및
+    // 시작 후 stop 되돌림(L1)은 startBackgroundLocationIfSessionActive가 담당한다.
+    const startTrackingIfEligible = useCallback(async (): Promise<void> => {
+      if (suspendedRef.current) return;
+      await startBackgroundLocationIfSessionActive();
+    }, []);
 
     // Resolve initial visibility once on mount.
     useEffect(() => {
@@ -99,7 +115,7 @@ export const useGuidanceBackgroundPermissionPrompt =
             // 세션 키 불변이라 재시도하지 않는다 — 초기 resolver가 배너를 숨기면서
             // 백그라운드 추적도 시작한다(멱등: 이미 시작된 태스크는 no-op). L1의
             // 사후 재확인이 이 경로에도 그대로 적용된다(L2). dismissal과 무관하게 시작.
-            await startBackgroundLocationIfSessionActive();
+            await startTrackingIfEligible();
             return;
           }
           // 미허용 상태에서만 dismissal이 배너 노출을 막는다(UI 전용).
@@ -107,7 +123,7 @@ export const useGuidanceBackgroundPermissionPrompt =
           if (dismissed !== null) return;
           // 초기 권한/스토리지 조회가 pending인 동안 여정이 완료됐을 수 있다 — 라이브
           // 세션이 비활성이면 반응성 hide를 되돌리지 않도록 setStatus를 생략한다(O1).
-          if (mountedRef.current && hasActiveGuidanceSession()) {
+          if (mountedRef.current && hasActiveGuidanceSession() && !suspendedRef.current) {
             // 이미 영구 거부(canAskAgain=false)면 in-app "허용하기"는 헛탭이므로
             // 바로 설정 모드로 시작한다 (설정 앱 딥링크로 유도).
             setStatus(permission.canAskAgain === false ? 'settings' : 'prompt');
@@ -117,7 +133,7 @@ export const useGuidanceBackgroundPermissionPrompt =
         }
       };
       void resolve();
-    }, []);
+    }, [startTrackingIfEligible]);
 
     // Re-check on return from the OS Settings app. The user may grant "Always" in
     // Settings and come back — nothing else re-checks (useGuidanceBackgroundLocationSync
@@ -129,14 +145,14 @@ export const useGuidanceBackgroundPermissionPrompt =
     // OS Settings, and we must start tracking on return even though no banner is
     // shown. Registering while the session is inactive is pointless (no journey).
     useEffect(() => {
-      if (!sessionActive) return undefined;
+      if (!sessionActive || suspended) return undefined;
       const appStateRef = { current: AppState.currentState };
       const recheck = async (): Promise<void> => {
         try {
           const permission = await Location.getBackgroundPermissionsAsync();
           if (permission.status === 'granted') {
-            // 설정 왕복 await 도중 안내가 종료됐을 수 있어 시작 직전 세션 재확인(J1).
-            await startBackgroundLocationIfSessionActive();
+            // 설정 왕복 await 도중 안내가 종료/완주됐을 수 있어 시작 직전 세션·suspended 재확인.
+            await startTrackingIfEligible();
             if (mountedRef.current) setStatus('hidden');
           }
           // 미허용이면 현 status 유지 (settings면 settings, dismissed-hidden이면 hidden).
@@ -155,12 +171,12 @@ export const useGuidanceBackgroundPermissionPrompt =
         }
       );
       return () => subscription.remove();
-    }, [sessionActive]);
+    }, [sessionActive, suspended, startTrackingIfEligible]);
 
     const requestPermission = useCallback(async (): Promise<void> => {
-      // 여정이 이미 종료/완료됐으면 민감 권한 다이얼로그를 띄우지 않고 숨긴다
-      // (N1 레이스 이중 방어 — 반응형 hide와 별개로 액션 진입부에서도 확인).
-      if (!hasActiveGuidanceSession()) {
+      // 여정이 이미 종료/완료(로컬 완주 suspended 포함)됐으면 민감 권한 다이얼로그를
+      // 띄우지 않고 숨긴다 (N1 레이스 이중 방어 — 반응형 hide와 별개로 액션 진입부에서도 확인).
+      if (!hasActiveGuidanceSession() || suspendedRef.current) {
         if (mountedRef.current) setStatus('hidden');
         return;
       }
@@ -169,8 +185,8 @@ export const useGuidanceBackgroundPermissionPrompt =
         if (granted) {
           // useGuidanceBackgroundLocationSync는 세션 키 변경에만 반응하므로,
           // 미드세션에 방금 얻은 권한으로 백그라운드 위치를 즉시 시작한다. 단,
-          // 권한 요청 await 도중 안내가 종료됐을 수 있어 시작 직전 세션을 재확인한다(J1).
-          await startBackgroundLocationIfSessionActive();
+          // 권한 요청 await 도중 안내가 종료/완주됐을 수 있어 시작 직전 세션·suspended 재확인.
+          await startTrackingIfEligible();
           if (mountedRef.current) setStatus('hidden');
         } else if (mountedRef.current) {
           setStatus('settings');
@@ -178,7 +194,7 @@ export const useGuidanceBackgroundPermissionPrompt =
       } catch {
         if (mountedRef.current) setStatus('hidden');
       }
-    }, []);
+    }, [startTrackingIfEligible]);
 
     const dismiss = useCallback(async (): Promise<void> => {
       try {

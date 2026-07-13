@@ -33,6 +33,7 @@ import { createRoute, type RouteSegment } from '@/models/route';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useGuidanceBackgroundPermissionPrompt } from '@/hooks/useGuidanceBackgroundPermissionPrompt';
 import { useGuidanceSession } from '@/hooks/useGuidanceSession';
+import { stopGuidanceBackgroundLocation } from '@/services/guidance/guidanceBackgroundLocationTask';
 
 const mockGoBack = jest.fn();
 
@@ -95,6 +96,13 @@ jest.mock('@/hooks/useGuidanceBackgroundPermissionPrompt', () => ({
 // 게이트의 세션 반응성을 setGuidanceSession + 명시 rerender로 제어한다.
 jest.mock('@/hooks/useGuidanceSession', () => ({
   useGuidanceSession: jest.fn(),
+}));
+
+// 화면이 로컬 완료(isAtEnd) 시 백그라운드 추적을 중지/재시도(S1) — 네이티브 태스크
+// 체인(expo-task-manager)을 mock해 화면 테스트가 그걸 로드하지 않게 한다.
+jest.mock('@/services/guidance/guidanceBackgroundLocationTask', () => ({
+  startGuidanceBackgroundLocation: jest.fn(() => Promise.resolve(true)),
+  stopGuidanceBackgroundLocation: jest.fn(() => Promise.resolve()),
 }));
 
 jest.mock('lucide-react-native', () => ({
@@ -1034,6 +1042,26 @@ describe('RouteGuidanceScreen', () => {
       seedSession();
       const { getByTestId } = render(<RouteGuidanceScreen />);
       expect(getByTestId('route-guidance-screen')).toBeTruthy();
+    });
+  });
+
+  describe('로컬 완료 시 백그라운드 추적 중지 (S1)', () => {
+    it('로컬 완료(isAtEnd) 전이 시 stopGuidanceBackgroundLocation을 호출한다', () => {
+      seedSession();
+      const { getByTestId } = render(<RouteGuidanceScreen />);
+      fireEvent.press(getByTestId('guidance-next')); // board → ride
+      (stopGuidanceBackgroundLocation as jest.Mock).mockClear();
+      act(() => {
+        jest.advanceTimersByTime(5 * 60_000 + 1_000); // ride 5분 경과 → isAtEnd(alight)
+      });
+      // 원격 완료(commuteLogCompletedAt)와 무관하게 로컬 완주로 추적 중지.
+      expect(stopGuidanceBackgroundLocation).toHaveBeenCalled();
+    });
+
+    it('진행 중 마운트에서는 stop을 호출하지 않는다 (전이 기반)', () => {
+      seedSession();
+      render(<RouteGuidanceScreen />);
+      expect(stopGuidanceBackgroundLocation).not.toHaveBeenCalled();
     });
   });
 

@@ -512,4 +512,49 @@ describe('useGuidanceBackgroundPermissionPrompt', () => {
       expect(result.current.status).toBe('hidden');
     });
   });
+
+  describe('suspended (로컬 완주 전파, S1)', () => {
+    it('suspended=true면 granted여도 배너 hidden + 초기 resolver start를 하지 않는다', async () => {
+      mockGetBgPerm.mockResolvedValue({ status: 'granted' }); // 원래라면 start
+      const { result } = renderHook(() =>
+        useGuidanceBackgroundPermissionPrompt({ suspended: true })
+      );
+      await waitFor(() => expect(mockGetBgPerm).toHaveBeenCalled());
+      expect(result.current.status).toBe('hidden');
+      expect(mockStartBgLocation).not.toHaveBeenCalled();
+    });
+
+    it('suspended=true면 미허용이어도 배너를 prompt로 띄우지 않는다', async () => {
+      mockGetBgPerm.mockResolvedValue({ status: 'undetermined' });
+      const { result } = renderHook(() =>
+        useGuidanceBackgroundPermissionPrompt({ suspended: true })
+      );
+      await waitFor(() => expect(mockGetBgPerm).toHaveBeenCalled());
+      expect(result.current.status).toBe('hidden');
+    });
+
+    it('suspended=true면 requestPermission이 권한 요청 없이 숨긴다', async () => {
+      const { result } = renderHook(() =>
+        useGuidanceBackgroundPermissionPrompt({ suspended: true })
+      );
+      await waitFor(() => expect(mockGetBgPerm).toHaveBeenCalled());
+
+      await act(async () => {
+        await result.current.requestPermission();
+      });
+
+      expect(mockRequestBgPerm).not.toHaveBeenCalled();
+      expect(mockStartBgLocation).not.toHaveBeenCalled();
+      expect(result.current.status).toBe('hidden');
+    });
+
+    it('suspended=false(기본)면 기존 활성 경로가 동작한다 (회귀)', async () => {
+      mockGetBgPerm.mockResolvedValue({ status: 'granted' });
+      const { result } = renderHook(() =>
+        useGuidanceBackgroundPermissionPrompt({ suspended: false })
+      );
+      await waitFor(() => expect(mockStartBgLocation).toHaveBeenCalled());
+      expect(result.current.status).toBe('hidden');
+    });
+  });
 });

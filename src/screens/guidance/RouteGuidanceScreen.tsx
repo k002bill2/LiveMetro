@@ -23,6 +23,10 @@ import { useGuidanceProgress } from '@/hooks/useGuidanceProgress';
 import { useGuidanceBackgroundPermissionPrompt } from '@/hooks/useGuidanceBackgroundPermissionPrompt';
 import { useGuidanceSession } from '@/hooks/useGuidanceSession';
 import {
+  startGuidanceBackgroundLocation,
+  stopGuidanceBackgroundLocation,
+} from '@/services/guidance/guidanceBackgroundLocationTask';
+import {
   routeToGuidanceSteps,
   computeRideProgress,
   cumulativeRideSecondsTo,
@@ -128,15 +132,6 @@ export const RouteGuidanceScreen: React.FC = () => {
   const liveSession = useGuidanceSession();
   const isGuidanceActive = liveSession !== null && !liveSession.commuteLogCompletedAt;
 
-  // One-time "Always" location nudge — without background permission, guidance
-  // and alerts stop when the phone locks.
-  const {
-    status: bgPermStatus,
-    requestPermission: requestBgPermission,
-    dismiss: dismissBgPermission,
-    openSettings: openBgSettings,
-  } = useGuidanceBackgroundPermissionPrompt();
-
   // Session is set by the CTA right before navigating; read once per mount.
   const session = useMemo(() => getGuidanceSession(), []);
   const steps = useMemo(
@@ -220,6 +215,32 @@ export const RouteGuidanceScreen: React.FC = () => {
       }
     };
   }, [isFocused, isGuidanceActive, isAtEnd]);
+
+  // One-time "Always" location nudge — without background permission, guidance and
+  // alerts stop when the phone locks. Suspended on local completion (isAtEnd): the
+  // banner hides and all start paths no-op once the rider has arrived.
+  const {
+    status: bgPermStatus,
+    requestPermission: requestBgPermission,
+    dismiss: dismissBgPermission,
+    openSettings: openBgSettings,
+  } = useGuidanceBackgroundPermissionPrompt({ suspended: isAtEnd });
+
+  // Stop background tracking on LOCAL completion (isAtEnd), not just remote — the
+  // Firestore completion write (commuteLogCompletedAt) can never land offline/
+  // logged-out, which would otherwise keep the Android foreground service alive
+  // (killServiceOnDestroy:false) after arrival (S1, same class as the wake lock).
+  // A goPrev correction (true→false) symmetrically retries (permission-checked).
+  const prevIsAtEndRef = useRef(isAtEnd);
+  useEffect(() => {
+    const prev = prevIsAtEndRef.current;
+    prevIsAtEndRef.current = isAtEnd;
+    if (isAtEnd && !prev) {
+      void stopGuidanceBackgroundLocation();
+    } else if (!isAtEnd && prev) {
+      void startGuidanceBackgroundLocation();
+    }
+  }, [isAtEnd]);
 
   const currentStep = steps[currentIndex];
   const isWaitingStep =
