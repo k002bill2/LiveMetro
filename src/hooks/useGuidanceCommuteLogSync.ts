@@ -16,7 +16,17 @@ export const useGuidanceCommuteLogSync = (): void => {
   const inFlightKeyRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (!user?.id || !session || session.commuteLogId || session.commuteLogCompletedAt) {
+    // localCompletedAt 게이트(X1): W1의 updateGuidanceLocalCompletion emit이 이 훅을
+    // 재실행시키는데, commuteLogId attach 전(예: 일시 Firestore 실패)에 isAtEnd에
+    // 도달하면 화면의 complete 호출과 동시에 여기서 departure 로그를 시작해 중복/
+    // departure-only 문서가 남는다. 이미 끝난 여정의 출발 기록은 무의미하므로 막는다.
+    if (
+      !user?.id ||
+      !session ||
+      session.commuteLogId ||
+      session.commuteLogCompletedAt ||
+      session.localCompletedAt
+    ) {
       return;
     }
 
