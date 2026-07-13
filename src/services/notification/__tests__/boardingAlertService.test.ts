@@ -33,10 +33,24 @@ const arrival = new Date('2026-05-19T11:05:00.000Z');
 
 describe('boardingAlertService', () => {
   beforeEach(async () => {
+    // 모듈 스코프 추적 상태를 확실히 비운다. 공개 cancelBoardingAlert는 standalone
+    // 추적 슬롯을 보존(K1)하므로, guidance로 한 번 예약해 추적 컨텍스트를 guidance로
+    // 만든 뒤 전량 취소해야 lastAlertId/trackedContext가 완전히 초기화된다.
+    mockNotif.requestPermissions.mockResolvedValue({ granted: true } as Awaited<
+      ReturnType<typeof notificationService.requestPermissions>
+    >);
+    mockNotif.shouldSendNotification.mockReturnValue(true);
+    mockNotif.scheduleArrivalAlert.mockResolvedValue('reset-id');
     mockNotif.cancelNotification.mockResolvedValue(undefined);
-    // 이전 테스트가 남긴 sweep 구현 잔재를 비운 뒤 모듈 레벨 lastId 잔재 제거.
     mockGetAllScheduled.mockResolvedValue([]);
     mockCancelScheduled.mockResolvedValue(undefined);
+    await scheduleBoardingAlert({
+      context: 'guidance',
+      sessionKey: 'reset',
+      stationName: 'reset',
+      finalDestination: 'reset',
+      arrivalTime: new Date(Date.now() + 3_600_000),
+    });
     await cancelBoardingAlert();
     jest.clearAllMocks();
     mockNotif.requestPermissions.mockResolvedValue({ granted: true } as Awaited<
@@ -143,9 +157,15 @@ describe('boardingAlertService', () => {
     expect(mockNotif.cancelNotification).toHaveBeenCalledWith('first-id');
   });
 
-  it('cancelBoardingAlert cancels the tracked id once and is a no-op afterwards', async () => {
+  it('cancelBoardingAlert cancels the tracked guidance id once and is a no-op afterwards', async () => {
     mockNotif.scheduleArrivalAlert.mockResolvedValueOnce('tracked-id');
-    await scheduleBoardingAlert({ context: 'standalone', stationName: '강남', finalDestination: '잠실', arrivalTime: arrival });
+    await scheduleBoardingAlert({
+      context: 'guidance',
+      sessionKey: 'S',
+      stationName: '강남',
+      finalDestination: '잠실',
+      arrivalTime: arrival,
+    });
 
     await cancelBoardingAlert();
     expect(mockNotif.cancelNotification).toHaveBeenCalledWith('tracked-id');
@@ -153,6 +173,33 @@ describe('boardingAlertService', () => {
     mockNotif.cancelNotification.mockClear();
     await cancelBoardingAlert();
     expect(mockNotif.cancelNotification).not.toHaveBeenCalled();
+  });
+
+  it('공개 cancel은 standalone 추적 ID를 취소하지 않는다 (추적 슬롯 공유, K1)', async () => {
+    mockNotif.scheduleArrivalAlert.mockResolvedValueOnce('standalone-id');
+    await scheduleBoardingAlert({
+      context: 'standalone',
+      stationName: '강남',
+      finalDestination: '잠실',
+      arrivalTime: arrival,
+    });
+
+    // guidance 수명주기 정리(전량/keep 모두) — standalone 추적 ID는 건드리지 않는다.
+    await cancelBoardingAlert();
+    expect(mockNotif.cancelNotification).not.toHaveBeenCalledWith('standalone-id');
+    await cancelBoardingAlert({ keepSessionKey: 'X' });
+    expect(mockNotif.cancelNotification).not.toHaveBeenCalledWith('standalone-id');
+
+    // 추적 상태가 보존돼 standalone 자체 dedup(내부 교체)은 여전히 이전 것을 취소한다.
+    mockNotif.cancelNotification.mockClear();
+    mockNotif.scheduleArrivalAlert.mockResolvedValueOnce('standalone-2');
+    await scheduleBoardingAlert({
+      context: 'standalone',
+      stationName: '강남',
+      finalDestination: '잠실',
+      arrivalTime: arrival,
+    });
+    expect(mockNotif.cancelNotification).toHaveBeenCalledWith('standalone-id');
   });
 
   it('returns null when scheduling rejects (never throws to caller)', async () => {
