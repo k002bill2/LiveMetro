@@ -109,30 +109,42 @@ export const clearGuidanceSession = (): void => {
  * injectable for deterministic tests.
  */
 export const hydrateGuidanceSession = async (nowMs: number = Date.now()): Promise<void> => {
+  // `succeeded` = "the stored state was resolved (restored / empty / discarded)".
+  // Only a *resolved* outcome sets hydrated=true so the alert orphan sweep can run.
+  //   - transient READ failure (getItem throws) → readOk false → succeeded false
+  //     → hydrated stays false (retried next boot; sweep stays disarmed, safe).
+  //   - empty store, valid session, OR corrupt/expired (removed) → resolved →
+  //     succeeded true. Corrupt data must NOT wedge hydration forever, so it is a
+  //     success once the bad value is cleared.
   let succeeded = false;
+  let readOk = false;
+  let raw: string | null = null;
   try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
-    if (!raw) {
-      succeeded = true;
-      return;
+    raw = await AsyncStorage.getItem(STORAGE_KEY);
+    readOk = true;
+  } catch (error) {
+    if (__DEV__) console.error('[guidanceSessionStore] hydrate read failed', error);
+  }
+  try {
+    if (!readOk) return; // transient read failure — leave hydrated false.
+    succeeded = true; // read resolved — hydration completes regardless of content.
+    if (raw === null) return; // clean empty store.
+    let parsed: GuidanceSession | null = null;
+    try {
+      parsed = JSON.parse(raw) as GuidanceSession;
+    } catch {
+      parsed = null; // corrupt JSON → treated as "no valid session" below.
     }
-    const parsed = JSON.parse(raw) as GuidanceSession;
     if (!parsed || typeof parsed.startedAt !== 'number' || isSessionExpired(parsed, nowMs)) {
-      await AsyncStorage.removeItem(STORAGE_KEY);
-      succeeded = true;
+      // Unrecoverable (corrupt / malformed / expired) — remove so it can't rewedge
+      // hydration every boot. Removal failure is non-fatal: still "no valid session".
+      await AsyncStorage.removeItem(STORAGE_KEY).catch((error) => {
+        if (__DEV__) console.error('[guidanceSessionStore] stale-remove failed', error);
+      });
       return;
     }
     current = parsed;
-    succeeded = true;
-  } catch (error) {
-    if (__DEV__) console.error('[guidanceSessionStore] hydrate failed', error);
   } finally {
-    // Mark hydrated only on a *clean* completion (restore / empty / expired) —
-    // NOT after a transient failure. A read error must leave hydrated false so the
-    // alert orphan sweep never fires on an unknown state and mis-cancels a valid
-    // journey's alerts (boot hydrate runs once, no retry, so "sweep never runs" is
-    // the safe failure mode — orphans are softened by the fire-time gate). Single
-    // emit for the whole call keeps the "notifies once" contract intact.
     if (succeeded) hydrated = true;
     emit();
   }

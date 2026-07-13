@@ -260,6 +260,24 @@ describe('guidanceSessionStore', () => {
         expect(store.isGuidanceSessionHydrated()).toBe(true);
       });
     });
+
+    // H3: corrupt JSON is a RESOLVED outcome ("no valid session"), not a transient
+    // failure — it must be removed and hydration marked complete, never wedged.
+    it('clears corrupt stored JSON and marks hydrated (never permanently sealed)', async () => {
+      await jest.isolateModulesAsync(async () => {
+        const store = require('../guidanceSessionStore') as typeof import('../guidanceSessionStore');
+        const storage = require('@react-native-async-storage/async-storage') as {
+          getItem: jest.Mock;
+          removeItem: jest.Mock;
+        };
+        storage.getItem.mockResolvedValue('{ corrupt json');
+        storage.removeItem.mockResolvedValue(undefined);
+        await store.hydrateGuidanceSession(1000);
+        expect(storage.removeItem).toHaveBeenCalledWith(STORAGE_KEY);
+        expect(store.isGuidanceSessionHydrated()).toBe(true);
+        expect(store.getGuidanceSession()).toBeNull();
+      });
+    });
   });
 
   // --- progress anchor (re-mount / app-restart restore) ---
