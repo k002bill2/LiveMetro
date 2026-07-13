@@ -28,9 +28,11 @@ import {
   type DepartedTrainEntry,
 } from '@/services/guidance/departedTrainLog';
 import { Platform } from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
 import { createRoute, type RouteSegment } from '@/models/route';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useGuidanceBackgroundPermissionPrompt } from '@/hooks/useGuidanceBackgroundPermissionPrompt';
+import { useGuidanceSession } from '@/hooks/useGuidanceSession';
 
 const mockGoBack = jest.fn();
 
@@ -87,6 +89,12 @@ jest.mock('@/hooks/useGuidanceBackgroundPermissionPrompt', () => ({
     dismiss: jest.fn(),
     openSettings: jest.fn(),
   })),
+}));
+
+// 실제 스토어를 추적하도록 mock (beforeEach에서 getGuidanceSession에 연결) — wake-lock
+// 게이트의 세션 반응성을 setGuidanceSession + 명시 rerender로 제어한다.
+jest.mock('@/hooks/useGuidanceSession', () => ({
+  useGuidanceSession: jest.fn(),
 }));
 
 jest.mock('lucide-react-native', () => ({
@@ -247,6 +255,9 @@ describe('RouteGuidanceScreen', () => {
       dismiss: jest.fn(),
       openSettings: jest.fn(),
     });
+    // wake-lock 게이트용 — 실제 스토어를 추적하고, focus는 기본 true로 리셋.
+    (useGuidanceSession as jest.Mock).mockImplementation(() => getGuidanceSession());
+    (useIsFocused as jest.Mock).mockReturnValue(true);
     mockedUseRealtimeTrains.mockReturnValue({
       trains: [],
       loading: false,
@@ -943,10 +954,42 @@ describe('RouteGuidanceScreen', () => {
   });
 
   describe('화면 꺼짐 방지 (keep-awake)', () => {
-    it('네이티브에서 길안내 렌더 시 activateKeepAwakeAsync를 호출한다', () => {
+    it('네이티브에서 활성 세션 + 포커스 시 activateKeepAwakeAsync를 호출한다', () => {
       seedSession();
       render(<RouteGuidanceScreen />);
       expect(activateKeepAwakeAsync).toHaveBeenCalledTimes(1);
+    });
+
+    it('세션이 없으면 wake lock을 걸지 않는다 (P1)', () => {
+      // seedSession 안 함 → 세션 없음(복원/딥링크 방어 경로).
+      render(<RouteGuidanceScreen />);
+      expect(activateKeepAwakeAsync).not.toHaveBeenCalled();
+    });
+
+    it('blur 전이 시 wake lock을 해제한다 (P1)', () => {
+      seedSession();
+      const { rerender } = render(<RouteGuidanceScreen />);
+      expect(activateKeepAwakeAsync).toHaveBeenCalled();
+      (deactivateKeepAwake as jest.Mock).mockClear();
+      (useIsFocused as jest.Mock).mockReturnValue(false); // 위에 다른 화면 push → blur
+      rerender(<RouteGuidanceScreen />);
+      expect(deactivateKeepAwake).toHaveBeenCalled();
+    });
+
+    it('여정 완료 전이 시 wake lock을 해제한다 (P1)', () => {
+      seedSession();
+      const { rerender } = render(<RouteGuidanceScreen />);
+      expect(activateKeepAwakeAsync).toHaveBeenCalled();
+      (deactivateKeepAwake as jest.Mock).mockClear();
+      // 목적지 도착 — commuteLogCompletedAt 설정(같은 startedAt 유지).
+      const current = getGuidanceSession();
+      if (current) {
+        act(() => {
+          setGuidanceSession({ ...current, commuteLogCompletedAt: T0 + 300_000 });
+        });
+      }
+      rerender(<RouteGuidanceScreen />);
+      expect(deactivateKeepAwake).toHaveBeenCalled();
     });
 
     it('언마운트 시 deactivateKeepAwake로 wake lock을 해제한다', () => {

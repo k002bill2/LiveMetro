@@ -21,6 +21,7 @@ import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/s
 import { useRealtimeTrains } from '@/hooks/useRealtimeTrains';
 import { useGuidanceProgress } from '@/hooks/useGuidanceProgress';
 import { useGuidanceBackgroundPermissionPrompt } from '@/hooks/useGuidanceBackgroundPermissionPrompt';
+import { useGuidanceSession } from '@/hooks/useGuidanceSession';
 import {
   routeToGuidanceSteps,
   computeRideProgress,
@@ -121,13 +122,21 @@ export const RouteGuidanceScreen: React.FC = () => {
   const isFocused = useIsFocused();
   const { user } = useAuth();
 
-  // Keep the screen awake during live guidance so auto-lock doesn't cut tracking.
+  // Reactive session for the wake-lock gate — the frozen mount snapshot (below)
+  // can't observe a completion (commuteLogCompletedAt) transition.
+  const liveSession = useGuidanceSession();
+  const isGuidanceActive = liveSession !== null && !liveSession.commuteLogCompletedAt;
+
+  // Keep the screen awake ONLY while this screen is focused AND a guidance journey
+  // is actively in progress (P1'). Otherwise (no/complete session, or blurred by a
+  // pushed screen) the wake lock must release so the device can auto-lock.
   // expo-keep-awake's useKeepAwake calls request() on web with no Wake Lock
   // availability check and swallows no rejection → unhandled rejection on web (a
-  // supported platform). Guard it: web is a no-op; native activates on mount and
-  // releases on unmount. Branch inside the effect (never a conditional hook call).
+  // supported platform). So web is a no-op; native activates/deactivates. Branch
+  // inside the effect (never a conditional hook call).
   useEffect(() => {
     if (Platform.OS === 'web') return undefined;
+    if (!(isFocused && isGuidanceActive)) return undefined;
     void activateKeepAwakeAsync(KEEP_AWAKE_TAG).catch(() => undefined);
     return () => {
       try {
@@ -136,7 +145,7 @@ export const RouteGuidanceScreen: React.FC = () => {
         /* no-op — deactivating an already-released tag is harmless */
       }
     };
-  }, []);
+  }, [isFocused, isGuidanceActive]);
 
   // One-time "Always" location nudge — without background permission, guidance
   // and alerts stop when the phone locks.
