@@ -414,7 +414,8 @@ describe('useGuidanceBackgroundPermissionPrompt', () => {
       });
       expect(result.current.status).toBe('settings');
 
-      mockGetBgPerm.mockResolvedValue({ status: 'denied' });
+      // 여전히 영구 거부(settings 모드는 canAskAgain=false를 함의) → 복귀 재평가도 settings 유지.
+      mockGetBgPerm.mockResolvedValue({ status: 'denied', canAskAgain: false });
       await act(async () => {
         goBackgroundThenActive(getHandler());
         await Promise.resolve();
@@ -423,6 +424,58 @@ describe('useGuidanceBackgroundPermissionPrompt', () => {
 
       expect(mockStartBgLocation).not.toHaveBeenCalled();
       expect(result.current.status).toBe('settings');
+    });
+
+    it('re-evaluates availability on return — location services on + granted → start+hidden (V1)', async () => {
+      mockIsAvailable.mockResolvedValue(false); // 위치 서비스 꺼짐 → 마운트 hidden
+      const { getHandler } = spyAppState(jest.fn());
+      const { result } = renderHook(() => useGuidanceBackgroundPermissionPrompt());
+      await waitFor(() => expect(mockIsAvailable).toHaveBeenCalled());
+      expect(result.current.status).toBe('hidden');
+
+      // 시스템 설정에서 위치 서비스 켬 + 권한 granted → 복귀 시 재평가로 추적 시작.
+      mockIsAvailable.mockResolvedValue(true);
+      mockGetBgPerm.mockResolvedValue({ status: 'granted' });
+      await act(async () => {
+        goBackgroundThenActive(getHandler());
+      });
+
+      await waitFor(() => expect(mockStartBgLocation).toHaveBeenCalled());
+      expect(result.current.status).toBe('hidden');
+    });
+
+    it('re-evaluates availability on return — location on + not granted → prompt re-shows (V1)', async () => {
+      mockIsAvailable.mockResolvedValue(false);
+      const { getHandler } = spyAppState(jest.fn());
+      const { result } = renderHook(() => useGuidanceBackgroundPermissionPrompt());
+      await waitFor(() => expect(mockIsAvailable).toHaveBeenCalled());
+      expect(result.current.status).toBe('hidden');
+
+      mockIsAvailable.mockResolvedValue(true);
+      mockGetBgPerm.mockResolvedValue({ status: 'undetermined' });
+      await act(async () => {
+        goBackgroundThenActive(getHandler());
+      });
+
+      await waitFor(() => expect(result.current.status).toBe('prompt'));
+    });
+
+    it('stays hidden on return when still unavailable (V1)', async () => {
+      mockIsAvailable.mockResolvedValue(false);
+      const { getHandler } = spyAppState(jest.fn());
+      const { result } = renderHook(() => useGuidanceBackgroundPermissionPrompt());
+      await waitFor(() => expect(mockIsAvailable).toHaveBeenCalled());
+
+      // 복귀해도 여전히 unavailable — 권한이 있어도 hidden 유지·start 없음.
+      mockGetBgPerm.mockResolvedValue({ status: 'granted' });
+      await act(async () => {
+        goBackgroundThenActive(getHandler());
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+
+      expect(result.current.status).toBe('hidden');
+      expect(mockStartBgLocation).not.toHaveBeenCalled();
     });
 
     it('does not register an AppState listener when the session is inactive', async () => {

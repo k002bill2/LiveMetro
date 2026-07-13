@@ -110,54 +110,52 @@ export const useGuidanceBackgroundPermissionPrompt = (
       }
     }, []);
 
-    // Resolve initial visibility once on mount.
-    useEffect(() => {
-      const resolve = async (): Promise<void> => {
-        try {
-          if (Platform.OS === 'web') return; // 웹 최우선 — Wake Lock/권한 개념 밖.
-          // 백그라운드 위치가 불가한 기기에서는 배너/권한 요청이 무의미하다 — 허용해도
-          // start가 조용히 false를 반환하므로 아예 숨긴다(U1).
-          const available = await Location.isBackgroundLocationAvailableAsync();
-          availableRef.current = available;
-          if (!available) return;
-          // 권한 확인을 dismissal보다 먼저 한다(M1). dismiss한 사용자가 세션 중 설정
-          // 화면에서 Always를 켜고 재진입해도 start 가드가 실행돼야 하기 때문 — dismissal은
-          // "미허용 상태에서 배너를 보일지"만 결정하는 UI 전용 게이트다.
-          const permission = await Location.getBackgroundPermissionsAsync();
-          if (permission.status === 'granted') {
-            // 세션 중 외부(설정/권한 화면)에서 Always를 켜고 돌아온 경우, sync 훅은
-            // 세션 키 불변이라 재시도하지 않는다 — 초기 resolver가 배너를 숨기면서
-            // 백그라운드 추적도 시작한다(멱등: 이미 시작된 태스크는 no-op). L1의
-            // 사후 재확인이 이 경로에도 그대로 적용된다(L2). dismissal과 무관하게 시작.
-            await startTrackingIfEligible();
-            return;
-          }
-          // 미허용 상태에서만 dismissal이 배너 노출을 막는다(UI 전용). 세션 스코프 —
-          // dismiss한 세션과 현재 세션이 같을 때만 숨긴다(U2, "나중에" 정직성). 다른 여정
-          // (새 startedAt)에서는 재노출. 레거시 값(구버전 timestamp)은 startedAt과 일치할
-          // 확률이 없어 자연히 무시되고 다음 dismiss에서 세션 키 스킴으로 전환된다(마이그레이션).
-          const dismissed = await AsyncStorage.getItem(GUIDANCE_BG_PERM_PROMPT_DISMISSED_KEY);
-          const dismissSession = getGuidanceSession();
-          if (
-            dismissed !== null &&
-            dismissSession !== null &&
-            dismissed === String(dismissSession.startedAt)
-          ) {
-            return;
-          }
-          // 초기 권한/스토리지 조회가 pending인 동안 여정이 완료됐을 수 있다 — 라이브
-          // 세션이 비활성이면 반응성 hide를 되돌리지 않도록 setStatus를 생략한다(O1).
-          if (mountedRef.current && hasActiveGuidanceSession() && !suspendedRef.current) {
-            // 이미 영구 거부(canAskAgain=false)면 in-app "허용하기"는 헛탭이므로
-            // 바로 설정 모드로 시작한다 (설정 앱 딥링크로 유도).
-            setStatus(permission.canAskAgain === false ? 'settings' : 'prompt');
-          }
-        } catch {
-          // 조용히 숨김 유지 — 권한/스토리지 조회 실패는 배너를 띄우지 않는다.
+    // 배너 가시성 + 추적 시작을 결정하는 공용 로직 — 초기 마운트와 AppState 복귀가
+    // 공유한다. 가용성(Android 위치 서비스 on/off = 가변 상태)까지 매번 재평가해,
+    // 위치 서비스를 끈 채 시작했다가 같은 여정 중 켜도 복귀 시 복구되게 한다(V1/U1).
+    const evaluateVisibility = useCallback(async (): Promise<void> => {
+      try {
+        if (Platform.OS === 'web') {
+          if (mountedRef.current) setStatus('hidden');
+          return;
         }
-      };
-      void resolve();
+        const available = await Location.isBackgroundLocationAvailableAsync();
+        availableRef.current = available;
+        if (!available) {
+          if (mountedRef.current) setStatus('hidden');
+          return;
+        }
+        // 권한 확인을 dismissal보다 먼저(M1). granted면 dismissal 무관하게 시작+숨김.
+        const permission = await Location.getBackgroundPermissionsAsync();
+        if (permission.status === 'granted') {
+          await startTrackingIfEligible();
+          if (mountedRef.current) setStatus('hidden');
+          return;
+        }
+        // 세션 스코프 dismissal(U2) — 현재 세션에서 dismiss했으면 숨김 유지.
+        const dismissed = await AsyncStorage.getItem(GUIDANCE_BG_PERM_PROMPT_DISMISSED_KEY);
+        const dismissSession = getGuidanceSession();
+        if (
+          dismissed !== null &&
+          dismissSession !== null &&
+          dismissed === String(dismissSession.startedAt)
+        ) {
+          if (mountedRef.current) setStatus('hidden');
+          return;
+        }
+        // 미허용 + 미dismiss: 활성·미suspended면 배너 노출(O1). 영구거부→settings(M1).
+        if (mountedRef.current && hasActiveGuidanceSession() && !suspendedRef.current) {
+          setStatus(permission.canAskAgain === false ? 'settings' : 'prompt');
+        }
+      } catch {
+        // 조회 실패 시 현 상태 유지(초기 마운트는 hidden에서 시작하므로 보수적).
+      }
     }, [startTrackingIfEligible]);
+
+    // Resolve initial visibility once on mount (공용 로직 재사용).
+    useEffect(() => {
+      void evaluateVisibility();
+    }, [evaluateVisibility]);
 
     // Re-check on return from the OS Settings app. The user may grant "Always" in
     // Settings and come back — nothing else re-checks (useGuidanceBackgroundLocationSync
@@ -171,31 +169,20 @@ export const useGuidanceBackgroundPermissionPrompt = (
     useEffect(() => {
       if (!sessionActive || suspended) return undefined;
       const appStateRef = { current: AppState.currentState };
-      const recheck = async (): Promise<void> => {
-        try {
-          const permission = await Location.getBackgroundPermissionsAsync();
-          if (permission.status === 'granted') {
-            // 설정 왕복 await 도중 안내가 종료/완주됐을 수 있어 시작 직전 세션·suspended 재확인.
-            await startTrackingIfEligible();
-            if (mountedRef.current) setStatus('hidden');
-          }
-          // 미허용이면 현 status 유지 (settings면 settings, dismissed-hidden이면 hidden).
-        } catch {
-          // 재확인 실패 시 현 상태를 유지한다 (배너를 강제로 숨기지 않는다).
-        }
-      };
       const subscription = AppState.addEventListener(
         'change',
         (nextState: AppStateStatus) => {
           const prev = appStateRef.current;
           appStateRef.current = nextState;
           if ((prev === 'background' || prev === 'inactive') && nextState === 'active') {
-            void recheck();
+            // 복귀 시 가용성(위치 서비스 on/off = 가변 상태)까지 재평가해 배너·추적을
+            // 다시 결정한다(V1) — 초기 resolver와 동일한 공용 로직.
+            void evaluateVisibility();
           }
         }
       );
       return () => subscription.remove();
-    }, [sessionActive, suspended, startTrackingIfEligible]);
+    }, [sessionActive, suspended, evaluateVisibility]);
 
     const requestPermission = useCallback(async (): Promise<void> => {
       // 여정이 이미 종료/완료(로컬 완주 suspended 포함)됐거나 백그라운드 위치 불가
