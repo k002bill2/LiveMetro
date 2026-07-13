@@ -171,15 +171,26 @@ describe('useGuidanceAlertCleanupSync', () => {
       expect(mockCancelAlight).toHaveBeenCalledTimes(1);
     });
 
-    it('does not sweep when hydration restores an active session', () => {
+    it('sweeps with keepSessionKey when hydration restores an active session (clears a dead swap\'s leftovers, keeps restored)', () => {
       renderHook(() => useGuidanceAlertCleanupSync());
 
       mockIsHydrated.mockReturnValue(true);
-      mockGetGuidanceSession.mockReturnValue(makeSession());
+      mockGetGuidanceSession.mockReturnValue(makeSession({ startedAt: 1_000 }));
       act(() => emit());
 
-      expect(mockCancelBoarding).not.toHaveBeenCalled();
-      expect(mockCancelAlight).not.toHaveBeenCalled();
+      // Preserve the restored session's alerts, sweep prior/keyless leftovers.
+      expect(mockCancelBoarding).toHaveBeenCalledWith({ keepSessionKey: '1000' });
+      expect(mockCancelAlight).toHaveBeenCalledWith({ keepSessionKey: '1000' });
+    });
+
+    it('does not re-sweep after the restored-active cleanup already ran', () => {
+      renderHook(() => useGuidanceAlertCleanupSync());
+      mockIsHydrated.mockReturnValue(true);
+      mockGetGuidanceSession.mockReturnValue(makeSession({ startedAt: 1_000 }));
+      act(() => emit());
+      expect(mockCancelBoarding).toHaveBeenCalledTimes(1);
+      act(() => emit());
+      expect(mockCancelBoarding).toHaveBeenCalledTimes(1);
     });
 
     it('sweeps once when mounted after hydration already completed with no session', () => {

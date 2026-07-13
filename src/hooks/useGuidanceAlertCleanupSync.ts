@@ -14,10 +14,12 @@
  *      explicit end. Keyed on identity (not a boolean) so progress-anchor churn
  *      (same key, frequent emits) is a no-op, while a genuine session swap still
  *      cancels the previous route's alerts.
- *   2. Orphan cleanup — a one-shot sweep for OS alerts left by a session that was
- *      dropped on a previous run (TTL expiry / app kill). Gated behind boot
- *      hydration ({@link isGuidanceSessionHydrated}) so a cold-start sweep can't
- *      cancel a still-pending alert whose session hasn't hydrated yet.
+ *   2. Orphan cleanup — a one-shot sweep for OS alerts left by a session dropped on
+ *      a previous run (TTL expiry / app kill / a swap that died mid-flight). Gated
+ *      behind boot hydration ({@link isGuidanceSessionHydrated}) so a cold-start
+ *      sweep can't cancel a still-pending alert whose session hasn't hydrated yet.
+ *      If hydration restored an active session, the sweep keeps that session's
+ *      alerts (keepSessionKey) and clears only prior/keyless leftovers.
  */
 import { useEffect, useRef } from 'react';
 import { useGuidanceSession } from '@/hooks/useGuidanceSession';
@@ -59,17 +61,22 @@ export const useGuidanceAlertCleanupSync = (): void => {
 
   // One-shot orphan cleanup, deferred until hydration completes. Runs whether
   // this hook mounts before hydration (via the subscription) or after (via the
-  // immediate call). Skips cleanup when hydration restored an active session.
+  // immediate call). When hydration restores an ACTIVE session it still sweeps —
+  // preserving that session's alerts (keepSessionKey) while clearing a prior
+  // session's / keyless leftovers: an A→B swap that died mid-flight can leave A's
+  // alerts in the OS queue, which would otherwise fire on the wrong journey.
   const orphanCleanedRef = useRef<boolean>(false);
   useEffect(() => {
     const maybeCleanup = (): void => {
       if (orphanCleanedRef.current || !isGuidanceSessionHydrated()) return;
       orphanCleanedRef.current = true;
       const restored = getGuidanceSession();
-      const restoredActive = restored !== null && !restored.commuteLogCompletedAt;
-      if (!restoredActive) {
-        cancelGuidanceAlerts();
-      }
+      // Restored + active → keep that session, sweep the rest; otherwise sweep all.
+      const keepSessionKey =
+        restored !== null && !restored.commuteLogCompletedAt
+          ? String(restored.startedAt)
+          : undefined;
+      cancelGuidanceAlerts(keepSessionKey);
     };
     maybeCleanup();
     const unsubscribe = subscribe(maybeCleanup);

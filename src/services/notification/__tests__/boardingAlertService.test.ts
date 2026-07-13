@@ -392,16 +392,18 @@ describe('boardingAlertService', () => {
       );
     });
 
-    it('keepSessionKey 지정 시 그 세션 알림은 보존하고 나머지 kind 매칭만 취소한다', async () => {
+    it('keepSessionKey 지정 시 그 세션 알림은 보존하고 나머지 kind 매칭만 취소한다 (standalone 무마커는 비대상)', async () => {
       mockGetAllScheduled.mockResolvedValue([
         { identifier: 'keep-new', content: { data: { kind: BOARDING_ALERT_KIND, sessionKey: 'new' } } },
         { identifier: 'drop-old', content: { data: { kind: BOARDING_ALERT_KIND, sessionKey: 'old' } } },
         { identifier: 'drop-nokey', content: { data: { kind: BOARDING_ALERT_KIND } } },
+        { identifier: 'standalone', content: { data: {} } }, // 마커 없음 — H1 계약상 sweep 비대상
       ]);
       await cancelBoardingAlert({ keepSessionKey: 'new' });
       expect(mockCancelScheduled).toHaveBeenCalledWith('drop-old');
       expect(mockCancelScheduled).toHaveBeenCalledWith('drop-nokey');
       expect(mockCancelScheduled).not.toHaveBeenCalledWith('keep-new');
+      expect(mockCancelScheduled).not.toHaveBeenCalledWith('standalone');
     });
 
     it('keepSessionKey 지정 시 추적 중 ID는 취소하지 않는다 (새 세션 것일 수 있음)', async () => {
