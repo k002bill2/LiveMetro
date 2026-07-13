@@ -17,6 +17,7 @@ import {
   stopGuidanceBackgroundLocation,
 } from '@/services/guidance/guidanceBackgroundLocationTask';
 import { getGuidanceSession } from '@/services/guidance/guidanceSessionStore';
+import { useGuidanceSession } from '@/hooks/useGuidanceSession';
 import type { GuidanceSession } from '@/models/guidance';
 import {
   useGuidanceBackgroundPermissionPrompt,
@@ -47,6 +48,10 @@ jest.mock('@/services/guidance/guidanceSessionStore', () => ({
   getGuidanceSession: jest.fn(),
 }));
 
+jest.mock('@/hooks/useGuidanceSession', () => ({
+  useGuidanceSession: jest.fn(),
+}));
+
 const mockGetItem = AsyncStorage.getItem as jest.Mock;
 const mockSetItem = AsyncStorage.setItem as jest.Mock;
 const mockGetBgPerm = Location.getBackgroundPermissionsAsync as jest.Mock;
@@ -54,7 +59,12 @@ const mockRequestBgPerm = locationService.requestBackgroundPermission as jest.Mo
 const mockStartBgLocation = startGuidanceBackgroundLocation as jest.Mock;
 const mockStopBgLocation = stopGuidanceBackgroundLocation as jest.Mock;
 const mockGetGuidanceSession = getGuidanceSession as jest.Mock;
+const mockUseGuidanceSession = useGuidanceSession as jest.Mock;
 const activeSession = { startedAt: 1000 } as unknown as GuidanceSession;
+const completedSession = {
+  startedAt: 1000,
+  commuteLogCompletedAt: 5,
+} as unknown as GuidanceSession;
 
 describe('useGuidanceBackgroundPermissionPrompt', () => {
   const originalOS = Platform.OS;
@@ -69,6 +79,7 @@ describe('useGuidanceBackgroundPermissionPrompt', () => {
     mockStartBgLocation.mockResolvedValue(true);
     mockStopBgLocation.mockResolvedValue(undefined);
     mockGetGuidanceSession.mockReturnValue(activeSession); // 기본: 활성 세션
+    mockUseGuidanceSession.mockReturnValue(activeSession); // 반응형 구독도 활성
     jest.spyOn(Linking, 'openSettings').mockResolvedValue(undefined);
   });
 
@@ -206,8 +217,12 @@ describe('useGuidanceBackgroundPermissionPrompt', () => {
     it('stops background location when the session ends during the start await (L1)', async () => {
       mockRequestBgPerm.mockResolvedValue(true);
       mockStartBgLocation.mockResolvedValue(true);
-      // 시작 전 체크는 활성, 시작 완료 후 체크는 종료됨 (start await 도중 종료 모사).
-      mockGetGuidanceSession.mockReturnValueOnce(activeSession).mockReturnValue(null);
+      // getGuidanceSession 호출 순서: ① requestPermission 진입 가드(N1) ② start 직전
+      // 가드 — 둘 다 활성, ③ start 완료 후 재확인 — 종료됨(start await 도중 종료 모사).
+      mockGetGuidanceSession
+        .mockReturnValueOnce(activeSession)
+        .mockReturnValueOnce(activeSession)
+        .mockReturnValue(null);
       const { result } = renderHook(() => useGuidanceBackgroundPermissionPrompt());
       await waitFor(() => expect(result.current.status).toBe('prompt'));
 
@@ -387,6 +402,59 @@ describe('useGuidanceBackgroundPermissionPrompt', () => {
       await waitFor(() => expect(result.current.status).toBe('prompt'));
       unmount();
       expect(remove).toHaveBeenCalled();
+    });
+  });
+
+  describe('session reactivity (N1)', () => {
+    it('hides the banner when the journey completes mid-mount', async () => {
+      mockUseGuidanceSession.mockReturnValue(activeSession);
+      const { result, rerender } = renderHook(() => useGuidanceBackgroundPermissionPrompt());
+      await waitFor(() => expect(result.current.status).toBe('prompt'));
+
+      // 목적지 도착 — commuteLogCompletedAt 설정된 세션으로 전이(화면은 mount 유지).
+      mockUseGuidanceSession.mockReturnValue(completedSession);
+      rerender(undefined);
+
+      expect(result.current.status).toBe('hidden');
+    });
+
+    it('hides the banner when the session clears (→ null)', async () => {
+      mockUseGuidanceSession.mockReturnValue(activeSession);
+      const { result, rerender } = renderHook(() => useGuidanceBackgroundPermissionPrompt());
+      await waitFor(() => expect(result.current.status).toBe('prompt'));
+
+      mockUseGuidanceSession.mockReturnValue(null);
+      rerender(undefined);
+
+      expect(result.current.status).toBe('hidden');
+    });
+
+    it('does not request permission when the CTA is pressed after the journey ended (race guard)', async () => {
+      mockUseGuidanceSession.mockReturnValue(activeSession); // 배너는 표시된 상태
+      mockGetGuidanceSession.mockReturnValue(null); // 액션 진입 시점엔 세션 종료
+      const { result } = renderHook(() => useGuidanceBackgroundPermissionPrompt());
+      await waitFor(() => expect(result.current.status).toBe('prompt'));
+
+      await act(async () => {
+        await result.current.requestPermission();
+      });
+
+      expect(mockRequestBgPerm).not.toHaveBeenCalled();
+      expect(result.current.status).toBe('hidden');
+    });
+
+    it('does not open Settings when the CTA is pressed after the journey ended (race guard)', async () => {
+      mockUseGuidanceSession.mockReturnValue(activeSession);
+      mockGetGuidanceSession.mockReturnValue(null);
+      const { result } = renderHook(() => useGuidanceBackgroundPermissionPrompt());
+      await waitFor(() => expect(result.current.status).toBe('prompt'));
+
+      act(() => {
+        result.current.openSettings();
+      });
+
+      expect(Linking.openSettings).not.toHaveBeenCalled();
+      expect(result.current.status).toBe('hidden');
     });
   });
 });

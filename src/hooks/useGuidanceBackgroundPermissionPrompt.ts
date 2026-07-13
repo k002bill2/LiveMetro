@@ -24,6 +24,7 @@ import {
   stopGuidanceBackgroundLocation,
 } from '@/services/guidance/guidanceBackgroundLocationTask';
 import { getGuidanceSession } from '@/services/guidance/guidanceSessionStore';
+import { useGuidanceSession } from '@/hooks/useGuidanceSession';
 
 /**
  * 백그라운드 추적을 시작하기 직전 활성 세션 여부를 재확인한다. 허용 continuation이
@@ -72,6 +73,17 @@ export const useGuidanceBackgroundPermissionPrompt =
     useEffect(() => () => {
       mountedRef.current = false;
     }, []);
+
+    // 세션을 반응형으로 구독 — 여정이 완료(commuteLogCompletedAt)되거나 종료되면
+    // 배너를 즉시 숨긴다(N1). 화면은 완료 후에도 mount를 유지하므로, 훅이 세션 전이를
+    // 관찰하지 않으면 끝난 여정에 배너가 살아남아 불필요한 Always 권한 요청을 유발한다.
+    const session = useGuidanceSession();
+    const sessionActive = session !== null && !session.commuteLogCompletedAt;
+    useEffect(() => {
+      if (!sessionActive && mountedRef.current) {
+        setStatus('hidden');
+      }
+    }, [sessionActive]);
 
     // Resolve initial visibility once on mount.
     useEffect(() => {
@@ -139,6 +151,12 @@ export const useGuidanceBackgroundPermissionPrompt =
     }, [status]);
 
     const requestPermission = useCallback(async (): Promise<void> => {
+      // 여정이 이미 종료/완료됐으면 민감 권한 다이얼로그를 띄우지 않고 숨긴다
+      // (N1 레이스 이중 방어 — 반응형 hide와 별개로 액션 진입부에서도 확인).
+      if (!hasActiveGuidanceSession()) {
+        if (mountedRef.current) setStatus('hidden');
+        return;
+      }
       try {
         const granted = await locationService.requestBackgroundPermission();
         if (granted) {
@@ -169,6 +187,11 @@ export const useGuidanceBackgroundPermissionPrompt =
     }, []);
 
     const openSettings = useCallback((): void => {
+      // 여정이 종료됐으면 설정을 열지 않고 배너만 숨긴다(N1 이중 방어).
+      if (!hasActiveGuidanceSession()) {
+        if (mountedRef.current) setStatus('hidden');
+        return;
+      }
       void Linking.openSettings().catch(() => undefined);
     }, []);
 
