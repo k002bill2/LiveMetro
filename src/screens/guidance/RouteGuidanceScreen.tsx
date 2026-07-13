@@ -153,7 +153,9 @@ export const RouteGuidanceScreen: React.FC = () => {
   const initialAnchor = useMemo((): { index: number; atMs: number } | undefined => {
     const anchor = session?.progressAnchor;
     if (!anchor) return undefined;
-    if (!Number.isFinite(anchor.stepIndex) || !Number.isFinite(anchor.atMs)) return undefined;
+    // stepIndex must be a whole index — a fractional value (e.g. 0.5) would pass
+    // a finite+range check yet crash `steps[0.5]` downstream.
+    if (!Number.isInteger(anchor.stepIndex) || !Number.isFinite(anchor.atMs)) return undefined;
     if (anchor.stepIndex < 0 || anchor.stepIndex >= steps.length) return undefined;
     if (anchor.atMs > Date.now()) return undefined;
     return { index: anchor.stepIndex, atMs: anchor.atMs };

@@ -910,6 +910,12 @@ describe('RouteGuidanceScreen', () => {
       const { getByText } = render(<RouteGuidanceScreen />);
       expect(getByText('탑승 대기')).toBeTruthy();
     });
+
+    it('소수 stepIndex anchor는 무시하고 기본 board 스텝에서 시작한다 (steps[0.5] 크래시 방지)', () => {
+      seedSessionWithAnchor({ stepIndex: 0.5, atMs: T0 });
+      const { getByText } = render(<RouteGuidanceScreen />);
+      expect(getByText('탑승 대기')).toBeTruthy();
+    });
   });
 
   describe('unmount 시 알림 취소 안 함 (세션 존속)', () => {

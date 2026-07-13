@@ -233,6 +233,35 @@ describe('guidanceSessionStore', () => {
     expect(getGuidanceSession()).toEqual(makeSession(started));
   });
 
+  // G1: hydrated must gate on SUCCESSFUL completion, not merely "finished".
+  // `hydrated` is monotonic module state, so each case runs in an isolated
+  // module registry to observe the false→(maybe)true transition cleanly.
+  describe('hydration success gating (G1)', () => {
+    it('does not mark hydrated when the read fails (guards against false orphan sweep)', async () => {
+      await jest.isolateModulesAsync(async () => {
+        const store = require('../guidanceSessionStore') as typeof import('../guidanceSessionStore');
+        const storage = require('@react-native-async-storage/async-storage') as {
+          getItem: jest.Mock;
+        };
+        storage.getItem.mockRejectedValue(new Error('storage unavailable'));
+        await store.hydrateGuidanceSession(1000);
+        expect(store.isGuidanceSessionHydrated()).toBe(false);
+      });
+    });
+
+    it('marks hydrated on a clean empty result (sweep may run)', async () => {
+      await jest.isolateModulesAsync(async () => {
+        const store = require('../guidanceSessionStore') as typeof import('../guidanceSessionStore');
+        const storage = require('@react-native-async-storage/async-storage') as {
+          getItem: jest.Mock;
+        };
+        storage.getItem.mockResolvedValue(null);
+        await store.hydrateGuidanceSession(1000);
+        expect(store.isGuidanceSessionHydrated()).toBe(true);
+      });
+    });
+  });
+
   // --- progress anchor (re-mount / app-restart restore) ---
 
   describe('updateGuidanceProgressAnchor', () => {

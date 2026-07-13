@@ -42,7 +42,12 @@ const emit = (): void => {
 /** Active guidance session, or null when none is in progress. */
 export const getGuidanceSession = (): GuidanceSession | null => current;
 
-/** True once boot hydration has completed (restore attempt finished). */
+/**
+ * True once boot hydration has *successfully* completed (restored a session,
+ * or cleanly determined there is none — empty/expired). A transient failure
+ * (e.g. AsyncStorage read error) leaves this false so the alert orphan sweep
+ * never runs on an unknown state and mis-cancels a valid journey's alerts.
+ */
 export const isGuidanceSessionHydrated = (): boolean => hydrated;
 
 /**
@@ -104,23 +109,31 @@ export const clearGuidanceSession = (): void => {
  * injectable for deterministic tests.
  */
 export const hydrateGuidanceSession = async (nowMs: number = Date.now()): Promise<void> => {
+  let succeeded = false;
   try {
     const raw = await AsyncStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
+    if (!raw) {
+      succeeded = true;
+      return;
+    }
     const parsed = JSON.parse(raw) as GuidanceSession;
     if (!parsed || typeof parsed.startedAt !== 'number' || isSessionExpired(parsed, nowMs)) {
       await AsyncStorage.removeItem(STORAGE_KEY);
+      succeeded = true;
       return;
     }
     current = parsed;
+    succeeded = true;
   } catch (error) {
     if (__DEV__) console.error('[guidanceSessionStore] hydrate failed', error);
   } finally {
-    // Mark hydration complete even when nothing was restored (expired / empty /
-    // malformed) — the alert cleanup hook gates its one-shot orphan sweep on this
-    // so it never runs before a persisted session has had its chance to hydrate.
-    // Single emit for the whole call keeps the "notifies once" contract intact.
-    hydrated = true;
+    // Mark hydrated only on a *clean* completion (restore / empty / expired) —
+    // NOT after a transient failure. A read error must leave hydrated false so the
+    // alert orphan sweep never fires on an unknown state and mis-cancels a valid
+    // journey's alerts (boot hydrate runs once, no retry, so "sweep never runs" is
+    // the safe failure mode — orphans are softened by the fire-time gate). Single
+    // emit for the whole call keeps the "notifies once" contract intact.
+    if (succeeded) hydrated = true;
     emit();
   }
 };
