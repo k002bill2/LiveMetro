@@ -16,6 +16,7 @@ import {
   parseTimeToMinutes,
   formatMinutesToTime,
   FrequentRoute,
+  MIN_PATTERN_CONFIDENCE_FOR_ALERTS,
 } from '@/models/pattern';
 import {
   IntegratedAlert,
@@ -86,6 +87,14 @@ class IntegratedAlertService {
       const dayOfWeek = getDayOfWeek(date);
       const pattern = await patternAnalysisService.getPatternForDay(userId, dayOfWeek);
       if (!pattern) {
+        return null;
+      }
+      // MIN_LOGS_FOR_PATTERN=1 surfaces a pattern for display after a single
+      // log, but a barely-learned pattern (calculateConfidence(1, x) ≤ 0.46)
+      // must NOT auto-fire alerts. Gate on confidence — same threshold as
+      // patternAnalysisService.hasTodayPattern — taking the existing
+      // "no pattern" early-return path.
+      if (pattern.confidence < MIN_PATTERN_CONFIDENCE_FOR_ALERTS) {
         return null;
       }
 

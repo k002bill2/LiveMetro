@@ -87,6 +87,8 @@ jest.mock('@/models/ml', () => ({
 
 jest.mock('@/models/pattern', () => ({
   getDayOfWeek: jest.fn(() => 1),
+  // Mirrors the real SSOT (pattern.ts) — the service gates auto-alerts on it.
+  MIN_PATTERN_CONFIDENCE_FOR_ALERTS: 0.5,
   parseTimeToMinutes: jest.fn((time: string) => {
     const [hours, minutes] = time.split(':').map(Number);
     return (hours || 0) * 60 + (minutes || 0);
@@ -162,6 +164,53 @@ describe('IntegratedAlertService', () => {
       const alert = await integratedAlertService.generateIntegratedAlert('user-123');
 
       expect(alert).toBeNull();
+    });
+
+    // MIN_LOGS_FOR_PATTERN was lowered to 1 (pattern shows after a single log),
+    // so the auto-alert path must gate on confidence. A single-log pattern
+    // (calculateConfidence(1, x) ≈ 0.46 < MIN_PATTERN_CONFIDENCE_FOR_ALERTS)
+    // must NOT fire an alert. Without the gate this would generate one.
+    it('should return null when the pattern confidence is below the alert threshold', async () => {
+      mockCommuteLogService.getRecentLogsForAnalysis.mockResolvedValue([
+        { departureTime: '08:30', dayOfWeek: 1 },
+      ]);
+      mockPatternAnalysisService.getPatternForDay.mockResolvedValue({
+        frequentRoute: {
+          startStation: '강남',
+          endStation: '신도림',
+          lineIds: ['2'],
+        },
+        confidence: 0.46,
+      });
+
+      const alert = await integratedAlertService.generateIntegratedAlert('user-123');
+
+      expect(alert).toBeNull();
+    });
+
+    it('should generate an alert when the pattern confidence meets the threshold (boundary 0.5)', async () => {
+      mockCommuteLogService.getRecentLogsForAnalysis.mockResolvedValue([
+        { departureTime: '08:30', dayOfWeek: 1 },
+      ]);
+      mockPatternAnalysisService.getPatternForDay.mockResolvedValue({
+        frequentRoute: {
+          startStation: '강남',
+          endStation: '신도림',
+          lineIds: ['2'],
+        },
+        confidence: 0.5,
+      });
+      mockModelService.predict.mockResolvedValue({
+        predictedDepartureTime: '08:30',
+        predictedArrivalTime: '09:00',
+        confidence: 0.85,
+        delayProbability: 0.1,
+      });
+
+      const alert = await integratedAlertService.generateIntegratedAlert('user-123');
+
+      expect(alert).not.toBeNull();
+      expect(alert?.type).toBe('departure');
     });
 
     it('should generate delay_warning alert when delays detected', async () => {

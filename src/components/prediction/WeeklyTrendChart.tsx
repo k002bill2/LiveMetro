@@ -31,6 +31,12 @@ export interface DayBarData {
   readonly dayLabel: WeekdayLabel;
   readonly durationMin: number;
   readonly isToday: boolean;
+  /**
+   * Whether this weekday has a real prediction. `false` renders an honest
+   * ghost placeholder (em-dash label, low-saturation minimal bar) instead of
+   * dropping the column, so all Mon–Fri days stay visible.
+   */
+  readonly hasData: boolean;
 }
 
 export interface WeeklyTrendChartProps {
@@ -44,6 +50,8 @@ export interface WeeklyTrendChartProps {
 // ============================================================================
 
 const BAR_HEIGHT = 80;
+/** Minimal height for a no-data ghost placeholder bar. */
+const GHOST_BAR_HEIGHT = 8;
 
 // ============================================================================
 // Component
@@ -56,12 +64,20 @@ const WeeklyTrendChartComponent: React.FC<WeeklyTrendChartProps> = ({
   const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
+  // Every weekday lacks a prediction → treat like the empty state below.
+  const hasAnyData = days.some((d) => d.hasData);
+
   const subtitle = useMemo(() => {
     if (days.length === 0) return '';
     if (todayIndex === -1) return '이번 주 평일 예측';
     const today = days[todayIndex];
     if (!today) return '';
-    const others = days.filter((_, i) => i !== todayIndex);
+    // Today has no prediction yet — invite the user to keep logging instead of
+    // comparing against a fabricated 0.
+    if (!today.hasData) return '기록이 쌓이면 요일별 예측이 채워져요';
+    // Average over data-only days so ghost placeholders (durationMin 0) never
+    // drag the baseline down.
+    const others = days.filter((d, i) => i !== todayIndex && d.hasData);
     const avgExcludingToday =
       others.length > 0
         ? others.reduce((sum, d) => sum + d.durationMin, 0) / others.length
@@ -72,7 +88,7 @@ const WeeklyTrendChartComponent: React.FC<WeeklyTrendChartProps> = ({
     return '평소와 같음';
   }, [days, todayIndex]);
 
-  if (days.length === 0) {
+  if (days.length === 0 || !hasAnyData) {
     return (
       <View style={styles.container}>
         <Text style={styles.title}>이번 주 추이</Text>
@@ -81,7 +97,12 @@ const WeeklyTrendChartComponent: React.FC<WeeklyTrendChartProps> = ({
     );
   }
 
-  const maxDuration = Math.max(...days.map((d) => d.durationMin), 1);
+  // Bar heights normalize against the busiest data-only day (floor 1 avoids
+  // divide-by-zero when the only data day is 0 minutes).
+  const maxDuration = Math.max(
+    ...days.filter((d) => d.hasData).map((d) => d.durationMin),
+    1,
+  );
 
   return (
     <View style={styles.container}>
@@ -95,25 +116,27 @@ const WeeklyTrendChartComponent: React.FC<WeeklyTrendChartProps> = ({
           const heightRatio = day.durationMin / maxDuration;
           // Trust todayIndex as the single source of truth. The caller derives
           // `day.isToday` from the same index, so checking both was redundant.
-          const isToday = i === todayIndex;
+          // A no-data day never gets the primary "today" treatment — it renders
+          // as a neutral ghost placeholder instead.
+          const showToday = i === todayIndex && day.hasData;
           return (
             <View
               key={day.dayLabel}
               style={styles.barColumn}
-              testID={isToday ? 'weekly-today-bar' : undefined}
+              testID={showToday ? 'weekly-today-bar' : undefined}
             >
-              <Text style={[styles.minuteLabel, isToday && styles.minuteLabelToday]}>
-                {truncateMinutes(day.durationMin)}분
+              <Text style={[styles.minuteLabel, showToday && styles.minuteLabelToday]}>
+                {day.hasData ? `${truncateMinutes(day.durationMin)}분` : '—'}
               </Text>
               <View
-                testID={`weekly-bar-${i}`}
+                testID={day.hasData ? `weekly-bar-${i}` : `weekly-bar-placeholder-${i}`}
                 style={[
                   styles.bar,
-                  { height: BAR_HEIGHT * heightRatio },
-                  isToday ? styles.barToday : styles.barRest,
+                  { height: day.hasData ? BAR_HEIGHT * heightRatio : GHOST_BAR_HEIGHT },
+                  day.hasData ? (showToday ? styles.barToday : styles.barRest) : styles.barGhost,
                 ]}
               />
-              <Text style={[styles.dayLabel, isToday && styles.dayLabelToday]}>
+              <Text style={[styles.dayLabel, showToday && styles.dayLabelToday]}>
                 {day.dayLabel}
               </Text>
             </View>
@@ -141,6 +164,7 @@ const createStyles = (
   bar: ViewStyle;
   barRest: ViewStyle;
   barToday: ViewStyle;
+  barGhost: ViewStyle;
   dayLabel: TextStyle;
   dayLabelToday: TextStyle;
   emptyText: TextStyle;
@@ -190,6 +214,9 @@ const createStyles = (
     },
     barRest: { backgroundColor: semantic.bgSubtle },
     barToday: { backgroundColor: semantic.primaryNormal },
+    // No-data ghost: same neutral fill as barRest but de-emphasized so an empty
+    // weekday reads as "awaiting data", not a real (very short) commute.
+    barGhost: { backgroundColor: semantic.bgSubtle, opacity: 0.4 },
     dayLabel: {
       fontSize: 13,
       fontFamily: weightToFontFamily('500'),

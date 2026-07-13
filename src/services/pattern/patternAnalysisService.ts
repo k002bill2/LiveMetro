@@ -21,6 +21,7 @@ import {
   FrequentRoute,
   DayOfWeek,
   MIN_LOGS_FOR_PATTERN,
+  MIN_PATTERN_CONFIDENCE_FOR_ALERTS,
   DEFAULT_WALK_TO_STATION_MIN,
   DEFAULT_WAIT_MIN,
   DEFAULT_WALK_TO_DEST_MIN,
@@ -223,7 +224,7 @@ class PatternAnalysisService {
   async hasTodayPattern(userId: string): Promise<boolean> {
     const dayOfWeek = getDayOfWeek(new Date());
     const pattern = await this.getPatternForDay(userId, dayOfWeek);
-    return pattern !== null && pattern.confidence >= 0.5;
+    return pattern !== null && pattern.confidence >= MIN_PATTERN_CONFIDENCE_FOR_ALERTS;
   }
 
   /**
