@@ -11,7 +11,7 @@
  * All math lives in pure functions (`guidanceSteps.ts`); this hook only owns
  * the 1Hz tick (focus-gated, cleaned up) and the anchor state.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   computeProgress,
   computeRemainingSeconds,
@@ -23,6 +23,16 @@ interface UseGuidanceProgressOptions {
   readonly startedAt: number;
   /** Gate for the 1Hz tick — pass `useIsFocused()` from the screen. */
   readonly enabled: boolean;
+  /**
+   * Restored anchor from a persisted session (re-mount / app restart). When
+   * provided, tracking resumes from this step + time instead of the first hold.
+   */
+  readonly initialAnchor?: Anchor;
+  /**
+   * Notified on every anchor change (incl. the initial mount value — an
+   * idempotent write). Screen persists it to survive re-mount / app restart.
+   */
+  readonly onAnchorChange?: (anchor: Anchor) => void;
 }
 
 export interface UseGuidanceProgressResult {
@@ -56,8 +66,10 @@ export const useGuidanceProgress = (
   steps: readonly GuidanceStep[],
   options: UseGuidanceProgressOptions
 ): UseGuidanceProgressResult => {
-  const { startedAt, enabled } = options;
-  const [anchor, setAnchor] = useState<Anchor>({ index: 0, atMs: startedAt });
+  const { startedAt, enabled, initialAnchor, onAnchorChange } = options;
+  const [anchor, setAnchor] = useState<Anchor>(
+    () => initialAnchor ?? { index: 0, atMs: startedAt }
+  );
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
 
   // 1Hz tick — focus-gated, cleared on unmount (subscription-cleanup rule).
@@ -67,6 +79,15 @@ export const useGuidanceProgress = (
     const tickId = setInterval(() => setNowMs(Date.now()), 1000);
     return () => clearInterval(tickId);
   }, [enabled]);
+
+  // Notify on every anchor change (mount + each rebase). Held in a ref + read in
+  // an effect so a per-render callback identity never re-fires it, and the
+  // setState updaters stay side-effect free (no callback inside setAnchor).
+  const onAnchorChangeRef = useRef(onAnchorChange);
+  onAnchorChangeRef.current = onAnchorChange;
+  useEffect(() => {
+    onAnchorChangeRef.current?.(anchor);
+  }, [anchor]);
 
   const progress = useMemo(
     () => computeProgress(steps, anchor.index, (nowMs - anchor.atMs) / 1000),

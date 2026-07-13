@@ -68,6 +68,20 @@ export const setGuidanceSession = (session: GuidanceSession): void => {
   });
 };
 
+/**
+ * Update the active session's progress anchor (last confirmed/corrected step
+ * position) + persist. No-op when no session is active. Reuses
+ * {@link setGuidanceSession} with the same `startedAt`, so the departed-train
+ * log is preserved (only a genuinely new journey clears it).
+ */
+export const updateGuidanceProgressAnchor = (anchor: {
+  readonly stepIndex: number;
+  readonly atMs: number;
+}): void => {
+  if (current === null) return;
+  setGuidanceSession({ ...current, progressAnchor: anchor });
+};
+
 /** End any active guidance session + remove the persisted copy. */
 export const clearGuidanceSession = (): void => {
   current = null;

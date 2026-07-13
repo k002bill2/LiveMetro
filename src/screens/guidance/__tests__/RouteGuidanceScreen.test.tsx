@@ -848,4 +848,42 @@ describe('RouteGuidanceScreen', () => {
       expect(cancelAlightAlert).toHaveBeenCalled();
     });
   });
+
+  describe('진행 anchor 복원 (progressAnchor restore)', () => {
+    const seedSessionWithAnchor = (
+      progressAnchor: { stepIndex: number; atMs: number }
+    ): void => {
+      setGuidanceSession({
+        route: createRoute([
+          hop('s1', '을지로3가', 's2', '시청', 2),
+          hop('s2', '시청', 's3', '산곡', 3),
+        ]),
+        fromStationName: '을지로3가',
+        toStationName: '산곡',
+        startedAt: T0,
+        progressAnchor,
+      });
+    };
+
+    it('저장된 ride anchor로 마운트하면 첫 board 홀드가 아니라 그 ride 스텝으로 복원한다', () => {
+      // ride(index 1)를 T0에 탑승한 것으로 복원 — 복원되면 '탑승 중', 미배선이면
+      // 첫 board 홀드('탑승 대기')로 되감김(RED).
+      seedSessionWithAnchor({ stepIndex: 1, atMs: T0 });
+      const { getByText, getByTestId } = render(<RouteGuidanceScreen />);
+      expect(getByText('탑승 중')).toBeTruthy();
+      expect(getByTestId('guidance-next-station')).toHaveTextContent('시청');
+    });
+
+    it('스텝 범위를 벗어난 무효 anchor는 무시하고 기본 board 스텝에서 시작한다', () => {
+      seedSessionWithAnchor({ stepIndex: 99, atMs: T0 });
+      const { getByText } = render(<RouteGuidanceScreen />);
+      expect(getByText('탑승 대기')).toBeTruthy();
+    });
+
+    it('미래 시각 anchor는 무시하고 기본 board 스텝에서 시작한다', () => {
+      seedSessionWithAnchor({ stepIndex: 1, atMs: T0 + 60_000 });
+      const { getByText } = render(<RouteGuidanceScreen />);
+      expect(getByText('탑승 대기')).toBeTruthy();
+    });
+  });
 });

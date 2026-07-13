@@ -14,6 +14,7 @@ import {
   getGuidanceSession,
   setGuidanceSession,
   clearGuidanceSession,
+  updateGuidanceProgressAnchor,
   subscribe,
   hydrateGuidanceSession,
   isSessionExpired,
@@ -213,5 +214,50 @@ describe('guidanceSessionStore', () => {
     mockGetItem.mockResolvedValue('{ not valid json');
     await expect(hydrateGuidanceSession(1000)).resolves.toBeUndefined();
     expect(getGuidanceSession()).toBeNull();
+  });
+
+  // --- progress anchor (re-mount / app-restart restore) ---
+
+  describe('updateGuidanceProgressAnchor', () => {
+    it('is a no-op when no session is active', () => {
+      updateGuidanceProgressAnchor({ stepIndex: 2, atMs: 1_700_000_000_500 });
+      expect(getGuidanceSession()).toBeNull();
+      expect(mockSetItem).not.toHaveBeenCalled();
+    });
+
+    it('records the anchor on the active session and persists it', () => {
+      setGuidanceSession(makeSession(1_700_000_000_000));
+      mockSetItem.mockClear();
+      const anchor = { stepIndex: 3, atMs: 1_700_000_050_000 };
+
+      updateGuidanceProgressAnchor(anchor);
+
+      expect(getGuidanceSession()?.progressAnchor).toEqual(anchor);
+      expect(mockSetItem).toHaveBeenCalledWith(
+        STORAGE_KEY,
+        JSON.stringify(getGuidanceSession())
+      );
+    });
+
+    it('keeps the same startedAt so the departed-train log is preserved', () => {
+      setGuidanceSession(makeSession(1_700_000_000_000));
+      appendDepartedTrains([departedEntry], 1_700_000_000_000);
+      expect(getDepartedTrainLog()).toHaveLength(1);
+
+      updateGuidanceProgressAnchor({ stepIndex: 1, atMs: 1_700_000_010_000 });
+
+      expect(getGuidanceSession()?.startedAt).toBe(1_700_000_000_000);
+      expect(getDepartedTrainLog()).toHaveLength(1);
+    });
+
+    it('overwrites a previous anchor on the same session', () => {
+      setGuidanceSession(makeSession(1_700_000_000_000));
+      updateGuidanceProgressAnchor({ stepIndex: 1, atMs: 1_700_000_010_000 });
+      updateGuidanceProgressAnchor({ stepIndex: 2, atMs: 1_700_000_020_000 });
+      expect(getGuidanceSession()?.progressAnchor).toEqual({
+        stepIndex: 2,
+        atMs: 1_700_000_020_000,
+      });
+    });
   });
 });

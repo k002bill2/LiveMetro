@@ -45,7 +45,11 @@ import {
   scheduleAlightAlert,
   cancelAlightAlert,
 } from '@/services/notification/alightAlertService';
-import { clearGuidanceSession, getGuidanceSession } from '@/services/guidance/guidanceSessionStore';
+import {
+  clearGuidanceSession,
+  getGuidanceSession,
+  updateGuidanceProgressAnchor,
+} from '@/services/guidance/guidanceSessionStore';
 import { completeGuidanceCommuteLog } from '@/services/guidance/guidanceCommuteLogService';
 import { useAuth } from '@/services/auth/AuthContext';
 import { GuidanceControls, GuidanceHeader, GuidanceNowCard, GuidanceStepRow, TrainSelectSheet, type GuidanceStepStatus } from '@/components/guidance';
@@ -125,6 +129,29 @@ export const RouteGuidanceScreen: React.FC = () => {
     }
   }, [session, steps.length, navigation]);
 
+  // Restore the persisted progress anchor (re-mount / app restart) so a confirmed
+  // boarding isn't rewound to the first hold. Validate defensively — a malformed
+  // or out-of-range anchor (legacy/corrupt persisted session) falls back to the
+  // default first-step start. Computed once at mount (deps stable), so the 1Hz
+  // tick can't re-validate atMs against a moving clock.
+  const initialAnchor = useMemo((): { index: number; atMs: number } | undefined => {
+    const anchor = session?.progressAnchor;
+    if (!anchor) return undefined;
+    if (!Number.isFinite(anchor.stepIndex) || !Number.isFinite(anchor.atMs)) return undefined;
+    if (anchor.stepIndex < 0 || anchor.stepIndex >= steps.length) return undefined;
+    if (anchor.atMs > Date.now()) return undefined;
+    return { index: anchor.stepIndex, atMs: anchor.atMs };
+  }, [session, steps.length]);
+
+  // Persist every anchor change (mount + each manual/soft correction) so the
+  // progress survives a screen close or app kill mid-journey.
+  const handleAnchorChange = useCallback(
+    (anchor: { index: number; atMs: number }): void => {
+      updateGuidanceProgressAnchor({ stepIndex: anchor.index, atMs: anchor.atMs });
+    },
+    []
+  );
+
   const {
     currentIndex,
     elapsedInStepSec,
@@ -138,6 +165,8 @@ export const RouteGuidanceScreen: React.FC = () => {
   } = useGuidanceProgress(steps, {
     startedAt: session?.startedAt ?? 0,
     enabled: isFocused && steps.length > 0,
+    initialAnchor,
+    onAnchorChange: handleAnchorChange,
   });
 
   const currentStep = steps[currentIndex];
