@@ -29,6 +29,7 @@ import {
 } from '@/services/guidance/departedTrainLog';
 import { createRoute, type RouteSegment } from '@/models/route';
 import { useKeepAwake } from 'expo-keep-awake';
+import { useGuidanceBackgroundPermissionPrompt } from '@/hooks/useGuidanceBackgroundPermissionPrompt';
 
 const mockGoBack = jest.fn();
 
@@ -72,6 +73,18 @@ jest.mock('@/services/guidance/guidanceCommuteLogService', () => ({
 
 jest.mock('expo-keep-awake', () => ({
   useKeepAwake: jest.fn(),
+}));
+
+// The bg-permission hook pulls in the native background-location task chain
+// (expo-task-manager). Mock it at the hook boundary so the screen never loads
+// that chain; hook behavior is covered by its own test.
+jest.mock('@/hooks/useGuidanceBackgroundPermissionPrompt', () => ({
+  useGuidanceBackgroundPermissionPrompt: jest.fn(() => ({
+    status: 'hidden',
+    requestPermission: jest.fn(),
+    dismiss: jest.fn(),
+    openSettings: jest.fn(),
+  })),
 }));
 
 jest.mock('lucide-react-native', () => ({
@@ -225,6 +238,13 @@ describe('RouteGuidanceScreen', () => {
     (scheduleAlightAlert as jest.Mock).mockClear();
     (cancelAlightAlert as jest.Mock).mockClear();
     (completeGuidanceCommuteLog as jest.Mock).mockClear();
+    // Default: bg-permission nudge hidden — wiring tests override per case.
+    (useGuidanceBackgroundPermissionPrompt as jest.Mock).mockReturnValue({
+      status: 'hidden',
+      requestPermission: jest.fn(),
+      dismiss: jest.fn(),
+      openSettings: jest.fn(),
+    });
     mockedUseRealtimeTrains.mockReturnValue({
       trains: [],
       loading: false,
@@ -911,6 +931,57 @@ describe('RouteGuidanceScreen', () => {
       seedSession();
       render(<RouteGuidanceScreen />);
       expect(useKeepAwake).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('백그라운드 권한 유도 배너 (background permission banner)', () => {
+    it('status가 hidden이면 배너를 렌더하지 않는다', () => {
+      seedSession();
+      const { queryByTestId } = render(<RouteGuidanceScreen />);
+      expect(queryByTestId('guidance-bg-permission-banner')).toBeNull();
+    });
+
+    it('prompt 모드면 배너를 렌더하고 허용 CTA가 requestPermission을 호출한다', () => {
+      const requestPermission = jest.fn();
+      (useGuidanceBackgroundPermissionPrompt as jest.Mock).mockReturnValue({
+        status: 'prompt',
+        requestPermission,
+        dismiss: jest.fn(),
+        openSettings: jest.fn(),
+      });
+      seedSession();
+      const { getByTestId } = render(<RouteGuidanceScreen />);
+      expect(getByTestId('guidance-bg-permission-banner')).toBeTruthy();
+      fireEvent.press(getByTestId('guidance-bg-permission-primary'));
+      expect(requestPermission).toHaveBeenCalledTimes(1);
+    });
+
+    it('settings 모드면 주 CTA가 openSettings를 호출한다', () => {
+      const openSettings = jest.fn();
+      (useGuidanceBackgroundPermissionPrompt as jest.Mock).mockReturnValue({
+        status: 'settings',
+        requestPermission: jest.fn(),
+        dismiss: jest.fn(),
+        openSettings,
+      });
+      seedSession();
+      const { getByTestId } = render(<RouteGuidanceScreen />);
+      fireEvent.press(getByTestId('guidance-bg-permission-primary'));
+      expect(openSettings).toHaveBeenCalledTimes(1);
+    });
+
+    it('보조 CTA가 dismiss를 호출한다', () => {
+      const dismiss = jest.fn();
+      (useGuidanceBackgroundPermissionPrompt as jest.Mock).mockReturnValue({
+        status: 'prompt',
+        requestPermission: jest.fn(),
+        dismiss,
+        openSettings: jest.fn(),
+      });
+      seedSession();
+      const { getByTestId } = render(<RouteGuidanceScreen />);
+      fireEvent.press(getByTestId('guidance-bg-permission-dismiss'));
+      expect(dismiss).toHaveBeenCalledTimes(1);
     });
   });
 });

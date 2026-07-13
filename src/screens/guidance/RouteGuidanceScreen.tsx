@@ -20,6 +20,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { useRealtimeTrains } from '@/hooks/useRealtimeTrains';
 import { useGuidanceProgress } from '@/hooks/useGuidanceProgress';
+import { useGuidanceBackgroundPermissionPrompt } from '@/hooks/useGuidanceBackgroundPermissionPrompt';
 import {
   routeToGuidanceSteps,
   computeRideProgress,
@@ -55,6 +56,7 @@ import { completeGuidanceCommuteLog } from '@/services/guidance/guidanceCommuteL
 import { useAuth } from '@/services/auth/AuthContext';
 import { GuidanceControls, GuidanceHeader, GuidanceNowCard, GuidanceStepRow, TrainSelectSheet, type GuidanceStepStatus } from '@/components/guidance';
 import { StationRebaseSheet } from '@/components/guidance/StationRebaseSheet';
+import { BackgroundPermissionBanner } from '@/components/guidance/BackgroundPermissionBanner';
 import type { AppStackParamList } from '@/navigation/types';
 import type { GuidanceStep, RideStep } from '@/models/guidance';
 import type { Train } from '@/models/train';
@@ -119,6 +121,15 @@ export const RouteGuidanceScreen: React.FC = () => {
   // Keep the screen awake during live guidance so auto-lock doesn't cut tracking.
   // Released automatically when the screen unmounts — no manual cleanup needed.
   useKeepAwake();
+
+  // One-time "Always" location nudge — without background permission, guidance
+  // and alerts stop when the phone locks.
+  const {
+    status: bgPermStatus,
+    requestPermission: requestBgPermission,
+    dismiss: dismissBgPermission,
+    openSettings: openBgSettings,
+  } = useGuidanceBackgroundPermissionPrompt();
 
   // Session is set by the CTA right before navigating; read once per mount.
   const session = useMemo(() => getGuidanceSession(), []);
@@ -618,6 +629,15 @@ export const RouteGuidanceScreen: React.FC = () => {
         progress={progress}
         onClose={handleExit}
       />
+      {bgPermStatus !== 'hidden' && (
+        <View style={styles.bgPermWrap}>
+          <BackgroundPermissionBanner
+            mode={bgPermStatus}
+            onPrimary={bgPermStatus === 'settings' ? openBgSettings : requestBgPermission}
+            onDismiss={dismissBgPermission}
+          />
+        </View>
+      )}
       {currentStep !== undefined && (
         <View style={styles.nowCardWrap}>
           <GuidanceNowCard
@@ -683,6 +703,9 @@ const createStyles = (semantic: WantedSemanticTheme): ReturnType<typeof StyleShe
       paddingHorizontal: WANTED_TOKENS.spacing.s5,
     },
     nowCardWrap: {
+      marginBottom: WANTED_TOKENS.spacing.s4,
+    },
+    bgPermWrap: {
       marginBottom: WANTED_TOKENS.spacing.s4,
     },
     sectionLabel: {
