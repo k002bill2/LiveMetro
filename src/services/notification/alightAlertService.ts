@@ -39,6 +39,9 @@ export const ALIGHT_ALERT_KIND = 'alight-alert';
 let trackedId: string | null = null;
 let trackedStepKey: string | null = null;
 let trackedFireAtMs: number | null = null;
+// 추적 알림의 세션 키(schedule param). keep 모드 정리에서 추적 ID가 보존 대상
+// 세션의 것인지 확인해, 이전 세션(A) 것이면 취소·상태 클리어한다(M2, boarding K1 대칭).
+let trackedSessionKey: string | null = null;
 
 // 공개 API 호출을 도착 순서대로 직렬화한다. await 도중 끼어드는 cancel/schedule이
 // 추적 상태를 엇갈리게 읽는 레이스(늦은 완료가 취소를 덮어씀)를 원천 차단한다
@@ -170,6 +173,7 @@ const scheduleAlightAlertInner = async (
       trackedId = id;
       trackedStepKey = stepKey;
       trackedFireAtMs = fireAtMs;
+      trackedSessionKey = sessionKey;
     }
     return id;
   } catch (error) {
@@ -180,9 +184,10 @@ const scheduleAlightAlertInner = async (
 
 /**
  * 추적 중인 하차 임박 알림을 취소하고, OS 큐에 남은 하차 알림 고아까지 sweep한다.
- * 공개 함수는 직렬화 큐를 통해 순차 실행된다. `options.keepSessionKey` 지정 시
- * (세션 교체 정리) 추적 ID는 건드리지 않고, sweep에서 그 세션 알림을 보존한다 —
- * 이전 세션의 늦은 정리가 새 세션 알림을 지우지 않게 한다. Never throws.
+ * 공개 함수는 직렬화 큐를 통해 순차 실행된다. keep 모드(`options.keepSessionKey`)에서는
+ * 추적 알림의 sessionKey가 보존 대상과 일치하면 건드리지 않고, 다르면(이전 세션 것)
+ * 취소·상태를 클리어한다 — OS sweep의 keep 필터와 동일 기준을 추적 ID에도 적용한다
+ * (M2, boarding K1 대칭). sweep에서도 그 세션 알림을 보존한다. Never throws.
  */
 export const cancelAlightAlert = (
   options?: { readonly keepSessionKey?: string }
@@ -192,11 +197,13 @@ const cancelAlightAlertInner = async (
   options?: { readonly keepSessionKey?: string }
 ): Promise<void> => {
   const keepSessionKey = options?.keepSessionKey;
-  if (keepSessionKey === undefined) {
+  const keptByFilter = keepSessionKey !== undefined && trackedSessionKey === keepSessionKey;
+  if (!keptByFilter) {
     const id = trackedId;
     trackedId = null;
     trackedStepKey = null;
     trackedFireAtMs = null;
+    trackedSessionKey = null;
     if (id !== null) {
       try {
         await notificationService.cancelNotification(id);

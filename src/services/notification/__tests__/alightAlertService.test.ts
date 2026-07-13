@@ -302,10 +302,21 @@ describe('세션 키 스탬프 + keep-필터 (G3/H2)', () => {
     expect(expo.cancelScheduledNotificationAsync).not.toHaveBeenCalledWith('keep-new');
   });
 
-  it('keepSessionKey 지정 시 추적 중 ID는 취소하지 않는다', async () => {
-    await svc.scheduleAlightAlert(baseParams); // trackedId='alert-1'
+  it('keepSessionKey가 추적 알림의 sessionKey와 일치하면 추적 ID를 보존한다 (B 추적 중 keep=B)', async () => {
+    await svc.scheduleAlightAlert(baseParams); // trackedId='alert-1', sessionKey='1000'
     notif.cancelNotification.mockClear();
-    await svc.cancelAlightAlert({ keepSessionKey: 'new' });
+    await svc.cancelAlightAlert({ keepSessionKey: '1000' });
+    expect(notif.cancelNotification).not.toHaveBeenCalled();
+  });
+
+  it('keepSessionKey가 추적 알림의 sessionKey와 다르면 추적 ID를 취소·클리어한다 (A 추적 중 keep=B, M2)', async () => {
+    await svc.scheduleAlightAlert(baseParams); // trackedId='alert-1', sessionKey='1000' (A)
+    notif.cancelNotification.mockClear();
+    await svc.cancelAlightAlert({ keepSessionKey: 'new' }); // keep=B
+    expect(notif.cancelNotification).toHaveBeenCalledWith('alert-1');
+    // 상태 클리어 확인 — 이후 full cancel이 취소된 ID를 다시 반환하지 않는다(오염 방지).
+    notif.cancelNotification.mockClear();
+    await svc.cancelAlightAlert();
     expect(notif.cancelNotification).not.toHaveBeenCalled();
   });
 

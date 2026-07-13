@@ -77,18 +77,22 @@ export const useGuidanceBackgroundPermissionPrompt =
     useEffect(() => {
       const resolve = async (): Promise<void> => {
         try {
-          if (Platform.OS === 'web') return;
-          const dismissed = await AsyncStorage.getItem(GUIDANCE_BG_PERM_PROMPT_DISMISSED_KEY);
-          if (dismissed !== null) return;
+          if (Platform.OS === 'web') return; // 웹 최우선 — Wake Lock/권한 개념 밖.
+          // 권한 확인을 dismissal보다 먼저 한다(M1). dismiss한 사용자가 세션 중 설정
+          // 화면에서 Always를 켜고 재진입해도 start 가드가 실행돼야 하기 때문 — dismissal은
+          // "미허용 상태에서 배너를 보일지"만 결정하는 UI 전용 게이트다.
           const permission = await Location.getBackgroundPermissionsAsync();
           if (permission.status === 'granted') {
             // 세션 중 외부(설정/권한 화면)에서 Always를 켜고 돌아온 경우, sync 훅은
             // 세션 키 불변이라 재시도하지 않는다 — 초기 resolver가 배너를 숨기면서
             // 백그라운드 추적도 시작한다(멱등: 이미 시작된 태스크는 no-op). L1의
-            // 사후 재확인이 이 경로에도 그대로 적용된다(L2).
+            // 사후 재확인이 이 경로에도 그대로 적용된다(L2). dismissal과 무관하게 시작.
             await startBackgroundLocationIfSessionActive();
             return;
           }
+          // 미허용 상태에서만 dismissal이 배너 노출을 막는다(UI 전용).
+          const dismissed = await AsyncStorage.getItem(GUIDANCE_BG_PERM_PROMPT_DISMISSED_KEY);
+          if (dismissed !== null) return;
           if (mountedRef.current) {
             // 이미 영구 거부(canAskAgain=false)면 in-app "허용하기"는 헛탭이므로
             // 바로 설정 모드로 시작한다 (설정 앱 딥링크로 유도).

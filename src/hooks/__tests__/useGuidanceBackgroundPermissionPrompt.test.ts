@@ -89,13 +89,22 @@ describe('useGuidanceBackgroundPermissionPrompt', () => {
       expect(mockStartBgLocation).not.toHaveBeenCalled(); // web hidden 경로 → start 없음
     });
 
-    it('stays hidden when the user previously dismissed it', async () => {
+    it('stays hidden when not granted and previously dismissed (dismissal is UI-only)', async () => {
       mockGetItem.mockResolvedValue(String(Date.now()));
+      // 미허용(undetermined) + dismissed → 배너 숨김, start 없음. (권한을 먼저 확인하되
+      // granted가 아니므로 dismissal이 배너 노출만 막는다.)
       const { result } = renderHook(() => useGuidanceBackgroundPermissionPrompt());
       await waitFor(() => expect(mockGetItem).toHaveBeenCalled());
       expect(result.current.status).toBe('hidden');
-      expect(mockGetBgPerm).not.toHaveBeenCalled();
-      expect(mockStartBgLocation).not.toHaveBeenCalled(); // dismissed hidden 경로 → start 없음
+      expect(mockStartBgLocation).not.toHaveBeenCalled();
+    });
+
+    it('starts tracking on mount when dismissed but permission became granted mid-session (M1)', async () => {
+      mockGetItem.mockResolvedValue(String(Date.now())); // 이전에 배너 dismiss
+      mockGetBgPerm.mockResolvedValue({ status: 'granted' }); // 설정에서 Always 켜고 재진입
+      const { result } = renderHook(() => useGuidanceBackgroundPermissionPrompt());
+      await waitFor(() => expect(mockStartBgLocation).toHaveBeenCalled());
+      expect(result.current.status).toBe('hidden');
     });
 
     it('starts background location on mount when permission is already granted mid-session (L2)', async () => {
