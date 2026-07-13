@@ -31,6 +31,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
 
 jest.mock('expo-location', () => ({
   getBackgroundPermissionsAsync: jest.fn(() => Promise.resolve({ status: 'undetermined' })),
+  isBackgroundLocationAvailableAsync: jest.fn(() => Promise.resolve(true)),
 }));
 
 jest.mock('@/services/location/locationService', () => ({
@@ -55,6 +56,7 @@ jest.mock('@/hooks/useGuidanceSession', () => ({
 const mockGetItem = AsyncStorage.getItem as jest.Mock;
 const mockSetItem = AsyncStorage.setItem as jest.Mock;
 const mockGetBgPerm = Location.getBackgroundPermissionsAsync as jest.Mock;
+const mockIsAvailable = Location.isBackgroundLocationAvailableAsync as jest.Mock;
 const mockRequestBgPerm = locationService.requestBackgroundPermission as jest.Mock;
 const mockStartBgLocation = startGuidanceBackgroundLocation as jest.Mock;
 const mockStopBgLocation = stopGuidanceBackgroundLocation as jest.Mock;
@@ -78,6 +80,7 @@ describe('useGuidanceBackgroundPermissionPrompt', () => {
     mockRequestBgPerm.mockResolvedValue(false);
     mockStartBgLocation.mockResolvedValue(true);
     mockStopBgLocation.mockResolvedValue(undefined);
+    mockIsAvailable.mockResolvedValue(true); // 기본: 백그라운드 위치 가용
     mockGetGuidanceSession.mockReturnValue(activeSession); // 기본: 활성 세션
     mockUseGuidanceSession.mockReturnValue(activeSession); // 반응형 구독도 활성
     jest.spyOn(Linking, 'openSettings').mockResolvedValue(undefined);
@@ -100,14 +103,35 @@ describe('useGuidanceBackgroundPermissionPrompt', () => {
       expect(mockStartBgLocation).not.toHaveBeenCalled(); // web hidden 경로 → start 없음
     });
 
-    it('stays hidden when not granted and previously dismissed (dismissal is UI-only)', async () => {
-      mockGetItem.mockResolvedValue(String(Date.now()));
-      // 미허용(undetermined) + dismissed → 배너 숨김, start 없음. (권한을 먼저 확인하되
-      // granted가 아니므로 dismissal이 배너 노출만 막는다.)
+    it('stays hidden when not granted and dismissed for the SAME session (U2)', async () => {
+      mockGetItem.mockResolvedValue('1000'); // activeSession.startedAt=1000 세션에서 dismiss
+      // 미허용(undetermined) + 같은 세션 dismiss → 배너 숨김, start 없음.
       const { result } = renderHook(() => useGuidanceBackgroundPermissionPrompt());
       await waitFor(() => expect(mockGetItem).toHaveBeenCalled());
       expect(result.current.status).toBe('hidden');
       expect(mockStartBgLocation).not.toHaveBeenCalled();
+    });
+
+    it('re-shows the banner for a DIFFERENT session (new startedAt) after a prior dismiss (U2)', async () => {
+      mockGetItem.mockResolvedValue('999'); // 이전 여정(startedAt=999)에서 dismiss
+      // 현재 세션은 startedAt=1000 → 키 불일치 → 재노출.
+      const { result } = renderHook(() => useGuidanceBackgroundPermissionPrompt());
+      await waitFor(() => expect(result.current.status).toBe('prompt'));
+    });
+
+    it('re-shows the banner for a legacy timestamp dismiss value (migration, U2)', async () => {
+      mockGetItem.mockResolvedValue('1700000000000'); // 구버전 timestamp 값
+      // startedAt=1000과 일치할 확률이 없어 무시 → 재노출.
+      const { result } = renderHook(() => useGuidanceBackgroundPermissionPrompt());
+      await waitFor(() => expect(result.current.status).toBe('prompt'));
+    });
+
+    it('stays hidden on a device where background location is unavailable (U1)', async () => {
+      mockIsAvailable.mockResolvedValue(false);
+      const { result } = renderHook(() => useGuidanceBackgroundPermissionPrompt());
+      await waitFor(() => expect(mockIsAvailable).toHaveBeenCalled());
+      expect(result.current.status).toBe('hidden');
+      expect(mockGetBgPerm).not.toHaveBeenCalled(); // 권한 조회 경로 미진입
     });
 
     it('starts tracking on mount when dismissed but permission became granted mid-session (M1)', async () => {
@@ -168,6 +192,20 @@ describe('useGuidanceBackgroundPermissionPrompt', () => {
       });
 
       expect(mockStartBgLocation).toHaveBeenCalledTimes(1);
+      expect(result.current.status).toBe('hidden');
+    });
+
+    it('does not request permission on an unavailable device (U1)', async () => {
+      mockIsAvailable.mockResolvedValue(false);
+      const { result } = renderHook(() => useGuidanceBackgroundPermissionPrompt());
+      await act(async () => {
+        await Promise.resolve();
+        await Promise.resolve();
+      }); // resolver 완료 → availableRef=false
+      await act(async () => {
+        await result.current.requestPermission();
+      });
+      expect(mockRequestBgPerm).not.toHaveBeenCalled();
       expect(result.current.status).toBe('hidden');
     });
 
@@ -263,7 +301,7 @@ describe('useGuidanceBackgroundPermissionPrompt', () => {
   });
 
   describe('dismiss', () => {
-    it('persists the dismissal and hides', async () => {
+    it('persists the current session key on dismissal and hides (U2 session-scope)', async () => {
       const { result } = renderHook(() => useGuidanceBackgroundPermissionPrompt());
       await waitFor(() => expect(result.current.status).toBe('prompt'));
 
@@ -271,9 +309,10 @@ describe('useGuidanceBackgroundPermissionPrompt', () => {
         await result.current.dismiss();
       });
 
+      // 세션 키(activeSession.startedAt=1000)를 저장 — 이 여정에서만 억제.
       expect(mockSetItem).toHaveBeenCalledWith(
         GUIDANCE_BG_PERM_PROMPT_DISMISSED_KEY,
-        expect.any(String)
+        '1000'
       );
       expect(result.current.status).toBe('hidden');
     });

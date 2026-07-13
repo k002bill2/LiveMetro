@@ -82,6 +82,9 @@ export const useGuidanceBackgroundPermissionPrompt = (
     const suspended = options?.suspended ?? false;
     const suspendedRef = useRef(suspended);
     suspendedRef.current = suspended;
+    // 백그라운드 위치 가용성(U1) — resolver가 한 번 확인해 저장한다. 불가 기기에서는
+    // 권한을 허용해도 start가 조용히 실패하므로 배너·권한 요청 경로를 아예 막는다.
+    const availableRef = useRef(true);
 
     // 세션을 반응형으로 구독 — 여정이 완료(commuteLogCompletedAt)되거나 종료되면
     // 배너를 즉시 숨긴다(N1). 화면은 완료 후에도 mount를 유지하므로, 훅이 세션 전이를
@@ -112,6 +115,11 @@ export const useGuidanceBackgroundPermissionPrompt = (
       const resolve = async (): Promise<void> => {
         try {
           if (Platform.OS === 'web') return; // 웹 최우선 — Wake Lock/권한 개념 밖.
+          // 백그라운드 위치가 불가한 기기에서는 배너/권한 요청이 무의미하다 — 허용해도
+          // start가 조용히 false를 반환하므로 아예 숨긴다(U1).
+          const available = await Location.isBackgroundLocationAvailableAsync();
+          availableRef.current = available;
+          if (!available) return;
           // 권한 확인을 dismissal보다 먼저 한다(M1). dismiss한 사용자가 세션 중 설정
           // 화면에서 Always를 켜고 재진입해도 start 가드가 실행돼야 하기 때문 — dismissal은
           // "미허용 상태에서 배너를 보일지"만 결정하는 UI 전용 게이트다.
@@ -124,9 +132,19 @@ export const useGuidanceBackgroundPermissionPrompt = (
             await startTrackingIfEligible();
             return;
           }
-          // 미허용 상태에서만 dismissal이 배너 노출을 막는다(UI 전용).
+          // 미허용 상태에서만 dismissal이 배너 노출을 막는다(UI 전용). 세션 스코프 —
+          // dismiss한 세션과 현재 세션이 같을 때만 숨긴다(U2, "나중에" 정직성). 다른 여정
+          // (새 startedAt)에서는 재노출. 레거시 값(구버전 timestamp)은 startedAt과 일치할
+          // 확률이 없어 자연히 무시되고 다음 dismiss에서 세션 키 스킴으로 전환된다(마이그레이션).
           const dismissed = await AsyncStorage.getItem(GUIDANCE_BG_PERM_PROMPT_DISMISSED_KEY);
-          if (dismissed !== null) return;
+          const dismissSession = getGuidanceSession();
+          if (
+            dismissed !== null &&
+            dismissSession !== null &&
+            dismissed === String(dismissSession.startedAt)
+          ) {
+            return;
+          }
           // 초기 권한/스토리지 조회가 pending인 동안 여정이 완료됐을 수 있다 — 라이브
           // 세션이 비활성이면 반응성 hide를 되돌리지 않도록 setStatus를 생략한다(O1).
           if (mountedRef.current && hasActiveGuidanceSession() && !suspendedRef.current) {
@@ -180,9 +198,9 @@ export const useGuidanceBackgroundPermissionPrompt = (
     }, [sessionActive, suspended, startTrackingIfEligible]);
 
     const requestPermission = useCallback(async (): Promise<void> => {
-      // 여정이 이미 종료/완료(로컬 완주 suspended 포함)됐으면 민감 권한 다이얼로그를
-      // 띄우지 않고 숨긴다 (N1 레이스 이중 방어 — 반응형 hide와 별개로 액션 진입부에서도 확인).
-      if (!hasActiveGuidanceSession() || suspendedRef.current) {
+      // 여정이 이미 종료/완료(로컬 완주 suspended 포함)됐거나 백그라운드 위치 불가
+      // 기기(U1)면 민감 권한 다이얼로그를 띄우지 않고 숨긴다 (N1 레이스 이중 방어).
+      if (!hasActiveGuidanceSession() || suspendedRef.current || !availableRef.current) {
         if (mountedRef.current) setStatus('hidden');
         return;
       }
@@ -204,10 +222,15 @@ export const useGuidanceBackgroundPermissionPrompt = (
 
     const dismiss = useCallback(async (): Promise<void> => {
       try {
-        await AsyncStorage.setItem(
-          GUIDANCE_BG_PERM_PROMPT_DISMISSED_KEY,
-          String(Date.now())
-        );
+        // "나중에"는 이 여정에서만 숨긴다(U2 정직성) — dismiss한 세션 키를 저장하고,
+        // resolver는 같은 세션일 때만 배너를 억제한다. 세션이 없으면 억제하지 않는다.
+        const current = getGuidanceSession();
+        if (current !== null) {
+          await AsyncStorage.setItem(
+            GUIDANCE_BG_PERM_PROMPT_DISMISSED_KEY,
+            String(current.startedAt)
+          );
+        }
       } catch {
         // 저장 실패해도 이 세션에서는 숨긴다.
       } finally {
