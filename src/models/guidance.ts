@@ -87,6 +87,14 @@ export interface GuidanceSession {
   readonly commuteLogId?: string;
   /** Epoch ms when the destination arrival was persisted to the commute log. */
   readonly commuteLogCompletedAt?: number;
+  /**
+   * Epoch ms when the rider reached the destination LOCALLY (isAtEnd), independent
+   * of the remote commute-log write. Persisted so an offline/logged-out arrival
+   * isn't reverted by a mid-TTL restart (which would otherwise restore the session
+   * as active and restart background tracking). A locally-completed session is
+   * treated as inactive for tracking/alerts/banner/wake-lock (W1).
+   */
+  readonly localCompletedAt?: number;
   /** 진행 anchor — 마지막 사용자 확인/보정 시점의 스텝 위치. 재마운트·앱 재시작 복원용. */
   readonly progressAnchor?: {
     readonly stepIndex: number;

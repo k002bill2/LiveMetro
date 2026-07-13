@@ -23,7 +23,12 @@ jest.mock('@/hooks/useGuidanceSession', () => ({
   useGuidanceSession: jest.fn(),
 }));
 
+// Partial mock: the real (pure) isActiveGuidanceSession SSOT runs so this suite
+// Red-Greens the active-definition wiring (an inline copy would hide SSOT drift).
+// Only the stateful exports are stubbed; the real store has no import-time side
+// effects. AsyncStorage is globally mocked in the jest setup.
 jest.mock('@/services/guidance/guidanceSessionStore', () => ({
+  ...jest.requireActual('@/services/guidance/guidanceSessionStore'),
   getGuidanceSession: jest.fn(),
   subscribe: jest.fn(),
   isGuidanceSessionHydrated: jest.fn(),
@@ -209,6 +214,19 @@ describe('useGuidanceAlertCleanupSync', () => {
 
       expect(mockCancelBoarding).toHaveBeenCalledTimes(1);
       expect(mockCancelAlight).toHaveBeenCalledTimes(1);
+    });
+
+    it('sweeps ALL (no keepSessionKey) when a restored session is locally completed (W1)', () => {
+      // A locally-completed session (arrived, restart before remote log) is
+      // inactive by the SSOT, so the orphan sweep must not preserve its alerts.
+      mockIsHydrated.mockReturnValue(true);
+      mockGetGuidanceSession.mockReturnValue(
+        makeSession({ startedAt: 1_000, localCompletedAt: 7 })
+      );
+      renderHook(() => useGuidanceAlertCleanupSync());
+
+      expect(mockCancelBoarding).toHaveBeenCalledWith(undefined);
+      expect(mockCancelAlight).toHaveBeenCalledWith(undefined);
     });
   });
 

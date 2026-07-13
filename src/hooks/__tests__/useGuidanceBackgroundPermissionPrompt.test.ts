@@ -45,7 +45,10 @@ jest.mock('@/services/guidance/guidanceBackgroundLocationTask', () => ({
   stopGuidanceBackgroundLocation: jest.fn(() => Promise.resolve()),
 }));
 
+// Partial mock: the real (pure) isActiveGuidanceSession SSOT runs so this suite
+// exercises the true active-definition wiring; only getGuidanceSession is stubbed.
 jest.mock('@/services/guidance/guidanceSessionStore', () => ({
+  ...jest.requireActual('@/services/guidance/guidanceSessionStore'),
   getGuidanceSession: jest.fn(),
 }));
 

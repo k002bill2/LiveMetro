@@ -23,17 +23,18 @@ import {
   startGuidanceBackgroundLocation,
   stopGuidanceBackgroundLocation,
 } from '@/services/guidance/guidanceBackgroundLocationTask';
-import { getGuidanceSession } from '@/services/guidance/guidanceSessionStore';
+import {
+  getGuidanceSession,
+  isActiveGuidanceSession,
+} from '@/services/guidance/guidanceSessionStore';
 import { useGuidanceSession } from '@/hooks/useGuidanceSession';
 
 /**
- * 백그라운드 추적을 시작하기 직전 활성 세션 여부를 재확인한다. 허용 continuation이
- * await 중일 때 사용자가 안내를 종료했을 수 있으므로(세션 종료 후 추적 되살아남 방지, J1).
+ * 백그라운드 추적을 시작하기 직전 활성 세션 여부를 재확인한다(J1). 활성 정의는 SSOT
+ * 헬퍼를 따른다 — 로컬 완주(localCompletedAt) 세션도 비활성 취급(W1).
  */
-const hasActiveGuidanceSession = (): boolean => {
-  const session = getGuidanceSession();
-  return session !== null && !session.commuteLogCompletedAt;
-};
+const hasActiveGuidanceSession = (): boolean =>
+  isActiveGuidanceSession(getGuidanceSession());
 
 /**
  * 활성 세션이 남아있을 때만 백그라운드 위치 추적을 시작한다. start await(네이티브
@@ -90,7 +91,7 @@ export const useGuidanceBackgroundPermissionPrompt = (
     // 배너를 즉시 숨긴다(N1). 화면은 완료 후에도 mount를 유지하므로, 훅이 세션 전이를
     // 관찰하지 않으면 끝난 여정에 배너가 살아남아 불필요한 Always 권한 요청을 유발한다.
     const session = useGuidanceSession();
-    const sessionActive = session !== null && !session.commuteLogCompletedAt;
+    const sessionActive = isActiveGuidanceSession(session); // SSOT — 로컬 완주도 비활성(W1)
     useEffect(() => {
       if ((!sessionActive || suspended) && mountedRef.current) {
         setStatus('hidden');

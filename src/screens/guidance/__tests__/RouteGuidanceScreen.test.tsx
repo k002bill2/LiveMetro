@@ -1079,6 +1079,19 @@ describe('RouteGuidanceScreen', () => {
       render(<RouteGuidanceScreen />);
       expect(stopGuidanceBackgroundLocation).toHaveBeenCalledTimes(1);
     });
+
+    it('로컬 완료(isAtEnd) 전이 시 세션에 localCompletedAt 마커를 영속한다 (W1)', () => {
+      // 원격 기록(completeGuidanceCommuteLog)은 mock이라 스토어에 쓰지 않으므로,
+      // 로컬 완주 마커만으로 세션이 비활성으로 표시돼 재시작 후 추적 부활을 막는다.
+      seedSession();
+      const { getByTestId } = render(<RouteGuidanceScreen />);
+      fireEvent.press(getByTestId('guidance-next')); // board → ride
+      expect(getGuidanceSession()?.localCompletedAt).toBeUndefined();
+      act(() => {
+        jest.advanceTimersByTime(5 * 60_000 + 1_000); // ride 5분 경과 → isAtEnd(alight)
+      });
+      expect(typeof getGuidanceSession()?.localCompletedAt).toBe('number');
+    });
   });
 
   describe('백그라운드 권한 유도 배너 (background permission banner)', () => {

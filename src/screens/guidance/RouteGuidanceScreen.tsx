@@ -56,6 +56,8 @@ import {
   clearGuidanceSession,
   getGuidanceSession,
   updateGuidanceProgressAnchor,
+  updateGuidanceLocalCompletion,
+  isActiveGuidanceSession,
 } from '@/services/guidance/guidanceSessionStore';
 import { completeGuidanceCommuteLog } from '@/services/guidance/guidanceCommuteLogService';
 import { useAuth } from '@/services/auth/AuthContext';
@@ -130,7 +132,11 @@ export const RouteGuidanceScreen: React.FC = () => {
   // can't observe a completion (commuteLogCompletedAt) transition. (The keep-awake
   // effect lives after useGuidanceProgress so it can also read local completion.)
   const liveSession = useGuidanceSession();
-  const isGuidanceActive = liveSession !== null && !liveSession.commuteLogCompletedAt;
+  // SSOT 활성 정의(W1) — 로컬 완주(localCompletedAt)도 비활성 취급(wake lock 해제).
+  const isGuidanceActive = isActiveGuidanceSession(liveSession);
+  // 복구 게이트는 REMOTE 완료만 본다 — 로컬 완주 마커를 되돌리는 게 복구의 목적이므로
+  // isGuidanceActive(로컬 포함)로 게이트하면 복구가 영영 막힌다.
+  const isRemotelyActive = liveSession !== null && !liveSession.commuteLogCompletedAt;
 
   // Session is set by the CTA right before navigating; read once per mount.
   const session = useMemo(() => getGuidanceSession(), []);
@@ -239,15 +245,20 @@ export const RouteGuidanceScreen: React.FC = () => {
     prevIsAtEndRef.current = isAtEnd;
     if (isAtEnd && !prev) {
       void stopGuidanceBackgroundLocation();
-    } else if (!isAtEnd && prev && isGuidanceActive) {
-      // 복구(재시도) 분기: true→false는 현 UI 기본 컨트롤(종점에서 GuidanceControls가
-      // prev/next 쌍을 숨김)로는 미도달 — 종점 상태에서 역 재베이스로 anchor가 뒤로
-      // 돌아가는 경로 대비 defensive. 세션이 여전히 활성일 때만 재시작한다 — 원격 완료가
-      // 이미 기록됐으면(비활성) 앱 레벨 sync가 inactive 전이를 소진해 다시 stop하지
-      // 않으므로 여기서 start하면 안 된다(T3).
+      // 로컬 완주를 세션에 영속(W1) — 오프라인/비로그인 도착이 재시작으로 뒤집혀
+      // 추적이 되살아나지 않게 한다. SSOT active 정의가 이 마커를 자동 반영한다.
+      if (session) updateGuidanceLocalCompletion(Date.now(), session.startedAt);
+    } else if (!isAtEnd && prev && isRemotelyActive) {
+      // 복구(재시도): true→false는 현 UI 기본 컨트롤(종점에서 GuidanceControls가
+      // prev/next 쌍을 숨김)로는 미도달 — 역 재베이스로 anchor가 뒤로 돌아가는 경로
+      // 대비 defensive. 로컬 완주 마커를 지우고 재시작한다. REMOTE 완료(commuteLog
+      // CompletedAt)가 아닐 때만 — 원격 완료면 sync가 이미 inactive 전이를 소진해 다시
+      // stop하지 않으므로 여기서 start·marker-clear하면 안 된다(T3). 로컬 완주 마커는
+      // 복구가 지우는 대상이므로 isGuidanceActive(로컬 포함)로 게이트하면 안 된다.
+      if (session) updateGuidanceLocalCompletion(null, session.startedAt);
       void startGuidanceBackgroundLocation();
     }
-  }, [isAtEnd, isGuidanceActive]);
+  }, [isAtEnd, isRemotelyActive, session]);
 
   const currentStep = steps[currentIndex];
   const isWaitingStep =

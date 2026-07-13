@@ -27,6 +27,7 @@ import {
   getGuidanceSession,
   subscribe,
   isGuidanceSessionHydrated,
+  isActiveGuidanceSession,
 } from '@/services/guidance/guidanceSessionStore';
 import { cancelBoardingAlert } from '@/services/notification/boardingAlertService';
 import { cancelAlightAlert } from '@/services/notification/alightAlertService';
@@ -40,8 +41,9 @@ const cancelGuidanceAlerts = (keepSessionKey?: string): void => {
 export const useGuidanceAlertCleanupSync = (): void => {
   const session = useGuidanceSession();
   // Identity key of the active session (its startedAt), or null when inactive.
+  // 활성 정의 SSOT(W1) — 로컬 완주 세션은 비활성 취급.
   const activeKey =
-    session !== null && !session.commuteLogCompletedAt ? String(session.startedAt) : null;
+    session && isActiveGuidanceSession(session) ? String(session.startedAt) : null;
 
   // Transition cleanup: fire when the active session ends (→null) OR is replaced
   // by a DIFFERENT session (key change) without an explicit end — starting a new
@@ -72,8 +74,9 @@ export const useGuidanceAlertCleanupSync = (): void => {
       orphanCleanedRef.current = true;
       const restored = getGuidanceSession();
       // Restored + active → keep that session, sweep the rest; otherwise sweep all.
+      // 로컬 완주(localCompletedAt) 복원 세션은 비활성 → keep 없이 전량 sweep(W1).
       const keepSessionKey =
-        restored !== null && !restored.commuteLogCompletedAt
+        restored && isActiveGuidanceSession(restored)
           ? String(restored.startedAt)
           : undefined;
       cancelGuidanceAlerts(keepSessionKey);

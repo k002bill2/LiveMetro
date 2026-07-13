@@ -43,6 +43,15 @@ const emit = (): void => {
 export const getGuidanceSession = (): GuidanceSession | null => current;
 
 /**
+ * 단일 "활성" 정의(SSOT) — 세션이 존재하고, 원격 완료(commuteLogCompletedAt)도
+ * 로컬 완주(localCompletedAt)도 아닐 때만 활성이다. 백그라운드 추적·알림 정리·권한
+ * 배너·wake lock 네 곳이 모두 이 헬퍼를 써서 로컬 완주 세션을 재시작 후에도 일관되게
+ * 비활성 취급한다(W1).
+ */
+export const isActiveGuidanceSession = (session: GuidanceSession | null): boolean =>
+  session !== null && !session.commuteLogCompletedAt && !session.localCompletedAt;
+
+/**
  * True once boot hydration has *successfully* completed (restored a session,
  * or cleanly determined there is none — empty/expired). A transient failure
  * (e.g. AsyncStorage read error) leaves this false so the alert orphan sweep
@@ -95,6 +104,26 @@ export const updateGuidanceProgressAnchor = (
 ): void => {
   if (current === null || current.startedAt !== expectedStartedAt) return;
   setGuidanceSession({ ...current, progressAnchor: anchor });
+};
+
+/**
+ * Set or clear the LOCAL completion marker (isAtEnd 로컬 도착 시각). 원격 완료와
+ * 독립적으로 영속돼, 오프라인/비로그인 도착이 재시작으로 뒤집히지 않게 한다(W1).
+ * `expectedStartedAt` 귀속 가드는 {@link updateGuidanceProgressAnchor}와 동일(불일치
+ * no-op). `null`이면 필드 제거(복구용), 값이면 설정. persist + emit.
+ */
+export const updateGuidanceLocalCompletion = (
+  completedAtMs: number | null,
+  expectedStartedAt: number
+): void => {
+  if (current === null || current.startedAt !== expectedStartedAt) return;
+  if (completedAtMs === null) {
+    if (current.localCompletedAt === undefined) return; // 이미 없음 — no-op
+    const { localCompletedAt: _cleared, ...rest } = current;
+    setGuidanceSession(rest);
+    return;
+  }
+  setGuidanceSession({ ...current, localCompletedAt: completedAtMs });
 };
 
 /** End any active guidance session + remove the persisted copy. */

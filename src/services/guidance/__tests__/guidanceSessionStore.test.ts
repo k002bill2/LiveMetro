@@ -15,6 +15,8 @@ import {
   setGuidanceSession,
   clearGuidanceSession,
   updateGuidanceProgressAnchor,
+  updateGuidanceLocalCompletion,
+  isActiveGuidanceSession,
   subscribe,
   hydrateGuidanceSession,
   isGuidanceSessionHydrated,
@@ -333,6 +335,104 @@ describe('guidanceSessionStore', () => {
         stepIndex: 2,
         atMs: 1_700_000_020_000,
       });
+    });
+  });
+
+  // --- active-session SSOT (W1) — single source shared by bg-sync, alert
+  // cleanup, permission prompt, and the screen wake lock. A session is active
+  // only while it is neither remotely completed (commuteLogCompletedAt) nor
+  // locally completed (localCompletedAt).
+  describe('isActiveGuidanceSession (SSOT)', () => {
+    it('is false for a null session', () => {
+      expect(isActiveGuidanceSession(null)).toBe(false);
+    });
+
+    it('is true for a plain in-progress session', () => {
+      expect(isActiveGuidanceSession(makeSession(1_700_000_000_000))).toBe(true);
+    });
+
+    it('is false once the commute log is completed remotely', () => {
+      expect(
+        isActiveGuidanceSession({ ...makeSession(1_700_000_000_000), commuteLogCompletedAt: 9_999 })
+      ).toBe(false);
+    });
+
+    it('is false once local completion is marked (W1 — survives restart)', () => {
+      expect(
+        isActiveGuidanceSession({ ...makeSession(1_700_000_000_000), localCompletedAt: 9_999 })
+      ).toBe(false);
+    });
+  });
+
+  // --- local completion marker (W1): persists the screen-local "arrived" signal
+  // so a mid-TTL restart doesn't revert to active and restart background tracking.
+  describe('updateGuidanceLocalCompletion', () => {
+    it('is a no-op when no session is active', () => {
+      updateGuidanceLocalCompletion(1_700_000_050_000, 1_700_000_000_000);
+      expect(getGuidanceSession()).toBeNull();
+      expect(mockSetItem).not.toHaveBeenCalled();
+    });
+
+    it('is a no-op when expectedStartedAt does not match the current session (Q1 scope)', () => {
+      setGuidanceSession(makeSession(1_700_000_000_000)); // 세션 B
+      mockSetItem.mockClear();
+
+      // 이전 경로(세션 A)의 startedAt으로 완료 마킹 시도 — B를 오염시키면 안 된다.
+      updateGuidanceLocalCompletion(1_700_000_050_000, 999);
+
+      expect(getGuidanceSession()?.localCompletedAt).toBeUndefined();
+      expect(mockSetItem).not.toHaveBeenCalled();
+    });
+
+    it('marks local completion on the active session, persists, and notifies', () => {
+      setGuidanceSession(makeSession(1_700_000_000_000));
+      mockSetItem.mockClear();
+      const listener = jest.fn();
+      const unsub = subscribe(listener);
+
+      updateGuidanceLocalCompletion(1_700_000_050_000, 1_700_000_000_000);
+
+      expect(getGuidanceSession()?.localCompletedAt).toBe(1_700_000_050_000);
+      expect(mockSetItem).toHaveBeenCalledWith(STORAGE_KEY, JSON.stringify(getGuidanceSession()));
+      expect(listener).toHaveBeenCalledTimes(1);
+      unsub();
+    });
+
+    it('clears the marker when passed null (recovery) and drops the field entirely', () => {
+      setGuidanceSession(makeSession(1_700_000_000_000));
+      updateGuidanceLocalCompletion(1_700_000_050_000, 1_700_000_000_000);
+      expect(getGuidanceSession()?.localCompletedAt).toBe(1_700_000_050_000);
+
+      updateGuidanceLocalCompletion(null, 1_700_000_000_000);
+
+      const session = getGuidanceSession();
+      expect(session?.localCompletedAt).toBeUndefined();
+      expect(session).not.toHaveProperty('localCompletedAt');
+      expect(isActiveGuidanceSession(session)).toBe(true);
+    });
+
+    it('is a no-op when clearing a marker that was never set (no redundant persist/emit)', () => {
+      setGuidanceSession(makeSession(1_700_000_000_000));
+      mockSetItem.mockClear();
+      const listener = jest.fn();
+      const unsub = subscribe(listener);
+
+      updateGuidanceLocalCompletion(null, 1_700_000_000_000);
+
+      expect(mockSetItem).not.toHaveBeenCalled();
+      expect(listener).not.toHaveBeenCalled();
+      unsub();
+    });
+
+    it('keeps the same startedAt so the departed-train log is preserved', () => {
+      setGuidanceSession(makeSession(1_700_000_000_000));
+      appendDepartedTrains([departedEntry], 1_700_000_000_000);
+      expect(getDepartedTrainLog()).toHaveLength(1);
+
+      updateGuidanceLocalCompletion(1_700_000_050_000, 1_700_000_000_000);
+
+      expect(getGuidanceSession()?.startedAt).toBe(1_700_000_000_000);
+      expect(getDepartedTrainLog()).toHaveLength(1);
     });
   });
 });
