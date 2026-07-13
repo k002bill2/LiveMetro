@@ -13,6 +13,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSemanticTokens } from '@/services/theme';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useKeepAwake } from 'expo-keep-awake';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
@@ -114,6 +115,10 @@ export const RouteGuidanceScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const isFocused = useIsFocused();
   const { user } = useAuth();
+
+  // Keep the screen awake during live guidance so auto-lock doesn't cut tracking.
+  // Released automatically when the screen unmounts — no manual cleanup needed.
+  useKeepAwake();
 
   // Session is set by the CTA right before navigating; read once per mount.
   const session = useMemo(() => getGuidanceSession(), []);

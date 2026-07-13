@@ -28,6 +28,7 @@ import {
   type DepartedTrainEntry,
 } from '@/services/guidance/departedTrainLog';
 import { createRoute, type RouteSegment } from '@/models/route';
+import { useKeepAwake } from 'expo-keep-awake';
 
 const mockGoBack = jest.fn();
 
@@ -67,6 +68,10 @@ jest.mock('@/services/notification/alightAlertService', () => ({
 
 jest.mock('@/services/guidance/guidanceCommuteLogService', () => ({
   completeGuidanceCommuteLog: jest.fn(() => Promise.resolve()),
+}));
+
+jest.mock('expo-keep-awake', () => ({
+  useKeepAwake: jest.fn(),
 }));
 
 jest.mock('lucide-react-native', () => ({
@@ -898,6 +903,14 @@ describe('RouteGuidanceScreen', () => {
       // 세션이 살아있는데 화면만 닫힌 경우 — 절대시각 하차 알림은 유효해야 한다.
       expect(cancelBoardingAlert).not.toHaveBeenCalled();
       expect(cancelAlightAlert).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('화면 꺼짐 방지 (keep-awake)', () => {
+    it('길안내 화면이 렌더되는 동안 자동 잠금을 막는다', () => {
+      seedSession();
+      render(<RouteGuidanceScreen />);
+      expect(useKeepAwake).toHaveBeenCalledTimes(1);
     });
   });
 });
