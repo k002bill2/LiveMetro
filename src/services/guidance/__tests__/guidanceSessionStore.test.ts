@@ -17,6 +17,7 @@ import {
   updateGuidanceProgressAnchor,
   subscribe,
   hydrateGuidanceSession,
+  isGuidanceSessionHydrated,
   isSessionExpired,
   GUIDANCE_SESSION_TTL_MS,
 } from '../guidanceSessionStore';
@@ -214,6 +215,22 @@ describe('guidanceSessionStore', () => {
     mockGetItem.mockResolvedValue('{ not valid json');
     await expect(hydrateGuidanceSession(1000)).resolves.toBeUndefined();
     expect(getGuidanceSession()).toBeNull();
+  });
+
+  // --- v2 hydration flag (alert orphan-cleanup gate) ---
+
+  it('marks the session hydrated after hydrate completes with nothing stored', async () => {
+    mockGetItem.mockResolvedValue(null);
+    await hydrateGuidanceSession(1000);
+    expect(isGuidanceSessionHydrated()).toBe(true);
+  });
+
+  it('marks the session hydrated after restoring a session', async () => {
+    const started = 5_000_000;
+    mockGetItem.mockResolvedValue(JSON.stringify(makeSession(started)));
+    await hydrateGuidanceSession(started + 1000);
+    expect(isGuidanceSessionHydrated()).toBe(true);
+    expect(getGuidanceSession()).toEqual(makeSession(started));
   });
 
   // --- progress anchor (re-mount / app-restart restore) ---

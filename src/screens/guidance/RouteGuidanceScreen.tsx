@@ -490,12 +490,16 @@ export const RouteGuidanceScreen: React.FC = () => {
     });
   }, [rideAlightAtMs, nextStep, currentIndex, session, notificationSettings]);
 
-  // Cancel any pending alert / timer on unmount (subscription-cleanup rule).
+  // Clear only the local auto-advance timer on unmount (subscription-cleanup
+  // rule). Boarding/alight alerts are intentionally NOT cancelled here: the
+  // guidance session can outlive this screen (rider closes the screen mid-ride),
+  // and the alight alert fires at an absolute time regardless of whether the
+  // screen is mounted. Cancellation responsibility moves to the session-end sync
+  // hook (useGuidanceAlertCleanupSync), which cancels when the session actually
+  // ends — not merely when the screen is dismissed.
   useEffect(() => {
     return () => {
       clearAutoTimer();
-      void cancelBoardingAlert();
-      void cancelAlightAlert();
     };
   }, [clearAutoTimer]);
 

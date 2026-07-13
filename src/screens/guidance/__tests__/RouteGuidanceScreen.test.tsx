@@ -886,4 +886,18 @@ describe('RouteGuidanceScreen', () => {
       expect(getByText('탑승 대기')).toBeTruthy();
     });
   });
+
+  describe('unmount 시 알림 취소 안 함 (세션 존속)', () => {
+    it('화면 언마운트 시 탑승/하차 알림을 취소하지 않는다 (세션 종료 훅으로 책임 이동)', () => {
+      seedSession();
+      const { unmount } = render(<RouteGuidanceScreen />);
+      // 마운트 시 board 홀드의 취소 호출(하차 alight effect)을 지워 언마운트 경로만 격리.
+      (cancelBoardingAlert as jest.Mock).mockClear();
+      (cancelAlightAlert as jest.Mock).mockClear();
+      unmount();
+      // 세션이 살아있는데 화면만 닫힌 경우 — 절대시각 하차 알림은 유효해야 한다.
+      expect(cancelBoardingAlert).not.toHaveBeenCalled();
+      expect(cancelAlightAlert).not.toHaveBeenCalled();
+    });
+  });
 });

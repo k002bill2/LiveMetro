@@ -29,6 +29,10 @@ const STORAGE_KEY = '@livemetro/guidance_session';
 export const GUIDANCE_SESSION_TTL_MS = 3 * 60 * 60 * 1000; // 3h — one commute leg upper bound
 
 let current: GuidanceSession | null = null;
+// True once {@link hydrateGuidanceSession} has run to completion (restored,
+// expired, or nothing stored). Gates the alert orphan-cleanup so a cold-start
+// sweep can't cancel a still-pending alert whose session hasn't hydrated yet.
+let hydrated = false;
 const listeners = new Set<() => void>();
 
 const emit = (): void => {
@@ -37,6 +41,9 @@ const emit = (): void => {
 
 /** Active guidance session, or null when none is in progress. */
 export const getGuidanceSession = (): GuidanceSession | null => current;
+
+/** True once boot hydration has completed (restore attempt finished). */
+export const isGuidanceSessionHydrated = (): boolean => hydrated;
 
 /**
  * Subscribe to session changes (set / clear / hydrate). Returns an unsubscribe
@@ -106,8 +113,14 @@ export const hydrateGuidanceSession = async (nowMs: number = Date.now()): Promis
       return;
     }
     current = parsed;
-    emit();
   } catch (error) {
     if (__DEV__) console.error('[guidanceSessionStore] hydrate failed', error);
+  } finally {
+    // Mark hydration complete even when nothing was restored (expired / empty /
+    // malformed) — the alert cleanup hook gates its one-shot orphan sweep on this
+    // so it never runs before a persisted session has had its chance to hydrate.
+    // Single emit for the whole call keeps the "notifies once" contract intact.
+    hydrated = true;
+    emit();
   }
 };
