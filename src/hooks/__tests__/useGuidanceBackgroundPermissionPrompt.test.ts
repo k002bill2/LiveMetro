@@ -186,9 +186,9 @@ describe('useGuidanceBackgroundPermissionPrompt', () => {
 
     it('does not start background location when the session ended during the permission await (J1)', async () => {
       mockRequestBgPerm.mockResolvedValue(true);
-      mockGetGuidanceSession.mockReturnValue(null); // 안내가 종료됨
       const { result } = renderHook(() => useGuidanceBackgroundPermissionPrompt());
       await waitFor(() => expect(result.current.status).toBe('prompt'));
+      mockGetGuidanceSession.mockReturnValue(null); // 배너 표시 후 안내가 종료됨
 
       await act(async () => {
         await result.current.requestPermission();
@@ -200,12 +200,12 @@ describe('useGuidanceBackgroundPermissionPrompt', () => {
 
     it('does not start background location when the session is already completed', async () => {
       mockRequestBgPerm.mockResolvedValue(true);
+      const { result } = renderHook(() => useGuidanceBackgroundPermissionPrompt());
+      await waitFor(() => expect(result.current.status).toBe('prompt'));
       mockGetGuidanceSession.mockReturnValue({
         startedAt: 1000,
         commuteLogCompletedAt: 5,
       } as unknown as GuidanceSession);
-      const { result } = renderHook(() => useGuidanceBackgroundPermissionPrompt());
-      await waitFor(() => expect(result.current.status).toBe('prompt'));
 
       await act(async () => {
         await result.current.requestPermission();
@@ -217,14 +217,14 @@ describe('useGuidanceBackgroundPermissionPrompt', () => {
     it('stops background location when the session ends during the start await (L1)', async () => {
       mockRequestBgPerm.mockResolvedValue(true);
       mockStartBgLocation.mockResolvedValue(true);
-      // getGuidanceSession 호출 순서: ① requestPermission 진입 가드(N1) ② start 직전
-      // 가드 — 둘 다 활성, ③ start 완료 후 재확인 — 종료됨(start await 도중 종료 모사).
+      const { result } = renderHook(() => useGuidanceBackgroundPermissionPrompt());
+      await waitFor(() => expect(result.current.status).toBe('prompt'));
+      // requestPermission의 getGuidanceSession 호출 순서: ① 진입 가드(N1) ② start
+      // 직전 가드 — 둘 다 활성, ③ start 완료 후 재확인 — 종료됨(start await 도중 종료 모사).
       mockGetGuidanceSession
         .mockReturnValueOnce(activeSession)
         .mockReturnValueOnce(activeSession)
         .mockReturnValue(null);
-      const { result } = renderHook(() => useGuidanceBackgroundPermissionPrompt());
-      await waitFor(() => expect(result.current.status).toBe('prompt'));
 
       await act(async () => {
         await result.current.requestPermission();
@@ -386,13 +386,42 @@ describe('useGuidanceBackgroundPermissionPrompt', () => {
       expect(result.current.status).toBe('settings');
     });
 
-    it('does not register an AppState listener while hidden', async () => {
-      mockGetBgPerm.mockResolvedValue({ status: 'granted' }); // → hidden
+    it('does not register an AppState listener when the session is inactive', async () => {
+      mockUseGuidanceSession.mockReturnValue(null); // 세션 비활성 → 리스너 불필요(O2 게이트)
       const addSpy = jest.spyOn(AppState, 'addEventListener');
-      const { result } = renderHook(() => useGuidanceBackgroundPermissionPrompt());
-      await waitFor(() => expect(mockGetBgPerm).toHaveBeenCalled());
-      expect(result.current.status).toBe('hidden');
+      renderHook(() => useGuidanceBackgroundPermissionPrompt());
+      await act(async () => {
+        await Promise.resolve();
+      });
       expect(addSpy).not.toHaveBeenCalled();
+    });
+
+    it('starts tracking on return from OS Settings even when dismissed (hidden) with an active session (O2)', async () => {
+      mockGetItem.mockResolvedValue(String(Date.now())); // dismissed → 배너 hidden
+      mockUseGuidanceSession.mockReturnValue(activeSession); // 세션은 여전히 활성
+      const { getHandler } = spyAppState(jest.fn());
+      renderHook(() => useGuidanceBackgroundPermissionPrompt());
+      // 세션 활성이므로 dismissed-hidden이어도 리스너가 등록된다.
+      await waitFor(() => expect(getHandler()).toBeDefined());
+
+      // OS 설정에서 Always 켜고 복귀.
+      mockGetBgPerm.mockResolvedValue({ status: 'granted' });
+      await act(async () => {
+        goBackgroundThenActive(getHandler());
+      });
+
+      await waitFor(() => expect(mockStartBgLocation).toHaveBeenCalled());
+    });
+
+    it('does not register an AppState listener once the session becomes inactive', async () => {
+      mockUseGuidanceSession.mockReturnValue(activeSession);
+      const remove = jest.fn();
+      spyAppState(remove);
+      const { rerender } = renderHook(() => useGuidanceBackgroundPermissionPrompt());
+      // 세션 완료 전이 → 리스너 제거.
+      mockUseGuidanceSession.mockReturnValue(completedSession);
+      rerender(undefined);
+      expect(remove).toHaveBeenCalled();
     });
 
     it('removes the AppState listener on unmount', async () => {
@@ -429,11 +458,37 @@ describe('useGuidanceBackgroundPermissionPrompt', () => {
       expect(result.current.status).toBe('hidden');
     });
 
+    it('keeps hidden when the journey completes while the initial resolve is pending (O1)', async () => {
+      // 초기 권한 조회를 pending으로 멈춰, 그 사이 세션 완료를 모사한다.
+      let resolvePerm: (v: { status: string }) => void = () => undefined;
+      mockGetBgPerm.mockReturnValue(
+        new Promise((r) => {
+          resolvePerm = r;
+        })
+      );
+      mockUseGuidanceSession.mockReturnValue(activeSession);
+      const { result, rerender } = renderHook(() => useGuidanceBackgroundPermissionPrompt());
+
+      // 여정 완료 — 반응성 hide(status hidden) + 라이브 세션도 비활성.
+      mockUseGuidanceSession.mockReturnValue(completedSession);
+      mockGetGuidanceSession.mockReturnValue(completedSession);
+      rerender(undefined);
+      expect(result.current.status).toBe('hidden');
+
+      // 초기 조회 continuation 완료(미허용) — O1 가드로 prompt로 되돌리지 않는다.
+      await act(async () => {
+        resolvePerm({ status: 'undetermined' });
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(result.current.status).toBe('hidden');
+    });
+
     it('does not request permission when the CTA is pressed after the journey ended (race guard)', async () => {
       mockUseGuidanceSession.mockReturnValue(activeSession); // 배너는 표시된 상태
-      mockGetGuidanceSession.mockReturnValue(null); // 액션 진입 시점엔 세션 종료
       const { result } = renderHook(() => useGuidanceBackgroundPermissionPrompt());
       await waitFor(() => expect(result.current.status).toBe('prompt'));
+      mockGetGuidanceSession.mockReturnValue(null); // 액션 진입 시점엔 세션 종료
 
       await act(async () => {
         await result.current.requestPermission();
@@ -445,9 +500,9 @@ describe('useGuidanceBackgroundPermissionPrompt', () => {
 
     it('does not open Settings when the CTA is pressed after the journey ended (race guard)', async () => {
       mockUseGuidanceSession.mockReturnValue(activeSession);
-      mockGetGuidanceSession.mockReturnValue(null);
       const { result } = renderHook(() => useGuidanceBackgroundPermissionPrompt());
       await waitFor(() => expect(result.current.status).toBe('prompt'));
+      mockGetGuidanceSession.mockReturnValue(null); // 액션 진입 시점엔 세션 종료
 
       act(() => {
         result.current.openSettings();

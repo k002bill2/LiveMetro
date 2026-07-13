@@ -105,7 +105,9 @@ export const useGuidanceBackgroundPermissionPrompt =
           // 미허용 상태에서만 dismissal이 배너 노출을 막는다(UI 전용).
           const dismissed = await AsyncStorage.getItem(GUIDANCE_BG_PERM_PROMPT_DISMISSED_KEY);
           if (dismissed !== null) return;
-          if (mountedRef.current) {
+          // 초기 권한/스토리지 조회가 pending인 동안 여정이 완료됐을 수 있다 — 라이브
+          // 세션이 비활성이면 반응성 hide를 되돌리지 않도록 setStatus를 생략한다(O1).
+          if (mountedRef.current && hasActiveGuidanceSession()) {
             // 이미 영구 거부(canAskAgain=false)면 in-app "허용하기"는 헛탭이므로
             // 바로 설정 모드로 시작한다 (설정 앱 딥링크로 유도).
             setStatus(permission.canAskAgain === false ? 'settings' : 'prompt');
@@ -117,13 +119,17 @@ export const useGuidanceBackgroundPermissionPrompt =
       void resolve();
     }, []);
 
-    // Re-check on return from the OS Settings app. When the nudge is visible
-    // (esp. 'settings' mode), the user may grant "Always" in Settings and come
-    // back — nothing else re-checks (useGuidanceBackgroundLocationSync only
-    // reacts to a changed session key), so background→active must re-poll and,
-    // if granted, start background location + dismiss the now-stale banner.
+    // Re-check on return from the OS Settings app. The user may grant "Always" in
+    // Settings and come back — nothing else re-checks (useGuidanceBackgroundLocationSync
+    // only reacts to a changed session key), so background→active must re-poll and,
+    // if granted, start background location + hide the now-stale banner.
+    //
+    // O2: gate on the ACTIVE SESSION, not on `status !== 'hidden'`. A dismissed
+    // banner is hidden, but the session is still active — the user may grant in
+    // OS Settings, and we must start tracking on return even though no banner is
+    // shown. Registering while the session is inactive is pointless (no journey).
     useEffect(() => {
-      if (status === 'hidden') return undefined;
+      if (!sessionActive) return undefined;
       const appStateRef = { current: AppState.currentState };
       const recheck = async (): Promise<void> => {
         try {
@@ -133,6 +139,7 @@ export const useGuidanceBackgroundPermissionPrompt =
             await startBackgroundLocationIfSessionActive();
             if (mountedRef.current) setStatus('hidden');
           }
+          // 미허용이면 현 status 유지 (settings면 settings, dismissed-hidden이면 hidden).
         } catch {
           // 재확인 실패 시 현 상태를 유지한다 (배너를 강제로 숨기지 않는다).
         }
@@ -148,7 +155,7 @@ export const useGuidanceBackgroundPermissionPrompt =
         }
       );
       return () => subscription.remove();
-    }, [status]);
+    }, [sessionActive]);
 
     const requestPermission = useCallback(async (): Promise<void> => {
       // 여정이 이미 종료/완료됐으면 민감 권한 다이얼로그를 띄우지 않고 숨긴다
