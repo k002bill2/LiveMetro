@@ -284,8 +284,19 @@ describe('guidanceSessionStore', () => {
 
   describe('updateGuidanceProgressAnchor', () => {
     it('is a no-op when no session is active', () => {
-      updateGuidanceProgressAnchor({ stepIndex: 2, atMs: 1_700_000_000_500 });
+      updateGuidanceProgressAnchor({ stepIndex: 2, atMs: 1_700_000_000_500 }, 1_700_000_000_000);
       expect(getGuidanceSession()).toBeNull();
+      expect(mockSetItem).not.toHaveBeenCalled();
+    });
+
+    it('is a no-op when expectedStartedAt does not match the current session (Q1 scope)', () => {
+      setGuidanceSession(makeSession(1_700_000_000_000)); // 세션 B
+      mockSetItem.mockClear();
+
+      // 이전 경로(세션 A)의 startedAt으로 쓰기 시도 — B를 오염시키면 안 된다.
+      updateGuidanceProgressAnchor({ stepIndex: 3, atMs: 1_700_000_050_000 }, 999);
+
+      expect(getGuidanceSession()?.progressAnchor).toBeUndefined();
       expect(mockSetItem).not.toHaveBeenCalled();
     });
 
@@ -294,7 +305,7 @@ describe('guidanceSessionStore', () => {
       mockSetItem.mockClear();
       const anchor = { stepIndex: 3, atMs: 1_700_000_050_000 };
 
-      updateGuidanceProgressAnchor(anchor);
+      updateGuidanceProgressAnchor(anchor, 1_700_000_000_000);
 
       expect(getGuidanceSession()?.progressAnchor).toEqual(anchor);
       expect(mockSetItem).toHaveBeenCalledWith(
@@ -308,7 +319,7 @@ describe('guidanceSessionStore', () => {
       appendDepartedTrains([departedEntry], 1_700_000_000_000);
       expect(getDepartedTrainLog()).toHaveLength(1);
 
-      updateGuidanceProgressAnchor({ stepIndex: 1, atMs: 1_700_000_010_000 });
+      updateGuidanceProgressAnchor({ stepIndex: 1, atMs: 1_700_000_010_000 }, 1_700_000_000_000);
 
       expect(getGuidanceSession()?.startedAt).toBe(1_700_000_000_000);
       expect(getDepartedTrainLog()).toHaveLength(1);
@@ -316,8 +327,8 @@ describe('guidanceSessionStore', () => {
 
     it('overwrites a previous anchor on the same session', () => {
       setGuidanceSession(makeSession(1_700_000_000_000));
-      updateGuidanceProgressAnchor({ stepIndex: 1, atMs: 1_700_000_010_000 });
-      updateGuidanceProgressAnchor({ stepIndex: 2, atMs: 1_700_000_020_000 });
+      updateGuidanceProgressAnchor({ stepIndex: 1, atMs: 1_700_000_010_000 }, 1_700_000_000_000);
+      updateGuidanceProgressAnchor({ stepIndex: 2, atMs: 1_700_000_020_000 }, 1_700_000_000_000);
       expect(getGuidanceSession()?.progressAnchor).toEqual({
         stepIndex: 2,
         atMs: 1_700_000_020_000,

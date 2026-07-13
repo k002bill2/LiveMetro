@@ -187,12 +187,18 @@ export const RouteGuidanceScreen: React.FC = () => {
   }, [session, steps.length]);
 
   // Persist every anchor change (mount + each manual/soft correction) so the
-  // progress survives a screen close or app kill mid-journey.
+  // progress survives a screen close or app kill mid-journey. Scoped to this
+  // screen's originating session (mount-fixed startedAt) — a screen that outlives
+  // a session swap must not write its old anchor onto the new session (Q1).
   const handleAnchorChange = useCallback(
     (anchor: { index: number; atMs: number }): void => {
-      updateGuidanceProgressAnchor({ stepIndex: anchor.index, atMs: anchor.atMs });
+      if (!session) return;
+      updateGuidanceProgressAnchor(
+        { stepIndex: anchor.index, atMs: anchor.atMs },
+        session.startedAt
+      );
     },
-    []
+    [session]
   );
 
   const {

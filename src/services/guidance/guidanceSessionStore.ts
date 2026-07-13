@@ -82,15 +82,18 @@ export const setGuidanceSession = (session: GuidanceSession): void => {
 
 /**
  * Update the active session's progress anchor (last confirmed/corrected step
- * position) + persist. No-op when no session is active. Reuses
- * {@link setGuidanceSession} with the same `startedAt`, so the departed-train
- * log is preserved (only a genuinely new journey clears it).
+ * position) + persist. Scoped to the ORIGINATING session via `expectedStartedAt`
+ * (H2 attribution principle) — no-op when no session is active OR the current
+ * session is a different journey (startedAt mismatch). A screen that outlives a
+ * session swap must never write its old route's anchor onto the new session and
+ * corrupt its persisted progress. Reuses {@link setGuidanceSession} with the same
+ * `startedAt`, so the departed-train log is preserved.
  */
-export const updateGuidanceProgressAnchor = (anchor: {
-  readonly stepIndex: number;
-  readonly atMs: number;
-}): void => {
-  if (current === null) return;
+export const updateGuidanceProgressAnchor = (
+  anchor: { readonly stepIndex: number; readonly atMs: number },
+  expectedStartedAt: number
+): void => {
+  if (current === null || current.startedAt !== expectedStartedAt) return;
   setGuidanceSession({ ...current, progressAnchor: anchor });
 };
 
