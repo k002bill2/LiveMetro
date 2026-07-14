@@ -4,8 +4,10 @@
  * owns the request / dismiss / open-settings actions.
  *
  * Background location is what lets guidance + alerts continue while the phone is
- * locked. Most users only granted foreground ("While Using"), so guidance is
- * suspended on lock. This hook surfaces a one-time, honest nudge:
+ * locked — via the native task's OS suspend exemption that keeps the foreground
+ * guidance JS running under lock (see guidanceBackgroundLocationTask doc, AB1).
+ * Most users only granted foreground ("While Using"), so guidance is suspended
+ * on lock. This hook surfaces a one-time, honest nudge:
  *   - hidden when: web, already granted, or the user previously dismissed it.
  *   - otherwise a 'prompt' the user can accept ("허용하기") or dismiss ("나중에").
  *   - on denial → 'settings' mode (the OS won't re-ask; deep-link to Settings).
