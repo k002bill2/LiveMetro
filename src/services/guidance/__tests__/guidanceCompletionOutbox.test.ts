@@ -9,7 +9,6 @@ import {
   PENDING_COMMUTE_COMPLETION_TTL_MS,
   savePendingCompletion,
   readPendingCompletion,
-  clearPendingCompletion,
   clearPendingCompletionForSession,
   isPendingCompletionExpired,
   type PendingCommuteCompletion,
@@ -93,19 +92,32 @@ describe('guidanceCompletionOutbox', () => {
     await expect(readPendingCompletion()).resolves.toBeNull();
   });
 
-  it('removes the slot on clear', async () => {
-    await clearPendingCompletion();
-    expect(mockRemoveItem).toHaveBeenCalledWith(PENDING_COMMUTE_COMPLETION_KEY);
-  });
-
-  it('clears only when the slot belongs to the given session (match)', async () => {
+  it('compare-and-clears the slot when it still belongs to the given session (match)', async () => {
     mockGetItem.mockResolvedValue(JSON.stringify(entry({ session: session(1_000) })));
     await clearPendingCompletionForSession(1_000);
     expect(mockRemoveItem).toHaveBeenCalledWith(PENDING_COMMUTE_COMPLETION_KEY);
   });
 
-  it('does not clear a slot that belongs to a different session (no clobber)', async () => {
+  it('preserves a slot that belongs to a DIFFERENT session — a raced-in save survives (AC2)', async () => {
+    // Session A drained; meanwhile session B's failure overwrote the slot. A's
+    // clear must not clobber B's only recovery record.
     mockGetItem.mockResolvedValue(JSON.stringify(entry({ session: session(2_000) })));
+    await clearPendingCompletionForSession(1_000);
+    expect(mockRemoveItem).not.toHaveBeenCalled();
+  });
+
+  it('serializes concurrent slot operations in FIFO order (AC2)', async () => {
+    // The queue must not interleave: two saves fired without awaiting still write
+    // in dispatch order, so the last writer wins deterministically.
+    const a = entry({ session: session(1_000), arrivalAtMs: 111 });
+    const b = entry({ session: session(2_000), arrivalAtMs: 222 });
+    await Promise.all([savePendingCompletion(a), savePendingCompletion(b)]);
+    expect(mockSetItem).toHaveBeenNthCalledWith(1, PENDING_COMMUTE_COMPLETION_KEY, JSON.stringify(a));
+    expect(mockSetItem).toHaveBeenNthCalledWith(2, PENDING_COMMUTE_COMPLETION_KEY, JSON.stringify(b));
+  });
+
+  it('does not remove when the read finds an empty slot (nothing to clear)', async () => {
+    mockGetItem.mockResolvedValue(null);
     await clearPendingCompletionForSession(1_000);
     expect(mockRemoveItem).not.toHaveBeenCalled();
   });

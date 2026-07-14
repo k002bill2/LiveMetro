@@ -15,6 +15,15 @@
  * useGuidanceCommuteLogSync's main branch; the drain skips an entry that matches
  * the active session to avoid a concurrent double write. Entries older than the
  * TTL are discarded on drain (a stale journey is not worth logging).
+ *
+ * Concurrency (AC2): every slot read/write/delete runs through a module-level
+ * serialization queue, so a drain's read and a concurrent failure's save can't
+ * interleave. Deletion is compare-and-clear by `startedAt` (sessionKey): the
+ * slot is removed only while it still belongs to the session being cleared, so a
+ * different journey's save that landed in between is preserved for the next
+ * drain. (Comparing by startedAt only — not savedAt — is deliberate: a re-save
+ * of the SAME journey must still be cleared once that journey is logged, or a
+ * second drain would create a duplicate completed doc.)
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { GuidanceSession } from '@/models/guidance';
@@ -31,6 +40,19 @@ export interface PendingCommuteCompletion {
   readonly savedAt: number;
 }
 
+// 슬롯 접근(읽기/쓰기/삭제)을 도착 순서대로 직렬화한다(AC2) — drain의 read와 다른
+// 실패의 save가 인터리브해 단일 슬롯을 오염/오삭제하지 않게 한다. 네트워크 호출
+// (completeGuidanceCommuteLog)은 이 큐 밖에서 돈다(슬롯 op이 아니다).
+let opQueue: Promise<unknown> = Promise.resolve();
+const enqueue = <T>(op: () => Promise<T>): Promise<T> => {
+  const run = opQueue.then(op, op);
+  opQueue = run.then(
+    () => undefined,
+    () => undefined
+  );
+  return run;
+};
+
 const isValid = (value: unknown): value is PendingCommuteCompletion => {
   if (value === null || typeof value !== 'object') return false;
   const entry = value as Partial<PendingCommuteCompletion>;
@@ -44,19 +66,7 @@ const isValid = (value: unknown): value is PendingCommuteCompletion => {
   );
 };
 
-/** Persist (overwrite) the pending completion. Failures degrade silently. */
-export const savePendingCompletion = async (
-  entry: PendingCommuteCompletion
-): Promise<void> => {
-  try {
-    await AsyncStorage.setItem(PENDING_COMMUTE_COMPLETION_KEY, JSON.stringify(entry));
-  } catch {
-    // 저장 실패해도 다음 실패 시 재저장을 시도한다.
-  }
-};
-
-/** Read the pending completion, or null when empty / malformed. */
-export const readPendingCompletion = async (): Promise<PendingCommuteCompletion | null> => {
+const rawRead = async (): Promise<PendingCommuteCompletion | null> => {
   try {
     const raw = await AsyncStorage.getItem(PENDING_COMMUTE_COMPLETION_KEY);
     if (raw === null) return null;
@@ -67,28 +77,39 @@ export const readPendingCompletion = async (): Promise<PendingCommuteCompletion 
   }
 };
 
-/** Remove the pending completion slot. Failures degrade silently. */
-export const clearPendingCompletion = async (): Promise<void> => {
+const rawWrite = async (entry: PendingCommuteCompletion): Promise<void> => {
   try {
-    await AsyncStorage.removeItem(PENDING_COMMUTE_COMPLETION_KEY);
+    await AsyncStorage.setItem(PENDING_COMMUTE_COMPLETION_KEY, JSON.stringify(entry));
   } catch {
-    // 다음 drain에서 재시도된다.
+    // 저장 실패해도 다음 실패 시 재저장을 시도한다.
   }
 };
 
+/** Persist (overwrite) the pending completion. Serialized; degrades silently. */
+export const savePendingCompletion = (entry: PendingCommuteCompletion): Promise<void> =>
+  enqueue(() => rawWrite(entry));
+
+/** Read the pending completion, or null when empty / malformed. Serialized. */
+export const readPendingCompletion = (): Promise<PendingCommuteCompletion | null> =>
+  enqueue(rawRead);
+
 /**
- * Clear the slot only when it belongs to the given session (startedAt). Used by
- * the live-session completion so a success clears its own orphan slot without
- * clobbering a different session's pending recovery.
+ * Atomically clear the slot only when it still belongs to the given session
+ * (startedAt). Used by both the live-session completion and the orphan drain so
+ * a success clears its own slot without clobbering a different journey's pending
+ * recovery that raced in between. Read-compare-remove runs as one queued op.
  */
-export const clearPendingCompletionForSession = async (
-  startedAt: number
-): Promise<void> => {
-  const entry = await readPendingCompletion();
-  if (entry !== null && entry.session.startedAt === startedAt) {
-    await clearPendingCompletion();
-  }
-};
+export const clearPendingCompletionForSession = (startedAt: number): Promise<void> =>
+  enqueue(async () => {
+    const entry = await rawRead();
+    if (entry !== null && entry.session.startedAt === startedAt) {
+      try {
+        await AsyncStorage.removeItem(PENDING_COMMUTE_COMPLETION_KEY);
+      } catch {
+        // 다음 drain에서 재시도된다.
+      }
+    }
+  });
 
 export const isPendingCompletionExpired = (
   entry: PendingCommuteCompletion,

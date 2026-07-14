@@ -24,7 +24,6 @@ import {
 import {
   savePendingCompletion,
   readPendingCompletion,
-  clearPendingCompletion,
   clearPendingCompletionForSession,
   isPendingCompletionExpired,
 } from '@/services/guidance/guidanceCompletionOutbox';
@@ -44,7 +43,6 @@ jest.mock('@/services/guidance/guidanceCommuteLogService', () => ({
 jest.mock('@/services/guidance/guidanceCompletionOutbox', () => ({
   savePendingCompletion: jest.fn(() => Promise.resolve()),
   readPendingCompletion: jest.fn(() => Promise.resolve(null)),
-  clearPendingCompletion: jest.fn(() => Promise.resolve()),
   clearPendingCompletionForSession: jest.fn(() => Promise.resolve()),
   isPendingCompletionExpired: jest.fn(() => false),
 }));
@@ -56,7 +54,6 @@ const mockStart = startGuidanceCommuteLog as jest.Mock;
 const mockComplete = completeGuidanceCommuteLog as jest.Mock;
 const mockSave = savePendingCompletion as jest.Mock;
 const mockRead = readPendingCompletion as jest.Mock;
-const mockClear = clearPendingCompletion as jest.Mock;
 const mockClearForSession = clearPendingCompletionForSession as jest.Mock;
 const mockExpired = isPendingCompletionExpired as jest.Mock;
 
@@ -92,7 +89,6 @@ describe('useGuidanceCommuteLogSync', () => {
     mockComplete.mockResolvedValue(undefined);
     mockSave.mockResolvedValue(undefined);
     mockRead.mockResolvedValue(null);
-    mockClear.mockResolvedValue(undefined);
     mockClearForSession.mockResolvedValue(undefined);
     mockExpired.mockReturnValue(false);
     mockGetSession.mockReturnValue(null);
@@ -220,6 +216,91 @@ describe('useGuidanceCommuteLogSync', () => {
     expect(mockComplete).toHaveBeenCalledTimes(1);
   });
 
+  // --- departure chaining (AC1) ---
+
+  it('chains completion onto an in-flight departure and completes ONCE after it settles (AC1)', async () => {
+    let settleStart: (value: unknown) => void = () => undefined;
+    mockStart.mockReturnValue(
+      new Promise((resolve) => {
+        settleStart = resolve;
+      })
+    );
+
+    // 1) Active session → departure starts and stays pending.
+    mockUseSession.mockReturnValue(makeSession());
+    const { rerender } = renderHook(() => useGuidanceCommuteLogSync());
+    expect(mockStart).toHaveBeenCalledTimes(1);
+
+    // 2) Local completion arrives while departure is pending → chained, not fired.
+    mockUseSession.mockReturnValue(makeSession({ localCompletedAt: 9_999 }));
+    rerender(undefined);
+    await flush();
+    expect(mockComplete).not.toHaveBeenCalled();
+
+    // 3) Departure settles → the chained completion runs exactly once.
+    await act(async () => {
+      settleStart(null);
+      await Promise.resolve();
+    });
+    await flush();
+    expect(mockComplete).toHaveBeenCalledTimes(1);
+    expect(mockComplete).toHaveBeenCalledWith(
+      'u1',
+      expect.objectContaining({ localCompletedAt: 9_999 }),
+      9_999
+    );
+  });
+
+  it('still completes after the in-flight departure REJECTS (AB2 create path, AC1)', async () => {
+    let rejectStart: (reason: unknown) => void = () => undefined;
+    mockStart.mockReturnValue(
+      new Promise((_resolve, reject) => {
+        rejectStart = reject;
+      })
+    );
+
+    mockUseSession.mockReturnValue(makeSession());
+    const { rerender } = renderHook(() => useGuidanceCommuteLogSync());
+
+    mockUseSession.mockReturnValue(makeSession({ localCompletedAt: 9_999 }));
+    rerender(undefined);
+    await flush();
+    expect(mockComplete).not.toHaveBeenCalled();
+
+    await act(async () => {
+      rejectStart(new Error('offline'));
+      await Promise.resolve();
+    });
+    await flush();
+    expect(mockComplete).toHaveBeenCalledTimes(1);
+  });
+
+  it('chains a SINGLE completion when localCompleted emits twice while the departure is pending (AC1)', async () => {
+    let settleStart: (value: unknown) => void = () => undefined;
+    mockStart.mockReturnValue(
+      new Promise((resolve) => {
+        settleStart = resolve;
+      })
+    );
+
+    mockUseSession.mockReturnValue(makeSession());
+    const { rerender } = renderHook(() => useGuidanceCommuteLogSync());
+
+    mockUseSession.mockReturnValue(makeSession({ localCompletedAt: 9_999 }));
+    rerender(undefined);
+    mockUseSession.mockReturnValue(makeSession({ localCompletedAt: 9_999 })); // fresh emit, still pending
+    rerender(undefined);
+    await flush();
+    expect(mockComplete).not.toHaveBeenCalled();
+
+    await act(async () => {
+      settleStart(null);
+      await Promise.resolve();
+    });
+    await flush();
+    expect(mockComplete).toHaveBeenCalledTimes(1);
+  });
+
   // --- outbox: live-write failure persistence (AB3) ---
 
   it('saves the completion to the outbox when the live write fails (AB3)', async () => {
@@ -266,7 +347,7 @@ describe('useGuidanceCommuteLogSync', () => {
     await flush();
 
     expect(mockComplete).toHaveBeenCalledWith('u1', orphan.session, 8_888);
-    expect(mockClear).toHaveBeenCalledTimes(1);
+    expect(mockClearForSession).toHaveBeenCalledWith(1_000);
   });
 
   it('keeps the outbox entry when the orphan drain write fails (AB3)', async () => {
@@ -283,7 +364,7 @@ describe('useGuidanceCommuteLogSync', () => {
     await flush();
 
     expect(mockComplete).toHaveBeenCalledTimes(1);
-    expect(mockClear).not.toHaveBeenCalled();
+    expect(mockClearForSession).not.toHaveBeenCalled();
   });
 
   it('discards an expired outbox entry without completing it (AB3)', async () => {
@@ -300,7 +381,7 @@ describe('useGuidanceCommuteLogSync', () => {
     await flush();
 
     expect(mockComplete).not.toHaveBeenCalled();
-    expect(mockClear).toHaveBeenCalledTimes(1);
+    expect(mockClearForSession).toHaveBeenCalledWith(1_000);
   });
 
   it('skips draining an outbox entry that matches the ACTIVE session (orphan-only, AB3)', async () => {
@@ -318,7 +399,7 @@ describe('useGuidanceCommuteLogSync', () => {
     await flush();
 
     expect(mockComplete).not.toHaveBeenCalled();
-    expect(mockClear).not.toHaveBeenCalled();
+    expect(mockClearForSession).not.toHaveBeenCalled();
   });
 
   it('does not drain another account\'s outbox entry (AB3)', async () => {
@@ -334,7 +415,7 @@ describe('useGuidanceCommuteLogSync', () => {
     await flush();
 
     expect(mockComplete).not.toHaveBeenCalled();
-    expect(mockClear).not.toHaveBeenCalled();
+    expect(mockClearForSession).not.toHaveBeenCalled();
   });
 
   it('does not save or clear the outbox on the normal active-session path (AB3)', async () => {
@@ -344,7 +425,6 @@ describe('useGuidanceCommuteLogSync', () => {
     await flush();
 
     expect(mockSave).not.toHaveBeenCalled();
-    expect(mockClear).not.toHaveBeenCalled();
     expect(mockClearForSession).not.toHaveBeenCalled();
   });
 });
