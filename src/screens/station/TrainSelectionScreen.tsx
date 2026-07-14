@@ -211,6 +211,8 @@ const TrainSelectionScreen: React.FC = () => {
     // 함정 회피).
     if (alertEnabled) {
       void scheduleBoardingAlert({
+        // 세션 무관 단독 알림 — kind 마커 없음(길안내 고아 sweep 비대상).
+        context: 'standalone',
         stationName,
         finalDestination: selectedTrain.finalDestination,
         arrivalTime: selectedTrain.arrivalTime,

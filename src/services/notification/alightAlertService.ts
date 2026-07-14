@@ -39,6 +39,9 @@ export const ALIGHT_ALERT_KIND = 'alight-alert';
 let trackedId: string | null = null;
 let trackedStepKey: string | null = null;
 let trackedFireAtMs: number | null = null;
+// 추적 알림의 세션 키(schedule param). keep 모드 정리에서 추적 ID가 보존 대상
+// 세션의 것인지 확인해, 이전 세션(A) 것이면 취소·상태 클리어한다(M2, boarding K1 대칭).
+let trackedSessionKey: string | null = null;
 
 // 공개 API 호출을 도착 순서대로 직렬화한다. await 도중 끼어드는 cancel/schedule이
 // 추적 상태를 엇갈리게 읽는 레이스(늦은 완료가 취소를 덮어씀)를 원천 차단한다
@@ -65,6 +68,13 @@ export interface AlightAlertParams {
   readonly arrivalAtMs: number;
   /** `${session.startedAt}:${stepIndex}` — 스텝 단위 dedup 키. */
   readonly stepKey: string;
+  /**
+   * 세션 키(`String(session.startedAt)`). 하차 알림은 길안내 전용이므로 필수.
+   * 호출 시점에 화면이 고정 read한 세션의 키여야 한다 — 서비스가 await 이후 스토어를
+   * 다시 읽지 않는다(in-flight 세션 교체 오스탬프 방지, H2). 세션 교체 정리 sweep의
+   * keep-필터가 이 값으로 새 세션 알림을 보존한다.
+   */
+  readonly sessionKey: string;
   /** 사용자 알림 설정 — 없으면 기본값(켜짐, 2분 전)으로 해석. */
   readonly settings?: NotificationSettings | null;
 }
@@ -81,7 +91,7 @@ export const scheduleAlightAlert = (
 const scheduleAlightAlertInner = async (
   params: AlightAlertParams
 ): Promise<string | null> => {
-  const { stationName, nextKind, toLineName, arrivalAtMs, stepKey, settings } = params;
+  const { stationName, nextKind, toLineName, arrivalAtMs, stepKey, sessionKey, settings } = params;
 
   try {
     const prefs = resolveAlightAlertPreferences(settings);
@@ -145,17 +155,25 @@ const scheduleAlightAlertInner = async (
         ? { title: `곧 ${stationName}역 도착`, body: `${toLineName ?? ''} 환승을 준비하세요`.trim() }
         : { title: `곧 ${stationName}역 도착`, body: '내릴 준비를 하세요' };
 
+    // 세션 키 스탬프 — 호출자 param이 유일 소스(서비스는 스토어를 다시 읽지 않는다,
+    // H2). 세션 교체 정리 sweep의 keep-필터 근거 (boarding과 동일).
     const id = await notificationService.scheduleArrivalAlert(new Date(arrivalAtMs), {
       secondsBefore: prefs.leadMinutes * 60,
       title: copy.title,
       body: copy.body,
-      data: { kind: ALIGHT_ALERT_KIND, variant: nextKind, stationName },
+      data: {
+        kind: ALIGHT_ALERT_KIND,
+        variant: nextKind,
+        stationName,
+        sessionKey,
+      },
     });
 
     if (id !== null) {
       trackedId = id;
       trackedStepKey = stepKey;
       trackedFireAtMs = fireAtMs;
+      trackedSessionKey = sessionKey;
     }
     return id;
   } catch (error) {
@@ -166,31 +184,44 @@ const scheduleAlightAlertInner = async (
 
 /**
  * 추적 중인 하차 임박 알림을 취소하고, OS 큐에 남은 하차 알림 고아까지 sweep한다.
- * 공개 함수는 직렬화 큐를 통해 순차 실행된다. Never throws.
+ * 공개 함수는 직렬화 큐를 통해 순차 실행된다. keep 모드(`options.keepSessionKey`)에서는
+ * 추적 알림의 sessionKey가 보존 대상과 일치하면 건드리지 않고, 다르면(이전 세션 것)
+ * 취소·상태를 클리어한다 — OS sweep의 keep 필터와 동일 기준을 추적 ID에도 적용한다
+ * (M2, boarding K1 대칭). sweep에서도 그 세션 알림을 보존한다. Never throws.
  */
-export const cancelAlightAlert = (): Promise<void> =>
-  enqueue(() => cancelAlightAlertInner());
+export const cancelAlightAlert = (
+  options?: { readonly keepSessionKey?: string }
+): Promise<void> => enqueue(() => cancelAlightAlertInner(options));
 
-const cancelAlightAlertInner = async (): Promise<void> => {
-  const id = trackedId;
-  trackedId = null;
-  trackedStepKey = null;
-  trackedFireAtMs = null;
-  if (id !== null) {
-    try {
-      await notificationService.cancelNotification(id);
-    } catch (error) {
-      console.error('Error cancelling alight alert:', error);
+const cancelAlightAlertInner = async (
+  options?: { readonly keepSessionKey?: string }
+): Promise<void> => {
+  const keepSessionKey = options?.keepSessionKey;
+  const keptByFilter = keepSessionKey !== undefined && trackedSessionKey === keepSessionKey;
+  if (!keptByFilter) {
+    const id = trackedId;
+    trackedId = null;
+    trackedStepKey = null;
+    trackedFireAtMs = null;
+    trackedSessionKey = null;
+    if (id !== null) {
+      try {
+        await notificationService.cancelNotification(id);
+      } catch (error) {
+        console.error('Error cancelling alight alert:', error);
+      }
     }
   }
-  // OS 큐를 훑어 kind 마커가 붙은 하차 알림을 전부 취소한다 — 앱/JS 재시작으로
-  // 추적이 끊긴 고아까지 청소한다. boarding 알림(kind 없음)은 건드리지 않는다.
+  // OS 큐를 훑어 kind 마커가 붙은 하차 알림을 취소한다 — 앱/JS 재시작으로 추적이
+  // 끊긴 고아까지 청소한다. boarding 알림(kind=BOARDING_ALERT_KIND)은 상수가 달라
+  // 건드리지 않는다. keepSessionKey 세션 알림은 보존한다.
   try {
     const scheduled = await Notifications.getAllScheduledNotificationsAsync();
     for (const request of scheduled) {
-      if (request.content?.data?.kind === ALIGHT_ALERT_KIND) {
-        await Notifications.cancelScheduledNotificationAsync(request.identifier);
-      }
+      const data = request.content?.data;
+      if (data?.kind !== ALIGHT_ALERT_KIND) continue;
+      if (keepSessionKey !== undefined && data?.sessionKey === keepSessionKey) continue;
+      await Notifications.cancelScheduledNotificationAsync(request.identifier);
     }
   } catch (error) {
     console.error('Error sweeping alight alerts:', error);

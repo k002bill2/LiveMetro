@@ -29,6 +29,7 @@ import { useDelayDetection } from '../../hooks/useDelayDetection';
 import { useCommuteHeroEstimate } from '../../hooks/useCommuteHeroEstimate';
 import { useStartCommuteGuidance } from '../../hooks/useStartCommuteGuidance';
 import { useGuidanceSession } from '../../hooks/useGuidanceSession';
+import { isActiveGuidanceSession } from '../../services/guidance/guidanceSessionStore';
 import { useFavorites } from '../../hooks/useFavorites';
 import { LoadingScreen } from '../../components/common/LoadingScreen';
 import { CommunityDelayCard, CommuteRouteCard, CommuteRouteCardPlaceholder, HomeTopBar, MLHeroCard, MLHeroCardPlaceholder, NearbyStationCard, Pill, QuickActionsGrid, SectionHeader } from '../../components/design';
@@ -387,9 +388,12 @@ export const HomeScreen: React.FC = () => {
         onBellPress={onPressBell}
       />
 
-      {/* Resume banner — only while a guidance journey is in progress. */}
-      {guidanceSession && (
-        <View style={styles.guidanceBannerWrap}>
+      {/* Resume banner — only while a guidance journey is ACTIVE (Y1/AA3). Gate
+          the wrapper on the same SSOT predicate as the banner so a completed
+          session leaves no empty paddingBottom gap; the banner's internal gate
+          stays as a defensive double-check. */}
+      {isActiveGuidanceSession(guidanceSession) && (
+        <View style={styles.guidanceBannerWrap} testID="guidance-banner-wrap">
           <GuidanceActiveBanner onPress={handleResumeGuidance} />
         </View>
       )}

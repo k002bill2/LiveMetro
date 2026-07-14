@@ -2,9 +2,17 @@
  * Background location bridge for active route guidance.
  *
  * Route guidance remains time-based because subway GPS is unreliable
- * underground, but registering a native background location task keeps the OS
- * aware that a commute guidance session is active. The task stores a tiny
- * heartbeat snapshot for diagnostics and future arrival heuristics.
+ * underground. The task HANDLER only stores a tiny diagnostic heartbeat snapshot
+ * — but that snapshot is NOT why this task exists. The reason to register a
+ * native background location task is the OS SUSPEND EXEMPTION it grants: while
+ * the task is running, iOS (UIBackgroundModes: location) and Android (a
+ * foreground service) keep the JS process alive even while the phone is locked.
+ * Locking does not change React Navigation focus, so the guidance screen's
+ * FOREGROUND JS keeps executing under the lock — the 1 Hz countdown tick, the
+ * 30 s realtime poll, boarding-alert rescheduling, and departure detection all
+ * continue. This is the mechanism by which the permission banner's promise
+ * ("화면이 꺼져도 안내와 알림이 이어져요") is actually fulfilled. The diagnostic
+ * snapshot is incidental; process liveness under lock is the point (AB1).
  */
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';

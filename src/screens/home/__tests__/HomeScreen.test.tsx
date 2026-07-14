@@ -756,9 +756,45 @@ describe('HomeScreen', () => {
         () => expect(getByTestId('guidance-active-banner')).toBeTruthy(),
         { timeout: 5000 },
       );
+      // Active session → the wrapper is present (no empty-gap concern here).
+      expect(getByTestId('guidance-banner-wrap')).toBeTruthy();
 
       fireEvent.press(getByTestId('guidance-active-banner'));
       expect(mockNavigate).toHaveBeenCalledWith('RouteGuidance');
+    });
+
+    it('does not render the banner wrapper for a locally-completed session (AA3 — no empty gap)', async () => {
+      // A persisted localCompletedAt session is non-null but inactive; gating the
+      // wrapper on session existence alone would leave an empty paddingBottom gap.
+      mockUseGuidanceSession.mockReturnValue({
+        route: { segments: [], totalMinutes: 18, transferCount: 0, lineIds: ['2'] },
+        fromStationName: '강남',
+        toStationName: '잠실',
+        startedAt: 1_700_000_000_000,
+        localCompletedAt: 1_700_000_050_000,
+      });
+
+      const { getByTestId, queryByTestId } = render(<HomeScreen />);
+      await waitFor(() => expect(getByTestId('home-top-bar')).toBeTruthy(), { timeout: 5000 });
+
+      expect(queryByTestId('guidance-banner-wrap')).toBeNull();
+      expect(queryByTestId('guidance-active-banner')).toBeNull();
+    });
+
+    it('does not render the banner wrapper for a remotely-completed session (AA3)', async () => {
+      mockUseGuidanceSession.mockReturnValue({
+        route: { segments: [], totalMinutes: 18, transferCount: 0, lineIds: ['2'] },
+        fromStationName: '강남',
+        toStationName: '잠실',
+        startedAt: 1_700_000_000_000,
+        commuteLogCompletedAt: 1_700_000_050_000,
+      });
+
+      const { getByTestId, queryByTestId } = render(<HomeScreen />);
+      await waitFor(() => expect(getByTestId('home-top-bar')).toBeTruthy(), { timeout: 5000 });
+
+      expect(queryByTestId('guidance-banner-wrap')).toBeNull();
+      expect(queryByTestId('guidance-active-banner')).toBeNull();
     });
 
     it('wires the commute card mid-node line from the route summary, not the origin station line', async () => {

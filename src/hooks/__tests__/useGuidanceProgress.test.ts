@@ -270,4 +270,110 @@ describe('useGuidanceProgress', () => {
       expect(Math.round(result.current.elapsedInStepSec)).toBe(180);
     });
   });
+
+  describe('initialAnchor / onAnchorChange (persistence bridge)', () => {
+    it('resumes mid-ride from a restored past anchor instead of the first hold', () => {
+      const { result } = renderHook(() =>
+        useGuidanceProgress(longRideSteps, {
+          startedAt: T0,
+          enabled: true,
+          initialAnchor: { index: 1, atMs: T0 - 5 * 60_000 }, // boarded 5min ago
+        })
+      );
+      // Restored onto the ride (index 1) with 5min already elapsed — NOT rewound
+      // to the board hold (index 0).
+      expect(result.current.currentIndex).toBe(1);
+      expect(result.current.isHolding).toBe(false);
+      expect(Math.round(result.current.elapsedInStepSec)).toBe(300);
+    });
+
+    it('starts at the first step when no initialAnchor is given (no regression)', () => {
+      const { result } = renderHook(() =>
+        useGuidanceProgress(steps, { startedAt: T0, enabled: true })
+      );
+      expect(result.current.currentIndex).toBe(0);
+      expect(result.current.isHolding).toBe(true);
+    });
+
+    it('notifies onAnchorChange once on mount with the initial (default) anchor', () => {
+      const onAnchorChange = jest.fn();
+      renderHook(() =>
+        useGuidanceProgress(steps, { startedAt: T0, enabled: true, onAnchorChange })
+      );
+      expect(onAnchorChange).toHaveBeenCalledTimes(1);
+      expect(onAnchorChange).toHaveBeenLastCalledWith({ index: 0, atMs: T0 });
+    });
+
+    it('notifies onAnchorChange on mount with the restored anchor', () => {
+      const onAnchorChange = jest.fn();
+      const restored = { index: 1, atMs: T0 - 60_000 };
+      renderHook(() =>
+        useGuidanceProgress(steps, {
+          startedAt: T0,
+          enabled: true,
+          initialAnchor: restored,
+          onAnchorChange,
+        })
+      );
+      expect(onAnchorChange).toHaveBeenLastCalledWith(restored);
+    });
+
+    it('notifies onAnchorChange after goNext with the advanced anchor', () => {
+      const onAnchorChange = jest.fn();
+      const { result } = renderHook(() =>
+        useGuidanceProgress(steps, { startedAt: T0, enabled: true, onAnchorChange })
+      );
+      act(() => {
+        result.current.goNext(); // board → ride, anchored at now (T0)
+      });
+      expect(onAnchorChange).toHaveBeenLastCalledWith({ index: 1, atMs: T0 });
+    });
+
+    it('notifies onAnchorChange after goNextAt with the past anchor time', () => {
+      const onAnchorChange = jest.fn();
+      const { result } = renderHook(() =>
+        useGuidanceProgress(longRideSteps, {
+          startedAt: T0,
+          enabled: true,
+          onAnchorChange,
+        })
+      );
+      act(() => {
+        result.current.goNextAt(T0 - 5 * 60_000); // boarded 5min ago
+      });
+      expect(onAnchorChange).toHaveBeenLastCalledWith({ index: 1, atMs: T0 - 5 * 60_000 });
+    });
+
+    it('notifies onAnchorChange after rebaseAt keeping the index but moving the time', () => {
+      const onAnchorChange = jest.fn();
+      const { result } = renderHook(() =>
+        useGuidanceProgress(longRideSteps, {
+          startedAt: T0,
+          enabled: true,
+          onAnchorChange,
+        })
+      );
+      act(() => {
+        result.current.goNext(); // board → ride (index 1)
+      });
+      act(() => {
+        result.current.rebaseAt(T0 - 3 * 60_000);
+      });
+      expect(onAnchorChange).toHaveBeenLastCalledWith({ index: 1, atMs: T0 - 3 * 60_000 });
+    });
+
+    it('notifies onAnchorChange after goPrev with the stepped-back anchor', () => {
+      const onAnchorChange = jest.fn();
+      const { result } = renderHook(() =>
+        useGuidanceProgress(steps, { startedAt: T0, enabled: true, onAnchorChange })
+      );
+      act(() => {
+        result.current.goNext(); // → ride (index 1)
+      });
+      act(() => {
+        result.current.goPrev(); // → back to board (index 0), anchored at now
+      });
+      expect(onAnchorChange).toHaveBeenLastCalledWith({ index: 0, atMs: T0 });
+    });
+  });
 });

@@ -11,14 +11,21 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSemanticTokens } from '@/services/theme';
-import { FlatList, StyleSheet, Text, View } from 'react-native';
+import { FlatList, Platform, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
 import { useIsFocused, useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { useRealtimeTrains } from '@/hooks/useRealtimeTrains';
 import { useGuidanceProgress } from '@/hooks/useGuidanceProgress';
+import { useGuidanceBackgroundPermissionPrompt } from '@/hooks/useGuidanceBackgroundPermissionPrompt';
+import { useGuidanceSession } from '@/hooks/useGuidanceSession';
+import {
+  startGuidanceBackgroundLocation,
+  stopGuidanceBackgroundLocation,
+} from '@/services/guidance/guidanceBackgroundLocationTask';
 import {
   routeToGuidanceSteps,
   computeRideProgress,
@@ -45,11 +52,17 @@ import {
   scheduleAlightAlert,
   cancelAlightAlert,
 } from '@/services/notification/alightAlertService';
-import { clearGuidanceSession, getGuidanceSession } from '@/services/guidance/guidanceSessionStore';
-import { completeGuidanceCommuteLog } from '@/services/guidance/guidanceCommuteLogService';
+import {
+  clearGuidanceSession,
+  getGuidanceSession,
+  updateGuidanceProgressAnchor,
+  updateGuidanceLocalCompletion,
+  isActiveGuidanceSession,
+} from '@/services/guidance/guidanceSessionStore';
 import { useAuth } from '@/services/auth/AuthContext';
 import { GuidanceControls, GuidanceHeader, GuidanceNowCard, GuidanceStepRow, TrainSelectSheet, type GuidanceStepStatus } from '@/components/guidance';
 import { StationRebaseSheet } from '@/components/guidance/StationRebaseSheet';
+import { BackgroundPermissionBanner } from '@/components/guidance/BackgroundPermissionBanner';
 import type { AppStackParamList } from '@/navigation/types';
 import type { GuidanceStep, RideStep } from '@/models/guidance';
 import type { Train } from '@/models/train';
@@ -85,6 +98,9 @@ interface StationRebaseContext {
 /** Grace window before a detected departure auto-confirms boarding (dismissable). */
 const SOFT_CONFIRM_AUTO_MS = 4000;
 
+/** expo-keep-awake tag scoping this screen's wake lock (activate/deactivate pair). */
+const KEEP_AWAKE_TAG = 'route-guidance';
+
 const formatWaitText = (totalSec: number): string => {
   const m = Math.floor(totalSec / 60);
   const s = totalSec % 60;
@@ -111,6 +127,16 @@ export const RouteGuidanceScreen: React.FC = () => {
   const isFocused = useIsFocused();
   const { user } = useAuth();
 
+  // Reactive session for the wake-lock gate — the frozen mount snapshot (below)
+  // can't observe a completion (commuteLogCompletedAt) transition. (The keep-awake
+  // effect lives after useGuidanceProgress so it can also read local completion.)
+  const liveSession = useGuidanceSession();
+  // SSOT 활성 정의(W1) — 로컬 완주(localCompletedAt)도 비활성 취급(wake lock 해제).
+  const isGuidanceActive = isActiveGuidanceSession(liveSession);
+  // 복구 게이트는 REMOTE 완료만 본다 — 로컬 완주 마커를 되돌리는 게 복구의 목적이므로
+  // isGuidanceActive(로컬 포함)로 게이트하면 복구가 영영 막힌다.
+  const isRemotelyActive = liveSession !== null && !liveSession.commuteLogCompletedAt;
+
   // Session is set by the CTA right before navigating; read once per mount.
   const session = useMemo(() => getGuidanceSession(), []);
   const steps = useMemo(
@@ -125,6 +151,37 @@ export const RouteGuidanceScreen: React.FC = () => {
     }
   }, [session, steps.length, navigation]);
 
+  // Restore the persisted progress anchor (re-mount / app restart) so a confirmed
+  // boarding isn't rewound to the first hold. Validate defensively — a malformed
+  // or out-of-range anchor (legacy/corrupt persisted session) falls back to the
+  // default first-step start. Computed once at mount (deps stable), so the 1Hz
+  // tick can't re-validate atMs against a moving clock.
+  const initialAnchor = useMemo((): { index: number; atMs: number } | undefined => {
+    const anchor = session?.progressAnchor;
+    if (!anchor) return undefined;
+    // stepIndex must be a whole index — a fractional value (e.g. 0.5) would pass
+    // a finite+range check yet crash `steps[0.5]` downstream.
+    if (!Number.isInteger(anchor.stepIndex) || !Number.isFinite(anchor.atMs)) return undefined;
+    if (anchor.stepIndex < 0 || anchor.stepIndex >= steps.length) return undefined;
+    if (anchor.atMs > Date.now()) return undefined;
+    return { index: anchor.stepIndex, atMs: anchor.atMs };
+  }, [session, steps.length]);
+
+  // Persist every anchor change (mount + each manual/soft correction) so the
+  // progress survives a screen close or app kill mid-journey. Scoped to this
+  // screen's originating session (mount-fixed startedAt) — a screen that outlives
+  // a session swap must not write its old anchor onto the new session (Q1).
+  const handleAnchorChange = useCallback(
+    (anchor: { index: number; atMs: number }): void => {
+      if (!session) return;
+      updateGuidanceProgressAnchor(
+        { stepIndex: anchor.index, atMs: anchor.atMs },
+        session.startedAt
+      );
+    },
+    [session]
+  );
+
   const {
     currentIndex,
     elapsedInStepSec,
@@ -138,7 +195,69 @@ export const RouteGuidanceScreen: React.FC = () => {
   } = useGuidanceProgress(steps, {
     startedAt: session?.startedAt ?? 0,
     enabled: isFocused && steps.length > 0,
+    initialAnchor,
+    onAnchorChange: handleAnchorChange,
   });
+
+  // Keep the screen awake ONLY while focused AND a guidance journey is actively in
+  // progress (P1') AND not yet at the destination (R1). `isAtEnd` is the LOCAL
+  // completion signal: commuteLogCompletedAt is set only after a successful remote
+  // (Firestore) write, so relying on it alone would hold the wake lock forever if
+  // the rider finishes offline/underground where that write can't land. Otherwise
+  // (no/complete session, blurred, or arrived) release so the device can auto-lock.
+  // expo-keep-awake's useKeepAwake requests on web with no Wake Lock check (→
+  // unhandled rejection), so web is a no-op; native activates/deactivates. Branch
+  // inside the effect (never a conditional hook call).
+  useEffect(() => {
+    if (Platform.OS === 'web') return undefined;
+    if (!(isFocused && isGuidanceActive && !isAtEnd)) return undefined;
+    void activateKeepAwakeAsync(KEEP_AWAKE_TAG).catch(() => undefined);
+    return () => {
+      try {
+        void deactivateKeepAwake(KEEP_AWAKE_TAG).catch(() => undefined);
+      } catch {
+        /* no-op — deactivating an already-released tag is harmless */
+      }
+    };
+  }, [isFocused, isGuidanceActive, isAtEnd]);
+
+  // One-time "Always" location nudge — without background permission, guidance and
+  // alerts stop when the phone locks. Suspended on local completion (isAtEnd): the
+  // banner hides and all start paths no-op once the rider has arrived.
+  const {
+    status: bgPermStatus,
+    requestPermission: requestBgPermission,
+    dismiss: dismissBgPermission,
+    openSettings: openBgSettings,
+  } = useGuidanceBackgroundPermissionPrompt({ suspended: isAtEnd });
+
+  // Stop background tracking on LOCAL completion (isAtEnd), not just remote — the
+  // Firestore completion write (commuteLogCompletedAt) can never land offline/
+  // logged-out, which would otherwise keep the Android foreground service alive
+  // (killServiceOnDestroy:false) after arrival (S1, same class as the wake lock).
+  // A goPrev correction (true→false) symmetrically retries (permission-checked).
+  // T2: prev를 false로 초기화 — 오프라인 완주(isAtEnd=true) 상태로 복원된 세션도 첫
+  // 렌더에서 false→true로 인식돼 stop이 1회 발동한다(전이 미감지로 서비스 잔존 방지).
+  const prevIsAtEndRef = useRef(false);
+  useEffect(() => {
+    const prev = prevIsAtEndRef.current;
+    prevIsAtEndRef.current = isAtEnd;
+    if (isAtEnd && !prev) {
+      void stopGuidanceBackgroundLocation();
+      // 로컬 완주를 세션에 영속(W1) — 오프라인/비로그인 도착이 재시작으로 뒤집혀
+      // 추적이 되살아나지 않게 한다. SSOT active 정의가 이 마커를 자동 반영한다.
+      if (session) updateGuidanceLocalCompletion(Date.now(), session.startedAt);
+    } else if (!isAtEnd && prev && isRemotelyActive) {
+      // 복구(재시도): true→false는 현 UI 기본 컨트롤(종점에서 GuidanceControls가
+      // prev/next 쌍을 숨김)로는 미도달 — 역 재베이스로 anchor가 뒤로 돌아가는 경로
+      // 대비 defensive. 로컬 완주 마커를 지우고 재시작한다. REMOTE 완료(commuteLog
+      // CompletedAt)가 아닐 때만 — 원격 완료면 sync가 이미 inactive 전이를 소진해 다시
+      // stop하지 않으므로 여기서 start·marker-clear하면 안 된다(T3). 로컬 완주 마커는
+      // 복구가 지우는 대상이므로 isGuidanceActive(로컬 포함)로 게이트하면 안 된다.
+      if (session) updateGuidanceLocalCompletion(null, session.startedAt);
+      void startGuidanceBackgroundLocation();
+    }
+  }, [isAtEnd, isRemotelyActive, session]);
 
   const currentStep = steps[currentIndex];
   const isWaitingStep =
@@ -420,8 +539,12 @@ export const RouteGuidanceScreen: React.FC = () => {
   // is foreground when scheduling, so tapping the alert just returns here.
   const notificationSettings = user?.preferences?.notificationSettings ?? null;
   useEffect(() => {
-    if (!isWaitingStep || earliestTrain?.arrivalTime == null) return;
+    if (!session || !isWaitingStep || earliestTrain?.arrivalTime == null) return;
     void scheduleBoardingAlert({
+      context: 'guidance',
+      // 화면 마운트 시 고정 read한 세션의 키 — 서비스가 스토어를 다시 읽지 않게
+      // 호출자가 전달한다(in-flight 세션 교체 오스탬프 방지, H2).
+      sessionKey: String(session.startedAt),
       stationName: waitingStationName,
       finalDestination: earliestTrain.finalDestination,
       arrivalTime: earliestTrain.arrivalTime,
@@ -429,7 +552,7 @@ export const RouteGuidanceScreen: React.FC = () => {
       settings: notificationSettings,
       variant: currentStep?.kind === 'transfer' ? 'transfer' : 'board',
     });
-  }, [isWaitingStep, earliestTrain, waitingStationName, currentStep?.kind, notificationSettings]);
+  }, [session, isWaitingStep, earliestTrain, waitingStationName, currentStep?.kind, notificationSettings]);
 
   // 하차 임박 알림 — ride 스텝의 도착 예정 시각으로 pending 알림을 예약한다.
   // `nowMs - elapsedInStepSec*1000`은 현재 스텝의 시작 시각(anchor 파생)이라
@@ -457,16 +580,21 @@ export const RouteGuidanceScreen: React.FC = () => {
       toLineName: nextStep.kind === 'transfer' ? nextStep.toLineName : undefined,
       arrivalAtMs: rideAlightAtMs,
       stepKey: `${session.startedAt}:${currentIndex}`,
+      sessionKey: String(session.startedAt),
       settings: notificationSettings,
     });
   }, [rideAlightAtMs, nextStep, currentIndex, session, notificationSettings]);
 
-  // Cancel any pending alert / timer on unmount (subscription-cleanup rule).
+  // Clear only the local auto-advance timer on unmount (subscription-cleanup
+  // rule). Boarding/alight alerts are intentionally NOT cancelled here: the
+  // guidance session can outlive this screen (rider closes the screen mid-ride),
+  // and the alight alert fires at an absolute time regardless of whether the
+  // screen is mounted. Cancellation responsibility moves to the session-end sync
+  // hook (useGuidanceAlertCleanupSync), which cancels when the session actually
+  // ends — not merely when the screen is dismissed.
   useEffect(() => {
     return () => {
       clearAutoTimer();
-      void cancelBoardingAlert();
-      void cancelAlightAlert();
     };
   }, [clearAutoTimer]);
 
@@ -505,21 +633,12 @@ export const RouteGuidanceScreen: React.FC = () => {
     return [...matched, ...rest];
   }, [session, trainSelectContext, nowMs]);
 
-  const completedLogKeyRef = useRef<string | null>(null);
-
-  const persistCompletion = useCallback((completedAt: number = Date.now()): void => {
-    if (!session || !user?.id || session.commuteLogCompletedAt) return;
-    const key = `${user.id}:${session.startedAt}`;
-    if (completedLogKeyRef.current === key) return;
-    completedLogKeyRef.current = key;
-    completeGuidanceCommuteLog(user.id, session, completedAt).catch((error) => {
-      completedLogKeyRef.current = null;
-      if (__DEV__) {
-        // eslint-disable-next-line no-console
-        console.warn('[RouteGuidanceScreen] commute log completion failed:', error);
-      }
-    });
-  }, [session, user?.id]);
+  // Commute-log COMPLETION is owned solely by the app-level useGuidanceCommuteLogSync
+  // hook (Z1): the screen only marks local completion (updateGuidanceLocalCompletion
+  // in the isAtEnd transition effect above), and the hook's emit-driven branch writes
+  // the arrival with localCompletedAt as the arrival time. Keeping a second writer
+  // here raced that branch on the same localCompletedAt emit → duplicate Firestore
+  // writes (AA2). The hook covers both first-completion and retry.
 
   // Whole-journey progress for the header bar. Total excludes platform wait
   // (same basis as remainingSeconds), so the fraction is internally honest.
@@ -530,23 +649,14 @@ export const RouteGuidanceScreen: React.FC = () => {
   const progress =
     totalSeconds <= 0 ? 0 : isAtEnd ? 1 : (totalSeconds - remainingSeconds) / totalSeconds;
 
-  useEffect(() => {
-    if (isAtEnd) {
-      persistCompletion();
-    }
-  }, [isAtEnd, persistCompletion]);
-
   const handleExit = useCallback((): void => {
     clearAutoTimer();
     void cancelBoardingAlert();
     void cancelAlightAlert();
-    if (isAtEnd) {
-      persistCompletion();
-    }
     clearDepartedTrainLog();
     clearGuidanceSession();
     navigation.goBack();
-  }, [clearAutoTimer, isAtEnd, persistCompletion, navigation]);
+  }, [clearAutoTimer, navigation]);
 
   const renderStep = useCallback(
     ({ item, index }: { item: GuidanceStep; index: number }): React.ReactElement => {
@@ -580,6 +690,15 @@ export const RouteGuidanceScreen: React.FC = () => {
         progress={progress}
         onClose={handleExit}
       />
+      {bgPermStatus !== 'hidden' && (
+        <View style={styles.bgPermWrap}>
+          <BackgroundPermissionBanner
+            mode={bgPermStatus}
+            onPrimary={bgPermStatus === 'settings' ? openBgSettings : requestBgPermission}
+            onDismiss={dismissBgPermission}
+          />
+        </View>
+      )}
       {currentStep !== undefined && (
         <View style={styles.nowCardWrap}>
           <GuidanceNowCard
@@ -645,6 +764,9 @@ const createStyles = (semantic: WantedSemanticTheme): ReturnType<typeof StyleShe
       paddingHorizontal: WANTED_TOKENS.spacing.s5,
     },
     nowCardWrap: {
+      marginBottom: WANTED_TOKENS.spacing.s4,
+    },
+    bgPermWrap: {
       marginBottom: WANTED_TOKENS.spacing.s4,
     },
     sectionLabel: {

@@ -27,7 +27,13 @@ import {
   getDepartedTrainLog,
   type DepartedTrainEntry,
 } from '@/services/guidance/departedTrainLog';
+import { Platform } from 'react-native';
+import { useIsFocused } from '@react-navigation/native';
 import { createRoute, type RouteSegment } from '@/models/route';
+import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+import { useGuidanceBackgroundPermissionPrompt } from '@/hooks/useGuidanceBackgroundPermissionPrompt';
+import { useGuidanceSession } from '@/hooks/useGuidanceSession';
+import { stopGuidanceBackgroundLocation } from '@/services/guidance/guidanceBackgroundLocationTask';
 
 const mockGoBack = jest.fn();
 
@@ -67,6 +73,36 @@ jest.mock('@/services/notification/alightAlertService', () => ({
 
 jest.mock('@/services/guidance/guidanceCommuteLogService', () => ({
   completeGuidanceCommuteLog: jest.fn(() => Promise.resolve()),
+}));
+
+jest.mock('expo-keep-awake', () => ({
+  activateKeepAwakeAsync: jest.fn(() => Promise.resolve()),
+  deactivateKeepAwake: jest.fn(() => Promise.resolve()),
+}));
+
+// The bg-permission hook pulls in the native background-location task chain
+// (expo-task-manager). Mock it at the hook boundary so the screen never loads
+// that chain; hook behavior is covered by its own test.
+jest.mock('@/hooks/useGuidanceBackgroundPermissionPrompt', () => ({
+  useGuidanceBackgroundPermissionPrompt: jest.fn(() => ({
+    status: 'hidden',
+    requestPermission: jest.fn(),
+    dismiss: jest.fn(),
+    openSettings: jest.fn(),
+  })),
+}));
+
+// 실제 스토어를 추적하도록 mock (beforeEach에서 getGuidanceSession에 연결) — wake-lock
+// 게이트의 세션 반응성을 setGuidanceSession + 명시 rerender로 제어한다.
+jest.mock('@/hooks/useGuidanceSession', () => ({
+  useGuidanceSession: jest.fn(),
+}));
+
+// 화면이 로컬 완료(isAtEnd) 시 백그라운드 추적을 중지/재시도(S1) — 네이티브 태스크
+// 체인(expo-task-manager)을 mock해 화면 테스트가 그걸 로드하지 않게 한다.
+jest.mock('@/services/guidance/guidanceBackgroundLocationTask', () => ({
+  startGuidanceBackgroundLocation: jest.fn(() => Promise.resolve(true)),
+  stopGuidanceBackgroundLocation: jest.fn(() => Promise.resolve()),
 }));
 
 jest.mock('lucide-react-native', () => ({
@@ -220,6 +256,16 @@ describe('RouteGuidanceScreen', () => {
     (scheduleAlightAlert as jest.Mock).mockClear();
     (cancelAlightAlert as jest.Mock).mockClear();
     (completeGuidanceCommuteLog as jest.Mock).mockClear();
+    // Default: bg-permission nudge hidden — wiring tests override per case.
+    (useGuidanceBackgroundPermissionPrompt as jest.Mock).mockReturnValue({
+      status: 'hidden',
+      requestPermission: jest.fn(),
+      dismiss: jest.fn(),
+      openSettings: jest.fn(),
+    });
+    // wake-lock 게이트용 — 실제 스토어를 추적하고, focus는 기본 true로 리셋.
+    (useGuidanceSession as jest.Mock).mockImplementation(() => getGuidanceSession());
+    (useIsFocused as jest.Mock).mockReturnValue(true);
     mockedUseRealtimeTrains.mockReturnValue({
       trains: [],
       loading: false,
@@ -296,21 +342,18 @@ describe('RouteGuidanceScreen', () => {
     expect(queryByTestId('guidance-next')).toBeNull();
   });
 
-  it('records arrival when the guidance reaches the destination', () => {
+  it('records arrival via the localCompletedAt marker, NOT a direct completion write (AA2)', () => {
+    // Completion ownership moved to the app-level useGuidanceCommuteLogSync hook
+    // (Z1). The screen only marks local completion; it must never call
+    // completeGuidanceCommuteLog itself (that raced the hook on the same emit).
     seedSession();
     const { getByTestId } = render(<RouteGuidanceScreen />);
     fireEvent.press(getByTestId('guidance-next'));
     act(() => {
       jest.advanceTimersByTime(5 * 60_000 + 1_000);
     });
-    expect(completeGuidanceCommuteLog).toHaveBeenCalledWith(
-      'user-1',
-      expect.objectContaining({
-        fromStationName: '을지로3가',
-        toStationName: '산곡',
-      }),
-      expect.any(Number)
-    );
+    expect(typeof getGuidanceSession()?.localCompletedAt).toBe('number');
+    expect(completeGuidanceCommuteLog).not.toHaveBeenCalled();
   });
 
   it('clears the session and goes back on 안내 종료', () => {
@@ -425,9 +468,16 @@ describe('RouteGuidanceScreen', () => {
       error: null,
     });
     const { getByTestId } = render(<RouteGuidanceScreen />);
-    // trainId는 발사 이력 dedup 키 — 반드시 함께 전달돼야 한다.
+    // trainId는 발사 이력 dedup 키 — 반드시 함께 전달돼야 한다. context='guidance' +
+    // sessionKey(고정 세션 키)는 세션 정리/고아 sweep 대상임을 표시한다(H1/H2).
     expect(scheduleBoardingAlert).toHaveBeenCalledWith(
-      expect.objectContaining({ stationName: '을지로3가', variant: 'board', trainId: 'T1' })
+      expect.objectContaining({
+        context: 'guidance',
+        sessionKey: String(T0),
+        stationName: '을지로3가',
+        variant: 'board',
+        trainId: 'T1',
+      })
     );
     fireEvent.press(getByTestId('guidance-exit'));
     expect(cancelBoardingAlert).toHaveBeenCalled();
@@ -794,7 +844,11 @@ describe('RouteGuidanceScreen', () => {
       expect(queryByTestId('guidance-rebase-station')).toBeNull();
     });
 
-    it('reaches the destination once when the 하차역 is picked for rebase (no double completion)', () => {
+    it('reaches the destination via 하차역 rebase without any screen-driven completion write (AA2)', () => {
+      // Pre-AA2 this guarded against the screen double-completing across the
+      // rebase path. The screen no longer writes completion at all (the hook's
+      // in-flight guard owns the "exactly once" invariant), so assert the marker
+      // is set once and the screen never calls completeGuidanceCommuteLog.
       seedSession();
       const { getByTestId, getByText } = render(<RouteGuidanceScreen />);
       fireEvent.press(getByTestId('guidance-next')); // board → ride
@@ -802,7 +856,8 @@ describe('RouteGuidanceScreen', () => {
       // Pick the final 하차역 (산곡, s3) → full ride duration → advances to alight.
       fireEvent.press(getByTestId('station-rebase-item-s3'));
       expect(getByText('산곡 도착 · 하차하세요')).toBeTruthy();
-      expect(completeGuidanceCommuteLog).toHaveBeenCalledTimes(1);
+      expect(typeof getGuidanceSession()?.localCompletedAt).toBe('number');
+      expect(completeGuidanceCommuteLog).not.toHaveBeenCalled();
     });
   });
 
@@ -820,6 +875,7 @@ describe('RouteGuidanceScreen', () => {
           stationName: '산곡',
           arrivalAtMs: expect.any(Number),
           stepKey: expect.stringMatching(/^\d+:\d+$/),
+          sessionKey: String(T0),
         })
       );
       // 도착 시각(rideAlightAtMs)은 1Hz 틱에 불변 → effect가 매초 재실행되지
@@ -846,6 +902,248 @@ describe('RouteGuidanceScreen', () => {
       (cancelAlightAlert as jest.Mock).mockClear();
       fireEvent.press(getByTestId('guidance-exit'));
       expect(cancelAlightAlert).toHaveBeenCalled();
+    });
+  });
+
+  describe('진행 anchor 복원 (progressAnchor restore)', () => {
+    const seedSessionWithAnchor = (
+      progressAnchor: { stepIndex: number; atMs: number }
+    ): void => {
+      setGuidanceSession({
+        route: createRoute([
+          hop('s1', '을지로3가', 's2', '시청', 2),
+          hop('s2', '시청', 's3', '산곡', 3),
+        ]),
+        fromStationName: '을지로3가',
+        toStationName: '산곡',
+        startedAt: T0,
+        progressAnchor,
+      });
+    };
+
+    it('저장된 ride anchor로 마운트하면 첫 board 홀드가 아니라 그 ride 스텝으로 복원한다', () => {
+      // ride(index 1)를 T0에 탑승한 것으로 복원 — 복원되면 '탑승 중', 미배선이면
+      // 첫 board 홀드('탑승 대기')로 되감김(RED).
+      seedSessionWithAnchor({ stepIndex: 1, atMs: T0 });
+      const { getByText, getByTestId } = render(<RouteGuidanceScreen />);
+      expect(getByText('탑승 중')).toBeTruthy();
+      expect(getByTestId('guidance-next-station')).toHaveTextContent('시청');
+    });
+
+    it('스텝 범위를 벗어난 무효 anchor는 무시하고 기본 board 스텝에서 시작한다', () => {
+      seedSessionWithAnchor({ stepIndex: 99, atMs: T0 });
+      const { getByText } = render(<RouteGuidanceScreen />);
+      expect(getByText('탑승 대기')).toBeTruthy();
+    });
+
+    it('미래 시각 anchor는 무시하고 기본 board 스텝에서 시작한다', () => {
+      seedSessionWithAnchor({ stepIndex: 1, atMs: T0 + 60_000 });
+      const { getByText } = render(<RouteGuidanceScreen />);
+      expect(getByText('탑승 대기')).toBeTruthy();
+    });
+
+    it('소수 stepIndex anchor는 무시하고 기본 board 스텝에서 시작한다 (steps[0.5] 크래시 방지)', () => {
+      seedSessionWithAnchor({ stepIndex: 0.5, atMs: T0 });
+      const { getByText } = render(<RouteGuidanceScreen />);
+      expect(getByText('탑승 대기')).toBeTruthy();
+    });
+  });
+
+  describe('unmount 시 알림 취소 안 함 (세션 존속)', () => {
+    it('화면 언마운트 시 탑승/하차 알림을 취소하지 않는다 (세션 종료 훅으로 책임 이동)', () => {
+      seedSession();
+      const { unmount } = render(<RouteGuidanceScreen />);
+      // 마운트 시 board 홀드의 취소 호출(하차 alight effect)을 지워 언마운트 경로만 격리.
+      (cancelBoardingAlert as jest.Mock).mockClear();
+      (cancelAlightAlert as jest.Mock).mockClear();
+      unmount();
+      // 세션이 살아있는데 화면만 닫힌 경우 — 절대시각 하차 알림은 유효해야 한다.
+      expect(cancelBoardingAlert).not.toHaveBeenCalled();
+      expect(cancelAlightAlert).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('화면 꺼짐 방지 (keep-awake)', () => {
+    it('네이티브에서 활성 세션 + 포커스 시 activateKeepAwakeAsync를 호출한다', () => {
+      seedSession();
+      render(<RouteGuidanceScreen />);
+      expect(activateKeepAwakeAsync).toHaveBeenCalledTimes(1);
+    });
+
+    it('세션이 없으면 wake lock을 걸지 않는다 (P1)', () => {
+      // seedSession 안 함 → 세션 없음(복원/딥링크 방어 경로).
+      render(<RouteGuidanceScreen />);
+      expect(activateKeepAwakeAsync).not.toHaveBeenCalled();
+    });
+
+    it('blur 전이 시 wake lock을 해제한다 (P1)', () => {
+      seedSession();
+      const { rerender } = render(<RouteGuidanceScreen />);
+      expect(activateKeepAwakeAsync).toHaveBeenCalled();
+      (deactivateKeepAwake as jest.Mock).mockClear();
+      (useIsFocused as jest.Mock).mockReturnValue(false); // 위에 다른 화면 push → blur
+      rerender(<RouteGuidanceScreen />);
+      expect(deactivateKeepAwake).toHaveBeenCalled();
+    });
+
+    it('여정 완료 전이 시 wake lock을 해제한다 (P1)', () => {
+      seedSession();
+      const { rerender } = render(<RouteGuidanceScreen />);
+      expect(activateKeepAwakeAsync).toHaveBeenCalled();
+      (deactivateKeepAwake as jest.Mock).mockClear();
+      // 목적지 도착 — commuteLogCompletedAt 설정(같은 startedAt 유지).
+      const current = getGuidanceSession();
+      if (current) {
+        act(() => {
+          setGuidanceSession({ ...current, commuteLogCompletedAt: T0 + 300_000 });
+        });
+      }
+      rerender(<RouteGuidanceScreen />);
+      expect(deactivateKeepAwake).toHaveBeenCalled();
+    });
+
+    it('로컬 완료(isAtEnd) 도달 시 원격 기록과 무관하게 wake lock을 해제한다 (R1)', () => {
+      // completeGuidanceCommuteLog는 mocked(resolve)라 commuteLogCompletedAt이
+      // 설정되지 않는다 → 세션은 여전히 활성이지만 로컬 isAtEnd로 해제돼야 한다
+      // (오프라인/지하 완주 시 원격 완료 write가 안 떨어지는 시나리오).
+      seedSession();
+      const { getByTestId } = render(<RouteGuidanceScreen />);
+      expect(activateKeepAwakeAsync).toHaveBeenCalled();
+      (deactivateKeepAwake as jest.Mock).mockClear();
+      fireEvent.press(getByTestId('guidance-next')); // board → ride
+      act(() => {
+        jest.advanceTimersByTime(5 * 60_000 + 1_000); // ride 5분 경과 → isAtEnd
+      });
+      // 세션은 활성 유지(원격 기록 미도착)인데도 로컬 완료로 해제.
+      expect(getGuidanceSession()?.commuteLogCompletedAt).toBeUndefined();
+      expect(deactivateKeepAwake).toHaveBeenCalled();
+    });
+
+    it('언마운트 시 deactivateKeepAwake로 wake lock을 해제한다', () => {
+      seedSession();
+      const { unmount } = render(<RouteGuidanceScreen />);
+      (deactivateKeepAwake as jest.Mock).mockClear();
+      unmount();
+      expect(deactivateKeepAwake).toHaveBeenCalled();
+    });
+
+    it('웹에서는 wake lock을 걸지 않는다 (unhandled rejection 방지)', () => {
+      const originalOS = Platform.OS;
+      (Platform as { OS: string }).OS = 'web';
+      try {
+        seedSession();
+        render(<RouteGuidanceScreen />);
+        expect(activateKeepAwakeAsync).not.toHaveBeenCalled();
+      } finally {
+        (Platform as { OS: string }).OS = originalOS;
+      }
+    });
+
+    it('activate가 reject해도 화면이 크래시하지 않는다', () => {
+      (activateKeepAwakeAsync as jest.Mock).mockRejectedValueOnce(new Error('no wake lock'));
+      seedSession();
+      const { getByTestId } = render(<RouteGuidanceScreen />);
+      expect(getByTestId('route-guidance-screen')).toBeTruthy();
+    });
+  });
+
+  describe('로컬 완료 시 백그라운드 추적 중지 (S1)', () => {
+    it('로컬 완료(isAtEnd) 전이 시 stopGuidanceBackgroundLocation을 호출한다', () => {
+      seedSession();
+      const { getByTestId } = render(<RouteGuidanceScreen />);
+      fireEvent.press(getByTestId('guidance-next')); // board → ride
+      (stopGuidanceBackgroundLocation as jest.Mock).mockClear();
+      act(() => {
+        jest.advanceTimersByTime(5 * 60_000 + 1_000); // ride 5분 경과 → isAtEnd(alight)
+      });
+      // 원격 완료(commuteLogCompletedAt)와 무관하게 로컬 완주로 추적 중지.
+      expect(stopGuidanceBackgroundLocation).toHaveBeenCalled();
+    });
+
+    it('진행 중 마운트에서는 stop을 호출하지 않는다 (전이 기반)', () => {
+      seedSession();
+      render(<RouteGuidanceScreen />);
+      expect(stopGuidanceBackgroundLocation).not.toHaveBeenCalled();
+    });
+
+    it('isAtEnd=true로 복원된 첫 렌더에서 stop을 1회 호출한다 (T2)', () => {
+      // ride를 10분 전에 탑승한 것으로 복원 → 5분 ride 초과 → 첫 렌더부터 isAtEnd(alight).
+      setGuidanceSession({
+        route: createRoute([
+          hop('s1', '을지로3가', 's2', '시청', 2),
+          hop('s2', '시청', 's3', '산곡', 3),
+        ]),
+        fromStationName: '을지로3가',
+        toStationName: '산곡',
+        startedAt: T0,
+        progressAnchor: { stepIndex: 1, atMs: T0 - 10 * 60_000 },
+      });
+      render(<RouteGuidanceScreen />);
+      expect(stopGuidanceBackgroundLocation).toHaveBeenCalledTimes(1);
+    });
+
+    it('로컬 완료(isAtEnd) 전이 시 세션에 localCompletedAt 마커를 영속한다 (W1)', () => {
+      // 원격 기록(completeGuidanceCommuteLog)은 mock이라 스토어에 쓰지 않으므로,
+      // 로컬 완주 마커만으로 세션이 비활성으로 표시돼 재시작 후 추적 부활을 막는다.
+      seedSession();
+      const { getByTestId } = render(<RouteGuidanceScreen />);
+      fireEvent.press(getByTestId('guidance-next')); // board → ride
+      expect(getGuidanceSession()?.localCompletedAt).toBeUndefined();
+      act(() => {
+        jest.advanceTimersByTime(5 * 60_000 + 1_000); // ride 5분 경과 → isAtEnd(alight)
+      });
+      expect(typeof getGuidanceSession()?.localCompletedAt).toBe('number');
+    });
+  });
+
+  describe('백그라운드 권한 유도 배너 (background permission banner)', () => {
+    it('status가 hidden이면 배너를 렌더하지 않는다', () => {
+      seedSession();
+      const { queryByTestId } = render(<RouteGuidanceScreen />);
+      expect(queryByTestId('guidance-bg-permission-banner')).toBeNull();
+    });
+
+    it('prompt 모드면 배너를 렌더하고 허용 CTA가 requestPermission을 호출한다', () => {
+      const requestPermission = jest.fn();
+      (useGuidanceBackgroundPermissionPrompt as jest.Mock).mockReturnValue({
+        status: 'prompt',
+        requestPermission,
+        dismiss: jest.fn(),
+        openSettings: jest.fn(),
+      });
+      seedSession();
+      const { getByTestId } = render(<RouteGuidanceScreen />);
+      expect(getByTestId('guidance-bg-permission-banner')).toBeTruthy();
+      fireEvent.press(getByTestId('guidance-bg-permission-primary'));
+      expect(requestPermission).toHaveBeenCalledTimes(1);
+    });
+
+    it('settings 모드면 주 CTA가 openSettings를 호출한다', () => {
+      const openSettings = jest.fn();
+      (useGuidanceBackgroundPermissionPrompt as jest.Mock).mockReturnValue({
+        status: 'settings',
+        requestPermission: jest.fn(),
+        dismiss: jest.fn(),
+        openSettings,
+      });
+      seedSession();
+      const { getByTestId } = render(<RouteGuidanceScreen />);
+      fireEvent.press(getByTestId('guidance-bg-permission-primary'));
+      expect(openSettings).toHaveBeenCalledTimes(1);
+    });
+
+    it('보조 CTA가 dismiss를 호출한다', () => {
+      const dismiss = jest.fn();
+      (useGuidanceBackgroundPermissionPrompt as jest.Mock).mockReturnValue({
+        status: 'prompt',
+        requestPermission: jest.fn(),
+        dismiss,
+        openSettings: jest.fn(),
+      });
+      seedSession();
+      const { getByTestId } = render(<RouteGuidanceScreen />);
+      fireEvent.press(getByTestId('guidance-bg-permission-dismiss'));
+      expect(dismiss).toHaveBeenCalledTimes(1);
     });
   });
 });

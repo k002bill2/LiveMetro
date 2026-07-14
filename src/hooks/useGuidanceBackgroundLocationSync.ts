@@ -7,6 +7,7 @@
  */
 import { useEffect, useRef } from 'react';
 import { useGuidanceSession } from '@/hooks/useGuidanceSession';
+import { isActiveGuidanceSession } from '@/services/guidance/guidanceSessionStore';
 import {
   startGuidanceBackgroundLocation,
   stopGuidanceBackgroundLocation,
@@ -14,7 +15,9 @@ import {
 
 export const useGuidanceBackgroundLocationSync = (): void => {
   const session = useGuidanceSession();
-  const activeSessionKey = session && !session.commuteLogCompletedAt
+  // 활성 정의 SSOT(W1) — 로컬 완주(localCompletedAt) 세션은 재시작 후에도 비활성이라
+  // 추적을 재시작하지 않는다.
+  const activeSessionKey = session && isActiveGuidanceSession(session)
     ? String(session.startedAt)
     : null;
   const startedForKeyRef = useRef<string | null>(null);

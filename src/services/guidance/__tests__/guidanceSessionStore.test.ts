@@ -14,8 +14,12 @@ import {
   getGuidanceSession,
   setGuidanceSession,
   clearGuidanceSession,
+  updateGuidanceProgressAnchor,
+  updateGuidanceLocalCompletion,
+  isActiveGuidanceSession,
   subscribe,
   hydrateGuidanceSession,
+  isGuidanceSessionHydrated,
   isSessionExpired,
   GUIDANCE_SESSION_TTL_MS,
 } from '../guidanceSessionStore';
@@ -213,5 +217,222 @@ describe('guidanceSessionStore', () => {
     mockGetItem.mockResolvedValue('{ not valid json');
     await expect(hydrateGuidanceSession(1000)).resolves.toBeUndefined();
     expect(getGuidanceSession()).toBeNull();
+  });
+
+  // --- v2 hydration flag (alert orphan-cleanup gate) ---
+
+  it('marks the session hydrated after hydrate completes with nothing stored', async () => {
+    mockGetItem.mockResolvedValue(null);
+    await hydrateGuidanceSession(1000);
+    expect(isGuidanceSessionHydrated()).toBe(true);
+  });
+
+  it('marks the session hydrated after restoring a session', async () => {
+    const started = 5_000_000;
+    mockGetItem.mockResolvedValue(JSON.stringify(makeSession(started)));
+    await hydrateGuidanceSession(started + 1000);
+    expect(isGuidanceSessionHydrated()).toBe(true);
+    expect(getGuidanceSession()).toEqual(makeSession(started));
+  });
+
+  // G1: hydrated must gate on SUCCESSFUL completion, not merely "finished".
+  // `hydrated` is monotonic module state, so each case runs in an isolated
+  // module registry to observe the false→(maybe)true transition cleanly.
+  describe('hydration success gating (G1)', () => {
+    it('does not mark hydrated when the read fails (guards against false orphan sweep)', async () => {
+      await jest.isolateModulesAsync(async () => {
+        const store = require('../guidanceSessionStore') as typeof import('../guidanceSessionStore');
+        const storage = require('@react-native-async-storage/async-storage') as {
+          getItem: jest.Mock;
+        };
+        storage.getItem.mockRejectedValue(new Error('storage unavailable'));
+        await store.hydrateGuidanceSession(1000);
+        expect(store.isGuidanceSessionHydrated()).toBe(false);
+      });
+    });
+
+    it('marks hydrated on a clean empty result (sweep may run)', async () => {
+      await jest.isolateModulesAsync(async () => {
+        const store = require('../guidanceSessionStore') as typeof import('../guidanceSessionStore');
+        const storage = require('@react-native-async-storage/async-storage') as {
+          getItem: jest.Mock;
+        };
+        storage.getItem.mockResolvedValue(null);
+        await store.hydrateGuidanceSession(1000);
+        expect(store.isGuidanceSessionHydrated()).toBe(true);
+      });
+    });
+
+    // H3: corrupt JSON is a RESOLVED outcome ("no valid session"), not a transient
+    // failure — it must be removed and hydration marked complete, never wedged.
+    it('clears corrupt stored JSON and marks hydrated (never permanently sealed)', async () => {
+      await jest.isolateModulesAsync(async () => {
+        const store = require('../guidanceSessionStore') as typeof import('../guidanceSessionStore');
+        const storage = require('@react-native-async-storage/async-storage') as {
+          getItem: jest.Mock;
+          removeItem: jest.Mock;
+        };
+        storage.getItem.mockResolvedValue('{ corrupt json');
+        storage.removeItem.mockResolvedValue(undefined);
+        await store.hydrateGuidanceSession(1000);
+        expect(storage.removeItem).toHaveBeenCalledWith(STORAGE_KEY);
+        expect(store.isGuidanceSessionHydrated()).toBe(true);
+        expect(store.getGuidanceSession()).toBeNull();
+      });
+    });
+  });
+
+  // --- progress anchor (re-mount / app-restart restore) ---
+
+  describe('updateGuidanceProgressAnchor', () => {
+    it('is a no-op when no session is active', () => {
+      updateGuidanceProgressAnchor({ stepIndex: 2, atMs: 1_700_000_000_500 }, 1_700_000_000_000);
+      expect(getGuidanceSession()).toBeNull();
+      expect(mockSetItem).not.toHaveBeenCalled();
+    });
+
+    it('is a no-op when expectedStartedAt does not match the current session (Q1 scope)', () => {
+      setGuidanceSession(makeSession(1_700_000_000_000)); // 세션 B
+      mockSetItem.mockClear();
+
+      // 이전 경로(세션 A)의 startedAt으로 쓰기 시도 — B를 오염시키면 안 된다.
+      updateGuidanceProgressAnchor({ stepIndex: 3, atMs: 1_700_000_050_000 }, 999);
+
+      expect(getGuidanceSession()?.progressAnchor).toBeUndefined();
+      expect(mockSetItem).not.toHaveBeenCalled();
+    });
+
+    it('records the anchor on the active session and persists it', () => {
+      setGuidanceSession(makeSession(1_700_000_000_000));
+      mockSetItem.mockClear();
+      const anchor = { stepIndex: 3, atMs: 1_700_000_050_000 };
+
+      updateGuidanceProgressAnchor(anchor, 1_700_000_000_000);
+
+      expect(getGuidanceSession()?.progressAnchor).toEqual(anchor);
+      expect(mockSetItem).toHaveBeenCalledWith(
+        STORAGE_KEY,
+        JSON.stringify(getGuidanceSession())
+      );
+    });
+
+    it('keeps the same startedAt so the departed-train log is preserved', () => {
+      setGuidanceSession(makeSession(1_700_000_000_000));
+      appendDepartedTrains([departedEntry], 1_700_000_000_000);
+      expect(getDepartedTrainLog()).toHaveLength(1);
+
+      updateGuidanceProgressAnchor({ stepIndex: 1, atMs: 1_700_000_010_000 }, 1_700_000_000_000);
+
+      expect(getGuidanceSession()?.startedAt).toBe(1_700_000_000_000);
+      expect(getDepartedTrainLog()).toHaveLength(1);
+    });
+
+    it('overwrites a previous anchor on the same session', () => {
+      setGuidanceSession(makeSession(1_700_000_000_000));
+      updateGuidanceProgressAnchor({ stepIndex: 1, atMs: 1_700_000_010_000 }, 1_700_000_000_000);
+      updateGuidanceProgressAnchor({ stepIndex: 2, atMs: 1_700_000_020_000 }, 1_700_000_000_000);
+      expect(getGuidanceSession()?.progressAnchor).toEqual({
+        stepIndex: 2,
+        atMs: 1_700_000_020_000,
+      });
+    });
+  });
+
+  // --- active-session SSOT (W1) — single source shared by bg-sync, alert
+  // cleanup, permission prompt, and the screen wake lock. A session is active
+  // only while it is neither remotely completed (commuteLogCompletedAt) nor
+  // locally completed (localCompletedAt).
+  describe('isActiveGuidanceSession (SSOT)', () => {
+    it('is false for a null session', () => {
+      expect(isActiveGuidanceSession(null)).toBe(false);
+    });
+
+    it('is true for a plain in-progress session', () => {
+      expect(isActiveGuidanceSession(makeSession(1_700_000_000_000))).toBe(true);
+    });
+
+    it('is false once the commute log is completed remotely', () => {
+      expect(
+        isActiveGuidanceSession({ ...makeSession(1_700_000_000_000), commuteLogCompletedAt: 9_999 })
+      ).toBe(false);
+    });
+
+    it('is false once local completion is marked (W1 — survives restart)', () => {
+      expect(
+        isActiveGuidanceSession({ ...makeSession(1_700_000_000_000), localCompletedAt: 9_999 })
+      ).toBe(false);
+    });
+  });
+
+  // --- local completion marker (W1): persists the screen-local "arrived" signal
+  // so a mid-TTL restart doesn't revert to active and restart background tracking.
+  describe('updateGuidanceLocalCompletion', () => {
+    it('is a no-op when no session is active', () => {
+      updateGuidanceLocalCompletion(1_700_000_050_000, 1_700_000_000_000);
+      expect(getGuidanceSession()).toBeNull();
+      expect(mockSetItem).not.toHaveBeenCalled();
+    });
+
+    it('is a no-op when expectedStartedAt does not match the current session (Q1 scope)', () => {
+      setGuidanceSession(makeSession(1_700_000_000_000)); // 세션 B
+      mockSetItem.mockClear();
+
+      // 이전 경로(세션 A)의 startedAt으로 완료 마킹 시도 — B를 오염시키면 안 된다.
+      updateGuidanceLocalCompletion(1_700_000_050_000, 999);
+
+      expect(getGuidanceSession()?.localCompletedAt).toBeUndefined();
+      expect(mockSetItem).not.toHaveBeenCalled();
+    });
+
+    it('marks local completion on the active session, persists, and notifies', () => {
+      setGuidanceSession(makeSession(1_700_000_000_000));
+      mockSetItem.mockClear();
+      const listener = jest.fn();
+      const unsub = subscribe(listener);
+
+      updateGuidanceLocalCompletion(1_700_000_050_000, 1_700_000_000_000);
+
+      expect(getGuidanceSession()?.localCompletedAt).toBe(1_700_000_050_000);
+      expect(mockSetItem).toHaveBeenCalledWith(STORAGE_KEY, JSON.stringify(getGuidanceSession()));
+      expect(listener).toHaveBeenCalledTimes(1);
+      unsub();
+    });
+
+    it('clears the marker when passed null (recovery) and drops the field entirely', () => {
+      setGuidanceSession(makeSession(1_700_000_000_000));
+      updateGuidanceLocalCompletion(1_700_000_050_000, 1_700_000_000_000);
+      expect(getGuidanceSession()?.localCompletedAt).toBe(1_700_000_050_000);
+
+      updateGuidanceLocalCompletion(null, 1_700_000_000_000);
+
+      const session = getGuidanceSession();
+      expect(session?.localCompletedAt).toBeUndefined();
+      expect(session).not.toHaveProperty('localCompletedAt');
+      expect(isActiveGuidanceSession(session)).toBe(true);
+    });
+
+    it('is a no-op when clearing a marker that was never set (no redundant persist/emit)', () => {
+      setGuidanceSession(makeSession(1_700_000_000_000));
+      mockSetItem.mockClear();
+      const listener = jest.fn();
+      const unsub = subscribe(listener);
+
+      updateGuidanceLocalCompletion(null, 1_700_000_000_000);
+
+      expect(mockSetItem).not.toHaveBeenCalled();
+      expect(listener).not.toHaveBeenCalled();
+      unsub();
+    });
+
+    it('keeps the same startedAt so the departed-train log is preserved', () => {
+      setGuidanceSession(makeSession(1_700_000_000_000));
+      appendDepartedTrains([departedEntry], 1_700_000_000_000);
+      expect(getDepartedTrainLog()).toHaveLength(1);
+
+      updateGuidanceLocalCompletion(1_700_000_050_000, 1_700_000_000_000);
+
+      expect(getGuidanceSession()?.startedAt).toBe(1_700_000_000_000);
+      expect(getDepartedTrainLog()).toHaveLength(1);
+    });
   });
 });

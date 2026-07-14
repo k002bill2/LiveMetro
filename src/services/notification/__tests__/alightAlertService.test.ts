@@ -45,6 +45,7 @@ const baseParams = {
   toLineName: '2호선',
   arrivalAtMs: NOW + 10 * 60_000, // 10분 뒤 도착
   stepKey: '1000:1',
+  sessionKey: '1000', // 호출자가 전달 — stepKey의 startedAt 부분과 일치
   settings: settingsWith({ enabled: true, leadMinutes: 2 }),
 };
 
@@ -80,7 +81,7 @@ describe('scheduleAlightAlert', () => {
         secondsBefore: 120,
         title: '곧 신도림역 도착',
         body: '2호선 환승을 준비하세요',
-        data: { kind: 'alight-alert', variant: 'transfer', stationName: '신도림' },
+        data: { kind: 'alight-alert', variant: 'transfer', stationName: '신도림', sessionKey: '1000' },
       })
     );
   });
@@ -274,5 +275,66 @@ describe('serialization (Codex P2 — 늦은 완료 레이스)', () => {
     notif.cancelNotification.mockClear();
     await svc.cancelAlightAlert();
     expect(notif.cancelNotification).not.toHaveBeenCalled();
+  });
+});
+
+// ── 세션 키 스탬프(호출자 param) + 교체 정리 keep-필터 (G3/H2, boarding과 대칭)
+describe('세션 키 스탬프 + keep-필터 (G3/H2)', () => {
+  it('호출자가 전달한 sessionKey를 data에 스탬프한다 (서비스는 스토어를 읽지 않음)', async () => {
+    await svc.scheduleAlightAlert({ ...baseParams, sessionKey: 'sess-xyz' });
+    expect(notif.scheduleArrivalAlert).toHaveBeenCalledWith(
+      expect.any(Date),
+      expect.objectContaining({
+        data: expect.objectContaining({ sessionKey: 'sess-xyz' }),
+      })
+    );
+  });
+
+  it('keepSessionKey 지정 시 그 세션 알림은 보존하고 나머지 kind 매칭만 취소한다', async () => {
+    expo.getAllScheduledNotificationsAsync.mockResolvedValue([
+      { identifier: 'keep-new', content: { data: { kind: 'alight-alert', sessionKey: 'new' } } },
+      { identifier: 'drop-old', content: { data: { kind: 'alight-alert', sessionKey: 'old' } } },
+      { identifier: 'drop-nokey', content: { data: { kind: 'alight-alert' } } },
+    ]);
+    await svc.cancelAlightAlert({ keepSessionKey: 'new' });
+    expect(expo.cancelScheduledNotificationAsync).toHaveBeenCalledWith('drop-old');
+    expect(expo.cancelScheduledNotificationAsync).toHaveBeenCalledWith('drop-nokey');
+    expect(expo.cancelScheduledNotificationAsync).not.toHaveBeenCalledWith('keep-new');
+  });
+
+  it('keepSessionKey가 추적 알림의 sessionKey와 일치하면 추적 ID를 보존한다 (B 추적 중 keep=B)', async () => {
+    await svc.scheduleAlightAlert(baseParams); // trackedId='alert-1', sessionKey='1000'
+    notif.cancelNotification.mockClear();
+    await svc.cancelAlightAlert({ keepSessionKey: '1000' });
+    expect(notif.cancelNotification).not.toHaveBeenCalled();
+  });
+
+  it('keepSessionKey가 추적 알림의 sessionKey와 다르면 추적 ID를 취소·클리어한다 (A 추적 중 keep=B, M2)', async () => {
+    await svc.scheduleAlightAlert(baseParams); // trackedId='alert-1', sessionKey='1000' (A)
+    notif.cancelNotification.mockClear();
+    await svc.cancelAlightAlert({ keepSessionKey: 'new' }); // keep=B
+    expect(notif.cancelNotification).toHaveBeenCalledWith('alert-1');
+    // 상태 클리어 확인 — 이후 full cancel이 취소된 ID를 다시 반환하지 않는다(오염 방지).
+    notif.cancelNotification.mockClear();
+    await svc.cancelAlightAlert();
+    expect(notif.cancelNotification).not.toHaveBeenCalled();
+  });
+
+  it('스케줄 도중 스토어 세션이 교체돼도 스탬프는 param 키를 유지한다 (H2 in-flight 레이스)', async () => {
+    // schedule을 in-flight로 멈춰두고, 완료 전에 다른 세션이 시작된 상황을 모사.
+    // 서비스가 스토어를 다시 읽지 않으므로 스탬프는 최초 param('sess-a')이어야 한다.
+    let resolveSchedule: (id: string) => void = () => undefined;
+    notif.scheduleArrivalAlert.mockReturnValue(
+      new Promise<string>((resolve) => {
+        resolveSchedule = resolve;
+      })
+    );
+    const p = svc.scheduleAlightAlert({ ...baseParams, sessionKey: 'sess-a' });
+    resolveSchedule('alert-a');
+    await p;
+    expect(notif.scheduleArrivalAlert).toHaveBeenCalledWith(
+      expect.any(Date),
+      expect.objectContaining({ data: expect.objectContaining({ sessionKey: 'sess-a' }) })
+    );
   });
 });

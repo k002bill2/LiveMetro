@@ -29,6 +29,10 @@ const STORAGE_KEY = '@livemetro/guidance_session';
 export const GUIDANCE_SESSION_TTL_MS = 3 * 60 * 60 * 1000; // 3h — one commute leg upper bound
 
 let current: GuidanceSession | null = null;
+// True once {@link hydrateGuidanceSession} has run to completion (restored,
+// expired, or nothing stored). Gates the alert orphan-cleanup so a cold-start
+// sweep can't cancel a still-pending alert whose session hasn't hydrated yet.
+let hydrated = false;
 const listeners = new Set<() => void>();
 
 const emit = (): void => {
@@ -37,6 +41,23 @@ const emit = (): void => {
 
 /** Active guidance session, or null when none is in progress. */
 export const getGuidanceSession = (): GuidanceSession | null => current;
+
+/**
+ * 단일 "활성" 정의(SSOT) — 세션이 존재하고, 원격 완료(commuteLogCompletedAt)도
+ * 로컬 완주(localCompletedAt)도 아닐 때만 활성이다. 백그라운드 추적·알림 정리·권한
+ * 배너·wake lock 네 곳이 모두 이 헬퍼를 써서 로컬 완주 세션을 재시작 후에도 일관되게
+ * 비활성 취급한다(W1).
+ */
+export const isActiveGuidanceSession = (session: GuidanceSession | null): boolean =>
+  session !== null && !session.commuteLogCompletedAt && !session.localCompletedAt;
+
+/**
+ * True once boot hydration has *successfully* completed (restored a session,
+ * or cleanly determined there is none — empty/expired). A transient failure
+ * (e.g. AsyncStorage read error) leaves this false so the alert orphan sweep
+ * never runs on an unknown state and mis-cancels a valid journey's alerts.
+ */
+export const isGuidanceSessionHydrated = (): boolean => hydrated;
 
 /**
  * Subscribe to session changes (set / clear / hydrate). Returns an unsubscribe
@@ -68,6 +89,43 @@ export const setGuidanceSession = (session: GuidanceSession): void => {
   });
 };
 
+/**
+ * Update the active session's progress anchor (last confirmed/corrected step
+ * position) + persist. Scoped to the ORIGINATING session via `expectedStartedAt`
+ * (H2 attribution principle) — no-op when no session is active OR the current
+ * session is a different journey (startedAt mismatch). A screen that outlives a
+ * session swap must never write its old route's anchor onto the new session and
+ * corrupt its persisted progress. Reuses {@link setGuidanceSession} with the same
+ * `startedAt`, so the departed-train log is preserved.
+ */
+export const updateGuidanceProgressAnchor = (
+  anchor: { readonly stepIndex: number; readonly atMs: number },
+  expectedStartedAt: number
+): void => {
+  if (current === null || current.startedAt !== expectedStartedAt) return;
+  setGuidanceSession({ ...current, progressAnchor: anchor });
+};
+
+/**
+ * Set or clear the LOCAL completion marker (isAtEnd 로컬 도착 시각). 원격 완료와
+ * 독립적으로 영속돼, 오프라인/비로그인 도착이 재시작으로 뒤집히지 않게 한다(W1).
+ * `expectedStartedAt` 귀속 가드는 {@link updateGuidanceProgressAnchor}와 동일(불일치
+ * no-op). `null`이면 필드 제거(복구용), 값이면 설정. persist + emit.
+ */
+export const updateGuidanceLocalCompletion = (
+  completedAtMs: number | null,
+  expectedStartedAt: number
+): void => {
+  if (current === null || current.startedAt !== expectedStartedAt) return;
+  if (completedAtMs === null) {
+    if (current.localCompletedAt === undefined) return; // 이미 없음 — no-op
+    const { localCompletedAt: _cleared, ...rest } = current;
+    setGuidanceSession(rest);
+    return;
+  }
+  setGuidanceSession({ ...current, localCompletedAt: completedAtMs });
+};
+
 /** End any active guidance session + remove the persisted copy. */
 export const clearGuidanceSession = (): void => {
   current = null;
@@ -83,17 +141,43 @@ export const clearGuidanceSession = (): void => {
  * injectable for deterministic tests.
  */
 export const hydrateGuidanceSession = async (nowMs: number = Date.now()): Promise<void> => {
+  // `succeeded` = "the stored state was resolved (restored / empty / discarded)".
+  // Only a *resolved* outcome sets hydrated=true so the alert orphan sweep can run.
+  //   - transient READ failure (getItem throws) → readOk false → succeeded false
+  //     → hydrated stays false (retried next boot; sweep stays disarmed, safe).
+  //   - empty store, valid session, OR corrupt/expired (removed) → resolved →
+  //     succeeded true. Corrupt data must NOT wedge hydration forever, so it is a
+  //     success once the bad value is cleared.
+  let succeeded = false;
+  let readOk = false;
+  let raw: string | null = null;
   try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
-    if (!raw) return;
-    const parsed = JSON.parse(raw) as GuidanceSession;
+    raw = await AsyncStorage.getItem(STORAGE_KEY);
+    readOk = true;
+  } catch (error) {
+    if (__DEV__) console.error('[guidanceSessionStore] hydrate read failed', error);
+  }
+  try {
+    if (!readOk) return; // transient read failure — leave hydrated false.
+    succeeded = true; // read resolved — hydration completes regardless of content.
+    if (raw === null) return; // clean empty store.
+    let parsed: GuidanceSession | null = null;
+    try {
+      parsed = JSON.parse(raw) as GuidanceSession;
+    } catch {
+      parsed = null; // corrupt JSON → treated as "no valid session" below.
+    }
     if (!parsed || typeof parsed.startedAt !== 'number' || isSessionExpired(parsed, nowMs)) {
-      await AsyncStorage.removeItem(STORAGE_KEY);
+      // Unrecoverable (corrupt / malformed / expired) — remove so it can't rewedge
+      // hydration every boot. Removal failure is non-fatal: still "no valid session".
+      await AsyncStorage.removeItem(STORAGE_KEY).catch((error) => {
+        if (__DEV__) console.error('[guidanceSessionStore] stale-remove failed', error);
+      });
       return;
     }
     current = parsed;
+  } finally {
+    if (succeeded) hydrated = true;
     emit();
-  } catch (error) {
-    if (__DEV__) console.error('[guidanceSessionStore] hydrate failed', error);
   }
 };

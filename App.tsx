@@ -24,6 +24,7 @@ import { useCommuteDelayAlerts } from './src/hooks/useCommuteDelayAlerts';
 import { useGuidanceCommuteLogSync } from './src/hooks/useGuidanceCommuteLogSync';
 import { useCommuteSettingsAutoLog } from './src/hooks/useCommuteSettingsAutoLog';
 import { useGuidanceBackgroundLocationSync } from './src/hooks/useGuidanceBackgroundLocationSync';
+import { useGuidanceAlertCleanupSync } from './src/hooks/useGuidanceAlertCleanupSync';
 import { hydrateGuidanceSession } from './src/services/guidance/guidanceSessionStore';
 import './src/services/guidance/guidanceBackgroundLocationTask';
 import { ErrorBoundary } from './src/components/common/ErrorBoundary';
@@ -58,6 +59,10 @@ const AppContent: React.FC = () => {
   // the app is later backgrounded or restarted before the rider arrives.
   useGuidanceCommuteLogSync();
   useGuidanceBackgroundLocationSync();
+  // Cancel guidance boarding/alight alerts when the session actually ends (not
+  // when the guidance screen unmounts) + sweep orphaned OS alerts after boot
+  // hydration completes.
+  useGuidanceAlertCleanupSync();
   // App opens during commute windows are commute signals too — log via the
   // configured commuteSettings route so home-screen-only users (no station
   // detail visits, no guidance sessions) still accumulate commute records.
