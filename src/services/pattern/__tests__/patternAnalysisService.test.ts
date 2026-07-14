@@ -48,7 +48,10 @@ jest.mock('@/models/pattern', () => {
   return {
     ...actual,
     DayOfWeek: 0,
-    MIN_LOGS_FOR_PATTERN: 3,
+    // Mirrors the real SSOT (pattern.ts) lowered 3 → 1: a single log now
+    // establishes a weekday pattern (notification gate stays protected by
+    // hasTodayPattern's confidence >= 0.5, exercised in pattern.test.ts).
+    MIN_LOGS_FOR_PATTERN: 1,
     getDayOfWeek: jest.fn(() => 1),
     formatDateString: jest.fn((date) => date.toISOString().split('T')[0]),
     isWeekday: jest.fn((day: number) => day >= 1 && day <= 5),
@@ -171,6 +174,21 @@ describe('PatternAnalysisService', () => {
       const result = await patternAnalysisService.analyzeAndUpdatePatterns('user-123');
 
       expect(result).toEqual([]);
+    });
+
+    it('creates a pattern from a single log now that the threshold is 1', async () => {
+      // MIN_LOGS_FOR_PATTERN lowered 3 → 1: one log on a weekday is enough to
+      // key that day, so the analysis surfaces a pattern instead of nothing.
+      (commuteLogService.getRecentLogsForAnalysis as jest.Mock).mockResolvedValue([
+        mockLogs[0],
+      ]);
+      mockSetDoc.mockResolvedValue(undefined);
+
+      const result = await patternAnalysisService.analyzeAndUpdatePatterns('user-123');
+
+      expect(result).toHaveLength(1);
+      expect(result[0]?.dayOfWeek).toBe(1);
+      expect(result[0]?.sampleCount).toBe(1);
     });
   });
 

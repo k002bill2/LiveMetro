@@ -186,8 +186,25 @@ type FirebaseTimestamp = {
 // Constants
 // ============================================================================
 
-/** Minimum logs needed to establish a pattern */
-export const MIN_LOGS_FOR_PATTERN = 3;
+/**
+ * Minimum logs needed to establish a pattern.
+ *
+ * 1회 기록부터 요일 패턴을 노출한다(개인화 표시용). 자동 알림 경로는
+ * `MIN_PATTERN_CONFIDENCE_FOR_ALERTS`가 별도로 보호한다 —
+ * `calculateConfidence(1, x) <= 0.46 < MIN_PATTERN_CONFIDENCE_FOR_ALERTS`이므로
+ * 로그 1개로는 알림이 열리지 않는다(표시는 되지만 알림은 데이터가 더 쌓여야
+ * 발동). 이 상수를 참조하는 게이트: `patternAnalysisService.hasTodayPattern`,
+ * `integratedAlertService.generateIntegratedAlert`.
+ */
+export const MIN_LOGS_FOR_PATTERN = 1;
+
+/**
+ * 자동 알림 경로(hasTodayPattern / generateIntegratedAlert)가 요구하는 최소
+ * 패턴 신뢰도. `MIN_LOGS_FOR_PATTERN = 1`이 안전한 근거 —
+ * `calculateConfidence(1, x) <= 0.46 < 이 값`이라 로그 1개짜리 패턴은 표시는
+ * 되지만 알림을 발사하지 못한다. 게이트들이 리터럴을 복붙하지 않도록 단일화.
+ */
+export const MIN_PATTERN_CONFIDENCE_FOR_ALERTS = 0.5;
 
 /** Maximum age of logs to consider (days) */
 export const MAX_LOG_AGE_DAYS = 30;

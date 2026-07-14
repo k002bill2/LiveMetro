@@ -42,6 +42,8 @@ import { GuidanceStepRow } from '@/components/guidance';
 import { congestionService, type HourlySlot } from '@/services/congestion/congestionService';
 import { type DayOfWeek, type PredictedCommute } from '@/models/pattern';
 import { directionToDisplay, type Direction } from '@/models/route';
+import { selectCommuteRoute } from '@services/route/selectCommuteRoute';
+import { deriveLoopDirection } from '@/utils/loopDirection';
 
 /**
  * Format an "HH:mm" time string as "오전/오후 h:mm".
@@ -92,19 +94,28 @@ const buildWeeklyDays = (
   const today = now.getDay();
   const todayKey = today >= 1 && today <= 5 ? today : null;
 
+  // Always emit all five Mon-Fri columns — no `.filter`. Days without a
+  // prediction carry `hasData: false` so WeeklyTrendChart renders an honest
+  // ghost placeholder instead of dropping the column (which previously left
+  // only 목/금 visible once the pattern threshold gated the rest).
   const days: DayBarData[] = WEEKDAY_KEYS.map((key, i) => {
     const pred = weekPredictions.find((p) => p.dayOfWeek === key);
+    const durationMin = pred ? (pred.predictedMinutes ?? DEFAULT_DURATION_MIN) : 0;
     return {
       dayLabel: WEEKDAY_LABELS[i]!,
-      durationMin: pred ? (pred.predictedMinutes ?? DEFAULT_DURATION_MIN) : 0,
+      durationMin,
       isToday: key === todayKey,
+      hasData: durationMin > 0,
     };
-  }).filter((d) => d.durationMin > 0);
+  });
 
   const todayIndex = days.findIndex((d) => d.isToday);
+  // Average only over days with real data so ghost placeholders (0 min) never
+  // drag the baseline down.
+  const dataDays = days.filter((d) => d.hasData);
   const averageMin =
-    days.length > 0
-      ? days.reduce((sum, d) => sum + d.durationMin, 0) / days.length
+    dataDays.length > 0
+      ? dataDays.reduce((sum, d) => sum + d.durationMin, 0) / dataDays.length
       : 0;
   return { days, todayIndex, averageMin };
 };
@@ -203,24 +214,66 @@ export const WeeklyPredictionScreen: React.FC = () => {
   // is typed `number` but its runtime range matches `DayOfWeek` exactly.
   // `todayDow` is captured once per mount for parity with weekly trend.
   const todayDow = useMemo<DayOfWeek>(() => new Date().getDay() as DayOfWeek, []);
-  const factorsLineId = useMemo(
-    () => todayPrediction?.route.lineIds[0] ?? '2',
-    [todayPrediction],
+
+  // Task 4 — configured commute route → boarding direction fallback.
+  // Even without an ML `todayPrediction`, the registered OD lets us derive the
+  // first-ride direction so the congestion section can render. selectCommuteRoute
+  // is the same null-safe SSOT `useCommuteRouteSteps` uses.
+  const configuredRoute = useMemo(
+    () =>
+      selectCommuteRoute(
+        morningCommute?.stationId,
+        morningCommute?.destinationStationId,
+        morningCommute?.transferStationId,
+      ),
+    [
+      morningCommute?.stationId,
+      morningCommute?.destinationStationId,
+      morningCommute?.transferStationId,
+    ],
   );
-  // `directionForChart` is the localized display label passed to
-  // HourlyCongestionChart (e.g. '내선' / '상행' depending on line).
-  // Producer signals `undefined` when direction is not determinable (loop
-  // line 2, Bundang/Shinbundang, etc. — see deriveDirection in pattern.ts
-  // and spec §7.1). Consumer respects that signal: direction-dependent UI
-  // is hidden or neutralized rather than rendering a wrong indicator.
-  const directionForService: Direction | undefined = todayPrediction?.direction;
-  const directionForChart =
-    directionForService !== undefined
-      ? directionToDisplay(directionForService, factorsLineId)
-      : undefined;
+  const firstRideSeg = configuredRoute?.segments.find((s) => !s.isTransfer);
+
+  // (lineId, direction) MUST come from a single source so the congestion chart
+  // never cross-binds a stale line with a route-derived direction. Priority:
+  //   1. ML todayPrediction.direction → pair with its own route.lineIds[0].
+  //   2. else configured first-ride segment → pair its lineId with
+  //      deriveLoopDirection (Line 2 loop only). deriveDirection is NOT used
+  //      here: it compares station slugs lexicographically, which does not
+  //      track real 상/하행 (e.g. seoul→city_hall is 'down' but runs 상행).
+  //      Linear lines (1, 3–9) therefore stay direction-undefined in this
+  //      fallback and surface the honest "unavailable" card.
+  //   3. else (no route) → undefined; the section renders nothing.
+  const congestionContext = useMemo(():
+    | { lineId: string; direction: Direction | undefined }
+    | undefined => {
+    if (todayPrediction?.direction !== undefined) {
+      return {
+        lineId: todayPrediction.route.lineIds[0] ?? '2',
+        direction: todayPrediction.direction as Direction | undefined,
+      };
+    }
+    const seg = firstRideSeg;
+    if (seg) {
+      return {
+        lineId: seg.lineId,
+        direction: deriveLoopDirection(seg.lineId, seg.fromStationId, seg.toStationId),
+      };
+    }
+    return undefined;
+  }, [todayPrediction, firstRideSeg]);
+
+  // Factors are direction-independent, so they must reflect the prediction's
+  // own line even when the direction (and thus the congestion chart) can't be
+  // resolved — otherwise an undetermined-direction prediction would surface
+  // another line's congestion/delay factors. Direction stays paired to
+  // congestionContext (undefined here is honest, not a cross-bind).
+  const factorsLineId =
+    congestionContext?.lineId ?? todayPrediction?.route.lineIds[0] ?? '2';
+
   const { factors } = usePredictionFactors({
     lineId: factorsLineId,
-    direction: directionForService,
+    direction: congestionContext?.direction,
     dayOfWeek: todayDow,
   });
 
@@ -233,14 +286,16 @@ export const WeeklyPredictionScreen: React.FC = () => {
   const [hourlySlots, setHourlySlots] = useState<readonly HourlySlot[]>([]);
   useEffect(() => {
     // Skip the direction-keyed fetch when direction is unknown — surfaces
-    // empty slots and the hourly chart section is hidden below.
-    if (directionForService === undefined) {
+    // empty slots and the hourly chart section is hidden below. lineId and
+    // direction come from the same congestionContext source (no cross-binding).
+    const ctx = congestionContext;
+    if (ctx?.direction === undefined) {
       setHourlySlots([]);
       return;
     }
     let cancelled = false;
     congestionService
-      .getHourlyForecast(factorsLineId, directionForService, hourlyChartTime)
+      .getHourlyForecast(ctx.lineId, ctx.direction, hourlyChartTime)
       .then((slots) => {
         if (!cancelled) setHourlySlots(slots);
       })
@@ -251,7 +306,7 @@ export const WeeklyPredictionScreen: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [factorsLineId, directionForService, hourlyChartTime]);
+  }, [congestionContext, hourlyChartTime]);
 
   // Animated count-up for the big number — 900ms ease-out cubic.
   const animatedValue = useRef(new Animated.Value(0)).current;
@@ -481,19 +536,45 @@ export const WeeklyPredictionScreen: React.FC = () => {
 
       {/* 7. Hourly congestion forecast (Task 10) — wires
           HourlyCongestionChart (Task 9) backed by
-          congestionService.getHourlyForecast (Task 8). Replaces the
-          earlier Phase 54 visual placeholder with real Firestore data.
-          Hidden when direction is unknown (loop/branched lines) — the
-          chart subtitle is "<line>호선 <direction> 방면" and there is no
-          honest neutral label that fits the design. */}
-      {directionForChart !== undefined && (
+          congestionService.getHourlyForecast (Task 8).
+          `congestionContext` binds (lineId, direction) as a single-source pair
+          (ML todayPrediction, else the configured route's first-ride segment).
+          Three cases:
+            1. no route configured (`congestionContext === undefined`) → render
+               nothing; the route-setup banner above already explains it.
+            2. route + resolved direction → render the chart.
+            3. route + unresolved direction (linear-line fallback / loop branch)
+               → honest "unavailable" card (the subtitle "<line>호선 <direction>
+               방면" has no honest neutral form). */}
+      {congestionContext === undefined ? null : congestionContext.direction !==
+        undefined ? (
         <View style={styles.sectionPad}>
           <HourlyCongestionChart
-            lineId={factorsLineId}
-            direction={directionForChart}
+            lineId={congestionContext.lineId}
+            direction={directionToDisplay(
+              congestionContext.direction,
+              congestionContext.lineId,
+            )}
             currentTime={hourlyChartTime}
             slots={hourlySlots}
           />
+        </View>
+      ) : (
+        <View style={styles.sectionPad}>
+          <View
+            style={[
+              styles.hourlyUnavailableCard,
+              { backgroundColor: semantic.bgElevated },
+            ]}
+            testID="hourly-congestion-unavailable"
+          >
+            <Text style={[styles.hourlyUnavailableTitle, { color: semantic.labelStrong }]}>
+              시간대별 혼잡도
+            </Text>
+            <Text style={[styles.hourlyUnavailableBody, { color: semantic.labelAlt }]}>
+              이 경로는 방면을 확정할 수 없어 혼잡도 예측을 제공하지 않아요
+            </Text>
+          </View>
         </View>
       )}
 
@@ -652,6 +733,24 @@ const createStyles = (semantic: ReturnType<typeof useSemanticTokens>) => {
       fontFamily: weightToFontFamily('800'),
       letterSpacing: 0.36,
       marginBottom: 10,
+    },
+    hourlyUnavailableCard: {
+      borderRadius: 16,
+      paddingVertical: 20,
+      paddingHorizontal: 18,
+    },
+    hourlyUnavailableTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      fontFamily: weightToFontFamily('700'),
+      letterSpacing: -0.2,
+    },
+    hourlyUnavailableBody: {
+      fontSize: 13,
+      fontWeight: '500',
+      fontFamily: weightToFontFamily('500'),
+      marginTop: 6,
+      lineHeight: 19,
     },
     bigCard: {
       borderRadius: 24,

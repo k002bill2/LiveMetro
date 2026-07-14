@@ -15,6 +15,8 @@ import { useMLPrediction } from '@/hooks/useMLPrediction';
 import { useFirestoreMorningCommute } from '@/hooks/useFirestoreMorningCommute';
 import { useCommuteRouteSummary } from '@/hooks/useCommuteRouteSummary';
 import { useCommuteRouteSteps } from '@/hooks/useCommuteRouteSteps';
+import { usePredictionFactors } from '@/hooks/usePredictionFactors';
+import { selectCommuteRoute } from '@services/route/selectCommuteRoute';
 import { trainService } from '@/services/train/trainService';
 import { useAuth } from '@/services/auth/AuthContext';
 
@@ -117,6 +119,17 @@ jest.mock('@/hooks/useCommuteRouteSummary', () => ({
 // (covered by useCommuteRouteSteps.test.ts + guidanceSteps.test.ts).
 jest.mock('@/hooks/useCommuteRouteSteps', () => ({
   useCommuteRouteSteps: jest.fn(() => []),
+}));
+
+// selectCommuteRoute runs the real graph search (getDiverseRoutes) in prod;
+// stub it so the direction-resolution chain (Task 4) is exercised with
+// deterministic segments. deriveDirection / deriveLoopDirection stay REAL so
+// the id-domain contract (loop trunk membership) is genuinely tested — the
+// coverage that loopDirection.test.ts also asserts against lines.json slugs.
+jest.mock('@services/route/selectCommuteRoute', () => ({
+  __esModule: true,
+  selectCommuteRoute: jest.fn(() => null),
+  default: jest.fn(() => null),
 }));
 
 // GuidanceStepRow has its own test (GuidanceStepRow.test.tsx). Stub it to a
@@ -254,6 +267,7 @@ describe('WeeklyPredictionScreen', () => {
     (useFirestoreMorningCommute as jest.Mock).mockReturnValue(null);
     (useCommuteRouteSummary as jest.Mock).mockReturnValue({ ready: false });
     (useCommuteRouteSteps as jest.Mock).mockReturnValue([]);
+    (selectCommuteRoute as jest.Mock).mockReturnValue(null);
     (trainService.getStation as jest.Mock).mockResolvedValue(null);
     // Default auth: signed in, empty preferences (store #1 absent). Re-applied
     // here so a per-test override (the gate-discrimination test below) doesn't
@@ -386,6 +400,208 @@ describe('WeeklyPredictionScreen', () => {
     expect(queryByText('시간대별 혼잡도 예측')).toBeNull();
     // Other direction-independent sections still render.
     expect(getByText('예측에 반영된 요소')).toBeTruthy();
+  });
+
+  // Task 4 — direction fallback chain. Even without an ML todayPrediction, a
+  // configured commute route lets the screen derive the boarding direction so
+  // the congestion chart (or an honest "unavailable" card) can render. The
+  // segment lineId/stationIds carry the real trunk id ('2'), matching the
+  // graph output verified in kShortestPath (trunkLineId strips '::N').
+  const makeRoute = (seg: {
+    fromStationId: string;
+    toStationId: string;
+    lineId: string;
+  }) => ({
+    segments: [
+      {
+        fromStationId: seg.fromStationId,
+        fromStationName: seg.fromStationId,
+        toStationId: seg.toStationId,
+        toStationName: seg.toStationId,
+        lineId: seg.lineId,
+        lineName: `${seg.lineId}호선`,
+        estimatedMinutes: 20,
+        isTransfer: false,
+      },
+    ],
+    totalMinutes: 20,
+    transferCount: 0,
+    lineIds: [seg.lineId],
+  });
+
+  it('shows the "unavailable" card for a configured LINEAR (line 1) route — no lexicographic guess', () => {
+    // No todayPrediction (default). The fallback intentionally does NOT use
+    // deriveDirection (slug lexicographic order ≠ real 상/하행), so a linear
+    // line stays direction-undefined → honest card instead of a wrong chart.
+    (useFirestoreMorningCommute as jest.Mock).mockReturnValue({
+      stationId: '0150',
+      destinationStationId: '0159',
+      departureTime: '08:00',
+      bufferMinutes: 0,
+    });
+    (selectCommuteRoute as jest.Mock).mockReturnValue(
+      makeRoute({ fromStationId: 'seoul_1', toStationId: 'zzz_dongdaemun', lineId: '1' }),
+    );
+
+    const { getByTestId, queryByText } = render(<WeeklyPredictionScreen />);
+    expect(getByTestId('hourly-congestion-unavailable')).toBeTruthy();
+    expect(queryByText('시간대별 혼잡도 예측')).toBeNull();
+  });
+
+  it('resolves 외선순환 for a LOOP (line 2 trunk) route via deriveLoopDirection', () => {
+    // deriveDirection returns undefined for line 2; deriveLoopDirection (real,
+    // against lines.json) resolves 신도림→강남 = 'down' → '외선순환' label.
+    (useFirestoreMorningCommute as jest.Mock).mockReturnValue({
+      stationId: '0234',
+      destinationStationId: '0222',
+      departureTime: '08:00',
+      bufferMinutes: 0,
+    });
+    (selectCommuteRoute as jest.Mock).mockReturnValue(
+      makeRoute({ fromStationId: 'sindorim', toStationId: 'gangnam', lineId: '2' }),
+    );
+
+    const { getByText } = render(<WeeklyPredictionScreen />);
+    expect(getByText('시간대별 혼잡도 예측')).toBeTruthy();
+    expect(getByText(/외선순환/)).toBeTruthy();
+  });
+
+  it('resolves 내선순환 for the reverse LOOP (line 2 trunk) route', () => {
+    // 강남→신도림 = 'up' → '내선순환' label.
+    (useFirestoreMorningCommute as jest.Mock).mockReturnValue({
+      stationId: '0222',
+      destinationStationId: '0234',
+      departureTime: '08:00',
+      bufferMinutes: 0,
+    });
+    (selectCommuteRoute as jest.Mock).mockReturnValue(
+      makeRoute({ fromStationId: 'gangnam', toStationId: 'sindorim', lineId: '2' }),
+    );
+
+    const { getByText } = render(<WeeklyPredictionScreen />);
+    expect(getByText(/내선순환/)).toBeTruthy();
+  });
+
+  it('renders the honest "unavailable" card when direction cannot be determined (line 2 branch)', () => {
+    // s_0244 lives on the 성수지선 (not the loop trunk) → deriveLoopDirection
+    // returns undefined → the direction-keyed chart is impossible, so an honest
+    // static card explains why instead of a silent gap.
+    (useFirestoreMorningCommute as jest.Mock).mockReturnValue({
+      stationId: 's_0244',
+      destinationStationId: '0222',
+      departureTime: '08:00',
+      bufferMinutes: 0,
+    });
+    (selectCommuteRoute as jest.Mock).mockReturnValue(
+      makeRoute({ fromStationId: 's_0244', toStationId: 'gangnam', lineId: '2' }),
+    );
+
+    const { getByTestId, getByText, queryByText } = render(<WeeklyPredictionScreen />);
+    expect(getByTestId('hourly-congestion-unavailable')).toBeTruthy();
+    expect(
+      getByText('이 경로는 방면을 확정할 수 없어 혼잡도 예측을 제공하지 않아요'),
+    ).toBeTruthy();
+    // The direction-keyed chart is NOT rendered.
+    expect(queryByText('시간대별 혼잡도 예측')).toBeNull();
+  });
+
+  it('binds (lineId, direction) to a single source — no cross-binding of stale prediction line with route direction', () => {
+    // Cross-binding guard: todayPrediction has a line (3호선) but NO direction,
+    // while the configured first-ride is on line 2. The old code would have
+    // paired todayPrediction's lineId (3) with the route-derived direction.
+    // The single-source context must instead take BOTH lineId and direction
+    // from the configured route → "2호선 외선순환", never "3호선".
+    (useCommutePattern as jest.Mock).mockReturnValue({
+      todayPrediction: {
+        date: '2026-05-12',
+        dayOfWeek: 2,
+        predictedDepartureTime: '08:30',
+        predictedArrivalTime: '09:15',
+        // direction intentionally omitted (undefined) so the fallback engages.
+        route: {
+          departureStationId: '0320',
+          departureStationName: '연신내',
+          arrivalStationId: '0330',
+          arrivalStationName: '충무로',
+          lineIds: ['3'],
+        },
+        confidence: 0.9,
+        suggestedAlertTime: '08:15',
+      },
+      patterns: [],
+      weekPredictions: [],
+      recentLogs: [],
+      notificationSettings: null,
+      todayNotification: null,
+      loading: false,
+      error: null,
+    });
+    (useFirestoreMorningCommute as jest.Mock).mockReturnValue({
+      stationId: '0234',
+      destinationStationId: '0222',
+      departureTime: '08:00',
+      bufferMinutes: 0,
+    });
+    (selectCommuteRoute as jest.Mock).mockReturnValue(
+      makeRoute({ fromStationId: 'sindorim', toStationId: 'gangnam', lineId: '2' }),
+    );
+
+    const { getByText, queryByText } = render(<WeeklyPredictionScreen />);
+    // Pair comes from the configured route: line 2 + 외선순환 (신도림→강남).
+    expect(getByText(/2호선 외선순환/)).toBeTruthy();
+    // The stale prediction line must NOT leak into the chart context.
+    expect(queryByText(/3호선/)).toBeNull();
+  });
+
+  it('keeps prediction-factors keyed to the prediction line even when direction is unresolved', () => {
+    // r2-P1: todayPrediction has a line (3호선) but no direction, and no route
+    // resolves → congestionContext is undefined. Factors are direction-
+    // independent, so they must still use the prediction's line (3), not the
+    // '2' default — otherwise a directionless prediction shows another line's
+    // congestion/delay factors.
+    (useCommutePattern as jest.Mock).mockReturnValue({
+      todayPrediction: {
+        date: '2026-05-12',
+        dayOfWeek: 2,
+        predictedDepartureTime: '08:30',
+        predictedArrivalTime: '09:15',
+        // direction omitted (undefined).
+        route: {
+          departureStationId: '0320',
+          departureStationName: '연신내',
+          arrivalStationId: '0330',
+          arrivalStationName: '충무로',
+          lineIds: ['3'],
+        },
+        confidence: 0.9,
+        suggestedAlertTime: '08:15',
+      },
+      patterns: [],
+      weekPredictions: [],
+      recentLogs: [],
+      notificationSettings: null,
+      todayNotification: null,
+      loading: false,
+      error: null,
+    });
+    // No configured route → congestionContext undefined.
+    (useFirestoreMorningCommute as jest.Mock).mockReturnValue(null);
+    (selectCommuteRoute as jest.Mock).mockReturnValue(null);
+
+    render(<WeeklyPredictionScreen />);
+
+    expect(usePredictionFactors).toHaveBeenCalledWith(
+      expect.objectContaining({ lineId: '3', direction: undefined }),
+    );
+  });
+
+  it('renders neither the chart nor the unavailable card when no route is configured', () => {
+    // Default: selectCommuteRoute → null, no morningCommute → firstRideSeg
+    // absent. The route-setup banner already explains the empty state, so this
+    // section stays silent (no card, no chart).
+    const { queryByText, queryByTestId } = render(<WeeklyPredictionScreen />);
+    expect(queryByText('시간대별 혼잡도 예측')).toBeNull();
+    expect(queryByTestId('hourly-congestion-unavailable')).toBeNull();
   });
 
   it('renders CTA pressable with departure-alert label', () => {
@@ -608,6 +824,7 @@ describe('WeeklyPredictionScreen — unified headline source', () => {
     (useFirestoreMorningCommute as jest.Mock).mockReturnValue(null);
     (useCommuteRouteSummary as jest.Mock).mockReturnValue({ ready: false });
     (useCommuteRouteSteps as jest.Mock).mockReturnValue([]);
+    (selectCommuteRoute as jest.Mock).mockReturnValue(null);
     (trainService.getStation as jest.Mock).mockResolvedValue(null);
     (useAuth as jest.Mock).mockReturnValue({ user: { id: 'test-user-id', preferences: {} } });
   });

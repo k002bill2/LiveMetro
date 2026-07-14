@@ -1,4 +1,12 @@
-import { computeArrivalTime, sumPredictedMinutes, deriveDirection, type PredictedCommute } from '@/models/pattern';
+import {
+  computeArrivalTime,
+  sumPredictedMinutes,
+  deriveDirection,
+  calculateConfidence,
+  MIN_LOGS_FOR_PATTERN,
+  MIN_PATTERN_CONFIDENCE_FOR_ALERTS,
+  type PredictedCommute,
+} from '@/models/pattern';
 import type { RouteSegment } from '@/models/route';
 
 describe('computeArrivalTime', () => {
@@ -121,5 +129,25 @@ describe('deriveDirection', () => {
 
   it('returns undefined for unknown line ids', () => {
     expect(deriveDirection(makeSeg({ lineId: 'KK' }))).toBeUndefined();
+  });
+});
+
+describe('MIN_LOGS_FOR_PATTERN — single-log personalization + notification-gate safety', () => {
+  it('is 1 so a single log surfaces the weekday pattern (personalization)', () => {
+    // Lowered 3 → 1: analyzeAndUpdatePatterns keys a day when
+    // `dayLogs.length >= MIN_LOGS_FOR_PATTERN`, so 1 log is enough to display.
+    expect(MIN_LOGS_FOR_PATTERN).toBe(1);
+    expect(1 >= MIN_LOGS_FOR_PATTERN).toBe(true);
+  });
+
+  it('keeps the notification gate closed for a single log — calculateConfidence(1, 0) < MIN_PATTERN_CONFIDENCE_FOR_ALERTS', () => {
+    // The alert gates (hasTodayPattern / generateIntegratedAlert) require
+    // confidence >= MIN_PATTERN_CONFIDENCE_FOR_ALERTS. A single log (stdDev 0)
+    // yields 0.1*0.6 + 1*0.4 = 0.46 < threshold, so display is unlocked but
+    // alerts stay gated until more logs accumulate.
+    expect(MIN_PATTERN_CONFIDENCE_FOR_ALERTS).toBe(0.5);
+    const confidence = calculateConfidence(1, 0);
+    expect(confidence).toBeCloseTo(0.46, 5);
+    expect(confidence).toBeLessThan(MIN_PATTERN_CONFIDENCE_FOR_ALERTS);
   });
 });
