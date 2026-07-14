@@ -59,7 +59,6 @@ import {
   updateGuidanceLocalCompletion,
   isActiveGuidanceSession,
 } from '@/services/guidance/guidanceSessionStore';
-import { completeGuidanceCommuteLog } from '@/services/guidance/guidanceCommuteLogService';
 import { useAuth } from '@/services/auth/AuthContext';
 import { GuidanceControls, GuidanceHeader, GuidanceNowCard, GuidanceStepRow, TrainSelectSheet, type GuidanceStepStatus } from '@/components/guidance';
 import { StationRebaseSheet } from '@/components/guidance/StationRebaseSheet';
@@ -634,21 +633,12 @@ export const RouteGuidanceScreen: React.FC = () => {
     return [...matched, ...rest];
   }, [session, trainSelectContext, nowMs]);
 
-  const completedLogKeyRef = useRef<string | null>(null);
-
-  const persistCompletion = useCallback((completedAt: number = Date.now()): void => {
-    if (!session || !user?.id || session.commuteLogCompletedAt) return;
-    const key = `${user.id}:${session.startedAt}`;
-    if (completedLogKeyRef.current === key) return;
-    completedLogKeyRef.current = key;
-    completeGuidanceCommuteLog(user.id, session, completedAt).catch((error) => {
-      completedLogKeyRef.current = null;
-      if (__DEV__) {
-        // eslint-disable-next-line no-console
-        console.warn('[RouteGuidanceScreen] commute log completion failed:', error);
-      }
-    });
-  }, [session, user?.id]);
+  // Commute-log COMPLETION is owned solely by the app-level useGuidanceCommuteLogSync
+  // hook (Z1): the screen only marks local completion (updateGuidanceLocalCompletion
+  // in the isAtEnd transition effect above), and the hook's emit-driven branch writes
+  // the arrival with localCompletedAt as the arrival time. Keeping a second writer
+  // here raced that branch on the same localCompletedAt emit → duplicate Firestore
+  // writes (AA2). The hook covers both first-completion and retry.
 
   // Whole-journey progress for the header bar. Total excludes platform wait
   // (same basis as remainingSeconds), so the fraction is internally honest.
@@ -659,23 +649,14 @@ export const RouteGuidanceScreen: React.FC = () => {
   const progress =
     totalSeconds <= 0 ? 0 : isAtEnd ? 1 : (totalSeconds - remainingSeconds) / totalSeconds;
 
-  useEffect(() => {
-    if (isAtEnd) {
-      persistCompletion();
-    }
-  }, [isAtEnd, persistCompletion]);
-
   const handleExit = useCallback((): void => {
     clearAutoTimer();
     void cancelBoardingAlert();
     void cancelAlightAlert();
-    if (isAtEnd) {
-      persistCompletion();
-    }
     clearDepartedTrainLog();
     clearGuidanceSession();
     navigation.goBack();
-  }, [clearAutoTimer, isAtEnd, persistCompletion, navigation]);
+  }, [clearAutoTimer, navigation]);
 
   const renderStep = useCallback(
     ({ item, index }: { item: GuidanceStep; index: number }): React.ReactElement => {

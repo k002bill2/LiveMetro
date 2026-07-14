@@ -5,6 +5,10 @@ import {
   BOARDING_ALERT_KIND,
 } from '../boardingAlertService';
 import { notificationService } from '../notificationService';
+import type { NotificationSettings } from '@models/user';
+
+// shouldSendNotification is mocked, so only non-nullness matters for the gate.
+const SETTINGS = {} as unknown as NotificationSettings;
 
 // notificationService는 expo-notifications를 감싸므로 통째로 mock —
 // boardingAlertService의 오케스트레이션(권한 게이트 + dedup)만 검증한다.
@@ -547,6 +551,54 @@ describe('boardingAlertService', () => {
         arrivalTime: arrival,
       });
       expect(mockNotif.cancelNotification).not.toHaveBeenCalledWith('g-tracked');
+    });
+  });
+
+  describe('settings opt-out (AA1 gated-reschedule cancellation)', () => {
+    it('cancels the pending guidance boarding alert and does not reschedule when settings are off', async () => {
+      // 1) settings ON → establish a tracked pending alert for this session.
+      mockNotif.shouldSendNotification.mockReturnValue(true);
+      mockNotif.scheduleArrivalAlert.mockResolvedValue('pending-id');
+      await scheduleBoardingAlert({
+        context: 'guidance',
+        sessionKey: 's1',
+        stationName: '강남',
+        finalDestination: '잠실',
+        arrivalTime: new Date(Date.now() + 3_600_000),
+      });
+      expect(mockNotif.scheduleArrivalAlert).toHaveBeenCalledTimes(1);
+      mockNotif.scheduleArrivalAlert.mockClear();
+      mockNotif.cancelNotification.mockClear();
+
+      // 2) settings OFF → the gated schedule must cancel the pending alert
+      //    (cancel-half of cancel-then-schedule) and NOT schedule a new one.
+      mockNotif.shouldSendNotification.mockReturnValue(false);
+      const id = await scheduleBoardingAlert({
+        context: 'guidance',
+        sessionKey: 's1',
+        stationName: '강남',
+        finalDestination: '잠실',
+        arrivalTime: new Date(Date.now() + 3_600_000),
+        settings: SETTINGS,
+      });
+
+      expect(id).toBeNull();
+      expect(mockNotif.cancelNotification).toHaveBeenCalledWith('pending-id');
+      expect(mockNotif.scheduleArrivalAlert).not.toHaveBeenCalled();
+    });
+
+    it('schedules normally when settings are on (regression)', async () => {
+      mockNotif.shouldSendNotification.mockReturnValue(true);
+      mockNotif.scheduleArrivalAlert.mockResolvedValue('new-id');
+      const id = await scheduleBoardingAlert({
+        context: 'guidance',
+        sessionKey: 's1',
+        stationName: '강남',
+        finalDestination: '잠실',
+        arrivalTime: new Date(Date.now() + 3_600_000),
+      });
+      expect(id).toBe('new-id');
+      expect(mockNotif.scheduleArrivalAlert).toHaveBeenCalledTimes(1);
     });
   });
 });

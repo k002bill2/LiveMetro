@@ -342,21 +342,18 @@ describe('RouteGuidanceScreen', () => {
     expect(queryByTestId('guidance-next')).toBeNull();
   });
 
-  it('records arrival when the guidance reaches the destination', () => {
+  it('records arrival via the localCompletedAt marker, NOT a direct completion write (AA2)', () => {
+    // Completion ownership moved to the app-level useGuidanceCommuteLogSync hook
+    // (Z1). The screen only marks local completion; it must never call
+    // completeGuidanceCommuteLog itself (that raced the hook on the same emit).
     seedSession();
     const { getByTestId } = render(<RouteGuidanceScreen />);
     fireEvent.press(getByTestId('guidance-next'));
     act(() => {
       jest.advanceTimersByTime(5 * 60_000 + 1_000);
     });
-    expect(completeGuidanceCommuteLog).toHaveBeenCalledWith(
-      'user-1',
-      expect.objectContaining({
-        fromStationName: '을지로3가',
-        toStationName: '산곡',
-      }),
-      expect.any(Number)
-    );
+    expect(typeof getGuidanceSession()?.localCompletedAt).toBe('number');
+    expect(completeGuidanceCommuteLog).not.toHaveBeenCalled();
   });
 
   it('clears the session and goes back on 안내 종료', () => {
@@ -847,7 +844,11 @@ describe('RouteGuidanceScreen', () => {
       expect(queryByTestId('guidance-rebase-station')).toBeNull();
     });
 
-    it('reaches the destination once when the 하차역 is picked for rebase (no double completion)', () => {
+    it('reaches the destination via 하차역 rebase without any screen-driven completion write (AA2)', () => {
+      // Pre-AA2 this guarded against the screen double-completing across the
+      // rebase path. The screen no longer writes completion at all (the hook's
+      // in-flight guard owns the "exactly once" invariant), so assert the marker
+      // is set once and the screen never calls completeGuidanceCommuteLog.
       seedSession();
       const { getByTestId, getByText } = render(<RouteGuidanceScreen />);
       fireEvent.press(getByTestId('guidance-next')); // board → ride
@@ -855,7 +856,8 @@ describe('RouteGuidanceScreen', () => {
       // Pick the final 하차역 (산곡, s3) → full ride duration → advances to alight.
       fireEvent.press(getByTestId('station-rebase-item-s3'));
       expect(getByText('산곡 도착 · 하차하세요')).toBeTruthy();
-      expect(completeGuidanceCommuteLog).toHaveBeenCalledTimes(1);
+      expect(typeof getGuidanceSession()?.localCompletedAt).toBe('number');
+      expect(completeGuidanceCommuteLog).not.toHaveBeenCalled();
     });
   });
 

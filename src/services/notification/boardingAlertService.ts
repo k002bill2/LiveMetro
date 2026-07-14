@@ -134,6 +134,12 @@ const scheduleBoardingAlertInner = async (
       settings != null &&
       !notificationService.shouldSendNotification(settings, NotificationType.ARRIVAL_REMINDER)
     ) {
+      // 옵트아웃(설정 off): 조기 return 대신 같은 컨텍스트의 pending을 먼저 정리한다
+      // (cancel-then-schedule의 cancel 절반만 — 추적 ID 취소 + guidance면 kind sweep).
+      // 안내를 나가 알림을 끈 사용자가 재진입/재예약하면 옵트아웃이 즉시 반영된다.
+      // known-limit: 옵트아웃 후 앱을 아예 다시 열지 않으면 이미 예약된 알림은 남는다
+      // (설정 변경 시점 sweep은 후속 — 설정 화면 연동 필요).
+      await cancelBoardingAlertInner({ scheduleContext: params.context });
       return null;
     }
 
