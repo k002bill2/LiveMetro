@@ -38,9 +38,12 @@ import { isBiometricAvailable, isBiometricLoginEnabled, getBiometricTypeName, pe
 import { LoginHero } from '@/components/auth/LoginHero';
 import { FaceIDButton } from '@/components/auth/FaceIDButton';
 import { SocialButton, type SocialProvider } from '@/components/auth/SocialButton';
+import { AppleSignInButton } from '@/components/auth/AppleSignInButton';
 import { OrDivider } from '@/components/auth/OrDivider';
 import { TermsFooter } from '@/components/auth/TermsFooter';
 import { AppStackParamList } from '@/navigation/types';
+import { useAppleAuthAvailability } from '@/hooks/useAppleAuthAvailability';
+import { isSocialAuthError, type SocialSignInResult } from '@/services/auth/social/types';
 
 const AUTO_LOGIN_ENABLED_KEY = '@livemetro_auto_login_enabled';
 const AUTO_LOGIN_EMAIL_KEY = 'livemetro_auto_login_email';
@@ -54,12 +57,23 @@ type Nav = NativeStackNavigationProp<AppStackParamList>;
 export const AuthScreen: React.FC = () => {
   const semantic = useSemanticTokens();
   const navigation = useNavigation<Nav>();
-  const { signInWithEmail, signInAnonymously } = useAuth();
+  const {
+    signInWithEmail,
+    signInAnonymously,
+    signInWithGoogle,
+    signInWithApple,
+    signInWithKakao,
+  } = useAuth();
+  const appleAvailable = useAppleAuthAvailability();
 
   const [biometricLabel, setBiometricLabel] = useState<string>('생체인증으로 계속하기');
   const [biometricVariant, setBiometricVariant] = useState<'face' | 'touch'>('face');
   const [autoLoggingIn, setAutoLoggingIn] = useState(true);
   const [loading, setLoading] = useState(false);
+  const [socialLoading, setSocialLoading] = useState<SocialProvider | null>(null);
+  // Any in-flight auth action (biometric/anonymous `loading` or a social login)
+  // blocks every other auth entry point to prevent concurrent sign-ins.
+  const busy = loading || socialLoading !== null;
 
   // Bootstrap: try silent auto-login + detect biometric type
   useEffect(() => {
@@ -132,14 +146,49 @@ export const AuthScreen: React.FC = () => {
     }
   }, [signInWithEmail]);
 
-  const handleSocialLogin = useCallback((provider: SocialProvider) => {
-    const labels: Record<SocialProvider, string> = {
-      apple: 'Apple',
-      google: 'Google',
-      kakao: '카카오',
-    };
-    Alert.alert('준비 중', `${labels[provider]} 로그인은 곧 출시 예정입니다.`);
-  }, []);
+  const runSocialLogin = useCallback(
+    async (
+      provider: SocialProvider,
+      action: () => Promise<SocialSignInResult>,
+    ): Promise<void> => {
+      if (busy) {
+        return;
+      }
+      setSocialLoading(provider);
+      try {
+        const result = await action();
+        if (result.status === 'cancelled') {
+          return;
+        }
+      } catch (err) {
+        console.error('Social login error:', err);
+        Alert.alert(
+          '로그인 실패',
+          isSocialAuthError(err)
+            ? err.userMessage
+            : '로그인 중 문제가 발생했습니다. 다시 시도해주세요.',
+        );
+      } finally {
+        setSocialLoading(null);
+      }
+    },
+    [busy],
+  );
+
+  const handleAppleLogin = useCallback(
+    () => runSocialLogin('apple', signInWithApple),
+    [runSocialLogin, signInWithApple],
+  );
+
+  const handleGoogleLogin = useCallback(
+    () => runSocialLogin('google', signInWithGoogle),
+    [runSocialLogin, signInWithGoogle],
+  );
+
+  const handleKakaoLogin = useCallback(
+    () => runSocialLogin('kakao', signInWithKakao),
+    [runSocialLogin, signInWithKakao],
+  );
 
   const handleAnonymous = useCallback(async () => {
     try {
@@ -245,7 +294,7 @@ export const AuthScreen: React.FC = () => {
             <FaceIDButton
               label={biometricLabel}
               onPress={handleBiometricLogin}
-              loading={loading}
+              loading={busy}
               variant={biometricVariant}
               testID="face-cta"
             />
@@ -255,10 +304,11 @@ export const AuthScreen: React.FC = () => {
             testID="email-cta"
             style={emailButtonStyle}
             onPress={() => navigation.navigate('EmailLogin')}
-            disabled={loading}
+            disabled={busy}
             accessible
             accessibilityRole="button"
             accessibilityLabel="이메일로 로그인"
+            accessibilityState={{ disabled: busy }}
             activeOpacity={0.8}
           >
             <Mail size={18} color={semantic.labelStrong} strokeWidth={2} />
@@ -270,22 +320,27 @@ export const AuthScreen: React.FC = () => {
           </View>
 
           <View style={styles.socialStack}>
-            <SocialButton
-              provider="apple"
-              label="Apple로 계속하기"
-              onPress={() => handleSocialLogin('apple')}
-              testID="social-apple"
-            />
+            {appleAvailable && (
+              <AppleSignInButton
+                onPress={handleAppleLogin}
+                disabled={busy && socialLoading !== 'apple'}
+                testID="social-apple"
+              />
+            )}
             <SocialButton
               provider="google"
               label="Google로 계속하기"
-              onPress={() => handleSocialLogin('google')}
+              onPress={handleGoogleLogin}
+              loading={socialLoading === 'google'}
+              disabled={busy && socialLoading !== 'google'}
               testID="social-google"
             />
             <SocialButton
               provider="kakao"
               label="카카오로 계속하기"
-              onPress={() => handleSocialLogin('kakao')}
+              onPress={handleKakaoLogin}
+              loading={socialLoading === 'kakao'}
+              disabled={busy && socialLoading !== 'kakao'}
               testID="social-kakao"
             />
           </View>
@@ -294,10 +349,11 @@ export const AuthScreen: React.FC = () => {
             testID="browse-cta"
             style={browseButtonStyle}
             onPress={handleAnonymous}
-            disabled={loading}
+            disabled={busy}
             accessible
             accessibilityRole="button"
             accessibilityLabel="로그인 없이 둘러보기"
+            accessibilityState={{ disabled: busy }}
           >
             <Eye size={15} color={semantic.labelNeutral} strokeWidth={2} />
             <Text style={browseLabel}>로그인 없이 둘러보기</Text>
