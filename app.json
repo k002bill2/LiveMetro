@@ -27,6 +27,7 @@
       "supportsTablet": false,
       "bundleIdentifier": "com.livemetro.app",
       "buildNumber": "4",
+      "usesAppleSignIn": true,
       "config": {
         "usesNonExemptEncryption": false
       },
@@ -115,7 +116,9 @@
           }
         }
       ],
-      "expo-updates"
+      "expo-updates",
+      "expo-apple-authentication",
+      "@react-native-google-signin/google-signin"
     ],
     "hooks": {
       "postPublish": [
