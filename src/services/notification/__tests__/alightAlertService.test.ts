@@ -2,6 +2,8 @@
  * alightAlertService — 하차 임박 알림 예약/취소/dedup.
  * 모듈 스코프 상태(추적 id/stepKey/fireAt)가 있어 jest.resetModules로 격리한다.
  */
+import type { NotificationSettings } from '@models/user';
+
 jest.mock('../notificationService', () => ({
   notificationService: {
     requestPermissions: jest.fn(),
@@ -18,8 +20,6 @@ jest.mock('expo-notifications', () => ({
   getAllScheduledNotificationsAsync: jest.fn(),
   cancelScheduledNotificationAsync: jest.fn(),
 }));
-
-import type { NotificationSettings } from '@models/user';
 
 const NOW = 1_750_000_000_000;
 

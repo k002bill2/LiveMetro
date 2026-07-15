@@ -362,6 +362,9 @@ describe('useCongestionReport', () => {
       confirmPhoneCode: jest.fn(),
       linkEmailToCurrentUser: jest.fn(),
       deleteCurrentUser: jest.fn(),
+      signInWithGoogle: jest.fn(),
+      signInWithApple: jest.fn(),
+      signInWithKakao: jest.fn(),
       } as ReturnType<typeof useAuth>);
     });
 
@@ -806,6 +809,9 @@ describe('useCongestion (combined hook)', () => {
       confirmPhoneCode: jest.fn(),
       linkEmailToCurrentUser: jest.fn(),
       deleteCurrentUser: jest.fn(),
+      signInWithGoogle: jest.fn(),
+      signInWithApple: jest.fn(),
+      signInWithKakao: jest.fn(),
     } as ReturnType<typeof useAuth>);
 
     const { result } = renderHook(() =>
