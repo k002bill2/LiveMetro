@@ -20,8 +20,14 @@ title = "LiveMetro gitleaks config"
 [extend]
 useDefault = true
 
+# Kakao 네이티브 앱 키(LiveMetro, 앱 ID 1514990)도 같은 이유로 allowlist:
+#   * config plugin이 배포 바이너리의 Info.plist(KAKAO_APP_KEY)/strings.xml에
+#     기록하는 공개 클라이언트 식별자로, 모든 APK/IPA에 이미 포함된다.
+#   * 서버 신뢰는 이 키가 아니라 Cloud Function `kakaoLogin`의 access token
+#     검증(app_id 대조)이 담당한다. 이 값 외 다른 시크릿은 계속 탐지된다.
 [allowlist]
-description = "Public Firebase Web SDK client key for project livemetro-cc092 (not a secret)."
+description = "Public client identifiers for LiveMetro (not secrets): Firebase Web SDK key, Kakao native app key."
 regexes = [
   '''AIzaSyArkmevCGo4T4fUqU4uN7vZUZBYg5culXU''',
+  '''8f70a45a817be91dce7341224fc17fd5''',
 ]

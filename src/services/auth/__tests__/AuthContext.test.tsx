@@ -5,6 +5,7 @@
 import React from 'react';
 import { renderHook, act, waitFor } from '@testing-library/react-native';
 import { AuthProvider, useAuth } from '../AuthContext';
+import { SocialAuthError } from '@/services/auth/social/types';
 
 // Mock Firebase Auth
 const mockSignInAnonymously = jest.fn();
@@ -75,6 +76,23 @@ jest.mock('../../firebase/config', () => ({
     messagingSenderId: 'mock',
     appId: 'mock',
   },
+}));
+
+// Mock the social sign-in services so the context's thin delegates can be
+// verified in isolation (the services own their own error/cancel semantics and
+// have their own suites).
+const mockGoogleService = jest.fn();
+const mockAppleService = jest.fn();
+const mockKakaoService = jest.fn();
+
+jest.mock('@/services/auth/social/googleSignIn', () => ({
+  signInWithGoogle: (...args: unknown[]) => mockGoogleService(...args),
+}));
+jest.mock('@/services/auth/social/appleSignIn', () => ({
+  signInWithApple: (...args: unknown[]) => mockAppleService(...args),
+}));
+jest.mock('@/services/auth/social/kakaoSignIn', () => ({
+  signInWithKakao: (...args: unknown[]) => mockKakaoService(...args),
 }));
 
 describe('AuthContext', () => {
@@ -701,6 +719,63 @@ describe('AuthContext', () => {
 
       errSpy.mockRestore();
       mockCurrentUser.value = null;
+    });
+  });
+
+  describe('social sign-in delegation', () => {
+    it('signInWithGoogle delegates to the google service and returns its result', async () => {
+      mockGoogleService.mockResolvedValue({ status: 'success' });
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      let outcome: unknown;
+      await act(async () => {
+        outcome = await result.current.signInWithGoogle();
+      });
+
+      expect(mockGoogleService).toHaveBeenCalledTimes(1);
+      expect(outcome).toEqual({ status: 'success' });
+    });
+
+    it('signInWithApple propagates a cancelled result unchanged', async () => {
+      mockAppleService.mockResolvedValue({ status: 'cancelled' });
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      let outcome: unknown;
+      await act(async () => {
+        outcome = await result.current.signInWithApple();
+      });
+
+      expect(mockAppleService).toHaveBeenCalledTimes(1);
+      expect(outcome).toEqual({ status: 'cancelled' });
+    });
+
+    it('signInWithKakao delegates to the kakao service and returns success', async () => {
+      mockKakaoService.mockResolvedValue({ status: 'success' });
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      let outcome: unknown;
+      await act(async () => {
+        outcome = await result.current.signInWithKakao();
+      });
+
+      expect(mockKakaoService).toHaveBeenCalledTimes(1);
+      expect(outcome).toEqual({ status: 'success' });
+    });
+
+    it('propagates a SocialAuthError thrown by the service without wrapping it', async () => {
+      const serviceError = new SocialAuthError('network', '네트워크 연결을 확인해주세요.');
+      mockGoogleService.mockRejectedValue(serviceError);
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await expect(
+        act(async () => {
+          await result.current.signInWithGoogle();
+        }),
+      ).rejects.toBe(serviceError);
     });
   });
 });

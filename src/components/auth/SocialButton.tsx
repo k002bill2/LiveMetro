@@ -19,6 +19,7 @@ interface SocialButtonProps {
   label: string;
   onPress: () => void;
   loading?: boolean;
+  disabled?: boolean;
   testID?: string;
 }
 
@@ -34,9 +35,11 @@ const SocialButtonImpl: React.FC<SocialButtonProps> = ({
   label,
   onPress,
   loading = false,
+  disabled = false,
   testID,
 }) => {
   const semantic = useSemanticTokens();
+  const isDisabled = loading || disabled;
 
   const variants: Record<SocialProvider, ProviderStyle> = {
     apple: { bg: '#000000', fg: '#FFFFFF', Icon: Apple },
@@ -60,7 +63,7 @@ const SocialButtonImpl: React.FC<SocialButtonProps> = ({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 10,
-    opacity: loading ? 0.7 : 1,
+    opacity: isDisabled ? 0.7 : 1,
     ...(v.borderColor ? { borderWidth: 1, borderColor: v.borderColor } : {}),
   };
 
@@ -76,12 +79,12 @@ const SocialButtonImpl: React.FC<SocialButtonProps> = ({
     <TouchableOpacity
       testID={testID}
       onPress={onPress}
-      disabled={loading}
+      disabled={isDisabled}
       style={buttonStyle}
       accessible
       accessibilityRole="button"
       accessibilityLabel={label}
-      accessibilityState={{ disabled: loading }}
+      accessibilityState={{ disabled: isDisabled }}
       activeOpacity={0.85}
     >
       <v.Icon size={20} color={v.fg} strokeWidth={2} />

@@ -60,6 +60,14 @@ jobs:
         working-directory: functions
         run: npm run build
 
+      # functions/.env는 gitignored — clean checkout에는 없으므로 여기서 생성한다.
+      # 없으면 firebase-tools가 defineString('KAKAO_APP_ID') 기본값('')으로 배포해
+      # kakaoLogin이 모든 요청을 failed-precondition으로 거부한다.
+      # KAKAO_APP_ID는 Kakao 앱의 공개 식별자(자격증명 아님)라 평문으로 안전하다.
+      - name: Provision Functions params (KAKAO_APP_ID)
+        working-directory: functions
+        run: echo "KAKAO_APP_ID=1514990" > .env
+
       - name: Authenticate to Firebase
         run: |
           echo '${{ secrets.FIREBASE_SERVICE_ACCOUNT }}' > "$RUNNER_TEMP/sa.json"

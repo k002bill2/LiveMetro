@@ -90,6 +90,21 @@ export interface UserData {
   };
 }
 
+// Request payload for the kakaoLogin callable (server-side Kakao token exchange).
+// No auth required — this runs before the user has a Firebase session.
+export interface KakaoLoginRequest {
+  accessToken: string;
+}
+
+// Response from the kakaoLogin callable: a Firebase custom token to sign in with,
+// plus a minimal profile echo (no email/photo — those live on the auth record).
+export interface KakaoLoginResponse {
+  token: string;
+  profile: {
+    nickname: string | null;
+  };
+}
+
 // SendGrid email template IDs
 export interface EmailTemplates {
   delayAlert: string;

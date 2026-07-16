@@ -20,6 +20,8 @@ import {
   getBiometricTypeName,
 } from '@/services/auth/biometricService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAppleAuthAvailability } from '@/hooks/useAppleAuthAvailability';
+import { SocialAuthError, type SocialSignInResult } from '@/services/auth/social/types';
 
 const mockNavigate = jest.fn();
 const mockGoBack = jest.fn();
@@ -39,6 +41,37 @@ jest.mock('@/services/theme/themeContext', () => ({
 jest.mock('@/services/auth/AuthContext', () => ({
   useAuth: jest.fn(),
 }));
+
+jest.mock('@/hooks/useAppleAuthAvailability', () => ({
+  useAppleAuthAvailability: jest.fn(),
+}));
+
+// The real AppleSignInButton lazily imports expo-apple-authentication and would
+// render null in tests; stub it to a touchable that keeps the 'social-apple'
+// testID contract and mirrors the disabled prop.
+jest.mock('@/components/auth/AppleSignInButton', () => {
+  const { TouchableOpacity, Text } = jest.requireActual('react-native');
+  return {
+    AppleSignInButton: ({
+      onPress,
+      disabled,
+      testID,
+    }: {
+      onPress: () => void;
+      disabled?: boolean;
+      testID?: string;
+    }) => (
+      <TouchableOpacity
+        testID={testID}
+        onPress={onPress}
+        disabled={disabled}
+        accessibilityState={{ disabled: !!disabled }}
+      >
+        <Text>Apple로 계속하기</Text>
+      </TouchableOpacity>
+    ),
+  };
+});
 
 jest.mock('@/services/auth/biometricService', () => ({
   isBiometricAvailable: jest.fn(),
@@ -96,7 +129,21 @@ jest.mock('lucide-react-native', () => {
 });
 
 const mockedUseAuth = useAuth as jest.Mock;
+const mockedAppleAvailability = useAppleAuthAvailability as jest.Mock;
 const mockedAsyncStorage = AsyncStorage as unknown as { getItem: jest.Mock };
+
+// Base auth context with the three social delegates resolving to success;
+// individual tests override specific fields (e.g. a rejecting google fn).
+const authContextValue = (
+  overrides: Record<string, unknown> = {},
+): Record<string, unknown> => ({
+  signInWithEmail: jest.fn(),
+  signInAnonymously: jest.fn(),
+  signInWithGoogle: jest.fn().mockResolvedValue({ status: 'success' }),
+  signInWithApple: jest.fn().mockResolvedValue({ status: 'success' }),
+  signInWithKakao: jest.fn().mockResolvedValue({ status: 'success' }),
+  ...overrides,
+});
 const mockedBiometricAvailable = isBiometricAvailable as jest.Mock;
 const mockedBiometricEnabled = isBiometricLoginEnabled as jest.Mock;
 const mockedBiometricLogin = performBiometricLogin as jest.Mock;
@@ -114,10 +161,8 @@ const flushBootstrap = async () => {
 describe('AuthScreen', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockedUseAuth.mockReturnValue({
-      signInWithEmail: jest.fn(),
-      signInAnonymously: jest.fn(),
-    });
+    mockedUseAuth.mockReturnValue(authContextValue());
+    mockedAppleAvailability.mockReturnValue(true);
     mockedAsyncStorage.getItem.mockResolvedValue('false');
     mockedBiometricAvailable.mockResolvedValue(true);
     mockedBiometricEnabled.mockResolvedValue(false);
@@ -152,16 +197,137 @@ describe('AuthScreen', () => {
     expect(mockNavigate).toHaveBeenCalledWith('EmailLogin');
   });
 
-  it('shows a "준비 중" alert for each social provider', async () => {
-    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+  it('hides the Apple button when Apple sign-in is unavailable, keeping Google/Kakao', async () => {
+    mockedAppleAvailability.mockReturnValue(false);
+    const { getByTestId, queryByTestId } = render(<AuthScreen />);
+    await flushBootstrap();
+    expect(queryByTestId('social-apple')).toBeNull();
+    expect(getByTestId('social-google')).toBeTruthy();
+    expect(getByTestId('social-kakao')).toBeTruthy();
+  });
+
+  it('shows the Apple button when Apple sign-in is available', async () => {
+    mockedAppleAvailability.mockReturnValue(true);
     const { getByTestId } = render(<AuthScreen />);
     await flushBootstrap();
-    fireEvent.press(getByTestId('social-apple'));
-    fireEvent.press(getByTestId('social-google'));
-    fireEvent.press(getByTestId('social-kakao'));
-    expect(alertSpy).toHaveBeenCalledTimes(3);
-    expect(alertSpy.mock.calls[0]?.[0]).toBe('준비 중');
+    expect(getByTestId('social-apple')).toBeTruthy();
+  });
+
+  it('calls signInWithGoogle when the Google button is pressed', async () => {
+    const signInWithGoogle = jest.fn().mockResolvedValue({ status: 'success' });
+    mockedUseAuth.mockReturnValue(authContextValue({ signInWithGoogle }));
+    const { getByTestId } = render(<AuthScreen />);
+    await flushBootstrap();
+    await act(async () => {
+      fireEvent.press(getByTestId('social-google'));
+    });
+    expect(signInWithGoogle).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not alert when a social login resolves to cancelled', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const signInWithGoogle = jest.fn().mockResolvedValue({ status: 'cancelled' });
+    mockedUseAuth.mockReturnValue(authContextValue({ signInWithGoogle }));
+    const { getByTestId } = render(<AuthScreen />);
+    await flushBootstrap();
+    await act(async () => {
+      fireEvent.press(getByTestId('social-google'));
+    });
+    expect(signInWithGoogle).toHaveBeenCalledTimes(1);
+    expect(alertSpy).not.toHaveBeenCalled();
     alertSpy.mockRestore();
+  });
+
+  it('alerts with the SocialAuthError userMessage when a social login rejects', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const signInWithKakao = jest
+      .fn()
+      .mockRejectedValue(new SocialAuthError('server', '카카오 인증에 실패했습니다.'));
+    mockedUseAuth.mockReturnValue(authContextValue({ signInWithKakao }));
+    const { getByTestId } = render(<AuthScreen />);
+    await flushBootstrap();
+    await act(async () => {
+      fireEvent.press(getByTestId('social-kakao'));
+    });
+    expect(alertSpy).toHaveBeenCalledWith('로그인 실패', '카카오 인증에 실패했습니다.');
+    alertSpy.mockRestore();
+    errSpy.mockRestore();
+  });
+
+  it('alerts with a generic message when a non-SocialAuthError is thrown', async () => {
+    const alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+    const signInWithGoogle = jest.fn().mockRejectedValue(new Error('boom'));
+    mockedUseAuth.mockReturnValue(authContextValue({ signInWithGoogle }));
+    const { getByTestId } = render(<AuthScreen />);
+    await flushBootstrap();
+    await act(async () => {
+      fireEvent.press(getByTestId('social-google'));
+    });
+    expect(alertSpy).toHaveBeenCalledWith(
+      '로그인 실패',
+      '로그인 중 문제가 발생했습니다. 다시 시도해주세요.',
+    );
+    alertSpy.mockRestore();
+    errSpy.mockRestore();
+  });
+
+  it('ignores presses on other social buttons while one login is in progress', async () => {
+    let resolveGoogle: (value: SocialSignInResult) => void = () => {};
+    const signInWithGoogle = jest.fn(
+      (): Promise<SocialSignInResult> =>
+        new Promise((resolve) => {
+          resolveGoogle = resolve;
+        }),
+    );
+    const signInWithKakao = jest.fn().mockResolvedValue({ status: 'success' });
+    mockedUseAuth.mockReturnValue(
+      authContextValue({ signInWithGoogle, signInWithKakao }),
+    );
+    const { getByTestId } = render(<AuthScreen />);
+    await flushBootstrap();
+
+    fireEvent.press(getByTestId('social-google'));
+    await waitFor(() => expect(signInWithGoogle).toHaveBeenCalledTimes(1));
+
+    // Kakao is now disabled (socialLoading === 'google'); its press is a no-op.
+    fireEvent.press(getByTestId('social-kakao'));
+    expect(signInWithKakao).not.toHaveBeenCalled();
+
+    // Resolve the in-flight login so the finally/setState runs inside act().
+    await act(async () => {
+      resolveGoogle({ status: 'success' });
+    });
+  });
+
+  it('disables the email and browse CTAs while a social login is in progress (busy)', async () => {
+    let resolveGoogle: (value: SocialSignInResult) => void = () => {};
+    const signInWithGoogle = jest.fn(
+      (): Promise<SocialSignInResult> =>
+        new Promise((resolve) => {
+          resolveGoogle = resolve;
+        }),
+    );
+    mockedUseAuth.mockReturnValue(authContextValue({ signInWithGoogle }));
+    const { getByTestId } = render(<AuthScreen />);
+    await flushBootstrap();
+
+    await act(async () => {
+      fireEvent.press(getByTestId('social-google'));
+    });
+
+    // busy === true → non-active entry points are disabled.
+    expect(getByTestId('email-cta').props.accessibilityState.disabled).toBe(true);
+    expect(getByTestId('browse-cta').props.accessibilityState.disabled).toBe(true);
+
+    await act(async () => {
+      resolveGoogle({ status: 'success' });
+    });
+
+    // Once the login settles, the CTAs are enabled again.
+    expect(getByTestId('email-cta').props.accessibilityState.disabled).toBe(false);
+    expect(getByTestId('browse-cta').props.accessibilityState.disabled).toBe(false);
   });
 
   it('invokes signInAnonymously when the browse-as-guest CTA is pressed', async () => {

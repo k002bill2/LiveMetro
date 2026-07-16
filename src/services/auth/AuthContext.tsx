@@ -27,6 +27,10 @@ import { doc, setDoc, getDoc, onSnapshot } from 'firebase/firestore';
 
 import { auth, firestore } from '../firebase/config';
 import { User, UserPreferences, SubscriptionStatus } from '../../models/user';
+import { SocialSignInResult } from '@/services/auth/social/types';
+import { signInWithGoogle as googleSignInService } from '@/services/auth/social/googleSignIn';
+import { signInWithApple as appleSignInService } from '@/services/auth/social/appleSignIn';
+import { signInWithKakao as kakaoSignInService } from '@/services/auth/social/kakaoSignIn';
 
 interface AuthContextType {
   user: User | null;
@@ -35,6 +39,12 @@ interface AuthContextType {
   signInAnonymously: () => Promise<void>;
   signInWithEmail: (email: string, password: string) => Promise<void>;
   signUpWithEmail: (email: string, password: string, displayName?: string) => Promise<void>;
+  // Social sign-in. On failure these reject with a SocialAuthError (Korean
+  // userMessage); user cancellation resolves to { status: 'cancelled' } instead
+  // of throwing so callers can no-op silently.
+  signInWithGoogle: () => Promise<SocialSignInResult>;
+  signInWithApple: () => Promise<SocialSignInResult>;
+  signInWithKakao: () => Promise<SocialSignInResult>;
   signOut: () => Promise<void>;
   // preferences is banned here on purpose: profile writes go through
   // setDoc(merge) with whatever rides in `updates`, so a stale
@@ -315,6 +325,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }, []);
 
+  // Thin delegates to the social sign-in services. Error/cancel semantics are
+  // owned by the services (SocialAuthError / { status: 'cancelled' }); no local
+  // try/catch so those semantics reach the screen unchanged.
+  const handleSignInWithGoogle = useCallback(
+    (): Promise<SocialSignInResult> => googleSignInService(),
+    [],
+  );
+
+  const handleSignInWithApple = useCallback(
+    (): Promise<SocialSignInResult> => appleSignInService(),
+    [],
+  );
+
+  const handleSignInWithKakao = useCallback(
+    (): Promise<SocialSignInResult> => kakaoSignInService(),
+    [],
+  );
+
   const handleSignOut = useCallback(async (): Promise<void> => {
     try {
       await signOut(auth);
@@ -562,6 +590,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signInAnonymously: handleSignInAnonymously,
     signInWithEmail: handleSignInWithEmail,
     signUpWithEmail: handleSignUpWithEmail,
+    signInWithGoogle: handleSignInWithGoogle,
+    signInWithApple: handleSignInWithApple,
+    signInWithKakao: handleSignInWithKakao,
     signOut: handleSignOut,
     updateUserProfile: handleUpdateUserProfile,
     updateUserPreferences: handleUpdateUserPreferences,
@@ -578,6 +609,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     handleSignInAnonymously,
     handleSignInWithEmail,
     handleSignUpWithEmail,
+    handleSignInWithGoogle,
+    handleSignInWithApple,
+    handleSignInWithKakao,
     handleSignOut,
     handleUpdateUserProfile,
     handleUpdateUserPreferences,
