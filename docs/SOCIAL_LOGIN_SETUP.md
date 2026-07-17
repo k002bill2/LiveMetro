@@ -230,6 +230,7 @@ custom token을 발급합니다. 검증은 카카오가 돌려준 토큰의 `app
 | Android 빌드 Kotlin 버전 충돌 | kakao-login 플러그인 기본 `kotlinVersion`(1.5.10)이 RN 0.72의 Kotlin 1.8.x를 다운그레이드 | app.config.ts에서 `kotlinVersion: '1.8.10'` 명시 (이미 배선됨) |
 | 로그인 시 "최신 버전의 앱이 필요합니다" / 크래시 | Expo Go 또는 네이티브 모듈 이전 빌드 | dev build 재빌드(§5). Expo Go는 소셜 로그인 미지원 |
 | Kakao 로그인 후 `permission-denied` | functions `KAKAO_APP_ID`가 실제 앱 ID와 불일치 | §6 `KAKAO_APP_ID` 재확인 후 재배포 |
+| Kakao "카카오 인증에 실패했습니다"(클라) + 함수 로그에 `Permission 'iam.serviceAccounts.signBlob' denied` | **2nd gen 함수의 `createCustomToken()`은 IAM signBlob API로 서명**하는데, 런타임 서비스 계정(기본: `<프로젝트번호>-compute@developer.gserviceaccount.com`)에 서명 권한이 없음 | IAM에서 해당 SA에 **"서비스 계정 토큰 생성자"**(roles/iam.serviceAccountTokenCreator) 부여 — LiveMetro는 2026-07-17 부여 완료. 반영까지 수 분 소요 |
 
 ---
 
