@@ -113,6 +113,9 @@
         {
           "ios": {
             "useFrameworks": "static"
+          },
+          "android": {
+            "minSdkVersion": 23
           }
         }
       ],
