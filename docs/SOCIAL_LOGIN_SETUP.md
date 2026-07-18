@@ -131,9 +131,10 @@ Kakao Developers(https://developers.kakao.com) > 내 애플리케이션.
 
   - **iOS**: 번들 ID `com.livemetro.app` 등록 완료
 
-- [ ] **③ 카카오 로그인 활성화** (제품 설정 > 카카오 로그인 > 활성화 ON)
+- [x] **③ 카카오 로그인 활성화** (제품 설정 > 카카오 로그인 > 활성화 ON) — 완료 (2026-07-17).
+  실기기 최초 시도에서 이 항목 누락으로 **KOE004(앱 관리자 설정 오류)** 발생했던 항목.
 
-- [ ] **④ 동의항목 설정** (카카오 로그인 > 동의항목)
+- [x] **④ 동의항목 설정** (카카오 로그인 > 동의항목) — 완료 (2026-07-17): 닉네임=필수 동의, 프로필 사진=선택 동의
   - 닉네임(profile_nickname), 프로필 사진(profile_image) → **필수 또는 선택 동의**로 설정
   - 이메일은 **비즈 앱 심사**가 필요하며 **현재 미사용**입니다 (auth record에 이메일을 넣지 않아 계정 충돌을 피함).
 
@@ -229,6 +230,7 @@ custom token을 발급합니다. 검증은 카카오가 돌려준 토큰의 `app
 | Android 빌드 Kotlin 버전 충돌 | kakao-login 플러그인 기본 `kotlinVersion`(1.5.10)이 RN 0.72의 Kotlin 1.8.x를 다운그레이드 | app.config.ts에서 `kotlinVersion: '1.8.10'` 명시 (이미 배선됨) |
 | 로그인 시 "최신 버전의 앱이 필요합니다" / 크래시 | Expo Go 또는 네이티브 모듈 이전 빌드 | dev build 재빌드(§5). Expo Go는 소셜 로그인 미지원 |
 | Kakao 로그인 후 `permission-denied` | functions `KAKAO_APP_ID`가 실제 앱 ID와 불일치 | §6 `KAKAO_APP_ID` 재확인 후 재배포 |
+| Kakao "카카오 인증에 실패했습니다"(클라) + 함수 로그에 `Permission 'iam.serviceAccounts.signBlob' denied` | **2nd gen 함수의 `createCustomToken()`은 IAM signBlob API로 서명**하는데, 런타임 서비스 계정(기본: `<프로젝트번호>-compute@developer.gserviceaccount.com`)에 서명 권한이 없음 | IAM에서 해당 SA에 **"서비스 계정 토큰 생성자"**(roles/iam.serviceAccountTokenCreator) 부여 — LiveMetro는 2026-07-17 부여 완료. 반영까지 수 분 소요 |
 
 ---
 
