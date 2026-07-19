@@ -44,4 +44,44 @@ describe('SocialButton', () => {
     expect(node.props.accessibilityRole).toBe('button');
     expect(node.props.accessibilityLabel).toBe('카카오로 계속하기');
   });
+
+  it('does not fire onPress when disabled and marks accessibilityState.disabled', () => {
+    const onPress = jest.fn();
+    const { getByTestId } = render(
+      <SocialButton provider="google" label="Google" onPress={onPress} disabled testID="sb" />
+    );
+    const node = getByTestId('sb');
+    expect(node.props.accessibilityState.disabled).toBe(true);
+    fireEvent.press(node);
+    expect(onPress).not.toHaveBeenCalled();
+  });
+
+  it('does not fire onPress while loading (disabled state)', () => {
+    const onPress = jest.fn();
+    const { getByTestId } = render(
+      <SocialButton provider="kakao" label="Kakao" onPress={onPress} loading testID="sb" />
+    );
+    const node = getByTestId('sb');
+    expect(node.props.accessibilityState.disabled).toBe(true);
+    fireEvent.press(node);
+    expect(onPress).not.toHaveBeenCalled();
+  });
+
+  it('fires onPress when neither loading nor disabled', () => {
+    const onPress = jest.fn();
+    const { getByTestId } = render(
+      <SocialButton
+        provider="apple"
+        label="Apple"
+        onPress={onPress}
+        loading={false}
+        disabled={false}
+        testID="sb"
+      />
+    );
+    const node = getByTestId('sb');
+    expect(node.props.accessibilityState.disabled).toBe(false);
+    fireEvent.press(node);
+    expect(onPress).toHaveBeenCalledTimes(1);
+  });
 });
