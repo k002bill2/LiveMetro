@@ -18,6 +18,7 @@ jest.mock('../../services/favorites/favoritesService', () => ({
   favoritesService: {
     getFavorites: jest.fn(),
     addFavorite: jest.fn(),
+    addFavorites: jest.fn(),
     removeFavorite: jest.fn(),
     removeFavorites: jest.fn(),
     updateFavorite: jest.fn(),
@@ -340,6 +341,109 @@ describe('useFavorites', () => {
           await result.current.removeFavorites(['fav_1']);
         }),
       ).rejects.toThrow('즐겨찾기 삭제에 실패했습니다.');
+    });
+  });
+
+  describe('addFavorites (bulk)', () => {
+    it('서비스를 1회 호출하고 목록을 다시 로드한다', async () => {
+      mockFavoritesService.addFavorites.mockResolvedValue([
+        createMockFavorite('fav-1', 'stn-1'),
+      ]);
+
+      const { result } = renderHook(() => useFavorites(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      mockFavoritesService.getFavorites.mockClear();
+
+      const entries = [
+        { station: createMockStation('stn-1', '강남역'), isCommuteStation: true },
+        { station: createMockStation('stn-2', '역삼역'), isCommuteStation: false },
+      ];
+      await act(async () => {
+        await result.current.addFavorites(entries);
+      });
+
+      expect(mockFavoritesService.addFavorites).toHaveBeenCalledTimes(1);
+      expect(mockFavoritesService.addFavorites).toHaveBeenCalledWith(mockUser.id, entries);
+      // reload 발생: 초기 로드 이후 한 번 더 호출됨
+      expect(mockFavoritesService.getFavorites).toHaveBeenCalledTimes(1);
+    });
+
+    it('빈 입력이면 서비스 호출·reload를 생략한다', async () => {
+      const { result } = renderHook(() => useFavorites(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      mockFavoritesService.getFavorites.mockClear();
+
+      await act(async () => {
+        await result.current.addFavorites([]);
+      });
+
+      expect(mockFavoritesService.addFavorites).not.toHaveBeenCalled();
+      expect(mockFavoritesService.getFavorites).not.toHaveBeenCalled();
+    });
+
+    it('전부 중복(서비스가 [] 반환)이면 reload를 생략한다', async () => {
+      mockFavoritesService.addFavorites.mockResolvedValue([]);
+
+      const { result } = renderHook(() => useFavorites(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      mockFavoritesService.getFavorites.mockClear();
+
+      await act(async () => {
+        await result.current.addFavorites([
+          { station: createMockStation('stn-1', '강남역') },
+        ]);
+      });
+
+      expect(mockFavoritesService.addFavorites).toHaveBeenCalledTimes(1);
+      expect(mockFavoritesService.getFavorites).not.toHaveBeenCalled();
+    });
+
+    it("'bulk:add' 락으로 더블탭 두 번째 호출은 무시된다", async () => {
+      let resolveAdd!: (v: FavoriteStation[]) => void;
+      mockFavoritesService.addFavorites.mockImplementation(
+        () => new Promise<FavoriteStation[]>((resolve) => { resolveAdd = resolve; }),
+      );
+
+      const { result } = renderHook(() => useFavorites(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      const entries = [{ station: createMockStation('stn-1', '강남역') }];
+      let p1!: Promise<void>;
+      let p2!: Promise<void>;
+      await act(async () => {
+        p1 = result.current.addFavorites(entries);
+        p2 = result.current.addFavorites(entries);
+        await p2; // second call resolves immediately (silent skip)
+      });
+
+      expect(mockFavoritesService.addFavorites).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        resolveAdd([createMockFavorite('fav-1', 'stn-1')]);
+        await p1;
+      });
+    });
+
+    it('미로그인 상태면 throw한다', async () => {
+      mockUseAuth.mockReturnValue({
+        user: null,
+        firebaseUser: null,
+        loading: false,
+      } as any);
+
+      const { result } = renderHook(() => useFavorites(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await expect(
+        act(async () => {
+          await result.current.addFavorites([
+            { station: createMockStation('stn-1', '강남역') },
+          ]);
+        }),
+      ).rejects.toThrow('로그인이 필요합니다.');
     });
   });
 

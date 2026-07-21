@@ -1,6 +1,6 @@
 /**
  * FavoritesOnboardingScreen — RTL smoke tests covering the recommendation
- * pre-selection, CTA gating, and the save → addFavorite → onComplete chain.
+ * pre-selection, CTA gating, and the save → addFavorites → onComplete chain.
  */
 import React from 'react';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
@@ -10,7 +10,7 @@ const mockGoBack = jest.fn();
 const mockOnComplete = jest.fn(() => Promise.resolve());
 const mockOnSkip = jest.fn();
 const mockSaveCommuteRoutes = jest.fn();
-const mockContextAddFavorite = jest.fn();
+const mockContextAddFavorites = jest.fn();
 
 jest.mock('@/services/theme/themeContext', () => ({
   useTheme: jest.fn(() => ({ isDark: false })),
@@ -44,7 +44,7 @@ jest.mock('@/services/commute/commuteService', () => ({
 // the next context mutation (the "favorites invisible until next add" bug).
 jest.mock('@/hooks/useFavorites', () => ({
   useFavorites: () => ({
-    addFavorite: (...args: unknown[]) => mockContextAddFavorite(...args),
+    addFavorites: (...args: unknown[]) => mockContextAddFavorites(...args),
   }),
 }));
 
@@ -136,7 +136,7 @@ beforeEach(() => {
   mockOnComplete.mockClear();
   mockOnSkip.mockClear();
   mockSaveCommuteRoutes.mockReset();
-  mockContextAddFavorite.mockReset();
+  mockContextAddFavorites.mockReset();
 });
 
 describe('FavoritesOnboardingScreen (step 4/4)', () => {
@@ -181,9 +181,9 @@ describe('FavoritesOnboardingScreen (step 4/4)', () => {
     expect(cta.props.accessibilityState?.disabled).toBe(false);
   });
 
-  it('"완료" runs save → context addFavorite (per selected) → onComplete', async () => {
+  it('"완료" runs save → context addFavorites (single bulk call) → onComplete', async () => {
     mockSaveCommuteRoutes.mockResolvedValue({ success: true });
-    mockContextAddFavorite.mockResolvedValue(undefined);
+    mockContextAddFavorites.mockResolvedValue(undefined);
 
     const { getByTestId } = render(
       <FavoritesOnboardingScreen navigation={baseNavigation} route={baseRoute} />,
@@ -192,28 +192,22 @@ describe('FavoritesOnboardingScreen (step 4/4)', () => {
 
     await waitFor(() => {
       expect(mockSaveCommuteRoutes).toHaveBeenCalledTimes(1);
-      // 2 pre-selected stations → 2 context addFavorite calls
-      expect(mockContextAddFavorite).toHaveBeenCalledTimes(2);
+      // 2 pre-selected stations → ONE bulk addFavorites call
+      expect(mockContextAddFavorites).toHaveBeenCalledTimes(1);
       expect(mockOnComplete).toHaveBeenCalledTimes(1);
     });
 
-    // Route stations are commute stations — flag must flow through the
-    // context options (Station object, options) signature.
-    expect(mockContextAddFavorite).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'stn-dep', name: '서울역' }),
-      { isCommuteStation: true },
-    );
-    expect(mockContextAddFavorite).toHaveBeenCalledWith(
-      expect.objectContaining({ id: 'stn-arr', name: '강남' }),
-      { isCommuteStation: true },
-    );
+    // Both selected route stations arrive in a single entries array; each
+    // carries its commute flag via { station, isCommuteStation }.
+    expect(mockContextAddFavorites).toHaveBeenCalledWith([
+      { station: expect.objectContaining({ id: 'stn-dep', name: '서울역' }), isCommuteStation: true },
+      { station: expect.objectContaining({ id: 'stn-arr', name: '강남' }), isCommuteStation: true },
+    ]);
   });
 
-  it('still calls onComplete when a favorite add fails (partial favorites are recoverable)', async () => {
+  it('still calls onComplete when the bulk favorite add fails (partial favorites are recoverable)', async () => {
     mockSaveCommuteRoutes.mockResolvedValue({ success: true });
-    mockContextAddFavorite
-      .mockRejectedValueOnce(new Error('firestore unavailable'))
-      .mockResolvedValueOnce(undefined);
+    mockContextAddFavorites.mockRejectedValueOnce(new Error('firestore unavailable'));
 
     const { getByTestId } = render(
       <FavoritesOnboardingScreen navigation={baseNavigation} route={baseRoute} />,
@@ -221,7 +215,7 @@ describe('FavoritesOnboardingScreen (step 4/4)', () => {
     fireEvent.press(getByTestId('favorites-cta'));
 
     await waitFor(() => {
-      expect(mockContextAddFavorite).toHaveBeenCalledTimes(2);
+      expect(mockContextAddFavorites).toHaveBeenCalledTimes(1);
       expect(mockOnComplete).toHaveBeenCalledTimes(1);
     });
   });
@@ -237,7 +231,7 @@ describe('FavoritesOnboardingScreen (step 4/4)', () => {
     await waitFor(() => {
       expect(mockSaveCommuteRoutes).toHaveBeenCalledTimes(1);
     });
-    expect(mockContextAddFavorite).not.toHaveBeenCalled();
+    expect(mockContextAddFavorites).not.toHaveBeenCalled();
     expect(mockOnComplete).not.toHaveBeenCalled();
   });
 
@@ -271,7 +265,7 @@ describe('FavoritesOnboardingScreen (step 4/4)', () => {
 
     it('saves a searched station as a favorite on complete (station_cd id)', async () => {
       mockSaveCommuteRoutes.mockResolvedValue({ success: true });
-      mockContextAddFavorite.mockResolvedValue(undefined);
+      mockContextAddFavorites.mockResolvedValue(undefined);
 
       const { getByTestId } = render(
         <FavoritesOnboardingScreen navigation={baseNavigation} route={baseRoute} />,
@@ -281,19 +275,23 @@ describe('FavoritesOnboardingScreen (step 4/4)', () => {
       fireEvent.press(getByTestId('favorites-cta'));
 
       await waitFor(() => {
-        // 2 pre-selected route stations + 1 searched station.
-        expect(mockContextAddFavorite).toHaveBeenCalledTimes(3);
+        // Single bulk call carrying all 3 selections (2 route + 1 searched).
+        expect(mockContextAddFavorites).toHaveBeenCalledTimes(1);
         expect(mockOnComplete).toHaveBeenCalledTimes(1);
       });
-      expect(mockContextAddFavorite).toHaveBeenCalledWith(
-        expect.objectContaining({ id: '0925', name: '신논현', lineId: '신분당선' }),
-        { isCommuteStation: false },
+      expect(mockContextAddFavorites).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          {
+            station: expect.objectContaining({ id: '0925', name: '신논현', lineId: '신분당선' }),
+            isCommuteStation: false,
+          },
+        ]),
       );
     });
 
     it('name-based duplicate guard: re-adding an already-listed station does not create a second row', async () => {
       mockSaveCommuteRoutes.mockResolvedValue({ success: true });
-      mockContextAddFavorite.mockResolvedValue(undefined);
+      mockContextAddFavorites.mockResolvedValue(undefined);
 
       const { getByTestId, queryByTestId } = render(
         <FavoritesOnboardingScreen navigation={baseNavigation} route={baseRoute} />,
@@ -310,13 +308,15 @@ describe('FavoritesOnboardingScreen (step 4/4)', () => {
       await waitFor(() => {
         expect(mockOnComplete).toHaveBeenCalledTimes(1);
       });
-      // Still only the 2 route stations — no duplicate 강남.
-      expect(mockContextAddFavorite).toHaveBeenCalledTimes(2);
+      // One bulk call carrying exactly the 2 route stations — no duplicate 강남.
+      expect(mockContextAddFavorites).toHaveBeenCalledTimes(1);
+      const entries = mockContextAddFavorites.mock.calls[0]?.[0] as ReadonlyArray<unknown>;
+      expect(entries).toHaveLength(2);
     });
 
     it('picking a search result whose name matches an UNSELECTED recommendation selects that recommendation (no silent drop)', async () => {
       mockSaveCommuteRoutes.mockResolvedValue({ success: true });
-      mockContextAddFavorite.mockResolvedValue(undefined);
+      mockContextAddFavorites.mockResolvedValue(undefined);
 
       const { getByTestId, queryByTestId } = render(
         <FavoritesOnboardingScreen navigation={baseNavigation} route={baseRoute} />,
@@ -336,12 +336,17 @@ describe('FavoritesOnboardingScreen (step 4/4)', () => {
 
       fireEvent.press(getByTestId('favorites-cta'));
       await waitFor(() => {
-        expect(mockContextAddFavorite).toHaveBeenCalledTimes(3);
+        expect(mockContextAddFavorites).toHaveBeenCalledTimes(1);
       });
-      // The recommendation (slug id) is persisted — the pick was not dropped.
-      expect(mockContextAddFavorite).toHaveBeenCalledWith(
-        expect.objectContaining({ id: 'stn-sadang', name: '사당' }),
-        { isCommuteStation: false },
+      // The recommendation (slug id) is persisted in the bulk entries — the
+      // pick was not dropped.
+      expect(mockContextAddFavorites).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          {
+            station: expect.objectContaining({ id: 'stn-sadang', name: '사당' }),
+            isCommuteStation: false,
+          },
+        ]),
       );
     });
 
@@ -370,7 +375,7 @@ describe('FavoritesOnboardingScreen (step 4/4)', () => {
   describe('evening leg reversal', () => {
     it('saves the evening leg as the reversed morning leg with the default evening time when unspecified', async () => {
       mockSaveCommuteRoutes.mockResolvedValue({ success: true });
-      mockContextAddFavorite.mockResolvedValue(undefined);
+      mockContextAddFavorites.mockResolvedValue(undefined);
 
       const { getByTestId } = render(
         <FavoritesOnboardingScreen navigation={baseNavigation} route={baseRoute} />,
@@ -409,7 +414,7 @@ describe('FavoritesOnboardingScreen (step 4/4)', () => {
 
     it('reflects the configured eveningDepartureTime on the reversed evening leg', async () => {
       mockSaveCommuteRoutes.mockResolvedValue({ success: true });
-      mockContextAddFavorite.mockResolvedValue(undefined);
+      mockContextAddFavorites.mockResolvedValue(undefined);
 
       const routeWithEveningTime = {
         ...baseRoute,

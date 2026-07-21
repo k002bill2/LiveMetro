@@ -43,6 +43,9 @@ export interface FavoritesContextValue {
     station: Station,
     options?: { alias?: string; direction?: 'up' | 'down' | 'both'; isCommuteStation?: boolean }
   ) => Promise<void>;
+  addFavorites: (
+    entries: readonly { station: Station; isCommuteStation?: boolean }[]
+  ) => Promise<void>;
   removeFavorite: (favoriteId: string) => Promise<void>;
   removeFavorites: (favoriteIds: readonly string[]) => Promise<void>;
   removeFavoriteByStationId: (stationId: string) => Promise<void>;
@@ -284,6 +287,29 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   );
 
   /**
+   * Bulk-add stations to favorites in one write (onboarding save). Mirror of
+   * removeFavorites: a single 'bulk:add' lock guards the completion button
+   * against double-taps, and the whole batch lands in one Firestore write. An
+   * empty input or an all-duplicate batch (service returns []) skips the
+   * reload.
+   */
+  const addFavorites = useCallback(
+    async (
+      entries: readonly { station: Station; isCommuteStation?: boolean }[],
+    ): Promise<void> =>
+      runExclusive('bulk:add', () =>
+        runMutation('adding favorites', async (userId) => {
+          if (entries.length === 0) {
+            return false; // nothing to do — skip the reload
+          }
+          const added = await favoritesService.addFavorites(userId, entries);
+          return added.length > 0; // reload only when something was inserted
+        }),
+      ),
+    [runExclusive, runMutation],
+  );
+
+  /**
    * Remove a station from favorites
    */
   const removeFavorite = useCallback(
@@ -436,6 +462,7 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       loading: state.loading,
       error: state.error,
       addFavorite,
+      addFavorites,
       removeFavorite,
       removeFavorites,
       removeFavoriteByStationId,
@@ -450,6 +477,7 @@ export const FavoritesProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     [
       state,
       addFavorite,
+      addFavorites,
       removeFavorite,
       removeFavorites,
       removeFavoriteByStationId,
