@@ -282,6 +282,84 @@ class FavoritesService {
   }
 
   /**
+   * Add multiple stations to favorites in one Firestore write (onboarding
+   * bulk save). Mirror of removeFavorites: a single runTransaction rewrites
+   * the array once instead of N sequential read+arrayUnion+reload round-trips.
+   *
+   * Duplicates against the stored favorites are silently skipped (a partly-
+   * duplicate batch must not abort the whole save), and duplicate stationIds
+   * *within* the input batch keep only their first entry. When there is
+   * nothing new to add the write is skipped and [] is returned. A missing
+   * user document throws (unlike removeFavorites' benign no-op): for an add,
+   * a silent no-op would silently lose the user's selections.
+   *
+   * Returns the FavoriteStation records actually inserted (empty when every
+   * entry was a duplicate).
+   */
+  async addFavorites(
+    userId: string,
+    entries: readonly {
+      station: Station;
+      alias?: string;
+      direction?: 'up' | 'down' | 'both';
+      isCommuteStation?: boolean;
+    }[],
+  ): Promise<FavoriteStation[]> {
+    if (entries.length === 0) {
+      return [];
+    }
+
+    try {
+      const userRef = doc(firestore, 'users', userId);
+      let added: FavoriteStation[] = [];
+      await runTransaction(firestore, async (transaction) => {
+        const snapshot = await transaction.get(userRef);
+        if (!snapshot.exists()) {
+          throw new Error('즐겨찾기 추가에 실패했습니다.');
+        }
+        const existing: FavoriteStation[] =
+          snapshot.data()?.preferences?.favoriteStations ?? [];
+        const knownStationIds = new Set(existing.map(fav => fav.stationId));
+        const newOnes: FavoriteStation[] = [];
+        for (const entry of entries) {
+          const stationId = entry.station.id;
+          // Skip stations already stored or already added earlier in this
+          // batch (first occurrence wins). knownStationIds absorbs both.
+          if (knownStationIds.has(stationId)) {
+            continue;
+          }
+          knownStationIds.add(stationId);
+          // Every field gets a concrete value (alias -> null, not undefined):
+          // Firestore rejects an explicit `undefined` nested in an array
+          // element (plain getFirestore, no ignoreUndefinedProperties).
+          newOnes.push({
+            id: `fav_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            stationId,
+            lineId: entry.station.lineId,
+            alias: entry.alias ?? null,
+            direction: entry.direction ?? 'both',
+            isCommuteStation: entry.isCommuteStation ?? false,
+            addedAt: new Date(),
+          });
+        }
+        if (newOnes.length === 0) {
+          added = [];
+          return;
+        }
+        transaction.update(userRef, {
+          'preferences.favoriteStations': [...existing, ...newOnes],
+          lastActiveAt: new Date(),
+        });
+        added = newOnes;
+      });
+      return added;
+    } catch (error) {
+      console.error('Error adding favorites:', error);
+      throw new Error('즐겨찾기 추가에 실패했습니다.');
+    }
+  }
+
+  /**
    * Remove multiple favorites in one Firestore write (edit-mode bulk
    * delete). Unknown ids are ignored; an empty input or zero matches
    * skips the write entirely so no-op taps cost nothing.

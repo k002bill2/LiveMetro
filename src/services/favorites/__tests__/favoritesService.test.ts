@@ -639,6 +639,149 @@ describe('FavoritesService', () => {
     });
   });
 
+  describe('addFavorites', () => {
+    const station = (id: string, lineId = '2'): Station => ({
+      id,
+      name: `${id}역`,
+      nameEn: id,
+      lineId,
+      coordinates: { latitude: 0, longitude: 0 },
+      transfers: [],
+    });
+
+    const fav = (id: string, stationId: string): FavoriteStation => ({
+      id,
+      stationId,
+      lineId: '2',
+      alias: null,
+      direction: 'both',
+      isCommuteStation: false,
+      addedAt: new Date('2024-01-01'),
+    });
+
+    // Drives the transaction read (transaction.get) — the write runs inside
+    // runTransaction, so mockGetDoc/mockUpdateDoc are dead here.
+    const seedFavorites = (favorites: FavoriteStation[]): void => {
+      mockTxGet.mockResolvedValue({
+        exists: () => true,
+        data: () => ({ preferences: { favoriteStations: favorites } }),
+      });
+    };
+
+    beforeEach(() => {
+      mockRunTransaction.mockImplementation(async (_db, fn) =>
+        fn({ get: mockTxGet, update: mockTxUpdate }),
+      );
+    });
+
+    it('saves multiple new favorites in a single transaction update', async () => {
+      seedFavorites([]);
+
+      const result = await favoritesService.addFavorites('user-123', [
+        { station: station('gangnam') },
+        { station: station('seoul') },
+      ]);
+
+      expect(mockTxUpdate).toHaveBeenCalledTimes(1);
+      const payload = mockTxUpdate.mock.calls[0]?.[1] as {
+        'preferences.favoriteStations': FavoriteStation[];
+      };
+      expect(payload['preferences.favoriteStations'].map((f) => f.stationId)).toEqual([
+        'gangnam',
+        'seoul',
+      ]);
+      expect(result.map((f) => f.stationId)).toEqual(['gangnam', 'seoul']);
+    });
+
+    it('skips entries already stored and adds only the new ones', async () => {
+      seedFavorites([fav('fav_1', 'gangnam')]);
+
+      const result = await favoritesService.addFavorites('user-123', [
+        { station: station('gangnam') }, // duplicate of stored
+        { station: station('seoul') }, // new
+      ]);
+
+      const payload = mockTxUpdate.mock.calls[0]?.[1] as {
+        'preferences.favoriteStations': FavoriteStation[];
+      };
+      expect(payload['preferences.favoriteStations'].map((f) => f.stationId)).toEqual([
+        'gangnam',
+        'seoul',
+      ]);
+      expect(result.map((f) => f.stationId)).toEqual(['seoul']);
+    });
+
+    it('dedupes duplicate stationIds within the input batch (first wins)', async () => {
+      seedFavorites([]);
+
+      const result = await favoritesService.addFavorites('user-123', [
+        { station: station('gangnam'), isCommuteStation: true },
+        { station: station('gangnam'), isCommuteStation: false },
+      ]);
+
+      expect(result).toHaveLength(1);
+      expect(result[0]?.stationId).toBe('gangnam');
+      // First entry wins — proves last-wins dedup would be caught.
+      expect(result[0]?.isCommuteStation).toBe(true);
+    });
+
+    it('is a no-op (no transaction) for an empty entry list', async () => {
+      const result = await favoritesService.addFavorites('user-123', []);
+
+      expect(mockRunTransaction).not.toHaveBeenCalled();
+      expect(result).toEqual([]);
+    });
+
+    it('skips the write and returns [] when every entry is a duplicate', async () => {
+      seedFavorites([fav('fav_1', 'gangnam'), fav('fav_2', 'seoul')]);
+
+      const result = await favoritesService.addFavorites('user-123', [
+        { station: station('gangnam') },
+        { station: station('seoul') },
+      ]);
+
+      expect(mockTxUpdate).not.toHaveBeenCalled();
+      expect(result).toEqual([]);
+    });
+
+    it('throws when the user document is missing (add must not silently no-op)', async () => {
+      mockTxGet.mockResolvedValue({ exists: () => false });
+
+      await expect(
+        favoritesService.addFavorites('user-123', [{ station: station('gangnam') }]),
+      ).rejects.toThrow('즐겨찾기 추가에 실패했습니다.');
+
+      expect(mockTxUpdate).not.toHaveBeenCalled();
+    });
+
+    it('never writes an element containing an undefined field', async () => {
+      seedFavorites([]);
+
+      await favoritesService.addFavorites('user-123', [{ station: station('gangnam') }]);
+
+      const payload = mockTxUpdate.mock.calls[0]?.[1] as {
+        'preferences.favoriteStations': FavoriteStation[];
+      };
+      const written = payload['preferences.favoriteStations'];
+      for (const element of written) {
+        for (const value of Object.values(element)) {
+          expect(value).not.toBeUndefined();
+        }
+      }
+      // alias defaults to null (not undefined) when not supplied.
+      expect(written[0]?.alias).toBeNull();
+    });
+
+    it('throws a user-friendly error when the transaction commit fails', async () => {
+      seedFavorites([]);
+      mockRunTransaction.mockRejectedValue(new Error('Firestore commit error'));
+
+      await expect(
+        favoritesService.addFavorites('user-123', [{ station: station('gangnam') }]),
+      ).rejects.toThrow('즐겨찾기 추가에 실패했습니다.');
+    });
+  });
+
   describe('reorderFavoritesByIds', () => {
     const fav = (id: string, extra: Partial<FavoriteStation> = {}): FavoriteStation => ({
       id,
