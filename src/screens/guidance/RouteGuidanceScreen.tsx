@@ -534,7 +534,8 @@ export const RouteGuidanceScreen: React.FC = () => {
 
   // Local-notification bridge — schedule/reschedule for the earliest train while
   // waiting. 폴링마다 earliestTrain 참조가 갱신되어 effect가 재실행되므로,
-  // boardingAlertService가 trainId 발사-이력 dedup으로 같은 열차의 중복 발사를
+  // boardingAlertService가 대기 컨텍스트(세션·역·variant) dedup으로 승강장 대기당
+  // 최대 1회만 발사한다 — 대기 중 열차가 A→B로 승계돼도(각기 다른 id) 중복 발사를
   // 막는다(발사된 알림은 취소 불가 — pending만 cancel-then-schedule). The screen
   // is foreground when scheduling, so tapping the alert just returns here.
   const notificationSettings = user?.preferences?.notificationSettings ?? null;
@@ -548,7 +549,6 @@ export const RouteGuidanceScreen: React.FC = () => {
       stationName: waitingStationName,
       finalDestination: earliestTrain.finalDestination,
       arrivalTime: earliestTrain.arrivalTime,
-      trainId: earliestTrain.id,
       settings: notificationSettings,
       variant: currentStep?.kind === 'transfer' ? 'transfer' : 'board',
     });

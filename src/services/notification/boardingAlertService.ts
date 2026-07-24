@@ -29,9 +29,9 @@ const DEFAULT_SECONDS_BEFORE = 30;
 export const BOARDING_ALERT_KIND = 'boarding-alert';
 
 /**
- * 같은 열차 재알림 억제 창. 열차 번호(btrainNo)는 다른 날 재사용될 수 있어
- * 억제를 무기한 유지하면 정당한 알림까지 삼킨다 — 한 번의 승강장 대기를
- * 충분히 덮는 길이로 제한.
+ * 발사된 탑승 알림 재발사 억제 창. dedup 키(대기 컨텍스트|역|variant)는 다음
+ * 승강장 대기에서 재사용되므로, 억제를 무기한 유지하면 정당한 알림까지 삼킨다 —
+ * 한 번의 승강장 대기를 충분히 덮는 길이로 제한한다(배달 시각 기준).
  */
 const FIRED_DEDUP_WINDOW_MS = 10 * 60 * 1000;
 
@@ -42,10 +42,16 @@ let lastAlertId: string | null = null;
 // 적용한다. (단일 추적 슬롯이라 컨텍스트 간 교체 시 이전 것을 놓치는 건 known-limit.)
 let trackedContext: 'guidance' | 'standalone' | null = null;
 let trackedSessionKey: string | null = null;
-// 마지막으로 예약한 알림의 (열차 키, 발사 시각) — "이미 발사된 알림은 취소
-// 불가"라는 OS 제약 아래에서, 발사 후 재스케줄(=즉시발사 강등 → 중복 배너)을
-// 차단하는 발사 이력. trainId를 넘긴 호출자에게만 적용된다.
-let lastScheduledTrainId: string | null = null;
+// 마지막으로 예약한 guidance 알림의 (dedup 키, 발사 시각) — "이미 발사된 알림은 취소
+// 불가"라는 OS 제약 아래에서, 발사 후 재스케줄(=즉시발사 강등 → 중복 배너)을 차단하는
+// 발사 이력. 키는 한 번의 승강장 대기(세션|역|variant)를 단위로 하므로, 대기 중 열차가
+// A→B로 승계돼도(각기 다른 trainId) 대기당 최대 1회만 발사된다. guidance 전용 —
+// standalone은 이 슬롯을 읽지도 쓰지도 않는다.
+// known-limit(누락 방향): 단일 슬롯이라 10분 창 안에 이전 역(goPrev)으로 되돌아갔다
+// 돌아오는 왕복 시 1회 추가 발사가 허용될 수 있다.
+// known-limit(삼킴 방향): 같은 세션·역·variant를 10분 창 내 재방문(순환선 왕복 등)하면
+// 두 번째 정당한 알림이 억제될 수 있다.
+let lastScheduledDedupKey: string | null = null;
 let lastScheduledFireAtMs: number | null = null;
 
 interface BoardingAlertParamsBase {
@@ -55,8 +61,6 @@ interface BoardingAlertParamsBase {
   readonly secondsBefore?: number;
   /** Copy variant: 'board' (first train, default) or 'transfer' (transfer train). */
   readonly variant?: 'board' | 'transfer';
-  /** Poll-stable train id (btrainNo 기반) — 제공 시 발사-이력 dedup 활성화. */
-  readonly trainId?: string;
   /** 사용자 알림 설정 — 제공 시 shouldSendNotification 게이트를 통과해야 예약. */
   readonly settings?: NotificationSettings | null;
 }
@@ -119,7 +123,6 @@ const scheduleBoardingAlertInner = async (
     arrivalTime,
     secondsBefore = DEFAULT_SECONDS_BEFORE,
     variant = 'board',
-    trainId,
     settings,
   } = params;
 
@@ -143,12 +146,19 @@ const scheduleBoardingAlertInner = async (
       return null;
     }
 
-    // 발사 이력 dedup: 같은 열차의 알림이 이미 발사됐다면(fireAt 경과) 재예약
-    // 금지 — 재예약은 과거 트리거로 강등되어 즉시 중복 배너가 된다.
+    // 발사 이력 dedup(guidance 전용): 같은 대기(세션|역|variant)의 알림이 이미
+    // 발사됐다면(fireAt 경과) 재예약 금지 — 재예약은 과거 트리거로 강등되어 즉시
+    // 중복 배너가 된다. 대기 중 열차가 A→B로 승계돼도 키가 같아 대기당 1회로 억제된다.
+    // standalone(TrainSelectionScreen)은 boardedRef로 탭당 1회가 이미 보장돼 dedup에
+    // 참여하지 않는다 — 슬롯을 읽지도 쓰지도 않아 guidance 슬롯을 덮어쓰지 않는다.
     const fireAtMs = arrivalTime.getTime() - secondsBefore * 1000;
+    const dedupKey =
+      params.context === 'guidance'
+        ? `g:${params.sessionKey}|${stationName}|${variant}`
+        : null;
     if (
-      trainId != null &&
-      trainId === lastScheduledTrainId &&
+      dedupKey !== null &&
+      dedupKey === lastScheduledDedupKey &&
       lastScheduledFireAtMs !== null
     ) {
       const now = Date.now();
@@ -196,9 +206,13 @@ const scheduleBoardingAlertInner = async (
     lastAlertId = id;
     trackedContext = params.context;
     trackedSessionKey = params.context === 'guidance' ? params.sessionKey : null;
-    if (id !== null) {
-      lastScheduledTrainId = trainId ?? null;
-      lastScheduledFireAtMs = fireAtMs;
+    if (id !== null && dedupKey !== null) {
+      // guidance 예약만 슬롯을 기록한다(standalone은 슬롯 미참여).
+      lastScheduledDedupKey = dedupKey;
+      // 클램프: 즉시발사 강등(과거 fireAt) 시 실제 배달 시각(now)으로 기록해야 10분
+      // 창이 배달 기준으로 작동한다 (stale ETA의 과거 fireAt이 창을 즉시 만료시키는
+      // 구멍 방지).
+      lastScheduledFireAtMs = Math.max(fireAtMs, Date.now());
     }
     return id;
   } catch (error) {
@@ -252,9 +266,24 @@ const cancelBoardingAlertInner = async (
   }
   if (cancelTracked) {
     const id = lastAlertId;
+    // dedup 슬롯은 guidance 전용 — 리셋 전에 취소 대상이 슬롯의 주인(guidance)인지 캡처한다.
+    const canceledTrackedIsGuidance = trackedContext === 'guidance';
     lastAlertId = null;
     trackedContext = null;
     trackedSessionKey = null;
+    // 미발사 pending(미래 fireAt)인 guidance 알림 취소 시 dedup 슬롯을 비운다 — 배달된
+    // 적 없는 알림이 이후 같은 키 재예약을 잘못 억제하지 않게 한다. 이미 과거(배달 추정)면
+    // 슬롯을 유지해 발사-이력 dedup을 살린다. guidance 게이트 필수: dedup 슬롯은 guidance
+    // 전용이므로, standalone 추적 알림 취소가 남의(guidance) pending 슬롯을 지우면 발사 후
+    // 재예약 중복 배너가 재발한다(Codex P2).
+    if (
+      canceledTrackedIsGuidance &&
+      lastScheduledFireAtMs !== null &&
+      lastScheduledFireAtMs > Date.now()
+    ) {
+      lastScheduledDedupKey = null;
+      lastScheduledFireAtMs = null;
+    }
     if (id !== null) {
       try {
         await notificationService.cancelNotification(id);
