@@ -1,6 +1,7 @@
 import React from 'react';
 import { fireEvent, render } from '@testing-library/react-native';
 import { GuidanceControls } from '../GuidanceControls';
+import { WANTED_TOKENS } from '@/styles/modernTheme';
 
 jest.mock('@/services/theme', () => ({
   useSemanticTokens: jest.fn(() => jest.requireActual('@/styles/modernTheme').WANTED_TOKENS.light),
@@ -85,5 +86,59 @@ describe('GuidanceControls', () => {
     );
     fireEvent.press(getByTestId('guidance-exit'));
     expect(onExit).toHaveBeenCalledTimes(1);
+  });
+
+  describe('nextEmphasis', () => {
+    it('uses the primary surface by default (board/transfer confirm)', () => {
+      const { getByTestId, getByText } = render(
+        <GuidanceControls
+          nextLabel="탑승했어요"
+          prevDisabled={false}
+          onPrev={jest.fn()}
+          onNext={jest.fn()}
+          onExit={jest.fn()}
+        />
+      );
+      expect(getByTestId('guidance-next')).toHaveStyle({
+        backgroundColor: WANTED_TOKENS.light.primaryNormal,
+      });
+      // Label + accessibility unchanged.
+      expect(getByText('탑승했어요')).toBeTruthy();
+    });
+
+    it('demotes the next button to a neutral surface when nextEmphasis="correction"', () => {
+      const { getByTestId, getByText } = render(
+        <GuidanceControls
+          nextLabel="하차했어요"
+          prevDisabled={false}
+          onPrev={jest.fn()}
+          onNext={jest.fn()}
+          onExit={jest.fn()}
+          nextEmphasis="correction"
+        />
+      );
+      const nextButton = getByTestId('guidance-next');
+      expect(nextButton).toHaveStyle({ backgroundColor: WANTED_TOKENS.light.bgSubtle });
+      expect(nextButton).not.toHaveStyle({ backgroundColor: WANTED_TOKENS.light.primaryNormal });
+      // Label + accessibility preserved on the demoted button.
+      expect(nextButton.props.accessibilityLabel).toBe('하차했어요');
+      expect(getByText('하차했어요')).toBeTruthy();
+    });
+
+    it('still fires onNext when demoted to correction', () => {
+      const onNext = jest.fn();
+      const { getByTestId } = render(
+        <GuidanceControls
+          nextLabel="하차했어요"
+          prevDisabled={false}
+          onPrev={jest.fn()}
+          onNext={onNext}
+          onExit={jest.fn()}
+          nextEmphasis="correction"
+        />
+      );
+      fireEvent.press(getByTestId('guidance-next'));
+      expect(onNext).toHaveBeenCalledTimes(1);
+    });
   });
 });

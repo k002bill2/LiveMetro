@@ -69,6 +69,25 @@ export interface Translations {
     termsOfService: string;
     appInfo: string;
     version: string;
+    // Guidance detection diagnostics (Alert)
+    detectionDiagnostics: {
+      title: string;
+      resetButton: string;
+      closeButton: string;
+      loadError: string;
+      empty: string;
+      total: string;
+      detectionRate: string;
+      auto: string;
+      manual: string;
+      softAccept: string;
+      trainSelect: string;
+      dismissed: string;
+      avgWait: string;
+      countUnit: string;
+      minute: string;
+      second: string;
+    };
     // Actions
     signOut: string;
     signOutConfirm: string;
@@ -235,6 +254,24 @@ export const translations: Record<Language, Translations> = {
       termsOfService: '서비스 이용약관',
       appInfo: '앱 정보',
       version: '버전',
+      detectionDiagnostics: {
+        title: '길안내 감지 진단',
+        resetButton: '기록 초기화',
+        closeButton: '닫기',
+        loadError: '진단 정보를 불러오지 못했습니다.',
+        empty: '기록 없음',
+        total: '총 대기 횟수',
+        detectionRate: '감지 발화율',
+        auto: '자동 진행',
+        manual: '수동 확인',
+        softAccept: '프롬프트 수락',
+        trainSelect: '열차 시트 선택',
+        dismissed: '기각 횟수',
+        avgWait: '평균 대기시간',
+        countUnit: '회',
+        minute: '분',
+        second: '초',
+      },
       signOut: '로그아웃',
       signOutConfirm: '정말 로그아웃하시겠습니까?',
     },
@@ -388,6 +425,24 @@ export const translations: Record<Language, Translations> = {
       termsOfService: 'Terms of Service',
       appInfo: 'App Info',
       version: 'Version',
+      detectionDiagnostics: {
+        title: 'Guidance Detection Diagnostics',
+        resetButton: 'Reset records',
+        closeButton: 'Close',
+        loadError: 'Could not load diagnostics.',
+        empty: 'No records',
+        total: 'Total waits',
+        detectionRate: 'Detection rate',
+        auto: 'Auto-advanced',
+        manual: 'Manual confirm',
+        softAccept: 'Prompt accepted',
+        trainSelect: 'Train picked',
+        dismissed: 'Dismissals',
+        avgWait: 'Avg wait',
+        countUnit: '',
+        minute: 'm',
+        second: 's',
+      },
       signOut: 'Sign Out',
       signOutConfirm: 'Are you sure you want to sign out?',
     },

@@ -11,6 +11,10 @@ import { SettingsScreen } from '../SettingsScreen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '@/services/auth/AuthContext';
 import { useTheme } from '@/services/theme';
+import {
+  loadDetectionEpisodes,
+  clearDetectionMetrics,
+} from '@/services/guidance/guidanceDetectionMetrics';
 
 jest.mock('lucide-react-native', () => ({
   ChevronRight: 'ChevronRight',
@@ -35,6 +39,23 @@ jest.mock('lucide-react-native', () => ({
   MessageSquare: 'MessageSquare',
   Wrench: 'Wrench',
   Trash2: 'Trash2',
+  Activity: 'Activity',
+}));
+
+// Detection-metrics diagnostics — mock at the module boundary so the row never
+// touches AsyncStorage; assert the Alert wiring.
+jest.mock('@/services/guidance/guidanceDetectionMetrics', () => ({
+  loadDetectionEpisodes: jest.fn(() => Promise.resolve([])),
+  summarizeDetectionMetrics: jest.fn(() => ({
+    total: 0,
+    byResolution: { auto: 0, 'soft-accept': 0, manual: 0, 'train-select': 0 },
+    softFiredCount: 0,
+    softFiredRate: null,
+    dismissedTotal: 0,
+    avgWaitedSec: null,
+  })),
+  formatDetectionSummary: jest.fn(() => '기록 없음'),
+  clearDetectionMetrics: jest.fn(() => Promise.resolve()),
 }));
 
 const mockNavigate = jest.fn();
@@ -119,6 +140,24 @@ jest.mock('@/services/i18n', () => ({
         termsOfService: '서비스 이용약관',
         appInfo: '앱 정보',
         version: '버전',
+        detectionDiagnostics: {
+          title: '길안내 감지 진단',
+          resetButton: '기록 초기화',
+          closeButton: '닫기',
+          loadError: '진단 정보를 불러오지 못했습니다.',
+          empty: '기록 없음',
+          total: '총 대기 횟수',
+          detectionRate: '감지 발화율',
+          auto: '자동 진행',
+          manual: '수동 확인',
+          softAccept: '프롬프트 수락',
+          trainSelect: '열차 시트 선택',
+          dismissed: '기각 횟수',
+          avgWait: '평균 대기시간',
+          countUnit: '회',
+          minute: '분',
+          second: '초',
+        },
         signOut: '로그아웃',
         signOutConfirm: '정말 로그아웃하시겠습니까?',
       },
@@ -879,6 +918,148 @@ describe('SettingsScreen', () => {
         ]),
       );
       alertSpy.mockRestore();
+    });
+  });
+
+  describe('길안내 감지 진단 (detection diagnostics)', () => {
+    it('renders the diagnostics row', () => {
+      const { getByTestId, getByText } = render(<SettingsScreen {...defaultProps} />);
+
+      expect(getByTestId('settings-detection-diagnostics')).toBeTruthy();
+      expect(getByText('길안내 감지 진단')).toBeTruthy();
+    });
+
+    it('loads the metrics and opens the summary Alert when pressed', async () => {
+      const { getByTestId } = render(<SettingsScreen {...defaultProps} />);
+
+      fireEvent.press(getByTestId('settings-detection-diagnostics'));
+
+      await waitFor(() => {
+        expect(loadDetectionEpisodes).toHaveBeenCalled();
+        expect(Alert.alert).toHaveBeenCalledWith(
+          '길안내 감지 진단',
+          '기록 없음',
+          expect.arrayContaining([
+            expect.objectContaining({ text: '기록 초기화', style: 'destructive' }),
+            expect.objectContaining({ text: '닫기', style: 'cancel' }),
+          ]),
+        );
+      });
+    });
+
+    it('clears the metrics when the 기록 초기화 action is invoked', async () => {
+      const { getByTestId } = render(<SettingsScreen {...defaultProps} />);
+
+      fireEvent.press(getByTestId('settings-detection-diagnostics'));
+
+      await waitFor(() => expect(Alert.alert).toHaveBeenCalled());
+      const call = (Alert.alert as jest.Mock).mock.calls.find(
+        (c) => c[0] === '길안내 감지 진단',
+      );
+      const resetButton = call![2].find((b: { style?: string }) => b.style === 'destructive');
+      resetButton.onPress();
+
+      expect(clearDetectionMetrics).toHaveBeenCalled();
+    });
+
+    it('shows a friendly Alert when loading the metrics fails', async () => {
+      (loadDetectionEpisodes as jest.Mock).mockRejectedValueOnce(new Error('load failed'));
+      const { getByTestId } = render(<SettingsScreen {...defaultProps} />);
+
+      fireEvent.press(getByTestId('settings-detection-diagnostics'));
+
+      await waitFor(() => {
+        expect(Alert.alert).toHaveBeenCalledWith('오류', '진단 정보를 불러오지 못했습니다.');
+      });
+    });
+
+    it('shows the loadError Alert (not the summary) when the read returns null (R4)', async () => {
+      // null = transient storage read failure → surface the load error, never the
+      // "기록 없음" summary (which would misrepresent a failure as empty history).
+      (loadDetectionEpisodes as jest.Mock).mockResolvedValueOnce(null);
+      const { getByTestId } = render(<SettingsScreen {...defaultProps} />);
+
+      fireEvent.press(getByTestId('settings-detection-diagnostics'));
+
+      await waitFor(() => {
+        expect(Alert.alert).toHaveBeenCalledWith('오류', '진단 정보를 불러오지 못했습니다.');
+      });
+      // The summary Alert must NOT have been shown.
+      expect(Alert.alert).not.toHaveBeenCalledWith(
+        '길안내 감지 진단',
+        expect.anything(),
+        expect.anything(),
+      );
+    });
+  });
+
+  describe('계정 삭제·로그아웃 시 감지 이력 파기 (R5, privacy)', () => {
+    const authWith = (overrides: Record<string, unknown>) => ({
+      user: {
+        id: 'test-uid',
+        displayName: 'Test User',
+        email: 'test@example.com',
+        isAnonymous: false,
+      },
+      firebaseUser: null,
+      loading: false,
+      signInAnonymously: jest.fn(),
+      signInWithEmail: jest.fn(),
+      signUpWithEmail: jest.fn(),
+      signOut: jest.fn().mockResolvedValue(undefined),
+      updateUserProfile: jest.fn(),
+      resetPassword: jest.fn(),
+      changePassword: jest.fn(),
+      deleteCurrentUser: jest.fn().mockResolvedValue(undefined),
+      ...overrides,
+    });
+
+    it('purges detection metrics after a successful account deletion', async () => {
+      (useAuth as jest.Mock).mockReturnValue(authWith({}));
+      const { getByTestId } = render(<SettingsScreen {...defaultProps} />);
+
+      fireEvent.press(getByTestId('dev-nuke-account'));
+      const nukeCall = (Alert.alert as jest.Mock).mock.calls.find(
+        (c) => typeof c[0] === 'string' && c[0].includes('회원 정보 모두 삭제'),
+      );
+      const deleteButton = nukeCall![2].find(
+        (b: { style?: string }) => b.style === 'destructive',
+      );
+      await deleteButton.onPress();
+
+      expect(clearDetectionMetrics).toHaveBeenCalled();
+    });
+
+    it('purges detection metrics after a successful sign out', async () => {
+      const mockSignOut = jest.fn().mockResolvedValue(undefined);
+      (useAuth as jest.Mock).mockReturnValue(authWith({ signOut: mockSignOut }));
+      const { getByText } = render(<SettingsScreen {...defaultProps} />);
+
+      fireEvent.press(getByText('로그아웃'));
+      const callArgs = (Alert.alert as jest.Mock).mock.calls[0];
+      const signOutButton = callArgs[2].find(
+        (b: { style?: string }) => b.style === 'destructive',
+      );
+      await signOutButton.onPress();
+
+      expect(mockSignOut).toHaveBeenCalled();
+      expect(clearDetectionMetrics).toHaveBeenCalled();
+    });
+
+    it('does NOT purge detection metrics when sign out fails', async () => {
+      const mockSignOut = jest.fn().mockRejectedValue(new Error('offline'));
+      (useAuth as jest.Mock).mockReturnValue(authWith({ signOut: mockSignOut }));
+      const { getByText } = render(<SettingsScreen {...defaultProps} />);
+
+      fireEvent.press(getByText('로그아웃'));
+      const callArgs = (Alert.alert as jest.Mock).mock.calls[0];
+      const signOutButton = callArgs[2].find(
+        (b: { style?: string }) => b.style === 'destructive',
+      );
+      await signOutButton.onPress();
+
+      // Sign out rejected → the purge (after the await) must not run.
+      expect(clearDetectionMetrics).not.toHaveBeenCalled();
     });
   });
 });

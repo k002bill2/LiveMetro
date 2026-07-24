@@ -32,6 +32,10 @@ import {
   cumulativeRideSecondsTo,
 } from '@/services/guidance/guidanceSteps';
 import {
+  recordDetectionEpisode,
+  type DetectionResolution,
+} from '@/services/guidance/guidanceDetectionMetrics';
+import {
   detectDeparture,
   ARRIVING_ETA_THRESHOLD_SEC,
 } from '@/services/guidance/departureDetection';
@@ -184,6 +188,7 @@ export const RouteGuidanceScreen: React.FC = () => {
 
   const {
     currentIndex,
+    isHolding,
     elapsedInStepSec,
     remainingSeconds,
     etaMs,
@@ -334,6 +339,20 @@ export const RouteGuidanceScreen: React.FC = () => {
   const autoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const nowMsRef = useRef(nowMs);
   nowMsRef.current = nowMs;
+  // Detection-metrics bookkeeping for the CURRENT board/transfer hold. Read via
+  // refs so `confirmBoardedAt` (the single record site) stays tick-stable — a
+  // direct `elapsedInStepSec` dep would churn the callback every second and
+  // destabilize the detection effect (which lists `confirmBoarded`).
+  const elapsedInStepSecRef = useRef(elapsedInStepSec);
+  elapsedInStepSecRef.current = elapsedInStepSec;
+  // known-limit (R6-3): 이 refs는 화면 마운트 수명 동안만 유지된다. 앱 재시작으로
+  // 세션이 복원되면(progressAnchor 복원) 그 이전 hold의 softFired/dismissedCount는
+  // 소실되어, 복원 후 재확정되는 hold는 softFired가 보수적으로 false로 기록된다
+  // (감지 성공을 과소 집계하는 방향 — 과대 집계가 아님). v1 진단 목적상 허용이며
+  // 이 refs의 영속화는 의도적으로 미구현.
+  const episodeSoftFiredRef = useRef(false);
+  const episodeDismissCountRef = useRef(0);
+  const pendingResolutionRef = useRef<DetectionResolution | null>(null);
 
   const clearAutoTimer = useCallback((): void => {
     if (autoTimerRef.current !== null) {
@@ -365,11 +384,42 @@ export const RouteGuidanceScreen: React.FC = () => {
         }),
         Date.now()
       );
+      // Detection metric: one confirmed board/transfer hold. resolution defaults
+      // to 'manual' when no funnel wrapper set a more specific one. Fire-and-forget
+      // (never blocks the advance); the service swallows its own failures.
+      void recordDetectionEpisode({
+        recordedAtMs: Date.now(),
+        sessionKey: session ? String(session.startedAt) : null,
+        stepIndex: currentIndex,
+        stepKind: currentStep?.kind === 'transfer' ? 'transfer' : 'board',
+        stationName: waitingStationName,
+        lineId: waitingLineId,
+        // R6-1: waitedSec은 hold 시작→탑승 시각(atMs) 구간이어야 한다. 소급 열차
+        // 선택은 atMs가 과거라 확정 시점까지의 초과분((now - atMs))을 빼야 실제
+        // 대기시간이 된다. 즉시 수동 확정은 atMs≈now라 뺄 값이 0(기존과 동일).
+        waitedSec: Math.max(
+          0,
+          Math.round(elapsedInStepSecRef.current - (Date.now() - atMs) / 1000)
+        ),
+        softFired: episodeSoftFiredRef.current,
+        dismissedCount: episodeDismissCountRef.current,
+        resolution: pendingResolutionRef.current ?? 'manual',
+      });
+      episodeSoftFiredRef.current = false;
+      episodeDismissCountRef.current = 0;
+      pendingResolutionRef.current = null;
     }
     goNextAt(atMs);
-  }, [clearAutoTimer, currentIndex, goNextAt, isWaitingStep, trains, waitingLineId, waitingStationName]);
+  }, [clearAutoTimer, currentIndex, currentStep, goNextAt, isWaitingStep, session, trains, waitingLineId, waitingStationName]);
 
   const confirmBoarded = useCallback((): void => confirmBoardedAt(Date.now()), [confirmBoardedAt]);
+
+  // Soft-confirm "예": accept the detected departure. Tags the resolution before
+  // funneling through the single advance path.
+  const confirmBoardedFromSoftConfirm = useCallback((): void => {
+    pendingResolutionRef.current = 'soft-accept';
+    confirmBoarded();
+  }, [confirmBoarded]);
 
   const dismissSoftConfirm = useCallback((): void => {
     clearAutoTimer();
@@ -380,6 +430,19 @@ export const RouteGuidanceScreen: React.FC = () => {
     }
     setSoftConfirm(null);
   }, [clearAutoTimer, softConfirm]);
+
+  // "아직 안 탔어요" — the ONLY path that counts as a dismissal against this hold
+  // (detection metric). The "다른 열차예요" / waiting-card links also route through
+  // dismissSoftConfirm (to clear a pending prompt before opening the sheet), but
+  // those must NOT inflate dismissedCount — else the same 'train-select' outcome
+  // would record 0 or 1 depending on entry path. Keeps the metric's field doc
+  // ("아직 안 탔어요 탭 수") honest.
+  const dismissSoftConfirmNotYet = useCallback((): void => {
+    if (softConfirm !== null) {
+      episodeDismissCountRef.current += 1;
+    }
+    dismissSoftConfirm();
+  }, [softConfirm, dismissSoftConfirm]);
 
   // Opening the sheet always dismisses any pending soft-confirm first, so its
   // 4s auto-advance can never fire behind the sheet. It also captures the step
@@ -419,6 +482,8 @@ export const RouteGuidanceScreen: React.FC = () => {
     setTrainSelectContext(null);
     if (ctx === null || currentIndex !== ctx.stepIndex) return;
     if (ctx.mode === 'confirm') {
+      // Detection metric: this hold resolved via a train-select pick.
+      pendingResolutionRef.current = 'train-select';
       confirmBoardedAt(departedAtMs);
     } else {
       rebaseAt(departedAtMs);
@@ -467,6 +532,10 @@ export const RouteGuidanceScreen: React.FC = () => {
     firedForIndexRef.current = null;
     cooldownTrainIdRef.current = null;
     prevTrainsRef.current = null;
+    // Reset detection-metrics bookkeeping for the new hold.
+    episodeSoftFiredRef.current = false;
+    episodeDismissCountRef.current = 0;
+    pendingResolutionRef.current = null;
   }, [currentIndex, clearAutoTimer]);
 
   // Departure detection — compare successive fresh snapshots. `trains` only
@@ -517,8 +586,16 @@ export const RouteGuidanceScreen: React.FC = () => {
       trainSelectContext === null
     ) {
       setSoftConfirm({ trainId: result.trainId });
+      // Detection metric: the soft-confirm fired at least once this hold.
+      episodeSoftFiredRef.current = true;
       clearAutoTimer();
-      autoTimerRef.current = setTimeout(confirmBoarded, SOFT_CONFIRM_AUTO_MS);
+      // Inline wrapper tags the resolution as 'auto' before the shared funnel —
+      // keeps `confirmBoarded` as the referenced identity so the effect deps are
+      // unchanged.
+      autoTimerRef.current = setTimeout(() => {
+        pendingResolutionRef.current = 'auto';
+        confirmBoarded();
+      }, SOFT_CONFIRM_AUTO_MS);
     }
   }, [
     trains,
@@ -601,9 +678,9 @@ export const RouteGuidanceScreen: React.FC = () => {
   const softConfirmHandlers = useMemo(
     () =>
       softConfirm !== null
-        ? { onYes: confirmBoarded, onNotYet: dismissSoftConfirm, onOther: openTrainSelect }
+        ? { onYes: confirmBoardedFromSoftConfirm, onNotYet: dismissSoftConfirmNotYet, onOther: openTrainSelect }
         : null,
-    [softConfirm, confirmBoarded, dismissSoftConfirm, openTrainSelect]
+    [softConfirm, confirmBoardedFromSoftConfirm, dismissSoftConfirmNotYet, openTrainSelect]
   );
 
   // Candidates for the sheet: recent departures at the station/line captured
@@ -731,6 +808,7 @@ export const RouteGuidanceScreen: React.FC = () => {
         onPrev={goPrev}
         onNext={confirmBoarded}
         onExit={handleExit}
+        nextEmphasis={isHolding ? 'primary' : 'correction'}
       />
       <TrainSelectSheet
         visible={trainSelectContext !== null}
