@@ -468,15 +468,15 @@ describe('RouteGuidanceScreen', () => {
       error: null,
     });
     const { getByTestId } = render(<RouteGuidanceScreen />);
-    // trainId는 발사 이력 dedup 키 — 반드시 함께 전달돼야 한다. context='guidance' +
-    // sessionKey(고정 세션 키)는 세션 정리/고아 sweep 대상임을 표시한다(H1/H2).
+    // dedup은 대기 컨텍스트(context+sessionKey+역+variant) 단위 — trainId를 넘기지
+    // 않는다. context='guidance' + sessionKey(고정 세션 키)는 세션 정리/고아 sweep
+    // 대상임을 표시한다(H1/H2).
     expect(scheduleBoardingAlert).toHaveBeenCalledWith(
       expect.objectContaining({
         context: 'guidance',
         sessionKey: String(T0),
         stationName: '을지로3가',
         variant: 'board',
-        trainId: 'T1',
       })
     );
     fireEvent.press(getByTestId('guidance-exit'));
@@ -498,11 +498,13 @@ describe('RouteGuidanceScreen', () => {
     const { getByText } = render(<RouteGuidanceScreen />);
     // 칩은 진행 방향 열차(90초) 기준 — 반대 방향(60초)이 아님
     expect(getByText('다음 열차 1분 30초 후 도착')).toBeTruthy();
+    // trainId를 넘기지 않으므로 방향 판별은 finalDestination으로 확인한다
+    // (진행 방향 T1='산곡' vs 반대 방향 OPP='을지로3가').
     expect(scheduleBoardingAlert).toHaveBeenCalledWith(
-      expect.objectContaining({ trainId: 'T1', finalDestination: '산곡' })
+      expect.objectContaining({ finalDestination: '산곡' })
     );
     expect(scheduleBoardingAlert).not.toHaveBeenCalledWith(
-      expect.objectContaining({ trainId: 'OPP' })
+      expect.objectContaining({ finalDestination: '을지로3가' })
     );
   });
 
@@ -518,7 +520,7 @@ describe('RouteGuidanceScreen', () => {
     const { getByText } = render(<RouteGuidanceScreen />);
     expect(getByText('다음 열차 1분 00초 후 도착')).toBeTruthy();
     expect(scheduleBoardingAlert).toHaveBeenCalledWith(
-      expect.objectContaining({ trainId: 'SHORT' })
+      expect.objectContaining({ finalDestination: '시청' })
     );
   });
 

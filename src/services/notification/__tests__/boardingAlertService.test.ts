@@ -216,88 +216,56 @@ describe('boardingAlertService', () => {
     expect(id).toBeNull();
   });
 
-  // ── 발사 이력 dedup: trainId를 넘긴 호출자(길안내 화면)에 한해, 이미
-  // 발사된(=fireAt이 지난) 같은 열차의 알림을 재스케줄하지 않는다. 재스케줄은
+  // ── 발사 이력 dedup: 한 번의 승강장 대기(컨텍스트|역|variant)당 최대 1회.
+  // 대기 중 열차가 A→B→C로 승계돼도(각기 다른 trainId) 억제된다 — 재예약은
   // 즉시발사(trigger:null)로 강등되어 취소 불가능한 중복 배너가 되기 때문.
-  describe('fired-train dedup (trainId)', () => {
-    it('skips re-scheduling when the same train alert has already fired', async () => {
-      // 도착 10초 전 → fireAt(도착-30초)은 이미 과거 = 스케줄 즉시 발사됨
-      const imminent = new Date(Date.now() + 10_000);
-      const first = await scheduleBoardingAlert({ context: 'standalone',
-        stationName: '강남',
-        finalDestination: '잠실',
-        arrivalTime: imminent,
-        trainId: 'train-fired-1',
-      });
-      expect(first).toBe('alert-id');
+  // 억제 창은 배달 시각 기준 10분.
+  describe('fired-boarding dedup (per waiting context)', () => {
+    const guidanceParams = (
+      sessionKey: string,
+      stationName: string,
+      arrivalTime: Date,
+      variant: 'board' | 'transfer' = 'board'
+    ): Parameters<typeof scheduleBoardingAlert>[0] => ({
+      context: 'guidance',
+      sessionKey,
+      stationName,
+      finalDestination: '잠실',
+      arrivalTime,
+      variant,
+    });
 
-      const second = await scheduleBoardingAlert({ context: 'standalone',
-        stationName: '강남',
-        finalDestination: '잠실',
-        arrivalTime: new Date(Date.now() + 8_000),
-        trainId: 'train-fired-1',
-      });
+    it('[핵심] guidance 같은 세션·역·variant: 임박한 열차 A 발사 후 다른 열차 B는 억제된다', async () => {
+      // 열차 A: 도착 10초 전 → fireAt(도착-30초) 과거 = 즉시발사 → 슬롯 배달시각=now
+      const first = await scheduleBoardingAlert(
+        guidanceParams('sess-1', '강남', new Date(Date.now() + 10_000))
+      );
+      expect(first).toBe('alert-id');
+      // 열차 B: 다른 도착시각이지만 같은 대기(세션·역·variant) → 억제
+      const second = await scheduleBoardingAlert(
+        guidanceParams('sess-1', '강남', new Date(Date.now() + 8_000))
+      );
       expect(second).toBeNull();
       expect(mockNotif.scheduleArrivalAlert).toHaveBeenCalledTimes(1);
     });
 
-    it('re-schedules (cancel-then-schedule) while the same train alert is still pending', async () => {
-      // 도착 120초 전 → fireAt은 90초 뒤 = 아직 pending → 갱신 허용
-      mockNotif.scheduleArrivalAlert.mockResolvedValueOnce('pending-1');
-      await scheduleBoardingAlert({ context: 'standalone',
-        stationName: '강남',
-        finalDestination: '잠실',
-        arrivalTime: new Date(Date.now() + 120_000),
-        trainId: 'train-pending-1',
-      });
-
-      mockNotif.scheduleArrivalAlert.mockResolvedValueOnce('pending-2');
-      const second = await scheduleBoardingAlert({ context: 'standalone',
-        stationName: '강남',
-        finalDestination: '잠실',
-        arrivalTime: new Date(Date.now() + 115_000),
-        trainId: 'train-pending-1',
-      });
-      expect(second).toBe('pending-2');
-      expect(mockNotif.cancelNotification).toHaveBeenCalledWith('pending-1');
-      expect(mockNotif.scheduleArrivalAlert).toHaveBeenCalledTimes(2);
+    it('연속 3개 열차 승계 → 총 1회만 발사한다', async () => {
+      await scheduleBoardingAlert(guidanceParams('sess-1', '강남', new Date(Date.now() + 12_000)));
+      await scheduleBoardingAlert(guidanceParams('sess-1', '강남', new Date(Date.now() + 9_000)));
+      await scheduleBoardingAlert(guidanceParams('sess-1', '강남', new Date(Date.now() + 6_000)));
+      expect(mockNotif.scheduleArrivalAlert).toHaveBeenCalledTimes(1);
     });
 
-    it('schedules a different train even after a previous train alert fired', async () => {
-      await scheduleBoardingAlert({ context: 'standalone',
-        stationName: '강남',
-        finalDestination: '잠실',
-        arrivalTime: new Date(Date.now() + 10_000),
-        trainId: 'train-a',
-      });
-      const other = await scheduleBoardingAlert({ context: 'standalone',
-        stationName: '강남',
-        finalDestination: '잠실',
-        arrivalTime: new Date(Date.now() + 10_000),
-        trainId: 'train-b',
-      });
-      expect(other).toBe('alert-id');
-      expect(mockNotif.scheduleArrivalAlert).toHaveBeenCalledTimes(2);
-    });
-
-    it('re-alerts the same train id after the dedup window (id 재사용 대비)', async () => {
+    it('10분 창 경과 후에는 같은 키라도 재발사를 허용한다 (fake timers)', async () => {
       jest.useFakeTimers();
       try {
-        jest.setSystemTime(new Date('2026-07-04T08:00:00.000Z'));
-        await scheduleBoardingAlert({ context: 'standalone',
-          stationName: '강남',
-          finalDestination: '잠실',
-          arrivalTime: new Date(Date.now() + 10_000),
-          trainId: 'train-reused',
-        });
-        // 11분 뒤 — 같은 id라도 억제 창(10분)을 벗어나면 새 알림 허용
-        jest.setSystemTime(new Date('2026-07-04T08:11:00.000Z'));
-        const later = await scheduleBoardingAlert({ context: 'standalone',
-          stationName: '강남',
-          finalDestination: '잠실',
-          arrivalTime: new Date(Date.now() + 10_000),
-          trainId: 'train-reused',
-        });
+        jest.setSystemTime(new Date('2026-07-25T08:00:00.000Z'));
+        await scheduleBoardingAlert(guidanceParams('sess-1', '강남', new Date(Date.now() + 10_000)));
+        // 11분 뒤 — 같은 키라도 억제 창(10분)을 벗어나면 새 알림 허용
+        jest.setSystemTime(new Date('2026-07-25T08:11:00.000Z'));
+        const later = await scheduleBoardingAlert(
+          guidanceParams('sess-1', '강남', new Date(Date.now() + 10_000))
+        );
         expect(later).toBe('alert-id');
         expect(mockNotif.scheduleArrivalAlert).toHaveBeenCalledTimes(2);
       } finally {
@@ -305,19 +273,134 @@ describe('boardingAlertService', () => {
       }
     });
 
-    it('does not dedup callers that omit trainId (기존 호출자 행동 불변)', async () => {
-      await scheduleBoardingAlert({ context: 'standalone',
+    it('역이 다르면 억제하지 않는다', async () => {
+      await scheduleBoardingAlert(guidanceParams('sess-1', '강남', new Date(Date.now() + 10_000)));
+      const other = await scheduleBoardingAlert(
+        guidanceParams('sess-1', '삼성', new Date(Date.now() + 10_000))
+      );
+      expect(other).toBe('alert-id');
+      expect(mockNotif.scheduleArrivalAlert).toHaveBeenCalledTimes(2);
+    });
+
+    it('variant가 다르면(board→transfer) 억제하지 않는다', async () => {
+      await scheduleBoardingAlert(
+        guidanceParams('sess-1', '강남', new Date(Date.now() + 10_000), 'board')
+      );
+      const other = await scheduleBoardingAlert(
+        guidanceParams('sess-1', '강남', new Date(Date.now() + 10_000), 'transfer')
+      );
+      expect(other).toBe('alert-id');
+      expect(mockNotif.scheduleArrivalAlert).toHaveBeenCalledTimes(2);
+    });
+
+    it('sessionKey가 다르면 억제하지 않는다', async () => {
+      await scheduleBoardingAlert(guidanceParams('sess-1', '강남', new Date(Date.now() + 10_000)));
+      const other = await scheduleBoardingAlert(
+        guidanceParams('sess-2', '강남', new Date(Date.now() + 10_000))
+      );
+      expect(other).toBe('alert-id');
+      expect(mockNotif.scheduleArrivalAlert).toHaveBeenCalledTimes(2);
+    });
+
+    it('미발사 pending(미래 fireAt)에서 ETA 갱신 재예약은 허용한다 (cancel-then-schedule)', async () => {
+      // 도착 120초 전 → fireAt은 90초 뒤 = 아직 pending → 갱신 허용
+      mockNotif.scheduleArrivalAlert.mockResolvedValueOnce('pending-1');
+      await scheduleBoardingAlert(guidanceParams('sess-1', '강남', new Date(Date.now() + 120_000)));
+
+      mockNotif.scheduleArrivalAlert.mockResolvedValueOnce('pending-2');
+      const second = await scheduleBoardingAlert(
+        guidanceParams('sess-1', '강남', new Date(Date.now() + 115_000))
+      );
+      expect(second).toBe('pending-2');
+      expect(mockNotif.cancelNotification).toHaveBeenCalledWith('pending-1');
+      expect(mockNotif.scheduleArrivalAlert).toHaveBeenCalledTimes(2);
+    });
+
+    it('미발사 pending을 cancelBoardingAlert로 취소하면 같은 키 재예약을 허용한다 (슬롯 클리어)', async () => {
+      mockNotif.scheduleArrivalAlert.mockResolvedValueOnce('pending-1');
+      await scheduleBoardingAlert(guidanceParams('sess-1', '강남', new Date(Date.now() + 120_000)));
+      // 배달 전(pending) 공개 취소 → dedup 슬롯도 비워져야 한다.
+      await cancelBoardingAlert();
+
+      mockNotif.scheduleArrivalAlert.mockResolvedValueOnce('pending-2');
+      const second = await scheduleBoardingAlert(
+        guidanceParams('sess-1', '강남', new Date(Date.now() + 118_000))
+      );
+      expect(second).toBe('pending-2');
+      expect(mockNotif.scheduleArrivalAlert).toHaveBeenCalledTimes(2);
+    });
+
+    it('fireAt이 15분 과거인 즉시발사 후 같은 키 재시도는 억제한다 (배달시각 클램프)', async () => {
+      // arrival = now - 870s → fireAt = now - 900s (15분 과거). 클램프가 없으면 슬롯
+      // fireAt이 15분 과거라 10분 창을 즉시 벗어나 재발사가 새어나간다.
+      const first = await scheduleBoardingAlert(
+        guidanceParams('sess-1', '강남', new Date(Date.now() - 870_000))
+      );
+      expect(first).toBe('alert-id');
+      const second = await scheduleBoardingAlert(
+        guidanceParams('sess-1', '강남', new Date(Date.now() - 860_000))
+      );
+      expect(second).toBeNull();
+      expect(mockNotif.scheduleArrivalAlert).toHaveBeenCalledTimes(1);
+    });
+
+    it('standalone은 dedup에 참여하지 않는다 — 같은 역 임박 열차 2회도 정상 발사 (boardedRef 가드, 회귀)', async () => {
+      // standalone(TrainSelectionScreen)은 탭당 1회가 boardedRef로 이미 보장돼 발사이력
+      // dedup에 편입하지 않는다. 같은 역·variant에서 임박 열차 A를 즉시발사한 뒤 두 번째
+      // 임박 열차 예약도 억제 없이 발사돼야 한다 (슬롯 read/write 비참여).
+      const first = await scheduleBoardingAlert({
+        context: 'standalone',
         stationName: '강남',
         finalDestination: '잠실',
         arrivalTime: new Date(Date.now() + 10_000),
       });
-      const second = await scheduleBoardingAlert({ context: 'standalone',
+      expect(first).toBe('alert-id');
+      const second = await scheduleBoardingAlert({
+        context: 'standalone',
         stationName: '강남',
         finalDestination: '잠실',
-        arrivalTime: new Date(Date.now() + 10_000),
+        arrivalTime: new Date(Date.now() + 8_000),
       });
       expect(second).toBe('alert-id');
       expect(mockNotif.scheduleArrivalAlert).toHaveBeenCalledTimes(2);
+    });
+
+    it('standalone 재교체가 guidance pending 슬롯을 지우지 않는다 — 발사 후 재예약 중복 방지 (Codex P2)', async () => {
+      jest.useFakeTimers();
+      try {
+        jest.setSystemTime(new Date('2026-07-25T08:00:00.000Z'));
+        const t0 = Date.now();
+        // 1) guidance pending 예약 (fireAt = t0+90s 미래) → dedup 슬롯 기록(g:sess-1|강남|board)
+        await scheduleBoardingAlert(guidanceParams('sess-1', '강남', new Date(t0 + 120_000)));
+        // 2) standalone 예약 → 컨텍스트 불일치로 guidance OS 알림은 생존하나 추적 슬롯(단일)이
+        //    standalone으로 덮인다. dedup 슬롯은 guidance 것 그대로.
+        await scheduleBoardingAlert({
+          context: 'standalone',
+          stationName: '강남',
+          finalDestination: '잠실',
+          arrivalTime: new Date(t0 + 120_000),
+        });
+        // 3) standalone 자기 알림 재교체 → cancelTracked(standalone). 소유권 게이트가 없으면
+        //    여기서 guidance의 미래 fireAt 슬롯이 잘못 지워진다.
+        await scheduleBoardingAlert({
+          context: 'standalone',
+          stationName: '강남',
+          finalDestination: '잠실',
+          arrivalTime: new Date(t0 + 120_000),
+        });
+        expect(mockNotif.scheduleArrivalAlert).toHaveBeenCalledTimes(3);
+        // 4) guidance fireAt 이후로 진행 (t0+100s > t0+90s) → guidance 알림은 이미 발사됨
+        jest.setSystemTime(new Date(t0 + 100_000));
+        // 5) 같은 guidance 키 재예약 → 슬롯이 보존됐다면 발사 이력으로 억제돼야 한다.
+        //    슬롯이 지워졌다면(버그) 즉시발사로 재예약되어 중복 배너가 된다.
+        const again = await scheduleBoardingAlert(
+          guidanceParams('sess-1', '강남', new Date(t0 + 130_000))
+        );
+        expect(again).toBeNull();
+        expect(mockNotif.scheduleArrivalAlert).toHaveBeenCalledTimes(3);
+      } finally {
+        jest.useRealTimers();
+      }
     });
   });
 
@@ -334,7 +417,6 @@ describe('boardingAlertService', () => {
         stationName: '강남',
         finalDestination: '잠실',
         arrivalTime: arrival,
-        trainId: 'train-gated-1',
         settings,
       });
       expect(id).toBeNull();
@@ -348,7 +430,6 @@ describe('boardingAlertService', () => {
         stationName: '강남',
         finalDestination: '잠실',
         arrivalTime: arrival,
-        trainId: 'train-gated-2',
         settings,
       });
       expect(id).toBe('alert-id');
