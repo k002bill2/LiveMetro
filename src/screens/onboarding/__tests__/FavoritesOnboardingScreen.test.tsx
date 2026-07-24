@@ -310,7 +310,7 @@ describe('FavoritesOnboardingScreen (step 4/4)', () => {
       });
       // One bulk call carrying exactly the 2 route stations — no duplicate 강남.
       expect(mockContextAddFavorites).toHaveBeenCalledTimes(1);
-      const entries = mockContextAddFavorites.mock.calls[0]?.[0] as ReadonlyArray<unknown>;
+      const entries = mockContextAddFavorites.mock.calls[0]?.[0] as readonly unknown[];
       expect(entries).toHaveLength(2);
     });
 
