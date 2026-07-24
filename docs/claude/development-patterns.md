@@ -216,6 +216,27 @@ function getWeekTag(date: Date): '1' | '2' | '3' {
 
 At 22:00+, include schedule rows < 03:00 next-day as upcoming. Seoul subway runs until ~01:00.
 
+### Check-Then-Act 금지 — 검사한 값을 실행부까지 전달 (TOCTOU)
+
+가드에서 확인한 상태를 실행부에서 **다시 계산**하면, 검사와 실행 사이에 상태가
+변할 수 있어 가드가 무효화된다 (Time-Of-Check to Time-Of-Use).
+
+발견 사례 (2026-07, 길안내 시간보정): `RouteGuidanceScreen`의 보정 픽 가드는
+1Hz 틱으로 렌더된 `currentIndex`(≤1s 스테일)를 비교하는데, `rebaseAt` 내부는
+`Date.now()`로 라이브 인덱스를 재계산했다. ride 추정 종료와 겹치는 ≤1초 창에서
+anchor가 transfer 스텝에 잘못 앉아, 넘긴 시각이 "환승 대기 경과"로 오해석되고
+잔여 ride 구간이 남은 시간 계산에서 탈락했다.
+
+규칙:
+
+- 가드 통과에 사용한 값(스텝 인덱스·키·버전)은 실행 함수의 **파라미터로
+  전달**한다. 실행부 재계산 금지 — 재계산은 검사를 무효화한다.
+- 모달/시트가 열릴 때 캡처한 컨텍스트가 있으면 픽 처리도 그 캡처값으로
+  라우팅한다 (라이브 상태 재참조 금지).
+- 길안내 anchor는 치환(memoryless) 모델: 보정 = `{index, atMs}` 전체 교체라
+  반복 보정에도 오차가 누적되지 않는다. 보정 API를 추가·수정할 때도 이 치환
+  의미론(누적 아님)을 유지할 것.
+
 ## Known Issues & Workarounds
 
 1. **Firebase Firestore Offline Persistence**: Not enabled by default in React Native. The app relies on AsyncStorage cache layer instead.
@@ -237,3 +258,4 @@ At 22:00+, include schedule rows < 03:00 next-day as upcoming. Seoul subway runs
 | 2026-02-06 | 동일 수정 3회+ 반복 | 2회 실패 후 접근 전환 (2-Strike Rule) |
 | 2026-02-06 | 배포 전 환경 점검 누락 | Pre-validation 단계 필수 실행 |
 | 2026-02-06 | 단순 요약만 제공 | 원인/영향/해결책 분석 포함 |
+| 2026-07-25 | 가드 통과 후 실행부에서 라이브 상태 재계산 (TOCTOU) | 검사에 쓴 값을 파라미터로 실행부까지 전달 ("Check-Then-Act 금지" 섹션) |

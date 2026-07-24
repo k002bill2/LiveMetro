@@ -264,10 +264,59 @@ describe('useGuidanceProgress', () => {
       });
       expect(result.current.currentIndex).toBe(1);
       act(() => {
-        result.current.rebaseAt(T0 - 3 * 60_000);
+        result.current.rebaseAt(T0 - 3 * 60_000, 1);
       });
       expect(result.current.currentIndex).toBe(1); // index unchanged
       expect(Math.round(result.current.elapsedInStepSec)).toBe(180);
+    });
+
+    // TOCTOU regression: the screen captures stepIndex from a 1Hz-derived render
+    // (up to 1s stale). If the ride estimate expires inside that window, a live
+    // recompute inside rebaseAt would anchor onto the NEXT step (the transfer
+    // hold) instead of the ride the user actually corrected.
+    // Pre-fix values here were currentIndex 2 (holding) and remainingSeconds 360.
+    it('rebaseAt anchors on the caller-captured ride index even after the estimate rolled into the transfer hold', () => {
+      const { result } = renderHook(() =>
+        useGuidanceProgress(transferSteps, { startedAt: T0, enabled: true })
+      );
+      act(() => {
+        result.current.goNext(); // board → ride (index 1, 5min)
+      });
+      const rideIndex = result.current.currentIndex;
+      expect(rideIndex).toBe(1);
+
+      // Estimate just rolled past the 5min ride → live index is the transfer hold.
+      act(() => {
+        jest.advanceTimersByTime(5 * 60_000 + 1_000);
+      });
+      expect(result.current.currentIndex).toBe(2);
+
+      // User corrects with "my train is at B" (120s into the ride) while the
+      // rendered index still said ride (index 1).
+      act(() => {
+        result.current.rebaseAt(Date.now() - 120_000, rideIndex);
+      });
+      expect(result.current.currentIndex).toBe(1);
+      expect(result.current.isHolding).toBe(false);
+      // ride remainder 180 + transfer 240 + ride2 240 + alight 0
+      expect(result.current.remainingSeconds).toBe(660);
+    });
+
+    it('rebaseAt clamps an out-of-range step index into [0, lastIndex]', () => {
+      const { result } = renderHook(() =>
+        useGuidanceProgress(steps, { startedAt: T0, enabled: true })
+      );
+      act(() => {
+        result.current.rebaseAt(T0, 99); // beyond the end → alight (index 2)
+      });
+      expect(result.current.currentIndex).toBe(2);
+      expect(result.current.isAtEnd).toBe(true);
+
+      act(() => {
+        result.current.rebaseAt(T0, -1); // below the start → board (index 0)
+      });
+      expect(result.current.currentIndex).toBe(0);
+      expect(result.current.isHolding).toBe(true);
     });
   });
 
@@ -357,7 +406,7 @@ describe('useGuidanceProgress', () => {
         result.current.goNext(); // board → ride (index 1)
       });
       act(() => {
-        result.current.rebaseAt(T0 - 3 * 60_000);
+        result.current.rebaseAt(T0 - 3 * 60_000, 1);
       });
       expect(onAnchorChange).toHaveBeenLastCalledWith({ index: 1, atMs: T0 - 3 * 60_000 });
     });
