@@ -421,7 +421,7 @@ export const RouteGuidanceScreen: React.FC = () => {
     if (ctx.mode === 'confirm') {
       confirmBoardedAt(departedAtMs);
     } else {
-      rebaseAt(departedAtMs);
+      rebaseAt(departedAtMs, ctx.stepIndex);
     }
   }, [trainSelectContext, currentIndex, confirmBoardedAt, rebaseAt]);
 
@@ -454,7 +454,7 @@ export const RouteGuidanceScreen: React.FC = () => {
     if (ctx === null || currentIndex !== ctx.stepIndex) return;
     const sec = cumulativeRideSecondsTo(ctx.step, stationId);
     if (sec === null) return;
-    rebaseAt(Date.now() - sec * 1000);
+    rebaseAt(Date.now() - sec * 1000, ctx.stepIndex);
   }, [stationRebaseContext, currentIndex, rebaseAt]);
 
   // Reset per-step guards whenever the active step changes (incl. undo via
