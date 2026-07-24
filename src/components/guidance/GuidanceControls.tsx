@@ -20,6 +20,13 @@ interface GuidanceControlsProps {
   onPrev: () => void;
   onNext: () => void;
   onExit: () => void;
+  /**
+   * Visual weight of the next button. 'primary' (default) is the bold CTA used
+   * while holding on a board/transfer step (a real confirm). 'correction'
+   * demotes it to a neutral surface (like 안내 종료) during ride/alight, where
+   * the button only nudges the time estimate and isn't a required action.
+   */
+  nextEmphasis?: 'primary' | 'correction';
 }
 
 const GuidanceControlsImpl: React.FC<GuidanceControlsProps> = ({
@@ -28,6 +35,7 @@ const GuidanceControlsImpl: React.FC<GuidanceControlsProps> = ({
   onPrev,
   onNext,
   onExit,
+  nextEmphasis = 'primary',
 }) => {
   const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
@@ -54,12 +62,14 @@ const GuidanceControlsImpl: React.FC<GuidanceControlsProps> = ({
           </Pressable>
           <Pressable
             onPress={onNext}
-            style={styles.nextButton}
+            style={[styles.nextButton, nextEmphasis === 'correction' && styles.nextButtonCorrection]}
             accessibilityRole="button"
             accessibilityLabel={nextLabel}
             testID="guidance-next"
           >
-            <Text style={styles.nextText}>{nextLabel}</Text>
+            <Text style={[styles.nextText, nextEmphasis === 'correction' && styles.nextTextCorrection]}>
+              {nextLabel}
+            </Text>
           </Pressable>
         </View>
       )}
@@ -124,11 +134,17 @@ const createStyles = (semantic: WantedSemanticTheme): ReturnType<typeof StyleShe
       alignItems: 'center',
       justifyContent: 'center',
     },
+    nextButtonCorrection: {
+      backgroundColor: semantic.bgSubtle,
+    },
     nextText: {
       fontSize: 15,
       fontFamily: weightToFontFamily('800'),
       color: semantic.labelOnColor,
       letterSpacing: -0.15,
+    },
+    nextTextCorrection: {
+      color: semantic.labelStrong,
     },
     exitButton: {
       flexDirection: 'row',

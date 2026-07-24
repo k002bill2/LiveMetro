@@ -27,6 +27,7 @@ import {
   getDepartedTrainLog,
   type DepartedTrainEntry,
 } from '@/services/guidance/departedTrainLog';
+import { recordDetectionEpisode } from '@/services/guidance/guidanceDetectionMetrics';
 import { Platform } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { createRoute, type RouteSegment } from '@/models/route';
@@ -103,6 +104,12 @@ jest.mock('@/hooks/useGuidanceSession', () => ({
 jest.mock('@/services/guidance/guidanceBackgroundLocationTask', () => ({
   startGuidanceBackgroundLocation: jest.fn(() => Promise.resolve(true)),
   stopGuidanceBackgroundLocation: jest.fn(() => Promise.resolve()),
+}));
+
+// Detection-metrics recording is fire-and-forget from the screen — mock at the
+// module boundary so the screen never touches AsyncStorage; assert call payloads.
+jest.mock('@/services/guidance/guidanceDetectionMetrics', () => ({
+  recordDetectionEpisode: jest.fn(() => Promise.resolve()),
 }));
 
 jest.mock('lucide-react-native', () => ({
@@ -256,6 +263,7 @@ describe('RouteGuidanceScreen', () => {
     (scheduleAlightAlert as jest.Mock).mockClear();
     (cancelAlightAlert as jest.Mock).mockClear();
     (completeGuidanceCommuteLog as jest.Mock).mockClear();
+    (recordDetectionEpisode as jest.Mock).mockClear();
     // Default: bg-permission nudge hidden — wiring tests override per case.
     (useGuidanceBackgroundPermissionPrompt as jest.Mock).mockReturnValue({
       status: 'hidden',
@@ -1144,6 +1152,187 @@ describe('RouteGuidanceScreen', () => {
       const { getByTestId } = render(<RouteGuidanceScreen />);
       fireEvent.press(getByTestId('guidance-bg-permission-dismiss'));
       expect(dismiss).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('감지 적중률 계측 (detection metrics)', () => {
+    it('records a manual resolution when the bottom confirm button is tapped on a board hold', () => {
+      seedSession();
+      const { getByTestId } = render(<RouteGuidanceScreen />);
+      // Manual confirm on the board hold — no soft-confirm fired, no dismissals.
+      fireEvent.press(getByTestId('guidance-next'));
+      expect(recordDetectionEpisode).toHaveBeenCalledTimes(1);
+      expect(recordDetectionEpisode).toHaveBeenCalledWith(
+        expect.objectContaining({
+          resolution: 'manual',
+          softFired: false,
+          dismissedCount: 0,
+          stepKind: 'board',
+          stationName: '을지로3가',
+          lineId: '2',
+          sessionKey: String(T0),
+        })
+      );
+    });
+
+    it('records an auto resolution with softFired when the detected departure auto-advances', () => {
+      seedSession();
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: [trainOf('T1', 10)],
+        loading: false,
+        error: null,
+      });
+      const { rerender } = render(<RouteGuidanceScreen />);
+      // Train departs → soft-confirm arms.
+      mockedUseRealtimeTrains.mockReturnValue({ trains: [], loading: false, error: null });
+      act(() => {
+        rerender(<RouteGuidanceScreen />);
+      });
+      // No tap → auto-advance after the grace window.
+      act(() => {
+        jest.advanceTimersByTime(4100);
+      });
+      expect(recordDetectionEpisode).toHaveBeenCalledTimes(1);
+      expect(recordDetectionEpisode).toHaveBeenCalledWith(
+        expect.objectContaining({
+          resolution: 'auto',
+          softFired: true,
+          dismissedCount: 0,
+        })
+      );
+    });
+
+    it('counts a dismissal before a later manual confirm (softFired + dismissedCount)', () => {
+      seedSession();
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: [trainOf('T1', 10)],
+        loading: false,
+        error: null,
+      });
+      const { getByTestId, rerender } = render(<RouteGuidanceScreen />);
+      // Departure → soft-confirm prompt (softFired=true).
+      mockedUseRealtimeTrains.mockReturnValue({ trains: [], loading: false, error: null });
+      act(() => {
+        rerender(<RouteGuidanceScreen />);
+      });
+      // Dismiss "아직이에요" (dismissedCount=1), then confirm manually.
+      fireEvent.press(getByTestId('guidance-soft-confirm-notyet'));
+      fireEvent.press(getByTestId('guidance-next'));
+      expect(recordDetectionEpisode).toHaveBeenCalledTimes(1);
+      expect(recordDetectionEpisode).toHaveBeenCalledWith(
+        expect.objectContaining({
+          resolution: 'manual',
+          softFired: true,
+          dismissedCount: 1,
+        })
+      );
+    });
+
+    it('does NOT count opening the sheet via 다른 열차예요 as a dismissal (dismissedCount 0, train-select)', () => {
+      // Fix R2-1: opening the train-select sheet from the soft-confirm "다른 열차예요"
+      // link routes through openTrainSelect → dismissSoftConfirm, which must not
+      // inflate dismissedCount. The same 'train-select' outcome must record
+      // dismissedCount 0 regardless of whether the sheet was opened from the
+      // waiting-card link or the soft-confirm prompt.
+      seedSession();
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: [trainOf('T1', 10)],
+        loading: false,
+        error: null,
+      });
+      const { getByTestId, rerender } = render(<RouteGuidanceScreen />);
+      // Departure → soft-confirm prompt (softFired=true).
+      mockedUseRealtimeTrains.mockReturnValue({ trains: [], loading: false, error: null });
+      act(() => {
+        rerender(<RouteGuidanceScreen />);
+      });
+      // "다른 열차예요" opens the sheet (previously this inflated dismissedCount to 1).
+      fireEvent.press(getByTestId('guidance-soft-confirm-other'));
+      expect(getByTestId('train-select-sheet')).toBeTruthy();
+      // Board via the "방금 출발했어요" fallback → train-select confirm.
+      fireEvent.press(getByTestId('train-select-now'));
+      expect(recordDetectionEpisode).toHaveBeenCalledTimes(1);
+      expect(recordDetectionEpisode).toHaveBeenCalledWith(
+        expect.objectContaining({
+          resolution: 'train-select',
+          softFired: true,
+          dismissedCount: 0,
+        })
+      );
+    });
+
+    it('does not record a detection episode when the bottom button is tapped on a ride step (isWaitingStep gate)', () => {
+      // Fix R2-3: only board/transfer holds are detection episodes. The ride
+      // "하차했어요"/"환승역에 도착했어요" correction button must never record.
+      seedSession();
+      const { getByTestId } = render(<RouteGuidanceScreen />);
+      fireEvent.press(getByTestId('guidance-next')); // board → ride (records the board hold)
+      (recordDetectionEpisode as jest.Mock).mockClear();
+      fireEvent.press(getByTestId('guidance-next')); // ride → alight (must NOT record)
+      expect(recordDetectionEpisode).not.toHaveBeenCalled();
+    });
+
+    it('does not carry a train-select resolution into a later hold (cross-hold resolution reset)', () => {
+      // Fix R2-2: after boarding one hold via a train-select pick (resolution
+      // 'train-select'), a subsequent hold's manual confirm records 'manual' —
+      // never the stale 'train-select'. This asserts the OBSERVABLE cross-hold
+      // invariant (resolution never leaks between holds), enforced by the ref
+      // reset inside confirmBoardedAt AND the step-transition reset effect. It is
+      // NOT a white-box test of handleTrainSelected's mismatch early-return: that
+      // branch is a sub-frame defensive guard the reset effect keeps unreachable
+      // via UI events (any currentIndex change closes the sheet before a pick),
+      // and pendingResolutionRef is assigned only AFTER that guard, so the branch
+      // structurally cannot pollute the resolution tag.
+      seedTransferSession(); // board(0) → ride(1,2m) → transfer(2)@시청 → ride(3) → alight(4)
+      const { getByTestId } = render(<RouteGuidanceScreen />);
+      // board(0): confirm via the train-select sheet → records 'train-select'.
+      fireEvent.press(getByTestId('guidance-open-train-select'));
+      fireEvent.press(getByTestId('train-select-now'));
+      expect(recordDetectionEpisode).toHaveBeenLastCalledWith(
+        expect.objectContaining({ resolution: 'train-select', stepKind: 'board' })
+      );
+      // ride(1) is 2min — advance past it so the tick lands on the transfer hold.
+      act(() => {
+        jest.advanceTimersByTime(2 * 60_000 + 1_000);
+      });
+      (recordDetectionEpisode as jest.Mock).mockClear();
+      // transfer(2): manual confirm → must record 'manual', NOT the earlier 'train-select'.
+      fireEvent.press(getByTestId('guidance-next'));
+      expect(recordDetectionEpisode).toHaveBeenCalledTimes(1);
+      expect(recordDetectionEpisode).toHaveBeenCalledWith(
+        expect.objectContaining({ resolution: 'manual', stepKind: 'transfer' })
+      );
+    });
+
+    it('excludes the retroactive gap from waitedSec on a train-select pick (R6-1)', () => {
+      seedSession();
+      // A train that departed 2min after guidance start — the rider actually boarded then.
+      appendDepartedTrains([logEntry('T1', T0 + 120_000)], T0);
+      const { getByTestId } = render(<RouteGuidanceScreen />);
+      // Hold on the board step for 5 minutes before retroactively confirming.
+      act(() => {
+        jest.advanceTimersByTime(5 * 60_000);
+      });
+      fireEvent.press(getByTestId('guidance-open-train-select'));
+      fireEvent.press(getByTestId('train-select-item-T1'));
+      // elapsed at confirm ≈ 300s, boarding atMs = T0+120s → the 180s gap between
+      // boarding and confirming is excluded → waitedSec = 120 (actual platform wait).
+      expect(recordDetectionEpisode).toHaveBeenCalledWith(
+        expect.objectContaining({ resolution: 'train-select', waitedSec: 120 })
+      );
+    });
+
+    it('keeps waitedSec = full elapsed on an immediate manual confirm (R6-1 unchanged path)', () => {
+      seedSession();
+      const { getByTestId } = render(<RouteGuidanceScreen />);
+      act(() => {
+        jest.advanceTimersByTime(5 * 60_000);
+      });
+      fireEvent.press(getByTestId('guidance-next'));
+      // atMs ≈ now → no retroactive gap → waitedSec equals the full 300s elapsed.
+      expect(recordDetectionEpisode).toHaveBeenCalledWith(
+        expect.objectContaining({ resolution: 'manual', waitedSec: 300 })
+      );
     });
   });
 });

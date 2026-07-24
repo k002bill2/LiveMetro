@@ -38,6 +38,7 @@ import {
   MessageSquare,
   Wrench,
   Trash2,
+  Activity,
 } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -61,6 +62,12 @@ import {
   hasStoredCredentials,
 } from '../../services/auth/biometricService';
 import { commuteLogService } from '@/services/pattern/commuteLogService';
+import {
+  loadDetectionEpisodes,
+  summarizeDetectionMetrics,
+  formatDetectionSummary,
+  clearDetectionMetrics,
+} from '@/services/guidance/guidanceDetectionMetrics';
 
 /**
  * Phase 42 (SE1): pick the first grapheme of the user's display name as
@@ -290,6 +297,10 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
             } catch (e) {
               console.error('Onboarding reset failed (non-fatal):', e);
             }
+            // 길안내 감지 진단 이력(역명·노선ID·타임스탬프 = 위치 이력)도 파기 —
+            // 전역 device-local 키라 계정 삭제 시 남으면 개인정보처리방침의 즉시 파기
+            // 약속과 상충하고 다음 계정 요약에 혼입될 수 있다. fire-and-forget(no-throw).
+            void clearDetectionMetrics();
             Alert.alert(
               '삭제 완료',
               '모든 데이터가 삭제되었습니다.\n앱을 재시작하면 처음부터 가입 흐름이 시작됩니다.',
@@ -321,6 +332,28 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
     );
   }, [resetSignupFlow]);
 
+  // 길안내 감지(soft-confirm) 적중률 진단 — 저장된 에피소드를 집계해 Alert로 보여준다.
+  // 라벨/버튼/요약은 i18n(t.settings.detectionDiagnostics)에서 주입 → 서비스는 순수 유지.
+  // 로드 실패는 친화 메시지로 폴백, 초기화는 fire-and-forget.
+  const handleDetectionDiagnostics = useCallback(async (): Promise<void> => {
+    const labels = t.settings.detectionDiagnostics;
+    try {
+      const episodes = await loadDetectionEpisodes();
+      // null = 저장소 읽기 실패(빈 이력과 구분) → "기록 없음" 요약이 아니라 로드 에러 표시.
+      if (episodes === null) {
+        Alert.alert(t.common.error, labels.loadError);
+        return;
+      }
+      const summary = summarizeDetectionMetrics(episodes);
+      Alert.alert(labels.title, formatDetectionSummary(summary, labels), [
+        { text: labels.resetButton, style: 'destructive', onPress: () => void clearDetectionMetrics() },
+        { text: labels.closeButton, style: 'cancel' },
+      ]);
+    } catch {
+      Alert.alert(t.common.error, labels.loadError);
+    }
+  }, [t]);
+
   const handleSignOut = async (): Promise<void> => {
     Alert.alert(
       t.settings.signOut,
@@ -336,6 +369,10 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
           onPress: async () => {
             try {
               await signOut();
+              // 로그아웃 시에도 길안내 감지 진단 이력을 파기 — 기기-로컬 측정이라
+              // 세션 종료 시 정리가 정직하고, 같은 기기에서 다음 계정으로 로그인해도
+              // 이전 사용자의 위치성 이력이 혼입되지 않는다. fire-and-forget(no-throw).
+              void clearDetectionMetrics();
             } catch {
               Alert.alert(t.common.error, language === 'ko' ? '로그아웃에 실패했습니다.' : 'Failed to sign out.');
             }
@@ -353,8 +390,16 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
     subtitle?: string;
     onPress?: () => void;
     showChevron?: boolean;
-  }> = ({ Icon, title, subtitle, onPress, showChevron = true }) => (
-    <TouchableOpacity style={styles.settingItem} onPress={onPress}>
+    accessibilityLabel?: string;
+    testID?: string;
+  }> = ({ Icon, title, subtitle, onPress, showChevron = true, accessibilityLabel, testID }) => (
+    <TouchableOpacity
+      style={styles.settingItem}
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      testID={testID}
+    >
       <View style={styles.settingItemLeft}>
         <View style={styles.iconContainer}>
           <Icon size={16} color={semantic.labelStrong} strokeWidth={2} />
@@ -579,6 +624,18 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
               Icon={ShieldCheck}
               title={t.settings.termsOfService}
               onPress={() => navigation.navigate('TermsOfService')}
+            />
+            <SettingItem
+              Icon={Activity}
+              title={language === 'ko' ? '길안내 감지 진단' : 'Guidance Detection Diagnostics'}
+              subtitle={
+                language === 'ko'
+                  ? '탑승 감지 적중률 및 대기 기록 보기'
+                  : 'Boarding-detection hit rate and wait log'
+              }
+              onPress={handleDetectionDiagnostics}
+              accessibilityLabel={language === 'ko' ? '길안내 감지 진단 보기' : 'View guidance detection diagnostics'}
+              testID="settings-detection-diagnostics"
             />
             <SettingItem
               Icon={Info}
