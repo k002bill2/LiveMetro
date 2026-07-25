@@ -113,6 +113,20 @@ const SOFT_CONFIRM_AUTO_MS = 4000;
 const KEEP_AWAKE_TAG = 'route-guidance';
 
 /**
+ * attach(저장 선호 원격 읽기) 미확정 창의 상한 — 세션 시작 후 이 시간을 넘기면
+ * 확정된 것으로 간주하고 탑승 알림 게이트를 연다.
+ *
+ * attachDestinationPreferences는 모든 종료 경로에서 settle하지만, 그래도 미확정이
+ * 영구화되는 경로가 둘 남는다: ① 네트워크 정체로 `loadCommuteRoutes`가 오래 매달릴
+ * 때(Firestore는 자체 오프라인 전환에 10초를 쓴다), ② 미확정 상태로 영속된 세션이
+ * 앱 재시작 후 복원될 때 — attach는 세션 시작 시점(useStartCommuteGuidance)에만
+ * 발사되므로 복원 경로에는 재발사가 없다. 상한이 없으면 그 세션의 탑승 알림이
+ * 영구히 죽는데, 이는 원래 막으려던 결함(제외 열차 알림 1회 — 사용자가 무시하면
+ * 그만)보다 나쁜 실패다. SDK 오프라인 전환(10초) 위로 여유를 둔 값.
+ */
+const PREFERENCE_SETTLE_TIMEOUT_MS = 15_000;
+
+/**
  * 대기 칩 문구. 종점행을 알면 "OO행"으로 지칭한다 — 분기 노선에서 어느 열차의
  * 카운트다운인지가 문구만으로 드러나야 한다. 종착역명이 비었거나 알 수 없으면
  * 기존의 "다음 열차"로 강등한다 ("undefined행" 렌더 방지).
@@ -760,10 +774,14 @@ export const RouteGuidanceScreen: React.FC = () => {
   // 영영 미확정으로 남아 알림이 완전히 죽는 일을 막는다. 일반 검색 세션
   // (sourceCommuteType 부재)은 attach 자체가 없어 게이트 무영향. 칩·보조 나열·
   // 카운트다운은 게이트하지 않는다 — 표시는 되돌릴 수 있고, 가리면 정직성이 깨진다.
+  // 마지막 절은 시간 상한(PREFERENCE_SETTLE_TIMEOUT_MS) — settle이 끝내 오지 않는
+  // 세션(정체·복원)이 영구히 게이트에 갇히지 않게 한다. nowMs는 1Hz로 갱신되므로
+  // 상한을 넘기는 순간 이 값이 false로 뒤집히고 effect가 재실행되어 예약된다.
   const destinationPreferencesPending =
     liveSession?.sourceCommuteType !== undefined &&
     liveSession?.ownerUid !== undefined &&
-    liveSession?.destinationPreferences === undefined;
+    liveSession?.destinationPreferences === undefined &&
+    nowMs - liveSession.startedAt < PREFERENCE_SETTLE_TIMEOUT_MS;
   useEffect(() => {
     if (!session || !isWaitingStep) return;
     // 미확정이면 예약 자체를 보류한다. settle되면 liveSession 갱신 → 이 effect가

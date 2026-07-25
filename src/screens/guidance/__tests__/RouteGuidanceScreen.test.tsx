@@ -1662,6 +1662,27 @@ describe('RouteGuidanceScreen', () => {
       );
     });
 
+    it('미확정이 상한(15초)을 넘기면 게이트를 열고 예약한다', () => {
+      // settle이 끝내 오지 않는 경로 — 네트워크 정체로 로드가 매달리거나, 미확정
+      // 세션이 앱 재시작 후 복원된 경우(attach는 세션 시작 시점에만 발사된다).
+      // 상한이 없으면 그 세션의 탑승 알림이 영구히 죽는다.
+      seedBranchSession({ sourceCommuteType: 'morning', ownerUid: 'user-1' });
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: branchTrains(),
+        loading: false,
+        error: null,
+      });
+      const { rerender } = render(<RouteGuidanceScreen />);
+      expect(scheduleBoardingAlert).not.toHaveBeenCalled();
+
+      // 1Hz 틱이 상한을 넘기면 게이트가 열린다 (settle 없이).
+      act(() => {
+        jest.advanceTimersByTime(16_000);
+        rerender(<RouteGuidanceScreen />);
+      });
+      expect(scheduleBoardingAlert).toHaveBeenCalled();
+    });
+
     it('비로그인 출퇴근 세션(ownerUid 부재)은 게이트되지 않는다', () => {
       // uid가 없으면 attach 자체가 발사되지 않으므로(useStartCommuteGuidance)
       // destinationPreferences가 영영 미확정으로 남는다 — 여기서 게이트하면 그
