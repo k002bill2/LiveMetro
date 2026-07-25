@@ -50,7 +50,7 @@ jest.mock('@/components/design/LineBadge', () => ({
 }));
 
 const mockOnSkip = jest.fn();
-jest.mock('@/navigation/OnboardingNavigator', () => ({
+jest.mock('@/navigation/onboardingCallbacks', () => ({
   // CommuteRouteScreen now uses the optional variant so it can also host
   // the in-settings EditCommuteRoute flow (no provider). Tests live in
   // onboarding context, so both variants resolve the same callbacks.

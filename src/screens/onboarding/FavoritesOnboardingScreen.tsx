@@ -34,7 +34,7 @@ import { useAuth } from '@/services/auth/AuthContext';
 import { OnbHeader } from '@/components/onboarding/OnbHeader';
 import { LineBadge } from '@/components/design/LineBadge';
 import { Pill } from '@/components/design/Pill';
-import { useOnboardingCallbacks } from '@/navigation/OnboardingNavigator';
+import { useOnboardingCallbacks } from '@/navigation/onboardingCallbacks';
 import { OnboardingStackParamList } from '@/navigation/types';
 import { saveCommuteRoutes } from '@/services/commute/commuteService';
 import { useFavorites } from '@/hooks/useFavorites';

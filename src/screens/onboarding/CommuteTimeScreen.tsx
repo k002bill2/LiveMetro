@@ -25,7 +25,7 @@ import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 
 import { OnbHeader } from '@/components/onboarding/OnbHeader';
 import { TimePickerCard } from '@/components/settings/TimePickerCard';
-import { useOnboardingCallbacks } from '@/navigation/OnboardingNavigator';
+import { useOnboardingCallbacks } from '@/navigation/onboardingCallbacks';
 import { OnboardingStackParamList } from '@/navigation/types';
 
 type Props = NativeStackScreenProps<OnboardingStackParamList, 'CommuteTime'>;
