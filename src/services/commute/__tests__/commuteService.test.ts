@@ -9,7 +9,9 @@ import {
   updateEveningRoute,
   updateEveningEnabled,
   updateBoardingPreferences,
+  deleteCommuteSettings,
 } from '../commuteService';
+import { doc } from 'firebase/firestore';
 import { CommuteRoute } from '@/models/commute';
 
 // Mock Firebase
@@ -21,12 +23,14 @@ jest.mock('@/services/firebase/config', () => ({
 const mockSetDoc = jest.fn();
 const mockGetDoc = jest.fn();
 const mockUpdateDoc = jest.fn();
+const mockDeleteDoc = jest.fn();
 
 jest.mock('firebase/firestore', () => ({
   doc: jest.fn(() => 'mockDocRef'),
   setDoc: (...args: unknown[]) => mockSetDoc(...args),
   getDoc: (...args: unknown[]) => mockGetDoc(...args),
   updateDoc: (...args: unknown[]) => mockUpdateDoc(...args),
+  deleteDoc: (...args: unknown[]) => mockDeleteDoc(...args),
   serverTimestamp: jest.fn(() => ({ _type: 'serverTimestamp' })),
   // `new FieldPath(...segments)` — jest mock 함수는 생성자로 호출해도 impl의 반환
   // 객체가 그대로 인스턴스가 되므로 평범한 객체로 관측한다.
@@ -431,6 +435,35 @@ describe('Commute Service', () => {
 
       (releaseFirst as unknown as () => void)();
       await blocked;
+    });
+  });
+
+  describe('deleteCommuteSettings', () => {
+    it('uid 문서를 삭제한다', async () => {
+      mockDeleteDoc.mockResolvedValue(undefined);
+
+      const result = await deleteCommuteSettings('user-123');
+
+      expect(result.success).toBe(true);
+      expect(mockDeleteDoc).toHaveBeenCalledWith('mockDocRef');
+      expect(doc).toHaveBeenCalledWith({}, 'commuteSettings', 'user-123');
+    });
+
+    it('uid가 없으면 삭제를 시도하지 않는다', async () => {
+      const result = await deleteCommuteSettings('');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('사용자 인증이 필요합니다');
+      expect(mockDeleteDoc).not.toHaveBeenCalled();
+    });
+
+    it('삭제 실패는 throw 하지 않고 결과 객체로 돌려준다', async () => {
+      mockDeleteDoc.mockRejectedValue(new Error('permission-denied'));
+
+      const result = await deleteCommuteSettings('user-123');
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('permission-denied');
     });
   });
 

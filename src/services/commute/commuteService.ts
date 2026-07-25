@@ -9,6 +9,7 @@ import {
   setDoc,
   getDoc,
   updateDoc,
+  deleteDoc,
   onSnapshot,
   serverTimestamp,
   deleteField,
@@ -411,6 +412,38 @@ export const updateEveningEnabled = async (
   }
 };
 
+/**
+ * 계정 삭제 시 `commuteSettings/<uid>` 문서를 파기한다.
+ *
+ * 이 문서는 출퇴근 경로(출발·도착·환승역)와 종점행 선호를 담은 개인 데이터라
+ * 계정이 사라진 뒤 남으면 어떤 클라이언트로도 도달할 수 없는 고아 문서가 된다.
+ *
+ * **호출 시점은 Firebase Auth 계정 삭제 *전*이어야 한다** — firestore.rules의
+ * `commuteSettings/{userId}`는 `request.auth.uid == userId`를 요구하므로,
+ * `deleteUser()` 이후에는 토큰이 사라져 permission-denied로 조용히 실패한다.
+ *
+ * 실패는 호출자가 계정 삭제를 중단할 사유가 아니다(throw 금지, 결과 객체 반환) —
+ * 일시적 Firestore 오류가 계정 삭제 자체를 막는 쪽이 더 나쁜 실패 모드다.
+ */
+export const deleteCommuteSettings = async (
+  uid: string
+): Promise<SaveCommuteResult> => {
+  if (!uid) {
+    return { success: false, error: '사용자 인증이 필요합니다' };
+  }
+
+  try {
+    await deleteDoc(doc(firestore, COMMUTE_COLLECTION, uid));
+    return { success: true };
+  } catch (error) {
+    console.error('Error deleting commute settings:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : '삭제 중 오류가 발생했습니다',
+    };
+  }
+};
+
 export default {
   saveCommuteRoutes,
   loadCommuteRoutes,
@@ -419,4 +452,5 @@ export default {
   updateEveningRoute,
   updateEveningEnabled,
   updateBoardingPreferences,
+  deleteCommuteSettings,
 };
