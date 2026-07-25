@@ -4,7 +4,7 @@
  * Minimal grayscale design with black accent
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSemanticTokens } from '@/services/theme';
 import {
   View,
@@ -69,6 +69,7 @@ import {
   formatDetectionSummary,
   clearDetectionMetrics,
 } from '@/services/guidance/guidanceDetectionMetrics';
+import { deleteAccountAndPurgeLocalData } from '@/services/account/accountDeletionService';
 
 /**
  * Phase 42 (SE1): pick the first grapheme of the user's display name as
@@ -246,6 +247,99 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
       );
     }
   }, [biometricTypeName]);
+
+  /**
+   * 계정 삭제 실행 — 서버 전수 파기(deleteAccount) → 로컬 파기 → 온보딩
+   * 상태 리셋 → 로그아웃.
+   *
+   * `resetSignupFlow()`는 반드시 `signOut()` **전에** 호출한다:
+   * OnboardingContext의 userId가 사라지면 early-return 하므로(그 함수는
+   * in-memory 플래그도 함께 되돌린다) 순서가 뒤집히면 다음 로그인에서
+   * 온보딩이 완료된 것처럼 보인다.
+   *
+   * 서버가 Auth 레코드까지 지우므로 여기서 deleteCurrentUser()는 호출하지
+   * 않는다. 실패는 친화 메시지만 노출하고 로그아웃하지 않는다 — 계정이
+   * 아직 살아 있으므로 그대로 재시도할 수 있다.
+   */
+  const deletionInFlight = useRef(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+
+  const runAccountDeletion = useCallback(async (): Promise<void> => {
+    // 중복 탭 가드 — state는 렌더용, 실제 게이트는 ref(동기 반영).
+    if (deletionInFlight.current) return;
+    deletionInFlight.current = true;
+    setIsDeletingAccount(true);
+    try {
+      const result = await deleteAccountAndPurgeLocalData();
+      if (!result.success) {
+        Alert.alert(
+          '계정 삭제 실패',
+          result.error ?? '계정 삭제에 실패했습니다. 잠시 후 다시 시도해 주세요.',
+        );
+        return;
+      }
+
+      try {
+        await resetSignupFlow();
+      } catch {
+        // 비치명: 다음 실행에서 온보딩이 한 번 더 뜰 뿐이다.
+      }
+      try {
+        await signOut();
+      } catch {
+        // 계정은 이미 서버에서 삭제됐다 — 로컬 세션 해제 실패는 비치명.
+      }
+      Alert.alert(
+        '삭제 완료',
+        '계정과 모든 개인 데이터가 삭제되었습니다.\n이용해 주셔서 감사합니다.',
+      );
+    } finally {
+      deletionInFlight.current = false;
+      setIsDeletingAccount(false);
+    }
+  }, [resetSignupFlow, signOut]);
+
+  /** 2단계 확인 — 1차 경고(무엇이 지워지는지) → 2차 최종 확인. */
+  const handleDeleteAccount = useCallback((): void => {
+    Alert.alert(
+      '계정 삭제',
+      [
+        '계정을 삭제하면 다음 정보가 영구 삭제됩니다:',
+        '',
+        '• 계정 및 프로필 정보',
+        '• 즐겨찾는 역, 출퇴근 경로 설정',
+        '• 이동 기록과 패턴 분석 데이터',
+        '• 알림 설정 및 푸시 토큰',
+        '',
+        '작성하신 지연·혼잡도 제보는 다른 이용자에게 도움이 되므로 삭제되지 않고 익명 처리됩니다.',
+        '',
+        '이 작업은 되돌릴 수 없습니다.',
+      ].join('\n'),
+      [
+        { text: '취소', style: 'cancel' },
+        {
+          text: '계속',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              '정말 삭제하시겠습니까?',
+              '마지막 확인입니다. 삭제된 데이터는 복구할 수 없습니다.',
+              [
+                { text: '취소', style: 'cancel' },
+                {
+                  text: '영구 삭제',
+                  style: 'destructive',
+                  onPress: () => {
+                    void runAccountDeletion();
+                  },
+                },
+              ],
+            );
+          },
+        },
+      ],
+    );
+  }, [runAccountDeletion]);
 
   const handleNukeAccount = useCallback((): void => {
     Alert.alert(
@@ -709,6 +803,40 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
             <Text style={styles.signOutText}>{t.settings.signOut}</Text>
           </TouchableOpacity>
         </View>
+
+        {/* 계정 삭제 — 되돌릴 수 없는 위험 액션이라 로그아웃 아래에 분리 배치.
+            2단계 확인 후 서버 전수 파기 → 로컬 파기 → 로그아웃한다. */}
+        <View style={styles.section}>
+          <TouchableOpacity
+            style={styles.deleteAccountButton}
+            onPress={handleDeleteAccount}
+            disabled={isDeletingAccount}
+            accessibilityRole="button"
+            accessibilityState={{ disabled: isDeletingAccount }}
+            accessibilityLabel={
+              language === 'ko'
+                ? '계정 삭제, 모든 개인 데이터가 영구 삭제됩니다'
+                : 'Delete account, all personal data will be permanently erased'
+            }
+            testID="settings-delete-account"
+          >
+            <Trash2 size={20} color={semantic.statusNegative} />
+            <Text style={styles.deleteAccountText}>
+              {isDeletingAccount
+                ? language === 'ko'
+                  ? '삭제 중...'
+                  : 'Deleting...'
+                : language === 'ko'
+                ? '계정 삭제'
+                : 'Delete Account'}
+            </Text>
+          </TouchableOpacity>
+          <Text style={styles.deleteAccountHint}>
+            {language === 'ko'
+              ? '계정과 개인 데이터가 영구 삭제됩니다. 작성한 제보는 익명 처리 후 유지됩니다.'
+              : 'Your account and personal data are erased permanently. Reports you posted are kept anonymized.'}
+          </Text>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -881,6 +1009,34 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       fontFamily: weightToFontFamily('600'),
       color: semantic.labelAlt,
       marginLeft: WANTED_TOKENS.spacing.s2,
+    },
+    deleteAccountButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: semantic.bgBase,
+      marginHorizontal: WANTED_TOKENS.spacing.s4,
+      // 최소 44x44pt 터치 영역 확보 (아이콘 20 + 상하 패딩).
+      paddingVertical: WANTED_TOKENS.spacing.s4,
+      borderRadius: WANTED_TOKENS.radius.r6,
+      borderWidth: 1,
+      borderColor: semantic.statusNegative,
+    },
+    deleteAccountText: {
+      fontSize: WANTED_TOKENS.type.body1.size,
+      fontWeight: '600',
+      fontFamily: weightToFontFamily('600'),
+      color: semantic.statusNegative,
+      marginLeft: WANTED_TOKENS.spacing.s2,
+    },
+    deleteAccountHint: {
+      fontSize: WANTED_TOKENS.type.caption1.size,
+      fontWeight: '400',
+      fontFamily: weightToFontFamily('400'),
+      color: semantic.labelAlt,
+      marginHorizontal: WANTED_TOKENS.spacing.s4,
+      marginTop: WANTED_TOKENS.spacing.s2,
+      textAlign: 'center',
     },
     devSectionLabel: {
       fontSize: 12,

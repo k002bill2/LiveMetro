@@ -16,6 +16,8 @@ import {
   clearDetectionMetrics,
 } from '@/services/guidance/guidanceDetectionMetrics';
 import { deleteCommuteSettings } from '@/services/commute/commuteService';
+import { deleteAccountAndPurgeLocalData } from '@/services/account/accountDeletionService';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 
 jest.mock('lucide-react-native', () => ({
   ChevronRight: 'ChevronRight',
@@ -62,6 +64,12 @@ jest.mock('@/services/guidance/guidanceDetectionMetrics', () => ({
 // 계정 삭제 시 원격 출퇴근 설정 파기 — 서비스 경계에서 mock (factory 내부 inline).
 jest.mock('@/services/commute/commuteService', () => ({
   deleteCommuteSettings: jest.fn(() => Promise.resolve({ success: true })),
+}));
+
+// 정식 계정 삭제(서버 전수 파기 + 로컬 파기)는 서비스 경계에서 mock —
+// 화면은 2단계 확인·순서·실패 시 로그아웃 금지만 책임진다.
+jest.mock('@/services/account/accountDeletionService', () => ({
+  deleteAccountAndPurgeLocalData: jest.fn(() => Promise.resolve({ success: true })),
 }));
 
 const mockNavigate = jest.fn();
@@ -1160,6 +1168,224 @@ describe('SettingsScreen', () => {
 
       // Sign out rejected → the purge (after the await) must not run.
       expect(clearDetectionMetrics).not.toHaveBeenCalled();
+    });
+  });
+
+  // 정식 계정 삭제 경로(dev 전용 nuke와 별개). 서버 전수 파기 → 로컬 파기 →
+  // 온보딩 리셋 → 로그아웃. 2단계 확인을 거치지 않으면 아무것도 실행되지 않는다.
+  describe('계정 삭제 (정식 경로)', () => {
+    const authWithDeletion = (overrides: Record<string, unknown>) => ({
+      user: {
+        id: 'test-uid',
+        displayName: 'Test User',
+        email: 'test@example.com',
+        isAnonymous: false,
+      },
+      firebaseUser: null,
+      loading: false,
+      signInAnonymously: jest.fn(),
+      signInWithEmail: jest.fn(),
+      signUpWithEmail: jest.fn(),
+      signOut: jest.fn().mockResolvedValue(undefined),
+      updateUserProfile: jest.fn(),
+      resetPassword: jest.fn(),
+      changePassword: jest.fn(),
+      deleteCurrentUser: jest.fn().mockResolvedValue(undefined),
+      ...overrides,
+    });
+
+    /** 1차 Alert에서 '계속'을 눌러 2차 확인 Alert를 띄운다. */
+    const openFinalConfirm = (): void => {
+      const firstCall = (Alert.alert as jest.Mock).mock.calls.find(
+        (c) => c[0] === '계정 삭제',
+      );
+      const continueButton = firstCall![2].find(
+        (b: { style?: string }) => b.style === 'destructive',
+      );
+      continueButton.onPress();
+    };
+
+    /** 2차 Alert의 '영구 삭제'를 눌러 실제 삭제를 실행한다. */
+    const pressFinalDelete = async (): Promise<void> => {
+      const finalCall = (Alert.alert as jest.Mock).mock.calls.find(
+        (c) => c[0] === '정말 삭제하시겠습니까?',
+      );
+      const deleteButton = finalCall![2].find(
+        (b: { text?: string }) => b.text === '영구 삭제',
+      );
+      await deleteButton.onPress();
+    };
+
+    it('설정 화면에 정식 계정 삭제 항목이 노출된다', () => {
+      (useAuth as jest.Mock).mockReturnValue(authWithDeletion({}));
+      const { getByTestId } = render(<SettingsScreen {...defaultProps} />);
+
+      expect(getByTestId('settings-delete-account')).toBeTruthy();
+    });
+
+    it('1차 경고에 익명 보존 정책과 되돌릴 수 없음을 명시한다', () => {
+      (useAuth as jest.Mock).mockReturnValue(authWithDeletion({}));
+      const { getByTestId } = render(<SettingsScreen {...defaultProps} />);
+
+      fireEvent.press(getByTestId('settings-delete-account'));
+
+      const firstCall = (Alert.alert as jest.Mock).mock.calls.find(
+        (c) => c[0] === '계정 삭제',
+      );
+      expect(firstCall![1]).toContain('익명 처리');
+      expect(firstCall![1]).toContain('되돌릴 수 없습니다');
+    });
+
+    it('1차 확인만으로는 삭제하지 않는다 (2단계 확인)', () => {
+      (useAuth as jest.Mock).mockReturnValue(authWithDeletion({}));
+      const { getByTestId } = render(<SettingsScreen {...defaultProps} />);
+
+      fireEvent.press(getByTestId('settings-delete-account'));
+      openFinalConfirm();
+
+      // 2차 Alert만 떴을 뿐 서비스는 아직 호출되지 않아야 한다.
+      expect(
+        (Alert.alert as jest.Mock).mock.calls.some(
+          (c) => c[0] === '정말 삭제하시겠습니까?',
+        ),
+      ).toBe(true);
+      expect(deleteAccountAndPurgeLocalData).not.toHaveBeenCalled();
+    });
+
+    it('1차에서 취소하면 2차 확인도 삭제도 일어나지 않는다', () => {
+      (useAuth as jest.Mock).mockReturnValue(authWithDeletion({}));
+      const { getByTestId } = render(<SettingsScreen {...defaultProps} />);
+
+      fireEvent.press(getByTestId('settings-delete-account'));
+      const firstCall = (Alert.alert as jest.Mock).mock.calls.find(
+        (c) => c[0] === '계정 삭제',
+      );
+      const cancelButton = firstCall![2].find(
+        (b: { style?: string }) => b.style === 'cancel',
+      );
+      cancelButton.onPress?.();
+
+      expect(
+        (Alert.alert as jest.Mock).mock.calls.some(
+          (c) => c[0] === '정말 삭제하시겠습니까?',
+        ),
+      ).toBe(false);
+      expect(deleteAccountAndPurgeLocalData).not.toHaveBeenCalled();
+    });
+
+    it('2단계 확인을 모두 거치면 서버 파기 후 로그아웃한다', async () => {
+      const mockSignOut = jest.fn().mockResolvedValue(undefined);
+      (useAuth as jest.Mock).mockReturnValue(
+        authWithDeletion({ signOut: mockSignOut }),
+      );
+      const { getByTestId } = render(<SettingsScreen {...defaultProps} />);
+
+      fireEvent.press(getByTestId('settings-delete-account'));
+      openFinalConfirm();
+      await pressFinalDelete();
+
+      expect(deleteAccountAndPurgeLocalData).toHaveBeenCalledTimes(1);
+      expect(mockSignOut).toHaveBeenCalledTimes(1);
+      await waitFor(() => {
+        expect(Alert.alert).toHaveBeenCalledWith(
+          '삭제 완료',
+          expect.stringContaining('삭제되었습니다'),
+        );
+      });
+    });
+
+    // OnboardingContext의 resetSignupFlow는 userId가 없으면 early-return 한다.
+    // signOut 이후에 호출하면 온보딩 플래그가 남아 다음 계정이 온보딩을
+    // 건너뛴다 — 순서를 못 박는다.
+    it('온보딩 리셋을 로그아웃보다 먼저 수행한다', async () => {
+      const mockSignOut = jest.fn().mockResolvedValue(undefined);
+      const mockResetSignupFlow = jest.fn().mockResolvedValue(undefined);
+      (useAuth as jest.Mock).mockReturnValue(
+        authWithDeletion({ signOut: mockSignOut }),
+      );
+      (useOnboarding as jest.Mock).mockReturnValue({
+        hasCompletedOnboarding: true,
+        hasSeenSignupCelebration: true,
+        hasAgreedToTerms: true,
+        isCheckingStatus: false,
+        completeOnboarding: jest.fn(),
+        skipOnboarding: jest.fn(),
+        resetOnboarding: jest.fn(),
+        resetSignupFlow: mockResetSignupFlow,
+        markCelebrationSeen: jest.fn(),
+        markTermsAgreed: jest.fn(),
+      });
+      const { getByTestId } = render(<SettingsScreen {...defaultProps} />);
+
+      fireEvent.press(getByTestId('settings-delete-account'));
+      openFinalConfirm();
+      await pressFinalDelete();
+
+      const resetOrder = mockResetSignupFlow.mock.invocationCallOrder[0]!;
+      const signOutOrder = mockSignOut.mock.invocationCallOrder[0]!;
+      expect(resetOrder).toBeLessThan(signOutOrder);
+    });
+
+    it('삭제 실패 시 로그아웃하지 않고 친화 메시지를 보여준다', async () => {
+      (deleteAccountAndPurgeLocalData as jest.Mock).mockResolvedValueOnce({
+        success: false,
+        error: '네트워크가 불안정합니다. 잠시 후 다시 시도해 주세요.',
+      });
+      const mockSignOut = jest.fn().mockResolvedValue(undefined);
+      (useAuth as jest.Mock).mockReturnValue(
+        authWithDeletion({ signOut: mockSignOut }),
+      );
+      const { getByTestId } = render(<SettingsScreen {...defaultProps} />);
+
+      fireEvent.press(getByTestId('settings-delete-account'));
+      openFinalConfirm();
+      await pressFinalDelete();
+
+      expect(mockSignOut).not.toHaveBeenCalled();
+      expect(Alert.alert).toHaveBeenCalledWith(
+        '계정 삭제 실패',
+        '네트워크가 불안정합니다. 잠시 후 다시 시도해 주세요.',
+      );
+    });
+
+    it('삭제 실패해도 계정은 살아 있으므로 재시도할 수 있다', async () => {
+      (deleteAccountAndPurgeLocalData as jest.Mock)
+        .mockResolvedValueOnce({ success: false, error: '일시적 오류' })
+        .mockResolvedValueOnce({ success: true });
+      const mockSignOut = jest.fn().mockResolvedValue(undefined);
+      (useAuth as jest.Mock).mockReturnValue(
+        authWithDeletion({ signOut: mockSignOut }),
+      );
+      const { getByTestId } = render(<SettingsScreen {...defaultProps} />);
+
+      fireEvent.press(getByTestId('settings-delete-account'));
+      openFinalConfirm();
+      await pressFinalDelete();
+      expect(mockSignOut).not.toHaveBeenCalled();
+
+      (Alert.alert as jest.Mock).mockClear();
+      fireEvent.press(getByTestId('settings-delete-account'));
+      openFinalConfirm();
+      await pressFinalDelete();
+
+      expect(deleteAccountAndPurgeLocalData).toHaveBeenCalledTimes(2);
+      expect(mockSignOut).toHaveBeenCalledTimes(1);
+    });
+
+    // 서버가 Auth 레코드까지 지우므로 클라이언트 deleteUser는 토큰 무효 상태에서
+    // 실패할 뿐이다. 호출하지 않는 것이 계약이다.
+    it('클라이언트 deleteCurrentUser는 호출하지 않는다', async () => {
+      const mockDeleteCurrentUser = jest.fn().mockResolvedValue(undefined);
+      (useAuth as jest.Mock).mockReturnValue(
+        authWithDeletion({ deleteCurrentUser: mockDeleteCurrentUser }),
+      );
+      const { getByTestId } = render(<SettingsScreen {...defaultProps} />);
+
+      fireEvent.press(getByTestId('settings-delete-account'));
+      openFinalConfirm();
+      await pressFinalDelete();
+
+      expect(mockDeleteCurrentUser).not.toHaveBeenCalled();
     });
   });
 });
