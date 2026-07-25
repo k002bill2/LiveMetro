@@ -105,4 +105,11 @@ export interface GuidanceSession {
   readonly destinationPreferences?: Readonly<Record<string, readonly string[]>>;
   /** 이 세션의 출처 출퇴근 leg. 부재 = 일반 경로 검색 세션 (선택은 세션 한정). */
   readonly sourceCommuteType?: 'morning' | 'evening';
+  /**
+   * 소유 귀속 — 이 세션을 시작한 계정의 uid. 세션은 AsyncStorage로 영속돼
+   * 로그아웃·계정 전환을 넘겨 살아남으므로, 원본(CommuteRoute)으로의
+   * write-back은 **생성 계정에만** 허용한다. 부재(구세션·비로그인)면 게이트
+   * 불통과 = 선호가 세션 한정으로 안전 강등된다 (하위 호환).
+   */
+  readonly ownerUid?: string;
 }

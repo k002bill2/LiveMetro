@@ -607,7 +607,15 @@ export const RouteGuidanceScreen: React.FC = () => {
       const live = getGuidanceSession();
       if (session === null || live === null || live.startedAt !== session.startedAt) return;
       setGuidanceSession({ ...live, destinationPreferences: next });
-      if (live.sourceCommuteType !== undefined && user?.id) {
+      // 소유 귀속 게이트 — 세션을 시작한 계정에서만 원본에 write-back한다. 세션은
+      // 영속돼 로그아웃/계정 전환을 넘겨 살아남으므로, 이 검사가 없으면 재개 후
+      // 토글이 이전 탑승자의 선택을 새 계정의 commuteSettings에 기록한다.
+      // 구세션(ownerUid 부재)은 불통과 = 세션 한정 적용으로 안전 강등.
+      if (
+        live.sourceCommuteType !== undefined &&
+        user?.id !== undefined &&
+        live.ownerUid === user.id
+      ) {
         // fire-and-forget — 원격 실패해도 세션 필터는 이미 적용됨 (재시도는 다음 토글).
         void updateBoardingPreferences(user.id, live.sourceCommuteType, writtenKey, writtenList);
       }

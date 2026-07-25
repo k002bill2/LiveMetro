@@ -275,6 +275,7 @@ const trainOnLine = (
 const seedBranchSession = (extra?: {
   readonly destinationPreferences?: Readonly<Record<string, readonly string[]>>;
   readonly sourceCommuteType?: 'morning' | 'evening';
+  readonly ownerUid?: string;
 }): void => {
   setGuidanceSession({
     route: createRoute([lineHop('p1', '광화문', 'p2', '강동', '5', 4)]),
@@ -1479,7 +1480,7 @@ describe('RouteGuidanceScreen', () => {
     });
 
     it('시트에서 토글하면 세션 선호가 갱신되고 출퇴근 세션이면 updateBoardingPreferences가 호출된다', () => {
-      seedBranchSession({ sourceCommuteType: 'morning' });
+      seedBranchSession({ sourceCommuteType: 'morning', ownerUid: 'user-1' });
       mockedUseRealtimeTrains.mockReturnValue({
         trains: branchTrains(),
         loading: false,
@@ -1513,6 +1514,7 @@ describe('RouteGuidanceScreen', () => {
       // ('s9|8')가 원격에서 소멸할 수 없다.
       seedBranchSession({
         sourceCommuteType: 'morning',
+        ownerUid: 'user-1',
         destinationPreferences: { 's9|8': ['암사'] },
       });
       mockedUseRealtimeTrains.mockReturnValue({
@@ -1557,6 +1559,23 @@ describe('RouteGuidanceScreen', () => {
       // 세션 한정 적용 — 원본(CommuteRoute)에는 쓰지 않는다.
       expect(getGuidanceSession()?.destinationPreferences).toEqual({ 'p1|5': ['마천'] });
       expect(updateBoardingPreferences).not.toHaveBeenCalled();
+    });
+
+    it('다른 계정이 시작한 세션(ownerUid 불일치)은 원격 저장하지 않고 세션 한정으로 강등한다', () => {
+      // 영속 세션이 로그아웃/계정 전환을 넘겨 살아남은 상태 — 재개 후 토글이 이전
+      // 탑승자의 선택을 현재 계정(user-1)의 commuteSettings에 기록하면 안 된다.
+      seedBranchSession({ sourceCommuteType: 'morning', ownerUid: 'other-user' });
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: branchTrains(),
+        loading: false,
+        error: null,
+      });
+      const { getByTestId } = render(<RouteGuidanceScreen />);
+      fireEvent.press(getByTestId('guidance-open-destination-filter'));
+      fireEvent.press(getByTestId('destination-option-마천'));
+      expect(updateBoardingPreferences).not.toHaveBeenCalled();
+      // 필터 자체는 살아 있다 — 원격 쓰기만 막고 세션 한정으로 강등(기능 무력화 아님).
+      expect(getGuidanceSession()?.destinationPreferences).toEqual({ 'p1|5': ['마천'] });
     });
 
     it('종점행 선택 시트가 열려 있는 동안에는 soft-confirm 자동 진행을 걸지 않는다', () => {

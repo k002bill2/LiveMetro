@@ -27,6 +27,8 @@ const SESSION = {
   toStationName: 'B',
   startedAt: 1_000,
   sourceCommuteType: 'morning' as const,
+  // 소유 귀속 — attach는 세션을 시작한 계정에서만 동작한다.
+  ownerUid: 'uid-1',
 };
 
 afterEach(() => clearGuidanceSession());
@@ -63,6 +65,19 @@ it('세션에 이미 선호가 있으면 늦게 도착한 원격 사본이 덮�
   });
   await attachDestinationPreferences('uid-1', 'morning', 1_000);
   expect(getGuidanceSession()?.destinationPreferences).toEqual({ 'D1|5': ['상일동'] });
+});
+
+it('세션 소유자가 다르면(ownerUid 불일치) attach하지 않는다', async () => {
+  // 영속 세션이 로그아웃/계정 전환을 넘겨 살아남은 상태 — 새 계정의 선호를
+  // 이전 탑승자의 세션에 붙이면 안 된다.
+  setGuidanceSession({ ...SESSION, ownerUid: 'other-uid' });
+  (loadCommuteRoutes as jest.Mock).mockResolvedValueOnce({
+    morningRoute: { boardingPreferences: { 'D1|5': ['마천'] } },
+    eveningRoute: null,
+    eveningEnabled: true,
+  });
+  await attachDestinationPreferences('uid-1', 'morning', 1_000);
+  expect(getGuidanceSession()?.destinationPreferences).toBeUndefined();
 });
 
 it('선호 없음·로드 실패는 조용히 no-op (안내를 막지 않는다)', async () => {

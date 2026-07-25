@@ -111,10 +111,20 @@ describe('useStartCommuteGuidance', () => {
       result.current?.();
     });
     expect(mockedSet).toHaveBeenCalledWith(
-      expect.objectContaining({ sourceCommuteType: 'morning' }),
+      expect.objectContaining({ sourceCommuteType: 'morning', ownerUid: 'uid-1' }),
     );
     const { startedAt } = mockedSet.mock.calls[0][0] as { startedAt: number };
     expect(mockedAttach).toHaveBeenCalledWith('uid-1', 'morning', startedAt);
+  });
+
+  it('비로그인(uid 부재) 진입은 ownerUid를 기록하지 않는다 (세션 한정 동작)', () => {
+    mockedSelect.mockReturnValue(ROUTE);
+    const { result } = renderHook(() => useStartCommuteGuidance(args({ commuteType: 'morning' })));
+    act(() => {
+      result.current?.();
+    });
+    expect(mockedSet.mock.calls[0][0]).not.toHaveProperty('ownerUid');
+    expect(mockedAttach).not.toHaveBeenCalled();
   });
 
   it('cancels the scheduled ML departure alert when guidance starts (이미 이동 중)', () => {

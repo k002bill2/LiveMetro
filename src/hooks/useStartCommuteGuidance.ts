@@ -62,6 +62,9 @@ export function useStartCommuteGuidance(
       // sourceCommuteType은 동기 기록 — attach(원격 읽기)가 실패해도 시트에서 고른
       // 선호를 leg에 write-back할 수 있어야 한다.
       ...(commuteType !== undefined && { sourceCommuteType: commuteType }),
+      // 소유 귀속 — 영속 세션이 로그아웃/계정 전환을 넘겨 살아남아도 남의 선호가
+      // 새 계정의 commuteSettings에 기록되지 않게 한다.
+      ...(uid !== undefined && { ownerUid: uid }),
     });
     if (commuteType !== undefined && uid !== undefined) {
       void attachDestinationPreferences(uid, commuteType, startedAt);
