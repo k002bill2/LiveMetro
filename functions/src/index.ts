@@ -20,11 +20,16 @@ import {
   KakaoAuthErrorKind,
 } from './services/kakaoAuthService';
 import {
+  deleteAccountAndData,
+  AccountDeletionError,
+} from './services/accountDeletionService';
+import {
   NotificationType,
   EmailNotificationRequest,
   EmailNotificationResponse,
   KakaoLoginRequest,
   KakaoLoginResponse,
+  DeleteAccountResponse,
 } from './types';
 
 // Kakao Developers "앱 ID" (numeric). Read at deploy time from functions/.env
@@ -254,6 +259,68 @@ export const kakaoLogin = onCall<KakaoLoginRequest>(
         error instanceof Error ? error.message : 'unknown'
       );
       throw new HttpsError('internal', 'Kakao 로그인 처리 중 오류가 발생했습니다.');
+    }
+  }
+);
+
+/**
+ * Callable (v2) that erases every piece of the caller's personal data and then
+ * deletes their Firebase Auth record.
+ *
+ * The target uid is taken **only** from `request.auth.uid` — no uid argument is
+ * accepted, so a caller can never delete another account (privilege escalation).
+ * Admin SDK bypasses firestore.rules, so `users/{uid}`'s `allow delete: if false`
+ * stays untouched.
+ *
+ * Firestore purge runs first; the Auth record is deleted only when every step
+ * succeeded. On partial failure the account survives so the client can retry
+ * (the purge is idempotent). Which step failed is logged, never returned.
+ *
+ * Usage from client:
+ *   const deleteAccount = httpsCallable(functions, 'deleteAccount');
+ *   await deleteAccount();
+ */
+export const deleteAccount = onCall<unknown>(
+  { region: 'asia-northeast3' },
+  async (request): Promise<DeleteAccountResponse> => {
+    const uid = request.auth?.uid;
+    if (!uid) {
+      throw new HttpsError('unauthenticated', '로그인이 필요합니다.');
+    }
+
+    const db = admin.firestore();
+    try {
+      await deleteAccountAndData(
+        {
+          db,
+          auth: admin.auth(),
+          // Adapter for the service's path-based recursive delete (the real
+          // DocumentReference cannot be expressed as a structural DI type).
+          recursiveDeleteDocument: (path) => db.recursiveDelete(db.doc(path)),
+        },
+        uid
+      );
+      return { success: true };
+    } catch (error) {
+      if (error instanceof AccountDeletionError) {
+        // Step names only — no document body, no uid-bearing payload.
+        console.error(
+          'deleteAccount purge incomplete, auth record kept:',
+          error.failedSteps.join(',')
+        );
+        throw new HttpsError(
+          'internal',
+          '계정 삭제를 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.'
+        );
+      }
+      console.error(
+        'deleteAccount unexpected error:',
+        error instanceof Error ? error.message : 'unknown'
+      );
+      throw new HttpsError(
+        'internal',
+        '계정 삭제 처리 중 오류가 발생했습니다.'
+      );
     }
   }
 );
