@@ -122,9 +122,10 @@ export interface GuidanceSession {
    */
   readonly sourceRouteVerified?: true;
   /**
-   * 이 세션에서 사용자가 토글/해제한 구간 키 — attach 병합에서 원격 값을 제외할
-   * 대상. 로컬 맵은 "해제(키 삭제)"와 "미접촉"을 구분하지 못해, in-flight 원격
-   * 사본이 방금 지운 필터를 부활시킬 수 있다.
+   * 이 세션에서 사용자가 토글/해제한 구간 키 — attach 병합에서 **원격 값을 제외할
+   * 대상**. 로컬 선호 맵은 "방금 해제(키 삭제)"와 "미접촉"을 구분하지 못하므로,
+   * in-flight로 도착한 원격 사본이 사용자가 방금 지운 필터를 부활시킨다. 접촉
+   * 이력을 따로 들어야 그 구간만 원격 병합에서 뺄 수 있다.
    */
   readonly touchedBoardingKeys?: readonly string[];
 }

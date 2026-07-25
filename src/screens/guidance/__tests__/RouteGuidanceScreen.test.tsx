@@ -1587,6 +1587,25 @@ describe('RouteGuidanceScreen', () => {
       expect(getGuidanceSession()?.destinationPreferences).toEqual({ 'p1|5': ['마천'] });
     });
 
+    it('토글·해제한 구간 키를 세션 접촉 이력에 기록한다 (attach 병합 제외용)', () => {
+      // 해제는 로컬 선호 맵에 아무 흔적도 남기지 않아 "미접촉"과 구분되지 않는다.
+      // 접촉 이력이 있어야 뒤늦게 도착한 attach가 방금 지운 필터를 되살리지 못한다.
+      seedBranchSession({ sourceCommuteType: 'morning', ownerUid: 'user-1' });
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: branchTrains(),
+        loading: false,
+        error: null,
+      });
+      const { getByTestId } = render(<RouteGuidanceScreen />);
+      fireEvent.press(getByTestId('guidance-open-destination-filter'));
+      fireEvent.press(getByTestId('destination-option-마천'));
+      expect(getGuidanceSession()?.touchedBoardingKeys).toEqual(['p1|5']);
+      // 같은 키를 다시 탭 = 해제. 선호는 사라져도 접촉 이력은 남고 중복되지 않는다.
+      fireEvent.press(getByTestId('destination-option-마천'));
+      expect(getGuidanceSession()?.destinationPreferences).toEqual({});
+      expect(getGuidanceSession()?.touchedBoardingKeys).toEqual(['p1|5']);
+    });
+
     it('경로 지문 미확인 세션(sourceRouteVerified 부재)은 원격 저장하지 않는다', () => {
       // 세션 OD가 저장된 leg 경로와 발산했거나(이중 SSOT) attach의 원격 읽기가
       // 실패해 확인 자체가 없던 상태 — 무관한 경로에 선호를 영속하느니 세션 한정으로

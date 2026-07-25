@@ -23,6 +23,11 @@
  * 일치할 때만 선호를 붙이고 `sourceRouteVerified`를 세운다(= write-back 허용). 불일치·
  * 로드 실패는 fail-closed: 빈 확정만 하고 미검증으로 남긴다 — 알림 게이트는 열리되
  * 원격 쓰기는 막힌다(선호는 세션 한정으로 강등).
+ *
+ * 접촉 키(touchedBoardingKeys): 병합은 로컬 우선이지만, 사용자가 attach 진행 중에
+ * 어떤 구간을 **해제**하면 그 키는 로컬 맵에 없다 — 스프레드만으로는 "삭제"와
+ * "미접촉"이 같은 모양이라 in-flight 원격 값이 방금 지운 필터를 되살린다. 그래서
+ * 세션이 든 접촉 이력의 키는 원격 사본에서 먼저 걷어낸 뒤 병합한다.
  */
 import { loadCommuteRoutes } from '@/services/commute/commuteService';
 import { normalizeStationId } from '@/services/guidance/destinationPreference';
@@ -83,16 +88,20 @@ const settleDestinationPreferences = (
   if (current.ownerUid !== uid) return;
   // 경로 지문 가드 — 다른 경로의 선호를 붙이지 않는다(불일치 시 remote 전량 제외).
   const verified = route != null && matchesSourceRoute(current, route) ? route : null;
+  // 접촉 키 제외 — 사용자가 이 세션에서 **해제한** 구간은 로컬 맵에 키가 없어
+  // 스프레드 병합만으로는 "삭제"와 "미접촉"이 구분되지 않는다. 그대로 두면
+  // in-flight 원격 값이 방금 지운 필터를 부활시킨다(사용자 의도 역전).
+  const touched = new Set(current.touchedBoardingKeys ?? []);
+  const remoteFiltered = Object.fromEntries(
+    Object.entries(verified?.boardingPreferences ?? {}).filter(([key]) => !touched.has(key))
+  );
   // 로컬 우선 병합 — 늦게 도착한 원격 사본이 사용자가 이미 고른 키를 덮어쓰지
   // 않으면서(로컬 승), 원격에만 있는 형제 구간 키는 채운다. 전량 스킵(옛 TOCTOU
   // 가드)이면 attach 전에 한 구간만 토글해도 이후 환승 구간의 저장 선호가 이
   // 세션에서 통째로 유실됐다.
   setGuidanceSession({
     ...current,
-    destinationPreferences: {
-      ...verified?.boardingPreferences,
-      ...current.destinationPreferences,
-    },
+    destinationPreferences: { ...remoteFiltered, ...current.destinationPreferences },
     ...(verified !== null && { sourceRouteVerified: true as const }),
   });
 };

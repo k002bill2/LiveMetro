@@ -190,6 +190,43 @@ it('가드 불통과(세션 스왑)면 실패 경로에서도 settle하지 않�
   expect(getGuidanceSession()?.destinationPreferences).toBeUndefined();
 });
 
+describe('접촉 키 제외 (해제한 필터의 부활 방지)', () => {
+  it('attach 전에 해제한 키는 원격 값으로 부활하지 않고, 미접촉 형제 키는 병합된다', async () => {
+    // 사용자가 attach 진행 중 'D1|5'를 해제했다 — 로컬 맵에 키가 없으므로 스프레드
+    // 병합만으로는 "삭제"와 "미접촉"이 같은 모양이고, in-flight 원격 값이 방금 지운
+    // 필터를 되살린다. 접촉 이력이 그 구간만 원격 병합에서 빼야 한다.
+    setGuidanceSession({
+      ...SESSION,
+      destinationPreferences: {},
+      touchedBoardingKeys: ['D1|5'],
+    });
+    (loadCommuteRoutes as jest.Mock).mockResolvedValueOnce(
+      settingsWith({}, { 'D1|5': ['마천'], 'D9|8': ['암사'] })
+    );
+    await attachDestinationPreferences('uid-1', 'morning', 1_000);
+    // 해제한 키는 부활 없음, 손대지 않은 형제 키는 그대로 채워진다.
+    expect(getGuidanceSession()?.destinationPreferences).toEqual({ 'D9|8': ['암사'] });
+  });
+
+  it('접촉했지만 값이 남아 있는 키는 로컬 값이 이긴다 (제외해도 결과 동일)', async () => {
+    setGuidanceSession({
+      ...SESSION,
+      destinationPreferences: { 'D1|5': ['상일동'] },
+      touchedBoardingKeys: ['D1|5'],
+    });
+    (loadCommuteRoutes as jest.Mock).mockResolvedValueOnce(settingsWith({}, { 'D1|5': ['마천'] }));
+    await attachDestinationPreferences('uid-1', 'morning', 1_000);
+    expect(getGuidanceSession()?.destinationPreferences).toEqual({ 'D1|5': ['상일동'] });
+  });
+
+  it('접촉 이력은 attach 후에도 보존된다 (세션 수명 동안 유효)', async () => {
+    setGuidanceSession({ ...SESSION, destinationPreferences: {}, touchedBoardingKeys: ['D1|5'] });
+    (loadCommuteRoutes as jest.Mock).mockResolvedValueOnce(settingsWith({}, { 'D9|8': ['암사'] }));
+    await attachDestinationPreferences('uid-1', 'morning', 1_000);
+    expect(getGuidanceSession()?.touchedBoardingKeys).toEqual(['D1|5']);
+  });
+});
+
 describe('경로 지문 대조 (이중 SSOT 발산 방어)', () => {
   it('OD가 다른 경로가 로드되면 선호를 붙이지 않고 빈 확정만 한다', async () => {
     // 세션 OD는 강남→홍대입구인데 저장된 leg는 사당→시청 — profile store와

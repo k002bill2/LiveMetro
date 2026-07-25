@@ -620,7 +620,14 @@ export const RouteGuidanceScreen: React.FC = () => {
       // 귀속 가드: mount-frozen session과 같은 여정일 때만 쓴다 (H2 원칙).
       const live = getGuidanceSession();
       if (session === null || live === null || live.startedAt !== session.startedAt) return;
-      setGuidanceSession({ ...live, destinationPreferences: next });
+      // 접촉 이력 동반 기록 — attach의 원격 병합이 이 키를 되살리지 못하게 한다.
+      // 해제(키 삭제)는 로컬 맵에 흔적을 남기지 않아 "미접촉"과 구분되지 않는다.
+      const touched = live.touchedBoardingKeys ?? [];
+      setGuidanceSession({
+        ...live,
+        destinationPreferences: next,
+        touchedBoardingKeys: touched.includes(writtenKey) ? touched : [...touched, writtenKey],
+      });
       // 소유 귀속 게이트 — 세션을 시작한 계정에서만 원본에 write-back한다. 세션은
       // 영속돼 로그아웃/계정 전환을 넘겨 살아남으므로, 이 검사가 없으면 재개 후
       // 토글이 이전 탑승자의 선택을 새 계정의 commuteSettings에 기록한다.
