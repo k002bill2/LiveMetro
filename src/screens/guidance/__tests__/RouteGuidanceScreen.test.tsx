@@ -1635,6 +1635,49 @@ describe('RouteGuidanceScreen', () => {
       expect(getByTestId('destination-filter-sheet')).toBeTruthy();
     });
 
+    it('attach 미확정 동안에는 탑승 알림을 예약하지 않고, settle 후에 예약한다', () => {
+      // 출퇴근 세션은 저장 선호가 붙기(attach) 전 창이 있다. 그 창에서 예약·발사된
+      // 알림은 사용자가 제외해 둔 종점행 열차의 것이어도 회수 불가다.
+      // destinationPreferences: undefined=미확정, {}=확정·선호 없음.
+      seedBranchSession({ sourceCommuteType: 'morning', ownerUid: 'user-1' });
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: branchTrains(),
+        loading: false,
+        error: null,
+      });
+      const { getByTestId, rerender } = render(<RouteGuidanceScreen />);
+      expect(scheduleBoardingAlert).not.toHaveBeenCalled();
+      // 표시는 게이트하지 않는다 — 칩·카운트다운은 그대로 살아 있다.
+      expect(getByTestId('guidance-live-chip')).toHaveTextContent('하남검단산행 5분 00초 후 도착');
+
+      // attach가 "선호 없음"으로 확정 → 미확정 창이 닫히며 자연스럽게 예약된다.
+      const live = getGuidanceSession();
+      act(() => {
+        setGuidanceSession({ ...live!, destinationPreferences: {} });
+        rerender(<RouteGuidanceScreen />);
+      });
+      expect(scheduleBoardingAlert).toHaveBeenCalledTimes(1);
+      expect(scheduleBoardingAlert).toHaveBeenCalledWith(
+        expect.objectContaining({ finalDestination: '하남검단산' })
+      );
+    });
+
+    it('비로그인 출퇴근 세션(ownerUid 부재)은 게이트되지 않는다', () => {
+      // uid가 없으면 attach 자체가 발사되지 않으므로(useStartCommuteGuidance)
+      // destinationPreferences가 영영 미확정으로 남는다 — 여기서 게이트하면 그
+      // 세션의 탑승 알림이 완전히 죽는다.
+      seedBranchSession({ sourceCommuteType: 'morning' });
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: branchTrains(),
+        loading: false,
+        error: null,
+      });
+      render(<RouteGuidanceScreen />);
+      expect(scheduleBoardingAlert).toHaveBeenCalledWith(
+        expect.objectContaining({ finalDestination: '하남검단산' })
+      );
+    });
+
     it('선호 없음이면 기존 방면 필터 동작 그대로다 (칩=방면 매칭 최선두)', () => {
       seedSession(); // 2호선 을지로3가→시청, 방면 = 산곡
       mockedUseRealtimeTrains.mockReturnValue({

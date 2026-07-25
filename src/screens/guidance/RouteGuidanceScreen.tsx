@@ -751,8 +751,25 @@ export const RouteGuidanceScreen: React.FC = () => {
   // 막는다(발사된 알림은 취소 불가 — pending만 cancel-then-schedule). The screen
   // is foreground when scheduling, so tapping the alert just returns here.
   const notificationSettings = user?.preferences?.notificationSettings ?? null;
+  // attach(저장 선호의 원격 읽기) 미확정 창 — 이 동안에는 탑승 알림을 예약하지
+  // 않는다. 확정 전에 발사된 알림은 사용자가 이미 제외해 둔 종점행 열차의 것이어도
+  // 회수할 수 없다(발사된 알림은 취소 불가 — pending만 cancel 가능). 판정 기준은
+  // destinationPreferenceSync의 settled 마커: undefined=미확정, {}=확정·선호 없음.
+  // `ownerUid` 동반 조건이 필수다 — attach는 uid가 있을 때만 발사되는데(useStart-
+  // CommuteGuidance) ownerUid도 같은 uid로 게이트되므로, 비로그인 출퇴근 진입이
+  // 영영 미확정으로 남아 알림이 완전히 죽는 일을 막는다. 일반 검색 세션
+  // (sourceCommuteType 부재)은 attach 자체가 없어 게이트 무영향. 칩·보조 나열·
+  // 카운트다운은 게이트하지 않는다 — 표시는 되돌릴 수 있고, 가리면 정직성이 깨진다.
+  const destinationPreferencesPending =
+    liveSession?.sourceCommuteType !== undefined &&
+    liveSession?.ownerUid !== undefined &&
+    liveSession?.destinationPreferences === undefined;
   useEffect(() => {
     if (!session || !isWaitingStep) return;
+    // 미확정이면 예약 자체를 보류한다. settle되면 liveSession 갱신 → 이 effect가
+    // 재실행되어 자연스럽게 예약된다(별도 재시도 경로 불필요). 취소 분기도 함께
+    // 건너뛴다 — 이 창에서는 이 세션 몫으로 예약된 알림이 아직 없다.
+    if (destinationPreferencesPending) return;
     if (earliestTrain?.arrivalTime == null) {
       // 선호를 골랐는데 추적 대상이 0대가 된 전이 — 앞서 예약된 미발사 알림은 이제
       // 사용자가 제외한 열차의 것이므로 취소한다("선택한 종점행 열차만 알림"). 기존
@@ -773,7 +790,7 @@ export const RouteGuidanceScreen: React.FC = () => {
       settings: notificationSettings,
       variant: currentStep?.kind === 'transfer' ? 'transfer' : 'board',
     });
-  }, [session, isWaitingStep, earliestTrain, selectedDestinations, waitingStationName, currentStep?.kind, notificationSettings]);
+  }, [session, isWaitingStep, earliestTrain, selectedDestinations, waitingStationName, currentStep?.kind, notificationSettings, destinationPreferencesPending]);
 
   // 하차 임박 알림 — ride 스텝의 도착 예정 시각으로 pending 알림을 예약한다.
   // `nowMs - elapsedInStepSec*1000`은 현재 스텝의 시작 시각(anchor 파생)이라

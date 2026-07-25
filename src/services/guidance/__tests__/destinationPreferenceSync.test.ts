@@ -85,9 +85,49 @@ it('세션 소유자가 다르면(ownerUid 불일치) attach하지 않는다', a
   expect(getGuidanceSession()?.destinationPreferences).toBeUndefined();
 });
 
-it('선호 없음·로드 실패는 조용히 no-op (안내를 막지 않는다)', async () => {
+// settled 마커 계약: undefined=미확정(원격 읽기 진행 중), {}=확정·선호 없음.
+// 소비자(탑승 알림 예약)가 미확정 창을 건너뛰려면 attach가 **모든** 종료 경로에서
+// 필드를 확정해야 한다 — 아니면 실패 한 번에 알림이 영영 막힌다.
+it('로드가 throw해도 {}로 settle한다 (미확정 상태로 남기지 않는다)', async () => {
   setGuidanceSession(SESSION);
   (loadCommuteRoutes as jest.Mock).mockRejectedValueOnce(new Error('offline'));
   await expect(attachDestinationPreferences('uid-1', 'morning', 1_000)).resolves.toBeUndefined();
+  expect(getGuidanceSession()?.destinationPreferences).toEqual({});
+});
+
+it('로드가 null(오프라인 폴백)이어도 {}로 settle한다', async () => {
+  // loadCommuteRoutes는 throw하지 않고 실패를 null로 반환한다 — 실제 오프라인은
+  // catch가 아니라 이 경로로 도착하므로 여기서도 확정돼야 한다.
+  setGuidanceSession(SESSION);
+  (loadCommuteRoutes as jest.Mock).mockResolvedValueOnce(null);
+  await attachDestinationPreferences('uid-1', 'morning', 1_000);
+  expect(getGuidanceSession()?.destinationPreferences).toEqual({});
+});
+
+it('저장된 선호가 비어 있어도 {}로 settle한다', async () => {
+  setGuidanceSession(SESSION);
+  (loadCommuteRoutes as jest.Mock).mockResolvedValueOnce({
+    morningRoute: { boardingPreferences: {} },
+    eveningRoute: null,
+    eveningEnabled: true,
+  });
+  await attachDestinationPreferences('uid-1', 'morning', 1_000);
+  expect(getGuidanceSession()?.destinationPreferences).toEqual({});
+});
+
+it('settle 실패 경로에서도 로컬 선택은 보존한다', async () => {
+  // 확정이 곧 초기화여선 안 된다 — attach 전에 시트에서 고른 키는 살아남는다.
+  setGuidanceSession({ ...SESSION, destinationPreferences: { 'D1|5': ['마천'] } });
+  (loadCommuteRoutes as jest.Mock).mockRejectedValueOnce(new Error('offline'));
+  await attachDestinationPreferences('uid-1', 'morning', 1_000);
+  expect(getGuidanceSession()?.destinationPreferences).toEqual({ 'D1|5': ['마천'] });
+});
+
+it('가드 불통과(세션 스왑)면 실패 경로에서도 settle하지 않는다', async () => {
+  // 확정은 "이 세션의 attach"에만 유효하다 — 남의 세션에 마커를 찍으면 그 세션의
+  // 미확정 창이 거짓으로 닫힌다.
+  setGuidanceSession({ ...SESSION, startedAt: 2_000 });
+  (loadCommuteRoutes as jest.Mock).mockRejectedValueOnce(new Error('offline'));
+  await attachDestinationPreferences('uid-1', 'morning', 1_000);
   expect(getGuidanceSession()?.destinationPreferences).toBeUndefined();
 });
