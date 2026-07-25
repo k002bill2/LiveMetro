@@ -55,16 +55,21 @@ it('세션이 바뀌었으면(startedAt 불일치) attach하지 않는다', asyn
   expect(getGuidanceSession()?.destinationPreferences).toBeUndefined();
 });
 
-it('세션에 이미 선호가 있으면 늦게 도착한 원격 사본이 덮어쓰지 않는다 (TOCTOU)', async () => {
-  // 시트에서 사용자가 먼저 고른 상태 — attach의 원격 읽기가 나중에 끝나도 선점이 이긴다.
+it('로컬 우선 병합 — 사용자가 고친 키는 유지하고 원격 형제 키는 채운다', async () => {
+  // 시트에서 사용자가 먼저 'D1|5'를 고른 상태에서 attach의 원격 읽기가 늦게 끝난다.
+  // 그 키는 로컬 선점이 이기되, 원격에만 있는 환승 구간 키('D9|8')는 유실되면 안 된다
+  // (전량 스킵하던 옛 TOCTOU 가드의 결함 — 형제 키가 이 세션 내내 미적용됐다).
   setGuidanceSession({ ...SESSION, destinationPreferences: { 'D1|5': ['상일동'] } });
   (loadCommuteRoutes as jest.Mock).mockResolvedValueOnce({
-    morningRoute: { boardingPreferences: { 'D1|5': ['마천'] } },
+    morningRoute: { boardingPreferences: { 'D1|5': ['마천'], 'D9|8': ['암사'] } },
     eveningRoute: null,
     eveningEnabled: true,
   });
   await attachDestinationPreferences('uid-1', 'morning', 1_000);
-  expect(getGuidanceSession()?.destinationPreferences).toEqual({ 'D1|5': ['상일동'] });
+  expect(getGuidanceSession()?.destinationPreferences).toEqual({
+    'D1|5': ['상일동'],
+    'D9|8': ['암사'],
+  });
 });
 
 it('세션 소유자가 다르면(ownerUid 불일치) attach하지 않는다', async () => {

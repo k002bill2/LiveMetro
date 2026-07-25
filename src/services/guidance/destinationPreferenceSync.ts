@@ -30,9 +30,14 @@ export const attachDestinationPreferences = async (
     // 소유 귀속 가드 — 다른 계정이 시작한 세션에 이 계정의 선호를 붙이지 않는다
     // (영속 세션은 로그아웃/계정 전환을 넘겨 살아남는다).
     if (current.ownerUid !== uid) return;
-    // 세션에 이미 선호가 있으면(사용자 시트 선택 등) 늦게 도착한 원격 사본이 덮어쓰지 않는다 (TOCTOU 가드).
-    if (current.destinationPreferences !== undefined) return;
-    setGuidanceSession({ ...current, destinationPreferences: prefs });
+    // 로컬 우선 병합 — 늦게 도착한 원격 사본이 사용자가 이미 고른 키를 덮어쓰지
+    // 않으면서(로컬 승), 원격에만 있는 형제 구간 키는 채운다. 전량 스킵(옛 TOCTOU
+    // 가드)이면 attach 전에 한 구간만 토글해도 이후 환승 구간의 저장 선호가 이
+    // 세션에서 통째로 유실됐다.
+    setGuidanceSession({
+      ...current,
+      destinationPreferences: { ...prefs, ...current.destinationPreferences },
+    });
   } catch (error) {
     if (__DEV__) console.error('[destinationPreferenceSync] attach failed', error);
   }
