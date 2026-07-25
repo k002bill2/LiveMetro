@@ -8,6 +8,7 @@
  * 익명화가 본문·집계를 보존하는지, 멱등성, 타 사용자 문서 불변, 페이징.
  */
 
+import { logger } from 'firebase-functions';
 import {
   deleteAccountAndData,
   purgeUserFirestoreData,
@@ -46,6 +47,12 @@ class FakeFirestore implements AdminFirestoreLike {
   failingPaths = new Set<string>();
   /** 실패시킬 collection group id. */
   failingCollectionGroups = new Set<string>();
+  /**
+   * failingPaths에 대해 던질 커스텀 오류. 지정 없으면 합성 메시지로 폴백한다.
+   * 실제 Admin SDK(gRPC) 오류 모양(문서 경로·uid 포함)을 재현해 "message를
+   * 로깅하지 않는다"는 방어가 진짜로 동작하는지 검증하기 위함이다.
+   */
+  failingPathErrors = new Map<string, Error>();
 
   seed(path: string, data: DocData): void {
     this.docs.set(path, data);
@@ -58,7 +65,7 @@ class FakeFirestore implements AdminFirestoreLike {
     const ref: AdminDocumentRefLike = {
       delete: async (): Promise<unknown> => {
         if (this.failingPaths.has(path)) {
-          throw new Error('simulated delete failure');
+          throw this.failingPathErrors.get(path) ?? new Error('simulated delete failure');
         }
         this.ops.push({ kind: 'delete', path });
         this.docs.delete(path);
@@ -179,7 +186,11 @@ class FakeFirestore implements AdminFirestoreLike {
         return undefined;
       },
       commit: async (): Promise<unknown> => {
-        if (failed !== null) throw new Error('simulated batch commit failure');
+        if (failed !== null) {
+          throw (
+            this.failingPathErrors.get(failed) ?? new Error('simulated batch commit failure')
+          );
+        }
         staged.forEach((apply) => apply());
         return undefined;
       },
@@ -244,6 +255,21 @@ const seedFullDataset = (db: FakeFirestore): void => {
   db.seed(`pushTokens/${UID}`, { token: 'ExponentPushToken[x]' });
   db.seed('favorites/f1', { userId: UID, stationId: '0222' });
   db.seed('favorites/f2', { userId: OTHER_UID, stationId: '0223' });
+  db.seed('fcm_tokens/t-mine', {
+    token: 'tok-1',
+    userId: UID,
+    deviceId: 'device-abc',
+  });
+  db.seed('fcm_tokens/t-mine-2', {
+    token: 'tok-2',
+    userId: UID,
+    deviceId: 'device-def',
+  });
+  db.seed('fcm_tokens/t-other', {
+    token: 'tok-other',
+    userId: OTHER_UID,
+    deviceId: 'device-other',
+  });
   db.seed('delayReports/r1', {
     userId: UID,
     userDisplayName: '홍길동',
@@ -287,13 +313,19 @@ const seedFullDataset = (db: FakeFirestore): void => {
 
 describe('accountDeletionService', () => {
   let errorSpy: jest.SpyInstance;
+  let loggerErrorSpy: jest.SpyInstance;
 
   beforeEach(() => {
     errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    // firebase-functions logger는 require 시점에 UNPATCHED_CONSOLE.error(원본
+    // console.error 참조)를 캡처해 두므로 console.error spy로는 잡히지 않는다.
+    // exports 객체의 error 메서드 자체를 스파이해야 한다.
+    loggerErrorSpy = jest.spyOn(logger, 'error').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
     errorSpy.mockRestore();
+    loggerErrorSpy.mockRestore();
   });
 
   describe('파기 순서 (Firestore 전부 → Auth)', () => {
@@ -326,7 +358,9 @@ describe('accountDeletionService', () => {
       expect(h.db.docs.has('favorites/f1')).toBe(false);
     });
 
-    it('서브컬렉션은 경로 기반 재귀 삭제로 처리한다', async () => {
+    // uid를 문서 ID로 쓰는 컬렉션은 하위 컬렉션 유무와 무관하게 전부 재귀 삭제로
+    // 통일한다 — 나중에 하위 컬렉션이 생겨도 조용히 누락되지 않는다.
+    it('uid 소유 문서는 전부 경로 기반 재귀 삭제로 처리한다', async () => {
       const h = makeHarness();
       seedFullDataset(h.db);
 
@@ -335,7 +369,31 @@ describe('accountDeletionService', () => {
       const recursivePaths = h.db.ops
         .filter((op) => op.kind === 'recursiveDelete')
         .map((op) => op.path);
-      expect(recursivePaths).toEqual([`commuteLogs/${UID}`, `commutePatterns/${UID}`]);
+      expect(recursivePaths).toEqual([
+        `pushTokens/${UID}`,
+        `smartNotificationSettings/${UID}`,
+        `commuteLogs/${UID}`,
+        `commutePatterns/${UID}`,
+        `commuteSettings/${UID}`,
+        `users/${UID}`,
+      ]);
+    });
+
+    // fcm_tokens는 문서 ID가 uid가 아니라 userId **필드**로 소유를 표현한다.
+    // deviceId(기기 식별자)를 담고 있고 registerFcmToken이 실제 배포된다.
+    it('fcm_tokens에서 내 기기 토큰을 삭제하고 타인 것은 남긴다', async () => {
+      const h = makeHarness();
+      seedFullDataset(h.db);
+
+      await deleteAccountAndData(h.deps, UID);
+
+      expect(h.db.docs.has('fcm_tokens/t-mine')).toBe(false);
+      expect(h.db.docs.has('fcm_tokens/t-mine-2')).toBe(false);
+      expect(h.db.docs.get('fcm_tokens/t-other')).toEqual({
+        token: 'tok-other',
+        userId: OTHER_UID,
+        deviceId: 'device-other',
+      });
     });
 
     it('다른 사용자의 문서는 건드리지 않는다', async () => {
@@ -475,7 +533,7 @@ describe('accountDeletionService', () => {
     it('문서 삭제가 실패하면 Auth를 삭제하지 않고 실패 단계를 담아 throw 한다', async () => {
       const h = makeHarness();
       seedFullDataset(h.db);
-      h.db.failingPaths.add(`pushTokens/${UID}`);
+      h.recursiveFailures.add(`pushTokens/${UID}`);
 
       await expect(deleteAccountAndData(h.deps, UID)).rejects.toBeInstanceOf(
         AccountDeletionError,
@@ -498,7 +556,10 @@ describe('accountDeletionService', () => {
       expect(h.deletedUsers).toEqual([]);
     });
 
-    it('앞선 단계가 실패해도 나머지 단계는 계속 수행한다', async () => {
+    // fail-fast가 핵심 안전장치다. 계속 진행하면 앞 단계가 영구 실패하는
+    // 상황(인덱스 빌드 창 등)에서 users까지 지워진 채 Auth만 남아
+    // "본인 데이터는 소실됐는데 댓글엔 uid가 남은 삭제 불가능한 계정"이 된다.
+    it('앞선 단계가 실패하면 뒤 단계는 실행되지 않는다', async () => {
       const h = makeHarness();
       seedFullDataset(h.db);
       // delayReportComments는 첫 단계다(인덱스 전제조건).
@@ -506,33 +567,51 @@ describe('accountDeletionService', () => {
 
       const result = await purgeUserFirestoreData(h.deps, UID);
 
-      // comments collection group 장애는 그 그룹을 쓰는 두 단계를 함께 무너뜨린다
-      // (인덱스 미배포 시 실제로 나타나는 모양).
-      expect(result.failedSteps).toEqual([
-        'delayReportComments',
-        'delayReportCommentLikes',
-      ]);
-      // 뒤따르는 단계는 정상 수행됨
-      expect(h.db.docs.has(`pushTokens/${UID}`)).toBe(false);
-      expect(h.db.docs.has(`users/${UID}`)).toBe(false);
-      expect(h.db.docs.get('delayReports/r1')).toMatchObject({
-        userId: DELETED_USER_ID,
-      });
+      expect(result.failedSteps).toEqual(['delayReportComments']);
+      // 뒤따르는 파괴적 단계는 하나도 실행되지 않아야 한다.
+      expect(h.db.docs.has(`users/${UID}`)).toBe(true);
+      expect(h.db.docs.has(`pushTokens/${UID}`)).toBe(true);
+      expect(h.db.docs.has(`commuteSettings/${UID}`)).toBe(true);
+      expect(h.db.docs.has('favorites/f1')).toBe(true);
+      expect(h.db.docs.has('fcm_tokens/t-mine')).toBe(true);
+      // 익명화도 첫 단계에서 멈췄으므로 내 제보는 그대로다.
+      expect(h.db.docs.get('delayReports/r1')).toMatchObject({ userId: UID });
     });
 
-    it('여러 단계가 실패하면 실행 순서대로 전부 수집한다', async () => {
+    it('중간 단계가 실패하면 그 지점에서 멈춘다', async () => {
       const h = makeHarness();
       seedFullDataset(h.db);
-      h.db.failingPaths.add(`users/${UID}`);
-      h.db.failingCollectionGroups.add('comments');
+      h.db.failingPaths.add('favorites/f1');
 
       const result = await purgeUserFirestoreData(h.deps, UID);
 
-      expect(result.failedSteps).toEqual([
-        'delayReportComments',
-        'delayReportCommentLikes',
-        'users',
+      expect(result.failedSteps).toEqual(['favorites']);
+      // favorites 앞 단계(익명화)는 완료됐다.
+      expect(h.db.docs.get('delayReports/r1')).toMatchObject({
+        userId: DELETED_USER_ID,
+      });
+      // favorites 뒤 단계는 실행되지 않았다.
+      expect(h.db.docs.has('fcm_tokens/t-mine')).toBe(true);
+      expect(h.db.docs.has(`users/${UID}`)).toBe(true);
+    });
+
+    it('재시도는 실패 지점부터 이어서 완료한다 (멱등 + fail-fast)', async () => {
+      const h = makeHarness();
+      seedFullDataset(h.db);
+      h.db.failingPaths.add('favorites/f1');
+
+      expect((await purgeUserFirestoreData(h.deps, UID)).failedSteps).toEqual([
+        'favorites',
       ]);
+
+      // 일시적 오류가 해소된 뒤 재호출 → 완주한다.
+      h.db.failingPaths.clear();
+      const retry = await purgeUserFirestoreData(h.deps, UID);
+
+      expect(retry.failedSteps).toEqual([]);
+      expect(h.db.docs.has(`users/${UID}`)).toBe(false);
+      expect(h.db.docs.has('favorites/f1')).toBe(false);
+      expect(h.db.docs.has('fcm_tokens/t-mine')).toBe(false);
     });
 
     // 순서가 곧 실패 안전성이다: users에는 프로필과 즐겨찾기 배열
@@ -555,23 +634,38 @@ describe('accountDeletionService', () => {
       const h = makeHarness();
       seedFullDataset(h.db);
       h.db.failingCollectionGroups.add('comments');
-      h.db.failingPaths.add(`pushTokens/${UID}`);
+      h.recursiveFailures.add(`pushTokens/${UID}`);
 
       const result = await purgeUserFirestoreData(h.deps, UID);
 
       expect(result.failedSteps[0]).toBe('delayReportComments');
     });
 
-    it('실패 로그에 문서 본문을 남기지 않는다', async () => {
+    // Admin SDK(gRPC) 오류 message에는 실패한 문서의 **전체 경로**가 들어가고
+    // 그 경로에는 uid가 포함된다. fake가 실제와 같은 모양의 메시지를 던지게 해
+    // "message를 로깅하지 않는다"는 방어가 실제로 동작하는지 검증한다
+    // (합성 문자열만 던지면 통과가 보장된 vacuous 단언이 된다).
+    it('실패 로그에 문서 경로·uid를 남기지 않는다', async () => {
       const h = makeHarness();
       seedFullDataset(h.db);
-      h.db.failingPaths.add(`users/${UID}`);
+      h.db.failingPathErrors.set(
+        'favorites/f1',
+        Object.assign(
+          new Error(
+            `7 PERMISSION_DENIED: projects/livemetro/databases/(default)/documents/favorites/f1 (uid=${UID}, target@example.com)`,
+          ),
+          { code: 7 },
+        ),
+      );
+      h.db.failingPaths.add('favorites/f1');
 
       await purgeUserFirestoreData(h.deps, UID);
 
-      const logged = errorSpy.mock.calls.flat().join(' ');
-      expect(logged).toContain('users');
+      const logged = JSON.stringify(loggerErrorSpy.mock.calls);
+      expect(logged).toContain('favorites');
+      expect(logged).not.toContain(UID);
       expect(logged).not.toContain('target@example.com');
+      expect(logged).not.toContain('PERMISSION_DENIED');
     });
   });
 

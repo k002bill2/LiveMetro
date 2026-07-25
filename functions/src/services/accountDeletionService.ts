@@ -17,6 +17,8 @@
  *      더 이상 매칭되지 않으므로 재호출은 안전하다(부분 실패 후 재시도).
  */
 
+import { logger } from 'firebase-functions';
+
 /** 작성자 식별자 치환 상수 — 커뮤니티 제보는 삭제하지 않고 익명화한다. */
 export const DELETED_USER_ID = 'deleted-user';
 /** 표시용 닉네임 치환 상수. */
@@ -101,6 +103,7 @@ export type PurgeStep =
   | 'commutePatterns'
   | 'smartNotificationSettings'
   | 'pushTokens'
+  | 'fcmTokens'
   | 'favorites'
   | 'delayReports'
   | 'delayReportComments'
@@ -118,6 +121,19 @@ export class AccountDeletionError extends Error {
     this.name = 'AccountDeletionError';
   }
 }
+
+/**
+ * 로깅용 안전한 오류 식별자.
+ *
+ * Admin SDK(gRPC) 오류 `message`에는 실패한 문서 경로가 그대로 들어가고 그
+ * 경로에는 uid가 포함된다. 따라서 message는 절대 로깅하지 않고, 구조화된
+ * `code`(없으면 생성자 이름)만 남긴다.
+ */
+const describeErrorCode = (error: unknown): string => {
+  const code = (error as { code?: unknown })?.code;
+  if (typeof code === 'string' || typeof code === 'number') return String(code);
+  return error instanceof Error ? error.name : 'unknown';
+};
 
 /**
  * uid로 매칭되는 문서를 페이지 단위로 순회하며 쓰기를 적용한다.
@@ -147,14 +163,16 @@ const runPagedWrite = async (
   throw new Error('paged write exceeded the maximum page count');
 };
 
-/** uid를 문서 ID로 쓰는 단일 문서 파기. 없는 문서 삭제는 Firestore no-op. */
-const deleteOwnedDocument =
-  (collectionPath: string) =>
-  ({ db }: AccountPurgeDeps, uid: string): Promise<unknown> =>
-    db.collection(collectionPath).doc(uid).delete();
-
 /**
- * uid 문서와 그 하위 컬렉션 전체를 재귀 삭제한다(commuteLogs/{uid}/logs 등).
+ * uid를 문서 ID로 쓰는 문서와 그 하위 컬렉션 전체를 재귀 삭제한다
+ * (`commuteLogs/{uid}/logs/*` 등).
+ *
+ * 단일 문서 삭제(`doc().delete()`)와 재귀 삭제를 섞지 않고 **전부 재귀로
+ * 통일**한다. 오늘은 `pushTokens`·`smartNotificationSettings`·`commuteSettings`·
+ * `users`에 하위 컬렉션이 없지만, 나중에 하나 생기면 조용히 파기 누락이
+ * 발생하고 이를 감지할 수단이 없다. 경로 형태가 같고 없는 문서·하위
+ * 컬렉션은 no-op이라 비용도 사실상 동일하다.
+ *
  * `recursiveDelete`는 개별 삭제가 하나라도 실패하면 reject 하므로
  * (SDK typedoc: "The promise is rejected if any of the deletes fail")
  * 별도 BulkWriter 오류 콜백 없이 try/catch 게이트로 충분하다.
@@ -233,6 +251,18 @@ const anonymizeCongestionReports = ({ db }: AccountPurgeDeps, uid: string): Prom
   );
 
 /**
+ * uid를 **필드**로 갖는 컬렉션의 문서를 일괄 삭제한다(문서 ID가 uid가 아닌 경우).
+ */
+const deleteQueriedDocuments =
+  (collectionPath: string, ownerField: string) =>
+  ({ db }: AccountPurgeDeps, uid: string): Promise<void> =>
+    runPagedWrite(
+      db,
+      db.collection(collectionPath).where(ownerField, '==', uid),
+      (batch, ref) => batch.delete(ref),
+    );
+
+/**
  * 최상위 `favorites` 컬렉션 정리.
  *
  * 현재 클라이언트(favoritesService)는 즐겨찾기를 `users/{uid}` 문서의
@@ -241,12 +271,18 @@ const anonymizeCongestionReports = ({ db }: AccountPurgeDeps, uid: string): Prom
  * 있어 구버전 앱이 쓴 문서가 남아 있을 수 있어 방어적으로 함께 지운다
  * (비어 있으면 no-op).
  */
-const deleteLegacyFavorites = ({ db }: AccountPurgeDeps, uid: string): Promise<void> =>
-  runPagedWrite(
-    db,
-    db.collection('favorites').where('userId', '==', uid),
-    (batch, ref) => batch.delete(ref),
-  );
+const deleteLegacyFavorites = deleteQueriedDocuments('favorites', 'userId');
+
+/**
+ * FCM 기기 토큰 — `tokenManagementService.ts:41`이 `fcm_tokens` 컬렉션에
+ * `{token, userId, deviceId, platform, appVersion}`을 쓴다. `deviceId`는
+ * 기기 식별자(PII)다. 문서 ID가 uid가 아니라 `userId` 필드로 소유를 표현한다.
+ *
+ * 현재 클라이언트 호출처는 0이지만 `registerFcmToken`이 실제로 배포되는
+ * 살아 있는 엔드포인트라(인증만 하면 호출 가능) 데이터가 실재할 수 있다 —
+ * rules default-deny로 물리적 쓰기가 불가능한 컬렉션들과 다르다.
+ */
+const deleteFcmTokens = deleteQueriedDocuments('fcm_tokens', 'userId');
 
 interface PurgeStepRunner {
   readonly step: PurgeStep;
@@ -276,21 +312,30 @@ const PURGE_STEPS: readonly PurgeStepRunner[] = [
   { step: 'delayReportUpvotes', run: removeUpvoteTraces },
   { step: 'congestionReports', run: anonymizeCongestionReports },
   { step: 'favorites', run: deleteLegacyFavorites },
-  { step: 'pushTokens', run: deleteOwnedDocument('pushTokens') },
+  { step: 'fcmTokens', run: deleteFcmTokens },
+  { step: 'pushTokens', run: recursiveDeleteOwnedTree('pushTokens') },
   {
     step: 'smartNotificationSettings',
-    run: deleteOwnedDocument('smartNotificationSettings'),
+    run: recursiveDeleteOwnedTree('smartNotificationSettings'),
   },
   { step: 'commuteLogs', run: recursiveDeleteOwnedTree('commuteLogs') },
   { step: 'commutePatterns', run: recursiveDeleteOwnedTree('commutePatterns') },
-  { step: 'commuteSettings', run: deleteOwnedDocument('commuteSettings') },
-  { step: 'users', run: deleteOwnedDocument('users') },
+  { step: 'commuteSettings', run: recursiveDeleteOwnedTree('commuteSettings') },
+  { step: 'users', run: recursiveDeleteOwnedTree('users') },
 ];
 
 /**
- * Firestore 개인정보를 전수 파기한다. 한 단계가 실패해도 나머지는 계속
- * 진행한다 — 일시적 오류로 파기 가능한 데이터까지 남기는 것이 더 나쁘고,
- * 멱등성 덕분에 재호출로 남은 단계만 다시 시도할 수 있다.
+ * Firestore 개인정보를 전수 파기한다. **첫 실패에서 즉시 중단한다(fail-fast).**
+ *
+ * 계속 진행하면 PURGE_STEPS의 순서 설계가 통째로 무의미해진다: 인덱스 빌드
+ * 창처럼 앞 단계가 영구 실패하는 상황에서 뒤 단계가 전부 실행되면 `users`까지
+ * 지워진 채 Auth 레코드는 남는다 → 본인 데이터는 영구 소실됐는데 댓글에는
+ * 실제 uid·닉네임이 그대로 남고, 재시도는 매번 같은 지점에서 실패하는
+ * **삭제 불가능한 계정**이 된다. 게다가 세션이 살아 있어 다음 앱 실행에서
+ * users 문서가 기본값으로 재생성된다.
+ *
+ * 중단해도 잃는 것이 없다: 계정이 살아 있고 파기가 멱등이므로 재호출하면
+ * 완료된 단계는 no-op으로 지나가고 실패 지점부터 다시 진행한다.
  *
  * 실패는 throw 하지 않고 결과로 반환한다(호출자가 Auth 삭제 여부를 결정).
  */
@@ -305,11 +350,13 @@ export const purgeUserFirestoreData = async (
       await runner.run(deps, uid);
     } catch (error) {
       failedSteps.push(runner.step);
-      // 문서 본문·PII는 절대 남기지 않는다 — 단계명과 에러 메시지만.
-      console.error(
-        `deleteAccount purge step failed: ${runner.step}:`,
-        error instanceof Error ? error.message : 'unknown',
-      );
+      // 단계명과 에러 코드만 남긴다. Admin SDK gRPC 오류 메시지에는 실패한
+      // 문서 경로(= uid)가 포함되므로 message를 그대로 로깅하면 안 된다.
+      logger.error('deleteAccount purge step failed', {
+        step: runner.step,
+        code: describeErrorCode(error),
+      });
+      break;
     }
   }
 
