@@ -103,7 +103,7 @@ export const destinationOptions = (
  * CommuteRouteScreen 참조) 정규화 없이 비교하면 prune이 전량 드롭으로 퇴화한다.
  * 슬러그는 pass-through, station_cd는 슬러그로, 미상 ID는 원문 유지(보수적).
  */
-const normalizeStationId = (id: string): string => resolveInternalStationId(id) ?? id;
+export const normalizeStationId = (id: string): string => resolveInternalStationId(id) ?? id;
 
 /**
  * 저장 직전 prune — 경로에 존재하는 역(출발+환승)의 키만 유지한다. lineId 부분은

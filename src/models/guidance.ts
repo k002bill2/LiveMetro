@@ -112,4 +112,20 @@ export interface GuidanceSession {
    * 불통과 = 선호가 세션 한정으로 안전 강등된다 (하위 호환).
    */
   readonly ownerUid?: string;
+  /**
+   * attach가 **로드된 commuteSettings leg 경로와 이 세션 경로의 지문 일치**를 확인했을
+   * 때만 설정된다 (write-back 허용 조건). 출퇴근 OD는 두 저장소(profile store의
+   * `preferences.commuteSchedule` / commuteSettings 문서)에서 올 수 있어 발산이
+   * 실재하므로(PR #292 transferStations 이중 SSOT 전례), 확인 없이 토글을
+   * `<leg>Route`에 쓰면 무관한 경로에 선호가 영속된다. 부재 = 미확인(불일치·로드
+   * 실패·비출퇴근 세션) = 세션 한정 적용으로 안전 강등.
+   */
+  readonly sourceRouteVerified?: true;
+  /**
+   * 이 세션에서 사용자가 토글/해제한 구간 키 — attach 병합에서 **원격 값을 제외할
+   * 대상**. 로컬 선호 맵은 "방금 해제(키 삭제)"와 "미접촉"을 구분하지 못하므로,
+   * in-flight로 도착한 원격 사본이 사용자가 방금 지운 필터를 부활시킨다. 접촉
+   * 이력을 따로 들어야 그 구간만 원격 병합에서 뺄 수 있다.
+   */
+  readonly touchedBoardingKeys?: readonly string[];
 }

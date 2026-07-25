@@ -620,15 +620,27 @@ export const RouteGuidanceScreen: React.FC = () => {
       // 귀속 가드: mount-frozen session과 같은 여정일 때만 쓴다 (H2 원칙).
       const live = getGuidanceSession();
       if (session === null || live === null || live.startedAt !== session.startedAt) return;
-      setGuidanceSession({ ...live, destinationPreferences: next });
+      // 접촉 이력 동반 기록 — attach의 원격 병합이 이 키를 되살리지 못하게 한다.
+      // 해제(키 삭제)는 로컬 맵에 흔적을 남기지 않아 "미접촉"과 구분되지 않는다.
+      const touched = live.touchedBoardingKeys ?? [];
+      setGuidanceSession({
+        ...live,
+        destinationPreferences: next,
+        touchedBoardingKeys: touched.includes(writtenKey) ? touched : [...touched, writtenKey],
+      });
       // 소유 귀속 게이트 — 세션을 시작한 계정에서만 원본에 write-back한다. 세션은
       // 영속돼 로그아웃/계정 전환을 넘겨 살아남으므로, 이 검사가 없으면 재개 후
       // 토글이 이전 탑승자의 선택을 새 계정의 commuteSettings에 기록한다.
       // 구세션(ownerUid 부재)은 불통과 = 세션 한정 적용으로 안전 강등.
+      // 경로 지문 게이트(sourceRouteVerified) — attach가 "이 세션의 경로 = 저장된
+      // leg 경로"를 확인했을 때만 원본에 쓴다. 세션 OD는 profile store에서도 올 수
+      // 있어(이중 SSOT) 확인 없이 쓰면 무관한 경로에 선호가 영속된다. 미확인(로드
+      // 실패·발산)은 fail-closed = 세션 한정.
       if (
         live.sourceCommuteType !== undefined &&
         user?.id !== undefined &&
-        live.ownerUid === user.id
+        live.ownerUid === user.id &&
+        live.sourceRouteVerified === true
       ) {
         // fire-and-forget — 원격 실패해도 세션 필터는 이미 적용됨 (재시도는 다음 토글).
         void updateBoardingPreferences(user.id, live.sourceCommuteType, writtenKey, writtenList);
