@@ -15,6 +15,7 @@ import {
   loadDetectionEpisodes,
   clearDetectionMetrics,
 } from '@/services/guidance/guidanceDetectionMetrics';
+import { deleteCommuteSettings } from '@/services/commute/commuteService';
 
 jest.mock('lucide-react-native', () => ({
   ChevronRight: 'ChevronRight',
@@ -56,6 +57,11 @@ jest.mock('@/services/guidance/guidanceDetectionMetrics', () => ({
   })),
   formatDetectionSummary: jest.fn(() => '기록 없음'),
   clearDetectionMetrics: jest.fn(() => Promise.resolve()),
+}));
+
+// 계정 삭제 시 원격 출퇴근 설정 파기 — 서비스 경계에서 mock (factory 내부 inline).
+jest.mock('@/services/commute/commuteService', () => ({
+  deleteCommuteSettings: jest.fn(() => Promise.resolve({ success: true })),
 }));
 
 const mockNavigate = jest.fn();
@@ -1027,6 +1033,100 @@ describe('SettingsScreen', () => {
       );
       await deleteButton.onPress();
 
+      expect(clearDetectionMetrics).toHaveBeenCalled();
+    });
+
+    // commuteSettings/<uid>는 출퇴근 경로 + 종점행 선호를 담은 원격 개인 데이터다.
+    // 계정이 사라진 뒤 남으면 어떤 클라이언트로도 도달할 수 없는 고아 문서가 된다.
+    it('deletes the remote commuteSettings document during account deletion', async () => {
+      (useAuth as jest.Mock).mockReturnValue(authWith({}));
+      const { getByTestId } = render(<SettingsScreen {...defaultProps} />);
+
+      fireEvent.press(getByTestId('dev-nuke-account'));
+      const nukeCall = (Alert.alert as jest.Mock).mock.calls.find(
+        (c) => typeof c[0] === 'string' && c[0].includes('회원 정보 모두 삭제'),
+      );
+      const deleteButton = nukeCall![2].find(
+        (b: { style?: string }) => b.style === 'destructive',
+      );
+      await deleteButton.onPress();
+
+      expect(deleteCommuteSettings).toHaveBeenCalledWith('test-uid');
+    });
+
+    // 순서가 곧 수정이다: firestore.rules는 `request.auth.uid == userId`를 요구하므로
+    // deleteUser 이후의 삭제는 permission-denied로 조용히 실패한다(테스트는 "호출됨"만
+    // 보고 통과하지만 프로덕션 문서는 영원히 남는다). 호출 순서를 못 박는다.
+    it('purges commuteSettings BEFORE deleting the auth account (rules need a token)', async () => {
+      const mockDeleteCurrentUser = jest.fn().mockResolvedValue(undefined);
+      (useAuth as jest.Mock).mockReturnValue(
+        authWith({ deleteCurrentUser: mockDeleteCurrentUser }),
+      );
+      const { getByTestId } = render(<SettingsScreen {...defaultProps} />);
+
+      fireEvent.press(getByTestId('dev-nuke-account'));
+      const nukeCall = (Alert.alert as jest.Mock).mock.calls.find(
+        (c) => typeof c[0] === 'string' && c[0].includes('회원 정보 모두 삭제'),
+      );
+      const deleteButton = nukeCall![2].find(
+        (b: { style?: string }) => b.style === 'destructive',
+      );
+      await deleteButton.onPress();
+
+      const purgeOrder = (deleteCommuteSettings as jest.Mock).mock.invocationCallOrder[0]!;
+      const deleteUserOrder = mockDeleteCurrentUser.mock.invocationCallOrder[0]!;
+      expect(purgeOrder).toBeLessThan(deleteUserOrder);
+    });
+
+    // `user`는 users/<uid> 문서 리스너가 채우므로 그 읽기가 실패/지연된 상태에서도
+    // deleteCurrentUser(auth.currentUser 기준)는 성공한다. 그 창에서 파기를 건너뛰면
+    // 계정만 사라지고 commuteSettings 문서가 고아로 남는다 — firebaseUser로 폴백.
+    it('falls back to firebaseUser.uid when the user doc has not loaded', async () => {
+      const mockDeleteCurrentUser = jest.fn().mockResolvedValue(undefined);
+      (useAuth as jest.Mock).mockReturnValue(
+        authWith({
+          user: null,
+          firebaseUser: { uid: 'test-uid' },
+          deleteCurrentUser: mockDeleteCurrentUser,
+        }),
+      );
+      const { getByTestId } = render(<SettingsScreen {...defaultProps} />);
+
+      fireEvent.press(getByTestId('dev-nuke-account'));
+      const nukeCall = (Alert.alert as jest.Mock).mock.calls.find(
+        (c) => typeof c[0] === 'string' && c[0].includes('회원 정보 모두 삭제'),
+      );
+      const deleteButton = nukeCall![2].find(
+        (b: { style?: string }) => b.style === 'destructive',
+      );
+      await deleteButton.onPress();
+
+      expect(deleteCommuteSettings).toHaveBeenCalledWith('test-uid');
+      expect(mockDeleteCurrentUser).toHaveBeenCalled();
+    });
+
+    // 일시적 Firestore 오류가 계정 삭제 자체를 막는 쪽이 더 나쁜 실패 모드다.
+    it('still deletes the account when the commuteSettings purge fails (non-fatal)', async () => {
+      (deleteCommuteSettings as jest.Mock).mockResolvedValueOnce({
+        success: false,
+        error: 'permission-denied',
+      });
+      const mockDeleteCurrentUser = jest.fn().mockResolvedValue(undefined);
+      (useAuth as jest.Mock).mockReturnValue(
+        authWith({ deleteCurrentUser: mockDeleteCurrentUser }),
+      );
+      const { getByTestId } = render(<SettingsScreen {...defaultProps} />);
+
+      fireEvent.press(getByTestId('dev-nuke-account'));
+      const nukeCall = (Alert.alert as jest.Mock).mock.calls.find(
+        (c) => typeof c[0] === 'string' && c[0].includes('회원 정보 모두 삭제'),
+      );
+      const deleteButton = nukeCall![2].find(
+        (b: { style?: string }) => b.style === 'destructive',
+      );
+      await deleteButton.onPress();
+
+      expect(mockDeleteCurrentUser).toHaveBeenCalled();
       expect(clearDetectionMetrics).toHaveBeenCalled();
     });
 

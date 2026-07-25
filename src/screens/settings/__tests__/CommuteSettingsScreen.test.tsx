@@ -1114,6 +1114,79 @@ describe('CommuteSettingsScreen', () => {
     expect(eveningArg.boardingPreferences).toEqual({ 's2|1': ['소요산'] });
   });
 
+  // notifications·bufferMinutes도 이 화면이 편집하지 않는 필드다. 시각 변경 저장이
+  // 두 leg를 로컬 UI 형상에서 재구성하면서 DEFAULT를 덮어쓰면, 사용자가 다른 화면에서
+  // 맞춰 둔 알림 설정·버퍼가 저장할 때마다 조용히 기본값으로 롤백된다.
+  // 값은 DEFAULT(alertMinutesBefore 5 / bufferMinutes 10)와 반드시 다르게 두고,
+  // 두 leg에 서로 다른 값을 넣어 leg 간 교차 오염도 함께 잡는다.
+  it('출근 시각 변경 저장이 두 leg의 notifications·bufferMinutes를 각각 보존한다', async () => {
+    mockUseAuth.mockReturnValue(signedInUserWithSchedule(false));
+    mockLoadCommuteRoutes.mockResolvedValue({
+      morningRoute: {
+        departureTime: '08:00',
+        departureStationId: 's1',
+        departureStationName: '강남',
+        departureLineId: '2',
+        arrivalStationId: 's2',
+        arrivalStationName: '시청',
+        arrivalLineId: '1',
+        transferStations: [],
+        notifications: {
+          transferAlert: false,
+          arrivalAlert: true,
+          delayAlert: false,
+          incidentAlert: true,
+          alertMinutesBefore: 7,
+          departureTimeAlert: false,
+          communityAlert: true,
+        },
+        bufferMinutes: 12,
+      },
+      eveningRoute: {
+        departureTime: '18:00',
+        departureStationId: 's2',
+        departureStationName: '시청',
+        departureLineId: '1',
+        arrivalStationId: 's1',
+        arrivalStationName: '강남',
+        arrivalLineId: '2',
+        transferStations: [],
+        notifications: {
+          transferAlert: true,
+          arrivalAlert: false,
+          delayAlert: true,
+          incidentAlert: false,
+          alertMinutesBefore: 3,
+          departureTimeAlert: true,
+          communityAlert: false,
+        },
+        bufferMinutes: 15,
+      },
+      eveningEnabled: true,
+      createdAt: null,
+      updatedAt: null,
+    });
+
+    const { getByTestId, getAllByText } = render(<CommuteSettingsScreen {...createProps()} />);
+    await waitFor(() => expect(getAllByText('08:00 출발').length).toBeGreaterThan(0));
+
+    fireEvent.press(getByTestId('morning-time-picker-display'));
+    fireEvent.press(getByTestId('morning-time-picker-native-picker'));
+
+    await waitFor(() => expect(mockSaveCommuteRoutes).toHaveBeenCalled());
+
+    const [, morningArg, eveningArg] = mockSaveCommuteRoutes.mock.calls[0]!;
+    expect(morningArg.departureTime).toBe('08:01');
+    // 편집한 leg: 커스텀 알림 설정·버퍼 유지.
+    expect(morningArg.notifications.alertMinutesBefore).toBe(7);
+    expect(morningArg.notifications.transferAlert).toBe(false);
+    expect(morningArg.bufferMinutes).toBe(12);
+    // 편집하지 않은 leg: 자기 값을 그대로 유지(출근 leg 값이 새지 않는다).
+    expect(eveningArg.notifications.alertMinutesBefore).toBe(3);
+    expect(eveningArg.notifications.arrivalAlert).toBe(false);
+    expect(eveningArg.bufferMinutes).toBe(15);
+  });
+
   // 선호가 없던 레거시 route는 키 자체가 생기지 않아야 한다 —
   // `boardingPreferences: undefined`를 실어 보내면 Firestore 쓰기가 거부된다.
   it('선호가 없는 route 저장 시 boardingPreferences 키를 만들지 않는다', async () => {

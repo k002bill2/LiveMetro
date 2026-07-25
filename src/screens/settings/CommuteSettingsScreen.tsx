@@ -473,8 +473,8 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
   ).length;
 
   // Convert local CommuteRouteData (UI shape) into CommuteRoute (Firestore
-  // shape). Adds default notifications + bufferMinutes; transferStations
-  // get a synthesized lineName + order.
+  // shape). Preserves the loaded notifications + bufferMinutes (defaults only
+  // as a fallback); transferStations get a synthesized lineName + order.
   const routeDataToCommuteRoute = useCallback(
     (data: CommuteRouteData): CommuteRoute => ({
       departureTime: data.departureTime,
@@ -491,8 +491,12 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
         lineName: '',
         order: i + 1,
       })),
-      notifications: DEFAULT_COMMUTE_NOTIFICATIONS,
-      bufferMinutes: DEFAULT_BUFFER_MINUTES,
+      // 로드된 커스텀 값을 우선 사용한다 — DEFAULT를 무조건 쓰면 시각만 바꿔
+      // 저장해도 사용자가 맞춰 둔 알림 설정·버퍼가 기본값으로 롤백된다.
+      // DEFAULT는 이 필드가 없던 레거시 route의 fallback 역할만 한다
+      // (CommuteRoute는 두 필드를 필수로 선언 → 조건부 spread 불가, `??` 사용).
+      notifications: data.notifications ?? DEFAULT_COMMUTE_NOTIFICATIONS,
+      bufferMinutes: data.bufferMinutes ?? DEFAULT_BUFFER_MINUTES,
       // 조건부 spread — 선호가 없던 route에 `undefined` 필드를 실어 보내면
       // Firestore 쓰기가 거부되므로 키 자체를 만들지 않는다.
       ...(data.boardingPreferences !== undefined && {

@@ -62,6 +62,7 @@ import {
   hasStoredCredentials,
 } from '../../services/auth/biometricService';
 import { commuteLogService } from '@/services/pattern/commuteLogService';
+import { deleteCommuteSettings } from '@/services/commute/commuteService';
 import {
   loadDetectionEpisodes,
   summarizeDetectionMetrics,
@@ -88,7 +89,7 @@ const AUTO_LOGIN_PASSWORD_KEY = 'livemetro_auto_login_password';
 type Props = NativeStackScreenProps<SettingsStackParamList, 'SettingsHome'>;
 
 export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
-  const { user, signOut, deleteCurrentUser } = useAuth();
+  const { user, firebaseUser, signOut, deleteCurrentUser } = useAuth();
   const { resetSignupFlow } = useOnboarding();
   const { language, t } = useI18n();
   const { themeMode } = useTheme();
@@ -253,6 +254,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
         '다음 데이터를 영구 삭제합니다 (개발용):',
         '',
         '• Firebase 계정 (휴대폰 인증 기록 포함)',
+        '• 출퇴근 경로 설정 (종점행 선호 포함)',
         '• 생체 인증 자격증명 (SecureStore)',
         '• 자동 로그인 정보',
         '• 온보딩 / 가입 축하 표시 플래그',
@@ -265,6 +267,27 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
           text: '모두 삭제',
           style: 'destructive',
           onPress: async () => {
+            // 원격 개인 데이터(commuteSettings/<uid> = 출퇴근 경로 + 종점행
+            // 선호)는 Auth 계정 삭제 **전에** 파기한다. firestore.rules가
+            // `request.auth.uid == userId`를 요구하므로 deleteUser 이후에는
+            // 토큰이 없어 permission-denied로 조용히 실패하고, 계정이 사라진
+            // 뒤의 문서는 어떤 클라이언트로도 도달할 수 없는 고아가 된다.
+            // 실패해도 계정 삭제는 계속한다 — 일시적 Firestore 오류가 계정
+            // 삭제 자체를 막는 쪽이 더 나쁜 실패 모드다(로그만 남긴다).
+            //
+            // uid는 `user?.id`를 우선하되 `firebaseUser?.uid`로 폴백한다:
+            // `user`는 users/<uid> 문서 리스너가 채우므로 그 읽기가 아직/영영
+            // 실패한 상태에서도 deleteCurrentUser(auth.currentUser 기준)는
+            // 성공한다. 그 창에서 `user?.id`만 보면 파기를 건너뛴 채 계정이
+            // 사라져 고아 문서가 남는다. 두 값은 같은 도메인이다
+            // (AuthContext.tsx:175 — `id: firebaseUser.uid`).
+            const purgeUid = user?.id ?? firebaseUser?.uid;
+            if (purgeUid) {
+              const purge = await deleteCommuteSettings(purgeUid);
+              if (!purge.success) {
+                console.error('Commute settings purge failed (non-fatal):', purge.error);
+              }
+            }
             // Order matters: Firebase user deletion FIRST, then local
             // cleanup only on success. If Firebase delete fails (e.g.
             // `auth/requires-recent-login`) we abort with local data
@@ -309,7 +332,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
         },
       ],
     );
-  }, [deleteCurrentUser, resetSignupFlow]);
+  }, [deleteCurrentUser, resetSignupFlow, user?.id, firebaseUser?.uid]);
 
   const handleResetSignupFlow = useCallback((): void => {
     Alert.alert(
