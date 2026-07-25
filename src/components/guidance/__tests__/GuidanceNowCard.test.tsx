@@ -20,6 +20,11 @@ jest.mock('lucide-react-native', () => ({
   TrainFront: 'TrainFront',
 }));
 
+/** 실제 토큰 값 — 카드가 useSemanticTokens로 받는 것과 동일 소스(위 mock과 일치). */
+const TOKENS =
+  jest.requireActual<typeof import('@/styles/modernTheme')>('@/styles/modernTheme').WANTED_TOKENS
+    .light;
+
 const board: BoardStep = {
   kind: 'board',
   id: 'board-0',
@@ -225,7 +230,7 @@ describe('GuidanceNowCard — soft-confirm', () => {
 
 describe('GuidanceNowCard — 종점행 대기 표시', () => {
   it('대기 상태에서 waitPreview를 도착 순으로 나열하고 매칭 여부를 구분한다', () => {
-    const { getByTestId } = render(
+    const { getByTestId, getByText } = render(
       <GuidanceNowCard
         step={board}
         elapsedInStepSec={0}
@@ -241,6 +246,13 @@ describe('GuidanceNowCard — 종점행 대기 표시', () => {
     // 한 행이 라벨+항목 여러 Text를 담으므로 부분 일치(정규식) 관용구 — RNTL 문자열 매처는 exact.
     expect(getByTestId('guidance-wait-preview')).toHaveTextContent(/마천행 6분/);
     expect(getByTestId('guidance-wait-preview')).toHaveTextContent(/하남검단산행 9분/);
+    // 전달된 도착 순서를 그대로 유지 ("다음" 라벨 → 6분 → 9분)
+    expect(getByTestId('guidance-wait-preview')).toHaveTextContent(
+      /다음.*마천행 6분.*하남검단산행 9분/
+    );
+    // isMatch가 만드는 유일한 사용자 가시 차이 = 비매칭 흐리게 / 매칭 강조
+    expect(getByText('마천행 6분')).toHaveStyle({ color: TOKENS.labelAlt });
+    expect(getByText('하남검단산행 9분')).toHaveStyle({ color: TOKENS.labelStrong });
     expect(getByTestId('guidance-destination-badge')).toHaveTextContent('하남검단산행만');
   });
 
