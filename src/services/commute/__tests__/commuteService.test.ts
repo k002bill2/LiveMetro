@@ -28,6 +28,10 @@ jest.mock('firebase/firestore', () => ({
   getDoc: (...args: unknown[]) => mockGetDoc(...args),
   updateDoc: (...args: unknown[]) => mockUpdateDoc(...args),
   serverTimestamp: jest.fn(() => ({ _type: 'serverTimestamp' })),
+  // `new FieldPath(...segments)` — jest mock 함수는 생성자로 호출해도 impl의 반환
+  // 객체가 그대로 인스턴스가 되므로 평범한 객체로 관측한다.
+  FieldPath: jest.fn((...segments: string[]) => ({ _type: 'fieldPath', segments })),
+  deleteField: jest.fn(() => ({ _type: 'deleteField' })),
   Timestamp: {
     fromDate: jest.fn((date) => ({ toDate: () => date })),
   },
@@ -273,29 +277,59 @@ describe('Commute Service', () => {
       mockSetDoc.mockResolvedValue(undefined);
     });
 
-    it('leg별 dot-path로 boardingPreferences만 부분 업데이트한다', async () => {
-      const result = await updateBoardingPreferences('uid-1', 'morning', {
-        'gangnam|2': ['마천'],
-      });
+    it('leg별 FieldPath로 해당 탑승 구간 키 하나만 부분 업데이트한다', async () => {
+      const result = await updateBoardingPreferences('uid-1', 'morning', 'gangnam|2', ['마천']);
 
       expect(result.success).toBe(true);
-      expect(mockUpdateDoc).toHaveBeenCalledWith('mockDocRef', {
-        'morningRoute.boardingPreferences': { 'gangnam|2': ['마천'] },
-        updatedAt: { _type: 'serverTimestamp' },
-      });
+      // 맵 전체가 아니라 키 하나만 — 같은 leg의 다른 구간 키는 인자에 등장조차 하지 않는다.
+      expect(mockUpdateDoc).toHaveBeenCalledWith(
+        'mockDocRef',
+        { _type: 'fieldPath', segments: ['morningRoute', 'boardingPreferences', 'gangnam|2'] },
+        ['마천'],
+        'updatedAt',
+        { _type: 'serverTimestamp' }
+      );
     });
 
     it('evening leg은 eveningRoute 경로를 쓴다', async () => {
-      await updateBoardingPreferences('uid-1', 'evening', {});
+      await updateBoardingPreferences('uid-1', 'evening', 'jamsil|8', ['암사']);
 
-      expect(mockUpdateDoc).toHaveBeenCalledWith('mockDocRef', {
-        'eveningRoute.boardingPreferences': {},
-        updatedAt: { _type: 'serverTimestamp' },
-      });
+      expect(mockUpdateDoc).toHaveBeenCalledWith(
+        'mockDocRef',
+        { _type: 'fieldPath', segments: ['eveningRoute', 'boardingPreferences', 'jamsil|8'] },
+        ['암사'],
+        'updatedAt',
+        { _type: 'serverTimestamp' }
+      );
+    });
+
+    it('destinations가 null이면 해당 키를 deleteField로 제거한다', async () => {
+      const result = await updateBoardingPreferences('uid-1', 'morning', 'gangnam|2', null);
+
+      expect(result.success).toBe(true);
+      expect(mockUpdateDoc).toHaveBeenCalledWith(
+        'mockDocRef',
+        { _type: 'fieldPath', segments: ['morningRoute', 'boardingPreferences', 'gangnam|2'] },
+        { _type: 'deleteField' },
+        'updatedAt',
+        { _type: 'serverTimestamp' }
+      );
+    });
+
+    it('빈 배열도 선호 해제로 보고 deleteField로 제거한다', async () => {
+      await updateBoardingPreferences('uid-1', 'morning', 'gangnam|2', []);
+
+      expect(mockUpdateDoc).toHaveBeenCalledWith(
+        'mockDocRef',
+        expect.objectContaining({ _type: 'fieldPath' }),
+        { _type: 'deleteField' },
+        'updatedAt',
+        { _type: 'serverTimestamp' }
+      );
     });
 
     it('uid 없으면 실패 result를 반환하고 쓰지 않는다', async () => {
-      const result = await updateBoardingPreferences('', 'morning', {});
+      const result = await updateBoardingPreferences('', 'morning', 'gangnam|2', ['마천']);
 
       expect(result.success).toBe(false);
       expect(mockUpdateDoc).not.toHaveBeenCalled();

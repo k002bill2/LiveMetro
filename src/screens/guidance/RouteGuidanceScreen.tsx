@@ -586,16 +586,23 @@ export const RouteGuidanceScreen: React.FC = () => {
   const openDestinationSheet = useCallback((): void => setDestinationSheetOpen(true), []);
   const closeDestinationSheet = useCallback((): void => setDestinationSheetOpen(false), []);
 
-  // 세션 사본을 SSOT로 갱신하고, 출퇴근 세션이면 원본(CommuteRoute)에도 write-back.
+  // 세션 사본(full map)을 SSOT로 갱신하고, 출퇴근 세션이면 원본(CommuteRoute)에도
+  // write-back한다. 원격 쓰기는 **방금 건드린 키만** 보낸다 — 세션 사본은 원격 선호가
+  // attach되기 전이면 비어 있을 수 있어, 그 상태의 맵 전체 치환은 같은 leg의 다른 구간
+  // 키를 원격에서 지워버린다. 키 단위 쓰기는 그 레이스를 구조적으로 무의미하게 만든다.
   const applyDestinationPreferences = useCallback(
-    (next: Readonly<Record<string, readonly string[]>>): void => {
+    (
+      next: Readonly<Record<string, readonly string[]>>,
+      writtenKey: string,
+      writtenList: readonly string[] | null
+    ): void => {
       // 귀속 가드: mount-frozen session과 같은 여정일 때만 쓴다 (H2 원칙).
       const live = getGuidanceSession();
       if (session === null || live === null || live.startedAt !== session.startedAt) return;
       setGuidanceSession({ ...live, destinationPreferences: next });
       if (live.sourceCommuteType !== undefined && user?.id) {
         // fire-and-forget — 원격 실패해도 세션 필터는 이미 적용됨 (재시도는 다음 토글).
-        void updateBoardingPreferences(user.id, live.sourceCommuteType, next);
+        void updateBoardingPreferences(user.id, live.sourceCommuteType, writtenKey, writtenList);
       }
     },
     [session, user?.id]
@@ -613,7 +620,7 @@ export const RouteGuidanceScreen: React.FC = () => {
       } else {
         next[boardingKey] = nextList;
       }
-      applyDestinationPreferences(next);
+      applyDestinationPreferences(next, boardingKey, nextList.length > 0 ? nextList : null);
     },
     [boardingKey, applyDestinationPreferences]
   );
@@ -624,7 +631,7 @@ export const RouteGuidanceScreen: React.FC = () => {
     if (!(boardingKey in prev)) return;
     const next: Record<string, readonly string[]> = { ...prev };
     delete next[boardingKey];
-    applyDestinationPreferences(next);
+    applyDestinationPreferences(next, boardingKey, null);
   }, [boardingKey, applyDestinationPreferences]);
 
   // Reset per-step guards whenever the active step changes (incl. undo via

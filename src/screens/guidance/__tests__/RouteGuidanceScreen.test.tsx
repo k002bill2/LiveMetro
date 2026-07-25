@@ -1495,15 +1495,53 @@ describe('RouteGuidanceScreen', () => {
       fireEvent.press(getByTestId('destination-option-마천'));
 
       expect(getGuidanceSession()?.destinationPreferences).toEqual({ 'p1|5': ['마천'] });
-      expect(updateBoardingPreferences).toHaveBeenCalledWith('user-1', 'morning', {
-        'p1|5': ['마천'],
-      });
+      // 원격은 맵이 아니라 방금 건드린 키 하나만 받는다 (형제 키 clobber 방지).
+      expect(updateBoardingPreferences).toHaveBeenCalledWith('user-1', 'morning', 'p1|5', [
+        '마천',
+      ]);
       // 세션 사본이 실제로 화면 추적에 반영되는지 (mocked 훅은 비반응형이라 명시 rerender).
       act(() => {
         rerender(<RouteGuidanceScreen />);
       });
       expect(getByTestId('guidance-live-chip')).toHaveTextContent('마천행 2분 00초 후 도착');
       expect(getByTestId('guidance-destination-badge')).toHaveTextContent('마천행만');
+    });
+
+    it('원격 write-back은 토글한 구간 키만 대상이다 (형제 키 무접촉)', () => {
+      // attach가 늦게 도착/실패해 세션 사본이 원격 전체를 담고 있지 않은 상태에서
+      // 토글해도, 맵 전체 치환이 아니라 키 하나만 쓰므로 같은 leg의 다른 구간 키
+      // ('s9|8')가 원격에서 소멸할 수 없다.
+      seedBranchSession({
+        sourceCommuteType: 'morning',
+        destinationPreferences: { 's9|8': ['암사'] },
+      });
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: branchTrains(),
+        loading: false,
+        error: null,
+      });
+      const { getByTestId } = render(<RouteGuidanceScreen />);
+      fireEvent.press(getByTestId('guidance-open-destination-filter'));
+      fireEvent.press(getByTestId('destination-option-마천'));
+
+      expect(updateBoardingPreferences).toHaveBeenCalledTimes(1);
+      expect(updateBoardingPreferences).toHaveBeenCalledWith('user-1', 'morning', 'p1|5', [
+        '마천',
+      ]);
+      // 로컬 세션 사본은 형제 키를 그대로 유지한다.
+      expect(getGuidanceSession()?.destinationPreferences).toEqual({
+        's9|8': ['암사'],
+        'p1|5': ['마천'],
+      });
+      // 같은 옵션을 다시 탭 = 해제 → 그 키만 null(=원격 삭제)로 보낸다.
+      fireEvent.press(getByTestId('destination-option-마천'));
+      expect(updateBoardingPreferences).toHaveBeenLastCalledWith(
+        'user-1',
+        'morning',
+        'p1|5',
+        null
+      );
+      expect(getGuidanceSession()?.destinationPreferences).toEqual({ 's9|8': ['암사'] });
     });
 
     it('일반 검색 세션(sourceCommuteType 없음)은 시트 토글해도 원격 저장하지 않는다', () => {

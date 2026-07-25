@@ -11,6 +11,8 @@ import {
   updateDoc,
   onSnapshot,
   serverTimestamp,
+  deleteField,
+  FieldPath,
   Timestamp,
 } from 'firebase/firestore';
 import { firestore } from '@/services/firebase/config';
@@ -282,15 +284,26 @@ export const updateEveningRoute = async (
 };
 
 /**
- * 특정 leg의 boardingPreferences만 dot-path로 부분 업데이트한다.
- * 경로 전체를 다시 쓰지 않으므로(설정 화면과의 동시 편집 등) 다른 필드를
- * 클로버하지 않는다 — stale 전체-객체 spread 저장이 즐겨찾기를 롤백시킨
- * 전례(updateUserPreferences 사건)와 같은 클래스의 사고를 구조적으로 차단.
+ * 특정 leg의 boardingPreferences 중 **한 탑승 구간 키만** 부분 업데이트한다.
+ *
+ * 맵 전체가 아니라 키 하나만 쓰는 이유: 호출자(길안내 화면)의 세션 사본은 원격
+ * 선호가 늦게 attach되기 전이면 비어 있을 수 있어, 그 상태의 full-map 치환이 같은
+ * leg의 다른 구간 키를 원격에서 소멸시킨다. 키 단위 쓰기는 그 레이스를 구조적으로
+ * 무의미하게 만든다 — stale 전체-객체 spread 저장이 즐겨찾기를 롤백시킨
+ * 전례(updateUserPreferences 사건)와 같은 클래스의 사고 차단.
+ *
+ * 경로는 문자열 dot-path 조합이 아니라 {@link FieldPath} 세그먼트로 만든다:
+ * boardingKey(`stationId|lineId`)에 임의 문자가 들어올 수 있어 문자열 조합은
+ * 경로 해석이 깨질 수 있다.
+ *
+ * `destinations`가 null이거나 빈 배열이면 해당 키를 {@link deleteField}로 제거한다
+ * (선호 해제 = 키 삭제).
  */
 export const updateBoardingPreferences = async (
   uid: string,
   leg: CommuteType,
-  boardingPreferences: Readonly<Record<string, readonly string[]>>
+  boardingKey: string,
+  destinations: readonly string[] | null
 ): Promise<SaveCommuteResult> => {
   if (!uid) {
     return { success: false, error: '사용자 인증이 필요합니다' };
@@ -298,9 +311,16 @@ export const updateBoardingPreferences = async (
 
   try {
     const docRef = doc(firestore, COMMUTE_COLLECTION, uid);
-    const field =
-      leg === 'morning' ? 'morningRoute.boardingPreferences' : 'eveningRoute.boardingPreferences';
-    await updateDoc(docRef, { [field]: boardingPreferences, updatedAt: serverTimestamp() });
+    const legField = leg === 'morning' ? 'morningRoute' : 'eveningRoute';
+    const value =
+      destinations !== null && destinations.length > 0 ? destinations : deleteField();
+    await updateDoc(
+      docRef,
+      new FieldPath(legField, 'boardingPreferences', boardingKey),
+      value,
+      'updatedAt',
+      serverTimestamp()
+    );
     return { success: true };
   } catch (error) {
     console.error('Error updating boarding preferences:', error);
