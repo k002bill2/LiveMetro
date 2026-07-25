@@ -760,17 +760,20 @@ it('옵션을 "OO행 · ETA" 행으로 렌더하고 탭 시 onToggle을 호출�
 });
 
 it('선택된 옵션에 체크 마커, "전체 열차" 행은 선택 없음일 때 활성 표시', () => {
-  const { getByTestId, rerender } = render(
+  const { queryByTestId, rerender } = render(
     <DestinationFilterSheet visible options={OPTIONS} selected={['마천']}
       onToggle={jest.fn()} onClear={jest.fn()} onClose={jest.fn()} />
   );
-  expect(getByTestId('destination-check-마천')).toBeTruthy();
-  expect(() => getByTestId('destination-check-하남검단산')).toThrow();
+  // 체크 마커의 존재/부재 자체가 검증 대상 — queryByTestId 관용구 사용
+  expect(queryByTestId('destination-check-마천')).not.toBeNull();
+  expect(queryByTestId('destination-check-하남검단산')).toBeNull();
+  expect(queryByTestId('destination-all-active')).toBeNull();
   rerender(
     <DestinationFilterSheet visible options={OPTIONS} selected={[]}
       onToggle={jest.fn()} onClear={jest.fn()} onClose={jest.fn()} />
   );
-  expect(getByTestId('destination-all-active')).toBeTruthy();
+  expect(queryByTestId('destination-all-active')).not.toBeNull();
+  expect(queryByTestId('destination-check-마천')).toBeNull();
 });
 
 it('"전체 열차" 탭 시 onClear, 백드롭 탭 시 onClose', () => {
