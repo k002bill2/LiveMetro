@@ -154,3 +154,53 @@ describe('detectDeparture', () => {
     expect(result).toEqual({ departed: false, trainId: null });
   });
 });
+
+describe('preferredDestinations', () => {
+  it('선호 종점행 열차의 소멸만 출발로 판정한다', () => {
+    const macheon = arriving('m1', 10, { lineId: '5', finalDestination: '마천' });
+    const hanam = arriving('h1', 15, { lineId: '5', finalDestination: '하남검단산' });
+    const result = detectDeparture({
+      prev: [macheon, hanam],
+      next: [hanam],
+      awaited: { lineId: '5', directionName: '하남검단산', preferredDestinations: ['마천'] },
+      nowMs: NOW,
+    });
+    expect(result).toEqual({ departed: true, trainId: 'm1' });
+  });
+
+  it('선호 밖 열차(방면 매칭 포함)가 사라져도 출발로 판정하지 않는다', () => {
+    const macheon = arriving('m1', 10, { lineId: '5', finalDestination: '마천' });
+    const hanam = arriving('h1', 15, { lineId: '5', finalDestination: '하남검단산' });
+    const result = detectDeparture({
+      prev: [macheon, hanam],
+      next: [macheon],
+      awaited: { lineId: '5', directionName: '하남검단산', preferredDestinations: ['마천'] },
+      nowMs: NOW,
+    });
+    expect(result).toEqual({ departed: false, trainId: null });
+  });
+
+  it('선호 밖 후보만 남으면 방면 폴백 없이 미출발로 판정한다', () => {
+    // 선호가 없었다면 방면 매칭(하남검단산)으로 preferred=[h1] → 출발 판정되었을 상황.
+    // 선호가 지정되면 후보를 선호 밖으로 넓히지 않으므로 pool이 비어 미출발이어야 한다.
+    const hanam = arriving('h1', 15, { lineId: '5', finalDestination: '하남검단산' });
+    const result = detectDeparture({
+      prev: [hanam],
+      next: [],
+      awaited: { lineId: '5', directionName: '하남검단산', preferredDestinations: ['마천'] },
+      nowMs: NOW,
+    });
+    expect(result).toEqual({ departed: false, trainId: null });
+  });
+
+  it('선호가 빈 배열이면 기존 방면 동작과 동일하다', () => {
+    const hanam = arriving('h1', 15, { lineId: '5', finalDestination: '하남검단산' });
+    const result = detectDeparture({
+      prev: [hanam],
+      next: [],
+      awaited: { lineId: '5', directionName: '하남검단산', preferredDestinations: [] },
+      nowMs: NOW,
+    });
+    expect(result).toEqual({ departed: true, trainId: 'h1' });
+  });
+});
