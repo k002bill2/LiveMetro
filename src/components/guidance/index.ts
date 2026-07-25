@@ -5,3 +5,5 @@ export type { GuidanceStepStatus } from './GuidanceStepRow';
 export { GuidanceControls } from './GuidanceControls';
 export { TrainSelectSheet } from './TrainSelectSheet';
 export type { TrainSelectSheetProps } from './TrainSelectSheet';
+export { DestinationFilterSheet } from './DestinationFilterSheet';
+export type { DestinationFilterSheetProps } from './DestinationFilterSheet';
