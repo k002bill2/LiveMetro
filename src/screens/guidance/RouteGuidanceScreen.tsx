@@ -59,12 +59,19 @@ import {
 import {
   clearGuidanceSession,
   getGuidanceSession,
+  setGuidanceSession,
   updateGuidanceProgressAnchor,
   updateGuidanceLocalCompletion,
   isActiveGuidanceSession,
 } from '@/services/guidance/guidanceSessionStore';
+import {
+  buildBoardingKey,
+  destinationOptions,
+  partitionWaitingTrains,
+} from '@/services/guidance/destinationPreference';
+import { updateBoardingPreferences } from '@/services/commute/commuteService';
 import { useAuth } from '@/services/auth/AuthContext';
-import { GuidanceControls, GuidanceHeader, GuidanceNowCard, GuidanceStepRow, TrainSelectSheet, type GuidanceStepStatus } from '@/components/guidance';
+import { DestinationFilterSheet, GuidanceControls, GuidanceHeader, GuidanceNowCard, GuidanceStepRow, TrainSelectSheet, type GuidanceStepStatus, type WaitPreviewItem } from '@/components/guidance';
 import { StationRebaseSheet } from '@/components/guidance/StationRebaseSheet';
 import { BackgroundPermissionBanner } from '@/components/guidance/BackgroundPermissionBanner';
 import type { AppStackParamList } from '@/navigation/types';
@@ -105,10 +112,32 @@ const SOFT_CONFIRM_AUTO_MS = 4000;
 /** expo-keep-awake tag scoping this screen's wake lock (activate/deactivate pair). */
 const KEEP_AWAKE_TAG = 'route-guidance';
 
-const formatWaitText = (totalSec: number): string => {
+/**
+ * attach(저장 선호 원격 읽기) 미확정 창의 상한 — 세션 시작 후 이 시간을 넘기면
+ * 확정된 것으로 간주하고 탑승 알림 게이트를 연다.
+ *
+ * attachDestinationPreferences는 모든 종료 경로에서 settle하지만, 그래도 미확정이
+ * 영구화되는 경로가 둘 남는다: ① 네트워크 정체로 `loadCommuteRoutes`가 오래 매달릴
+ * 때(Firestore는 자체 오프라인 전환에 10초를 쓴다), ② 미확정 상태로 영속된 세션이
+ * 앱 재시작 후 복원될 때 — attach는 세션 시작 시점(useStartCommuteGuidance)에만
+ * 발사되므로 복원 경로에는 재발사가 없다. 상한이 없으면 그 세션의 탑승 알림이
+ * 영구히 죽는데, 이는 원래 막으려던 결함(제외 열차 알림 1회 — 사용자가 무시하면
+ * 그만)보다 나쁜 실패다. SDK 오프라인 전환(10초) 위로 여유를 둔 값.
+ */
+const PREFERENCE_SETTLE_TIMEOUT_MS = 15_000;
+
+/**
+ * 대기 칩 문구. 종점행을 알면 "OO행"으로 지칭한다 — 분기 노선에서 어느 열차의
+ * 카운트다운인지가 문구만으로 드러나야 한다. 종착역명이 비었거나 알 수 없으면
+ * 기존의 "다음 열차"로 강등한다 ("undefined행" 렌더 방지).
+ */
+const formatWaitText = (totalSec: number, destination: string | null): string => {
   const m = Math.floor(totalSec / 60);
   const s = totalSec % 60;
-  return m > 0 ? `다음 열차 ${m}분 ${String(s).padStart(2, '0')}초 후 도착` : `다음 열차 ${s}초 후 도착`;
+  const head = destination != null && destination !== '' ? `${destination}행` : '다음 열차';
+  return m > 0
+    ? `${head} ${m}분 ${String(s).padStart(2, '0')}초 후 도착`
+    : `${head} ${s}초 후 도착`;
 };
 
 /** Contextual confirm label for the manual-correction button. */
@@ -288,21 +317,36 @@ export const RouteGuidanceScreen: React.FC = () => {
   const waitingDirection: string | null =
     currentStep !== undefined && currentStep.kind !== 'alight' ? currentStep.direction : null;
 
+  // 종점행 선호 — 세션 사본이 SSOT. liveSession(reactive)을 읽어 attach·시트 토글이
+  // 즉시 반영된다 (mount-frozen `session`이 아니라).
+  const boardingKey =
+    currentStep?.kind === 'board' || currentStep?.kind === 'transfer'
+      ? buildBoardingKey(currentStep.stationId, waitingLineId)
+      : null;
+  const selectedDestinations = useMemo((): readonly string[] => {
+    if (boardingKey === null) return [];
+    return liveSession?.destinationPreferences?.[boardingKey] ?? [];
+  }, [liveSession, boardingKey]);
+
   // Numbered-line filter (transfer-station 다노선 혼입 방지) — mirrors
   // TrainSelectionScreen. Extended lines keep all trains. 이후 진행 방향(방면)
   // 매칭 열차를 우선한다 — 반대 방향 열차 기준의 칩/알림 방지. 단축 운행
   // 종착역은 방면명과 정당하게 다를 수 있어(detectDeparture와 같은 원칙)
-  // 매칭이 전무하면 노선 필터 결과로 폴백한다.
-  const filteredTrains = useMemo((): readonly Train[] => {
-    if (!isWaitingStep) return [];
-    const all: readonly Train[] = trains ?? [];
-    const onLine = /^[1-9]$/.test(waitingLineId)
-      ? all.filter(t => t.lineId === waitingLineId)
-      : all;
-    if (waitingDirection === null) return onLine;
-    const matched = onLine.filter(t => t.finalDestination === waitingDirection);
-    return matched.length > 0 ? matched : onLine;
-  }, [isWaitingStep, trains, waitingLineId, waitingDirection]);
+  // 매칭이 전무하면 노선 필터 결과로 폴백한다. display=보조 나열·시트 옵션(선호와
+  // 무관한 진행 방향 전체), tracked=칩·알림·감지(선호 적용) 2-풀.
+  const trainPools = useMemo(
+    () =>
+      isWaitingStep
+        ? partitionWaitingTrains({
+            trains: trains ?? [],
+            lineId: waitingLineId,
+            directionName: waitingDirection,
+            preferredDestinations: selectedDestinations,
+          })
+        : { display: [] as readonly Train[], tracked: [] as readonly Train[] },
+    [isWaitingStep, trains, waitingLineId, waitingDirection, selectedDestinations]
+  );
+  const filteredTrains = trainPools.tracked;
 
   // Earliest train still ahead — feeds both the live chip and the local alert.
   const earliestTrain = useMemo((): Train | null => {
@@ -316,17 +360,48 @@ export const RouteGuidanceScreen: React.FC = () => {
     return best?.train ?? null;
   }, [filteredTrains, nowMs]);
 
+  // 선호를 골랐는데 그 종점행이 지금 도착 목록에 없는 상태 — 로딩("불러오는 중")과
+  // 구분해 정직하게 알린다. display가 비어 있으면 그냥 정보 없음이므로 제외한다.
+  const noMatchingSelection =
+    selectedDestinations.length > 0 &&
+    trainPools.tracked.length === 0 &&
+    trainPools.display.length > 0;
   const liveWaitText = useMemo((): string | null => {
-    if (!isWaitingStep || earliestTrain?.arrivalTime == null) return null;
+    if (!isWaitingStep) return null;
+    if (noMatchingSelection) return '선택한 종점행 열차가 없어요';
+    if (earliestTrain?.arrivalTime == null) return null;
     const sec = Math.floor((earliestTrain.arrivalTime.getTime() - nowMs) / 1000);
-    return sec >= 0 ? formatWaitText(sec) : null;
-  }, [isWaitingStep, earliestTrain, nowMs]);
+    return sec >= 0 ? formatWaitText(sec, earliestTrain.finalDestination) : null;
+  }, [isWaitingStep, noMatchingSelection, earliestTrain, nowMs]);
+
+  // 보조 나열 — 진행 방향 다음 도착 2대(선호와 무관). GuidanceNowCard가 memo라
+  // 인라인 배열은 메모이제이션을 무력화하므로 반드시 useMemo로 참조를 안정화한다.
+  const waitPreview = useMemo((): readonly WaitPreviewItem[] => {
+    if (!isWaitingStep) return [];
+    const upcoming = trainPools.display
+      .filter(t => t.arrivalTime !== null && t.arrivalTime.getTime() >= nowMs)
+      .sort((a, b) => (a.arrivalTime as Date).getTime() - (b.arrivalTime as Date).getTime())
+      .slice(0, 2);
+    return upcoming.map(t => {
+      const sec = Math.floor(((t.arrivalTime as Date).getTime() - nowMs) / 1000);
+      return {
+        destination: t.finalDestination,
+        etaText: sec < 60 ? '곧 도착' : `${Math.floor(sec / 60)}분`,
+        isMatch:
+          selectedDestinations.length === 0 ||
+          selectedDestinations.includes(t.finalDestination),
+      };
+    });
+  }, [isWaitingStep, trainPools, nowMs, selectedDestinations]);
+  const destinationFilterLabel =
+    selectedDestinations.length > 0 ? `${selectedDestinations.join('·')}행만` : null;
 
   // ── Soft-confirm: auto-advance a board/transfer hold when the awaited train
   // departs (inferred from id disappearance), so the rider rarely needs to tap.
   const [softConfirm, setSoftConfirm] = useState<{ readonly trainId: string } | null>(null);
   const [trainSelectContext, setTrainSelectContext] = useState<TrainSelectContext | null>(null);
   const [stationRebaseContext, setStationRebaseContext] = useState<StationRebaseContext | null>(null);
+  const [destinationSheetOpen, setDestinationSheetOpen] = useState(false);
   const prevTrainsRef = useRef<readonly Train[] | null>(null);
   // Identity of the last `trains` value the detection effect actually processed.
   // Guards against non-poll re-runs (step transitions) seeding prevTrainsRef with
@@ -522,6 +597,72 @@ export const RouteGuidanceScreen: React.FC = () => {
     rebaseAt(Date.now() - sec * 1000, ctx.stepIndex);
   }, [stationRebaseContext, currentIndex, rebaseAt]);
 
+  // 시트를 열기 전에 pending soft-confirm을 해제한다 (openTrainSelect와 동일 패턴).
+  // 감지 effect의 arm 가드(`!destinationSheetOpen`)는 **새 arm만** 막으므로, 이미 걸린
+  // 4초 auto-advance 타이머는 모달 뒤에서 발화해 여정을 진행시키고 시트를 stale 스텝
+  // 컨텍스트로 남긴다. dismissSoftConfirm은 pending이 없으면 (쿨다운 장부 외) no-op.
+  const openDestinationSheet = useCallback((): void => {
+    dismissSoftConfirm();
+    setDestinationSheetOpen(true);
+  }, [dismissSoftConfirm]);
+  const closeDestinationSheet = useCallback((): void => setDestinationSheetOpen(false), []);
+
+  // 세션 사본(full map)을 SSOT로 갱신하고, 출퇴근 세션이면 원본(CommuteRoute)에도
+  // write-back한다. 원격 쓰기는 **방금 건드린 키만** 보낸다 — 세션 사본은 원격 선호가
+  // attach되기 전이면 비어 있을 수 있어, 그 상태의 맵 전체 치환은 같은 leg의 다른 구간
+  // 키를 원격에서 지워버린다. 키 단위 쓰기는 그 레이스를 구조적으로 무의미하게 만든다.
+  const applyDestinationPreferences = useCallback(
+    (
+      next: Readonly<Record<string, readonly string[]>>,
+      writtenKey: string,
+      writtenList: readonly string[] | null
+    ): void => {
+      // 귀속 가드: mount-frozen session과 같은 여정일 때만 쓴다 (H2 원칙).
+      const live = getGuidanceSession();
+      if (session === null || live === null || live.startedAt !== session.startedAt) return;
+      setGuidanceSession({ ...live, destinationPreferences: next });
+      // 소유 귀속 게이트 — 세션을 시작한 계정에서만 원본에 write-back한다. 세션은
+      // 영속돼 로그아웃/계정 전환을 넘겨 살아남으므로, 이 검사가 없으면 재개 후
+      // 토글이 이전 탑승자의 선택을 새 계정의 commuteSettings에 기록한다.
+      // 구세션(ownerUid 부재)은 불통과 = 세션 한정 적용으로 안전 강등.
+      if (
+        live.sourceCommuteType !== undefined &&
+        user?.id !== undefined &&
+        live.ownerUid === user.id
+      ) {
+        // fire-and-forget — 원격 실패해도 세션 필터는 이미 적용됨 (재시도는 다음 토글).
+        void updateBoardingPreferences(user.id, live.sourceCommuteType, writtenKey, writtenList);
+      }
+    },
+    [session, user?.id]
+  );
+
+  const handleDestinationToggle = useCallback(
+    (name: string): void => {
+      if (boardingKey === null) return;
+      const prev = getGuidanceSession()?.destinationPreferences ?? {};
+      const cur = prev[boardingKey] ?? [];
+      const nextList = cur.includes(name) ? cur.filter(d => d !== name) : [...cur, name];
+      const next: Record<string, readonly string[]> = { ...prev };
+      if (nextList.length === 0) {
+        delete next[boardingKey];
+      } else {
+        next[boardingKey] = nextList;
+      }
+      applyDestinationPreferences(next, boardingKey, nextList.length > 0 ? nextList : null);
+    },
+    [boardingKey, applyDestinationPreferences]
+  );
+
+  const handleDestinationClear = useCallback((): void => {
+    if (boardingKey === null) return;
+    const prev = getGuidanceSession()?.destinationPreferences ?? {};
+    if (!(boardingKey in prev)) return;
+    const next: Record<string, readonly string[]> = { ...prev };
+    delete next[boardingKey];
+    applyDestinationPreferences(next, boardingKey, null);
+  }, [boardingKey, applyDestinationPreferences]);
+
   // Reset per-step guards whenever the active step changes (incl. undo via
   // goPrev). Also auto-closes the sheet so a stale-step pick is impossible.
   useEffect(() => {
@@ -557,7 +698,11 @@ export const RouteGuidanceScreen: React.FC = () => {
     const result = detectDeparture({
       prev: prevTrainsRef.current,
       next,
-      awaited: { lineId: waitingLineId, directionName: waitingDirection },
+      awaited: {
+        lineId: waitingLineId,
+        directionName: waitingDirection,
+        preferredDestinations: selectedDestinations,
+      },
       nowMs: nowMsRef.current,
       thresholdSec: ARRIVING_ETA_THRESHOLD_SEC,
     });
@@ -575,15 +720,17 @@ export const RouteGuidanceScreen: React.FC = () => {
       nowMsRef.current
     );
     prevTrainsRef.current = next;
-    // Keep logging departures even while the sheet is open (real-time list), but
+    // Keep logging departures even while a sheet is open (real-time list), but
     // never arm the soft-confirm auto-advance behind the modal — that would
-    // advance the journey and force-close the sheet under the user.
+    // advance the journey and force-close the sheet under the user (종점행 선택
+    // 시트도 열차 선택 시트와 같은 원칙).
     if (
       result.departed &&
       result.trainId !== null &&
       result.trainId !== cooldownTrainIdRef.current &&
       firedForIndexRef.current !== currentIndex &&
-      trainSelectContext === null
+      trainSelectContext === null &&
+      !destinationSheetOpen
     ) {
       setSoftConfirm({ trainId: result.trainId });
       // Detection metric: the soft-confirm fired at least once this hold.
@@ -607,6 +754,8 @@ export const RouteGuidanceScreen: React.FC = () => {
     confirmBoarded,
     clearAutoTimer,
     trainSelectContext,
+    destinationSheetOpen,
+    selectedDestinations,
   ]);
 
   // Local-notification bridge — schedule/reschedule for the earliest train while
@@ -616,8 +765,38 @@ export const RouteGuidanceScreen: React.FC = () => {
   // 막는다(발사된 알림은 취소 불가 — pending만 cancel-then-schedule). The screen
   // is foreground when scheduling, so tapping the alert just returns here.
   const notificationSettings = user?.preferences?.notificationSettings ?? null;
+  // attach(저장 선호의 원격 읽기) 미확정 창 — 이 동안에는 탑승 알림을 예약하지
+  // 않는다. 확정 전에 발사된 알림은 사용자가 이미 제외해 둔 종점행 열차의 것이어도
+  // 회수할 수 없다(발사된 알림은 취소 불가 — pending만 cancel 가능). 판정 기준은
+  // destinationPreferenceSync의 settled 마커: undefined=미확정, {}=확정·선호 없음.
+  // `ownerUid` 동반 조건이 필수다 — attach는 uid가 있을 때만 발사되는데(useStart-
+  // CommuteGuidance) ownerUid도 같은 uid로 게이트되므로, 비로그인 출퇴근 진입이
+  // 영영 미확정으로 남아 알림이 완전히 죽는 일을 막는다. 일반 검색 세션
+  // (sourceCommuteType 부재)은 attach 자체가 없어 게이트 무영향. 칩·보조 나열·
+  // 카운트다운은 게이트하지 않는다 — 표시는 되돌릴 수 있고, 가리면 정직성이 깨진다.
+  // 마지막 절은 시간 상한(PREFERENCE_SETTLE_TIMEOUT_MS) — settle이 끝내 오지 않는
+  // 세션(정체·복원)이 영구히 게이트에 갇히지 않게 한다. nowMs는 1Hz로 갱신되므로
+  // 상한을 넘기는 순간 이 값이 false로 뒤집히고 effect가 재실행되어 예약된다.
+  const destinationPreferencesPending =
+    liveSession?.sourceCommuteType !== undefined &&
+    liveSession?.ownerUid !== undefined &&
+    liveSession?.destinationPreferences === undefined &&
+    nowMs - liveSession.startedAt < PREFERENCE_SETTLE_TIMEOUT_MS;
   useEffect(() => {
-    if (!session || !isWaitingStep || earliestTrain?.arrivalTime == null) return;
+    if (!session || !isWaitingStep) return;
+    // 미확정이면 예약 자체를 보류한다. settle되면 liveSession 갱신 → 이 effect가
+    // 재실행되어 자연스럽게 예약된다(별도 재시도 경로 불필요). 취소 분기도 함께
+    // 건너뛴다 — 이 창에서는 이 세션 몫으로 예약된 알림이 아직 없다.
+    if (destinationPreferencesPending) return;
+    if (earliestTrain?.arrivalTime == null) {
+      // 선호를 골랐는데 추적 대상이 0대가 된 전이 — 앞서 예약된 미발사 알림은 이제
+      // 사용자가 제외한 열차의 것이므로 취소한다("선택한 종점행 열차만 알림"). 기존
+      // cancel 경로를 그대로 재사용하므로 계약은 불변이다: 이미 발사된 알림은 취소
+      // 대상이 아니고(과거 fireAt), 그 경우 dedup 슬롯이 유지돼 대기당 1회 의미론이
+      // 그대로 산다. 미발사 pending을 취소할 때만 슬롯이 비워진다.
+      if (selectedDestinations.length > 0) void cancelBoardingAlert();
+      return;
+    }
     void scheduleBoardingAlert({
       context: 'guidance',
       // 화면 마운트 시 고정 read한 세션의 키 — 서비스가 스토어를 다시 읽지 않게
@@ -629,7 +808,7 @@ export const RouteGuidanceScreen: React.FC = () => {
       settings: notificationSettings,
       variant: currentStep?.kind === 'transfer' ? 'transfer' : 'board',
     });
-  }, [session, isWaitingStep, earliestTrain, waitingStationName, currentStep?.kind, notificationSettings]);
+  }, [session, isWaitingStep, earliestTrain, selectedDestinations, waitingStationName, currentStep?.kind, notificationSettings, destinationPreferencesPending]);
 
   // 하차 임박 알림 — ride 스텝의 도착 예정 시각으로 pending 알림을 예약한다.
   // `nowMs - elapsedInStepSec*1000`은 현재 스텝의 시작 시각(anchor 파생)이라
@@ -785,6 +964,9 @@ export const RouteGuidanceScreen: React.FC = () => {
             softConfirm={softConfirmHandlers}
             onOpenTrainSelect={openTrainSelect}
             onOpenStationRebase={openStationRebase}
+            waitPreview={waitPreview}
+            destinationFilterLabel={destinationFilterLabel}
+            onOpenDestinationFilter={isWaitingStep ? openDestinationSheet : undefined}
           />
         </View>
       )}
@@ -810,11 +992,21 @@ export const RouteGuidanceScreen: React.FC = () => {
         onExit={handleExit}
         nextEmphasis={isHolding ? 'primary' : 'correction'}
       />
+      {/* 열차 선택 시트에는 종점행 필터를 걸지 않는다 — 사용자가 필터 밖 열차를 탔다는
+          사실 보고를 막으면 안 되므로 전체 후보를 유지한다. */}
       <TrainSelectSheet
         visible={trainSelectContext !== null}
         entries={trainSelectEntries}
         onSelect={handleTrainSelected}
         onClose={closeTrainSelect}
+      />
+      <DestinationFilterSheet
+        visible={destinationSheetOpen}
+        options={destinationOptions(trainPools.display, selectedDestinations, nowMs)}
+        selected={selectedDestinations}
+        onToggle={handleDestinationToggle}
+        onClear={handleDestinationClear}
+        onClose={closeDestinationSheet}
       />
       {stationRebaseContext !== null && (
         <StationRebaseSheet

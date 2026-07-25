@@ -560,6 +560,13 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
         })),
         notifications: editParams.initial?.notifications ?? DEFAULT_COMMUTE_NOTIFICATIONS,
         bufferMinutes: editParams.initial?.bufferMinutes ?? DEFAULT_BUFFER_MINUTES,
+        // 편집 = 이 leg의 교체 → 종점행 선호를 명시적으로 무효화한다. 생략하면
+        // setDoc({merge:true})가 옛 선호를 보존해, 같은 역·노선이지만 목적지가
+        // 달라진 새 경로에 도달 불가한 종점 선택이 재부착된다. 빈 맵은 Firestore
+        // 필드 마스크에 명시적으로 실려(SDK parseObject) 기존 키를 지운다.
+        // `otherLeg`(아래)는 이 필드를 싣지 않는다 — 손대지 않은 leg의 선호는
+        // merge 보존이 정답이고, 여기서 {}를 쓰면 그 leg의 선호가 통째로 날아간다.
+        boardingPreferences: {},
       };
       const otherLegSrc = editParams.otherLeg;
       const otherLeg: CommuteRoute = otherLegSrc

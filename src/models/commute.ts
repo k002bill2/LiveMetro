@@ -47,6 +47,9 @@ export interface CommuteRoute {
   readonly arrivalLineId: string;
   readonly notifications: CommuteNotifications;
   readonly bufferMinutes: number;
+  /** 탑승 구간별 선호 종점행. 키 = `${stationId}|${lineId}` (출발역 + 환승역 각각).
+   *  값 = 선호 종착역 이름 배열 (`Train.finalDestination` 도메인). 부재/빈 배열 = 전체 열차. */
+  readonly boardingPreferences?: Readonly<Record<string, readonly string[]>>;
 }
 
 /**
@@ -233,6 +236,7 @@ export const reverseCommuteRoute = (
     };
   });
 
+  // boardingPreferences는 의도적으로 미러하지 않는다 — 반대 방향의 종점 집합은 별개다.
   return {
     departureTime,
     departureStationId: route.arrivalStationId,

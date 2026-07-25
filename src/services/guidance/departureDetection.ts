@@ -25,6 +25,9 @@ export interface AwaitedTrain {
   readonly lineId: string;
   /** Best-effort travel-direction endpoint name ("OO 방면"), or null. */
   readonly directionName: string | null;
+  /** 사용자가 선택한 선호 종점행. 비어 있지 않으면 directionName 매칭을 대체하며,
+   *  선호 밖 열차의 출발은 감지하지 않는다 (폴백 없음 — 자동 진행 방지). */
+  readonly preferredDestinations?: readonly string[];
 }
 
 export interface DepartureDetectionInput {
@@ -62,16 +65,20 @@ export const detectDeparture = (input: DepartureDetectionInput): DepartureDetect
   if (prev === null || prev.length === 0) return NOT_DEPARTED;
 
   const numbered = isNumberedLine(awaited.lineId);
+  const prefs = awaited.preferredDestinations ?? [];
 
   // Extended (non-numbered) lines bypass the numeric line filter, so the
   // candidate pool mixes lines at a transfer station. Require a direction match
   // to disambiguate; without one, degrade to manual rather than risk a false advance.
-  if (!numbered && awaited.directionName === null) return NOT_DEPARTED;
+  // An explicit preference is itself such a disambiguator, so it lifts this gate.
+  if (!numbered && awaited.directionName === null && prefs.length === 0) return NOT_DEPARTED;
 
   const onLine = (train: Train): boolean => (numbered ? train.lineId === awaited.lineId : true);
 
   const directionMatches = (train: Train): boolean =>
     awaited.directionName === null ? true : train.finalDestination === awaited.directionName;
+
+  const preferMatches = (train: Train): boolean => prefs.includes(train.finalDestination);
 
   // A candidate was "arriving" (0 ≤ ETA ≤ threshold) on the awaited line in `prev`.
   const qualifies = (train: Train): boolean => {
@@ -80,18 +87,30 @@ export const detectDeparture = (input: DepartureDetectionInput): DepartureDetect
     if (eta === null || eta < 0 || eta > thresholdSec) return false;
     // Extended lines demand a strong direction match; numbered lines rely on
     // the line filter (direction is applied as best-effort narrowing below).
-    return numbered ? true : directionMatches(train);
+    if (numbered) return true;
+    return prefs.length > 0 ? preferMatches(train) : directionMatches(train);
   };
 
   const candidates = prev.filter(qualifies);
   if (candidates.length === 0) return NOT_DEPARTED;
 
-  // Numbered-line best-effort narrowing: prefer the awaited direction when any
-  // candidate matches, but don't drop everything when none do (endpoint name vs
-  // short-turn terminus can legitimately differ).
-  const preferred =
-    numbered && awaited.directionName !== null ? candidates.filter(directionMatches) : candidates;
-  const pool = preferred.length > 0 ? preferred : candidates;
+  // 선호 종점행이 지정되면 그것만이 "기다리는 열차"다 — 방면명 best-effort 폴백과
+  // 달리 선호 밖 후보로 넓히지 않는다 (선호 밖 열차 출발 = 사용자가 보내는 열차).
+  //
+  // Numbered-line best-effort narrowing (선호 부재 시): prefer the awaited direction
+  // when any candidate matches, but don't drop everything when none do (endpoint name
+  // vs short-turn terminus can legitimately differ).
+  const pool =
+    prefs.length > 0
+      ? candidates.filter(preferMatches)
+      : (() => {
+          const preferred =
+            numbered && awaited.directionName !== null
+              ? candidates.filter(directionMatches)
+              : candidates;
+          return preferred.length > 0 ? preferred : candidates;
+        })();
+  if (pool.length === 0) return NOT_DEPARTED;
 
   const nextIds = new Set(next.map(t => t.id));
   const departed = pool.find(t => !nextIds.has(t.id));

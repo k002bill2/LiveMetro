@@ -221,6 +221,8 @@ export const HomeScreen: React.FC = () => {
     viaTransferId: activeCommute?.transferStationId,
     fromStationName: commuteStationNames.origin,
     toStationName: commuteStationNames.destination,
+    commuteType: activeCommuteType,
+    uid: user?.id,
   });
 
   // Re-entry into an in-progress guidance journey from the "안내 중" banner.
