@@ -1588,6 +1588,34 @@ describe('RouteGuidanceScreen', () => {
       expect(getByTestId('train-select-item-T1')).toBeTruthy();
     });
 
+    it('이미 걸린 soft-confirm 자동 진행을 종점행 시트를 열 때 해제한다', () => {
+      // arm 가드는 새 arm만 막는다 — 감지가 먼저 타이머를 걸어둔 뒤 시트를 열면
+      // 모달 뒤에서 자동 진행이 발화해 시트가 stale 스텝을 가리키게 된다.
+      seedSession();
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: [trainOf('T1', 10)],
+        loading: false,
+        error: null,
+      });
+      const { getByTestId, getByText, queryByTestId, rerender } = render(<RouteGuidanceScreen />);
+      // 두 번째 스냅샷: T1 사라짐 → soft-confirm 표시(4초 타이머 armed).
+      mockedUseRealtimeTrains.mockReturnValue({ trains: [], loading: false, error: null });
+      act(() => {
+        rerender(<RouteGuidanceScreen />);
+      });
+      expect(getByTestId('guidance-soft-confirm')).toBeTruthy();
+      // 유예 타이머가 pending인 상태에서 종점행 시트를 연다.
+      fireEvent.press(getByTestId('guidance-open-destination-filter'));
+      expect(getByTestId('destination-filter-sheet')).toBeTruthy();
+      act(() => {
+        jest.advanceTimersByTime(5000);
+      });
+      expect(queryByTestId('guidance-soft-confirm')).toBeNull();
+      // 자동 진행 없음(여전히 탑승 대기) + 시트도 강제로 닫히지 않는다.
+      expect(getByText('탑승 대기')).toBeTruthy();
+      expect(getByTestId('destination-filter-sheet')).toBeTruthy();
+    });
+
     it('선호 없음이면 기존 방면 필터 동작 그대로다 (칩=방면 매칭 최선두)', () => {
       seedSession(); // 2호선 을지로3가→시청, 방면 = 산곡
       mockedUseRealtimeTrains.mockReturnValue({

@@ -583,7 +583,14 @@ export const RouteGuidanceScreen: React.FC = () => {
     rebaseAt(Date.now() - sec * 1000, ctx.stepIndex);
   }, [stationRebaseContext, currentIndex, rebaseAt]);
 
-  const openDestinationSheet = useCallback((): void => setDestinationSheetOpen(true), []);
+  // 시트를 열기 전에 pending soft-confirm을 해제한다 (openTrainSelect와 동일 패턴).
+  // 감지 effect의 arm 가드(`!destinationSheetOpen`)는 **새 arm만** 막으므로, 이미 걸린
+  // 4초 auto-advance 타이머는 모달 뒤에서 발화해 여정을 진행시키고 시트를 stale 스텝
+  // 컨텍스트로 남긴다. dismissSoftConfirm은 pending이 없으면 (쿨다운 장부 외) no-op.
+  const openDestinationSheet = useCallback((): void => {
+    dismissSoftConfirm();
+    setDestinationSheetOpen(true);
+  }, [dismissSoftConfirm]);
   const closeDestinationSheet = useCallback((): void => setDestinationSheetOpen(false), []);
 
   // 세션 사본(full map)을 SSOT로 갱신하고, 출퇴근 세션이면 원본(CommuteRoute)에도
