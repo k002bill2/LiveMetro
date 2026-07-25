@@ -395,23 +395,24 @@ describe('accountDeletionService', () => {
       expect(h.deletedUsers).toEqual([]);
     });
 
-    it('한 단계가 실패해도 나머지 단계는 계속 수행한다', async () => {
+    it('앞선 단계가 실패해도 나머지 단계는 계속 수행한다', async () => {
       const h = makeHarness();
       seedFullDataset(h.db);
-      h.db.failingPaths.add(`users/${UID}`);
+      // delayReportComments는 첫 단계다(인덱스 전제조건).
+      h.db.failingCollectionGroups.add('comments');
 
       const result = await purgeUserFirestoreData(h.deps, UID);
 
-      expect(result.failedSteps).toEqual(['users']);
-      expect(h.db.docs.has(`users/${UID}`)).toBe(true);
+      expect(result.failedSteps).toEqual(['delayReportComments']);
       // 뒤따르는 단계는 정상 수행됨
       expect(h.db.docs.has(`pushTokens/${UID}`)).toBe(false);
+      expect(h.db.docs.has(`users/${UID}`)).toBe(false);
       expect(h.db.docs.get('delayReports/r1')).toMatchObject({
         userId: DELETED_USER_ID,
       });
     });
 
-    it('여러 단계가 실패하면 전부 수집한다', async () => {
+    it('여러 단계가 실패하면 실행 순서대로 전부 수집한다', async () => {
       const h = makeHarness();
       seedFullDataset(h.db);
       h.db.failingPaths.add(`users/${UID}`);
@@ -419,7 +420,34 @@ describe('accountDeletionService', () => {
 
       const result = await purgeUserFirestoreData(h.deps, UID);
 
-      expect(result.failedSteps).toEqual(['users', 'delayReportComments']);
+      expect(result.failedSteps).toEqual(['delayReportComments', 'users']);
+    });
+
+    // 순서가 곧 실패 안전성이다: users에는 프로필과 즐겨찾기 배열
+    // (preferences.favoriteStations)이 들어 있다. 앞에서 지워버리면 뒤 단계가
+    // 실패했을 때 "계정은 살아 있는데 프로필·즐겨찾기는 소멸" 상태가 된다.
+    it('users 문서 삭제는 다른 모든 파기 단계 이후에 일어난다', async () => {
+      const h = makeHarness();
+      seedFullDataset(h.db);
+
+      await purgeUserFirestoreData(h.deps, UID);
+
+      const usersIndex = h.db.ops.findIndex((op) => op.path === `users/${UID}`);
+      expect(usersIndex).toBe(h.db.ops.length - 1);
+    });
+
+    // 인덱스 미배포(FAILED_PRECONDITION)는 유일한 외부 전제조건 실패다.
+    // 첫 단계로 배치했으므로 실패 보고의 선두에 온다 — 운영 로그에서
+    // 원인을 즉시 식별할 수 있다.
+    it('collection group 인덱스 실패는 첫 번째 실패 단계로 보고된다', async () => {
+      const h = makeHarness();
+      seedFullDataset(h.db);
+      h.db.failingCollectionGroups.add('comments');
+      h.db.failingPaths.add(`pushTokens/${UID}`);
+
+      const result = await purgeUserFirestoreData(h.deps, UID);
+
+      expect(result.failedSteps[0]).toBe('delayReportComments');
     });
 
     it('실패 로그에 문서 본문을 남기지 않는다', async () => {

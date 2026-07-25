@@ -212,21 +212,35 @@ interface PurgeStepRunner {
   readonly run: (deps: AccountPurgeDeps, uid: string) => Promise<unknown>;
 }
 
-/** 실행 순서 고정 — 로그와 테스트 단언이 결정적이어야 한다. */
+/**
+ * 실행 순서 고정 — 로그와 테스트 단언이 결정적이어야 하고, **부분 실패 시
+ * 사용자가 남는 상태**가 순서로 결정된다.
+ *
+ * 순서 원칙(파괴력이 낮은 것부터):
+ *   1. `delayReportComments`를 **맨 앞**에 둔다. 유일하게 외부 전제조건
+ *      (collection group 인덱스)이 있는 단계라, 인덱스 미배포 같은 사고는
+ *      아무것도 건드리지 않은 채 즉시 중단되어 깨끗한 재시도가 된다.
+ *   2. 익명화(쓰기) → 3. 부수 문서 삭제 → 4. `users`를 **맨 뒤**에 둔다.
+ *
+ * `users`가 앞에 있으면 뒤 단계 하나가 실패했을 때 프로필과 즐겨찾기
+ * (`preferences.favoriteStations`)가 이미 사라진 채 계정은 살아 있는
+ * 최악의 상태가 된다. 익명화만 되고 중단되면 본인 게시물이 "탈퇴한
+ * 사용자"로 보이는 표시상의 이상에 그친다 — 기능 데이터 파괴보다 낫다.
+ */
 const PURGE_STEPS: readonly PurgeStepRunner[] = [
-  { step: 'users', run: deleteOwnedDocument('users') },
-  { step: 'commuteSettings', run: deleteOwnedDocument('commuteSettings') },
-  { step: 'commuteLogs', run: recursiveDeleteOwnedTree('commuteLogs') },
-  { step: 'commutePatterns', run: recursiveDeleteOwnedTree('commutePatterns') },
+  { step: 'delayReportComments', run: anonymizeReportComments },
+  { step: 'delayReports', run: anonymizeDelayReports },
+  { step: 'congestionReports', run: anonymizeCongestionReports },
+  { step: 'favorites', run: deleteLegacyFavorites },
+  { step: 'pushTokens', run: deleteOwnedDocument('pushTokens') },
   {
     step: 'smartNotificationSettings',
     run: deleteOwnedDocument('smartNotificationSettings'),
   },
-  { step: 'pushTokens', run: deleteOwnedDocument('pushTokens') },
-  { step: 'favorites', run: deleteLegacyFavorites },
-  { step: 'delayReports', run: anonymizeDelayReports },
-  { step: 'delayReportComments', run: anonymizeReportComments },
-  { step: 'congestionReports', run: anonymizeCongestionReports },
+  { step: 'commuteLogs', run: recursiveDeleteOwnedTree('commuteLogs') },
+  { step: 'commutePatterns', run: recursiveDeleteOwnedTree('commutePatterns') },
+  { step: 'commuteSettings', run: deleteOwnedDocument('commuteSettings') },
+  { step: 'users', run: deleteOwnedDocument('users') },
 ];
 
 /**

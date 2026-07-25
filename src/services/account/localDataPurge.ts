@@ -33,6 +33,11 @@ const PRESERVED_KEYS: readonly string[] = [
   '@livemetro_theme',
   '@livemetro_theme_auto_switch',
   '@livemetro_accent_color',
+  // 접근성·음성 설정도 같은 범주다(글자 크기, 모션 감소, 발화 속도 등).
+  // 식별성이 없고, 지우면 계정 삭제가 사용자의 접근성 구성을 초기화해
+  // 그 설정에 의존하는 사용자에게 실질적 불이익이 된다.
+  '@livemetro:accessibility_settings', // AccessibilityContext.tsx:69, accessibilityService.ts:39
+  '@livemetro:tts_settings', // ttsService.ts:98
 ];
 
 /**
@@ -69,7 +74,7 @@ export const selectPurgeableKeys = (allKeys: readonly string[]): readonly string
   );
 
 /** 진단 로그는 개발 빌드에서만 — 프로덕션 콘솔에 파기 실패 흔적을 남기지 않는다. */
-const logFailure = (message: string, error: unknown): void => {
+const logFailure = (message: string, error?: unknown): void => {
   if (!__DEV__) return;
   // eslint-disable-next-line no-console
   console.error(message, error);
@@ -86,6 +91,31 @@ export const purgeLocalUserData = async (): Promise<LocalPurgeResult> => {
   let hadFailure = false;
   let removedKeyCount = 0;
 
+  // SecureStore 자격증명을 먼저 파기한다. `disableBiometricLogin()`이
+  // `@livemetro_biometric_enabled`를 'false'로 **다시 쓰기** 때문에,
+  // AsyncStorage 스윕보다 뒤에 두면 방금 지운 키가 되살아난다.
+  for (const key of SECURE_STORE_KEYS) {
+    try {
+      await SecureStore.deleteItemAsync(key);
+    } catch (error) {
+      hadFailure = true;
+      logFailure('SecureStore purge failed:', error);
+    }
+  }
+
+  // 이 함수는 내부에서 예외를 흡수하고 boolean을 반환한다(throw 하지 않는다).
+  // try/catch만 두면 실패가 조용히 성공으로 보고돼 삭제된 계정의 생체인증
+  // 자격증명이 기기에 남는다 — 반환값을 반드시 확인한다.
+  try {
+    if (!(await disableBiometricLogin())) {
+      hadFailure = true;
+      logFailure('Biometric credential purge returned false');
+    }
+  } catch (error) {
+    hadFailure = true;
+    logFailure('Biometric credential purge failed:', error);
+  }
+
   try {
     const allKeys = await AsyncStorage.getAllKeys();
     const targets = selectPurgeableKeys(allKeys);
@@ -96,22 +126,6 @@ export const purgeLocalUserData = async (): Promise<LocalPurgeResult> => {
   } catch (error) {
     hadFailure = true;
     logFailure('Local storage purge failed:', error);
-  }
-
-  for (const key of SECURE_STORE_KEYS) {
-    try {
-      await SecureStore.deleteItemAsync(key);
-    } catch (error) {
-      hadFailure = true;
-      logFailure('SecureStore purge failed:', error);
-    }
-  }
-
-  try {
-    await disableBiometricLogin();
-  } catch (error) {
-    hadFailure = true;
-    logFailure('Biometric credential purge failed:', error);
   }
 
   return { removedKeyCount, hadFailure };

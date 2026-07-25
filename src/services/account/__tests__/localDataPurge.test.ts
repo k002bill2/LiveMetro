@@ -44,6 +44,8 @@ const ALL_KEYS: readonly string[] = [
   '@livemetro_theme',
   '@livemetro_theme_auto_switch',
   '@livemetro_accent_color',
+  '@livemetro:accessibility_settings',
+  '@livemetro:tts_settings',
   // 타 앱/무관 키 — 대상 아님
   'some_other_app_key',
   'firebase:authUser:xyz',
@@ -57,6 +59,15 @@ describe('selectPurgeableKeys', () => {
     expect(selected).not.toContain('@livemetro_theme');
     expect(selected).not.toContain('@livemetro_theme_auto_switch');
     expect(selected).not.toContain('@livemetro_accent_color');
+  });
+
+  // 접근성 구성은 식별성이 없고, 지우면 그 설정에 의존하는 사용자에게
+  // 실질적 불이익이 된다(글자 크기·모션 감소·발화 속도).
+  it('접근성·음성 설정도 보존한다', () => {
+    const selected = selectPurgeableKeys(ALL_KEYS);
+
+    expect(selected).not.toContain('@livemetro:accessibility_settings');
+    expect(selected).not.toContain('@livemetro:tts_settings');
   });
 
   it('대문자 변형 접두(@LiveMetro:)도 파기 대상에 포함한다', () => {
@@ -95,7 +106,7 @@ describe('selectPurgeableKeys', () => {
         '@livemetro_user_preferences',
       ]),
     );
-    expect(selected).toHaveLength(ALL_KEYS.length - 6);
+    expect(selected).toHaveLength(ALL_KEYS.length - 8);
   });
 
   it('새로 추가된 접두 키는 나열 없이도 자동 포함된다', () => {
@@ -197,5 +208,26 @@ describe('purgeLocalUserData', () => {
     const result = await purgeLocalUserData();
 
     expect(result.hadFailure).toBe(true);
+  });
+
+  // disableBiometricLogin은 내부에서 예외를 흡수하고 false를 반환한다
+  // (throw 하지 않는다) — 반환값을 무시하면 자격증명이 남은 채 성공으로
+  // 보고된다. 실제 실패 모드는 reject가 아니라 이쪽이다.
+  it('생체인증 해제가 false를 반환하면 실패로 기록한다', async () => {
+    mockDisableBiometricLogin.mockResolvedValue(false);
+
+    const result = await purgeLocalUserData();
+
+    expect(result.hadFailure).toBe(true);
+  });
+
+  // disableBiometricLogin이 '@livemetro_biometric_enabled'를 다시 쓰므로
+  // AsyncStorage 스윕보다 반드시 먼저 실행돼야 한다(안 그러면 부활한다).
+  it('생체인증 해제를 AsyncStorage 스윕보다 먼저 수행한다', async () => {
+    await purgeLocalUserData();
+
+    const biometricOrder = mockDisableBiometricLogin.mock.invocationCallOrder[0]!;
+    const sweepOrder = multiRemoveSpy.mock.invocationCallOrder[0]!;
+    expect(biometricOrder).toBeLessThan(sweepOrder);
   });
 });
