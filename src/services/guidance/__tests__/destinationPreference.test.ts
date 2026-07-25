@@ -186,4 +186,36 @@ describe('pruneBoardingPreferences', () => {
   it('빈 배열 값 키는 제거한다', () => {
     expect(pruneBoardingPreferences({ 'D1|5': [] }, ROUTE)).toEqual({});
   });
+
+  // 온보딩은 Seoul station_cd('0222')를, 길안내 키는 내부 슬러그('gangnam')를 쓴다.
+  // 두 도메인은 비교차라 정규화 없이는 유효 키까지 전량 드롭된다.
+  it('route가 station_cd·키가 슬러그인 혼합 도메인에서도 유효 키가 살아남는다', () => {
+    const cdRoute: CommuteRoute = {
+      ...ROUTE,
+      departureStationId: '0222', // 강남 → gangnam
+      transferStations: [
+        { stationId: '0239', stationName: '홍대입구', lineId: '2', lineName: '2호선', order: 1 },
+      ],
+    };
+
+    const pruned = pruneBoardingPreferences(
+      { 'gangnam|2': ['마천'], 'hongdae|2': ['성수'], 'seolleung|2': ['하남검단산'] },
+      cdRoute
+    );
+
+    expect(pruned).toEqual({ 'gangnam|2': ['마천'], 'hongdae|2': ['성수'] });
+  });
+
+  it('반대 조합(route=슬러그·키=station_cd)도 정규화해 비교하고 키 원문을 보존한다', () => {
+    const slugRoute: CommuteRoute = {
+      ...ROUTE,
+      departureStationId: 'gangnam',
+      transferStations: [],
+    };
+
+    const pruned = pruneBoardingPreferences({ '0222|2': ['마천'], '0239|2': ['성수'] }, slugRoute);
+
+    // 키는 정규화하지 않는다 — 조회가 정확 키 매칭이라 원문이 유지돼야 한다.
+    expect(pruned).toEqual({ '0222|2': ['마천'] });
+  });
 });

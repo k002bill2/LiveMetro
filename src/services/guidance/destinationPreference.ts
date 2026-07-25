@@ -8,6 +8,7 @@
  */
 import type { CommuteRoute } from '@/models/commute';
 import type { Train } from '@/models/train';
+import { resolveInternalStationId } from '@/utils/stationIdResolver';
 
 /** 탑승 구간 식별 키. board = stationId|lineId, transfer = stationId|toLineId. */
 export const buildBoardingKey = (stationId: string, lineId: string): string =>
@@ -96,21 +97,35 @@ export const destinationOptions = (
 };
 
 /**
+ * 두 ID 우주를 공통 도메인(내부 슬러그)으로 모은다. 키 생산자(길안내)는
+ * `selectCommuteRoute`의 슬러그('gangnam')를, CommuteRoute의 stationId는 온보딩이
+ * 저장한 Seoul station_cd('0222')를 쓴다 — 비교차 도메인이라(onboarding
+ * CommuteRouteScreen 참조) 정규화 없이 비교하면 prune이 전량 드롭으로 퇴화한다.
+ * 슬러그는 pass-through, station_cd는 슬러그로, 미상 ID는 원문 유지(보수적).
+ */
+const normalizeStationId = (id: string): string => resolveInternalStationId(id) ?? id;
+
+/**
  * 저장 직전 prune — 경로에 존재하는 역(출발+환승)의 키만 유지한다. lineId 부분은
  * 검사하지 않는다(역 단위 prune): 노선만 바뀐 스테일 키는 조회에서 자연 미적용되고,
  * 역이 경로에 있는 한 크기가 유계라 단순함을 택했다. 빈 배열 값도 제거.
+ *
+ * 비교만 정규화하고 키는 원문 그대로 남긴다 — 조회 경로가 정확 키 매칭
+ * (`destinationPreferences[boardingKey]`)이라 키를 바꾸면 선호가 유실된다.
  */
 export const pruneBoardingPreferences = (
   prefs: Readonly<Record<string, readonly string[]>>,
   route: CommuteRoute
 ): Readonly<Record<string, readonly string[]>> => {
-  const validStations = new Set<string>([
-    route.departureStationId,
-    ...route.transferStations.map(t => t.stationId),
-  ]);
+  const validStations = new Set<string>(
+    [route.departureStationId, ...route.transferStations.map(t => t.stationId)].map(
+      normalizeStationId
+    )
+  );
   return Object.fromEntries(
     Object.entries(prefs).filter(
-      ([key, value]) => value.length > 0 && validStations.has(key.split('|')[0] ?? '')
+      ([key, value]) =>
+        value.length > 0 && validStations.has(normalizeStationId(key.split('|')[0] ?? ''))
     )
   );
 };
