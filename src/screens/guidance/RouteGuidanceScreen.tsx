@@ -730,7 +730,16 @@ export const RouteGuidanceScreen: React.FC = () => {
   // is foreground when scheduling, so tapping the alert just returns here.
   const notificationSettings = user?.preferences?.notificationSettings ?? null;
   useEffect(() => {
-    if (!session || !isWaitingStep || earliestTrain?.arrivalTime == null) return;
+    if (!session || !isWaitingStep) return;
+    if (earliestTrain?.arrivalTime == null) {
+      // 선호를 골랐는데 추적 대상이 0대가 된 전이 — 앞서 예약된 미발사 알림은 이제
+      // 사용자가 제외한 열차의 것이므로 취소한다("선택한 종점행 열차만 알림"). 기존
+      // cancel 경로를 그대로 재사용하므로 계약은 불변이다: 이미 발사된 알림은 취소
+      // 대상이 아니고(과거 fireAt), 그 경우 dedup 슬롯이 유지돼 대기당 1회 의미론이
+      // 그대로 산다. 미발사 pending을 취소할 때만 슬롯이 비워진다.
+      if (selectedDestinations.length > 0) void cancelBoardingAlert();
+      return;
+    }
     void scheduleBoardingAlert({
       context: 'guidance',
       // 화면 마운트 시 고정 read한 세션의 키 — 서비스가 스토어를 다시 읽지 않게
@@ -742,7 +751,7 @@ export const RouteGuidanceScreen: React.FC = () => {
       settings: notificationSettings,
       variant: currentStep?.kind === 'transfer' ? 'transfer' : 'board',
     });
-  }, [session, isWaitingStep, earliestTrain, waitingStationName, currentStep?.kind, notificationSettings]);
+  }, [session, isWaitingStep, earliestTrain, selectedDestinations, waitingStationName, currentStep?.kind, notificationSettings]);
 
   // 하차 임박 알림 — ride 스텝의 도착 예정 시각으로 pending 알림을 예약한다.
   // `nowMs - elapsedInStepSec*1000`은 현재 스텝의 시작 시각(anchor 파생)이라

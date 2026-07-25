@@ -1438,6 +1438,46 @@ describe('RouteGuidanceScreen', () => {
       expect(scheduleBoardingAlert).not.toHaveBeenCalled();
     });
 
+    it('선호 매칭이 0대로 바뀌면 예약된 pending 탑승 알림을 취소한다', () => {
+      // 스펙 §4: 임박 알림은 매칭 열차에만 발사(0대면 미발사). 예약해 둔 알림이
+      // 남아 사용자가 제외한 열차로 발사되면 안 된다.
+      seedBranchSession();
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: branchTrains(),
+        loading: false,
+        error: null,
+      });
+      const { getByTestId, rerender } = render(<RouteGuidanceScreen />);
+      // ① 선호 없음 → 방면 매칭(하남검단산) 열차로 예약된 상태.
+      expect(scheduleBoardingAlert).toHaveBeenCalledWith(
+        expect.objectContaining({ finalDestination: '하남검단산' })
+      );
+      // ② 시트에서 마천 선택 → 추적 대상이 마천으로 교체(재예약).
+      fireEvent.press(getByTestId('guidance-open-destination-filter'));
+      fireEvent.press(getByTestId('destination-option-마천'));
+      act(() => {
+        rerender(<RouteGuidanceScreen />);
+      });
+      expect(scheduleBoardingAlert).toHaveBeenCalledWith(
+        expect.objectContaining({ finalDestination: '마천' })
+      );
+      // ③ 다음 폴링에서 마천이 사라짐 → 추적 0대 전이.
+      (cancelBoardingAlert as jest.Mock).mockClear();
+      const scheduleCallsBefore = (scheduleBoardingAlert as jest.Mock).mock.calls.length;
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: [trainOnLine('HN', 300, '하남검단산', '5')],
+        loading: false,
+        error: null,
+      });
+      act(() => {
+        rerender(<RouteGuidanceScreen />);
+      });
+      expect(cancelBoardingAlert).toHaveBeenCalled();
+      // 남은 하남검단산(선호 밖)으로 새 알림을 예약하지도 않는다.
+      expect((scheduleBoardingAlert as jest.Mock).mock.calls.length).toBe(scheduleCallsBefore);
+      expect(getByTestId('guidance-live-chip')).toHaveTextContent('선택한 종점행 열차가 없어요');
+    });
+
     it('시트에서 토글하면 세션 선호가 갱신되고 출퇴근 세션이면 updateBoardingPreferences가 호출된다', () => {
       seedBranchSession({ sourceCommuteType: 'morning' });
       mockedUseRealtimeTrains.mockReturnValue({
