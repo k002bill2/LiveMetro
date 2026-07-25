@@ -25,6 +25,15 @@ export interface SoftConfirmHandlers {
   readonly onOther?: () => void;
 }
 
+/** 대기 카드의 "다음" 보조 나열 한 줄 — 진행 방향 다음 도착 열차. */
+export interface WaitPreviewItem {
+  readonly destination: string;
+  /** "6분" | "곧 도착" 같이 이미 사람이 읽는 형태로 포맷된 ETA. */
+  readonly etaText: string;
+  /** 추적 대상 여부 (종점행 필터가 없으면 전부 true). */
+  readonly isMatch: boolean;
+}
+
 interface GuidanceNowCardProps {
   step: GuidanceStep;
   /** Seconds spent inside the current step (drives ride countdown). */
@@ -37,6 +46,12 @@ interface GuidanceNowCardProps {
   onOpenTrainSelect?: () => void;
   /** ride 문맥 전용: 역 선택 시간 보정 시트 열기. 전달 시 ride 링크가 "열차 변경"·"시간 보정" 두 개로 분리됨. */
   onOpenStationRebase?: () => void;
+  /** 대기 보조 나열 — 진행 방향 다음 도착 순 최대 2대. 빈 배열/미전달 시 줄 숨김. */
+  waitPreview?: readonly WaitPreviewItem[];
+  /** 종점행 필터 활성 뱃지 라벨 (예: "하남검단산·마천행만"). null/미전달 시 숨김. */
+  destinationFilterLabel?: string | null;
+  /** "종점행 선택" 칩 — 미전달 시 칩 숨김 (실시간 옵션이 없는 화면 상태). */
+  onOpenDestinationFilter?: () => void;
 }
 
 const formatMinSec = (totalSec: number): string => {
@@ -68,6 +83,9 @@ const GuidanceNowCardImpl: React.FC<GuidanceNowCardProps> = ({
   softConfirm,
   onOpenTrainSelect,
   onOpenStationRebase,
+  waitPreview,
+  destinationFilterLabel,
+  onOpenDestinationFilter,
 }) => {
   const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
@@ -135,6 +153,43 @@ const GuidanceNowCardImpl: React.FC<GuidanceNowCardProps> = ({
                 {liveWaitText ?? '실시간 도착 정보를 불러오는 중'}
               </Text>
             </View>
+            {destinationFilterLabel != null && (
+              <View
+                style={[styles.destinationBadge, { borderColor: lineColor }]}
+                testID="guidance-destination-badge"
+              >
+                <Text style={[styles.destinationBadgeText, { color: lineColor }]}>
+                  {destinationFilterLabel}
+                </Text>
+              </View>
+            )}
+            {waitPreview !== undefined && waitPreview.length > 0 && (
+              <View style={styles.waitPreviewRow} testID="guidance-wait-preview">
+                <Text style={styles.waitPreviewLabel}>다음</Text>
+                {waitPreview.map((item, i) => (
+                  <Text
+                    key={`${item.destination}-${i}`}
+                    style={[styles.waitPreviewItem, !item.isMatch && styles.waitPreviewDimmed]}
+                  >
+                    {`${item.destination}행 ${item.etaText}`}
+                  </Text>
+                ))}
+              </View>
+            )}
+            {onOpenDestinationFilter && (
+              <Pressable
+                onPress={onOpenDestinationFilter}
+                style={styles.trainSelectLink}
+                accessibilityRole="button"
+                accessibilityLabel="탈 열차의 종점행 선택"
+                testID="guidance-open-destination-filter"
+              >
+                <Text style={styles.trainSelectLinkText}>
+                  종점이 다른 열차가 섞여 있나요?{' '}
+                  <Text style={styles.trainSelectLinkStrong}>종점행 선택</Text>
+                </Text>
+              </Pressable>
+            )}
             {onOpenTrainSelect && (
               <Pressable
                 onPress={onOpenTrainSelect}
@@ -549,6 +604,38 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       fontSize: 13,
       fontFamily: weightToFontFamily('700'),
       color: semantic.labelStrong,
+    },
+    destinationBadge: {
+      alignSelf: 'flex-start',
+      borderWidth: 1,
+      paddingHorizontal: 9,
+      paddingVertical: 3,
+      borderRadius: WANTED_TOKENS.radius.pill,
+      marginTop: 8,
+    },
+    destinationBadgeText: {
+      fontSize: 12,
+      fontFamily: weightToFontFamily('800'),
+    },
+    waitPreviewRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: 8,
+      marginTop: 10,
+    },
+    waitPreviewLabel: {
+      fontSize: 12,
+      fontFamily: weightToFontFamily('700'),
+      color: semantic.labelAlt,
+    },
+    waitPreviewItem: {
+      fontSize: 13,
+      fontFamily: weightToFontFamily('700'),
+      color: semantic.labelStrong,
+    },
+    waitPreviewDimmed: {
+      color: semantic.labelAlt,
     },
     rideLinkRow: {
       flexDirection: 'row',

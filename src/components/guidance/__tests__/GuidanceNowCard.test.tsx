@@ -223,6 +223,94 @@ describe('GuidanceNowCard — soft-confirm', () => {
   });
 });
 
+describe('GuidanceNowCard — 종점행 대기 표시', () => {
+  it('대기 상태에서 waitPreview를 도착 순으로 나열하고 매칭 여부를 구분한다', () => {
+    const { getByTestId } = render(
+      <GuidanceNowCard
+        step={board}
+        elapsedInStepSec={0}
+        liveWaitText="하남검단산행 3분 24초 후 도착"
+        waitPreview={[
+          { destination: '마천', etaText: '6분', isMatch: false },
+          { destination: '하남검단산', etaText: '9분', isMatch: true },
+        ]}
+        destinationFilterLabel="하남검단산행만"
+        onOpenDestinationFilter={jest.fn()}
+      />
+    );
+    // 한 행이 라벨+항목 여러 Text를 담으므로 부분 일치(정규식) 관용구 — RNTL 문자열 매처는 exact.
+    expect(getByTestId('guidance-wait-preview')).toHaveTextContent(/마천행 6분/);
+    expect(getByTestId('guidance-wait-preview')).toHaveTextContent(/하남검단산행 9분/);
+    expect(getByTestId('guidance-destination-badge')).toHaveTextContent('하남검단산행만');
+  });
+
+  it('칩 탭 시 onOpenDestinationFilter 호출, 미전달 시 칩·뱃지 없음', () => {
+    const open = jest.fn();
+    const { getByTestId, queryByTestId, rerender } = render(
+      <GuidanceNowCard
+        step={board}
+        elapsedInStepSec={0}
+        liveWaitText={null}
+        onOpenDestinationFilter={open}
+      />
+    );
+    fireEvent.press(getByTestId('guidance-open-destination-filter'));
+    expect(open).toHaveBeenCalledTimes(1);
+    rerender(<GuidanceNowCard step={board} elapsedInStepSec={0} liveWaitText={null} />);
+    expect(queryByTestId('guidance-open-destination-filter')).toBeNull();
+    expect(queryByTestId('guidance-destination-badge')).toBeNull();
+  });
+
+  it('환승 대기 상태에서도 나열·뱃지가 렌더된다', () => {
+    const { getByTestId } = render(
+      <GuidanceNowCard
+        step={transfer}
+        elapsedInStepSec={0}
+        liveWaitText={null}
+        waitPreview={[{ destination: '석남', etaText: '4분', isMatch: true }]}
+        destinationFilterLabel="석남행만"
+      />
+    );
+    expect(getByTestId('guidance-wait-preview')).toHaveTextContent(/석남행 4분/);
+    expect(getByTestId('guidance-destination-badge')).toHaveTextContent('석남행만');
+  });
+
+  it('waitPreview가 빈 배열이면 나열 줄을 숨긴다', () => {
+    const { queryByTestId } = render(
+      <GuidanceNowCard step={board} elapsedInStepSec={0} liveWaitText={null} waitPreview={[]} />
+    );
+    expect(queryByTestId('guidance-wait-preview')).toBeNull();
+  });
+
+  it('ride·alight 스텝에서는 대기 전용 UI가 렌더되지 않는다', () => {
+    const rideCard = render(
+      <GuidanceNowCard
+        step={ride}
+        elapsedInStepSec={0}
+        waitPreview={[{ destination: '마천', etaText: '6분', isMatch: true }]}
+        destinationFilterLabel="마천행만"
+        onOpenDestinationFilter={jest.fn()}
+      />
+    );
+    expect(rideCard.queryByTestId('guidance-wait-preview')).toBeNull();
+    expect(rideCard.queryByTestId('guidance-destination-badge')).toBeNull();
+    expect(rideCard.queryByTestId('guidance-open-destination-filter')).toBeNull();
+
+    const alightCard = render(
+      <GuidanceNowCard
+        step={alight}
+        elapsedInStepSec={0}
+        waitPreview={[{ destination: '마천', etaText: '6분', isMatch: true }]}
+        destinationFilterLabel="마천행만"
+        onOpenDestinationFilter={jest.fn()}
+      />
+    );
+    expect(alightCard.queryByTestId('guidance-wait-preview')).toBeNull();
+    expect(alightCard.queryByTestId('guidance-destination-badge')).toBeNull();
+    expect(alightCard.queryByTestId('guidance-open-destination-filter')).toBeNull();
+  });
+});
+
 describe('GuidanceNowCard — train select entry points', () => {
   it('renders the waiting train-select link on a board step and fires it', () => {
     const onOpen = jest.fn();
