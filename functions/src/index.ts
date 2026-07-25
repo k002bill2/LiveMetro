@@ -20,9 +20,10 @@ import {
   KakaoAuthErrorKind,
 } from './services/kakaoAuthService';
 import {
-  deleteAccountAndData,
-  AccountDeletionError,
-} from './services/accountDeletionService';
+  runDeleteAccountRequest,
+  createRecursiveDeleteAdapter,
+  createArrayRemoveAdapter,
+} from './services/accountDeletionHandler';
 import {
   NotificationType,
   EmailNotificationRequest,
@@ -281,48 +282,19 @@ export const kakaoLogin = onCall<KakaoLoginRequest>(
  *   await deleteAccount();
  */
 export const deleteAccount = onCall<unknown>(
-  { region: 'asia-northeast3' },
+  // 기본 60초로는 제보·댓글·이동 로그가 많은 계정에서 매 호출이 타임아웃해
+  // 영구 실패(=삭제 불가능한 계정)가 된다. 12단계 페이지 순회에 여유를 준다.
+  { region: 'asia-northeast3', timeoutSeconds: 300 },
   async (request): Promise<DeleteAccountResponse> => {
-    const uid = request.auth?.uid;
-    if (!uid) {
-      throw new HttpsError('unauthenticated', '로그인이 필요합니다.');
-    }
-
     const db = admin.firestore();
-    try {
-      await deleteAccountAndData(
-        {
-          db,
-          auth: admin.auth(),
-          // Adapter for the service's path-based recursive delete (the real
-          // DocumentReference cannot be expressed as a structural DI type).
-          recursiveDeleteDocument: (path) => db.recursiveDelete(db.doc(path)),
-          arrayRemoveValue: (value) =>
-            admin.firestore.FieldValue.arrayRemove(value),
-        },
-        uid
-      );
-      return { success: true };
-    } catch (error) {
-      if (error instanceof AccountDeletionError) {
-        // Step names only — no document body, no uid-bearing payload.
-        console.error(
-          'deleteAccount purge incomplete, auth record kept:',
-          error.failedSteps.join(',')
-        );
-        throw new HttpsError(
-          'internal',
-          '계정 삭제를 완료하지 못했습니다. 잠시 후 다시 시도해 주세요.'
-        );
-      }
-      console.error(
-        'deleteAccount unexpected error:',
-        error instanceof Error ? error.message : 'unknown'
-      );
-      throw new HttpsError(
-        'internal',
-        '계정 삭제 처리 중 오류가 발생했습니다.'
-      );
-    }
+    return runDeleteAccountRequest(
+      {
+        db,
+        auth: admin.auth(),
+        recursiveDeleteDocument: createRecursiveDeleteAdapter(db),
+        arrayRemoveValue: createArrayRemoveAdapter(admin.firestore.FieldValue),
+      },
+      request.auth?.uid
+    );
   }
 );
