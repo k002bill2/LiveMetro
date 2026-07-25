@@ -100,4 +100,9 @@ export interface GuidanceSession {
     readonly stepIndex: number;
     readonly atMs: number;
   };
+  /** 대기 구간별 선호 종점행 세션 사본 — 키잉은 CommuteRoute.boardingPreferences와 동일.
+   *  시트에서 변경 시 즉시 갱신되고, 출퇴근 세션이면 원본에도 write-back된다. */
+  readonly destinationPreferences?: Readonly<Record<string, readonly string[]>>;
+  /** 이 세션의 출처 출퇴근 leg. 부재 = 일반 경로 검색 세션 (선택은 세션 한정). */
+  readonly sourceCommuteType?: 'morning' | 'evening';
 }
