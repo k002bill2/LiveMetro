@@ -8,6 +8,7 @@ import {
   updateMorningRoute,
   updateEveningRoute,
   updateEveningEnabled,
+  updateBoardingPreferences,
 } from '../commuteService';
 import { CommuteRoute } from '@/models/commute';
 
@@ -263,6 +264,76 @@ describe('Commute Service', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toBe('Firestore error');
+    });
+  });
+
+  describe('updateBoardingPreferences', () => {
+    beforeEach(() => {
+      mockUpdateDoc.mockResolvedValue(undefined);
+      mockSetDoc.mockResolvedValue(undefined);
+    });
+
+    it('leg별 dot-path로 boardingPreferences만 부분 업데이트한다', async () => {
+      const result = await updateBoardingPreferences('uid-1', 'morning', {
+        'gangnam|2': ['마천'],
+      });
+
+      expect(result.success).toBe(true);
+      expect(mockUpdateDoc).toHaveBeenCalledWith('mockDocRef', {
+        'morningRoute.boardingPreferences': { 'gangnam|2': ['마천'] },
+        updatedAt: { _type: 'serverTimestamp' },
+      });
+    });
+
+    it('evening leg은 eveningRoute 경로를 쓴다', async () => {
+      await updateBoardingPreferences('uid-1', 'evening', {});
+
+      expect(mockUpdateDoc).toHaveBeenCalledWith('mockDocRef', {
+        'eveningRoute.boardingPreferences': {},
+        updatedAt: { _type: 'serverTimestamp' },
+      });
+    });
+
+    it('uid 없으면 실패 result를 반환하고 쓰지 않는다', async () => {
+      const result = await updateBoardingPreferences('', 'morning', {});
+
+      expect(result.success).toBe(false);
+      expect(mockUpdateDoc).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('저장 경로의 boardingPreferences 보존', () => {
+    const withPrefs = (
+      route: CommuteRoute,
+      prefs: Readonly<Record<string, readonly string[]>>
+    ): CommuteRoute => ({ ...route, boardingPreferences: prefs });
+
+    beforeEach(() => {
+      mockSetDoc.mockResolvedValue(undefined);
+      mockUpdateDoc.mockResolvedValue(undefined);
+    });
+
+    it('saveCommuteRoutes는 존재하는 boardingPreferences를 prune해 함께 저장한다', async () => {
+      await saveCommuteRoutes(
+        'user-123',
+        withPrefs(mockCommuteRoute, { 'gangnam|2': ['마천'], 'GONE|7': ['x'] }),
+        mockEveningRoute
+      );
+
+      const written = mockSetDoc.mock.calls[0][1];
+      expect(written.morningRoute.boardingPreferences).toEqual({ 'gangnam|2': ['마천'] });
+      // 없는 leg에는 필드 자체가 없어야 한다 (undefined 필드 금지)
+      expect('boardingPreferences' in written.eveningRoute).toBe(false);
+    });
+
+    it('updateMorningRoute / updateEveningRoute도 동일하게 보존한다', async () => {
+      await updateMorningRoute('user-123', withPrefs(mockCommuteRoute, { 'gangnam|2': ['마천'] }));
+      const morning = mockUpdateDoc.mock.calls[0][1].morningRoute;
+      expect(morning.boardingPreferences).toEqual({ 'gangnam|2': ['마천'] });
+
+      await updateEveningRoute('user-123', mockEveningRoute);
+      const evening = mockUpdateDoc.mock.calls[1][1].eveningRoute;
+      expect('boardingPreferences' in evening).toBe(false);
     });
   });
 });

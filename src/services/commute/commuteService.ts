@@ -14,7 +14,8 @@ import {
   Timestamp,
 } from 'firebase/firestore';
 import { firestore } from '@/services/firebase/config';
-import { CommuteRoute } from '@/models/commute';
+import { CommuteRoute, CommuteType } from '@/models/commute';
+import { pruneBoardingPreferences } from '@/services/guidance/destinationPreference';
 
 // Firestore collection name
 const COMMUTE_COLLECTION = 'commuteSettings';
@@ -67,6 +68,12 @@ export const saveCommuteRoutes = async (
         transferStations: morningRoute.transferStations || [],
         notifications: morningRoute.notifications,
         bufferMinutes: morningRoute.bufferMinutes,
+        ...(morningRoute.boardingPreferences !== undefined && {
+          boardingPreferences: pruneBoardingPreferences(
+            morningRoute.boardingPreferences,
+            morningRoute
+          ),
+        }),
       },
       eveningRoute: {
         departureTime: eveningRoute.departureTime,
@@ -79,6 +86,12 @@ export const saveCommuteRoutes = async (
         transferStations: eveningRoute.transferStations || [],
         notifications: eveningRoute.notifications,
         bufferMinutes: eveningRoute.bufferMinutes,
+        ...(eveningRoute.boardingPreferences !== undefined && {
+          boardingPreferences: pruneBoardingPreferences(
+            eveningRoute.boardingPreferences,
+            eveningRoute
+          ),
+        }),
       },
       updatedAt: serverTimestamp(),
       createdAt: serverTimestamp(),
@@ -205,6 +218,12 @@ export const updateMorningRoute = async (
         transferStations: morningRoute.transferStations || [],
         notifications: morningRoute.notifications,
         bufferMinutes: morningRoute.bufferMinutes,
+        ...(morningRoute.boardingPreferences !== undefined && {
+          boardingPreferences: pruneBoardingPreferences(
+            morningRoute.boardingPreferences,
+            morningRoute
+          ),
+        }),
       },
       updatedAt: serverTimestamp(),
     });
@@ -243,6 +262,12 @@ export const updateEveningRoute = async (
         transferStations: eveningRoute.transferStations || [],
         notifications: eveningRoute.notifications,
         bufferMinutes: eveningRoute.bufferMinutes,
+        ...(eveningRoute.boardingPreferences !== undefined && {
+          boardingPreferences: pruneBoardingPreferences(
+            eveningRoute.boardingPreferences,
+            eveningRoute
+          ),
+        }),
       },
       updatedAt: serverTimestamp(),
     });
@@ -252,6 +277,36 @@ export const updateEveningRoute = async (
     return {
       success: false,
       error: error instanceof Error ? error.message : '저장 중 오류가 발생했습니다'
+    };
+  }
+};
+
+/**
+ * 특정 leg의 boardingPreferences만 dot-path로 부분 업데이트한다.
+ * 경로 전체를 다시 쓰지 않으므로(설정 화면과의 동시 편집 등) 다른 필드를
+ * 클로버하지 않는다 — stale 전체-객체 spread 저장이 즐겨찾기를 롤백시킨
+ * 전례(updateUserPreferences 사건)와 같은 클래스의 사고를 구조적으로 차단.
+ */
+export const updateBoardingPreferences = async (
+  uid: string,
+  leg: CommuteType,
+  boardingPreferences: Readonly<Record<string, readonly string[]>>
+): Promise<SaveCommuteResult> => {
+  if (!uid) {
+    return { success: false, error: '사용자 인증이 필요합니다' };
+  }
+
+  try {
+    const docRef = doc(firestore, COMMUTE_COLLECTION, uid);
+    const field =
+      leg === 'morning' ? 'morningRoute.boardingPreferences' : 'eveningRoute.boardingPreferences';
+    await updateDoc(docRef, { [field]: boardingPreferences, updatedAt: serverTimestamp() });
+    return { success: true };
+  } catch (error) {
+    console.error('Error updating boarding preferences:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : '저장 중 오류가 발생했습니다',
     };
   }
 };
@@ -297,4 +352,5 @@ export default {
   updateMorningRoute,
   updateEveningRoute,
   updateEveningEnabled,
+  updateBoardingPreferences,
 };
