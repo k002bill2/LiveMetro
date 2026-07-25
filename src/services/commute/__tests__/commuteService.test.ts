@@ -275,6 +275,11 @@ describe('Commute Service', () => {
     beforeEach(() => {
       mockUpdateDoc.mockResolvedValue(undefined);
       mockSetDoc.mockResolvedValue(undefined);
+      // 쓰기 전 leg 존재 게이트가 읽는 기본 문서 — 두 leg 모두 저장돼 있는 상태.
+      mockGetDoc.mockResolvedValue({
+        exists: () => true,
+        data: () => ({ morningRoute: mockCommuteRoute, eveningRoute: mockEveningRoute }),
+      });
     });
 
     it('leg별 FieldPath로 해당 탑승 구간 키 하나만 부분 업데이트한다', async () => {
@@ -330,6 +335,30 @@ describe('Commute Service', () => {
 
     it('uid 없으면 실패 result를 반환하고 쓰지 않는다', async () => {
       const result = await updateBoardingPreferences('', 'morning', 'gangnam|2', ['마천']);
+
+      expect(result.success).toBe(false);
+      expect(mockUpdateDoc).not.toHaveBeenCalled();
+    });
+
+    // 중첩 FieldPath 쓰기는 leg가 없어도 실패하지 않고 중간 맵을 만든다 →
+    // 필수 필드 없는 팬텀 route가 남아 설정 화면이 이를 로드하게 된다.
+    it('대상 leg가 문서에 없으면(null) 쓰지 않고 실패 result를 반환한다', async () => {
+      mockGetDoc.mockResolvedValue({
+        exists: () => true,
+        data: () => ({ morningRoute: null, eveningRoute: mockEveningRoute, eveningEnabled: true }),
+      });
+
+      const result = await updateBoardingPreferences('uid-1', 'morning', 'gangnam|2', ['마천']);
+
+      expect(result.success).toBe(false);
+      expect(result.error).toBe('해당 출퇴근 경로가 저장되어 있지 않습니다');
+      expect(mockUpdateDoc).not.toHaveBeenCalled();
+    });
+
+    it('문서 자체가 없으면 쓰지 않고 실패 result를 반환한다', async () => {
+      mockGetDoc.mockResolvedValue({ exists: () => false, data: () => undefined });
+
+      const result = await updateBoardingPreferences('uid-1', 'evening', 'jamsil|8', ['암사']);
 
       expect(result.success).toBe(false);
       expect(mockUpdateDoc).not.toHaveBeenCalled();

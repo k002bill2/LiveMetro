@@ -298,6 +298,12 @@ export const updateEveningRoute = async (
  *
  * `destinations`가 null이거나 빈 배열이면 해당 키를 {@link deleteField}로 제거한다
  * (선호 해제 = 키 삭제).
+ *
+ * 쓰기 전 leg 존재를 {@link getDoc}으로 확인한다: 대상 leg가 없는 문서(퇴근 토글만
+ * 켠 사용자·레거시 문서)에 중첩 FieldPath를 쓰면 Firestore가 실패 대신 중간 맵을
+ * 만들어 `morningRoute = { boardingPreferences }`라는 필수 필드 없는 팬텀 route가
+ * 남고, loadCommuteRoutes가 이를 truthy로 통과시킨다. 읽기 1회 추가 비용은 토글
+ * 빈도상 수용한다.
  */
 export const updateBoardingPreferences = async (
   uid: string,
@@ -312,6 +318,12 @@ export const updateBoardingPreferences = async (
   try {
     const docRef = doc(firestore, COMMUTE_COLLECTION, uid);
     const legField = leg === 'morning' ? 'morningRoute' : 'eveningRoute';
+
+    const snapshot = await getDoc(docRef);
+    if (!snapshot.data()?.[legField]) {
+      return { success: false, error: '해당 출퇴근 경로가 저장되어 있지 않습니다' };
+    }
+
     const value =
       destinations !== null && destinations.length > 0 ? destinations : deleteField();
     await updateDoc(
