@@ -142,7 +142,7 @@ describe('destinationOptions', () => {
     ]);
   });
 
-  it('이미 지나간 도착시각은 etaText null (가장 이른 도착이라 맨 앞)', () => {
+  it('미래 도착이 없는 종착역(지나간 열차뿐)은 etaText null + 맨 뒤로 밀린다', () => {
     const opts = destinationOptions(
       [
         train({ id: 'a', finalDestination: '마천', arrivalTime: new Date(NOW - 10_000) }),
@@ -152,8 +152,24 @@ describe('destinationOptions', () => {
       NOW
     );
     expect(opts).toEqual([
-      { name: '마천', etaText: null },
       { name: '하남검단산', etaText: '2분' },
+      { name: '마천', etaText: null },
+    ]);
+  });
+
+  it('같은 종착역에 과거+미래 열차 공존 → 미래 열차가 대표하고 순서도 밀리지 않는다', () => {
+    const opts = destinationOptions(
+      [
+        train({ id: 'past', finalDestination: '마천', arrivalTime: new Date(NOW - 10_000) }),
+        train({ id: 'future', finalDestination: '마천', arrivalTime: new Date(NOW + 120_000) }),
+        train({ id: 'h', finalDestination: '하남검단산', arrivalTime: new Date(NOW + 300_000) }),
+      ],
+      [],
+      NOW
+    );
+    expect(opts).toEqual([
+      { name: '마천', etaText: '2분' },
+      { name: '하남검단산', etaText: '5분' },
     ]);
   });
 });

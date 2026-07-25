@@ -65,7 +65,7 @@ const etaTextOf = (train: Train, nowMs: number): string | null => {
 };
 
 /**
- * 시트 옵션 목록 — display의 distinct 종착역(최초 도착 순) ∪ 저장돼 있으나 현재
+ * 시트 옵션 목록 — display의 distinct 종착역(미래 최초 도착 순) ∪ 저장돼 있으나 현재
  * 도착 창에 없는 선호(etaText null, 뒤에 배치 — 체크 해제 가능해야 하므로 노출 유지).
  */
 export const destinationOptions = (
@@ -75,10 +75,15 @@ export const destinationOptions = (
 ): readonly DestinationOption[] => {
   const byName = new Map<string, { readonly ms: number; readonly etaText: string | null }>();
   for (const t of display) {
-    const ms = t.arrivalTime?.getTime() ?? Number.MAX_SAFE_INTEGER;
+    const arrivalMs = t.arrivalTime?.getTime() ?? null;
+    // 대표 열차 선택은 "미래 도착"만 값으로 친다. arrivalTime은 fetch 시점 barvlDt 파생값이라
+    // 폴링 30초 · 표시 1Hz 사이에 ETA만 과거로 흘러간 스테일 열차가 스냅샷에 남는다. 그 열차가
+    // 최솟값을 이기면 2분 뒤 같은 종착역 열차가 있는데도 "ETA 없음"으로 맨 앞에 뜬다.
+    const effectiveMs =
+      arrivalMs === null || arrivalMs < nowMs ? Number.MAX_SAFE_INTEGER : arrivalMs;
     const existing = byName.get(t.finalDestination);
-    if (existing === undefined || ms < existing.ms) {
-      byName.set(t.finalDestination, { ms, etaText: etaTextOf(t, nowMs) });
+    if (existing === undefined || effectiveMs < existing.ms) {
+      byName.set(t.finalDestination, { ms: effectiveMs, etaText: etaTextOf(t, nowMs) });
     }
   }
   const present = [...byName.entries()]
