@@ -28,7 +28,8 @@ import {
   type DepartedTrainEntry,
 } from '@/services/guidance/departedTrainLog';
 import { recordDetectionEpisode } from '@/services/guidance/guidanceDetectionMetrics';
-import { Platform } from 'react-native';
+import { updateBoardingPreferences } from '@/services/commute/commuteService';
+import { Platform, StyleSheet, type StyleProp, type TextStyle } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { createRoute, type RouteSegment } from '@/models/route';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
@@ -112,6 +113,13 @@ jest.mock('@/services/guidance/guidanceDetectionMetrics', () => ({
   recordDetectionEpisode: jest.fn(() => Promise.resolve()),
 }));
 
+// 종점행 선호 write-back(출퇴근 세션)의 원격 저장 경계 — commuteService는 Firebase를
+// 끌어오므로 모듈 경계에서 mock하고 호출 페이로드만 검증한다.
+jest.mock('@/services/commute/commuteService', () => ({
+  updateBoardingPreferences: jest.fn(() => Promise.resolve({ success: true })),
+  loadCommuteRoutes: jest.fn(() => Promise.resolve(null)),
+}));
+
 jest.mock('lucide-react-native', () => ({
   Check: 'Check',
   ChevronDown: 'ChevronDown',
@@ -130,12 +138,17 @@ jest.mock('@/components/design/LineBadge', () => ({
   LineBadge: () => null,
 }));
 
+// '5'는 분기 노선(마천·하남검단산) 픽스처용 — 기존 '2' 항목은 그대로 두어 기존
+// 케이스의 방면 도출(산곡)이 바뀌지 않는다.
 jest.mock('@/utils/subwayMapData', () => ({
-  LINE_STATIONS: { '2': [['s1', 's2', 's3']] },
+  LINE_STATIONS: { '2': [['s1', 's2', 's3']], '5': [['p1', 'p2', 'p3']] },
   STATIONS: {
     s1: { name: '을지로3가' },
     s2: { name: '시청' },
     s3: { name: '산곡' },
+    p1: { name: '광화문' },
+    p2: { name: '강동' },
+    p3: { name: '하남검단산' },
   },
 }));
 
@@ -243,6 +256,41 @@ const seedExtendedTransferSession = (): void => {
   });
 };
 
+/** A train on an arbitrary line, for the 5호선 분기(마천·하남검단산) 픽스처. */
+const trainOnLine = (
+  id: string,
+  etaSec: number,
+  finalDestination: string,
+  lineId: string,
+  direction: 'up' | 'down' = 'up'
+) => ({
+  id,
+  lineId,
+  direction,
+  arrivalTime: new Date(T0 + etaSec * 1000),
+  finalDestination,
+});
+
+/** 광화문에서 5호선 탑승(방면=하남검단산) → 강동 하차. boardingKey = 'p1|5'. */
+const seedBranchSession = (extra?: {
+  readonly destinationPreferences?: Readonly<Record<string, readonly string[]>>;
+  readonly sourceCommuteType?: 'morning' | 'evening';
+}): void => {
+  setGuidanceSession({
+    route: createRoute([lineHop('p1', '광화문', 'p2', '강동', '5', 4)]),
+    fromStationName: '광화문',
+    toStationName: '강동',
+    startedAt: T0,
+    ...extra,
+  });
+};
+
+/** 분기 노선 도착 스냅샷: 마천행 2분(선호 밖) + 하남검단산행 5분(방면 일치). */
+const branchTrains = (): readonly ReturnType<typeof trainOnLine>[] => [
+  trainOnLine('MC', 120, '마천', '5'),
+  trainOnLine('HN', 300, '하남검단산', '5'),
+];
+
 /** Board on an EXTENDED line absent from the map mock → step.direction is null. */
 const seedExtendedBoardSession = (): void => {
   setGuidanceSession({
@@ -264,6 +312,7 @@ describe('RouteGuidanceScreen', () => {
     (cancelAlightAlert as jest.Mock).mockClear();
     (completeGuidanceCommuteLog as jest.Mock).mockClear();
     (recordDetectionEpisode as jest.Mock).mockClear();
+    (updateBoardingPreferences as jest.Mock).mockClear();
     // Default: bg-permission nudge hidden — wiring tests override per case.
     (useGuidanceBackgroundPermissionPrompt as jest.Mock).mockReturnValue({
       status: 'hidden',
@@ -504,8 +553,9 @@ describe('RouteGuidanceScreen', () => {
       error: null,
     });
     const { getByText } = render(<RouteGuidanceScreen />);
-    // 칩은 진행 방향 열차(90초) 기준 — 반대 방향(60초)이 아님
-    expect(getByText('다음 열차 1분 30초 후 도착')).toBeTruthy();
+    // 칩은 진행 방향 열차(90초) 기준 — 반대 방향(60초)이 아님. 종점행을 알면 칩이
+    // 그 열차를 "OO행"으로 지칭한다(종점행 필터 도입).
+    expect(getByText('산곡행 1분 30초 후 도착')).toBeTruthy();
     // trainId를 넘기지 않으므로 방향 판별은 finalDestination으로 확인한다
     // (진행 방향 T1='산곡' vs 반대 방향 OPP='을지로3가').
     expect(scheduleBoardingAlert).toHaveBeenCalledWith(
@@ -526,7 +576,7 @@ describe('RouteGuidanceScreen', () => {
       error: null,
     });
     const { getByText } = render(<RouteGuidanceScreen />);
-    expect(getByText('다음 열차 1분 00초 후 도착')).toBeTruthy();
+    expect(getByText('시청행 1분 00초 후 도착')).toBeTruthy();
     expect(scheduleBoardingAlert).toHaveBeenCalledWith(
       expect.objectContaining({ finalDestination: '시청' })
     );
@@ -1335,6 +1385,149 @@ describe('RouteGuidanceScreen', () => {
       expect(recordDetectionEpisode).toHaveBeenCalledWith(
         expect.objectContaining({ resolution: 'manual', waitedSec: 300 })
       );
+    });
+  });
+
+  describe('종점행 선호 (destination preference)', () => {
+    /** 나열 한 줄의 최종 색 — isMatch(강조/흐림) 배선을 스타일 비교로 검증한다. */
+    const textColorOf = (style: unknown): unknown =>
+      (StyleSheet.flatten(style as StyleProp<TextStyle>) as TextStyle | undefined)?.color;
+
+    it('종점행 선호가 있으면 칩 카운트다운이 선호 열차 기준이고 보조 나열은 전체를 보여준다', () => {
+      seedBranchSession({ destinationPreferences: { 'p1|5': ['하남검단산'] } });
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: branchTrains(),
+        loading: false,
+        error: null,
+      });
+      const { getByTestId, getByText } = render(<RouteGuidanceScreen />);
+      // 칩 = 선호(하남검단산, 5분) 기준 — 더 먼저 오는 마천(2분)이 아니다.
+      expect(getByTestId('guidance-live-chip')).toHaveTextContent('하남검단산행 5분 00초 후 도착');
+      // 보조 나열은 선호와 무관하게 진행 방향 전체(마천 포함)를 도착 순으로 보여준다.
+      const preview = getByTestId('guidance-wait-preview');
+      // 한 줄에 라벨("다음")+항목들이 모이므로 부분 일치(정규식) 관용구 — 문자열 매처는 exact.
+      expect(preview).toHaveTextContent(/마천행 2분/);
+      expect(preview).toHaveTextContent(/하남검단산행 5분/);
+      // 선호 밖(마천)은 흐림 처리 — isMatch=false가 화면에서 실제로 전달됐다는 증거.
+      expect(textColorOf(getByText('마천행 2분').props.style)).not.toBe(
+        textColorOf(getByText('하남검단산행 5분').props.style)
+      );
+      expect(getByTestId('guidance-destination-badge')).toHaveTextContent('하남검단산행만');
+      // 알림도 선호 열차 기준.
+      expect(scheduleBoardingAlert).toHaveBeenCalledWith(
+        expect.objectContaining({ finalDestination: '하남검단산' })
+      );
+    });
+
+    it('선호 매칭 열차가 없으면 "선택한 종점행 열차가 없어요"를 칩에 표시한다', () => {
+      // 저장된 선호(강동)가 현재 도착 리스트(마천·하남검단산)에 없는 상태.
+      seedBranchSession({ destinationPreferences: { 'p1|5': ['강동'] } });
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: branchTrains(),
+        loading: false,
+        error: null,
+      });
+      const { getByTestId } = render(<RouteGuidanceScreen />);
+      expect(getByTestId('guidance-live-chip')).toHaveTextContent('선택한 종점행 열차가 없어요');
+      // 나열은 여전히 실제 도착 열차를 보여준다 (정보 은폐 금지).
+      const preview = getByTestId('guidance-wait-preview');
+      // 한 줄에 라벨("다음")+항목들이 모이므로 부분 일치(정규식) 관용구 — 문자열 매처는 exact.
+      expect(preview).toHaveTextContent(/마천행 2분/);
+      expect(preview).toHaveTextContent(/하남검단산행 5분/);
+      // 선호 밖 열차로는 탑승 알림을 발사하지 않는다.
+      expect(scheduleBoardingAlert).not.toHaveBeenCalled();
+    });
+
+    it('시트에서 토글하면 세션 선호가 갱신되고 출퇴근 세션이면 updateBoardingPreferences가 호출된다', () => {
+      seedBranchSession({ sourceCommuteType: 'morning' });
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: branchTrains(),
+        loading: false,
+        error: null,
+      });
+      const { getByTestId, queryByTestId, rerender } = render(<RouteGuidanceScreen />);
+      // 선호 없음 → 칩은 기존 방면 매칭(하남검단산) 최선두.
+      expect(getByTestId('guidance-live-chip')).toHaveTextContent('하남검단산행 5분 00초 후 도착');
+      expect(queryByTestId('destination-filter-sheet')).toBeNull();
+
+      fireEvent.press(getByTestId('guidance-open-destination-filter'));
+      expect(getByTestId('destination-filter-sheet')).toBeTruthy();
+      fireEvent.press(getByTestId('destination-option-마천'));
+
+      expect(getGuidanceSession()?.destinationPreferences).toEqual({ 'p1|5': ['마천'] });
+      expect(updateBoardingPreferences).toHaveBeenCalledWith('user-1', 'morning', {
+        'p1|5': ['마천'],
+      });
+      // 세션 사본이 실제로 화면 추적에 반영되는지 (mocked 훅은 비반응형이라 명시 rerender).
+      act(() => {
+        rerender(<RouteGuidanceScreen />);
+      });
+      expect(getByTestId('guidance-live-chip')).toHaveTextContent('마천행 2분 00초 후 도착');
+      expect(getByTestId('guidance-destination-badge')).toHaveTextContent('마천행만');
+    });
+
+    it('일반 검색 세션(sourceCommuteType 없음)은 시트 토글해도 원격 저장하지 않는다', () => {
+      seedBranchSession();
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: branchTrains(),
+        loading: false,
+        error: null,
+      });
+      const { getByTestId } = render(<RouteGuidanceScreen />);
+      fireEvent.press(getByTestId('guidance-open-destination-filter'));
+      fireEvent.press(getByTestId('destination-option-마천'));
+      // 세션 한정 적용 — 원본(CommuteRoute)에는 쓰지 않는다.
+      expect(getGuidanceSession()?.destinationPreferences).toEqual({ 'p1|5': ['마천'] });
+      expect(updateBoardingPreferences).not.toHaveBeenCalled();
+    });
+
+    it('종점행 선택 시트가 열려 있는 동안에는 soft-confirm 자동 진행을 걸지 않는다', () => {
+      // 열차 선택 시트와 같은 원칙 — 시트 뒤에서 여정이 자동 진행되면 시트가 강제로
+      // 닫히고 사용자가 고르던 선택이 사라진다.
+      seedSession();
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: [trainOf('T1', 10)],
+        loading: false,
+        error: null,
+      });
+      const { getByTestId, getByText, queryByTestId, rerender } = render(<RouteGuidanceScreen />);
+      fireEvent.press(getByTestId('guidance-open-destination-filter'));
+      expect(getByTestId('destination-filter-sheet')).toBeTruthy();
+      // 시트가 열린 동안 T1이 출발한 스냅샷이 도착.
+      mockedUseRealtimeTrains.mockReturnValue({ trains: [], loading: false, error: null });
+      act(() => {
+        rerender(<RouteGuidanceScreen />);
+      });
+      expect(queryByTestId('guidance-soft-confirm')).toBeNull();
+      // 유예 창을 지나도 자동 진행 없음 — 여전히 탑승 대기, 시트도 열린 채.
+      act(() => {
+        jest.advanceTimersByTime(5000);
+      });
+      expect(getByText('탑승 대기')).toBeTruthy();
+      expect(getByTestId('destination-filter-sheet')).toBeTruthy();
+      // 출발 기록은 계속 쌓인다 (감지 억제 ≠ 로깅 중단).
+      fireEvent.press(getByTestId('guidance-open-train-select'));
+      expect(getByTestId('train-select-item-T1')).toBeTruthy();
+    });
+
+    it('선호 없음이면 기존 방면 필터 동작 그대로다 (칩=방면 매칭 최선두)', () => {
+      seedSession(); // 2호선 을지로3가→시청, 방면 = 산곡
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: [
+          trainOf('OPP', 60, '을지로3가'), // 반대 방면 — 더 먼저 도착
+          trainOf('T1', 90, '산곡'), // 진행 방면
+        ],
+        loading: false,
+        error: null,
+      });
+      const { getByTestId, queryByTestId } = render(<RouteGuidanceScreen />);
+      // 칩·알림은 기존과 동일하게 방면 매칭 열차(90초) 기준.
+      expect(getByTestId('guidance-live-chip')).toHaveTextContent('산곡행 1분 30초 후 도착');
+      expect(scheduleBoardingAlert).toHaveBeenCalledWith(
+        expect.objectContaining({ finalDestination: '산곡' })
+      );
+      // 필터 미선택 → 뱃지 없음.
+      expect(queryByTestId('guidance-destination-badge')).toBeNull();
     });
   });
 });
