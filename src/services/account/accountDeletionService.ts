@@ -27,6 +27,15 @@ export interface AccountDeletionResult {
 
 const GENERIC_ERROR = '계정 삭제에 실패했습니다. 잠시 후 다시 시도해 주세요.';
 
+/**
+ * 서버 `deleteAccount` 함수의 `timeoutSeconds: 300`(functions/src/index.ts)과
+ * 반드시 일치시킨다. firebase/functions의 callable 기본 timeout은 70초라
+ * 클라이언트가 서버보다 먼저 끊기면, 서버는 끝까지 완주해 계정을 삭제하는데
+ * 클라이언트는 실패로 보고해 로컬 개인정보(purgeLocalUserData)를 건너뛰는
+ * 되돌릴 수 없는 불일치가 생긴다.
+ */
+const CALLABLE_TIMEOUT_MS = 300000;
+
 /** 진단 로그는 개발 빌드에서만 (error-handling: console.error는 개발 중만). */
 const logFailure = (message: string, error?: unknown): void => {
   if (!__DEV__) return;
@@ -65,6 +74,7 @@ export const deleteAccountAndPurgeLocalData =
       const callable = httpsCallable<void, DeleteAccountResponse>(
         functions,
         'deleteAccount',
+        { timeout: CALLABLE_TIMEOUT_MS },
       );
       await callable();
     } catch (error) {

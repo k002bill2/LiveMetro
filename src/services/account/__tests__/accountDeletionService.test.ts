@@ -48,8 +48,19 @@ describe('deleteAccountAndPurgeLocalData', () => {
   it('deleteAccount callable을 인자 없이 호출한다 (uid 인자 미전달)', async () => {
     await deleteAccountAndPurgeLocalData();
 
-    expect(mockHttpsCallable).toHaveBeenCalledWith({}, 'deleteAccount');
+    expect(mockHttpsCallable).toHaveBeenCalledWith(
+      {},
+      'deleteAccount',
+      { timeout: 300000 },
+    );
     expect(mockCallable).toHaveBeenCalledWith();
+  });
+
+  it('서버 timeoutSeconds(300초)와 일치하는 timeout 옵션을 전달한다', async () => {
+    await deleteAccountAndPurgeLocalData();
+
+    const [, , options] = mockHttpsCallable.mock.calls[0];
+    expect(options).toEqual({ timeout: 300000 });
   });
 
   it('서버 파기 성공 시 로컬 데이터를 파기하고 성공을 반환한다', async () => {
