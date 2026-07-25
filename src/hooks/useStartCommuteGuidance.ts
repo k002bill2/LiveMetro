@@ -13,8 +13,10 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { selectCommuteRoute } from '@services/route/selectCommuteRoute';
 import { setGuidanceSession } from '@services/guidance/guidanceSessionStore';
+import { attachDestinationPreferences } from '@services/guidance/destinationPreferenceSync';
 import { notificationService } from '@services/notification/notificationService';
 import type { AppStackParamList } from '@/navigation/types';
+import type { CommuteType } from '@/models/commute';
 
 interface StartCommuteGuidanceArgs {
   fromStationId?: string;
@@ -22,6 +24,10 @@ interface StartCommuteGuidanceArgs {
   viaTransferId?: string;
   fromStationName?: string;
   toStationName?: string;
+  /** 이 진입의 출처 출퇴근 leg. 부재 = 일반 경로 세션 (선호는 세션 한정). */
+  commuteType?: CommuteType;
+  /** 저장된 leg 선호를 읽어올 사용자. 부재(비로그인)면 attach를 건너뛴다. */
+  uid?: string;
 }
 
 type NavigationProp = NativeStackNavigationProp<AppStackParamList>;
@@ -30,7 +36,15 @@ export function useStartCommuteGuidance(
   args: StartCommuteGuidanceArgs,
 ): (() => void) | null {
   const navigation = useNavigation<NavigationProp>();
-  const { fromStationId, toStationId, viaTransferId, fromStationName, toStationName } = args;
+  const {
+    fromStationId,
+    toStationId,
+    viaTransferId,
+    fromStationName,
+    toStationName,
+    commuteType,
+    uid,
+  } = args;
 
   const route = useMemo(
     () => selectCommuteRoute(fromStationId, toStationId, viaTransferId),
@@ -39,17 +53,24 @@ export function useStartCommuteGuidance(
 
   const handler = useCallback(() => {
     if (!route || !fromStationName || !toStationName) return;
+    const startedAt = Date.now();
     setGuidanceSession({
       route,
       fromStationName,
       toStationName,
-      startedAt: Date.now(),
+      startedAt,
+      // sourceCommuteType은 동기 기록 — attach(원격 읽기)가 실패해도 시트에서 고른
+      // 선호를 leg에 write-back할 수 있어야 한다.
+      ...(commuteType !== undefined && { sourceCommuteType: commuteType }),
     });
+    if (commuteType !== undefined && uid !== undefined) {
+      void attachDestinationPreferences(uid, commuteType, startedAt);
+    }
     // 이미 이동을 시작했으므로 오늘 예약된 ML "출발 알림"은 발사 전에 제거
     // (fire-and-forget — 실패해도 길안내 시작을 막지 않는다).
     void notificationService.cancelScheduledMlDepartureAlerts();
     navigation.navigate('RouteGuidance');
-  }, [route, fromStationName, toStationName, navigation]);
+  }, [route, fromStationName, toStationName, commuteType, uid, navigation]);
 
   if (!route || !fromStationName || !toStationName) return null;
   return handler;
