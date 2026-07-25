@@ -42,7 +42,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { useTheme } from '@/services/theme/themeContext';
 import { OnbHeader } from '@/components/onboarding/OnbHeader';
-import { useOnboardingCallbacks } from '@/navigation/OnboardingNavigator';
+import { useOnboardingCallbacks } from '@/navigation/onboardingCallbacks';
 import { OnboardingStackParamList } from '@/navigation/types';
 import { notificationService } from '@/services/notification/notificationService';
 import { CommuteNotifications, DEFAULT_COMMUTE_NOTIFICATIONS } from '@/models/commute';

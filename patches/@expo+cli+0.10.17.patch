@@ -1,0 +1,13 @@
+diff --git a/node_modules/@expo/cli/build/src/export/exportAssets.js b/node_modules/@expo/cli/build/src/export/exportAssets.js
+index 1776740..2f1768a 100644
+--- a/node_modules/@expo/cli/build/src/export/exportAssets.js
++++ b/node_modules/@expo/cli/build/src/export/exportAssets.js
+@@ -79,7 +79,7 @@ function logPatterns(patterns) {
+ function shouldBundleAsset(asset, patterns) {
+     var ref;
+     const file = (ref = asset.files) == null ? void 0 : ref[0];
+-    return !!("__packager_asset" in asset && asset.__packager_asset && file && patterns.some((pattern)=>(0, _minimatch).default(file, pattern)
++    return !!("__packager_asset" in asset && asset.__packager_asset && file && patterns.some((pattern)=>((_minimatch).default||(_minimatch).minimatch)(file, pattern)
+     ));
+ }
+ async function exportAssetsAsync(projectRoot, { exp , outputDir , bundles  }) {

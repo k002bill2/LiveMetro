@@ -28,7 +28,7 @@ jest.mock('@/services/auth/AuthContext', () => ({
   useAuth: jest.fn(() => ({ user: { id: 'uid-1' } })),
 }));
 
-jest.mock('@/navigation/OnboardingNavigator', () => ({
+jest.mock('@/navigation/onboardingCallbacks', () => ({
   useOnboardingCallbacks: jest.fn(() => ({
     onComplete: mockOnComplete,
     onSkip: mockOnSkip,

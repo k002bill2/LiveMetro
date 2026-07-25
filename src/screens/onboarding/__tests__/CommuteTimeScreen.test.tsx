@@ -19,7 +19,7 @@ jest.mock('lucide-react-native', () => ({
   ChevronLeft: 'ChevronLeft',
 }));
 
-jest.mock('@/navigation/OnboardingNavigator', () => ({
+jest.mock('@/navigation/onboardingCallbacks', () => ({
   useOnboardingCallbacks: jest.fn(() => ({
     onComplete: jest.fn(),
     onSkip: mockOnSkip,

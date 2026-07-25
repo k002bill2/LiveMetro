@@ -62,7 +62,7 @@ import {
   type TransferRouteOptionData,
 } from '@/components/onboarding/TransferRouteOption';
 import { LineBadge } from '@/components/design/LineBadge';
-import { useOnboardingCallbacksOptional } from '@/navigation/OnboardingNavigator';
+import { useOnboardingCallbacksOptional } from '@/navigation/onboardingCallbacks';
 import { OnboardingStackParamList, SettingsStackParamList } from '@/navigation/types';
 import {
   StationSelection,
