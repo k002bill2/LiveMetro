@@ -363,6 +363,75 @@ describe('Commute Service', () => {
       expect(result.success).toBe(false);
       expect(mockUpdateDoc).not.toHaveBeenCalled();
     });
+
+    it('같은 키 연속 호출은 직렬 실행된다 (getDoc→updateDoc 인터리브 금지)', async () => {
+      // 시트에서 같은 옵션을 빠르게 두 번 탭하면 두 호출의 존재 게이트(getDoc)와
+      // 쓰기(updateDoc)가 겹쳐, 나중 의도가 먼저 착지하는 역전이 가능하다.
+      const order: string[] = [];
+      let releaseFirstGetDoc: (() => void) | null = null;
+      const snapshot = {
+        exists: () => true,
+        data: () => ({ morningRoute: mockCommuteRoute, eveningRoute: mockEveningRoute }),
+      };
+      // ...Once 큐 누출을 피해 호출 횟수로 분기한다 (레포 관례).
+      mockGetDoc.mockImplementation(() => {
+        order.push('getDoc');
+        if (releaseFirstGetDoc === null) {
+          return new Promise(resolve => {
+            releaseFirstGetDoc = () => resolve(snapshot);
+          });
+        }
+        return Promise.resolve(snapshot);
+      });
+      mockUpdateDoc.mockImplementation(() => {
+        order.push('updateDoc');
+        return Promise.resolve(undefined);
+      });
+
+      const first = updateBoardingPreferences('uid-1', 'morning', 'gangnam|2', ['마천']);
+      const second = updateBoardingPreferences('uid-1', 'morning', 'gangnam|2', null);
+      // 1번째가 getDoc에서 멈춰 있는 동안 2번째는 아직 읽지도 못한다.
+      await Promise.resolve();
+      expect(order).toEqual(['getDoc']);
+
+      (releaseFirstGetDoc as unknown as () => void)();
+      await Promise.all([first, second]);
+      // 완전 직렬 — 1번째 updateDoc이 끝난 뒤에야 2번째 getDoc이 시작한다.
+      expect(order).toEqual(['getDoc', 'updateDoc', 'getDoc', 'updateDoc']);
+      // 마지막 의도(해제=deleteField)가 마지막에 착지한다.
+      expect(mockUpdateDoc).toHaveBeenLastCalledWith(
+        'mockDocRef',
+        { _type: 'fieldPath', segments: ['morningRoute', 'boardingPreferences', 'gangnam|2'] },
+        { _type: 'deleteField' },
+        'updatedAt',
+        { _type: 'serverTimestamp' }
+      );
+    });
+
+    it('다른 키의 호출은 서로 대기하지 않는다 (키별 큐)', async () => {
+      let releaseFirst: (() => void) | null = null;
+      const snapshot = {
+        exists: () => true,
+        data: () => ({ morningRoute: mockCommuteRoute, eveningRoute: mockEveningRoute }),
+      };
+      mockGetDoc.mockImplementation(() => {
+        if (releaseFirst === null) {
+          return new Promise(resolve => {
+            releaseFirst = () => resolve(snapshot);
+          });
+        }
+        return Promise.resolve(snapshot);
+      });
+      mockUpdateDoc.mockResolvedValue(undefined);
+
+      const blocked = updateBoardingPreferences('uid-1', 'morning', 'gangnam|2', ['마천']);
+      // 다른 구간 키 — 앞 호출이 멈춰 있어도 독립적으로 완주한다.
+      const other = await updateBoardingPreferences('uid-1', 'morning', 'jamsil|8', ['암사']);
+      expect(other.success).toBe(true);
+
+      (releaseFirst as unknown as () => void)();
+      await blocked;
+    });
   });
 
   describe('저장 경로의 boardingPreferences 보존', () => {

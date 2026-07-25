@@ -304,17 +304,22 @@ export const updateEveningRoute = async (
  * 만들어 `morningRoute = { boardingPreferences }`라는 필수 필드 없는 팬텀 route가
  * 남고, loadCommuteRoutes가 이를 truthy로 통과시킨다. 읽기 1회 추가 비용은 토글
  * 빈도상 수용한다.
+ *
+ * 호출은 **키 단위 직렬화 큐**를 거친다 — 같은 옵션을 빠르게 두 번 탭하면 두 호출의
+ * `getDoc`(존재 게이트) → `updateDoc`이 인터리브해 나중 의도가 먼저 착지하는 역전이
+ * 가능하다(선택 해제가 선택보다 먼저 커밋되는 등). 키(`uid|leg|boardingKey`)별 큐라
+ * 다른 구간·다른 leg의 토글은 서로 대기하지 않는다. 문법은 boardingAlertService·
+ * alightAlertService의 직렬화 큐 패턴 그대로.
  */
-export const updateBoardingPreferences = async (
+const boardingPreferenceQueues = new Map<string, Promise<unknown>>();
+
+/** {@link updateBoardingPreferences}의 실제 본문 — 직렬화 큐 안에서만 실행된다. */
+const updateBoardingPreferencesInner = async (
   uid: string,
   leg: CommuteType,
   boardingKey: string,
   destinations: readonly string[] | null
 ): Promise<SaveCommuteResult> => {
-  if (!uid) {
-    return { success: false, error: '사용자 인증이 필요합니다' };
-  }
-
   try {
     const docRef = doc(firestore, COMMUTE_COLLECTION, uid);
     const legField = leg === 'morning' ? 'morningRoute' : 'eveningRoute';
@@ -340,6 +345,35 @@ export const updateBoardingPreferences = async (
       success: false,
       error: error instanceof Error ? error.message : '저장 중 오류가 발생했습니다',
     };
+  }
+};
+
+export const updateBoardingPreferences = async (
+  uid: string,
+  leg: CommuteType,
+  boardingKey: string,
+  destinations: readonly string[] | null
+): Promise<SaveCommuteResult> => {
+  if (!uid) {
+    return { success: false, error: '사용자 인증이 필요합니다' };
+  }
+
+  const queueKey = `${uid}|${leg}|${boardingKey}`;
+  const exec = (): Promise<SaveCommuteResult> =>
+    updateBoardingPreferencesInner(uid, leg, boardingKey, destinations);
+  const prev = boardingPreferenceQueues.get(queueKey) ?? Promise.resolve();
+  // 앞선 실행이 어떻게 끝나든(성공/거부) 다음 주자를 이어 붙인다 — 한 번의 실패가
+  // 그 키의 큐를 영구히 멈추지 않게.
+  const run = prev.then(exec, exec);
+  boardingPreferenceQueues.set(queueKey, run);
+  try {
+    return await run;
+  } finally {
+    // 마지막 주자만 정리한다 — 대기 중인 후속이 이미 큐를 이어받았다면 그 소유를
+    // 빼앗지 않는다(그랬다간 후속과 그 다음 호출이 병렬로 달린다).
+    if (boardingPreferenceQueues.get(queueKey) === run) {
+      boardingPreferenceQueues.delete(queueKey);
+    }
   }
 };
 
