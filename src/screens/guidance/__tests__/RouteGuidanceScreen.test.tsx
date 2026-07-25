@@ -276,6 +276,8 @@ const seedBranchSession = (extra?: {
   readonly destinationPreferences?: Readonly<Record<string, readonly string[]>>;
   readonly sourceCommuteType?: 'morning' | 'evening';
   readonly ownerUid?: string;
+  /** attach의 경로 지문 확인 결과 — write-back 게이트의 세 번째 조건. */
+  readonly sourceRouteVerified?: true;
 }): void => {
   setGuidanceSession({
     route: createRoute([lineHop('p1', '광화문', 'p2', '강동', '5', 4)]),
@@ -1480,7 +1482,13 @@ describe('RouteGuidanceScreen', () => {
     });
 
     it('시트에서 토글하면 세션 선호가 갱신되고 출퇴근 세션이면 updateBoardingPreferences가 호출된다', () => {
-      seedBranchSession({ sourceCommuteType: 'morning', ownerUid: 'user-1' });
+      // sourceRouteVerified = attach가 "세션 경로 = 저장된 leg 경로"를 확인한 상태
+      // (write-back 게이트의 세 번째 조건).
+      seedBranchSession({
+        sourceCommuteType: 'morning',
+        ownerUid: 'user-1',
+        sourceRouteVerified: true,
+      });
       mockedUseRealtimeTrains.mockReturnValue({
         trains: branchTrains(),
         loading: false,
@@ -1515,6 +1523,7 @@ describe('RouteGuidanceScreen', () => {
       seedBranchSession({
         sourceCommuteType: 'morning',
         ownerUid: 'user-1',
+        sourceRouteVerified: true,
         destinationPreferences: { 's9|8': ['암사'] },
       });
       mockedUseRealtimeTrains.mockReturnValue({
@@ -1575,6 +1584,24 @@ describe('RouteGuidanceScreen', () => {
       fireEvent.press(getByTestId('destination-option-마천'));
       expect(updateBoardingPreferences).not.toHaveBeenCalled();
       // 필터 자체는 살아 있다 — 원격 쓰기만 막고 세션 한정으로 강등(기능 무력화 아님).
+      expect(getGuidanceSession()?.destinationPreferences).toEqual({ 'p1|5': ['마천'] });
+    });
+
+    it('경로 지문 미확인 세션(sourceRouteVerified 부재)은 원격 저장하지 않는다', () => {
+      // 세션 OD가 저장된 leg 경로와 발산했거나(이중 SSOT) attach의 원격 읽기가
+      // 실패해 확인 자체가 없던 상태 — 무관한 경로에 선호를 영속하느니 세션 한정으로
+      // 강등한다(fail-closed).
+      seedBranchSession({ sourceCommuteType: 'morning', ownerUid: 'user-1' });
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: branchTrains(),
+        loading: false,
+        error: null,
+      });
+      const { getByTestId } = render(<RouteGuidanceScreen />);
+      fireEvent.press(getByTestId('guidance-open-destination-filter'));
+      fireEvent.press(getByTestId('destination-option-마천'));
+      expect(updateBoardingPreferences).not.toHaveBeenCalled();
+      // 필터는 이 세션에 그대로 적용된다 — 원격 쓰기만 막는다.
       expect(getGuidanceSession()?.destinationPreferences).toEqual({ 'p1|5': ['마천'] });
     });
 

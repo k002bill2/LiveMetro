@@ -59,8 +59,9 @@ export function useStartCommuteGuidance(
       fromStationName,
       toStationName,
       startedAt,
-      // sourceCommuteType은 동기 기록 — attach(원격 읽기)가 실패해도 시트에서 고른
-      // 선호를 leg에 write-back할 수 있어야 한다.
+      // sourceCommuteType은 동기 기록 — write-back 대상 leg를 attach 성패와 무관하게
+      // 확정해 둔다. 실제 write-back은 attach가 경로 지문을 확인해야(sourceRouteVerified)
+      // 열리므로, 원격 읽기가 실패하면 선호는 세션 한정으로 강등된다(fail-closed).
       ...(commuteType !== undefined && { sourceCommuteType: commuteType }),
       // 소유 귀속 — 영속 세션이 로그아웃/계정 전환을 넘겨 살아남아도 남의 선호가
       // 새 계정의 commuteSettings에 기록되지 않게 한다.
