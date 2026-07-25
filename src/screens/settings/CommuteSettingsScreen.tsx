@@ -72,6 +72,10 @@ interface CommuteRouteData {
   // when the loaded route predates these fields — handle with ?? at use.
   notifications?: CommuteRoute['notifications'];
   bufferMinutes?: number;
+  // 이 화면은 종점행 선호를 편집하지 않지만, 시각 변경 저장이 두 leg를 이
+  // UI 형상에서 재구성해 넘기므로 여기서 실어 나르지 않으면 저장 시 증발한다.
+  // 선호가 없던 route에서는 undefined — 저장 빌더에서 조건부 spread로 처리.
+  boardingPreferences?: CommuteRoute['boardingPreferences'];
 }
 
 const DAY_LABELS: readonly string[] = ['월', '화', '수', '목', '금', '토', '일'];
@@ -489,6 +493,11 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
       })),
       notifications: DEFAULT_COMMUTE_NOTIFICATIONS,
       bufferMinutes: DEFAULT_BUFFER_MINUTES,
+      // 조건부 spread — 선호가 없던 route에 `undefined` 필드를 실어 보내면
+      // Firestore 쓰기가 거부되므로 키 자체를 만들지 않는다.
+      ...(data.boardingPreferences !== undefined && {
+        boardingPreferences: data.boardingPreferences,
+      }),
     }),
     [],
   );
@@ -687,6 +696,10 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
       // round-trip preserves them (Gemini regression fix).
       notifications: route.notifications,
       bufferMinutes: route.bufferMinutes,
+      // 편집 대상이 아닌 필드지만 저장 시 재구성되므로 로드 값을 보존한다.
+      ...(route.boardingPreferences !== undefined && {
+        boardingPreferences: route.boardingPreferences,
+      }),
     };
   };
 

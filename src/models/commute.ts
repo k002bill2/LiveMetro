@@ -236,6 +236,7 @@ export const reverseCommuteRoute = (
     };
   });
 
+  // boardingPreferences는 의도적으로 미러하지 않는다 — 반대 방향의 종점 집합은 별개다.
   return {
     departureTime,
     departureStationId: route.arrivalStationId,

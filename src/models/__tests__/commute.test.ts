@@ -99,6 +99,25 @@ describe('reverseCommuteRoute', () => {
     expect(reversed.departureTime).toBe('19:15');
   });
 
+  // Characterization pin: the reversed leg travels the opposite direction, so
+  // the forward leg's preferred terminus set (keyed by 대기 구간) is meaningless
+  // there. The field-by-field rebuild drops it — that drop is intended.
+  it('(g2) does not mirror boardingPreferences onto the reversed leg', () => {
+    const forward: CommuteRoute = {
+      ...makeRoute([]),
+      boardingPreferences: { 'D1|5': ['마천'] },
+    };
+
+    const reversed = reverseCommuteRoute(forward, DEFAULT_EVENING_DEPARTURE_TIME);
+
+    expect(reversed.boardingPreferences).toBeUndefined();
+    // `toBeUndefined` also passes for a present-but-undefined key; assert the
+    // key is absent so the reversed leg never writes an empty field.
+    expect('boardingPreferences' in reversed).toBe(false);
+    // The source leg keeps its own preferences (no mutation via the rebuild).
+    expect(forward.boardingPreferences).toEqual({ 'D1|5': ['마천'] });
+  });
+
   it('(g) does not mutate the input route (deep equal before/after)', () => {
     const forward = makeRoute([
       { stationId: 't1-id', stationName: 'T1', lineId: '1', lineName: '1호선', order: 1 },
