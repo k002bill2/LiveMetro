@@ -306,4 +306,67 @@ describe('CommuteRouteScreen (step 2/4 redesign)', () => {
       }),
     );
   });
+
+  // 경로 교체 = 종점행 선호 무효화. setDoc({merge:true})는 생략된 필드를 보존하므로
+  // 명시적으로 빈 맵을 실어야 옛 선호가 새 경로에 재부착되지 않는다(같은 역·노선인데
+  // 목적지만 바뀐 편집에서 도달 불가한 종점 선택이 살아남는 결함).
+  it('edit mode invalidates the edited leg 종점행 선호 but leaves otherLeg untouched', async () => {
+    (saveCommuteRoutes as jest.Mock).mockReset();
+    (saveCommuteRoutes as jest.Mock).mockResolvedValue({ success: true });
+
+    const editRoute = {
+      name: 'EditCommuteRoute',
+      params: {
+        kind: 'morning',
+        initial: {
+          departureTime: '08:30',
+          departureStation: {
+            stationId: 'dep-id',
+            stationName: '신길',
+            lineId: '1',
+            lineName: '1호선',
+          },
+          arrivalStation: {
+            stationId: 'arr-id',
+            stationName: '선릉',
+            lineId: '2',
+            lineName: '2호선',
+          },
+          transferStations: [],
+        },
+        otherLeg: {
+          departureTime: '18:30',
+          departureStation: {
+            stationId: 'arr-id',
+            stationName: '선릉',
+            lineId: '2',
+            lineName: '2호선',
+          },
+          arrivalStation: {
+            stationId: 'dep-id',
+            stationName: '신길',
+            lineId: '1',
+            lineName: '1호선',
+          },
+          transferStations: [],
+        },
+      },
+    };
+
+    const { getByTestId } = render(
+      <CommuteRouteScreen
+        navigation={mockNavigation as never}
+        route={editRoute as never}
+      />,
+    );
+    fireEvent.press(getByTestId('commute-next'));
+
+    await waitFor(() => expect(saveCommuteRoutes).toHaveBeenCalledTimes(1));
+    const [, morningArg, eveningArg] = (saveCommuteRoutes as jest.Mock).mock.calls[0];
+    // 편집한 leg = 교체 → 빈 맵을 명시해 원격 선호를 지운다.
+    expect(morningArg.boardingPreferences).toEqual({});
+    // 손대지 않은 leg = 필드 생략 → merge가 저장된 선호를 그대로 보존한다.
+    // (nav 파라미터 타입 OnboardingRouteData에 선호가 없어 여기서 {}를 쓰면 유실된다.)
+    expect('boardingPreferences' in eveningArg).toBe(false);
+  });
 });

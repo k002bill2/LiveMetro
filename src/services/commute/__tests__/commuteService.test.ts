@@ -458,6 +458,18 @@ describe('Commute Service', () => {
       expect('boardingPreferences' in written.eveningRoute).toBe(false);
     });
 
+    it('빈 맵({})도 그대로 실어 보낸다 — 경로 교체 시 명시적 무효화', async () => {
+      // EditCommuteRoute는 교체된 leg에 {}를 실어 옛 종점행 선호를 지운다.
+      // 조건부 spread는 `{} !== undefined`라 발화하고, prune({})는 {}를 돌려줘야
+      // 한다 — 여기서 필드가 빠지면 merge가 옛 선호를 보존해 무효화가 무산된다.
+      // (호출부 테스트는 saveCommuteRoutes를 mock하므로 이 구간을 증명하지 못한다.)
+      await saveCommuteRoutes('user-123', withPrefs(mockCommuteRoute, {}), mockEveningRoute);
+
+      const written = mockSetDoc.mock.calls[0][1];
+      expect('boardingPreferences' in written.morningRoute).toBe(true);
+      expect(written.morningRoute.boardingPreferences).toEqual({});
+    });
+
     it('updateMorningRoute / updateEveningRoute도 동일하게 보존한다', async () => {
       await updateMorningRoute('user-123', withPrefs(mockCommuteRoute, { 'gangnam|2': ['마천'] }));
       const morning = mockUpdateDoc.mock.calls[0][1].morningRoute;
