@@ -77,12 +77,32 @@ class FakeFirestore implements AdminFirestoreLike {
     matches: (path: string, data: DocData) => boolean,
     groupId: string | null,
   ): AdminQueryLike {
+    const matchesField = (
+      data: DocData,
+      field: string,
+      op: '==' | 'array-contains',
+      value: string,
+    ): boolean => {
+      if (op === 'array-contains') {
+        const current = data[field];
+        return Array.isArray(current) && current.includes(value);
+      }
+      return data[field] === value;
+    };
+
     const build = (
       predicate: (path: string, data: DocData) => boolean,
       max: number | null,
     ): AdminQueryLike => ({
-      where: (field: string, _op: '==', value: string): AdminQueryLike =>
-        build((path, data) => predicate(path, data) && data[field] === value, max),
+      where: (
+        field: string,
+        op: '==' | 'array-contains',
+        value: string,
+      ): AdminQueryLike =>
+        build(
+          (path, data) => predicate(path, data) && matchesField(data, field, op, value),
+          max,
+        ),
       limit: (count: number): AdminQueryLike => build(predicate, count),
       get: async (): Promise<AdminQuerySnapshotLike> => {
         if (groupId !== null && this.failingCollectionGroups.has(groupId)) {
@@ -131,7 +151,21 @@ class FakeFirestore implements AdminFirestoreLike {
         if (this.failingPaths.has(path)) failed = path;
         staged.push(() => {
           this.ops.push({ kind: 'update', path });
-          this.docs.set(path, { ...(this.docs.get(path) ?? {}), ...data });
+          const current = this.docs.get(path) ?? {};
+          const resolved: DocData = {};
+          // arrayRemove 센티널을 실제 배열 연산으로 해석한다(실 SDK 의미론 재현).
+          for (const [field, value] of Object.entries(data)) {
+            const sentinel = value as { __arrayRemove?: string } | null;
+            if (sentinel && typeof sentinel === 'object' && '__arrayRemove' in sentinel) {
+              const existing = current[field];
+              resolved[field] = Array.isArray(existing)
+                ? existing.filter((entry) => entry !== sentinel.__arrayRemove)
+                : existing;
+            } else {
+              resolved[field] = value;
+            }
+          }
+          this.docs.set(path, { ...current, ...resolved });
         });
         return undefined;
       },
@@ -160,6 +194,7 @@ interface Harness {
     readonly db: FakeFirestore;
     readonly auth: { deleteUser(uid: string): Promise<void> };
     readonly recursiveDeleteDocument: (path: string) => Promise<void>;
+    readonly arrayRemoveValue: (value: string) => unknown;
   };
   recursiveFailures: Set<string>;
   authError: unknown;
@@ -175,6 +210,7 @@ const makeHarness = (): Harness => {
     authError: null,
     deps: {
       db,
+      arrayRemoveValue: (value: string): unknown => ({ __arrayRemove: value }),
       auth: {
         deleteUser: async (uid: string): Promise<void> => {
           db.ops.push({ kind: 'deleteUser', path: uid });
@@ -217,7 +253,13 @@ const seedFullDataset = (db: FakeFirestore): void => {
     commentCount: 1,
     timestamp: 1700000000,
   });
-  db.seed('delayReports/r2', { userId: OTHER_UID, userDisplayName: '김철수' });
+  // 남의 제보에 내가 추천을 누른 흔적 — 작성자 익명화로는 지워지지 않는다.
+  db.seed('delayReports/r2', {
+    userId: OTHER_UID,
+    userDisplayName: '김철수',
+    upvotes: 2,
+    upvotedBy: [UID, OTHER_UID],
+  });
   db.seed('delayReports/r1/comments/c1', {
     userId: UID,
     userDisplayName: '홍**',
@@ -227,7 +269,13 @@ const seedFullDataset = (db: FakeFirestore): void => {
     likedBy: ['a', 'b', 'c'],
     replyCount: 0,
   });
-  db.seed('delayReports/r2/comments/c2', { userId: OTHER_UID, text: '남의 댓글' });
+  // 남의 댓글에 내가 좋아요를 누른 흔적.
+  db.seed('delayReports/r2/comments/c2', {
+    userId: OTHER_UID,
+    text: '남의 댓글',
+    likes: 2,
+    likedBy: [OTHER_UID, UID],
+  });
   db.seed('congestionReports/cr1', {
     reporterId: UID,
     congestionLevel: 'CROWDED',
@@ -303,11 +351,12 @@ describe('accountDeletionService', () => {
         userId: OTHER_UID,
         stationId: '0223',
       });
-      expect(h.db.docs.get('delayReports/r2')).toEqual({
+      // 남의 제보/댓글은 작성자 정보와 본문이 그대로다(반응 배열의 내 uid만 빠진다).
+      expect(h.db.docs.get('delayReports/r2')).toMatchObject({
         userId: OTHER_UID,
         userDisplayName: '김철수',
       });
-      expect(h.db.docs.get('delayReports/r2/comments/c2')).toEqual({
+      expect(h.db.docs.get('delayReports/r2/comments/c2')).toMatchObject({
         userId: OTHER_UID,
         text: '남의 댓글',
       });
@@ -351,6 +400,60 @@ describe('accountDeletionService', () => {
         likedBy: ['a', 'b', 'c'],
         replyCount: 0,
       });
+    });
+
+    // "누가 무엇에 반응했는가"는 개인 식별 데이터이고 **타인의 문서**에 남으므로
+    // 작성자 익명화로는 지워지지 않는다. 반면 카운트는 커뮤니티 집계라 보존한다.
+    it('남의 제보 upvotedBy에서 내 uid만 빼고 upvotes 카운트는 보존한다', async () => {
+      const h = makeHarness();
+      seedFullDataset(h.db);
+
+      await deleteAccountAndData(h.deps, UID);
+
+      const report = h.db.docs.get('delayReports/r2');
+      expect(report!.upvotedBy).toEqual([OTHER_UID]);
+      expect(report!.upvotes).toBe(2);
+    });
+
+    it('남의 댓글 likedBy에서 내 uid만 빼고 likes 카운트는 보존한다', async () => {
+      const h = makeHarness();
+      seedFullDataset(h.db);
+
+      await deleteAccountAndData(h.deps, UID);
+
+      const comment = h.db.docs.get('delayReports/r2/comments/c2');
+      expect(comment!.likedBy).toEqual([OTHER_UID]);
+      expect(comment!.likes).toBe(2);
+    });
+
+    it('내 제보의 반응 배열에 남은 타인 uid는 보존한다', async () => {
+      const h = makeHarness();
+      seedFullDataset(h.db);
+
+      await deleteAccountAndData(h.deps, UID);
+
+      // r1은 내가 쓴 제보 — upvotedBy에 내 uid는 없고 타인 것만 있다.
+      expect(h.db.docs.get('delayReports/r1')!.upvotedBy).toEqual(['a', 'b']);
+      expect(h.db.docs.get('delayReports/r1/comments/c1')!.likedBy).toEqual([
+        'a',
+        'b',
+        'c',
+      ]);
+    });
+
+    it('반응 흔적 제거는 멱등이다 (재호출 시 대상 0건)', async () => {
+      const h = makeHarness();
+      seedFullDataset(h.db);
+
+      await purgeUserFirestoreData(h.deps, UID);
+      const opsAfterFirst = h.db.ops.length;
+      const result = await purgeUserFirestoreData(h.deps, UID);
+
+      expect(result.failedSteps).toEqual([]);
+      expect(h.db.ops.slice(opsAfterFirst).filter((op) => op.kind === 'update')).toEqual(
+        [],
+      );
+      expect(h.db.docs.get('delayReports/r2')!.upvotedBy).toEqual([OTHER_UID]);
     });
 
     it('congestionReports는 reporterId만 치환한다', async () => {
@@ -403,7 +506,12 @@ describe('accountDeletionService', () => {
 
       const result = await purgeUserFirestoreData(h.deps, UID);
 
-      expect(result.failedSteps).toEqual(['delayReportComments']);
+      // comments collection group 장애는 그 그룹을 쓰는 두 단계를 함께 무너뜨린다
+      // (인덱스 미배포 시 실제로 나타나는 모양).
+      expect(result.failedSteps).toEqual([
+        'delayReportComments',
+        'delayReportCommentLikes',
+      ]);
       // 뒤따르는 단계는 정상 수행됨
       expect(h.db.docs.has(`pushTokens/${UID}`)).toBe(false);
       expect(h.db.docs.has(`users/${UID}`)).toBe(false);
@@ -420,7 +528,11 @@ describe('accountDeletionService', () => {
 
       const result = await purgeUserFirestoreData(h.deps, UID);
 
-      expect(result.failedSteps).toEqual(['delayReportComments', 'users']);
+      expect(result.failedSteps).toEqual([
+        'delayReportComments',
+        'delayReportCommentLikes',
+        'users',
+      ]);
     });
 
     // 순서가 곧 실패 안전성이다: users에는 프로필과 즐겨찾기 배열

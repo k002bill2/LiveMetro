@@ -41,7 +41,7 @@ export interface AdminQuerySnapshotLike {
 }
 
 export interface AdminQueryLike {
-  where(field: string, op: '==', value: string): AdminQueryLike;
+  where(field: string, op: '==' | 'array-contains', value: string): AdminQueryLike;
   limit(count: number): AdminQueryLike;
   get(): Promise<AdminQuerySnapshotLike>;
 }
@@ -77,6 +77,14 @@ export interface AccountPurgeDeps {
    * 서비스는 순수하게 유지되고 테스트는 fake 하나로 끝난다.
    */
   readonly recursiveDeleteDocument: (path: string) => Promise<void>;
+  /**
+   * `FieldValue.arrayRemove(value)` 센티널을 만든다.
+   *
+   * 반응 배열에서 uid만 원자적으로 빼기 위한 것이다. 문서를 읽어 메모리에서
+   * 걸러 다시 쓰면 동시에 들어온 다른 사용자의 투표를 덮어쓴다(lost update).
+   * 센티널은 Admin SDK 전역이라 순수 서비스에 주입한다(recursiveDelete와 동일한 이유).
+   */
+  readonly arrayRemoveValue: (value: string) => unknown;
 }
 
 export interface AccountDeletionDeps extends AccountPurgeDeps {
@@ -85,6 +93,8 @@ export interface AccountDeletionDeps extends AccountPurgeDeps {
 
 /** 파기 단계 식별자 — 실패 로깅과 테스트 단언에 쓰인다(응답에는 넣지 않는다). */
 export type PurgeStep =
+  | 'delayReportUpvotes'
+  | 'delayReportCommentLikes'
   | 'users'
   | 'commuteSettings'
   | 'commuteLogs'
@@ -183,6 +193,37 @@ const anonymizeReportComments = ({ db }: AccountPurgeDeps, uid: string): Promise
       }),
   );
 
+/**
+ * 반응 배열에서 uid만 제거한다 — **집계 카운트는 건드리지 않는다.**
+ *
+ * `upvotedBy`/`likedBy`는 "누가 무엇에 반응했는가"라는 개인 식별 데이터이고,
+ * **타인의 문서**에 남으므로 작성자 익명화(userId 치환)로는 지워지지 않는다.
+ * 반면 `upvotes`/`likes` 카운트는 커뮤니티 집계다. 탈퇴 계정의 재투표 방지는
+ * 무의미하므로 배열에서만 빼도 정합성 문제가 되지 않는다(카운트 보존이 요구사항).
+ *
+ * `arrayRemove` 센티널을 쓰는 이유는 원자성이다 — 읽고-거르고-쓰면 그 사이
+ * 다른 사용자의 투표가 유실된다.
+ */
+const removeUidFromArray =
+  (
+    step: 'upvotedBy' | 'likedBy',
+    buildQuery: (deps: AccountPurgeDeps, uid: string) => AdminQueryLike,
+  ) =>
+  (deps: AccountPurgeDeps, uid: string): Promise<void> =>
+    runPagedWrite(deps.db, buildQuery(deps, uid), (batch, ref) =>
+      batch.update(ref, { [step]: deps.arrayRemoveValue(uid) }),
+    );
+
+/** 내가 추천을 누른 (남의) 지연 제보. */
+const removeUpvoteTraces = removeUidFromArray('upvotedBy', ({ db }, uid) =>
+  db.collection('delayReports').where('upvotedBy', 'array-contains', uid),
+);
+
+/** 내가 좋아요를 누른 (남의) 제보 댓글 — 하위 컬렉션이라 collection group. */
+const removeCommentLikeTraces = removeUidFromArray('likedBy', ({ db }, uid) =>
+  db.collectionGroup('comments').where('likedBy', 'array-contains', uid),
+);
+
 /** congestionReports는 표시용 이름 없이 reporterId만 개인 식별자다. */
 const anonymizeCongestionReports = ({ db }: AccountPurgeDeps, uid: string): Promise<void> =>
   runPagedWrite(
@@ -228,8 +269,11 @@ interface PurgeStepRunner {
  * 사용자"로 보이는 표시상의 이상에 그친다 — 기능 데이터 파괴보다 낫다.
  */
 const PURGE_STEPS: readonly PurgeStepRunner[] = [
+  // 인덱스 전제조건이 있는 collection group 단계를 앞에 모아 조기 실패시킨다.
   { step: 'delayReportComments', run: anonymizeReportComments },
+  { step: 'delayReportCommentLikes', run: removeCommentLikeTraces },
   { step: 'delayReports', run: anonymizeDelayReports },
+  { step: 'delayReportUpvotes', run: removeUpvoteTraces },
   { step: 'congestionReports', run: anonymizeCongestionReports },
   { step: 'favorites', run: deleteLegacyFavorites },
   { step: 'pushTokens', run: deleteOwnedDocument('pushTokens') },

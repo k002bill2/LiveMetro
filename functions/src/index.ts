@@ -297,6 +297,8 @@ export const deleteAccount = onCall<unknown>(
           // Adapter for the service's path-based recursive delete (the real
           // DocumentReference cannot be expressed as a structural DI type).
           recursiveDeleteDocument: (path) => db.recursiveDelete(db.doc(path)),
+          arrayRemoveValue: (value) =>
+            admin.firestore.FieldValue.arrayRemove(value),
         },
         uid
       );
