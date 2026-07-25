@@ -25,6 +25,8 @@ export const attachDestinationPreferences = async (
     if (!prefs || Object.keys(prefs).length === 0) return;
     const current = getGuidanceSession();
     if (current === null || current.startedAt !== expectedStartedAt) return;
+    // 세션에 이미 선호가 있으면(사용자 시트 선택 등) 늦게 도착한 원격 사본이 덮어쓰지 않는다 (TOCTOU 가드).
+    if (current.destinationPreferences !== undefined) return;
     setGuidanceSession({ ...current, destinationPreferences: prefs });
   } catch (error) {
     if (__DEV__) console.error('[destinationPreferenceSync] attach failed', error);

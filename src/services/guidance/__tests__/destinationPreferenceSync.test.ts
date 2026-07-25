@@ -53,6 +53,18 @@ it('세션이 바뀌었으면(startedAt 불일치) attach하지 않는다', asyn
   expect(getGuidanceSession()?.destinationPreferences).toBeUndefined();
 });
 
+it('세션에 이미 선호가 있으면 늦게 도착한 원격 사본이 덮어쓰지 않는다 (TOCTOU)', async () => {
+  // 시트에서 사용자가 먼저 고른 상태 — attach의 원격 읽기가 나중에 끝나도 선점이 이긴다.
+  setGuidanceSession({ ...SESSION, destinationPreferences: { 'D1|5': ['상일동'] } });
+  (loadCommuteRoutes as jest.Mock).mockResolvedValueOnce({
+    morningRoute: { boardingPreferences: { 'D1|5': ['마천'] } },
+    eveningRoute: null,
+    eveningEnabled: true,
+  });
+  await attachDestinationPreferences('uid-1', 'morning', 1_000);
+  expect(getGuidanceSession()?.destinationPreferences).toEqual({ 'D1|5': ['상일동'] });
+});
+
 it('선호 없음·로드 실패는 조용히 no-op (안내를 막지 않는다)', async () => {
   setGuidanceSession(SESSION);
   (loadCommuteRoutes as jest.Mock).mockRejectedValueOnce(new Error('offline'));
