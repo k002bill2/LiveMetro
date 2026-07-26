@@ -20,11 +20,17 @@ import {
   KakaoAuthErrorKind,
 } from './services/kakaoAuthService';
 import {
+  runDeleteAccountRequest,
+  createRecursiveDeleteAdapter,
+  createArrayRemoveAdapter,
+} from './services/accountDeletionHandler';
+import {
   NotificationType,
   EmailNotificationRequest,
   EmailNotificationResponse,
   KakaoLoginRequest,
   KakaoLoginResponse,
+  DeleteAccountResponse,
 } from './types';
 
 // Kakao Developers "앱 ID" (numeric). Read at deploy time from functions/.env
@@ -255,5 +261,40 @@ export const kakaoLogin = onCall<KakaoLoginRequest>(
       );
       throw new HttpsError('internal', 'Kakao 로그인 처리 중 오류가 발생했습니다.');
     }
+  }
+);
+
+/**
+ * Callable (v2) that erases every piece of the caller's personal data and then
+ * deletes their Firebase Auth record.
+ *
+ * The target uid is taken **only** from `request.auth.uid` — no uid argument is
+ * accepted, so a caller can never delete another account (privilege escalation).
+ * Admin SDK bypasses firestore.rules, so `users/{uid}`'s `allow delete: if false`
+ * stays untouched.
+ *
+ * Firestore purge runs first; the Auth record is deleted only when every step
+ * succeeded. On partial failure the account survives so the client can retry
+ * (the purge is idempotent). Which step failed is logged, never returned.
+ *
+ * Usage from client:
+ *   const deleteAccount = httpsCallable(functions, 'deleteAccount');
+ *   await deleteAccount();
+ */
+export const deleteAccount = onCall<unknown>(
+  // 기본 60초로는 제보·댓글·이동 로그가 많은 계정에서 매 호출이 타임아웃해
+  // 영구 실패(=삭제 불가능한 계정)가 된다. 12단계 페이지 순회에 여유를 준다.
+  { region: 'asia-northeast3', timeoutSeconds: 300 },
+  async (request): Promise<DeleteAccountResponse> => {
+    const db = admin.firestore();
+    return runDeleteAccountRequest(
+      {
+        db,
+        auth: admin.auth(),
+        recursiveDeleteDocument: createRecursiveDeleteAdapter(db),
+        arrayRemoveValue: createArrayRemoveAdapter(admin.firestore.FieldValue),
+      },
+      request.auth?.uid
+    );
   }
 );

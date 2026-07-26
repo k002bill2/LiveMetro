@@ -105,6 +105,13 @@ export interface KakaoLoginResponse {
   };
 }
 
+// Response from the deleteAccount callable. The request carries no payload —
+// the target uid is always the caller's own `request.auth.uid` — and the
+// response carries no document body or step detail (PII / 내부 구조 비노출).
+export interface DeleteAccountResponse {
+  success: true;
+}
+
 // SendGrid email template IDs
 export interface EmailTemplates {
   delayAlert: string;
