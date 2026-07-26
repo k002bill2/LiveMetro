@@ -6,6 +6,8 @@
 
 **Base URL:** `http://swopenapi.seoul.go.kr/api/subway/{API_KEY}/json/realtimeStationArrival/{START}/{END}/{STATION_NAME}`
 
+> **평문 HTTP 전용 (HTTPS 미지원).** 그래서 두 호스트(`swopenapi.seoul.go.kr`, `openapi.seoul.go.kr`)만 예외로 허용한다 — iOS는 `app.json`의 ATS `NSExceptionDomains`, Android는 config plugin `plugins/withSeoulApiCleartext.js`(`res/xml/network_security_config.xml`). 예외가 없으면 Android 9+ 에서 모든 실시간 호출이 즉시 차단된다. 전역 cleartext 허용은 금지.
+
 **Key Fields in Response:**
 | Field | Description |
 |-------|-------------|
