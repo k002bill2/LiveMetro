@@ -49,7 +49,8 @@ dev/active/[task-name]/
 - `main` 브랜치: PR 머지 시 Firebase Functions 자동 배포
 - 태그 (`v*.*.*`): EAS Build (Android+iOS) 트리거
 - 핫픽스: `chore/hotfix-*` 브랜치에서 작업 → main 머지 후 즉시 태깅
-- preview 채널: PR마다 `eas update --channel preview`로 OTA 업데이트
+- preview 채널 OTA: `main` 머지 시 `.github/workflows/preview-ota.yml`이 자동 발행 (앱 코드 paths 변경 시에만 — `functions/**`·`docs/**` 전용 푸시는 제외)
+- 수동 발행: 같은 워크플로우를 `workflow_dispatch`로 실행하고 채널(preview/production) 선택
 
 ## e2e 테스트 잔여물 방지
 - `afterAll`/`afterEach`에서 생성된 리소스(파일, 프로세스, Firestore 데이터) 정리 필수
