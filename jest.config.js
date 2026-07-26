@@ -33,10 +33,14 @@ module.exports = {
     '^@hooks/(.*)$': '<rootDir>/src/hooks/$1',
   },
 
-  // Test patterns - exclude setup and mock files
+  // Test patterns - exclude setup and mock files.
+  // plugins/ is included on purpose: the Expo config plugin there decides
+  // whether Android cleartext leaks globally, and no other gate (lint --ext,
+  // tsc include, pre-commit) sees that file.
   testMatch: [
     '<rootDir>/src/**/__tests__/**/*.test.{js,jsx,ts,tsx}',
     '<rootDir>/src/**/*.(test|spec).{js,jsx,ts,tsx}',
+    '<rootDir>/plugins/**/__tests__/**/*.test.{js,ts}',
   ],
 
   // Transform ignore patterns for React Native modules
