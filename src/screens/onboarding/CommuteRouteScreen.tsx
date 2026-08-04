@@ -131,6 +131,11 @@ const NAME_TO_LINES = (() => {
 
 const SEARCH_RESULT_PREFIX = 'search-';
 const MAX_SEARCH_RESULTS = 6;
+// 검색 결과 1건마다 calculateRoute(Dijkstra)를 2회 돌린다(최대 12회/입력).
+// 계산 자체는 싸지만(측정: V8 3ms) Hermes에서는 프레임 예산에 근접하므로
+// 타이핑이 멈춘 뒤에만 계산한다. 추천 목록의 문자열 필터는 디바운스하지
+// 않는다 — 그쪽은 includes() 한 번이라 즉시 반응이 낫다.
+const SEARCH_DEBOUNCE_MS = 200;
 
 const buildDirectFallback = (): TransferRouteOptionData => ({
   id: DIRECT_OPTION_ID,
@@ -356,6 +361,13 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
     return first ? first.stationId : DIRECT_OPTION_ID;
   });
   const [query, setQuery] = useState('');
+  // TextInput은 query로 즉시 갱신하고, 무거운 경로 계산만 이 값에 매단다.
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query), SEARCH_DEBOUNCE_MS);
+    return () => clearTimeout(timer);
+  }, [query]);
 
   // Phase 52 picker handoff — picker writes back via merged params.
   useEffect(() => {
@@ -376,9 +388,10 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
 
   // Search-derived options. Computed only when the user types a query —
   // lets users pick *any* station as a transfer point, not just the
-  // algorithm's top-K. Local data (sync) — no debounce needed.
+  // algorithm's top-K. Station lookup is local/sync, but each candidate
+  // costs two Dijkstra runs (see :411), so this reads the debounced query.
   const searchOptions = useMemo<TransferRouteOptionData[]>(() => {
-    const q = query.trim();
+    const q = debouncedQuery.trim();
     if (!q || !departureStation || !arrivalStation) return [];
     const matches = searchLocalStations(q);
     if (matches.length === 0) return [];
@@ -427,7 +440,7 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
       if (opts.length >= MAX_SEARCH_RESULTS) break;
     }
     return opts;
-  }, [query, departureStation, arrivalStation]);
+  }, [debouncedQuery, departureStation, arrivalStation]);
 
   // Combined display list — recommendations filtered by query, plus any
   // search-only options that aren't already represented by name.

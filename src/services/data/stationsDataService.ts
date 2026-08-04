@@ -46,23 +46,71 @@ const convertLineNumToLineId = (lineNum: string): string => {
 };
 
 /**
+ * Build `역명 → 이 역을 지나는 모든 lineId` index.
+ *
+ * seoulStations.json은 한 물리적 역을 노선별 행으로 나눠 담는다
+ * (강남 = "02호선" 행 + "신분당선" 행). 역명으로 행을 묶으면 환승 노선을
+ * 원격 조회 없이 로컬만으로 도출할 수 있다.
+ */
+const buildLinesByName = (
+  rows: readonly SeoulStationData[],
+): ReadonlyMap<string, readonly string[]> => {
+  const map = new Map<string, string[]>();
+  for (const row of rows) {
+    const lineId = convertLineNumToLineId(row.line_num);
+    const lines = map.get(row.station_nm);
+    if (!lines) {
+      map.set(row.station_nm, [lineId]);
+    } else if (!lines.includes(lineId)) {
+      // 같은 노선이 여러 행으로 중복 등장해도 한 번만 담는다.
+      lines.push(lineId);
+    }
+  }
+  return map;
+};
+
+// 역명→노선 인덱스는 stationsCache와 별개로 lazy 구축한다.
+// searchLocalStations / getAllLocalStations는 캐시를 거치지 않고
+// convertSeoulStationToModel을 직접 호출하므로, 인덱스를 인자로 넘기는 대신
+// 여기서 공유해야 모든 경로가 같은 transfers를 받는다.
+let linesByNameCache: ReadonlyMap<string, readonly string[]> | null = null;
+
+const getLinesByName = (): ReadonlyMap<string, readonly string[]> => {
+  if (!linesByNameCache) {
+    linesByNameCache = buildLinesByName(
+      (seoulStationsData as SeoulStationsJson).DATA,
+    );
+  }
+  return linesByNameCache;
+};
+
+/**
  * Convert Seoul Metro station data to Station model
  * Coordinates are looked up from stationCoordinates.json
+ *
+ * `transfers`는 linesByName에서 자기 노선을 뺀 나머지로 채운다. 예전에는
+ * 항상 빈 배열이라 Firestore 조회가 실패하는 오프라인 상황에서 환승 배지가
+ * 통째로 사라졌다.
  */
 const convertSeoulStationToModel = (data: SeoulStationData): Station => {
+  const linesByName = getLinesByName();
   const coords = (stationCoordinates as CoordinateData)[data.station_cd];
 
   if (!coords) {
     console.warn(`[stationsDataService] No coordinates for station ${data.station_cd} (${data.station_nm})`);
   }
 
+  const lineId = convertLineNumToLineId(data.line_num);
+
   return {
     id: data.station_cd,
     name: data.station_nm,
     nameEn: data.station_nm_eng,
-    lineId: convertLineNumToLineId(data.line_num),
+    lineId,
     coordinates: coords ?? { latitude: 0, longitude: 0 },
-    transfers: [],
+    transfers: (linesByName.get(data.station_nm) ?? []).filter(
+      (l) => l !== lineId,
+    ),
     stationCode: data.fr_code,
   };
 };
