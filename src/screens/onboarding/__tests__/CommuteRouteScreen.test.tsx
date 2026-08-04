@@ -7,9 +7,10 @@
  */
 
 import React from 'react';
-import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
 import { CommuteRouteScreen } from '../CommuteRouteScreen';
 import { saveCommuteRoutes } from '@/services/commute/commuteService';
+import { calculateRoute } from '@/services/route';
 
 jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
 jest.mock('lucide-react-native', () => ({
@@ -82,6 +83,12 @@ jest.mock('@/services/commute/commuteService', () => ({
 
 // Keep the model module live so DEFAULT_COMMUTE_NOTIFICATIONS / TransferStation
 // type-check at compile time. Importing for real is fine — it has no native deps.
+
+// 검색 결과 1건당 calculateRoute를 2회 부른다. 디바운스가 걸렸는지는
+// "타이핑 직후 호출 0"으로만 직접 증명할 수 있어 이 seam을 센다.
+jest.mock('@/services/route', () => ({
+  calculateRoute: jest.fn(() => ({ totalMinutes: 12, segments: [] })),
+}));
 
 const mockGoBack = jest.fn();
 const mockNavigate = jest.fn();
@@ -368,5 +375,85 @@ describe('CommuteRouteScreen (step 2/4 redesign)', () => {
     // 손대지 않은 leg = 필드 생략 → merge가 저장된 선호를 그대로 보존한다.
     // (nav 파라미터 타입 OnboardingRouteData에 선호가 없어 여기서 {}를 쓰면 유실된다.)
     expect('boardingPreferences' in eveningArg).toBe(false);
+  });
+
+  describe('환승역 검색 디바운스', () => {
+    const pickRoute = (
+      selectionType: 'departure' | 'arrival',
+      stationId: string,
+      stationName: string,
+      lineId: string,
+    ) => ({
+      params: {
+        pickedStation: { selectionType, station: { stationId, stationName, lineId } },
+      },
+    });
+
+    /** 출발/도착이 모두 선택돼야 검색 UI가 렌더된다. picker 핸드오프는
+     *  route.params 병합으로 오므로 rerender 두 번으로 재현한다. */
+    const renderWithBothStations = () => {
+      const utils = render(
+        <CommuteRouteScreen
+          navigation={mockNavigation as never}
+          route={pickRoute('departure', '0222', '강남', '2') as never}
+        />,
+      );
+      utils.rerender(
+        <CommuteRouteScreen
+          navigation={mockNavigation as never}
+          route={pickRoute('arrival', '0239', '홍대입구', '2') as never}
+        />,
+      );
+      return utils;
+    };
+
+    afterEach(() => {
+      jest.useRealTimers();
+    });
+
+    it('타이핑 직후에는 경로 계산을 돌리지 않는다', () => {
+      jest.useFakeTimers();
+      const { getByTestId } = renderWithBothStations();
+      (calculateRoute as jest.Mock).mockClear();
+
+      fireEvent.changeText(getByTestId('recommend-search'), '왕십리');
+
+      expect(calculateRoute).not.toHaveBeenCalled();
+    });
+
+    it('입력이 멈추면 그때 계산한다', () => {
+      jest.useFakeTimers();
+      const { getByTestId } = renderWithBothStations();
+      (calculateRoute as jest.Mock).mockClear();
+
+      fireEvent.changeText(getByTestId('recommend-search'), '왕십리');
+      act(() => {
+        jest.advanceTimersByTime(200);
+      });
+
+      expect(calculateRoute).toHaveBeenCalled();
+    });
+
+    it('연속 입력은 마지막 한 번만 계산한다', () => {
+      jest.useFakeTimers();
+      const { getByTestId } = renderWithBothStations();
+      const input = getByTestId('recommend-search');
+      (calculateRoute as jest.Mock).mockClear();
+
+      // 디바운스 창 안에서 연타 — 중간 값들은 계산되지 않아야 한다.
+      // 마지막 값은 실제 역명이어야 한다("왕십리역"은 매칭 0건이라 계산 자체가 없다).
+      for (const text of ['왕', '왕십', '왕십리']) {
+        fireEvent.changeText(input, text);
+        act(() => {
+          jest.advanceTimersByTime(50);
+        });
+      }
+      expect(calculateRoute).not.toHaveBeenCalled();
+
+      act(() => {
+        jest.advanceTimersByTime(200);
+      });
+      expect(calculateRoute).toHaveBeenCalled();
+    });
   });
 });
