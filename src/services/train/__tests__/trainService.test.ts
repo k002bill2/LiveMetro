@@ -173,24 +173,25 @@ describe('TrainService', () => {
       expect(result[0]?.name).toBe('강남역');
     });
 
-    it('should fallback to local data when Firebase returns empty', async () => {
+    it('로컬·Firestore 모두 비면 빈 배열', async () => {
+      // 로컬을 비워야 원격 분기를 실제로 태운다. mockStations를 두면
+      // local-first 단축로에서 끝나 원격 경로가 검증되지 않는다.
+      mockGetLocalStationsByLine.mockReturnValue([]);
       mockGetDocs.mockResolvedValue({ docs: [] });
-      mockGetLocalStationsByLine.mockReturnValue(mockStations);
 
       const result = await trainService.getStationsByLine('2');
 
-      expect(result).toHaveLength(2);
-      expect(mockGetLocalStationsByLine).toHaveBeenCalledWith('2');
+      expect(result).toEqual([]);
+      expect(mockGetDocs).toHaveBeenCalled();
     });
 
-    it('should fallback to local data on Firebase error', async () => {
+    it('로컬이 비었고 Firestore가 실패하면 빈 배열 (throw 금지)', async () => {
+      mockGetLocalStationsByLine.mockReturnValue([]);
       mockGetDocs.mockRejectedValue(new Error('Firebase error'));
-      mockGetLocalStationsByLine.mockReturnValue(mockStations);
 
       const result = await trainService.getStationsByLine('2');
 
-      expect(result).toHaveLength(2);
-      expect(mockGetLocalStationsByLine).toHaveBeenCalledWith('2');
+      expect(result).toEqual([]);
     });
   });
 
