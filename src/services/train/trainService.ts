@@ -61,8 +61,15 @@ class TrainService {
    * Falls back to local data if not found in Firebase
    */
   async getStationsByLine(lineId: string): Promise<Station[]> {
+    // local-first — 노선별 역 목록은 seoulStations.json이 전량 담고 있다.
+    // 원격을 먼저 기다리면 오프라인/느린 회선에서 화면 전체가 왕복만큼 지연된다.
+    const localStations = getLocalStationsByLine(lineId);
+    if (localStations.length > 0) {
+      return localStations;
+    }
+
     try {
-      // Try Firebase first
+      // 로컬이 커버하지 못하는 노선일 때만 원격으로.
       const stationsQuery = query(
         collection(firestore, 'stations'),
         where('lineId', '==', lineId),
@@ -70,30 +77,13 @@ class TrainService {
       );
 
       const stationsSnapshot = await getDocs(stationsQuery);
-      const firestoreStations = stationsSnapshot.docs.map(doc => ({
+      return stationsSnapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       } as Station));
-
-      if (firestoreStations.length > 0) {
-        return firestoreStations;
-      }
-
-      // Fallback to local data if Firebase has no results
-      console.warn(`No stations found in Firebase for line ${lineId}, trying local data`);
-      const localStations = getLocalStationsByLine(lineId);
-
-      if (localStations.length > 0) {
-        console.log(`✅ Loaded ${localStations.length} stations for line ${lineId} from local data`);
-        return localStations;
-      }
-
-      console.error(`❌ No stations found for line ${lineId} in Firebase or local data`);
-      return [];
     } catch (error) {
-      // Firebase connection error - use local fallback
-      console.error('Firebase error fetching stations, falling back to local data:', error);
-      return getLocalStationsByLine(lineId);
+      console.error('Firebase error fetching stations:', error);
+      return [];
     }
   }
 
@@ -109,8 +99,18 @@ class TrainService {
     if (!stationId) {
       return null;
     }
+
+    // local-first. seoulStations.json이 역 메타데이터를 전량 담고 있어
+    // (Firestore stations 표본 300건의 역 id가 100% 로컬에 존재) 원격을 먼저
+    // 기다릴 이유가 없다. 실측 왕복은 270ms~1s이고, FavoritesContext가 즐겨찾기
+    // 1개당 이 함수를 부르므로 최초 온보딩에서 SDK cold start까지 얹힌다.
+    const localStation = getLocalStation(stationId);
+    if (localStation) {
+      return localStation;
+    }
+
     try {
-      // Try Firebase first
+      // 로컬에 없는 역(신설역 등)만 원격 조회.
       const stationDoc = await getDoc(doc(firestore, 'stations', stationId));
 
       if (stationDoc.exists()) {
@@ -120,21 +120,11 @@ class TrainService {
         } as Station;
       }
 
-      // Fallback to local data
-      console.warn(`Station not found in Firebase: ${stationId}, trying local data`);
-      const localStation = getLocalStation(stationId);
-
-      if (localStation) {
-        console.log(`✅ Loaded station ${stationId} from local data`);
-        return localStation;
-      }
-
-      console.error(`❌ Station ${stationId} not found in Firebase or local data`);
+      console.error(`❌ Station ${stationId} not found in local or Firebase data`);
       return null;
     } catch (error) {
-      // Firebase 연결 오류 시 로컬 데이터로 폴백
-      console.error('Firebase error fetching station, falling back to local data:', error);
-      return getLocalStation(stationId);
+      console.error('Firebase error fetching station:', error);
+      return null;
     }
   }
 

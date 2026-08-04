@@ -142,7 +142,18 @@ describe('TrainService', () => {
   });
 
   describe('getStationsByLine', () => {
+    it('로컬에 노선 데이터가 있으면 Firestore 쿼리를 보내지 않는다', async () => {
+      mockGetLocalStationsByLine.mockReturnValue(mockStations);
+
+      const result = await trainService.getStationsByLine('2');
+
+      expect(result).toHaveLength(2);
+      expect(mockGetLocalStationsByLine).toHaveBeenCalledWith('2');
+      expect(mockGetDocs).not.toHaveBeenCalled();
+    });
+
     it('should fetch stations from Firebase', async () => {
+      mockGetLocalStationsByLine.mockReturnValue([]);
       mockGetDocs.mockResolvedValue({
         docs: mockStations.map(station => ({
           id: station.id,
@@ -184,7 +195,21 @@ describe('TrainService', () => {
   });
 
   describe('getStation', () => {
-    it('should fetch station from Firebase', async () => {
+    // local-first: 역 메타데이터는 seoulStations.json이 이미 전량 담고 있고
+    // (Firestore stations 300건 표본의 역 id가 100% 로컬에 존재), 왕복은
+    // 실측 270ms~1s를 더한다. 로컬이 답을 갖고 있으면 네트워크에 가지 않는다.
+    it('로컬에 있으면 Firestore를 조회하지 않고 즉시 반환한다', async () => {
+      mockGetLocalStation.mockReturnValue(mockStation);
+
+      const result = await trainService.getStation('gangnam');
+
+      expect(result?.name).toBe('강남역');
+      expect(mockGetLocalStation).toHaveBeenCalledWith('gangnam');
+      expect(mockGetDoc).not.toHaveBeenCalled();
+    });
+
+    it('로컬에 없을 때만 Firestore로 간다', async () => {
+      mockGetLocalStation.mockReturnValue(null);
       mockGetDoc.mockResolvedValue({
         exists: () => true,
         id: 'gangnam',
@@ -201,17 +226,7 @@ describe('TrainService', () => {
 
       expect(result).not.toBeNull();
       expect(result?.name).toBe('강남역');
-    });
-
-    it('should fallback to local data when not found in Firebase', async () => {
-      mockGetDoc.mockResolvedValue({ exists: () => false });
-      mockGetLocalStation.mockReturnValue(mockStation);
-
-      const result = await trainService.getStation('gangnam');
-
-      expect(result).not.toBeNull();
-      expect(result?.name).toBe('강남역');
-      expect(mockGetLocalStation).toHaveBeenCalledWith('gangnam');
+      expect(mockGetDoc).toHaveBeenCalled();
     });
 
     it('should return null when station not found anywhere', async () => {
@@ -223,14 +238,23 @@ describe('TrainService', () => {
       expect(result).toBeNull();
     });
 
-    it('should fallback to local data on Firebase error', async () => {
+    it('로컬 미스 + Firestore 에러면 null (앱을 막지 않는다)', async () => {
+      mockGetLocalStation.mockReturnValue(null);
       mockGetDoc.mockRejectedValue(new Error('Firebase error'));
-      mockGetLocalStation.mockReturnValue(mockStation);
 
       const result = await trainService.getStation('gangnam');
 
-      expect(result).not.toBeNull();
-      expect(mockGetLocalStation).toHaveBeenCalledWith('gangnam');
+      expect(result).toBeNull();
+    });
+
+    it('오프라인이어도 로컬 히트면 정상 동작한다', async () => {
+      mockGetLocalStation.mockReturnValue(mockStation);
+      mockGetDoc.mockRejectedValue(new Error('network unavailable'));
+
+      const result = await trainService.getStation('gangnam');
+
+      expect(result?.name).toBe('강남역');
+      expect(mockGetDoc).not.toHaveBeenCalled();
     });
 
     it('returns null without touching Firestore when stationId is empty', async () => {
