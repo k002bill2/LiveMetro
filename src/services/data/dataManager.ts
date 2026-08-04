@@ -6,7 +6,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { seoulSubwayApi, SeoulRealtimeArrival } from '../api/seoulSubwayApi';
 import { arrivalService, ArrivalInfo } from '../arrival/arrivalService';
-import { trainService } from '../train/trainService';
 import { Train, Station, TrainDelay, DelaySeverity, TrainStatus, ServiceDisruption } from '../../models/train';
 import { updnLineToDisplay } from '@/models/route';
 import { getLocalStationByName } from './stationsDataService';
@@ -145,23 +144,12 @@ class DataManager {
     }
 
     try {
-      // First try to get station from local data by name
+      // 역 메타데이터는 로컬 데이터가 전량 담고 있다. 예전에는 여기서
+      // trainService.getStation을 한 번 더 불러 "더 정확한 데이터"를 받으려 했지만,
+      // 그 함수가 local-first로 바뀌면서(커밋 a990704) 방금 읽은 것과 같은 로컬
+      // 객체를 되받는 순환이 됐다. 왕복도 없고 얻는 정보도 없어 제거한다.
       const localStation = getLocalStationByName(stationName);
 
-      // Try Firebase with station ID if we have it (for more accurate data)
-      if (localStation?.id) {
-        try {
-          const firebaseStation = await trainService.getStation(localStation.id);
-          if (firebaseStation) {
-            await this.setCachedData(cacheKey, firebaseStation, 24 * 60 * 60 * 1000); // Cache for 24 hours
-            return firebaseStation;
-          }
-        } catch (firebaseError) {
-          console.warn('Firebase station lookup failed, using local data:', firebaseError);
-        }
-      }
-
-      // Use local station data if available
       if (localStation) {
         await this.setCachedData(cacheKey, localStation, 24 * 60 * 60 * 1000); // Cache for 24 hours
         return localStation;
