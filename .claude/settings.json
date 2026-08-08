@@ -24,26 +24,9 @@
           },
           {
             "type": "command",
-            "command": "node ${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/hardGateGuard.js",
-            "timeout": 3,
-            "statusMessage": "HARD-GATE check..."
-          },
-          {
-            "type": "command",
             "command": "node ${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/skillGateGuard.js",
             "timeout": 3,
             "statusMessage": "Skill gate check..."
-          }
-        ]
-      },
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node ${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/ethicalValidator.js",
-            "timeout": 5,
-            "statusMessage": "보안 명령 검사..."
           }
         ]
       }
@@ -79,17 +62,6 @@
             "command": "node ${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/skillGateGuard.js",
             "timeout": 3,
             "statusMessage": "Recording skill invocation..."
-          }
-        ]
-      },
-      {
-        "matcher": "Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "node ${CLAUDE_PROJECT_DIR:-.}/.claude/hooks/verificationGuard.js",
-            "timeout": 20,
-            "statusMessage": "Verification check..."
           }
         ]
       }
@@ -151,7 +123,7 @@
           },
           {
             "type": "command",
-            "command": "node -e \"const fs=require('fs');['/tmp/claude-hard-gate-livemetro','/tmp/claude-skill-gate-livemetro','/tmp/claude-skill-gate-cooldown-livemetro'].forEach(d=>{try{fs.rmSync(d,{recursive:true})}catch{}});\"",
+            "command": "node -e \"const fs=require('fs');['/tmp/claude-skill-gate-livemetro','/tmp/claude-skill-gate-cooldown-livemetro'].forEach(d=>{try{fs.rmSync(d,{recursive:true})}catch{}});\"",
             "timeout": 3,
             "statusMessage": "Resetting session state..."
           }

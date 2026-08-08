@@ -15,17 +15,31 @@ Claude Code 네이티브 이벤트(UserPromptSubmit / PreToolUse / PostToolUse /
 |----|--------|------|
 | `pathProtection.js` | PreToolUse/Edit\|Write | `.env*`, `google-services.json`, `.ssh/`, 키 파일 등 민감 경로 편집 차단 |
 | `fileLock.js acquire` | PreToolUse/Edit\|Write | 동일 파일 다중 에이전트 편집 advisory lock (60초 TTL) |
-| `ethicalValidator.js` | PreToolUse/Bash | 위험 명령 차단 (rm -rf, force push, 하드코딩 키, Seoul API 30초 폴링 검증) |
+| `ethicalValidator.js` | PreToolUse/Edit\|Write | 편집 **내용** 검사 — 하드코딩 키, Seoul API 30초 폴링 위반 등 (path-gated 규칙 포함) |
+| `skillGateGuard.js` | PreToolUse/Edit\|Write + PostToolUse/Skill | 파일 타입별 권장 스킬 미호출 시 **경고**(차단 아님) + 호출된 스킬 기록 |
 | `fileLock.js release` | PostToolUse/Edit\|Write | acquire 짝 해제 |
 | `outputSecretFilter.js` | PostToolUse/Bash | Bash 출력의 API키/토큰/시크릿 사후 감지 및 stderr 경고 (마스킹은 미수행) |
 | `userPromptSubmit.js` | UserPromptSubmit | 스킬/에이전트 자동 활성화 |
+| `docEnforcer.js` | UserPromptSubmit | 프롬프트 키워드 → 해당 영역 필수 문서 Read 지시 주입 |
 | Notification | Notification | macOS `osascript` 알림 (jq → display notification) |
+
+**Bash 명령 검사는 전역 훅이 담당한다** (`~/.claude/settings.json` → `~/.claude/hooks/universal/ethicalValidator.js`).
+2026-08-09 이전에는 프로젝트본이 Bash 에도 wire 돼 있어 Bash 호출마다 두 판본이 각각 돌았다.
+두 판본의 규칙을 전역으로 병합한 뒤 프로젝트본의 Bash 등록을 해제해 **호출당 1회**로 정리했다.
+프로젝트본은 Edit\|Write 전용으로 남아 편집 *내용* 을 검사한다 — Bash 의 `tool_input.command` 는 보지 않는다.
+
+2026-08-09 제거된 훅:
+
+| 훅 | 제거 사유 |
+|----|-----------|
+| `hardGateGuard.js` | `.claude/plans/` 에 `.md` 가 하나라도 있으면 영구 통과하는 구조라 2026-05-09 이후 무발화. 훅과 원칙(`golden-principles.md` HARD-GATE)을 함께 폐지 |
+| `verificationGuard.js` | `typeCheckHook.sh` 와 tsc 중복. Write 한 번에 tsc 가 3회(root·functions·root) 돌았다 |
 
 `.claude/settings.local.json`에 wire되는 선택 훅:
 
 | 훅 | 이벤트 | 기능 |
 |----|--------|------|
-| `typeCheckHook.sh` | PostToolUse/Edit\|Write | .ts/.tsx 편집 후 자동 `npx tsc --noEmit` (개인 환경에서만 활성) |
+| `typeCheckHook.sh` | PostToolUse/Edit\|Write | .ts/.tsx 편집 후 자동 `tsc --noEmit`. 편집 파일이 속한 **워크스페이스로 라우팅**(`functions/` 하위면 functions, 아니면 root)해 편집당 1회만 검사 |
 
 **설정**: `.claude/settings.json` (팀 공유), `.claude/settings.local.json` (개인, gitignore됨)
 

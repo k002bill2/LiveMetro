@@ -14,10 +14,18 @@
  *   - functions/src/.*\.ts 편집 (테스트 제외) → firebase-integration 스킬 필요
  *   - .test.* / .spec.* 작성 → test-automation 스킬 필요
  *
- * 차단 조건: 필수 스킬이 세션 내에서 한 번도 호출되지 않은 경우
- * 쿨다운: 파일 타입별 1회 경고 후 5분간 재차단 안 함
+ * 경고 조건: 권장 스킬이 세션 내에서 한 번도 호출되지 않은 경우
+ * 쿨다운: 파일 타입별 1회 경고 후 5분간 재경고 안 함
  *
- * @version 1.0.0-livemetro
+ * v2.0 (2026-08-09): BLOCK(exit 2) → WARN(exit 0) 강등.
+ *   사유: 같은 스킬 라우팅 규칙이 3중으로 걸려 있다 —
+ *     (1) 스킬 설명 전체가 시스템 프롬프트에 상주,
+ *     (2) superpowers:using-superpowers 가 "1%라도 해당하면 필수 호출"을 강제,
+ *     (3) 이 훅.
+ *   셋 중 이 훅만 도구 호출을 되돌렸다. 모델이 스킬을 모른다는 전제가 이미 성립하지 않으므로
+ *   판단을 대체하지 않고 신호만 남긴다. 안전 목적 차단(pathProtection)과는 성격이 다르다.
+ *
+ * @version 2.0.0-livemetro
  */
 
 const fs = require('fs');
@@ -119,11 +127,11 @@ function main() {
         setCooldown(cooldownKey);
         const basename = path.basename(filePath);
         console.log(
-          `\n[BLOCKED] Skill Gate: ${req.label} 편집에 '${req.skill}' 스킬이 필요합니다.\n` +
+          `\n[WARN] Skill Gate: ${req.label} 편집 — '${req.skill}' 스킬 미호출.\n` +
           `파일: ${basename}\n` +
-          `ACTION: Skill('${req.skill}') 을 먼저 호출하세요.\n`
+          `권고: 도메인 규칙이 필요하면 Skill('${req.skill}') 을 호출하세요. (차단하지 않음)\n`
         );
-        return process.exit(2);
+        return process.exit(0);
       }
 
       process.exit(0);

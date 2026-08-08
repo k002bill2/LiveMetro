@@ -62,9 +62,10 @@ State:      AuthContext + Custom Hooks (no Redux)
 - **피드백 루프**: 코드 변경 후 `/verify-app` → PR 전 `/check-health` → 커밋 `/commit-push-pr` → 리팩토링 `/simplify-code`.
 - **검증 후 커밋**: `/verify-app`(tsc + lint + test) 통과 후에만 커밋. 빌드 깨진 채 커밋 금지.
 - **2-Strike Rule**: 같은 수정을 2회 시도 후 실패하면 멈추고 근본 원인 분석.
-- **작은 단위 + Plan 먼저**: 복잡/3+파일 변경은 Plan 모드로 시작, 큰 변경은 작은 커밋으로 분리.
+- **작은 단위 + Plan 먼저**: 범위가 불확실하면 Plan 모드로 시작, 큰 변경은 작은 커밋으로 분리. (파일 수 기준 HARD-GATE는 2026-08-09 폐지 — 기준은 파일 개수가 아니라 불확실성)
 - **복잡도별 에이전트 수**: 라우팅은 `.claude/rules/livemetro-workflow.md`, 상세 effort scaling은 [Automation](docs/claude/automation.md).
 - **병렬 에이전트 파일 충돌**: 편집 파일이 겹치면 순차, 안 겹치면 병렬 + `isolation: "worktree"`. 상세 File Lock 표는 [Automation](docs/claude/automation.md).
+- **위임 판단**: 위임은 기본값이 아니다. 서로 독립인 작업 2건 이상을 병렬로 돌릴 때, 워크트리 격리가 필요할 때, 또는 메인 창을 실제로 위협하는 대량 원문일 때만 `worker`(Opus)에게 맡긴다 — 서브에이전트 창은 메인보다 좁으므로 위임 자체가 비용이다. 위임할 땐 파일 범위와 완료 기준을 명시하고, 메인이 설계·통합·최종 검토를 유지한다. 상세 기준은 `~/.claude/CLAUDE.md` "위임 판단".
 - **배포**: 배포 전 검증 체크리스트는 `.claude/rules/livemetro-workflow.md` + [Development Guide](docs/DEVELOPMENT.md). Production 빌드는 `/deploy-with-tests` 사용.
 
 ## Automation & Orchestration
