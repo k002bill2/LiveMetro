@@ -2,7 +2,6 @@
 name: quality-validator
 description: Final validation agent for multi-agent workflows. Reviews code quality, verifies citations/references, ensures compliance with project standards.
 tools: Edit, Write, Read, Grep, Glob, Bash
-model: haiku
 role: validator
 ---
 

@@ -258,10 +258,13 @@ function recommendAgents(prompt) {
       const rules = JSON.parse(fs.readFileSync(RULES_PATH, 'utf-8'));
       for (const [name, rule] of Object.entries(rules)) {
         if (rule.agentFile && shouldActivateSkill(prompt, rule)) {
+          // model 라벨은 붙이지 않는다 (2026-08-09). skill-rules.json 어느 항목에도 model
+          // 필드가 없어 폴백 'haiku' 가 그대로 출력됐고, 실제 에이전트 frontmatter(예:
+          // mobile-ui-specialist = inherit)와 어긋나는 값을 매 프롬프트마다 주입했다.
+          // 모델은 하네스가 에이전트 파일에서 해석한다 — 여기서 중복 표기하면 드리프트만 생긴다.
           recommended.push({
             agent: path.basename(rule.agentFile, '.md'),
-            reason: `skill:${name}`,
-            model: rule.model || 'haiku'
+            reason: `skill:${name}`
           });
         }
       }
@@ -274,7 +277,7 @@ function recommendAgents(prompt) {
 
   let msg = '[AGENT RECOMMENDATION]';
   for (const r of unique) {
-    msg += `\n  -> ${r.agent} (${r.model}) [${r.reason}]`;
+    msg += `\n  -> ${r.agent} [${r.reason}]`;
   }
   return msg;
 }

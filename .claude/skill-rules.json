@@ -88,7 +88,7 @@
     "enforcement": "require",
     "priority": "high",
     "description": "Firebase Auth + Firestore 통합",
-    "agentFile": ".claude/agents/mobile-ui-specialist.md",
+    "_agentFile_removed_2026_08_09": "mobile-ui-specialist(UI 전문가)를 Firebase 작업에 추천하던 오매핑. Firebase 전담 에이전트가 없으므로 잘못된 추천을 내보내느니 추천을 생략한다 — firebase-integration 스킬 활성화는 그대로 동작한다.",
     "skillFile": ".claude/skills/firebase-integration/SKILL.md",
     "promptTriggers": {
       "keywords": [
