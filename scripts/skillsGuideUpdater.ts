@@ -11,6 +11,8 @@
  * - 변경 사항 보고서 생성
  */
 
+/* eslint-disable no-console -- This CLI intentionally reports progress and results. */
+
 import * as fs from 'fs';
 import * as path from 'path';
 import { execSync } from 'child_process';
@@ -19,6 +21,12 @@ import { execSync } from 'child_process';
 
 interface TechStackItem {
   name: string;
+  /**
+   * npm 조회에 쓸 실제 패키지 식별자. 표시명과 다를 때만 채운다.
+   * npm 은 표시용 라벨을 받지 않는다 — "React Native" 는 EINVALIDTAGNAME(공백),
+   * "React"/"TypeScript"/"Expo" 는 E404(대문자)로 거부된다. 실측 2026-08-09.
+   */
+  packageName?: string;
   currentVersion: string;
   category: 'core' | 'dependency' | 'devDependency' | 'tool';
   isDeprecated?: boolean;
@@ -26,7 +34,22 @@ interface TechStackItem {
   latestVersion?: string;
   deprecated?: boolean;
   alternatives?: string[];
+  /** npm 조회가 실패해 latestVersion 을 신뢰할 수 없음 (현재 버전으로 폴백된 상태) */
+  lookupFailed?: boolean;
 }
+
+/**
+ * 표시명 → 실제 npm 패키지 식별자.
+ * 조회용과 dedup 용 SSOT — 예전에는 조회를 표시명으로 하고 dedup 도 표시명 키로 해서,
+ * (a) core 4종의 최신 버전 조회가 전부 실패하고 (b) 실패가 catch 로 삼켜져 "최신 상태"로 보고되며
+ * (c) dedup 이 어긋나 react-native·react·expo 가 dependency 로 중복 집계됐다.
+ */
+const CORE_PACKAGES: Record<string, string> = {
+  'React Native': 'react-native',
+  React: 'react',
+  TypeScript: 'typescript',
+  Expo: 'expo',
+};
 
 interface UpdateConfig {
   skillsGuidePath: string;
@@ -106,16 +129,21 @@ function extractCurrentTechStack(): TechStackItem[] {
     if (version) {
       techStack.push({
         name,
+        packageName: CORE_PACKAGES[name],
         currentVersion: version,
         category: 'core',
       });
     }
   });
 
+  // core 로 이미 집계한 실제 패키지명 — dependencies/devDependencies 순회에서 제외한다.
+  // 표시명(coreVersions 의 키)으로 비교하면 절대 일치하지 않아 중복이 생긴다.
+  const corePackageNames = new Set(Object.values(CORE_PACKAGES));
+
   // Dependencies
   Object.entries(packageJson.dependencies as Record<string, string>).forEach(
     ([name, version]) => {
-      if (!coreVersions[name] && version) {
+      if (!corePackageNames.has(name) && version) {
         techStack.push({
           name,
           currentVersion: version,
@@ -128,7 +156,7 @@ function extractCurrentTechStack(): TechStackItem[] {
   // DevDependencies
   Object.entries(packageJson.devDependencies as Record<string, string>).forEach(
     ([name, version]) => {
-      if (name !== 'typescript' && version) {
+      if (!corePackageNames.has(name) && version) {
         techStack.push({
           name,
           currentVersion: version,
@@ -190,19 +218,26 @@ async function validateTechStack(
   for (const tech of techStack) {
     console.log(`  검사 중: ${tech.name}`);
 
-    const latestVersion = await getLatestVersion(tech.name);
-    const deprecated = await isDeprecated(tech.name);
+    // 표시명이 아니라 실제 패키지 식별자로 조회한다.
+    const packageName = tech.packageName ?? tech.name;
+    const latestVersion = await getLatestVersion(packageName);
+    const deprecated = await isDeprecated(packageName);
+    const lookupFailed = latestVersion === null;
 
     updatedStack.push({
       ...tech,
       latestVersion: latestVersion || tech.currentVersion,
       deprecated,
+      lookupFailed,
       lastChecked: new Date().toISOString(),
     });
 
-    if (deprecated) {
+    if (lookupFailed) {
+      // 조회 실패를 "최신 상태"로 보고하면 초록불이 거짓이 된다 — 명시적으로 구분한다.
+      console.log(`    ❓ 조회 실패 — 최신 버전을 확인하지 못했습니다 (${packageName})`);
+    } else if (deprecated) {
       console.log(`    ⚠️  낙후된 패키지: ${tech.name}`);
-    } else if (latestVersion && latestVersion !== tech.currentVersion.replace(/[~^]/, '')) {
+    } else if (latestVersion !== tech.currentVersion.replace(/[~^]/, '')) {
       console.log(`    🆕 새 버전 사용 가능: ${latestVersion}`);
     } else {
       console.log(`    ✅ 최신 상태`);
@@ -418,16 +453,23 @@ function saveUpdateDate(): void {
 
 // ================== 메인 실행 ==================
 
-async function main() {
+async function main(): Promise<void> {
+  const force = process.argv.includes('--force');
+  const checkOnly = process.argv.includes('--check-only');
+
   console.log('🚀 LiveMetro Skills Guide Auto-Updater\n');
   console.log('='.repeat(50));
   console.log('\n');
 
+  if (checkOnly) {
+    console.log('🔎 검사 전용 모드: 파일을 변경하지 않습니다.\n');
+  }
+
   // 1. 업데이트 필요 여부 확인
-  if (!shouldUpdate() && process.argv[2] !== '--force') {
+  if (!shouldUpdate() && !force && !checkOnly) {
     console.log('✅ 아직 업데이트 시기가 아닙니다.');
     console.log('강제 실행하려면 --force 옵션을 사용하세요.\n');
-    process.exit(0);
+    return;
   }
 
   // 2. 현재 기술 스택 추출
@@ -437,6 +479,24 @@ async function main() {
 
   // 3. 기술 스택 검증
   const validatedStack = await validateTechStack(techStack);
+
+  if (checkOnly) {
+    console.log('='.repeat(50));
+    console.log('✨ 검사 완료 — 변경된 파일 없음\n');
+    // 조회 실패는 별도로 센다. 실패를 "최신 상태"에 섞으면 요약이 언제나 초록불이 된다.
+    const failed = validatedStack.filter((t) => t.lookupFailed);
+    const outdated = validatedStack.filter(
+      (t) => !t.lookupFailed && !t.deprecated && t.latestVersion && t.currentVersion !== t.latestVersion
+    );
+
+    console.log('📈 요약:');
+    console.log(`  - 검사한 패키지: ${validatedStack.length}개`);
+    console.log(`  - 낙후된 패키지: ${validatedStack.filter((t) => t.deprecated).length}개`);
+    console.log(`  - 업데이트 가능: ${outdated.length}개`);
+    console.log(`  - 조회 실패: ${failed.length}개${failed.length > 0 ? ` (${failed.map((t) => t.name).join(', ')})` : ''}`);
+    console.log('\n');
+    return;
+  }
 
   // 4. 마크다운 파일 업데이트
   console.log('📝 문서 업데이트 중...\n');
