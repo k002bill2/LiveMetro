@@ -301,6 +301,16 @@ class CommuteLogService {
     userId: string,
     departureStationName: string
   ): Promise<CommuteLog[]> {
+    const logs = await this.getTodayLogs(userId);
+    return logs.filter((log) => log.departureStationName === departureStationName);
+  }
+
+  /**
+   * All of today's logs. Single date-equality query (no orderBy → no composite
+   * index required), then callers narrow in memory by whichever end of the leg
+   * they know — departure station or destination.
+   */
+  async getTodayLogs(userId: string): Promise<CommuteLog[]> {
     const today = formatDateString(new Date());
 
     const userLogsRef = collection(db, COLLECTION_NAME, userId, 'logs');
@@ -310,11 +320,9 @@ class CommuteLogService {
     const q = query(userLogsRef, where('date', '==', today), limit(50));
 
     const snapshot = await getDocs(q);
-    return snapshot.docs
-      .map((docSnap) =>
-        fromCommuteLogDoc(docSnap.id, userId, docSnap.data() as CommuteLogDoc)
-      )
-      .filter((log) => log.departureStationName === departureStationName);
+    return snapshot.docs.map((docSnap) =>
+      fromCommuteLogDoc(docSnap.id, userId, docSnap.data() as CommuteLogDoc)
+    );
   }
 
   /**
@@ -328,11 +336,9 @@ class CommuteLogService {
     lineId: string,
     commuteType: 'departure' | 'arrival'
   ): Promise<CommuteLog | null> {
-    // Check if already logged today
-    const todayLog = await this.getTodayLog(userId);
-
     if (commuteType === 'departure') {
-      // If we have no log today, create a new one
+      // Check if already logged today. If we have no log today, create a new one
+      const todayLog = await this.getTodayLog(userId);
       if (!todayLog) {
         return this.logCommute(userId, {
           departureStationId: stationId,
@@ -343,18 +349,25 @@ class CommuteLogService {
           isManual: false,
         });
       }
-    } else if (commuteType === 'arrival' && todayLog && !todayLog.arrivalTime) {
-      // Update existing log with arrival info
-      await this.updateLog(userId, todayLog.id, {
-        arrivalTime: getCurrentTimeString(),
-      });
-      return {
-        ...todayLog,
-        arrivalTime: getCurrentTimeString(),
-      };
+      return null;
     }
 
-    return null;
+    // arrival: stamp only a log that is actually heading *here*. All we know at
+    // this call site is the station being viewed — the destination — so the
+    // match is on arrivalStationName. A destination-less stub (arrivalStationName
+    // === '') must NOT be adopted here: unlike the route-aware callers that use
+    // matchesLeg, we have no route to repair it with, so filling it would pair
+    // this evening timestamp with an unrelated morning departure and record a
+    // ~10-hour commute (08:05 → 18:40) into baselineMinutes.
+    const openLegsToHere = (await this.getTodayLogs(userId)).filter(
+      (log) => !log.arrivalTime && log.arrivalStationName === stationName
+    );
+    const target = openLegsToHere[0];
+    if (!target) return null;
+
+    const arrivalTime = getCurrentTimeString();
+    await this.updateLog(userId, target.id, { arrivalTime });
+    return { ...target, arrivalTime };
   }
 
   /**

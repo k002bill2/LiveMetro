@@ -2,8 +2,12 @@
  * Commute Log Service Tests
  */
 
+import { doc } from 'firebase/firestore';
 import { commuteLogService } from '../commuteLogService';
-import { DayOfWeek } from '@/models/pattern';
+import { DayOfWeek, getCurrentTimeString } from '@/models/pattern';
+
+// `doc()` is the only seam that reveals *which* log document a write targets.
+const mockDocRef = doc as jest.Mock;
 
 // Mock Firebase
 jest.mock('@/services/firebase/config', () => ({
@@ -324,6 +328,146 @@ describe('CommuteLogService', () => {
       );
 
       expect(result).toBeNull();
+    });
+
+    // Regression: the arrival stamp used to land on getTodayLog() — a limit(1),
+    // unordered date query with no leg filter. The log it returned was almost
+    // always the morning departure stub, so an evening station view produced a
+    // measured duration of 08:05 → 18:40 = 635min instead of 18:05 → 18:40 =
+    // 35min. That number is then averaged into baselineMinutes ("평균 출퇴근
+    // 시간") and shown as the hero ETA.
+    describe('arrival leg pairing', () => {
+      // Morning departure stub (autoLogIfAppropriate 'departure'): destination
+      // unknown, still open. Listed FIRST so getTodayLog()'s docs[0] picks it.
+      const openMorningStubDoc = {
+        id: 'morning-stub',
+        data: () => ({
+          date: '2024-01-15',
+          dayOfWeek: 1,
+          departureTime: '08:05',
+          departureStationId: 'sindorim',
+          departureStationName: '신도림',
+          arrivalStationId: '',
+          arrivalStationName: '',
+          lineIds: ['2'],
+          wasDelayed: false,
+          isManual: false,
+          createdAt: { toDate: () => new Date('2024-01-15T08:05:00') },
+        }),
+      };
+
+      // Evening leg heading to 신도림 — the log the 18:40 stamp belongs to.
+      const openEveningLegDoc = {
+        id: 'evening-open',
+        data: () => ({
+          date: '2024-01-15',
+          dayOfWeek: 1,
+          departureTime: '18:05',
+          departureStationId: 'gangnam',
+          departureStationName: '강남',
+          arrivalStationId: 'sindorim',
+          arrivalStationName: '신도림',
+          lineIds: ['2'],
+          wasDelayed: false,
+          isManual: false,
+          createdAt: { toDate: () => new Date('2024-01-15T18:05:00') },
+        }),
+      };
+
+      beforeEach(() => {
+        (getCurrentTimeString as jest.Mock).mockReturnValue('18:40');
+      });
+
+      afterEach(() => {
+        // Restore the suite-wide default so later tests aren't polluted.
+        (getCurrentTimeString as jest.Mock).mockReturnValue('08:30');
+      });
+
+      it('stamps the evening leg (18:05→18:40 = 35min), not the morning stub (08:05→18:40 = 635min)', async () => {
+        mockGetDocs.mockResolvedValue({
+          empty: false,
+          docs: [openMorningStubDoc, openEveningLegDoc],
+        });
+
+        const result = await commuteLogService.autoLogIfAppropriate(
+          'user-123',
+          'sindorim',
+          '신도림',
+          '2',
+          'arrival'
+        );
+
+        expect(result?.id).toBe('evening-open');
+        expect(result?.arrivalTime).toBe('18:40');
+        expect(mockUpdateDoc).toHaveBeenCalledTimes(1);
+        // Which document was written is the whole point — a mocked seam that
+        // only proves "updateDoc was called" would pass with the bug intact.
+        expect(mockDocRef).toHaveBeenCalledWith(
+          expect.anything(),
+          'commuteLogs',
+          'user-123',
+          'logs',
+          'evening-open'
+        );
+      });
+
+      it('writes nothing when no open log is heading to the viewed station', async () => {
+        mockGetDocs.mockResolvedValue({
+          empty: false,
+          docs: [openMorningStubDoc],
+        });
+
+        const result = await commuteLogService.autoLogIfAppropriate(
+          'user-123',
+          'sindorim',
+          '신도림',
+          '2',
+          'arrival'
+        );
+
+        expect(result).toBeNull();
+        expect(mockUpdateDoc).not.toHaveBeenCalled();
+      });
+
+      it('does not re-stamp a leg that already has an arrivalTime', async () => {
+        const completedLegDoc = {
+          id: 'evening-done',
+          data: () => ({
+            ...openEveningLegDoc.data(),
+            arrivalTime: '18:38',
+          }),
+        };
+        mockGetDocs.mockResolvedValue({
+          empty: false,
+          docs: [completedLegDoc],
+        });
+
+        const result = await commuteLogService.autoLogIfAppropriate(
+          'user-123',
+          'sindorim',
+          '신도림',
+          '2',
+          'arrival'
+        );
+
+        expect(result).toBeNull();
+        expect(mockUpdateDoc).not.toHaveBeenCalled();
+      });
+
+      it('propagates a Firestore read failure to the caller', async () => {
+        mockGetDocs.mockRejectedValue(new Error('firestore unavailable'));
+
+        await expect(
+          commuteLogService.autoLogIfAppropriate(
+            'user-123',
+            'sindorim',
+            '신도림',
+            '2',
+            'arrival'
+          )
+        ).rejects.toThrow('firestore unavailable');
+        expect(mockUpdateDoc).not.toHaveBeenCalled();
+      });
     });
   });
 
