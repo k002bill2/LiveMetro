@@ -75,13 +75,13 @@ const WEEKDAY_KEYS = [1, 2, 3, 4, 5] as const;
 /**
  * Build the Mon-Fri DayBarData[] consumed by WeeklyTrendChart from the
  * raw `useCommutePattern.weekPredictions` list. Reads
- * `PredictedCommute.predictedMinutes` directly; falls back to a 30-min
- * default for predictions where the producer hasn't populated it.
+ * `PredictedCommute.predictedMinutes` directly; a prediction without it
+ * renders the hasData:false ghost placeholder — never a fabricated number
+ * (prod: unresolved station ids once made all five bars claim "30분").
  *
  * `isToday` is the single source of truth; `todayIndex` is derived
  * from `findIndex(d => d.isToday)` to keep them consistent.
  */
-const DEFAULT_DURATION_MIN = 30;
 // Dash segments for the confidence divider. Over-provisioned and clipped by the
 // container's `overflow: 'hidden'`, so it fills any width without measuring.
 const DIVIDER_DASH_COUNT = 40;
@@ -100,7 +100,7 @@ const buildWeeklyDays = (
   // only 목/금 visible once the pattern threshold gated the rest).
   const days: DayBarData[] = WEEKDAY_KEYS.map((key, i) => {
     const pred = weekPredictions.find((p) => p.dayOfWeek === key);
-    const durationMin = pred ? (pred.predictedMinutes ?? DEFAULT_DURATION_MIN) : 0;
+    const durationMin = pred?.predictedMinutes ?? 0;
     return {
       dayLabel: WEEKDAY_LABELS[i]!,
       durationMin,

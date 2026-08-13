@@ -150,6 +150,9 @@ jest.mock('@/utils/subwayMapData', () => ({
     p2: { name: '강동' },
     p3: { name: '하남검단산' },
   },
+  // stationIdResolver (transitive import) calls this at module-load time; the
+  // real function passes unknown ids through, which is all this suite needs.
+  resolveLineKey: (lineId: string) => lineId,
 }));
 
 const mockedUseRealtimeTrains = useRealtimeTrains as jest.Mock;
