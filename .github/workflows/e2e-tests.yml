@@ -1,13 +1,22 @@
 name: E2E Tests
 
 # 트리거 정책 (Option D — 2026-05-17, E2E_CI_DIAGNOSIS.md 근거):
-#   이전엔 PR-level e2e가 트리거됐으나 최근 14/14 run이 cancelled — 단 한 번도
-#   정상 종료된 적 없음 (Gradle + Metro cold build + emulator boot이 30분 timeout
-#   초과). PR review에 noise만 누적. main의 health check 가치만 보존:
+#   PR-level e2e는 전부 cancelled로 끝나 noise만 누적 → main health check 가치만 보존:
 #   - schedule: KST 새벽 2시(UTC 17:00) main HEAD 매일 1회 — 회귀 24h 내 발견
 #   - workflow_dispatch: 수동 발의 (PR 머지 직후 검증 또는 incident 재현 시)
 #
-#   build cache + smoke-only split은 후속 phase (E2E_CI_DIAGNOSIS.md Option B/E).
+# 파이프라인 재구성 (2026-08-13 재진단 — 도입 이래 성공 0회의 3층 원인):
+#   1) wdio가 gitignored 로컬 산출물(apps/android/app-debug.apk)을 가리켜 CI에 APK 부재
+#      → 부팅 성공한 날에도 전 spec "Failed to create session" 전멸
+#   2) `expo run:android &`가 내장한 Metro dev 서버는 종료되지 않아 wdio 전멸 후에도
+#      스텝을 붙잡음 → 30분 job timeout → conclusion=cancelled 가 실패를 은폐
+#      (05-17 진단의 "빌드가 느려 wdio 미도달"은 오진 — wdio는 1분 만에 도달·전멸했다)
+#   3) 에뮬레이터 콜드부팅 flake + actions/cache post 저장은 실패 job에서 skip
+#      → 성공 0회라 AVD 캐시 영영 미저장 → 매일 콜드부팅 자기강화 루프
+#   해결: 포그라운드 prebuild+assembleRelease(번들 내장·종료되는 빌드) → APK 존재 검증
+#   → wdio 기본 경로를 CI 산출물로 통일(e2e/config/wdio.android.conf.ts) → Appium은
+#   wdio appium-service가 관리(수동 백그라운드 프로세스 0) → AVD 스냅샷을 테스트 실행
+#   "전에" cache/save로 저장해 실패-무저장 루프 절단.
 on:
   schedule:
     - cron: '0 17 * * *'  # KST 02:00 (UTC 17:00) 매일 새벽
@@ -31,7 +40,24 @@ jobs:
       (github.event_name == 'workflow_dispatch' &&
        (inputs.platform == 'android' || inputs.platform == 'both'))
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
+
+    # EXPO_PUBLIC_* 는 Gradle 빌드 중 Metro 번들링 시점에 JS로 inline 되므로 빌드 스텝이
+    # 반드시 필요로 한다 (매핑은 preview-ota.yml과 동일). Firebase 키들은
+    # google-services.json 합성 스텝도 같은 값을 읽으므로 job 레벨에 한 번만 선언한다.
+    env:
+      EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.EXPO_PUBLIC_FIREBASE_API_KEY }}
+      EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN }}
+      EXPO_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_PROJECT_ID }}
+      EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET }}
+      EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID }}
+      EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.EXPO_PUBLIC_FIREBASE_APP_ID }}
+      EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY: ${{ secrets.EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY }}
+      EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY_2: ${{ secrets.EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY_2 }}
+      EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY_3: ${{ secrets.EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY_3 }}
+      EXPO_PUBLIC_DATA_PORTAL_API_KEY: ${{ secrets.EXPO_PUBLIC_DATA_PORTAL_API_KEY }}
+      EXPO_PUBLIC_DATA_PORTAL_API_KEY_2: ${{ secrets.EXPO_PUBLIC_DATA_PORTAL_API_KEY_2 }}
+      EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID: ${{ secrets.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID }}
 
     steps:
       - name: Checkout
@@ -61,37 +87,128 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: AVD cache
-        uses: actions/cache@v4
+      # google-services.json 은 gitignored 시크릿이라 CI 체크아웃에 없다. 이 앱은 Firebase
+      # JS SDK(firebase@10)만 쓰므로 네이티브 설정은 런타임에 읽히지 않는다 — 이 파일은
+      # prebuild가 android/app/ 로 복사하고 google-services gradle plugin 이 파싱만 통과하면
+      # 된다. 기존 EXPO_PUBLIC_FIREBASE_* secrets 에서 합성한다 (신규 secret 불필요).
+      # FIREBASE_APP_ID 는 웹 앱 id(1:n:web:x)라 plugin 형식 기대에 맞춰 android 로 치환한다.
+      - name: Synthesize google-services.json (prebuild pass-through)
+        run: |
+          cat > google-services.json <<EOF
+          {
+            "project_info": {
+              "project_number": "${EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID}",
+              "project_id": "${EXPO_PUBLIC_FIREBASE_PROJECT_ID}",
+              "storage_bucket": "${EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET}"
+            },
+            "client": [
+              {
+                "client_info": {
+                  "mobilesdk_app_id": "${EXPO_PUBLIC_FIREBASE_APP_ID/:web:/:android:}",
+                  "android_client_info": { "package_name": "com.livemetro.app" }
+                },
+                "oauth_client": [],
+                "api_key": [{ "current_key": "${EXPO_PUBLIC_FIREBASE_API_KEY}" }],
+                "services": { "appinvite_service": { "other_platform_oauth_client": [] } }
+              }
+            ],
+            "configuration_version": "1"
+          }
+          EOF
+          node -e "JSON.parse(require('fs').readFileSync('google-services.json','utf8'))" \
+            || { echo "::error::synthesized google-services.json is not valid JSON"; exit 1; }
+
+      - name: Restore Gradle cache
+        uses: actions/cache/restore@v4
+        id: gradle-cache
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      # android/ 는 gitignored(CNG) — CI에서 매번 생성한다. KAKAO_NATIVE_APP_KEY 없이도
+      # prebuild 가 성공하도록 app.config.ts 가 kakao plugin 을 조건부 주입한다.
+      - name: Expo prebuild (android)
+        run: npx expo prebuild --platform android --no-install
+
+      # release 변형인 이유: debug 변형은 JS 번들을 Metro dev 서버에서 로드하므로 CI에서
+      # 실행 불가. release 는 번들을 APK에 내장하고, Expo 템플릿이 release 서명을 debug
+      # keystore 로 두므로 추가 서명 설정 없이 빌드된다. Gradle 은 빌드 후 종료된다 —
+      # 이전 `expo run:android &` 의 Metro 좀비(30분 timeout 원인)가 구조적으로 사라진다.
+      - name: Build release APK (JS bundle embedded)
+        run: cd android && ./gradlew assembleRelease --no-daemon
+
+      - name: Verify APK artifact exists
+        run: |
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          test -f "$APK" || { echo "::error::$APK not found — wdio appium:app 계약 위반"; exit 1; }
+          ls -lh "$APK"
+
+      - name: Save Gradle cache
+        if: steps.gradle-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: gradle-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+
+      # AVD 캐시는 restore/save 분리가 필수다: actions/cache 의 post 저장은 job 실패 시
+      # skip 되는데, 이 job 은 성공 이력이 없어 캐시가 영영 저장되지 않는 자기강화 루프에
+      # 빠져 있었다. 스냅샷 생성 직후·테스트 실행 "전"에 명시적으로 저장한다.
+      - name: Restore AVD cache
+        uses: actions/cache/restore@v4
         id: avd-cache
         with:
           path: |
             ~/.android/avd/*
             ~/.android/adb*
-          key: avd-api-33-${{ runner.os }}
+          key: avd-api-33-${{ runner.os }}-v2
 
-      - name: Create AVD and run tests
+      - name: Create AVD and generate snapshot for caching
+        if: steps.avd-cache.outputs.cache-hit != 'true'
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 33
           arch: x86_64
           profile: pixel_6
           force-avd-creation: false
-          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          disable-animations: false
+          script: echo "Generated AVD snapshot for caching."
+
+      - name: Save AVD cache
+        if: steps.avd-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.android/avd/*
+            ~/.android/adb*
+          key: avd-api-33-${{ runner.os }}-v2
+
+      # Appium 은 wdio 의 appium-service(wdio.shared.conf.ts)가 시작·종료를 관리한다 —
+      # 수동 백그라운드 프로세스를 두지 않는다. wdio 종료 코드가 곧 스텝 결과다.
+      - name: Run E2E tests
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 33
+          arch: x86_64
+          profile: pixel_6
+          force-avd-creation: false
+          emulator-options: -no-snapshot-save -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           disable-animations: true
-          script: |
-            npx expo run:android --variant debug &
-            sleep 60
-            npx appium --port 4723 --allow-cors &
-            sleep 5
-            npx wdio e2e/config/wdio.android.conf.ts
+          script: npm run e2e:android
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: e2e-android-results-${{ github.run_number }}
-          path: e2e/reports/
+          path: |
+            e2e/reports/
+            e2e/screenshots/
+            e2e/logs/
           retention-days: 14
 
   # NOTE (2026-05-17): unit-tests-gate job 제거. ci.yml의 quality-gate composite
