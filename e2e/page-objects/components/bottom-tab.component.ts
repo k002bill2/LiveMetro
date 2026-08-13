@@ -2,6 +2,8 @@
  * Bottom Tab Component
  * Handles navigation between main app tabs
  */
+import { $ as $wdio } from '@wdio/globals';
+
 import { BasePage } from '../base.page';
 
 class BottomTabComponent extends BasePage {
@@ -100,13 +102,22 @@ class BottomTabComponent extends BasePage {
   }
 
   /**
-   * Check if a specific tab is selected
+   * Check if a specific tab is selected.
+   *
+   * selected 상태는 라벨 TextView가 아니라 클릭 가능한 탭 버튼(부모 노드)의
+   * AccessibilityNodeInfo에 실린다 — 텍스트 노드의 selected는 항상 false다
+   * (CI run 31724957819 실증: 탭 이동은 성공했는데 selected 판정만 전부 실패).
    */
   private async isTabSelected(tabName: string): Promise<boolean> {
     try {
+      if (this.isAndroid) {
+        const button = await $wdio(
+          `android=new UiSelector().clickable(true).childSelector(new UiSelector().text("${tabName}"))`
+        );
+        return (await button.getAttribute('selected')) === 'true';
+      }
       const tab = await this.getByText(tabName);
-      const selected = await tab.getAttribute('selected');
-      return selected === 'true';
+      return (await tab.getAttribute('selected')) === 'true';
     } catch {
       return false;
     }
