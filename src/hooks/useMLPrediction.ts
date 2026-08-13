@@ -10,10 +10,11 @@
  * TensorFlow is disabled - uses fallback predictions
  */
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/services/auth/AuthContext';
 import { modelService, trainingService } from '@/services/ml';
 import { commuteLogService } from '@/services/pattern/commuteLogService';
+import { averageCommuteDurationFor } from '@/services/pattern/commuteDuration';
 import { weatherService } from '@/services/weather/weatherService';
 import { useLocation } from '@/hooks/useLocation';
 import {
@@ -52,13 +53,21 @@ export interface UseMLPredictionState {
   /** Whether enough data for ML training */
   hasEnoughData: boolean;
   /**
-   * User's personal baseline commute duration in minutes.
+   * User's personal baseline commute duration in minutes, for one leg.
    *
-   * Average of actual durations from recent logs that have both
-   * departureTime and arrivalTime. `null` when there are no usable logs.
-   * Drives MLHeroCard's "평소보다 ±N분" delta pill.
+   * Average of measured durations from recent logs that ran exactly
+   * `origin` → `destination` (matched by station name) and carry both
+   * departureTime and arrivalTime. `null` when the leg is unresolved or has no
+   * completed logs. Drives MLHeroCard's "평소보다 ±N분" delta pill.
+   *
+   * The leg is a required argument rather than an internal default: the two
+   * directions of a commute are different populations, so any caller that
+   * labels a number "출근" must ask for that leg explicitly.
    */
-  baselineMinutes: number | null;
+  baselineMinutesFor: (
+    origin: string | undefined,
+    destination: string | undefined
+  ) => number | null;
 }
 
 export interface UseMLPredictionActions {
@@ -109,27 +118,16 @@ export function useMLPrediction(): UseMLPredictionReturn {
   // ML은 modelService의 weather 기본값 'clear'로 동작 (graceful degrade).
   const { location } = useLocation();
 
-  // Baseline = simple average of past actual commute durations (HH:mm pairs).
-  // Wraps midnight to handle late-night commutes (23:55 → 00:20 = 25min).
-  const baselineMinutes = useMemo<number | null>(() => {
-    const MIN_PER_DAY = 24 * 60;
-    const parse = (s?: string): number | null => {
-      if (!s) return null;
-      const m = /^(\d{1,2}):(\d{2})$/.exec(s.trim());
-      if (!m) return null;
-      return parseInt(m[1]!, 10) * 60 + parseInt(m[2]!, 10);
-    };
-    const durations: number[] = [];
-    for (const log of logs) {
-      const d = parse(log.departureTime);
-      const a = parse(log.arrivalTime);
-      if (d === null || a === null) continue;
-      const diff = ((a - d) % MIN_PER_DAY + MIN_PER_DAY) % MIN_PER_DAY;
-      if (diff > 0) durations.push(diff);
-    }
-    if (durations.length === 0) return null;
-    return durations.reduce((sum, n) => sum + n, 0) / durations.length;
-  }, [logs]);
+  // Baseline = average of past *measured* commute durations, scoped to one
+  // origin→destination leg. Callers must pass the leg they are labelling: a
+  // round trip is not one population (real data: 산곡→선릉 ~69min vs 선릉→산곡
+  // ~81min), so a leg-blind mean is wrong in both directions at once. Returns
+  // null for an unresolved or unseen leg so the UI shows its honest empty state.
+  const baselineMinutesFor = useCallback(
+    (origin: string | undefined, destination: string | undefined): number | null =>
+      averageCommuteDurationFor(logs, origin, destination),
+    [logs]
+  );
 
   // Initialize model on mount (fallback mode)
   useEffect(() => {
@@ -342,7 +340,7 @@ export function useMLPrediction(): UseMLPredictionReturn {
     isTraining,
     logCount,
     hasEnoughData: logCount >= MIN_LOGS_FOR_ML_TRAINING,
-    baselineMinutes,
+    baselineMinutesFor,
 
     // Actions
     refreshPrediction,

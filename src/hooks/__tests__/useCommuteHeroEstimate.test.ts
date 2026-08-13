@@ -22,7 +22,7 @@ import { useAuth } from '@/services/auth/AuthContext';
 import { trainService } from '@/services/train/trainService';
 
 jest.mock('@/hooks/useMLPrediction', () => ({
-  useMLPrediction: jest.fn(() => ({ prediction: null, baselineMinutes: null })),
+  useMLPrediction: jest.fn(() => ({ prediction: null, baselineMinutesFor: () => null })),
 }));
 
 jest.mock('@/hooks/useFirestoreMorningCommute', () => ({
@@ -68,7 +68,7 @@ const userWithProfileCommute = (
 describe('useCommuteHeroEstimate', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseMLPrediction.mockReturnValue({ prediction: null, baselineMinutes: null });
+    mockUseMLPrediction.mockReturnValue({ prediction: null, baselineMinutesFor: () => null });
     mockUseFirestoreMorningCommute.mockReturnValue(null);
     mockUseFirestoreCommuteLeg.mockReturnValue(null);
     mockResolveActiveCommuteType.mockReturnValue('morning');
@@ -93,7 +93,7 @@ describe('useCommuteHeroEstimate', () => {
         predictedArrivalTime: '08:28',
         confidence: 0.82,
       },
-      baselineMinutes: 31,
+      baselineMinutesFor: () => 31,
     });
     mockUseFirestoreMorningCommute.mockReturnValue({
       departureTime: '08:00',
@@ -110,6 +110,64 @@ describe('useCommuteHeroEstimate', () => {
     expect(result.current.effectiveHero?.arrivalTime).toBe('08:28');
     expect(result.current.effectiveHero?.confidence).toBe(0.82);
     expect(result.current.effectiveDepartureTime).toBe('08:00');
+  });
+
+  // Wiring regression: the baseline must be looked up for the leg the number is
+  // labelled as. commuteStationNames tracks the ACTIVE leg, so on the evening
+  // leg it names the reverse OD — asking with those would price a morning
+  // number off the (measurably slower) return trip.
+  it('asks for the baseline of the morning OD, using resolved station names', async () => {
+    const baselineMinutesFor = jest.fn(() => 31);
+    mockUseMLPrediction.mockReturnValue({
+      prediction: {
+        predictedDepartureTime: '08:00',
+        predictedArrivalTime: '08:28',
+        confidence: 0.82,
+      },
+      baselineMinutesFor,
+    });
+    mockUseFirestoreMorningCommute.mockReturnValue({
+      departureTime: '08:00',
+      stationId: '0150',
+      destinationStationId: '0220',
+    });
+    mockGetStation.mockImplementation((id: string) =>
+      Promise.resolve(
+        id === '0150'
+          ? { name: '산곡', lineId: '7' }
+          : { name: '선릉', lineId: '2' },
+      ),
+    );
+
+    const { result } = renderHook(() => useCommuteHeroEstimate());
+
+    await waitFor(() => {
+      expect(baselineMinutesFor).toHaveBeenCalledWith('산곡', '선릉');
+    });
+    expect(result.current.effectiveHero?.deltaMinutes).toBe(-3);
+  });
+
+  it('does not surface an ML hero on the evening leg (baseline would be the wrong OD)', async () => {
+    mockResolveActiveCommuteType.mockReturnValue('evening');
+    const baselineMinutesFor = jest.fn(() => 31);
+    mockUseMLPrediction.mockReturnValue({
+      prediction: {
+        predictedDepartureTime: '08:00',
+        predictedArrivalTime: '08:28',
+        confidence: 0.82,
+      },
+      baselineMinutesFor,
+    });
+    mockUseFirestoreCommuteLeg.mockReturnValue({
+      departureTime: '18:40',
+      stationId: '0220',
+      destinationStationId: '0150',
+    });
+
+    const { result } = renderHook(() => useCommuteHeroEstimate(0, 'auto'));
+
+    expect(result.current.hasRealPrediction).toBe(false);
+    expect(result.current.effectiveHero?.confidence).toBeUndefined();
   });
 
   it('falls back to graph ride minutes (no ML) and derives arrival from departure + ride', async () => {
@@ -216,7 +274,7 @@ describe('useCommuteHeroEstimate', () => {
 describe('useCommuteHeroEstimate direction=auto (evening switch)', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockUseMLPrediction.mockReturnValue({ prediction: null, baselineMinutes: null });
+    mockUseMLPrediction.mockReturnValue({ prediction: null, baselineMinutesFor: () => null });
     mockUseFirestoreMorningCommute.mockReturnValue(null);
     mockUseFirestoreCommuteLeg.mockReturnValue(null);
     mockResolveActiveCommuteType.mockReturnValue('morning');
@@ -252,7 +310,7 @@ describe('useCommuteHeroEstimate direction=auto (evening switch)', () => {
         predictedArrivalTime: '08:30',
         confidence: 0.9,
       },
-      baselineMinutes: 30,
+      baselineMinutesFor: () => 30,
     });
 
     const { result } = renderHook(() => useCommuteHeroEstimate(0, 'auto'));
@@ -283,7 +341,7 @@ describe('useCommuteHeroEstimate direction=auto (evening switch)', () => {
         predictedArrivalTime: '08:28',
         confidence: 0.8,
       },
-      baselineMinutes: 31,
+      baselineMinutesFor: () => 31,
     });
 
     const { result } = renderHook(() => useCommuteHeroEstimate(0, 'auto'));

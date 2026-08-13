@@ -328,12 +328,13 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
   const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
-  // ML prediction wiring for the Hero ETA card. baselineMinutes is the average
-  // of the user's actual past commute durations; prediction.confidence (when
-  // available) tightens the ±N-minute interval. The hero ETA derivation lives
-  // below (after `morningRoute` is declared) so it can fall back to the shared
-  // graph-search estimate for the configured route.
-  const { baselineMinutes, prediction } = useMLPrediction();
+  // ML prediction wiring for the Hero ETA card. baselineMinutesFor gives the
+  // average of the user's actual past durations *for one leg* — the morning OD
+  // is passed below, since that is the leg this screen's hero is labelled as;
+  // prediction.confidence (when available) tightens the ±N-minute interval. The
+  // hero ETA derivation lives below (after `morningRoute` is declared) so it can
+  // fall back to the shared graph-search estimate for the configured route.
+  const { baselineMinutesFor, prediction } = useMLPrediction();
 
   // Toast feedback for the "저장" header action. Settings already persist
   // optimistically on each change, so the toast is an explicit confirmation
@@ -418,6 +419,13 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
   const heroRouteSummary = useCommuteRouteSummary(
     morningRoute?.departureStation.stationId,
     morningRoute?.arrivalStation.stationId,
+  );
+  // Scoped to the morning leg specifically: this number is labelled 출근 (hero
+  // card + the morning RouteCard below), and the return trip runs measurably
+  // slower, so a leg-blind average would misreport both directions.
+  const baselineMinutes = baselineMinutesFor(
+    morningRoute?.departureStation.stationName,
+    morningRoute?.arrivalStation.stationName,
   );
   // truncateMinutes (not raw): graph rideMinutes can carry a float tail (e.g.
   // 25.7) and every displayed minute in the app must be truncated — same SoT as

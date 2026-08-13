@@ -114,7 +114,8 @@ jest.mock('@/components/common/Toast', () => {
 jest.mock('@/hooks/useMLPrediction', () => ({
   useMLPrediction: () => ({
     prediction: null,
-    baselineMinutes: null,
+    // Leg-scoped selector: "no measured logs for this OD yet" → null.
+    baselineMinutesFor: () => null,
     loading: false,
     error: null,
     modelMetadata: null,
