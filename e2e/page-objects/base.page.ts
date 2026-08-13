@@ -20,19 +20,31 @@ export class BasePage {
   }
 
   /**
-   * Get element by accessibility ID (testID in React Native)
-   * @param accessibilityId - The testID attribute value
+   * Build the platform-correct locator for a React Native `testID`.
+   *
+   * Android에서 RN(0.71+)의 testID는 resource-id로 노출되고, `~`(accessibility id)는
+   * content-desc(accessibilityLabel)만 매칭한다 — 기존 `~` 단일 전략은 testID를 단 하나도
+   * 찾지 못해 전 spec이 대기 타임아웃으로 죽었다 (2026-08-13 nightly 재진단).
+   * iOS는 testID가 accessibility identifier로 노출되므로 `~`가 맞다.
    */
-  protected $(accessibilityId: string): Promise<WebdriverIO.Element> {
-    return $wdio(`~${accessibilityId}`);
+  private testIdLocator(testId: string): string {
+    return this.isAndroid ? `id=${testId}` : `~${testId}`;
   }
 
   /**
-   * Get elements by accessibility ID
-   * @param accessibilityId - The testID attribute value
+   * Get element by React Native testID (Android: resource-id, iOS: accessibility id)
+   * @param testId - The testID attribute value
    */
-  protected $$(accessibilityId: string): Promise<WebdriverIO.ElementArray> {
-    return $$wdio(`~${accessibilityId}`);
+  protected $(testId: string): Promise<WebdriverIO.Element> {
+    return $wdio(this.testIdLocator(testId));
+  }
+
+  /**
+   * Get elements by React Native testID
+   * @param testId - The testID attribute value
+   */
+  protected $$(testId: string): Promise<WebdriverIO.ElementArray> {
+    return $$wdio(this.testIdLocator(testId));
   }
 
   /**
@@ -137,8 +149,9 @@ export class BasePage {
    */
   async scrollToElement(accessibilityId: string): Promise<WebdriverIO.Element> {
     if (this.isAndroid) {
+      // testID는 content-desc가 아니라 resource-id로 노출되므로 resourceId 매처를 쓴다
       return $wdio(
-        `android=new UiScrollable(new UiSelector().scrollable(true)).scrollIntoView(new UiSelector().description("${accessibilityId}"))`
+        `android=new UiScrollable(new UiSelector().scrollable(true)).scrollIntoView(new UiSelector().resourceId("${accessibilityId}"))`
       );
     }
     // iOS scroll implementation
