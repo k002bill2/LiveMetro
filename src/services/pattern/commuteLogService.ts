@@ -24,6 +24,7 @@ import {
   getDayOfWeek,
   formatDateString,
   getCurrentTimeString,
+  parseTimeToMinutes,
   MAX_LOG_AGE_DAYS,
   fromCommuteLogDoc,
 } from '@/models/pattern';
@@ -65,6 +66,42 @@ export const matchesLeg = (
   arrivalStationName: string
 ): boolean =>
   log.arrivalStationName === arrivalStationName || log.arrivalStationName === '';
+
+const MIN_PER_DAY = 24 * 60;
+
+/**
+ * Longest commute an arrival stamp may record. An open log older than this is
+ * an abandoned record, not a trip in progress — completing it writes a
+ * fabricated duration straight into `baselineMinutes` (prod, 2026-08-05: a
+ * 12:45 log adopted at 18:54 recorded a 369-min commute). 3h clears the whole
+ * Seoul network end-to-end with headroom, so no real journey is refused.
+ */
+export const MAX_OPEN_LOG_AGE_MIN = 180;
+
+/**
+ * True when stamping an arrival at `atTime` on `log` would record a plausible
+ * commute.
+ *
+ * The basis is `departureTime`, not `createdAt`, for two reasons: it is the
+ * exact quantity the recorded duration is computed from — guard and harm share
+ * a unit — and guidance refreshes `departureTime` to the *measured* departure
+ * while leaving `createdAt` at the doc's creation, so a `createdAt` basis would
+ * penalise precisely the logs whose departure is most accurate.
+ *
+ * Callers hold same-date logs only, so the wrap yields exactly the elapsed
+ * minutes. An unparseable departureTime is allowed through: `baselineMinutes`
+ * cannot parse it either, so such a log never reaches the average anyway.
+ */
+export const isCompletableAt = (
+  log: Pick<CommuteLog, 'departureTime'>,
+  atTime: string
+): boolean => {
+  const departed = parseTimeToMinutes(log.departureTime);
+  const now = parseTimeToMinutes(atTime);
+  if (!Number.isFinite(departed) || !Number.isFinite(now)) return true;
+  const elapsed = (((now - departed) % MIN_PER_DAY) + MIN_PER_DAY) % MIN_PER_DAY;
+  return elapsed <= MAX_OPEN_LOG_AGE_MIN;
+};
 
 export interface AdoptableOpenLog {
   readonly log: CommuteLog;
@@ -359,13 +396,16 @@ class CommuteLogService {
     // matchesLeg, we have no route to repair it with, so filling it would pair
     // this evening timestamp with an unrelated morning departure and record a
     // ~10-hour commute (08:05 → 18:40) into baselineMinutes.
+    const arrivalTime = getCurrentTimeString();
     const openLegsToHere = (await this.getTodayLogs(userId)).filter(
-      (log) => !log.arrivalTime && log.arrivalStationName === stationName
+      (log) =>
+        !log.arrivalTime &&
+        log.arrivalStationName === stationName &&
+        isCompletableAt(log, arrivalTime)
     );
     const target = openLegsToHere[0];
     if (!target) return null;
 
-    const arrivalTime = getCurrentTimeString();
     await this.updateLog(userId, target.id, { arrivalTime });
     return { ...target, arrivalTime };
   }
@@ -405,9 +445,14 @@ class CommuteLogService {
     }
 
     // arrival (퇴근): fill this leg's open log, or start an evening-only log.
-    const adoptable = findAdoptableOpenLog(legLogs, routeInput.arrivalStationName);
+    // Logs too old to yield a plausible commute are withheld from adoption —
+    // they stay open rather than receiving a fabricated arrival.
+    const arrivalTime = getCurrentTimeString();
+    const adoptable = findAdoptableOpenLog(
+      legLogs.filter((log) => isCompletableAt(log, arrivalTime)),
+      routeInput.arrivalStationName
+    );
     if (adoptable) {
-      const arrivalTime = getCurrentTimeString();
       const repair: Partial<CreateCommuteLogInput> = adoptable.needsRepair
         ? {
             arrivalStationId: routeInput.arrivalStationId,

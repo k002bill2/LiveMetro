@@ -47,6 +47,12 @@ jest.mock('@/models/pattern', () => ({
   getDayOfWeek: jest.fn(() => 1), // Monday
   formatDateString: jest.fn((date) => date.toISOString().split('T')[0]),
   getCurrentTimeString: jest.fn(() => '08:30'),
+  // Inline (not a captured jest.fn) — a factory may not close over outer refs.
+  // Mirrors the real helper so the staleness bound is exercised, not stubbed.
+  parseTimeToMinutes: (time: string) => {
+    const parts = String(time).split(':').map(Number);
+    return (parts[0] ?? 0) * 60 + (parts[1] ?? 0);
+  },
   fromCommuteLogDoc: jest.fn((id, userId, data) => ({
     id,
     userId,
@@ -454,6 +460,76 @@ describe('CommuteLogService', () => {
         expect(mockUpdateDoc).not.toHaveBeenCalled();
       });
 
+      // Regression: adoption had no staleness bound, so an open log from hours
+      // earlier was still completable. Observed in prod: a 12:45 log adopted at
+      // 18:54 recorded a 369-min "commute" into baselineMinutes.
+      it('refuses an open log too old to yield a plausible commute (08:00 → 18:40 = 640min)', async () => {
+        const staleOpenDoc = {
+          id: 'stale-open',
+          data: () => ({
+            ...openEveningLegDoc.data(),
+            departureTime: '08:00',
+          }),
+        };
+        mockGetDocs.mockResolvedValue({ empty: false, docs: [staleOpenDoc] });
+
+        const result = await commuteLogService.autoLogIfAppropriate(
+          'user-123',
+          'sindorim',
+          '신도림',
+          '2',
+          'arrival'
+        );
+
+        expect(result).toBeNull();
+        // The stale log is left open and untouched, never back-filled.
+        expect(mockUpdateDoc).not.toHaveBeenCalled();
+      });
+
+      it('still adopts an open log inside the bound (17:25 → 18:40 = 75min)', async () => {
+        const freshOpenDoc = {
+          id: 'fresh-open',
+          data: () => ({
+            ...openEveningLegDoc.data(),
+            departureTime: '17:25',
+          }),
+        };
+        mockGetDocs.mockResolvedValue({ empty: false, docs: [freshOpenDoc] });
+
+        const result = await commuteLogService.autoLogIfAppropriate(
+          'user-123',
+          'sindorim',
+          '신도림',
+          '2',
+          'arrival'
+        );
+
+        expect(result?.id).toBe('fresh-open');
+        expect(mockUpdateDoc).toHaveBeenCalledTimes(1);
+      });
+
+      it('adopts exactly at the bound (15:40 → 18:40 = 180min)', async () => {
+        const boundaryDoc = {
+          id: 'boundary-open',
+          data: () => ({
+            ...openEveningLegDoc.data(),
+            departureTime: '15:40',
+          }),
+        };
+        mockGetDocs.mockResolvedValue({ empty: false, docs: [boundaryDoc] });
+
+        const result = await commuteLogService.autoLogIfAppropriate(
+          'user-123',
+          'sindorim',
+          '신도림',
+          '2',
+          'arrival'
+        );
+
+        expect(result?.id).toBe('boundary-open');
+        expect(mockUpdateDoc).toHaveBeenCalledTimes(1);
+      });
+
       it('propagates a Firestore read failure to the caller', async () => {
         mockGetDocs.mockRejectedValue(new Error('firestore unavailable'));
 
@@ -722,6 +798,64 @@ describe('CommuteLogService', () => {
       expect(result).toBeNull();
       expect(mockAddDoc).not.toHaveBeenCalled();
       expect(mockUpdateDoc).not.toHaveBeenCalled();
+    });
+
+    // Same staleness bound as autoLogIfAppropriate — this path writes
+    // arrivalTime too, so an abandoned open log must not be back-filled here
+    // either. Prod evidence: 12:45 log adopted at 18:54 → 369min recorded.
+    describe('open-log staleness bound', () => {
+      afterEach(() => {
+        (getCurrentTimeString as jest.Mock).mockReturnValue('08:30');
+      });
+
+      it('starts a fresh log instead of back-filling a stale one, leaving it open', async () => {
+        (getCurrentTimeString as jest.Mock).mockReturnValue('18:54');
+        const staleOpenDoc = {
+          id: 'stale-open',
+          data: () => ({
+            ...sameLegOpenDoc.data(),
+            departureTime: '12:45',
+          }),
+        };
+        mockGetDocs.mockResolvedValue({ empty: false, docs: [staleOpenDoc] });
+        mockAddDoc.mockResolvedValue({ id: 'fresh-evening-log' });
+
+        const result = await commuteLogService.autoLogCommuteRoute(
+          'user-123',
+          mockRoute,
+          'arrival'
+        );
+
+        // The abandoned 12:45 log keeps its open state — no fabricated arrival.
+        expect(mockUpdateDoc).not.toHaveBeenCalled();
+        // A standalone evening log starts instead, stamped at the current time.
+        expect(mockAddDoc).toHaveBeenCalledTimes(1);
+        expect(mockAddDoc.mock.calls[0][1].departureTime).toBe('18:54');
+        expect(mockAddDoc.mock.calls[0][1].arrivalTime).toBeUndefined();
+        expect(result).not.toBeNull();
+      });
+
+      it('still adopts an open log inside the bound', async () => {
+        (getCurrentTimeString as jest.Mock).mockReturnValue('18:54');
+        const freshOpenDoc = {
+          id: 'fresh-open',
+          data: () => ({
+            ...sameLegOpenDoc.data(),
+            departureTime: '17:40',
+          }),
+        };
+        mockGetDocs.mockResolvedValue({ empty: false, docs: [freshOpenDoc] });
+
+        const result = await commuteLogService.autoLogCommuteRoute(
+          'user-123',
+          mockRoute,
+          'arrival'
+        );
+
+        expect(mockUpdateDoc).toHaveBeenCalledTimes(1);
+        expect(mockAddDoc).not.toHaveBeenCalled();
+        expect(result?.arrivalTime).toBe('18:54');
+      });
     });
   });
 
