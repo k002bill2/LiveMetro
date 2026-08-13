@@ -40,7 +40,12 @@ jobs:
       (github.event_name == 'workflow_dispatch' &&
        (inputs.platform == 'android' || inputs.platform == 'both'))
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # 70분 근거(2026-08-13 실측): cold run은 Gradle release+Hermes 빌드만 ~35분(2-core)
+    # + AVD 스냅샷 생성 ~8분 + 테스트 ~8분 + 셋업 ~8분. 캐시 적중 시 ~25분으로 줄지만
+    # 첫 실행·캐시 증발 시 45분은 빌드 도중 잘려 Gradle 캐시조차 저장 못 하는 cold 루프에
+    # 빠진다. 지금은 스텝이 전부 정상 종료하므로(좀비 없음) 넉넉한 timeout이 실패를
+    # 은폐하지 않는다 — 실패는 wdio exit code가 결정한다.
+    timeout-minutes: 70
 
     # EXPO_PUBLIC_* 는 Gradle 빌드 중 Metro 번들링 시점에 JS로 inline 되므로 빌드 스텝이
     # 반드시 필요로 한다 (매핑은 preview-ota.yml과 동일). Firebase 키들은
