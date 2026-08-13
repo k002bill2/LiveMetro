@@ -27,6 +27,33 @@ const formatEpochAsTime = (epochMs: number): string => {
 const rideSegmentsOf = (session: GuidanceSession): readonly RouteSegment[] =>
   session.route.segments.filter(segment => !segment.isTransfer);
 
+/**
+ * Guard against tap-through "completions": stepping through guidance manually
+ * flips isAtEnd in minutes, and that timestamp would be recorded as this
+ * route's measured duration (prod: an 8-minute log on a 75-minute route).
+ * A journey this much faster than the route's own estimate didn't happen —
+ * measured durations include platform waiting, so real ones normally EXCEED
+ * the ride estimate. Complements the staleness ceiling (#324): recorded
+ * durations must be plausible for the route, bounded on both sides.
+ */
+const MIN_COMPLETION_RATIO = 0.5;
+const isPlausibleCompletion = (
+  session: GuidanceSession,
+  completedAt: number
+): boolean => {
+  // Realtime boarding wait is folded into totalMinutes at search time, but it
+  // may have fully elapsed before the user pressed the guidance CTA
+  // (startedAt) — compare against the structural estimate, or a legitimate
+  // short trip after a long platform wait would be discarded. When the wait
+  // has NOT yet elapsed this floor is lower than it could be; that is the
+  // deliberate side: a floor must prefer accepting a marginal ghost (bounded
+  // elsewhere) over permanently discarding a real measurement.
+  const estimate =
+    session.route.totalMinutes - (session.route.boardingWaitMinutes ?? 0);
+  if (!Number.isFinite(estimate) || estimate <= 0) return true;
+  return (completedAt - session.startedAt) / 60_000 >= estimate * MIN_COMPLETION_RATIO;
+};
+
 export const buildGuidanceCommuteLogInput = (
   session: GuidanceSession,
   completedAt?: number
@@ -116,6 +143,20 @@ export const completeGuidanceCommuteLog = async (
     live !== null && live.startedAt === session.startedAt ? live : null;
 
   if (session.commuteLogCompletedAt || liveSession?.commuteLogCompletedAt) return;
+
+  if (!isPlausibleCompletion(session, completedAt)) {
+    // Skip the arrival write (the departure log stays open — same rule as the
+    // prod cleanup), but DO stamp commuteLogCompletedAt: the sync hook retries
+    // on every emit while localCompletedAt is set without it, and the outbox
+    // slot only clears on resolve. Stamp + resolve terminates both loops.
+    const current = getGuidanceSession();
+    if (!current || current.startedAt !== session.startedAt) return;
+    setGuidanceSession({
+      ...current,
+      commuteLogCompletedAt: completedAt,
+    });
+    return;
+  }
 
   const input = buildGuidanceCommuteLogInput(session, completedAt);
   if (!input) return;
