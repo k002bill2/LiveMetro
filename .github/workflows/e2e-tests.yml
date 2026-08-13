@@ -105,11 +105,29 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
+      # 합성 전에 필수 secrets 를 검증한다 (Codex 리뷰 반영): secret 누락 시에도 빈 값으로
+      # 유효한 JSON 이 만들어져 앱이 dev 기본값 백엔드로 조용히 실행될 수 있다 — 명확히
+      # 실패시킨다. _2/_3 폴백 키는 선택이므로 검사하지 않는다 (preview-ota.yml 과 동일 정책).
+      - name: Validate required secrets
+        run: |
+          missing=0
+          for v in EXPO_PUBLIC_FIREBASE_API_KEY EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN \
+                   EXPO_PUBLIC_FIREBASE_PROJECT_ID EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET \
+                   EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID EXPO_PUBLIC_FIREBASE_APP_ID \
+                   EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY EXPO_PUBLIC_DATA_PORTAL_API_KEY \
+                   EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID; do
+            if [ -z "${!v}" ]; then echo "::error::required secret $v is empty"; missing=1; fi
+          done
+          exit $missing
+
       # google-services.json 은 gitignored 시크릿이라 CI 체크아웃에 없다. 이 앱은 Firebase
       # JS SDK(firebase@10)만 쓰므로 네이티브 설정은 런타임에 읽히지 않는다 — 이 파일은
       # prebuild가 android/app/ 로 복사하고 google-services gradle plugin 이 파싱만 통과하면
       # 된다. 기존 EXPO_PUBLIC_FIREBASE_* secrets 에서 합성한다 (신규 secret 불필요).
       # FIREBASE_APP_ID 는 웹 앱 id(1:n:web:x)라 plugin 형식 기대에 맞춰 android 로 치환한다.
+      # known-limit: 합성 파일은 실제 Android Firebase 클라이언트 등록이 아니므로 FCM 네이티브
+      # 푸시는 이 파이프라인에서 검증 불가 — 단 에뮬레이터가 default(non-GMS) 이미지라 실파일을
+      # 넣어도 FCM 은 어차피 동작하지 않고, 현행 4개 spec 은 push 를 검증하지 않는다.
       - name: Synthesize google-services.json (prebuild pass-through)
         run: |
           cat > google-services.json <<EOF
