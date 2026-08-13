@@ -893,4 +893,59 @@ describe('WeeklyPredictionScreen — unified headline source', () => {
     const { findByText } = render(<WeeklyPredictionScreen />);
     expect(await findByText('예상 26분')).toBeTruthy();
   });
+
+  it('renders an honest ghost — not a fabricated 30분 — for a prediction without predictedMinutes', () => {
+    // Prod regression: every weekday prediction existed but lost its duration
+    // (unresolved station ids), so all five bars showed the hardcoded 30-min
+    // default. A missing duration must render the hasData:false placeholder.
+    (useCommutePattern as jest.Mock).mockReturnValue({
+      todayPrediction: null,
+      patterns: [],
+      weekPredictions: [
+        {
+          // 화 (index 1): real duration → real bar.
+          date: '2026-08-11',
+          dayOfWeek: 2,
+          predictedDepartureTime: '08:30',
+          route: {
+            departureStationId: '3762',
+            departureStationName: '산곡',
+            arrivalStationId: '1023',
+            arrivalStationName: '선릉',
+            lineIds: ['7'],
+          },
+          confidence: 0.5,
+          suggestedAlertTime: '08:15',
+          predictedMinutes: 82,
+        },
+        {
+          // 수 (index 2): prediction present but duration undefined.
+          date: '2026-08-12',
+          dayOfWeek: 3,
+          predictedDepartureTime: '08:30',
+          route: {
+            departureStationId: '3762',
+            departureStationName: '산곡',
+            arrivalStationId: '1023',
+            arrivalStationName: '선릉',
+            lineIds: ['7'],
+          },
+          confidence: 0.5,
+          suggestedAlertTime: '08:15',
+        },
+      ],
+      recentLogs: [],
+      notificationSettings: null,
+      todayNotification: null,
+      loading: false,
+      error: null,
+    });
+
+    const { queryAllByText, getByTestId, getByText } = render(<WeeklyPredictionScreen />);
+
+    expect(getByText('82분')).toBeTruthy();
+    expect(getByTestId('weekly-bar-1')).toBeTruthy();
+    expect(getByTestId('weekly-bar-placeholder-2')).toBeTruthy();
+    expect(queryAllByText('30분')).toHaveLength(0);
+  });
 });

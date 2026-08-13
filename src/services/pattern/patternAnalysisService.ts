@@ -39,6 +39,7 @@ import {
   fromCommutePatternDoc,
 } from '@/models/pattern';
 import { calculateRoute } from '@/services/route/routeService';
+import { resolveInternalStationId } from '@/utils/stationIdResolver';
 import { commuteLogService } from './commuteLogService';
 
 const COLLECTION_NAME = 'commutePatterns';
@@ -126,12 +127,20 @@ class PatternAnalysisService {
     }
 
     // Resolve transit segments — soft-fail to null route on any failure.
+    // Pattern docs persist whatever id domain the source logs carried (Seoul
+    // API station_cd like "3762"/"1023"), while the route graph is slug-keyed;
+    // bridge at this boundary or every prediction silently loses its duration.
+    // Unresolvable ids pass through unchanged so the graph's own null return
+    // stays the single soft-fail path.
+    const departureStationId =
+      resolveInternalStationId(pattern.frequentRoute.departureStationId) ??
+      pattern.frequentRoute.departureStationId;
+    const arrivalStationId =
+      resolveInternalStationId(pattern.frequentRoute.arrivalStationId) ??
+      pattern.frequentRoute.arrivalStationId;
     let route: ReturnType<typeof calculateRoute> = null;
     try {
-      route = calculateRoute(
-        pattern.frequentRoute.departureStationId,
-        pattern.frequentRoute.arrivalStationId,
-      );
+      route = calculateRoute(departureStationId, arrivalStationId);
     } catch {
       route = null;
     }

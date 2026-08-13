@@ -303,6 +303,76 @@ describe('PatternAnalysisService', () => {
       expect(result?.direction).toBe('up');
     });
 
+    it('resolves external station_cd ids (prod pattern docs) to internal slugs for the route graph', async () => {
+      // Prod commutePatterns docs persist Seoul API station_cd ids ("3762"
+      // 산곡 / "1023" 선릉) because logs carry that domain. The route graph is
+      // slug-keyed, so unresolved ids made every weekday prediction lose its
+      // duration (weekly trend fell back to a fabricated 30min).
+      jest.spyOn(patternAnalysisService, 'getPatternForDay').mockResolvedValueOnce({
+        userId: 'u1',
+        dayOfWeek: 4 as DayOfWeek,
+        avgDepartureTime: '08:00',
+        stdDevMinutes: 3,
+        frequentRoute: {
+          departureStationId: '3762',
+          departureStationName: '산곡',
+          arrivalStationId: '1023',
+          arrivalStationName: '선릉',
+          lineIds: ['7', '수인분당선'],
+        },
+        confidence: 0.5,
+        sampleCount: 8,
+        lastUpdated: new Date('2026-08-13'),
+      });
+      mockedCalculateRoute.mockReturnValueOnce({
+        segments: [
+          {
+            fromStationId: 's_ec82b0ea', fromStationName: '산곡',
+            toStationId: 'seolleung', toStationName: '선릉',
+            lineId: '7', lineName: '7호선',
+            estimatedMinutes: 68, isTransfer: false,
+          },
+        ],
+        totalMinutes: 68,
+        transferCount: 0,
+        lineIds: ['7'],
+      });
+
+      const result = await patternAnalysisService.predictCommute(
+        'u1',
+        new Date('2026-08-13'),
+      );
+
+      // Real join through stationIdResolver's data files — not a mock.
+      expect(mockedCalculateRoute).toHaveBeenCalledWith('s_ec82b0ea', 'seolleung');
+      expect(result?.predictedMinutes).toBe(4 + 3 + 3 + 68);
+    });
+
+    it('passes unresolvable ids through unchanged (soft-fail path stays reachable)', async () => {
+      jest.spyOn(patternAnalysisService, 'getPatternForDay').mockResolvedValueOnce({
+        userId: 'u1',
+        dayOfWeek: 2 as DayOfWeek,
+        avgDepartureTime: '08:00',
+        stdDevMinutes: 3,
+        frequentRoute: {
+          departureStationId: 'no-such-id',
+          departureStationName: 'X',
+          arrivalStationId: 'also-unknown',
+          arrivalStationName: 'Y',
+          lineIds: [],
+        },
+        confidence: 0.5,
+        sampleCount: 8,
+        lastUpdated: new Date('2026-08-13'),
+      });
+      mockedCalculateRoute.mockReturnValueOnce(null);
+
+      const result = await patternAnalysisService.predictCommute('u1', new Date('2026-05-12'));
+
+      expect(mockedCalculateRoute).toHaveBeenCalledWith('no-such-id', 'also-unknown');
+      expect(result?.predictedMinutes).toBeUndefined();
+    });
+
     it('returns base fields with transit/total/range undefined when calculateRoute returns null', async () => {
       jest.spyOn(patternAnalysisService, 'getPatternForDay').mockResolvedValueOnce({
         userId: 'u1',

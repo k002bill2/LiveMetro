@@ -24,6 +24,20 @@ describe('resolveInternalStationId', () => {
     });
   });
 
+  describe('duplicate-name stations (동명이역) disambiguate by line', () => {
+    // 양평 is the graph's only true duplicate-name pair: 5호선 s_2523 and
+    // 경의선 yangpyeong_gyeongui are different physical stations. Name-only
+    // joining would collapse both station_cds onto whichever slug registered
+    // first, routing one of them from the wrong station.
+    it('resolves 5호선 양평 station_cd "2523" to slug "s_2523"', () => {
+      expect(resolveInternalStationId('2523')).toBe('s_2523');
+    });
+
+    it('resolves 경의선 양평 station_cd "1217" to slug "yangpyeong_gyeongui"', () => {
+      expect(resolveInternalStationId('1217')).toBe('yangpyeong_gyeongui');
+    });
+  });
+
   describe('internal slug pass-through', () => {
     it('returns "seolleung" unchanged', () => {
       expect(resolveInternalStationId('seolleung')).toBe('seolleung');
