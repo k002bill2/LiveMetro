@@ -89,7 +89,7 @@ jest.mock('@/services/auth/AuthContext', () => ({
 jest.mock('@/hooks/useMLPrediction', () => ({
   useMLPrediction: jest.fn(() => ({
     prediction: null,
-    baselineMinutes: null,
+    baselineMinutesFor: () => null,
   })),
 }));
 
@@ -261,7 +261,7 @@ describe('WeeklyPredictionScreen', () => {
     // Re-apply the no-prediction default. clearAllMocks() wipes call records
     // but not mockReturnValue, so a persistent override in one test would
     // otherwise leak into the next.
-    (useMLPrediction as jest.Mock).mockReturnValue({ prediction: null, baselineMinutes: null });
+    (useMLPrediction as jest.Mock).mockReturnValue({ prediction: null, baselineMinutesFor: () => null });
     // Same leak-guard for the new store-#2 + route-step seams and the station
     // name lookup (a per-test mockImplementation otherwise persists).
     (useFirestoreMorningCommute as jest.Mock).mockReturnValue(null);
@@ -330,7 +330,7 @@ describe('WeeklyPredictionScreen', () => {
         predictedArrivalTime: '09:15',
         confidence: 0.9,
       },
-      baselineMinutes: null,
+      baselineMinutesFor: () => null,
     });
 
     const { getByText } = render(<WeeklyPredictionScreen />);
@@ -795,7 +795,7 @@ describe('WeeklyPredictionScreen', () => {
         predictedArrivalTime: '09:15',
         confidence: 0.92,
       },
-      baselineMinutes: null,
+      baselineMinutesFor: () => null,
     });
     const { getByText, queryByText } = render(<WeeklyPredictionScreen />);
     expect(getByText('92%')).toBeTruthy();
@@ -810,7 +810,7 @@ describe('WeeklyPredictionScreen — unified headline source', () => {
   // (memory project_tdd_red_mock_once_leak).
   beforeEach(() => {
     jest.clearAllMocks();
-    (useMLPrediction as jest.Mock).mockReturnValue({ prediction: null, baselineMinutes: null });
+    (useMLPrediction as jest.Mock).mockReturnValue({ prediction: null, baselineMinutesFor: () => null });
     (useCommutePattern as jest.Mock).mockReturnValue({
       todayPrediction: null,
       patterns: [],
@@ -841,7 +841,7 @@ describe('WeeklyPredictionScreen — unified headline source', () => {
         predictedArrivalTime: '09:15',
         confidence: 0.8,
       },
-      baselineMinutes: null,
+      baselineMinutesFor: () => null,
     });
     (useCommutePattern as jest.Mock).mockReturnValue({
       todayPrediction: {

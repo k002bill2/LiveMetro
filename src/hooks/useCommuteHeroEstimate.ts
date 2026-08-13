@@ -96,7 +96,7 @@ export function useCommuteHeroEstimate(
   direction: 'morning' | 'auto' = 'morning',
 ): CommuteHeroEstimate {
   const { user } = useAuth();
-  const { prediction: mlPrediction, baselineMinutes } = useMLPrediction();
+  const { prediction: mlPrediction, baselineMinutesFor } = useMLPrediction();
 
   // Two stores populate the morning commute (full rationale in HomeScreen).
   // morningCommute is always resolved — the field name stays truthful, and the
@@ -171,11 +171,21 @@ export function useCommuteHeroEstimate(
   // 1. ML prediction — door-to-door minutes from predicted departure→arrival.
   const heroProps = useMemo<CommuteHeroValue | null>(() => {
     if (!mlPrediction) return null;
+    // Morning-only is enforced *here*, not just at the effectiveHero gate
+    // below, because the baseline lookup depends on it: commuteStationNames
+    // tracks the ACTIVE leg, so on the evening leg it would name the reverse
+    // OD — producing an evening baseline for a morning number. Bailing out
+    // early keeps the names below provably the morning endpoints.
+    if (activeLeg !== 'morning') return null;
     const minutes = minutesBetween(
       mlPrediction.predictedDepartureTime,
       mlPrediction.predictedArrivalTime,
     );
     if (minutes === null) return null;
+    const baselineMinutes = baselineMinutesFor(
+      commuteStationNames.origin,
+      commuteStationNames.destination,
+    );
     const delta =
       baselineMinutes !== null ? minutes - baselineMinutes : undefined;
     return {
@@ -186,7 +196,7 @@ export function useCommuteHeroEstimate(
       origin: commuteStationNames.origin,
       destination: commuteStationNames.destination,
     };
-  }, [mlPrediction, baselineMinutes, commuteStationNames]);
+  }, [mlPrediction, activeLeg, baselineMinutesFor, commuteStationNames]);
 
   // 2. Registered commute + graph route summary fallback. Gated on resolved
   // endpoint names (faithful to HomeScreen) so the route label is always
