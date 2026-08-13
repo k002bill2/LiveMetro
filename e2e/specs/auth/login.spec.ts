@@ -33,9 +33,11 @@ describe('Auth Landing', () => {
       expect(await google.isDisplayed()).toBe(true);
       expect(await kakao.isDisplayed()).toBe(true);
       // Apple 로그인 버튼은 iOS에서만 렌더된다 (CI run 31720225752 페이지 소스
-      // 실증 — Android 트리에 social-apple 부재)
+      // 실증 — Android 트리에 social-apple 부재). iOS에서도 가용성 훅 해석 후
+      // 지연 마운트되므로 표시 대기를 선행한다 (Codex 리뷰 반영).
       if (browser.isIOS) {
         const apple = await authLanding.socialApple;
+        await apple.waitForDisplayed({ timeout: 10000 });
         expect(await apple.isDisplayed()).toBe(true);
       }
     });

@@ -19,6 +19,13 @@ class EntryFlow extends BasePage {
    * 항상 Auth 랜딩에서 시작한다.
    */
   async enterMainAsAnonymous(timeout = 60000): Promise<void> {
+    // 방어적 멱등성: 이미 Main에 있으면 곧장 반환한다. 현행 구성(spec 파일마다
+    // 새 세션 + UiAutomator2 fast reset)에서는 항상 Auth 랜딩부터 시작하지만,
+    // noReset 설정이 바뀌어 세션이 재사용되면 auth-hero 대기가 영원히 실패하는
+    // 함정을 막는다 (Codex 리뷰 반영).
+    if (await this.elementExists('home-screen')) {
+      return;
+    }
     const hero = await this.$('auth-hero');
     await hero.waitForDisplayed({ timeout: 30000 });
     await this.safeTap(await this.$('browse-cta'));
