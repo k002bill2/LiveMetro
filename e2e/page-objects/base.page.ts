@@ -25,10 +25,15 @@ export class BasePage {
    * Android에서 RN(0.71+)의 testID는 resource-id로 노출되고, `~`(accessibility id)는
    * content-desc(accessibilityLabel)만 매칭한다 — 기존 `~` 단일 전략은 testID를 단 하나도
    * 찾지 못해 전 spec이 대기 타임아웃으로 죽었다 (2026-08-13 nightly 재진단).
+   * resource-id 조회는 UiAutomator 전략으로 해야 한다 — `id=` 접두사는 wdio의
+   * appium 네이티브 전략이 아니라 즉시 NoSuchElement가 난다 (CI run 31720225752
+   * 페이지 소스 실증: resource-id="auth-hero"가 존재하는데 id=auth-hero는 실패).
    * iOS는 testID가 accessibility identifier로 노출되므로 `~`가 맞다.
    */
   private testIdLocator(testId: string): string {
-    return this.isAndroid ? `id=${testId}` : `~${testId}`;
+    return this.isAndroid
+      ? `android=new UiSelector().resourceId("${testId}")`
+      : `~${testId}`;
   }
 
   /**

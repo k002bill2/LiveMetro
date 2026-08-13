@@ -10,6 +10,7 @@
 import { browser } from '@wdio/globals';
 import authLanding from '../../page-objects/auth/auth-landing.page';
 import entryFlow from '../../page-objects/onboarding/entry-flow';
+import homePage from '../../page-objects/home/home.page';
 
 describe('Auth Landing', () => {
   before(async () => {
@@ -26,13 +27,17 @@ describe('Auth Landing', () => {
       expect(await browseCta.isDisplayed()).toBe(true);
     });
 
-    it('소셜 로그인 버튼 3종(구글·카카오·애플)이 표시된다', async () => {
+    it('소셜 로그인 버튼(구글·카카오, iOS는 애플 포함)이 표시된다', async () => {
       const google = await authLanding.socialGoogle;
       const kakao = await authLanding.socialKakao;
-      const apple = await authLanding.socialApple;
       expect(await google.isDisplayed()).toBe(true);
       expect(await kakao.isDisplayed()).toBe(true);
-      expect(await apple.isDisplayed()).toBe(true);
+      // Apple 로그인 버튼은 iOS에서만 렌더된다 (CI run 31720225752 페이지 소스
+      // 실증 — Android 트리에 social-apple 부재)
+      if (browser.isIOS) {
+        const apple = await authLanding.socialApple;
+        expect(await apple.isDisplayed()).toBe(true);
+      }
     });
   });
 
@@ -40,10 +45,7 @@ describe('Auth Landing', () => {
     it('둘러보기로 Main 홈 화면까지 도달한다', async () => {
       await entryFlow.enterMainAsAnonymous();
       // enterMainAsAnonymous가 home-screen 도달을 보장하지만, 명시적으로 재확인
-      const home = await browser.$(
-        browser.isAndroid ? 'id=home-screen' : '~home-screen'
-      );
-      expect(await home.isDisplayed()).toBe(true);
+      expect(await homePage.isDisplayed()).toBe(true);
     });
   });
 });
