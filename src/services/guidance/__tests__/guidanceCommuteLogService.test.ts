@@ -273,4 +273,106 @@ describe('guidanceCommuteLogService', () => {
     });
     expect(mockedLogCommute).not.toHaveBeenCalled();
   });
+
+  describe('implausibly fast completion (tap-through) guard', () => {
+    // Fixture route totalMinutes = 9 (2 + 4 transfer + 3) → floor = 4.5 min.
+
+    it('skips the arrival write when completion is faster than half the route estimate', async () => {
+      const session = makeSession({ commuteLogId: 'log-1' });
+      setGuidanceSession(session);
+      const tapThroughAt = STARTED_AT + 2 * 60_000; // 2 min < 4.5 min floor
+
+      await completeGuidanceCommuteLog('user-1', session, tapThroughAt);
+
+      // Departure log stays open (same rule as the prod cleanup) — no writes at all.
+      expect(mockedUpdateLog).not.toHaveBeenCalled();
+      expect(mockedLogCommute).not.toHaveBeenCalled();
+      expect(mockedGetTodayLogsByDeparture).not.toHaveBeenCalled();
+    });
+
+    it('stamps commuteLogCompletedAt on rejection so the sync loop terminates', async () => {
+      const session = makeSession({ commuteLogId: 'log-1' });
+      setGuidanceSession(session);
+      const tapThroughAt = STARTED_AT + 2 * 60_000;
+
+      await completeGuidanceCommuteLog('user-1', session, tapThroughAt);
+
+      expect(getGuidanceSession()?.commuteLogCompletedAt).toBe(tapThroughAt);
+    });
+
+    it('completes normally at exactly half the route estimate (boundary is inclusive)', async () => {
+      const session = makeSession({ commuteLogId: 'log-1' });
+      setGuidanceSession(session);
+      const boundaryAt = STARTED_AT + 4.5 * 60_000; // exactly 9 * 0.5 min
+
+      await completeGuidanceCommuteLog('user-1', session, boundaryAt);
+
+      expect(mockedUpdateLog).toHaveBeenCalledWith('user-1', 'log-1', {
+        arrivalTime: '08:12',
+      });
+      expect(getGuidanceSession()?.commuteLogCompletedAt).toBe(boundaryAt);
+    });
+
+    it('excludes the folded-in realtime boarding wait from the floor (Codex P2)', async () => {
+      // applyRealtimeBoardingWait folds the platform wait into totalMinutes at
+      // search time, but the wait may have fully elapsed before the user pressed
+      // the guidance CTA (startedAt). The floor must use the structural estimate.
+      const base = makeSession({ commuteLogId: 'log-1' });
+      const session = {
+        ...base,
+        route: {
+          ...base.route,
+          totalMinutes: base.route.totalMinutes + 10, // 9 + 10 wait = 19
+          boardingWaitMinutes: 10,
+        },
+      };
+      setGuidanceSession(session);
+      // 5 min ≥ structural floor 4.5, but < 9.5 (the wait-inflated floor).
+      const completedAtMs = STARTED_AT + 5 * 60_000;
+
+      await completeGuidanceCommuteLog('user-1', session, completedAtMs);
+
+      expect(mockedUpdateLog).toHaveBeenCalledWith('user-1', 'log-1', {
+        arrivalTime: '08:12',
+      });
+    });
+
+    it('does not block when the route estimate is zero', async () => {
+      const base = makeSession({ commuteLogId: 'log-1' });
+      const session = { ...base, route: { ...base.route, totalMinutes: 0 } };
+      setGuidanceSession(session);
+
+      await completeGuidanceCommuteLog('user-1', session, STARTED_AT + 60_000);
+
+      expect(mockedUpdateLog).toHaveBeenCalledWith('user-1', 'log-1', {
+        arrivalTime: '08:08',
+      });
+    });
+
+    it('does not block when the route estimate is not a finite number', async () => {
+      const base = makeSession({ commuteLogId: 'log-1' });
+      const session = { ...base, route: { ...base.route, totalMinutes: Number.NaN } };
+      setGuidanceSession(session);
+
+      await completeGuidanceCommuteLog('user-1', session, STARTED_AT + 60_000);
+
+      expect(mockedUpdateLog).toHaveBeenCalledWith('user-1', 'log-1', {
+        arrivalTime: '08:08',
+      });
+    });
+
+    it('resolves without writes when rejected and the store session is already gone', async () => {
+      // Outbox drain path: the store no longer holds this journey's session.
+      const snapshot = makeSession({ commuteLogId: 'log-1' });
+      const tapThroughAt = STARTED_AT + 2 * 60_000;
+
+      await expect(
+        completeGuidanceCommuteLog('user-1', snapshot, tapThroughAt)
+      ).resolves.toBeUndefined();
+
+      expect(mockedUpdateLog).not.toHaveBeenCalled();
+      expect(mockedLogCommute).not.toHaveBeenCalled();
+      expect(getGuidanceSession()).toBeNull();
+    });
+  });
 });
