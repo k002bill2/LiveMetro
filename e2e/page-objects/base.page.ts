@@ -122,11 +122,14 @@ export class BasePage {
   }
 
   /**
-   * Safe tap with wait for clickable
+   * Safe tap with wait for displayed.
+   * waitForClickable은 모바일 네이티브 컨텍스트에서 "Method not supported in
+   * mobile native environment"로 던진다 (CI run 31722635217 실증) — 표시 대기
+   * 후 바로 click 한다.
    * @param element - WebdriverIO element to tap
    */
   async safeTap(element: WebdriverIO.Element): Promise<void> {
-    await this.waitForClickable(element);
+    await this.waitForDisplayed(element);
     await element.click();
   }
 

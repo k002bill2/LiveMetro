@@ -1,6 +1,7 @@
 import type { Options } from '@wdio/types';
 import { browser } from '@wdio/globals';
 import { join } from 'path';
+import { mkdirSync } from 'fs';
 
 export const config: Partial<Options.Testrunner> = {
   // Test specs location
@@ -82,7 +83,9 @@ export const config: Partial<Options.Testrunner> = {
     { error }: { error?: Error }
   ): Promise<void> {
     if (error) {
-      // Take screenshot on failure
+      // Take screenshot on failure. 디렉토리는 gitignored라 CI 체크아웃에
+      // 존재하지 않으므로 먼저 만들어야 저장이 성공한다 (run 31722635217 실증).
+      mkdirSync('./e2e/screenshots', { recursive: true });
       const testParent = test.parent || 'unknown';
       const testTitle = test.title || 'unknown';
       await browser.saveScreenshot(
