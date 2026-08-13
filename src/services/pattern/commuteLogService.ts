@@ -79,6 +79,14 @@ const MIN_PER_DAY = 24 * 60;
 export const MAX_OPEN_LOG_AGE_MIN = 180;
 
 /**
+ * Fetch cap for {@link CommuteLogService.getRecentLogsForAnalysis}. Exported
+ * so pattern recomputation can detect a truncated fetch: a result at this
+ * size may have paged out whole weekdays, and "absent from the result" then
+ * no longer proves "no logs exist".
+ */
+export const RECENT_LOGS_ANALYSIS_LIMIT = 100;
+
+/**
  * True when stamping an arrival at `atTime` on `log` would record a plausible
  * commute.
  *
@@ -219,7 +227,7 @@ class CommuteLogService {
     cutoffDate.setDate(cutoffDate.getDate() - MAX_LOG_AGE_DAYS);
 
     return this.getCommuteLogs(userId, {
-      maxResults: 100,
+      maxResults: RECENT_LOGS_ANALYSIS_LIMIT,
       fromDate: cutoffDate,
     });
   }

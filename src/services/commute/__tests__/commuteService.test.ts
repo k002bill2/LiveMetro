@@ -5,6 +5,7 @@
 import {
   saveCommuteRoutes,
   loadCommuteRoutes,
+  loadCommuteRoutesOrThrow,
   updateMorningRoute,
   updateEveningRoute,
   updateEveningEnabled,
@@ -114,7 +115,46 @@ describe('Commute Service', () => {
     });
   });
 
+  describe('loadCommuteRoutesOrThrow', () => {
+    it('propagates a read failure instead of collapsing it into null', async () => {
+      mockGetDoc.mockRejectedValue(new Error('firestore unavailable'));
+
+      await expect(loadCommuteRoutesOrThrow('user-123')).rejects.toThrow(
+        'firestore unavailable',
+      );
+    });
+
+    it('returns null only when the document genuinely does not exist', async () => {
+      mockGetDoc.mockResolvedValue({ exists: () => false });
+
+      await expect(loadCommuteRoutesOrThrow('user-123')).resolves.toBeNull();
+    });
+
+    it('returns the settings when the document exists', async () => {
+      mockGetDoc.mockResolvedValue({
+        exists: () => true,
+        data: () => ({
+          morningRoute: mockCommuteRoute,
+          eveningRoute: null,
+          eveningEnabled: true,
+          createdAt: null,
+          updatedAt: null,
+        }),
+      });
+
+      const result = await loadCommuteRoutesOrThrow('user-123');
+
+      expect(result?.morningRoute).toBeDefined();
+    });
+  });
+
   describe('loadCommuteRoutes', () => {
+    it('still returns null on a read failure (lenient wrapper contract)', async () => {
+      mockGetDoc.mockRejectedValue(new Error('firestore unavailable'));
+
+      await expect(loadCommuteRoutes('user-123')).resolves.toBeNull();
+    });
+
     it('should load commute routes successfully', async () => {
       mockGetDoc.mockResolvedValue({
         exists: () => true,

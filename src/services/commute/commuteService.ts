@@ -115,7 +115,14 @@ export const saveCommuteRoutes = async (
  * Load commute routes from Firebase Firestore
  * Uses user UID to fetch settings
  */
-export const loadCommuteRoutes = async (
+/**
+ * Like {@link loadCommuteRoutes}, but a read FAILURE propagates instead of
+ * collapsing into the same `null` as "no settings saved". Callers that make
+ * destructive or scoping decisions off the settings (pattern recomputes)
+ * need the distinction — a transient outage must not read as "user has no
+ * commute". `null` here always means the document genuinely does not exist.
+ */
+export const loadCommuteRoutesOrThrow = async (
   uid: string
 ): Promise<CommuteSettings | null> => {
   if (!uid) {
@@ -123,25 +130,31 @@ export const loadCommuteRoutes = async (
     return null;
   }
 
+  const docRef = doc(firestore, COMMUTE_COLLECTION, uid);
+  const docSnap = await getDoc(docRef);
+
+  if (docSnap.exists()) {
+    const data = docSnap.data();
+    console.log('Commute routes loaded successfully for UID:', uid);
+    return {
+      morningRoute: data.morningRoute || null,
+      eveningRoute: data.eveningRoute || null,
+      // Legacy docs predate this field — default to enabled.
+      eveningEnabled: data.eveningEnabled ?? true,
+      createdAt: data.createdAt || null,
+      updatedAt: data.updatedAt || null,
+    };
+  }
+
+  console.log('No commute settings found for UID:', uid);
+  return null;
+};
+
+export const loadCommuteRoutes = async (
+  uid: string
+): Promise<CommuteSettings | null> => {
   try {
-    const docRef = doc(firestore, COMMUTE_COLLECTION, uid);
-    const docSnap = await getDoc(docRef);
-
-    if (docSnap.exists()) {
-      const data = docSnap.data();
-      console.log('Commute routes loaded successfully for UID:', uid);
-      return {
-        morningRoute: data.morningRoute || null,
-        eveningRoute: data.eveningRoute || null,
-        // Legacy docs predate this field — default to enabled.
-        eveningEnabled: data.eveningEnabled ?? true,
-        createdAt: data.createdAt || null,
-        updatedAt: data.updatedAt || null,
-      };
-    }
-
-    console.log('No commute settings found for UID:', uid);
-    return null;
+    return await loadCommuteRoutesOrThrow(uid);
   } catch (error) {
     console.error('Error loading commute routes:', error);
     return null;
@@ -447,6 +460,7 @@ export const deleteCommuteSettings = async (
 export default {
   saveCommuteRoutes,
   loadCommuteRoutes,
+  loadCommuteRoutesOrThrow,
   subscribeCommuteRoutes,
   updateMorningRoute,
   updateEveningRoute,
