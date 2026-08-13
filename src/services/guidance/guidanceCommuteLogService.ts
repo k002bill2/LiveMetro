@@ -10,6 +10,7 @@
 import {
   commuteLogService,
   findAdoptableOpenLog,
+  isCompletableAt,
   type CreateCommuteLogInput,
 } from '@/services/pattern/commuteLogService';
 import {
@@ -166,12 +167,17 @@ export const completeGuidanceCommuteLog = async (
   if (!commuteLogId) {
     // Neither snapshot has the id — fall back to a same-leg open log created by
     // settings auto-logging or the departure step, before creating a new doc.
-    // A destination-less stub also gets its route repaired.
+    // A destination-less stub also gets its route repaired. Logs too old to
+    // yield a plausible commute are withheld: this branch writes arrivalTime,
+    // so adopting one would fabricate the duration rather than measure it.
     const legLogs = await commuteLogService.getTodayLogsByDeparture(
       userId,
       input.departureStationName
     );
-    const adoptable = findAdoptableOpenLog(legLogs, input.arrivalStationName);
+    const adoptable = findAdoptableOpenLog(
+      legLogs.filter((log) => isCompletableAt(log, formatEpochAsTime(completedAt))),
+      input.arrivalStationName
+    );
     if (adoptable) {
       commuteLogId = adoptable.log.id;
       if (adoptable.needsRepair) {

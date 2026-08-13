@@ -20,6 +20,17 @@ jest.mock('@/services/pattern/commuteLogService', () => ({
     updateLog: jest.fn(),
     getTodayLogsByDeparture: jest.fn(),
   },
+  // Mirrors the real staleness bound (departureTime basis, 180min).
+  isCompletableAt: (log: { departureTime?: string }, atTime: string) => {
+    const toMin = (t?: string): number => {
+      const p = String(t).split(':').map(Number);
+      return (p[0] ?? 0) * 60 + (p[1] ?? 0);
+    };
+    const departed = toMin(log.departureTime);
+    const now = toMin(atTime);
+    if (!Number.isFinite(departed) || !Number.isFinite(now)) return true;
+    return ((((now - departed) % 1440) + 1440) % 1440) <= 180;
+  },
   findAdoptableOpenLog: (
     logs: readonly { arrivalStationName?: string; arrivalTime?: string }[],
     arrivalStationName: string
@@ -374,5 +385,50 @@ describe('guidanceCommuteLogService', () => {
       expect(mockedLogCommute).not.toHaveBeenCalled();
       expect(getGuidanceSession()).toBeNull();
     });
+  });
+
+  // This fallback also writes arrivalTime, so it carries the same staleness
+  // bound as the commuteLogService adoption sites: an abandoned open log must
+  // not receive a fabricated arrival (prod: 12:45 log adopted at 18:54).
+  it('refuses a stale open log on complete and creates a new one instead', async () => {
+    const session = makeSession();
+    setGuidanceSession(session);
+    mockedGetTodayLogsByDeparture.mockResolvedValue([
+      {
+        id: 'stale-open',
+        departureStationName: '시청',
+        arrivalStationName: '건대입구',
+        departureTime: '02:00', // 02:00 → 08:42 = 402min, past the 180min bound
+        arrivalTime: undefined,
+      },
+    ]);
+    mockedLogCommute.mockResolvedValue({ id: 'new-log' });
+
+    await completeGuidanceCommuteLog('user-1', session, COMPLETED_AT);
+
+    expect(mockedUpdateLog).not.toHaveBeenCalled();
+    expect(mockedLogCommute).toHaveBeenCalledTimes(1);
+  });
+
+  it('still adopts an open log inside the bound on complete', async () => {
+    const session = makeSession();
+    setGuidanceSession(session);
+    mockedGetTodayLogsByDeparture.mockResolvedValue([
+      {
+        id: 'fresh-open',
+        departureStationName: '시청',
+        arrivalStationName: '건대입구',
+        departureTime: '08:07', // 08:07 → 08:42 = 35min, well inside the bound
+        arrivalTime: undefined,
+      },
+    ]);
+    mockedUpdateLog.mockResolvedValue(undefined);
+
+    await completeGuidanceCommuteLog('user-1', session, COMPLETED_AT);
+
+    expect(mockedUpdateLog).toHaveBeenCalledWith('user-1', 'fresh-open', {
+      arrivalTime: '08:42',
+    });
+    expect(mockedLogCommute).not.toHaveBeenCalled();
   });
 });
