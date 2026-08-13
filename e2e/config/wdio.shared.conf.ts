@@ -31,7 +31,10 @@ export const config: Partial<Options.Testrunner> = {
       'appium',
       {
         args: {
-          address: 'localhost',
+          // 'localhost'는 Node 17+에서 ::1(IPv6)로 우선 해석돼 Appium이 ::1에만
+          // 바인드되는데, wdio는 127.0.0.1(IPv4)로 접속해 ECONNREFUSED가 난다
+          // (CI run 31701317587 실측). IPv4 리터럴로 바인드를 고정한다.
+          address: '127.0.0.1',
           port: 4723,
         },
         logPath: './e2e/logs/',
