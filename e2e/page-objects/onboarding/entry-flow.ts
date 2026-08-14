@@ -55,6 +55,17 @@ class EntryFlow extends BasePage {
         await this.safeTap(await this.$('onb-header-skip'));
         continue;
       }
+      // 익명 로그인 실패 Alert 감지 — AuthScreen.handleAnonymous가
+      // signInAnonymously 거부 시 띄우는 다이얼로그가 모든 마커를 가려
+      // "120초 침묵 후 타임아웃"이 된다 (run 31761026818: 마커 4종 전무).
+      // CI 다연속 실행으로 인한 Firebase Auth 익명 가입 스로틀이 의심 원인.
+      // 침묵 대신 즉시 진단 가능한 실패로 바꾼다.
+      if (await this.textExists('둘러보기 모드 진입에 실패했습니다')) {
+        throw new Error(
+          'enterMainAsAnonymous: 익명 로그인 실패 Alert 감지 — ' +
+            'signInAnonymously 거부 (Firebase Auth 익명 가입 스로틀/네트워크 오류 의심)'
+        );
+      }
       await browser.pause(500);
     }
     throw new Error(

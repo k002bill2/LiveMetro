@@ -47,7 +47,12 @@ export const config: Partial<Options.Testrunner> = {
   framework: 'mocha',
   mochaOpts: {
     ui: 'bdd',
-    timeout: 120000,
+    // 240s: 진입 흐름(enterMainAsAnonymous)의 원소 데드라인이 120s라,
+    // mocha 테스트 예산이 같은 120s면 데드라인이 발동하기 전에 mocha가
+    // 테스트를 죽여 진단 메시지가 사라진다 (run 31761026818 실증 —
+    // "Timeout of 120000ms exceeded"로 균일 실패). 진입 + 탭 이동 + 화면
+    // 대기가 한 테스트에 겹치는 before-all까지 감안해 2배 여유를 둔다.
+    timeout: 240000,
   },
 
   // TypeScript support via autoCompileOpts

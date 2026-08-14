@@ -278,6 +278,19 @@ export class BasePage {
   }
 
   /**
+   * Check if an element with the exact text is currently displayed.
+   * 네이티브 Alert처럼 testID가 없는 요소의 존재 판정에 쓴다.
+   */
+  async textExists(text: string): Promise<boolean> {
+    try {
+      const element = await this.getByText(text);
+      return await element.isDisplayed();
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Check if element exists without throwing error
    * @param accessibilityId - The testID to check
    */
