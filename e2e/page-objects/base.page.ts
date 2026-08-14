@@ -334,6 +334,17 @@ export class BasePage {
    *   완료 후에 뜨는 Alert도 있어 넉넉히 둔다)
    */
   async tapAlertButton(label: string, timeout = 15000): Promise<void> {
+    // iOS 러너는 autoAcceptAlerts 케이퍼빌리티(capabilities.ts)로 네이티브
+    // 알럿을 세션 차원에서 자동 수락한다 — 이 경우 버튼이 조회되기 전에
+    // 알럿이 이미 사라지므로, 대기하면 타임아웃으로 죽는다 (Codex P1).
+    // 케이퍼빌리티를 읽어 판단해 설정과 코드가 어긋나지 않게 한다.
+    const caps = browser.capabilities as Record<string, unknown>;
+    if (
+      caps['autoAcceptAlerts'] === true ||
+      caps['appium:autoAcceptAlerts'] === true
+    ) {
+      return;
+    }
     const button = await this.getByText(label);
     await button.waitForDisplayed({ timeout });
     await button.click();

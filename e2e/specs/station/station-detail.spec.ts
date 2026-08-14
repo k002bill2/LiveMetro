@@ -29,6 +29,30 @@ describe('Station Detail', () => {
     await favoritesPage.waitForScreen();
   });
 
+  after(async () => {
+    // Best-effort 잔여물 정리 (Codex P2 — livemetro-workflow "e2e 잔여물
+    // 방지"): 중간 테스트가 실패해도 익명 사용자의 즐겨찾기를 Firestore에
+    // 남기지 않는다. 마지막 it가 정상 삭제했다면 행이 없어 no-op이다.
+    // UI가 어느 화면에 멈췄는지 모르므로 전 단계를 방어적으로 감싼다.
+    try {
+      if (await stationDetailPage.isDisplayed()) {
+        await stationDetailPage.tapBack();
+      }
+      await favoritesPage.waitForScreen(5000);
+      if (await favoritesPage.elementExists('favorite-row-강남')) {
+        await favoritesPage.safeTap(await favoritesPage.editButton);
+        await favoritesPage.safeTap(await favoritesPage.selectCheckbox);
+        await favoritesPage.safeTap(await favoritesPage.bulkDeleteButton);
+        await favoritesPage.tapAlertButton('삭제');
+        const emptyTitle = await favoritesPage.emptyTitle;
+        await emptyTitle.waitForDisplayed({ timeout: 15000 });
+      }
+    } catch {
+      // 정리 실패가 spec 결과를 오염시키지 않는다 — 다음 spec 파일은
+      // fast reset으로 새 익명 사용자에서 시작하므로 기능 영향도 없다.
+    }
+  });
+
   it('즐겨찾기 추가(+) 버튼으로 역 검색 모달이 열린다', async () => {
     await favoritesPage.safeTap(await favoritesPage.addButton);
     await searchModal.waitForOpen();
