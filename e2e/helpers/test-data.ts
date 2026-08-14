@@ -159,64 +159,9 @@ export const mockArrivals = {
   },
 };
 
-/**
- * Test IDs used in the app
- */
-export const testIds = {
-  // Welcome screen
-  welcomeLogo: 'welcome-logo',
-  getStartedButton: 'get-started-button',
-  tryAnonymousButton: 'try-anonymous-button',
-
-  // Auth screen
-  emailInput: 'email-input',
-  passwordInput: 'password-input',
-  displayNameInput: 'displayname-input',
-  submitButton: 'submit-button',
-  anonymousLoginButton: 'anonymous-login-button',
-
-  // Home screen
-  appContainer: 'app-container',
-  refreshButton: 'refresh-button',
-  stationList: 'station-list',
-  stationCard: 'station-card',
-  trainArrivalCard: 'train-arrival-card',
-
-  // Navigation
-  homeTab: 'home-tab',
-  favoritesTab: 'favorites-tab',
-  alertsTab: 'alerts-tab',
-  settingsTab: 'settings-tab',
-
-  // Favorites screen
-  favoritesHeader: 'favorites-header',
-  searchInput: 'search-input',
-  favoriteItem: 'favorite-item',
-  emptyState: 'empty-state',
-
-  // Station detail
-  stationName: 'station-name',
-  lineIndicator: 'line-indicator',
-  prevStationButton: 'prev-station-button',
-  nextStationButton: 'next-station-button',
-  arrivalList: 'arrival-list',
-  departureTab: 'departure-tab',
-  arrivalTab: 'arrival-tab',
-  timetableTab: 'timetable-tab',
-  favoriteTab: 'favorite-tab',
-
-  // Settings
-  settingsHeader: 'settings-header',
-  signOutButton: 'sign-out-button',
-  notificationSettings: 'notification-settings',
-  themeSettings: 'theme-settings',
-  languageSettings: 'language-settings',
-
-  // Common
-  loadingIndicator: 'loading-indicator',
-  errorMessage: 'error-message',
-  toastMessage: 'toast-message',
-};
+// NOTE (2026-08-14): 과거 이 자리에 있던 `testIds` 상수는 앱에 존재하지 않는
+// 가공 testID 목록이라 제거했다. 셀렉터는 각 page object가 실제 화면의
+// testID를 직접 소유한다 — 중앙 상수로 다시 모으지 말 것 (드리프트 재발 지점).
 
 /**
  * Generate unique test email

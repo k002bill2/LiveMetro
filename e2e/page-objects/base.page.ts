@@ -20,19 +20,36 @@ export class BasePage {
   }
 
   /**
-   * Get element by accessibility ID (testID in React Native)
-   * @param accessibilityId - The testID attribute value
+   * Build the platform-correct locator for a React Native `testID`.
+   *
+   * Android에서 RN(0.71+)의 testID는 resource-id로 노출되고, `~`(accessibility id)는
+   * content-desc(accessibilityLabel)만 매칭한다 — 기존 `~` 단일 전략은 testID를 단 하나도
+   * 찾지 못해 전 spec이 대기 타임아웃으로 죽었다 (2026-08-13 nightly 재진단).
+   * resource-id 조회는 UiAutomator 전략으로 해야 한다 — `id=` 접두사는 wdio의
+   * appium 네이티브 전략이 아니라 즉시 NoSuchElement가 난다 (CI run 31720225752
+   * 페이지 소스 실증: resource-id="auth-hero"가 존재하는데 id=auth-hero는 실패).
+   * iOS는 testID가 accessibility identifier로 노출되므로 `~`가 맞다.
    */
-  protected $(accessibilityId: string): Promise<WebdriverIO.Element> {
-    return $wdio(`~${accessibilityId}`);
+  private testIdLocator(testId: string): string {
+    return this.isAndroid
+      ? `android=new UiSelector().resourceId("${testId}")`
+      : `~${testId}`;
   }
 
   /**
-   * Get elements by accessibility ID
-   * @param accessibilityId - The testID attribute value
+   * Get element by React Native testID (Android: resource-id, iOS: accessibility id)
+   * @param testId - The testID attribute value
    */
-  protected $$(accessibilityId: string): Promise<WebdriverIO.ElementArray> {
-    return $$wdio(`~${accessibilityId}`);
+  protected $(testId: string): Promise<WebdriverIO.Element> {
+    return $wdio(this.testIdLocator(testId));
+  }
+
+  /**
+   * Get elements by React Native testID
+   * @param testId - The testID attribute value
+   */
+  protected $$(testId: string): Promise<WebdriverIO.ElementArray> {
+    return $$wdio(this.testIdLocator(testId));
   }
 
   /**
@@ -105,11 +122,14 @@ export class BasePage {
   }
 
   /**
-   * Safe tap with wait for clickable
+   * Safe tap with wait for displayed.
+   * waitForClickable은 모바일 네이티브 컨텍스트에서 "Method not supported in
+   * mobile native environment"로 던진다 (CI run 31722635217 실증) — 표시 대기
+   * 후 바로 click 한다.
    * @param element - WebdriverIO element to tap
    */
   async safeTap(element: WebdriverIO.Element): Promise<void> {
-    await this.waitForClickable(element);
+    await this.waitForDisplayed(element);
     await element.click();
   }
 
@@ -137,8 +157,9 @@ export class BasePage {
    */
   async scrollToElement(accessibilityId: string): Promise<WebdriverIO.Element> {
     if (this.isAndroid) {
+      // testID는 content-desc가 아니라 resource-id로 노출되므로 resourceId 매처를 쓴다
       return $wdio(
-        `android=new UiScrollable(new UiSelector().scrollable(true)).scrollIntoView(new UiSelector().description("${accessibilityId}"))`
+        `android=new UiScrollable(new UiSelector().scrollable(true)).scrollIntoView(new UiSelector().resourceId("${accessibilityId}"))`
       );
     }
     // iOS scroll implementation

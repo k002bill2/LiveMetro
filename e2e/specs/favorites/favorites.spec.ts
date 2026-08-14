@@ -1,139 +1,28 @@
 /**
- * Favorites Screen E2E Tests
- * Tests for favorites management functionality
+ * Favorites E2E Tests — 현행 FavoritesScreen 기준 (2026-08-14 현행화)
+ *
+ * 신규 익명 사용자의 기본 상태(즐겨찾기 0건)를 검증한다. 추가/삭제/정렬
+ * 상호작용은 검색 모달·데이터 시드가 필요해 후속 현행화 대상.
  */
-import { browser } from '@wdio/globals';
-import welcomePage from '../../page-objects/auth/welcome.page';
-import homePage from '../../page-objects/home/home.page';
-import bottomTab from '../../page-objects/components/bottom-tab.component';
+import entryFlow from '../../page-objects/onboarding/entry-flow';
 import favoritesPage from '../../page-objects/favorites/favorites.page';
+import bottomTab from '../../page-objects/components/bottom-tab.component';
 
 describe('Favorites Management', () => {
   before(async () => {
-    // Login first to access main app
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (browser as any).terminateApp('com.livemetro.app');
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (browser as any).activateApp('com.livemetro.app');
-    await welcomePage.waitForScreen();
-    await welcomePage.tapTryAnonymously();
-    await homePage.waitForScreen();
+    await entryFlow.enterMainAsAnonymous();
     await bottomTab.tapFavorites();
     await favoritesPage.waitForScreen();
   });
 
-  describe('Favorites Screen Display', () => {
-    it('should display favorites screen header', async () => {
-      const header = await favoritesPage.header;
-      expect(await header.isDisplayed()).toBe(true);
-    });
-
-    it('should be on favorites screen', async () => {
-      const isDisplayed = await favoritesPage.isDisplayed();
-      expect(isDisplayed).toBe(true);
-    });
+  it('즐겨찾기 추가(+) 버튼이 헤더에 표시된다', async () => {
+    const addButton = await favoritesPage.addButton;
+    expect(await addButton.isDisplayed()).toBe(true);
   });
 
-  describe('Empty State', () => {
-    it('should show empty state when no favorites (if applicable)', async () => {
-      const isEmpty = await favoritesPage.isEmptyStateDisplayed();
-
-      if (isEmpty) {
-        const message = await favoritesPage.emptyStateMessage;
-        expect(await message.isDisplayed()).toBe(true);
-
-        const findButton = await favoritesPage.findStationsButton;
-        expect(await findButton.isDisplayed()).toBe(true);
-      }
-    });
-
-    it('should have find stations button when empty', async () => {
-      const isEmpty = await favoritesPage.isEmptyStateDisplayed();
-
-      if (isEmpty) {
-        const button = await favoritesPage.findStationsButton;
-        expect(await button.isDisplayed()).toBe(true);
-      }
-    });
-  });
-
-  describe('Navigation from Empty State', () => {
-    it('should navigate to home when tapping find stations', async () => {
-      const isEmpty = await favoritesPage.isEmptyStateDisplayed();
-
-      if (isEmpty) {
-        await favoritesPage.tapFindStations();
-        await browser.pause(500);
-
-        const isHomeDisplayed = await homePage.isDisplayed();
-        expect(isHomeDisplayed).toBe(true);
-
-        // Navigate back to favorites
-        await bottomTab.tapFavorites();
-        await favoritesPage.waitForScreen();
-      }
-    });
-  });
-
-  describe('Pull to Refresh', () => {
-    it('should support pull to refresh', async () => {
-      await favoritesPage.refresh();
-      await browser.pause(1000);
-
-      // Verify screen is still displayed after refresh
-      const isDisplayed = await favoritesPage.isDisplayed();
-      expect(isDisplayed).toBe(true);
-    });
-  });
-
-  describe('Search Functionality', () => {
-    it('should have search input available', async () => {
-      // Search may not be visible if empty state is shown
-      const isEmpty = await favoritesPage.isEmptyStateDisplayed();
-
-      if (!isEmpty) {
-        try {
-          const searchInput = await favoritesPage.searchInput;
-          expect(await searchInput.isDisplayed()).toBe(true);
-        } catch {
-          // Search input may not exist in current implementation
-          console.log('Search input not available');
-        }
-      }
-    });
-  });
-
-  describe('Favorite Count', () => {
-    it('should display correct favorite count', async () => {
-      const count = await favoritesPage.getFavoriteCount();
-      expect(typeof count).toBe('number');
-      expect(count).toBeGreaterThanOrEqual(0);
-    });
-  });
-});
-
-describe('Favorites Interaction (with stations)', () => {
-  before(async () => {
-    // This test suite requires favorites to be added
-    // Skip if no favorites exist
-  });
-
-  describe('Favorite Station Selection', () => {
-    it.skip('should navigate to station detail when tapping favorite', async () => {
-      // This test requires at least one favorite
-      const count = await favoritesPage.getFavoriteCount();
-
-      if (count > 0) {
-        // Get first favorite and tap it
-        // Implementation depends on how favorites are displayed
-      }
-    });
-  });
-
-  describe('Favorite Deletion', () => {
-    it.skip('should delete favorite on swipe', async () => {
-      // This test requires at least one favorite
-      // and would modify app state
-    });
+  it('신규 사용자는 빈 상태 안내가 표시된다', async () => {
+    const emptyTitle = await favoritesPage.emptyTitle;
+    await emptyTitle.waitForDisplayed({ timeout: 15000 });
+    expect(await emptyTitle.isDisplayed()).toBe(true);
   });
 });
