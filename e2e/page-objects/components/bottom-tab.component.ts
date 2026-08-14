@@ -3,8 +3,9 @@
  *
  * 활성 탭은 src/navigation/RootNavigator.tsx의 MainTabNavigator다:
  * 홈 / 즐겨찾기 / 경로 / 제보 / 설정 (CI run 31727330570 스크린샷 실증).
- * src/navigation/AppNavigator.tsx의 MainTabs(알림 탭 포함)는 렌더되지 않는
- * 죽은 코드다 — 이전 버전이 그걸 근거로 '알림' 탭을 찾다 전멸했다.
+ * 과거 src/navigation/AppNavigator.tsx의 MainTabs(알림 탭 포함)는 렌더되지
+ * 않는 죽은 코드였고 지금은 삭제됨 — 이전 버전이 그걸 근거로 '알림' 탭을
+ * 찾다 전멸했다.
  *
  * 탭 버튼은 react-navigation이 testID를 주지 않으므로 라벨 텍스트로 찾는다.
  * 탭 이동 검증은 각 화면의 testID 마커로 한다 — 탭 버튼의 selected 속성은

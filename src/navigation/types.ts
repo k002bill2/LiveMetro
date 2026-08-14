@@ -4,18 +4,6 @@ import {
   CommuteNotifications,
 } from '@/models/commute';
 
-// LEGACY: AppNavigator (4-tab) is dead code as of Phase 56. The active
-// navigator is RootNavigator with `MainTabParamList` (5 tabs). Kept here
-// only because src/navigation/AppNavigator.tsx still imports it for type
-// inference. Do not add new tabs to this list — update RootNavigator's
-// MainTabParamList instead.
-export type AppTabParamList = {
-  Home: undefined;
-  Favorites: undefined;
-  Alerts: undefined;
-  Settings: undefined;
-};
-
 export interface RouteSearchInitialParams {
   fromStationId?: string;
   toStationId?: string;
