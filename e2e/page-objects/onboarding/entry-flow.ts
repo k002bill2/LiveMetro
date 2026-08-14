@@ -36,7 +36,31 @@ class EntryFlow extends BasePage {
     await this.safeTap(await this.$('browse-cta'));
 
     const deadline = Date.now() + timeout;
+    const startedAt = Date.now();
+    let nextObserveAt = startedAt;
     while (Date.now() < deadline) {
+      // 자가 진단 관측 (run 31765235108 실증 후 추가): 같은 run에서 첫
+      // 세션은 15초 만에 celebration 도달, 이후 세션은 120초간 아래 4개
+      // 마커가 전부 404였다 — 루프가 관측하지 않는 화면(랜딩 스피너·ANR
+      // 다이얼로그 등)에 갇혔다는 뜻이다. 15초마다 랜딩 마커 포함 관측
+      // 로그를 남겨 모든 실패 spec이 정체 화면을 스스로 보고하게 한다.
+      if (Date.now() >= nextObserveAt) {
+        const elapsed = Math.round((Date.now() - startedAt) / 1000);
+        const present: string[] = [];
+        if (await this.elementExists('auth-hero')) present.push('auth-hero');
+        if (await this.elementExists('home-screen')) present.push('home-screen');
+        if (await this.elementExists('signup-step3-cta')) {
+          present.push('signup-step3-cta');
+        }
+        if (await this.elementExists('welcome-cta')) present.push('welcome-cta');
+        if (await this.elementExists('onb-header-skip')) {
+          present.push('onb-header-skip');
+        }
+        console.log(
+          `[ENTRY ${elapsed}s] ${present.join(', ') || '(마커 전무)'}`
+        );
+        nextObserveAt = Date.now() + 15000;
+      }
       if (await this.elementExists('home-screen')) {
         return;
       }
@@ -67,6 +91,15 @@ class EntryFlow extends BasePage {
         );
       }
       await browser.pause(500);
+    }
+    // 데드라인 도달 — 정체 화면의 실체를 페이지 소스로 남긴다. UiAutomator는
+    // 최상위 윈도우(예: 시스템 ANR 다이얼로그)를 반영하므로 앱 마커 404의
+    // 원인을 이 덤프가 확정한다.
+    try {
+      console.log('[ENTRY PAGESRC]');
+      console.log(await browser.getPageSource());
+    } catch {
+      console.log('[ENTRY PAGESRC] 페이지 소스 덤프 실패');
     }
     throw new Error(
       `enterMainAsAnonymous: home-screen에 ${timeout}ms 내 도달하지 못했습니다`
