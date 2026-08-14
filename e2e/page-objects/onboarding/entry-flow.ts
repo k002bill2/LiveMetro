@@ -17,8 +17,13 @@ class EntryFlow extends BasePage {
    * 신규(앱 데이터 초기화된) 세션에서 익명 진입 → Main 탭 home-screen 도달.
    * appium 세션은 noReset:false라 spec 파일마다 앱 데이터가 초기화되어
    * 항상 Auth 랜딩에서 시작한다.
+   *
+   * 기본 timeout 120s: cold AVD(캐시 미적중 2-core 러너)에서는 release 번들
+   * 로드 + 익명 auth + 홈 데이터 로드가 60s를 초과한다 — main dispatch run
+   * 31758646877에서 3개 spec이 전부 이 지점의 60s 데드라인에서 균일하게
+   * 죽은 것으로 실증됨 (warm 런 5/5 그린과 동일 코드).
    */
-  async enterMainAsAnonymous(timeout = 60000): Promise<void> {
+  async enterMainAsAnonymous(timeout = 120000): Promise<void> {
     // 방어적 멱등성: 이미 Main에 있으면 곧장 반환한다. 현행 구성(spec 파일마다
     // 새 세션 + UiAutomator2 fast reset)에서는 항상 Auth 랜딩부터 시작하지만,
     // noReset 설정이 바뀌어 세션이 재사용되면 auth-hero 대기가 영원히 실패하는
