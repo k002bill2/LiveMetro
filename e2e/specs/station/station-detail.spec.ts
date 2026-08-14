@@ -1,18 +1,74 @@
 /**
- * Station Detail E2E Tests — 의도적 보류 (2026-08-14 현행화 시점)
+ * Station Detail E2E Tests — 즐겨찾기 경유 진입 (2026-08-14 구현)
  *
- * 보류 사유: 역 상세 화면 진입은 (a) 즐겨찾기 추가 검색 모달을 통해 역을
- * 등록하거나 (b) 홈 주변 역 카드를 탭해야 하는데, (a)는 검색 모달 내부
- * testID 계약 정리가 선행돼야 하고 (b)는 CI 에뮬레이터 기본 좌표(미국)라
- * 주변 역이 잡히지 않아 결정적이지 않다.
+ * 진입 경로: 즐겨찾기 탭 → 검색 모달(+) → 2호선 강남 선택 → 카드 탭 → 상세.
+ * 홈 주변 역 카드 경로는 CI 에뮬레이터 기본 좌표(미국)라 비결정적이어서
+ * 쓰지 않는다.
  *
- * 후속 계획: 즐겨찾기 검색 모달(FavoritesScreen의 isSearchModalVisible 경로)에
- * testID를 부여한 뒤 "즐겨찾기 추가 → 역 선택 → 상세 진입 → 도착정보
- * 로딩/빈/에러 상태(station-detail-loading/empty/error) 검증" 흐름으로 구현한다.
- * 화면 자체의 testID(station-detail-header 등)는 이미 존재한다.
+ * 검색 모달에서는 한글 IME 입력을 쓰지 않는다 — 호선 필터 탭 +
+ * `station-search-item-강남` resource-id 대기라는 실증된 전략만 쓴다
+ * (2호선 필터 안에서 '강남' 역명은 유일하다).
+ *
+ * 도착정보는 실행 시각·Seoul API 응답에 따라 도착 카드/빈/에러가 갈리므로
+ * (nightly KST 02시는 운행 종료 시간대 → 보통 빈 상태) "로딩을 벗어나 셋 중
+ * 하나에 도달한다"는 계약만 단언한다.
+ *
+ * 마지막 테스트는 추가한 즐겨찾기를 UI로 삭제한다 — 삭제 흐름 검증을 겸한
+ * Firestore 잔여물 정리다 (익명 계정이라도 남기지 않는다).
  */
-describe.skip('Station Detail (보류 — 진입 경로 확정 후 구현)', () => {
-  it('placeholder — 위 보류 사유 참조', () => {
-    // intentionally skipped
+import entryFlow from '../../page-objects/onboarding/entry-flow';
+import favoritesPage from '../../page-objects/favorites/favorites.page';
+import bottomTab from '../../page-objects/components/bottom-tab.component';
+import searchModal from '../../page-objects/components/station-search-modal.component';
+import stationDetailPage from '../../page-objects/station/station-detail.page';
+
+describe('Station Detail', () => {
+  before(async () => {
+    await entryFlow.enterMainAsAnonymous();
+    await bottomTab.tapFavorites();
+    await favoritesPage.waitForScreen();
+  });
+
+  it('즐겨찾기 추가(+) 버튼으로 역 검색 모달이 열린다', async () => {
+    await favoritesPage.safeTap(await favoritesPage.addButton);
+    await searchModal.waitForOpen();
+    const input = await searchModal.searchInput;
+    expect(await input.isDisplayed()).toBe(true);
+  });
+
+  it('2호선 강남역을 선택하면 즐겨찾기에 추가된다', async () => {
+    await searchModal.tapLineFilter('2');
+    await searchModal.tapStationItem('강남');
+    // 모달이 닫히고 addFavorite(Firestore 왕복)이 끝나면 '완료' Alert가 뜬다.
+    // 버튼 배열 없는 Alert.alert이라 확인 버튼은 RN 기본값 'OK'다.
+    await searchModal.tapAlertButton('OK');
+    const row = await favoritesPage.favoriteRow('강남');
+    await row.waitForDisplayed({ timeout: 15000 });
+    expect(await row.isDisplayed()).toBe(true);
+  });
+
+  it('즐겨찾기 카드를 탭하면 역 상세 화면으로 진입한다', async () => {
+    await favoritesPage.safeTap(await favoritesPage.favoriteRow('강남'));
+    await stationDetailPage.waitForScreen();
+    expect(await stationDetailPage.isDisplayed()).toBe(true);
+  });
+
+  it('도착정보가 로딩을 벗어나 도착/빈/에러 중 한 상태에 도달한다', async () => {
+    const state = await stationDetailPage.waitForArrivalState();
+    expect(['arrivals', 'empty', 'error']).toContain(state);
+  });
+
+  it('뒤로 가서 추가한 즐겨찾기를 삭제한다 (잔여물 정리)', async () => {
+    await stationDetailPage.tapBack();
+    await favoritesPage.waitForScreen();
+    // 전역 편집 모드 → 행 선택 → 일괄 삭제 → 확인 다이얼로그('삭제'는
+    // 앱이 지정한 버튼 텍스트)
+    await favoritesPage.safeTap(await favoritesPage.editButton);
+    await favoritesPage.safeTap(await favoritesPage.selectCheckbox);
+    await favoritesPage.safeTap(await favoritesPage.bulkDeleteButton);
+    await favoritesPage.tapAlertButton('삭제');
+    const emptyTitle = await favoritesPage.emptyTitle;
+    await emptyTitle.waitForDisplayed({ timeout: 15000 });
+    expect(await emptyTitle.isDisplayed()).toBe(true);
   });
 });

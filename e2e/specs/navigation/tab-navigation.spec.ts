@@ -6,9 +6,9 @@
  * 마커로 도착을 확인한다. 탭 버튼의 selected 속성 단언은 판정이
  * 비결정적이라 제외했다.
  *
- * 미검증 잔여: 설정 탭 — SettingsScreen 상단에 안정 마커 testID가 없어
- * (최상단 요소들이 testID 미부여) src에 화면 마커를 추가한 뒤 후속으로
- * 검증한다. 이 브랜치는 src 무변경 원칙을 유지한다.
+ * 설정 탭은 SettingsScreen ScrollView에 화면 마커(settings-screen)를
+ * 추가하면서 검증을 복원했다 (2026-08-14 후속 — home-screen과 동일하게
+ * ScrollView에 testID를 붙이는 실증된 마커 패턴).
  */
 import entryFlow from '../../page-objects/onboarding/entry-flow';
 import homePage from '../../page-objects/home/home.page';
@@ -24,6 +24,10 @@ class TabScreenProbe extends BasePage {
 
   get delayFeedHeaderTitle(): Promise<WebdriverIO.Element> {
     return this.$('delay-feed-header-title');
+  }
+
+  get settingsScreen(): Promise<WebdriverIO.Element> {
+    return this.$('settings-screen');
   }
 }
 const probe = new TabScreenProbe();
@@ -57,6 +61,13 @@ describe('Tab Navigation', () => {
     const header = await probe.delayFeedHeaderTitle;
     await header.waitForDisplayed({ timeout: 15000 });
     expect(await header.isDisplayed()).toBe(true);
+  });
+
+  it('설정 탭으로 이동하면 설정 화면이 표시된다', async () => {
+    await bottomTab.tapSettings();
+    const settings = await probe.settingsScreen;
+    await settings.waitForDisplayed({ timeout: 15000 });
+    expect(await settings.isDisplayed()).toBe(true);
   });
 
   it('홈 탭으로 복귀할 수 있다', async () => {

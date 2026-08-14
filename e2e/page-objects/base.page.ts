@@ -321,6 +321,25 @@ export class BasePage {
   }
 
   /**
+   * 네이티브 Alert 다이얼로그의 버튼을 탭한다.
+   *
+   * RN `Alert.alert(title, message)`가 버튼 배열 없이 호출되면 RN(Alert.js)이
+   * 기본 확인 버튼 'OK'를 채운다 — 한국어 문구여도 버튼은 'OK'다. Android
+   * Material 테마의 textAllCaps 변형은 'OK'가 이미 대문자라 매칭에 영향 없다.
+   * 앱이 버튼 텍스트를 지정한 경우('삭제', '취소' 등)는 그 텍스트를 넘긴다.
+   * Alert는 네이티브 다이얼로그라 testID가 없어 텍스트 매칭이 유일한 경로다.
+   *
+   * @param label - Alert 버튼에 표시되는 정확한 텍스트
+   * @param timeout - 다이얼로그 표시 대기 한도 (기본 15초 — Firestore 왕복
+   *   완료 후에 뜨는 Alert도 있어 넉넉히 둔다)
+   */
+  async tapAlertButton(label: string, timeout = 15000): Promise<void> {
+    const button = await this.getByText(label);
+    await button.waitForDisplayed({ timeout });
+    await button.click();
+  }
+
+  /**
    * Go back (platform-specific)
    */
   async goBack(): Promise<void> {

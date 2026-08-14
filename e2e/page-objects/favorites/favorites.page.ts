@@ -23,6 +23,24 @@ class FavoritesPage extends BasePage {
     return this.getByText('즐겨찾기가 없습니다');
   }
 
+  /**
+   * 즐겨찾기 카드 행 — FavoriteRow(design)가 `favorite-row-{역명}` 기본
+   * testID를 부여한다 (한글 역명 그대로).
+   */
+  favoriteRow(stationName: string): Promise<WebdriverIO.Element> {
+    return this.$(`favorite-row-${stationName}`);
+  }
+
+  /** 편집(선택) 모드의 행별 체크박스 — 행이 1개면 유일하게 매칭된다 */
+  get selectCheckbox(): Promise<WebdriverIO.Element> {
+    return this.$('favorite-select-checkbox');
+  }
+
+  /** 편집 모드 하단 일괄 삭제 버튼 */
+  get bulkDeleteButton(): Promise<WebdriverIO.Element> {
+    return this.$('favorites-bulk-delete-button');
+  }
+
   async waitForScreen(timeout = 15000): Promise<void> {
     const addButton = await this.addButton;
     await addButton.waitForDisplayed({ timeout });
