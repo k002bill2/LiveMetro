@@ -5,14 +5,12 @@
 
 ## 한 줄 요약
 
-도입 이래 성공 0회이던 E2E nightly를 2단계로 부활시켰다: 파이프라인 수리(**#329 머지됨**) + spec 전면 현행화(**#330 OPEN — 머지 대기가 첫 착수 항목**). 최종 2개 run 연속 `Spec Files: 5 passed, 5 total` (도입 후 최초 그린, run 31729722676·31732615127).
+도입 이래 성공 0회이던 E2E nightly를 2단계로 부활시켰다: 파이프라인 수리(**#329 머지**) + spec 전면 현행화(**#330 머지** — 6e784cc). 최종 2개 run 연속 `Spec Files: 5 passed, 5 total` (도입 후 최초 그린, run 31729722676·31732615127).
 
 ## 다음 세션 착수 순서
 
-### 0. PR #330 머지 (즉시, 5분)
-- https://github.com/k002bill2/LiveMetro/pull/330 — e2e/ 전용, src 무변경, quality-gate 통과 확인 후 squash 머지.
-- 머지 전 검증 습관: 로컬↔PR head 일치 + squash라 `--is-ancestor` 대신 파일 내용 대조.
-- 머지되면 다음 nightly(KST 02:00)가 사상 처음 그린으로 돌 수 있다. **머지 다음 날 `gh run list --workflow=e2e-tests.yml --limit 3`으로 nightly 결과 확인**이 실질적 완결 검증.
+### 0. nightly 그린 확인 (즉시, 1분)
+- 다음 nightly(KST 02:00)가 사상 처음 그린으로 돌 수 있다. `gh run list --workflow=e2e-tests.yml --limit 3`으로 결과 확인이 실질적 완결 검증.
 - 참고: Actions 캐시는 브랜치 격리라 main 첫 nightly는 cold(~40분, timeout 70분 내). 이후 main 캐시로 warm(~25분).
 
 ### 1. 후속 — station-detail spec 구현 (중간 난도)
