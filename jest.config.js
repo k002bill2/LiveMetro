@@ -66,7 +66,7 @@ module.exports = {
   // 15/20/20/20 safety net to tier-1 targets after a measured full --coverage
   // pass (stmt 84.8 / br 73.6 / fn 87.2 / lines 86.0 — all clear with headroom).
   // Do NOT raise to the 85/80/70 final targets yet: statements sits at ~84.8%,
-  // so an 85 gate would fail the next run. See .claude/rules/coverage-thresholds.md.
+  // so an 85 gate would fail the next run. Ratchet policy: .claude/skills/test-automation/SKILL.md.
   coverageThreshold: {
     global: {
       branches: 60,

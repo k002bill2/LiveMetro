@@ -39,7 +39,7 @@ Node 20 + TypeScript strict + Firebase Cloud Functions 2nd gen 기준.
 ## 테스트
 - `firebase-functions-test` + emulator로 통합 테스트
 - Unit: 핸들러 로직 함수만 분리해 jest로 검증
-- 커버리지 임계값은 `.claude/rules/coverage-thresholds.md` 정책 따름
+- 커버리지 목표·ratchet 정책은 `.claude/skills/test-automation/SKILL.md` 따름
 - Firestore rules 변경은 `firebase emulators:exec --only firestore "npm run test:rules"` 강제
 
 ## 배포 전 게이트

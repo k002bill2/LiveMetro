@@ -9,7 +9,7 @@ Jest + React Native Testing Library 기반 단위·통합 테스트 작성 가�
 
 ## When to Use
 - 새 컴포넌트/훅/서비스 테스트 작성
-- 커버리지 개선 (목표: stmt 75% / fn 70% / branch 60%)
+- 커버리지 개선 (게이트·목표는 아래 Standards)
 - TDD 워크플로우
 - 실패 테스트 디버깅 / 픽스처 생성
 
@@ -17,10 +17,12 @@ Jest + React Native Testing Library 기반 단위·통합 테스트 작성 가�
 
 | 항목 | 값 |
 |------|-----|
-| 커버리지 임계값 | SSOT=`jest.config.js`의 `coverageThreshold.global` (하드코딩 금지 — `.claude/rules/coverage-thresholds.md`) |
+| 커버리지 임계값 | SSOT=`jest.config.js`의 `coverageThreshold.global` (문서에 숫자 하드코딩 금지 — 드리프트 발생 이력) |
 | Test 위치 | source 옆 `__tests__/` |
 | 파일명 | `*.test.ts` / `*.test.tsx` |
 | 서브타이틀 | `describe(componentName)` |
+
+커버리지 목표(게이트 아님): 1차 stmt 75 / fn 70 / br 60 → 최종 85 / 80 / 70. 게이트 상향(ratchet)은 전체 `--coverage` 실측 통과 확인 후 `jest.config.js`에서만 올린다. 새 파일 추가 시 테스트 파일도 함께 생성.
 
 체크리스트: `.claude/checklists/testing.md`
 
