@@ -278,6 +278,19 @@ export class BasePage {
   }
 
   /**
+   * Check if an element with the exact text is currently displayed.
+   * 네이티브 Alert처럼 testID가 없는 요소의 존재 판정에 쓴다.
+   */
+  async textExists(text: string): Promise<boolean> {
+    try {
+      const element = await this.getByText(text);
+      return await element.isDisplayed();
+    } catch {
+      return false;
+    }
+  }
+
+  /**
    * Check if element exists without throwing error
    * @param accessibilityId - The testID to check
    */
@@ -318,6 +331,36 @@ export class BasePage {
     } catch {
       // Keyboard might not be visible
     }
+  }
+
+  /**
+   * 네이티브 Alert 다이얼로그의 버튼을 탭한다.
+   *
+   * RN `Alert.alert(title, message)`가 버튼 배열 없이 호출되면 RN(Alert.js)이
+   * 기본 확인 버튼 'OK'를 채운다 — 한국어 문구여도 버튼은 'OK'다. Android
+   * Material 테마의 textAllCaps 변형은 'OK'가 이미 대문자라 매칭에 영향 없다.
+   * 앱이 버튼 텍스트를 지정한 경우('삭제', '취소' 등)는 그 텍스트를 넘긴다.
+   * Alert는 네이티브 다이얼로그라 testID가 없어 텍스트 매칭이 유일한 경로다.
+   *
+   * @param label - Alert 버튼에 표시되는 정확한 텍스트
+   * @param timeout - 다이얼로그 표시 대기 한도 (기본 15초 — Firestore 왕복
+   *   완료 후에 뜨는 Alert도 있어 넉넉히 둔다)
+   */
+  async tapAlertButton(label: string, timeout = 15000): Promise<void> {
+    // iOS 러너는 autoAcceptAlerts 케이퍼빌리티(capabilities.ts)로 네이티브
+    // 알럿을 세션 차원에서 자동 수락한다 — 이 경우 버튼이 조회되기 전에
+    // 알럿이 이미 사라지므로, 대기하면 타임아웃으로 죽는다 (Codex P1).
+    // 케이퍼빌리티를 읽어 판단해 설정과 코드가 어긋나지 않게 한다.
+    const caps = browser.capabilities as Record<string, unknown>;
+    if (
+      caps['autoAcceptAlerts'] === true ||
+      caps['appium:autoAcceptAlerts'] === true
+    ) {
+      return;
+    }
+    const button = await this.getByText(label);
+    await button.waitForDisplayed({ timeout });
+    await button.click();
   }
 
   /**

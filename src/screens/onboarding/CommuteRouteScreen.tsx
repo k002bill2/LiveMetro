@@ -31,7 +31,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Alert,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -39,6 +38,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+// core RN SafeAreaView는 Android no-op — 헤더가 상태바에 깔림 (WelcomeOnboardingScreen 참조)
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ArrowRight,
   Building2,
@@ -720,7 +721,12 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
+    // edit 모드는 SettingsNavigator 헤더가 상태바 아래 공간을 이미 차지하므로
+    // top inset을 빼고, 온보딩 모드(헤더 없음)에서만 top을 적용한다.
+    <SafeAreaView
+      style={styles.safe}
+      edges={isEditMode ? ['bottom'] : ['top', 'bottom']}
+    >
       {/* Onboarding step gauge only — in edit mode the SettingsNavigator
           owns the screen header (title "경로 편집"), so OnbHeader is
           suppressed to avoid a duplicate top bar. */}

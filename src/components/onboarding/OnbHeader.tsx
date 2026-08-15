@@ -41,7 +41,11 @@ export const OnbHeader: React.FC<OnbHeaderProps> = ({
   const dots = Array.from({ length: totalSteps }, (_, i) => i + 1);
 
   return (
-    <View style={styles.container} testID={testID}>
+    // collapsable={false}: E2E CI(release)에서 이 헤더 서브트리가 UiAutomator
+    // a11y 트리에서 통째로 사라지는 현상이 관측됐다 (2026-08-15, run
+    // 31859235020 — 같은 코드가 8/13엔 skip을 68회 노출). Android 뷰
+    // 평탄화가 개입할 여지를 제거해 네이티브 뷰 실체화를 강제한다.
+    <View style={styles.container} testID={testID} collapsable={false}>
       <View style={styles.side}>
         {onBack ? (
           <TouchableOpacity

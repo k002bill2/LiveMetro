@@ -16,13 +16,16 @@
 import React, { useCallback } from 'react';
 import { useSemanticTokens } from '@/services/theme';
 import {
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from 'react-native';
+// core RN SafeAreaView는 Android에서 inset을 적용하지 않는 no-op이라
+// OnbHeader가 상태바 아래에 깔린다 (E2E run 31864042720 스크린샷 실증,
+// UiAutomator는 상태바에 가린 뷰를 트리에서 제외해 skip 탐지도 불가).
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ArrowRight,
   BellRing,

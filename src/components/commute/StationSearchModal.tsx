@@ -300,6 +300,7 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
         style={styles.stationItem}
         onPress={() => handleSelectStation(item)}
         accessibilityState={{ selected: isAlreadyFavorite }}
+        testID={`station-search-item-${item.name}`}
       >
         <View
           style={[
@@ -357,6 +358,9 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
             <TouchableOpacity
               style={styles.closeButton}
               onPress={handleClose}
+              accessibilityRole="button"
+              accessibilityLabel="역 검색 닫기"
+              testID="station-search-close"
             >
               <X size={24} color={semantic.labelStrong} />
             </TouchableOpacity>
@@ -383,6 +387,7 @@ export const StationSearchModal: React.FC<StationSearchModalProps> = ({
                 autoCapitalize="none"
                 autoCorrect={false}
                 returnKeyType="search"
+                testID="station-search-input"
               />
               {searchQuery.length > 0 && (
                 <TouchableOpacity

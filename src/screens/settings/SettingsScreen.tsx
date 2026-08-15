@@ -534,7 +534,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <ScrollView style={styles.content}>
+      <ScrollView style={styles.content} testID="settings-screen">
         {/* User Profile Section — Phase 42 (SE1): gradient avatar + 이니셜
             + 누적 횟수. 카드 전체 onPress가 EditProfile로 이동하므로
             별도 Pencil 버튼 대신 chevron-right만 표시 (번들 매칭). */}
