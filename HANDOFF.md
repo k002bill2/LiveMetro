@@ -16,16 +16,13 @@ OnbHeader가 상태바 뒤에 렌더**되었고, AVD 상태바가 63→128px로 
 - 그린 실증: run 31867618329 `6/6` (브랜치) + **run 31869830074 `6/6, 6m21s,
   재시도 0` (#331 머지 후 main 최초 — nightly 경로 사상 첫 그린 조건 충족)**
 
-## 남은 일 (이 순서로)
+## 남은 일
 
-### 1. PR #332 머지 (HITL — 사용자 승인 대기)
-- OnboardingStationPickerScreen 1파일 — #331이 남긴 마지막 RN core
-  SafeAreaView 동일 패턴 교체. quality-gate **pass**, jest 62·tsc·eslint 그린.
-- 6파일판 Codex 리뷰에서 동일 diff 검토 완료. 머지만 남음.
-
-### 2. nightly 확인 (KST 8/16 02:00)
+### nightly 확인 (KST 8/16 02:00) — 유일한 잔여
 - `gh run list --workflow=e2e-tests.yml --limit 3` — main 캐시가 아직
   없어 첫 nightly는 cold(~40분). 그린이면 이 사가 완전 종결.
+- ~~PR #332 머지~~ → **완료 (8/15 사용자 승인 후 squash 머지, main d4b41fc,
+  내용 검증·OTA 자동 발행 확인)**. 온보딩 6개 화면 전부 RNSAC 전환 완결.
 
 ## 재발 방지 지식 (메모리 SSOT)
 
