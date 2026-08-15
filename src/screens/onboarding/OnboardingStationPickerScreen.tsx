@@ -17,7 +17,9 @@
 
 import React, { useCallback, useMemo, useState } from 'react';
 import { useSemanticTokens } from '@/services/theme';
-import { View, Text, TouchableOpacity, TextInput, ScrollView, FlatList, SafeAreaView, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, ScrollView, FlatList, StyleSheet } from 'react-native';
+// core RN SafeAreaView는 Android no-op — 헤더가 상태바에 깔림 (WelcomeOnboardingScreen 참조)
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowLeft, ChevronRight, Check, Home, Building2, ArrowLeftRight, Search, Sparkles, List, X as XIcon } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
