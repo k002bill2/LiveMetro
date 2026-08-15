@@ -20,7 +20,6 @@
 import React, { useCallback, useState } from 'react';
 import { useSemanticTokens } from '@/services/theme';
 import {
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Switch,
@@ -28,6 +27,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+// core RN SafeAreaView는 Android no-op — 헤더가 상태바에 깔림 (WelcomeOnboardingScreen 참조)
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   AlertTriangle,
   ArrowRight,
