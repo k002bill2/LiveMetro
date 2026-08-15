@@ -82,7 +82,7 @@ jest.mock('@models/route', () => ({
 }));
 
 // elevator-priority 순수 헬퍼의 입력을 통제한다. factory 내부 inline 정의 —
-// 호이스팅 안전 패턴 (.claude/rules/coverage-thresholds.md).
+// 호이스팅 안전 패턴 (.claude/skills/test-automation/SKILL.md BANNED Patterns).
 jest.mock('@/data/stationAccessibility.json', () => ({
   generatedAt: 'test',
   source: 'test',

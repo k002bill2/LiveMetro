@@ -74,7 +74,7 @@ npx expo export      # 번들 export 검증 (로컬)
 | 경고 10개 미만 | 권장 |
 
 ### 테스트 커버리지
-`jest.config.js`의 `coverageThreshold`가 강제 게이트의 SSOT다 (`npm test -- --coverage`로 강제, 미달 시 PR 차단). 숫자를 여기 하드코딩하면 드리프트가 발생하므로 적지 않는다. 목표·상향(ratchet) 정책은 [`.claude/rules/coverage-thresholds.md`](../../rules/coverage-thresholds.md) 참조.
+`jest.config.js`의 `coverageThreshold`가 강제 게이트의 SSOT다 (`npm test -- --coverage`로 강제, 미달 시 PR 차단). 숫자를 여기 하드코딩하면 드리프트가 발생하므로 적지 않는다. 목표·상향(ratchet) 정책은 [`test-automation` 스킬](../test-automation/SKILL.md) 참조.
 
 ### 빌드
 | 기준 | 상태 |

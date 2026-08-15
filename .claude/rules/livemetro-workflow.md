@@ -26,7 +26,7 @@
 1. `tsc --noEmit` (루트 RN 앱)
 2. `cd functions && tsc --noEmit` (Functions 서브프로젝트)
 3. `eslint . --max-warnings 0`
-4. `jest --coverage` (커버리지 임계값 통과 — `.claude/rules/coverage-thresholds.md` 참조)
+4. `jest --coverage` (커버리지 임계값 통과 — SSOT는 `jest.config.js`의 `coverageThreshold`)
 5. `expo-doctor` (Expo SDK 호환성)
 6. Firestore rules 변경 시 `firebase emulators:exec --only firestore "npm test:rules"`
 7. 에러 0 확인 후 커밋

@@ -40,19 +40,18 @@ State:      AuthContext + Custom Hooks (no Redux)
 
 ## Project Rules (`.claude/rules/`)
 
-프로젝트 전용 규칙 9개(핵심 7개 + 추가 2개)가 항상 로드됩니다. 각 규칙의 BANNED 표·상세는 해당 파일이 SSOT (여기엔 복붙하지 않음):
+프로젝트 전용 규칙 8개(핵심 6개 + 추가 2개)가 항상 로드됩니다. 각 규칙의 상세·함정 표는 해당 파일이 SSOT (여기엔 복붙하지 않음):
 
 | 규칙 파일 | 내용 |
 |-----------|------|
-| `typescript-strict.md` | `any` 금지, 명시적 반환 타입, strict mode |
+| `typescript-strict.md` | `any` 금지, 명시적 반환 타입 (lint 미강제 — 규칙이 유일 게이트) |
 | `path-aliases.md` | `@/` alias 필수, 상대 경로 금지 |
 | `subscription-cleanup.md` | useEffect cleanup, onSnapshot 해제, 타이머 정리 |
 | `seoul-api-limits.md` | 30초 최소 폴링, 타임아웃 10초, 캐시 폴백 |
-| `error-handling.md` | 빈 배열/null 반환, throw 지양, ErrorBoundary |
-| `react-native-patterns.md` | StyleSheet.create, memo, FlatList, 접근성 |
-| `coverage-thresholds.md` | Stmt 75%, Fn 70%, Branch 60% |
+| `error-handling.md` | 서비스는 빈 배열/null 반환(throw 금지), ErrorBoundary |
+| `react-native-patterns.md` | 접근성 필수, 테마 색상, Pretendard fontWeight 함정 |
 
-추가 컨텍스트 규칙: `mandatory-docs.md`(영역별 필수 Read 문서), `livemetro-workflow.md`(skill routing·에이전트 수·배포 검증). Firebase Functions 규칙은 `functions/CLAUDE.md`로 분리 — functions/ 작업 시에만 자동 로드(항상-로드 비용 제거).
+추가 컨텍스트 규칙: `mandatory-docs.md`(영역별 필수 Read 문서), `livemetro-workflow.md`(skill routing·에이전트 수·배포 검증). 테스트·커버리지 규칙은 `test-automation` 스킬로 이관 — 테스트 작업 시에만 로드. 도달 경로는 3중: `livemetro-workflow.md`의 Skill Routing(항상 로드)이 호출을 지시하고, superpowers 스킬-필수 규칙이 강제하며, skillGateGuard가 누락 시 경고. 커버리지 실게이트는 CI의 `jest --coverage`(SSOT=`jest.config.js`). Firebase Functions 규칙은 `functions/CLAUDE.md`로 분리 — functions/ 작업 시에만 자동 로드(항상-로드 비용 제거).
 
 > 글로벌 규칙(`~/.claude/rules/`)도 함께 적용: surgical changes, DRY/KISS/YAGNI, 보안, 검증
 
@@ -65,7 +64,7 @@ State:      AuthContext + Custom Hooks (no Redux)
 - **작은 단위 + Plan 먼저**: 범위가 불확실하면 Plan 모드로 시작, 큰 변경은 작은 커밋으로 분리. (파일 수 기준 HARD-GATE는 2026-08-09 폐지 — 기준은 파일 개수가 아니라 불확실성)
 - **복잡도별 에이전트 수**: 라우팅은 `.claude/rules/livemetro-workflow.md`, 상세 effort scaling은 [Automation](docs/claude/automation.md).
 - **병렬 에이전트 파일 충돌**: 편집 파일이 겹치면 순차, 안 겹치면 병렬 + `isolation: "worktree"`. 상세 File Lock 표는 [Automation](docs/claude/automation.md).
-- **위임 판단**: 위임은 기본값이 아니다. 서로 독립인 작업 2건 이상을 병렬로 돌릴 때, 워크트리 격리가 필요할 때, 또는 메인 창을 실제로 위협하는 대량 원문일 때만 `worker`(Opus)에게 맡긴다 — 서브에이전트 창은 메인보다 좁으므로 위임 자체가 비용이다. 위임할 땐 파일 범위와 완료 기준을 명시하고, 메인이 설계·통합·최종 검토를 유지한다. 상세 기준은 `~/.claude/CLAUDE.md` "위임 판단".
+- **위임 판단**: 위임은 기본값이 아니다. 서로 독립인 작업 2건 이상 병렬, 워크트리 격리가 필요한 동시 파일 변경, 또는 메인 창을 실제로 위협하는 대량 원문일 때만 `worker`(Opus)에게 맡긴다 — 위임 비용은 창 크기가 아니라 컨텍스트 재적재와 요약 과정의 정보 손실이다(서브에이전트도 부모의 1M 창을 상속). 위임할 땐 파일 범위와 완료 기준을 명시하고, 메인이 설계·통합·최종 검토를 유지한다. 기준 SSOT는 `~/.claude/CLAUDE.md` "위임 판단".
 - **배포**: 배포 전 검증 체크리스트는 `.claude/rules/livemetro-workflow.md` + [Development Guide](docs/DEVELOPMENT.md). Production 빌드는 `/deploy-with-tests` 사용.
 
 ## Automation & Orchestration

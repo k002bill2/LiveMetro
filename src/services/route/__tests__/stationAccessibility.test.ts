@@ -2,7 +2,7 @@
  * stationAccessibility 단위 테스트.
  *
  * 번들 JSON 을 jest.mock 으로 대체해 입력을 통제한다 (factory 내부 inline 정의 —
- * .claude/rules/coverage-thresholds.md 의 호이스팅 안전 패턴).
+ * .claude/skills/test-automation/SKILL.md 의 호이스팅 안전 패턴).
  */
 import { stationHasElevator } from '../stationAccessibility';
 
