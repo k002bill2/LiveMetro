@@ -9,8 +9,17 @@
  * 어떤 분기로 와도 CTA/건너뛰기를 눌러 home-screen까지 전진한다.
  * 대기 셀렉터는 전부 앱에 실존하는 testID (2026-08-14 현행화 기준).
  */
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+
 import { browser } from '@wdio/globals';
 import { BasePage } from '../base.page';
+
+// 아티팩트 업로드에 포함되는 로그 디렉토리 (.github/workflows/e2e-tests.yml의
+// upload path에 e2e/logs/가 있다). __dirname 기준 절대 경로라 wdio 워커의
+// CWD와 무관하게 항상 같은 곳에 저장된다 — afterTest 스크린샷이 상대 경로로
+// 저장돼 아티팩트에 잡히지 않던 문제의 재발 방지.
+const EVIDENCE_DIR = join(__dirname, '..', '..', 'logs');
 
 class EntryFlow extends BasePage {
   /**
@@ -92,14 +101,24 @@ class EntryFlow extends BasePage {
       }
       await browser.pause(500);
     }
-    // 데드라인 도달 — 정체 화면의 실체를 페이지 소스로 남긴다. UiAutomator는
-    // 최상위 윈도우(예: 시스템 ANR 다이얼로그)를 반영하므로 앱 마커 404의
-    // 원인을 이 덤프가 확정한다.
+    // 데드라인 도달 — 정체 화면의 실체를 파일로 남긴다 (XML + 스크린샷).
+    // 콘솔 로그는 wdio 로거의 절단 의심이 있어(run 31767590757의 트리가
+    // 도착역 행 없이 117줄에서 닫힘) 증거는 파일 저장이 정본이다. UiAutomator
+    // 트리는 최상위 윈도우(예: 시스템 ANR 다이얼로그)를 반영하므로 앱 마커
+    // 404의 원인을 이 덤프가 확정한다.
     try {
-      console.log('[ENTRY PAGESRC]');
-      console.log(await browser.getPageSource());
-    } catch {
-      console.log('[ENTRY PAGESRC] 페이지 소스 덤프 실패');
+      mkdirSync(EVIDENCE_DIR, { recursive: true });
+      const stamp = Date.now();
+      writeFileSync(
+        join(EVIDENCE_DIR, `entry-stall-${stamp}.xml`),
+        await browser.getPageSource()
+      );
+      await browser.saveScreenshot(
+        join(EVIDENCE_DIR, `entry-stall-${stamp}.png`)
+      );
+      console.log(`[ENTRY PAGESRC] e2e/logs/entry-stall-${stamp}.{xml,png} 저장됨`);
+    } catch (evidenceError) {
+      console.log(`[ENTRY PAGESRC] 증거 저장 실패: ${String(evidenceError)}`);
     }
     throw new Error(
       `enterMainAsAnonymous: home-screen에 ${timeout}ms 내 도달하지 못했습니다`
