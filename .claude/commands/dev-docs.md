@@ -25,6 +25,15 @@ allowed-tools: Read, Write, Glob
 ## Executive Summary
 [작업 요약 - 1-2문장]
 
+## Acceptance Criteria
+<!-- 스펙은 산문보다 깊은 자료로 (Claude 5 컨텍스트 신규칙 6):
+     - 가능하면 실패하는 테스트 파일 경로를 여기 적는다 — "이 테스트가 통과하게 만들어"가
+       산문 요구사항보다 명확한 스펙이다. 테스트로 표현 불가한 기준만 체크리스트로.
+     - UI/디자인 작업이면 마크다운 서술 대신 HTML 목업·레퍼런스 스크린샷을 1차 스펙으로
+       첨부한다 (모델에겐 분석 가능한 코드, 사람에겐 보이는 화면). -->
+- 테스트 스펙: `src/.../__tests__/[name].test.ts` (RED 상태로 커밋)
+- [테스트로 표현 불가한 기준]
+
 ## Phase 1: [Phase Name]
 ### Tasks
 - [ ] Task 1
@@ -71,6 +80,7 @@ allowed-tools: Read, Write, Glob
 
 ## 주의사항
 
+- Acceptance Criteria는 산문 최소화 — 테스트 파일(기능)·HTML 목업(UI)이 1차 스펙
 - 모든 문서에 타임스탬프 추가
 - 체크박스 형식으로 진행 상황 추적 가능하게
 - 섹션별 완료 카운트 유지
