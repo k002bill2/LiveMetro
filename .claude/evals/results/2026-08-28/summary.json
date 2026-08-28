@@ -1,0 +1,55 @@
+{
+  "batch_id": "batch_20260828_ui_component",
+  "date": "2026-08-28",
+  "category": "ui_component",
+  "total_tasks": 4,
+  "total_runs": 4,
+  "k": 1,
+  "pass_at_1": 0.75,
+  "average_score": 0.8525,
+  "by_task": {
+    "task_ui_001": {
+      "name": "StationCard 컴포넌트 생성",
+      "difficulty": "simple",
+      "result": "PASS",
+      "score": 0.91,
+      "pass_threshold": 0.70
+    },
+    "task_ui_hard_001": {
+      "name": "실시간 노선도 컴포넌트 (애니메이션 + 제스처)",
+      "difficulty": "hard",
+      "result": "PASS",
+      "score": 0.92,
+      "pass_threshold": 0.70
+    },
+    "task_ui_expert_001": {
+      "name": "3D 노선도 with 핀치/회전/팬 동시 제스처",
+      "difficulty": "expert",
+      "result": "FAIL",
+      "score": 0.763,
+      "pass_threshold": 0.80
+    },
+    "task_ui_expert_002": {
+      "name": "AR 증강현실 노선도 with 실시간 열차 추적",
+      "difficulty": "expert_plus",
+      "result": "PASS",
+      "score": 0.82,
+      "pass_threshold": 0.75
+    }
+  },
+  "low_performers": [
+    {
+      "task_id": "task_ui_expert_001",
+      "score": 0.763,
+      "pass_threshold": 0.80,
+      "gap": -0.037,
+      "root_cause": "1000+ nodes performance gap (0.50): missing viewport culling/LOD/virtualization. Gesture arbitration (0.65): no explicit Gesture.Race() or requireToFail chains. @shopify/react-native-skia not installed — agent used native RN 3D transforms."
+    }
+  ],
+  "notes": [
+    "task_ui_001 agent lost to container restart; graded from produced artifacts by eval orchestrator.",
+    "task_ui_expert_001 and task_ui_expert_002: native AR/Skia libraries absent from package.json — agents used correct fallback architectures and were graded on structural correctness.",
+    "task_ui_expert_002 has a hooks-violation defect (useSharedValue inside setState callback) — flagged in result, realtime_marker_smoothness=0.60."
+  ],
+  "result_path": ".claude/evals/results/2026-08-28/"
+}

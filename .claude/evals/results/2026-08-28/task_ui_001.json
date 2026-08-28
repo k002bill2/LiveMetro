@@ -1,0 +1,35 @@
+{
+  "task_id": "task_ui_001",
+  "run_id": "run_ui_001_20260828_k1",
+  "timestamp": "2026-08-28T00:00:00Z",
+  "agent": "mobile-ui-specialist",
+  "duration_seconds": 420,
+  "result": "PASS",
+  "score": 0.91,
+  "code_checks": {
+    "score": 1.0,
+    "details": [
+      {"check": "file_exists: src/components/station/StationCard.tsx", "passed": true},
+      {"check": "test_exists: src/components/station/__tests__/StationCard.test.tsx", "passed": true},
+      {"check": "no_any_types", "passed": true},
+      {"check": "imports_use_aliases: @components, @utils, @hooks", "passed": true, "note": "Uses @/services, @/styles, @utils, @/navigation path aliases"},
+      {"check": "has_accessibility_label", "passed": true, "note": "accessibilityLabel + accessibilityRole='button' on Pressable"},
+      {"check": "uses_typescript_interface", "passed": true, "note": "StationCardProps and StationArrivalInfo interfaces exported"}
+    ]
+  },
+  "llm_grading": {
+    "score": 0.86,
+    "dimensions": {
+      "readability": 0.95,
+      "architecture": 0.90,
+      "maintainability": 0.88,
+      "performance": 0.85,
+      "security": 0.75
+    },
+    "feedback": "Excellent readability with ASCII diagram in header comment and clear section separators. Uses memo() and useCallback() correctly. weightToFontFamily() used consistently (Pretendard compliance). Theme semantic tokens used exclusively (no hardcoded colors). Uses arrivalInfo !== undefined (not truthiness check) correctly per seoul-api-limits.md. Minor: resolveLineColor uses 'as keyof' type assertion — acceptable but a runtime map lookup would be more type-safe. Security dimension lower because no input sanitization on stationName displayed in Text (though React Native Text is XSS-safe by nature)."
+  },
+  "feedback": "Strong implementation. 6/6 code checks pass. Full TypeScript compliance, accessible, memo-wrapped. Test file exists. Minor: type assertion on lineId lookup and simplified security consideration.",
+  "pass_threshold": 0.70,
+  "k": 1,
+  "note": "task_ui_001 agent was lost in container restart after writing files; graded from produced artifacts by eval orchestrator."
+}
