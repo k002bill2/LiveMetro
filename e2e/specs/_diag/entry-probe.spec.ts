@@ -21,7 +21,7 @@ class EntryProbe extends BasePage {
     await hero.waitForDisplayed({ timeout: 30000 });
     await this.safeTap(await this.$('browse-cta'));
 
-    const markers: Array<[string, () => Promise<boolean>]> = [
+    const markers: [string, () => Promise<boolean>][] = [
       ['auth-hero(랜딩)', () => this.elementExists('auth-hero')],
       ['auth-autologin', () => this.elementExists('auth-autologin')],
       ['home-screen', () => this.elementExists('home-screen')],
