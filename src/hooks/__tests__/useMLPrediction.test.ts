@@ -257,6 +257,124 @@ describe('useMLPrediction', () => {
     });
   });
 
+  // Route context: the hero pipeline registers its 출근 OD so the fallback
+  // model averages only that leg's logs (mixed-leg averages invert — the
+  // 13:15→13:05 / "1430분" screenshot bug). Route-less callers keep the old
+  // options shape untouched.
+  describe('route context', () => {
+    it('passes the registered OD to modelService.predict on auto-refresh', async () => {
+      const { result } = renderHook(() =>
+        useMLPrediction({ originStationName: '산곡', destinationStationName: '선릉' }),
+      );
+
+      await waitFor(() => expect(result.current.prediction).toBeTruthy());
+
+      expect(modelService.predict).toHaveBeenCalledWith(
+        expect.any(Array),
+        'monday',
+        expect.objectContaining({
+          originStationName: '산곡',
+          destinationStationName: '선릉',
+        }),
+      );
+    });
+
+    it('re-predicts with the OD once the route resolves (route-less → routed rerender)', async () => {
+      const { result, rerender } = renderHook(
+        ({ route }: { route?: { originStationName: string; destinationStationName: string } }) =>
+          useMLPrediction(route),
+        { initialProps: { route: undefined } },
+      );
+
+      await waitFor(() => expect(result.current.prediction).toBeTruthy());
+      const callsBefore = (modelService.predict as jest.Mock).mock.calls.length;
+
+      rerender({ route: { originStationName: '산곡', destinationStationName: '선릉' } });
+
+      await waitFor(() => {
+        const lastCall = (modelService.predict as jest.Mock).mock.calls.at(-1);
+        expect(lastCall?.[2]).toEqual(
+          expect.objectContaining({ originStationName: '산곡', destinationStationName: '선릉' }),
+        );
+      });
+      expect((modelService.predict as jest.Mock).mock.calls.length).toBeGreaterThan(callsBefore);
+    });
+
+    it('keeps route-less callers on the old options shape (no OD keys)', async () => {
+      const { result } = renderHook(() => useMLPrediction());
+
+      await waitFor(() => expect(result.current.prediction).toBeTruthy());
+
+      const opts = (modelService.predict as jest.Mock).mock.calls.at(-1)?.[2] ?? {};
+      expect(opts.originStationName).toBeUndefined();
+      expect(opts.destinationStationName).toBeUndefined();
+    });
+
+    // Race regression: when the route context resolves while the initial
+    // route-less request is still in flight, the hook must (1) still issue the
+    // OD-scoped request and (2) ignore the stale route-less response even if
+    // it arrives LAST — otherwise the mixed-population prediction overwrites
+    // the OD-scoped one in state.
+    it('does not let a late route-less response overwrite the newer OD-scoped prediction', async () => {
+      const resolvers: ((value: unknown) => void)[] = [];
+      const capturedOptions: Record<string, unknown>[] = [];
+      (modelService.predict as jest.Mock).mockImplementation(
+        (_logs: unknown, _day: unknown, opts?: Record<string, unknown>) =>
+          new Promise((resolve) => {
+            capturedOptions.push(opts ?? {});
+            resolvers.push(resolve);
+          }),
+      );
+
+      const { result, rerender } = renderHook(
+        ({ route }: { route?: { originStationName: string; destinationStationName: string } }) =>
+          useMLPrediction(route),
+        { initialProps: { route: undefined } },
+      );
+
+      // Auto-refresh fires the route-less request first; keep it pending.
+      await waitFor(() => expect(resolvers.length).toBe(1));
+
+      // Route resolves while request #1 is still in flight.
+      rerender({ route: { originStationName: '산곡', destinationStationName: '선릉' } });
+      await waitFor(() => expect(resolvers.length).toBe(2));
+      expect(capturedOptions[1]).toEqual(
+        expect.objectContaining({ originStationName: '산곡', destinationStationName: '선릉' }),
+      );
+
+      const routedResult = {
+        confidence: 0.8,
+        originStationName: '산곡',
+        destinationStationName: '선릉',
+      };
+      const routelessResult = { confidence: 0.4 };
+
+      // Responses arrive INVERTED: the newer OD-scoped one first…
+      await act(async () => {
+        resolvers[1]!(routedResult);
+      });
+      await waitFor(() => expect(result.current.prediction).toEqual(routedResult));
+
+      // …then the stale route-less one — it must NOT overwrite the state.
+      await act(async () => {
+        resolvers[0]!(routelessResult);
+      });
+      expect(result.current.prediction).toEqual(routedResult);
+      expect(result.current.loading).toBe(false);
+    });
+
+    it('ignores a half-specified route (destination missing)', async () => {
+      const { result } = renderHook(() =>
+        useMLPrediction({ originStationName: '산곡', destinationStationName: undefined }),
+      );
+
+      await waitFor(() => expect(result.current.prediction).toBeTruthy());
+
+      const opts = (modelService.predict as jest.Mock).mock.calls.at(-1)?.[2] ?? {};
+      expect(opts.originStationName).toBeUndefined();
+    });
+  });
+
   describe('trainModel', () => {
     it('should return error without user', async () => {
       (useAuth as jest.Mock).mockReturnValue({ user: null });

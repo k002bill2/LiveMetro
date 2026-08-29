@@ -25,6 +25,21 @@ export const minutesBetween = (departure?: string, arrival?: string): number | n
 };
 
 /**
+ * True when the pair reads as a midnight wrap — arrival earlier on the clock
+ * than departure. minutesBetween() deliberately supports that wrap for real
+ * overnight trips; callers for whom a wrap is impossible (e.g. a morning
+ * commute prediction) use this to reject the pair as corrupt input instead.
+ * Missing/malformed input returns false — minutesBetween already rejects it.
+ */
+export const isWrappedTimePair = (departure?: string, arrival?: string): boolean => {
+  if (!departure || !arrival) return false;
+  const d = parseHHmm(departure);
+  const a = parseHHmm(arrival);
+  if (d === null || a === null) return false;
+  return a < d;
+};
+
+/**
  * Add minutes to an "HH:mm" time string, wrapping at midnight.
  * Returns null on malformed input. Used to derive an arrival time when
  * only the registered departure + estimated ride duration is known

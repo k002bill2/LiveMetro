@@ -87,6 +87,21 @@ export interface PredictionOptions {
   weather?: WeatherCondition;
   isHoliday?: boolean;
   useCache?: boolean;
+  /** OD scope forwarded to modelService.predict — normally injected from the
+   * hook-level route context, not per call. */
+  originStationName?: string;
+  destinationStationName?: string;
+}
+
+/**
+ * Registered commute OD (station *names* — the id domains diverge across log
+ * writers) that scopes fallback predictions to one leg. Optional and
+ * half-tolerant: until both endpoints resolve, predictions stay route-less
+ * and consumers must not treat them as OD-scoped.
+ */
+export interface MLPredictionRouteContext {
+  originStationName?: string;
+  destinationStationName?: string;
 }
 
 export type UseMLPredictionReturn = UseMLPredictionState & UseMLPredictionActions;
@@ -95,8 +110,12 @@ export type UseMLPredictionReturn = UseMLPredictionState & UseMLPredictionAction
 // Hook
 // ============================================================================
 
-export function useMLPrediction(): UseMLPredictionReturn {
+export function useMLPrediction(route?: MLPredictionRouteContext): UseMLPredictionReturn {
   const { user } = useAuth();
+  // Destructured to primitives so effect/callback deps track the names, not
+  // the (possibly re-created) route object identity.
+  const routeOrigin = route?.originStationName;
+  const routeDestination = route?.destinationStationName;
   const [prediction, setPrediction] = useState<MLPrediction | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -112,6 +131,11 @@ export function useMLPrediction(): UseMLPredictionReturn {
   const [currentWeather, setCurrentWeather] = useState<WeatherCondition | null>(null);
 
   const unsubscribeRef = useRef<(() => void) | null>(null);
+  // Monotonic request generation: only the LATEST refreshPrediction call may
+  // write prediction/error/loading. Without it, the initial route-less request
+  // and the OD-scoped one issued when the route context resolves can return
+  // out of order, letting the stale mixed-population result overwrite state.
+  const requestGenerationRef = useRef(0);
 
   // useLocation은 위치 권한이 없거나 미허용이면 location=null. 그 경우
   // weatherService.getWeatherCondition()이 null 반환 → 자동 주입 안 됨,
@@ -221,6 +245,7 @@ export function useMLPrediction(): UseMLPredictionReturn {
         return;
       }
 
+      const generation = ++requestGenerationRef.current;
       setLoading(true);
       setError(null);
 
@@ -230,20 +255,29 @@ export function useMLPrediction(): UseMLPredictionReturn {
         // 우선하고, 아니면 currentWeather를 사용. modelService.predict는
         // weather 미제공 시 'clear'로 fallback하므로 currentWeather=null이어도
         // 안전 (graceful degrade).
+        // Route context는 all-or-nothing: 한쪽 역명만으로는 OD를 scope할 수
+        // 없으므로 둘 다 해소됐을 때만 주입한다 (미해소 시 route-less 예측).
         const mergedOptions: PredictionOptions = {
           ...(currentWeather !== null ? { weather: currentWeather } : {}),
+          ...(routeOrigin && routeDestination
+            ? { originStationName: routeOrigin, destinationStationName: routeDestination }
+            : {}),
           ...options,
         };
         const result = await modelService.predict(logs, targetDay, mergedOptions);
+        if (generation !== requestGenerationRef.current) return;
         setPrediction(result);
       } catch (err) {
+        if (generation !== requestGenerationRef.current) return;
         const errorMessage = err instanceof Error ? err.message : 'Unknown error';
         setError(errorMessage);
       } finally {
-        setLoading(false);
+        if (generation === requestGenerationRef.current) {
+          setLoading(false);
+        }
       }
     },
-    [user?.id, isModelReady, logs, currentWeather]
+    [user?.id, isModelReady, logs, currentWeather, routeOrigin, routeDestination]
   );
 
   // Train model (disabled - returns error)
@@ -321,12 +355,16 @@ export function useMLPrediction(): UseMLPredictionReturn {
     [prediction]
   );
 
-  // Auto-refresh prediction on mount and when logs change
+  // Auto-refresh prediction on mount and when logs change — and when the
+  // route context resolves, so the OD-scoped prediction replaces the initial
+  // route-less one. No `!loading` gate: skipping while a request is in flight
+  // would DROP the OD-scoped refresh when the route resolves mid-request; the
+  // generation guard in refreshPrediction makes overlapping requests safe.
   useEffect(() => {
-    if (isModelReady && logs.length > 0 && !loading) {
+    if (isModelReady && logs.length > 0) {
       refreshPrediction();
     }
-  }, [isModelReady, logs.length]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isModelReady, logs.length, routeOrigin, routeDestination]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
     // State

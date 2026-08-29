@@ -3,6 +3,7 @@ import {
   addMinutesToHHmm,
   formatRelativeKorean,
   formatDateTimeLabel,
+  isWrappedTimePair,
 } from './homeTimeFormat';
 
 describe('homeTimeFormat', () => {
@@ -27,6 +28,23 @@ describe('homeTimeFormat', () => {
     it('returns null on malformed input', () => {
       expect(minutesBetween('8am', '09:00')).toBeNull();
       expect(minutesBetween('08:00', '9:5')).toBeNull();
+    });
+  });
+
+  describe('isWrappedTimePair', () => {
+    it('flags a pair whose arrival reads earlier on the clock (13:15 → 13:05)', () => {
+      expect(isWrappedTimePair('13:15', '13:05')).toBe(true);
+      expect(isWrappedTimePair('23:55', '00:20')).toBe(true);
+    });
+
+    it('does not flag an ordered same-day pair', () => {
+      expect(isWrappedTimePair('08:00', '08:28')).toBe(false);
+      expect(isWrappedTimePair('08:00', '08:00')).toBe(false);
+    });
+
+    it('does not flag missing or malformed input (minutesBetween rejects those)', () => {
+      expect(isWrappedTimePair(undefined, '08:00')).toBe(false);
+      expect(isWrappedTimePair('8am', '07:00')).toBe(false);
     });
   });
 

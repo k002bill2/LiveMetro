@@ -86,12 +86,16 @@ describe('useCommuteHeroEstimate', () => {
     expect(result.current.morningCommute).toBeNull();
   });
 
-  it('derives door-to-door hero minutes from an ML prediction (departure→arrival)', () => {
+  it('derives door-to-door hero minutes from an OD-matched ML prediction (departure→arrival)', async () => {
+    // The prediction carries the OD it was computed from; it is promoted only
+    // because that OD matches the registered route's resolved station names.
     mockUseMLPrediction.mockReturnValue({
       prediction: {
         predictedDepartureTime: '08:00',
         predictedArrivalTime: '08:28',
         confidence: 0.82,
+        originStationName: '서울역',
+        destinationStationName: '강남역',
       },
       baselineMinutesFor: () => 31,
     });
@@ -100,15 +104,260 @@ describe('useCommuteHeroEstimate', () => {
       stationId: '0150',
       destinationStationId: '0220',
     });
+    mockGetStation.mockImplementation(async (id: string) =>
+      id === '0150'
+        ? { id: '0150', name: '서울역', lineId: '1' }
+        : { id: '0220', name: '강남역', lineId: '2' },
+    );
 
     const { result } = renderHook(() => useCommuteHeroEstimate());
 
+    await waitFor(() => {
+      expect(result.current.effectiveHero?.predictedMinutes).toBe(28);
+    });
     expect(result.current.hasRealPrediction).toBe(true);
-    expect(result.current.effectiveHero?.predictedMinutes).toBe(28);
     // delta = 28 - baseline(31) = -3 (faster than usual)
     expect(result.current.effectiveHero?.deltaMinutes).toBe(-3);
     expect(result.current.effectiveHero?.arrivalTime).toBe('08:28');
     expect(result.current.effectiveHero?.confidence).toBe(0.82);
+    expect(result.current.effectiveDepartureTime).toBe('08:00');
+  });
+
+  // OD wiring: the hero hook must register its 출근 OD with useMLPrediction so
+  // the fallback model averages only that leg's logs — and must refuse to
+  // promote any prediction that was NOT computed for that OD (route-less
+  // initial state, or a stale/mismatched route).
+  it('passes the resolved morning OD to useMLPrediction as route context', async () => {
+    mockUseFirestoreMorningCommute.mockReturnValue({
+      departureTime: '08:00',
+      stationId: '0150',
+      destinationStationId: '0220',
+    });
+    mockGetStation.mockImplementation(async (id: string) =>
+      id === '0150'
+        ? { id: '0150', name: '서울역', lineId: '1' }
+        : { id: '0220', name: '강남역', lineId: '2' },
+    );
+
+    renderHook(() => useCommuteHeroEstimate());
+
+    await waitFor(() => {
+      expect(mockUseMLPrediction).toHaveBeenCalledWith({
+        originStationName: '서울역',
+        destinationStationName: '강남역',
+      });
+    });
+  });
+
+  it('does not promote a route-less (mixed-population) prediction — graph fallback wins', async () => {
+    // Prediction carries no OD tag: it was averaged over ALL weekday logs
+    // (potentially 출근+퇴근 mixed), so it must not become the hero number.
+    mockUseMLPrediction.mockReturnValue({
+      prediction: {
+        predictedDepartureTime: '13:15',
+        predictedArrivalTime: '13:45',
+        confidence: 0.4,
+      },
+      baselineMinutesFor: () => null,
+    });
+    mockUseFirestoreMorningCommute.mockReturnValue({
+      departureTime: '08:00',
+      stationId: '0150',
+      destinationStationId: '0220',
+    });
+    mockUseCommuteRouteSummary.mockReturnValue({ ready: true, rideMinutes: 26 });
+    mockGetStation.mockImplementation(async (id: string) =>
+      id === '0150'
+        ? { id: '0150', name: '서울역', lineId: '1' }
+        : { id: '0220', name: '강남역', lineId: '2' },
+    );
+
+    const { result } = renderHook(() => useCommuteHeroEstimate());
+
+    await waitFor(() => {
+      expect(result.current.effectiveHero?.predictedMinutes).toBe(26);
+    });
+    // Graph fallback, not the 30-minute ML span (13:15→13:45).
+    expect(result.current.effectiveHero?.confidence).toBeUndefined();
+    // The hero on screen is the graph estimate — the "real prediction" flag
+    // must not report the discarded route-less ML result as promoted.
+    expect(result.current.hasRealPrediction).toBe(false);
+  });
+
+  it('does not promote a prediction computed for a different OD than the registered route', async () => {
+    mockUseMLPrediction.mockReturnValue({
+      prediction: {
+        predictedDepartureTime: '08:00',
+        predictedArrivalTime: '08:28',
+        confidence: 0.8,
+        originStationName: '산곡',
+        destinationStationName: '선릉',
+      },
+      baselineMinutesFor: () => null,
+    });
+    mockUseFirestoreMorningCommute.mockReturnValue({
+      departureTime: '08:10',
+      stationId: '0150',
+      destinationStationId: '0220',
+    });
+    mockUseCommuteRouteSummary.mockReturnValue({ ready: true, rideMinutes: 26 });
+    mockGetStation.mockImplementation(async (id: string) =>
+      id === '0150'
+        ? { id: '0150', name: '서울역', lineId: '1' }
+        : { id: '0220', name: '강남역', lineId: '2' },
+    );
+
+    const { result } = renderHook(() => useCommuteHeroEstimate());
+
+    await waitFor(() => {
+      expect(result.current.effectiveHero?.predictedMinutes).toBe(26);
+    });
+    expect(result.current.effectiveHero?.confidence).toBeUndefined();
+    // OD-mismatched prediction was discarded → not a real prediction on screen.
+    expect(result.current.hasRealPrediction).toBe(false);
+  });
+
+  // Regression (screenshot bug): the fallback model could emit an inverted
+  // pair (departure 13:15 / arrival 13:05) from mixed-leg logs. minutesBetween
+  // reads that as a midnight wrap → "1430분" on the hero. An inverted morning
+  // prediction is corrupt input, not a real overnight commute — it must not be
+  // promoted to the hero at all.
+  it('rejects an inverted ML prediction (arrival before departure) instead of showing 1430', async () => {
+    // OD matches the registered route on purpose: this pins the wrap gate
+    // specifically, independent of the OD-match gate.
+    mockUseMLPrediction.mockReturnValue({
+      prediction: {
+        predictedDepartureTime: '13:15',
+        predictedArrivalTime: '13:05',
+        confidence: 0.3,
+        originStationName: '서울역',
+        destinationStationName: '강남역',
+      },
+      baselineMinutesFor: () => null,
+    });
+    mockUseFirestoreMorningCommute.mockReturnValue({
+      departureTime: '08:00',
+      stationId: '0150',
+      destinationStationId: '0220',
+    });
+    mockGetStation.mockImplementation(async (id: string) =>
+      id === '0150'
+        ? { id: '0150', name: '서울역', lineId: '1' }
+        : { id: '0220', name: '강남역', lineId: '2' },
+    );
+
+    const { result } = renderHook(() => useCommuteHeroEstimate());
+
+    // Wait until the station names resolve (the OD gate would pass) — the
+    // hero must STILL be null because the pair is inverted.
+    await waitFor(() => {
+      expect(result.current.commuteStationNames.origin).toBe('서울역');
+    });
+    expect(result.current.effectiveHero).toBeNull();
+  });
+
+  it('falls back to graph ride minutes when the ML prediction is inverted', async () => {
+    mockUseMLPrediction.mockReturnValue({
+      prediction: {
+        predictedDepartureTime: '13:15',
+        predictedArrivalTime: '13:05',
+        confidence: 0.3,
+        originStationName: '서울역',
+        destinationStationName: '강남역',
+      },
+      baselineMinutesFor: () => null,
+    });
+    mockUseFirestoreMorningCommute.mockReturnValue({
+      departureTime: '08:00',
+      stationId: '0150',
+      destinationStationId: '0220',
+    });
+    mockUseCommuteRouteSummary.mockReturnValue({ ready: true, rideMinutes: 26 });
+    mockGetStation.mockImplementation(async (id: string) =>
+      id === '0150'
+        ? { id: '0150', name: '서울역', lineId: '1' }
+        : { id: '0220', name: '강남역', lineId: '2' },
+    );
+
+    const { result } = renderHook(() => useCommuteHeroEstimate());
+
+    await waitFor(() => {
+      expect(result.current.effectiveHero?.predictedMinutes).toBe(26);
+    });
+    // The 1430-minute wrap number must never surface.
+    expect(result.current.effectiveHero?.confidence).toBeUndefined();
+    // Inverted prediction was discarded → not a real prediction on screen.
+    expect(result.current.hasRealPrediction).toBe(false);
+  });
+
+  // hasRealPrediction gates the "데이터 수집중" copy and the ML badge. It must
+  // track the hero actually promoted to the screen (heroProps), not the mere
+  // existence of an mlPrediction object — a discarded prediction (route-less,
+  // OD-mismatched or inverted) falls through to the graph estimate, and the
+  // flag must say so.
+  it('reports hasRealPrediction=false when the ML prediction is discarded and the graph hero shows', async () => {
+    // Route-less prediction (no OD tag): heroProps refuses to promote it.
+    mockUseMLPrediction.mockReturnValue({
+      prediction: {
+        predictedDepartureTime: '13:15',
+        predictedArrivalTime: '13:45',
+        confidence: 0.4,
+      },
+      baselineMinutesFor: () => null,
+    });
+    mockUseFirestoreMorningCommute.mockReturnValue({
+      departureTime: '08:00',
+      stationId: '0150',
+      destinationStationId: '0220',
+    });
+    mockUseCommuteRouteSummary.mockReturnValue({ ready: true, rideMinutes: 26 });
+    mockGetStation.mockImplementation(async (id: string) =>
+      id === '0150'
+        ? { id: '0150', name: '서울역', lineId: '1' }
+        : { id: '0220', name: '강남역', lineId: '2' },
+    );
+
+    const { result } = renderHook(() => useCommuteHeroEstimate());
+
+    // Wait until the graph fallback hero is on screen (names resolved).
+    await waitFor(() => {
+      expect(result.current.effectiveHero?.predictedMinutes).toBe(26);
+    });
+    expect(result.current.hasRealPrediction).toBe(false);
+  });
+
+  // When the ML prediction is discarded (inverted / OD-mismatched) and the
+  // graph fallback provides the hero, the departure timestamp must come from
+  // the registered commute too — otherwise the card would pair the graph's
+  // ride minutes with the corrupt 13:15 ML departure.
+  it('uses the registered departure time (not the ML one) when the ML prediction is discarded', async () => {
+    mockUseMLPrediction.mockReturnValue({
+      prediction: {
+        predictedDepartureTime: '13:15',
+        predictedArrivalTime: '13:05',
+        confidence: 0.3,
+        originStationName: '서울역',
+        destinationStationName: '강남역',
+      },
+      baselineMinutesFor: () => null,
+    });
+    mockUseFirestoreMorningCommute.mockReturnValue({
+      departureTime: '08:00',
+      stationId: '0150',
+      destinationStationId: '0220',
+    });
+    mockUseCommuteRouteSummary.mockReturnValue({ ready: true, rideMinutes: 26 });
+    mockGetStation.mockImplementation(async (id: string) =>
+      id === '0150'
+        ? { id: '0150', name: '서울역', lineId: '1' }
+        : { id: '0220', name: '강남역', lineId: '2' },
+    );
+
+    const { result } = renderHook(() => useCommuteHeroEstimate());
+
+    await waitFor(() => {
+      expect(result.current.effectiveHero?.predictedMinutes).toBe(26);
+    });
     expect(result.current.effectiveDepartureTime).toBe('08:00');
   });
 
@@ -123,6 +372,8 @@ describe('useCommuteHeroEstimate', () => {
         predictedDepartureTime: '08:00',
         predictedArrivalTime: '08:28',
         confidence: 0.82,
+        originStationName: '산곡',
+        destinationStationName: '선릉',
       },
       baselineMinutesFor,
     });
@@ -328,27 +579,38 @@ describe('useCommuteHeroEstimate direction=auto (evening switch)', () => {
     expect(result.current.effectiveDepartureTime).toBe('19:00');
   });
 
-  it("AM + 출근설정 → activeCommuteType='morning', ML 적용(오늘과 동일)", () => {
+  it("AM + 출근설정 → activeCommuteType='morning', ML 적용(오늘과 동일)", async () => {
     mockResolveActiveCommuteType.mockReturnValue('morning');
     mockUseFirestoreMorningCommute.mockReturnValue({
       departureTime: '08:00',
       stationId: '0150',
       destinationStationId: '0220',
     });
+    // OD-tagged so the prediction survives promotion once the names resolve —
+    // hasRealPrediction tracks the PROMOTED hero, not the raw prediction.
     mockUseMLPrediction.mockReturnValue({
       prediction: {
         predictedDepartureTime: '08:00',
         predictedArrivalTime: '08:28',
         confidence: 0.8,
+        originStationName: '서울역',
+        destinationStationName: '강남역',
       },
       baselineMinutesFor: () => 31,
     });
+    mockGetStation.mockImplementation(async (id: string) =>
+      id === '0150'
+        ? { id: '0150', name: '서울역', lineId: '1' }
+        : { id: '0220', name: '강남역', lineId: '2' },
+    );
 
     const { result } = renderHook(() => useCommuteHeroEstimate(0, 'auto'));
 
     expect(result.current.activeCommuteType).toBe('morning');
     expect(result.current.activeCommute?.stationId).toBe('0150');
-    expect(result.current.hasRealPrediction).toBe(true);
+    await waitFor(() => {
+      expect(result.current.hasRealPrediction).toBe(true);
+    });
   });
 
   it('PM + 퇴근 미설정 → activeCommute null', () => {
@@ -379,5 +641,56 @@ describe('useCommuteHeroEstimate direction=auto (evening switch)', () => {
   it("evening leg subscription enabled in direction='auto'", () => {
     renderHook(() => useCommuteHeroEstimate(0, 'auto'));
     expect(mockUseFirestoreCommuteLeg).toHaveBeenCalledWith('u1', 'evening', 0, true);
+  });
+
+  // Station names resolve ASYNCHRONOUSLY, so for one window after the commute
+  // (or the active leg) changes the state still holds the PREVIOUS OD's names.
+  // Those stale names feed both the prediction's route context and the OD gate
+  // that checks it, so they agree with each other and a prediction computed for
+  // the old route sails through onto the new commute. The names must be
+  // invalidated the moment the commute they were resolved for changes.
+  it('discards station names resolved for a previous commute until the new lookup lands', async () => {
+    mockUseMLPrediction.mockReturnValue({
+      prediction: {
+        predictedDepartureTime: '08:00',
+        predictedArrivalTime: '08:28',
+        confidence: 0.82,
+        originStationName: '서울역',
+        destinationStationName: '강남역',
+      },
+      baselineMinutesFor: () => null,
+    });
+    mockUseFirestoreMorningCommute.mockReturnValue({
+      departureTime: '08:00',
+      stationId: '0150',
+      destinationStationId: '0220',
+    });
+    mockGetStation.mockImplementation(async (id: string) =>
+      id === '0150'
+        ? { id: '0150', name: '서울역', lineId: '1' }
+        : { id: '0220', name: '강남역', lineId: '2' },
+    );
+
+    const { result, rerender } = renderHook(() => useCommuteHeroEstimate());
+
+    await waitFor(() => {
+      expect(result.current.commuteStationNames.origin).toBe('서울역');
+    });
+    expect(result.current.hasRealPrediction).toBe(true);
+
+    // The commute flips to the reverse OD and the new lookup never settles
+    // inside this window — exactly the leg-transition gap.
+    mockUseFirestoreMorningCommute.mockReturnValue({
+      departureTime: '18:40',
+      stationId: '0220',
+      destinationStationId: '0150',
+    });
+    mockGetStation.mockImplementation(() => new Promise(() => {}));
+    rerender({});
+
+    expect(result.current.commuteStationNames.origin).toBeUndefined();
+    expect(result.current.commuteStationNames.destination).toBeUndefined();
+    // The old-OD prediction must NOT be promoted onto the new commute.
+    expect(result.current.hasRealPrediction).toBe(false);
   });
 });

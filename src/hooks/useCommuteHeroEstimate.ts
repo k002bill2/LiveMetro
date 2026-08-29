@@ -35,7 +35,11 @@ import {
 } from '@/hooks/useFirestoreMorningCommute';
 import { useCommuteRouteSummary, type CommuteRouteSummary } from '@/hooks/useCommuteRouteSummary';
 import { isUsableCommuteTime, type CommuteTime } from '@/models/user';
-import { addMinutesToHHmm, minutesBetween } from '@screens/home/homeTimeFormat';
+import {
+  addMinutesToHHmm,
+  isWrappedTimePair,
+  minutesBetween,
+} from '@screens/home/homeTimeFormat';
 import { resolveActiveCommuteType, type CommuteLeg } from '@/utils/commuteSchedule';
 
 export interface CommuteHeroValue {
@@ -57,6 +61,19 @@ export interface CommuteStationNames {
   origin?: string;
   destination?: string;
   originLineId?: string;
+}
+
+/**
+ * Internal: resolved names plus the OD they were resolved FOR. The lookup is
+ * asynchronous, so without this provenance a commute/leg change would leave
+ * the previous OD's names in state for one window — and since those same
+ * stale names feed both the prediction's route context and the OD gate that
+ * checks it, the two would agree and a prediction computed for the old route
+ * would be promoted onto the new commute.
+ */
+interface ResolvedCommuteStationNames extends CommuteStationNames {
+  forOriginId?: string;
+  forDestinationId?: string;
 }
 
 export interface CommuteHeroEstimate {
@@ -81,7 +98,11 @@ export interface CommuteHeroEstimate {
   effectiveHero: CommuteHeroValue | null;
   /** Departure HH:mm — ML predicted departure ?? registered departure. */
   effectiveDepartureTime: string | undefined;
-  /** True only when a real ML prediction exists (gates the "데이터 수집중" copy). */
+  /**
+   * True only when the ML prediction was actually promoted to the hero
+   * (heroProps survived the OD-match / inversion gates). Graph fallback and
+   * discarded predictions report false (gates the "데이터 수집중" copy).
+   */
   hasRealPrediction: boolean;
 }
 
@@ -96,7 +117,11 @@ export function useCommuteHeroEstimate(
   direction: 'morning' | 'auto' = 'morning',
 ): CommuteHeroEstimate {
   const { user } = useAuth();
-  const { prediction: mlPrediction, baselineMinutesFor } = useMLPrediction();
+
+  // Declared before useMLPrediction (hook order) — the resolved names feed the
+  // prediction's route context; the resolving effect lives further down.
+  const [resolvedStationNames, setResolvedStationNames] =
+    useState<ResolvedCommuteStationNames>({});
 
   // Two stores populate the morning commute (full rationale in HomeScreen).
   // morningCommute is always resolved — the field name stays truthful, and the
@@ -133,17 +158,53 @@ export function useCommuteHeroEstimate(
   const activeCommute: CommuteTime | null =
     activeLeg === 'evening' ? eveningCommute : morningCommute;
 
+  // Expose the names only while they still belong to the CURRENT commute. On a
+  // leg switch activeCommute changes a render before the async lookup lands, so
+  // an identity check on the OD ids is what keeps the stale (reverse-route)
+  // names out of both the route context and the gate below. Memoised because
+  // HomeScreen holds this object in a useCallback dep list.
+  const namesMatchActiveCommute =
+    resolvedStationNames.forOriginId === activeCommute?.stationId &&
+    resolvedStationNames.forDestinationId === activeCommute?.destinationStationId;
+  const commuteStationNames = useMemo<CommuteStationNames>(
+    () =>
+      namesMatchActiveCommute
+        ? {
+            origin: resolvedStationNames.origin,
+            destination: resolvedStationNames.destination,
+            originLineId: resolvedStationNames.originLineId,
+          }
+        : {},
+    [
+      namesMatchActiveCommute,
+      resolvedStationNames.origin,
+      resolvedStationNames.destination,
+      resolvedStationNames.originLineId,
+    ],
+  );
+
+  // Register the 출근 OD with the prediction pipeline so the fallback model
+  // averages only that leg's logs (station-NAME matched — id domains diverge
+  // across log writers). Morning leg only: commuteStationNames tracks the
+  // ACTIVE leg, so on the evening leg it would name the reverse OD.
+  const { prediction: mlPrediction, baselineMinutesFor } = useMLPrediction(
+    activeLeg === 'morning'
+      ? {
+          originStationName: commuteStationNames.origin,
+          destinationStationName: commuteStationNames.destination,
+        }
+      : undefined,
+  );
+
   const routeSummary = useCommuteRouteSummary(
     activeCommute?.stationId,
     activeCommute?.destinationStationId,
     activeCommute?.transferStationId,
   );
 
-  const [commuteStationNames, setCommuteStationNames] = useState<CommuteStationNames>({});
-
   useEffect(() => {
     if (!activeCommute) {
-      setCommuteStationNames({});
+      setResolvedStationNames({});
       return;
     }
     let cancelled = false;
@@ -154,10 +215,12 @@ export function useCommuteHeroEstimate(
           trainService.getStation(activeCommute.destinationStationId).catch(() => null),
         ]);
         if (cancelled) return;
-        setCommuteStationNames({
+        setResolvedStationNames({
           origin: origin?.name,
           destination: dest?.name,
           originLineId: origin?.lineId,
+          forOriginId: activeCommute.stationId,
+          forDestinationId: activeCommute.destinationStationId,
         });
       } catch {
         // ignore — consumers tolerate missing endpoint names
@@ -177,6 +240,31 @@ export function useCommuteHeroEstimate(
     // OD — producing an evening baseline for a morning number. Bailing out
     // early keeps the names below provably the morning endpoints.
     if (activeLeg !== 'morning') return null;
+    // Promote only a prediction computed for the registered 출근 OD. A
+    // route-less prediction (initial state, names not yet resolved) or one
+    // tagged with a different OD was averaged over the wrong population —
+    // mixed legs are exactly what produced the inverted 13:15→13:05 pair.
+    // Fall through to the graph estimate instead.
+    if (
+      !commuteStationNames.origin ||
+      !commuteStationNames.destination ||
+      mlPrediction.originStationName !== commuteStationNames.origin ||
+      mlPrediction.destinationStationName !== commuteStationNames.destination
+    ) {
+      return null;
+    }
+    // A morning prediction whose arrival reads earlier than its departure is
+    // corrupt input (the fallback model once averaged mixed-leg logs into
+    // 13:15 → 13:05), not an overnight trip — minutesBetween would read it as
+    // a ~1430-minute midnight wrap. Drop it so the graph fallback shows.
+    if (
+      isWrappedTimePair(
+        mlPrediction.predictedDepartureTime,
+        mlPrediction.predictedArrivalTime,
+      )
+    ) {
+      return null;
+    }
     const minutes = minutesBetween(
       mlPrediction.predictedDepartureTime,
       mlPrediction.predictedArrivalTime,
@@ -226,8 +314,13 @@ export function useCommuteHeroEstimate(
   const effectiveHero =
     (activeLeg === 'morning' ? heroProps : null) ?? registeredCommuteHero;
 
+  // Departure follows the hero's provenance: the ML departure is shown only
+  // when the ML hero itself survived promotion (heroProps is already null on
+  // the evening leg and for discarded — inverted or OD-mismatched —
+  // predictions). Otherwise the registered commute's departure pairs with the
+  // graph estimate, so the two numbers never mix sources.
   const effectiveDepartureTime =
-    (activeLeg === 'morning' ? mlPrediction?.predictedDepartureTime : undefined) ??
+    (heroProps !== null ? mlPrediction?.predictedDepartureTime : undefined) ??
     activeCommute?.departureTime;
 
   return {
@@ -240,7 +333,10 @@ export function useCommuteHeroEstimate(
     commuteStationNames,
     effectiveHero,
     effectiveDepartureTime,
-    hasRealPrediction: activeLeg === 'morning' && mlPrediction !== null,
+    // heroProps is already null on the evening leg and for discarded
+    // (route-less / OD-mismatched / inverted) predictions, so this flag is
+    // true exactly when the hero on screen IS the ML prediction.
+    hasRealPrediction: heroProps !== null,
   };
 }
 
