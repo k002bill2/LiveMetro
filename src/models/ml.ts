@@ -50,6 +50,16 @@ export interface MLPrediction {
   readonly modelVersion: string;
   /** Timestamp of prediction */
   readonly predictedAt: Date;
+  /**
+   * Origin station name of the OD this prediction was computed from — present
+   * only when the fallback population was scoped to one origin→destination.
+   * Route-aware consumers compare this against their registered route before
+   * promoting the prediction; a prediction without these fields was averaged
+   * over ALL of the weekday's logs (potentially mixed legs).
+   */
+  readonly originStationName?: string;
+  /** Destination station name of the OD this prediction was computed from. */
+  readonly destinationStationName?: string;
 }
 
 /**

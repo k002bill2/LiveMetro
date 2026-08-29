@@ -323,18 +323,35 @@ describe('WeeklyPredictionScreen', () => {
   // this screen must show the SAME value. Both now read useCommuteHeroEstimate;
   // here the shared ML estimate (departure 08:30 → arrival 09:15 = 45 min)
   // drives the headline, range (±2 band), header timestamp and CTA together.
-  it('reflects the shared ML estimate in headline, range, header and CTA', () => {
+  // OD-safety contract: the hook promotes an ML prediction only when it is
+  // tagged with the registered commute's resolved endpoint names, so the
+  // fixture supplies a registered commute + station-name resolution + a
+  // matching OD-tagged prediction. Station names resolve async → findByText.
+  it('reflects the shared ML estimate in headline, range, header and CTA', async () => {
+    (useFirestoreMorningCommute as jest.Mock).mockReturnValue({
+      stationId: '0150',
+      destinationStationId: '0220',
+      departureTime: '08:00',
+      bufferMinutes: 0,
+    });
+    (trainService.getStation as jest.Mock).mockImplementation((id: string) =>
+      Promise.resolve(
+        id === '0150' ? { id: '0150', name: '서울역' } : { id: '0220', name: '강남역' },
+      ),
+    );
     (useMLPrediction as jest.Mock).mockReturnValue({
       prediction: {
         predictedDepartureTime: '08:30',
         predictedArrivalTime: '09:15',
         confidence: 0.9,
+        originStationName: '서울역',
+        destinationStationName: '강남역',
       },
       baselineMinutesFor: () => null,
     });
 
-    const { getByText } = render(<WeeklyPredictionScreen />);
-    expect(getByText('예상 45분')).toBeTruthy();
+    const { getByText, findByText } = render(<WeeklyPredictionScreen />);
+    expect(await findByText('예상 45분')).toBeTruthy();
     expect(getByText('최단 43분')).toBeTruthy();
     expect(getByText('최장 47분')).toBeTruthy();
     // (B) Header = 도착 시각 (same field as HomeScreen's card), NOT the current
@@ -788,17 +805,33 @@ describe('WeeklyPredictionScreen', () => {
   // because the screen re-renders on async slot state updates and each render
   // re-reads useMLPrediction — a one-shot override would be consumed by the
   // first render and revert to null before assertions run.
-  it('shows confidence percentage and learning meta when a real prediction exists', () => {
+  // The 92% figure reads effectiveHero.confidence, so the prediction must
+  // survive the OD promotion gate: registered commute + resolved station names
+  // + matching OD tags. Name resolution is async → findByText for the pct.
+  it('shows confidence percentage and learning meta when a real prediction exists', async () => {
+    (useFirestoreMorningCommute as jest.Mock).mockReturnValue({
+      stationId: '0150',
+      destinationStationId: '0220',
+      departureTime: '08:00',
+      bufferMinutes: 0,
+    });
+    (trainService.getStation as jest.Mock).mockImplementation((id: string) =>
+      Promise.resolve(
+        id === '0150' ? { id: '0150', name: '서울역' } : { id: '0220', name: '강남역' },
+      ),
+    );
     (useMLPrediction as jest.Mock).mockReturnValue({
       prediction: {
         predictedDepartureTime: '08:23',
         predictedArrivalTime: '09:15',
         confidence: 0.92,
+        originStationName: '서울역',
+        destinationStationName: '강남역',
       },
       baselineMinutesFor: () => null,
     });
-    const { getByText, queryByText } = render(<WeeklyPredictionScreen />);
-    expect(getByText('92%')).toBeTruthy();
+    const { getByText, queryByText, findByText } = render(<WeeklyPredictionScreen />);
+    expect(await findByText('92%')).toBeTruthy();
     expect(getByText('· 지난 30일 학습')).toBeTruthy();
     expect(queryByText('데이터 수집중')).toBeNull();
   });
@@ -833,13 +866,28 @@ describe('WeeklyPredictionScreen — unified headline source', () => {
   // The headline now reads the shared useCommuteHeroEstimate and must IGNORE the
   // useCommutePattern.todayPrediction.predictedMinutes it used to read (that
   // pipeline still drives the trend / factors / hourly sections, not the hero).
-  it('renders the shared estimate minutes and ignores todayPrediction.predictedMinutes', () => {
+  it('renders the shared estimate minutes and ignores todayPrediction.predictedMinutes', async () => {
     // Shared estimate (ML) = 45 min; todayPrediction carries a *different* 30.
+    // The ML prediction must pass the OD promotion gate (registered commute +
+    // resolved names + matching OD tags), or the hero would fall back to null.
+    (useFirestoreMorningCommute as jest.Mock).mockReturnValue({
+      stationId: '0150',
+      destinationStationId: '0220',
+      departureTime: '08:00',
+      bufferMinutes: 0,
+    });
+    (trainService.getStation as jest.Mock).mockImplementation((id: string) =>
+      Promise.resolve(
+        id === '0150' ? { id: '0150', name: '서울역' } : { id: '0220', name: '강남역' },
+      ),
+    );
     (useMLPrediction as jest.Mock).mockReturnValue({
       prediction: {
         predictedDepartureTime: '08:30',
         predictedArrivalTime: '09:15',
         confidence: 0.8,
+        originStationName: '서울역',
+        destinationStationName: '강남역',
       },
       baselineMinutesFor: () => null,
     });
@@ -869,8 +917,8 @@ describe('WeeklyPredictionScreen — unified headline source', () => {
       error: null,
     });
 
-    const { getByText, queryByText } = render(<WeeklyPredictionScreen />);
-    expect(getByText('예상 45분')).toBeTruthy();
+    const { findByText, queryByText } = render(<WeeklyPredictionScreen />);
+    expect(await findByText('예상 45분')).toBeTruthy();
     expect(queryByText('예상 30분')).toBeNull();
   });
 
