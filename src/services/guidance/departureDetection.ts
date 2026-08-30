@@ -16,6 +16,7 @@
  * Pure / timer-free / RN-free — unit-tested like guidanceSteps.ts.
  */
 import type { Train } from '@/models/train';
+import { isOnCanonicalLine, resolveCanonicalLineId } from '@/utils/canonicalLine';
 
 /** ETA window (seconds) treated as "arriving / at the platform" (arvlCd '0'/'1'). */
 export const ARRIVING_ETA_THRESHOLD_SEC = 30;
@@ -49,7 +50,8 @@ export interface DepartureDetectionResult {
 
 const NOT_DEPARTED: DepartureDetectionResult = { departed: false, trainId: null };
 
-const isNumberedLine = (lineId: string): boolean => /^[1-9]$/.test(lineId);
+/** Seoul 본선 1~9호선인지 — canonical id 기준. 확장 노선 추가 게이트 선택에만 쓴다. */
+const isNumberedLine = (canonicalLineId: string): boolean => /^[1-9]$/.test(canonicalLineId);
 
 const etaSeconds = (train: Train, nowMs: number): number | null =>
   train.arrivalTime === null ? null : Math.floor((train.arrivalTime.getTime() - nowMs) / 1000);
@@ -64,16 +66,22 @@ export const detectDeparture = (input: DepartureDetectionInput): DepartureDetect
 
   if (prev === null || prev.length === 0) return NOT_DEPARTED;
 
-  const numbered = isNumberedLine(awaited.lineId);
+  // 노선 필터는 숫자·확장 노선에 동일하게 적용된다 (canonicalLine.ts). 미지의 노선은
+  // 후보를 특정할 수 없으므로 수동으로 강등한다 — 자동 진행의 false positive 가 가장
+  // 비싼 오류라는 이 파일의 지배 원칙 그대로. 위치 API 미지원 노선(인천2 등)은 도착
+  // 스냅샷 기준으로 정상 판정되며, 확장 노선이므로 아래 방면/선호 게이트를 받는다.
+  const canonicalLine = resolveCanonicalLineId(awaited.lineId);
+  if (canonicalLine === null) return NOT_DEPARTED;
+
+  const numbered = isNumberedLine(canonicalLine);
   const prefs = awaited.preferredDestinations ?? [];
 
-  // Extended (non-numbered) lines bypass the numeric line filter, so the
-  // candidate pool mixes lines at a transfer station. Require a direction match
-  // to disambiguate; without one, degrade to manual rather than risk a false advance.
-  // An explicit preference is itself such a disambiguator, so it lifts this gate.
+  // 확장 노선은 노선 필터를 통과해도 방면/선호 매칭을 추가로 요구한다. 다노선 혼입은
+  // 위 필터로 해소됐지만, 수인분당선·경의중앙선의 분기 종점(청량리/인천, 문산/지평)이라는
+  // 독립적인 모호성이 남는다 — 그 상태로 자동 진행하느니 수동으로 강등한다.
   if (!numbered && awaited.directionName === null && prefs.length === 0) return NOT_DEPARTED;
 
-  const onLine = (train: Train): boolean => (numbered ? train.lineId === awaited.lineId : true);
+  const onLine = (train: Train): boolean => isOnCanonicalLine(canonicalLine, train.lineId);
 
   const directionMatches = (train: Train): boolean =>
     awaited.directionName === null ? true : train.finalDestination === awaited.directionName;

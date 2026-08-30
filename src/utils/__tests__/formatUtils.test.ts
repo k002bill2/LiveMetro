@@ -165,8 +165,82 @@ describe('formatUtils', () => {
       expect(toSeoulApiLineName(' 경의선 ')).toBe('경의중앙선');
     });
 
-    it('returns unknown ids unchanged (current INFO-200-safe behavior)', () => {
-      expect(toSeoulApiLineName('미지의노선')).toBe('미지의노선');
+    // 예전엔 미지의 id를 formatLineName으로 흘려보내 그럴싸한 문자열을 돌려줬고,
+    // 호출부가 그것을 "지원되는 노선"으로 오인했다(fail-open). 이제는 정직하게 null.
+    it('returns null for unknown ids instead of a plausible-looking passthrough', () => {
+      expect(toSeoulApiLineName('미지의노선')).toBeNull();
+      expect(toSeoulApiLineName('K4')).toBeNull();
+    });
+
+    it('returns null for an empty or whitespace-only id', () => {
+      expect(toSeoulApiLineName('')).toBeNull();
+      expect(toSeoulApiLineName('   ')).toBeNull();
+    });
+
+    it('still resolves supported ids given in any input domain (slug/subwayId/display name)', () => {
+      expect(toSeoulApiLineName('bundang')).toBe('수인분당선');
+      expect(toSeoulApiLineName('경의중앙선')).toBe('경의중앙선');
+      expect(toSeoulApiLineName('1071')).toBe('수인분당선');
+      expect(toSeoulApiLineName('1002')).toBe('2호선');
+      expect(toSeoulApiLineName('2호선')).toBe('2호선');
+    });
+  });
+
+  /**
+   * 회귀: 노선 표는 전부 객체 리터럴이라 `table[key]` 가 프로토타입 체인까지 걷는다.
+   * 그래서 `__proto__`·`constructor`·`toString` 같은 입력은 "없음"이 아니라
+   * `Object.prototype` 이나 네이티브 함수에 적중했다 — 문자열을 반환한다고 선언된
+   * 함수가 객체/함수를 흘려보낸 것이다. lineId 는 서울 API 응답과 영속된 사용자
+   * 데이터에서 오므로 신뢰할 수 없는 키로 다뤄야 한다. 실패 양상은 둘이다:
+   * 하류에서 문자열 메서드를 부르는 순간 TypeError(`.replace is not a function`),
+   * 또는 useTrainPositions 가 그 값을 그대로 위치 API 요청에 실어 보내는 fail-open.
+   *
+   * 네 표를 한꺼번에 막아야 한다. normalizeSeoulLineId 만 고치면 오히려 나빠진다 —
+   * 지금 toSeoulApiLineName('toString') 이 null 인 것은 정규화가 함수를 돌려주고 그
+   * 함수가 키로 문자열화되며 표에서 빗나가는 *우연*이라, 정규화가 정직해지는 순간
+   * SEOUL_API_POSITION_LINE_NAMES['toString'] 이 상속 메서드에 적중하기 때문이다.
+   */
+  describe('prototype-chain keys are treated as unknown strings', () => {
+    const PROTOTYPE_KEYS = [
+      '__proto__',
+      'constructor',
+      'toString',
+      'valueOf',
+      'hasOwnProperty',
+    ] as const;
+
+    it.each(PROTOTYPE_KEYS)(
+      'normalizeSeoulLineId(%p) returns the id as a plain string, never an inherited value',
+      key => {
+        const result = normalizeSeoulLineId(key);
+        expect(typeof result).toBe('string');
+        expect(result).toBe(key);
+      }
+    );
+
+    it.each(PROTOTYPE_KEYS)(
+      'formatLineName(%p) returns the id as a plain string, never an inherited value',
+      key => {
+        const result = formatLineName(key);
+        expect(typeof result).toBe('string');
+        expect(result).toBe(key);
+      }
+    );
+
+    it.each(PROTOTYPE_KEYS)('toSeoulApiLineName(%p) fails closed with null', key => {
+      expect(toSeoulApiLineName(key)).toBeNull();
+    });
+
+    // 정규화 결과가 문자열이어야 하류 문자열 연산이 성립한다. 예전엔 여기서
+    // "TypeError: normalizeSeoulLineId(...).replace is not a function" 로 터졌다.
+    it.each(PROTOTYPE_KEYS)('downstream string operations on %p do not throw', key => {
+      expect(() => normalizeSeoulLineId(key).replace(/x/g, 'y')).not.toThrow();
+      expect(() => formatLineName(key).trim()).not.toThrow();
+    });
+
+    it('does not let a prototype key masquerade as a supported line', () => {
+      expect(toSeoulApiLineName('__proto__')).not.toBe('2호선');
+      expect(normalizeSeoulLineId('constructor')).not.toBe('2');
     });
   });
 

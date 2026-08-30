@@ -77,6 +77,7 @@ import { BackgroundPermissionBanner } from '@/components/guidance/BackgroundPerm
 import type { AppStackParamList } from '@/navigation/types';
 import type { GuidanceStep, RideStep } from '@/models/guidance';
 import type { Train } from '@/models/train';
+import { isOnCanonicalLine, resolveCanonicalLineId } from '@/utils/canonicalLine';
 
 type NavigationProp = NativeStackNavigationProp<AppStackParamList>;
 
@@ -328,8 +329,9 @@ export const RouteGuidanceScreen: React.FC = () => {
     return liveSession?.destinationPreferences?.[boardingKey] ?? [];
   }, [liveSession, boardingKey]);
 
-  // Numbered-line filter (transfer-station 다노선 혼입 방지) — mirrors
-  // TrainSelectionScreen. Extended lines keep all trains. 이후 진행 방향(방면)
+  // Canonical-line filter (transfer-station 다노선 혼입 방지) — step lineId와
+  // Train.lineId를 같은 도메인으로 모아 비교하므로 확장 노선도 동일하게 걸러진다.
+  // 미지의 노선만 빈 풀(fail-closed). 이후 진행 방향(방면)
   // 매칭 열차를 우선한다 — 반대 방향 열차 기준의 칩/알림 방지. 단축 운행
   // 종착역은 방면명과 정당하게 다를 수 있어(detectDeparture와 같은 원칙)
   // 매칭이 전무하면 노선 필터 결과로 폴백한다. display=보조 나열·시트 옵션(선호와
@@ -880,13 +882,18 @@ export const RouteGuidanceScreen: React.FC = () => {
   const trainSelectEntries = useMemo((): readonly DepartedTrainEntry[] => {
     if (!session || trainSelectContext === null) return [];
     const { stationName, lineId, direction } = trainSelectContext;
-    const numbered = /^[1-9]$/.test(lineId);
+    // Canonical line filter — 대기 풀·출발 로그·출발 감지와 같은 술어(canonicalLine.ts).
+    // 예전엔 숫자 노선만 걸러, 확장 노선 대기 중엔 같은 역의 타 노선 출발이 "내가 탄
+    // 열차" 후보로 올라왔다. 미지의 노선만 후보 없음(fail-closed) — 위치 API 미지원
+    // 노선은 그대로 후보에 남는다. "방금 출발했어요" 폴백은 시트에 항상 남는다.
+    const canonicalLine = resolveCanonicalLineId(lineId);
+    if (canonicalLine === null) return [];
     // Store prune only runs on non-empty appends, so a long ride without new
     // departures can leave stale entries — filter the retention window here too.
     const base = getDepartedTrainLog().filter(
       (e) =>
         e.stationName === stationName &&
-        (!numbered || e.lineId === lineId) &&
+        isOnCanonicalLine(canonicalLine, e.lineId) &&
         e.departedAtMs <= nowMs &&
         e.departedAtMs >= session.startedAt &&
         e.departedAtMs >= nowMs - DEPARTED_LOG_RETENTION_MS
