@@ -46,10 +46,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # eas-cli(latest)의 전이 의존성 @oclif/plugin-autocomplete가 Node>=22를 요구해
+      # Node 20에서는 "Setup EAS CLI" 설치가 EBADENGINE으로 죽는다. 러너만 22로
+      # 올린다 — package.json의 engines.node는 EAS **빌드 서버**의 Node를 고르는
+      # 값이라 여기서 넓히면 프로덕션 빌드 환경이 딸려 바뀐다. 그 불일치로 npm ci가
+      # EBADENGINE 경고를 내지만, .npmrc에 engine-strict가 없어 실패하지 않는다.
+      # guard 잡은 eas-cli를 쓰지 않으므로 Node 20 그대로 둔다.
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Setup EAS CLI
