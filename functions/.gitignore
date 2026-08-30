@@ -1,0 +1,4 @@
+# tsc 빌드 산출물 (tsconfig.json outDir="lib").
+# firebase.json predeploy 와 .github/workflows/firebase-deploy.yml 이 배포 직전
+# `npm run build` 로 항상 재생성하므로 커밋 대상이 아니다.
+lib/
