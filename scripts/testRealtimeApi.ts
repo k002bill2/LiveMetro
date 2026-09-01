@@ -40,20 +40,22 @@ const safeLogValue = (value: unknown): string => {
   return text === '' ? 'N/A' : maskKey(text);
 };
 
-// 기본값은 https 다. 평문 http 는 API 키가 URL path segment 에 실려 나가 경로 상의
-// 누구나 그대로 읽을 수 있다.
-const DEFAULT_BASE_URL = 'https://swopenapi.seoul.go.kr/api/subway';
+// 기본값은 http 다 — 서울 실시간 API 는 HTTPS 를 제공하지 않는다(443 은 TLS 연결
+// 자체가 실패). 같은 사실 위에 `plugins/withSeoulApiCleartext.js` 가 Android
+// cleartext 예외를, `app.json` 이 iOS ATS 예외를 두 도메인에만 걸어두고 있다.
+// 앱 런타임(`seoulSubwayApi.ts`, `officialDelayService.ts`)도 같은 http 를 쓴다.
+const DEFAULT_BASE_URL = 'http://swopenapi.seoul.go.kr/api/subway';
 const configuredBaseUrl = process.env.SEOUL_SUBWAY_API_BASE_URL;
-// 명시 설정된 값은 https 만 허용하고, 요청을 조립하기 *전에* 중단한다 — URL 을 만든
-// 뒤엔 이미 키가 문자열 안에 들어가 있고, 평문 요청은 리다이렉트가 일어나기 전에 이미
-// 한 번 나간다. 에러 메시지에 설정값 자체를 싣지 않는다: 그 값에도 키가 박혀 있을 수 있다.
-if (configuredBaseUrl && !/^https:\/\//i.test(configuredBaseUrl)) {
-  throw new Error(
-    'SEOUL_SUBWAY_API_BASE_URL 은 https:// 스킴이어야 합니다. 평문 http 는 URL 경로에 담긴 ' +
-      'API 키를 그대로 노출합니다. (설정값에 키가 섞일 수 있어 여기 출력하지 않습니다.)'
+// 평문 http 는 API 키가 URL path segment 에 실려 나가 경로 상의 누구나 읽을 수 있다.
+// 서버가 https 를 열어주지 않는 한 코드로 없앨 수 없는 위험이라 차단이 아니라 경고로
+// 남긴다. 경고문에 설정값 자체는 싣지 않는다: 그 값에도 키가 박혀 있을 수 있다.
+const BASE_URL = configuredBaseUrl || DEFAULT_BASE_URL;
+if (!/^https:\/\//i.test(BASE_URL)) {
+  console.warn(
+    '⚠️  평문 http 로 요청합니다. URL 경로의 API 키가 그대로 노출됩니다 ' +
+      '(서울 실시간 API 는 https 미지원 — 진단용 스크립트에서만 사용하세요).'
   );
 }
-const BASE_URL = configuredBaseUrl || DEFAULT_BASE_URL;
 
 async function testRealtimeArrival(stationName: string): Promise<void> {
   console.log('='.repeat(60));
