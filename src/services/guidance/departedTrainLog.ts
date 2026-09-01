@@ -21,6 +21,7 @@
  */
 import type { Train } from '@/models/train';
 import { ARRIVING_ETA_THRESHOLD_SEC } from '@/services/guidance/departureDetection';
+import { isOnCanonicalLine, resolveCanonicalLineId } from '@/utils/canonicalLine';
 
 export interface DepartedTrainEntry {
   readonly trainId: string;
@@ -42,8 +43,6 @@ export const ESTIMATED_DWELL_MS = 30 * 1000;
  */
 export const OBSERVED_ETA_LOOKBACK_SEC = 60;
 
-const isNumberedLine = (lineId: string): boolean => /^[1-9]$/.test(lineId);
-
 const etaSeconds = (train: Train, nowMs: number): number | null =>
   train.arrivalTime === null ? null : Math.floor((train.arrivalTime.getTime() - nowMs) / 1000);
 
@@ -58,19 +57,23 @@ export interface CollectDeparturesInput {
 
 /**
  * Every train that was "arriving" (0 ≤ ETA ≤ threshold) on the awaited line in
- * `prev` and is absent from `next`. Numbered lines apply the line filter;
- * extended lines pass all trains (the rider disambiguates by destination).
+ * `prev` and is absent from `next`. The canonical line filter applies to every
+ * line — numbered and extended alike (see `canonicalLine.ts`); an unknown line
+ * logs nothing rather than logging every line's departures. Lines the
+ * realtimePosition API does not cover still log normally: arrival snapshots
+ * carry them, and position coverage is a separate question.
  */
 export const collectDepartures = (input: CollectDeparturesInput): DepartedTrainEntry[] => {
   const { prev, next, lineId, stationName, nowMs, thresholdSec = ARRIVING_ETA_THRESHOLD_SEC } = input;
   if (prev === null || prev.length === 0) return [];
 
-  const numbered = isNumberedLine(lineId);
+  const canonicalLine = resolveCanonicalLineId(lineId);
+  if (canonicalLine === null) return [];
   const nextIds = new Set(next.map(t => t.id));
   const result: DepartedTrainEntry[] = [];
 
   for (const t of prev) {
-    if (numbered && t.lineId !== lineId) continue;
+    if (!isOnCanonicalLine(canonicalLine, t.lineId)) continue;
     const eta = etaSeconds(t, nowMs);
     // Lookback keeps trains that arrived within the last poll interval — their
     // ETA has gone negative by nowMs but they only just left the platform.
@@ -108,11 +111,12 @@ export interface CollectEstimatesInput {
  */
 export const collectEstimates = (input: CollectEstimatesInput): DepartedTrainEntry[] => {
   const { trains, lineId, stationName, nowMs } = input;
-  const numbered = isNumberedLine(lineId);
+  const canonicalLine = resolveCanonicalLineId(lineId);
+  if (canonicalLine === null) return [];
   const result: DepartedTrainEntry[] = [];
 
   for (const t of trains) {
-    if (numbered && t.lineId !== lineId) continue;
+    if (!isOnCanonicalLine(canonicalLine, t.lineId)) continue;
     if (t.arrivalTime === null) continue;
     const eta = etaSeconds(t, nowMs);
     if (eta === null || eta < 0) continue;

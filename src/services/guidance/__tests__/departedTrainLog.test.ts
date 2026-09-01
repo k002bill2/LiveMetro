@@ -114,11 +114,14 @@ describe('collectDepartures', () => {
     expect(result).toEqual([]);
   });
 
-  it('passes all lines through on an extended (non-numbered) line', () => {
+  // 예전 사양은 "확장 노선은 전량 통과"였고, 픽스처도 존재하지 않는 'K2'를 썼다.
+  // 환승역 스냅샷은 역 단위라 그 통과분이 타 노선 출발로 로그에 쌓였다 —
+  // 이제 확장 노선도 숫자 노선과 같은 canonical 필터를 받는다.
+  it('records a vanished train on an extended line when the canonical line matches', () => {
     const result = collectDepartures({
-      prev: [arriving('K', 10, { lineId: 'K2', finalDestination: '청량리' })],
+      prev: [arriving('K', 10, { lineId: '수인분당선', finalDestination: '청량리' })],
       next: [],
-      lineId: '경의중앙선',
+      lineId: '수인분당선',
       stationName: STATION,
       nowMs: NOW,
     });
@@ -126,12 +129,64 @@ describe('collectDepartures', () => {
       {
         trainId: 'K',
         finalDestination: '청량리',
-        lineId: 'K2',
+        lineId: '수인분당선',
         stationName: STATION,
         departedAtMs: NOW,
         confidence: 'observed',
       },
     ]);
+  });
+
+  it('excludes a vanished other-line train on an extended line (환승역 다노선 혼입)', () => {
+    const result = collectDepartures({
+      prev: [
+        arriving('L2', 10, { lineId: '2', finalDestination: '성수' }),
+        arriving('SB', 10, { lineId: '수인분당선', finalDestination: '청량리' }),
+      ],
+      next: [],
+      lineId: '수인분당선',
+      stationName: STATION,
+      nowMs: NOW,
+    });
+    expect(result.map(e => e.trainId)).toEqual(['SB']);
+  });
+
+  it('matches the graph slug lineId against the normalized Train.lineId domain', () => {
+    const result = collectDepartures({
+      prev: [arriving('SB', 10, { lineId: '수인분당선', finalDestination: '청량리' })],
+      next: [],
+      lineId: 'bundang',
+      stationName: STATION,
+      nowMs: NOW,
+    });
+    expect(result.map(e => e.trainId)).toEqual(['SB']);
+  });
+
+  it('returns [] for an unknown or empty lineId instead of passing everything (fail-closed)', () => {
+    const prev = [arriving('SB', 10, { lineId: '수인분당선', finalDestination: '청량리' })];
+    expect(
+      collectDepartures({ prev, next: [], lineId: 'K2', stationName: STATION, nowMs: NOW })
+    ).toEqual([]);
+    expect(
+      collectDepartures({ prev, next: [], lineId: '', stationName: STATION, nowMs: NOW })
+    ).toEqual([]);
+  });
+
+  // 회귀: 위치 API 커버리지로 도착 소속을 판정하던 시절엔 인천2 대기 중 출발이 하나도
+  // 기록되지 않아 "방금 출발한 열차" 선택 후보가 전멸했다. 도착 스냅샷엔 존재하는
+  // 노선이므로 같은 노선 출발은 기록하고 타 노선만 걸러야 한다.
+  it('위치 API 미지원 노선(인천2)의 출발은 기록하고 타 노선 출발은 제외한다', () => {
+    const result = collectDepartures({
+      prev: [
+        arriving('L2', 10, { lineId: '2', finalDestination: '성수' }),
+        arriving('I2', 10, { lineId: '인천2', finalDestination: '검단오류' }),
+      ],
+      next: [],
+      lineId: 'incheon2',
+      stationName: STATION,
+      nowMs: NOW,
+    });
+    expect(result.map(e => e.trainId)).toEqual(['I2']);
   });
 
   it('records every departed candidate when two vanish', () => {
@@ -247,6 +302,52 @@ describe('collectEstimates', () => {
       nowMs: NOW,
     });
     expect(result).toEqual([]);
+  });
+
+  it('keeps an extended-line train whose canonical line matches', () => {
+    const t = arriving('SB', 90, { lineId: '수인분당선', finalDestination: '청량리' });
+    const result = collectEstimates({
+      trains: [t],
+      lineId: 'bundang',
+      stationName: STATION,
+      nowMs: NOW,
+    });
+    expect(result.map(e => e.trainId)).toEqual(['SB']);
+  });
+
+  it('excludes an other-line train on an extended line (환승역 다노선 혼입)', () => {
+    const result = collectEstimates({
+      trains: [
+        arriving('L2', 90, { lineId: '2', finalDestination: '성수' }),
+        arriving('SB', 90, { lineId: '수인분당선', finalDestination: '청량리' }),
+      ],
+      lineId: '수인분당선',
+      stationName: STATION,
+      nowMs: NOW,
+    });
+    expect(result.map(e => e.trainId)).toEqual(['SB']);
+  });
+
+  it('keeps a same-line arrival train on a position-unsupported line (인천2)', () => {
+    const result = collectEstimates({
+      trains: [
+        arriving('L2', 90, { lineId: '2', finalDestination: '성수' }),
+        arriving('I2', 90, { lineId: '인천2', finalDestination: '검단오류' }),
+      ],
+      lineId: 'incheon2',
+      stationName: STATION,
+      nowMs: NOW,
+    });
+    expect(result.map(e => e.trainId)).toEqual(['I2']);
+  });
+
+  it('returns [] for an unknown or empty lineId instead of passing everything (fail-closed)', () => {
+    const trains = [arriving('SB', 90, { lineId: '수인분당선', finalDestination: '청량리' })];
+    expect(collectEstimates({ trains, lineId: 'K2', stationName: STATION, nowMs: NOW })).toEqual([]);
+    expect(collectEstimates({ trains, lineId: '', stationName: STATION, nowMs: NOW })).toEqual([]);
+    expect(
+      collectEstimates({ trains, lineId: 'incheon2', stationName: STATION, nowMs: NOW })
+    ).toEqual([]);
   });
 });
 

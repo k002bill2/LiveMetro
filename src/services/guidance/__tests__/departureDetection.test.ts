@@ -121,11 +121,14 @@ describe('detectDeparture', () => {
     expect(result).toEqual({ departed: false, trainId: null });
   });
 
+  // 예전 픽스처는 존재하지 않는 노선 'K2'를 확장 노선 대역으로 썼다. 확장 노선이
+  // 노선 필터를 통째로 건너뛰던 시절엔 그래도 통했지만, canonical 필터가 붙은 지금은
+  // 실재하는 노선이어야 감지 경로를 실제로 지난다. 수인분당선(청량리/인천 분기)으로 교체.
   it('degrades to manual on an extended (non-numbered) line without a direction', () => {
     const result = detectDeparture({
-      prev: [arriving('K', 5, { lineId: 'K2' })],
+      prev: [arriving('K', 5, { lineId: '수인분당선' })],
       next: [],
-      awaited: { lineId: 'K2', directionName: null },
+      awaited: { lineId: '수인분당선', directionName: null },
       nowMs: NOW,
     });
     expect(result).toEqual({ departed: false, trainId: null });
@@ -134,11 +137,11 @@ describe('detectDeparture', () => {
   it('detects departure on an extended line when the direction matches', () => {
     const result = detectDeparture({
       prev: [
-        arriving('match', 5, { lineId: 'K2', finalDestination: '청량리' }),
-        arriving('other', 5, { lineId: 'K2', finalDestination: '인천' }),
+        arriving('match', 5, { lineId: '수인분당선', finalDestination: '청량리' }),
+        arriving('other', 5, { lineId: '수인분당선', finalDestination: '인천' }),
       ],
-      next: [arriving('other', 0, { lineId: 'K2', finalDestination: '인천' })],
-      awaited: { lineId: 'K2', directionName: '청량리' },
+      next: [arriving('other', 0, { lineId: '수인분당선', finalDestination: '인천' })],
+      awaited: { lineId: '수인분당선', directionName: '청량리' },
       nowMs: NOW,
     });
     expect(result).toEqual({ departed: true, trainId: 'match' });
@@ -146,12 +149,67 @@ describe('detectDeparture', () => {
 
   it('does NOT detect departure on an extended line when the matching train remains', () => {
     const result = detectDeparture({
-      prev: [arriving('match', 5, { lineId: 'K2', finalDestination: '청량리' })],
-      next: [arriving('match', 0, { lineId: 'K2', finalDestination: '청량리' })],
-      awaited: { lineId: 'K2', directionName: '청량리' },
+      prev: [arriving('match', 5, { lineId: '수인분당선', finalDestination: '청량리' })],
+      next: [arriving('match', 0, { lineId: '수인분당선', finalDestination: '청량리' })],
+      awaited: { lineId: '수인분당선', directionName: '청량리' },
       nowMs: NOW,
     });
     expect(result).toEqual({ departed: false, trainId: null });
+  });
+
+  // 실기기 QA(2026-08-29) 회귀: 환승역 스냅샷은 역 단위라 타 노선 열차가 섞인다.
+  // 확장 노선이 필터를 건너뛰면 방면명이 우연히 일치하는 타 노선 열차의 출발로
+  // 여정이 자동 진행됐다 — 가장 비싼 false positive.
+  it('ignores an other-line train that vanishes on an extended line', () => {
+    const result = detectDeparture({
+      prev: [arriving('L2', 5, { lineId: '2', finalDestination: '청량리' })],
+      next: [],
+      awaited: { lineId: '수인분당선', directionName: '청량리' },
+      nowMs: NOW,
+    });
+    expect(result).toEqual({ departed: false, trainId: null });
+  });
+
+  it('ignores an other-line train even when it is the preferred destination', () => {
+    const result = detectDeparture({
+      prev: [arriving('L2', 5, { lineId: '2', finalDestination: '청량리' })],
+      next: [],
+      awaited: {
+        lineId: '수인분당선',
+        directionName: null,
+        preferredDestinations: ['청량리'],
+      },
+      nowMs: NOW,
+    });
+    expect(result).toEqual({ departed: false, trainId: null });
+  });
+
+  it('matches the graph slug lineId against the normalized Train.lineId domain', () => {
+    const result = detectDeparture({
+      prev: [arriving('SB', 5, { lineId: '수인분당선', finalDestination: '청량리' })],
+      next: [],
+      awaited: { lineId: 'bundang', directionName: '청량리' },
+      nowMs: NOW,
+    });
+    expect(result).toEqual({ departed: true, trainId: 'SB' });
+  });
+
+  it('returns not-departed for an unknown or empty awaited lineId (fail-closed)', () => {
+    const prev = [arriving('X', 5, { lineId: 'K2', finalDestination: '청량리' })];
+    expect(
+      detectDeparture({ prev, next: [], awaited: { lineId: 'K2', directionName: '청량리' }, nowMs: NOW })
+    ).toEqual({ departed: false, trainId: null });
+    expect(
+      detectDeparture({ prev, next: [], awaited: { lineId: '', directionName: '청량리' }, nowMs: NOW })
+    ).toEqual({ departed: false, trainId: null });
+    expect(
+      detectDeparture({
+        prev,
+        next: [],
+        awaited: { lineId: 'incheon2', directionName: '청량리' },
+        nowMs: NOW,
+      })
+    ).toEqual({ departed: false, trainId: null });
   });
 });
 

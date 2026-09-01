@@ -97,15 +97,114 @@ describe('partitionWaitingTrains', () => {
     expect(pick(['강동'])).toEqual([]);
   });
 
-  it('비숫자 노선(lineId 필터 미적용)에서도 동작한다', () => {
-    const gy = train({ id: 'g1', finalDestination: '문산', lineId: 'K4' });
+  // 예전 픽스처는 존재하지 않는 노선 'K4'로 "비숫자 노선은 필터 미적용"을 확인했다 —
+  // fail-open이 사양이던 시절의 테스트다. 실재하는 확장 노선으로 교체해 "canonical
+  // 일치 시 통과"를 확인하고, 미지의 노선은 아래 fail-closed 케이스가 따로 덮는다.
+  it('비숫자 노선도 canonical line이 일치하면 통과한다', () => {
+    const gy = train({ id: 'g1', finalDestination: '문산', lineId: '경의중앙선' });
     const { tracked } = partitionWaitingTrains({
+      trains: [gy],
+      lineId: '경의중앙선',
+      directionName: '문산',
+      preferredDestinations: [],
+    });
+    expect(tracked.map(t => t.id)).toEqual(['g1']);
+  });
+
+  it('미지의 노선 id는 전량 통과가 아니라 빈 결과를 낸다 (fail-closed)', () => {
+    const gy = train({ id: 'g1', finalDestination: '문산', lineId: '경의중앙선' });
+    const { display, tracked } = partitionWaitingTrains({
       trains: [gy],
       lineId: 'K4',
       directionName: '문산',
       preferredDestinations: [],
     });
-    expect(tracked.map(t => t.id)).toEqual(['g1']);
+    expect(display).toEqual([]);
+    expect(tracked).toEqual([]);
+  });
+
+  it('빈 lineId는 빈 결과를 낸다 (대기 단계가 아닐 때의 빈 문자열 방어)', () => {
+    const gy = train({ id: 'g1', finalDestination: '문산', lineId: '경의중앙선' });
+    const { display, tracked } = partitionWaitingTrains({
+      trains: [gy],
+      lineId: '',
+      directionName: null,
+      preferredDestinations: [],
+    });
+    expect(display).toEqual([]);
+    expect(tracked).toEqual([]);
+  });
+
+  // 실기기 QA(2026-08-29) APP_FAIL — 수인분당선 청량리 방면 대기 step에 2호선 성수행이
+  // 섞여 나왔다. 확장 노선이 숫자 노선 필터를 건너뛰어 다노선 스냅샷이 통째로 통과했다.
+  describe('확장 노선 다노선 혼입 (실기기 QA 회귀)', () => {
+    const seongsu = train({ id: 's1', finalDestination: '성수', lineId: '2' });
+    const cheongnyangni = train({ id: 'c1', finalDestination: '청량리', lineId: '수인분당선' });
+
+    it('수인분당선 대기 step에 2호선 성수행은 display·tracked 모두 0건이다', () => {
+      const { display, tracked } = partitionWaitingTrains({
+        trains: [seongsu],
+        lineId: '수인분당선',
+        directionName: '청량리',
+        preferredDestinations: [],
+      });
+      expect(display.map(t => t.id)).toEqual([]);
+      expect(tracked.map(t => t.id)).toEqual([]);
+    });
+
+    it('같은 스냅샷에서 수인분당선 열차만 남긴다', () => {
+      const { display, tracked } = partitionWaitingTrains({
+        trains: [seongsu, cheongnyangni],
+        lineId: '수인분당선',
+        directionName: '청량리',
+        preferredDestinations: [],
+      });
+      expect(display.map(t => t.id)).toEqual(['c1']);
+      expect(tracked.map(t => t.id)).toEqual(['c1']);
+    });
+
+    // step의 lineId는 경로 그래프 슬러그('bundang'), Train.lineId는 Seoul subwayId 정규화
+    // 결과('수인분당선') — 비교 전 양쪽을 canonical로 모아야 유효 열차가 살아남는다.
+    it('그래프 슬러그 lineId와 정규화된 Train.lineId를 같은 도메인에서 비교한다', () => {
+      const { tracked } = partitionWaitingTrains({
+        trains: [seongsu, cheongnyangni],
+        lineId: 'bundang',
+        directionName: '청량리',
+        preferredDestinations: [],
+      });
+      expect(tracked.map(t => t.id)).toEqual(['c1']);
+    });
+
+    it('확장 노선에서도 preferred destination 필터 계약을 지킨다', () => {
+      const wangsimni = train({ id: 'w1', finalDestination: '왕십리', lineId: '수인분당선' });
+      const pick = (prefs: readonly string[]): string[] =>
+        partitionWaitingTrains({
+          trains: [seongsu, cheongnyangni, wangsimni],
+          lineId: '수인분당선',
+          directionName: '청량리',
+          preferredDestinations: prefs,
+        }).tracked.map(t => t.id);
+      expect(pick(['청량리'])).toEqual(['c1']);
+      expect(pick(['왕십리'])).toEqual(['w1']);
+      // 선호가 다른 노선 종착역이어도 노선 필터를 뚫고 들어오지 않는다.
+      expect(pick(['성수'])).toEqual([]);
+    });
+
+    // 회귀: 도착 스냅샷 소속을 realtimePosition API 커버리지로 판정하던 시절엔
+    // 인천2 대기 step 의 대기 풀이 통째로 비었다 — 타 노선 혼입이 아니라 화면 전멸.
+    // 위치 API 미지원은 도착 스냅샷 유효성과 무관하므로 같은 노선 열차는 살아남고
+    // 타 노선만 걸러져야 한다.
+    it('위치 API 미지원 노선(인천2)의 열차는 남기고 타 노선만 걸러낸다', () => {
+      const geomdan = train({ id: 'i2', finalDestination: '검단오류', lineId: '인천2' });
+      const { display, tracked } = partitionWaitingTrains({
+        trains: [seongsu, cheongnyangni, geomdan],
+        lineId: 'incheon2',
+        directionName: '검단오류',
+        preferredDestinations: [],
+      });
+      expect(display.map(t => t.id)).toEqual(['i2']);
+      expect(tracked.map(t => t.id)).toEqual(['i2']);
+    });
   });
 });
 

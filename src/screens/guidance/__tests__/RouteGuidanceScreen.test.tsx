@@ -307,6 +307,16 @@ const seedExtendedBoardSession = (): void => {
   });
 };
 
+/** Board on a line the Seoul realtime API does not provide at all (인천2). */
+const seedUnsupportedLineBoardSession = (): void => {
+  setGuidanceSession({
+    route: createRoute([lineHop('s1', '검단오류', 's2', '왕길', '인천2', 3)]),
+    fromStationName: '검단오류',
+    toStationName: '왕길',
+    startedAt: T0,
+  });
+};
+
 describe('RouteGuidanceScreen', () => {
   beforeEach(() => {
     jest.useFakeTimers();
@@ -683,6 +693,43 @@ describe('RouteGuidanceScreen', () => {
     expect(getByTestId('train-select-item-B')).toBeTruthy();
   });
 
+  // 실기기 QA(2026-08-29) 회귀 — 시트 후보도 숫자 노선만 걸러, 확장 노선 대기 중엔
+  // 같은 환승역에서 로그된 타 노선 출발이 "내가 탄 열차" 후보로 올라왔다.
+  it('drops other-line sheet candidates on an extended line', () => {
+    seedExtendedBoardSession(); // board on 경의중앙선 @ 대곡
+    appendDepartedTrains(
+      [dirEntry('GY', '문산', '대곡', '경의중앙선'), dirEntry('L2', '성수', '대곡', '2')],
+      T0
+    );
+    const { getByTestId, queryByTestId } = render(<RouteGuidanceScreen />);
+    fireEvent.press(getByTestId('guidance-open-train-select'));
+    expect(getByTestId('train-select-item-GY')).toBeTruthy();
+    expect(queryByTestId('train-select-item-L2')).toBeNull();
+  });
+
+  it('keeps a sheet candidate whose lineId is in a different domain than the step lineId', () => {
+    seedExtendedBoardSession(); // step lineId = '경의중앙선'
+    // Train.lineId는 Seoul subwayId 정규화 결과('경의선') — 원문끼리 비교하면
+    // 정당한 후보가 사라진다. canonical 도메인에서 비교해야 살아남는다.
+    appendDepartedTrains([dirEntry('GY', '문산', '대곡', '경의선')], T0);
+    const { getByTestId } = render(<RouteGuidanceScreen />);
+    fireEvent.press(getByTestId('guidance-open-train-select'));
+    expect(getByTestId('train-select-item-GY')).toBeTruthy();
+  });
+
+  it('shows no sheet candidates when the step line is one the Seoul API does not provide', () => {
+    seedUnsupportedLineBoardSession(); // board on 인천2 → API 미제공
+    appendDepartedTrains(
+      [dirEntry('GY', '문산', '검단오류', '경의중앙선'), dirEntry('L2', '성수', '검단오류', '2')],
+      T0
+    );
+    const { getByTestId, queryByTestId } = render(<RouteGuidanceScreen />);
+    fireEvent.press(getByTestId('guidance-open-train-select'));
+    expect(queryByTestId('train-select-item-GY')).toBeNull();
+    expect(queryByTestId('train-select-item-L2')).toBeNull();
+    expect(getByTestId('train-select-now')).toBeTruthy(); // fallback always present
+  });
+
   it('does not record estimated departures with an empty station when confirming a non-waiting (ride) step', () => {
     seedSession();
     mockedUseRealtimeTrains.mockReturnValue({
@@ -815,8 +862,8 @@ describe('RouteGuidanceScreen', () => {
 
   it('does not record previous-station trains as departures when a stale snapshot seeds a transfer step', () => {
     seedExtendedTransferSession();
-    // Previous-station snapshot (extended line passes the numbered filter) —
-    // useRealtimeTrains keeps this stale array until the new subscription delivers.
+    // Previous-station snapshot — useRealtimeTrains keeps this stale array
+    // until the new subscription for the transfer station delivers.
     const stale = { trains: [trainOf('STALE', 10, '천안')], loading: false, error: null };
     mockedUseRealtimeTrains.mockReturnValue(stale);
     const { getByTestId, queryByTestId, rerender } = render(<RouteGuidanceScreen />);

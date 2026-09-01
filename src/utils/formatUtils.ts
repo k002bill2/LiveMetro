@@ -3,6 +3,9 @@
  * String formatting and display utilities
  */
 
+const getOwnValue = <T>(record: Record<string, T>, key: string): T | undefined =>
+  Object.prototype.hasOwnProperty.call(record, key) ? record[key] : undefined;
+
 /**
  * Format station name for display
  */
@@ -38,7 +41,7 @@ export const formatLineName = (lineId: string): string => {
   };
   
   const normalized = lineId.toLowerCase();
-  return specialLines[normalized] || lineId;
+  return getOwnValue(specialLines, normalized) ?? lineId;
 };
 
 const SEOUL_REALTIME_SUBWAY_ID_TO_LINE_ID: Record<string, string> = {
@@ -114,7 +117,7 @@ const APP_LINE_ID_ALIASES: Record<string, string> = {
  */
 export const normalizeSeoulLineId = (rawLineId: string): string => {
   const trimmed = rawLineId.trim();
-  const subwayId = SEOUL_REALTIME_SUBWAY_ID_TO_LINE_ID[trimmed];
+  const subwayId = getOwnValue(SEOUL_REALTIME_SUBWAY_ID_TO_LINE_ID, trimmed);
   if (subwayId) return subwayId;
 
   const direct = trimmed.match(/^0?([1-9])(?:호선)?$/);
@@ -123,7 +126,9 @@ export const normalizeSeoulLineId = (rawLineId: string): string => {
   const legacy = trimmed.match(/^line-([1-9])$/i);
   if (legacy?.[1]) return legacy[1];
 
-  const alias = APP_LINE_ID_ALIASES[trimmed] ?? APP_LINE_ID_ALIASES[trimmed.toLowerCase()];
+  const alias =
+    getOwnValue(APP_LINE_ID_ALIASES, trimmed) ??
+    getOwnValue(APP_LINE_ID_ALIASES, trimmed.toLowerCase());
   if (alias) return alias;
 
   return trimmed;
@@ -170,13 +175,14 @@ const SEOUL_API_POSITION_LINE_NAMES: Record<string, string | null> = {
  * Returns `null` when the API does not cover the line (skip the call).
  */
 export const toSeoulApiLineName = (lineId: string): string | null => {
-  const trimmed = lineId.trim();
-  if (trimmed in SEOUL_API_POSITION_LINE_NAMES) {
-    return SEOUL_API_POSITION_LINE_NAMES[trimmed] ?? null;
-  }
-  // Legacy english slugs ('gyeongui') and unknown ids keep the historical
-  // formatLineName behavior — unknown names fail safe as INFO-200 no-data.
-  return formatLineName(trimmed);
+  // Normalize first so every input domain (english slug 'gyeongui', display name
+  // '경의중앙선', raw subwayId '1063', 'N호선') collapses onto the canonical id the
+  // table is keyed by. Every alias target is a key here, so this is a no-op for
+  // the known universe — it only removes the old formatLineName fallback, which
+  // handed unknown ids back as a plausible-looking string and let callers mistake
+  // them for supported lines (fail-open). Unknown and empty ids are now null.
+  const canonical = normalizeSeoulLineId(lineId);
+  return getOwnValue(SEOUL_API_POSITION_LINE_NAMES, canonical) ?? null;
 };
 
 /**

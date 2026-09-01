@@ -8,6 +8,7 @@
  */
 import type { CommuteRoute } from '@/models/commute';
 import type { Train } from '@/models/train';
+import { isOnCanonicalLine, resolveCanonicalLineId } from '@/utils/canonicalLine';
 import { resolveInternalStationId } from '@/utils/stationIdResolver';
 
 /** 탑승 구간 식별 키. board = stationId|lineId, transfer = stationId|toLineId. */
@@ -21,8 +22,6 @@ export interface WaitingTrainPools {
   readonly tracked: readonly Train[];
 }
 
-const isNumberedLine = (lineId: string): boolean => /^[1-9]$/.test(lineId);
-
 /**
  * RouteGuidanceScreen의 기존 방면 필터(matched-else-onLine 폴백)를 보존하면서
  * display/tracked 2-풀로 확장한다. `preferredDestinations`가 비어 있으면 tracked는
@@ -35,7 +34,13 @@ export const partitionWaitingTrains = (input: {
   readonly preferredDestinations: readonly string[];
 }): WaitingTrainPools => {
   const { trains, lineId, directionName, preferredDestinations } = input;
-  const onLine = isNumberedLine(lineId) ? trains.filter(t => t.lineId === lineId) : trains;
+  // 공유 canonical 술어 — 출발 로그·출발 감지·열차 선택 후보와 같은 규칙을 쓴다
+  // (도메인 불일치와 fail-open 이유는 canonicalLine.ts 참조). 미지의 id만 빈 풀이다 —
+  // 전량 통과는 타 노선 열차가 칩·알림·감지에 올라타는 길이다. 위치 API 미지원 노선
+  // (인천2 등)은 도착 스냅샷엔 정상 존재하므로 여기서 걸러지지 않는다.
+  const canonicalLine = resolveCanonicalLineId(lineId);
+  if (canonicalLine === null) return { display: [], tracked: [] };
+  const onLine = trains.filter(t => isOnCanonicalLine(canonicalLine, t.lineId));
   const matched =
     directionName === null ? [] : onLine.filter(t => t.finalDestination === directionName);
   // 기존 동작: 방면 매칭 우선, 전무하면 노선 필터 결과 폴백 (단축 운행 종착역 케이스).
