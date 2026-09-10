@@ -14,12 +14,20 @@ import { join } from 'node:path';
 
 import { browser } from '@wdio/globals';
 import { BasePage } from '../base.page';
+import { waitForElementDismissingAnr } from '../../helpers/android-anr-dialog';
 
 // 아티팩트 업로드에 포함되는 로그 디렉토리 (.github/workflows/e2e-tests.yml의
 // upload path에 e2e/logs/가 있다). __dirname 기준 절대 경로라 wdio 워커의
 // CWD와 무관하게 항상 같은 곳에 저장된다 — afterTest 스크린샷이 상대 경로로
 // 저장돼 아티팩트에 잡히지 않던 문제의 재발 방지.
 const EVIDENCE_DIR = join(__dirname, '..', '..', 'logs');
+
+// Auth 랜딩 대기 예산. 기존 값(30s)을 유지한다 — ANR 내성은 예산을 늘리는 게
+// 아니라 같은 예산 안에서 화면을 덮은 시스템 다이얼로그를 걷어내는 것이다.
+const AUTH_LANDING_TIMEOUT_MS = 30000;
+// 내성 대기가 실패한 뒤 한 번 더 짧게 기다려, 실패를 wdio 표준 타임아웃 에러
+// 형태로 낸다 (기존 실패 메시지·스택 모양을 보존해 진단 습관을 깨지 않는다).
+const AUTH_LANDING_FINAL_TIMEOUT_MS = 1000;
 
 class EntryFlow extends BasePage {
   /**
@@ -40,8 +48,7 @@ class EntryFlow extends BasePage {
     if (await this.elementExists('home-screen')) {
       return;
     }
-    const hero = await this.$('auth-hero');
-    await hero.waitForDisplayed({ timeout: 30000 });
+    await this.waitForAuthLanding();
     await this.safeTap(await this.$('browse-cta'));
 
     const deadline = Date.now() + timeout;
@@ -123,6 +130,51 @@ class EntryFlow extends BasePage {
     throw new Error(
       `enterMainAsAnonymous: home-screen에 ${timeout}ms 내 도달하지 못했습니다`
     );
+  }
+
+  /**
+   * Auth 랜딩(auth-hero) 표시 대기 — Android 시스템 ANR 다이얼로그에 내성.
+   *
+   * run 34159050379에서 런처(Quickstep) ANR 다이얼로그가 **이미 렌더된** auth
+   * 랜딩을 덮어 3개 spec 전부가 이 대기에서 죽었다. 같은 SHA가 이어진 두
+   * 스케줄 런에서 그린이었으므로 앱 회귀가 아니라 호스티드 에뮬레이터 flake다.
+   * 해제는 resource-id(`android:id/aerr_wait`)로만 한다 — 텍스트는 로케일
+   * 의존이고, 닫기/강제 종료 계열을 누르면 앱이 죽어 flake가 회귀로 오진된다.
+   */
+  private async waitForAuthLanding(): Promise<void> {
+    const { reached, anrDismissals } = await waitForElementDismissingAnr(
+      'auth-hero',
+      {
+        isDisplayed: (id: string): Promise<boolean> => this.elementExists(id),
+        tap: async (id: string): Promise<void> => {
+          try {
+            await (await this.$(id)).click();
+          } catch {
+            // 탐지와 탭 사이에 다이얼로그가 스스로 닫힌 경우 — 다음 폴링이 재판정한다.
+          }
+        },
+        pause: async (ms: number): Promise<void> => {
+          // browser.pause 는 Promise<unknown> 으로 타입돼 있어 await 로 흘린다.
+          await browser.pause(ms);
+        },
+        now: (): number => Date.now(),
+      },
+      {
+        timeout: AUTH_LANDING_TIMEOUT_MS,
+        probeSystemAnr: this.isAndroid,
+      }
+    );
+    if (anrDismissals > 0) {
+      console.log(
+        `[ENTRY ANR] 시스템 ANR 대기 버튼 ${anrDismissals}회 해제 후 진행`
+      );
+    }
+    if (!reached) {
+      // 내성 대기로도 못 찾았다 — 평소와 같은 실패로 끝낸다.
+      await (await this.$('auth-hero')).waitForDisplayed({
+        timeout: AUTH_LANDING_FINAL_TIMEOUT_MS,
+      });
+    }
   }
 }
 
