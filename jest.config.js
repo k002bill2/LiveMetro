@@ -41,6 +41,9 @@ module.exports = {
     '<rootDir>/src/**/__tests__/**/*.test.{js,jsx,ts,tsx}',
     '<rootDir>/src/**/*.(test|spec).{js,jsx,ts,tsx}',
     '<rootDir>/plugins/**/__tests__/**/*.test.{js,ts}',
+    // e2e 하네스 헬퍼의 순수 단위 테스트. e2e/specs/**/*.spec.ts는 mocha 글로벌과
+    // 실제 appium 세션을 요구하므로 __tests__ 디렉터리만 잡는다.
+    '<rootDir>/e2e/**/__tests__/**/*.test.ts',
   ],
 
   // Transform ignore patterns for React Native modules
