@@ -14,11 +14,15 @@
  */
 import { browser } from '@wdio/globals';
 import { BasePage } from '../../page-objects/base.page';
+import authLanding from '../../page-objects/auth/auth-landing.page';
 
 class EntryProbe extends BasePage {
   async run(): Promise<void> {
-    const hero = await this.$('auth-hero');
-    await hero.waitForDisplayed({ timeout: 30000 });
+    // 랜딩 대기는 AuthLandingPage에 위임한다 — 직접 waitForDisplayed 하면
+    // 시스템 ANR 다이얼로그가 랜딩을 덮었을 때 이 프로브만 내성을 잃어,
+    // 정작 정체 원인을 진단해야 할 spec이 그 원인으로 먼저 죽는다
+    // (run 34820586373). 예산은 기존과 동일한 30초 기본값이다.
+    await authLanding.waitForScreen();
     await this.safeTap(await this.$('browse-cta'));
 
     const markers: [string, () => Promise<boolean>][] = [

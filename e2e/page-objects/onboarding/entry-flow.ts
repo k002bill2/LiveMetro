@@ -14,7 +14,11 @@ import { join } from 'node:path';
 
 import { browser } from '@wdio/globals';
 import { BasePage } from '../base.page';
-import { waitForElementDismissingAnr } from '../../helpers/android-anr-dialog';
+import {
+  dismissSystemAnrIfPresent,
+  waitForElementDismissingAnr,
+  type AnrTolerantWaitDeps,
+} from '../../helpers/android-anr-dialog';
 
 // 아티팩트 업로드에 포함되는 로그 디렉토리 (.github/workflows/e2e-tests.yml의
 // upload path에 e2e/logs/가 있다). __dirname 기준 절대 경로라 wdio 워커의
@@ -54,6 +58,7 @@ class EntryFlow extends BasePage {
     const deadline = Date.now() + timeout;
     const startedAt = Date.now();
     let nextObserveAt = startedAt;
+    let anrDismissals = 0;
     while (Date.now() < deadline) {
       // 자가 진단 관측 (run 31765235108 실증 후 추가): 같은 run에서 첫
       // 세션은 15초 만에 celebration 도달, 이후 세션은 120초간 아래 4개
@@ -72,8 +77,9 @@ class EntryFlow extends BasePage {
         if (await this.elementExists('onb-header-skip')) {
           present.push('onb-header-skip');
         }
+        const anrNote = anrDismissals > 0 ? ` / ANR해제 ${anrDismissals}회` : '';
         console.log(
-          `[ENTRY ${elapsed}s] ${present.join(', ') || '(마커 전무)'}`
+          `[ENTRY ${elapsed}s] ${present.join(', ') || '(마커 전무)'}${anrNote}`
         );
         nextObserveAt = Date.now() + 15000;
       }
@@ -106,6 +112,19 @@ class EntryFlow extends BasePage {
             'signInAnonymously 거부 (Firebase Auth 익명 가입 스로틀/네트워크 오류 의심)'
         );
       }
+      // 시스템 ANR 다이얼로그 해제. 앱 마커 5종도, 익명 로그인 실패 Alert도
+      // 못 찾은 뒤에만 시도한다(대상 우선) — 정상 화면에서 랜딩 CTA를 잘못
+      // 누르는 일을 구조적으로 막는다. run 34776888207에서 Quickstep ANR이
+      // CTA 탭 직후에도 화면을 덮어, 초기 랜딩 대기의 1회 해제만으로는
+      // 부족함이 entry-stall-*.xml 6건으로 실증됐다.
+      if (await dismissSystemAnrIfPresent(this.anrDeps(), this.isAndroid)) {
+        anrDismissals += 1;
+        if (anrDismissals === 1) {
+          console.log('[ENTRY ANR] 진입 루프에서 시스템 ANR 대기 버튼 해제');
+        }
+      }
+      // 해제 여부와 무관하게 항상 쉰다 — 탭이 먹지 않는 다이얼로그에서
+      // 무지연 클릭 폭주가 되는 것을 막고, 다음 회차가 마커를 재평가한다.
       await browser.pause(500);
     }
     // 데드라인 도달 — 정체 화면의 실체를 파일로 남긴다 (XML + 스크린샷).
@@ -141,24 +160,32 @@ class EntryFlow extends BasePage {
    * 해제는 resource-id(`android:id/aerr_wait`)로만 한다 — 텍스트는 로케일
    * 의존이고, 닫기/강제 종료 계열을 누르면 앱이 죽어 flake가 회귀로 오진된다.
    */
+  /**
+   * ANR 헬퍼에 주입할 wdio 어댑터. 초기 랜딩 대기와 진입 lifecycle 루프가
+   * 같은 어댑터를 공유해 "wait 버튼만 탭" 규칙이 한 곳에만 존재하게 한다.
+   */
+  private anrDeps(): AnrTolerantWaitDeps {
+    return {
+      isDisplayed: (id: string): Promise<boolean> => this.elementExists(id),
+      tap: async (id: string): Promise<void> => {
+        try {
+          await (await this.$(id)).click();
+        } catch {
+          // 탐지와 탭 사이에 다이얼로그가 스스로 닫힌 경우 — 다음 폴링이 재판정한다.
+        }
+      },
+      pause: async (ms: number): Promise<void> => {
+        // browser.pause 는 Promise<unknown> 으로 타입돼 있어 await 로 흘린다.
+        await browser.pause(ms);
+      },
+      now: (): number => Date.now(),
+    };
+  }
+
   private async waitForAuthLanding(): Promise<void> {
     const { reached, anrDismissals } = await waitForElementDismissingAnr(
       'auth-hero',
-      {
-        isDisplayed: (id: string): Promise<boolean> => this.elementExists(id),
-        tap: async (id: string): Promise<void> => {
-          try {
-            await (await this.$(id)).click();
-          } catch {
-            // 탐지와 탭 사이에 다이얼로그가 스스로 닫힌 경우 — 다음 폴링이 재판정한다.
-          }
-        },
-        pause: async (ms: number): Promise<void> => {
-          // browser.pause 는 Promise<unknown> 으로 타입돼 있어 await 로 흘린다.
-          await browser.pause(ms);
-        },
-        now: (): number => Date.now(),
-      },
+      this.anrDeps(),
       {
         timeout: AUTH_LANDING_TIMEOUT_MS,
         probeSystemAnr: this.isAndroid,
