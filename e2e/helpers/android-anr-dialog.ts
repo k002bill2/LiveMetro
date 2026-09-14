@@ -24,11 +24,15 @@ export const ANDROID_ANR_WAIT_ID = 'android:id/aerr_wait';
 /** 폴링 기본 간격 — entry-flow의 기존 루프(500ms)와 동일하게 둔다. */
 export const DEFAULT_ANR_POLL_INTERVAL_MS = 500;
 
-export interface AnrTolerantWaitDeps {
+/** 한 번의 ANR 해제 시도에 필요한 최소 주입. */
+export interface AnrDismissDeps {
   /** 해당 id가 화면에 표시 중인지. 미존재 시 throw 하지 않고 false. */
   readonly isDisplayed: (id: string) => Promise<boolean>;
   /** 해당 id를 탭한다. */
   readonly tap: (id: string) => Promise<void>;
+}
+
+export interface AnrTolerantWaitDeps extends AnrDismissDeps {
   /** 폴링 간격 대기. */
   readonly pause: (ms: number) => Promise<void>;
   /** 현재 시각(ms). 테스트에서 가짜 시계를 주입한다. */
@@ -55,6 +59,32 @@ export interface AnrTolerantWaitResult {
 }
 
 /**
+ * 시스템 ANR 다이얼로그가 떠 있으면 "대기" 버튼(`aerr_wait`)만 한 번 누른다.
+ *
+ * 단발 primitive라 대기 루프를 가지지 않는다 — 호출부가 이미 가진 폴링 루프
+ * (초기 랜딩 대기, 진입 lifecycle 루프)에 그대로 끼워 넣고, 해제 직후의
+ * 재평가·속도 제한은 그 루프의 기존 pause에 맡긴다. 누를 대상은 언제나
+ * `aerr_wait` 하나다: 텍스트는 에뮬레이터 로케일에 따라 변하고,
+ * `aerr_close`·`aerr_app_info`를 누르면 테스트 대상 앱이 죽는다.
+ *
+ * @param probeSystemAnr Android에서만 true — 다른 플랫폼엔 이 id가 없다.
+ * @returns "대기" 버튼을 실제로 눌렀으면 true.
+ */
+export async function dismissSystemAnrIfPresent(
+  deps: AnrDismissDeps,
+  probeSystemAnr: boolean
+): Promise<boolean> {
+  if (!probeSystemAnr) {
+    return false;
+  }
+  if (!(await deps.isDisplayed(ANDROID_ANR_WAIT_ID))) {
+    return false;
+  }
+  await deps.tap(ANDROID_ANR_WAIT_ID);
+  return true;
+}
+
+/**
  * `targetId`가 표시될 때까지 폴링하되, 그 사이 시스템 ANR 다이얼로그가 화면을
  * 덮고 있으면 "대기" 버튼만 눌러 걷어낸다. 한도 내 도달 실패는 예외가 아니라
  * `reached: false`로 알린다 — 실패 메시지·증거 수집은 호출부 책임이다.
@@ -75,10 +105,7 @@ export async function waitForElementDismissingAnr(
       return { reached: true, anrDismissals };
     }
 
-    const anrPresent =
-      options.probeSystemAnr && (await deps.isDisplayed(ANDROID_ANR_WAIT_ID));
-    if (anrPresent) {
-      await deps.tap(ANDROID_ANR_WAIT_ID);
+    if (await dismissSystemAnrIfPresent(deps, options.probeSystemAnr)) {
       anrDismissals += 1;
     }
 
