@@ -96,8 +96,15 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
+      # v3 기본값(tools platform-tools)의 `tools` 패키지가 현재 호스티드 SDK 이미지에서
+      # 제거되어 `sdkmanager tools` → "Failed to find package 'tools'" (exit 1)로 부팅
+      # 자체가 실패했다(run 35142927020 등, 2026-09-16). v4로 올리고 packages: ''로
+      # 명시 비움 — 러너 제공 SDK를 PATH에 그대로 두고, platform-tools/시스템 이미지는
+      # 이후 Gradle·reactivecircus/android-emulator-runner가 필요분을 설치한다.
       - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+        uses: android-actions/setup-android@v4
+        with:
+          packages: ''
 
       - name: Enable KVM
         run: |
