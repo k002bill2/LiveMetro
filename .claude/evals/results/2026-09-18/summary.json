@@ -1,0 +1,63 @@
+{
+  "batch_id": "batch_20260918_ui_component",
+  "date": "2026-09-18",
+  "category": "ui_component",
+  "total_tasks": 4,
+  "total_runs": 4,
+  "k": 1,
+  "pass_at_1": 1.0,
+  "average_score": 0.878,
+  "by_task": {
+    "task_ui_001": {
+      "name": "StationCard 컴포넌트 생성",
+      "difficulty": "simple",
+      "result": "PASS",
+      "score": 0.851,
+      "pass_threshold": 0.70,
+      "vs_prev": -0.059
+    },
+    "task_ui_hard_001": {
+      "name": "실시간 노선도 컴포넌트 (애니메이션 + 제스처)",
+      "difficulty": "hard",
+      "result": "PASS",
+      "score": 0.910,
+      "pass_threshold": 0.70,
+      "vs_prev": -0.010
+    },
+    "task_ui_expert_001": {
+      "name": "3D 노선도 with 핀치/회전/팬 동시 제스처",
+      "difficulty": "expert",
+      "result": "PASS",
+      "score": 0.865,
+      "pass_threshold": 0.80,
+      "vs_prev": +0.102
+    },
+    "task_ui_expert_002": {
+      "name": "AR 증강현실 노선도 with 실시간 열차 추적",
+      "difficulty": "expert_plus",
+      "result": "PASS",
+      "score": 0.886,
+      "pass_threshold": 0.75,
+      "vs_prev": +0.066
+    }
+  },
+  "low_performers": [],
+  "regression_vs_prev": {
+    "date": "2026-08-28",
+    "prev_pass_at_1": 0.75,
+    "prev_average_score": 0.853,
+    "delta_pass_at_1": +0.25,
+    "delta_average_score": +0.025,
+    "notable_improvements": [
+      "task_ui_expert_001 flipped from FAIL (0.763) to PASS (0.865) — +0.102. Previous failure was viewport culling not connected to JSX render; this run still shows same gap but Skia dependency handling and gesture arbitration improved significantly.",
+      "task_ui_expert_002 improved +0.066 (0.820 → 0.886): stronger AR state machine and subscription cleanup."
+    ],
+    "notable_regressions": [
+      "task_ui_001 dropped 0.059 (0.910 → 0.851): imports_use_aliases check failed (used '@/' prefix instead of shorthand '@utils/'/'@hooks/' aliases). Note: '@/' is valid per path-aliases.md — grader check may need calibration."
+    ]
+  },
+  "grader_calibration_notes": [
+    "imports_use_aliases check in task_ui_001: project rules permit both '@/' prefix and shorthand aliases. The check penalized '@/utils/colorUtils' as non-compliant. Consider widening the check to accept '@/' prefix. Affected score: −0.167 on code_checks (1 of 6 checks)."
+  ],
+  "notes": []
+}
