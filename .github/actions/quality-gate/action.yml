@@ -22,7 +22,7 @@ runs:
   using: composite
   steps:
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
       with:
         node-version: ${{ inputs.node-version }}
         cache: 'npm'
@@ -62,7 +62,7 @@ runs:
       run: npm run build
 
     - name: Secret scan (gitleaks)
-      uses: gitleaks/gitleaks-action@v2
+      uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7  # v2.3.9
       env:
         GITHUB_TOKEN: ${{ github.token }}
         GITLEAKS_ENABLE_UPLOAD_ARTIFACT: false
