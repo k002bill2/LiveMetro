@@ -31,7 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
       - name: Quality gate (no Functions rebuild — already verified on main)
         uses: ./.github/actions/quality-gate
         with:
@@ -44,7 +44,7 @@ jobs:
     timeout-minutes: 60
     steps:
       - name: Checkout
-        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262  # v4.4.0
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
 
       # eas-cli(latest)의 전이 의존성 @oclif/plugin-autocomplete가 Node>=22를 요구해
       # Node 20에서는 "Setup EAS CLI" 설치가 EBADENGINE으로 죽는다. 러너만 22로
@@ -53,13 +53,13 @@ jobs:
       # EBADENGINE 경고를 내지만, .npmrc에 engine-strict가 없어 실패하지 않는다.
       # guard 잡은 eas-cli를 쓰지 않으므로 Node 20 그대로 둔다.
       - name: Setup Node.js
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020  # v7.0.0
         with:
           node-version: '22'
           cache: 'npm'
 
       - name: Setup EAS CLI
-        uses: expo/expo-github-action@c7b66a9c327a43a8fa7c0158e7f30d6040d2481e  # 8.2.1
+        uses: expo/expo-github-action@eab7a230208c952974db8c3245cfd78402c7b385  # 9
         with:
           eas-version: latest
           token: ${{ secrets.EXPO_TOKEN }}
