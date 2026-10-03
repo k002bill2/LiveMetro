@@ -170,7 +170,6 @@ export const enableBiometricLogin = async (
     // First authenticate to confirm user identity
     const authResult = await authenticateWithBiometric('생체인증 로그인을 설정합니다');
     if (!authResult.success) {
-      console.log('Biometric authentication failed during setup');
       return false;
     }
 

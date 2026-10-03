@@ -390,7 +390,6 @@ class DataManager {
       this.syncStatus.errors = [];
       
       if (isSeoulApiOnline) {
-        console.log('Force sync completed successfully');
         this.updateSyncStatus(true);
         return true;
       } else {
@@ -413,7 +412,6 @@ class DataManager {
       const keys = await AsyncStorage.getAllKeys();
       const cacheKeys = keys.filter(key => key.startsWith(this.CACHE_PREFIX));
       await AsyncStorage.multiRemove(cacheKeys);
-      console.log(`Cleared ${cacheKeys.length} cached items`);
     } catch (error) {
       console.error('Error clearing cache:', error);
     }

@@ -485,14 +485,10 @@ class SeoulSubwayApiService {
 
     if (this.keyManager.keyCount === 0) {
       console.warn('Seoul Subway API key not found. Please set EXPO_PUBLIC_SEOUL_SUBWAY_API_KEY environment variable.');
-    } else {
-      console.info(`Seoul Subway API: ${this.keyManager.keyCount} key(s) loaded`);
     }
 
     if (this.timetableKeyManager.keyCount === 0) {
       console.warn('Data Portal API key not found. Please set EXPO_PUBLIC_DATA_PORTAL_API_KEY environment variable.');
-    } else {
-      console.info(`Timetable API: ${this.timetableKeyManager.keyCount} key(s) loaded`);
     }
   }
 
@@ -547,10 +543,7 @@ class SeoulSubwayApiService {
     const rateLimitKey = `realtime:${stationName}`;
 
     // Apply rate limiting (30-second minimum interval)
-    const waitedMs = await this.rateLimiter.throttle(rateLimitKey);
-    if (waitedMs > 0) {
-      console.debug(`Rate limited: waited ${waitedMs}ms before fetching ${stationName}`);
-    }
+    await this.rateLimiter.throttle(rateLimitKey);
 
     return withRetry(async () => {
       const apiKey = this.keyManager.getNextKey();
@@ -664,10 +657,7 @@ class SeoulSubwayApiService {
   private async fetchRealtimePosition(lineName: string): Promise<SeoulRealtimePosition[]> {
     const rateLimitKey = `position:${lineName}`;
 
-    const waitedMs = await this.rateLimiter.throttle(rateLimitKey);
-    if (waitedMs > 0) {
-      console.debug(`Rate limited: waited ${waitedMs}ms before fetching positions for ${lineName}`);
-    }
+    await this.rateLimiter.throttle(rateLimitKey);
 
     return withRetry(async () => {
       const apiKey = this.keyManager.getNextKey();
@@ -879,7 +869,6 @@ class SeoulSubwayApiService {
     // policy. Throw a typed error so callers can render an informative message
     // instead of an empty schedule that looks like a bug.
     if (typeof window !== 'undefined' && typeof document !== 'undefined') {
-      console.debug('[SeoulSubwayApi] Timetable API not supported on web');
       throw new TimetableUnsupportedOnWebError();
     }
 

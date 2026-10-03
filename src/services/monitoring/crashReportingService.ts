@@ -63,7 +63,6 @@ class CrashReportingService {
       // Process any queued reports
       await this.processQueuedReports();
       
-      console.log('📊 CrashReportingService initialized');
     } catch (error) {
       console.error('Failed to initialize crash reporting:', error);
     } finally {
@@ -76,7 +75,6 @@ class CrashReportingService {
    */
   setEnabled(enabled: boolean): void {
     this.isEnabled = enabled;
-    console.log(`📊 Crash reporting ${enabled ? 'enabled' : 'disabled'}`);
   }
 
   /**
@@ -135,22 +133,9 @@ class CrashReportingService {
   /**
    * Add breadcrumb for debugging
    */
-  addBreadcrumb(message: string, category?: string, data?: Record<string, any>): void {
-    if (!this.isEnabled) return;
-
-    try {
-      const breadcrumb = {
-        timestamp: new Date().toISOString(),
-        message,
-        category: category || 'custom',
-        data,
-      };
-
-      // Store breadcrumbs for context (implementation would store in memory/storage)
-      console.log('🍞 Breadcrumb:', breadcrumb);
-    } catch (error) {
-      console.error('Failed to add breadcrumb:', error);
-    }
+  addBreadcrumb(_message: string, _category?: string, _data?: Record<string, any>): void {
+    // Breadcrumb storage is not implemented yet — intentionally a no-op.
+    // (Previously logged the breadcrumb payload, which may carry user data.)
   }
 
   /**
@@ -253,7 +238,6 @@ class CrashReportingService {
     try {
       // In production, send to crash reporting service
       if (__DEV__) {
-        console.log(`📊 Would send ${this.reportQueue.length} crash reports to service`);
         // Clear queue in development
         this.reportQueue = [];
         await this.saveQueueToStorage();
@@ -271,7 +255,7 @@ class CrashReportingService {
     }
   }
 
-  private async sendToService(reports: CrashReport[]): Promise<void> {
+  private async sendToService(_reports: CrashReport[]): Promise<void> {
     // Implementation would send to crash reporting service
     // Example implementations:
     
@@ -295,7 +279,6 @@ class CrashReportingService {
     //   body: JSON.stringify(reports)
     // });
 
-    console.log('📊 Crash reports sent to service:', reports.length);
   }
 
   private async loadQueueFromStorage(): Promise<void> {

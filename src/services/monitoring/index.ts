@@ -34,7 +34,6 @@ class MonitoringManager {
    */
   async initialize(config?: Partial<MonitoringConfig>): Promise<void> {
     if (this.isInitialized) {
-      console.log('📊 Monitoring services already initialized');
       return;
     }
 
@@ -44,7 +43,6 @@ class MonitoringManager {
         this.config = { ...this.config, ...config };
       }
 
-      console.log('📊 Initializing production monitoring services...');
 
       // Initialize services in parallel
       const initPromises: Promise<void>[] = [];
@@ -70,14 +68,12 @@ class MonitoringManager {
       await Promise.all(initPromises);
 
       this.isInitialized = true;
-      console.log('📊 All monitoring services initialized successfully');
 
       // Perform initial health check
       if (this.config.healthCheck.enabled) {
         setTimeout(async () => {
           try {
-            const health = await healthCheckService.performHealthCheck();
-            console.log(`📊 Initial system health: ${health.overall}`);
+            await healthCheckService.performHealthCheck();
           } catch (error) {
             console.error('Initial health check failed:', error);
           }
@@ -104,7 +100,6 @@ class MonitoringManager {
       performanceMonitoringService.setUser(userId);
     }
 
-    console.log(`📊 User context set for monitoring: ${userId}`);
   }
 
   /**
@@ -215,7 +210,6 @@ class MonitoringManager {
    */
   async shutdown(): Promise<void> {
     try {
-      console.log('📊 Shutting down monitoring services...');
 
       // Flush any remaining data
       await this.flush();
@@ -226,7 +220,6 @@ class MonitoringManager {
       }
 
       this.isInitialized = false;
-      console.log('📊 Monitoring services shut down');
     } catch (error) {
       console.error('Failed to shutdown monitoring services:', error);
     }

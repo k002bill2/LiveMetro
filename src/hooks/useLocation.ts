@@ -265,9 +265,6 @@ export const useLocation = (options: UseLocationOptions = {}) => {
       if (success) {
         trackingRef.current = true;
         updateState({ isTracking: true, trackingMode: effectiveMode });
-        if (__DEV__) {
-          console.log(`Location tracking started (mode: ${effectiveMode})`);
-        }
         return true;
       } else {
         handleError('위치 추적을 시작할 수 없습니다.');
@@ -307,33 +304,21 @@ export const useLocation = (options: UseLocationOptions = {}) => {
     locationService.stopLocationTracking();
     trackingRef.current = false;
     updateState({ isTracking: false });
-    if (__DEV__) {
-      console.log('Location tracking stopped');
-    }
   }, [updateState]);
 
   /**
    * Handle app state changes for battery optimization
    */
   const handleAppStateChange = useCallback((nextAppState: AppStateStatus) => {
-    if (__DEV__) {
-      console.log('App state changed:', appStateRef.current, '->', nextAppState);
-    }
 
     if (appStateRef.current.match(/inactive|background/) && nextAppState === 'active') {
       // App has come to foreground - resume tracking if it was active
       if (trackingRef.current && !state.isTracking) {
-        if (__DEV__) {
-          console.log('Resuming location tracking');
-        }
         startTracking();
       }
     } else if (appStateRef.current === 'active' && nextAppState.match(/inactive|background/)) {
       // App is going to background - optionally stop tracking for battery saving
       if (state.isTracking && !options.enableBackgroundLocation) {
-        if (__DEV__) {
-          console.log('Pausing location tracking (background)');
-        }
         stopTracking();
       }
     }

@@ -49,7 +49,6 @@ class HealthCheckService {
    */
   async startMonitoring(): Promise<void> {
     if (this.isRunning) {
-      console.log('🏥 Health monitoring already running');
       return;
     }
 
@@ -68,7 +67,6 @@ class HealthCheckService {
         });
       }, this.intervalMs) as unknown as NodeJS.Timeout;
 
-      console.log('🏥 Health monitoring started');
     } catch (error) {
       console.error('Failed to start health monitoring:', error);
       this.isRunning = false;
@@ -86,7 +84,6 @@ class HealthCheckService {
       this.checkInterval = null;
     }
     this.isRunning = false;
-    console.log('🏥 Health monitoring stopped');
   }
 
   /**
@@ -477,11 +474,6 @@ class HealthCheckService {
   }
 
   private logHealthStatus(result: HealthCheckResult): void {
-    const icon = result.overall === 'healthy' ? '✅' : 
-                result.overall === 'degraded' ? '⚠️' : '❌';
-    
-    console.log(`🏥 ${icon} System Health: ${result.overall.toUpperCase()}`);
-    
     if (result.overall !== 'healthy') {
       Object.entries(result.checks).forEach(([service, status]) => {
         if (status && status.status !== 'healthy') {

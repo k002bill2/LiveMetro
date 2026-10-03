@@ -2,6 +2,7 @@
  * Notification Test Helper
  * Utility functions for testing notification system
  */
+/* eslint-disable no-console -- dev-only test helper: printing is this module's purpose */
 
 import { notificationStorageService } from '../services/notification/notificationStorageService';
 

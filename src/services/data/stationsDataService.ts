@@ -188,7 +188,6 @@ const initializeCache = (): void => {
     y?: number;
   }>;
 
-  let stationsJsonCount = 0;
   Object.values(stationsJson).forEach((stationData) => {
     // Skip if already cached (seoulStations.json takes priority)
     if (stationsCache!.has(stationData.id)) {
@@ -209,10 +208,8 @@ const initializeCache = (): void => {
     };
 
     stationsCache!.set(station.id, station);
-    stationsJsonCount++;
   });
 
-  console.log(`✅ Loaded stations from Seoul Metro data (${stationsByLineCache.size} lines, +${stationsJsonCount} from stations.json)`);
 };
 
 /**

@@ -39,7 +39,6 @@ function loadSpeechModule(): SpeechModule | null {
     Speech = require('expo-speech') as SpeechModule;
     return Speech;
   } catch {
-    console.log('ℹ️ expo-speech not available');
     return null;
   }
 }

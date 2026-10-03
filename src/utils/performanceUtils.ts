@@ -256,6 +256,7 @@ export const shallowEqual = <T extends Record<string, any>>(
 export const performanceLog = {
   info: (message: string, data?: any) => {
     if (!__DEV__) return;
+    // eslint-disable-next-line no-console -- dev-gated performance logger
     console.log(`📊 Performance: ${message}`, data);
   },
   

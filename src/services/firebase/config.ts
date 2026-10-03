@@ -117,6 +117,5 @@ export const validateFirebaseConfig = (): boolean => {
 
 // Development helper
 if (__DEV__) {
-  console.log('Firebase initialized with project:', firebaseConfig.projectId);
   validateFirebaseConfig();
 }

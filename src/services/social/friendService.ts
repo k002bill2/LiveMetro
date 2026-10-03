@@ -49,7 +49,6 @@ function loadFirestoreModule(): FirestoreInstance | null {
     firestore = require('@react-native-firebase/firestore').default as FirestoreModule;
     return firestore();
   } catch {
-    console.log('ℹ️ @react-native-firebase/firestore not available');
     return null;
   }
 }

@@ -100,7 +100,6 @@ export const saveCommuteRoutes = async (
       createdAt: serverTimestamp(),
     }, { merge: true });
 
-    console.log('Commute routes saved successfully for UID:', uid);
     return { success: true };
   } catch (error) {
     console.error('Error saving commute routes:', error);
@@ -135,7 +134,6 @@ export const loadCommuteRoutesOrThrow = async (
 
   if (docSnap.exists()) {
     const data = docSnap.data();
-    console.log('Commute routes loaded successfully for UID:', uid);
     return {
       morningRoute: data.morningRoute || null,
       eveningRoute: data.eveningRoute || null,
@@ -146,7 +144,6 @@ export const loadCommuteRoutesOrThrow = async (
     };
   }
 
-  console.log('No commute settings found for UID:', uid);
   return null;
 };
 

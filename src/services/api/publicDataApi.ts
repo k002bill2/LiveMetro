@@ -207,7 +207,6 @@ class PublicDataApiService {
   async getAccessibilityInfo(stationName: string): Promise<AccessibilityInfo | null> {
     // Skip API call on web platform (CORS not supported)
     if (isWebPlatform()) {
-      console.debug('[PublicDataApi] Skipping accessibility API on web (CORS not supported)');
       return null;
     }
 
@@ -259,7 +258,6 @@ class PublicDataApiService {
   async getAlerts(): Promise<SubwayAlert[]> {
     // Skip API call on web platform (CORS not supported)
     if (isWebPlatform()) {
-      console.debug('[PublicDataApi] Skipping alerts API on web (CORS not supported)');
       return [];
     }
 

@@ -85,7 +85,6 @@ class NotificationService {
       }
 
       this.isInitialized = true;
-      console.log('Notification service initialized successfully');
       return true;
     } catch (error) {
       console.error('Failed to initialize notification service:', error);
@@ -140,7 +139,6 @@ class NotificationService {
       }
 
       const token = (await Notifications.getExpoPushTokenAsync()).data;
-      console.log('Expo push token:', token);
       return token;
     } catch (error) {
       console.error('Error getting Expo push token:', error);

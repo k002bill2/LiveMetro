@@ -451,14 +451,12 @@ const migrateStationId = (stationId: string, lineId: string): string => {
   });
 
   if (matchedStation) {
-    console.log(`✅ Migrated stationId: ${stationId} → ${matchedStation.id} (${matchedStation.name})`);
     return matchedStation.id;
   }
 
   // Fallback: try findStationCdByNameAndLine with the original ID as name
   const stationCd = findStationCdByNameAndLine(stationId, lineId);
   if (stationCd) {
-    console.log(`✅ Migrated stationId by name: ${stationId} → ${stationCd}`);
     return stationCd;
   }
 

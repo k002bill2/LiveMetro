@@ -21,7 +21,6 @@ function loadLinkingModule(): LinkingModule | null {
     Linking = require('expo-linking') as LinkingModule;
     return Linking;
   } catch {
-    console.log('ℹ️ expo-linking not available');
     return null;
   }
 }
