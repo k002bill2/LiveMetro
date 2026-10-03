@@ -11,4 +11,13 @@ const config = getDefaultConfig(__dirname);
 // Metro does NOT honor .gitignore, so these copies must be excluded explicitly.
 config.resolver.blockList = exclusionList([/[\/\\]\.claude[\/\\].*/]);
 
+// Workaround (SDK 53+ enables package.json "exports" by default): Firebase JS
+// SDK 10 then bundles @firebase/app twice — @firebase/auth's RN build does
+// require('@firebase/app') (→ "require" condition → index.cjs.js) while
+// `firebase/app` resolves to the ESM build. Auth registers on one copy and the
+// app instance lives on the other, breaking initializeAuth/persistence.
+// Legacy field resolution (react-native/browser/main) yields a single copy.
+// Remove once Firebase ships a "react-native" exports condition for @firebase/app.
+config.resolver.unstable_enablePackageExports = false;
+
 module.exports = config;

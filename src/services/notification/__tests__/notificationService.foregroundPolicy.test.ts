@@ -27,7 +27,8 @@ jest.mock('@/services/guidance/guidanceSessionStore', () => ({
 const mockedGetSession = getGuidanceSession as jest.Mock;
 
 type HandlerBehavior = {
-  shouldShowAlert: boolean;
+  shouldShowBanner: boolean;
+  shouldShowList: boolean;
   shouldPlaySound: boolean;
   shouldSetBadge: boolean;
 };
@@ -58,7 +59,8 @@ describe('notificationService foreground handler', () => {
     mockedGetSession.mockReturnValue({ startedAt: 1 });
     const behavior = await getHandler()(notificationOf('commute_reminder'));
     expect(behavior).toEqual({
-      shouldShowAlert: false,
+      shouldShowBanner: false,
+      shouldShowList: false,
       shouldPlaySound: false,
       shouldSetBadge: false,
     });
@@ -68,7 +70,8 @@ describe('notificationService foreground handler', () => {
     mockedGetSession.mockReturnValue(null);
     const behavior = await getHandler()(notificationOf('commute_reminder'));
     expect(behavior).toEqual({
-      shouldShowAlert: true,
+      shouldShowBanner: true,
+      shouldShowList: true,
       shouldPlaySound: true,
       shouldSetBadge: false,
     });
@@ -77,17 +80,17 @@ describe('notificationService foreground handler', () => {
   it('never suppresses other types even while a guidance session is active', async () => {
     mockedGetSession.mockReturnValue({ startedAt: 1 });
     const arrival = await getHandler()(notificationOf('arrival_reminder'));
-    expect(arrival.shouldShowAlert).toBe(true);
+    expect(arrival.shouldShowBanner).toBe(true);
     const delay = await getHandler()(notificationOf('delay_alert'));
-    expect(delay.shouldShowAlert).toBe(true);
+    expect(delay.shouldShowBanner).toBe(true);
   });
 
   it('shows notifications with missing/malformed data (never throws)', async () => {
     mockedGetSession.mockReturnValue({ startedAt: 1 });
     const noData = await getHandler()(notificationOf(undefined));
-    expect(noData.shouldShowAlert).toBe(true);
+    expect(noData.shouldShowBanner).toBe(true);
     const empty = await getHandler()({});
-    expect(empty.shouldShowAlert).toBe(true);
+    expect(empty.shouldShowBanner).toBe(true);
   });
 });
 

@@ -18,8 +18,10 @@ Notifications.setNotificationHandler({
     const dataType = notification?.request?.content?.data?.type;
     const suppress =
       dataType === NotificationType.COMMUTE_REMINDER && getGuidanceSession() !== null;
+    // shouldShowAlert (deprecated in SDK 53) meant banner + notification list.
     return {
-      shouldShowAlert: !suppress,
+      shouldShowBanner: !suppress,
+      shouldShowList: !suppress,
       shouldPlaySound: !suppress,
       shouldSetBadge: false,
     };
