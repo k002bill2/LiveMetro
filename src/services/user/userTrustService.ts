@@ -290,10 +290,14 @@ class UserTrustService {
     await this.initialize();
 
     const profile = await this.getProfile(userId);
-    const isFirstReport = profile.totalReports === 0;
+    // totalReports only increments on verification, so pending reports count too
+    const isFirstReport = profile.totalReports === 0 && profile.pendingReports === 0;
 
     const updatedProfile: UserTrustProfile = {
       ...profile,
+      trustScore: isFirstReport
+        ? Math.min(100, profile.trustScore + SCORE_CHANGES.FIRST_REPORT)
+        : profile.trustScore,
       pendingReports: profile.pendingReports + 1,
       lastReportAt: new Date(),
       badges: isFirstReport
@@ -301,10 +305,6 @@ class UserTrustService {
         : profile.badges,
       updatedAt: new Date(),
     };
-
-    if (isFirstReport) {
-      updatedProfile.trustScore + SCORE_CHANGES.FIRST_REPORT;
-    }
 
     this.profiles.set(userId, updatedProfile);
     await this.saveProfiles();
