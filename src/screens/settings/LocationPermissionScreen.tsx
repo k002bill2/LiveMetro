@@ -327,7 +327,7 @@ export const LocationPermissionScreen: React.FC<Props> = ({ navigation }) => {
   const statusColor = getStatusColor();
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['left', 'right']} style={styles.container}>
       <ScrollView style={styles.content}>
         {/* Status hero card (handoff 443-491) */}
         <View style={styles.heroCard}>

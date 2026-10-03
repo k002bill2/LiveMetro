@@ -462,7 +462,7 @@ export const DelayCertificateScreen: React.FC = () => {
   // --------------------------------------------------------------------
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
       {/* 제목은 네이티브 헤더(RootNavigator)가 담당 — 화면 내 중복 헤더 없음 */}
       {loading && history.length === 0 && certificates.length === 0 ? (
         /* 로딩 스켈레톤 — 빈 화면 금지 */

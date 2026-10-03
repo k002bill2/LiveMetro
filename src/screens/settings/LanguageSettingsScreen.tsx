@@ -52,7 +52,7 @@ export const LanguageSettingsScreen: React.FC<Props> = ({ navigation }) => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['left', 'right']} style={styles.container}>
       <ScrollView style={styles.content}>
         <SettingSection title={t.languageSettings.title}>
           {LANGUAGE_OPTIONS.map((option, index) => {

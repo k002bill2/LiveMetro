@@ -115,7 +115,7 @@ export const ThemeSettingsScreen: React.FC<Props> = () => {
   const currentAccent = getAccentColorOption(accentColorId);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['left', 'right']} style={styles.container}>
       <ScrollView style={styles.content}>
         {/* 모드 — 미니 앱 미리보기 3장 그리드 (카드 밖, 페이지 배경 위) */}
         <View style={styles.modeSection}>

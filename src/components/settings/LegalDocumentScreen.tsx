@@ -64,7 +64,7 @@ export const LegalDocumentScreen: React.FC<LegalDocumentScreenProps> = ({
   }, []);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['left', 'right']} style={styles.container}>
       <ScrollView
         ref={scrollRef}
         style={styles.scrollView}

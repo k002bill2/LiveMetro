@@ -331,7 +331,7 @@ export const NotificationTimeScreen: React.FC<Props> = ({ navigation }) => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['left', 'right']} style={styles.container}>
       <ScrollView style={styles.content} contentContainerStyle={styles.contentInner}>
         <NotificationTimeline
           morningTime={morningTime}

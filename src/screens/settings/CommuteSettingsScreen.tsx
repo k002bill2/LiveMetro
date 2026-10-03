@@ -797,7 +797,7 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
   );
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView edges={['left', 'right']} style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={WANTED_TOKENS.blue[500]} />
           <Text style={styles.loadingText}>출퇴근 설정을 불러오는 중...</Text>
@@ -807,7 +807,7 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['left', 'right']} style={styles.container}>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Hero ETA gradient card — ETA = ML baseline ?? shared graph-search ride
             (useCommuteRouteSummary, parity with Home/WeeklyPrediction) ?? placeholder */}

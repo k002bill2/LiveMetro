@@ -127,7 +127,7 @@ export const HelpScreen: React.FC = () => {
   }, [navigation]);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['left', 'right']} style={styles.container}>
       {/* 검색 바 — 디자인 763-780행 */}
       <View style={styles.searchContainer}>
         <View style={styles.searchCard}>

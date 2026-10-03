@@ -123,7 +123,7 @@ export const EditProfileScreen: React.FC<Props> = ({ navigation }) => {
   const isAnonymousUser = !user?.email || user?.isAnonymous;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['left', 'right']} style={styles.container}>
       <KeyboardAvoidingView
         style={styles.keyboardView}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}

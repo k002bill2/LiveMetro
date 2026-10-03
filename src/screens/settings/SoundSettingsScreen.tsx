@@ -213,7 +213,7 @@ export const SoundSettingsScreen: React.FC = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['left', 'right']} style={styles.container}>
       <ScrollView style={styles.content}>
         {/* 1) Alert Mode 2×2 grid — sound + vibration combo */}
         <SettingSection title="알림 방식">

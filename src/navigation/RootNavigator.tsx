@@ -7,6 +7,7 @@ import React from 'react';
 import { useSemanticTokens } from '@/services/theme';
 import { createStackNavigator } from '@react-navigation/stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, Star, Route as RouteIcon, Megaphone, Settings, CircleHelp } from 'lucide-react-native';
 
 import { useAuth } from '../services/auth/AuthContext';
@@ -129,6 +130,10 @@ const Tab = createBottomTabNavigator<MainTabParamList>();
 const MainTabNavigator: React.FC = () => {
   const semantic = useSemanticTokens();
   const t = useTranslation();
+  // targetSdk 36 forces Android edge-to-edge, so the tab bar now draws behind the
+  // system navigation bar. A fixed height/paddingBottom overrides the navigator's
+  // own inset handling — add the bottom inset to the designed 60/8 instead.
+  const { bottom: bottomInset } = useSafeAreaInsets();
 
   return (
     <Tab.Navigator
@@ -159,8 +164,8 @@ const MainTabNavigator: React.FC = () => {
           backgroundColor: semantic.bgBase,
           borderTopWidth: 1,
           borderTopColor: semantic.lineSubtle,
-          height: 60,
-          paddingBottom: 8,
+          height: 60 + bottomInset,
+          paddingBottom: 8 + bottomInset,
           paddingTop: 8,
         },
         tabBarAllowFontScaling: true,

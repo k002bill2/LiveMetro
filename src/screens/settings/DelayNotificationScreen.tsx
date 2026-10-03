@@ -291,7 +291,7 @@ export const DelayNotificationScreen: React.FC = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['left', 'right']} style={styles.container}>
       <ScrollView style={styles.content}>
         {/* Master hero (handoff 405-429) */}
         {enabled ? (

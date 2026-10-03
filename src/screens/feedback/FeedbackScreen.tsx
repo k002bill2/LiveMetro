@@ -91,7 +91,7 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({ onClose, onSubmi
   }, [canSubmit, rating, category, tags, description, includeDiagnostics, user, onSubmitSuccess]);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['top']} style={styles.container}>
       <View style={styles.header}>
         {onClose ? (
           <TouchableOpacity
