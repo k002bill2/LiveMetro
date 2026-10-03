@@ -360,7 +360,6 @@ export const useTrainSchedule = (
       // log at debug level to avoid red console noise. Genuine fetch failures
       // still surface as console.error.
       if (err instanceof TimetableUnsupportedOnWebError) {
-        console.debug('[useTrainSchedule] Timetable unsupported on web');
         setError('시간표는 모바일 앱에서 확인할 수 있습니다.');
       } else {
         console.error('Error fetching train schedule:', err);

@@ -66,7 +66,6 @@ async function loadTensorFlow(): Promise<TensorFlowModule | null> {
     tf = tfModule;
     return tf;
   } catch {
-    console.log('ℹ️ TensorFlow.js not available, using fallback mode');
     return null;
   }
 }
@@ -105,7 +104,6 @@ class TensorFlowSetupService {
           version: tfModule.version.tfjs || 'unknown',
           mode: 'tensorflow',
         };
-        console.log(`✅ TensorFlow.js initialized (backend: ${this.status.backend})`);
       } else {
         this.status = {
           isReady: true,
@@ -113,7 +111,6 @@ class TensorFlowSetupService {
           version: 'fallback',
           mode: 'fallback',
         };
-        console.log('ℹ️ Using statistics-based fallback predictions');
       }
     } catch (error) {
       this.status = {
@@ -123,7 +120,6 @@ class TensorFlowSetupService {
         mode: 'fallback',
         error: error instanceof Error ? error.message : 'Unknown error',
       };
-      console.log('ℹ️ TensorFlow.js initialization failed, using fallback');
     }
 
     tfInitialized = true;

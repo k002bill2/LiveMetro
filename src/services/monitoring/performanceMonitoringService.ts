@@ -94,7 +94,6 @@ class PerformanceMonitoringService {
       // Monitor app lifecycle
       this.setupAppStateMonitoring();
       
-      console.log('📈 PerformanceMonitoringService initialized');
     } catch (error) {
       console.error('Failed to initialize performance monitoring:', error);
     } finally {
@@ -376,7 +375,6 @@ class PerformanceMonitoringService {
 
     try {
       if (__DEV__) {
-        console.log(`📈 Would send ${this.metricsQueue.length} performance metrics to service`);
         this.metricsQueue = [];
         await this.saveQueueToStorage();
       } else {
@@ -390,10 +388,9 @@ class PerformanceMonitoringService {
     }
   }
 
-  private async sendToAnalyticsService(metrics: PerformanceMetrics[]): Promise<void> {
+  private async sendToAnalyticsService(_metrics: PerformanceMetrics[]): Promise<void> {
     // Implementation would send to analytics service
     // Examples: Firebase Analytics, Google Analytics, custom service
-    console.log('📈 Performance metrics sent to service:', metrics.length);
   }
 
   private async loadQueueFromStorage(): Promise<void> {

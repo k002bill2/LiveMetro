@@ -4,7 +4,8 @@ module.exports = {
   ],
   rules: {
     // General code quality
-    'no-console': 'warn',
+    // warn/error는 에러 계약(.claude/rules/error-handling.md)상 정당한 로깅
+    'no-console': ['warn', { allow: ['warn', 'error'] }],
     'no-debugger': 'error',
     'prefer-const': 'error',
     'no-var': 'error'

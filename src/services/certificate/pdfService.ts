@@ -234,7 +234,6 @@ class PdfService {
     try {
       const isAvailable = await Sharing.isAvailableAsync();
       if (!isAvailable) {
-        console.log('Sharing is not available on this device');
         return false;
       }
 

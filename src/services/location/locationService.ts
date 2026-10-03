@@ -146,7 +146,6 @@ class LocationService {
       }
 
       this.hasPermission = true;
-      console.log('Location service initialized successfully (foreground only)');
       return true;
     } catch (error) {
       console.error('Failed to initialize location service:', error);
@@ -419,7 +418,6 @@ class LocationService {
       );
 
       this.isTracking = true;
-      console.log(`Location tracking started (mode: ${mode})`);
       return true;
     } catch (error) {
       console.error('Error starting location tracking:', error);
@@ -476,7 +474,6 @@ class LocationService {
     }
 
     this.isTracking = false;
-    console.log('Location tracking stopped');
   }
 
   /**
@@ -685,7 +682,6 @@ class LocationService {
     };
 
     this.geofences.set(geofence.identifier, geofence);
-    console.log(`Added geofence for station: ${station.name}`);
   }
 
   /**
@@ -693,7 +689,6 @@ class LocationService {
    */
   removeGeofence(identifier: string): void {
     this.geofences.delete(identifier);
-    console.log(`Removed geofence: ${identifier}`);
   }
 
   /**

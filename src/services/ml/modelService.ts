@@ -60,7 +60,6 @@ class ModelService {
     }
 
     // TensorFlow is disabled, use fallback mode
-    console.log('ℹ️ ML Model Service initialized in fallback mode (statistics-based predictions)');
 
     this.metadata = {
       version: 'fallback',

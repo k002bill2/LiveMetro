@@ -241,7 +241,6 @@ export const useNotifications = (options: UseNotificationsOptions = {}) => {
     const timer = setInterval(checkDelays, 60000) as unknown as NodeJS.Timeout; // Check every minute
     monitoringRef.current.set(stationName, timer);
 
-    console.log(`Started delay monitoring for ${stationName}`);
 
     // Initial check (runs after registration; its result does not gate the timer)
     await checkDelays();
@@ -260,7 +259,6 @@ export const useNotifications = (options: UseNotificationsOptions = {}) => {
       monitoringRef.current.delete(stationName);
       lastDelaysRef.current.delete(stationName);
       lastDisruptionsRef.current.delete(stationName);
-      console.log(`Stopped delay monitoring for ${stationName}`);
     }
   }, []);
 
@@ -270,7 +268,6 @@ export const useNotifications = (options: UseNotificationsOptions = {}) => {
   const startMonitoring = useCallback(() => {
     if (!enableDelayAlerts || monitoredStations.length === 0) return;
 
-    console.log('Starting delay monitoring for stations:', monitoredStations);
     monitoredStations.forEach(stationName => {
       monitorStationDelays(stationName);
     });
@@ -280,9 +277,8 @@ export const useNotifications = (options: UseNotificationsOptions = {}) => {
    * Stop all monitoring
    */
   const stopAllMonitoring = useCallback(() => {
-    monitoringRef.current.forEach((timer, stationName) => {
+    monitoringRef.current.forEach((timer) => {
       clearInterval(timer);
-      console.log(`Stopped monitoring ${stationName}`);
     });
     monitoringRef.current.clear();
     lastDelaysRef.current.clear();
@@ -355,7 +351,6 @@ export const useNotifications = (options: UseNotificationsOptions = {}) => {
    * Handle incoming notifications
    */
   const handleNotificationReceived = useCallback(async (notification: Notifications.Notification) => {
-    console.log('Notification received:', notification);
 
     updateState({ lastNotification: notification });
 
@@ -377,7 +372,6 @@ export const useNotifications = (options: UseNotificationsOptions = {}) => {
         data: data ? { ...data } : undefined,
       });
 
-      console.log('✅ Notification saved to storage');
     } catch (error) {
       console.error('Error saving notification to storage:', error);
     }
@@ -391,7 +385,6 @@ export const useNotifications = (options: UseNotificationsOptions = {}) => {
    * Handle notification response (when user taps notification)
    */
   const handleNotificationResponse = useCallback((response: Notifications.NotificationResponse) => {
-    console.log('Notification response:', response);
 
     const { notification } = response;
     const { data } = notification.request.content;
@@ -399,10 +392,8 @@ export const useNotifications = (options: UseNotificationsOptions = {}) => {
     // Handle different notification types
     if (data?.type === NotificationType.DELAY_ALERT) {
       // Navigate to affected station/line
-      console.log('User tapped delay alert for:', data.stationName);
     } else if (data?.type === NotificationType.EMERGENCY_ALERT) {
       // Navigate to alerts screen
-      console.log('User tapped emergency alert');
     }
 
     if (onNotificationTapped) {

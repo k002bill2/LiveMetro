@@ -104,7 +104,6 @@ class CurrentStationAlertService {
       }
 
       await notificationService.initialize();
-      console.log('CurrentStationAlertService initialized');
       return true;
     } catch (error) {
       console.error('Failed to initialize CurrentStationAlertService:', error);
@@ -179,7 +178,6 @@ class CurrentStationAlertService {
       return;
     }
 
-    console.log('Started monitoring station arrivals');
   }
 
   /**

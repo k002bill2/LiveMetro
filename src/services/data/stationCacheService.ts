@@ -98,7 +98,6 @@ class StationCacheService {
 
     // Check if cache is expired
     if (this.isCacheExpired(this.stationsCache)) {
-      console.log('[StationCacheService] Stations cache expired');
       return null;
     }
 
@@ -114,7 +113,6 @@ class StationCacheService {
     if (!this.linesCache) return null;
 
     if (this.isCacheExpired(this.linesCache)) {
-      console.log('[StationCacheService] Lines cache expired');
       return null;
     }
 
@@ -141,7 +139,6 @@ class StationCacheService {
     try {
       await AsyncStorage.setItem(STORAGE_KEYS.STATIONS, JSON.stringify(cache));
       this.stationsCache = cache;
-      console.log(`[StationCacheService] Saved ${Object.keys(data).length} stations to cache`);
     } catch (error) {
       console.error('[StationCacheService] Failed to save stations:', error);
     }
@@ -166,7 +163,6 @@ class StationCacheService {
     try {
       await AsyncStorage.setItem(STORAGE_KEYS.LINES, JSON.stringify(cache));
       this.linesCache = cache;
-      console.log(`[StationCacheService] Saved ${Object.keys(stations).length} lines to cache`);
     } catch (error) {
       console.error('[StationCacheService] Failed to save lines:', error);
     }
@@ -205,7 +201,6 @@ class StationCacheService {
       this.stationsCache = null;
       this.linesCache = null;
 
-      console.log('[StationCacheService] Cache cleared');
     } catch (error) {
       console.error('[StationCacheService] Failed to clear cache:', error);
     }
@@ -234,7 +229,6 @@ class StationCacheService {
         this.setLines(LINE_COLORS, LINE_STATIONS),
       ]);
 
-      console.log('[StationCacheService] Refreshed from bundle');
     } catch (error) {
       console.error('[StationCacheService] Failed to refresh from bundle:', error);
     }

@@ -719,7 +719,6 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
   const loadSettings = useCallback(async (): Promise<void> => {
     const uid = user?.id;
     if (!uid) {
-      console.log('No user ID available');
       setLoading(false);
       return;
     }
@@ -732,9 +731,7 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
         setMorningRoute(convertToRouteData(settings.morningRoute));
         setEveningRoute(convertToRouteData(settings.eveningRoute));
         setEveningEnabled(settings.eveningEnabled ?? true);
-        console.log('Commute settings loaded from Firebase');
       } else {
-        console.log('No commute settings found in Firebase');
         setMorningRoute(null);
         setEveningRoute(null);
         setEveningEnabled(true);

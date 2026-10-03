@@ -225,7 +225,6 @@ export class ApiKeyManager {
         state.isDisabled = false;
         state.disabledUntil = null;
         state.errorCount = 0;
-        console.info(`ApiKeyManager: Key ${this.maskKey(state.key)} re-enabled`);
       }
     });
   }

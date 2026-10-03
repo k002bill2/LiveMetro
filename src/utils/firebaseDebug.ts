@@ -2,6 +2,7 @@
  * Firebase Debug Utilities
  * Helps diagnose Firebase authentication issues
  */
+/* eslint-disable no-console -- dev-only diagnostic: printing is this module's purpose */
 
 import { validateFirebaseConfig } from '../services/firebase/config';
 

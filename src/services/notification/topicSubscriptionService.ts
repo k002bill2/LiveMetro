@@ -22,7 +22,6 @@ function loadMessagingModule(): FirebaseMessaging | null {
     messaging = require('@react-native-firebase/messaging').default as () => FirebaseMessaging;
     return messaging();
   } catch {
-    console.log('ℹ️ @react-native-firebase/messaging not available');
     return null;
   }
 }
