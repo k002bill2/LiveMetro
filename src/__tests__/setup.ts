@@ -33,6 +33,9 @@ declare global {
 (global as any).self = global;
 
 // Mock React Native modules
+// Reanimated 4.2+ (SDK 55) mock requires react-native-worklets; without its
+// mock the worklets native part "isn't initialized" and the suite fails to load.
+jest.mock('react-native-worklets', () => require('react-native-worklets/src/mock'));
 jest.mock('react-native-reanimated', () => {
   const Reanimated = require('react-native-reanimated/mock');
   Reanimated.default.call = () => {};
