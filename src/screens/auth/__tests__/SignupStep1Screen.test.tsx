@@ -43,19 +43,23 @@ jest.mock('@/services/firebase/config', () => ({
   },
 }));
 
-// expo-firebase-recaptcha — replace the modal with a forwardRef View whose
-// instance exposes a stub `verify()` method (Phone Auth requires
-// ApplicationVerifier; the AuthContext mock never calls verify() because
-// signInWithPhoneNumber is itself mocked, but the screen still passes the
-// ref through).
-jest.mock('expo-firebase-recaptcha', () => {
+// RecaptchaVerifierModal — forwardRef View 로 대체하고 verify() 스텁을 노출한다
+// (signInWithPhoneNumber 자체가 mock 이라 verify 는 호출되지 않지만 화면은 ref 를 넘긴다).
+jest.mock('@/components/auth/recaptcha/RecaptchaVerifierModal', () => {
   const React = jest.requireActual('react');
   const { View } = jest.requireActual('react-native');
-  const ModalStub = React.forwardRef((props: unknown, ref: React.Ref<unknown>) => {
-    React.useImperativeHandle(ref, () => ({ verify: jest.fn(() => Promise.resolve('token')) }));
+  const RecaptchaVerifierModal = React.forwardRef(function MockRecaptchaVerifierModal(
+    props: unknown,
+    ref: React.Ref<unknown>,
+  ) {
+    React.useImperativeHandle(ref, () => ({
+      type: 'recaptcha',
+      verify: jest.fn(() => Promise.resolve('token')),
+      _reset: jest.fn(),
+    }));
     return <View {...(props as object)} />;
   });
-  return { FirebaseRecaptchaVerifierModal: ModalStub };
+  return { RecaptchaVerifierModal };
 });
 
 jest.mock('react-native-svg', () => {
@@ -114,6 +118,10 @@ describe('SignupStep1Screen', () => {
 
     await waitFor(() => {
       expect(mockRequestPhoneVerification).toHaveBeenCalledWith('+821012345678', expect.anything());
+      // 화면이 넘기는 verifier 는 RecaptchaVerifierModal(위 mock) 의 핸들이어야 한다 —
+      // Firebase 가 내부에서 호출하는 _reset 까지 포함한 ApplicationVerifier 계약.
+      const verifier = mockRequestPhoneVerification.mock.calls[0][1];
+      expect(jest.isMockFunction(verifier._reset)).toBe(true);
       expect(queryByTestId('otp-title')).toBeTruthy();
       expect(queryByTestId('otp-cell-0')).toBeTruthy();
     });
