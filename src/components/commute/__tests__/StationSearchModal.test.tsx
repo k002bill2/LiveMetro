@@ -163,14 +163,13 @@ describe('StationSearchModal', () => {
     });
   });
 
-  it('renders Modal with visible=false when not visible', () => {
-    const { toJSON } = render(
+  it('renders nothing when not visible', () => {
+    const { toJSON, queryByText } = render(
       <StationSearchModal {...defaultProps} visible={false} />,
     );
-    // Modal still renders but with visible=false
-    const tree = toJSON();
-    expect(tree).toBeTruthy();
-    expect((tree as { props: { visible: boolean } }).props.visible).toBe(false);
+    // RN 0.73+ Modal (and its jest mock) renders null when visible=false.
+    expect(toJSON()).toBeNull();
+    expect(queryByText('강남')).toBeNull();
   });
 
   it('renders line filter buttons from station data, including non-numeric lines', async () => {

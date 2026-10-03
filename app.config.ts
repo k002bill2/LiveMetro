@@ -11,15 +11,12 @@
  *   the absolute path to the mounted temp file at build time.
  * - On local dev (no EAS env), we fall back to the project-root paths.
  *
- * Expo loads `app.config.ts` in preference to `app.json` when both are
- * present, but we still import `app.json` so all the static config lives
- * in one place and version control sees JSON-shaped diffs.
+ * Expo reads `app.json` first and passes its `expo` object to this function
+ * as `config`, so all the static config lives in one place and version
+ * control sees JSON-shaped diffs. (Importing app.json directly instead of
+ * using `config` trips expo-doctor's "app.config.ts is not using app.json".)
  */
-import type { ExpoConfig } from 'expo/config';
-
-import baseConfig from './app.json';
-
-const base = baseConfig.expo as unknown as ExpoConfig;
+import type { ConfigContext, ExpoConfig } from 'expo/config';
 
 /**
  * Kakao 로그인 config plugin은 네이티브 앱 키를 요구하므로 조건부로만 주입한다.
@@ -31,31 +28,30 @@ const base = baseConfig.expo as unknown as ExpoConfig;
  *   요구하는 Kotlin 1.8.x를 다운그레이드해 Android 빌드를 깨뜨린다. (kakao maven repo는
  *   라이브러리 자체 build.gradle이 선언하므로 extraMavenRepos 설정은 불필요.)
  */
-const kakaoAppKey = process.env.KAKAO_NATIVE_APP_KEY;
+export default ({ config: base }: ConfigContext): ExpoConfig => {
+  const { name, slug } = base;
+  if (!name || !slug) {
+    throw new Error('app.json must define expo.name and expo.slug');
+  }
 
-const plugins: NonNullable<ExpoConfig['plugins']> = kakaoAppKey
-  ? [
-      ...(base.plugins ?? []),
-      [
-        '@react-native-seoul/kakao-login',
-        { kakaoAppKey, kotlinVersion: '1.8.10' },
-      ],
-    ]
-  : base.plugins ?? [];
+  const kakaoAppKey = process.env.KAKAO_NATIVE_APP_KEY;
 
-const config: ExpoConfig = {
-  ...base,
-  plugins,
-  android: {
-    ...base.android,
-    googleServicesFile:
-      process.env.GOOGLE_SERVICES_JSON ?? './google-services.json',
-  },
-  ios: {
-    ...base.ios,
-    googleServicesFile:
-      process.env.GOOGLE_SERVICES_INFO_PLIST ?? './GoogleService-Info.plist',
-  },
+  const plugins: NonNullable<ExpoConfig['plugins']> = kakaoAppKey
+    ? [...(base.plugins ?? []), ['@react-native-seoul/kakao-login', { kakaoAppKey, kotlinVersion: '1.8.10' }]]
+    : (base.plugins ?? []);
+
+  return {
+    ...base,
+    name,
+    slug,
+    plugins,
+    android: {
+      ...base.android,
+      googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? './google-services.json',
+    },
+    ios: {
+      ...base.ios,
+      googleServicesFile: process.env.GOOGLE_SERVICES_INFO_PLIST ?? './GoogleService-Info.plist',
+    },
+  };
 };
-
-export default config;

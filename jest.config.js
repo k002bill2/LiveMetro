@@ -46,6 +46,15 @@ module.exports = {
     '<rootDir>/e2e/**/__tests__/**/*.test.ts',
   ],
 
+  // babel-preset-expo@10 (SDK 50) treats NODE_ENV=test as "not dev" and
+  // inlines process.env.EXPO_PUBLIC_* at transform time, so tests that set
+  // env vars at runtime see the transform-time value (undefined).
+  // preserveEnvVars is the preset's own opt-out (common.js getInlineEnvVarsEnabled).
+  // Same key as react-native/jest-preset so this replaces, not adds, the transform.
+  transform: {
+    '^.+\\.(js|ts|tsx)$': ['babel-jest', { caller: { preserveEnvVars: true } }],
+  },
+
   // Transform ignore patterns for React Native modules
   transformIgnorePatterns: [
     'node_modules/(?!((jest-)?react-native|@react-native(-community)?)|expo(nent)?|@expo(nent)?/.*|@expo-google-fonts/.*|react-navigation|@react-navigation/.*|@unimodules/.*|unimodules|sentry-expo|native-base|react-native-svg|firebase|@firebase)',
