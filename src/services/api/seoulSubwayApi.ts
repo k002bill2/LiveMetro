@@ -897,7 +897,7 @@ class SeoulSubwayApiService {
         let data: SeoulTimetableResponse;
         try {
           data = await response.json();
-        } catch (parseError) {
+        } catch {
           const contentType = response.headers?.get?.('content-type') ?? 'unknown';
           let bodyPreview = '<unavailable>';
           if (responseClone) {

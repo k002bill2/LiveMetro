@@ -151,7 +151,7 @@ export const AlertsScreen: React.FC = () => {
    * + favorite. Returns a string color (not a token name) so callers can
    * pass it directly to Lucide's `color` prop.
    */
-  const getNotificationColor = (type: string): string => {
+  const getNotificationColor = useCallback((type: string): string => {
     switch (type) {
       case 'ARRIVAL':
       case 'arrival_reminder':
@@ -174,7 +174,7 @@ export const AlertsScreen: React.FC = () => {
       default:
         return semantic.labelAlt;
     }
-  };
+  }, [semantic]);
 
   const formatTimestamp = (isoString: string): string => {
     const date = new Date(isoString);
@@ -199,7 +199,7 @@ export const AlertsScreen: React.FC = () => {
     if (!notification.isRead) {
       try {
         await markAsRead(notification.id);
-      } catch (error) {
+      } catch {
         // 읽음 처리 실패 시 무시 (UX 영향 최소화)
       }
     }
@@ -217,7 +217,7 @@ export const AlertsScreen: React.FC = () => {
           onPress: async () => {
             try {
               await deleteNotification(notificationId);
-            } catch (error) {
+            } catch {
               Alert.alert('오류', '알림 삭제에 실패했습니다.');
             }
           },
@@ -240,7 +240,7 @@ export const AlertsScreen: React.FC = () => {
           onPress: async () => {
             try {
               await clearAll();
-            } catch (error) {
+            } catch {
               Alert.alert('오류', '알림 삭제에 실패했습니다.');
             }
           },
@@ -253,7 +253,7 @@ export const AlertsScreen: React.FC = () => {
     if (unreadCount === 0) return;
     try {
       await markAllAsRead();
-    } catch (error) {
+    } catch {
       Alert.alert('오류', '알림을 읽음으로 표시하는 데 실패했습니다.');
     }
   }, [unreadCount, markAllAsRead]);
@@ -263,7 +263,7 @@ export const AlertsScreen: React.FC = () => {
       await addTestNotifications();
       await refresh();
       Alert.alert('테스트 알림 추가', '5개의 테스트 알림이 추가되었습니다.');
-    } catch (error) {
+    } catch {
       Alert.alert('오류', '테스트 알림 추가에 실패했습니다.');
     }
   }, [refresh]);
@@ -353,7 +353,7 @@ export const AlertsScreen: React.FC = () => {
         </TouchableOpacity>
       );
     },
-    [semantic, styles, handleNotificationPress, handleDelete]
+    [semantic, styles, handleNotificationPress, handleDelete, getNotificationColor]
   );
 
   if (loading && notifications.length === 0) {

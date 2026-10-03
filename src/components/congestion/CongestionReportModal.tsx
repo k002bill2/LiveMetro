@@ -68,7 +68,7 @@ export const CongestionReportModal: React.FC<CongestionReportModalProps> = ({
         congestionLevel: selectedLevel,
       });
       onClose();
-    } catch (err) {
+    } catch {
       setError('제보 중 오류가 발생했습니다');
     }
   }, [selectedCar, selectedLevel, trainInfo, onSubmit, onClose]);

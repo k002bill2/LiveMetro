@@ -48,7 +48,7 @@ function listBackups(backupDir: string): BackupInfo[] {
       if (fs.existsSync(metadataPath)) {
         try {
           metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf-8'));
-        } catch (error) {
+        } catch {
           // Ignore metadata read errors
         }
       }

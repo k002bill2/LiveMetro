@@ -539,7 +539,7 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
         setSaving(false);
       }
     },
-    [user],
+    [user, updateUserPreferences],
   );
 
   const handleToggleAlertEnabled = useCallback(
