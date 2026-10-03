@@ -16,6 +16,9 @@
  * control sees JSON-shaped diffs. (Importing app.json directly instead of
  * using `config` trips expo-doctor's "app.config.ts is not using app.json".)
  */
+import { readFileSync } from 'fs';
+import { dirname, join } from 'path';
+
 import type { ConfigContext, ExpoConfig } from 'expo/config';
 
 /**
@@ -24,10 +27,25 @@ import type { ConfigContext, ExpoConfig } from 'expo/config';
  * - 조건부 주입 이유: 로컬/CI에서 키 없이도 `expo prebuild`가 성공해야 한다. 키는
  *   EAS 환경변수(`KAKAO_NATIVE_APP_KEY`)로 빌드 타임에만 주입되며, 그 값은 네이티브
  *   리소스(AndroidManifest / Info.plist)에만 쓰이고 JS 번들에는 포함되지 않는다.
- * - `kotlinVersion: '1.8.10'` 명시 이유: 플러그인 기본값(1.5.10)이 RN 0.72 / Expo 49가
- *   요구하는 Kotlin 1.8.x를 다운그레이드해 Android 빌드를 깨뜨린다. (kakao maven repo는
+ * - `kotlinVersion` 명시 이유: 플러그인은 값이 없으면 1.5.10 을 android.kotlinVersion 과
+ *   kotlin-gradle-plugin classpath 에 강제로 쓴다. 고정값(예전 '1.8.10')은 RN 업그레이드 때마다
+ *   Kotlin 을 다운그레이드해 빌드를 깨뜨리므로(SDK 54: "Can't find KSP version for Kotlin
+ *   1.8.10"), 설치된 react-native 의 gradle 버전 카탈로그에서 읽는다. (kakao maven repo는
  *   라이브러리 자체 build.gradle이 선언하므로 extraMavenRepos 설정은 불필요.)
  */
+const readReactNativeKotlinVersion = (): string => {
+  const catalog = join(
+    dirname(require.resolve('react-native/package.json')),
+    'gradle',
+    'libs.versions.toml'
+  );
+  const version = readFileSync(catalog, 'utf8').match(/^kotlin\s*=\s*"([^"]+)"/m)?.[1];
+  if (!version) {
+    throw new Error(`kotlin version not found in ${catalog}`);
+  }
+  return version;
+};
+
 export default ({ config: base }: ConfigContext): ExpoConfig => {
   const { name, slug } = base;
   if (!name || !slug) {
@@ -37,7 +55,7 @@ export default ({ config: base }: ConfigContext): ExpoConfig => {
   const kakaoAppKey = process.env.KAKAO_NATIVE_APP_KEY;
 
   const plugins: NonNullable<ExpoConfig['plugins']> = kakaoAppKey
-    ? [...(base.plugins ?? []), ['@react-native-seoul/kakao-login', { kakaoAppKey, kotlinVersion: '1.8.10' }]]
+    ? [...(base.plugins ?? []), ['@react-native-seoul/kakao-login', { kakaoAppKey, kotlinVersion: readReactNativeKotlinVersion() }]]
     : (base.plugins ?? []);
 
   return {
