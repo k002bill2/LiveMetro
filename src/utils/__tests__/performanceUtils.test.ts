@@ -13,7 +13,6 @@ import {
   performanceLog,
   scheduleAfterInteractions,
 } from '../performanceUtils';
-import { InteractionManager } from 'react-native';
 
 jest.unmock('../performanceUtils');
 
@@ -275,14 +274,37 @@ describe('optimizeImageProps', () => {
 });
 
 describe('scheduleAfterInteractions', () => {
-  it('should call InteractionManager.runAfterInteractions', () => {
-    const spy = jest.spyOn(InteractionManager, 'runAfterInteractions');
+  const originalRequestIdleCallback = global.requestIdleCallback;
+  let idleCallbacks: (() => void)[];
+
+  beforeEach(() => {
+    idleCallbacks = [];
+    global.requestIdleCallback = jest.fn((fn: IdleRequestCallback) => {
+      idleCallbacks.push(() => fn({ didTimeout: false, timeRemaining: () => 50 }));
+      return idleCallbacks.length;
+    });
+  });
+
+  afterEach(() => {
+    global.requestIdleCallback = originalRequestIdleCallback;
+  });
+
+  it('defers the callback to requestIdleCallback instead of running it inline', () => {
     const cb = jest.fn();
 
     scheduleAfterInteractions(cb);
 
-    expect(spy).toHaveBeenCalledWith(cb);
-    spy.mockRestore();
+    expect(global.requestIdleCallback).toHaveBeenCalledTimes(1);
+    expect(cb).not.toHaveBeenCalled();
+  });
+
+  it('runs the callback exactly once when the JS thread becomes idle', () => {
+    const cb = jest.fn();
+
+    scheduleAfterInteractions(cb);
+    idleCallbacks.forEach((run) => run());
+
+    expect(cb).toHaveBeenCalledTimes(1);
   });
 });
 

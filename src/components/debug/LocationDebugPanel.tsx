@@ -8,7 +8,7 @@
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { useSemanticTokens } from '@/services/theme';
-import { View, Text, TouchableOpacity, StyleSheet, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, LayoutAnimation, Platform } from 'react-native';
 import { ChevronUp, ChevronDown, MapPin, Navigation, Train, Clock, Crosshair } from 'lucide-react-native';
 
 import { useLocation } from '@/hooks/useLocation';
@@ -16,9 +16,6 @@ import { useLocation } from '@/hooks/useLocation';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { LocationCoordinates, NearbyStation } from '@/services/location/locationService';
 
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 interface LocationDelta {
   deltaLat: number;

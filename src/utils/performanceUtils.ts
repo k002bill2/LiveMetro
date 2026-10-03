@@ -4,7 +4,7 @@
  */
 
 import React from 'react';
-import { InteractionManager, Platform } from 'react-native';
+import { Platform } from 'react-native';
 
 interface PerformanceMetrics {
   startTime: number;
@@ -158,10 +158,12 @@ export const throttle = <T extends (...args: any[]) => void>(
 };
 
 /**
- * Schedule heavy operations after interactions
+ * Schedule heavy operations for when the JS thread is idle.
+ * InteractionManager is deprecated in RN 0.83 (warns on access); RN's own
+ * guidance is requestIdleCallback.
  */
 export const scheduleAfterInteractions = (callback: () => void): void => {
-  InteractionManager.runAfterInteractions(callback);
+  requestIdleCallback(() => callback());
 };
 
 /**
