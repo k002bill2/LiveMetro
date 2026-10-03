@@ -25,5 +25,17 @@ module.exports = {
     es6: true,
     node: true,
     jest: true
-  }
+  },
+  overrides: [
+    {
+      // CLI scripts and e2e specs report progress via stdout by design
+      files: ['scripts/**', 'e2e/**'],
+      rules: { 'no-console': 'off' }
+    },
+    {
+      // Test wrappers/mocks are anonymous by convention; console is stubbed in tests
+      files: ['**/__tests__/**', '**/*.test.ts', '**/*.test.tsx'],
+      rules: { 'no-console': 'off', 'react/display-name': 'off' }
+    }
+  ]
 };
