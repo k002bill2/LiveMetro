@@ -64,7 +64,7 @@ const snapToThresholdStep = (value: number): number =>
 // wanted-tokens.css --red-500 — WANTED_TOKENS에 red 스케일이 없어 로컬 상수.
 const RED_500 = '#FF4242';
 // 시안 hero: linear-gradient(135deg, #0066FF 0%, #2C7BFF 100%)
-const HERO_GRADIENT_COLORS = ['#0066FF', '#2C7BFF'];
+const HERO_GRADIENT_COLORS = ['#0066FF', '#2C7BFF'] as const;
 
 interface AlertSourceRowSpec {
   readonly key: keyof AlertSourcePreferences;

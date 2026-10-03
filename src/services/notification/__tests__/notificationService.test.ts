@@ -10,6 +10,16 @@ import * as Notifications from 'expo-notifications';
 
 // Mock expo-notifications
 jest.mock('expo-notifications', () => ({
+  // Mirrors expo-notifications' real SchedulableTriggerInputTypes (SDK 52+ triggers need `type`).
+  SchedulableTriggerInputTypes: {
+    CALENDAR: 'calendar',
+    DAILY: 'daily',
+    WEEKLY: 'weekly',
+    MONTHLY: 'monthly',
+    YEARLY: 'yearly',
+    DATE: 'date',
+    TIME_INTERVAL: 'timeInterval',
+  },
   setNotificationHandler: jest.fn(),
   getPermissionsAsync: jest.fn(),
   requestPermissionsAsync: jest.fn(),
@@ -544,6 +554,33 @@ describe('NotificationService', () => {
   });
 });
 
+describe('NotificationService.scheduleCommuteReminder', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('schedules an explicit one-shot date trigger and returns the identifier', async () => {
+    mockNotifications.scheduleNotificationAsync.mockResolvedValue('commute-id');
+    const scheduledTime = new Date('2026-05-20T08:00:00.000Z');
+
+    const id = await notificationService.scheduleCommuteReminder('출근', '출발하세요', scheduledTime);
+
+    expect(id).toBe('commute-id');
+    const arg = mockNotifications.scheduleNotificationAsync.mock.calls[0]?.[0];
+    // Untyped `{ date }` triggers fall through to "fire now" on SDK 52+.
+    expect(arg?.trigger).toEqual({ type: 'date', date: scheduledTime });
+    expect(arg?.content.data).toEqual({ type: NotificationType.COMMUTE_REMINDER });
+  });
+
+  it('returns null when scheduling throws', async () => {
+    mockNotifications.scheduleNotificationAsync.mockRejectedValue(new Error('boom'));
+
+    const id = await notificationService.scheduleCommuteReminder('출근', '출발하세요', new Date());
+
+    expect(id).toBeNull();
+  });
+});
+
 describe('NotificationService.scheduleArrivalAlert', () => {
   beforeEach(() => {
     jest.clearAllMocks();
@@ -555,7 +592,7 @@ describe('NotificationService.scheduleArrivalAlert', () => {
     jest.useRealTimers();
   });
 
-  it('schedules a {seconds} trigger `secondsBefore` ahead of a future arrival', async () => {
+  it('schedules a timeInterval trigger `secondsBefore` ahead of a future arrival', async () => {
     mockNotifications.scheduleNotificationAsync.mockResolvedValue('arr-id');
     const arrival = new Date(Date.now() + 120_000); // +120s
 
@@ -563,7 +600,7 @@ describe('NotificationService.scheduleArrivalAlert', () => {
 
     expect(id).toBe('arr-id');
     const arg = mockNotifications.scheduleNotificationAsync.mock.calls[0]?.[0];
-    expect(arg?.trigger).toEqual({ seconds: 90 }); // 120 - 30
+    expect(arg?.trigger).toEqual({ type: 'timeInterval', seconds: 90 }); // 120 - 30
     expect(arg?.content.data).toMatchObject({ type: NotificationType.ARRIVAL_REMINDER });
   });
 

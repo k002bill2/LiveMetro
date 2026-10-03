@@ -5,6 +5,16 @@ import * as Notifications from 'expo-notifications';
 import { notificationService } from '../notificationService';
 
 jest.mock('expo-notifications', () => ({
+  // Mirrors expo-notifications' real SchedulableTriggerInputTypes (SDK 52+ triggers need `type`).
+  SchedulableTriggerInputTypes: {
+    CALENDAR: 'calendar',
+    DAILY: 'daily',
+    WEEKLY: 'weekly',
+    MONTHLY: 'monthly',
+    YEARLY: 'yearly',
+    DATE: 'date',
+    TIME_INTERVAL: 'timeInterval',
+  },
   setNotificationHandler: jest.fn(),
   scheduleNotificationAsync: jest.fn(),
 }));
@@ -21,7 +31,7 @@ describe('notificationService.scheduleWeeklyReminder', () => {
     expect(Notifications.scheduleNotificationAsync).toHaveBeenCalledWith(
       expect.objectContaining({
         content: expect.objectContaining({ title: '출발 시간', body: '지금 출발하세요' }),
-        trigger: { weekday: 2, hour: 8, minute: 15, repeats: true },
+        trigger: { type: 'weekly', weekday: 2, hour: 8, minute: 15 },
       }),
     );
   });

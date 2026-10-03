@@ -58,7 +58,7 @@ const storeBackgroundLocationSnapshot = async (
 if (!TaskManager.isTaskDefined(GUIDANCE_BACKGROUND_LOCATION_TASK)) {
   TaskManager.defineTask<GuidanceBackgroundLocationTaskData>(
     GUIDANCE_BACKGROUND_LOCATION_TASK,
-    ({ data, error }) => {
+    async ({ data, error }) => {
       if (error) {
         if (__DEV__) {
           // eslint-disable-next-line no-console

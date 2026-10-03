@@ -43,6 +43,17 @@ interface NotificationPayload {
   channelId?: string;
 }
 
+// expo-notifications 0.29 dropped CalendarNotificationTrigger from the declared
+// NotificationTrigger union, but iOS still returns that shape at runtime.
+const isCalendarNotificationTrigger = (
+  trigger: unknown
+): trigger is Notifications.CalendarNotificationTrigger =>
+  typeof trigger === 'object' &&
+  trigger !== null &&
+  'type' in trigger &&
+  trigger.type === 'calendar' &&
+  'dateComponents' in trigger;
+
 /**
  * True when a scheduled trigger is a WEEKLY reminder. Android reports it as
  * `'weekly'`; iOS collapses the same input into a `'calendar'` trigger carrying
@@ -50,10 +61,12 @@ interface NotificationPayload {
  * trigger (a concrete day), so this predicate deliberately excludes it.
  */
 const isWeeklyTrigger = (trigger: Notifications.NotificationTrigger | null): boolean => {
-  if (!trigger) return false;
+  if (!trigger || !('type' in trigger)) return false;
   if (trigger.type === 'weekly') return true;
-  if (trigger.type === 'calendar') {
-    const components = trigger.dateComponents;
+  // Widen first: narrowing the declared union to the runtime shape yields never.
+  const runtimeTrigger: unknown = trigger;
+  if (isCalendarNotificationTrigger(runtimeTrigger)) {
+    const components = runtimeTrigger.dateComponents;
     return components?.weekday != null && components.day == null;
   }
   return false;
@@ -316,9 +329,11 @@ class NotificationService {
           data: { type: NotificationType.COMMUTE_REMINDER },
           sound: 'default',
         },
+        // SDK 49 parsed `{ date, repeats: true }` as a one-shot date trigger
+        // (repeats was ignored); keep that behavior with the explicit type.
         trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DATE,
           date: scheduledTime,
-          repeats: true,
         },
       });
 
@@ -359,7 +374,10 @@ class NotificationService {
       const fireAtMs = arrivalTime.getTime() - secondsBefore * 1000;
       const secondsFromNow = Math.round((fireAtMs - Date.now()) / 1000);
       // 과거/임박(<1s) → 즉시 발송(null). 그 외 → N초 후 트리거.
-      const trigger = secondsFromNow >= 1 ? { seconds: secondsFromNow } : null;
+      const trigger: Notifications.NotificationTriggerInput =
+        secondsFromNow >= 1
+          ? { type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL, seconds: secondsFromNow }
+          : null;
 
       const identifier = await Notifications.scheduleNotificationAsync({
         content: {
@@ -398,7 +416,7 @@ class NotificationService {
           data: { type: NotificationType.COMMUTE_REMINDER },
           sound: 'default',
         },
-        trigger: { weekday, hour, minute, repeats: true },
+        trigger: { type: Notifications.SchedulableTriggerInputTypes.WEEKLY, weekday, hour, minute },
       });
       return identifier;
     } catch (error) {

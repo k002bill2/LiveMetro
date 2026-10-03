@@ -67,6 +67,16 @@ jest.mock('expo-location', () => ({
 }));
 
 jest.mock('expo-notifications', () => ({
+  // Mirrors expo-notifications' real SchedulableTriggerInputTypes (SDK 52+ triggers need `type`).
+  SchedulableTriggerInputTypes: {
+    CALENDAR: 'calendar',
+    DAILY: 'daily',
+    WEEKLY: 'weekly',
+    MONTHLY: 'monthly',
+    YEARLY: 'yearly',
+    DATE: 'date',
+    TIME_INTERVAL: 'timeInterval',
+  },
   requestPermissionsAsync: jest.fn(() => 
     Promise.resolve({ status: 'granted' })
   ),

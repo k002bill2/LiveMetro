@@ -6,6 +6,7 @@
     "runtimeVersion": {
       "policy": "appVersion"
     },
+    "newArchEnabled": false,
     "updates": {
       "url": "https://u.expo.dev/5a336447-64fc-48bd-a025-f2be8b0c7176",
       "fallbackToCacheTimeout": 0
@@ -115,7 +116,7 @@
             "useFrameworks": "static"
           },
           "android": {
-            "minSdkVersion": 23
+            "minSdkVersion": 24
           }
         }
       ],
@@ -134,7 +135,6 @@
       "supportUrl": "https://livemetro.app/support",
       "websiteUrl": "https://livemetro.app"
     },
-    "privacy": "public",
     "scheme": "livemetro",
     "platforms": [
       "ios",
