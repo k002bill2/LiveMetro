@@ -18,7 +18,6 @@ import {
   NativeSyntheticEvent,
   Platform,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -28,6 +27,7 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { RecaptchaVerifierHandle, RecaptchaVerifierModal } from '@/components/auth/recaptcha/RecaptchaVerifierModal';
 import { ArrowRight, Calendar, ShieldCheck, Smartphone, User } from 'lucide-react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';

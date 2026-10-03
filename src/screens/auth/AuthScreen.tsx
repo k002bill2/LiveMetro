@@ -24,7 +24,8 @@
  */
 import React, { useCallback, useEffect, useState } from 'react';
 import { useSemanticTokens } from '@/services/theme';
-import { Alert, Linking, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View, ViewStyle, TextStyle } from 'react-native';
+import { Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View, ViewStyle, TextStyle } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronRight, Eye, Mail } from 'lucide-react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as SecureStore from 'expo-secure-store';

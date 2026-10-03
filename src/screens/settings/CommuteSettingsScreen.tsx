@@ -15,7 +15,8 @@ import React, {
   useEffect,
 } from 'react';
 import { useSemanticTokens } from '@/services/theme';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert, ActivityIndicator, Switch } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, Switch } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowRight, BellRing, Clock, MapPin, PlusCircle, Route as RouteIcon, Sparkles, TrainFront } from 'lucide-react-native';
 import { Pill } from '@/components/design/Pill';
 import { LinearGradient } from 'expo-linear-gradient';

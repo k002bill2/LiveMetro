@@ -15,7 +15,8 @@
 
 import React, { useEffect, useState } from 'react';
 import { useSemanticTokens } from '@/services/theme';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Linking, Alert, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking, Alert, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { BellRing, Check, ChevronRight, Crosshair, MapPin, Navigation, Route, RotateCw, Settings, ShieldCheck, TrainFront, Zap, type LucideIcon } from 'lucide-react-native';
 import * as Location from 'expo-location';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';

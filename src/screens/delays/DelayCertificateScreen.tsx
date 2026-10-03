@@ -13,7 +13,8 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSemanticTokens } from '@/services/theme';
-import { Alert, FlatList, RefreshControl, SafeAreaView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, RefreshControl, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { BadgeCheck, Download, FileText, History } from 'lucide-react-native';
 
 import { useAuth } from '@/services/auth/AuthContext';

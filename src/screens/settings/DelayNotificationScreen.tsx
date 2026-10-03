@@ -14,7 +14,8 @@
 
 import React, { useMemo, useState } from 'react';
 import { useSemanticTokens } from '@/services/theme';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, Switch, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Switch, TouchableOpacity, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { AlertTriangle, ArrowRightLeft, Building2, Check, Megaphone, Train, Users, XCircle, Zap, type LucideIcon } from 'lucide-react-native';

@@ -10,7 +10,8 @@
 
 import React, { useCallback, useMemo, useState } from 'react';
 import { useSemanticTokens } from '@/services/theme';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Eye, EyeOff, Lock, User } from 'lucide-react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 

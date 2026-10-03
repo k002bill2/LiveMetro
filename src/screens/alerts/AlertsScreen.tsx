@@ -5,7 +5,8 @@
 
 import React, { useCallback, useMemo, useState } from 'react';
 import { useSemanticTokens } from '@/services/theme';
-import { View, Text, StyleSheet, SafeAreaView, FlatList, type ListRenderItem, RefreshControl, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, type ListRenderItem, RefreshControl, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { AlertCircle, AlertTriangle, BarChart3, Bell, Clock, Plus, Star, TrainFront, Trash2, X } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { useAlerts } from '../../hooks/useAlerts';
