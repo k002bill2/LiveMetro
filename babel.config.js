@@ -19,7 +19,8 @@ module.exports = function (api) {
           },
         },
       ],
-      'react-native-reanimated/plugin',
+      // Reanimated 4 / react-native-worklets plugin is added by babel-preset-expo
+      // (SDK 54+) when the package is installed — listing it here ran it twice.
     ],
     env: {
       // jest(NODE_ENV=test) 전용: 소셜 로그인 서비스의 OTA-안전 dynamic

@@ -6,7 +6,6 @@
     "runtimeVersion": {
       "policy": "appVersion"
     },
-    "newArchEnabled": false,
     "updates": {
       "url": "https://u.expo.dev/5a336447-64fc-48bd-a025-f2be8b0c7176",
       "fallbackToCacheTimeout": 0
@@ -123,7 +122,10 @@
       "expo-updates",
       "expo-apple-authentication",
       "@react-native-google-signin/google-signin",
-      "./plugins/withSeoulApiCleartext"
+      "./plugins/withSeoulApiCleartext",
+      "@react-native-community/datetimepicker",
+      "expo-font",
+      "expo-secure-store"
     ],
     "extra": {
       "eas": {

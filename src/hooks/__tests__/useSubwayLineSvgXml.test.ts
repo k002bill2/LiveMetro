@@ -1,6 +1,6 @@
 import { renderHook, waitFor } from '@testing-library/react-native';
 import { Platform } from 'react-native';
-import { readAsStringAsync } from 'expo-file-system';
+import { readAsStringAsync } from 'expo-file-system/legacy';
 import { useSubwayLineSvgXml } from '@hooks/useSubwayLineSvgXml';
 
 // Inline mock definitions (BANNED: external jest.fn referenced inside factory).
@@ -15,7 +15,7 @@ jest.mock('expo-asset', () => ({
   },
 }));
 
-jest.mock('expo-file-system', () => ({
+jest.mock('expo-file-system/legacy', () => ({
   __esModule: true,
   readAsStringAsync: jest.fn().mockResolvedValue('<svg>SUBWAY_MAP</svg>'),
 }));

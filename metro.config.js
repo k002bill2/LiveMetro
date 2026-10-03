@@ -1,6 +1,5 @@
 // Learn more: https://docs.expo.dev/guides/customizing-metro/
 const { getDefaultConfig } = require('expo/metro-config');
-const exclusionList = require('metro-config/src/defaults/exclusionList');
 
 const config = getDefaultConfig(__dirname);
 
@@ -9,7 +8,13 @@ const config = getDefaultConfig(__dirname);
 // duplicate package.json ("livemetro-app" / "livemetro-functions") otherwise
 // collide in Metro's Haste map: "Error: Duplicated files or mocks".
 // Metro does NOT honor .gitignore, so these copies must be excluded explicitly.
-config.resolver.blockList = exclusionList([/[\/\\]\.claude[\/\\].*/]);
+// Appended to Expo's defaults (which already exclude __tests__) instead of
+// metro-config/src/defaults/exclusionList — Metro 0.83 (SDK 54) no longer
+// exports that internal path, so requiring it crashed config loading.
+config.resolver.blockList = [
+  ...[].concat(config.resolver.blockList ?? []),
+  /[\/\\]\.claude[\/\\].*/,
+];
 
 // Workaround (SDK 53+ enables package.json "exports" by default): Firebase JS
 // SDK 10 then bundles @firebase/app twice — @firebase/auth's RN build does

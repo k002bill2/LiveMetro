@@ -16,7 +16,7 @@ jest.mock('expo-sharing', () => ({
   shareAsync: jest.fn().mockResolvedValue(undefined),
 }), { virtual: true });
 
-jest.mock('expo-file-system', () => ({
+jest.mock('expo-file-system/legacy', () => ({
   documentDirectory: '/documents/',
   moveAsync: jest.fn().mockResolvedValue(undefined),
 }), { virtual: true });

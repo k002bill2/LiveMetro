@@ -98,7 +98,7 @@ function loadFileSystemModule(): FileSystemModule | null {
 
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    FileSystem = require('expo-file-system') as FileSystemModule;
+    FileSystem = require('expo-file-system/legacy') as FileSystemModule;
     return FileSystem;
   } catch {
     return null;
