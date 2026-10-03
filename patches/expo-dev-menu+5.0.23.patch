@@ -1,8 +1,8 @@
 diff --git a/node_modules/expo-dev-menu/ios/DevMenuViewController.swift b/node_modules/expo-dev-menu/ios/DevMenuViewController.swift
-index c5e7494..6424bf0 100644
+index 5d58874..78d2171 100644
 --- a/node_modules/expo-dev-menu/ios/DevMenuViewController.swift
 +++ b/node_modules/expo-dev-menu/ios/DevMenuViewController.swift
-@@ -61,7 +61,11 @@ class DevMenuViewController: UIViewController {
+@@ -63,7 +63,11 @@ class DevMenuViewController: UIViewController {
    // MARK: private
  
    private func initialProps() -> [String: Any] {
@@ -12,6 +12,6 @@ index c5e7494..6424bf0 100644
 +    #else
 +    let isSimulator = false
 +    #endif
-     
+ 
      return [
        "showOnboardingView": manager.shouldShowOnboarding(),

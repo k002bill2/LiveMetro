@@ -124,17 +124,6 @@
       "@react-native-google-signin/google-signin",
       "./plugins/withSeoulApiCleartext"
     ],
-    "hooks": {
-      "postPublish": [
-        {
-          "file": "sentry-expo/upload-sourcemaps",
-          "config": {
-            "organization": "livemetro",
-            "project": "livemetro-app"
-          }
-        }
-      ]
-    },
     "extra": {
       "eas": {
         "projectId": "5a336447-64fc-48bd-a025-f2be8b0c7176"
