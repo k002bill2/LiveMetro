@@ -6,7 +6,9 @@
  */
 
 import React from 'react';
-import { Text, TouchableOpacity, StyleSheet, SafeAreaView } from 'react-native';
+import { Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { weightToFontFamily } from '@/styles/modernTheme';
 import { useNavigation, useRoute } from '@react-navigation/native';
 
 import { ReportFeedbackScreen } from './ReportFeedbackScreen';
@@ -38,7 +40,7 @@ const styles = StyleSheet.create({
   fallback: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 16 },
   fallbackText: { fontSize: 16, color: '#444' },
   fallbackButton: { paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, backgroundColor: '#2563EB' },
-  fallbackButtonText: { color: '#FFFFFF', fontWeight: '600' },
+  fallbackButtonText: { color: '#FFFFFF', fontWeight: '600', fontFamily: weightToFontFamily('600') },
 });
 
 export default ReportFeedbackScreenAdapter;

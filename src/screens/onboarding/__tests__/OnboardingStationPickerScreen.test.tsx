@@ -16,7 +16,6 @@ import { render, fireEvent } from '@testing-library/react-native';
 import { OnboardingStationPickerScreen } from '../OnboardingStationPickerScreen';
 
 // React Native Animated noise
-jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
 
 // Lucide icons — Proxy stubs every imported name to a string component
 jest.mock('lucide-react-native', () => {

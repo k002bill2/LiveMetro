@@ -15,7 +15,8 @@ import React, {
   useEffect,
 } from 'react';
 import { useSemanticTokens } from '@/services/theme';
-import { View, Text, TouchableOpacity, StyleSheet, SafeAreaView, ScrollView, Alert, ActivityIndicator, Switch } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, Alert, ActivityIndicator, Switch } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ArrowRight, BellRing, Clock, MapPin, PlusCircle, Route as RouteIcon, Sparkles, TrainFront } from 'lucide-react-native';
 import { Pill } from '@/components/design/Pill';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -796,7 +797,7 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
   );
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView edges={['left', 'right']} style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={WANTED_TOKENS.blue[500]} />
           <Text style={styles.loadingText}>출퇴근 설정을 불러오는 중...</Text>
@@ -806,7 +807,7 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['left', 'right']} style={styles.container}>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Hero ETA gradient card — ETA = ML baseline ?? shared graph-search ride
             (useCommuteRouteSummary, parity with Home/WeeklyPrediction) ?? placeholder */}

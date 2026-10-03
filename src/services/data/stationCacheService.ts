@@ -222,6 +222,7 @@ class StationCacheService {
   async refreshFromBundle(): Promise<void> {
     try {
       // Import bundled data (static import at top level ensures it's always available)
+      // eslint-disable-next-line @typescript-eslint/no-require-imports -- loaded only on refresh, not at module init
       const { STATIONS, LINE_COLORS, LINE_STATIONS } = require('@utils/subwayMapData');
 
       await Promise.all([

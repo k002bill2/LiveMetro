@@ -33,6 +33,9 @@ declare global {
 (global as any).self = global;
 
 // Mock React Native modules
+// Reanimated 4.2+ (SDK 55) mock requires react-native-worklets; without its
+// mock the worklets native part "isn't initialized" and the suite fails to load.
+jest.mock('react-native-worklets', () => require('react-native-worklets/src/mock'));
 jest.mock('react-native-reanimated', () => {
   const Reanimated = require('react-native-reanimated/mock');
   Reanimated.default.call = () => {};
@@ -67,6 +70,16 @@ jest.mock('expo-location', () => ({
 }));
 
 jest.mock('expo-notifications', () => ({
+  // Mirrors expo-notifications' real SchedulableTriggerInputTypes (SDK 52+ triggers need `type`).
+  SchedulableTriggerInputTypes: {
+    CALENDAR: 'calendar',
+    DAILY: 'daily',
+    WEEKLY: 'weekly',
+    MONTHLY: 'monthly',
+    YEARLY: 'yearly',
+    DATE: 'date',
+    TIME_INTERVAL: 'timeInterval',
+  },
   requestPermissionsAsync: jest.fn(() => 
     Promise.resolve({ status: 'granted' })
   ),

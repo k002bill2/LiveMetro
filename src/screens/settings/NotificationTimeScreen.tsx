@@ -29,11 +29,11 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { Calendar, Moon } from 'lucide-react-native';
 
@@ -331,7 +331,7 @@ export const NotificationTimeScreen: React.FC<Props> = ({ navigation }) => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['left', 'right']} style={styles.container}>
       <ScrollView style={styles.content} contentContainerStyle={styles.contentInner}>
         <NotificationTimeline
           morningTime={morningTime}

@@ -10,7 +10,8 @@
 
 import React, { useCallback, useState, useMemo } from 'react';
 import { useSemanticTokens } from '@/services/theme';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Minus, ChevronRight, AlertCircle, ArrowLeft, RefreshCw, ArrowUp, ArrowDown, Flag } from 'lucide-react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';

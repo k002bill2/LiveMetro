@@ -10,7 +10,6 @@ import { useAuth } from '@/services/auth/AuthContext';
 import { commuteLogService } from '@/services/pattern';
 import { statisticsService } from '@/services/statistics/statisticsService';
 
-jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
 jest.mock('react-native-safe-area-context', () => {
   return {
     SafeAreaView: ({ children }: { children: unknown }) => children,

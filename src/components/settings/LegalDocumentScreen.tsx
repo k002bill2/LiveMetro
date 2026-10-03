@@ -14,7 +14,8 @@
 
 import React, { useCallback, useMemo, useRef } from 'react';
 import { useSemanticTokens } from '@/services/theme';
-import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View, type LayoutChangeEvent } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View, type LayoutChangeEvent } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronRight, FileText } from 'lucide-react-native';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 
@@ -63,7 +64,7 @@ export const LegalDocumentScreen: React.FC<LegalDocumentScreenProps> = ({
   }, []);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['left', 'right']} style={styles.container}>
       <ScrollView
         ref={scrollRef}
         style={styles.scrollView}

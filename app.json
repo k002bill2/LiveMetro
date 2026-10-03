@@ -2,7 +2,7 @@
   "expo": {
     "name": "LiveMetro",
     "slug": "livemetro-subway-app",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "runtimeVersion": {
       "policy": "appVersion"
     },
@@ -115,26 +115,19 @@
             "useFrameworks": "static"
           },
           "android": {
-            "minSdkVersion": 23
+            "minSdkVersion": 24
           }
         }
       ],
       "expo-updates",
       "expo-apple-authentication",
       "@react-native-google-signin/google-signin",
-      "./plugins/withSeoulApiCleartext"
+      "./plugins/withSeoulApiCleartext",
+      "@react-native-community/datetimepicker",
+      "expo-font",
+      "expo-secure-store",
+      "expo-sharing"
     ],
-    "hooks": {
-      "postPublish": [
-        {
-          "file": "sentry-expo/upload-sourcemaps",
-          "config": {
-            "organization": "livemetro",
-            "project": "livemetro-app"
-          }
-        }
-      ]
-    },
     "extra": {
       "eas": {
         "projectId": "5a336447-64fc-48bd-a025-f2be8b0c7176"
@@ -145,7 +138,6 @@
       "supportUrl": "https://livemetro.app/support",
       "websiteUrl": "https://livemetro.app"
     },
-    "privacy": "public",
     "scheme": "livemetro",
     "platforms": [
       "ios",

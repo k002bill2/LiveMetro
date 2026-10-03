@@ -9,7 +9,8 @@
 
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSemanticTokens } from '@/services/theme';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronLeft, MoreHorizontal, MessageSquare, MapPin } from 'lucide-react-native';
 
 import { delayReportService } from '@/services/delay/delayReportService';

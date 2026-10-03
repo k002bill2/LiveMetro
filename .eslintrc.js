@@ -33,9 +33,15 @@ module.exports = {
       rules: { 'no-console': 'off' }
     },
     {
-      // Test wrappers/mocks are anonymous by convention; console is stubbed in tests
+      // Test wrappers/mocks are anonymous by convention; console is stubbed in tests.
+      // require() inside jest.mock factories / isolateModules is the jest idiom
+      // (no-require-imports arrived with eslint-config-expo 9 / typescript-eslint 8).
       files: ['**/__tests__/**', '**/*.test.ts', '**/*.test.tsx'],
-      rules: { 'no-console': 'off', 'react/display-name': 'off' }
+      rules: {
+        'no-console': 'off',
+        'react/display-name': 'off',
+        '@typescript-eslint/no-require-imports': 'off'
+      }
     }
   ]
 };

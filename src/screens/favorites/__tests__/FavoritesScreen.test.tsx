@@ -9,7 +9,6 @@ import { Alert } from 'react-native';
 import { FavoritesScreen } from '../FavoritesScreen';
 import { useFavorites } from '@/hooks/useFavorites';
 
-jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
 jest.mock('@react-navigation/native', () => {
   const actualNav = jest.requireActual('@react-navigation/native');
   return {

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { Asset } from 'expo-asset';
-import { readAsStringAsync } from 'expo-file-system';
+import { readAsStringAsync } from 'expo-file-system/legacy';
 
 /**
  * Loads a bundled SVG asset as raw XML text for native rendering via <SvgXml>.

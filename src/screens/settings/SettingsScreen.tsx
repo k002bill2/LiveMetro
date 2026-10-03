@@ -11,12 +11,12 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   Alert,
   Switch,
   Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import {
   ChevronRight,
   TrainFront,
@@ -533,7 +533,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['top']} style={styles.container}>
       <ScrollView style={styles.content} testID="settings-screen">
         {/* User Profile Section — Phase 42 (SE1): gradient avatar + 이니셜
             + 누적 횟수. 카드 전체 onPress가 EditProfile로 이동하므로

@@ -3,7 +3,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { mapCacheService, CachedMapData } from '../mapCacheService';
 
 // Mock dependencies
@@ -13,7 +13,7 @@ jest.mock('@react-native-async-storage/async-storage', () => ({
   multiRemove: jest.fn(),
 }));
 
-jest.mock('expo-file-system', () => ({
+jest.mock('expo-file-system/legacy', () => ({
   cacheDirectory: '/mock/cache/',
   getInfoAsync: jest.fn(),
   makeDirectoryAsync: jest.fn(),

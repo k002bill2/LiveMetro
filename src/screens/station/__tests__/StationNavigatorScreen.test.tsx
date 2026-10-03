@@ -9,7 +9,6 @@ import { render } from '@testing-library/react-native';
 import { StationNavigatorScreen } from '../StationNavigatorScreen';
 import { useStationNavigation } from '@/hooks/useStationNavigation';
 
-jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
 jest.mock('lucide-react-native', () => ({
   Minus: 'Minus',
   ChevronRight: 'ChevronRight',

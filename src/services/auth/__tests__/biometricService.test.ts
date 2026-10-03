@@ -267,19 +267,7 @@ describe('BiometricService', () => {
 
       expect(result.success).toBe(false);
       expect(result.error).toContain('잠겼습니다');
-    });
-
-    it('should handle permanent lockout', async () => {
-      mockLocalAuthentication.supportedAuthenticationTypesAsync.mockResolvedValue([2]);
-      mockLocalAuthentication.authenticateAsync.mockResolvedValue({
-        success: false,
-        error: 'lockout_permanent',
-      });
-
-      const result = await biometricService.authenticateWithBiometric();
-
-      expect(result.success).toBe(false);
-      expect(result.error).toContain('영구 잠금');
+      expect(result.error).toContain('기기 비밀번호');
     });
 
     it('should handle unknown error', async () => {

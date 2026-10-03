@@ -134,9 +134,12 @@ export const authenticateWithBiometric = async (
     } else if (result.error === 'user_fallback') {
       return { success: false, error: 'fallback' };
     } else if (result.error === 'lockout') {
-      return { success: false, error: '너무 많은 시도로 잠겼습니다. 잠시 후 다시 시도하세요.' };
-    } else if (result.error === 'lockout_permanent') {
-      return { success: false, error: '영구 잠금. 기기 비밀번호로 해제하세요.' };
+      // expo-local-authentication 16 reports temporary and permanent lockout
+      // both as 'lockout' (Android ERROR_LOCKOUT_PERMANENT included).
+      return {
+        success: false,
+        error: '너무 많은 시도로 잠겼습니다. 잠시 후 다시 시도하거나 기기 비밀번호로 해제하세요.',
+      };
     }
 
     return { success: false, error: '인증에 실패했습니다.' };

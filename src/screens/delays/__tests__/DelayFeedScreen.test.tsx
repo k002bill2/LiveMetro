@@ -11,7 +11,6 @@ import { DelayFeedScreen } from '../DelayFeedScreen';
 import { delayReportService } from '@/services/delay/delayReportService';
 import { getSubwayLineColor } from '@/utils/colorUtils';
 
-jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
 jest.mock('lucide-react-native', () => ({
   MessageSquare: 'MessageSquare',
   MessageCircle: 'MessageCircle',

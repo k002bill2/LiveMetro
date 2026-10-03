@@ -14,7 +14,8 @@
 
 import React, { useMemo, useState } from 'react';
 import { useSemanticTokens } from '@/services/theme';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, Switch, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Switch, TouchableOpacity, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { AlertTriangle, ArrowRightLeft, Building2, Check, Megaphone, Train, Users, XCircle, Zap, type LucideIcon } from 'lucide-react-native';
@@ -64,7 +65,7 @@ const snapToThresholdStep = (value: number): number =>
 // wanted-tokens.css --red-500 — WANTED_TOKENS에 red 스케일이 없어 로컬 상수.
 const RED_500 = '#FF4242';
 // 시안 hero: linear-gradient(135deg, #0066FF 0%, #2C7BFF 100%)
-const HERO_GRADIENT_COLORS = ['#0066FF', '#2C7BFF'];
+const HERO_GRADIENT_COLORS = ['#0066FF', '#2C7BFF'] as const;
 
 interface AlertSourceRowSpec {
   readonly key: keyof AlertSourcePreferences;
@@ -290,7 +291,7 @@ export const DelayNotificationScreen: React.FC = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['left', 'right']} style={styles.container}>
       <ScrollView style={styles.content}>
         {/* Master hero (handoff 405-429) */}
         {enabled ? (

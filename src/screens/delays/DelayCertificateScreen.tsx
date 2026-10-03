@@ -13,7 +13,8 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSemanticTokens } from '@/services/theme';
-import { Alert, FlatList, RefreshControl, SafeAreaView, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, RefreshControl, Share, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { BadgeCheck, Download, FileText, History } from 'lucide-react-native';
 
 import { useAuth } from '@/services/auth/AuthContext';
@@ -461,7 +462,7 @@ export const DelayCertificateScreen: React.FC = () => {
   // --------------------------------------------------------------------
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
       {/* 제목은 네이티브 헤더(RootNavigator)가 담당 — 화면 내 중복 헤더 없음 */}
       {loading && history.length === 0 && certificates.length === 0 ? (
         /* 로딩 스켈레톤 — 빈 화면 금지 */

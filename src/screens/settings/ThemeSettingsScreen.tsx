@@ -14,9 +14,9 @@ import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Aperture, Contrast, MoonStar, Type } from 'lucide-react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
@@ -115,7 +115,7 @@ export const ThemeSettingsScreen: React.FC<Props> = () => {
   const currentAccent = getAccentColorOption(accentColorId);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['left', 'right']} style={styles.container}>
       <ScrollView style={styles.content}>
         {/* 모드 — 미니 앱 미리보기 3장 그리드 (카드 밖, 페이지 배경 위) */}
         <View style={styles.modeSection}>

@@ -7,7 +7,8 @@
 
 import React, { useCallback, useMemo, useState } from 'react';
 import { useSemanticTokens } from '@/services/theme';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, TextInput, Switch, Platform, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Switch, Platform, Alert, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Star, X, Send, Info } from 'lucide-react-native';
 
 import { useAuth } from '@/services/auth/AuthContext';
@@ -90,7 +91,7 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({ onClose, onSubmi
   }, [canSubmit, rating, category, tags, description, includeDiagnostics, user, onSubmitSuccess]);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['top']} style={styles.container}>
       <View style={styles.header}>
         {onClose ? (
           <TouchableOpacity

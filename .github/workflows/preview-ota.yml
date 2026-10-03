@@ -150,6 +150,7 @@ jobs:
       - name: Export JS bundles (Metro)
         run: npx expo export --platform ios --platform android --output-dir dist --dump-assetmap
 
+      # SDK 55 부터 eas update 는 --environment 필수 — EAS 환경 이름이 채널과 같다(preview/production).
       # 2단계 발행 2/2. 커밋 메시지는 여러 줄일 수 있으므로 env로 넘겨 셸에서 인용하고,
       # 첫 줄만 잘라 --message에 싣는다. workflow_dispatch에서는 head_commit이 없어 빈 값이다.
       - name: Publish EAS Update
@@ -160,6 +161,7 @@ jobs:
           summary="$(printf '%s' "${COMMIT_MESSAGE:-manual dispatch}" | head -n 1 | cut -c 1-180)"
           eas update \
             --channel "$CHANNEL" \
+            --environment "$CHANNEL" \
             --skip-bundler \
             --message "$summary (${GITHUB_SHA:0:7})" \
             --non-interactive

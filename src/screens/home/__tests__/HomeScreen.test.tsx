@@ -22,7 +22,6 @@ import type { GuidanceSession } from '@/models/guidance';
 // Mocks
 // ============================================================================
 
-jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
 
 const mockNavigate = jest.fn();
 jest.mock('@react-navigation/native', () => ({

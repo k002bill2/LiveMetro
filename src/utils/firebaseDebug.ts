@@ -198,6 +198,7 @@ export const printFirebaseDebugInfo = (debugInfo: FirebaseDebugInfo): void => {
 export const testFirebaseConnection = (): boolean => {
   try {
     // Simple test - try to get auth instance
+    // eslint-disable-next-line @typescript-eslint/no-require-imports -- debug helper must not pull Firebase in at import time
     const { auth } = require('../services/firebase/config');
 
     if (!auth) {

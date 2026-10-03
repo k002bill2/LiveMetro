@@ -5,7 +5,8 @@
 
 import React, { useCallback, useMemo, useState } from 'react';
 import { useSemanticTokens } from '@/services/theme';
-import { View, Text, StyleSheet, SafeAreaView, FlatList, type ListRenderItem, RefreshControl, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, FlatList, type ListRenderItem, RefreshControl, TouchableOpacity, Alert, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { AlertCircle, AlertTriangle, BarChart3, Bell, Clock, Plus, Star, TrainFront, Trash2, X } from 'lucide-react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { useAlerts } from '../../hooks/useAlerts';
@@ -358,7 +359,7 @@ export const AlertsScreen: React.FC = () => {
 
   if (loading && notifications.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={semantic.labelStrong} />
           <Text style={styles.loadingText}>알림 로딩중</Text>
@@ -369,7 +370,7 @@ export const AlertsScreen: React.FC = () => {
 
   if (error && notifications.length === 0) {
     return (
-      <SafeAreaView style={styles.container}>
+      <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
         <View style={styles.errorContainer}>
           <AlertCircle size={48} color={semantic.labelAlt} />
           <Text style={styles.errorTitle}>{error}</Text>
@@ -382,7 +383,7 @@ export const AlertsScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['left', 'right', 'bottom']} style={styles.container}>
       {/* Header — Phase 4 redesign: 28px Korean title, no English subtitle */}
       <View style={styles.header}>
         <View style={styles.headerTitleWrap}>

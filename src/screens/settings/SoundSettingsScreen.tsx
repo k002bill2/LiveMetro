@@ -16,7 +16,8 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSemanticTokens } from '@/services/theme';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import { AlertTriangle, BellOff, BellRing, Mail, Megaphone, Smartphone, Train, Vibrate, Volume2, type LucideIcon } from 'lucide-react-native';
 import { useAuth } from '@/services/auth/AuthContext';
@@ -212,7 +213,7 @@ export const SoundSettingsScreen: React.FC = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['left', 'right']} style={styles.container}>
       <ScrollView style={styles.content}>
         {/* 1) Alert Mode 2×2 grid — sound + vibration combo */}
         <SettingSection title="알림 방식">

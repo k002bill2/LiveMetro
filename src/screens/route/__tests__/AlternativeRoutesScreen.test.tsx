@@ -9,7 +9,6 @@ import { render } from '@testing-library/react-native';
 import { AlternativeRoutesScreen } from '../AlternativeRoutesScreen';
 import { useAlternativeRoutes } from '@/hooks/useAlternativeRoutes';
 
-jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
 jest.mock('lucide-react-native', () => ({
   ArrowLeft: 'ArrowLeft',
   AlertTriangle: 'AlertTriangle',

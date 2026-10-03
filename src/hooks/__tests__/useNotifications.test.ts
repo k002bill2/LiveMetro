@@ -125,6 +125,11 @@ describe('useNotifications', () => {
       const created = setIntervalSpy.mock.calls.filter((c) => c[1] === 60000).length;
       const cleared = clearIntervalSpy.mock.calls.length;
       const live = created - cleared;
+      // Restore before afterEach's useRealTimers(): uninstalling fake timers
+      // with these spies still attached deletes global set/clearInterval, and
+      // React 19 then rethrows the next unmount's ReferenceError in a later act.
+      setIntervalSpy.mockRestore();
+      clearIntervalSpy.mockRestore();
 
       // Bug: 2 created, 0 cleared → 2 live (one orphan, unkillable). Fix: 2 created,
       // 1 cleared → 1 live. (A received value of 0 would mean the setup is broken,

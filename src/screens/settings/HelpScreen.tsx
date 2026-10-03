@@ -12,7 +12,8 @@
 
 import React, { useState, useMemo, useCallback } from 'react';
 import { useSemanticTokens } from '@/services/theme';
-import { View, Text, StyleSheet, SafeAreaView, ScrollView, TouchableOpacity, TextInput, Linking, Alert, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Linking, Alert, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronDown, ChevronRight, ChevronUp, Mail, MessageSquare, Phone, Search, ShieldCheck, XCircle, type LucideIcon } from 'lucide-react-native';
 import { useNavigation, type NavigationProp } from '@react-navigation/native';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
@@ -126,7 +127,7 @@ export const HelpScreen: React.FC = () => {
   }, [navigation]);
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView edges={['left', 'right']} style={styles.container}>
       {/* 검색 바 — 디자인 763-780행 */}
       <View style={styles.searchContainer}>
         <View style={styles.searchCard}>
