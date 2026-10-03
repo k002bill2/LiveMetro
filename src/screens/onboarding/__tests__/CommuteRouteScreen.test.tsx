@@ -12,7 +12,6 @@ import { CommuteRouteScreen } from '../CommuteRouteScreen';
 import { saveCommuteRoutes } from '@/services/commute/commuteService';
 import { calculateRoute } from '@/services/route';
 
-jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
 jest.mock('lucide-react-native', () => ({
   ArrowRight: 'ArrowRight',
   Building2: 'Building2',

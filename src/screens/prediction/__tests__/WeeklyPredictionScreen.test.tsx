@@ -20,7 +20,6 @@ import { selectCommuteRoute } from '@services/route/selectCommuteRoute';
 import { trainService } from '@/services/train/trainService';
 import { useAuth } from '@/services/auth/AuthContext';
 
-jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
 
 // Auto-map every lucide icon to its name so redesign icon swaps don't break
 // the test (Phase 7 imports differ from earlier revisions).

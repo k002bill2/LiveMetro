@@ -11,7 +11,6 @@ import { AlertsScreen } from '../AlertsScreen';
 import { useAlerts } from '@/hooks/useAlerts';
 
 // Mock modules BEFORE imports (Jest hoisting)
-jest.mock('react-native/Libraries/Animated/NativeAnimatedHelper');
 
 jest.mock('@react-navigation/native', () => ({
   useNavigation: jest.fn(() => ({
