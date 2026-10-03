@@ -28,7 +28,7 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
-import { FirebaseRecaptchaVerifierModal } from 'expo-firebase-recaptcha';
+import { RecaptchaVerifierHandle, RecaptchaVerifierModal } from '@/components/auth/recaptcha/RecaptchaVerifierModal';
 import { ArrowRight, Calendar, ShieldCheck, Smartphone, User } from 'lucide-react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
@@ -100,7 +100,7 @@ export const SignupStep1Screen: React.FC = () => {
   const [otpDigits, setOtpDigits] = useState<string[]>(() => Array(OTP_LENGTH).fill(''));
   const [secondsLeft, setSecondsLeft] = useState(OTP_TIMEOUT_SECONDS);
   const otpRefs = useRef<(TextInput | null)[]>(Array(OTP_LENGTH).fill(null));
-  const recaptchaRef = useRef<FirebaseRecaptchaVerifierModal>(null);
+  const recaptchaRef = useRef<RecaptchaVerifierHandle>(null);
 
   const shouldReduceMotion = useShouldReduceMotion();
   const cursorOpacity = useRef(new Animated.Value(1)).current;
@@ -558,10 +558,10 @@ export const SignupStep1Screen: React.FC = () => {
           )}
         </ScrollView>
       </KeyboardAvoidingView>
-      <FirebaseRecaptchaVerifierModal
+      <RecaptchaVerifierModal
         ref={recaptchaRef}
         firebaseConfig={firebaseConfig}
-        attemptInvisibleVerification
+        languageCode="ko"
         title="reCAPTCHA 본인 확인"
         cancelLabel="취소"
       />

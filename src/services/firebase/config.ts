@@ -28,7 +28,7 @@ interface FirebaseConfig {
 
 // Environment variables with fallbacks for development.
 // Exported so that components needing the raw config (e.g. the
-// FirebaseRecaptchaVerifierModal in expo-firebase-recaptcha) can pass it
+// RecaptchaVerifierModal in @/components/auth/recaptcha) can pass it
 // in directly. Do not mutate.
 export const firebaseConfig: FirebaseConfig = {
   apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || 'development-key',
