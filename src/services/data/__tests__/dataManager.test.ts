@@ -7,6 +7,7 @@ import { dataManager } from '../dataManager';
 import { seoulSubwayApi } from '../../api/seoulSubwayApi';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Train, TrainStatus } from '../../../models/train';
+import { arrivalService } from '@/services/arrival/arrivalService';
 
 // Use mocks from setup.ts
 jest.mock('../../firebase/config');
@@ -46,6 +47,15 @@ describe('DataManager', () => {
     jest.clearAllMocks();
     // Clear AsyncStorage cache
     await AsyncStorage.clear();
+  });
+
+  // subscribeToRealtimeUpdates 는 실제 arrivalService 싱글톤에 위임하는데,
+  // dataManager.unsubscribeAll()/destroy() 는 그 구독을 해제하지 않는다.
+  // 정리하지 않으면 30초 폴링 interval(unref)이 이 파일 종료 후에도 같은 워커에서 발사돼
+  // 늦은 console.error("Failed to read cache") → "Cannot log after tests are done" →
+  // 전 테스트 통과인데 jest exit 1 (CI 간헐 실패, 2026-10-03).
+  afterEach(() => {
+    arrivalService.destroy();
   });
 
   describe('3-Tier Data Architecture', () => {
