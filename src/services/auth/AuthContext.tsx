@@ -288,6 +288,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       unsubscribe();
       detachUserDocListener();
     };
+    // Subscribe once per mount: createOrGetUserDocument is recreated every render,
+    // so listing it would tear down and re-attach the auth listener each render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detachUserDocListener]);
 
   const handleSignInAnonymously = useCallback(async (): Promise<void> => {

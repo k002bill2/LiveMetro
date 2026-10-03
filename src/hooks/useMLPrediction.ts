@@ -208,14 +208,18 @@ export function useMLPrediction(route?: MLPredictionRouteContext): UseMLPredicti
   // 30분 internal cache + AsyncStorage 영속 캐시를 사용하므로 위치 변경 시
   // 호출해도 실제 네트워크 요청은 드물다. mount 시 한 번 initialize()로
   // 캐시 복원 후 location 기반으로 fetch.
+  // 좌표 원시값만 의존 — location 객체 identity 변경으로는 재요청하지 않는다.
+  const latitude = location?.latitude;
+  const longitude = location?.longitude;
   useEffect(() => {
     let cancelled = false;
     const fetchWeather = async (): Promise<void> => {
       try {
         await weatherService.initialize();
-        const coords = location
-          ? { latitude: location.latitude, longitude: location.longitude }
-          : undefined;
+        const coords =
+          latitude !== undefined && longitude !== undefined
+            ? { latitude, longitude }
+            : undefined;
         const data = await weatherService.getCurrentWeather(coords);
         if (!cancelled) {
           setCurrentWeather(data?.condition ?? null);
@@ -230,7 +234,7 @@ export function useMLPrediction(route?: MLPredictionRouteContext): UseMLPredicti
     return () => {
       cancelled = true;
     };
-  }, [location?.latitude, location?.longitude]);
+  }, [latitude, longitude]);
 
   // Refresh prediction
   const refreshPrediction = useCallback(

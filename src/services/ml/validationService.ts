@@ -153,13 +153,11 @@ class ValidationService {
     let truePositives = 0;
     let falsePositives = 0;
     let falseNegatives = 0;
-    let trueNegatives = 0;
 
     for (const v of validations) {
       if (v.delayPredicted && v.actualDelay) truePositives++;
       else if (v.delayPredicted && !v.actualDelay) falsePositives++;
       else if (!v.delayPredicted && v.actualDelay) falseNegatives++;
-      else trueNegatives++;
     }
 
     const delayPrecision =

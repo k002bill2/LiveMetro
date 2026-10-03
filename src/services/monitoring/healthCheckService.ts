@@ -362,7 +362,7 @@ class HealthCheckService {
         message,
         lastCheck: new Date().toISOString(),
       };
-    } catch (error) {
+    } catch {
       return {
         status: 'degraded',
         message: 'Memory check unavailable',
@@ -393,7 +393,7 @@ class HealthCheckService {
         message: 'Battery level normal',
         lastCheck: new Date().toISOString(),
       };
-    } catch (error) {
+    } catch {
       return {
         status: 'degraded',
         message: 'Battery check unavailable',
@@ -450,13 +450,9 @@ class HealthCheckService {
   }
 
   private async calculateDataFreshness(): Promise<number> {
-    try {
-      // Check how old the cached data is
-      // This would check the timestamp of cached train data
-      return 30000; // Placeholder: 30 seconds
-    } catch {
-      return 0;
-    }
+    // Check how old the cached data is
+    // This would check the timestamp of cached train data
+    return 30000; // Placeholder: 30 seconds
   }
 
   private getCurrentMemoryUsage(): number | undefined {

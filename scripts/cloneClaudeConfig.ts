@@ -85,7 +85,7 @@ function checkCompatibility(
           suggestion: 'firebase-integration skill may not be relevant',
         });
       }
-    } catch (error) {
+    } catch {
       issues.push({
         severity: 'warning',
         category: 'Package Analysis',

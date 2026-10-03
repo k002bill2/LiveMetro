@@ -336,7 +336,7 @@ export const useLocation = (options: UseLocationOptions = {}) => {
         handleError('위치 서비스가 비활성화되어 있습니다. 설정에서 위치 서비스를 활성화해주세요.');
       }
       return isEnabled;
-    } catch (error) {
+    } catch {
       handleError('위치 서비스 상태를 확인할 수 없습니다.');
       return false;
     }

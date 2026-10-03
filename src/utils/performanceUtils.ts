@@ -171,7 +171,7 @@ export const withPerformanceMonitoring = <P extends object>(
   Component: React.ComponentType<P>,
   componentName: string
 ): React.ComponentType<P> => {
-  return (props: P) => {
+  const Monitored = (props: P) => {
     const measureKey = `${componentName}_render`;
     
     React.useEffect(() => {
@@ -186,6 +186,8 @@ export const withPerformanceMonitoring = <P extends object>(
 
     return React.createElement(Component, props);
   };
+  Monitored.displayName = `withPerformanceMonitoring(${componentName})`;
+  return Monitored;
 };
 
 /**

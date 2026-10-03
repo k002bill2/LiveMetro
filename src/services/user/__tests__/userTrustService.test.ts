@@ -97,6 +97,19 @@ describe('UserTrustService', () => {
       const profile = await userTrustService.getProfile(userId);
       expect(profile.badges.some(b => b.id === 'first_report')).toBe(true);
     });
+
+    it('should add the first-report score bonus only on the first report', async () => {
+      const userId = 'firstReportBonusUser';
+      const initialScore = (await userTrustService.getProfile(userId)).trustScore;
+
+      await userTrustService.recordReportSubmission(userId);
+      const afterFirst = (await userTrustService.getProfile(userId)).trustScore;
+      expect(afterFirst).toBe(initialScore + 2);
+
+      await userTrustService.recordReportSubmission(userId);
+      const afterSecond = (await userTrustService.getProfile(userId)).trustScore;
+      expect(afterSecond).toBe(afterFirst);
+    });
   });
 
   describe('applyPenalty', () => {

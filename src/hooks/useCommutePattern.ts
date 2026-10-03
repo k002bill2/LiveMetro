@@ -219,7 +219,7 @@ export function useSmartNotifications(): UseSmartNotificationsReturn {
     try {
       await smartNotificationService.enable(user.id);
       setSettings((prev) => (prev ? { ...prev, enabled: true } : prev));
-    } catch (err) {
+    } catch {
       setError('알림 활성화에 실패했습니다');
     }
   }, [user]);
@@ -230,7 +230,7 @@ export function useSmartNotifications(): UseSmartNotificationsReturn {
     try {
       await smartNotificationService.disable(user.id);
       setSettings((prev) => (prev ? { ...prev, enabled: false } : prev));
-    } catch (err) {
+    } catch {
       setError('알림 비활성화에 실패했습니다');
     }
   }, [user]);
@@ -242,7 +242,7 @@ export function useSmartNotifications(): UseSmartNotificationsReturn {
       try {
         await smartNotificationService.updateSettings(user.id, newSettings);
         setSettings(newSettings);
-      } catch (err) {
+      } catch {
         setError('설정 저장에 실패했습니다');
       }
     },
@@ -256,7 +256,7 @@ export function useSmartNotifications(): UseSmartNotificationsReturn {
       try {
         await smartNotificationService.setCustomAlertTime(user.id, dayOfWeek, time);
         await refresh();
-      } catch (err) {
+      } catch {
         setError('알림 시간 설정에 실패했습니다');
       }
     },
@@ -357,7 +357,7 @@ export function useCommutePattern(): UseCommutePatternReturn {
         const log = await commuteLogService.logCommute(user.id, input);
         setRecentLogs((prev) => [log, ...prev]);
         return log;
-      } catch (err) {
+      } catch {
         setError('출퇴근 기록에 실패했습니다');
         return null;
       }
@@ -379,7 +379,7 @@ export function useCommutePattern(): UseCommutePatternReturn {
       ]);
       setTodayPrediction(prediction);
       setWeekPredictions(weekPreds);
-    } catch (err) {
+    } catch {
       setError('패턴 분석에 실패했습니다');
     }
   }, [user]);
@@ -391,7 +391,7 @@ export function useCommutePattern(): UseCommutePatternReturn {
       try {
         await smartNotificationService.updateSettings(user.id, settings);
         setNotificationSettings(settings);
-      } catch (err) {
+      } catch {
         setError('설정 저장에 실패했습니다');
       }
     },
@@ -404,7 +404,7 @@ export function useCommutePattern(): UseCommutePatternReturn {
     try {
       await smartNotificationService.enable(user.id);
       setNotificationSettings((prev) => (prev ? { ...prev, enabled: true } : prev));
-    } catch (err) {
+    } catch {
       setError('알림 활성화에 실패했습니다');
     }
   }, [user]);
@@ -415,7 +415,7 @@ export function useCommutePattern(): UseCommutePatternReturn {
     try {
       await smartNotificationService.disable(user.id);
       setNotificationSettings((prev) => (prev ? { ...prev, enabled: false } : prev));
-    } catch (err) {
+    } catch {
       setError('알림 비활성화에 실패했습니다');
     }
   }, [user]);
