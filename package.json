@@ -123,6 +123,7 @@
     "appium-xcuitest-driver": "^6.2.0",
     "babel-plugin-dynamic-import-node": "^2.3.3",
     "babel-plugin-module-resolver": "^5.0.2",
+    "dotenv": "^16.6.1",
     "eslint": "^8.50.0",
     "eslint-config-expo": "~55.0.1",
     "eslint-import-resolver-typescript": "^3.5.5",
