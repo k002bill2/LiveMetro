@@ -27,8 +27,6 @@ import { useSemanticTokens } from '@/services/theme';
 import { Alert, Linking, ScrollView, StyleSheet, Text, TouchableOpacity, View, ViewStyle, TextStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronRight, Eye, Mail } from 'lucide-react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as SecureStore from 'expo-secure-store';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
 
@@ -45,10 +43,6 @@ import { TermsFooter } from '@/components/auth/TermsFooter';
 import { AppStackParamList } from '@/navigation/types';
 import { useAppleAuthAvailability } from '@/hooks/useAppleAuthAvailability';
 import { isSocialAuthError, type SocialSignInResult } from '@/services/auth/social/types';
-
-const AUTO_LOGIN_ENABLED_KEY = '@livemetro_auto_login_enabled';
-const AUTO_LOGIN_EMAIL_KEY = 'livemetro_auto_login_email';
-const AUTO_LOGIN_PASSWORD_KEY = 'livemetro_auto_login_password';
 
 const TOS_URL = 'https://livemetro.app/terms';
 const PRIVACY_URL = 'https://livemetro.app/privacy';
@@ -76,7 +70,9 @@ export const AuthScreen: React.FC = () => {
   // blocks every other auth entry point to prevent concurrent sign-ins.
   const busy = loading || socialLoading !== null;
 
-  // Bootstrap: try silent auto-login + detect biometric type
+  // Bootstrap: detect biometric type. Staying signed in is handled by Firebase
+  // Auth persistence (this screen only mounts without a user); a stored
+  // plaintext password is no longer used for silent re-login.
   useEffect(() => {
     let cancelled = false;
     const bootstrap = async (): Promise<void> => {
@@ -89,19 +85,6 @@ export const AuthScreen: React.FC = () => {
             setBiometricVariant(typeName === 'Touch ID' ? 'touch' : 'face');
           }
         }
-        const autoLoginPref = await AsyncStorage.getItem(AUTO_LOGIN_ENABLED_KEY);
-        if (autoLoginPref === 'true') {
-          const savedEmail = await SecureStore.getItemAsync(AUTO_LOGIN_EMAIL_KEY);
-          const savedPassword = await SecureStore.getItemAsync(AUTO_LOGIN_PASSWORD_KEY);
-          if (savedEmail && savedPassword && !cancelled) {
-            try {
-              await signInWithEmail(savedEmail, savedPassword);
-              return;
-            } catch {
-              // Auto-login failed silently — fall through to UI
-            }
-          }
-        }
       } catch (err) {
         console.error('Auth bootstrap error:', err);
       } finally {
@@ -112,7 +95,7 @@ export const AuthScreen: React.FC = () => {
     return () => {
       cancelled = true;
     };
-  }, [signInWithEmail]);
+  }, []);
 
   const handleBiometricLogin = useCallback(async () => {
     setLoading(true);

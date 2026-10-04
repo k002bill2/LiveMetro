@@ -41,16 +41,17 @@ export const EmailLoginScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
 
   const persistAutoLogin = useCallback(
-    async (storedEmail: string, storedPassword: string): Promise<void> => {
+    async (storedEmail: string): Promise<void> => {
       try {
+        // The password is never persisted: Firebase Auth persistence keeps
+        // the session. Remove any plaintext copy written by older versions.
+        await SecureStore.deleteItemAsync(AUTO_LOGIN_PASSWORD_KEY);
         if (autoLogin) {
           await AsyncStorage.setItem(AUTO_LOGIN_ENABLED_KEY, 'true');
           await SecureStore.setItemAsync(AUTO_LOGIN_EMAIL_KEY, storedEmail);
-          await SecureStore.setItemAsync(AUTO_LOGIN_PASSWORD_KEY, storedPassword);
         } else {
           await AsyncStorage.setItem(AUTO_LOGIN_ENABLED_KEY, 'false');
           await SecureStore.deleteItemAsync(AUTO_LOGIN_EMAIL_KEY);
-          await SecureStore.deleteItemAsync(AUTO_LOGIN_PASSWORD_KEY);
         }
       } catch (err) {
         console.error('Error saving auto login credentials:', err);
@@ -108,7 +109,7 @@ export const EmailLoginScreen: React.FC = () => {
     const trimmedEmail = email.trim();
     try {
       await signInWithEmail(trimmedEmail, password);
-      await persistAutoLogin(trimmedEmail, password);
+      await persistAutoLogin(trimmedEmail);
       await promptBiometricSetup(trimmedEmail, password);
     } catch (err) {
       console.error('Auth error:', err);

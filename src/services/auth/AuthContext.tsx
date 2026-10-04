@@ -31,6 +31,7 @@ import { SocialSignInResult } from '@/services/auth/social/types';
 import { signInWithGoogle as googleSignInService } from '@/services/auth/social/googleSignIn';
 import { signInWithApple as appleSignInService } from '@/services/auth/social/appleSignIn';
 import { signInWithKakao as kakaoSignInService } from '@/services/auth/social/kakaoSignIn';
+import { purgeLegacyPlaintextCredentials } from '@/services/auth/legacyCredentialPurge';
 
 interface AuthContextType {
   user: User | null;
@@ -226,6 +227,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       userDocUnsubscribeRef.current();
       userDocUnsubscribeRef.current = null;
     }
+  }, []);
+
+  // Remove plaintext passwords stored by older versions — on every start,
+  // since signed-in users never revisit the login screens. Never throws.
+  useEffect(() => {
+    void purgeLegacyPlaintextCredentials();
   }, []);
 
   // Auth state listener
