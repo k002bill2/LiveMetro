@@ -23,6 +23,10 @@ import { useAuth } from '@/services/auth/AuthContext';
 
 // Auto-map every lucide icon to its name so redesign icon swaps don't break
 // the test (Phase 7 imports differ from earlier revisions).
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 24, right: 0, bottom: 48, left: 0 }),
+}));
+
 jest.mock('lucide-react-native', () =>
   new Proxy(
     {},
