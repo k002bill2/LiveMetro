@@ -99,16 +99,35 @@ describe('ArrivalService', () => {
   });
 
   describe('getArrivals', () => {
-    it('does not retry a non-retryable error (e.g. daily quota ERROR-337) — one call, no backoff storm', async () => {
+    it('does not retry once every key has hit the daily quota (ERROR-337) — one call, no backoff storm', async () => {
       const quotaError = Object.assign(new Error('daily quota'), {
         errorCode: 'ERROR-337',
         retryable: false,
+        dailyQuotaExhausted: true,
       });
       mockSeoulSubwayApi.getRealtimeArrival.mockReset().mockRejectedValue(quotaError);
       const errSpy = jest.spyOn(console, 'error').mockImplementation();
 
       await expect(service.getArrivals('강남', { throwOnError: true })).rejects.toBe(quotaError);
       expect(mockSeoulSubwayApi.getRealtimeArrival).toHaveBeenCalledTimes(1);
+      errSpy.mockRestore();
+    });
+
+    it('still retries an auth failure so the next attempt can use a healthy backup key', async () => {
+      // INFO-100 disables only the failing key; the retry picks another one.
+      const authError = Object.assign(new Error('invalid key'), {
+        errorCode: 'INFO-100',
+        retryable: false,
+      });
+      mockSeoulSubwayApi.getRealtimeArrival.mockRejectedValueOnce(authError);
+      const errSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      const pending = service.getArrivals('강남');
+      await jest.runAllTimersAsync();
+      const result = await pending;
+
+      expect(mockSeoulSubwayApi.getRealtimeArrival).toHaveBeenCalledTimes(2);
+      expect(result.source).toBe('api');
       errSpy.mockRestore();
     });
 

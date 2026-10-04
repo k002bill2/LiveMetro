@@ -393,12 +393,15 @@ class ArrivalService {
       const seoulData = await seoulSubwayApi.getRealtimeArrival(stationName);
       return this.convertToArrivalInfo(stationName, seoulData);
     } catch (error) {
-      // A non-retryable failure (SeoulApiError with retryable=false, e.g. the
-      // daily quota ERROR-337) cannot succeed on retry — each attempt would only
-      // spend another call or backoff wait. Duck-typed so tests that mock the
-      // whole seoulSubwayApi module don't need the class.
-      const nonRetryable = (error as { retryable?: unknown } | null)?.retryable === false;
-      if (!nonRetryable && attempt < this.options.maxRetries - 1) {
+      // Once every key has hit the daily quota (ERROR-337) no attempt can
+      // succeed before KST midnight — skip the backoff waits. Other
+      // retryable=false errors (e.g. one key's INFO-100) still retry: the key
+      // manager has disabled the failing key, so the next attempt can use a
+      // healthy backup. Duck-typed so tests that mock the whole seoulSubwayApi
+      // module don't need the class.
+      const quotaExhausted =
+        (error as { dailyQuotaExhausted?: unknown } | null)?.dailyQuotaExhausted === true;
+      if (!quotaExhausted && attempt < this.options.maxRetries - 1) {
         // Exponential backoff
         const delay = this.options.retryDelay * Math.pow(2, attempt);
         await this.delay(delay);
