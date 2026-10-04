@@ -175,11 +175,33 @@ jobs:
       - name: Expo prebuild (android)
         run: npx expo prebuild --platform android --no-install
 
+      # SDK 55(Gradle 9 · New Architecture) 이후 run 37148675372 가 빌드 스텝에서 70분
+      # timeout 으로 cancelled 됐다(실측): ① 템플릿 기본 org.gradle.jvmargs(heap 2 GiB ·
+      # metaspace 512 MiB)로 lintVitalAnalyzeRelease(16개 모듈) 도중 Metaspace 가 고갈 —
+      # OOM 이 데몬 스레드에서 나 빌드가 실패도 종료도 못 한 채 40분 정지, ② New Arch 로
+      # C++ 모듈이 2→7개로 늘어 4 ABI × 7 = 28개 CMake 빌드(~18분). 에뮬레이터는 x86_64
+      # 단일 ABI 이므로 그것만 빌드하고, metaspace 상한을 올린다. ~/.gradle/gradle.properties 는
+      # 프로젝트 gradle.properties(prebuild 생성물, gitignored)보다 우선한다 — CI 전용
+      # 설정이라 앱/EAS 빌드에는 영향 없다. 러너는 private repo 표준(2 vCPU · 7 GB)이라 heap 은
+      # clang·Kotlin 데몬 몫을 남겨 3 GiB 로 둔다 (metaspace 상한은 실제 사용분만 점유).
+      - name: Configure Gradle for CI (emulator ABI + JVM memory)
+        run: |
+          mkdir -p ~/.gradle
+          cat >> ~/.gradle/gradle.properties <<'EOF'
+          org.gradle.jvmargs=-Xmx3g -XX:MaxMetaspaceSize=1536m -Dfile.encoding=UTF-8
+          reactNativeArchitectures=x86_64
+          EOF
+          cat ~/.gradle/gradle.properties
+
       # release 변형인 이유: debug 변형은 JS 번들을 Metro dev 서버에서 로드하므로 CI에서
       # 실행 불가. release 는 번들을 APK에 내장하고, Expo 템플릿이 release 서명을 debug
       # keystore 로 두므로 추가 서명 설정 없이 빌드된다. Gradle 은 빌드 후 종료된다 —
       # 이전 `expo run:android &` 의 Metro 좀비(30분 timeout 원인)가 구조적으로 사라진다.
+      # 스텝 timeout 은 job timeout 연장이 아니라 hang → 실패 전환 장치다: 데몬 스레드 OOM 은
+      # 빌드를 끝내지 않으므로 job timeout(cancelled)까지 가면 실패가 은폐된다. 40분 근거:
+      # SDK 49 cold 빌드 17m37s(run 31698868002), SDK 55 는 hang 전 생산적 작업 ~27분(4 ABI).
       - name: Build release APK (JS bundle embedded)
+        timeout-minutes: 40
         run: cd android && ./gradlew assembleRelease --no-daemon
 
       - name: Verify APK artifact exists
