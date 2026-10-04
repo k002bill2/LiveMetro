@@ -31,11 +31,26 @@ describe('ArrivalCard', () => {
     expect(getByText('30초')).toBeTruthy();
   });
 
-  it('shows "곧 도착" Pill only when isFirst is true', () => {
-    const { queryByText, rerender } = render(<ArrivalCard {...base} />);
+  it('does not show "곧 도착" on a non-first card even when imminent', () => {
+    const { queryByText } = render(<ArrivalCard {...base} minutes={0} seconds={30} />);
     expect(queryByText('곧 도착')).toBeNull();
-    rerender(<ArrivalCard {...base} isFirst />);
+  });
+
+  it('shows "곧 도착" on the first card only when under 60 seconds remain', () => {
+    const { queryByText } = render(<ArrivalCard {...base} minutes={0} seconds={59} isFirst />);
     expect(queryByText('곧 도착')).toBeTruthy();
+    // countdown stays visible alongside the badge
+    expect(queryByText('59초')).toBeTruthy();
+  });
+
+  it('hides "곧 도착" on the first card when 60 seconds or more remain', () => {
+    const { queryByText, rerender } = render(
+      <ArrivalCard {...base} minutes={1} seconds={0} isFirst />
+    );
+    expect(queryByText('곧 도착')).toBeNull();
+    // regression: 11분 53초 used to carry the badge just for being first
+    rerender(<ArrivalCard {...base} minutes={11} seconds={53} isFirst />);
+    expect(queryByText('곧 도착')).toBeNull();
   });
 
   it('omits seconds row when totalSeconds is 0 — shows "곧 도착" placeholder', () => {
