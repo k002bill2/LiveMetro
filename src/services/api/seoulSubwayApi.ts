@@ -71,7 +71,26 @@ class RateLimiter {
 }
 
 /**
- * Retry with exponential backoff
+ * Retry decision. A structured {@link SeoulApiError} carries its own
+ * `retryable` flag (quota / transient). Generic errors (network, HTTP status,
+ * timeout) are retryable, except stations/timetable which wrap a
+ * SeoulApiError into a generic Error — those keep the legacy no-retry rule
+ * via the message marker so their call count does not grow.
+ */
+function isRetryableError(error: Error): boolean {
+  if (error instanceof SeoulApiError) {
+    return error.retryable;
+  }
+  return !error.message.includes('Seoul API Error');
+}
+
+/**
+ * Retry with exponential backoff.
+ *
+ * Call budget: at most `maxAttempts` calls in total (unchanged), and a
+ * retryable Seoul API error (quota / transient) is retried at most
+ * `maxApiErrorRetries` times — the server already answered, so hammering it
+ * only burns the daily quota.
  */
 async function withRetry<T>(
   fn: () => Promise<T>,
@@ -80,6 +99,7 @@ async function withRetry<T>(
     initialDelayMs?: number;
     maxDelayMs?: number;
     backoffMultiplier?: number;
+    maxApiErrorRetries?: number;
   } = {}
 ): Promise<T> {
   const {
@@ -87,10 +107,12 @@ async function withRetry<T>(
     initialDelayMs = 1000,
     maxDelayMs = 5000,
     backoffMultiplier = 2,
+    maxApiErrorRetries = 1,
   } = options;
 
   let lastError: Error | undefined;
   let delay = initialDelayMs;
+  let apiErrorRetries = 0;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -98,12 +120,14 @@ async function withRetry<T>(
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
 
-      // Don't retry on certain errors
-      if (lastError.message.includes('API 요청 시간이 초과')) {
-        // Timeout - retry with backoff
-      } else if (lastError.message.includes('Seoul API Error')) {
-        // API error - don't retry
+      if (!isRetryableError(lastError)) {
         throw lastError;
+      }
+      if (lastError instanceof SeoulApiError) {
+        if (apiErrorRetries >= maxApiErrorRetries) {
+          throw lastError;
+        }
+        apiErrorRetries++;
       }
 
       if (attempt < maxAttempts) {
@@ -262,12 +286,17 @@ export class SeoulApiError extends Error {
   /** True for categories where retry without user action is meaningful. */
   readonly retryable: boolean;
 
-  constructor(errorCode: string, message: string) {
+  /**
+   * @param options.retryable Override the category default — e.g. a quota
+   *   error with no healthy backup key is not worth an immediate retry.
+   */
+  constructor(errorCode: string, message: string, options: { retryable?: boolean } = {}) {
     super(`Seoul API Error: ${message} (Code: ${errorCode})`);
     this.name = 'SeoulApiError';
     this.errorCode = errorCode;
     this.category = categorizeSeoulApiError(errorCode);
-    this.retryable = this.category === 'transient' || this.category === 'quota';
+    this.retryable =
+      options.retryable ?? (this.category === 'transient' || this.category === 'quota');
   }
 }
 
@@ -452,6 +481,9 @@ const resolveRealtimeStationQueryName = (stationName: string): string => {
   return REALTIME_STATION_NAME_ALIASES[withoutStationSuffix] ?? trimmed;
 };
 
+const maskApiKey = (text: string, apiKey: string): string =>
+  apiKey ? text.split(apiKey).join('***') : text;
+
 class SeoulSubwayApiService {
   private readonly baseUrl: string;
   private readonly timeout: number = 10000;
@@ -469,6 +501,14 @@ class SeoulSubwayApiService {
   clearInflightRequests(): void {
     this.inflightRequests.clear();
     this.inflightPositionRequests.clear();
+  }
+
+  /**
+   * Reset key-manager health state (for testing)
+   */
+  resetKeyStates(): void {
+    this.keyManager.resetKeyStates();
+    this.timetableKeyManager.resetKeyStates();
   }
 
   constructor() {
@@ -545,8 +585,12 @@ class SeoulSubwayApiService {
     // Apply rate limiting (30-second minimum interval)
     await this.rateLimiter.throttle(rateLimitKey);
 
+    // Backup key handed over by reportRateLimit for the next attempt (A2).
+    let nextKey: string | null = null;
+
     return withRetry(async () => {
-      const apiKey = this.keyManager.getNextKey();
+      const apiKey = this.claimReservedKey(nextKey) ?? this.keyManager.getNextKey();
+      nextKey = null;
       if (!apiKey) {
         throw new Error('사용 가능한 API 키가 없습니다. 잠시 후 다시 시도해주세요.');
       }
@@ -554,8 +598,7 @@ class SeoulSubwayApiService {
       try {
         const url = `${this.baseUrl}/${apiKey}/json/realtimeStationArrival/0/10/${encodeURIComponent(stationName)}`;
 
-        const response = await this.fetchWithTimeout(url);
-        const data: SeoulApiResponse<SeoulRealtimeArrival> = await response.json();
+        const data = await this.fetchJsonWithTimeout<SeoulApiResponse<SeoulRealtimeArrival>>(url);
 
         // Seoul API delivers both success and failure over HTTP 200, in two
         // response shapes (see extractSeoulApiErrorCode). Normalize them so a
@@ -583,16 +626,23 @@ class SeoulSubwayApiService {
             return [];
           }
 
+          let retryable: boolean | undefined;
           if (category === 'quota') {
-            // Rate limit / server overload — try a backup key.
-            const fallbackKey = this.keyManager.reportRateLimit(apiKey);
-            if (fallbackKey) {
-              console.warn(`Rate limit hit on ${errorCode}, switching to backup key`);
-            }
+            // Rate limit / server overload — retry once on a healthy backup key.
+            nextKey = this.takeFallbackKey(this.keyManager, apiKey);
+            retryable = nextKey !== null;
+            console.warn(
+              nextKey
+                ? `Rate limit hit on ${errorCode}, switching to backup key`
+                : `Rate limit hit on ${errorCode}, no healthy backup key — not retrying`
+            );
           } else if (category === 'transient') {
             // Dispatcher hiccup (ERROR-335/336). Same key is still valid;
             // retry handled by `withRetry` wrapper. No key rotation.
             console.warn(`Transient Seoul API error ${errorCode}, will retry`);
+          } else if (category === 'auth') {
+            // Invalid key — keep it out of rotation for the long auth TTL (A1).
+            this.keyManager.reportAuthError(apiKey);
           } else {
             this.keyManager.reportError(apiKey);
           }
@@ -605,7 +655,7 @@ class SeoulSubwayApiService {
             `code=${errorCode} category=${category} message=${message}`
           );
 
-          throw new SeoulApiError(errorCode, message);
+          throw new SeoulApiError(errorCode, message, { retryable });
         }
 
         // Success - report to key manager
@@ -659,8 +709,11 @@ class SeoulSubwayApiService {
 
     await this.rateLimiter.throttle(rateLimitKey);
 
+    let nextKey: string | null = null;
+
     return withRetry(async () => {
-      const apiKey = this.keyManager.getNextKey();
+      const apiKey = this.claimReservedKey(nextKey) ?? this.keyManager.getNextKey();
+      nextKey = null;
       if (!apiKey) {
         throw new Error('사용 가능한 API 키가 없습니다. 잠시 후 다시 시도해주세요.');
       }
@@ -668,8 +721,7 @@ class SeoulSubwayApiService {
       try {
         const url = `${this.baseUrl}/${apiKey}/json/realtimePosition/0/100/${encodeURIComponent(lineName)}`;
 
-        const response = await this.fetchWithTimeout(url);
-        const data: SeoulApiResponse<SeoulRealtimePosition> = await response.json();
+        const data = await this.fetchJsonWithTimeout<SeoulApiResponse<SeoulRealtimePosition>>(url);
 
         const apiError = extractSeoulApiErrorCode(data);
 
@@ -684,13 +736,19 @@ class SeoulSubwayApiService {
             return [];
           }
 
+          let retryable: boolean | undefined;
           if (category === 'quota') {
-            const fallbackKey = this.keyManager.reportRateLimit(apiKey);
-            if (fallbackKey) {
-              console.warn(`Rate limit hit on ${errorCode}, switching to backup key`);
-            }
+            nextKey = this.takeFallbackKey(this.keyManager, apiKey);
+            retryable = nextKey !== null;
+            console.warn(
+              nextKey
+                ? `Rate limit hit on ${errorCode}, switching to backup key`
+                : `Rate limit hit on ${errorCode}, no healthy backup key — not retrying`
+            );
           } else if (category === 'transient') {
             console.warn(`Transient Seoul API error ${errorCode}, will retry`);
+          } else if (category === 'auth') {
+            this.keyManager.reportAuthError(apiKey);
           } else {
             this.keyManager.reportError(apiKey);
           }
@@ -700,7 +758,7 @@ class SeoulSubwayApiService {
             `code=${errorCode} category=${category} message=${message}`
           );
 
-          throw new SeoulApiError(errorCode, message);
+          throw new SeoulApiError(errorCode, message, { retryable });
         }
 
         this.keyManager.reportSuccess(apiKey);
@@ -763,8 +821,7 @@ class SeoulSubwayApiService {
       try {
         const url = `${this.baseUrl}/${apiKey}/json/SearchInfoBySubwayNameService/1/1000/${encodeURIComponent(lineNumber)}호선`;
 
-        const response = await this.fetchWithTimeout(url);
-        const data: SeoulApiResponse<SeoulStationInfo> = await response.json();
+        const data = await this.fetchJsonWithTimeout<SeoulApiResponse<SeoulStationInfo>>(url);
 
         // Seoul API delivers failures over HTTP 200 in two shapes — the
         // wrapped `errorMessage` and the top-level `{status,code,message}`
@@ -782,6 +839,8 @@ class SeoulSubwayApiService {
           }
           if (category === 'quota') {
             this.keyManager.reportRateLimit(apiKey);
+          } else if (category === 'auth') {
+            this.keyManager.reportAuthError(apiKey);
           } else if (category !== 'transient') {
             this.keyManager.reportError(apiKey);
           }
@@ -888,37 +947,45 @@ class SeoulSubwayApiService {
         const generalBaseUrl = process.env.SEOUL_OPEN_API_BASE_URL || 'http://openapi.seoul.go.kr:8088';
         const url = `${generalBaseUrl}/${apiKey}/json/SearchSTNTimeTableByIDService/1/${TIMETABLE_FULL_DAY_END_INDEX}/${stationCode}/${weekTag}/${inoutTag}/`;
 
-        const response = await this.fetchWithTimeout(url);
-
         // DIAGNOSTIC: clone response so we can capture body preview when the
         // server returns XML/HTML (e.g. invalid key) instead of JSON. Success
         // path is unchanged; the clone is only consumed on JSON parse failure.
-        const responseClone = typeof response.clone === 'function' ? response.clone() : null;
-        let data: SeoulTimetableResponse;
-        try {
-          data = await response.json();
-        } catch {
-          const contentType = response.headers?.get?.('content-type') ?? 'unknown';
-          let bodyPreview = '<unavailable>';
-          if (responseClone) {
-            try {
-              bodyPreview = (await responseClone.text()).slice(0, 300);
-            } catch {
-              // ignore — preview is best-effort
+        // Both reads run inside the request timeout (A3).
+        const body = await this.fetchWithTimeout(url, async (response): Promise<
+          { ok: true; data: SeoulTimetableResponse } | { ok: false; contentType: string; bodyPreview: string }
+        > => {
+          const responseClone = typeof response.clone === 'function' ? response.clone() : null;
+          try {
+            return { ok: true, data: await response.json() };
+          } catch {
+            const contentType = response.headers?.get?.('content-type') ?? 'unknown';
+            let bodyPreview = '<unavailable>';
+            if (responseClone) {
+              try {
+                bodyPreview = (await responseClone.text()).slice(0, 300);
+              } catch {
+                // ignore — preview is best-effort
+              }
             }
+            return { ok: false, contentType, bodyPreview };
           }
+        });
+
+        if (!body.ok) {
+          // Gateways echo the request (key included) in error bodies — mask it (A5).
           console.error(
             `[SeoulSubwayApi] Timetable response is not JSON. ` +
-            `url=${url.replace(apiKey, '***')} ` +
-            `content-type=${contentType} ` +
-            `body[0..300]=${bodyPreview}`
+            `url=${maskApiKey(url, apiKey)} ` +
+            `content-type=${body.contentType} ` +
+            `body[0..300]=${maskApiKey(body.bodyPreview, apiKey)}`
           );
           this.timetableKeyManager.reportError(apiKey);
           throw new Error(
-            `시간표 응답이 JSON이 아닙니다 (content-type=${contentType}). ` +
+            `시간표 응답이 JSON이 아닙니다 (content-type=${body.contentType}). ` +
             `API 키 또는 엔드포인트 상태를 확인하세요.`
           );
         }
+        const data = body.data;
 
         // Handle empty or invalid response structure. The 8088 portal
         // returns gateway-level failures (invalid key, quota) with no
@@ -938,6 +1005,8 @@ class SeoulSubwayApiService {
             const category = categorizeSeoulApiError(gatewayCode);
             if (category === 'quota') {
               this.timetableKeyManager.reportRateLimit(apiKey);
+            } else if (category === 'auth') {
+              this.timetableKeyManager.reportAuthError(apiKey);
             } else if (category !== 'transient') {
               this.timetableKeyManager.reportError(apiKey);
             }
@@ -976,13 +1045,53 @@ class SeoulSubwayApiService {
   }
 
   /**
-   * Fetch with timeout support
+   * Take the backup key returned by `reportRateLimit` only if it is a
+   * different, currently-enabled key. When every key is disabled the manager
+   * hands back the earliest-recovering (still rate-limited) key — retrying on
+   * it would just burn another call.
    */
-  private async fetchWithTimeout(url: string): Promise<Response> {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), this.timeout);
+  private takeFallbackKey(manager: ApiKeyManager, failedKey: string): string | null {
+    const fallbackKey = manager.reportRateLimit(failedKey);
+    if (fallbackKey && fallbackKey !== failedKey && manager.isKeyAvailable(fallbackKey)) {
+      return fallbackKey;
+    }
+    return null;
+  }
 
-    try {
+  /**
+   * A reserved backup key can be disabled by a concurrent request during the
+   * retry backoff — only reuse it if it is still enabled.
+   */
+  private claimReservedKey(reservedKey: string | null): string | null {
+    return reservedKey && this.keyManager.isKeyAvailable(reservedKey) ? reservedKey : null;
+  }
+
+  private fetchJsonWithTimeout<T>(url: string): Promise<T> {
+    return this.fetchWithTimeout(url, (response): Promise<T> => response.json());
+  }
+
+  /**
+   * Fetch with a single 10s deadline covering headers AND body (`readBody`).
+   *
+   * Clearing the timer when headers arrive left `response.json()` unbounded —
+   * a stalled body hung forever. The deadline is raced rather than relying on
+   * abort alone, because not every fetch implementation propagates abort into
+   * an in-progress body read.
+   */
+  private async fetchWithTimeout<T>(
+    url: string,
+    readBody: (response: Response) => Promise<T>
+  ): Promise<T> {
+    const controller = new AbortController();
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        controller.abort();
+        reject(new Error('API 요청 시간이 초과되었습니다.'));
+      }, this.timeout);
+    });
+
+    const exchange = (async (): Promise<T> => {
       const response = await fetch(url, {
         signal: controller.signal,
         headers: {
@@ -1000,7 +1109,11 @@ class SeoulSubwayApiService {
         throw new Error(`HTTP Error: ${response.status} ${response.statusText}`);
       }
 
-      return response;
+      return readBody(response);
+    })();
+
+    try {
+      return await Promise.race([exchange, deadline]);
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
         throw new Error('API 요청 시간이 초과되었습니다.');
