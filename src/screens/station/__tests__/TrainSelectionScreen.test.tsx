@@ -5,6 +5,7 @@
  * passes (destination / selected / ETA / recommendedCar).
  */
 import React from 'react';
+import { StyleSheet, type ViewStyle } from 'react-native';
 import { render, fireEvent, act } from '@testing-library/react-native';
 import TrainSelectionScreen from '../TrainSelectionScreen';
 import { useIsFocused } from '@react-navigation/native';
@@ -19,6 +20,12 @@ import { notificationService } from '@/services/notification/notificationService
 import { CongestionLevel } from '@/models/congestion';
 
 const mockGoBack = jest.fn();
+
+// Non-zero bottom inset (Android 3-button nav bar ≈ 48dp) so the edge-to-edge
+// padding is observable — the library's default jest mock reports 0.
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 48, left: 0 }),
+}));
 
 jest.mock('@react-navigation/native', () => ({
   useIsFocused: jest.fn(() => true),
@@ -235,6 +242,17 @@ describe('TrainSelectionScreen', () => {
     // select the second card (u2 → 5분 00초 후)
     fireEvent.press(getByText('성수 방면'));
     expect(getByTestId('train-selection-cta-eta')).toHaveTextContent('5분 00초 후');
+  });
+
+  it('pads the bottom CTA bar by the bottom safe-area inset (edge-to-edge)', () => {
+    mockedUseRealtimeTrains.mockReturnValue(
+      okState([buildTrain({ id: 'u1', finalDestination: '잠실', direction: 'up', secondsAway: 120 })])
+    );
+    const { getByTestId } = render(<TrainSelectionScreen />);
+
+    // WANTED_TOKENS.spacing.s5 (20) + bottom inset (48)
+    const ctaStyle = StyleSheet.flatten(getByTestId('train-selection-cta').props.style) as ViewStyle;
+    expect(ctaStyle.paddingBottom).toBe(20 + 48);
   });
 
   it('writes the boarding selection and navigates back when 탑승 시작 is pressed', () => {
