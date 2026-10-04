@@ -5,6 +5,7 @@
  * passes (destination / selected / ETA / recommendedCar).
  */
 import React from 'react';
+import { StyleSheet, type ViewStyle } from 'react-native';
 import { render, fireEvent, act } from '@testing-library/react-native';
 import TrainSelectionScreen from '../TrainSelectionScreen';
 import { useIsFocused } from '@react-navigation/native';
@@ -250,7 +251,8 @@ describe('TrainSelectionScreen', () => {
     const { getByTestId } = render(<TrainSelectionScreen />);
 
     // WANTED_TOKENS.spacing.s5 (20) + bottom inset (48)
-    expect(getByTestId('train-selection-cta')).toHaveStyle({ paddingBottom: 20 + 48 });
+    const ctaStyle = StyleSheet.flatten(getByTestId('train-selection-cta').props.style) as ViewStyle;
+    expect(ctaStyle.paddingBottom).toBe(20 + 48);
   });
 
   it('writes the boarding selection and navigates back when 탑승 시작 is pressed', () => {
