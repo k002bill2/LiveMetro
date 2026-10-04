@@ -13,6 +13,8 @@ interface ApiKeyState {
   lastError: number | null;
   isDisabled: boolean;
   disabledUntil: number | null;
+  /** 'auth' = 키 자체가 무효 — 복구 후보에서 제외하고 장기 TTL 적용 */
+  disabledReason: 'error' | 'auth' | null;
 }
 
 interface ApiKeyManagerOptions {
@@ -22,12 +24,19 @@ interface ApiKeyManagerOptions {
   errorThreshold?: number;
   /** 사용량 카운터 리셋 주기 (ms) */
   usageResetIntervalMs?: number;
+  /**
+   * 인증 오류(INFO-100 등)로 비활성화된 키의 비활성 시간 (ms).
+   * 무효 키를 짧은 쿨다운 후 라운드로빈에 재투입하면 주기적 실패 버스트가 생긴다.
+   * 세션 영구가 아닌 장기 TTL인 이유: 신규 발급 키는 활성화 지연 동안 INFO-100을 낸다.
+   */
+  authDisableDurationMs?: number;
 }
 
 const DEFAULT_OPTIONS: Required<ApiKeyManagerOptions> = {
   disableDurationMs: 60000, // 1분
   errorThreshold: 3,
   usageResetIntervalMs: 3600000, // 1시간
+  authDisableDurationMs: 3600000, // 1시간 — 무효 키 재시도 ≤ 24회/일/키
 };
 
 /**
@@ -56,15 +65,7 @@ export class ApiKeyManager {
     }
 
     validKeys.forEach((key) => {
-      this.keys.set(key, {
-        key,
-        usageCount: 0,
-        errorCount: 0,
-        lastUsed: 0,
-        lastError: null,
-        isDisabled: false,
-        disabledUntil: null,
-      });
+      this.keys.set(key, ApiKeyManager.freshState(key));
       this.keyOrder.push(key);
     });
 
@@ -139,6 +140,29 @@ export class ApiKeyManager {
   }
 
   /**
+   * 인증 오류(키 무효) 발생 시 호출 — 즉시 장기 비활성화 (임계값 누적 없음)
+   */
+  reportAuthError(key: string): void {
+    this.disableKey(key, 'auth');
+  }
+
+  /**
+   * 키가 지금 라운드로빈에 들어 있는지 (비활성 아님)
+   */
+  isKeyAvailable(key: string): boolean {
+    const state = this.keys.get(key);
+    return !!state && !state.isDisabled;
+  }
+
+  /**
+   * 모든 키 상태 초기화 (테스트용)
+   */
+  resetKeyStates(): void {
+    this.keyOrder.forEach((key) => this.keys.set(key, ApiKeyManager.freshState(key)));
+    this.currentIndex = 0;
+  }
+
+  /**
    * 현재 키 상태 조회
    */
   getKeyStats(): {
@@ -206,11 +230,31 @@ export class ApiKeyManager {
     return key ?? null;
   }
 
-  private disableKey(key: string): void {
+  private static freshState(key: string): ApiKeyState {
+    return {
+      key,
+      usageCount: 0,
+      errorCount: 0,
+      lastUsed: 0,
+      lastError: null,
+      isDisabled: false,
+      disabledUntil: null,
+      disabledReason: null,
+    };
+  }
+
+  private disableKey(key: string, reason: 'error' | 'auth' = 'error'): void {
     const state = this.keys.get(key);
     if (state) {
+      // 이미 auth로 장기 비활성인 키를 짧은 쿨다운으로 덮어쓰지 않는다
+      if (state.isDisabled && state.disabledReason === 'auth' && reason !== 'auth') {
+        return;
+      }
+      const duration =
+        reason === 'auth' ? this.options.authDisableDurationMs : this.options.disableDurationMs;
       state.isDisabled = true;
-      state.disabledUntil = Date.now() + this.options.disableDurationMs;
+      state.disabledReason = reason;
+      state.disabledUntil = Date.now() + duration;
       console.warn(
         `ApiKeyManager: Key ${this.maskKey(key)} disabled until ${new Date(state.disabledUntil).toISOString()}`
       );
@@ -224,6 +268,7 @@ export class ApiKeyManager {
       if (state.isDisabled && state.disabledUntil && now >= state.disabledUntil) {
         state.isDisabled = false;
         state.disabledUntil = null;
+        state.disabledReason = null;
         state.errorCount = 0;
       }
     });
@@ -234,13 +279,19 @@ export class ApiKeyManager {
     let earliestTime = Infinity;
 
     this.keys.forEach((state) => {
+      // 무효(auth) 키는 복구 후보가 아니다 — 내주면 실패가 확정된 호출 1회가 낭비된다
+      if (state.disabledReason === 'auth') return;
       if (state.disabledUntil && state.disabledUntil < earliestTime) {
         earliestTime = state.disabledUntil;
         earliestKey = state.key;
       }
     });
 
-    return earliestKey ?? (this.keyOrder[0] ?? null);
+    return (
+      earliestKey ??
+      this.keyOrder.find((key) => this.keys.get(key)?.disabledReason !== 'auth') ??
+      null
+    );
   }
 
   private startUsageResetTimer(): void {

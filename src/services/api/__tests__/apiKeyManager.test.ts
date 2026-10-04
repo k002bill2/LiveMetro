@@ -67,3 +67,89 @@ describe('createPublicDataApiKeyManager', () => {
     expect(() => createPublicDataApiKeyManager()).not.toThrow();
   });
 });
+
+/**
+ * A1 (2026-10-04 security review): an auth failure (INFO-100 etc.) means the
+ * key itself is invalid. Re-enabling it after the generic 60s cooldown put a
+ * permanently-invalid key back into round-robin every minute, causing a
+ * periodic failure burst. Auth-disabled keys must stay out for a long TTL;
+ * transient/quota disables keep the short cooldown.
+ */
+describe('ApiKeyManager auth-error handling', () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { ApiKeyManager } = jest.requireActual('../apiKeyManager');
+  const SHORT_MS = 60_000;
+  const AUTH_MS = 3_600_000;
+  let manager: InstanceType<typeof ApiKeyManager>;
+  let now: number;
+  let nowSpy: jest.SpyInstance;
+  let warnSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    now = 1_000_000;
+    nowSpy = jest.spyOn(Date, 'now').mockImplementation(() => now);
+    warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+    manager = new ApiKeyManager(['good-key-1111', 'bad-key-22222'], {
+      disableDurationMs: SHORT_MS,
+      errorThreshold: 3,
+      authDisableDurationMs: AUTH_MS,
+    });
+  });
+
+  afterEach(() => {
+    manager.dispose();
+    nowSpy.mockRestore();
+    warnSpy.mockRestore();
+  });
+
+  it('disables an auth-failed key immediately (no 3-error threshold)', () => {
+    manager.reportAuthError('bad-key-22222');
+    expect(manager.availableKeyCount).toBe(1);
+  });
+
+  it('does NOT re-enable an auth-failed key after the short 60s cooldown', () => {
+    manager.reportAuthError('bad-key-22222');
+    now += SHORT_MS + 1_000;
+
+    const picked = new Set([manager.getNextKey(), manager.getNextKey(), manager.getNextKey()]);
+    expect(picked).toEqual(new Set(['good-key-1111']));
+  });
+
+  it('re-enables an auth-failed key only after the long auth TTL', () => {
+    manager.reportAuthError('bad-key-22222');
+    now += AUTH_MS + 1;
+
+    const picked = new Set([manager.getNextKey(), manager.getNextKey()]);
+    expect(picked).toEqual(new Set(['good-key-1111', 'bad-key-22222']));
+  });
+
+  it('still re-enables a generic-error key after the short cooldown (unchanged)', () => {
+    manager.reportError('bad-key-22222');
+    manager.reportError('bad-key-22222');
+    manager.reportError('bad-key-22222');
+    expect(manager.availableKeyCount).toBe(1);
+
+    now += SHORT_MS + 1;
+    const picked = new Set([manager.getNextKey(), manager.getNextKey()]);
+    expect(picked).toEqual(new Set(['good-key-1111', 'bad-key-22222']));
+  });
+
+  it('returns null (no call) when every key is auth-disabled — never hands out an invalid key', () => {
+    manager.reportAuthError('good-key-1111');
+    manager.reportAuthError('bad-key-22222');
+    expect(manager.getNextKey()).toBeNull();
+  });
+
+  it('prefers a recovering rate-limited key over an auth-disabled one when all are disabled', () => {
+    manager.reportAuthError('bad-key-22222');
+    manager.reportRateLimit('good-key-1111');
+    expect(manager.getNextKey()).toBe('good-key-1111');
+  });
+
+  it('resetKeyStates() restores every key to available', () => {
+    manager.reportAuthError('good-key-1111');
+    manager.reportAuthError('bad-key-22222');
+    manager.resetKeyStates();
+    expect(manager.availableKeyCount).toBe(2);
+  });
+});

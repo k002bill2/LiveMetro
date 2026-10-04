@@ -62,6 +62,9 @@ describe('SeoulSubwayApiService', () => {
     // Clear rate limiter and in-flight requests to avoid cross-test contamination
     seoulSubwayApi.getRateLimiter().clear();
     seoulSubwayApi.clearInflightRequests();
+    // Auth failures now disable a key for a long TTL — don't let one test's
+    // INFO-100 starve the singleton's keys in later tests.
+    seoulSubwayApi.resetKeyStates();
   });
 
   describe('getRealtimeArrival', () => {
@@ -1514,6 +1517,220 @@ describe('SeoulSubwayApiService', () => {
       const remaining = rateLimiter.getRemainingCooldown('test');
       expect(remaining).toBeGreaterThan(0);
       expect(remaining).toBeLessThanOrEqual(1000);
+    });
+  });
+});
+
+/**
+ * 2026-10-04 security review — A1 (auth key re-enable), A2 (retryable errors
+ * honored + fallbackKey used), A3 (response body parsed inside the 10s
+ * timeout), A5 (body preview masking). All network I/O is mocked.
+ */
+describe('SeoulSubwayApiService resilience (A1~A3, A5)', () => {
+  const okArrival = {
+    errorMessage: { status: 200, code: 'INFO-000', message: '정상 처리되었습니다.' },
+    realtimeArrivalList: [],
+  };
+  const apiErrorBody = (code: string): Record<string, unknown> => ({
+    status: 500, code, message: `msg-${code}`, link: '', developerMessage: '', total: 0,
+  });
+  const jsonResponse = (body: unknown): Record<string, unknown> => ({
+    ok: true,
+    json: () => Promise.resolve(body),
+  });
+  const keyOf = (callIndex: number): string => {
+    const url = String(mockFetch.mock.calls[callIndex]?.[0] ?? '');
+    const match = url.match(/\/api\/subway\/([^/]+)\/json\//);
+    return match?.[1] ?? '';
+  };
+  let warnSpy: jest.SpyInstance;
+  let errorSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    mockFetch.mockReset();
+    seoulSubwayApi.getRateLimiter().clear();
+    seoulSubwayApi.clearInflightRequests();
+    seoulSubwayApi.resetKeyStates();
+    warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+    errorSpy = jest.spyOn(console, 'error').mockImplementation();
+  });
+
+  afterEach(() => {
+    jest.useRealTimers();
+    warnSpy.mockRestore();
+    errorSpy.mockRestore();
+  });
+
+  describe('A1 — auth failure keeps the key out for a long TTL', () => {
+    it('disables the INFO-100 key well beyond the 60s generic cooldown after a single failure', async () => {
+      mockFetch.mockResolvedValue(jsonResponse(apiErrorBody('INFO-100')));
+
+      await expect(seoulSubwayApi.getRealtimeArrival('강남')).rejects.toBeInstanceOf(SeoulApiError);
+
+      const disabled = seoulSubwayApi
+        .getKeyStats()
+        .realtime.filter((s: { isDisabled: boolean }) => s.isDisabled);
+      expect(disabled).toHaveLength(1);
+      expect(disabled[0].disabledUntil - Date.now()).toBeGreaterThan(60_000 * 10);
+      // auth is not retryable — exactly one network call
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not hand the auth-disabled key out again on the next request', async () => {
+      mockFetch.mockResolvedValueOnce(jsonResponse(apiErrorBody('INFO-100')));
+      await expect(seoulSubwayApi.getRealtimeArrival('강남')).rejects.toBeInstanceOf(SeoulApiError);
+      const badKey = keyOf(0);
+
+      for (const station of ['역삼', '선릉', '삼성']) {
+        mockFetch.mockResolvedValueOnce(jsonResponse(okArrival));
+        await seoulSubwayApi.getRealtimeArrival(station);
+      }
+
+      expect([keyOf(1), keyOf(2), keyOf(3)]).not.toContain(badKey);
+    });
+  });
+
+  describe('A2 — retryable SeoulApiError is retried (bounded), others fail fast', () => {
+    it('retries a transient ERROR-336 once and returns the successful result', async () => {
+      mockFetch
+        .mockResolvedValueOnce(jsonResponse(apiErrorBody('ERROR-336')))
+        .mockResolvedValueOnce(jsonResponse(okArrival));
+
+      await expect(seoulSubwayApi.getRealtimeArrival('강남')).resolves.toEqual([]);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('retries a quota ERROR-500 with the fallback key returned by reportRateLimit', async () => {
+      mockFetch
+        .mockResolvedValueOnce(jsonResponse(apiErrorBody('ERROR-500')))
+        .mockResolvedValueOnce(jsonResponse(okArrival));
+
+      await expect(seoulSubwayApi.getRealtimeArrival('강남')).resolves.toEqual([]);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(keyOf(1)).not.toBe(keyOf(0));
+      expect(keyOf(1)).not.toBe('');
+    });
+
+    it('caps Seoul API error retries at one extra call (persistent quota → 2 calls total)', async () => {
+      mockFetch.mockResolvedValue(jsonResponse(apiErrorBody('ERROR-500')));
+
+      let caught: unknown;
+      try {
+        await seoulSubwayApi.getRealtimeArrival('강남');
+      } catch (err) {
+        caught = err;
+      }
+
+      expect(caught).toBeInstanceOf(SeoulApiError);
+      expect((caught as InstanceType<typeof SeoulApiError>).errorCode).toBe('ERROR-500');
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not retry a quota error when no other key is available (no wasted call)', async () => {
+      // Take one of the two keys out via auth, then hit quota on the other.
+      mockFetch.mockResolvedValueOnce(jsonResponse(apiErrorBody('INFO-100')));
+      await expect(seoulSubwayApi.getRealtimeArrival('강남')).rejects.toBeInstanceOf(SeoulApiError);
+
+      mockFetch.mockResolvedValue(jsonResponse(apiErrorBody('ERROR-500')));
+      await expect(seoulSubwayApi.getRealtimeArrival('역삼')).rejects.toBeInstanceOf(SeoulApiError);
+
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+
+    it('re-checks the reserved backup key before the retry (disabled during backoff → not used)', async () => {
+      // Request A hits quota on key X and reserves backup key Y. During A's
+      // backoff, concurrent request B gets INFO-100 on Y, auth-disabling it.
+      // A's retry must not blindly reuse Y.
+      mockFetch.mockImplementation((url: string) => {
+        if (url.includes(encodeURIComponent('역삼'))) {
+          return Promise.resolve(jsonResponse(apiErrorBody('INFO-100')));
+        }
+        return Promise.resolve(
+          mockFetch.mock.calls.length === 1
+            ? jsonResponse(apiErrorBody('ERROR-500'))
+            : jsonResponse(okArrival)
+        );
+      });
+
+      const first = seoulSubwayApi.getRealtimeArrival('강남');
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      await expect(seoulSubwayApi.getRealtimeArrival('역삼')).rejects.toBeInstanceOf(SeoulApiError);
+      await first.catch(() => undefined);
+
+      const reservedKey = keyOf(1); // 역삼 drew the same backup key and auth-disabled it
+      expect(mockFetch).toHaveBeenCalledTimes(3);
+      expect(keyOf(2)).not.toBe(reservedKey);
+    });
+
+    it('fails fast on non-retryable client/auth errors (single call)', async () => {
+      mockFetch.mockResolvedValue(jsonResponse(apiErrorBody('ERROR-300')));
+      await expect(seoulSubwayApi.getRealtimePosition('2호선')).rejects.toBeInstanceOf(SeoulApiError);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('retries a transient error on realtimePosition too', async () => {
+      mockFetch
+        .mockResolvedValueOnce(jsonResponse(apiErrorBody('ERROR-335')))
+        .mockResolvedValueOnce(jsonResponse({
+          errorMessage: { status: 200, code: 'INFO-000', message: 'ok' },
+          realtimePositionList: [],
+        }));
+
+      await expect(seoulSubwayApi.getRealtimePosition('2호선')).resolves.toEqual([]);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('A3 — response body is read inside the 10s timeout', () => {
+    it('times out and aborts when the body never arrives after headers', async () => {
+      jest.useFakeTimers();
+      const signals: AbortSignal[] = [];
+      mockFetch.mockImplementation((_url: string, init: { signal: AbortSignal }) => {
+        signals.push(init.signal);
+        return Promise.resolve({ ok: true, json: () => new Promise(() => undefined) });
+      });
+
+      const assertion = expect(seoulSubwayApi.getRealtimeArrival('강남')).rejects.toThrow(
+        'API 요청 시간이 초과'
+      );
+      await jest.advanceTimersByTimeAsync(60_000);
+      await assertion;
+
+      expect(signals.length).toBeGreaterThan(0);
+      expect(signals.every((s) => s.aborted)).toBe(true);
+    });
+
+    it('still succeeds when the body arrives before the timeout', async () => {
+      jest.useFakeTimers();
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => new Promise((resolve) => setTimeout(() => resolve(okArrival), 5_000)),
+      });
+
+      const promise = seoulSubwayApi.getRealtimeArrival('강남');
+      await jest.advanceTimersByTimeAsync(5_000);
+
+      await expect(promise).resolves.toEqual([]);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe('A5 — timetable non-JSON body preview is masked', () => {
+    it('never logs the API key echoed back in a non-JSON body', async () => {
+      const echoed = `<RESULT><MESSAGE>invalid key test-data-portal-key</MESSAGE></RESULT>`;
+      const makeResponse = (): Record<string, unknown> => ({
+        ok: true,
+        headers: { get: () => 'text/xml' },
+        json: () => Promise.reject(new SyntaxError('Unexpected token <')),
+        clone: () => ({ text: () => Promise.resolve(echoed) }),
+      });
+      mockFetch.mockImplementation(() => Promise.resolve(makeResponse()));
+
+      await expect(seoulSubwayApi.getStationTimetable('0222', '1', '1')).rejects.toThrow();
+
+      const logged = errorSpy.mock.calls.map((c) => c.map(String).join(' ')).join('\n');
+      expect(logged).toContain('body[0..300]');
+      expect(logged).not.toContain('test-data-portal-key');
     });
   });
 });
