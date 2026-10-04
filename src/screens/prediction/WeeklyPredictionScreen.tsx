@@ -38,11 +38,10 @@ import { useSemanticTokens } from '@/services/theme';
 import { weightToFontFamily } from '@/styles/modernTheme';
 import { truncateMinutes } from '@/utils/dateUtils';
 import { Pill } from '@/components/design';
-import { WeeklyTrendChart, PredictionFactorsSection, HourlyCongestionChart, type DayBarData, type WeekdayLabel } from '@/components/prediction';
+import { WeeklyTrendChart, PredictionFactorsSection, type DayBarData, type WeekdayLabel } from '@/components/prediction';
 import { GuidanceStepRow } from '@/components/guidance';
-import { congestionService, type HourlySlot } from '@/services/congestion/congestionService';
 import { type DayOfWeek, type PredictedCommute } from '@/models/pattern';
-import { directionToDisplay, type Direction } from '@/models/route';
+import { type Direction } from '@/models/route';
 import { selectCommuteRoute } from '@services/route/selectCommuteRoute';
 import { deriveLoopDirection } from '@/utils/loopDirection';
 
@@ -284,36 +283,12 @@ export const WeeklyPredictionScreen: React.FC = () => {
     dayOfWeek: todayDow,
   });
 
-  // Section 7: hourly congestion forecast — 7 slots (±45 min around now)
-  // sourced from historical Firestore docs via congestionService. The
-  // reference time is captured once per mount so the "지금" highlight is
-  // stable across re-renders; refresh on next mount is acceptable for a
-  // commute screen.
-  const hourlyChartTime = useMemo(() => new Date(), []);
-  const [hourlySlots, setHourlySlots] = useState<readonly HourlySlot[]>([]);
-  useEffect(() => {
-    // Skip the direction-keyed fetch when direction is unknown — surfaces
-    // empty slots and the hourly chart section is hidden below. lineId and
-    // direction come from the same congestionContext source (no cross-binding).
-    const ctx = congestionContext;
-    if (ctx?.direction === undefined) {
-      setHourlySlots([]);
-      return;
-    }
-    let cancelled = false;
-    congestionService
-      .getHourlyForecast(ctx.lineId, ctx.direction, hourlyChartTime)
-      .then((slots) => {
-        if (!cancelled) setHourlySlots(slots);
-      })
-      .catch(() => {
-        // graceful fallback — empty slots → chart renders empty bars.
-        if (!cancelled) setHourlySlots([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [congestionContext, hourlyChartTime]);
+  // Section 7: hourly congestion forecast — TODO(혼잡도): disabled until a data
+  // source exists. congestionData has no writer (app, Functions, scripts) and is
+  // empty in production, so congestionService.getHourlyForecast always produced
+  // "0%" placeholder slots — and every open fired 7 Firestore queries that
+  // failed on a missing composite index (fetchSlotAverage). Restore the
+  // getHourlyForecast effect + HourlyCongestionChart once data is collected.
 
   // Animated count-up for the big number — 900ms ease-out cubic.
   const animatedValue = useRef(new Animated.Value(0)).current;
@@ -541,45 +516,23 @@ export const WeeklyPredictionScreen: React.FC = () => {
         </View>
       )}
 
-      {/* 7. Hourly congestion forecast (Task 10) — wires
-          HourlyCongestionChart (Task 9) backed by
-          congestionService.getHourlyForecast (Task 8).
-          `congestionContext` binds (lineId, direction) as a single-source pair
-          (ML todayPrediction, else the configured route's first-ride segment).
-          Three cases:
-            1. no route configured (`congestionContext === undefined`) → render
-               nothing; the route-setup banner above already explains it.
-            2. route + resolved direction → render the chart.
-            3. route + unresolved direction (linear-line fallback / loop branch)
-               → honest "unavailable" card (the subtitle "<line>호선 <direction>
-               방면" has no honest neutral form). */}
-      {congestionContext === undefined ? null : congestionContext.direction !==
-        undefined ? (
-        <View style={styles.sectionPad}>
-          <HourlyCongestionChart
-            lineId={congestionContext.lineId}
-            direction={directionToDisplay(
-              congestionContext.direction,
-              congestionContext.lineId,
-            )}
-            currentTime={hourlyChartTime}
-            slots={hourlySlots}
-          />
-        </View>
-      ) : (
+      {/* 7. Hourly congestion forecast — "preparing" card while the data source
+          is missing (TODO(혼잡도), see the note above the hooks). Hidden when no
+          route is configured: the route-setup banner above already explains it. */}
+      {congestionContext === undefined ? null : (
         <View style={styles.sectionPad}>
           <View
             style={[
               styles.hourlyUnavailableCard,
               { backgroundColor: semantic.bgElevated },
             ]}
-            testID="hourly-congestion-unavailable"
+            testID="hourly-congestion-pending"
           >
             <Text style={[styles.hourlyUnavailableTitle, { color: semantic.labelStrong }]}>
               시간대별 혼잡도
             </Text>
             <Text style={[styles.hourlyUnavailableBody, { color: semantic.labelAlt }]}>
-              이 경로는 방면을 확정할 수 없어 혼잡도 예측을 제공하지 않아요
+              혼잡도 예측 데이터를 준비하고 있어요
             </Text>
           </View>
         </View>

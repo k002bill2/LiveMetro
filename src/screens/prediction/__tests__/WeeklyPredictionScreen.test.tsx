@@ -9,6 +9,7 @@
 
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
+import { congestionService } from '@/services/congestion/congestionService';
 import { WeeklyPredictionScreen } from '../WeeklyPredictionScreen';
 import { useCommutePattern } from '@/hooks/useCommutePattern';
 import { useMLPrediction } from '@/hooks/useMLPrediction';
@@ -364,18 +365,11 @@ describe('WeeklyPredictionScreen', () => {
     expect(getByText('출발 시간에 알려드릴게요 (09:15)')).toBeTruthy();
   });
 
-  it('renders hourly congestion forecast and prediction factors sections', async () => {
-    // Task 10 (2026-05-12) replaced the inline Section 7 placeholder
-    // with HourlyCongestionChart wired to congestionService. The chart
-    // title renders synchronously; the "지금" current-slot marker only
-    // appears after the async getHourlyForecast resolves and slots are
-    // committed via useState — hence findByText.
-    // Final-review fix: the hourly chart is now gated on a known
-    // direction (producer returns undefined for loop/branched lines —
-    // see deriveDirection in pattern.ts and spec §7.1). Provide a
-    // prediction with a concrete direction so the chart renders.
-    // Use mockReturnValue (not Once) because the screen re-renders on
-    // async slot state updates and each render re-reads the hook.
+  it('shows the honest "preparing" card instead of the hourly chart and skips the Firestore query', () => {
+    // congestionData has no writer anywhere (app, Functions, scripts) and is
+    // empty in production, so the hourly forecast would always render fake
+    // "0%" slots (and failed on a missing composite index). Until a data
+    // source exists the section is a "preparing" card — TODO(혼잡도).
     (useCommutePattern as jest.Mock).mockReturnValue({
       todayPrediction: {
         date: '2026-05-12',
@@ -403,9 +397,11 @@ describe('WeeklyPredictionScreen', () => {
       loading: false,
       error: null,
     });
-    const { getByText, findByText } = render(<WeeklyPredictionScreen />);
-    expect(getByText('시간대별 혼잡도 예측')).toBeTruthy();
-    expect(await findByText('지금')).toBeTruthy();
+    const { getByTestId, queryByText, getByText } = render(<WeeklyPredictionScreen />);
+    expect(getByTestId('hourly-congestion-pending')).toBeTruthy();
+    expect(getByText('혼잡도 예측 데이터를 준비하고 있어요')).toBeTruthy();
+    expect(queryByText('지금')).toBeNull();
+    expect(congestionService.getHourlyForecast).not.toHaveBeenCalled();
     expect(getByText('예측에 반영된 요소')).toBeTruthy();
   });
 
@@ -464,11 +460,11 @@ describe('WeeklyPredictionScreen', () => {
     );
 
     const { getByTestId, queryByText } = render(<WeeklyPredictionScreen />);
-    expect(getByTestId('hourly-congestion-unavailable')).toBeTruthy();
+    expect(getByTestId('hourly-congestion-pending')).toBeTruthy();
     expect(queryByText('시간대별 혼잡도 예측')).toBeNull();
   });
 
-  it('resolves 외선순환 for a LOOP (line 2 trunk) route via deriveLoopDirection', () => {
+  it('shows the preparing card for a configured LOOP (line 2 trunk) route', () => {
     // deriveDirection returns undefined for line 2; deriveLoopDirection (real,
     // against lines.json) resolves 신도림→강남 = 'down' → '외선순환' label.
     (useFirestoreMorningCommute as jest.Mock).mockReturnValue({
@@ -481,12 +477,12 @@ describe('WeeklyPredictionScreen', () => {
       makeRoute({ fromStationId: 'sindorim', toStationId: 'gangnam', lineId: '2' }),
     );
 
-    const { getByText } = render(<WeeklyPredictionScreen />);
-    expect(getByText('시간대별 혼잡도 예측')).toBeTruthy();
-    expect(getByText(/외선순환/)).toBeTruthy();
+    const { getByTestId, getByText } = render(<WeeklyPredictionScreen />);
+    expect(getByTestId('hourly-congestion-pending')).toBeTruthy();
+    expect(getByText('혼잡도 예측 데이터를 준비하고 있어요')).toBeTruthy();
   });
 
-  it('resolves 내선순환 for the reverse LOOP (line 2 trunk) route', () => {
+  it('shows the preparing card for the reverse LOOP (line 2 trunk) route', () => {
     // 강남→신도림 = 'up' → '내선순환' label.
     (useFirestoreMorningCommute as jest.Mock).mockReturnValue({
       stationId: '0222',
@@ -498,11 +494,12 @@ describe('WeeklyPredictionScreen', () => {
       makeRoute({ fromStationId: 'gangnam', toStationId: 'sindorim', lineId: '2' }),
     );
 
-    const { getByText } = render(<WeeklyPredictionScreen />);
-    expect(getByText(/내선순환/)).toBeTruthy();
+    const { getByTestId, getByText } = render(<WeeklyPredictionScreen />);
+    expect(getByTestId('hourly-congestion-pending')).toBeTruthy();
+    expect(getByText('혼잡도 예측 데이터를 준비하고 있어요')).toBeTruthy();
   });
 
-  it('renders the honest "unavailable" card when direction cannot be determined (line 2 branch)', () => {
+  it('shows the preparing card even when direction cannot be determined (line 2 branch)', () => {
     // s_0244 lives on the 성수지선 (not the loop trunk) → deriveLoopDirection
     // returns undefined → the direction-keyed chart is impossible, so an honest
     // static card explains why instead of a silent gap.
@@ -517,10 +514,8 @@ describe('WeeklyPredictionScreen', () => {
     );
 
     const { getByTestId, getByText, queryByText } = render(<WeeklyPredictionScreen />);
-    expect(getByTestId('hourly-congestion-unavailable')).toBeTruthy();
-    expect(
-      getByText('이 경로는 방면을 확정할 수 없어 혼잡도 예측을 제공하지 않아요'),
-    ).toBeTruthy();
+    expect(getByTestId('hourly-congestion-pending')).toBeTruthy();
+    expect(getByText('혼잡도 예측 데이터를 준비하고 있어요')).toBeTruthy();
     // The direction-keyed chart is NOT rendered.
     expect(queryByText('시간대별 혼잡도 예측')).toBeNull();
   });
@@ -566,10 +561,11 @@ describe('WeeklyPredictionScreen', () => {
       makeRoute({ fromStationId: 'sindorim', toStationId: 'gangnam', lineId: '2' }),
     );
 
-    const { getByText, queryByText } = render(<WeeklyPredictionScreen />);
-    // Pair comes from the configured route: line 2 + 외선순환 (신도림→강남).
-    expect(getByText(/2호선 외선순환/)).toBeTruthy();
-    // The stale prediction line must NOT leak into the chart context.
+    const { getByTestId, queryByText } = render(<WeeklyPredictionScreen />);
+    // The hourly chart is disabled (TODO(혼잡도)) so the (line 2, 외선순환) pair
+    // is not rendered; restore the chart-subtitle assertion with the chart.
+    expect(getByTestId('hourly-congestion-pending')).toBeTruthy();
+    // The stale prediction line must still not leak anywhere on screen.
     expect(queryByText(/3호선/)).toBeNull();
   });
 
@@ -621,7 +617,7 @@ describe('WeeklyPredictionScreen', () => {
     // section stays silent (no card, no chart).
     const { queryByText, queryByTestId } = render(<WeeklyPredictionScreen />);
     expect(queryByText('시간대별 혼잡도 예측')).toBeNull();
-    expect(queryByTestId('hourly-congestion-unavailable')).toBeNull();
+    expect(queryByTestId('hourly-congestion-pending')).toBeNull();
   });
 
   it('renders CTA pressable with departure-alert label', () => {
