@@ -19,6 +19,12 @@ import TrainSelectionScreen from '../TrainSelectionScreen';
 import { useRealtimeTrains } from '@/hooks/useRealtimeTrains';
 import { useCongestion } from '@/hooks/useCongestion';
 
+// The screen reads useSafeAreaInsets (edge-to-edge bottom inset); without a
+// provider the real hook throws, so stub zero insets.
+jest.mock('react-native-safe-area-context', () => ({
+  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 0, left: 0 }),
+}));
+
 jest.mock('@react-navigation/native', () => ({
   useIsFocused: jest.fn(() => true),
   useNavigation: jest.fn(() => ({
