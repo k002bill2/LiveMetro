@@ -1147,9 +1147,15 @@ class SeoulSubwayApiService {
     // Primary: use barvlDt (exact remaining seconds from Seoul API)
     let arrivalTime: number | null = null;
 
+    // barvlDt '0' means "remaining seconds unknown", not "arriving now": live
+    // responses send '0' for trains still a station or more away (e.g. 수인분당
+    // at 선릉 with arvlCd 4 '전역 진입' / 99 '[6]번째 전역'), which rendered as
+    // "0분". Only a positive value is authoritative; 0 falls through to the
+    // message/arvlCd fallbacks, which still yield 0s for a genuinely arrived
+    // train (arvlCd 1 / "도착").
     if (seoulData.barvlDt) {
       const seconds = parseInt(seoulData.barvlDt, 10);
-      if (!isNaN(seconds) && seconds >= 0) {
+      if (!isNaN(seconds) && seconds > 0) {
         arrivalTime = seconds;
       }
     }
@@ -1168,9 +1174,9 @@ class SeoulSubwayApiService {
         arrivalTime = parseInt(minSecMatch[1], 10) * 60 + parseInt(minSecMatch[2], 10);
       }
 
-      // "X분후" pattern (e.g., "2분후[1번째전]")
+      // "X분후" / "X분 후" pattern (e.g., "2분후[1번째전]", live "5분 후")
       if (arrivalTime === null) {
-        const minuteMatch = arrivalMsg.match(/(\d+)분후/);
+        const minuteMatch = arrivalMsg.match(/(\d+)분\s*후/);
         if (minuteMatch?.[1]) {
           arrivalTime = parseInt(minuteMatch[1], 10) * 60;
         }
