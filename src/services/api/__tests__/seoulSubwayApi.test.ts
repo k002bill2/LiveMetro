@@ -873,6 +873,41 @@ describe('SeoulSubwayApiService', () => {
   });
 
   describe('convertToAppTrain', () => {
+    // Real 2026-10-04 선릉 response: the 수인분당(1075) rows carry barvlDt '0'
+    // while arvlCd/arvlMsg2 say the train is still a station (or more) away.
+    // '0' there means "remaining seconds unknown", not "arriving now".
+    describe("barvlDt '0' (remaining time unknown)", () => {
+      const row = (overrides: Partial<SeoulRealtimeArrival>): SeoulRealtimeArrival => ({
+        rowNum: '1', selectedCount: '1', totalCount: '8',
+        subwayId: '1075', updnLine: '상행', trainLineNm: '왕십리행 - 한티방면',
+        subwayHeading: '', statnFid: '', statnTid: '', statnId: '1075075220', statnNm: '선릉',
+        trainCo: '', ordkey: '01', subwayList: '', statnList: '', btrainSttus: '일반',
+        barvlDt: '0', btrainNo: '6101', bstatnId: '', bstatnNm: '왕십리',
+        recptnDt: '', arvlMsg2: '', arvlMsg3: '', arvlCd: '',
+        ...overrides,
+      });
+
+      it('falls through to arvlCd for a previous-station entry (전역 진입)', () => {
+        const result = seoulSubwayApi.convertToAppTrain(row({ arvlCd: '4', arvlMsg2: '전역 진입' }));
+        expect(result.arrivalTime).toBe(180);
+      });
+
+      it('treats a far-away running train (arvlCd 99) as unknown, not 0s', () => {
+        const result = seoulSubwayApi.convertToAppTrain(row({ arvlCd: '99', arvlMsg2: '[6]번째 전역 (수서)' }));
+        expect(result.arrivalTime).toBeNull();
+      });
+
+      it('still reports 0s when the train has actually arrived (arvlCd 1)', () => {
+        const result = seoulSubwayApi.convertToAppTrain(row({ arvlCd: '1', arvlMsg2: '선릉 도착' }));
+        expect(result.arrivalTime).toBe(0);
+      });
+
+      it('uses the message text when it carries minutes', () => {
+        const result = seoulSubwayApi.convertToAppTrain(row({ arvlCd: '99', arvlMsg2: '5분 후' }));
+        expect(result.arrivalTime).toBe(300);
+      });
+    });
+
     it('should convert Seoul API data to app format with minutes', () => {
       // arvlCd left empty: this fixture exercises the "X분후" text-fallback
       // path. Real API responses never combine "3분후" text with arvlCd='2'
