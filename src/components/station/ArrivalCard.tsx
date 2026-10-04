@@ -23,6 +23,9 @@ import { LineBadge, Pill, congFromPct, CONG_TONE, type LineId } from '@/componen
  *  to block subsequent interactions. */
 const TOOLTIP_DISMISS_MS = 2500;
 
+/** "곧 도착" threshold — same 60s cut as dateUtils / guidance ETA labels. */
+const IMMINENT_THRESHOLD_SEC = 60;
+
 export interface ArrivalCardProps {
   line: LineId;
   destination: string;
@@ -61,6 +64,8 @@ const ArrivalCardImpl: React.FC<ArrivalCardProps> = ({
 
   const totalSeconds = Math.max(0, Math.floor(minutes) * 60 + Math.max(0, Math.floor(seconds)));
   const showImminentOnly = totalSeconds === 0;
+  // Being first only highlights the card; the badge must reflect the actual ETA.
+  const showImminentBadge = isFirst && totalSeconds < IMMINENT_THRESHOLD_SEC;
 
   // Phase 53b: long-press tooltip on each car bar. Surfaces the level
   // name + percentage (data ArrivalCard already has) without needing the
@@ -172,7 +177,7 @@ const ArrivalCardImpl: React.FC<ArrivalCardProps> = ({
                 <Text style={minutesUnitStyle}>분</Text>
                 <Text style={secondsStyle}>{`${String(seconds).padStart(2, '0')}초`}</Text>
               </View>
-              {isFirst ? (
+              {showImminentBadge ? (
                 <View style={styles.pillSpacer}>
                   <Pill tone="primary" size="sm">
                     곧 도착
