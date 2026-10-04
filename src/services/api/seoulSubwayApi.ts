@@ -13,6 +13,11 @@ import type { TrainPosition, TrainPositionStatus } from '@/models/trainPosition'
  * Rate Limiter for Seoul API (30-second minimum interval per endpoint)
  * Required by CLAUDE.md: "Seoul API - 30s minimum polling interval"
  */
+/** Seoul Open API daily call cap exceeded (1,000 calls/key/day). */
+const DAILY_QUOTA_ERROR_CODE = 'ERROR-337';
+const DAILY_QUOTA_EXHAUSTED_MESSAGE =
+  '오늘 실시간 조회 한도를 모두 사용했습니다 (자정에 초기화)';
+
 class RateLimiter {
   private lastRequestTime: Map<string, number> = new Map();
   private readonly minInterval: number;
@@ -285,18 +290,30 @@ export class SeoulApiError extends Error {
   readonly category: SeoulApiErrorCategory;
   /** True for categories where retry without user action is meaningful. */
   readonly retryable: boolean;
+  /**
+   * True only when every realtime key has hit its daily cap (ERROR-337), so no
+   * call can succeed until KST midnight. A single key's ERROR-337 while other
+   * keys are merely cooling down stays false.
+   */
+  readonly dailyQuotaExhausted: boolean;
 
   /**
    * @param options.retryable Override the category default — e.g. a quota
    *   error with no healthy backup key is not worth an immediate retry.
+   * @param options.dailyQuotaExhausted See {@link dailyQuotaExhausted}.
    */
-  constructor(errorCode: string, message: string, options: { retryable?: boolean } = {}) {
+  constructor(
+    errorCode: string,
+    message: string,
+    options: { retryable?: boolean; dailyQuotaExhausted?: boolean } = {}
+  ) {
     super(`Seoul API Error: ${message} (Code: ${errorCode})`);
     this.name = 'SeoulApiError';
     this.errorCode = errorCode;
     this.category = categorizeSeoulApiError(errorCode);
     this.retryable =
       options.retryable ?? (this.category === 'transient' || this.category === 'quota');
+    this.dailyQuotaExhausted = options.dailyQuotaExhausted ?? false;
   }
 }
 
@@ -582,6 +599,10 @@ class SeoulSubwayApiService {
   private async fetchRealtimeArrival(stationName: string): Promise<SeoulRealtimeArrival[]> {
     const rateLimitKey = `realtime:${stationName}`;
 
+    // Daily cap (ERROR-337) exhausted on every key: fail fast with no network
+    // call and no 30s throttle wait — retrying cannot succeed before KST midnight.
+    this.assertDailyQuotaAvailable();
+
     // Apply rate limiting (30-second minimum interval)
     await this.rateLimiter.throttle(rateLimitKey);
 
@@ -629,7 +650,12 @@ class SeoulSubwayApiService {
           let retryable: boolean | undefined;
           if (category === 'quota') {
             // Rate limit / server overload — retry once on a healthy backup key.
-            nextKey = this.takeFallbackKey(this.keyManager, apiKey);
+            // ERROR-337 (daily cap) keeps the key out until KST midnight instead
+            // of the generic 60s cooldown.
+            nextKey =
+              errorCode === DAILY_QUOTA_ERROR_CODE
+                ? this.takeDailyQuotaFallbackKey(this.keyManager, apiKey)
+                : this.takeFallbackKey(this.keyManager, apiKey);
             retryable = nextKey !== null;
             console.warn(
               nextKey
@@ -655,7 +681,11 @@ class SeoulSubwayApiService {
             `code=${errorCode} category=${category} message=${message}`
           );
 
-          throw new SeoulApiError(errorCode, message, { retryable });
+          throw new SeoulApiError(errorCode, message, {
+            retryable,
+            dailyQuotaExhausted:
+              errorCode === DAILY_QUOTA_ERROR_CODE && this.keyManager.isDailyQuotaExhausted(),
+          });
         }
 
         // Success - report to key manager
@@ -707,6 +737,10 @@ class SeoulSubwayApiService {
   private async fetchRealtimePosition(lineName: string): Promise<SeoulRealtimePosition[]> {
     const rateLimitKey = `position:${lineName}`;
 
+    // Daily cap (ERROR-337) exhausted on every key: fail fast with no network
+    // call and no 30s throttle wait — retrying cannot succeed before KST midnight.
+    this.assertDailyQuotaAvailable();
+
     await this.rateLimiter.throttle(rateLimitKey);
 
     let nextKey: string | null = null;
@@ -738,7 +772,10 @@ class SeoulSubwayApiService {
 
           let retryable: boolean | undefined;
           if (category === 'quota') {
-            nextKey = this.takeFallbackKey(this.keyManager, apiKey);
+            nextKey =
+              errorCode === DAILY_QUOTA_ERROR_CODE
+                ? this.takeDailyQuotaFallbackKey(this.keyManager, apiKey)
+                : this.takeFallbackKey(this.keyManager, apiKey);
             retryable = nextKey !== null;
             console.warn(
               nextKey
@@ -758,7 +795,11 @@ class SeoulSubwayApiService {
             `code=${errorCode} category=${category} message=${message}`
           );
 
-          throw new SeoulApiError(errorCode, message, { retryable });
+          throw new SeoulApiError(errorCode, message, {
+            retryable,
+            dailyQuotaExhausted:
+              errorCode === DAILY_QUOTA_ERROR_CODE && this.keyManager.isDailyQuotaExhausted(),
+          });
         }
 
         this.keyManager.reportSuccess(apiKey);
@@ -1050,6 +1091,29 @@ class SeoulSubwayApiService {
    * hands back the earliest-recovering (still rate-limited) key — retrying on
    * it would just burn another call.
    */
+  /**
+   * Throws a non-retryable ERROR-337 when every realtime key has hit the daily
+   * cap. Called before throttling so polling callers get an immediate,
+   * network-free rejection until the keys re-enable at KST midnight.
+   */
+  private assertDailyQuotaAvailable(): void {
+    if (this.keyManager.isDailyQuotaExhausted()) {
+      throw new SeoulApiError(DAILY_QUOTA_ERROR_CODE, DAILY_QUOTA_EXHAUSTED_MESSAGE, {
+        retryable: false,
+        dailyQuotaExhausted: true,
+      });
+    }
+  }
+
+  /** ERROR-337 variant of {@link takeFallbackKey}: disables until KST midnight. */
+  private takeDailyQuotaFallbackKey(manager: ApiKeyManager, failedKey: string): string | null {
+    manager.reportDailyQuotaExceeded(failedKey);
+    const fallbackKey = manager.getNextKey();
+    return fallbackKey && fallbackKey !== failedKey && manager.isKeyAvailable(fallbackKey)
+      ? fallbackKey
+      : null;
+  }
+
   private takeFallbackKey(manager: ApiKeyManager, failedKey: string): string | null {
     const fallbackKey = manager.reportRateLimit(failedKey);
     if (fallbackKey && fallbackKey !== failedKey && manager.isKeyAvailable(fallbackKey)) {

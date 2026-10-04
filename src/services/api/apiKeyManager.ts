@@ -13,9 +13,26 @@ interface ApiKeyState {
   lastError: number | null;
   isDisabled: boolean;
   disabledUntil: number | null;
-  /** 'auth' = 키 자체가 무효 — 복구 후보에서 제외하고 장기 TTL 적용 */
-  disabledReason: 'error' | 'auth' | null;
+  /**
+   * 'auth' = 키 자체가 무효 — 복구 후보에서 제외하고 장기 TTL 적용.
+   * 'quota' = 일일 호출 한도 소진(ERROR-337) — 다음 KST 자정까지 비활성, 복구 후보 제외.
+   */
+  disabledReason: DisableReason | null;
 }
+
+type DisableReason = 'error' | 'auth' | 'quota';
+
+/** KST = UTC+9, no DST. */
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Next 00:00 in Korea (KST) as an epoch ms, computed from epoch arithmetic so
+ * it is correct regardless of the device's local time zone. Assumption: the
+ * Seoul Open API daily quota (1,000 calls/key) resets at KST midnight.
+ */
+export const nextKstMidnight = (nowMs: number): number =>
+  Math.floor((nowMs + KST_OFFSET_MS) / DAY_MS) * DAY_MS + DAY_MS - KST_OFFSET_MS;
 
 interface ApiKeyManagerOptions {
   /** 에러 발생 시 키를 비활성화할 시간 (ms) */
@@ -147,6 +164,28 @@ export class ApiKeyManager {
   }
 
   /**
+   * 일일 호출 한도 소진(ERROR-337) 시 호출 — 다음 KST 자정까지 비활성화.
+   * 60초 쿨다운으로 재투입하면 자정 전까지 매분 실패 호출이 반복된다.
+   */
+  reportDailyQuotaExceeded(key: string): void {
+    this.disableKey(key, 'quota');
+  }
+
+  /**
+   * 오늘 더 이상 호출할 수 있는 키가 없는지 — 모든 키가 한도 소진/무효이고
+   * 그중 하나 이상이 한도 소진일 때 true. (전부 무효 키뿐이면 한도 문제가 아니다)
+   */
+  isDailyQuotaExhausted(): boolean {
+    this.checkAndReenableKeys();
+    const states = Array.from(this.keys.values());
+    return (
+      states.length > 0 &&
+      states.every((s) => s.isDisabled && (s.disabledReason === 'quota' || s.disabledReason === 'auth')) &&
+      states.some((s) => s.disabledReason === 'quota')
+    );
+  }
+
+  /**
    * 키가 지금 라운드로빈에 들어 있는지 (비활성 아님)
    */
   isKeyAvailable(key: string): boolean {
@@ -243,18 +282,24 @@ export class ApiKeyManager {
     };
   }
 
-  private disableKey(key: string, reason: 'error' | 'auth' = 'error'): void {
+  private disableKey(key: string, reason: DisableReason = 'error'): void {
     const state = this.keys.get(key);
     if (state) {
-      // 이미 auth로 장기 비활성인 키를 짧은 쿨다운으로 덮어쓰지 않는다
-      if (state.isDisabled && state.disabledReason === 'auth' && reason !== 'auth') {
+      // 이미 auth/quota로 장기 비활성인 키를 짧은 쿨다운으로 덮어쓰지 않는다
+      if (
+        state.isDisabled &&
+        (state.disabledReason === 'auth' || state.disabledReason === 'quota') &&
+        reason === 'error'
+      ) {
         return;
       }
-      const duration =
-        reason === 'auth' ? this.options.authDisableDurationMs : this.options.disableDurationMs;
+      const now = Date.now();
       state.isDisabled = true;
       state.disabledReason = reason;
-      state.disabledUntil = Date.now() + duration;
+      state.disabledUntil =
+        reason === 'quota'
+          ? nextKstMidnight(now)
+          : now + (reason === 'auth' ? this.options.authDisableDurationMs : this.options.disableDurationMs);
       console.warn(
         `ApiKeyManager: Key ${this.maskKey(key)} disabled until ${new Date(state.disabledUntil).toISOString()}`
       );
@@ -279,8 +324,8 @@ export class ApiKeyManager {
     let earliestTime = Infinity;
 
     this.keys.forEach((state) => {
-      // 무효(auth) 키는 복구 후보가 아니다 — 내주면 실패가 확정된 호출 1회가 낭비된다
-      if (state.disabledReason === 'auth') return;
+      // 무효(auth)·한도 소진(quota) 키는 복구 후보가 아니다 — 내주면 실패가 확정된 호출이 낭비된다
+      if (state.disabledReason === 'auth' || state.disabledReason === 'quota') return;
       if (state.disabledUntil && state.disabledUntil < earliestTime) {
         earliestTime = state.disabledUntil;
         earliestKey = state.key;
@@ -289,7 +334,10 @@ export class ApiKeyManager {
 
     return (
       earliestKey ??
-      this.keyOrder.find((key) => this.keys.get(key)?.disabledReason !== 'auth') ??
+      this.keyOrder.find((key) => {
+        const reason = this.keys.get(key)?.disabledReason;
+        return reason !== 'auth' && reason !== 'quota';
+      }) ??
       null
     );
   }

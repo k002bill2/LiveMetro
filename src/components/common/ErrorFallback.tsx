@@ -99,6 +99,18 @@ const CATEGORY_COPY: Record<SeoulApiErrorCategory, FallbackCopy> = {
   },
 };
 
+// 모든 키의 일일 한도(ERROR-337) 소진은 quota 카테고리지만 "잠시 후"에 풀리지
+// 않는다 — 한도는 자정(KST)에 초기화되고, 그때까지 앱은 호출 자체를 차단한다.
+// retry 버튼은 차단된 호출만 반복하므로 숨긴다. 한 키만 337이고 다른 키가
+// 쿨다운 중이면 곧 복구되므로 일반 quota 문구를 쓴다.
+const DAILY_QUOTA_COPY: FallbackCopy = {
+  title: '오늘 실시간 조회 한도를 모두 사용했어요',
+  description: '실시간 도착정보는 자정에 다시 제공됩니다.',
+  showRetry: false,
+  Icon: Info,
+  iconColor: COLORS.semantic.warning,
+};
+
 // Non-SeoulApiError용 - 네트워크 끊김 / 알 수 없는 throw
 const NETWORK_FALLBACK: FallbackCopy = {
   title: '연결을 확인해주세요',
@@ -110,6 +122,9 @@ const NETWORK_FALLBACK: FallbackCopy = {
 
 const selectCopy = (error: unknown): FallbackCopy => {
   if (error instanceof SeoulApiError) {
+    if (error.dailyQuotaExhausted) {
+      return DAILY_QUOTA_COPY;
+    }
     return CATEGORY_COPY[error.category];
   }
   return NETWORK_FALLBACK;

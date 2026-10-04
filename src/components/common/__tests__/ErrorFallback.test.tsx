@@ -71,6 +71,36 @@ describe('ErrorFallback', () => {
       expect(getByText('다시 시도')).toBeTruthy();
     });
 
+    it('renders daily-quota copy without retry for ERROR-337 (resets at midnight, not "잠시 후")', () => {
+      // 일일 한도 소진은 자정까지 회복되지 않는다 — "잠시 후 다시 시도"와
+      // retry 버튼은 거짓 약속이고, 누를 때마다 차단된 호출만 반복한다.
+      const error = new SeoulApiError('ERROR-337', 'daily quota', {
+        retryable: false,
+        dailyQuotaExhausted: true,
+      });
+
+      const { getByText, queryByText } = render(
+        <ErrorFallback error={error} onRetry={jest.fn()} />
+      );
+
+      expect(getByText('오늘 실시간 조회 한도를 모두 사용했어요')).toBeTruthy();
+      expect(getByText(/자정/)).toBeTruthy();
+      expect(queryByText('서버가 잠시 바빠요')).toBeNull();
+      expect(queryByText('다시 시도')).toBeNull();
+    });
+
+    it('keeps the generic quota copy and retry for a single-key ERROR-337 (other keys recover soon)', () => {
+      const error = new SeoulApiError('ERROR-337', 'daily quota on one key');
+
+      const { getByText, queryByText } = render(
+        <ErrorFallback error={error} onRetry={jest.fn()} />
+      );
+
+      expect(getByText('서버가 잠시 바빠요')).toBeTruthy();
+      expect(getByText('다시 시도')).toBeTruthy();
+      expect(queryByText('오늘 실시간 조회 한도를 모두 사용했어요')).toBeNull();
+    });
+
     it('renders no-data copy and retry button for INFO-200 (defensive)', () => {
       // INFO-200은 호출자가 보통 빈 배열로 처리하므로 ErrorFallback에 도달하지
       // 않지만, 직접 throw하는 경로(`throwOnError: true`)를 위한 defensive copy.

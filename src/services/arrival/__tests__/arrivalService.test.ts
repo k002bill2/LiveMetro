@@ -4,6 +4,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AppState, type AppStateStatus } from 'react-native';
 import { ArrivalService, ArrivalInfo, ArrivalCallback } from '../arrivalService';
 
 // Mock dependencies
@@ -98,6 +99,38 @@ describe('ArrivalService', () => {
   });
 
   describe('getArrivals', () => {
+    it('does not retry once every key has hit the daily quota (ERROR-337) — one call, no backoff storm', async () => {
+      const quotaError = Object.assign(new Error('daily quota'), {
+        errorCode: 'ERROR-337',
+        retryable: false,
+        dailyQuotaExhausted: true,
+      });
+      mockSeoulSubwayApi.getRealtimeArrival.mockReset().mockRejectedValue(quotaError);
+      const errSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      await expect(service.getArrivals('강남', { throwOnError: true })).rejects.toBe(quotaError);
+      expect(mockSeoulSubwayApi.getRealtimeArrival).toHaveBeenCalledTimes(1);
+      errSpy.mockRestore();
+    });
+
+    it('still retries an auth failure so the next attempt can use a healthy backup key', async () => {
+      // INFO-100 disables only the failing key; the retry picks another one.
+      const authError = Object.assign(new Error('invalid key'), {
+        errorCode: 'INFO-100',
+        retryable: false,
+      });
+      mockSeoulSubwayApi.getRealtimeArrival.mockRejectedValueOnce(authError);
+      const errSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      const pending = service.getArrivals('강남');
+      await jest.runAllTimersAsync();
+      const result = await pending;
+
+      expect(mockSeoulSubwayApi.getRealtimeArrival).toHaveBeenCalledTimes(2);
+      expect(result.source).toBe('api');
+      errSpy.mockRestore();
+    });
+
     it('should return arrival info from API', async () => {
       const result = await service.getArrivals('강남');
 
@@ -542,6 +575,97 @@ describe('ArrivalService', () => {
       const result = await service.getArrivals('강남');
 
       expect(result.source).toBe('api');
+    });
+  });
+
+  describe('background pause (AppState)', () => {
+    let appStateHandler: ((next: AppStateStatus) => void) | null;
+    let removeListener: jest.Mock;
+    let addListenerSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      appStateHandler = null;
+      removeListener = jest.fn();
+      addListenerSpy = jest
+        .spyOn(AppState, 'addEventListener')
+        .mockImplementation(((_type: string, handler: (next: AppStateStatus) => void) => {
+          appStateHandler = handler;
+          return { remove: removeListener };
+        }) as unknown as typeof AppState.addEventListener);
+    });
+
+    afterEach(() => {
+      addListenerSpy.mockRestore();
+    });
+
+    const calls = (): number => mockSeoulSubwayApi.getRealtimeArrival.mock.calls.length;
+
+    it('stops polling while the app is in the background', async () => {
+      service.subscribe('강남', jest.fn(), 30000);
+      await jest.runOnlyPendingTimersAsync();
+      const before = calls();
+
+      appStateHandler?.('background');
+      jest.advanceTimersByTime(90000);
+      await jest.runOnlyPendingTimersAsync();
+
+      expect(calls()).toBe(before);
+    });
+
+    it('polls once immediately on return to foreground and resumes the interval', async () => {
+      service.subscribe('강남', jest.fn(), 30000);
+      await jest.runOnlyPendingTimersAsync();
+      appStateHandler?.('background');
+      jest.advanceTimersByTime(90000);
+      const paused = calls();
+
+      appStateHandler?.('active');
+      await jest.runOnlyPendingTimersAsync();
+      expect(calls()).toBeGreaterThan(paused);
+
+      const resumed = calls();
+      jest.advanceTimersByTime(30000);
+      await jest.runOnlyPendingTimersAsync();
+      expect(calls()).toBeGreaterThan(resumed);
+    });
+
+    it('keeps polling in the background for a keepPollingInBackground subscription (guidance)', async () => {
+      service.subscribe('강남', jest.fn(), 30000, { keepPollingInBackground: true });
+      await jest.runOnlyPendingTimersAsync();
+      const before = calls();
+
+      appStateHandler?.('background');
+      jest.advanceTimersByTime(30000);
+      await jest.runOnlyPendingTimersAsync();
+
+      expect(calls()).toBeGreaterThan(before);
+    });
+
+    it('resyncs with the current AppState when re-subscribing after the listener was removed in the background', async () => {
+      // Last subscriber leaves while backgrounded → listener removed, so the
+      // later 'active' event is never seen. A fresh subscribe must not start
+      // paused based on the stale background flag.
+      const unsubscribe = service.subscribe('강남', jest.fn(), 30000);
+      appStateHandler?.('background');
+      unsubscribe();
+      const appStateRef = AppState as unknown as { currentState: string };
+      const original = appStateRef.currentState;
+      appStateRef.currentState = 'active';
+
+      service.subscribe('역삼', jest.fn(), 30000);
+      await jest.runOnlyPendingTimersAsync();
+      const before = calls();
+      jest.advanceTimersByTime(30000);
+      await jest.runOnlyPendingTimersAsync();
+
+      appStateRef.currentState = original;
+      expect(calls()).toBeGreaterThan(before);
+    });
+
+    it('removes the AppState listener on destroy', () => {
+      service.subscribe('강남', jest.fn(), 30000);
+      service.destroy();
+      expect(removeListener).toHaveBeenCalled();
     });
   });
 
