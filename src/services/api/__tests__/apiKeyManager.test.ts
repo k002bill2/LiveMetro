@@ -153,3 +153,89 @@ describe('ApiKeyManager auth-error handling', () => {
     expect(manager.availableKeyCount).toBe(2);
   });
 });
+
+describe('ApiKeyManager daily-quota (ERROR-337) handling', () => {
+  // eslint-disable-next-line @typescript-eslint/no-var-requires
+  const { ApiKeyManager } = jest.requireActual('../apiKeyManager');
+  const SHORT_MS = 60_000;
+  // 2026-10-04 20:00 KST (11:00Z) → next KST midnight = 2026-10-05 00:00 KST (15:00Z)
+  const T_2000_KST = Date.UTC(2026, 9, 4, 11, 0, 0);
+  const NEXT_MIDNIGHT_KST = Date.UTC(2026, 9, 4, 15, 0, 0);
+  let manager: InstanceType<typeof ApiKeyManager>;
+  let now: number;
+  let nowSpy: jest.SpyInstance;
+  let warnSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    now = T_2000_KST;
+    nowSpy = jest.spyOn(Date, 'now').mockImplementation(() => now);
+    warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+    manager = new ApiKeyManager(['key-a-11111', 'key-b-22222'], {
+      disableDurationMs: SHORT_MS,
+      errorThreshold: 3,
+    });
+  });
+
+  afterEach(() => {
+    manager.dispose();
+    nowSpy.mockRestore();
+    warnSpy.mockRestore();
+  });
+
+  const disabledUntilOf = (index: number): number | null =>
+    manager.getKeyStats()[index].disabledUntil;
+
+  it('disables a quota-exhausted key until the next KST midnight', () => {
+    manager.reportDailyQuotaExceeded('key-a-11111');
+    expect(disabledUntilOf(0)).toBe(NEXT_MIDNIGHT_KST);
+  });
+
+  it('computes KST midnight from epoch, not the local calendar day (UTC date differs)', () => {
+    now = Date.UTC(2026, 9, 3, 23, 0, 0); // 2026-10-04 08:00 KST
+    manager.reportDailyQuotaExceeded('key-a-11111');
+    expect(disabledUntilOf(0)).toBe(NEXT_MIDNIGHT_KST);
+  });
+
+  it('does not re-enable the key after the short cooldown, only after KST midnight', () => {
+    manager.reportDailyQuotaExceeded('key-a-11111');
+    now += SHORT_MS + 1_000;
+    expect(new Set([manager.getNextKey(), manager.getNextKey()])).toEqual(new Set(['key-b-22222']));
+
+    now = NEXT_MIDNIGHT_KST + 1;
+    expect(new Set([manager.getNextKey(), manager.getNextKey()])).toEqual(
+      new Set(['key-a-11111', 'key-b-22222'])
+    );
+  });
+
+  it('a later short rate-limit disable does not shorten the quota disable', () => {
+    manager.reportDailyQuotaExceeded('key-a-11111');
+    manager.reportRateLimit('key-a-11111');
+    expect(disabledUntilOf(0)).toBe(NEXT_MIDNIGHT_KST);
+  });
+
+  it('returns null (no call) and reports exhaustion when every key is quota-disabled', () => {
+    manager.reportDailyQuotaExceeded('key-a-11111');
+    manager.reportDailyQuotaExceeded('key-b-22222');
+    expect(manager.getNextKey()).toBeNull();
+    expect(manager.isDailyQuotaExhausted()).toBe(true);
+  });
+
+  it('treats quota + auth disabled keys together as exhausted', () => {
+    manager.reportDailyQuotaExceeded('key-a-11111');
+    manager.reportAuthError('key-b-22222');
+    expect(manager.getNextKey()).toBeNull();
+    expect(manager.isDailyQuotaExhausted()).toBe(true);
+  });
+
+  it('is not exhausted while any key is still usable', () => {
+    manager.reportDailyQuotaExceeded('key-a-11111');
+    expect(manager.isDailyQuotaExhausted()).toBe(false);
+    expect(manager.getNextKey()).toBe('key-b-22222');
+  });
+
+  it('is not "quota exhausted" when keys are only auth-invalid (a different failure)', () => {
+    manager.reportAuthError('key-a-11111');
+    manager.reportAuthError('key-b-22222');
+    expect(manager.isDailyQuotaExhausted()).toBe(false);
+  });
+});

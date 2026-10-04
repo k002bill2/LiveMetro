@@ -98,6 +98,19 @@ describe('ArrivalService', () => {
   });
 
   describe('getArrivals', () => {
+    it('does not retry a non-retryable error (e.g. daily quota ERROR-337) — one call, no backoff storm', async () => {
+      const quotaError = Object.assign(new Error('daily quota'), {
+        errorCode: 'ERROR-337',
+        retryable: false,
+      });
+      mockSeoulSubwayApi.getRealtimeArrival.mockReset().mockRejectedValue(quotaError);
+      const errSpy = jest.spyOn(console, 'error').mockImplementation();
+
+      await expect(service.getArrivals('강남', { throwOnError: true })).rejects.toBe(quotaError);
+      expect(mockSeoulSubwayApi.getRealtimeArrival).toHaveBeenCalledTimes(1);
+      errSpy.mockRestore();
+    });
+
     it('should return arrival info from API', async () => {
       const result = await service.getArrivals('강남');
 

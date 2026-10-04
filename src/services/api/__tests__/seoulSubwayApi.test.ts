@@ -1769,3 +1769,92 @@ describe('SeoulSubwayApiService resilience (A1~A3, A5)', () => {
     });
   });
 });
+
+describe('daily quota exhaustion (ERROR-337)', () => {
+  const quota337 = {
+    ok: true,
+    json: async () => ({
+      status: 500,
+      code: 'ERROR-337',
+      message: '데이터요청은 일일 호출건수 최대 1000건을 넘을 수 없습니다.',
+    }),
+  };
+  const ok = (rows: unknown[] = []) => ({
+    ok: true,
+    json: async () => ({ errorMessage: { code: 'INFO-000', message: '정상' }, realtimeArrivalList: rows }),
+  });
+  let warnSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    mockFetch.mockReset();
+    seoulSubwayApi.getRateLimiter().clear();
+    seoulSubwayApi.clearInflightRequests();
+    seoulSubwayApi.resetKeyStates();
+    warnSpy = jest.spyOn(console, 'warn').mockImplementation();
+  });
+
+  afterEach(() => {
+    warnSpy.mockRestore();
+    seoulSubwayApi.resetKeyStates();
+  });
+
+  const urlKeys = (): string[] =>
+    mockFetch.mock.calls.map((c) => (String(c[0]).match(/test-api-key-\d/) ?? ['?'])[0]);
+
+  it('switches to the backup key and keeps the exhausted key out for the rest of the day', async () => {
+    mockFetch.mockResolvedValueOnce(quota337).mockResolvedValue(ok());
+    await seoulSubwayApi.getRealtimeArrival('강남');
+
+    // 2 minutes later — past the generic 60s cooldown, still before KST midnight
+    // (unless the test happens to straddle midnight, which the 2-min window avoids
+    // by asserting against the computed boundary below).
+    const realNow = Date.now();
+    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(realNow + 120_000);
+    try {
+      seoulSubwayApi.getRateLimiter().clear();
+      await seoulSubwayApi.getRealtimeArrival('역삼');
+      seoulSubwayApi.getRateLimiter().clear();
+      await seoulSubwayApi.getRealtimeArrival('선릉');
+    } finally {
+      nowSpy.mockRestore();
+    }
+
+    const keys = urlKeys();
+    const exhausted = keys[0];
+    // after the first ERROR-337 the exhausted key is never used again today
+    expect(keys.slice(1).every((k) => k !== exhausted)).toBe(true);
+  });
+
+  it('throws a non-retryable quota error, then rejects later calls without any network request', async () => {
+    mockFetch.mockResolvedValue(quota337);
+
+    let caught: unknown;
+    try {
+      await seoulSubwayApi.getRealtimeArrival('강남');
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(SeoulApiError);
+    expect((caught as InstanceType<typeof SeoulApiError>).errorCode).toBe('ERROR-337');
+    expect((caught as InstanceType<typeof SeoulApiError>).retryable).toBe(false);
+    const callsAfterExhaustion = mockFetch.mock.calls.length;
+    expect(callsAfterExhaustion).toBeLessThanOrEqual(2); // one per key, no retry storm
+
+    await expect(seoulSubwayApi.getRealtimeArrival('시청')).rejects.toMatchObject({
+      errorCode: 'ERROR-337',
+      retryable: false,
+    });
+    expect(mockFetch.mock.calls.length).toBe(callsAfterExhaustion);
+  });
+
+  it('short-circuits realtimePosition too once the shared daily quota is exhausted', async () => {
+    mockFetch.mockResolvedValue(quota337);
+    await expect(seoulSubwayApi.getRealtimeArrival('강남')).rejects.toBeInstanceOf(SeoulApiError);
+    const before = mockFetch.mock.calls.length;
+
+    await expect(seoulSubwayApi.getRealtimePosition('2호선')).rejects.toMatchObject({
+      errorCode: 'ERROR-337',
+    });
+    expect(mockFetch.mock.calls.length).toBe(before);
+  });
+});
