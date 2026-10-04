@@ -15,8 +15,9 @@
 
 | 기술 | 버전 | 용도 |
 |------|------|------|
-| React Native | 0.72.10 | 모바일 프레임워크 |
-| Expo SDK | ~49.0.15 | 개발 플랫폼 |
+| React Native | 0.83.10 | 모바일 프레임워크 (New Architecture) |
+| Expo SDK | ^55.0.0 | 개발 플랫폼 (Android target API 36) |
+| React | 19.2.0 | UI 라이브러리 |
 | TypeScript | 5.1+ | 타입 시스템 (strict mode) |
 | Firebase | 10.7.1 | Auth, Firestore, FCM |
 | React Navigation | 6.x | 네비게이션 |

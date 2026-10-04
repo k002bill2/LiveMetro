@@ -8,8 +8,9 @@ This file provides guidance to Claude Code when working with this repository.
 
 | Technology | Version |
 |------------|---------|
-| React Native | 0.72 |
-| Expo SDK | ~49 |
+| React Native | 0.83 (New Architecture) |
+| Expo SDK | ~55 |
+| React | 19 |
 | TypeScript | 5.1+ (strict) |
 | Firebase | Auth, Firestore |
 | Navigation | React Navigation 6.x |
