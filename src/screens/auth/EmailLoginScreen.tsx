@@ -9,8 +9,6 @@ import React, { useCallback, useState } from 'react';
 import { useSemanticTokens } from '@/services/theme';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View, ViewStyle, TextStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as SecureStore from 'expo-secure-store';
 import { ChevronLeft } from 'lucide-react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useNavigation } from '@react-navigation/native';
@@ -21,10 +19,6 @@ import { useAuth } from '@/services/auth/AuthContext';
 import { isBiometricAvailable, isBiometricLoginEnabled, getBiometricTypeName, enableBiometricLogin } from '@/services/auth/biometricService';
 import { analyzeAuthError, printFirebaseDebugInfo } from '@/utils/firebaseDebug';
 import { AppStackParamList } from '@/navigation/types';
-
-const AUTO_LOGIN_ENABLED_KEY = '@livemetro_auto_login_enabled';
-const AUTO_LOGIN_EMAIL_KEY = 'livemetro_auto_login_email';
-const AUTO_LOGIN_PASSWORD_KEY = 'livemetro_auto_login_password';
 
 const isValidEmail = (value: string): boolean => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
@@ -37,28 +31,7 @@ export const EmailLoginScreen: React.FC = () => {
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [autoLogin, setAutoLogin] = useState(true);
   const [loading, setLoading] = useState(false);
-
-  const persistAutoLogin = useCallback(
-    async (storedEmail: string): Promise<void> => {
-      try {
-        // The password is never persisted: Firebase Auth persistence keeps
-        // the session. Remove any plaintext copy written by older versions.
-        await SecureStore.deleteItemAsync(AUTO_LOGIN_PASSWORD_KEY);
-        if (autoLogin) {
-          await AsyncStorage.setItem(AUTO_LOGIN_ENABLED_KEY, 'true');
-          await SecureStore.setItemAsync(AUTO_LOGIN_EMAIL_KEY, storedEmail);
-        } else {
-          await AsyncStorage.setItem(AUTO_LOGIN_ENABLED_KEY, 'false');
-          await SecureStore.deleteItemAsync(AUTO_LOGIN_EMAIL_KEY);
-        }
-      } catch (err) {
-        console.error('Error saving auto login credentials:', err);
-      }
-    },
-    [autoLogin]
-  );
 
   const promptBiometricSetup = useCallback(
     async (loginEmail: string, loginPassword: string): Promise<void> => {
@@ -109,7 +82,6 @@ export const EmailLoginScreen: React.FC = () => {
     const trimmedEmail = email.trim();
     try {
       await signInWithEmail(trimmedEmail, password);
-      await persistAutoLogin(trimmedEmail);
       await promptBiometricSetup(trimmedEmail, password);
     } catch (err) {
       console.error('Auth error:', err);
@@ -125,7 +97,7 @@ export const EmailLoginScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [email, password, signInWithEmail, persistAutoLogin, promptBiometricSetup]);
+  }, [email, password, signInWithEmail, promptBiometricSetup]);
 
   const handleForgotPassword = useCallback(async () => {
     if (!email.trim()) {
@@ -244,28 +216,14 @@ export const EmailLoginScreen: React.FC = () => {
             />
           </View>
 
-          <TouchableOpacity
-            testID="auto-login-toggle"
-            style={styles.checkRow}
-            onPress={() => setAutoLogin((v) => !v)}
-            accessible
-            accessibilityRole="checkbox"
-            accessibilityLabel="자동로그인"
-            accessibilityState={{ checked: autoLogin }}
+          {/* Staying signed in is handled by Firebase Auth persistence, so
+              there is no auto-login option to toggle. */}
+          <Text
+            testID="session-persist-note"
+            style={[styles.persistNote, { color: semantic.labelAlt }]}
           >
-            <View
-              style={[
-                styles.checkbox,
-                {
-                  borderColor: autoLogin ? semantic.primaryNormal : semantic.lineNormal,
-                  backgroundColor: autoLogin ? semantic.primaryNormal : 'transparent',
-                },
-              ]}
-            >
-              {autoLogin ? <Text style={styles.checkmark}>✓</Text> : null}
-            </View>
-            <Text style={[styles.checkLabel, { color: semantic.labelNormal }]}>자동로그인</Text>
-          </TouchableOpacity>
+            로그아웃하기 전까지 로그인 상태가 유지됩니다
+          </Text>
 
           <TouchableOpacity
             testID="submit-button"
@@ -334,31 +292,11 @@ const styles = StyleSheet.create({
   field: {
     marginTop: WANTED_TOKENS.spacing.s5,
   },
-  checkRow: {
+  persistNote: {
     marginTop: WANTED_TOKENS.spacing.s4,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: WANTED_TOKENS.spacing.s2,
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderRadius: 4,
-    borderWidth: 2,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkmark: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '900',
-    fontFamily: weightToFontFamily('900'),
-    lineHeight: 14,
-  },
-  checkLabel: {
     fontSize: WANTED_TOKENS.type.label1.size,
-    fontWeight: '600',
-    fontFamily: weightToFontFamily('600'),
+    fontWeight: '500',
+    fontFamily: weightToFontFamily('500'),
   },
   primaryLabel: {
     color: '#FFFFFF',

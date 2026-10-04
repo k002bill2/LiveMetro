@@ -85,7 +85,6 @@ const getAvatarInitial = (name?: string | null): string => {
 // Storage keys
 const AUTO_LOGIN_ENABLED_KEY = '@livemetro_auto_login_enabled';
 const AUTO_LOGIN_EMAIL_KEY = 'livemetro_auto_login_email';
-const AUTO_LOGIN_PASSWORD_KEY = 'livemetro_auto_login_password';
 
 type Props = NativeStackScreenProps<SettingsStackParamList, 'SettingsHome'>;
 
@@ -107,9 +106,6 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
       ? t.settings.themeDark
       : t.settings.themeLight;
 
-  // Auto login state
-  const [autoLoginEnabled, setAutoLoginEnabled] = useState(false);
-
   // Biometric state
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [biometricEnabled, setBiometricEnabled] = useState(false);
@@ -120,14 +116,10 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   // meta line silently omits the trailing fragment.
   const [commuteCount, setCommuteCount] = useState<number | null>(null);
 
-  // Check auto login and biometric status on mount
+  // Check biometric status on mount
   useEffect(() => {
     const checkSettings = async (): Promise<void> => {
       try {
-        // Check auto login status
-        const savedAutoLogin = await AsyncStorage.getItem(AUTO_LOGIN_ENABLED_KEY);
-        setAutoLoginEnabled(savedAutoLogin === 'true');
-
         // Check biometric status
         const available = await isBiometricAvailable();
         setBiometricAvailable(available);
@@ -167,41 +159,6 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
       cancelled = true;
     };
   }, [user?.id]);
-
-  // Handle auto login toggle
-  const handleAutoLoginToggle = useCallback(async (value: boolean): Promise<void> => {
-    if (!value) {
-      // Disable: show confirmation dialog
-      Alert.alert(
-        '자동로그인 해제',
-        '저장된 로그인 정보가 삭제됩니다. 계속하시겠습니까?',
-        [
-          { text: '취소', style: 'cancel' },
-          {
-            text: '해제',
-            style: 'destructive',
-            onPress: async () => {
-              try {
-                await AsyncStorage.setItem(AUTO_LOGIN_ENABLED_KEY, 'false');
-                await SecureStore.deleteItemAsync(AUTO_LOGIN_EMAIL_KEY);
-                await SecureStore.deleteItemAsync(AUTO_LOGIN_PASSWORD_KEY);
-                setAutoLoginEnabled(false);
-              } catch {
-                Alert.alert('오류', '설정 변경에 실패했습니다.');
-              }
-            },
-          },
-        ]
-      );
-    } else {
-      // Enable: show info that it can only be set during login
-      Alert.alert(
-        '자동로그인',
-        '자동로그인은 로그인 시 설정할 수 있습니다.',
-        [{ text: '확인' }]
-      );
-    }
-  }, []);
 
   // Handle biometric toggle
   const handleBiometricToggle = useCallback(async (value: boolean): Promise<void> => {
@@ -656,7 +613,8 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t.settings.security}</Text>
           <View style={styles.settingGroup}>
-            {/* Auto Login Toggle */}
+            {/* Session persistence — informational. Firebase Auth keeps the
+                user signed in, so there is no auto-login switch to offer. */}
             <View style={styles.settingItem}>
               <View style={styles.settingItemLeft}>
                 <View style={styles.iconContainer}>
@@ -664,19 +622,15 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
                 </View>
                 <View style={styles.textContainer}>
                   <Text style={styles.settingTitle}>
-                    {language === 'ko' ? '자동로그인' : 'Auto Login'}
+                    {language === 'ko' ? '로그인 상태 유지' : 'Stay signed in'}
                   </Text>
                   <Text style={styles.settingSubtitle}>
-                    {language === 'ko' ? '앱 시작 시 자동으로 로그인합니다' : 'Automatically sign in when app starts'}
+                    {language === 'ko'
+                      ? '로그아웃하기 전까지 로그인 상태가 유지됩니다'
+                      : 'You stay signed in until you sign out'}
                   </Text>
                 </View>
               </View>
-              <Switch
-                value={autoLoginEnabled}
-                onValueChange={handleAutoLoginToggle}
-                trackColor={{ false: semantic.lineNormal, true: semantic.primaryNormal }}
-                thumbColor={'#FFFFFF'}
-              />
             </View>
             {/* Biometric Login Toggle */}
             <View style={styles.settingItem}>

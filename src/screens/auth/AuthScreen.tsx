@@ -197,7 +197,7 @@ export const AuthScreen: React.FC = () => {
       <SafeAreaView style={[styles.safe, { backgroundColor: semantic.bgBase }]}>
         <View style={styles.autoLoginPanel} testID="auth-autologin">
           <Text style={[styles.autoLoginText, { color: semantic.labelNeutral }]}>
-            자동 로그인 중...
+            불러오는 중...
           </Text>
         </View>
       </SafeAreaView>

@@ -1,13 +1,14 @@
 /**
- * EmailLoginScreen — auto-login persistence.
+ * EmailLoginScreen — session persistence.
  *
- * The auto-login option must never persist the plaintext password: the
- * signed-in session is kept by Firebase Auth persistence instead.
+ * The signed-in session is kept by Firebase Auth persistence, so the screen
+ * shows a note instead of an auto-login checkbox and persists no credentials.
  */
 import React from 'react';
 import { fireEvent, render, waitFor } from '@testing-library/react-native';
 import * as SecureStore from 'expo-secure-store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { isBiometricAvailable } from '@/services/auth/biometricService';
 import { EmailLoginScreen } from '../EmailLoginScreen';
 
 const mockSignIn = jest.fn((..._args: unknown[]) => Promise.resolve());
@@ -66,10 +67,8 @@ jest.mock('lucide-react-native', () => {
   );
 });
 
-const PASSWORD_KEY = 'livemetro_auto_login_password';
 const TYPED_SECRET = 'typed-secret';
 const mockedSetItemAsync = SecureStore.setItemAsync as jest.Mock;
-const mockedDeleteItemAsync = SecureStore.deleteItemAsync as jest.Mock;
 const mockedAsyncSetItem = AsyncStorage.setItem as jest.Mock;
 
 const submitLogin = async (): Promise<void> => {
@@ -78,32 +77,37 @@ const submitLogin = async (): Promise<void> => {
   fireEvent.changeText(api.getByTestId('password-input'), TYPED_SECRET);
   fireEvent.press(api.getByTestId('submit-button'));
   await waitFor(() => expect(mockSignIn).toHaveBeenCalledWith('user@example.com', TYPED_SECRET));
-  await waitFor(() => expect(mockedAsyncSetItem).toHaveBeenCalled());
+  // The biometric setup check runs last in the submit flow.
+  await waitFor(() => expect(isBiometricAvailable).toHaveBeenCalled());
 };
 
-describe('EmailLoginScreen auto-login', () => {
+describe('EmailLoginScreen session persistence', () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });
 
-  it('never stores the password in SecureStore', async () => {
-    await submitLogin();
+  it('shows a session-persistence note instead of an auto-login checkbox', () => {
+    const { getByTestId, queryByTestId, queryByText } = render(<EmailLoginScreen />);
 
-    const passwordWrites = mockedSetItemAsync.mock.calls.filter(
-      (call: unknown[]) => call[0] === PASSWORD_KEY || call[1] === TYPED_SECRET
+    expect(queryByTestId('auto-login-toggle')).toBeNull();
+    expect(queryByText('자동로그인')).toBeNull();
+    expect(getByTestId('session-persist-note')).toHaveTextContent(
+      '로그아웃하기 전까지 로그인 상태가 유지됩니다'
     );
-    expect(passwordWrites).toHaveLength(0);
   });
 
-  it('removes any password left by older versions', async () => {
+  it('never stores credentials in SecureStore on login', async () => {
     await submitLogin();
 
-    await waitFor(() => expect(mockedDeleteItemAsync).toHaveBeenCalledWith(PASSWORD_KEY));
+    expect(mockedSetItemAsync).not.toHaveBeenCalled();
   });
 
-  it('still records the auto-login preference', async () => {
+  it('no longer writes an auto-login flag', async () => {
     await submitLogin();
 
-    expect(mockedAsyncSetItem).toHaveBeenCalledWith('@livemetro_auto_login_enabled', 'true');
+    expect(mockedAsyncSetItem).not.toHaveBeenCalledWith(
+      '@livemetro_auto_login_enabled',
+      expect.anything()
+    );
   });
 });

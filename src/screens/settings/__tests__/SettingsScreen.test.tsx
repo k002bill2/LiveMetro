@@ -453,27 +453,20 @@ describe('SettingsScreen', () => {
     });
   });
 
-  describe('Auto Login Toggle', () => {
-    it('loads auto login state from storage when enabled', async () => {
-      (AsyncStorage.getItem as jest.Mock).mockResolvedValue('true');
-      const { getByText } = render(<SettingsScreen {...defaultProps} />);
+  describe('Session persistence (replaces the auto-login toggle)', () => {
+    it('explains that sign-in persists instead of offering an inert toggle', async () => {
+      const { getByText, queryByText } = render(<SettingsScreen {...defaultProps} />);
 
-      await waitFor(() => {
-        expect(AsyncStorage.getItem).toHaveBeenCalledWith('@livemetro_auto_login_enabled');
-      });
-
-      expect(getByText('자동로그인')).toBeTruthy();
+      await waitFor(() => expect(getByText('로그인 상태 유지')).toBeTruthy());
+      expect(getByText('로그아웃하기 전까지 로그인 상태가 유지됩니다')).toBeTruthy();
+      expect(queryByText('자동로그인')).toBeNull();
     });
 
-    it('loads auto login state from storage when disabled', async () => {
-      (AsyncStorage.getItem as jest.Mock).mockResolvedValue('false');
+    it('no longer reads the legacy auto-login flag', async () => {
       const { getByText } = render(<SettingsScreen {...defaultProps} />);
 
-      await waitFor(() => {
-        expect(AsyncStorage.getItem).toHaveBeenCalledWith('@livemetro_auto_login_enabled');
-      });
-
-      expect(getByText('자동로그인')).toBeTruthy();
+      await waitFor(() => expect(getByText('로그인 상태 유지')).toBeTruthy());
+      expect(AsyncStorage.getItem).not.toHaveBeenCalledWith('@livemetro_auto_login_enabled');
     });
   });
 
@@ -699,13 +692,14 @@ describe('SettingsScreen', () => {
       expect(getByText('Test User')).toBeTruthy();
     });
 
-    it('handles AsyncStorage initialization error gracefully', async () => {
-      (AsyncStorage.getItem as jest.Mock).mockRejectedValue(new Error('Storage error'));
+    it('handles a status lookup error on mount gracefully', async () => {
+      const { isBiometricAvailable } = require('@/services/auth/biometricService');
+      (isBiometricAvailable as jest.Mock).mockRejectedValueOnce(new Error('Storage error'));
 
       const { getByText } = render(<SettingsScreen {...defaultProps} />);
 
       await waitFor(() => {
-        expect(AsyncStorage.getItem).toHaveBeenCalled();
+        expect(isBiometricAvailable).toHaveBeenCalled();
       });
 
       // Should still render without crashing

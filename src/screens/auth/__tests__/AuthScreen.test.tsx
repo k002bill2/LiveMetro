@@ -172,8 +172,10 @@ describe('AuthScreen', () => {
   });
 
   it('shows the auto-login state on mount, then transitions to the entry UI', async () => {
-    const { getByTestId, queryByTestId } = render(<AuthScreen />);
+    const { getByTestId, queryByTestId, queryByText } = render(<AuthScreen />);
     expect(getByTestId('auth-autologin')).toBeTruthy();
+    // No silent sign-in happens here any more — don't claim one.
+    expect(queryByText('자동 로그인 중...')).toBeNull();
     await flushBootstrap();
     expect(queryByTestId('auth-autologin')).toBeNull();
     expect(getByTestId('face-cta')).toBeTruthy();
