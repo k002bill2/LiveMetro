@@ -5,7 +5,7 @@
 
 import React from 'react';
 import { useSemanticTokens } from '@/services/theme';
-import { createStackNavigator } from '@react-navigation/stack';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, Star, Route as RouteIcon, Megaphone, Settings, CircleHelp } from 'lucide-react-native';
@@ -124,7 +124,10 @@ export type MainTabParamList = {
   Profile: undefined;
 };
 
-const Stack = createStackNavigator<RootStackParamList>();
+// native-stack (not @react-navigation/stack): the JS stack's Card creates
+// InteractionManager handles on every transition, which RN 0.83 deprecates
+// (warns on access). Settings/Onboarding stacks were already native-stack.
+const Stack = createNativeStackNavigator<RootStackParamList>();
 const Tab = createBottomTabNavigator<MainTabParamList>();
 
 const MainTabNavigator: React.FC = () => {

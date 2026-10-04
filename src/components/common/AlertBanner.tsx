@@ -9,14 +9,11 @@
 
 import React, { memo, useMemo, useState, useCallback } from 'react';
 import { useSemanticTokens } from '@/services/theme';
-import { View, Text, StyleSheet, TouchableOpacity, Animated, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Animated, LayoutAnimation } from 'react-native';
 
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 import type { SubwayAlert, AlertType } from '@/models/publicData';
 
-if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 interface AlertBannerProps {
   alerts: SubwayAlert[];

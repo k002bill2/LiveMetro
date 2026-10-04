@@ -12,7 +12,7 @@
 
 import React, { useState, useMemo, useCallback } from 'react';
 import { useSemanticTokens } from '@/services/theme';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Linking, Alert, LayoutAnimation, Platform, UIManager } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Linking, Alert, LayoutAnimation } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { ChevronDown, ChevronRight, ChevronUp, Mail, MessageSquare, Phone, Search, ShieldCheck, XCircle, type LucideIcon } from 'lucide-react-native';
 import { useNavigation, type NavigationProp } from '@react-navigation/native';
@@ -21,13 +21,6 @@ import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/s
 import { SettingsStackParamList } from '@/navigation/types';
 import { FAQ_DATA, SUPPORT_EMAIL, SUPPORT_PHONE, FAQItem } from '@/utils/helpContent';
 
-// Enable LayoutAnimation on Android
-if (
-  Platform.OS === 'android' &&
-  UIManager.setLayoutAnimationEnabledExperimental
-) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
 
 // 디자인 FAQS 중 앱 사실과 일치하여 채택한 항목 (익명 로그인 실재 —
 // AuthContext anonymous sign-in + 이메일 전용 기능 게이팅 참조).
