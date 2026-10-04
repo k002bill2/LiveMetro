@@ -19,6 +19,7 @@ import { useSemanticTokens } from '@/services/theme';
 import { ActivityIndicator, ScrollView, StyleSheet, Switch, Text, TouchableOpacity, View } from 'react-native';
 import { RouteProp, useRoute, useNavigation, useIsFocused } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AlertCircle, Moon } from 'lucide-react-native';
 
 import { AppStackParamList } from '../../navigation/types';
@@ -66,6 +67,9 @@ const TrainSelectionScreen: React.FC = () => {
   const route = useRoute<TrainSelectionRouteProp>();
   const navigation = useNavigation<TrainSelectionNavProp>();
   const semantic = useSemanticTokens();
+  // Android edge-to-edge (targetSdk 36): the screen draws behind the system
+  // navigation bar, so the bottom CTA / list end must clear the bottom inset.
+  const { bottom: bottomInset } = useSafeAreaInsets();
   const green = WANTED_TOKENS.status.green500;
 
   const { stationId = '', stationName = '강남', lineId = '2' } = route.params || {};
@@ -307,7 +311,12 @@ const TrainSelectionScreen: React.FC = () => {
 
   return (
     <View style={[styles.container, { backgroundColor: semantic.bgSubtlePage }]}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          !selectedTrain && { paddingBottom: WANTED_TOKENS.spacing.s8 + bottomInset },
+        ]}
+      >
         <View style={styles.hero}>
           <View style={styles.heroRow}>
             <LineBadge line={lineId as LineId} size={28} />
@@ -367,7 +376,14 @@ const TrainSelectionScreen: React.FC = () => {
       {selectedTrain ? (
         <View
           testID="train-selection-cta"
-          style={[styles.ctaBar, { backgroundColor: semantic.bgBase, borderTopColor: semantic.lineSubtle }]}
+          style={[
+            styles.ctaBar,
+            {
+              backgroundColor: semantic.bgBase,
+              borderTopColor: semantic.lineSubtle,
+              paddingBottom: WANTED_TOKENS.spacing.s5 + bottomInset,
+            },
+          ]}
         >
           <View style={styles.ctaInfo}>
             <Text style={[styles.ctaDest, { color: semantic.labelStrong }]} numberOfLines={1}>
