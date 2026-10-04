@@ -20,6 +20,7 @@ import {
   getBiometricTypeName,
 } from '@/services/auth/biometricService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { useAppleAuthAvailability } from '@/hooks/useAppleAuthAvailability';
 import { SocialAuthError, type SocialSignInResult } from '@/services/auth/social/types';
 
@@ -176,6 +177,18 @@ describe('AuthScreen', () => {
     await flushBootstrap();
     expect(queryByTestId('auth-autologin')).toBeNull();
     expect(getByTestId('face-cta')).toBeTruthy();
+  });
+
+  it('never reads a stored auto-login password or signs in silently with it', async () => {
+    const signInWithEmail = jest.fn().mockResolvedValue(undefined);
+    mockedUseAuth.mockReturnValue(authContextValue({ signInWithEmail }));
+    mockedAsyncStorage.getItem.mockResolvedValue('true');
+    (SecureStore.getItemAsync as jest.Mock).mockResolvedValue('stored-value');
+    const { queryByTestId } = render(<AuthScreen />);
+    await flushBootstrap();
+    await waitFor(() => expect(queryByTestId('auth-autologin')).toBeNull());
+    expect(SecureStore.getItemAsync).not.toHaveBeenCalledWith('livemetro_auto_login_password');
+    expect(signInWithEmail).not.toHaveBeenCalled();
   });
 
   it('renders the title, hero, social, divider, and terms', async () => {
