@@ -10,6 +10,7 @@ import React, { memo, useMemo } from 'react';
 import { useSemanticTokens } from '@/services/theme';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { ChevronLeft, Square } from 'lucide-react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
 
@@ -39,9 +40,12 @@ const GuidanceControlsImpl: React.FC<GuidanceControlsProps> = ({
 }) => {
   const semantic = useSemanticTokens();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
+  // Bottom-docked bar on a headerless root-stack screen: extend it behind the
+  // Android navigation bar (edge-to-edge) instead of letting it be covered.
+  const { bottom: bottomInset } = useSafeAreaInsets();
 
   return (
-    <View style={styles.bar}>
+    <View testID="guidance-controls" style={[styles.bar, { paddingBottom: WANTED_TOKENS.spacing.s3 + bottomInset }]}>
       {nextLabel !== null && (
         <View style={styles.stepRow}>
           <Pressable

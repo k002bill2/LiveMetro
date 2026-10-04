@@ -39,6 +39,12 @@ import { stopGuidanceBackgroundLocation } from '@/services/guidance/guidanceBack
 
 const mockGoBack = jest.fn();
 
+jest.mock('react-native-safe-area-context', () => ({
+  ...jest.requireActual('react-native-safe-area-context'),
+  // Non-zero bottom inset (Android 3-button nav bar) so edge-to-edge padding is observable.
+  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 48, left: 0 }),
+}));
+
 jest.mock('@react-navigation/native', () => ({
   useIsFocused: jest.fn(() => true),
   useNavigation: jest.fn(() => ({

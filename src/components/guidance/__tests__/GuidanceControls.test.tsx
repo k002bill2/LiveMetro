@@ -1,7 +1,14 @@
 import React from 'react';
 import { fireEvent, render } from '@testing-library/react-native';
+import { StyleSheet } from 'react-native';
 import { GuidanceControls } from '../GuidanceControls';
 import { WANTED_TOKENS } from '@/styles/modernTheme';
+
+jest.mock('react-native-safe-area-context', () => ({
+  ...jest.requireActual('react-native-safe-area-context'),
+  // Non-zero bottom inset (Android 3-button nav bar) so edge-to-edge padding is observable.
+  useSafeAreaInsets: () => ({ top: 0, right: 0, bottom: 48, left: 0 }),
+}));
 
 jest.mock('@/services/theme', () => ({
   useSemanticTokens: jest.fn(() => jest.requireActual('@/styles/modernTheme').WANTED_TOKENS.light),
@@ -14,6 +21,21 @@ jest.mock('lucide-react-native', () => ({
 }));
 
 describe('GuidanceControls', () => {
+  it('pads the bottom-docked bar by the bottom safe-area inset (edge-to-edge)', () => {
+    const { getByTestId } = render(
+      <GuidanceControls
+        nextLabel="다음"
+        prevDisabled={false}
+        onPrev={jest.fn()}
+        onNext={jest.fn()}
+        onExit={jest.fn()}
+      />
+    );
+    expect(StyleSheet.flatten(getByTestId('guidance-controls').props.style).paddingBottom).toBe(
+      WANTED_TOKENS.spacing.s3 + 48
+    );
+  });
+
   it('fires onNext with the contextual label', () => {
     const onNext = jest.fn();
     const { getByTestId, getByText } = render(

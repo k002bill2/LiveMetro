@@ -23,9 +23,10 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '@/services/auth/AuthContext';
-import { Alert, Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Animated, Easing, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { ArrowRight, Bell, ChevronLeft, Settings2, ShieldCheck, Sparkles, TrendingDown } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { useCommutePattern } from '@/hooks/useCommutePattern';
@@ -123,6 +124,12 @@ const buildWeeklyDays = (
 export const WeeklyPredictionScreen: React.FC = () => {
   const navigation = useNavigation();
   const semantic = useSemanticTokens();
+  // iOS clears the status bar / home indicator via contentInsetAdjustmentBehavior;
+  // Android has no equivalent and draws edge-to-edge (targetSdk 36), so the top
+  // bar and the last CTA need the safe-area insets added explicitly.
+  const insets = useSafeAreaInsets();
+  const androidInsetPadding =
+    Platform.OS === 'android' ? { paddingTop: 8 + insets.top, paddingBottom: 24 + insets.bottom } : null;
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   // 출퇴근 경로 등록/변경 진입점. HomeScreen.handleOpenCommuteSettings와 동일
@@ -340,7 +347,7 @@ export const WeeklyPredictionScreen: React.FC = () => {
   return (
     <ScrollView
       style={styles.container}
-      contentContainerStyle={styles.scrollContent}
+      contentContainerStyle={[styles.scrollContent, androidInsetPadding]}
       contentInsetAdjustmentBehavior="automatic"
       testID="commute-prediction-screen"
     >

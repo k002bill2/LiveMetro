@@ -441,7 +441,9 @@ const StationDetailScreen: React.FC = () => {
   return (
     <SafeAreaView
       style={[styles.safeArea, { backgroundColor: semantic.bgSubtlePage }]}
-      edges={['top']}
+      // Headerless root-stack screen outside the tabs: also clear the Android
+      // navigation bar (edge-to-edge) so the last card isn't cut off.
+      edges={['top', 'bottom']}
     >
       <ScrollView
         style={[styles.container, { backgroundColor: semantic.bgSubtlePage }]}

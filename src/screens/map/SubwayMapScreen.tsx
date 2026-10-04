@@ -9,6 +9,7 @@ import { View, Text, ScrollView, TouchableOpacity, StyleSheet, Modal, Alert } fr
 import { ArrowRightLeft, ChevronRight, Heart, Train, X } from 'lucide-react-native';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { getSubwayLineColor, getLineTextColor } from '@utils/colorUtils';
 import { LINE_NAMES } from '@utils/transferLabel';
@@ -102,6 +103,8 @@ export const SubwayMapScreen: React.FC = () => {
   const navigation = useNavigation<NavigationProp>();
   const { toggleFavorite, isFavorite, addFavorite, removeFavoriteByStationId } = useFavorites();
   const semantic = useSemanticTokens();
+  // Android edge-to-edge: the list's last row must clear the system navigation bar.
+  const { bottom: bottomInset } = useSafeAreaInsets();
   const styles = useMemo(() => createStyles(semantic), [semantic]);
   const subwayLines = useMemo(() => buildSubwayLines(), []);
   const [selectedLine, setSelectedLine] = useState<string | null>('2');
@@ -228,7 +231,7 @@ export const SubwayMapScreen: React.FC = () => {
 
       {/* Station List */}
       {selectedLineData && (
-        <ScrollView style={styles.stationList}>
+        <ScrollView style={styles.stationList} contentContainerStyle={{ paddingBottom: bottomInset }}>
           <View style={styles.stationListHeader}>
             <Text style={styles.stationListTitle}>
               {selectedLineData.name} 역 목록
