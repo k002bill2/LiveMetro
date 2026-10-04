@@ -1802,15 +1802,16 @@ describe('daily quota exhaustion (ERROR-337)', () => {
     mockFetch.mock.calls.map((c) => (String(c[0]).match(/test-api-key-\d/) ?? ['?'])[0]);
 
   it('switches to the backup key and keeps the exhausted key out for the rest of the day', async () => {
-    mockFetch.mockResolvedValueOnce(quota337).mockResolvedValue(ok());
-    await seoulSubwayApi.getRealtimeArrival('강남');
-
-    // 2 minutes later — past the generic 60s cooldown, still before KST midnight
-    // (unless the test happens to straddle midnight, which the 2-min window avoids
-    // by asserting against the computed boundary below).
-    const realNow = Date.now();
-    const nowSpy = jest.spyOn(Date, 'now').mockReturnValue(realNow + 120_000);
+    // Pinned clock (2026-10-04 20:00 KST) so the 2-minute step can never
+    // straddle KST midnight, where the exhausted key legitimately re-enables.
+    let now = Date.UTC(2026, 9, 4, 11, 0, 0);
+    const nowSpy = jest.spyOn(Date, 'now').mockImplementation(() => now);
     try {
+      mockFetch.mockResolvedValueOnce(quota337).mockResolvedValue(ok());
+      await seoulSubwayApi.getRealtimeArrival('강남');
+
+      // 2 minutes later — past the generic 60s cooldown, still before KST midnight
+      now += 120_000;
       seoulSubwayApi.getRateLimiter().clear();
       await seoulSubwayApi.getRealtimeArrival('역삼');
       seoulSubwayApi.getRateLimiter().clear();
