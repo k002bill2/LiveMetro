@@ -117,6 +117,7 @@ describe('BiometricService', () => {
     it('should return true when supported and enrolled', async () => {
       mockLocalAuthentication.hasHardwareAsync.mockResolvedValue(true);
       mockLocalAuthentication.isEnrolledAsync.mockResolvedValue(true);
+      mockSecureStore.canUseBiometricAuthentication.mockReturnValue(true);
 
       const result = await biometricService.isBiometricAvailable();
 
@@ -134,6 +135,18 @@ describe('BiometricService', () => {
     it('should return false when supported but not enrolled', async () => {
       mockLocalAuthentication.hasHardwareAsync.mockResolvedValue(true);
       mockLocalAuthentication.isEnrolledAsync.mockResolvedValue(false);
+
+      const result = await biometricService.isBiometricAvailable();
+
+      expect(result).toBe(false);
+    });
+
+    it('should return false when OS-bound credential storage is unavailable', async () => {
+      // e.g. Android Class 2 (weak) face unlock: enrolled, but SecureStore
+      // requireAuthentication needs BIOMETRIC_STRONG — setup would silently no-op.
+      mockLocalAuthentication.hasHardwareAsync.mockResolvedValue(true);
+      mockLocalAuthentication.isEnrolledAsync.mockResolvedValue(true);
+      mockSecureStore.canUseBiometricAuthentication.mockReturnValue(false);
 
       const result = await biometricService.isBiometricAvailable();
 

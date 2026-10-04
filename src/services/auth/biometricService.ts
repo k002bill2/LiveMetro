@@ -90,7 +90,11 @@ export const isBiometricAvailable = async (): Promise<boolean> => {
     if (!supported) return false;
 
     const enrolled = await isBiometricEnrolled();
-    return enrolled;
+    if (!enrolled) return false;
+
+    // Biometric login needs an OS-bound key (Android: BIOMETRIC_STRONG).
+    // Without it setup would silently fail, so don't offer the feature.
+    return SecureStore.canUseBiometricAuthentication();
   } catch (error) {
     console.error('Error checking biometric availability:', error);
     return false;
