@@ -4,6 +4,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AppState, type AppStateStatus } from 'react-native';
 import { ArrivalService, ArrivalInfo, ArrivalCallback } from '../arrivalService';
 
 // Mock dependencies
@@ -555,6 +556,76 @@ describe('ArrivalService', () => {
       const result = await service.getArrivals('강남');
 
       expect(result.source).toBe('api');
+    });
+  });
+
+  describe('background pause (AppState)', () => {
+    let appStateHandler: ((next: AppStateStatus) => void) | null;
+    let removeListener: jest.Mock;
+    let addListenerSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      appStateHandler = null;
+      removeListener = jest.fn();
+      addListenerSpy = jest
+        .spyOn(AppState, 'addEventListener')
+        .mockImplementation(((_type: string, handler: (next: AppStateStatus) => void) => {
+          appStateHandler = handler;
+          return { remove: removeListener };
+        }) as unknown as typeof AppState.addEventListener);
+    });
+
+    afterEach(() => {
+      addListenerSpy.mockRestore();
+    });
+
+    const calls = (): number => mockSeoulSubwayApi.getRealtimeArrival.mock.calls.length;
+
+    it('stops polling while the app is in the background', async () => {
+      service.subscribe('강남', jest.fn(), 30000);
+      await jest.runOnlyPendingTimersAsync();
+      const before = calls();
+
+      appStateHandler?.('background');
+      jest.advanceTimersByTime(90000);
+      await jest.runOnlyPendingTimersAsync();
+
+      expect(calls()).toBe(before);
+    });
+
+    it('polls once immediately on return to foreground and resumes the interval', async () => {
+      service.subscribe('강남', jest.fn(), 30000);
+      await jest.runOnlyPendingTimersAsync();
+      appStateHandler?.('background');
+      jest.advanceTimersByTime(90000);
+      const paused = calls();
+
+      appStateHandler?.('active');
+      await jest.runOnlyPendingTimersAsync();
+      expect(calls()).toBeGreaterThan(paused);
+
+      const resumed = calls();
+      jest.advanceTimersByTime(30000);
+      await jest.runOnlyPendingTimersAsync();
+      expect(calls()).toBeGreaterThan(resumed);
+    });
+
+    it('keeps polling in the background for a keepPollingInBackground subscription (guidance)', async () => {
+      service.subscribe('강남', jest.fn(), 30000, { keepPollingInBackground: true });
+      await jest.runOnlyPendingTimersAsync();
+      const before = calls();
+
+      appStateHandler?.('background');
+      jest.advanceTimersByTime(30000);
+      await jest.runOnlyPendingTimersAsync();
+
+      expect(calls()).toBeGreaterThan(before);
+    });
+
+    it('removes the AppState listener on destroy', () => {
+      service.subscribe('강남', jest.fn(), 30000);
+      service.destroy();
+      expect(removeListener).toHaveBeenCalled();
     });
   });
 

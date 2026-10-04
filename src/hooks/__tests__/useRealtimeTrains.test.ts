@@ -106,6 +106,17 @@ describe('useRealtimeTrains', () => {
   });
 
   describe('Subscription', () => {
+    it('opts the subscription out of the background pause only when pollInBackground is set', () => {
+      renderHook(() => useRealtimeTrains('강남역', { pollInBackground: true }));
+
+      expect(mockDataManager.subscribeToRealtimeUpdates).toHaveBeenCalledWith(
+        '강남역',
+        expect.any(Function),
+        30000,
+        { keepPollingInBackground: true }
+      );
+    });
+
     it('should call dataManager.subscribeToRealtimeUpdates with correct params', () => {
       renderHook(() =>
         useRealtimeTrains('강남역', { refetchInterval: 60000 })

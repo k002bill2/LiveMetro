@@ -296,7 +296,8 @@ class DataManager {
   subscribeToRealtimeUpdates(
     stationName: string,
     callback: (data: RealtimeTrainData | null, error?: unknown) => void,
-    intervalMs: number = 30000
+    intervalMs: number = 30000,
+    subscribeOptions: { keepPollingInBackground?: boolean } = {}
   ): () => void {
     // G4 wiring + #2 opt-in: arrivalService의 error 인자를 consumer까지
     // forward + `throwOnError: true`로 cache fallback 우회. SeoulApiError
@@ -310,7 +311,9 @@ class DataManager {
         callback(this.adaptArrivalInfoToRealtimeData(info), error);
       },
       intervalMs,
-      { throwOnError: true },
+      subscribeOptions.keepPollingInBackground
+        ? { throwOnError: true, keepPollingInBackground: true }
+        : { throwOnError: true },
     );
   }
 

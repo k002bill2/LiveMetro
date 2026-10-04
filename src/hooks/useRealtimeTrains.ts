@@ -23,6 +23,11 @@ interface UseRealtimeTrainsOptions {
   retryAttempts?: number;
   onError?: (error: string) => void;
   onDataReceived?: (data: RealtimeTrainData) => void;
+  /**
+   * Keep polling while the app is backgrounded (default false — polling pauses
+   * to save the shared daily Seoul API quota). Only route guidance needs this.
+   */
+  pollInBackground?: boolean;
 }
 
 /**
@@ -38,7 +43,8 @@ export const useRealtimeTrains = (
     staleTime = 60000, // 1 minute
     retryAttempts = 3,
     onError,
-    onDataReceived
+    onDataReceived,
+    pollInBackground = false,
   } = options;
 
   const [state, setState] = useState<UseRealtimeTrainsState>({
@@ -136,12 +142,15 @@ export const useRealtimeTrains = (
 
     updateState({ loading: true, error: null });
 
-    unsubscribeRef.current = dataManager.subscribeToRealtimeUpdates(
-      stationName,
-      handleDataReceived,
-      refetchInterval
-    );
-  }, [enabled, stationName, handleDataReceived, refetchInterval, updateState]);
+    unsubscribeRef.current = pollInBackground
+      ? dataManager.subscribeToRealtimeUpdates(
+          stationName,
+          handleDataReceived,
+          refetchInterval,
+          { keepPollingInBackground: true }
+        )
+      : dataManager.subscribeToRealtimeUpdates(stationName, handleDataReceived, refetchInterval);
+  }, [enabled, stationName, handleDataReceived, refetchInterval, pollInBackground, updateState]);
 
   const refetch = useCallback(() => {
     retryCountRef.current = 0;

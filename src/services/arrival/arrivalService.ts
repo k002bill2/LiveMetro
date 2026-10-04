@@ -5,6 +5,7 @@
  */
 
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { AppState, type AppStateStatus } from 'react-native';
 import { seoulSubwayApi, SeoulRealtimeArrival } from '@/services/api/seoulSubwayApi';
 import type { TrainType } from '@/models/train';
 import { normalizeSeoulLineId } from '@/utils/formatUtils';
@@ -75,6 +76,14 @@ export interface GetArrivalsOptions {
    * controls only the cache fallback layer.
    */
   throwOnError?: boolean;
+  /**
+   * Subscription only: keep polling this station while the app is in the
+   * background. Default `false` — polling pauses on `background` and resumes
+   * (with one immediate poll) on `active`, so a backgrounded app stops burning
+   * the shared daily Seoul API quota. Route guidance opts in because departure
+   * detection keeps running behind the lock screen during a guidance session.
+   */
+  keepPollingInBackground?: boolean;
 }
 
 /**
@@ -119,6 +128,15 @@ class ArrivalService {
   // 역명별 "진행 중인 초기 fetch"를 추적해, 같은 역명의 후속 구독자가 새 fetch를
   // 트리거하지 않고 같은 Promise를 재사용하게 한다. (subscribe 참고)
   private initialFetches: Map<string, Promise<ArrivalInfo>> = new Map();
+  // Per-station interval + options captured at first subscribe, so polling can
+  // be restarted identically after a background pause.
+  private pollingConfigs: Map<string, { intervalMs: number; options?: GetArrivalsOptions }> = new Map();
+  // Subscribers that asked to keep polling in the background (see
+  // GetArrivalsOptions.keepPollingInBackground).
+  private keepAliveCallbacks: Map<string, Set<ArrivalCallback>> = new Map();
+  private pausedStations: Set<string> = new Set();
+  private isInBackground = false;
+  private appStateSubscription: { remove: () => void } | null = null;
 
   constructor(options?: ArrivalServiceOptions) {
     this.options = { ...DEFAULT_OPTIONS, ...options };
@@ -225,20 +243,28 @@ class ArrivalService {
     }
     this.activeSubscriptions.get(trimmedName)!.add(callback);
 
-    // Start polling if not already active. The interval captures `options` so
-    // every poll honors the caller's error-handling preference.
-    if (!this.pollingIntervals.has(trimmedName)) {
-      const interval = setInterval(async () => {
-        await this.pollAndNotify(trimmedName, options);
-      }, pollInterval);
-
-      // 폴링 타이머가 Node/Jest 프로세스 종료를 막지 않도록 unref (구독 후
-      // unsubscribe 없는 테스트의 open handle 누수 방어). RN의 setInterval은
-      // number 반환이라 unref가 없어 가드로 프로덕션 동작은 보존된다.
-      (interval as { unref?: () => void }).unref?.();
-
-      this.pollingIntervals.set(trimmedName, interval);
+    if (options?.keepPollingInBackground) {
+      if (!this.keepAliveCallbacks.has(trimmedName)) {
+        this.keepAliveCallbacks.set(trimmedName, new Set());
+      }
+      this.keepAliveCallbacks.get(trimmedName)!.add(callback);
     }
+
+    // Start polling if not already active. The interval captures `options` so
+    // every poll honors the caller's error-handling preference. While the app
+    // is backgrounded, a station without a keep-alive subscriber starts paused.
+    if (!this.pollingConfigs.has(trimmedName)) {
+      this.pollingConfigs.set(trimmedName, { intervalMs: pollInterval, options });
+    }
+    if (!this.pollingIntervals.has(trimmedName)) {
+      if (this.isInBackground && !this.isKeepAlive(trimmedName)) {
+        this.pausedStations.add(trimmedName);
+      } else {
+        this.pausedStations.delete(trimmedName);
+        this.startPolling(trimmedName);
+      }
+    }
+    this.ensureAppStateListener();
 
     // Send initial data.
     //
@@ -334,6 +360,13 @@ class ArrivalService {
     // Clear all polling intervals
     this.pollingIntervals.forEach((interval) => clearInterval(interval));
     this.pollingIntervals.clear();
+
+    // Background-pause bookkeeping + AppState listener
+    this.pollingConfigs.clear();
+    this.keepAliveCallbacks.clear();
+    this.pausedStations.clear();
+    this.isInBackground = false;
+    this.removeAppStateListener();
 
     // Clear subscriptions
     this.activeSubscriptions.clear();
@@ -485,6 +518,7 @@ class ArrivalService {
     const subscribers = this.activeSubscriptions.get(stationName);
     if (subscribers) {
       subscribers.delete(callback);
+      this.keepAliveCallbacks.get(stationName)?.delete(callback);
 
       // If no more subscribers, stop polling
       if (subscribers.size === 0) {
@@ -494,9 +528,84 @@ class ArrivalService {
           this.pollingIntervals.delete(stationName);
         }
         this.activeSubscriptions.delete(stationName);
+        this.pollingConfigs.delete(stationName);
+        this.keepAliveCallbacks.delete(stationName);
+        this.pausedStations.delete(stationName);
+      } else if (this.isInBackground && !this.isKeepAlive(stationName)) {
+        // The last keep-alive subscriber left while backgrounded — pause now.
+        this.pauseStation(stationName);
       }
     }
+
+    if (this.activeSubscriptions.size === 0) {
+      this.removeAppStateListener();
+    }
   }
+
+  // ==========================================================================
+  // Background pause (AppState)
+  // ==========================================================================
+
+  private startPolling(stationName: string): void {
+    const config = this.pollingConfigs.get(stationName);
+    if (!config || this.pollingIntervals.has(stationName)) return;
+
+    const interval = setInterval(async () => {
+      await this.pollAndNotify(stationName, config.options);
+    }, config.intervalMs);
+
+    // 폴링 타이머가 Node/Jest 프로세스 종료를 막지 않도록 unref (구독 후
+    // unsubscribe 없는 테스트의 open handle 누수 방어). RN의 setInterval은
+    // number 반환이라 unref가 없어 가드로 프로덕션 동작은 보존된다.
+    (interval as { unref?: () => void }).unref?.();
+
+    this.pollingIntervals.set(stationName, interval);
+  }
+
+  private pauseStation(stationName: string): void {
+    const interval = this.pollingIntervals.get(stationName);
+    if (interval) {
+      clearInterval(interval);
+      this.pollingIntervals.delete(stationName);
+    }
+    this.pausedStations.add(stationName);
+  }
+
+  private isKeepAlive(stationName: string): boolean {
+    return (this.keepAliveCallbacks.get(stationName)?.size ?? 0) > 0;
+  }
+
+  private ensureAppStateListener(): void {
+    if (this.appStateSubscription) return;
+    this.appStateSubscription = AppState.addEventListener('change', this.handleAppStateChange);
+  }
+
+  private removeAppStateListener(): void {
+    this.appStateSubscription?.remove();
+    this.appStateSubscription = null;
+  }
+
+  // 'inactive' (iOS transient: control center, app switcher peek) is ignored —
+  // pausing on it would churn intervals. Only a real background pauses.
+  private handleAppStateChange = (next: AppStateStatus): void => {
+    if (next === 'background') {
+      this.isInBackground = true;
+      Array.from(this.pollingIntervals.keys()).forEach((station) => {
+        if (!this.isKeepAlive(station)) this.pauseStation(station);
+      });
+    } else if (next === 'active' && this.isInBackground) {
+      this.isInBackground = false;
+      const resumed = Array.from(this.pausedStations);
+      this.pausedStations.clear();
+      resumed.forEach((station) => {
+        if (!this.activeSubscriptions.has(station)) return;
+        this.startPolling(station);
+        // Refresh right away — the data is stale after the pause. getArrivals
+        // still honors the min polling interval / cache.
+        void this.pollAndNotify(station, this.pollingConfigs.get(station)?.options);
+      });
+    }
+  };
 
   // ==========================================================================
   // Cache Methods

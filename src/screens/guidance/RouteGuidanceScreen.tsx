@@ -312,6 +312,10 @@ export const RouteGuidanceScreen: React.FC = () => {
   const { trains } = useRealtimeTrains(waitingStationName, {
     enabled: isFocused && isWaitingStep,
     refetchInterval: 30000,
+    // Departure detection keeps running behind the lock screen during a
+    // guidance session (background location keeps the app alive), so this
+    // subscription is exempt from the background polling pause.
+    pollInBackground: true,
   });
 
   // Travel-direction endpoint name for the waiting step (board/transfer have it).
