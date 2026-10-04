@@ -256,6 +256,7 @@ class ArrivalService {
     if (!this.pollingConfigs.has(trimmedName)) {
       this.pollingConfigs.set(trimmedName, { intervalMs: pollInterval, options });
     }
+    this.ensureAppStateListener();
     if (!this.pollingIntervals.has(trimmedName)) {
       if (this.isInBackground && !this.isKeepAlive(trimmedName)) {
         this.pausedStations.add(trimmedName);
@@ -264,7 +265,6 @@ class ArrivalService {
         this.startPolling(trimmedName);
       }
     }
-    this.ensureAppStateListener();
 
     // Send initial data.
     //
@@ -577,6 +577,9 @@ class ArrivalService {
 
   private ensureAppStateListener(): void {
     if (this.appStateSubscription) return;
+    // The listener is removed while no station is subscribed, so transitions
+    // in that gap are missed — resync from the current state before use.
+    this.isInBackground = AppState.currentState === 'background';
     this.appStateSubscription = AppState.addEventListener('change', this.handleAppStateChange);
   }
 

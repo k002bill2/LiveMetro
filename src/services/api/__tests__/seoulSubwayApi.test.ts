@@ -1837,14 +1837,31 @@ describe('daily quota exhaustion (ERROR-337)', () => {
     expect(caught).toBeInstanceOf(SeoulApiError);
     expect((caught as InstanceType<typeof SeoulApiError>).errorCode).toBe('ERROR-337');
     expect((caught as InstanceType<typeof SeoulApiError>).retryable).toBe(false);
+    expect((caught as InstanceType<typeof SeoulApiError>).dailyQuotaExhausted).toBe(true);
     const callsAfterExhaustion = mockFetch.mock.calls.length;
     expect(callsAfterExhaustion).toBeLessThanOrEqual(2); // one per key, no retry storm
 
     await expect(seoulSubwayApi.getRealtimeArrival('시청')).rejects.toMatchObject({
       errorCode: 'ERROR-337',
       retryable: false,
+      dailyQuotaExhausted: true,
     });
     expect(mockFetch.mock.calls.length).toBe(callsAfterExhaustion);
+  });
+
+  it('does not mark the error as all-keys-exhausted when the other key is only in a short cooldown', async () => {
+    // key A: overload (60s cooldown) → backup key B: ERROR-337. A recovers in
+    // a minute, so the UI must not claim "no data until midnight".
+    const overload = {
+      ok: true,
+      json: async () => ({ status: 500, code: 'ERROR-500', message: '서버 오류' }),
+    };
+    mockFetch.mockResolvedValueOnce(overload).mockResolvedValue(quota337);
+
+    await expect(seoulSubwayApi.getRealtimeArrival('강남')).rejects.toMatchObject({
+      errorCode: 'ERROR-337',
+      dailyQuotaExhausted: false,
+    });
   });
 
   it('short-circuits realtimePosition too once the shared daily quota is exhausted', async () => {

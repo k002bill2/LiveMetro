@@ -290,18 +290,30 @@ export class SeoulApiError extends Error {
   readonly category: SeoulApiErrorCategory;
   /** True for categories where retry without user action is meaningful. */
   readonly retryable: boolean;
+  /**
+   * True only when every realtime key has hit its daily cap (ERROR-337), so no
+   * call can succeed until KST midnight. A single key's ERROR-337 while other
+   * keys are merely cooling down stays false.
+   */
+  readonly dailyQuotaExhausted: boolean;
 
   /**
    * @param options.retryable Override the category default — e.g. a quota
    *   error with no healthy backup key is not worth an immediate retry.
+   * @param options.dailyQuotaExhausted See {@link dailyQuotaExhausted}.
    */
-  constructor(errorCode: string, message: string, options: { retryable?: boolean } = {}) {
+  constructor(
+    errorCode: string,
+    message: string,
+    options: { retryable?: boolean; dailyQuotaExhausted?: boolean } = {}
+  ) {
     super(`Seoul API Error: ${message} (Code: ${errorCode})`);
     this.name = 'SeoulApiError';
     this.errorCode = errorCode;
     this.category = categorizeSeoulApiError(errorCode);
     this.retryable =
       options.retryable ?? (this.category === 'transient' || this.category === 'quota');
+    this.dailyQuotaExhausted = options.dailyQuotaExhausted ?? false;
   }
 }
 
@@ -669,7 +681,11 @@ class SeoulSubwayApiService {
             `code=${errorCode} category=${category} message=${message}`
           );
 
-          throw new SeoulApiError(errorCode, message, { retryable });
+          throw new SeoulApiError(errorCode, message, {
+            retryable,
+            dailyQuotaExhausted:
+              errorCode === DAILY_QUOTA_ERROR_CODE && this.keyManager.isDailyQuotaExhausted(),
+          });
         }
 
         // Success - report to key manager
@@ -779,7 +795,11 @@ class SeoulSubwayApiService {
             `code=${errorCode} category=${category} message=${message}`
           );
 
-          throw new SeoulApiError(errorCode, message, { retryable });
+          throw new SeoulApiError(errorCode, message, {
+            retryable,
+            dailyQuotaExhausted:
+              errorCode === DAILY_QUOTA_ERROR_CODE && this.keyManager.isDailyQuotaExhausted(),
+          });
         }
 
         this.keyManager.reportSuccess(apiKey);
@@ -1080,6 +1100,7 @@ class SeoulSubwayApiService {
     if (this.keyManager.isDailyQuotaExhausted()) {
       throw new SeoulApiError(DAILY_QUOTA_ERROR_CODE, DAILY_QUOTA_EXHAUSTED_MESSAGE, {
         retryable: false,
+        dailyQuotaExhausted: true,
       });
     }
   }

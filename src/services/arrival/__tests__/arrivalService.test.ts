@@ -622,6 +622,27 @@ describe('ArrivalService', () => {
       expect(calls()).toBeGreaterThan(before);
     });
 
+    it('resyncs with the current AppState when re-subscribing after the listener was removed in the background', async () => {
+      // Last subscriber leaves while backgrounded → listener removed, so the
+      // later 'active' event is never seen. A fresh subscribe must not start
+      // paused based on the stale background flag.
+      const unsubscribe = service.subscribe('강남', jest.fn(), 30000);
+      appStateHandler?.('background');
+      unsubscribe();
+      const appStateRef = AppState as unknown as { currentState: string };
+      const original = appStateRef.currentState;
+      appStateRef.currentState = 'active';
+
+      service.subscribe('역삼', jest.fn(), 30000);
+      await jest.runOnlyPendingTimersAsync();
+      const before = calls();
+      jest.advanceTimersByTime(30000);
+      await jest.runOnlyPendingTimersAsync();
+
+      appStateRef.currentState = original;
+      expect(calls()).toBeGreaterThan(before);
+    });
+
     it('removes the AppState listener on destroy', () => {
       service.subscribe('강남', jest.fn(), 30000);
       service.destroy();
