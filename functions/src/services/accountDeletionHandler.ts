@@ -14,6 +14,7 @@ import {
   deleteAccountAndData,
   AccountDeletionError,
   AccountDeletionDeps,
+  AdminFieldPathLike,
 } from './accountDeletionService';
 import { DeleteAccountResponse } from '../types';
 
@@ -27,6 +28,14 @@ export interface AdminRecursiveDeleteCapable {
 export interface AdminFieldValueCapable {
   arrayRemove(value: string): unknown;
 }
+
+/** `FieldValue.delete` 센티널 팩토리의 최소 형태. */
+export interface AdminFieldValueDeleteCapable {
+  delete(): unknown;
+}
+
+/** `FieldPath` 생성자의 최소 형태. */
+export type AdminFieldPathConstructor = new (...segments: string[]) => AdminFieldPathLike;
 
 /**
  * 경로 문자열 → 실제 `DocumentReference` 재귀 삭제.
@@ -84,3 +93,25 @@ export const runDeleteAccountRequest = async (
     throw new HttpsError('internal', '계정 삭제 처리 중 오류가 발생했습니다.');
   }
 };
+
+/**
+ * 세그먼트 배열 → 실제 `FieldPath`.
+ *
+ * uid를 키로 쓰는 map 경로는 dotted 문자열로 만들면 uid 속 문자가 경로
+ * 해석을 바꿀 수 있어, 세그먼트를 그대로 생성자에 넘긴다.
+ */
+export const createFieldPathAdapter =
+  (FieldPathCtor: AdminFieldPathConstructor) =>
+  (...segments: string[]): AdminFieldPathLike =>
+    new FieldPathCtor(...segments);
+
+/**
+ * 필드 키 자체를 지우는 센티널을 만든다.
+ *
+ * 반드시 `FieldValue.delete()`의 반환값이어야 한다 — `null`을 쓰면 키가 그대로
+ * 남아 uid가 잔존한다(#318).
+ */
+export const createDeleteFieldAdapter =
+  (fieldValue: AdminFieldValueDeleteCapable) =>
+  (): unknown =>
+    fieldValue.delete();

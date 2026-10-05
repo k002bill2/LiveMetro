@@ -35,6 +35,7 @@ jest.mock('firebase/firestore', () => ({
   arrayUnion: jest.fn((val) => ({ type: 'arrayUnion', value: val })),
   arrayRemove: jest.fn((val) => ({ type: 'arrayRemove', value: val })),
   increment: jest.fn((val) => ({ type: 'increment', value: val })),
+  deleteField: jest.fn(() => ({ type: 'deleteField' })),
 }));
 
 describe('DelayReportService', () => {
@@ -187,6 +188,36 @@ describe('DelayReportService', () => {
       await delayReportService.removeUpvote('report-123', 'user-456');
 
       expect(mockUpdateDoc).toHaveBeenCalled();
+    });
+  });
+
+  describe('clearReaction', () => {
+    beforeEach(() => {
+      mockUpdateDoc.mockResolvedValue(undefined);
+    });
+
+    // null을 쓰면 uid 키가 map에 남는다 — 탈퇴 후에도 "누가 반응했는가"가
+    // 타인 문서에 잔존한다(#318). 키 자체를 지우는 deleteField 센티널이어야 한다.
+    it('반응 키를 null이 아니라 deleteField 센티널로 지운다', async () => {
+      await delayReportService.clearReaction('report-123', 'kakao:4123456789', 'same');
+
+      const updates = mockUpdateDoc.mock.calls[0][1] as Record<string, unknown>;
+      expect(updates['reactedBy.kakao:4123456789']).toEqual({ type: 'deleteField' });
+    });
+
+    it('해당 종류의 반응 카운트를 1 감소시킨다', async () => {
+      await delayReportService.clearReaction('report-123', 'user-456', 'same');
+
+      const updates = mockUpdateDoc.mock.calls[0][1] as Record<string, unknown>;
+      expect(updates['reactions.same']).toEqual({ type: 'increment', value: -1 });
+    });
+
+    it('updateDoc 실패를 호출자에게 전파한다', async () => {
+      mockUpdateDoc.mockRejectedValueOnce(new Error('permission-denied'));
+
+      await expect(
+        delayReportService.clearReaction('report-123', 'user-456', 'same'),
+      ).rejects.toThrow('permission-denied');
     });
   });
 

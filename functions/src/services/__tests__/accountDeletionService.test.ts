@@ -17,6 +17,7 @@ import {
   DELETED_USER_DISPLAY_NAME,
   AdminCollectionLike,
   AdminDocumentRefLike,
+  AdminFieldPathLike,
   AdminFirestoreLike,
   AdminQueryLike,
   AdminQuerySnapshotLike,
@@ -24,9 +25,64 @@ import {
 } from '../accountDeletionService';
 
 const UID = 'uid-target';
+/** 실제 형태의 커스텀 토큰 uid — 콜론이 들어간다(dotted 문자열 경로 함정 검출용). */
+const KAKAO_UID = 'kakao:4123456789';
 const OTHER_UID = 'uid-bystander';
 
 type DocData = Record<string, unknown>;
+
+/** `FieldPath` double — 세그먼트를 그대로 들고 다닌다(문자열로 쪼개지 않는다). */
+class FakeFieldPath implements AdminFieldPathLike {
+  constructor(readonly segments: readonly string[]) {}
+
+  isEqual(other: AdminFieldPathLike): boolean {
+    return (
+      other instanceof FakeFieldPath &&
+      other.segments.length === this.segments.length &&
+      other.segments.every((segment, i) => segment === this.segments[i])
+    );
+  }
+}
+
+/** `FieldValue.delete()` 센티널 double. */
+const DELETE_FIELD = { __deleteField: true } as const;
+
+type FieldRef = string | AdminFieldPathLike;
+type QueryOp = '==' | '!=' | 'array-contains';
+
+/**
+ * 필드 참조를 실제 Firestore처럼 해석한다. 문자열은 **최상위 필드명 그대로**
+ * 본다 — 서비스가 `reactedBy.<uid>` 같은 dotted 문자열을 넘기면 매칭되지 않아
+ * 테스트가 실패한다(FieldPath 사용 강제).
+ */
+const segmentsOf = (field: FieldRef): readonly string[] =>
+  field instanceof FakeFieldPath ? field.segments : [field as string];
+
+const readField = (data: DocData, field: FieldRef): { exists: boolean; value: unknown } => {
+  let current: unknown = data;
+  for (const segment of segmentsOf(field)) {
+    if (current === null || typeof current !== 'object' || !(segment in current)) {
+      return { exists: false, value: undefined };
+    }
+    current = (current as DocData)[segment];
+  }
+  return { exists: true, value: current };
+};
+
+/** 중첩 필드를 불변으로 갱신한다. DELETE_FIELD면 키 자체를 지운다. */
+const writeField = (data: DocData, segments: readonly string[], value: unknown): DocData => {
+  const [head, ...rest] = segments;
+  if (rest.length === 0) {
+    if (value === DELETE_FIELD) {
+      const { [head]: _removed, ...remaining } = data;
+      return remaining;
+    }
+    return { ...data, [head]: value };
+  }
+  const child = data[head];
+  const childData = child !== null && typeof child === 'object' ? (child as DocData) : {};
+  return { ...data, [head]: writeField(childData, rest, value) };
+};
 
 interface Op {
   readonly kind: 'delete' | 'update' | 'recursiveDelete' | 'deleteUser';
@@ -84,28 +140,27 @@ class FakeFirestore implements AdminFirestoreLike {
     matches: (path: string, data: DocData) => boolean,
     groupId: string | null,
   ): AdminQueryLike {
+    // 실 Firestore 의미론: `==`·`!=` 모두 필드가 **존재하는** 문서만 매칭한다.
+    // 즉 `!= null`은 값이 null인 키를 반환하지 않는다.
     const matchesField = (
       data: DocData,
-      field: string,
-      op: '==' | 'array-contains',
-      value: string,
+      field: FieldRef,
+      op: QueryOp,
+      value: string | null,
     ): boolean => {
+      const { exists, value: current } = readField(data, field);
+      if (!exists) return false;
       if (op === 'array-contains') {
-        const current = data[field];
         return Array.isArray(current) && current.includes(value);
       }
-      return data[field] === value;
+      return op === '==' ? current === value : current !== value;
     };
 
     const build = (
       predicate: (path: string, data: DocData) => boolean,
       max: number | null,
     ): AdminQueryLike => ({
-      where: (
-        field: string,
-        op: '==' | 'array-contains',
-        value: string,
-      ): AdminQueryLike =>
+      where: (field: FieldRef, op: QueryOp, value: string | null): AdminQueryLike =>
         build(
           (path, data) => predicate(path, data) && matchesField(data, field, op, value),
           max,
@@ -153,9 +208,22 @@ class FakeFirestore implements AdminFirestoreLike {
     const staged: (() => void)[] = [];
     let failed: string | null = null;
     return {
-      update: (ref: AdminDocumentRefLike, data: DocData): unknown => {
+      update: (
+        ref: AdminDocumentRefLike,
+        dataOrField: DocData | AdminFieldPathLike,
+        fieldValue?: unknown,
+      ): unknown => {
         const path = this.pathOf(ref);
         if (this.failingPaths.has(path)) failed = path;
+        if (dataOrField instanceof FakeFieldPath) {
+          staged.push(() => {
+            this.ops.push({ kind: 'update', path });
+            const current = this.docs.get(path) ?? {};
+            this.docs.set(path, writeField(current, dataOrField.segments, fieldValue));
+          });
+          return undefined;
+        }
+        const data = dataOrField as DocData;
         staged.push(() => {
           this.ops.push({ kind: 'update', path });
           const current = this.docs.get(path) ?? {};
@@ -206,6 +274,8 @@ interface Harness {
     readonly auth: { deleteUser(uid: string): Promise<void> };
     readonly recursiveDeleteDocument: (path: string) => Promise<void>;
     readonly arrayRemoveValue: (value: string) => unknown;
+    readonly fieldPath: (...segments: string[]) => AdminFieldPathLike;
+    readonly deleteFieldValue: () => unknown;
   };
   recursiveFailures: Set<string>;
   authError: unknown;
@@ -222,6 +292,8 @@ const makeHarness = (): Harness => {
     deps: {
       db,
       arrayRemoveValue: (value: string): unknown => ({ __arrayRemove: value }),
+      fieldPath: (...segments: string[]): AdminFieldPathLike => new FakeFieldPath(segments),
+      deleteFieldValue: (): unknown => DELETE_FIELD,
       auth: {
         deleteUser: async (uid: string): Promise<void> => {
           db.ops.push({ kind: 'deleteUser', path: uid });
@@ -285,6 +357,15 @@ const seedFullDataset = (db: FakeFirestore): void => {
     userDisplayName: '김철수',
     upvotes: 2,
     upvotedBy: [UID, OTHER_UID],
+    // 남의 제보에 내가 남긴 반응 — uid가 map의 **키**라 arrayRemove로 못 지운다.
+    reactions: { helped: 0, same: 2, recovered: 0, differ: 0 },
+    reactedBy: { [UID]: 'same', [OTHER_UID]: 'same' },
+  });
+  // 구버전 clearReaction은 키를 지우지 않고 null을 써서 uid 키가 남았다(#318).
+  db.seed('delayReports/r3', {
+    userId: OTHER_UID,
+    reactions: { helped: 1, same: 0, recovered: 0, differ: 0 },
+    reactedBy: { [UID]: null, [OTHER_UID]: 'helped' },
   });
   db.seed('delayReports/r1/comments/c1', {
     userId: UID,
@@ -512,6 +593,59 @@ describe('accountDeletionService', () => {
         [],
       );
       expect(h.db.docs.get('delayReports/r2')!.upvotedBy).toEqual([OTHER_UID]);
+      expect(h.db.docs.get('delayReports/r2')!.reactedBy).toEqual({ [OTHER_UID]: 'same' });
+    });
+
+    it('남의 제보 reactedBy에서 내 uid 키를 지우고 타인 키·reactions 카운트는 보존한다', async () => {
+      const h = makeHarness();
+      seedFullDataset(h.db);
+
+      await deleteAccountAndData(h.deps, UID);
+
+      const report = h.db.docs.get('delayReports/r2')!;
+      expect(report.reactedBy).toEqual({ [OTHER_UID]: 'same' });
+      expect(report.reactions).toEqual({ helped: 0, same: 2, recovered: 0, differ: 0 });
+    });
+
+    it('구버전 clearReaction이 남긴 null 값 키도 지운다', async () => {
+      const h = makeHarness();
+      seedFullDataset(h.db);
+
+      await deleteAccountAndData(h.deps, UID);
+
+      const report = h.db.docs.get('delayReports/r3')!;
+      expect(report.reactedBy).toEqual({ [OTHER_UID]: 'helped' });
+      expect(report.reactions).toEqual({ helped: 1, same: 0, recovered: 0, differ: 0 });
+    });
+
+    it('콜론이 든 커스텀 토큰 uid의 반응 키도 지운다', async () => {
+      const h = makeHarness();
+      h.db.seed('delayReports/rk', {
+        userId: OTHER_UID,
+        reactedBy: { [KAKAO_UID]: 'differ', [OTHER_UID]: 'same' },
+      });
+
+      await deleteAccountAndData(h.deps, KAKAO_UID);
+
+      expect(h.db.docs.get('delayReports/rk')!.reactedBy).toEqual({ [OTHER_UID]: 'same' });
+    });
+
+    it('반응 키 제거는 배치 상한(400)을 넘어도 전부 처리하고 종료한다', async () => {
+      const h = makeHarness();
+      for (let i = 0; i < 450; i += 1) {
+        h.db.seed(`delayReports/bulk${i}`, {
+          userId: OTHER_UID,
+          reactedBy: { [UID]: i % 2 === 0 ? 'same' : null },
+        });
+      }
+
+      const result = await purgeUserFirestoreData(h.deps, UID);
+
+      expect(result.failedSteps).toEqual([]);
+      const leftovers = [...h.db.docs.values()].filter((data) =>
+        readField(data, new FakeFieldPath(['reactedBy', UID])).exists,
+      );
+      expect(leftovers).toEqual([]);
     });
 
     it('congestionReports는 reporterId만 치환한다', async () => {
@@ -576,6 +710,23 @@ describe('accountDeletionService', () => {
       expect(h.db.docs.has('fcm_tokens/t-mine')).toBe(true);
       // 익명화도 첫 단계에서 멈췄으므로 내 제보는 그대로다.
       expect(h.db.docs.get('delayReports/r1')).toMatchObject({ userId: UID });
+    });
+
+    it('반응 키 제거가 실패하면 그 단계로 보고하고 뒤 단계를 멈춘다', async () => {
+      const h = makeHarness();
+      seedFullDataset(h.db);
+      // r3은 reactedBy 단계만 건드리는 문서다.
+      h.db.failingPaths.add('delayReports/r3');
+
+      const result = await purgeUserFirestoreData(h.deps, UID);
+
+      expect(result.failedSteps).toEqual(['delayReportReactions']);
+      // 앞 단계(upvotedBy 제거)는 완료됐다.
+      expect(h.db.docs.get('delayReports/r2')!.upvotedBy).toEqual([OTHER_UID]);
+      // 뒤 단계는 실행되지 않았다.
+      expect(h.db.docs.has(`users/${UID}`)).toBe(true);
+      expect(h.db.docs.has('congestionReports/cr1')).toBe(true);
+      expect(h.db.docs.get('congestionReports/cr1')!.reporterId).toBe(UID);
     });
 
     it('중간 단계가 실패하면 그 지점에서 멈춘다', async () => {
