@@ -47,10 +47,6 @@ export interface ArrivalServiceOptions {
   minPollingInterval?: number;
   /** Cache TTL in ms (default: 60000) */
   cacheTTL?: number;
-  /** Maximum retry attempts (default: 3) */
-  maxRetries?: number;
-  /** Delay between retries in ms (default: 1000) */
-  retryDelay?: number;
 }
 
 /**
@@ -72,7 +68,7 @@ export interface GetArrivalsOptions {
    * Use this when the caller routes errors to a category-aware UI like
    * `ErrorFallback`, where seeing `SeoulApiError` instance directly is
    * preferable to silently degrading to stale cache. Note: when `true`,
-   * `fetchWithRetry` still runs the full retry chain — `throwOnError`
+   * seoulSubwayApi still runs its full retry chain — `throwOnError`
    * controls only the cache fallback layer.
    */
   throwOnError?: boolean;
@@ -101,8 +97,6 @@ export type ArrivalCallback = (
 const DEFAULT_OPTIONS: Required<ArrivalServiceOptions> = {
   minPollingInterval: 30000, // 30 seconds (Seoul API requirement)
   cacheTTL: 60000, // 1 minute
-  maxRetries: 3,
-  retryDelay: 1000,
 };
 
 const CACHE_PREFIX = '@livemetro_arrival_';
@@ -116,7 +110,8 @@ const CACHE_PREFIX = '@livemetro_arrival_';
  *
  * Features:
  * - Rate limiting: Enforces 30-second minimum polling interval
- * - Retry logic: Exponential backoff on failures
+ * - One network chain per station at a time (retries are owned by
+ *   seoulSubwayApi, which caps one logical request at 3 fetches)
  * - Caching: AsyncStorage-based with TTL
  * - Subscription pattern: For continuous updates
  */
@@ -128,6 +123,9 @@ class ArrivalService {
   // 역명별 "진행 중인 초기 fetch"를 추적해, 같은 역명의 후속 구독자가 새 fetch를
   // 트리거하지 않고 같은 Promise를 재사용하게 한다. (subscribe 참고)
   private initialFetches: Map<string, Promise<ArrivalInfo>> = new Map();
+  // 역명별 진행 중인 네트워크 요청. 느린 재시도 체인이 폴링 주기(30초)를 넘겨도
+  // 다음 interval 틱·foreground 복귀·재구독이 새 체인을 만들지 않고 합류한다.
+  private inflightFetches: Map<string, Promise<ArrivalInfo>> = new Map();
   // Per-station interval + options captured at first subscribe, so polling can
   // be restarted identically after a background pause.
   private pollingConfigs: Map<string, { intervalMs: number; options?: GetArrivalsOptions }> = new Map();
@@ -174,24 +172,12 @@ class ArrivalService {
       }
     }
 
-    // Fetch with retry logic
     try {
-      const arrivals = await this.fetchWithRetry(trimmedName);
-      this.lastFetchTime.set(trimmedName, now);
-
-      // Cache the result — but skip empty arrivals so the next call re-fetches
-      // immediately instead of returning an empty cache for the polling window.
-      // An empty result usually means transient API hiccup or rate-limit; caching
-      // it would freeze the UI for 30-60s on a stale empty state.
-      if (arrivals.arrivals.length > 0) {
-        await this.setCachedArrivals(trimmedName, arrivals);
-      }
-
-      return arrivals;
+      return await this.fetchShared(trimmedName);
     } catch (error) {
       // Caller wants categorized error UI — skip cache fallback, propagate the
       // original error (e.g. SeoulApiError) so downstream can branch on category.
-      // The retry chain in fetchWithRetry already ran; this just controls
+      // The retry chain in seoulSubwayApi already ran; this just controls
       // whether the cache layer masks the final failure.
       if (options?.throwOnError) {
         throw error;
@@ -371,8 +357,9 @@ class ArrivalService {
     // Clear subscriptions
     this.activeSubscriptions.clear();
 
-    // Clear in-flight initial fetches
+    // Clear in-flight initial fetches and network requests
     this.initialFetches.clear();
+    this.inflightFetches.clear();
 
     // Clear fetch timestamps
     this.lastFetchTime.clear();
@@ -383,33 +370,43 @@ class ArrivalService {
   // ==========================================================================
 
   /**
-   * Fetch arrivals with retry logic
+   * One network request per station at a time: concurrent callers join the
+   * in-flight one. No retry here — seoulSubwayApi owns retries (network,
+   * timeout, quota fallback, auth key swap) within a 3-fetch budget, and a
+   * second retry layer on top multiplied it (3 × 3 = 9 fetches per poll).
    */
-  private async fetchWithRetry(
-    stationName: string,
-    attempt: number = 0
-  ): Promise<ArrivalInfo> {
-    try {
-      const seoulData = await seoulSubwayApi.getRealtimeArrival(stationName);
-      return this.convertToArrivalInfo(stationName, seoulData);
-    } catch (error) {
-      // Once every key has hit the daily quota (ERROR-337) no attempt can
-      // succeed before KST midnight — skip the backoff waits. Other
-      // retryable=false errors (e.g. one key's INFO-100) still retry: the key
-      // manager has disabled the failing key, so the next attempt can use a
-      // healthy backup. Duck-typed so tests that mock the whole seoulSubwayApi
-      // module don't need the class.
-      const quotaExhausted =
-        (error as { dailyQuotaExhausted?: unknown } | null)?.dailyQuotaExhausted === true;
-      if (!quotaExhausted && attempt < this.options.maxRetries - 1) {
-        // Exponential backoff
-        const delay = this.options.retryDelay * Math.pow(2, attempt);
-        await this.delay(delay);
-        return this.fetchWithRetry(stationName, attempt + 1);
-      }
-
-      throw error;
+  private fetchShared(stationName: string): Promise<ArrivalInfo> {
+    const inflight = this.inflightFetches.get(stationName);
+    if (inflight) {
+      return inflight;
     }
+
+    const request = this.fetchArrivals(stationName);
+    this.inflightFetches.set(stationName, request);
+    const clear = (): void => {
+      if (this.inflightFetches.get(stationName) === request) {
+        this.inflightFetches.delete(stationName);
+      }
+    };
+    request.then(clear, clear);
+    return request;
+  }
+
+  private async fetchArrivals(stationName: string): Promise<ArrivalInfo> {
+    const startedAt = Date.now();
+    const seoulData = await seoulSubwayApi.getRealtimeArrival(stationName);
+    const arrivals = this.convertToArrivalInfo(stationName, seoulData);
+    this.lastFetchTime.set(stationName, startedAt);
+
+    // Cache the result — but skip empty arrivals so the next call re-fetches
+    // immediately instead of returning an empty cache for the polling window.
+    // An empty result usually means transient API hiccup or rate-limit; caching
+    // it would freeze the UI for 30-60s on a stale empty state.
+    if (arrivals.arrivals.length > 0) {
+      await this.setCachedArrivals(stationName, arrivals);
+    }
+
+    return arrivals;
   }
 
   /**
@@ -672,17 +669,6 @@ class ArrivalService {
       // Cache failures are non-critical
       console.warn('Failed to cache arrivals:', error);
     }
-  }
-
-  // ==========================================================================
-  // Utility Methods
-  // ==========================================================================
-
-  /**
-   * Delay helper for retry logic
-   */
-  private delay(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
 

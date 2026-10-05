@@ -184,7 +184,10 @@ export const useRealtimeTrains = (
 
   // AppState 복귀 시 강제 refresh — 백그라운드에 오래 있다가 돌아오면 폴링 타이머가
   // 죽거나 데이터가 stale 상태로 남아있어 도착 정보가 갱신되지 않는 증상을 해소.
-  // background/inactive → active 전환에서만 refetch 트리거.
+  // 실제 'background'를 거친 뒤의 'active'에서만 1회 refetch 트리거 (iOS의
+  // background→inactive→active 경유 포함). 'inactive'만 거친 깜빡임(제어 센터,
+  // 앱 스위처 엿보기)은 무시 — arrivalService의 일시정지 정책과 같은 기준이며,
+  // 매번 재구독해 폴링 interval 위상을 리셋하던 낭비를 막는다.
   // Burst guard: 5초 내 fresh data가 있으면 refetch skip — 짧은 background→active
   // 전환(앱 스위처, push 알림 닫기)이 30s polling과 겹쳐 Seoul API rate budget을
   // 낭비하는 회귀 방지.
@@ -192,11 +195,14 @@ export const useRealtimeTrains = (
     if (!enabled) return;
 
     const BURST_GUARD_MS = 5000;
-    const appStateRef = { current: AppState.currentState };
+    let wasBackgrounded = AppState.currentState === 'background';
     const subscription = AppState.addEventListener('change', (nextState: AppStateStatus) => {
-      const prev = appStateRef.current;
-      appStateRef.current = nextState;
-      if ((prev === 'background' || prev === 'inactive') && nextState === 'active') {
+      if (nextState === 'background') {
+        wasBackgrounded = true;
+        return;
+      }
+      if (nextState === 'active' && wasBackgrounded) {
+        wasBackgrounded = false;
         const sinceLastFetch = Date.now() - lastFetchAtRef.current;
         if (sinceLastFetch < BURST_GUARD_MS) {
           return;
