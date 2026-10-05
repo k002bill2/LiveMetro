@@ -13,6 +13,22 @@ import { ThemeProvider } from '@/services/theme';
 const wrap = (node: React.ReactElement) => render(<ThemeProvider>{node}</ThemeProvider>);
 
 describe('FavoriteRow', () => {
+  it('renders "정보 없음" instead of "0분" when nextMinutes is null', () => {
+    const { getByText, queryByText, getByLabelText } = wrap(
+      <FavoriteRow lines={['2']} stationName="강남" nextMinutes={null} />,
+    );
+    expect(getByText('정보 없음')).toBeTruthy();
+    expect(queryByText('분')).toBeNull();
+    expect(getByLabelText('강남역 즐겨찾기, 도착 정보 없음')).toBeTruthy();
+  });
+
+  it('suppresses the imminent badge when nextMinutes is null', () => {
+    const { queryByText } = wrap(
+      <FavoriteRow lines={['2']} stationName="강남" nextMinutes={null} imminent />,
+    );
+    expect(queryByText('곧 도착')).toBeNull();
+  });
+
   it('renders station name and minutes', () => {
     const { getByText } = wrap(
       <FavoriteRow lines={['2']} stationName="강남" nextMinutes={3} />,

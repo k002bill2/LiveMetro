@@ -28,7 +28,16 @@ interface HomeFavoriteRowProps {
 export const HomeFavoriteRow: React.FC<HomeFavoriteRowProps> = memo(
   ({ station, alias, isFocused, isFirst = false, onPress, testID }) => {
     const { trains } = useRealtimeTrains(station.name, { enabled: isFocused });
-    const next = trains[0];
+    // Earliest train with a known ETA. trains[0] may carry arrivalTime === null
+    // (unknown, e.g. arvlCd 99) — treating that as 0s rendered a false "0분".
+    const next = trains.reduce<(typeof trains)[number] | undefined>(
+      (best, t) =>
+        t.arrivalTime !== null &&
+        (best?.arrivalTime == null || t.arrivalTime.getTime() < best.arrivalTime.getTime())
+          ? t
+          : best,
+      undefined,
+    );
 
     // Tick every second only when this is the first row AND the screen is
     // focused — avoids 1Hz timers across the favorite stack.
@@ -39,17 +48,18 @@ export const HomeFavoriteRow: React.FC<HomeFavoriteRowProps> = memo(
       return () => clearInterval(id);
     }, [isFirst, isFocused]);
 
-    const totalSecondsLeft = next?.arrivalTime
-      ? Math.max(0, Math.round((next.arrivalTime.getTime() - Date.now()) / 1000))
-      : 0;
-    const nextMinutes = Math.floor(totalSecondsLeft / 60);
+    const totalSecondsLeft =
+      next?.arrivalTime != null
+        ? Math.max(0, Math.round((next.arrivalTime.getTime() - Date.now()) / 1000))
+        : null;
+    const nextMinutes = totalSecondsLeft !== null ? Math.floor(totalSecondsLeft / 60) : null;
 
     const destLabel = next?.finalDestination
       ? `${next.finalDestination} 방면`
       : undefined;
 
     const imminent =
-      isFirst && totalSecondsLeft > 0 && totalSecondsLeft <= 90;
+      isFirst && totalSecondsLeft !== null && totalSecondsLeft > 0 && totalSecondsLeft <= 90;
 
     return (
       <FavoriteRow
