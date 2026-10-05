@@ -225,6 +225,7 @@ MP2 high severity 가정 **틀림** — vertical timeline은 정확히 구현되
 
 ### ✅ 일치 (검증됨)
 - AsyncStorage + SecureStore 기반 자동로그인/생체인증 토글 ✓
+  - 2026-10-05 갱신: 자동로그인 토글은 폐지됐습니다. 비밀번호 평문 저장을 없앤 뒤(#356) 동작에 영향이 없는 토글이 돼 "로그인 상태 유지" 안내 행으로 대체했습니다. 로그인 유지는 Firebase Auth persistence가 담당합니다. 생체인증 토글은 유지합니다.
 - biometric 서비스(isBiometricAvailable, isBiometricLoginEnabled, getBiometricTypeName, reEnable, disable) wired ✓
 - React Native `<Switch>` 컴포넌트 사용 ✓ (번들의 커스텀 44x26 토글 UI 대신 OS 표준)
 - 25개 sub-screen으로 분리된 구조 — 번들의 단일 list와 다른 indexed navigation pattern

@@ -4,6 +4,7 @@
  */
 
 import * as SecureStore from 'expo-secure-store';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { migrateLegacyBiometricCredentials } from '@/services/auth/biometricService';
 import {
   LEGACY_AUTO_LOGIN_CREDENTIAL_KEY,
@@ -15,6 +16,10 @@ jest.mock('expo-secure-store', () => ({
   deleteItemAsync: jest.fn(),
 }));
 
+jest.mock('@react-native-async-storage/async-storage', () => ({
+  removeItem: jest.fn(),
+}));
+
 jest.mock('@/services/auth/biometricService', () => ({
   migrateLegacyBiometricCredentials: jest.fn(),
 }));
@@ -22,6 +27,7 @@ jest.mock('@/services/auth/biometricService', () => ({
 const mockedDelete = SecureStore.deleteItemAsync as jest.Mock;
 const mockedGet = SecureStore.getItemAsync as jest.Mock;
 const mockedMigrateBiometric = migrateLegacyBiometricCredentials as jest.Mock;
+const mockedRemoveItem = AsyncStorage.removeItem as jest.Mock;
 
 describe('purgeLegacyPlaintextCredentials', () => {
   const originalConsoleError = console.error;
@@ -31,6 +37,7 @@ describe('purgeLegacyPlaintextCredentials', () => {
     console.error = jest.fn();
     mockedDelete.mockResolvedValue(undefined);
     mockedMigrateBiometric.mockResolvedValue(undefined);
+    mockedRemoveItem.mockResolvedValue(undefined);
   });
 
   afterEach(() => {
@@ -45,6 +52,21 @@ describe('purgeLegacyPlaintextCredentials', () => {
     await purgeLegacyPlaintextCredentials();
 
     expect(mockedDelete).toHaveBeenCalledWith(LEGACY_AUTO_LOGIN_CREDENTIAL_KEY);
+  });
+
+  it('removes the retired auto-login email and flag', async () => {
+    await purgeLegacyPlaintextCredentials();
+
+    expect(mockedDelete).toHaveBeenCalledWith('livemetro_auto_login_email');
+    expect(mockedRemoveItem).toHaveBeenCalledWith('@livemetro_auto_login_enabled');
+  });
+
+  it('still removes the flag when SecureStore deletes fail', async () => {
+    mockedDelete.mockRejectedValue(new Error('Delete error'));
+
+    await purgeLegacyPlaintextCredentials();
+
+    expect(mockedRemoveItem).toHaveBeenCalledWith('@livemetro_auto_login_enabled');
   });
 
   it('never reads the plaintext password', async () => {
