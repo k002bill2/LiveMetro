@@ -35,6 +35,12 @@ export interface ArrivalCardProps {
   seconds: number;
   /** Highlights this card as the next-to-arrive (primary border + shadow). */
   isFirst?: boolean;
+  /**
+   * false → the train's ETA is unknown (arrivalTime null, e.g. arvlCd 99).
+   * Renders "운행 중" instead of a countdown — 0 minutes would read as
+   * "곧 도착". Same honesty rule as SelectableTrainCard. Defaults to true.
+   */
+  hasEta?: boolean;
   /** Optional minute-level delay shown as subtitle. */
   delayMinutes?: number;
   /** Per-car congestion percentages (0–100). Length = car count. */
@@ -55,6 +61,7 @@ const ArrivalCardImpl: React.FC<ArrivalCardProps> = ({
   minutes,
   seconds,
   isFirst = false,
+  hasEta = true,
   delayMinutes = 0,
   carCongestion,
   showEmptyCongestion = false,
@@ -63,9 +70,9 @@ const ArrivalCardImpl: React.FC<ArrivalCardProps> = ({
   const semantic = useSemanticTokens();
 
   const totalSeconds = Math.max(0, Math.floor(minutes) * 60 + Math.max(0, Math.floor(seconds)));
-  const showImminentOnly = totalSeconds === 0;
+  const showImminentOnly = hasEta && totalSeconds === 0;
   // Being first only highlights the card; the badge must reflect the actual ETA.
-  const showImminentBadge = isFirst && totalSeconds < IMMINENT_THRESHOLD_SEC;
+  const showImminentBadge = hasEta && isFirst && totalSeconds < IMMINENT_THRESHOLD_SEC;
 
   // Phase 53b: long-press tooltip on each car bar. Surfaces the level
   // name + percentage (data ArrivalCard already has) without needing the
@@ -166,7 +173,11 @@ const ArrivalCardImpl: React.FC<ArrivalCardProps> = ({
           </Text>
         </View>
         <View style={styles.timeBlock}>
-          {showImminentOnly ? (
+          {!hasEta ? (
+            <Pill tone="neutral" size="sm" testID={testID ? `${testID}-running` : undefined}>
+              운행 중
+            </Pill>
+          ) : showImminentOnly ? (
             <Pill tone="primary" size="sm" testID={testID ? `${testID}-imminent` : undefined}>
               곧 도착
             </Pill>
