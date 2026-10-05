@@ -42,8 +42,23 @@ export interface AdminQuerySnapshotLike {
   readonly docs: readonly AdminQueryDocumentLike[];
 }
 
+/**
+ * `FieldPath`의 최소 형태. 서비스는 만들어 넘기기만 하고 내부를 보지 않는다.
+ *
+ * uid를 필드 **이름**으로 쓰는 map(`reactedBy`)은 `reactedBy.${uid}` 같은
+ * dotted 문자열로 가리키면 uid 속 문자가 경로 해석을 바꿀 수 있다 —
+ * 세그먼트를 그대로 담는 `FieldPath`로만 다룬다.
+ */
+export interface AdminFieldPathLike {
+  isEqual(other: AdminFieldPathLike): boolean;
+}
+
 export interface AdminQueryLike {
-  where(field: string, op: '==' | 'array-contains', value: string): AdminQueryLike;
+  where(
+    field: string | AdminFieldPathLike,
+    op: '==' | '!=' | 'array-contains',
+    value: string | null,
+  ): AdminQueryLike;
   limit(count: number): AdminQueryLike;
   get(): Promise<AdminQuerySnapshotLike>;
 }
@@ -54,6 +69,7 @@ export interface AdminCollectionLike extends AdminQueryLike {
 
 export interface AdminWriteBatchLike {
   update(ref: AdminDocumentRefLike, data: Record<string, unknown>): unknown;
+  update(ref: AdminDocumentRefLike, field: AdminFieldPathLike, value: unknown): unknown;
   delete(ref: AdminDocumentRefLike): unknown;
   commit(): Promise<unknown>;
 }
@@ -87,6 +103,13 @@ export interface AccountPurgeDeps {
    * 센티널은 Admin SDK 전역이라 순수 서비스에 주입한다(recursiveDelete와 동일한 이유).
    */
   readonly arrayRemoveValue: (value: string) => unknown;
+  /** `new FieldPath(...segments)` — 위 두 어댑터와 같은 이유로 주입한다. */
+  readonly fieldPath: (...segments: string[]) => AdminFieldPathLike;
+  /**
+   * `FieldValue.delete()` 센티널. `null`이나 `undefined`로 대체하면 키가
+   * 남거나(null) 쓰기가 거부된다(undefined) — 반드시 진짜 센티널이어야 한다.
+   */
+  readonly deleteFieldValue: () => unknown;
 }
 
 export interface AccountDeletionDeps extends AccountPurgeDeps {
@@ -96,6 +119,7 @@ export interface AccountDeletionDeps extends AccountPurgeDeps {
 /** 파기 단계 식별자 — 실패 로깅과 테스트 단언에 쓰인다(응답에는 넣지 않는다). */
 export type PurgeStep =
   | 'delayReportUpvotes'
+  | 'delayReportReactions'
   | 'delayReportCommentLikes'
   | 'users'
   | 'commuteSettings'
@@ -242,6 +266,33 @@ const removeCommentLikeTraces = removeUidFromArray('likedBy', ({ db }, uid) =>
   db.collectionGroup('comments').where('likedBy', 'array-contains', uid),
 );
 
+/**
+ * 내가 반응한 (남의) 지연 제보의 `reactedBy` map에서 **내 uid 키**를 지운다.
+ * `reactions.*` 카운트는 upvotes와 같은 이유로 보존한다(커뮤니티 집계).
+ *
+ * `reactedBy`는 배열이 아니라 uid-키 map이라 arrayRemove를 쓸 수 없다 →
+ * 키 자체를 `FieldValue.delete()`로 지운다. 지워진 문서는 다음 페이지 쿼리에
+ * 다시 잡히지 않으므로 `runPagedWrite` 루프가 종료한다.
+ *
+ * 쿼리가 2개인 이유: Firestore `!= null`은 값이 null인 키를 반환하지 않는다.
+ * 구버전 `clearReaction`이 키를 지우지 않고 null을 써서 남긴 uid 키(#318)는
+ * `== null`로만 잡힌다. 수정판을 받지 않은 앱은 계속 null을 쓰므로 이 쿼리는
+ * 일회성 정리가 아니라 상시 필요하다.
+ *
+ * 새 인덱스는 필요 없다 — map 하위 키는 자동 단일 필드 인덱스 대상이라
+ * `reactedBy.<uid>` 항목은 반응을 쓸 때 이미 색인된다(인덱스 빌드 창 없음).
+ */
+const removeReactionTraces = async (deps: AccountPurgeDeps, uid: string): Promise<void> => {
+  const reactionKey = deps.fieldPath('reactedBy', uid);
+  for (const op of ['!=', '=='] as const) {
+    await runPagedWrite(
+      deps.db,
+      deps.db.collection('delayReports').where(reactionKey, op, null),
+      (batch, ref) => batch.update(ref, reactionKey, deps.deleteFieldValue()),
+    );
+  }
+};
+
 /** congestionReports는 표시용 이름 없이 reporterId만 개인 식별자다. */
 const anonymizeCongestionReports = ({ db }: AccountPurgeDeps, uid: string): Promise<void> =>
   runPagedWrite(
@@ -310,6 +361,7 @@ const PURGE_STEPS: readonly PurgeStepRunner[] = [
   { step: 'delayReportCommentLikes', run: removeCommentLikeTraces },
   { step: 'delayReports', run: anonymizeDelayReports },
   { step: 'delayReportUpvotes', run: removeUpvoteTraces },
+  { step: 'delayReportReactions', run: removeReactionTraces },
   { step: 'congestionReports', run: anonymizeCongestionReports },
   { step: 'favorites', run: deleteLegacyFavorites },
   { step: 'fcmTokens', run: deleteFcmTokens },

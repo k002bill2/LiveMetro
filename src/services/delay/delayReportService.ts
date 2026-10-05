@@ -19,6 +19,7 @@ import {
   arrayUnion,
   arrayRemove,
   increment,
+  deleteField,
 } from 'firebase/firestore';
 import { firestore as db } from '@/services/firebase/config';
 import {
@@ -228,13 +229,15 @@ class DelayReportService {
   }
 
   /**
-   * Remove a user's existing reaction.
+   * Remove a user's existing reaction. The uid key is deleted rather than set
+   * to null — a null value would leave the uid behind in someone else's
+   * report (#318).
    */
   async clearReaction(reportId: string, userId: string, previousKind: ReactionKind): Promise<void> {
     const reportRef = doc(db, COLLECTION_NAME, reportId);
     await updateDoc(reportRef, {
       [`reactions.${previousKind}`]: increment(-1),
-      [`reactedBy.${userId}`]: null,
+      [`reactedBy.${userId}`]: deleteField(),
       updatedAt: Timestamp.fromDate(new Date()),
     });
   }

@@ -23,6 +23,8 @@ import {
   runDeleteAccountRequest,
   createRecursiveDeleteAdapter,
   createArrayRemoveAdapter,
+  createFieldPathAdapter,
+  createDeleteFieldAdapter,
 } from './services/accountDeletionHandler';
 import {
   NotificationType,
@@ -293,6 +295,8 @@ export const deleteAccount = onCall<unknown>(
         auth: admin.auth(),
         recursiveDeleteDocument: createRecursiveDeleteAdapter(db),
         arrayRemoveValue: createArrayRemoveAdapter(admin.firestore.FieldValue),
+        fieldPath: createFieldPathAdapter(admin.firestore.FieldPath),
+        deleteFieldValue: createDeleteFieldAdapter(admin.firestore.FieldValue),
       },
       request.auth?.uid
     );

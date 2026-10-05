@@ -20,6 +20,8 @@ import {
   runDeleteAccountRequest,
   createRecursiveDeleteAdapter,
   createArrayRemoveAdapter,
+  createFieldPathAdapter,
+  createDeleteFieldAdapter,
   AdminRecursiveDeleteCapable,
   AdminFieldValueCapable,
 } from '../accountDeletionHandler';
@@ -97,6 +99,8 @@ const makeDeps = (options: MakeDepsOptions = {}): DepsHarness => {
     },
     recursiveDeleteDocument: async (): Promise<void> => undefined,
     arrayRemoveValue: (value: string): unknown => ({ __arrayRemove: value }),
+    fieldPath: (...segments: string[]) => ({ isEqual: (): boolean => false, segments }),
+    deleteFieldValue: (): unknown => ({ __deleteField: true }),
   };
 
   return { deps, deletedUsers };
@@ -221,6 +225,37 @@ describe('accountDeletionHandler', () => {
 
       expect(result).toBe(sentinel);
       expect(result).not.toBe('uid-1');
+    });
+  });
+
+  describe('createFieldPathAdapter', () => {
+    it('세그먼트를 쪼개지 않고 그대로 FieldPath 생성자에 넘긴다', () => {
+      // uid가 필드 이름이 되는 map 키 경로 — 콜론·점이 섞인 uid도 한 세그먼트다.
+      class FakeFieldPath {
+        readonly segments: string[];
+        constructor(...segments: string[]) {
+          this.segments = segments;
+        }
+        isEqual(): boolean {
+          return false;
+        }
+      }
+
+      const result = createFieldPathAdapter(FakeFieldPath)('reactedBy', 'kakao:1.2');
+
+      expect(result).toBeInstanceOf(FakeFieldPath);
+      expect((result as FakeFieldPath).segments).toEqual(['reactedBy', 'kakao:1.2']);
+    });
+  });
+
+  describe('createDeleteFieldAdapter', () => {
+    it('FieldValue.delete()의 반환값을 그대로 돌려준다(null로 대체하지 않는다)', () => {
+      // null을 쓰면 uid 키가 map에 남는다(#318의 원인) — 참조 동일성으로 단언한다.
+      const sentinel = Symbol('delete-sentinel');
+
+      const result = createDeleteFieldAdapter({ delete: (): unknown => sentinel })();
+
+      expect(result).toBe(sentinel);
     });
   });
 });
