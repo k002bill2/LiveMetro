@@ -32,6 +32,7 @@ import { StationSearchModal } from '../../components/commute/StationSearchModal'
 import { StationSelection } from '../../models/commute';
 import { Station } from '../../models/train';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '../../styles/modernTheme';
+import { ScreenTitle } from '@/components/common/ScreenTitle';
 
 type NavigationProp = NativeStackNavigationProp<AppStackParamList>;
 
@@ -528,12 +529,7 @@ export const FavoritesScreen: React.FC = () => {
     <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header — Phase 3 redesign: large title + sort/add round buttons */}
       <View style={styles.header}>
-        <Text
-          style={styles.headerTitle}
-          accessibilityRole="header"
-        >
-          즐겨찾기
-        </Text>
+        <ScreenTitle>즐겨찾기</ScreenTitle>
         <View style={styles.headerActions}>
           {!hasNoFavorites && (
             <TouchableOpacity
@@ -677,7 +673,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      paddingHorizontal: WANTED_TOKENS.spacing.s5,
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
       paddingTop: WANTED_TOKENS.spacing.s2,
       paddingBottom: WANTED_TOKENS.spacing.s1,
       backgroundColor: 'transparent',
@@ -713,15 +709,6 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       backgroundColor: semantic.primaryNormal,
       justifyContent: 'center',
       alignItems: 'center',
-    },
-    headerTitle: {
-      fontSize: WANTED_TOKENS.type.heading1.size,
-      lineHeight: WANTED_TOKENS.type.heading1.lh,
-      fontWeight: '800',
-      fontFamily: weightToFontFamily('800'),
-      color: semantic.labelStrong,
-      letterSpacing:
-        WANTED_TOKENS.type.heading1.size * WANTED_TOKENS.type.heading1.tracking,
     },
     content: {
       flex: 1,

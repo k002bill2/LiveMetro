@@ -22,6 +22,7 @@ import { ReportCard } from '@/components/delays/ReportCard';
 import { ReportCardSkeleton } from '@/components/delays/ReportCardSkeleton';
 import { ReportFilterBar, type FilterCategory } from '@/components/delays/ReportFilterBar';
 import { WANTED_TOKENS, weightToFontFamily, type WantedSemanticTheme } from '@/styles/modernTheme';
+import { ScreenTitle } from '@/components/common/ScreenTitle';
 
 export const DelayFeedScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -165,17 +166,11 @@ export const DelayFeedScreen: React.FC = () => {
       style={styles.container}
       edges={isPushedOnRootStack ? ['left', 'right'] : ['top']}
     >
-      {/* Header — Phase 4 redesign: heading1 title + round add button */}
+      {/* Header — Phase 4 redesign: ScreenTitle + round add button */}
       <View style={[styles.header, isPushedOnRootStack && styles.headerCompact]}>
         <View style={styles.headerTitleWrap}>
           {!isPushedOnRootStack && (
-            <Text
-              style={styles.headerTitle}
-              accessibilityRole="header"
-              testID="delay-feed-header-title"
-            >
-              실시간 제보
-            </Text>
+            <ScreenTitle testID="delay-feed-header-title">실시간 제보</ScreenTitle>
           )}
           <Text style={styles.headerSubtitle} testID="delay-feed-header-subtitle">
             지난 4시간 · 실시간 제보 {filteredReports.length}건
@@ -243,7 +238,7 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      paddingHorizontal: 20,
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
       paddingTop: 8,
       paddingBottom: 12,
     },
@@ -253,15 +248,6 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     },
     headerTitleWrap: {
       flex: 1,
-    },
-    headerTitle: {
-      fontSize: WANTED_TOKENS.type.heading1.size,
-      lineHeight: WANTED_TOKENS.type.heading1.lh,
-      fontWeight: '800',
-      fontFamily: weightToFontFamily('800'),
-      color: semantic.labelStrong,
-      letterSpacing:
-        WANTED_TOKENS.type.heading1.size * WANTED_TOKENS.type.heading1.tracking,
     },
     headerSubtitle: {
       fontSize: 13,
