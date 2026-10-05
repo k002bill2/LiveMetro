@@ -357,9 +357,10 @@ const RootNavigatorContent: React.FC = () => {
         component={DelayFeedScreen}
         options={{
           headerShown: true,
-          // DelayFeedScreen draws its own 28px "실시간 제보" title; the native
-          // header only contributes the circular back button.
-          title: '',
+          // Pushed variant (from Settings): title lives in the native header
+          // like other pushed screens; DelayFeedScreen adds headerRight and
+          // drops its in-screen 28px title.
+          title: '실시간 제보',
         }}
       />
       <Stack.Screen

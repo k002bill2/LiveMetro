@@ -3,13 +3,14 @@
  * 실시간 지연 제보 피드 화면
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useSemanticTokens } from '@/services/theme';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { MessageSquare, Megaphone } from 'lucide-react-native';
 
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { ROOT_STACK_ID } from '@/navigation/types';
 import { useAuth } from '@/services/auth/AuthContext';
 
 import { useFavorites } from '@/hooks/useFavorites';
@@ -41,6 +42,38 @@ export const DelayFeedScreen: React.FC = () => {
   const [category, setCategory] = useState<FilterCategory>('all');
   const [onlyMyLines, setOnlyMyLines] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
+  const openReportModal = useCallback(() => setShowReportModal(true), []);
+
+  // Pushed on the root stack (e.g. from Settings) the native header shows the
+  // title + back button, so the in-screen title row collapses to the subtitle,
+  // the add button moves to headerRight, and the top inset is skipped (the
+  // header already clears the status bar).
+  const isPushedOnRootStack = navigation.getId?.() === ROOT_STACK_ID;
+  const navigationRef = useRef(navigation);
+  navigationRef.current = navigation;
+
+  const addButton = (
+    <TouchableOpacity
+      style={styles.addButton}
+      accessibilityRole="button"
+      accessibilityLabel="제보 작성"
+      testID="delay-feed-add-button"
+      onPress={openReportModal}
+    >
+      <Megaphone size={18} color={WANTED_TOKENS.light.labelOnColor} strokeWidth={2.2} />
+    </TouchableOpacity>
+  );
+  const addButtonRef = useRef(addButton);
+  addButtonRef.current = addButton;
+
+  // Registered on focus, not mount: setOptions during a cross-stack mount
+  // transition can trigger a remount loop.
+  useFocusEffect(
+    useCallback(() => {
+      if (!isPushedOnRootStack) return;
+      navigationRef.current.setOptions({ headerRight: () => addButtonRef.current });
+    }, [isPushedOnRootStack]),
+  );
 
   const loadReports = useCallback(async () => {
     try {
@@ -128,30 +161,27 @@ export const DelayFeedScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView
+      style={styles.container}
+      edges={isPushedOnRootStack ? ['left', 'right'] : ['top']}
+    >
       {/* Header — Phase 4 redesign: 28px title + round add button */}
-      <View style={styles.header}>
+      <View style={[styles.header, isPushedOnRootStack && styles.headerCompact]}>
         <View style={styles.headerTitleWrap}>
-          <Text
-            style={styles.headerTitle}
-            accessibilityRole="header"
-            testID="delay-feed-header-title"
-          >
-            실시간 제보
-          </Text>
+          {!isPushedOnRootStack && (
+            <Text
+              style={styles.headerTitle}
+              accessibilityRole="header"
+              testID="delay-feed-header-title"
+            >
+              실시간 제보
+            </Text>
+          )}
           <Text style={styles.headerSubtitle} testID="delay-feed-header-subtitle">
             지난 4시간 · 실시간 제보 {filteredReports.length}건
           </Text>
         </View>
-        <TouchableOpacity
-          style={styles.addButton}
-          accessibilityRole="button"
-          accessibilityLabel="제보 작성"
-          testID="delay-feed-add-button"
-          onPress={() => setShowReportModal(true)}
-        >
-          <Megaphone size={18} color={WANTED_TOKENS.light.labelOnColor} strokeWidth={2.2} />
-        </TouchableOpacity>
+        {!isPushedOnRootStack && addButton}
       </View>
 
       {/* Category + my-lines filter */}
@@ -216,6 +246,10 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       paddingHorizontal: 20,
       paddingTop: 8,
       paddingBottom: 12,
+    },
+    headerCompact: {
+      paddingTop: 12,
+      paddingBottom: 8,
     },
     headerTitleWrap: {
       flex: 1,
