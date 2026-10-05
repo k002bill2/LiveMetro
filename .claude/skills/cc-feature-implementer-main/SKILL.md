@@ -1,6 +1,6 @@
 ---
 name: cc-feature-implementer-main
-description: Creates a phase-based feature PLAN DOCUMENT with quality gates and incremental delivery structure (planning step only, before any code). Use when planning features, organizing work, breaking down tasks, creating roadmaps, or structuring development strategy. Does NOT implement code, run tests, or execute the plan — implementation/testing belong to the domain skills and test-automation; this skill produces the plan document only. Keywords: plan, planning, phases, breakdown, strategy, roadmap.
+description: "Creates a phase-based feature PLAN DOCUMENT with quality gates and incremental delivery structure (planning step only, before any code). Use when planning features, organizing work, breaking down tasks, creating roadmaps, or structuring development strategy. Does NOT implement code, run tests, or execute the plan — implementation/testing belong to the domain skills and test-automation; this skill produces the plan document only. Keywords: plan, planning, phases, breakdown, strategy, roadmap."
 ---
 
 # Feature Planner
