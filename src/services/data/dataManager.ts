@@ -336,9 +336,14 @@ class DataManager {
       nextStationId: null,
       finalDestination: arrival.destination || '종착역 미확인',
       direction: arrival.direction,
+      // Anchor to the fetch time, not Date.now(): arrivalSeconds is relative to
+      // when the snapshot was fetched (convertToAppTrain already compensates
+      // recptnDt latency up to that point). A cached ArrivalInfo is re-adapted
+      // on every callback while the API is failing; anchoring to now made its
+      // ETA never age, so "0분" stuck forever (#360).
       arrivalTime:
         arrival.arrivalSeconds !== null
-          ? new Date(Date.now() + arrival.arrivalSeconds * 1000)
+          ? new Date(info.lastUpdated.getTime() + arrival.arrivalSeconds * 1000)
           : null,
       status: TrainStatus.NORMAL,
       lastUpdated: info.lastUpdated,

@@ -902,4 +902,75 @@ describe('DataManager', () => {
       expect(data?.trains[0]?.lineId).toBe('공항철도');
     });
   });
+
+  describe('arrivalTime anchoring (#360)', () => {
+    // On-device 2026-10-05: with the API failing for 7 min, cached arrivals were
+    // re-adapted on every callback as Date.now() + arrivalSeconds, so they never
+    // aged and "0분" stayed forever. Anchor to the fetch time instead.
+    const T0 = new Date('2026-10-05T08:30:00.000Z').getTime();
+
+    const infoFetchedAt = (fetchedAtMs: number, arrivalSeconds: number | null) => ({
+      stationName: '선릉',
+      stationId: '1023',
+      arrivals: [
+        {
+          trainId: 't1',
+          lineId: '2',
+          direction: 'up' as const,
+          destination: '성수',
+          arrivalSeconds,
+          arrivalMessage: '',
+          trainNumber: '2001',
+        },
+      ],
+      lastUpdated: new Date(fetchedAtMs),
+      source: 'cache' as const,
+    });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+      jest.useRealTimers();
+    });
+
+    it('anchors arrivalTime to the fetch time, so a cached ETA ages', () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date(T0));
+      const fetchedAt = T0 - 5 * 60_000;
+      jest.spyOn(arrivalService, 'subscribe').mockImplementation((_name, cb) => {
+        cb(infoFetchedAt(fetchedAt, 30));
+        return () => undefined;
+      });
+      const callback = jest.fn();
+      dataManager.subscribeToRealtimeUpdates('선릉', callback);
+
+      const data = callback.mock.calls[0]?.[0] as { trains: Train[] } | null;
+      expect(data?.trains[0]?.arrivalTime?.getTime()).toBe(fetchedAt + 30_000);
+    });
+
+    it('is unchanged for a fresh fetch (lastUpdated = now)', () => {
+      jest.useFakeTimers();
+      jest.setSystemTime(new Date(T0));
+      jest.spyOn(arrivalService, 'subscribe').mockImplementation((_name, cb) => {
+        cb(infoFetchedAt(T0, 90));
+        return () => undefined;
+      });
+      const callback = jest.fn();
+      dataManager.subscribeToRealtimeUpdates('선릉', callback);
+
+      const data = callback.mock.calls[0]?.[0] as { trains: Train[] } | null;
+      expect(data?.trains[0]?.arrivalTime?.getTime()).toBe(T0 + 90_000);
+    });
+
+    it('keeps an unknown ETA as null', () => {
+      jest.spyOn(arrivalService, 'subscribe').mockImplementation((_name, cb) => {
+        cb(infoFetchedAt(Date.now(), null));
+        return () => undefined;
+      });
+      const callback = jest.fn();
+      dataManager.subscribeToRealtimeUpdates('선릉', callback);
+
+      const data = callback.mock.calls[0]?.[0] as { trains: Train[] } | null;
+      expect(data?.trains[0]?.arrivalTime).toBeNull();
+    });
+  });
 });
