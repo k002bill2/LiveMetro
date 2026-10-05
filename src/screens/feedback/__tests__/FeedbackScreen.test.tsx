@@ -49,6 +49,12 @@ describe('FeedbackScreen', () => {
     expect(getByText('분류')).toBeTruthy();
   });
 
+  it('omits the in-screen header without onClose (native stack header owns title + back)', () => {
+    const { queryByTestId } = render(<FeedbackScreen />);
+    expect(queryByTestId('feedback-header-title')).toBeNull();
+    expect(queryByTestId('feedback-close')).toBeNull();
+  });
+
   it('renders all 5 star buttons and starts unrated', () => {
     const { getByTestId, queryByTestId } = render(<FeedbackScreen />);
     [1, 2, 3, 4, 5].forEach(n => expect(getByTestId(`feedback-star-${n}`)).toBeTruthy());

@@ -6,6 +6,7 @@
 import React from 'react';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { DelayFeedScreen } from '../DelayFeedScreen';
 
 import { delayReportService } from '@/services/delay/delayReportService';
@@ -29,12 +30,19 @@ jest.mock('@/components/design', () => {
   };
 });
 
+let mockNavigatorId: string | undefined;
+const mockSetOptions = jest.fn();
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({
     navigate: jest.fn(),
     goBack: jest.fn(),
-    setOptions: jest.fn(),
+    setOptions: mockSetOptions,
+    getId: () => mockNavigatorId,
   }),
+  useFocusEffect: (cb: () => void) => {
+    const { useEffect } = jest.requireActual('react');
+    useEffect(cb, [cb]);
+  },
   useRoute: () => ({ params: {} }),
 }));
 
@@ -196,6 +204,40 @@ describe('DelayFeedScreen', () => {
   });
 
   describe('Rendering', () => {
+    it('applies the top safe-area inset as a tab (no native header above it)', () => {
+      mockNavigatorId = undefined;
+      const { UNSAFE_getByType } = render(<DelayFeedScreen />);
+      expect(UNSAFE_getByType(SafeAreaView).props.edges).toEqual(['top']);
+    });
+
+    it('skips the top inset when pushed on the root stack under the native header', () => {
+      mockNavigatorId = 'RootStack';
+      const { UNSAFE_getByType } = render(<DelayFeedScreen />);
+      expect(UNSAFE_getByType(SafeAreaView).props.edges).toEqual(['left', 'right']);
+      mockNavigatorId = undefined;
+    });
+
+    it('as a tab keeps the in-screen title + add button and leaves header options alone', () => {
+      mockNavigatorId = undefined;
+      const { getByTestId } = render(<DelayFeedScreen />);
+      expect(getByTestId('delay-feed-header-title')).toHaveTextContent('실시간 제보');
+      expect(getByTestId('delay-feed-add-button')).toBeTruthy();
+      expect(mockSetOptions).not.toHaveBeenCalled();
+    });
+
+    it('when pushed, moves the title to the native header and the add button to headerRight', () => {
+      mockNavigatorId = 'RootStack';
+      const { queryByTestId, getByTestId } = render(<DelayFeedScreen />);
+      expect(queryByTestId('delay-feed-header-title')).toBeNull();
+      expect(queryByTestId('delay-feed-add-button')).toBeNull();
+      expect(getByTestId('delay-feed-header-subtitle')).toBeTruthy();
+      expect(mockSetOptions).toHaveBeenCalledTimes(1);
+      const { headerRight } = mockSetOptions.mock.calls[0][0];
+      const header = render(<>{headerRight()}</>);
+      expect(header.getByTestId('delay-feed-add-button')).toBeTruthy();
+      mockNavigatorId = undefined;
+    });
+
     it('renders header with title and report-count subtitle', () => {
       const { getByText, getByTestId } = render(<DelayFeedScreen />);
       expect(getByText('실시간 제보')).toBeTruthy();

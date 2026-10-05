@@ -74,11 +74,14 @@ jest.mock('@/services/account/accountDeletionService', () => ({
 
 const mockNavigate = jest.fn();
 const mockGoBack = jest.fn();
+const mockRootStackNavigate = jest.fn();
+const mockGetParent = jest.fn();
 
 jest.mock('@react-navigation/native', () => ({
   useNavigation: () => ({
     navigate: mockNavigate,
     goBack: mockGoBack,
+    getParent: mockGetParent,
   }),
 }));
 
@@ -440,7 +443,17 @@ describe('SettingsScreen', () => {
       expect(mockNavigate).toHaveBeenCalledWith('TermsOfService');
     });
 
-    it('navigates to DelayFeed via root navigation', () => {
+    it('pushes DelayFeed on the root stack (not the same-named tab) so it gets a back button', () => {
+      mockGetParent.mockReturnValue({ navigate: mockRootStackNavigate });
+      const { getByText } = render(<SettingsScreen {...defaultProps} />);
+      fireEvent.press(getByText('실시간 제보'));
+      expect(mockGetParent).toHaveBeenCalledWith('RootStack');
+      expect(mockRootStackNavigate).toHaveBeenCalledWith('DelayFeed');
+      expect(mockNavigate).not.toHaveBeenCalledWith('DelayFeed');
+    });
+
+    it('falls back to bubbling navigate when the root stack is not found', () => {
+      mockGetParent.mockReturnValue(undefined);
       const { getByText } = render(<SettingsScreen {...defaultProps} />);
       fireEvent.press(getByText('실시간 제보'));
       expect(mockNavigate).toHaveBeenCalledWith('DelayFeed');

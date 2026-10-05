@@ -91,9 +91,12 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({ onClose, onSubmi
   }, [canSubmit, rating, category, tags, description, includeDiagnostics, user, onSubmitSuccess]);
 
   return (
-    <SafeAreaView edges={['top']} style={styles.container}>
-      <View style={styles.header}>
-        {onClose ? (
+    // Inside SettingsNavigator the native stack header owns the title and the
+    // circular back button, so the in-screen row (and its top inset) is only
+    // drawn when a caller presents this screen standalone with onClose.
+    <SafeAreaView edges={onClose ? ['top'] : ['left', 'right']} style={styles.container}>
+      {onClose && (
+        <View style={styles.header}>
           <TouchableOpacity
             testID="feedback-close"
             onPress={onClose}
@@ -103,12 +106,10 @@ export const FeedbackScreen: React.FC<FeedbackScreenProps> = ({ onClose, onSubmi
           >
             <X size={24} color={semantic.labelStrong} />
           </TouchableOpacity>
-        ) : (
+          <Text testID="feedback-header-title" style={styles.headerTitle}>의견 보내기</Text>
           <View style={styles.headerButton} />
-        )}
-        <Text testID="feedback-header-title" style={styles.headerTitle}>의견 보내기</Text>
-        <View style={styles.headerButton} />
-      </View>
+        </View>
+      )}
 
       <ScrollView
         style={styles.scroll}

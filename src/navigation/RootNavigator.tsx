@@ -44,6 +44,7 @@ import { RouteGuidanceScreen } from '../screens/guidance/RouteGuidanceScreen';
 import { RoutesTabScreen } from '../screens/route/RoutesTabScreen';
 import { WeeklyPredictionScreen } from '../screens/prediction';
 import type { RouteSearchInitialParams } from './types';
+import { ROOT_STACK_ID } from './types';
 
 // DEBUG: Set to true to always show onboarding screen during development
 const DEBUG_FORCE_ONBOARDING = __DEV__ && false;
@@ -307,6 +308,7 @@ const RootNavigatorContent: React.FC = () => {
   // Authenticated and completed onboarding - show main app
   return (
     <Stack.Navigator
+      id={ROOT_STACK_ID}
       screenOptions={{ headerShown: false, headerBackTitleVisible: false }}
     >
       <Stack.Screen name="Main" component={MainTabNavigator} />
@@ -355,6 +357,9 @@ const RootNavigatorContent: React.FC = () => {
         component={DelayFeedScreen}
         options={{
           headerShown: true,
+          // Pushed variant (from Settings): title lives in the native header
+          // like other pushed screens; DelayFeedScreen adds headerRight and
+          // drops its in-screen 28px title.
           title: '실시간 제보',
         }}
       />

@@ -104,6 +104,14 @@ export type OnboardingStackParamList = {
   };
 };
 
+/**
+ * `id` of the authenticated root Stack.Navigator. 'DelayFeed' exists both as a
+ * tab and as a root-stack route; a plain navigate() from inside the tabs
+ * resolves to the tab, so callers that want the pushed (back-button) version
+ * must target this navigator via getParent(ROOT_STACK_ID).
+ */
+export const ROOT_STACK_ID = 'RootStack';
+
 export type AppStackParamList = {
   // Authenticated screens
   MainTabs: undefined;
