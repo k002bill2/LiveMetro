@@ -12,7 +12,7 @@
  * the Favorites tab.
  */
 import React from 'react';
-import { render } from '@testing-library/react-native';
+import { act, render } from '@testing-library/react-native';
 import { HomeFavoriteRow } from '../HomeFavoriteRow';
 import type { Station } from '@models/train';
 
@@ -110,6 +110,57 @@ describe('HomeFavoriteRow', () => {
       const { getByTestId } = renderRow({ isFirst: true });
       expect(getByTestId('minutes')).toHaveTextContent('0');
       expect(getByTestId('imminent')).toHaveTextContent('true');
+    });
+  });
+
+  describe('stale cached ETA (#360)', () => {
+    it('passes null when the only ETA is long past (API failing, cache stale)', () => {
+      useRealtimeTrains.mockReturnValue({
+        trains: [{ lineId: '2', direction: 'up', arrivalTime: inSec(-300), finalDestination: '성수' }],
+      });
+      const { getByTestId } = renderRow();
+      expect(getByTestId('minutes')).toHaveTextContent('null');
+    });
+
+    it('skips a stale ETA and uses the next fresh one', () => {
+      useRealtimeTrains.mockReturnValue({
+        trains: [
+          { lineId: '2', direction: 'up', arrivalTime: inSec(-300), finalDestination: '성수' },
+          { lineId: '2', direction: 'up', arrivalTime: inSec(130), finalDestination: '홍대입구' },
+        ],
+      });
+      const { getByTestId } = renderRow();
+      expect(getByTestId('minutes')).toHaveTextContent('2');
+      expect(getByTestId('dest')).toHaveTextContent('홍대입구 방면');
+    });
+
+    it('re-judges a non-first row on a clock tick, with no new data (quota exhausted)', () => {
+      jest.useFakeTimers();
+      try {
+        jest.setSystemTime(new Date('2026-10-05T07:00:00.000Z'));
+        const cached = [
+          { lineId: '2', direction: 'up', arrivalTime: new Date(Date.now() + 30_000), finalDestination: '성수' },
+        ];
+        useRealtimeTrains.mockReturnValue({ trains: cached });
+        const { getByTestId } = renderRow({ isFirst: false });
+        expect(getByTestId('minutes')).toHaveTextContent('0');
+
+        // 5 minutes pass, no callback, no parent re-render.
+        act(() => {
+          jest.advanceTimersByTime(5 * 60_000);
+        });
+        expect(getByTestId('minutes')).toHaveTextContent('null');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('keeps "0분" for a train that arrived moments ago (within grace)', () => {
+      useRealtimeTrains.mockReturnValue({
+        trains: [{ lineId: '2', direction: 'up', arrivalTime: inSec(-20), finalDestination: '성수' }],
+      });
+      const { getByTestId } = renderRow();
+      expect(getByTestId('minutes')).toHaveTextContent('0');
     });
   });
 

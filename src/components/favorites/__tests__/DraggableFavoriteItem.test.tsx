@@ -7,7 +7,7 @@
  */
 
 import React from 'react';
-import { render, fireEvent } from '@testing-library/react-native';
+import { act, render, fireEvent } from '@testing-library/react-native';
 import { DraggableFavoriteItem } from '../DraggableFavoriteItem';
 import { FavoriteWithDetails } from '@/hooks/useFavorites';
 
@@ -145,6 +145,73 @@ describe('DraggableFavoriteItem', () => {
       });
       const { getByTestId } = renderItem();
       expect(getByTestId('favorite-row-minutes')).toHaveTextContent('null');
+    });
+
+    it('passes null when the only ETA is a stale cache entry long past (#360)', () => {
+      useRealtimeTrains.mockReturnValue({
+        trains: [{ arrivalTime: new Date(Date.now() - 300_000), direction: 'up' }],
+      });
+      const { getByTestId } = renderItem();
+      expect(getByTestId('favorite-row-minutes')).toHaveTextContent('null');
+    });
+
+    it('drops a cached ETA once it goes stale, even when trains do not change (#360)', () => {
+      jest.useFakeTimers();
+      try {
+        jest.setSystemTime(new Date('2026-10-05T07:00:00.000Z'));
+        // Same array instance across renders = API failing, hook keeps the cache.
+        const cached = [{ arrivalTime: new Date(Date.now() + 30_000), direction: 'up' }];
+        useRealtimeTrains.mockReturnValue({ trains: cached });
+        const { getByTestId, rerender } = renderItem();
+        expect(getByTestId('favorite-row-minutes')).toHaveTextContent('1');
+
+        jest.setSystemTime(new Date('2026-10-05T07:05:00.000Z'));
+        rerender(
+          <DraggableFavoriteItem
+            favorite={baseFavorite}
+            index={0}
+            isEditing={false}
+            onEditToggle={jest.fn()}
+            onRemove={jest.fn()}
+            onPress={jest.fn()}
+            onSaveEdit={jest.fn().mockResolvedValue(undefined)}
+            drag={jest.fn()}
+          />,
+        );
+        expect(getByTestId('favorite-row-minutes')).toHaveTextContent('null');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('re-judges on a clock tick with no new data and no parent re-render (#360)', () => {
+      jest.useFakeTimers();
+      try {
+        jest.setSystemTime(new Date('2026-10-05T07:00:00.000Z'));
+        const cached = [{ arrivalTime: new Date(Date.now() + 30_000), direction: 'up' }];
+        useRealtimeTrains.mockReturnValue({ trains: cached });
+        const { getByTestId } = renderItem({ arrivalsEnabled: true });
+        expect(getByTestId('favorite-row-minutes')).toHaveTextContent('1');
+
+        act(() => {
+          jest.advanceTimersByTime(5 * 60_000);
+        });
+        expect(getByTestId('favorite-row-minutes')).toHaveTextContent('null');
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+
+    it('skips a stale ETA and uses the next fresh one (#360)', () => {
+      const now = Date.now();
+      useRealtimeTrains.mockReturnValue({
+        trains: [
+          { arrivalTime: new Date(now - 300_000), direction: 'up' },
+          { arrivalTime: new Date(now + 4 * 60_000), direction: 'up' },
+        ],
+      });
+      const { getByTestId } = renderItem();
+      expect(getByTestId('favorite-row-minutes')).toHaveTextContent('4');
     });
 
     it('passes the minutes of the earliest train with a known arrival time', () => {
