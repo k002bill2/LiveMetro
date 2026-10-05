@@ -4,6 +4,7 @@
  */
 
 import { renderHook, act } from '@testing-library/react-native';
+import { AppState, type AppStateStatus } from 'react-native';
 import { useRealtimeTrains } from '../useRealtimeTrains';
 import { dataManager, RealtimeTrainData } from '../../services/data/dataManager';
 import { Train, TrainStatus } from '../../models/train';
@@ -336,6 +337,60 @@ describe('useRealtimeTrains', () => {
       });
 
       expect(mockDataManager.subscribeToRealtimeUpdates).toHaveBeenCalledTimes(2);
+    });
+  });
+
+  describe('AppState return', () => {
+    let handlers: ((next: AppStateStatus) => void)[];
+    // Saved and reassigned (not spyOn+mockRestore): AppState.addEventListener is
+    // already a jest-expo mock, and mockRestore on it wipes its implementation
+    // for every later test in this file.
+    const originalAddListener = AppState.addEventListener;
+    const appStateRef = AppState as unknown as { currentState: string };
+    let originalState: string;
+
+    const dispatch = (next: AppStateStatus): void => {
+      appStateRef.currentState = next;
+      act(() => {
+        handlers.slice().forEach((h) => h(next));
+      });
+    };
+
+    beforeEach(() => {
+      handlers = [];
+      originalState = appStateRef.currentState;
+      appStateRef.currentState = 'active';
+      AppState.addEventListener = ((_type: string, handler: (next: AppStateStatus) => void) => {
+        handlers.push(handler);
+        return { remove: () => { handlers = handlers.filter((h) => h !== handler); } };
+      }) as unknown as typeof AppState.addEventListener;
+    });
+
+    afterEach(() => {
+      AppState.addEventListener = originalAddListener;
+      appStateRef.currentState = originalState;
+    });
+
+    it('re-subscribes once when returning from the background', () => {
+      renderHook(() => useRealtimeTrains('강남역'));
+      jest.advanceTimersByTime(10_000);
+
+      dispatch('background');
+      dispatch('inactive');
+      dispatch('active');
+      dispatch('active');
+
+      expect(mockDataManager.subscribeToRealtimeUpdates).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not re-subscribe on an inactive-only blip (control center, app switcher peek)', () => {
+      renderHook(() => useRealtimeTrains('강남역'));
+      jest.advanceTimersByTime(10_000);
+
+      dispatch('inactive');
+      dispatch('active');
+
+      expect(mockDataManager.subscribeToRealtimeUpdates).toHaveBeenCalledTimes(1);
     });
   });
 

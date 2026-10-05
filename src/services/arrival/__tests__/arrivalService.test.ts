@@ -88,8 +88,6 @@ describe('ArrivalService', () => {
     service = new ArrivalService({
       minPollingInterval: 30000,
       cacheTTL: 60000,
-      maxRetries: 3,
-      retryDelay: 100, // Fast retries for testing
     });
   });
 
@@ -113,8 +111,10 @@ describe('ArrivalService', () => {
       errSpy.mockRestore();
     });
 
-    it('still retries an auth failure so the next attempt can use a healthy backup key', async () => {
-      // INFO-100 disables only the failing key; the retry picks another one.
+    it('does not add its own retry on an auth failure — the backup-key swap happens inside seoulSubwayApi', async () => {
+      // seoulSubwayApi already retried INFO-100 on a healthy backup key (see
+      // arrivalService.integration.test.ts); a second layer here re-multiplied
+      // the per-poll fetch budget.
       const authError = Object.assign(new Error('invalid key'), {
         errorCode: 'INFO-100',
         retryable: false,
@@ -126,8 +126,8 @@ describe('ArrivalService', () => {
       await jest.runAllTimersAsync();
       const result = await pending;
 
-      expect(mockSeoulSubwayApi.getRealtimeArrival).toHaveBeenCalledTimes(2);
-      expect(result.source).toBe('api');
+      expect(mockSeoulSubwayApi.getRealtimeArrival).toHaveBeenCalledTimes(1);
+      expect(result.arrivals).toHaveLength(0);
       errSpy.mockRestore();
     });
 
@@ -236,16 +236,14 @@ describe('ArrivalService', () => {
     });
   });
 
-  describe('Retry Logic', () => {
-    it('should call API successfully after first failure', async () => {
+  describe('Retry Logic (single owner: seoulSubwayApi)', () => {
+    it('makes one call per logical request and fetches again on the next request after a failure', async () => {
       // Use real timers for this test
       jest.useRealTimers();
 
       const testService = new ArrivalService({
         minPollingInterval: 30000,
         cacheTTL: 60000,
-        maxRetries: 2,
-        retryDelay: 5,
       });
 
       // Clear any previous mock calls
@@ -254,25 +252,29 @@ describe('ArrivalService', () => {
       mockSeoulSubwayApi.getRealtimeArrival
         .mockRejectedValueOnce(new Error('Network error'))
         .mockResolvedValueOnce(mockSeoulApiResponse);
+      const errSpy = jest.spyOn(console, 'error').mockImplementation();
 
+      const failed = await testService.getArrivals('강남');
+      expect(mockSeoulSubwayApi.getRealtimeArrival).toHaveBeenCalledTimes(1);
+      expect(failed.arrivals).toHaveLength(0);
+
+      // A failure does not stamp lastFetchTime, so the next poll goes out.
       const result = await testService.getArrivals('강남');
-
       expect(mockSeoulSubwayApi.getRealtimeArrival).toHaveBeenCalledTimes(2);
       expect(result.source).toBe('api');
+      errSpy.mockRestore();
 
       testService.destroy();
       jest.useFakeTimers();
     });
 
-    it('should return empty after max retries exceeded', async () => {
+    it('returns empty after a single failed call (no outer retry)', async () => {
       // Use real timers for this test
       jest.useRealTimers();
 
       const testService = new ArrivalService({
         minPollingInterval: 30000,
         cacheTTL: 60000,
-        maxRetries: 2,
-        retryDelay: 5,
       });
 
       // Clear any previous mock calls
@@ -285,7 +287,7 @@ describe('ArrivalService', () => {
 
       const result = await testService.getArrivals('강남');
 
-      expect(mockSeoulSubwayApi.getRealtimeArrival).toHaveBeenCalledTimes(2);
+      expect(mockSeoulSubwayApi.getRealtimeArrival).toHaveBeenCalledTimes(1);
       expect(result.arrivals).toHaveLength(0);
 
       testService.destroy();
@@ -299,8 +301,6 @@ describe('ArrivalService', () => {
       const testService = new ArrivalService({
         minPollingInterval: 30000,
         cacheTTL: 60000,
-        maxRetries: 2,
-        retryDelay: 5,
       });
 
       // Clear any previous mock calls
@@ -351,14 +351,12 @@ describe('ArrivalService', () => {
   // to stale cache. Default false preserves legacy behavior — separate test
   // above ('should use cache when API fails after retries') guards that.
   describe('throwOnError option', () => {
-    it('rethrows the original error after retries when throwOnError=true and no cache', async () => {
+    it('rethrows the original error when throwOnError=true and no cache', async () => {
       jest.useRealTimers();
 
       const testService = new ArrivalService({
         minPollingInterval: 30000,
         cacheTTL: 60000,
-        maxRetries: 2,
-        retryDelay: 5,
       });
 
       mockSeoulSubwayApi.getRealtimeArrival.mockReset();
@@ -371,9 +369,9 @@ describe('ArrivalService', () => {
         testService.getArrivals('강남', { throwOnError: true }),
       ).rejects.toBe(original);
 
-      // Retry chain still ran in full — throwOnError only controls the
-      // cache-fallback layer, not retry behavior.
-      expect(mockSeoulSubwayApi.getRealtimeArrival).toHaveBeenCalledTimes(2);
+      // throwOnError only controls the cache-fallback layer; retries live in
+      // seoulSubwayApi, so this layer makes exactly one call.
+      expect(mockSeoulSubwayApi.getRealtimeArrival).toHaveBeenCalledTimes(1);
 
       testService.destroy();
       jest.useFakeTimers();
@@ -385,8 +383,6 @@ describe('ArrivalService', () => {
       const testService = new ArrivalService({
         minPollingInterval: 30000,
         cacheTTL: 60000,
-        maxRetries: 2,
-        retryDelay: 5,
       });
 
       mockSeoulSubwayApi.getRealtimeArrival.mockReset();
@@ -430,8 +426,6 @@ describe('ArrivalService', () => {
       const testService = new ArrivalService({
         minPollingInterval: 30000,
         cacheTTL: 60000,
-        maxRetries: 2,
-        retryDelay: 5,
       });
 
       mockSeoulSubwayApi.getRealtimeArrival.mockReset();
@@ -470,8 +464,6 @@ describe('ArrivalService', () => {
       const testService = new ArrivalService({
         minPollingInterval: 30000,
         cacheTTL: 60000,
-        maxRetries: 2,
-        retryDelay: 5,
       });
 
       mockSeoulSubwayApi.getRealtimeArrival.mockReset();
@@ -662,6 +654,48 @@ describe('ArrivalService', () => {
       expect(calls()).toBeGreaterThan(before);
     });
 
+    it('does not start a second network chain while a slow one is still in flight (interval tick + foreground return)', async () => {
+      let release: (rows: unknown[]) => void = () => undefined;
+      mockSeoulSubwayApi.getRealtimeArrival.mockReset().mockImplementation(
+        () => new Promise((resolve) => { release = resolve; })
+      );
+      service.subscribe('강남', jest.fn(), 30000);
+      await Promise.resolve();
+      expect(calls()).toBe(1);
+
+      // The slow chain outlives the 30s interval, and the user leaves and returns.
+      await jest.advanceTimersByTimeAsync(30000);
+      appStateHandler?.('background');
+      appStateHandler?.('active');
+      await jest.advanceTimersByTimeAsync(0);
+      expect(calls()).toBe(1);
+
+      // Once it settles, the next tick polls normally again.
+      release(mockSeoulApiResponse);
+      await jest.advanceTimersByTimeAsync(0);
+      mockSeoulSubwayApi.getRealtimeArrival.mockResolvedValue(mockSeoulApiResponse);
+      await jest.advanceTimersByTimeAsync(30000);
+      expect(calls()).toBe(2);
+    });
+
+    it('refreshes exactly once on background → active and ignores repeated or inactive-only transitions', async () => {
+      service.subscribe('강남', jest.fn(), 30000);
+      await jest.advanceTimersByTimeAsync(0);
+      appStateHandler?.('background');
+      await jest.advanceTimersByTimeAsync(90000);
+      const paused = calls();
+
+      appStateHandler?.('active');
+      appStateHandler?.('active');
+      await jest.advanceTimersByTimeAsync(0);
+      expect(calls()).toBe(paused + 1);
+
+      appStateHandler?.('inactive');
+      appStateHandler?.('active');
+      await jest.advanceTimersByTimeAsync(0);
+      expect(calls()).toBe(paused + 1);
+    });
+
     it('removes the AppState listener on destroy', () => {
       service.subscribe('강남', jest.fn(), 30000);
       service.destroy();
@@ -813,8 +847,6 @@ describe('ArrivalService', () => {
       const testService = new ArrivalService({
         minPollingInterval: 30000,
         cacheTTL: 60000,
-        maxRetries: 2,
-        retryDelay: 10,
       });
 
       mockSeoulSubwayApi.getRealtimeArrival.mockRejectedValue(

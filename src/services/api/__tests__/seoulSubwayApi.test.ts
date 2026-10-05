@@ -253,11 +253,17 @@ describe('SeoulSubwayApiService', () => {
         json: () => Promise.resolve(authError),
       });
 
+      // The backup-key swap waits for the 30s per-station limiter.
+      jest.useFakeTimers();
       let caught: unknown;
       try {
-        await seoulSubwayApi.getRealtimeArrival('강남');
-      } catch (err) {
-        caught = err;
+        const pending = seoulSubwayApi.getRealtimeArrival('강남').catch((err: unknown) => {
+          caught = err;
+        });
+        await jest.runAllTimersAsync();
+        await pending;
+      } finally {
+        jest.useRealTimers();
       }
 
       expect(caught).toBeInstanceOf(SeoulApiError);
@@ -1596,32 +1602,71 @@ describe('SeoulSubwayApiService resilience (A1~A3, A5)', () => {
     errorSpy.mockRestore();
   });
 
-  describe('A1 — auth failure keeps the key out for a long TTL', () => {
-    it('disables the INFO-100 key well beyond the 60s generic cooldown after a single failure', async () => {
-      mockFetch.mockResolvedValue(jsonResponse(apiErrorBody('INFO-100')));
+  /** Drains backoff / limiter timers under fake timers, then yields the result. */
+  const settle = async <T,>(promise: Promise<T>): Promise<Promise<T>> => {
+    promise.catch(() => undefined);
+    await jest.runAllTimersAsync();
+    return promise;
+  };
 
-      await expect(seoulSubwayApi.getRealtimeArrival('강남')).rejects.toBeInstanceOf(SeoulApiError);
+  describe('A1 — auth failure keeps the key out for a long TTL', () => {
+    // A backup-key swap waits for the 30s per-station limiter; fake timers
+    // drain it (afterEach restores real timers).
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
+    it('disables the INFO-100 key well beyond the 60s generic cooldown after a single failure', async () => {
+      mockFetch
+        .mockResolvedValueOnce(jsonResponse(apiErrorBody('INFO-100')))
+        .mockResolvedValueOnce(jsonResponse(okArrival));
+
+      await expect(settle(seoulSubwayApi.getRealtimeArrival('강남'))).resolves.toEqual([]);
 
       const disabled = seoulSubwayApi
         .getKeyStats()
         .realtime.filter((s: { isDisabled: boolean }) => s.isDisabled);
       expect(disabled).toHaveLength(1);
       expect(disabled[0].disabledUntil - Date.now()).toBeGreaterThan(60_000 * 10);
-      // auth is not retryable — exactly one network call
-      expect(mockFetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('tries each key at most once when every key is invalid (no repeat on a disabled key)', async () => {
+      mockFetch.mockResolvedValue(jsonResponse(apiErrorBody('INFO-100')));
+
+      await expect(settle(seoulSubwayApi.getRealtimeArrival('강남'))).rejects.toMatchObject({
+        errorCode: 'INFO-100',
+      });
+
+      // Two keys configured in this file → one call each, then give up.
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(keyOf(1)).not.toBe(keyOf(0));
     });
 
     it('does not hand the auth-disabled key out again on the next request', async () => {
-      mockFetch.mockResolvedValueOnce(jsonResponse(apiErrorBody('INFO-100')));
-      await expect(seoulSubwayApi.getRealtimeArrival('강남')).rejects.toBeInstanceOf(SeoulApiError);
+      mockFetch
+        .mockResolvedValueOnce(jsonResponse(apiErrorBody('INFO-100')))
+        .mockResolvedValueOnce(jsonResponse(okArrival));
+      await settle(seoulSubwayApi.getRealtimeArrival('강남'));
       const badKey = keyOf(0);
 
       for (const station of ['역삼', '선릉', '삼성']) {
         mockFetch.mockResolvedValueOnce(jsonResponse(okArrival));
-        await seoulSubwayApi.getRealtimeArrival(station);
+        await settle(seoulSubwayApi.getRealtimeArrival(station));
       }
 
-      expect([keyOf(1), keyOf(2), keyOf(3)]).not.toContain(badKey);
+      expect([keyOf(1), keyOf(2), keyOf(3), keyOf(4)]).not.toContain(badKey);
+    });
+
+    it('retries an auth failure once on a healthy backup key within the same request', async () => {
+      // Retry ownership lives here (arrivalService no longer retries), so the
+      // key swap after INFO-100 must happen inside this request.
+      mockFetch
+        .mockResolvedValueOnce(jsonResponse(apiErrorBody('INFO-100')))
+        .mockResolvedValueOnce(jsonResponse(okArrival));
+
+      await expect(settle(seoulSubwayApi.getRealtimeArrival('강남'))).resolves.toEqual([]);
+      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(keyOf(1)).not.toBe(keyOf(0));
     });
   });
 
@@ -1662,14 +1707,19 @@ describe('SeoulSubwayApiService resilience (A1~A3, A5)', () => {
     });
 
     it('does not retry a quota error when no other key is available (no wasted call)', async () => {
-      // Take one of the two keys out via auth, then hit quota on the other.
-      mockFetch.mockResolvedValueOnce(jsonResponse(apiErrorBody('INFO-100')));
-      await expect(seoulSubwayApi.getRealtimeArrival('강남')).rejects.toBeInstanceOf(SeoulApiError);
+      // Take one of the two keys out via auth (the request itself recovers on
+      // the other key), then hit quota on the remaining key.
+      mockFetch
+        .mockResolvedValueOnce(jsonResponse(apiErrorBody('INFO-100')))
+        .mockResolvedValueOnce(jsonResponse(okArrival));
+      jest.useFakeTimers(); // the auth swap waits for the 30s limiter
+      await settle(seoulSubwayApi.getRealtimeArrival('강남'));
+      jest.useRealTimers();
 
       mockFetch.mockResolvedValue(jsonResponse(apiErrorBody('ERROR-500')));
       await expect(seoulSubwayApi.getRealtimeArrival('역삼')).rejects.toBeInstanceOf(SeoulApiError);
 
-      expect(mockFetch).toHaveBeenCalledTimes(2);
+      expect(mockFetch).toHaveBeenCalledTimes(3);
     });
 
     it('re-checks the reserved backup key before the retry (disabled during backoff → not used)', async () => {
@@ -1733,6 +1783,40 @@ describe('SeoulSubwayApiService resilience (A1~A3, A5)', () => {
 
       expect(signals.length).toBeGreaterThan(0);
       expect(signals.every((s) => s.aborted)).toBe(true);
+    });
+
+    it('pins the deadline at 10,000ms: not aborted at 9,999ms, aborted at 10,000ms', async () => {
+      jest.useFakeTimers();
+      const signals: AbortSignal[] = [];
+      mockFetch.mockImplementation((_url: string, init: { signal: AbortSignal }) => {
+        signals.push(init.signal);
+        return Promise.resolve({ ok: true, json: () => new Promise(() => undefined) });
+      });
+
+      const outcome = seoulSubwayApi.getRealtimeArrival('강남').catch((e: Error) => e);
+      await jest.advanceTimersByTimeAsync(9_999);
+      expect(signals).toHaveLength(1);
+      expect(signals[0]?.aborted).toBe(false);
+
+      await jest.advanceTimersByTimeAsync(1);
+      expect(signals[0]?.aborted).toBe(true);
+
+      await jest.runAllTimersAsync();
+      await expect(outcome).resolves.toMatchObject({ message: expect.stringContaining('시간이 초과') });
+    });
+
+    it('succeeds with a single fetch when the body arrives at 9,999ms', async () => {
+      jest.useFakeTimers();
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => new Promise((resolve) => setTimeout(() => resolve(okArrival), 9_999)),
+      });
+
+      const promise = seoulSubwayApi.getRealtimeArrival('강남');
+      await jest.advanceTimersByTimeAsync(9_999);
+
+      await expect(promise).resolves.toEqual([]);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
     });
 
     it('still succeeds when the body arrives before the timeout', async () => {

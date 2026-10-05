@@ -92,10 +92,13 @@ function isRetryableError(error: Error): boolean {
 /**
  * Retry with exponential backoff.
  *
- * Call budget: at most `maxAttempts` calls in total (unchanged), and a
- * retryable Seoul API error (quota / transient) is retried at most
- * `maxApiErrorRetries` times — the server already answered, so hammering it
- * only burns the daily quota.
+ * Call budget: at most `maxAttempts` calls in total, and a retryable Seoul
+ * API error (quota / transient) is retried at most `maxApiErrorRetries` times
+ * — the server already answered, so hammering it only burns the daily quota.
+ *
+ * This is the only retry layer for realtime arrivals: arrivalService makes a
+ * single call per logical request, so `maxAttempts` is the whole network
+ * budget of one poll (network, timeout, quota fallback and auth key swap).
  */
 async function withRetry<T>(
   fn: () => Promise<T>,
@@ -128,7 +131,9 @@ async function withRetry<T>(
       if (!isRetryableError(lastError)) {
         throw lastError;
       }
-      if (lastError instanceof SeoulApiError) {
+      // An auth swap moves to a different key and the failed key stays out
+      // for the auth TTL, so it cannot loop — only maxAttempts bounds it.
+      if (lastError instanceof SeoulApiError && lastError.category !== 'auth') {
         if (apiErrorRetries >= maxApiErrorRetries) {
           throw lastError;
         }
@@ -608,8 +613,15 @@ class SeoulSubwayApiService {
 
     // Backup key handed over by reportRateLimit for the next attempt (A2).
     let nextKey: string | null = null;
+    // An auth key swap is a fresh call to the same station, so it goes through
+    // the 30s limiter like the next poll would (keeps pre-retry-budget timing).
+    let throttleNextAttempt = false;
 
     return withRetry(async () => {
+      if (throttleNextAttempt) {
+        throttleNextAttempt = false;
+        await this.rateLimiter.throttle(rateLimitKey);
+      }
       const apiKey = this.claimReservedKey(nextKey) ?? this.keyManager.getNextKey();
       nextKey = null;
       if (!apiKey) {
@@ -667,8 +679,12 @@ class SeoulSubwayApiService {
             // retry handled by `withRetry` wrapper. No key rotation.
             console.warn(`Transient Seoul API error ${errorCode}, will retry`);
           } else if (category === 'auth') {
-            // Invalid key — keep it out of rotation for the long auth TTL (A1).
+            // Invalid key — keep it out of rotation for the long auth TTL (A1)
+            // and retry on a healthy backup key, if any, within this request.
             this.keyManager.reportAuthError(apiKey);
+            nextKey = this.takeHealthyNextKey(this.keyManager, apiKey);
+            retryable = nextKey !== null;
+            throttleNextAttempt = retryable;
           } else {
             this.keyManager.reportError(apiKey);
           }
@@ -1108,6 +1124,11 @@ class SeoulSubwayApiService {
   /** ERROR-337 variant of {@link takeFallbackKey}: disables until KST midnight. */
   private takeDailyQuotaFallbackKey(manager: ApiKeyManager, failedKey: string): string | null {
     manager.reportDailyQuotaExceeded(failedKey);
+    return this.takeHealthyNextKey(manager, failedKey);
+  }
+
+  /** Next enabled key other than `failedKey`, or null when none is healthy. */
+  private takeHealthyNextKey(manager: ApiKeyManager, failedKey: string): string | null {
     const fallbackKey = manager.getNextKey();
     return fallbackKey && fallbackKey !== failedKey && manager.isKeyAvailable(fallbackKey)
       ? fallbackKey
