@@ -44,6 +44,13 @@ interface FavoriteRowProps {
    */
   nextMinutes: number | null;
   /**
+   * The realtime API is currently failing. Only affects the no-ETA state:
+   * renders "연결 안 됨" instead of "정보 없음" so a network/quota failure is
+   * not shown as "no train data" (seoul-api-limits: error ≠ empty). A
+   * still-fresh cached ETA keeps rendering as minutes.
+   */
+  connectionLost?: boolean;
+  /**
    * When true, append the green "곧 도착" badge under `nextMinutes`.
    * Caller decides the threshold — typical: remaining time ≤ 90s.
    *
@@ -71,6 +78,7 @@ const FavoriteRowImpl: React.FC<FavoriteRowProps> = ({
   destinationLabel,
   congestion,
   nextMinutes,
+  connectionLost = false,
   imminent = false,
   showDragHandle = false,
   onPress,
@@ -88,9 +96,11 @@ const FavoriteRowImpl: React.FC<FavoriteRowProps> = ({
       onLongPress={onLongPress}
       accessibilityRole={onPress ? 'button' : undefined}
       accessibilityLabel={
-        nextMinutes === null
-          ? `${stationName}역 즐겨찾기, 도착 정보 없음`
-          : `${stationName}역 즐겨찾기, ${nextMinutes}분 후 도착`
+        nextMinutes !== null
+          ? `${stationName}역 즐겨찾기, ${nextMinutes}분 후 도착`
+          : connectionLost
+            ? `${stationName}역 즐겨찾기, 실시간 연결 안 됨`
+            : `${stationName}역 즐겨찾기, 도착 정보 없음`
       }
       style={({ pressed }) => [
         styles.row,
@@ -159,7 +169,9 @@ const FavoriteRowImpl: React.FC<FavoriteRowProps> = ({
       {/* Right: minutes — primary signal */}
       <View style={styles.right}>
         {nextMinutes === null ? (
-          <Text style={[styles.noArrival, { color: semantic.labelAlt }]}>정보 없음</Text>
+          <Text style={[styles.noArrival, { color: semantic.labelAlt }]}>
+            {connectionLost ? '연결 안 됨' : '정보 없음'}
+          </Text>
         ) : (
           <Text style={[styles.minutes, { color: semantic.primaryNormal }]}>
             {nextMinutes}
