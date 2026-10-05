@@ -129,7 +129,7 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
   // Gated by `arrivalsEnabled` (parent uses useIsFocused) and disabled
   // when editing (no need to refresh during a non-visible card).
   const shouldFetchArrivals = !!station && arrivalsEnabled && !isEditing;
-  const { trains } = useRealtimeTrains(station?.name ?? '', {
+  const { trains, error } = useRealtimeTrains(station?.name ?? '', {
     enabled: shouldFetchArrivals,
     refetchInterval: 30_000,
   });
@@ -318,6 +318,7 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
               isCommute={favorite.isCommuteStation}
               destinationLabel={directionToLabel(favorite.direction)}
               nextMinutes={nextMinutes}
+              connectionLost={error !== null && error !== undefined}
               showDragHandle
               onPress={isSelectMode ? onSelectToggle ?? onPress : onPress}
             />

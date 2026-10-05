@@ -39,15 +39,22 @@ jest.mock('@/components/design', () => {
       onPress,
       stationName,
       nextMinutes,
+      connectionLost,
     }: {
       onPress?: () => void;
       stationName?: string;
       nextMinutes?: number | null;
+      connectionLost?: boolean;
     }) =>
       ReactModule.createElement(
         TouchableOpacity,
         { testID: 'favorite-row', onPress },
         ReactModule.createElement(Text, null, stationName),
+        ReactModule.createElement(
+          Text,
+          { testID: 'favorite-row-conn' },
+          String(Boolean(connectionLost)),
+        ),
         ReactModule.createElement(
           Text,
           { testID: 'favorite-row-minutes' },
@@ -132,6 +139,18 @@ describe('DraggableFavoriteItem', () => {
     const { useRealtimeTrains } = jest.requireMock('@/hooks/useRealtimeTrains') as {
       useRealtimeTrains: jest.Mock;
     };
+
+    it('flags connectionLost when the realtime hook reports an error', () => {
+      useRealtimeTrains.mockReturnValue({ trains: [], error: '최대 재시도 횟수(3)에 도달했습니다.' });
+      const { getByTestId } = renderItem();
+      expect(getByTestId('favorite-row-conn')).toHaveTextContent('true');
+    });
+
+    it('does not flag connectionLost when there is no error', () => {
+      useRealtimeTrains.mockReturnValue({ trains: [], error: null });
+      const { getByTestId } = renderItem();
+      expect(getByTestId('favorite-row-conn')).toHaveTextContent('false');
+    });
 
     it('passes null when there are no trains', () => {
       useRealtimeTrains.mockReturnValue({ trains: [] });

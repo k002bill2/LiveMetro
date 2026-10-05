@@ -29,14 +29,17 @@ jest.mock('@components/design', () => {
       nextMinutes,
       imminent,
       destinationLabel,
+      connectionLost,
     }: {
       nextMinutes: number | null;
       imminent?: boolean;
       destinationLabel?: string;
+      connectionLost?: boolean;
     }) =>
       ReactModule.createElement(
         View,
         null,
+        ReactModule.createElement(Text, { testID: 'conn' }, String(Boolean(connectionLost))),
         ReactModule.createElement(
           Text,
           { testID: 'minutes' },
@@ -110,6 +113,20 @@ describe('HomeFavoriteRow', () => {
       const { getByTestId } = renderRow({ isFirst: true });
       expect(getByTestId('minutes')).toHaveTextContent('0');
       expect(getByTestId('imminent')).toHaveTextContent('true');
+    });
+  });
+
+  describe('connection lost', () => {
+    it('flags connectionLost when the realtime hook reports an error', () => {
+      useRealtimeTrains.mockReturnValue({ trains: [], error: '최대 재시도 횟수(3)에 도달했습니다.' });
+      const { getByTestId } = renderRow();
+      expect(getByTestId('conn')).toHaveTextContent('true');
+    });
+
+    it('does not flag connectionLost when there is no error', () => {
+      useRealtimeTrains.mockReturnValue({ trains: [], error: null });
+      const { getByTestId } = renderRow();
+      expect(getByTestId('conn')).toHaveTextContent('false');
     });
   });
 

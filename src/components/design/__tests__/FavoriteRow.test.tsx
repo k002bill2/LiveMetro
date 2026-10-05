@@ -22,6 +22,25 @@ describe('FavoriteRow', () => {
     expect(getByLabelText('강남역 즐겨찾기, 도착 정보 없음')).toBeTruthy();
   });
 
+  describe('connection lost (API failing)', () => {
+    it('renders "연결 안 됨" instead of "정보 없음" when there is no ETA', () => {
+      const { getByText, queryByText, getByLabelText } = wrap(
+        <FavoriteRow lines={['2']} stationName="강남" nextMinutes={null} connectionLost />,
+      );
+      expect(getByText('연결 안 됨')).toBeTruthy();
+      expect(queryByText('정보 없음')).toBeNull();
+      expect(getByLabelText('강남역 즐겨찾기, 실시간 연결 안 됨')).toBeTruthy();
+    });
+
+    it('keeps showing a still-fresh ETA while the connection is lost', () => {
+      const { getByText, queryByText } = wrap(
+        <FavoriteRow lines={['2']} stationName="강남" nextMinutes={3} connectionLost />,
+      );
+      expect(getByText(/3/)).toBeTruthy();
+      expect(queryByText('연결 안 됨')).toBeNull();
+    });
+  });
+
   it('suppresses the imminent badge when nextMinutes is null', () => {
     const { queryByText } = wrap(
       <FavoriteRow lines={['2']} stationName="강남" nextMinutes={null} imminent />,

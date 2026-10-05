@@ -33,7 +33,7 @@ interface HomeFavoriteRowProps {
 
 export const HomeFavoriteRow: React.FC<HomeFavoriteRowProps> = memo(
   ({ station, alias, lineId, direction, isFocused, isFirst = false, onPress, testID }) => {
-    const { trains } = useRealtimeTrains(station.name, { enabled: isFocused });
+    const { trains, error } = useRealtimeTrains(station.name, { enabled: isFocused });
     // The arrival snapshot is per station, so a transfer station mixes lines and
     // both directions — the earliest of all of them is almost always "0분". Keep
     // only this favorite's line (fail-closed on an unknown line, per
@@ -90,6 +90,7 @@ export const HomeFavoriteRow: React.FC<HomeFavoriteRowProps> = memo(
         nickname={alias ?? null}
         destinationLabel={destLabel}
         nextMinutes={nextMinutes}
+        connectionLost={error !== null && error !== undefined}
         imminent={imminent}
         onPress={onPress}
         testID={testID}
