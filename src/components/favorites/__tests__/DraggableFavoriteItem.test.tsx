@@ -35,11 +35,24 @@ jest.mock('@/components/design', () => {
   const ReactModule = require('react');
   const { Text, TouchableOpacity } = require('react-native');
   return {
-    FavoriteRow: ({ onPress, stationName }: { onPress?: () => void; stationName?: string }) =>
+    FavoriteRow: ({
+      onPress,
+      stationName,
+      nextMinutes,
+    }: {
+      onPress?: () => void;
+      stationName?: string;
+      nextMinutes?: number | null;
+    }) =>
       ReactModule.createElement(
         TouchableOpacity,
         { testID: 'favorite-row', onPress },
         ReactModule.createElement(Text, null, stationName),
+        ReactModule.createElement(
+          Text,
+          { testID: 'favorite-row-minutes' },
+          nextMinutes === null ? 'null' : String(nextMinutes),
+        ),
       ),
   };
 });
@@ -113,6 +126,38 @@ const renderItem = (overrides: Partial<ItemProps> = {}) => {
 describe('DraggableFavoriteItem', () => {
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  describe('nextMinutes (도착 정보 없음 vs 0분)', () => {
+    const { useRealtimeTrains } = jest.requireMock('@/hooks/useRealtimeTrains') as {
+      useRealtimeTrains: jest.Mock;
+    };
+
+    it('passes null when there are no trains', () => {
+      useRealtimeTrains.mockReturnValue({ trains: [] });
+      const { getByTestId } = renderItem();
+      expect(getByTestId('favorite-row-minutes')).toHaveTextContent('null');
+    });
+
+    it('passes null when no train has a known arrival time', () => {
+      useRealtimeTrains.mockReturnValue({
+        trains: [{ arrivalTime: null, direction: 'up' }, { arrivalTime: null, direction: 'down' }],
+      });
+      const { getByTestId } = renderItem();
+      expect(getByTestId('favorite-row-minutes')).toHaveTextContent('null');
+    });
+
+    it('passes the minutes of the earliest train with a known arrival time', () => {
+      const now = Date.now();
+      useRealtimeTrains.mockReturnValue({
+        trains: [
+          { arrivalTime: null, direction: 'up' },
+          { arrivalTime: new Date(now + 3 * 60_000), direction: 'up' },
+        ],
+      });
+      const { getByTestId } = renderItem();
+      expect(getByTestId('favorite-row-minutes')).toHaveTextContent('3');
+    });
   });
 
   describe('선택 모드 (isSelectMode)', () => {

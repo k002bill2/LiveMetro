@@ -135,16 +135,17 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
 
   // Pick the next train matching the favorite's direction (or the soonest
   // overall when 'both' / unknown). Returns minutes-until-arrival for the
-  // FavoriteRow primary signal, or 0 when nothing is available.
-  const nextMinutes = useMemo(() => {
-    if (!trains?.length) return 0;
+  // FavoriteRow primary signal, or null when no train has a known ETA
+  // (null renders "정보 없음"; 0 would read as a train arriving now).
+  const nextMinutes = useMemo((): number | null => {
+    if (!trains?.length) return null;
     const now = Date.now();
     const filtered = trains.filter((t) => {
       if (!t.arrivalTime) return false;
       if (favorite.direction === 'both' || !favorite.direction) return true;
       return t.direction === favorite.direction;
     });
-    if (filtered.length === 0) return 0;
+    if (filtered.length === 0) return null;
     const earliest = filtered.reduce((min, t) =>
       t.arrivalTime!.getTime() < min.arrivalTime!.getTime() ? t : min
     );

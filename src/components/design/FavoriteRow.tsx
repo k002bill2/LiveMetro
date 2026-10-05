@@ -38,8 +38,11 @@ interface FavoriteRowProps {
   destinationLabel?: string;
   /** Congestion level shown next to direction with tone-colored dot. */
   congestion?: CongestionLevel;
-  /** Minutes until next train. Required — the card's primary signal. */
-  nextMinutes: number;
+  /**
+   * Minutes until next train — the card's primary signal. `null` means no
+   * train with a known ETA; renders "정보 없음" instead of a misleading "0분".
+   */
+  nextMinutes: number | null;
   /**
    * When true, append the green "곧 도착" badge under `nextMinutes`.
    * Caller decides the threshold — typical: remaining time ≤ 90s.
@@ -84,7 +87,11 @@ const FavoriteRowImpl: React.FC<FavoriteRowProps> = ({
       onPress={onPress}
       onLongPress={onLongPress}
       accessibilityRole={onPress ? 'button' : undefined}
-      accessibilityLabel={`${stationName}역 즐겨찾기, ${nextMinutes}분 후 도착`}
+      accessibilityLabel={
+        nextMinutes === null
+          ? `${stationName}역 즐겨찾기, 도착 정보 없음`
+          : `${stationName}역 즐겨찾기, ${nextMinutes}분 후 도착`
+      }
       style={({ pressed }) => [
         styles.row,
         {
@@ -151,11 +158,15 @@ const FavoriteRowImpl: React.FC<FavoriteRowProps> = ({
 
       {/* Right: minutes — primary signal */}
       <View style={styles.right}>
-        <Text style={[styles.minutes, { color: semantic.primaryNormal }]}>
-          {nextMinutes}
-          <Text style={styles.minutesUnit}>분</Text>
-        </Text>
-        {imminent && (
+        {nextMinutes === null ? (
+          <Text style={[styles.noArrival, { color: semantic.labelAlt }]}>정보 없음</Text>
+        ) : (
+          <Text style={[styles.minutes, { color: semantic.primaryNormal }]}>
+            {nextMinutes}
+            <Text style={styles.minutesUnit}>분</Text>
+          </Text>
+        )}
+        {imminent && nextMinutes !== null && (
           <View style={styles.imminentWrap}>
             <View style={[styles.imminentDot, { backgroundColor: '#00A84D' }]} />
             <Text style={[styles.imminentText, { color: '#008F30' }]}>
@@ -237,6 +248,10 @@ const styles = StyleSheet.create({
   minutesUnit: {
     fontSize: 12,
     fontFamily: weightToFontFamily('700'),
+  },
+  noArrival: {
+    fontSize: 13,
+    fontFamily: weightToFontFamily('600'),
   },
   imminentWrap: {
     flexDirection: 'row',
