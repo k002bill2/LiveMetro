@@ -16,6 +16,7 @@ import { FavoriteRow } from '@components/design';
 import type { LineId } from '@components/design';
 import type { Station } from '@models/train';
 import { isOnCanonicalLine, resolveCanonicalLineId } from '@/utils/canonicalLine';
+import { isEtaFresh } from '@/utils/arrivalFreshness';
 
 interface HomeFavoriteRowProps {
   station: Station;
@@ -44,23 +45,28 @@ export const HomeFavoriteRow: React.FC<HomeFavoriteRowProps> = memo(
         isOnCanonicalLine(canonicalLine, t.lineId) &&
         (direction === undefined || direction === 'both' || t.direction === direction),
     );
-    // Earliest train with a known ETA. A train may carry arrivalTime === null
-    // (unknown, e.g. arvlCd 99) — treating that as 0s rendered a false "0분".
+    // Earliest train with a known, fresh ETA. A train may carry
+    // arrivalTime === null (unknown, e.g. arvlCd 99) or a cached ETA long past
+    // (#360) — both used to render a false "0분".
+    const now = Date.now();
     const next = candidates.reduce<(typeof trains)[number] | undefined>(
       (best, t) =>
         t.arrivalTime !== null &&
+        isEtaFresh(t.arrivalTime, now) &&
         (best?.arrivalTime == null || t.arrivalTime.getTime() < best.arrivalTime.getTime())
           ? t
           : best,
       undefined,
     );
 
-    // Tick every second only when this is the first row AND the screen is
-    // focused — avoids 1Hz timers across the favorite stack.
+    // Re-render on a clock while focused: 1Hz for the first row (seconds
+    // countdown), 30s for the rest. The slow tick re-judges ETA staleness even
+    // when no data callback arrives (e.g. quota exhausted, #360) — avoids 1Hz
+    // timers across the whole favorite stack.
     const [, setTick] = useState(0);
     useEffect(() => {
-      if (!isFirst || !isFocused) return;
-      const id = setInterval(() => setTick((t) => t + 1), 1000);
+      if (!isFocused) return;
+      const id = setInterval(() => setTick((t) => t + 1), isFirst ? 1000 : 30_000);
       return () => clearInterval(id);
     }, [isFirst, isFocused]);
 

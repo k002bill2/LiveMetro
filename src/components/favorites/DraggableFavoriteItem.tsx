@@ -3,7 +3,7 @@
  * Wraps StationCard with edit and drag functionality
  */
 
-import React, { useCallback, useEffect, useMemo, useRef } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSemanticTokens } from '@/services/theme';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { AlertCircle, Trash2, Bell, BellOff, CheckCircle2, Circle, Pencil } from 'lucide-react-native';
@@ -14,6 +14,7 @@ import { FavoriteWithDetails } from '../../hooks/useFavorites';
 import { useRealtimeTrains } from '../../hooks/useRealtimeTrains';
 import { FavoriteEditForm } from './FavoriteEditForm';
 import { FavoriteRow, type LineId } from '../design';
+import { isEtaFresh } from '@/utils/arrivalFreshness';
 
 interface DraggableFavoriteItemProps {
   favorite: FavoriteWithDetails;
@@ -137,11 +138,21 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
   // overall when 'both' / unknown). Returns minutes-until-arrival for the
   // FavoriteRow primary signal, or null when no train has a known ETA
   // (null renders "정보 없음"; 0 would read as a train arriving now).
-  const nextMinutes = useMemo((): number | null => {
+  // Not memoized on [trains]: while the API is failing the hook keeps the same
+  // cached array, and staleness depends on the clock, not on trains (#360).
+  // A 30s tick re-renders even when no data callback arrives (quota exhausted).
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    if (!shouldFetchArrivals) return;
+    const id = setInterval(() => setTick((t) => t + 1), 30_000);
+    return () => clearInterval(id);
+  }, [shouldFetchArrivals]);
+  const nextMinutes = ((): number | null => {
     if (!trains?.length) return null;
     const now = Date.now();
     const filtered = trains.filter((t) => {
-      if (!t.arrivalTime) return false;
+      // Unknown or stale-cached ETA (#360) must not read as "0분".
+      if (!isEtaFresh(t.arrivalTime, now)) return false;
       if (favorite.direction === 'both' || !favorite.direction) return true;
       return t.direction === favorite.direction;
     });
@@ -154,7 +165,7 @@ export const DraggableFavoriteItem: React.FC<DraggableFavoriteItemProps> = ({
       Math.ceil((earliest.arrivalTime!.getTime() - now) / 60_000)
     );
     return diffMin;
-  }, [trains, favorite.direction]);
+  })();
 
   // Lines passing through this station — bundle's FavoriteRow stacks up to 2
   // LineBadges (primary + first transfer).
