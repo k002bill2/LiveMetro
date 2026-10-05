@@ -32,6 +32,7 @@ import { StationSearchBar } from '@/components/route/StationSearchBar';
 import { TimeChipRow } from '@/components/route/TimeChipRow';
 import { StationPickerModal } from '@/components/route/StationPickerModal';
 import { RouteSortTabs } from '@/components/route/RouteSortTabs';
+import { ScreenTitle } from '@/components/common/ScreenTitle';
 import { RouteCard } from '@/components/route/RouteCard';
 
 interface StationLite {
@@ -299,7 +300,7 @@ export const RoutesTabScreen: React.FC = () => {
         }
         testID="routes-tab-screen"
       >
-        <Text style={styles.title}>{t.routes.title}</Text>
+        <ScreenTitle style={styles.title}>{t.routes.title}</ScreenTitle>
 
         <StationSearchBar
           fromStation={fromStation}
@@ -371,10 +372,6 @@ const createStyles = (semantic: WantedSemanticTheme): ReturnType<typeof StyleShe
       fontFamily: weightToFontFamily('700'),
     },
     title: {
-      fontSize: WANTED_TOKENS.type.heading1.size,
-      lineHeight: WANTED_TOKENS.type.heading1.lh,
-      fontFamily: weightToFontFamily('800'),
-      color: semantic.labelStrong,
       marginBottom: WANTED_TOKENS.spacing.s4,
     },
     emptyHint: {
