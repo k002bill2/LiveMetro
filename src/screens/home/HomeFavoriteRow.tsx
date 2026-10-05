@@ -15,10 +15,15 @@ import { useRealtimeTrains } from '@hooks/useRealtimeTrains';
 import { FavoriteRow } from '@components/design';
 import type { LineId } from '@components/design';
 import type { Station } from '@models/train';
+import { isOnCanonicalLine, resolveCanonicalLineId } from '@/utils/canonicalLine';
 
 interface HomeFavoriteRowProps {
   station: Station;
   alias?: string | null;
+  /** Favorite's own line; falls back to `station.lineId`. */
+  lineId?: string;
+  /** Favorite's saved direction; 'both'/undefined considers both directions. */
+  direction?: 'up' | 'down' | 'both';
   isFocused: boolean;
   isFirst?: boolean;
   onPress: () => void;
@@ -26,11 +31,22 @@ interface HomeFavoriteRowProps {
 }
 
 export const HomeFavoriteRow: React.FC<HomeFavoriteRowProps> = memo(
-  ({ station, alias, isFocused, isFirst = false, onPress, testID }) => {
+  ({ station, alias, lineId, direction, isFocused, isFirst = false, onPress, testID }) => {
     const { trains } = useRealtimeTrains(station.name, { enabled: isFocused });
-    // Earliest train with a known ETA. trains[0] may carry arrivalTime === null
+    // The arrival snapshot is per station, so a transfer station mixes lines and
+    // both directions — the earliest of all of them is almost always "0분". Keep
+    // only this favorite's line (fail-closed on an unknown line, per
+    // canonicalLine) and its saved direction, as the Favorites tab does.
+    const canonicalLine = resolveCanonicalLineId(lineId ?? station.lineId);
+    const candidates = trains.filter(
+      (t) =>
+        canonicalLine !== null &&
+        isOnCanonicalLine(canonicalLine, t.lineId) &&
+        (direction === undefined || direction === 'both' || t.direction === direction),
+    );
+    // Earliest train with a known ETA. A train may carry arrivalTime === null
     // (unknown, e.g. arvlCd 99) — treating that as 0s rendered a false "0분".
-    const next = trains.reduce<(typeof trains)[number] | undefined>(
+    const next = candidates.reduce<(typeof trains)[number] | undefined>(
       (best, t) =>
         t.arrivalTime !== null &&
         (best?.arrivalTime == null || t.arrivalTime.getTime() < best.arrivalTime.getTime())

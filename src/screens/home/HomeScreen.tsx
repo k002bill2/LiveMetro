@@ -592,6 +592,8 @@ export const HomeScreen: React.FC = () => {
                     key={station.id}
                     station={station}
                     alias={fav.alias}
+                    lineId={fav.lineId}
+                    direction={fav.direction}
                     isFocused={isFocused}
                     isFirst={isFirst}
                     onPress={() => handleStationPress(station)}
