@@ -157,4 +157,73 @@ describe('SignupStep1Screen', () => {
     // No navigate('SignUp') anymore — RootNavigator handles routing via auth state.
     expect(mockNavigate).not.toHaveBeenCalledWith('SignUp');
   });
+
+  it('distributes an SMS-autofilled 6-digit code across all OTP cells', async () => {
+    mockRequestPhoneVerification.mockResolvedValue('vid-123');
+    mockConfirmPhoneCode.mockResolvedValue(undefined);
+    const { getByTestId } = render(<SignupStep1Screen />);
+
+    fireEvent.press(getByTestId('carrier-skt'));
+    fireEvent.changeText(getByTestId('name-input'), '홍길동');
+    fireEvent.changeText(getByTestId('phone-input'), '01012345678');
+    fireEvent.changeText(getByTestId('birth-input'), '900101');
+
+    await act(async () => {
+      fireEvent.press(getByTestId('request-otp-button'));
+    });
+
+    // 키패드 위 "메시지에서" 제안을 탭하면 포커스된 첫 칸에 6자리가 한 번에 들어온다.
+    const firstCell = getByTestId('otp-cell-0');
+    expect(firstCell.props.maxLength).not.toBe(1);
+    expect(firstCell.props.textContentType).toBe('oneTimeCode');
+    expect(firstCell.props.autoComplete).toBe('sms-otp');
+    act(() => {
+      fireEvent.changeText(firstCell, '987654');
+    });
+
+    ['9', '8', '7', '6', '5', '4'].forEach((d, i) => {
+      expect(getByTestId(`otp-cell-${i}`).props.value).toBe(d);
+    });
+
+    await act(async () => {
+      fireEvent.press(getByTestId('verify-button'));
+    });
+    await waitFor(() => {
+      expect(mockConfirmPhoneCode).toHaveBeenCalledWith('vid-123', '987654');
+    });
+  });
+
+  it('replaces only the current cell when typing into an already-filled cell', async () => {
+    mockRequestPhoneVerification.mockResolvedValue('vid-123');
+    const { getByTestId } = render(<SignupStep1Screen />);
+
+    fireEvent.press(getByTestId('carrier-skt'));
+    fireEvent.changeText(getByTestId('name-input'), '홍길동');
+    fireEvent.changeText(getByTestId('phone-input'), '01012345678');
+    fireEvent.changeText(getByTestId('birth-input'), '900101');
+
+    await act(async () => {
+      fireEvent.press(getByTestId('request-otp-button'));
+    });
+
+    act(() => {
+      fireEvent.changeText(getByTestId('otp-cell-0'), '123456');
+    });
+    // 세 번째 칸("3") 끝에 9 입력 → onChangeText 에는 "39" 가 온다.
+    act(() => {
+      fireEvent.changeText(getByTestId('otp-cell-2'), '39');
+    });
+
+    ['1', '2', '9', '4', '5', '6'].forEach((d, i) => {
+      expect(getByTestId(`otp-cell-${i}`).props.value).toBe(d);
+    });
+
+    // 채워진 칸("9") 끝에 새 전체 코드 붙여넣기 → "9"+"987654" 7자리가 온다.
+    act(() => {
+      fireEvent.changeText(getByTestId('otp-cell-2'), '9987654');
+    });
+    ['9', '8', '7', '6', '5', '4'].forEach((d, i) => {
+      expect(getByTestId(`otp-cell-${i}`).props.value).toBe(d);
+    });
+  });
 });

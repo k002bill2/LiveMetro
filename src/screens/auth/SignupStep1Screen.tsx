@@ -185,7 +185,33 @@ export const SignupStep1Screen: React.FC = () => {
   }, [phone, requestPhoneVerification]);
 
   const handleOtpChange = useCallback((index: number, value: string) => {
-    const digit = value.replace(/[^0-9]/g, '').slice(0, 1);
+    let digits = value.replace(/[^0-9]/g, '');
+    const current = otpDigits[index] ?? '';
+    // 이미 채워진 칸에 입력하면 "기존 1자리 + 새 입력"이 온다 (한 자리 → 2자리,
+    // 전체 코드 붙여넣기 → OTP_LENGTH+1자리). 기존 숫자를 떼어내 새 입력만 남긴다.
+    // 커서 위치를 모르므로 기본 위치(끝)를 먼저 가정한다.
+    if (current && (digits.length === 2 || digits.length === OTP_LENGTH + 1)) {
+      if (digits.startsWith(current)) digits = digits.slice(1);
+      else if (digits.endsWith(current)) digits = digits.slice(0, -1);
+    }
+    if (digits.length > 1) {
+      // SMS autofill (키패드 위 "메시지에서" 제안) 이나 붙여넣기는 포커스된 칸 하나에
+      // 여러 자리가 한 번에 들어온다. 전체 코드면 어느 칸이든 첫 칸부터, 아니면
+      // 현재 칸부터 뒤로 분배한다.
+      const start = digits.length >= OTP_LENGTH ? 0 : index;
+      const chunk = digits.slice(0, OTP_LENGTH - start).split('');
+      setOtpDigits((prev) => {
+        const next = [...prev];
+        chunk.forEach((d, i) => {
+          next[start + i] = d;
+        });
+        return next;
+      });
+      const last = Math.min(start + chunk.length, OTP_LENGTH - 1);
+      otpRefs.current[last]?.focus();
+      return;
+    }
+    const digit = digits;
     setOtpDigits((prev) => {
       const next = [...prev];
       next[index] = digit;
@@ -194,7 +220,7 @@ export const SignupStep1Screen: React.FC = () => {
     if (digit && index < OTP_LENGTH - 1) {
       otpRefs.current[index + 1]?.focus();
     }
-  }, []);
+  }, [otpDigits]);
 
   const handleOtpKeyPress = useCallback(
     (index: number, e: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
@@ -483,8 +509,10 @@ export const SignupStep1Screen: React.FC = () => {
                         onChangeText={(v) => handleOtpChange(idx, v)}
                         onKeyPress={(e) => handleOtpKeyPress(idx, e)}
                         keyboardType="number-pad"
-                        maxLength={1}
+                        // maxLength 1 이면 OS 가 자동완성한 6자리를 1자리로 잘라버린다. +1 은 채워진 칸에 붙여넣을 때 기존 숫자 몫.
+                        maxLength={OTP_LENGTH + 1}
                         textContentType="oneTimeCode"
+                        autoComplete="sms-otp"
                         style={[
                           styles.otpCell,
                           {
