@@ -22,6 +22,46 @@ jest.mock('@/services/theme', () => ({
 }));
 
 describe('CommuteRouteCard', () => {
+  describe('line label (#361)', () => {
+    it('shows a display name, not the raw slug, for a non-numeric line', () => {
+      const { getByText, queryByText } = render(
+        <CommuteRouteCard origin="선릉" destination="산곡" lineId="bundang" />,
+      );
+      expect(getByText('수인분당선')).toBeTruthy();
+      expect(queryByText('bundang')).toBeNull();
+    });
+
+    it('reads the display name in the accessibility label', () => {
+      const { getByLabelText } = render(
+        <CommuteRouteCard origin="선릉" destination="산곡" lineId="bundang" />,
+      );
+      expect(getByLabelText(/수인분당선 이용/)).toBeTruthy();
+    });
+
+    it('keeps "N호선" for numeric lines', () => {
+      const { getByText, getByLabelText } = render(
+        <CommuteRouteCard origin="산곡" destination="선릉" lineId="7" />,
+      );
+      expect(getByText('7호선')).toBeTruthy();
+      expect(getByLabelText(/7호선 이용/)).toBeTruthy();
+    });
+
+    it('does not turn a numbered non-subway slug into "N호선"', () => {
+      const { getByText, queryByText } = render(
+        <CommuteRouteCard origin="인천시청" destination="부평" lineId="incheon1" />,
+      );
+      expect(getByText('인천선')).toBeTruthy();
+      expect(queryByText('1호선')).toBeNull();
+    });
+
+    it('falls back to the raw id for an unknown line', () => {
+      const { getByText } = render(
+        <CommuteRouteCard origin="A" destination="B" lineId="mystery" />,
+      );
+      expect(getByText('mystery')).toBeTruthy();
+    });
+  });
+
   it('returns null when origin is missing', () => {
     const { queryByTestId } = render(
       <CommuteRouteCard destination="강남" testID="cr-card" />,

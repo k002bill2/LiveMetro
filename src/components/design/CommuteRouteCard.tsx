@@ -40,7 +40,20 @@ import { useSemanticTokens } from '@/services/theme';
 import { WANTED_TOKENS, weightToFontFamily } from '@/styles/modernTheme';
 import { getSubwayLineColor } from '@/utils/colorUtils';
 import { truncateMinutes } from '@/utils/dateUtils';
+import { resolveCanonicalLineId } from '@/utils/canonicalLine';
 import { LineBadge, type LineId } from './LineBadge';
+
+/**
+ * Human label for a route lineId (#361). Route slugs like 'bundang' used to
+ * render raw. Resolve through the canonical line id ('bundang' → '수인분당선')
+ * so numbered non-subway slugs ('incheon1') don't collapse to "N호선". Unknown
+ * ids fall back to the raw value.
+ */
+const lineLabel = (lineId: string): string => {
+  const canonical = resolveCanonicalLineId(lineId);
+  if (canonical === null) return lineId;
+  return /^\d+$/.test(canonical) ? `${canonical}호선` : canonical;
+};
 
 interface CommuteRouteCardProps {
   /** Card header label. Defaults to the morning copy ("오늘의 출근 경로"). */
@@ -126,7 +139,7 @@ const CommuteRouteCardImpl: React.FC<CommuteRouteCardProps> = ({
     title,
     `${origin}에서 ${destination}`,
     departureTime && arrivalTime ? `${departureTime}부터 ${arrivalTime}` : null,
-    lineId ? `${lineId}호선 이용` : null,
+    lineId ? `${lineLabel(lineId)} 이용` : null,
   ]
     .filter(Boolean)
     .join(', ');
@@ -253,7 +266,7 @@ const CommuteRouteCardImpl: React.FC<CommuteRouteCardProps> = ({
           )}
           {lineId && (
             <Text style={[styles.nodeLabel, { color: semantic.labelStrong }]}>
-              {/^\d+$/.test(lineId) ? `${lineId}호선` : lineId}
+              {lineLabel(lineId)}
             </Text>
           )}
           {/* Honest mid-node meta. "직행" is asserted ONLY for an affirmative
