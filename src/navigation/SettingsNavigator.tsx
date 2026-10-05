@@ -51,7 +51,10 @@ export const SettingsNavigator: React.FC = () => {
           fontFamily: weightToFontFamily('700'),
           color: semantic.labelStrong,
         },
-        headerBackTitle: '',
+        // `headerBackTitle: ''` let iOS fall back to the previous route's
+        // name ("SettingsHome") or a wide empty pill; hiding the title gives
+        // the icon-only circular back button RootNavigator screens use.
+        headerBackTitleVisible: false,
         headerTintColor: semantic.labelStrong,
       }}
     >
@@ -131,7 +134,9 @@ export const SettingsNavigator: React.FC = () => {
       <SettingsStack.Screen
         name="Feedback"
         component={FeedbackScreen}
-        options={{ headerShown: false }}
+        // Native header supplies the back button; FeedbackScreen only draws
+        // its own header row when an onClose handler is passed (modal use).
+        options={{ title: '의견 보내기' }}
       />
       <SettingsStack.Screen
         name="PrivacyPolicy"
