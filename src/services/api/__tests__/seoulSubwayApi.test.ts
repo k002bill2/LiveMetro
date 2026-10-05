@@ -253,11 +253,17 @@ describe('SeoulSubwayApiService', () => {
         json: () => Promise.resolve(authError),
       });
 
+      // The backup-key swap waits for the 30s per-station limiter.
+      jest.useFakeTimers();
       let caught: unknown;
       try {
-        await seoulSubwayApi.getRealtimeArrival('강남');
-      } catch (err) {
-        caught = err;
+        const pending = seoulSubwayApi.getRealtimeArrival('강남').catch((err: unknown) => {
+          caught = err;
+        });
+        await jest.runAllTimersAsync();
+        await pending;
+      } finally {
+        jest.useRealTimers();
       }
 
       expect(caught).toBeInstanceOf(SeoulApiError);
@@ -1596,13 +1602,26 @@ describe('SeoulSubwayApiService resilience (A1~A3, A5)', () => {
     errorSpy.mockRestore();
   });
 
+  /** Drains backoff / limiter timers under fake timers, then yields the result. */
+  const settle = async <T,>(promise: Promise<T>): Promise<Promise<T>> => {
+    promise.catch(() => undefined);
+    await jest.runAllTimersAsync();
+    return promise;
+  };
+
   describe('A1 — auth failure keeps the key out for a long TTL', () => {
+    // A backup-key swap waits for the 30s per-station limiter; fake timers
+    // drain it (afterEach restores real timers).
+    beforeEach(() => {
+      jest.useFakeTimers();
+    });
+
     it('disables the INFO-100 key well beyond the 60s generic cooldown after a single failure', async () => {
       mockFetch
         .mockResolvedValueOnce(jsonResponse(apiErrorBody('INFO-100')))
         .mockResolvedValueOnce(jsonResponse(okArrival));
 
-      await expect(seoulSubwayApi.getRealtimeArrival('강남')).resolves.toEqual([]);
+      await expect(settle(seoulSubwayApi.getRealtimeArrival('강남'))).resolves.toEqual([]);
 
       const disabled = seoulSubwayApi
         .getKeyStats()
@@ -1614,7 +1633,7 @@ describe('SeoulSubwayApiService resilience (A1~A3, A5)', () => {
     it('tries each key at most once when every key is invalid (no repeat on a disabled key)', async () => {
       mockFetch.mockResolvedValue(jsonResponse(apiErrorBody('INFO-100')));
 
-      await expect(seoulSubwayApi.getRealtimeArrival('강남')).rejects.toMatchObject({
+      await expect(settle(seoulSubwayApi.getRealtimeArrival('강남'))).rejects.toMatchObject({
         errorCode: 'INFO-100',
       });
 
@@ -1627,12 +1646,12 @@ describe('SeoulSubwayApiService resilience (A1~A3, A5)', () => {
       mockFetch
         .mockResolvedValueOnce(jsonResponse(apiErrorBody('INFO-100')))
         .mockResolvedValueOnce(jsonResponse(okArrival));
-      await seoulSubwayApi.getRealtimeArrival('강남');
+      await settle(seoulSubwayApi.getRealtimeArrival('강남'));
       const badKey = keyOf(0);
 
       for (const station of ['역삼', '선릉', '삼성']) {
         mockFetch.mockResolvedValueOnce(jsonResponse(okArrival));
-        await seoulSubwayApi.getRealtimeArrival(station);
+        await settle(seoulSubwayApi.getRealtimeArrival(station));
       }
 
       expect([keyOf(1), keyOf(2), keyOf(3), keyOf(4)]).not.toContain(badKey);
@@ -1645,7 +1664,7 @@ describe('SeoulSubwayApiService resilience (A1~A3, A5)', () => {
         .mockResolvedValueOnce(jsonResponse(apiErrorBody('INFO-100')))
         .mockResolvedValueOnce(jsonResponse(okArrival));
 
-      await expect(seoulSubwayApi.getRealtimeArrival('강남')).resolves.toEqual([]);
+      await expect(settle(seoulSubwayApi.getRealtimeArrival('강남'))).resolves.toEqual([]);
       expect(mockFetch).toHaveBeenCalledTimes(2);
       expect(keyOf(1)).not.toBe(keyOf(0));
     });
@@ -1693,7 +1712,9 @@ describe('SeoulSubwayApiService resilience (A1~A3, A5)', () => {
       mockFetch
         .mockResolvedValueOnce(jsonResponse(apiErrorBody('INFO-100')))
         .mockResolvedValueOnce(jsonResponse(okArrival));
-      await seoulSubwayApi.getRealtimeArrival('강남');
+      jest.useFakeTimers(); // the auth swap waits for the 30s limiter
+      await settle(seoulSubwayApi.getRealtimeArrival('강남'));
+      jest.useRealTimers();
 
       mockFetch.mockResolvedValue(jsonResponse(apiErrorBody('ERROR-500')));
       await expect(seoulSubwayApi.getRealtimeArrival('역삼')).rejects.toBeInstanceOf(SeoulApiError);

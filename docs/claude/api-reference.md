@@ -116,7 +116,7 @@ arrivalService.destroy(): void
 
 **`GetArrivalsOptions.throwOnError`** (PR #140, added 2026-05-17):
 
-By default, `getArrivals` swallows `fetchWithRetry` errors and falls back to cached data, or returns an empty `ArrivalInfo` (`source: 'cache'`) when no cache exists. This is the *legacy behavior* — `throwOnError: false`.
+By default, `getArrivals` swallows errors from its single fetch (`fetchShared` → `seoulSubwayApi`, whose `withRetry` is the only retry layer) and falls back to cached data, or returns an empty `ArrivalInfo` (`source: 'cache'`) when no cache exists. This is the *legacy behavior* — `throwOnError: false`.
 
 When `throwOnError: true`, the retry chain still runs in full, but the cache fallback layer is bypassed: the original error (often `SeoulApiError` with a category — `quota` / `auth` / `transient` / `rateLimit` / `network`) is re-thrown. Subscribers receive the error via the second callback argument.
 

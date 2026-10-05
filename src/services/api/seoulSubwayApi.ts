@@ -613,8 +613,15 @@ class SeoulSubwayApiService {
 
     // Backup key handed over by reportRateLimit for the next attempt (A2).
     let nextKey: string | null = null;
+    // An auth key swap is a fresh call to the same station, so it goes through
+    // the 30s limiter like the next poll would (keeps pre-retry-budget timing).
+    let throttleNextAttempt = false;
 
     return withRetry(async () => {
+      if (throttleNextAttempt) {
+        throttleNextAttempt = false;
+        await this.rateLimiter.throttle(rateLimitKey);
+      }
       const apiKey = this.claimReservedKey(nextKey) ?? this.keyManager.getNextKey();
       nextKey = null;
       if (!apiKey) {
@@ -677,6 +684,7 @@ class SeoulSubwayApiService {
             this.keyManager.reportAuthError(apiKey);
             nextKey = this.takeHealthyNextKey(this.keyManager, apiKey);
             retryable = nextKey !== null;
+            throttleNextAttempt = retryable;
           } else {
             this.keyManager.reportError(apiKey);
           }

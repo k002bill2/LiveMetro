@@ -188,6 +188,60 @@ describe('arrivalService + seoulSubwayApi — network budget per logical request
     expect(mockFetch).toHaveBeenCalledTimes(afterExhaustion + 1);
   });
 
+  describe('fetch start times (ms after the logical request starts)', () => {
+    let startedAt: number[];
+    let t0: number;
+
+    beforeEach(() => {
+      startedAt = [];
+      t0 = Date.now();
+    });
+
+    const record = (respond: (url: string) => Promise<unknown>) =>
+      (url: string): Promise<unknown> => {
+        startedAt.push(Date.now() - t0);
+        return respond(url);
+      };
+
+    it('swaps an invalid (INFO-100) key to the backup key no sooner than 30s later', async () => {
+      mockFetch.mockImplementation(record((url) =>
+        Promise.resolve(
+          keyOf(url) === 'it-key-1' ? jsonResponse(apiErrorBody('INFO-100')) : jsonResponse(okBody)
+        )
+      ));
+
+      const { value } = await settle();
+
+      expect(value).toMatchObject({ source: 'api' });
+      expect(startedAt).toHaveLength(2);
+      expect(startedAt[0]).toBe(0);
+      expect(startedAt[1]).toBeGreaterThanOrEqual(30_000);
+    });
+
+    it('spaces every key swap by 30s when all keys are invalid (INFO-100)', async () => {
+      mockFetch.mockImplementation(record(() => Promise.resolve(jsonResponse(apiErrorBody('INFO-100')))));
+
+      const { error } = await settle();
+
+      expect(error).toMatchObject({ errorCode: 'INFO-100' });
+      expect(startedAt).toHaveLength(3);
+      expect(startedAt[0]).toBe(0);
+      expect(startedAt[1]).toBeGreaterThanOrEqual(30_000);
+      expect(startedAt[2]).toBeGreaterThanOrEqual(60_000);
+    });
+
+    it('leaves the timeout chain timing and the follow-up request unchanged', async () => {
+      mockFetch.mockImplementation(record(() => new Promise(() => undefined)));
+      await settle();
+      expect(startedAt).toEqual([0, 11_000, 23_000]);
+
+      mockFetch.mockImplementation(record(() => Promise.resolve(jsonResponse(okBody))));
+      const { value } = await settle();
+      expect(value).toMatchObject({ source: 'api' });
+      expect(startedAt).toEqual([0, 11_000, 23_000, 33_000]);
+    });
+  });
+
   it('keeps the 30s per-station rate limit after a failed chain (retries do not reopen it)', async () => {
     mockFetch.mockRejectedValue(new TypeError('Network request failed'));
     const chainStart = Date.now();
