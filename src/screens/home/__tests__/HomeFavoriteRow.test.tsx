@@ -1,9 +1,15 @@
 /**
  * HomeFavoriteRow — which train's ETA reaches the FavoriteRow.
  *
- * Regression (2026-10-05, SM-N971N): 4 of 5 home favorites showed "0분" while
+ * Regression 1 (2026-10-05, SM-N971N): 4 of 5 home favorites showed "0분" while
  * the API was healthy. trains[0] often has arrivalTime === null (#358 leaves
  * unknown ETAs as null), and the row turned that null into 0 seconds.
+ *
+ * Regression 2 (same day, raw API at 선릉): the snapshot is per station, so a
+ * 수인분당 favorite also received 2호선 trains and both directions. Picking the
+ * earliest of all of them pinned transfer stations to "0분" almost constantly.
+ * The row now follows the favorite's own line and saved direction, matching
+ * the Favorites tab.
  */
 import React from 'react';
 import { render } from '@testing-library/react-native';
@@ -55,9 +61,13 @@ const station: Station = {
   transfers: [],
 };
 
-const renderRow = (isFirst = false) =>
+const inSec = (sec: number): Date => new Date(Date.now() + sec * 1000 + 500);
+
+type RowOverrides = Partial<React.ComponentProps<typeof HomeFavoriteRow>>;
+
+const renderRow = (overrides: RowOverrides = {}) =>
   render(
-    <HomeFavoriteRow station={station} isFocused isFirst={isFirst} onPress={jest.fn()} />,
+    <HomeFavoriteRow station={station} isFocused onPress={jest.fn()} {...overrides} />,
   );
 
 describe('HomeFavoriteRow', () => {
@@ -65,39 +75,86 @@ describe('HomeFavoriteRow', () => {
     jest.clearAllMocks();
   });
 
-  it('passes null (not 0) when there are no trains', () => {
-    useRealtimeTrains.mockReturnValue({ trains: [] });
-    const { getByTestId } = renderRow();
-    expect(getByTestId('minutes')).toHaveTextContent('null');
+  describe('unknown ETA (null) is not "0분"', () => {
+    it('passes null when there are no trains', () => {
+      useRealtimeTrains.mockReturnValue({ trains: [] });
+      const { getByTestId } = renderRow();
+      expect(getByTestId('minutes')).toHaveTextContent('null');
+    });
+
+    it('passes null when no train has a known arrival time', () => {
+      useRealtimeTrains.mockReturnValue({
+        trains: [{ lineId: '2', direction: 'up', arrivalTime: null, finalDestination: '성수' }],
+      });
+      const { getByTestId } = renderRow({ isFirst: true });
+      expect(getByTestId('minutes')).toHaveTextContent('null');
+      expect(getByTestId('imminent')).toHaveTextContent('false');
+    });
+
+    it('skips a leading null-ETA train and uses the next known arrival', () => {
+      useRealtimeTrains.mockReturnValue({
+        trains: [
+          { lineId: '2', direction: 'up', arrivalTime: null, finalDestination: '성수' },
+          { lineId: '2', direction: 'up', arrivalTime: inSec(250), finalDestination: '홍대입구' },
+        ],
+      });
+      const { getByTestId } = renderRow();
+      expect(getByTestId('minutes')).toHaveTextContent('4');
+      expect(getByTestId('dest')).toHaveTextContent('홍대입구 방면');
+    });
+
+    it('still reports 0 minutes for a train that is genuinely arriving', () => {
+      useRealtimeTrains.mockReturnValue({
+        trains: [{ lineId: '2', direction: 'up', arrivalTime: inSec(20), finalDestination: '성수' }],
+      });
+      const { getByTestId } = renderRow({ isFirst: true });
+      expect(getByTestId('minutes')).toHaveTextContent('0');
+      expect(getByTestId('imminent')).toHaveTextContent('true');
+    });
   });
 
-  it('passes null (not 0) when no train has a known arrival time', () => {
-    useRealtimeTrains.mockReturnValue({
-      trains: [{ arrivalTime: null, finalDestination: '왕십리' }],
-    });
-    const { getByTestId } = renderRow(true);
-    expect(getByTestId('minutes')).toHaveTextContent('null');
-    expect(getByTestId('imminent')).toHaveTextContent('false');
-  });
+  describe("follows the favorite's line and saved direction", () => {
+    // 선릉 snapshot shape from the 2026-10-05 raw API: 수인분당(1075) + 2호선(1002).
+    const seolleungSnapshot = [
+      { lineId: '1075', direction: 'down', arrivalTime: inSec(0), finalDestination: '죽전' },
+      { lineId: '1002', direction: 'up', arrivalTime: inSec(30), finalDestination: '성수' },
+      { lineId: '1075', direction: 'up', arrivalTime: inSec(150), finalDestination: '왕십리' },
+      { lineId: '1002', direction: 'down', arrivalTime: inSec(270), finalDestination: '성수' },
+    ];
 
-  it('skips a leading null-ETA train and uses the next known arrival', () => {
-    useRealtimeTrains.mockReturnValue({
-      trains: [
-        { arrivalTime: null, finalDestination: '왕십리' },
-        { arrivalTime: new Date(Date.now() + 4 * 60_000 + 10_000), finalDestination: '인천' },
-      ],
+    it('ignores other lines at a transfer station (bundang slug vs 1075 subwayId)', () => {
+      useRealtimeTrains.mockReturnValue({ trains: seolleungSnapshot });
+      const { getByTestId } = renderRow({ lineId: 'bundang', direction: 'up' });
+      expect(getByTestId('minutes')).toHaveTextContent('2');
+      expect(getByTestId('dest')).toHaveTextContent('왕십리 방면');
     });
-    const { getByTestId } = renderRow();
-    expect(getByTestId('minutes')).toHaveTextContent('4');
-    expect(getByTestId('dest')).toHaveTextContent('인천 방면');
-  });
 
-  it('still reports 0 minutes for a train that is genuinely arriving', () => {
-    useRealtimeTrains.mockReturnValue({
-      trains: [{ arrivalTime: new Date(Date.now() + 20_000), finalDestination: '도봉산' }],
+    it('ignores the opposite direction when a direction is saved', () => {
+      useRealtimeTrains.mockReturnValue({ trains: seolleungSnapshot });
+      const { getByTestId } = renderRow({ lineId: '2', direction: 'down' });
+      expect(getByTestId('minutes')).toHaveTextContent('4');
     });
-    const { getByTestId } = renderRow(true);
-    expect(getByTestId('minutes')).toHaveTextContent('0');
-    expect(getByTestId('imminent')).toHaveTextContent('true');
+
+    it("considers both directions of the favorite's line when direction is 'both'", () => {
+      useRealtimeTrains.mockReturnValue({ trains: seolleungSnapshot });
+      const { getByTestId } = renderRow({ lineId: 'bundang', direction: 'both' });
+      expect(getByTestId('minutes')).toHaveTextContent('0');
+      expect(getByTestId('dest')).toHaveTextContent('죽전 방면');
+    });
+
+    it("falls back to the station's line when the favorite has no lineId", () => {
+      useRealtimeTrains.mockReturnValue({ trains: seolleungSnapshot });
+      const { getByTestId } = renderRow({ direction: 'up' });
+      expect(getByTestId('minutes')).toHaveTextContent('0');
+      expect(getByTestId('dest')).toHaveTextContent('성수 방면');
+    });
+
+    it('passes null when only other lines have trains', () => {
+      useRealtimeTrains.mockReturnValue({
+        trains: [{ lineId: '1002', direction: 'up', arrivalTime: inSec(30), finalDestination: '성수' }],
+      });
+      const { getByTestId } = renderRow({ lineId: 'bundang', direction: 'both' });
+      expect(getByTestId('minutes')).toHaveTextContent('null');
+    });
   });
 });
