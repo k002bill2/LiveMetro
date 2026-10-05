@@ -120,6 +120,53 @@ describe('selectPurgeableKeys', () => {
   });
 });
 
+describe('selectPurgeableKeys — 계정별 키', () => {
+  const DELETED = 'kakao:12';
+  const SURVIVOR = 'FEXFJHmSpCa4ZhhE3fI7x9th0xN2';
+  const scoped = (uid: string): string[] => [
+    `@livemetro/onboarding_complete_${uid}`,
+    `@livemetro/signup_celebration_seen_${uid}`,
+    `@livemetro/signup_terms_agreed_${uid}`,
+    `@livemetro_commute_reminders:${uid}`,
+  ];
+
+  it('삭제한 계정의 계정별 키 4종을 전부 파기한다', () => {
+    expect(selectPurgeableKeys(scoped(DELETED), DELETED)).toEqual(scoped(DELETED));
+  });
+
+  // 같은 기기의 다른 계정은 탈퇴하지 않았다 — 그 계정의 온보딩 완료·리마인더를
+  // 지우면 재로그인 시 온보딩이 다시 뜬다(2026-10-05 실기기 실측).
+  it('다른 계정의 계정별 키 4종은 보존한다', () => {
+    expect(selectPurgeableKeys(scoped(SURVIVOR), DELETED)).toEqual([]);
+  });
+
+  it('uid 비교는 정확 일치다 — 접두가 겹치는 uid를 혼동하지 않는다', () => {
+    expect(selectPurgeableKeys(scoped('kakao:123'), 'kakao:12')).toEqual([]);
+    expect(selectPurgeableKeys(scoped('kakao:12'), 'kakao:123')).toEqual([]);
+  });
+
+  it('uid 없는 맨 접두 키는 계정 귀속이 아니므로 파기한다', () => {
+    const bare = ['@livemetro/onboarding_complete', '@livemetro_commute_reminders:'];
+    expect(selectPurgeableKeys(bare, DELETED)).toEqual(bare);
+  });
+
+  it('기기 공용 키는 여전히 파기하고 보존 예외는 여전히 남긴다', () => {
+    const keys = [...ALL_KEYS, ...scoped(SURVIVOR), ...scoped(DELETED)];
+    const selected = selectPurgeableKeys(keys, DELETED);
+
+    expect(selected).toContain('@livemetro_last_location');
+    expect(selected).toEqual(expect.arrayContaining(scoped(DELETED)));
+    expect(selected).not.toContain('@livemetro_language');
+    expect(selected.filter((key) => key.includes(SURVIVOR))).toEqual([]);
+  });
+
+  it('삭제 uid를 모르면 계정별 키도 전부 파기한다(과삭제 쪽으로 안전)', () => {
+    const keys = [...scoped(SURVIVOR), ...scoped(DELETED)];
+    expect(selectPurgeableKeys(keys)).toEqual(keys);
+    expect(selectPurgeableKeys(keys, null)).toEqual(keys);
+  });
+});
+
 describe('purgeLocalUserData', () => {
   let getAllKeysSpy: jest.SpyInstance;
   let multiRemoveSpy: jest.SpyInstance;
@@ -171,6 +218,21 @@ describe('purgeLocalUserData', () => {
     await purgeLocalUserData();
 
     expect(mockDisableBiometricLogin).toHaveBeenCalledTimes(1);
+  });
+
+  it('삭제 uid를 받으면 다른 계정의 계정별 키를 남기고 지운다', async () => {
+    getAllKeysSpy.mockResolvedValue([
+      '@livemetro/onboarding_complete_gone-uid',
+      '@livemetro/onboarding_complete_other-uid',
+      '@livemetro_last_location',
+    ]);
+
+    await purgeLocalUserData('gone-uid');
+
+    expect(multiRemoveSpy).toHaveBeenCalledWith([
+      '@livemetro/onboarding_complete_gone-uid',
+      '@livemetro_last_location',
+    ]);
   });
 
   it('지울 키가 없으면 multiRemove를 호출하지 않는다', async () => {

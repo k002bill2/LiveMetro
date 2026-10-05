@@ -12,7 +12,7 @@
  */
 
 import { httpsCallable, FunctionsError } from 'firebase/functions';
-import { functions } from '@/services/firebase/config';
+import { auth, functions } from '@/services/firebase/config';
 import { purgeLocalUserData } from '@/services/account/localDataPurge';
 
 interface DeleteAccountResponse {
@@ -70,6 +70,9 @@ const mapCallableError = (error: unknown): string => {
  */
 export const deleteAccountAndPurgeLocalData =
   async (): Promise<AccountDeletionResult> => {
+    // 호출 **전에** 잡는다 — 서버가 계정을 지운 뒤에는 클라 auth 상태가
+    // 비워질 수 있고, 그러면 다른 계정의 로컬 키까지 지우는 폴백으로 떨어진다.
+    const deletedUid = auth.currentUser?.uid ?? null;
     try {
       const callable = httpsCallable<void, DeleteAccountResponse>(
         functions,
@@ -82,7 +85,7 @@ export const deleteAccountAndPurgeLocalData =
       return { success: false, error: mapCallableError(error) };
     }
 
-    const purge = await purgeLocalUserData();
+    const purge = await purgeLocalUserData(deletedUid);
     if (purge.hadFailure) {
       logFailure('Local purge incomplete after account deletion');
     }

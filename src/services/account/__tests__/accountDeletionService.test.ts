@@ -16,9 +16,13 @@ jest.mock('firebase/functions', () => ({
   httpsCallable: (...args: unknown[]) => mockHttpsCallable(...args),
 }));
 
+const mockAuth: { currentUser: { uid: string } | null } = { currentUser: null };
+
 jest.mock('@/services/firebase/config', () => ({
   __esModule: true,
-  auth: { currentUser: null },
+  get auth() {
+    return mockAuth;
+  },
   firestore: {},
   functions: {},
 }));
@@ -41,6 +45,7 @@ describe('deleteAccountAndPurgeLocalData', () => {
   });
 
   afterEach(() => {
+    mockAuth.currentUser = null;
     jest.clearAllMocks();
     errorSpy.mockRestore();
   });
@@ -68,6 +73,28 @@ describe('deleteAccountAndPurgeLocalData', () => {
 
     expect(mockPurgeLocalUserData).toHaveBeenCalledTimes(1);
     expect(result).toEqual({ success: true });
+  });
+
+  it('호출 직전의 uid를 로컬 파기에 넘긴다', async () => {
+    mockAuth.currentUser = { uid: 'kakao:123' };
+
+    await deleteAccountAndPurgeLocalData();
+
+    expect(mockPurgeLocalUserData).toHaveBeenCalledWith('kakao:123');
+  });
+
+  // 서버가 계정을 지운 뒤에는 클라 auth 상태가 비워질 수 있다. 그때 currentUser를
+  // 읽으면 null → 계정 구분 없이 전부 지우는 폴백으로 조용히 떨어진다.
+  it('callable 이후 currentUser가 비워져도 호출 전 uid로 파기한다', async () => {
+    mockAuth.currentUser = { uid: 'gone-uid' };
+    mockCallable.mockImplementation(async () => {
+      mockAuth.currentUser = null;
+      return { data: { success: true } };
+    });
+
+    await deleteAccountAndPurgeLocalData();
+
+    expect(mockPurgeLocalUserData).toHaveBeenCalledWith('gone-uid');
   });
 
   it('서버 파기 실패 시 로컬 데이터를 건드리지 않는다', async () => {

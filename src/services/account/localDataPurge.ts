@@ -4,11 +4,12 @@
  * 계정 삭제 시 기기에 남는 개인 데이터를 파기한다. 서버 파기(deleteAccount
  * Cloud Function)가 성공한 뒤에만 호출한다.
  *
- * **키를 나열하지 않는다**: AsyncStorage는 `getAllKeys()`로 열거한 뒤
+ * **파기 대상을 나열하지 않는다**: AsyncStorage는 `getAllKeys()`로 열거한 뒤
  * `@livemetro` 접두(대소문자 무시 — `@LiveMetro:` 형태의 키가 실제로
- * 존재한다)로 거르고 보존 예외만 제외한다. 새 기능이 새 키를 만들어도
+ * 존재한다)로 거르고 보존 쪽만 나열한다. 새 기능이 새 키를 만들어도
  * 자동으로 파기 대상에 포함되므로, 키 추가를 잊어 개인정보가 남는
- * 클래스의 버그가 구조적으로 생기지 않는다.
+ * 클래스의 버그가 구조적으로 생기지 않는다. 보존 쪽 목록(기기 선호, 다른
+ * 계정의 계정별 키)은 빠뜨려도 **과삭제**로 끝날 뿐 잔존은 생기지 않는다.
  *
  * SecureStore는 열거 API가 없고 키에 공통 접두도 없어 명시 나열이
  * 불가피하다(아래 상수 주석에 정의 위치를 남긴다).
@@ -41,6 +42,34 @@ const PRESERVED_KEYS: readonly string[] = [
 ];
 
 /**
+ * uid를 뒤에 붙여 만드는 계정별 키의 접두(정의: OnboardingContext.tsx,
+ * commuteReminderService.ts).
+ *
+ * 같은 기기의 **다른 계정**은 탈퇴하지 않았으므로 그 계정의 키는 남긴다 —
+ * 지우면 그 계정으로 재로그인할 때 온보딩이 다시 뜨고 출퇴근 리마인더가
+ * 사라진다. 나머지 기기 공용 키는 어느 계정 것인지 알 수 없어 계속 파기한다.
+ */
+const ACCOUNT_SCOPED_KEY_PREFIXES: readonly string[] = [
+  '@livemetro/onboarding_complete_',
+  '@livemetro/signup_celebration_seen_',
+  '@livemetro/signup_terms_agreed_',
+  '@livemetro_commute_reminders:',
+];
+
+/**
+ * 삭제한 계정이 아닌 **다른 계정**의 계정별 키인가.
+ *
+ * uid는 정확 일치로 비교한다 — `kakao:12`와 `kakao:123`처럼 접두가 겹치는
+ * uid가 있고, `commute_reminders:` 키의 uid에는 콜론이 들어간다.
+ */
+const isOtherAccountScopedKey = (key: string, deletedUid: string): boolean =>
+  ACCOUNT_SCOPED_KEY_PREFIXES.some((prefix) => {
+    if (!key.startsWith(prefix)) return false;
+    const ownerUid = key.slice(prefix.length);
+    return ownerUid.length > 0 && ownerUid !== deletedUid;
+  });
+
+/**
  * SecureStore 자격증명 키.
  *
  * 자동 로그인: AuthScreen.tsx / EmailLoginScreen.tsx / SettingsScreen.tsx에
@@ -65,12 +94,17 @@ export interface LocalPurgeResult {
  * 파기 대상 AsyncStorage 키를 고른다. 순수 함수로 분리해 테스트한다.
  *
  * @param allKeys `AsyncStorage.getAllKeys()` 결과
+ * @param deletedUid 삭제한 계정의 uid. 모르면(null) 계정별 키도 전부 파기한다.
  */
-export const selectPurgeableKeys = (allKeys: readonly string[]): readonly string[] =>
+export const selectPurgeableKeys = (
+  allKeys: readonly string[],
+  deletedUid: string | null = null,
+): readonly string[] =>
   allKeys.filter(
     (key) =>
       key.toLowerCase().startsWith(PERSONAL_KEY_PREFIX) &&
-      !PRESERVED_KEYS.includes(key),
+      !PRESERVED_KEYS.includes(key) &&
+      !(deletedUid !== null && isOtherAccountScopedKey(key, deletedUid)),
   );
 
 /** 진단 로그는 개발 빌드에서만 — 프로덕션 콘솔에 파기 실패 흔적을 남기지 않는다. */
@@ -87,7 +121,9 @@ const logFailure = (message: string, error?: unknown): void => {
  * 끝난 뒤라 SecureStore 한 건의 오류로 흐름을 중단하면 사용자가 삭제된
  * 계정의 자격증명을 기기에 남긴 채 멈춘다.
  */
-export const purgeLocalUserData = async (): Promise<LocalPurgeResult> => {
+export const purgeLocalUserData = async (
+  deletedUid: string | null = null,
+): Promise<LocalPurgeResult> => {
   let hadFailure = false;
   let removedKeyCount = 0;
 
@@ -118,7 +154,7 @@ export const purgeLocalUserData = async (): Promise<LocalPurgeResult> => {
 
   try {
     const allKeys = await AsyncStorage.getAllKeys();
-    const targets = selectPurgeableKeys(allKeys);
+    const targets = selectPurgeableKeys(allKeys, deletedUid);
     if (targets.length > 0) {
       await AsyncStorage.multiRemove([...targets]);
     }
