@@ -165,7 +165,7 @@ export const DelayFeedScreen: React.FC = () => {
       style={styles.container}
       edges={isPushedOnRootStack ? ['left', 'right'] : ['top']}
     >
-      {/* Header — Phase 4 redesign: 28px title + round add button */}
+      {/* Header — Phase 4 redesign: heading1 title + round add button */}
       <View style={[styles.header, isPushedOnRootStack && styles.headerCompact]}>
         <View style={styles.headerTitleWrap}>
           {!isPushedOnRootStack && (
@@ -255,11 +255,13 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       flex: 1,
     },
     headerTitle: {
-      fontSize: 28,
+      fontSize: WANTED_TOKENS.type.heading1.size,
+      lineHeight: WANTED_TOKENS.type.heading1.lh,
       fontWeight: '800',
       fontFamily: weightToFontFamily('800'),
       color: semantic.labelStrong,
-      letterSpacing: -0.6,
+      letterSpacing:
+        WANTED_TOKENS.type.heading1.size * WANTED_TOKENS.type.heading1.tracking,
     },
     headerSubtitle: {
       fontSize: 13,

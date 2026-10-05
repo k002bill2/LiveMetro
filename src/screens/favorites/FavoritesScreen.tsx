@@ -715,8 +715,8 @@ const createStyles = (semantic: WantedSemanticTheme) =>
       alignItems: 'center',
     },
     headerTitle: {
-      fontSize: WANTED_TOKENS.type.title2.size,
-      lineHeight: WANTED_TOKENS.type.title2.lh,
+      fontSize: WANTED_TOKENS.type.heading1.size,
+      lineHeight: WANTED_TOKENS.type.heading1.lh,
       fontWeight: '800',
       fontFamily: weightToFontFamily('800'),
       color: semantic.labelStrong,

@@ -493,6 +493,9 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <SafeAreaView edges={['top']} style={styles.container}>
       <ScrollView style={styles.content} testID="settings-screen">
+        <Text style={styles.screenTitle} accessibilityRole="header">
+          {t.settings.title}
+        </Text>
         {/* User Profile Section — Phase 42 (SE1): gradient avatar + 이니셜
             + 누적 횟수. 카드 전체 onPress가 EditProfile로 이동하므로
             별도 Pencil 버튼 대신 chevron-right만 표시 (번들 매칭). */}
@@ -813,6 +816,15 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     },
     content: {
       flex: 1,
+    },
+    screenTitle: {
+      fontSize: WANTED_TOKENS.type.heading1.size,
+      lineHeight: WANTED_TOKENS.type.heading1.lh,
+      fontFamily: weightToFontFamily('800'),
+      color: semantic.labelStrong,
+      paddingHorizontal: WANTED_TOKENS.spacing.s4,
+      paddingTop: WANTED_TOKENS.spacing.s4,
+      paddingBottom: WANTED_TOKENS.spacing.s4,
     },
     section: {
       marginBottom: WANTED_TOKENS.spacing.s5,
