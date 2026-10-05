@@ -552,6 +552,36 @@ describe('StationDetailScreen', () => {
   // 결함 #1 회귀: 도착 카드의 "초" 카운트다운이 폴링(30초) 사이 멈춰 false
   // precision을 유발하던 버그. arrivalViews가 폴링 시에만 재계산되면 초 표시가
   // 얼어붙는다 — StationDetailScreen의 1Hz tick이 매초 재계산하는지 검증.
+  describe('unknown ETA (arrivalTime null)', () => {
+    // 2026-10-05 SM-N971N: 선릉 수인분당 4 trains all read "곧 도착" because
+    // trainToArrival mapped arrivalTime null (arvlCd 99) to 0 seconds.
+    it('renders "운행 중" for a train with no arrival time, not "곧 도착"', () => {
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: [{ ...buildTrain({ id: 'unknown', finalDestination: '왕십리' }), arrivalTime: null }],
+        loading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+      const { getByTestId } = render(<StationDetailScreen />);
+      const card = within(getByTestId('station-detail-arrival-0'));
+      expect(card.getByText('운행 중')).toBeTruthy();
+      expect(card.queryByText('곧 도착')).toBeNull();
+    });
+
+    it('keeps the countdown for a train with a known arrival time', () => {
+      mockedUseRealtimeTrains.mockReturnValue({
+        trains: [buildTrain({ id: 'known', minutesAway: 3 })],
+        loading: false,
+        error: null,
+        refetch: jest.fn(),
+      });
+      const { getByTestId } = render(<StationDetailScreen />);
+      const card = within(getByTestId('station-detail-arrival-0'));
+      expect(card.queryByText('운행 중')).toBeNull();
+      expect(card.getByText('분')).toBeTruthy();
+    });
+  });
+
   describe('1Hz arrival countdown tick', () => {
     const trainAt = (secondsAway: number) => ({
       id: 'tick-train',

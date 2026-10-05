@@ -94,21 +94,27 @@ interface ArrivalView {
   destination: string;
   minutes: number;
   seconds: number;
+  /** false when arrivalTime is null (ETA unknown, e.g. arvlCd 99). */
+  hasEta: boolean;
   delayMinutes: number;
 }
 
 const REFETCH_INTERVAL_MS = 30_000;
 
 const trainToArrival = (train: Train, now: number): ArrivalView => {
-  const total = train.arrivalTime
-    ? Math.max(0, Math.floor((train.arrivalTime.getTime() - now) / 1000))
-    : 0;
+  // null = ETA unknown — must not collapse to 0s, which ArrivalCard reads as "곧 도착".
+  const hasEta = train.arrivalTime !== null;
+  const total =
+    train.arrivalTime !== null
+      ? Math.max(0, Math.floor((train.arrivalTime.getTime() - now) / 1000))
+      : 0;
   return {
     id: train.id,
     line: train.lineId as LineId,
     destination: train.finalDestination,
     minutes: Math.floor(total / 60),
     seconds: total % 60,
+    hasEta,
     delayMinutes: train.delayMinutes ?? 0,
   };
 };
@@ -558,6 +564,7 @@ const StationDetailScreen: React.FC = () => {
                 destination={arrival.destination}
                 minutes={arrival.minutes}
                 seconds={arrival.seconds}
+                hasEta={arrival.hasEta}
                 delayMinutes={arrival.delayMinutes}
                 isFirst={idx === 0}
                 carCongestion={idx === 0 ? carCongestionPct : undefined}

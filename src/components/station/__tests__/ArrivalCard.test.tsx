@@ -31,6 +31,24 @@ describe('ArrivalCard', () => {
     expect(getByText('30초')).toBeTruthy();
   });
 
+  describe('unknown ETA (hasEta=false)', () => {
+    it('renders "운행 중" instead of a countdown or "곧 도착"', () => {
+      const { getByText, queryByText } = render(
+        <ArrivalCard {...base} minutes={0} seconds={0} hasEta={false} />
+      );
+      expect(getByText('운행 중')).toBeTruthy();
+      expect(queryByText('곧 도착')).toBeNull();
+      expect(queryByText('분')).toBeNull();
+    });
+
+    it('never shows the "곧 도착" badge on the first card', () => {
+      const { queryByText } = render(
+        <ArrivalCard {...base} minutes={0} seconds={0} hasEta={false} isFirst />
+      );
+      expect(queryByText('곧 도착')).toBeNull();
+    });
+  });
+
   it('does not show "곧 도착" on a non-first card even when imminent', () => {
     const { queryByText } = render(<ArrivalCard {...base} minutes={0} seconds={30} />);
     expect(queryByText('곧 도착')).toBeNull();
