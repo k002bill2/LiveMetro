@@ -91,8 +91,11 @@ export const config: Partial<Options.Testrunner> = {
       // Take screenshot on failure. 디렉토리는 gitignored라 CI 체크아웃에
       // 존재하지 않으므로 먼저 만들어야 저장이 성공한다 (run 31722635217 실증).
       mkdirSync('./e2e/screenshots', { recursive: true });
-      const testParent = test.parent || 'unknown';
-      const testTitle = test.title || 'unknown';
+      // 제목의 '/' 등은 경로 구분자로 해석돼 ENOENT로 저장이 실패한다
+      // (run 38173611957: '도착/빈/에러' 제목 → 스크린샷 유실).
+      const toFileSafe = (s: string): string => s.replace(/[/\\:*?"<>|]/g, '_');
+      const testParent = toFileSafe(test.parent || 'unknown');
+      const testTitle = toFileSafe(test.title || 'unknown');
       await browser.saveScreenshot(
         `./e2e/screenshots/${testParent}-${testTitle}-${Date.now()}.png`
       );
