@@ -78,8 +78,14 @@ class StationDetailPage extends BasePage {
    * 어느 상태로 끝날지는 실행 시각과 Seoul API 응답에 달려 있어 단정할 수
    * 없다 — nightly(KST 02시)는 운행 종료 시간대라 보통 empty다. spec은
    * "세 상태 중 하나에 결정적으로 도달한다"는 계약만 단언한다.
+   *
+   * 기본 90s 근거 — run 38173611957에서 30s로 두 번 모두 loading에 머문 채
+   * 타임아웃했다. 앱의 재시도(withRetry: 10s timeout × 3 + 백오프)·auth
+   * 스로틀·폴링 경로가 30s budget보다 길어질 수 있어 여유를 둔 값이다.
+   * 그 run의 실제 실패 원인은 logcat이 없어 미확인이다.
+   * withRetry 예산이나 폴링 간격을 바꾸면 이 값도 함께 맞출 것.
    */
-  async waitForArrivalState(timeout = 30000): Promise<ArrivalState> {
+  async waitForArrivalState(timeout = 90000): Promise<ArrivalState> {
     const deadline = Date.now() + timeout;
     while (Date.now() < deadline) {
       if (await this.elementExists('station-detail-arrival-0')) {
@@ -93,8 +99,10 @@ class StationDetailPage extends BasePage {
       }
       await browser.pause(500);
     }
+    // loading 패널 존재 여부를 남겨 "로딩 정체"와 "다른 화면이 덮음"을 구분한다.
+    const stillLoading = await this.elementExists('station-detail-loading');
     throw new Error(
-      `waitForArrivalState: ${timeout}ms 내에 도착/빈/에러 상태에 도달하지 못했습니다`
+      `waitForArrivalState: ${timeout}ms 내에 도착/빈/에러 상태에 도달하지 못했습니다 (loading 패널 ${stillLoading ? '표시 중' : '없음'})`
     );
   }
 }
