@@ -197,8 +197,6 @@ TrainArrivalList (List Container)
 ## Related Documentation
 
 - [Component Guidelines](.claude/skills/react-native-development/SKILL.md)
-- [Project Architecture](../../vooster-docs/architecture.md)
-- [Clean Code Guidelines](../../vooster-docs/clean-code.md)
 - [Color Utilities](../../utils/colorUtils.ts)
 
 ---
