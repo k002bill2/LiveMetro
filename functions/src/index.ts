@@ -12,7 +12,8 @@ import {
 } from 'firebase-functions/v2/https';
 import { defineString } from 'firebase-functions/params';
 import { emailService } from './services/emailService';
-import { getUserById, isEmailNotificationEnabled } from './services/userService';
+import { isEmailOptedIn } from './services/userService';
+import { resolveRecipientForUid } from './services/emailRecipient';
 import {
   verifyKakaoAccessToken,
   upsertKakaoFirebaseUser,
@@ -121,8 +122,9 @@ export const sendEmailNotification = functions
         );
       }
 
-      // 3. Check if email notifications are enabled for this user
-      const isEnabled = await isEmailNotificationEnabled(uid);
+      // 3. Check opt-in preferences (Firestore prefs only — the doc's
+      //    client-writable email/isAnonymous fields are NOT trusted)
+      const isEnabled = await isEmailOptedIn(uid);
       if (!isEnabled) {
         return {
           success: false,
@@ -130,30 +132,29 @@ export const sendEmailNotification = functions
         };
       }
 
-      // 4. Get user data
-      const user = await getUserById(uid);
-      if (!user || !user.email) {
-        return {
-          success: false,
-          error: '사용자 이메일을 찾을 수 없습니다.',
-        };
+      // 4. Resolve recipient ONLY from Firebase Auth (verified email required)
+      const recipient = await resolveRecipientForUid(uid, (authUid) =>
+        admin.auth().getUser(authUid)
+      );
+      if (!recipient.ok) {
+        return { success: false, error: recipient.error };
       }
 
       // 5. Send email
       const result = await emailService.sendNotification(
-        user.email,
+        recipient.email,
         data.type,
         data.data || {}
       );
 
-      // 6. Log the result
+      // 6. Log the result (uid only — no email address in logs)
       if (result.success) {
         console.log(
-          `Email sent successfully to ${user.email} (type: ${data.type}, messageId: ${result.messageId})`
+          `Email sent successfully (uid: ${uid}, type: ${data.type}, messageId: ${result.messageId})`
         );
       } else {
         console.error(
-          `Email send failed for ${user.email} (type: ${data.type}, error: ${result.error})`
+          `Email send failed (uid: ${uid}, type: ${data.type}, error: ${result.error})`
         );
       }
 

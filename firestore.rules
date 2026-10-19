@@ -19,7 +19,12 @@ service cloud.firestore {
       allow update: if request.auth != null
         && request.auth.uid == userId
         && !('role' in request.resource.data.diff(resource.data).affectedKeys())
-        && !('isAdmin' in request.resource.data.diff(resource.data).affectedKeys());
+        && !('isAdmin' in request.resource.data.diff(resource.data).affectedKeys())
+        // email/isAnonymous are identity fields owned by Firebase Auth; the
+        // client never rewrites them after create (AuthContext), and server
+        // code must not trust a user-edited copy (F-02).
+        && !request.resource.data.diff(resource.data).affectedKeys()
+          .hasAny(['email', 'isAnonymous']);
       allow delete: if false;
     }
 
