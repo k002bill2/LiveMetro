@@ -52,7 +52,8 @@
     "e2e:android": "wdio e2e/config/wdio.android.conf.ts",
     "e2e:ios": "wdio e2e/config/wdio.ios.conf.ts",
     "e2e:mock-server": "json-server --watch e2e/data/mock-db.json --port 3001",
-    "e2e:report": "allure generate e2e/reports/allure-results --clean -o e2e/reports/allure-report && allure open e2e/reports/allure-report"
+    "e2e:report": "allure generate e2e/reports/allure-results --clean -o e2e/reports/allure-report && allure open e2e/reports/allure-report",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-livemetro \"node --test --test-concurrency=1 firestore-tests/*.test.mjs\""
   },
   "dependencies": {
     "@expo/ngrok": "^4.1.3",

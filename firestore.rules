@@ -91,9 +91,21 @@ service cloud.firestore {
     match /delayReports/{reportId} {
       allow read: if true;
 
-      // Only authenticated users can create, must set own userId
+      // Only authenticated users can create, must set own userId.
+      // Field allowlist mirrors delayReportService.submitReport(); a client can
+      // never mint `status`/`verified`/upvotes (push fan-out is driven by the
+      // server-only verifiedDelays marker, never by this collection).
       allow create: if request.auth != null
-        && request.resource.data.userId == request.auth.uid;
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'userId', 'userDisplayName', 'lineId', 'stationId', 'stationName',
+          'reportType', 'severity', 'description', 'estimatedDelayMinutes',
+          'direction', 'timestamp', 'upvotes', 'upvotedBy', 'verified',
+          'active', 'updatedAt'
+        ])
+        && request.resource.data.verified == false
+        && request.resource.data.upvotes == 0
+        && !('status' in request.resource.data);
 
       // Upvote: any authenticated user can update only vote-related fields
       allow update: if request.auth != null
@@ -160,6 +172,12 @@ service cloud.firestore {
 
     // Push dedup markers - server-only (Cloud Functions). Clients never touch.
     match /pushDedup/{reportId} {
+      allow read, write: if false;
+    }
+
+    // Verified-delay push markers - server-only (Admin SDK). Creating a doc here
+    // fires onDelayReportVerified; clients must never be able to mint one.
+    match /verifiedDelays/{reportId} {
       allow read, write: if false;
     }
 }

@@ -9,7 +9,7 @@ import * as admin from 'firebase-admin';
 import { pushNotificationService } from '../services/pushNotificationService';
 import { tokenManagementService } from '../services/tokenManagementService';
 import { expoPushService } from '../services/expoPushService';
-import { processDelayReport, DelayReportData } from './delayPushLogic';
+import { processDelayReport } from './delayPushLogic';
 
 const db = admin.firestore();
 
@@ -54,17 +54,23 @@ interface CommuteSchedule {
 // ============================================================================
 
 /**
- * Trigger when a delay report is verified → push to users subscribed to the
- * line (pushTokens.lines array-contains). v2 (onDocumentWritten) + reportId
- * idempotency (pushDedup). Logic lives in `processDelayReport` (delayPushLogic);
- * this wrapper only injects the Firestore/Expo implementations.
+ * Trigger when a server-only `verifiedDelays/{reportId}` marker is created →
+ * push to users subscribed to the line (pushTokens.lines array-contains).
+ *
+ * Deliberately NOT on client-writable `delayReports` (security finding F-01:
+ * a client could create a report with `status:'verified'` and push its own
+ * text to every line subscriber). The marker is written only by the Admin
+ * SDK; only its `lineId` / `delayMinutes` are read and push copy comes from
+ * the server line table. v2 (onDocumentWritten) + reportId idempotency
+ * (pushDedup). Logic lives in `processDelayReport` (delayPushLogic); this
+ * wrapper only injects the Firestore/Expo implementations.
  */
 export const onDelayReportVerified = onDocumentWritten(
-  { document: 'delayReports/{reportId}', region: 'asia-northeast3' },
+  { document: 'verifiedDelays/{reportId}', region: 'asia-northeast3' },
   async (event) => {
     const reportId = event.params.reportId;
-    const before = event.data?.before.data() as DelayReportData | undefined;
-    const after = event.data?.after.data() as DelayReportData | undefined;
+    const before = event.data?.before.data();
+    const after = event.data?.after.data();
 
     await processDelayReport(reportId, before, after, {
       queryTokensByLine: async (lineId) => {
