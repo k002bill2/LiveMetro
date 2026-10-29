@@ -6,6 +6,7 @@
 import {
   collection,
   doc,
+  getDoc,
   addDoc,
   updateDoc,
   deleteDoc,
@@ -178,6 +179,23 @@ class DelayReportService {
         callback([]);
       }
     );
+  }
+
+  /**
+   * Read a single report. Returns null when it does not exist or the read
+   * fails — callers use this to re-sync local state, never to gate a write.
+   */
+  async getReport(reportId: string): Promise<DelayReport | null> {
+    try {
+      const snapshot = await getDoc(doc(db, COLLECTION_NAME, reportId));
+      return snapshot.exists() ? this.docToReport(snapshot) : null;
+    } catch (error) {
+      if (__DEV__) {
+        // eslint-disable-next-line no-console
+        console.error('getReport failed:', error);
+      }
+      return null;
+    }
   }
 
   /**

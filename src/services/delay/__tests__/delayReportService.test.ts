@@ -13,6 +13,7 @@ jest.mock('@/services/firebase/config', () => ({
 // Mock Firestore functions
 const mockAddDoc = jest.fn();
 const mockGetDocs = jest.fn();
+const mockGetDoc = jest.fn();
 const mockUpdateDoc = jest.fn();
 const mockDeleteDoc = jest.fn();
 const mockOnSnapshot = jest.fn();
@@ -22,6 +23,7 @@ jest.mock('firebase/firestore', () => ({
   doc: jest.fn(() => 'mockDocRef'),
   addDoc: (...args: unknown[]) => mockAddDoc(...args),
   getDocs: (...args: unknown[]) => mockGetDocs(...args),
+  getDoc: (...args: unknown[]) => mockGetDoc(...args),
   updateDoc: (...args: unknown[]) => mockUpdateDoc(...args),
   deleteDoc: (...args: unknown[]) => mockDeleteDoc(...args),
   onSnapshot: (...args: unknown[]) => mockOnSnapshot(...args),
@@ -74,6 +76,31 @@ describe('DelayReportService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  describe('getReport', () => {
+    it('returns the mapped report when the document exists', async () => {
+      mockGetDoc.mockResolvedValue({ ...mockReportDoc, exists: () => true });
+
+      const result = await delayReportService.getReport('report-123');
+
+      expect(result?.id).toBe('report-123');
+      expect(result?.upvotes).toBe(5);
+    });
+
+    it('returns null when the document does not exist', async () => {
+      mockGetDoc.mockResolvedValue({ id: 'missing', exists: () => false, data: () => undefined });
+
+      await expect(delayReportService.getReport('missing')).resolves.toBeNull();
+    });
+
+    it('returns null instead of throwing when the read fails', async () => {
+      const errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+      mockGetDoc.mockRejectedValue(new Error('unavailable'));
+
+      await expect(delayReportService.getReport('report-123')).resolves.toBeNull();
+      errorSpy.mockRestore();
+    });
   });
 
   describe('submitReport', () => {
