@@ -31,12 +31,19 @@ const car = (carNumber, overrides = {}) => ({
   lastUpdated: Timestamp.fromDate(new Date()), ...overrides,
 });
 
+/**
+ * Mirrors aggregateCarCongestion(): always TRAIN_CAR_COUNT (10) cars from
+ * createEmptyCarCongestions(); unreported cars stay level 'low', reportCount 0.
+ */
+const realCars = (reported = { 3: { congestionLevel: 'high', reportCount: 1 } }) =>
+  Array.from({ length: 10 }, (_, i) => car(i + 1, { congestionLevel: 'low', reportCount: 0, ...(reported[i + 1] || {}) }));
+
 /** Mirrors congestionService.updateSummaryFromReport() summaryData. */
 const legitSummary = (overrides = {}) => ({
   trainId: '2041',
   lineId: '2',
   direction: 'up',
-  cars: [car(3, { congestionLevel: 'high' })],
+  cars: realCars(),
   overallLevel: 'high',
   reportCount: 1,
   lastUpdated: Timestamp.fromDate(new Date()),
@@ -96,10 +103,11 @@ describe('congestionSummary writes (F-03)', () => {
   after(cleanup);
   const ref = (uid, id = SUMMARY_ID) => doc(dbAs(uid), 'congestionSummary', id);
 
-  it('allows the legit create and full-overwrite update', async () => {
+  it('allows the legit create and full-overwrite update (10 cars, unreported = 0)', async () => {
     await assertSucceeds(setDoc(ref('alice'), legitSummary()));
     await assertSucceeds(setDoc(ref('bob'), legitSummary({
-      cars: [car(3, { congestionLevel: 'high', reportCount: 2 }), car(10)], reportCount: 3,
+      cars: realCars({ 3: { congestionLevel: 'high', reportCount: 2 }, 10: { congestionLevel: 'moderate', reportCount: 1 } }),
+      reportCount: 3,
     })));
   });
 
@@ -126,6 +134,7 @@ describe('congestionSummary writes (F-03)', () => {
   it('denies out-of-range reportCount', async () => {
     await assertDenied(setDoc(ref('mallory'), legitSummary({ reportCount: 99999 })));
     await assertDenied(setDoc(ref('mallory'), legitSummary({ reportCount: -1 })));
+    await assertDenied(setDoc(ref('mallory'), legitSummary({ cars: realCars({ 3: { reportCount: -1 } }) })));
   });
 
   it('denies more than 10 cars', async () => {

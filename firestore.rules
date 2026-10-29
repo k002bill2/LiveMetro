@@ -102,13 +102,14 @@ service cloud.firestore {
     }
 
     // Kept lean: a 10-car summary must stay under the 1000-expression budget
-    // per rule evaluation (exact keys = hasOnly + size).
+    // per rule evaluation (exact keys = hasOnly + size). Unreported cars keep
+    // reportCount 0 (createEmptyCarCongestions), so 0 is a legit value.
     function isValidCar(c) {
       return c.keys().hasOnly(['carNumber', 'congestionLevel', 'reportCount', 'lastUpdated'])
         && c.size() == 4
         && isCarNumber(c.carNumber)
         && isCongestionLevel(c.congestionLevel)
-        && isReportCount(c.reportCount, 1)
+        && isReportCount(c.reportCount, 0)
         && c.lastUpdated is timestamp;
     }
 
