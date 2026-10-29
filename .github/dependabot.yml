@@ -16,3 +16,54 @@ updates:
       actions:
         patterns:
           - "*"
+
+  # npm 의존성(F-09) — 루트 RN 앱과 functions/ 는 lockfile 이 따로라 항목을 분리한다.
+  # 그룹 정책: minor+patch 는 한 PR 로 묶고, major 는 별도 그룹으로 분리해 소음을 줄인다.
+  # major 를 ignore 하지 않는 이유: ignore 는 보안 패치 경로까지 가릴 수 있어 F-09 의 목적
+  # (수정 가능한 취약점이 자동으로 올라오는 것)과 충돌한다 — 묶어서 보이게만 하고 판단은 사람이 한다.
+  # 주의(루트): expo / react-native 계열 major 는 Expo SDK 에 묶여 있어 Dependabot PR 로 올리지 말고
+  # `npx expo install --fix` 로 SDK 단위 업그레이드한다. 또 루트 package.json·lockfile 변경은
+  # main 머지 시 preview-ota.yml 을 트리거하므로, 네이티브 모듈이 바뀌는 PR 은 OTA 대신 빌드가 필요하다.
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+    groups:
+      npm-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+      npm-major:
+        patterns:
+          - "*"
+        update-types:
+          - "major"
+
+  # Firebase Functions(Node 20) — main 머지 시 firebase-deploy.yml 이 자동 배포하므로
+  # 머지 전 functions 빌드·테스트 통과를 반드시 확인한다.
+  - package-ecosystem: "npm"
+    directory: "/functions"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+    groups:
+      functions-minor-patch:
+        patterns:
+          - "*"
+        update-types:
+          - "minor"
+          - "patch"
+      functions-major:
+        patterns:
+          - "*"
+        update-types:
+          - "major"
