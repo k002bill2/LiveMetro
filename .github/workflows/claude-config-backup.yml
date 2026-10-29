@@ -15,9 +15,15 @@ on:
     paths:
       - '.claude/**'
 
+# 최소 권한(F-12): 기본은 읽기 전용, git push 하는 backup job 에만 쓰기 권한.
+permissions:
+  contents: read
+
 jobs:
   backup:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # schedule 실행 시 .claude-backups/ 커밋 후 git push
 
     steps:
       - name: Checkout repository

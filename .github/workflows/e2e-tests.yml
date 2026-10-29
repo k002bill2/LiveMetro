@@ -33,6 +33,10 @@ on:
           - ios
           - both
 
+# 최소 권한(F-12): checkout·cache·upload-artifact 만 쓰고 저장소에 쓰지 않는다.
+permissions:
+  contents: read
+
 jobs:
   e2e-android:
     if: >
@@ -80,6 +84,9 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          # push 하지 않는다 — npm ci 로 실행되는 의존성이 토큰을 재사용하지 못하게 한다(F-12).
+          persist-credentials: false
 
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0

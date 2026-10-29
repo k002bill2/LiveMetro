@@ -11,7 +11,12 @@ on:
       force:
         description: '강제 업데이트 (30일 대기 무시)'
         required: false
-        default: 'false'
+        type: boolean
+        default: false
+
+# 최소 권한(F-12): 기본은 읽기 전용, 쓰기는 아래 job 레벨에서만 부여.
+permissions:
+  contents: read
 
 jobs:
   update-skills-guide:
@@ -35,9 +40,13 @@ jobs:
       - name: 📦 Install dependencies
         run: npm ci
 
+      # 입력은 run: 본문에 ${{ }} 로 보간하지 않고 env: 로 넘긴다(F-12 스크립트 인젝션 차단).
+      # schedule 실행에서는 inputs 가 없어 빈 문자열 → else 분기.
       - name: 🔍 Run Skills Guide Updater
+        env:
+          FORCE: ${{ inputs.force }}
         run: |
-          if [ "${{ github.event.inputs.force }}" = "true" ]; then
+          if [ "$FORCE" = "true" ]; then
             npx ts-node scripts/skillsGuideUpdater.ts --force
           else
             npx ts-node scripts/skillsGuideUpdater.ts
