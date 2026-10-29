@@ -101,6 +101,14 @@ service cloud.firestore {
       return t is timestamp && t <= request.time + maxClockSkew();
     }
 
+    // Aggregate toggles (upvote / reaction) may bump updatedAt, but only to a
+    // timestamp within clock skew of now — a far-future value would pin the
+    // report as "freshest" (D5). An unchanged updatedAt is left alone.
+    function updatedAtNotFuture() {
+      return !('updatedAt' in request.resource.data.diff(resource.data).affectedKeys())
+        || isNotFuture(request.resource.data.updatedAt);
+    }
+
     // Kept lean: a 10-car summary must stay under the 1000-expression budget
     // per rule evaluation (exact keys = hasOnly + size). Unreported cars keep
     // reportCount 0 (createEmptyCarCongestions), so 0 is a legit value.
@@ -281,12 +289,14 @@ service cloud.firestore {
       // upvoteReport / removeUpvote:
       allow update: if request.auth != null
         && onlyUpdates(['upvotes', 'upvotedBy', 'updatedAt'])
-        && togglesOwnMember('upvotes', 'upvotedBy');
+        && togglesOwnMember('upvotes', 'upvotedBy')
+        && updatedAtNotFuture();
 
       // setReaction / clearReaction:
       allow update: if request.auth != null
         && onlyUpdates(['reactions', 'reactedBy', 'updatedAt'])
-        && isOwnReactionChange();
+        && isOwnReactionChange()
+        && updatedAtNotFuture();
 
       // reportCommentService.addComment batch: commentCount +1 only.
       allow update: if request.auth != null

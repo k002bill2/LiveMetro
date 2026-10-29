@@ -13,6 +13,8 @@ import {
 import { assertDenied, assertSucceeds, cleanup, clearData, dbAs, seed } from './helpers.mjs';
 
 const now = () => Timestamp.fromDate(new Date());
+/** Beyond the 15-minute clock-skew allowance (D5). */
+const farFuture = () => Timestamp.fromDate(new Date(Date.now() + 60 * 60 * 1000));
 
 /** Mirrors delayReportService.submitReport() payload. */
 const legitReport = (userId, overrides = {}) => ({
@@ -128,6 +130,12 @@ describe('delayReports upvotes (F-03)', () => {
     }));
   });
 
+  it('denies an upvote that sets updatedAt into the future (D5)', async () => {
+    await seedReport();
+    await assertDenied(updateDoc(reportRef('bob'), { ...upvote('bob'), updatedAt: farFuture() }));
+    await assertSucceeds(updateDoc(reportRef('bob'), upvote('bob')));
+  });
+
   it('denies pre-seeded upvotedBy on create', async () => {
     await assertDenied(addDoc(collection(dbAs('mallory'), 'delayReports'),
       legitReport('mallory', { upvotedBy: ['alice', 'carol'] })));
@@ -183,6 +191,17 @@ describe('delayReports reactions (F-03)', () => {
     await assertDenied(updateDoc(reportRef('mallory'), {
       ...setReaction('mallory', null, 'helped'), 'reactedBy.alice': deleteField(),
     }));
+  });
+
+  it('denies a reaction that sets updatedAt into the future (D5)', async () => {
+    await seedReport();
+    await assertDenied(updateDoc(reportRef('bob'), {
+      ...setReaction('bob', null, 'helped'), updatedAt: farFuture(),
+    }));
+    await assertDenied(updateDoc(reportRef('bob'), {
+      ...setReaction('bob', null, 'helped'), updatedAt: 'tomorrow',
+    }));
+    await assertSucceeds(updateDoc(reportRef('bob'), setReaction('bob', null, 'helped')));
   });
 
   it('denies an unknown kind in reactedBy even without a counter change', async () => {
