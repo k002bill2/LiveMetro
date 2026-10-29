@@ -100,6 +100,27 @@ describe('delayReports upvotes (F-03)', () => {
     await assertDenied(updateDoc(reportRef('mallory'), unvote('mallory')));
   });
 
+  it('denies an explicit duplicate own entry in upvotedBy', async () => {
+    await seedReport({ upvotes: 1, upvotedBy: ['bob'] });
+    await assertDenied(updateDoc(reportRef('bob'), {
+      upvotes: increment(1), upvotedBy: ['bob', 'bob'], updatedAt: now(),
+    }));
+  });
+
+  it('denies an un-upvote that also drops another member', async () => {
+    await seedReport({ upvotes: 2, upvotedBy: ['alice', 'carol'] });
+    await assertDenied(updateDoc(reportRef('alice'), {
+      upvotes: increment(-1), upvotedBy: [], updatedAt: now(),
+    }));
+  });
+
+  it('denies an un-upvote that subtracts more than 1', async () => {
+    await seedReport({ upvotes: 5, upvotedBy: ['bob'] });
+    await assertDenied(updateDoc(reportRef('bob'), {
+      upvotes: increment(-5), upvotedBy: arrayRemove('bob'), updatedAt: now(),
+    }));
+  });
+
   it('denies mixing an upvote with a reaction write in one update', async () => {
     await seedReport();
     await assertDenied(updateDoc(reportRef('bob'), {
@@ -156,6 +177,18 @@ describe('delayReports reactions (F-03)', () => {
     await seedReport({ reactions: { same: 3 }, reactedBy: { alice: 'same' } });
     await assertDenied(updateDoc(reportRef('bob'), setReaction('bob', 'same', 'helped')));
   });
+
+  it('denies an own reaction that also erases another user\'s entry', async () => {
+    await seedReport({ reactions: { same: 1 }, reactedBy: { alice: 'same' } });
+    await assertDenied(updateDoc(reportRef('mallory'), {
+      ...setReaction('mallory', null, 'helped'), 'reactedBy.alice': deleteField(),
+    }));
+  });
+
+  it('denies an unknown kind in reactedBy even without a counter change', async () => {
+    await seedReport();
+    await assertDenied(updateDoc(reportRef('bob'), { 'reactedBy.bob': 'evil', updatedAt: now() }));
+  });
 });
 
 describe('delayReports commentCount + comments (F-03)', () => {
@@ -198,6 +231,8 @@ describe('delayReports commentCount + comments (F-03)', () => {
       legitComment('mallory', { likes: 9999, likedBy: ['a', 'b'] })));
     await assertDenied(addDoc(collection(reportDoc, 'comments'),
       legitComment('mallory', { pinned: true })));
+    await assertDenied(addDoc(collection(reportDoc, 'comments'),
+      legitComment('mallory', { likes: 9999 })));
   });
 
   it('allows the legit like then unlike by the caller', async () => {
@@ -221,5 +256,12 @@ describe('delayReports commentCount + comments (F-03)', () => {
   it('denies setting likes to an arbitrary value', async () => {
     await seedComment({ likes: 1, likedBy: ['alice'] });
     await assertDenied(updateDoc(commentRef('mallory'), { likes: 500 }));
+  });
+
+  it('denies a like that also rewrites the comment text', async () => {
+    await seedComment();
+    await assertDenied(updateDoc(commentRef('bob'), {
+      likes: increment(1), likedBy: arrayUnion('bob'), text: '광고',
+    }));
   });
 });
