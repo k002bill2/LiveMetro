@@ -117,8 +117,9 @@ class CongestionService {
     userId: string
   ): Promise<CongestionReport> {
     const now = new Date();
-    const expiresAt = new Date(now);
-    expiresAt.setMinutes(expiresAt.getMinutes() + REPORT_EXPIRATION_MINUTES);
+    // Absolute ms arithmetic: the rules require expiresAt == timestamp + 10m
+    // exactly, which local wall-clock setMinutes can miss across a DST shift.
+    const expiresAt = new Date(now.getTime() + REPORT_EXPIRATION_MINUTES * 60_000);
 
     const reportData: Omit<CongestionReportDoc, 'timestamp' | 'expiresAt'> & {
       timestamp: Timestamp;
