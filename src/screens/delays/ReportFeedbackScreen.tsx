@@ -70,6 +70,9 @@ export const ReportFeedbackScreen: React.FC<ReportFeedbackScreenProps> = ({ repo
   // write). A failed write must roll back here, not to the entry prop —
   // otherwise the next write sends a stale previousKind and the rules reject it.
   const lastConfirmedRef = useRef<ReactionState>({ reactions: initialReactions, myReaction: initialMyReaction });
+  // One reaction write (including its failure re-sync) at a time, so a late
+  // re-sync can never overwrite a newer tap's state.
+  const reactionInFlightRef = useRef<boolean>(false);
   const [sort, setSort] = useState<CommentSortMode>('newest');
   const [comments, setComments] = useState<ReportComment[]>([]);
   const [loadingComments, setLoadingComments] = useState<boolean>(true);
@@ -111,6 +114,8 @@ export const ReportFeedbackScreen: React.FC<ReportFeedbackScreenProps> = ({ repo
         Alert.alert('알림', '로그인 후 반응을 남길 수 있어요.');
         return;
       }
+      if (reactionInFlightRef.current) return;
+      reactionInFlightRef.current = true;
       const previousKind = myReaction;
       const nextKind = myReaction === kind ? null : kind;
       try {
@@ -137,6 +142,8 @@ export const ReportFeedbackScreen: React.FC<ReportFeedbackScreenProps> = ({ repo
             : lastConfirmedRef.current,
         );
         Alert.alert('오류', '반응을 저장하지 못했습니다.');
+      } finally {
+        reactionInFlightRef.current = false;
       }
     },
     [user, myReaction, report.id, applyReactionState],

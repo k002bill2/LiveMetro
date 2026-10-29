@@ -225,6 +225,28 @@ describe('ReportFeedbackScreen', () => {
       expect(mockSetReaction.mock.calls[2]).toEqual(['r-1', 'u-me', 'helped', 'same']);
     });
 
+    it('ignores taps while a failed write is still re-syncing (Codex P2)', async () => {
+      let resolveRead: (value: null) => void = () => undefined;
+      mockGetReport.mockImplementation(
+        () => new Promise<null>(resolve => { resolveRead = resolve; }),
+      );
+      mockSetReaction.mockRejectedValueOnce(new Error('permission-denied'));
+      const { getByTestId } = render(<ReportFeedbackScreen report={baseReport} />);
+      fireEvent.press(getByTestId('reaction-tile-helped'));
+      await waitFor(() => expect(mockGetReport).toHaveBeenCalledTimes(1));
+
+      fireEvent.press(getByTestId('reaction-tile-same'));
+      fireEvent.press(getByTestId('reaction-tile-same'));
+      expect(mockSetReaction).toHaveBeenCalledTimes(1);
+      expect(mockClearReaction).not.toHaveBeenCalled();
+
+      resolveRead(null);
+      await waitFor(() => expect(alertSpy).toHaveBeenCalled());
+      fireEvent.press(getByTestId('reaction-tile-same'));
+      await waitFor(() => expect(mockSetReaction).toHaveBeenCalledTimes(2));
+      expect(mockSetReaction.mock.calls[1]).toEqual(['r-1', 'u-me', null, 'same']);
+    });
+
     it('rolls back to the last successful state after a failed clear', async () => {
       mockGetReport.mockResolvedValue(null);
       mockClearReaction.mockRejectedValueOnce(new Error('permission-denied'));
