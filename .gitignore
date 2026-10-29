@@ -20,11 +20,11 @@ ios/
 # Temporary files created by Metro to check the health of the file watcher
 .metro-health-check*
 
-# Environment variables
+# Environment variables (S-05): 모든 .env.* 변형을 무시하고 템플릿만 추적한다.
+# 슬래시 없는 패턴이라 하위 디렉터리(functions/.env.example 등)에도 동일하게 적용된다.
 .env
-.env.local
-.env.*.local
-.env.pre-*
+.env.*
+!.env.example
 
 # Firebase config (contains API keys; inject at build time via EAS/CI secrets)
 google-services.json
