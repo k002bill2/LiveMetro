@@ -144,9 +144,43 @@ class TokenManagementService {
   }
 
   /**
-   * Invalidate a token
+   * Invalidate a token owned by `userId` (client-initiated unregister).
+   *
+   * Owner-scoped (security finding F-10, IDOR): only `fcm_tokens` docs whose
+   * `userId` matches are touched, so knowing another user's token value is not
+   * enough to invalidate it. Resolves quietly when nothing matches.
    */
-  async invalidateToken(token: string): Promise<void> {
+  async invalidateToken(token: string, userId: string): Promise<void> {
+    const snapshot = await this.db
+      .collection(COLLECTION)
+      .where('token', '==', token)
+      .where('userId', '==', userId)
+      .get();
+
+    const batch = this.db.batch();
+
+    for (const doc of snapshot.docs) {
+      const data = doc.data() as DeviceToken;
+      // Defense in depth: never touch a doc owned by someone else.
+      if (data.userId !== userId) continue;
+
+      batch.update(doc.ref, { isValid: false });
+      batch.update(this.db.collection('users').doc(userId), {
+        fcmTokens: admin.firestore.FieldValue.arrayRemove(token),
+      });
+    }
+
+    await batch.commit();
+  }
+
+  /**
+   * Invalidate a token for every owner (server-only FCM failure cleanup).
+   *
+   * Tokens rejected by FCM are dead regardless of who registered them, so
+   * this is intentionally not owner-scoped. Must never be reachable from a
+   * client-supplied token — use `invalidateToken(token, userId)` for that.
+   */
+  private async invalidateDeadToken(token: string): Promise<void> {
     const snapshot = await this.db
       .collection(COLLECTION)
       .where('token', '==', token)
@@ -252,7 +286,7 @@ class TokenManagementService {
    */
   async handleFailedTokens(tokens: string[]): Promise<void> {
     for (const token of tokens) {
-      await this.invalidateToken(token);
+      await this.invalidateDeadToken(token);
     }
   }
 

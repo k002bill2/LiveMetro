@@ -10,6 +10,10 @@ import { pushNotificationService } from '../services/pushNotificationService';
 import { tokenManagementService } from '../services/tokenManagementService';
 import { expoPushService } from '../services/expoPushService';
 import { processDelayReport } from './delayPushLogic';
+import {
+  parseRegisterFcmTokenInput,
+  parseUnregisterFcmTokenInput,
+} from './fcmTokenInput';
 
 const db = admin.firestore();
 
@@ -273,15 +277,7 @@ export const cleanupExpiredTokens = functions
 export const registerFcmToken = functions
   .region('asia-northeast3')
   .https.onCall(
-    async (
-      data: {
-        token: string;
-        deviceId: string;
-        platform: 'ios' | 'android' | 'web';
-        appVersion: string;
-      },
-      context: functions.https.CallableContext
-    ) => {
+    async (data: unknown, context: functions.https.CallableContext) => {
       if (!context.auth) {
         throw new functions.https.HttpsError(
           'unauthenticated',
@@ -289,9 +285,15 @@ export const registerFcmToken = functions
         );
       }
 
+      // Validate outside the try so the code stays 'invalid-argument' (F-10).
+      const input = parseRegisterFcmTokenInput(data);
+
       try {
         await tokenManagementService.registerToken({
-          ...data,
+          token: input.token,
+          deviceId: input.deviceId,
+          platform: input.platform,
+          appVersion: input.appVersion,
           userId: context.auth.uid,
         });
 
@@ -312,10 +314,7 @@ export const registerFcmToken = functions
 export const unregisterFcmToken = functions
   .region('asia-northeast3')
   .https.onCall(
-    async (
-      data: { token: string },
-      context: functions.https.CallableContext
-    ) => {
+    async (data: unknown, context: functions.https.CallableContext) => {
       if (!context.auth) {
         throw new functions.https.HttpsError(
           'unauthenticated',
@@ -323,8 +322,13 @@ export const unregisterFcmToken = functions
         );
       }
 
+      // Validate outside the try so the code stays 'invalid-argument' (F-10).
+      const token = parseUnregisterFcmTokenInput(data);
+
       try {
-        await tokenManagementService.invalidateToken(data.token);
+        // Owner-scoped: a caller can only invalidate their own token docs
+        // (F-10 IDOR). Zero matches still returns success — no existence oracle.
+        await tokenManagementService.invalidateToken(token, context.auth.uid);
         return { success: true };
       } catch (error) {
         console.error('Token removal failed:', error);
