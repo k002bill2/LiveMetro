@@ -10,6 +10,7 @@ import {
   EmailNotificationData,
   EmailContent,
 } from '../types';
+import { sanitizeEmailData, SafeEmailFields } from './emailTemplateData';
 
 class EmailService {
   private initialized = false;
@@ -81,29 +82,29 @@ class EmailService {
   }
 
   /**
-   * Build email content based on notification type
+   * Build email content based on notification type.
+   * `data` is untyped at runtime (callable payload), so it is sanitized
+   * (HTML-escaped / coerced) before reaching any template.
    */
-  private buildEmailContent(
-    type: NotificationType,
-    data: EmailNotificationData
-  ): EmailContent {
+  buildEmailContent(type: NotificationType, data: unknown): EmailContent {
+    const fields = sanitizeEmailData(data);
     switch (type) {
       case NotificationType.DELAY_ALERT:
-        return this.buildDelayAlertEmail(data);
+        return this.buildDelayAlertEmail(fields);
       case NotificationType.EMERGENCY_ALERT:
-        return this.buildEmergencyAlertEmail(data);
+        return this.buildEmergencyAlertEmail(fields);
       case NotificationType.SERVICE_UPDATE:
-        return this.buildServiceUpdateEmail(data);
+        return this.buildServiceUpdateEmail(fields);
       default:
-        return this.buildServiceUpdateEmail(data);
+        return this.buildServiceUpdateEmail(fields);
     }
   }
 
   /**
    * Build delay alert email
    */
-  private buildDelayAlertEmail(data: EmailNotificationData): EmailContent {
-    const subject = `[LiveMetro] ${data.lineName || '지하철'} 지연 알림`;
+  private buildDelayAlertEmail(data: SafeEmailFields): EmailContent {
+    const subject = `[LiveMetro] ${data.subjectLineName ?? '지하철'} 지연 알림`;
     const html = `
       <!DOCTYPE html>
       <html>
@@ -132,17 +133,17 @@ class EmailService {
             <div class="info-box">
               <div class="info-row">
                 <span class="label">노선</span>
-                <p class="value">${data.lineName || '-'}</p>
+                <p class="value">${data.lineName ?? '-'}</p>
               </div>
               <div class="info-row">
                 <span class="label">역</span>
-                <p class="value">${data.stationName || '-'}</p>
+                <p class="value">${data.stationName ?? '-'}</p>
               </div>
               <div class="info-row">
                 <span class="label">지연 시간</span>
-                <p class="value">${data.delayMinutes || 0}분</p>
+                <p class="value">${data.delayMinutes}분</p>
               </div>
-              ${data.reason ? `
+              ${data.reason !== null ? `
               <div class="info-row">
                 <span class="label">지연 사유</span>
                 <p class="value">${data.reason}</p>
@@ -164,7 +165,7 @@ class EmailService {
   /**
    * Build emergency alert email
    */
-  private buildEmergencyAlertEmail(data: EmailNotificationData): EmailContent {
+  private buildEmergencyAlertEmail(data: SafeEmailFields): EmailContent {
     const subject = '[긴급] LiveMetro 서비스 알림';
     const html = `
       <!DOCTYPE html>
@@ -189,9 +190,9 @@ class EmailService {
           </div>
           <div class="content">
             <div class="alert-box">
-              <p style="margin: 0; font-size: 16px; color: #991b1b;">${data.message || '서비스에 문제가 발생했습니다.'}</p>
+              <p style="margin: 0; font-size: 16px; color: #991b1b;">${data.message ?? '서비스에 문제가 발생했습니다.'}</p>
             </div>
-            ${data.affectedLines && data.affectedLines.length > 0 ? `
+            ${data.affectedLines.length > 0 ? `
             <div class="affected-lines">
               <strong>영향 노선:</strong> ${data.affectedLines.join(', ')}
             </div>
@@ -211,7 +212,7 @@ class EmailService {
   /**
    * Build service update email
    */
-  private buildServiceUpdateEmail(data: EmailNotificationData): EmailContent {
+  private buildServiceUpdateEmail(data: SafeEmailFields): EmailContent {
     const subject = '[LiveMetro] 서비스 안내';
     const html = `
       <!DOCTYPE html>
@@ -235,7 +236,7 @@ class EmailService {
           </div>
           <div class="content">
             <div class="message-box">
-              <p style="margin: 0; font-size: 16px;">${data.message || 'LiveMetro에서 알려드립니다.'}</p>
+              <p style="margin: 0; font-size: 16px;">${data.message ?? 'LiveMetro에서 알려드립니다.'}</p>
             </div>
           </div>
           <div class="footer">

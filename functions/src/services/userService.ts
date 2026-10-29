@@ -5,6 +5,7 @@
 
 import * as admin from 'firebase-admin';
 import { UserData } from '../types';
+import { isEmailOptInEnabled } from './emailRecipient';
 
 // Initialize Firebase Admin (only once)
 if (!admin.apps.length) {
@@ -69,6 +70,19 @@ export async function isEmailNotificationEnabled(uid: string): Promise<boolean> 
     !!user.email &&
     !user.isAnonymous
   );
+}
+
+/**
+ * Check only the email opt-in preferences in the Firestore users doc.
+ *
+ * Unlike isEmailNotificationEnabled, this does NOT gate on the doc's
+ * `email` / `isAnonymous` fields: those are client-writable and go stale when
+ * a user links an email later. The recipient address must instead come from
+ * Firebase Auth (see emailRecipient.ts).
+ */
+export async function isEmailOptedIn(uid: string): Promise<boolean> {
+  const user = await getUserById(uid);
+  return isEmailOptInEnabled(user ? user.preferences.notificationSettings : null);
 }
 
 /**
