@@ -35,10 +35,13 @@ jobs:
         with:
           # 이 워크플로는 push 하지 않는다 — GITHUB_TOKEN 을 .git/config 에 남기지 않는다(F-06).
           persist-credentials: false
+          # gitleaks 가 push 범위(before..after)를 스캔하려면 전체 히스토리가 필요하다 —
+          # 기본 shallow(depth 1) checkout 에서는 `unknown revision` 으로 guard 가 실패한다.
+          fetch-depth: 0
       - name: Quality gate
         uses: ./.github/actions/quality-gate
         with:
-          node-version: '20'
+          node-version: '22'
           run-functions-build: 'true'
 
   deploy:
@@ -55,7 +58,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1  # v7.1.0
         with:
-          node-version: '20'
+          node-version: '22'
           cache: 'npm'
 
       - name: Install Functions dependencies
@@ -88,7 +91,7 @@ jobs:
       # firebase-tools 는 정확한 버전으로 고정한다(F-06) — 미고정 `npx --yes` 는 자격증명이
       # 환경에 있는 상태에서 매 실행 최신 버전을 내려받아 실행한다(공급망 위험).
       # 15.34.1 근거: 2026-10-30 기준 registry latest=15.34.2(10-28 배포)였으나 배포 1일차라
-      # 직전 패치(10-21 배포)를 택함. engines node>=20 — 이 job 의 Node 20 과 호환.
+      # 직전 패치(10-21 배포)를 택함. engines node>=20 — 이 job 의 Node 22 와 호환.
       # 갱신은 수동(이 줄): 릴리스 노트 확인 후 버전만 올린다.
       - name: Deploy Functions + Firestore rules
         run: npx --yes firebase-tools@15.34.1 deploy --only functions,firestore:rules,firestore:indexes --non-interactive
