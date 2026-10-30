@@ -61,6 +61,12 @@ runs:
       working-directory: functions
       run: npm run build
 
+    - name: Unit tests (Firebase Functions)
+      if: ${{ inputs.run-functions-build == 'true' }}
+      shell: bash
+      working-directory: functions
+      run: npx jest --ci
+
     - name: Secret scan (gitleaks)
       uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e  # v3.0.0
       env:
