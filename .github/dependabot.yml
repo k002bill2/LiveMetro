@@ -68,6 +68,23 @@ updates:
       - dependency-name: "react-native-worklets"
       - dependency-name: "@react-native-async-storage/async-storage"
       - dependency-name: "@react-native-community/*"
+      # major 만 보류(#399 triage) — Expo SDK 58(jest-expo 가 jest 30·RNTL 14 지원) 또는
+      # 상위 도구 지원(Babel 8: babel-preset-expo, TS 7·ESLint 10: typescript-eslint/플러그인) 전까지.
+      # minor/patch(보안 수정 포함)는 계속 올라온다. SDK 업그레이드 PR 에서 이 블록을 정리할 것.
+      - dependency-name: "@babel/core"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@babel/preset-*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "jest"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/jest"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@testing-library/react-native"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "eslint"
+        update-types: ["version-update:semver-major"]
 
   # Firebase Functions(Node 20) — main 머지 시 firebase-deploy.yml 이 자동 배포하므로
   # 머지 전 functions 빌드·테스트 통과를 반드시 확인한다.
