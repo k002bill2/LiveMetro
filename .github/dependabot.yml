@@ -85,6 +85,9 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "eslint"
         update-types: ["version-update:semver-major"]
+      # 7.x는 React Compiler 규칙으로 177 errors(#399 triage) — 별도 정리 후 해제
+      - dependency-name: "eslint-plugin-react-hooks"
+        update-types: ["version-update:semver-major"]
 
   # Firebase Functions(Node 20) — main 머지 시 firebase-deploy.yml 이 자동 배포하므로
   # 머지 전 functions 빌드·테스트 통과를 반드시 확인한다.

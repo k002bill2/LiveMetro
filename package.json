@@ -128,7 +128,7 @@
     "eslint-config-expo": "~55.0.1",
     "eslint-import-resolver-typescript": "^4.4.5",
     "eslint-plugin-react": "^7.33.0",
-    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-native": "^5.0.0",
     "expect-webdriverio": "^4.15.4",
     "firebase-admin": "^13.6.0",
