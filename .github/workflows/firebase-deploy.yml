@@ -73,9 +73,13 @@ jobs:
       # 없으면 firebase-tools가 defineString('KAKAO_APP_ID') 기본값('')으로 배포해
       # kakaoLogin이 모든 요청을 failed-precondition으로 거부한다.
       # KAKAO_APP_ID는 Kakao 앱의 공개 식별자(자격증명 아님)라 평문으로 안전하다.
-      - name: Provision Functions params (KAKAO_APP_ID)
+      # SENDGRID_API_KEY/SENDGRID_SENDER는 키 자체가 .env에 있어야 한다 — firebase-tools는
+      # non-interactive에서 .env에 키가 없는 defineString을 default('')와 무관하게 오류로 막는다.
+      # 빈 값 = 이메일 미설정(emailService가 not configured 반환). 실제 키는 defineSecret 전환
+      # 후속 PR에서 Secret Manager로 공급한다 — 여기에 비밀을 쓰지 않는다.
+      - name: Provision Functions params (KAKAO_APP_ID, SENDGRID_*)
         working-directory: functions
-        run: echo "KAKAO_APP_ID=1514990" > .env
+        run: printf '%s\n' 'KAKAO_APP_ID=1514990' 'SENDGRID_API_KEY=' 'SENDGRID_SENDER=' > .env
 
       # 비밀은 run: 본문에 ${{ }} 로 직접 확장하지 않고 env: 로 넘긴다(F-06) — 직접 확장은
       # 셸 스크립트 텍스트에 키가 박혀 JSON 의 ' 가 쿼팅을 깨고 로그·프로세스 인자로 샐 수 있다.
