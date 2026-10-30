@@ -35,6 +35,9 @@ jobs:
         with:
           # 이 워크플로는 push 하지 않는다 — GITHUB_TOKEN 을 .git/config 에 남기지 않는다(F-06).
           persist-credentials: false
+          # gitleaks 가 push 범위(before..after)를 스캔하려면 전체 히스토리가 필요하다 —
+          # 기본 shallow(depth 1) checkout 에서는 `unknown revision` 으로 guard 가 실패한다.
+          fetch-depth: 0
       - name: Quality gate
         uses: ./.github/actions/quality-gate
         with:

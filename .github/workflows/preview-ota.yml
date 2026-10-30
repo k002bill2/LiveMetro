@@ -69,6 +69,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+        with:
+          # gitleaks 가 push 범위(before..after)를 스캔하려면 전체 히스토리가 필요하다 —
+          # 기본 shallow(depth 1) checkout 에서는 `unknown revision` 으로 guard 가 실패한다.
+          fetch-depth: 0
       - name: Quality gate (no Functions rebuild — OTA는 앱 번들만 발행)
         uses: ./.github/actions/quality-gate
         with:
