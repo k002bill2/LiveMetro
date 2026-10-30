@@ -4,7 +4,7 @@
  */
 
 import * as sgMail from '@sendgrid/mail';
-import * as functions from 'firebase-functions';
+import { defineString } from 'firebase-functions/params';
 import {
   NotificationType,
   EmailNotificationData,
@@ -12,23 +12,29 @@ import {
 } from '../types';
 import { sanitizeEmailData, SafeEmailFields } from './emailTemplateData';
 
+// functions.config() was removed in firebase-functions v7. SendGrid settings are
+// read from functions/.env via params (same pattern as KAKAO_APP_ID). Defaults
+// are '' so a missing value never blocks `firebase deploy --non-interactive`;
+// initialize() reports "not configured" instead.
+export const sendgridApiKey = defineString('SENDGRID_API_KEY', { default: '' });
+export const sendgridSender = defineString('SENDGRID_SENDER', { default: '' });
+
 class EmailService {
   private initialized = false;
   private senderEmail = '';
 
   /**
-   * Initialize SendGrid with API key from Firebase config
+   * Initialize SendGrid with API key from params (functions/.env)
    */
   initialize(): boolean {
     if (this.initialized) return true;
 
     try {
-      const config = functions.config();
-      const apiKey = config.sendgrid?.apikey;
-      this.senderEmail = config.sendgrid?.sender || 'noreply@livemetro.app';
+      const apiKey = sendgridApiKey.value();
+      this.senderEmail = sendgridSender.value() || 'noreply@livemetro.app';
 
       if (!apiKey) {
-        console.error('SendGrid API key not configured. Run: firebase functions:config:set sendgrid.apikey="YOUR_KEY"');
+        console.error('SendGrid API key not configured. Set SENDGRID_API_KEY in functions/.env');
         return false;
       }
 

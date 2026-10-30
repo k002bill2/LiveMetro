@@ -3,15 +3,20 @@
  * Email notification service using SendGrid
  */
 
-import * as functions from 'firebase-functions';
-import * as admin from 'firebase-admin';
+import * as functions from 'firebase-functions/v1';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore, FieldValue, FieldPath } from 'firebase-admin/firestore';
 import {
   onCall,
   HttpsError,
   FunctionsErrorCode,
 } from 'firebase-functions/v2/https';
 import { defineString } from 'firebase-functions/params';
-import { emailService } from './services/emailService';
+import {
+  emailService,
+  sendgridApiKey,
+  sendgridSender,
+} from './services/emailService';
 import { isEmailOptedIn } from './services/userService';
 import { resolveRecipientForUid } from './services/emailRecipient';
 import {
@@ -134,7 +139,7 @@ export const sendEmailNotification = functions
 
       // 4. Resolve recipient ONLY from Firebase Auth (verified email required)
       const recipient = await resolveRecipientForUid(uid, (authUid) =>
-        admin.auth().getUser(authUid)
+        getAuth().getUser(authUid)
       );
       if (!recipient.ok) {
         return { success: false, error: recipient.error };
@@ -181,9 +186,8 @@ export const testEmailConfiguration = functions
       }
 
       try {
-        const config = functions.config();
-        const hasApiKey = !!config.sendgrid?.apikey;
-        const hasSender = !!config.sendgrid?.sender;
+        const hasApiKey = !!sendgridApiKey.value();
+        const hasSender = !!sendgridSender.value();
 
         if (!hasApiKey) {
           return {
@@ -249,8 +253,8 @@ export const kakaoLogin = onCall<KakaoLoginRequest>(
         kakaoAppId.value(),
         fetch
       );
-      const uid = await upsertKakaoFirebaseUser(admin.auth(), profile);
-      const token = await admin.auth().createCustomToken(uid, { provider: 'KAKAO' });
+      const uid = await upsertKakaoFirebaseUser(getAuth(), profile);
+      const token = await getAuth().createCustomToken(uid, { provider: 'KAKAO' });
       return { token, profile: { nickname: profile.nickname } };
     } catch (error) {
       if (error instanceof KakaoAuthError) {
@@ -289,15 +293,15 @@ export const deleteAccount = onCall<unknown>(
   // 영구 실패(=삭제 불가능한 계정)가 된다. 12단계 페이지 순회에 여유를 준다.
   { region: 'asia-northeast3', timeoutSeconds: 300 },
   async (request): Promise<DeleteAccountResponse> => {
-    const db = admin.firestore();
+    const db = getFirestore();
     return runDeleteAccountRequest(
       {
         db,
-        auth: admin.auth(),
+        auth: getAuth(),
         recursiveDeleteDocument: createRecursiveDeleteAdapter(db),
-        arrayRemoveValue: createArrayRemoveAdapter(admin.firestore.FieldValue),
-        fieldPath: createFieldPathAdapter(admin.firestore.FieldPath),
-        deleteFieldValue: createDeleteFieldAdapter(admin.firestore.FieldValue),
+        arrayRemoveValue: createArrayRemoveAdapter(FieldValue),
+        fieldPath: createFieldPathAdapter(FieldPath),
+        deleteFieldValue: createDeleteFieldAdapter(FieldValue),
       },
       request.auth?.uid
     );

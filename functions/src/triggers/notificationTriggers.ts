@@ -3,9 +3,9 @@
  * Firebase triggers for automatic push notifications
  */
 
-import * as functions from 'firebase-functions';
+import * as functions from 'firebase-functions/v1';
 import { onDocumentWritten } from 'firebase-functions/v2/firestore';
-import * as admin from 'firebase-admin';
+import { getFirestore, FieldValue, Timestamp } from 'firebase-admin/firestore';
 import { pushNotificationService } from '../services/pushNotificationService';
 import { tokenManagementService } from '../services/tokenManagementService';
 import { expoPushService } from '../services/expoPushService';
@@ -15,7 +15,7 @@ import {
   parseUnregisterFcmTokenInput,
 } from './fcmTokenInput';
 
-const db = admin.firestore();
+const db = getFirestore();
 
 // ============================================================================
 // Types
@@ -28,7 +28,7 @@ interface DelayCertificate {
   stationName: string;
   date: string;
   status: string;
-  createdAt: admin.firestore.Timestamp;
+  createdAt: Timestamp;
 }
 
 interface UserTrustProfile {
@@ -40,7 +40,7 @@ interface UserTrustProfile {
     name: string;
     icon: string;
     description: string;
-    earnedAt: admin.firestore.Timestamp;
+    earnedAt: Timestamp;
   }[];
 }
 
@@ -89,7 +89,7 @@ export const onDelayReportVerified = onDocumentWritten(
         await db
           .collection('pushDedup')
           .doc(rid)
-          .set({ sentAt: admin.firestore.FieldValue.serverTimestamp() });
+          .set({ sentAt: FieldValue.serverTimestamp() });
       },
       send: (tokens, message) => expoPushService.sendToTokens(tokens, message),
       invalidate: async (token) => {

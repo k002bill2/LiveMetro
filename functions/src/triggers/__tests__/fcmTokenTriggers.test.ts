@@ -14,8 +14,10 @@
 const mockRegisterToken = jest.fn<Promise<void>, [unknown]>();
 const mockInvalidateToken = jest.fn<Promise<void>, [unknown, unknown]>();
 
-jest.mock('firebase-admin', () => ({
-  firestore: () => ({}),
+jest.mock('firebase-admin/firestore', () => ({
+  getFirestore: () => ({}),
+  FieldValue: {},
+  Timestamp: {},
 }));
 
 jest.mock('../../services/tokenManagementService', () => ({

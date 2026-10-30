@@ -3,7 +3,12 @@
  * Manages FCM tokens for users
  */
 
-import * as admin from 'firebase-admin';
+import {
+  getFirestore,
+  FieldValue,
+  Firestore,
+  Timestamp,
+} from 'firebase-admin/firestore';
 
 // ============================================================================
 // Types
@@ -18,8 +23,8 @@ export interface DeviceToken {
   deviceId: string;
   platform: 'ios' | 'android' | 'web';
   appVersion: string;
-  createdAt: admin.firestore.Timestamp;
-  lastUsedAt: admin.firestore.Timestamp;
+  createdAt: Timestamp;
+  lastUsedAt: Timestamp;
   isValid: boolean;
 }
 
@@ -46,10 +51,10 @@ const TOKEN_EXPIRY_DAYS = 60;
 // ============================================================================
 
 class TokenManagementService {
-  private db: admin.firestore.Firestore;
+  private db: Firestore;
 
   constructor() {
-    this.db = admin.firestore();
+    this.db = getFirestore();
   }
 
   /**
@@ -66,7 +71,7 @@ class TokenManagementService {
       .limit(1)
       .get();
 
-    const now = admin.firestore.FieldValue.serverTimestamp();
+    const now = FieldValue.serverTimestamp();
 
     if (!existing.empty) {
       // Update existing
@@ -96,7 +101,7 @@ class TokenManagementService {
 
     // Also store in user document for quick access
     await this.db.collection('users').doc(userId).update({
-      fcmTokens: admin.firestore.FieldValue.arrayUnion(token),
+      fcmTokens: FieldValue.arrayUnion(token),
       lastTokenUpdate: now,
     });
   }
@@ -166,7 +171,7 @@ class TokenManagementService {
 
       batch.update(doc.ref, { isValid: false });
       batch.update(this.db.collection('users').doc(userId), {
-        fcmTokens: admin.firestore.FieldValue.arrayRemove(token),
+        fcmTokens: FieldValue.arrayRemove(token),
       });
     }
 
@@ -195,7 +200,7 @@ class TokenManagementService {
       const data = doc.data() as DeviceToken;
       const userRef = this.db.collection('users').doc(data.userId);
       batch.update(userRef, {
-        fcmTokens: admin.firestore.FieldValue.arrayRemove(token),
+        fcmTokens: FieldValue.arrayRemove(token),
       });
     }
 
@@ -249,7 +254,7 @@ class TokenManagementService {
   async cleanupExpiredTokens(): Promise<number> {
     const expiryDate = new Date();
     expiryDate.setDate(expiryDate.getDate() - TOKEN_EXPIRY_DAYS);
-    const expiryTimestamp = admin.firestore.Timestamp.fromDate(expiryDate);
+    const expiryTimestamp = Timestamp.fromDate(expiryDate);
 
     const snapshot = await this.db
       .collection(COLLECTION)
@@ -271,7 +276,7 @@ class TokenManagementService {
 
       // Remove from user document
       batch.update(this.db.collection('users').doc(data.userId), {
-        fcmTokens: admin.firestore.FieldValue.arrayRemove(data.token),
+        fcmTokens: FieldValue.arrayRemove(data.token),
       });
 
       count++;
