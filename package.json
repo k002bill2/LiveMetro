@@ -84,7 +84,7 @@
     "expo-task-manager": "~55.0.20",
     "expo-updates": "~55.0.33",
     "firebase": "^10.7.1",
-    "lucide-react-native": "^0.562.0",
+    "lucide-react-native": "^1.65.0",
     "react": "19.2.0",
     "react-dom": "19.2.0",
     "react-native": "0.83.10",
