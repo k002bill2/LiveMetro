@@ -54,3 +54,34 @@ export async function assertDenied(promise) {
     return true;
   });
 }
+
+/** Encode a JS value as a Firestore REST `Value` (seed-only; subset we need). */
+function toValue(v) {
+  if (v === null) return { nullValue: null };
+  if (v instanceof Date) return { timestampValue: v.toISOString() };
+  if (Array.isArray(v)) return { arrayValue: { values: v.map(toValue) } };
+  if (typeof v === 'string') return { stringValue: v };
+  if (typeof v === 'boolean') return { booleanValue: v };
+  if (typeof v === 'number') {
+    return Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+  }
+  return { mapValue: { fields: Object.fromEntries(Object.entries(v).map(([k, x]) => [k, toValue(x)])) } };
+}
+
+/**
+ * Write a document bypassing security rules (emulator `Bearer owner`), to seed
+ * state that create rules forbid a client from minting directly (e.g. another
+ * user's existing vote, legacy null reactions).
+ */
+export async function seed(path, data) {
+  const fields = Object.fromEntries(Object.entries(data).map(([k, v]) => [k, toValue(v)]));
+  const res = await fetch(
+    `http://${emulatorHost}/v1/projects/${PROJECT_ID}/databases/(default)/documents/${path}`,
+    {
+      method: 'PATCH',
+      headers: { Authorization: 'Bearer owner', 'Content-Type': 'application/json' },
+      body: JSON.stringify({ fields }),
+    },
+  );
+  assert.ok(res.ok, `seed ${path} failed: ${res.status} ${await res.text()}`);
+}

@@ -5,7 +5,7 @@
  * 상세 화면(`ReportDetailScreen`)에서 진입.
  */
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSemanticTokens } from '@/services/theme';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -32,6 +32,23 @@ const REACTION_BAR_COLORS: Record<ReactionKind, string> = {
   differ: '#DC2626',
 };
 
+interface ReactionState {
+  reactions: ReactionCounts;
+  myReaction: ReactionKind | null;
+}
+
+/** Apply one user's reaction transition (prev → next) to the counts. */
+const applyReactionChange = (
+  counts: ReactionCounts,
+  prev: ReactionKind | null,
+  next: ReactionKind | null,
+): ReactionCounts => {
+  const updated = { ...counts };
+  if (prev) updated[prev] = Math.max(0, (updated[prev] ?? 0) - 1);
+  if (next) updated[next] = (updated[next] ?? 0) + 1;
+  return updated;
+};
+
 const formatMinAgo = (date: Date): string => {
   const diffM = Math.max(0, Math.floor((Date.now() - date.getTime()) / 60000));
   if (diffM < 1) return '방금 전';
@@ -45,10 +62,17 @@ export const ReportFeedbackScreen: React.FC<ReportFeedbackScreenProps> = ({ repo
   const styles = useMemo(() => createStyles(semantic), [semantic]);
 
   const initialReactions: ReactionCounts = report.reactions ?? emptyReactionCounts();
+  const initialMyReaction: ReactionKind | null =
+    user && report.reactedBy ? (report.reactedBy[user.id] ?? null) : null;
   const [reactions, setReactions] = useState<ReactionCounts>(initialReactions);
-  const [myReaction, setMyReaction] = useState<ReactionKind | null>(
-    user && report.reactedBy ? (report.reactedBy[user.id] ?? null) : null,
-  );
+  const [myReaction, setMyReaction] = useState<ReactionKind | null>(initialMyReaction);
+  // Last state the server is known to hold (entry prop, then each successful
+  // write). A failed write must roll back here, not to the entry prop —
+  // otherwise the next write sends a stale previousKind and the rules reject it.
+  const lastConfirmedRef = useRef<ReactionState>({ reactions: initialReactions, myReaction: initialMyReaction });
+  // One reaction write (including its failure re-sync) at a time, so a late
+  // re-sync can never overwrite a newer tap's state.
+  const reactionInFlightRef = useRef<boolean>(false);
   const [sort, setSort] = useState<CommentSortMode>('newest');
   const [comments, setComments] = useState<ReportComment[]>([]);
   const [loadingComments, setLoadingComments] = useState<boolean>(true);
@@ -78,39 +102,51 @@ export const ReportFeedbackScreen: React.FC<ReportFeedbackScreenProps> = ({ repo
   const total = totalReactions(reactions);
   const totalParticipants = total === 0 ? 0 : total;
 
+  const applyReactionState = useCallback((next: ReactionState) => {
+    lastConfirmedRef.current = next;
+    setReactions(next.reactions);
+    setMyReaction(next.myReaction);
+  }, []);
+
   const handleReaction = useCallback(
     async (kind: ReactionKind) => {
       if (!user) {
         Alert.alert('알림', '로그인 후 반응을 남길 수 있어요.');
         return;
       }
+      if (reactionInFlightRef.current) return;
+      reactionInFlightRef.current = true;
+      const previousKind = myReaction;
+      const nextKind = myReaction === kind ? null : kind;
       try {
-        if (myReaction === kind) {
-          // Clear
-          setReactions(prev => ({ ...prev, [kind]: Math.max(0, prev[kind] - 1) }));
-          setMyReaction(null);
+        // Optimistic update
+        setReactions(prev => applyReactionChange(prev, previousKind, nextKind));
+        setMyReaction(nextKind);
+        if (nextKind === null) {
           await delayReportService.clearReaction(report.id, user.id, kind);
         } else {
-          // Switch / set
-          setReactions(prev => {
-            const next = { ...prev };
-            if (myReaction) next[myReaction] = Math.max(0, prev[myReaction] - 1);
-            next[kind] = (prev[kind] ?? 0) + 1;
-            return next;
-          });
-          const previousKind = myReaction;
-          setMyReaction(kind);
           await delayReportService.setReaction(report.id, user.id, previousKind, kind);
         }
+        const confirmed = lastConfirmedRef.current;
+        lastConfirmedRef.current = {
+          reactions: applyReactionChange(confirmed.reactions, confirmed.myReaction, nextKind),
+          myReaction: nextKind,
+        };
       } catch (error) {
         console.error('Failed to toggle reaction:', error);
-        // Rollback optimistic update
-        setReactions(initialReactions);
-        setMyReaction(user && report.reactedBy ? (report.reactedBy[user.id] ?? null) : null);
+        // Re-sync with the server; fall back to the last confirmed state.
+        const fresh = await delayReportService.getReport(report.id);
+        applyReactionState(
+          fresh
+            ? { reactions: fresh.reactions ?? emptyReactionCounts(), myReaction: fresh.reactedBy?.[user.id] ?? null }
+            : lastConfirmedRef.current,
+        );
         Alert.alert('오류', '반응을 저장하지 못했습니다.');
+      } finally {
+        reactionInFlightRef.current = false;
       }
     },
-    [user, myReaction, report.id, report.reactedBy, initialReactions],
+    [user, myReaction, report.id, applyReactionState],
   );
 
   const handleSubmitComment = useCallback(async () => {

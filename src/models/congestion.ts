@@ -234,9 +234,7 @@ export function isReportExpired(report: CongestionReport): boolean {
  * Create expiration date from timestamp
  */
 export function createExpirationDate(timestamp: Date): Date {
-  const expiresAt = new Date(timestamp);
-  expiresAt.setMinutes(expiresAt.getMinutes() + REPORT_EXPIRATION_MINUTES);
-  return expiresAt;
+  return new Date(timestamp.getTime() + REPORT_EXPIRATION_MINUTES * 60_000);
 }
 
 /**

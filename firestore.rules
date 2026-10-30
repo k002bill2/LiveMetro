@@ -8,6 +8,135 @@ service cloud.firestore {
       return request.resource.data.diff(resource.data).affectedKeys().hasOnly(allowedFields);
     }
 
+    // --- F-03: per-user aggregate toggles ------------------------------------
+    // A counter may only move by exactly the caller's own +-1, tied to adding
+    // or removing request.auth.uid in the matching member list. Comparing the
+    // whole list (concat/removeAll) is what stops a write from also dropping
+    // someone else's entry. Missing fields default (legacy / fresh docs).
+
+    // +1: uid not yet a member; list gains exactly uid at the end (arrayUnion).
+    function addsOwnMember(countField, listField) {
+      let before = resource.data.get(listField, []);
+      return !(request.auth.uid in before)
+        && request.resource.data[listField] == before.concat([request.auth.uid])
+        && request.resource.data[countField] == resource.data.get(countField, 0) + 1;
+    }
+
+    // -1: uid is a member; list loses exactly uid (arrayRemove).
+    function removesOwnMember(countField, listField) {
+      let before = resource.data.get(listField, []);
+      return request.auth.uid in before
+        && request.resource.data[listField] == before.removeAll([request.auth.uid])
+        && request.resource.data[countField] == resource.data.get(countField, 0) - 1;
+    }
+
+    function togglesOwnMember(countField, listField) {
+      return addsOwnMember(countField, listField) || removesOwnMember(countField, listField);
+    }
+
+    // delayReportService ReactionKind.
+    function reactionKinds() {
+      return ['helped', 'same', 'recovered', 'differ'];
+    }
+
+    // One kind's count must move exactly as the caller's own choice implies:
+    // +1 if they now pick it, -1 if they dropped it, otherwise unchanged.
+    function reactionDeltaOk(kind, prevKind, nextKind) {
+      let delta = request.resource.data.get('reactions', {}).get(kind, 0)
+        - resource.data.get('reactions', {}).get(kind, 0);
+      return (nextKind == kind && prevKind != kind && delta == 1)
+        || (prevKind == kind && nextKind != kind && delta == -1)
+        || ((nextKind == kind) == (prevKind == kind) && delta == 0);
+    }
+
+    // setReaction/clearReaction: only reactedBy.<uid> changes, and every kind
+    // count follows from the caller's previous -> next kind. A legacy null
+    // reactedBy value (pre-#318) counts as "no reaction".
+    function isOwnReactionChange() {
+      let uid = request.auth.uid;
+      let beforeBy = resource.data.get('reactedBy', {});
+      let afterBy = request.resource.data.get('reactedBy', {});
+      let prevKind = beforeBy.get(uid, null);
+      let nextKind = afterBy.get(uid, null);
+      return afterBy.diff(beforeBy).affectedKeys().hasOnly([uid])
+        && (nextKind == null || nextKind in reactionKinds())
+        && request.resource.data.get('reactions', {}).keys().hasOnly(reactionKinds())
+        && reactionDeltaOk('helped', prevKind, nextKind)
+        && reactionDeltaOk('same', prevKind, nextKind)
+        && reactionDeltaOk('recovered', prevKind, nextKind)
+        && reactionDeltaOk('differ', prevKind, nextKind);
+    }
+
+    // --- F-03: congestion value domains (models/congestion.ts) ---------------
+    // Client clock skew tolerated on time fields before they are rejected as
+    // "future". Past values are harmless (they simply expire / sort lower).
+    function maxClockSkew() {
+      return duration.value(15, 'm');
+    }
+
+    function isCongestionLevel(v) {
+      return v in ['low', 'moderate', 'high', 'crowded'];
+    }
+
+    function isDirection(v) {
+      return v in ['up', 'down'];
+    }
+
+    function isIdString(v) {
+      return v is string && v.size() > 0 && v.size() <= 64;
+    }
+
+    // TRAIN_CAR_COUNT = 10.
+    function isCarNumber(v) {
+      return v is int && v >= 1 && v <= 10;
+    }
+
+    // Summaries aggregate at most 100 reports (getCarCongestionFromReports
+    // limit(100)), so no count can exceed that.
+    function isReportCount(v, min) {
+      return v is int && v >= min && v <= 100;
+    }
+
+    function isNotFuture(t) {
+      return t is timestamp && t <= request.time + maxClockSkew();
+    }
+
+    // Aggregate toggles (upvote / reaction) may bump updatedAt, but only to a
+    // timestamp within clock skew of now — a far-future value would pin the
+    // report as "freshest" (D5). An unchanged updatedAt is left alone.
+    function updatedAtNotFuture() {
+      return !('updatedAt' in request.resource.data.diff(resource.data).affectedKeys())
+        || isNotFuture(request.resource.data.updatedAt);
+    }
+
+    // Kept lean: a 10-car summary must stay under the 1000-expression budget
+    // per rule evaluation (exact keys = hasOnly + size). Unreported cars keep
+    // reportCount 0 (createEmptyCarCongestions), so 0 is a legit value.
+    function isValidCar(c) {
+      return c.keys().hasOnly(['carNumber', 'congestionLevel', 'reportCount', 'lastUpdated'])
+        && c.size() == 4
+        && isCarNumber(c.carNumber)
+        && isCongestionLevel(c.congestionLevel)
+        && isReportCount(c.reportCount, 0)
+        && c.lastUpdated is timestamp;
+    }
+
+    // Rules have no loops: check each of the (at most 10) car slots.
+    function isValidCarList(cars) {
+      let n = cars.size();
+      return n <= 10
+        && (n <= 0 || isValidCar(cars[0]))
+        && (n <= 1 || isValidCar(cars[1]))
+        && (n <= 2 || isValidCar(cars[2]))
+        && (n <= 3 || isValidCar(cars[3]))
+        && (n <= 4 || isValidCar(cars[4]))
+        && (n <= 5 || isValidCar(cars[5]))
+        && (n <= 6 || isValidCar(cars[6]))
+        && (n <= 7 || isValidCar(cars[7]))
+        && (n <= 8 || isValidCar(cars[8]))
+        && (n <= 9 || isValidCar(cars[9]));
+    }
+
     // Users collection - prevent privilege escalation
     // Users can read/update their own profile, but cannot set role/admin fields
     match /users/{userId} {
@@ -62,21 +191,62 @@ service cloud.firestore {
     // Reports carry `reporterId`; expired-report cleanup runs server-side
     // (Cloud Functions / Admin SDK, which bypasses rules), so clients never
     // update or delete.
+    // F-03: field allowlist + value domains mirror congestionService
+    // submitReport(). expiresAt is pinned to timestamp + 10m
+    // (REPORT_EXPIRATION_MINUTES) so a report cannot stay inside the
+    // `expiresAt >= now` aggregation window indefinitely.
     match /congestionReports/{reportId} {
       allow read: if true;
       allow create: if request.auth != null
-        && request.resource.data.reporterId == request.auth.uid;
+        && request.resource.data.reporterId == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'trainId', 'lineId', 'stationId', 'direction', 'carNumber',
+          'congestionLevel', 'reporterId', 'timestamp', 'expiresAt'
+        ])
+        && request.resource.data.keys().hasAll([
+          'trainId', 'lineId', 'stationId', 'direction', 'carNumber',
+          'congestionLevel', 'reporterId', 'timestamp', 'expiresAt'
+        ])
+        && isIdString(request.resource.data.trainId)
+        && isIdString(request.resource.data.lineId)
+        && isIdString(request.resource.data.stationId)
+        && isDirection(request.resource.data.direction)
+        && isCarNumber(request.resource.data.carNumber)
+        && isCongestionLevel(request.resource.data.congestionLevel)
+        && isNotFuture(request.resource.data.timestamp)
+        && request.resource.data.expiresAt == request.resource.data.timestamp + duration.value(10, 'm');
       allow update, delete: if false;
     }
 
     // Congestion summary - client-computed aggregate written after each report
-    // (CongestionService.updateSummaryFromReport). Summaries have no owner
-    // field, so any authenticated user may (re)compute them - matching the
-    // delayReports upvote precedent. Hardening this into a Cloud Function
-    // trigger on congestionReports is tracked as a follow-up.
+    // (CongestionService.updateSummaryFromReport, full setDoc overwrite).
+    // Summaries have no owner field, so any authenticated user may (re)compute
+    // them, but only in the exact shape and value domains the client writes
+    // (F-03): doc id = {lineId}_{direction}_{trainId}, bounded counts, no
+    // future lastUpdated (the orderBy field of the line list). Rules cannot
+    // check that the numbers match the live reports; moving this aggregate to
+    // a Cloud Function trigger on congestionReports remains a follow-up.
     match /congestionSummary/{summaryId} {
       allow read: if true;
-      allow create, update: if request.auth != null;
+      allow create, update: if request.auth != null
+        && request.resource.data.keys().hasOnly([
+          'trainId', 'lineId', 'direction', 'cars', 'overallLevel',
+          'reportCount', 'lastUpdated'
+        ])
+        && request.resource.data.keys().hasAll([
+          'trainId', 'lineId', 'direction', 'cars', 'overallLevel',
+          'reportCount', 'lastUpdated'
+        ])
+        && isIdString(request.resource.data.trainId)
+        && isIdString(request.resource.data.lineId)
+        && isDirection(request.resource.data.direction)
+        && summaryId == request.resource.data.lineId + '_'
+          + request.resource.data.direction + '_' + request.resource.data.trainId
+        && request.resource.data.cars is list
+        && isValidCarList(request.resource.data.cars)
+        && isCongestionLevel(request.resource.data.overallLevel)
+        && isReportCount(request.resource.data.reportCount, 0)
+        && isNotFuture(request.resource.data.lastUpdated);
       allow delete: if false;
     }
 
@@ -110,11 +280,28 @@ service cloud.firestore {
         ])
         && request.resource.data.verified == false
         && request.resource.data.upvotes == 0
+        && request.resource.data.upvotedBy == []
         && !('status' in request.resource.data);
 
-      // Upvote: any authenticated user can update only vote-related fields
+      // Any authenticated user may change the shared aggregates, but only as
+      // their own single toggle (F-03). Separate allow branches, each with its
+      // own field set, so a mixed write cannot ride the weakest check.
+      // upvoteReport / removeUpvote:
       allow update: if request.auth != null
-        && onlyUpdates(['upvotes', 'upvotedBy', 'reactions', 'reactedBy', 'commentCount', 'updatedAt']);
+        && onlyUpdates(['upvotes', 'upvotedBy', 'updatedAt'])
+        && togglesOwnMember('upvotes', 'upvotedBy')
+        && updatedAtNotFuture();
+
+      // setReaction / clearReaction:
+      allow update: if request.auth != null
+        && onlyUpdates(['reactions', 'reactedBy', 'updatedAt'])
+        && isOwnReactionChange()
+        && updatedAtNotFuture();
+
+      // reportCommentService.addComment batch: commentCount +1 only.
+      allow update: if request.auth != null
+        && onlyUpdates(['commentCount'])
+        && request.resource.data.commentCount == resource.data.get('commentCount', 0) + 1;
 
       // Owner can resolve or update their own report
       allow update: if request.auth != null
@@ -134,11 +321,22 @@ service cloud.firestore {
     // like fields; no client deletes (no client delete path exists).
     match /delayReports/{reportId}/comments/{commentId} {
       allow read: if true;
+      // Field allowlist mirrors reportCommentService.addComment(); like/reply
+      // counters start at zero (F-03).
       allow create: if request.auth != null
         && request.resource.data.userId == request.auth.uid
-        && request.resource.data.reportId == reportId;
+        && request.resource.data.reportId == reportId
+        && request.resource.data.keys().hasOnly([
+          'reportId', 'userId', 'userDisplayName', 'badge', 'text',
+          'createdAt', 'likes', 'likedBy', 'replyCount'
+        ])
+        && request.resource.data.likes == 0
+        && request.resource.data.likedBy == []
+        && request.resource.data.replyCount == 0;
+      // toggleCommentLike: the caller's own +-1 only (F-03).
       allow update: if request.auth != null
-        && onlyUpdates(['likes', 'likedBy']);
+        && onlyUpdates(['likes', 'likedBy'])
+        && togglesOwnMember('likes', 'likedBy');
       allow delete: if false;
     }
 

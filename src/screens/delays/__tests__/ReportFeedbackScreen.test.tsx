@@ -1,4 +1,5 @@
 import React from 'react';
+import { Alert } from 'react-native';
 import { render, fireEvent, waitFor } from '@testing-library/react-native';
 import { ReportFeedbackScreen } from '../ReportFeedbackScreen';
 import { ReportType, ReportSeverity } from '@/models/delayReport';
@@ -7,6 +8,7 @@ const mockListComments = jest.fn();
 const mockAddComment = jest.fn();
 const mockSetReaction = jest.fn();
 const mockClearReaction = jest.fn();
+const mockGetReport = jest.fn();
 
 jest.mock('lucide-react-native', () => ({
   ChevronLeft: 'ChevronLeft',
@@ -37,6 +39,7 @@ jest.mock('@/services/delay/delayReportService', () => ({
   delayReportService: {
     setReaction: (...args: unknown[]) => mockSetReaction(...args),
     clearReaction: (...args: unknown[]) => mockClearReaction(...args),
+    getReport: (...args: unknown[]) => mockGetReport(...args),
   },
 }));
 
@@ -74,6 +77,7 @@ describe('ReportFeedbackScreen', () => {
     mockAddComment.mockResolvedValue('c-new');
     mockSetReaction.mockResolvedValue(undefined);
     mockClearReaction.mockResolvedValue(undefined);
+    mockGetReport.mockResolvedValue(null);
   });
 
   it('renders header and summary', () => {
@@ -156,5 +160,105 @@ describe('ReportFeedbackScreen', () => {
     const { getByTestId } = render(<ReportFeedbackScreen report={baseReport} onBack={onBack} />);
     fireEvent.press(getByTestId('feedback-back'));
     expect(onBack).toHaveBeenCalled();
+  });
+  describe('reaction write failure (D1)', () => {
+    let alertSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      alertSpy = jest.spyOn(Alert, 'alert').mockImplementation(() => undefined);
+    });
+
+    afterEach(() => {
+      alertSpy.mockRestore();
+    });
+
+    const setHelpedThenFailRecovered = async (
+      getByTestId: ReturnType<typeof render>['getByTestId'],
+    ): Promise<void> => {
+      fireEvent.press(getByTestId('reaction-tile-helped'));
+      await waitFor(() => expect(mockSetReaction).toHaveBeenCalledTimes(1));
+      mockSetReaction.mockRejectedValueOnce(new Error('permission-denied'));
+      fireEvent.press(getByTestId('reaction-tile-recovered'));
+      await waitFor(() => expect(alertSpy).toHaveBeenCalledWith('오류', '반응을 저장하지 못했습니다.'));
+    };
+
+    it('re-reads the report and sends the server previousKind on the next tap', async () => {
+      mockGetReport.mockResolvedValue({
+        ...baseReport,
+        reactions: { helped: 30, same: 14, recovered: 6, differ: 2 },
+        reactedBy: { 'u-me': 'helped' },
+      });
+      const { getByTestId } = render(<ReportFeedbackScreen report={baseReport} />);
+      await setHelpedThenFailRecovered(getByTestId);
+      expect(mockGetReport).toHaveBeenCalledWith('r-1');
+
+      fireEvent.press(getByTestId('reaction-tile-same'));
+      await waitFor(() => expect(mockSetReaction).toHaveBeenCalledTimes(3));
+      expect(mockSetReaction.mock.calls[2]).toEqual(['r-1', 'u-me', 'helped', 'same']);
+    });
+
+    it('shows server reaction counts after re-read', async () => {
+      mockGetReport.mockResolvedValue({
+        ...baseReport,
+        reactions: { helped: 30, same: 14, recovered: 6, differ: 2 },
+        reactedBy: { 'u-me': 'helped' },
+      });
+      const { getByTestId } = render(<ReportFeedbackScreen report={baseReport} />);
+      await setHelpedThenFailRecovered(getByTestId);
+      await waitFor(() =>
+        expect(getByTestId('feedback-total-participants').props.children.join('')).toContain('52'),
+      );
+      expect(getByTestId('reaction-tile-helped').props.accessibilityState).toEqual({ selected: true });
+    });
+
+    it('rolls back to the last successful state (not the prop) when re-read fails', async () => {
+      mockGetReport.mockResolvedValue(null);
+      const { getByTestId } = render(<ReportFeedbackScreen report={baseReport} />);
+      await setHelpedThenFailRecovered(getByTestId);
+      // baseReport has 45 participants; the successful "helped" set makes it 46.
+      await waitFor(() =>
+        expect(getByTestId('feedback-total-participants').props.children.join('')).toContain('46'),
+      );
+
+      fireEvent.press(getByTestId('reaction-tile-same'));
+      await waitFor(() => expect(mockSetReaction).toHaveBeenCalledTimes(3));
+      expect(mockSetReaction.mock.calls[2]).toEqual(['r-1', 'u-me', 'helped', 'same']);
+    });
+
+    it('ignores taps while a failed write is still re-syncing (Codex P2)', async () => {
+      let resolveRead: (value: null) => void = () => undefined;
+      mockGetReport.mockImplementation(
+        () => new Promise<null>(resolve => { resolveRead = resolve; }),
+      );
+      mockSetReaction.mockRejectedValueOnce(new Error('permission-denied'));
+      const { getByTestId } = render(<ReportFeedbackScreen report={baseReport} />);
+      fireEvent.press(getByTestId('reaction-tile-helped'));
+      await waitFor(() => expect(mockGetReport).toHaveBeenCalledTimes(1));
+
+      fireEvent.press(getByTestId('reaction-tile-same'));
+      fireEvent.press(getByTestId('reaction-tile-same'));
+      expect(mockSetReaction).toHaveBeenCalledTimes(1);
+      expect(mockClearReaction).not.toHaveBeenCalled();
+
+      resolveRead(null);
+      await waitFor(() => expect(alertSpy).toHaveBeenCalled());
+      fireEvent.press(getByTestId('reaction-tile-same'));
+      await waitFor(() => expect(mockSetReaction).toHaveBeenCalledTimes(2));
+      expect(mockSetReaction.mock.calls[1]).toEqual(['r-1', 'u-me', null, 'same']);
+    });
+
+    it('rolls back to the last successful state after a failed clear', async () => {
+      mockGetReport.mockResolvedValue(null);
+      mockClearReaction.mockRejectedValueOnce(new Error('permission-denied'));
+      const { getByTestId } = render(<ReportFeedbackScreen report={baseReport} />);
+      fireEvent.press(getByTestId('reaction-tile-helped'));
+      await waitFor(() => expect(mockSetReaction).toHaveBeenCalledTimes(1));
+      fireEvent.press(getByTestId('reaction-tile-helped'));
+      await waitFor(() => expect(alertSpy).toHaveBeenCalled());
+
+      fireEvent.press(getByTestId('reaction-tile-helped'));
+      await waitFor(() => expect(mockClearReaction).toHaveBeenCalledTimes(2));
+      expect(mockClearReaction.mock.calls[1]).toEqual(['r-1', 'u-me', 'helped']);
+    });
   });
 });

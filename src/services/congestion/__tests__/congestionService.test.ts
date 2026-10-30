@@ -149,6 +149,16 @@ describe('CongestionService', () => {
       expect(result.expiresAt).toBeDefined();
       expect(result.expiresAt.getTime()).toBeGreaterThan(result.timestamp.getTime());
     });
+
+    it('sets expiresAt exactly REPORT_EXPIRATION_MINUTES after timestamp (D3)', async () => {
+      mockAddDoc.mockResolvedValue({ id: 'new-report-id' });
+      mockGetDocs.mockResolvedValue({ docs: [] });
+
+      const result = await congestionService.submitReport(mockReportInput, 'user-123');
+
+      // REPORT_EXPIRATION_MINUTES is mocked to 15 in this file.
+      expect(result.expiresAt.getTime() - result.timestamp.getTime()).toBe(15 * 60_000);
+    });
   });
 
   describe('getTrainCongestion', () => {
