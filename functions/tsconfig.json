@@ -4,12 +4,14 @@
     "noImplicitReturns": true,
     "noUnusedLocals": true,
     "outDir": "lib",
+    "rootDir": "src",
     "sourceMap": true,
     "strict": true,
     "target": "es2017",
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "types": ["node", "jest"]
   },
   "compileOnSave": true,
   "include": [
