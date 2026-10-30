@@ -44,6 +44,30 @@ updates:
           - "*"
         update-types:
           - "major"
+    # Expo SDK 가 버전을 고정하는 패키지는 Dependabot 이 올리지 않는다 — SDK 업그레이드 시
+    # `npx expo install --fix` 로 일괄 정렬한다. (#393: minor 그룹에 react 19.3·react-native 0.88 등이
+    # 섞여 루트 tsc 가 깨짐.) 목록 기준 = expo/bundledNativeModules.json 에 있는 루트 의존성 +
+    # @types/react(react 핀과 짝). 비관리 react-native-* 라이브러리는 막지 않도록 와일드카드 대신 이름을 나열한다.
+    # 새 Expo 모듈을 추가하면 expo-* 외에는 여기도 추가할 것.
+    ignore:
+      - dependency-name: "expo"
+      - dependency-name: "expo-*"
+      - dependency-name: "jest-expo"
+      - dependency-name: "eslint-config-expo"
+      - dependency-name: "react"
+      - dependency-name: "react-dom"
+      - dependency-name: "@types/react"
+      - dependency-name: "react-native"
+      - dependency-name: "react-native-gesture-handler"
+      - dependency-name: "react-native-reanimated"
+      - dependency-name: "react-native-safe-area-context"
+      - dependency-name: "react-native-screens"
+      - dependency-name: "react-native-svg"
+      - dependency-name: "react-native-web"
+      - dependency-name: "react-native-webview"
+      - dependency-name: "react-native-worklets"
+      - dependency-name: "@react-native-async-storage/async-storage"
+      - dependency-name: "@react-native-community/*"
 
   # Firebase Functions(Node 20) — main 머지 시 firebase-deploy.yml 이 자동 배포하므로
   # 머지 전 functions 빌드·테스트 통과를 반드시 확인한다.
