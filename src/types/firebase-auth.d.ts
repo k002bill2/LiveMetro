@@ -1,7 +1,7 @@
 /**
- * Module augmentation for firebase v10's React Native auth persistence.
+ * Module augmentation for firebase's React Native auth persistence.
  *
- * firebase v10 ships `getReactNativePersistence` (and its
+ * firebase (v10 through v12.19) ships `getReactNativePersistence` (and its
  * `ReactNativeAsyncStorage` storage interface) only in the React Native
  * entry point (`index.rn.d.ts`). tsc resolves `firebase/auth` to the
  * default web typings (`dist/auth/index.d.ts`) where both are absent —

@@ -57,6 +57,8 @@ module.exports = {
   // Same key as react-native/jest-preset so this replaces, not adds, the transform.
   transform: {
     '^.+\\.(js|ts|tsx)$': ['babel-jest', { caller: { preserveEnvVars: true } }],
+    // firebase 12's @firebase/util ESM build imports './postinstall.mjs'.
+    '^.+\\.mjs$': ['babel-jest', { caller: { preserveEnvVars: true } }],
   },
 
   // Transform ignore patterns for React Native modules
