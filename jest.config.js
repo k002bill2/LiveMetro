@@ -31,6 +31,10 @@ module.exports = {
     '^@utils/(.*)$': '<rootDir>/src/utils/$1',
     '^@models/(.*)$': '<rootDir>/src/models/$1',
     '^@hooks/(.*)$': '<rootDir>/src/hooks/$1',
+    // lucide-react-native 1.x adds package.json "exports" whose RN entry is an
+    // untransformed ESM .mjs; pin Jest to the CJS build (what 0.x resolved via
+    // "main"). Metro still bundles the .mjs via the "react-native" main field.
+    '^lucide-react-native$': '<rootDir>/node_modules/lucide-react-native/dist/cjs/lucide-react-native.js',
   },
 
   // Test patterns - exclude setup and mock files.
