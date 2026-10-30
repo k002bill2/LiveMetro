@@ -81,8 +81,13 @@ describe('emailService.buildEmailContent escaping', () => {
       message: '운행 중단',
       affectedLines: ['<i>1호선</i>', 42, { toString: () => '<script>' }, '2호선'],
     });
-    expect(html).toContain('&lt;i&gt;1호선&lt;/i&gt;, 2호선');
-    expect(html).not.toContain('42');
+    // Scope to the affected-lines block: the footer carries the wall-clock send
+    // time, so a whole-html '42' check fails whenever the time contains 42.
+    const affectedLines = html.match(
+      /<strong>영향 노선:<\/strong>([\s\S]*?)<\/div>/,
+    )?.[1];
+    expect(affectedLines?.trim()).toBe('&lt;i&gt;1호선&lt;/i&gt;, 2호선');
+    expect(affectedLines).not.toContain('42');
     expect(html).not.toContain('<script');
   });
 
