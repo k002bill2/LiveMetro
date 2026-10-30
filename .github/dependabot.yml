@@ -111,3 +111,8 @@ updates:
           - "*"
         update-types:
           - "major"
+    # typescript 는 @typescript-eslint 8.x peer(<6.1.0) 안에서만 올린다 — 7.x(#401·#406)는
+    # ERESOLVE 로 npm ci 가 깨진다. typescript-eslint 가 TS 6.1+/7 을 지원하면 해제할 것.
+    ignore:
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
