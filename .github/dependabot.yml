@@ -85,6 +85,9 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: "eslint"
         update-types: ["version-update:semver-major"]
+      # 7.x는 React Compiler 규칙으로 177 errors(#399 triage) — 별도 정리 후 해제
+      - dependency-name: "eslint-plugin-react-hooks"
+        update-types: ["version-update:semver-major"]
 
   # Firebase Functions(Node 20) — main 머지 시 firebase-deploy.yml 이 자동 배포하므로
   # 머지 전 functions 빌드·테스트 통과를 반드시 확인한다.
@@ -108,3 +111,8 @@ updates:
           - "*"
         update-types:
           - "major"
+    # typescript 는 @typescript-eslint 8.x peer(<6.1.0) 안에서만 올린다 — 7.x(#401·#406)는
+    # ERESOLVE 로 npm ci 가 깨진다. typescript-eslint 가 TS 6.1+/7 을 지원하면 해제할 것.
+    ignore:
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major", "version-update:semver-minor"]
