@@ -3,16 +3,17 @@
  * Handles user data retrieval for email notifications
  */
 
-import * as admin from 'firebase-admin';
+import { getApps, initializeApp } from 'firebase-admin/app';
+import { getFirestore } from 'firebase-admin/firestore';
 import { UserData } from '../types';
 import { isEmailOptInEnabled } from './emailRecipient';
 
 // Initialize Firebase Admin (only once)
-if (!admin.apps.length) {
-  admin.initializeApp();
+if (!getApps().length) {
+  initializeApp();
 }
 
-const db = admin.firestore();
+const db = getFirestore();
 
 /**
  * Get user data by UID

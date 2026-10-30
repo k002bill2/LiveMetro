@@ -1,7 +1,7 @@
 /**
  * tokenManagementService 토큰 무효화 테스트 (보안 finding F-10, IDOR).
  *
- * 서비스 싱글턴이 import 시점에 `admin.firestore()`를 잡으므로 firebase-admin을
+ * 서비스 싱글턴이 import 시점에 `getFirestore()`를 잡으므로 firebase-admin/firestore를
  * in-memory fake로 대체한다. fake는 `where()` 절을 기록하고(필터 제거 회귀
  * 검출용), 옵션으로 userId 필터를 무시해 방어적 skip 경로도 독립 검증한다.
  *
@@ -94,17 +94,15 @@ const mockMakeFirestore = (): unknown => {
   };
 };
 
-jest.mock('firebase-admin', () => {
-  const firestore = Object.assign(() => mockMakeFirestore(), {
-    FieldValue: {
-      arrayRemove: (...values: unknown[]) => ({ __arrayRemove: values }),
-      arrayUnion: (...values: unknown[]) => ({ __arrayUnion: values }),
-      serverTimestamp: () => ({ __serverTimestamp: true }),
-    },
-    Timestamp: { fromDate: (date: Date) => ({ __ts: date.getTime() }) },
-  });
-  return { firestore };
-});
+jest.mock('firebase-admin/firestore', () => ({
+  getFirestore: () => mockMakeFirestore(),
+  FieldValue: {
+    arrayRemove: (...values: unknown[]) => ({ __arrayRemove: values }),
+    arrayUnion: (...values: unknown[]) => ({ __arrayUnion: values }),
+    serverTimestamp: () => ({ __serverTimestamp: true }),
+  },
+  Timestamp: { fromDate: (date: Date) => ({ __ts: date.getTime() }) },
+}));
 
 import { tokenManagementService } from '../tokenManagementService';
 

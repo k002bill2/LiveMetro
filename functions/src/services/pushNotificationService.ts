@@ -3,7 +3,15 @@
  * Sends push notifications via Firebase Cloud Messaging
  */
 
-import * as admin from 'firebase-admin';
+import {
+  getMessaging,
+  Messaging,
+  MulticastMessage,
+  Notification,
+  AndroidConfig,
+  ApnsConfig,
+  Message,
+} from 'firebase-admin/messaging';
 
 // ============================================================================
 // Types
@@ -85,13 +93,13 @@ const NOTIFICATION_CHANNELS = {
  * Common FCM message shape before a routing key (`token`/`topic`/`condition`/`tokens`)
  * is attached. Each `sendToX` method spreads this base and appends its own key.
  */
-type FcmBaseMessage = Omit<admin.messaging.MulticastMessage, 'tokens'>;
+type FcmBaseMessage = Omit<MulticastMessage, 'tokens'>;
 
 class PushNotificationService {
-  private messaging: admin.messaging.Messaging;
+  private messaging: Messaging;
 
   constructor() {
-    this.messaging = admin.messaging();
+    this.messaging = getMessaging();
   }
 
   /**
@@ -321,7 +329,7 @@ class PushNotificationService {
    * Build FCM message
    */
   private buildMessage(payload: PushNotificationPayload): FcmBaseMessage {
-    const notification: admin.messaging.Notification = {
+    const notification: Notification = {
       title: payload.title,
       body: payload.body,
     };
@@ -330,7 +338,7 @@ class PushNotificationService {
       notification.imageUrl = payload.imageUrl;
     }
 
-    const android: admin.messaging.AndroidConfig = {
+    const android: AndroidConfig = {
       priority: 'high',
       notification: {
         channelId: NOTIFICATION_CHANNELS.general.id,
@@ -340,7 +348,7 @@ class PushNotificationService {
       },
     };
 
-    const apns: admin.messaging.ApnsConfig = {
+    const apns: ApnsConfig = {
       payload: {
         aps: {
           badge: payload.badge,
@@ -355,7 +363,7 @@ class PushNotificationService {
       data: payload.data,
       android,
       apns,
-    } as admin.messaging.Message;
+    } as Message;
   }
 
   /**
@@ -393,7 +401,7 @@ class PushNotificationService {
 
     for (let i = 0; i < tokens.length; i += batchSize) {
       const batch = tokens.slice(i, i + batchSize);
-      const multicastMessage: admin.messaging.MulticastMessage = {
+      const multicastMessage: MulticastMessage = {
         ...message,
         tokens: batch,
       };
