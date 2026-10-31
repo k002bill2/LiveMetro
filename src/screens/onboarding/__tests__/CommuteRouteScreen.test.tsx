@@ -7,7 +7,7 @@
  */
 
 import React from 'react';
-import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
+import { render, fireEvent, waitFor, act, within } from '@testing-library/react-native';
 import { CommuteRouteScreen } from '../CommuteRouteScreen';
 import { saveCommuteRoutes } from '@/services/commute/commuteService';
 import { routeVia } from '@/services/route/routeVia';
@@ -418,7 +418,7 @@ describe('CommuteRouteScreen (step 2/4 redesign)', () => {
     };
     const optionIds = (utils: ReturnType<typeof render>): string[] =>
       utils
-        .getAllByTestId(/^route-option-[a-z_]+$/)
+        .getAllByTestId(/^route-option-(?!search-)[a-z0-9_]+$/)
         .map((n) => String(n.props.testID).replace('route-option-', ''));
     const minutesOf = (utils: ReturnType<typeof render>, id: string): string | undefined =>
       String(utils.getByTestId(`route-option-${id}`).props.accessibilityLabel).match(
@@ -470,6 +470,33 @@ describe('CommuteRouteScreen (step 2/4 redesign)', () => {
         '최단 경로 (자동), 76분',
       );
       expect(utils.queryAllByText('소요 시간 미상')).toHaveLength(0);
+    });
+
+    it('"가장 빠름"은 표시 분이 가장 작은 옵션 하나에만 붙는다 (직행보다 빠른 환승)', () => {
+      const route = {
+        name: 'EditCommuteRoute',
+        params: {
+          kind: 'morning',
+          initial: {
+            departureTime: '08:30',
+            departureStation: { stationId: '0222', stationName: '강남', lineId: '2', lineName: '' },
+            arrivalStation: { stationId: '0239', stationName: '홍대입구', lineId: '2', lineName: '' },
+            transferStations: [],
+          },
+        },
+      };
+      const utils = render(
+        <CommuteRouteScreen navigation={mockNavigation as never} route={route as never} />,
+      );
+      const ids = optionIds(utils);
+      expect(ids[0]).toBe('direct');
+      const mins = ids.map((id) => Number(minutesOf(utils, id)));
+      // 전제: 이 OD에선 SSOT상 환승 경로(신촌)가 직행보다 빠르다.
+      expect(Math.min(...mins.slice(1))).toBeLessThan(mins[0]!);
+      // 그러면 직행 행은 "가장 빠름"을 주장하지 않는다(배지는 최소 분 옵션에만).
+      expect(
+        within(utils.getByTestId('route-option-direct')).queryByText(/가장 빠름/),
+      ).toBeNull();
     });
 
     it('검색으로 찾은 환승역 분도 같은 routeVia SSOT로 계산한다', () => {

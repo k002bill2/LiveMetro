@@ -76,11 +76,11 @@ import {
 } from '@/models/commute';
 import { useAuth } from '@/services/auth/AuthContext';
 import { saveCommuteRoutes } from '@/services/commute/commuteService';
-import { calculateRoute, getDiverseRoutes } from '@/services/route';
+import { getDiverseRoutes } from '@/services/route';
 import { routeVia } from '@/services/route/routeVia';
 import { selectCommuteRoute } from '@/services/route/selectCommuteRoute';
 import { resolveInternalStationId } from '@/utils/stationIdResolver';
-import { AVG_STATION_TRAVEL_TIME } from '@/models/route';
+import { AVG_STATION_TRAVEL_TIME, AVG_TRANSFER_TIME } from '@/models/route';
 import { STATIONS, LINE_STATIONS } from '@/utils/subwayMapData';
 import { searchLocalStations } from '@/services/data/stationsDataService';
 import { useCommuteRouteSteps } from '@/hooks/useCommuteRouteSteps';
@@ -106,6 +106,8 @@ const DIRECT_OPTION_ID = 'direct';
 // transferStations list, so home/ML render the globally fastest path.
 const FASTEST_OPTION_ID = 'fastest';
 const MAX_TRANSFER_OPTIONS = 4;
+// How many index-estimate-ranked candidates get a path-SSOT routeVia run.
+const SSOT_PRESELECT = 8;
 
 // stations.json (used by routeService graph) is keyed by English-slug IDs
 // like "gangnam"/"city_hall_1", whereas StationSelection.stationId comes from
@@ -137,8 +139,8 @@ const NAME_TO_LINES = (() => {
 
 const SEARCH_RESULT_PREFIX = 'search-';
 const MAX_SEARCH_RESULTS = 6;
-// 검색 결과 1건마다 calculateRoute(Dijkstra)를 2회 돌린다(최대 12회/입력).
-// 계산 자체는 싸지만(측정: V8 3ms) Hermes에서는 프레임 예산에 근접하므로
+// 검색 결과 1건마다 routeVia(K-shortest 2회)를 돌린다(최대 6회/입력). 추천 목록과
+// 같은 경로 SSOT라 분이 일치하지만 비싸므로(측정: V8 routeVia 1회 ≈ 100ms, REPORT)
 // 타이핑이 멈춘 뒤에만 계산한다. 추천 목록의 문자열 필터는 디바운스하지
 // 않는다 — 그쪽은 includes() 한 번이라 즉시 반응이 낫다.
 const SEARCH_DEBOUNCE_MS = 200;
@@ -241,6 +243,25 @@ const directRideMinutes = (
 };
 
 /**
+ * `fastest` ("가장 빠름") goes to exactly one option: the smallest displayed
+ * minutes. Options come head-first (자동/직행), so a tie keeps the head. A
+ * via route can beat the head — routeVia stitches two optimal legs without
+ * getDiverseRoutes' whole-route filters — so the head is not assumed fastest.
+ * With no measured option at all the head keeps the flag (badge stays hidden
+ * without minutes anyway).
+ */
+const withFastestBadge = (
+  options: readonly TransferRouteOptionData[],
+): TransferRouteOptionData[] => {
+  let winner = options[0];
+  for (const o of options) {
+    if (o.minutes === undefined) continue;
+    if (winner?.minutes === undefined || o.minutes < winner.minutes) winner = o;
+  }
+  return options.map((o) => ({ ...o, fastest: o === winner }));
+};
+
+/**
  * Build the "환승역 추천" list for the user's departure → arrival pair.
  *
  * The previous implementation used Yen's K-shortest path with a Jaccard
@@ -300,7 +321,13 @@ const buildRecommendations = (
   // result stays correct even when LINE_STATIONS coverage is incomplete
   // (e.g. 산곡 missing from LINE_STATIONS['7']). Membership decides *which*
   // stations are candidates; minutes come from the path SSOT (routeVia).
-  const candidates: { option: TransferRouteOptionData; raw: number | undefined }[] = [];
+  const scanned: {
+    stnId: string;
+    name: string;
+    fromLineId: string;
+    toLineId: string;
+    approx: number | undefined;
+  }[] = [];
   for (const [stnId, stnData] of Object.entries(STATIONS)) {
     if (stnId === depId || stnId === arrId) continue;
     if (stnId === depSlug || stnId === arrSlug) continue;
@@ -315,19 +342,43 @@ const buildRecommendations = (
     );
     if (!fromCandidate || !toCandidate) continue;
 
-    const raw = viaRouteMinutes(depSlug, stnId, arrSlug);
-    candidates.push({
-      raw,
-      option: {
-        id: stnId,
-        label: stnData.name,
-        isDirect: false,
-        fromLineId: fromCandidate,
-        toLineId: toCandidate,
-        minutes: toDisplayMinutes(raw),
-      },
+    const fromTime = directMinutesOnLine(fromCandidate, depId, stnId);
+    const toTime = directMinutesOnLine(toCandidate, stnId, arrId);
+    scanned.push({
+      stnId,
+      name: stnData.name,
+      fromLineId: fromCandidate,
+      toLineId: toCandidate,
+      approx:
+        fromTime !== undefined && toTime !== undefined
+          ? fromTime + toTime + AVG_TRANSFER_TIME
+          : undefined,
     });
   }
+
+  // Each routeVia runs two K-shortest searches (~100ms on V8), so only the
+  // SSOT_PRESELECT best candidates by the cheap index estimate get measured.
+  // The estimate only ranks the pre-selection; it is never displayed.
+  // Estimate-less candidates (LINE_STATIONS gaps) always stay in.
+  const preselected = [
+    ...scanned
+      .filter((s) => s.approx !== undefined)
+      .sort((a, b) => (a.approx ?? 0) - (b.approx ?? 0))
+      .slice(0, SSOT_PRESELECT),
+    ...scanned.filter((s) => s.approx === undefined),
+  ];
+  const candidates = preselected.map((s) => {
+    const raw = viaRouteMinutes(depSlug, s.stnId, arrSlug);
+    const option: TransferRouteOptionData = {
+      id: s.stnId,
+      label: s.name,
+      isDirect: false,
+      fromLineId: s.fromLineId,
+      toLineId: s.toLineId,
+      minutes: toDisplayMinutes(raw),
+    };
+    return { raw, option };
+  });
 
   // 3. Sort (SSOT minutes) + prune detours slower than 2× the direct ride
   // (only when a direct ride exists — otherwise we keep all candidates,
@@ -375,6 +426,7 @@ const buildRecommendations = (
     });
   }
   result.push(...transfers);
+  const badged = withFastestBadge(result);
 
   // 4. Honest fallback. Only fall back to a 직행 option when dep and arr
   // actually share a line (so direct is theoretically valid) but
@@ -384,7 +436,7 @@ const buildRecommendations = (
   if (result.length === 0) {
     return sharesLine ? [buildDirectFallback()] : [];
   }
-  return result;
+  return badged;
 };
 
 /**
@@ -512,7 +564,7 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
   // Search-derived options. Computed only when the user types a query —
   // lets users pick *any* station as a transfer point, not just the
   // algorithm's top-K. Station lookup is local/sync, but each candidate
-  // costs two Dijkstra runs (see :411), so this reads the debounced query.
+  // costs one routeVia (two K-shortest searches), so this reads the debounced query.
   const searchOptions = useMemo<TransferRouteOptionData[]>(() => {
     const q = debouncedQuery.trim();
     if (!q || !departureStation || !arrivalStation) return [];
@@ -523,8 +575,10 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
     const arrName = arrivalStation.stationName;
     const depLine = departureStation.lineId;
     const arrLine = arrivalStation.lineId;
-    const depGraphId = NAME_TO_GRAPH_ID.get(depName);
-    const arrGraphId = NAME_TO_GRAPH_ID.get(arrName);
+    const depGraphId =
+      resolveInternalStationId(departureStation.stationId) ?? NAME_TO_GRAPH_ID.get(depName);
+    const arrGraphId =
+      resolveInternalStationId(arrivalStation.stationId) ?? NAME_TO_GRAPH_ID.get(arrName);
 
     const seen = new Set<string>();
     const opts: TransferRouteOptionData[] = [];
@@ -541,15 +595,14 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
         lines.find((l) => l !== fromLineId) ??
         arrLine;
 
-      let minutes: number | undefined;
-      const stnGraphId = NAME_TO_GRAPH_ID.get(station.name);
-      if (stnGraphId && depGraphId && arrGraphId) {
-        const leg1 = calculateRoute(depGraphId, stnGraphId);
-        const leg2 = calculateRoute(stnGraphId, arrGraphId);
-        if (leg1 && leg2) {
-          minutes = Math.max(1, Math.round(leg1.totalMinutes + leg2.totalMinutes));
-        }
-      }
+      // Same via resolution the settings card applies to the saved id
+      // (station_cd, prefix stripped in handleNext) → same routeVia minutes.
+      const stnGraphId =
+        resolveInternalStationId(station.id) ?? NAME_TO_GRAPH_ID.get(station.name);
+      const minutes =
+        stnGraphId && depGraphId && arrGraphId
+          ? toDisplayMinutes(viaRouteMinutes(depGraphId, stnGraphId, arrGraphId))
+          : undefined;
 
       opts.push({
         id: `${SEARCH_RESULT_PREFIX}${station.id}`,
