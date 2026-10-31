@@ -13,7 +13,7 @@ This file provides guidance to Claude Code when working with this repository.
 | React | 19 |
 | TypeScript | 5.1+ (strict) |
 | Firebase | Auth, Firestore |
-| Navigation | React Navigation 6.x |
+| Navigation | React Navigation 7.x (`navigate` pushes; use `pop: true`/`popTo` to return to a route already in the stack) |
 
 ## Essential Commands
 
