@@ -12,6 +12,8 @@ import { CommuteRouteScreen } from '../CommuteRouteScreen';
 import { saveCommuteRoutes } from '@/services/commute/commuteService';
 import { routeVia } from '@/services/route/routeVia';
 import { resolveInternalStationId } from '@/utils/stationIdResolver';
+import { selectCommuteRoute } from '@/services/route/selectCommuteRoute';
+import { STATIONS } from '@/utils/subwayMapData';
 
 jest.mock('lucide-react-native', () => ({
   ArrowRight: 'ArrowRight',
@@ -515,6 +517,87 @@ describe('CommuteRouteScreen (step 2/4 redesign)', () => {
       } finally {
         jest.useRealTimers();
       }
+    });
+  });
+
+  // 불변식(R2): 편집 화면의 모든 분 == 그 선택을 저장했을 때 설정 카드·홈이 보일
+  // selectCommuteRoute 분(반올림). 후보는 사전 선별 없이 전부 SSOT로 재서 상위 4개를 보인다.
+  describe('불변식: 화면 분 == selectCommuteRoute 분 (대표 OD 3개)', () => {
+    const ODS = [
+      {
+        label: '산곡→선릉',
+        dep: { stationId: '3762', stationName: '산곡', lineId: '7', lineName: '' },
+        arr: { stationId: '0220', stationName: '선릉', lineId: '2', lineName: '' },
+      },
+      {
+        label: '신길→선릉',
+        dep: { stationId: 's_1032', stationName: '신길', lineId: '1', lineName: '' },
+        arr: { stationId: '0220', stationName: '선릉', lineId: '2', lineName: '' },
+      },
+      {
+        label: '서울역→선릉',
+        dep: { stationId: 'seoul', stationName: '서울역', lineId: '1', lineName: '' },
+        arr: { stationId: '0220', stationName: '선릉', lineId: '2', lineName: '' },
+      },
+    ];
+    const display = (m: number | undefined): number | undefined =>
+      m === undefined ? undefined : Math.max(1, Math.round(m));
+    const labelMinutes = (utils: ReturnType<typeof render>, id: string): number | undefined => {
+      const m = String(utils.getByTestId(`route-option-${id}`).props.accessibilityLabel).match(
+        /, (\d+)분$/,
+      )?.[1];
+      return m === undefined ? undefined : Number(m);
+    };
+    /** Every 1-transfer candidate the screen scans, measured by the path SSOT. */
+    const allCandidateMinutes = (depSlug: string, arrSlug: string): number[] => {
+      const dl = STATIONS[depSlug]?.lines ?? [];
+      const al = STATIONS[arrSlug]?.lines ?? [];
+      return Object.entries(STATIONS)
+        .filter(([id, s]) => {
+          if (id === depSlug || id === arrSlug) return false;
+          const a = dl.find((l) => s.lines?.includes(l));
+          return !!a && al.some((l) => l !== a && s.lines?.includes(l));
+        })
+        .map(([id]) => display(selectCommuteRoute(depSlug, arrSlug, id)?.totalMinutes))
+        .filter((m): m is number => m !== undefined)
+        .sort((x, y) => x - y);
+    };
+
+    it.each(ODS)('$label: 후보·자동 분이 selectCommuteRoute와 같고, SSOT 상위 4개를 보인다', ({ dep, arr }) => {
+      const utils = render(
+        <CommuteRouteScreen
+          navigation={mockNavigation as never}
+          route={
+            {
+              name: 'EditCommuteRoute',
+              params: {
+                kind: 'morning',
+                initial: {
+                  departureTime: '08:30',
+                  departureStation: dep,
+                  arrivalStation: arr,
+                  transferStations: [],
+                },
+              },
+            } as never
+          }
+        />,
+      );
+      const ids = utils
+        .getAllByTestId(/^route-option-(?!search-)[a-z0-9_]+$/)
+        .map((n) => String(n.props.testID).replace('route-option-', ''));
+      expect(ids[0]).toBe('fastest');
+      expect(labelMinutes(utils, 'fastest')).toBe(
+        display(selectCommuteRoute(dep.stationId, arr.stationId)?.totalMinutes),
+      );
+      const shown = ids.slice(1).map((id) => {
+        const m = labelMinutes(utils, id);
+        expect(m).toBe(display(selectCommuteRoute(dep.stationId, arr.stationId, id)?.totalMinutes));
+        return m;
+      });
+      const depSlug = resolveInternalStationId(dep.stationId) ?? dep.stationId;
+      const arrSlug = resolveInternalStationId(arr.stationId) ?? arr.stationId;
+      expect(shown).toEqual(allCandidateMinutes(depSlug, arrSlug).slice(0, 4));
     });
   });
 
