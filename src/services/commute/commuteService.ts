@@ -15,6 +15,7 @@ import {
   deleteField,
   FieldPath,
   Timestamp,
+  type FieldValue,
 } from 'firebase/firestore';
 import { firestore } from '@/services/firebase/config';
 import { CommuteRoute, CommuteType } from '@/models/commute';
@@ -42,6 +43,20 @@ export interface SaveCommuteResult {
   success: boolean;
   error?: string;
 }
+
+/**
+ * routePreference 쓰기 필드. 부재(undefined) = 키 생략 → merge가 저장값을 보존
+ * (시각만 바꾸는 저장 등 이 필드를 다루지 않는 경로). null = 명시적 해제 →
+ * deleteField(): setDoc({merge:true})는 생략된 중첩 키를 지우지 않으므로, 편집
+ * 화면에서 직행 → 자동으로 바꿨을 때 옛 'direct'가 남는 것을 막는다
+ * (updateBoardingPreference의 deleteField 관례와 같다).
+ */
+const routePreferenceField = (
+  route: CommuteRoute
+): { routePreference?: CommuteRoute['routePreference'] | FieldValue } => {
+  if (route.routePreference === undefined) return {};
+  return { routePreference: route.routePreference ?? deleteField() };
+};
 
 /**
  * Save commute routes to Firebase Firestore
@@ -77,6 +92,7 @@ export const saveCommuteRoutes = async (
             morningRoute
           ),
         }),
+        ...routePreferenceField(morningRoute),
       },
       eveningRoute: {
         departureTime: eveningRoute.departureTime,
@@ -95,6 +111,7 @@ export const saveCommuteRoutes = async (
             eveningRoute
           ),
         }),
+        ...routePreferenceField(eveningRoute),
       },
       updatedAt: serverTimestamp(),
       createdAt: serverTimestamp(),
@@ -237,6 +254,7 @@ export const updateMorningRoute = async (
             morningRoute
           ),
         }),
+        ...routePreferenceField(morningRoute),
       },
       updatedAt: serverTimestamp(),
     });
@@ -281,6 +299,7 @@ export const updateEveningRoute = async (
             eveningRoute
           ),
         }),
+        ...routePreferenceField(eveningRoute),
       },
       updatedAt: serverTimestamp(),
     });

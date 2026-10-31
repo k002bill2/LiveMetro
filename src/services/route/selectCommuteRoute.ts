@@ -12,6 +12,10 @@
  *   - otherwise → `getFastestRoute` — the same Route as `getDiverseRoutes[0]`
  *     (Yen's K-shortest fastest path), proven equal or computed by falling
  *     back to it, without the full Yen search on the hot path
+ *   - `routePreference === 'direct'` (no via) → the first transfer-free route
+ *     of `getDiverseRoutes` — the exact definition the route editor uses for
+ *     its "직행 (환승 없음)" minutes — falling back to the fastest route when
+ *     the OD has no direct ride
  *
  * Returns `null` (no throw — project error policy) when:
  *   - either station id is missing, or both are equal
@@ -20,15 +24,17 @@
  *   - graph search returns no path
  *   - any thrown error during calculation
  */
-import { getFastestRoute } from '@services/route/kShortestPath';
+import { getDiverseRoutes, getFastestRoute } from '@services/route/kShortestPath';
 import { routeVia } from '@services/route/routeVia';
 import { resolveInternalStationId } from '@utils/stationIdResolver';
 import type { Route } from '@/models/route';
+import type { CommuteRoutePreference } from '@/models/commute';
 
 export function selectCommuteRoute(
   fromStationId?: string,
   toStationId?: string,
   viaTransferId?: string,
+  routePreference?: CommuteRoutePreference,
 ): Route | null {
   if (!fromStationId || !toStationId || fromStationId === toStationId) return null;
 
@@ -41,10 +47,12 @@ export function selectCommuteRoute(
 
   try {
     const viaSlug = viaTransferId ? resolveInternalStationId(viaTransferId) : null;
-    const route = viaSlug
-      ? routeVia(fromSlug, viaSlug, toSlug)
-      : getFastestRoute(fromSlug, toSlug);
-    return route ?? null;
+    if (viaSlug) return routeVia(fromSlug, viaSlug, toSlug) ?? null;
+    if (routePreference === 'direct') {
+      const direct = getDiverseRoutes(fromSlug, toSlug).find((r) => r.transferCount === 0);
+      if (direct) return direct;
+    }
+    return getFastestRoute(fromSlug, toSlug) ?? null;
   } catch {
     return null;
   }

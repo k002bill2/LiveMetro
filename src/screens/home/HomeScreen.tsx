@@ -219,6 +219,7 @@ export const HomeScreen: React.FC = () => {
     fromStationId: activeCommute?.stationId,
     toStationId: activeCommute?.destinationStationId,
     viaTransferId: activeCommute?.transferStationId,
+    routePreference: activeCommute?.routePreference,
     fromStationName: commuteStationNames.origin,
     toStationName: commuteStationNames.destination,
     commuteType: activeCommuteType,

@@ -16,12 +16,14 @@ import { setGuidanceSession } from '@services/guidance/guidanceSessionStore';
 import { attachDestinationPreferences } from '@services/guidance/destinationPreferenceSync';
 import { notificationService } from '@services/notification/notificationService';
 import type { AppStackParamList } from '@/navigation/types';
-import type { CommuteType } from '@/models/commute';
+import type { CommuteRoutePreference, CommuteType } from '@/models/commute';
 
 interface StartCommuteGuidanceArgs {
   fromStationId?: string;
   toStationId?: string;
   viaTransferId?: string;
+  /** 저장된 경로 선호 — 'direct'면 같은 노선 직행으로 안내한다. */
+  routePreference?: CommuteRoutePreference;
   fromStationName?: string;
   toStationName?: string;
   /** 이 진입의 출처 출퇴근 leg. 부재 = 일반 경로 세션 (선호는 세션 한정). */
@@ -40,6 +42,7 @@ export function useStartCommuteGuidance(
     fromStationId,
     toStationId,
     viaTransferId,
+    routePreference,
     fromStationName,
     toStationName,
     commuteType,
@@ -47,8 +50,8 @@ export function useStartCommuteGuidance(
   } = args;
 
   const route = useMemo(
-    () => selectCommuteRoute(fromStationId, toStationId, viaTransferId),
-    [fromStationId, toStationId, viaTransferId],
+    () => selectCommuteRoute(fromStationId, toStationId, viaTransferId, routePreference),
+    [fromStationId, toStationId, viaTransferId, routePreference],
   );
 
   const handler = useCallback(() => {

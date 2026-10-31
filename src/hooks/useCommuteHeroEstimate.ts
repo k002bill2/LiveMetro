@@ -200,6 +200,7 @@ export function useCommuteHeroEstimate(
     activeCommute?.stationId,
     activeCommute?.destinationStationId,
     activeCommute?.transferStationId,
+    activeCommute?.routePreference,
   );
 
   useEffect(() => {

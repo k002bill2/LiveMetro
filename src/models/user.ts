@@ -2,6 +2,7 @@
  * User domain models and types
  * Handles user preferences, authentication, and personalization
  */
+import type { CommuteRoutePreference } from '@/models/commute';
 
 export interface User {
   readonly id: string;
@@ -173,6 +174,8 @@ export interface CommuteTime {
    * the route is the globally fastest path. Drives home card / ML timeline.
    */
   readonly transferStationId?: string;
+  /** 저장된 경로 선호(`'direct'` = 같은 노선 직행). 부재 = 최단/via. */
+  readonly routePreference?: CommuteRoutePreference;
 }
 
 /**
