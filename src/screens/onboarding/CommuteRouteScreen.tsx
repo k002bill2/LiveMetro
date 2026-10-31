@@ -76,8 +76,11 @@ import {
 } from '@/models/commute';
 import { useAuth } from '@/services/auth/AuthContext';
 import { saveCommuteRoutes } from '@/services/commute/commuteService';
-import { calculateRoute } from '@/services/route';
-import { AVG_STATION_TRAVEL_TIME, AVG_TRANSFER_TIME } from '@/models/route';
+import { calculateRoute, getDiverseRoutes } from '@/services/route';
+import { routeVia } from '@/services/route/routeVia';
+import { selectCommuteRoute } from '@/services/route/selectCommuteRoute';
+import { resolveInternalStationId } from '@/utils/stationIdResolver';
+import { AVG_STATION_TRAVEL_TIME } from '@/models/route';
 import { STATIONS, LINE_STATIONS } from '@/utils/subwayMapData';
 import { searchLocalStations } from '@/services/data/stationsDataService';
 import { useCommuteRouteSteps } from '@/hooks/useCommuteRouteSteps';
@@ -186,6 +189,57 @@ const directMinutesOnLine = (
   return undefined;
 };
 
+/** Display rule for every option: whole minutes, never below 1. */
+const toDisplayMinutes = (raw: number | undefined): number | undefined =>
+  raw === undefined || !Number.isFinite(raw) ? undefined : Math.max(1, Math.round(raw));
+
+/**
+ * Path-SSOT minutes for a forced transfer at `viaSlug` — the same `routeVia`
+ * the settings card / home use once that transfer is saved. undefined (never
+ * an approximation) when the graph has no path.
+ */
+const viaRouteMinutes = (
+  depSlug: string,
+  viaSlug: string,
+  arrSlug: string,
+): number | undefined => {
+  try {
+    return routeVia(depSlug, viaSlug, arrSlug)?.totalMinutes;
+  } catch {
+    return undefined;
+  }
+};
+
+/**
+ * Minutes for the 직행 option. Prefers the graph's own 0-transfer route
+ * (path SSOT); falls back to the LINE_STATIONS index estimate when the
+ * diverse-route set has no transfer-free path. `getDiverseRoutes[0]` is NOT
+ * used: for same-line ODs it can be a faster multi-transfer path, which would
+ * label "직행" with another route's time.
+ */
+const directRideMinutes = (
+  depSlug: string,
+  arrSlug: string,
+  depLines: readonly string[],
+  arrLines: readonly string[],
+  depId: string,
+  arrId: string,
+): number | undefined => {
+  try {
+    const ride = getDiverseRoutes(depSlug, arrSlug).find((r) => r.transferCount === 0);
+    if (ride) return ride.totalMinutes;
+  } catch {
+    // fall through to the index estimate
+  }
+  let estimate: number | undefined;
+  for (const line of depLines) {
+    if (!arrLines.includes(line)) continue;
+    const m = directMinutesOnLine(line, depId, arrId);
+    if (m !== undefined && (estimate === undefined || m < estimate)) estimate = m;
+  }
+  return estimate;
+};
+
 /**
  * Build the "환승역 추천" list for the user's departure → arrival pair.
  *
@@ -229,24 +283,27 @@ const buildRecommendations = (
     return [buildDirectFallback()];
   }
 
-  // 1. Direct option — shortest ride across any shared line.
-  let directMinutes: number | undefined;
-  for (const line of depLines) {
-    if (!arrLines.includes(line)) continue;
-    const m = directMinutesOnLine(line, depId, arrId);
-    if (m !== undefined && (directMinutes === undefined || m < directMinutes)) {
-      directMinutes = m;
-    }
-  }
+  // Graph slugs for the path SSOT, resolved exactly like selectCommuteRoute
+  // (station_cd → slug) so a candidate's minutes equal what the settings card
+  // shows once it is saved. Name lookup is only a fallback for fixtures/ids the
+  // resolver doesn't know.
+  const depSlug = resolveInternalStationId(dep.stationId) ?? depId;
+  const arrSlug = resolveInternalStationId(arr.stationId) ?? arrId;
+
+  // 1. Direct option — only when the endpoints share a line.
+  const sharesLine = depLines.some((l) => arrLines.includes(l));
+  const directMinutes = sharesLine
+    ? directRideMinutes(depSlug, arrSlug, depLines, arrLines, depId, arrId)
+    : undefined;
 
   // 2. 1-transfer candidates — scan STATIONS membership directly so the
   // result stays correct even when LINE_STATIONS coverage is incomplete
-  // (e.g. 산곡 missing from LINE_STATIONS['7']). Membership tells us
-  // *which* stations are valid candidates; time calc is best-effort.
-  const sharesLine = depLines.some((l) => arrLines.includes(l));
-  const transferMap = new Map<string, TransferRouteOptionData>();
+  // (e.g. 산곡 missing from LINE_STATIONS['7']). Membership decides *which*
+  // stations are candidates; minutes come from the path SSOT (routeVia).
+  const candidates: { option: TransferRouteOptionData; raw: number | undefined }[] = [];
   for (const [stnId, stnData] of Object.entries(STATIONS)) {
     if (stnId === depId || stnId === arrId) continue;
+    if (stnId === depSlug || stnId === arrSlug) continue;
     const stnLines = stnData.lines;
     if (!stnLines || stnLines.length === 0) continue;
 
@@ -258,45 +315,37 @@ const buildRecommendations = (
     );
     if (!fromCandidate || !toCandidate) continue;
 
-    const fromTime = directMinutesOnLine(fromCandidate, depId, stnId);
-    const toTime = directMinutesOnLine(toCandidate, stnId, arrId);
-    const minutes =
-      fromTime !== undefined && toTime !== undefined
-        ? Math.max(1, Math.round(fromTime + toTime + AVG_TRANSFER_TIME))
-        : undefined;
-
-    const existing = transferMap.get(stnId);
-    const existingMin = existing?.minutes ?? Number.POSITIVE_INFINITY;
-    const newMin = minutes ?? Number.POSITIVE_INFINITY;
-    if (!existing || newMin < existingMin) {
-      transferMap.set(stnId, {
+    const raw = viaRouteMinutes(depSlug, stnId, arrSlug);
+    candidates.push({
+      raw,
+      option: {
         id: stnId,
         label: stnData.name,
         isDirect: false,
         fromLineId: fromCandidate,
         toLineId: toCandidate,
-        minutes,
-      });
-    }
+        minutes: toDisplayMinutes(raw),
+      },
+    });
   }
 
-  // 3. Sort + prune detours that are slower than 2× the direct ride
+  // 3. Sort (SSOT minutes) + prune detours slower than 2× the direct ride
   // (only when a direct ride exists — otherwise we keep all candidates,
   // including time-unknown ones, since the user has no faster baseline).
   const directCutoff =
     directMinutes !== undefined ? directMinutes * 2 : Number.POSITIVE_INFINITY;
-  const transfers = Array.from(transferMap.values())
-    .filter((t) =>
+  const transfers = candidates
+    .filter((c) =>
       directMinutes !== undefined
-        ? (t.minutes ?? Number.POSITIVE_INFINITY) <= directCutoff
+        ? (c.raw ?? Number.POSITIVE_INFINITY) <= directCutoff
         : true,
     )
     .sort(
       (a, b) =>
-        (a.minutes ?? Number.POSITIVE_INFINITY) -
-        (b.minutes ?? Number.POSITIVE_INFINITY),
+        (a.raw ?? Number.POSITIVE_INFINITY) - (b.raw ?? Number.POSITIVE_INFINITY),
     )
-    .slice(0, MAX_TRANSFER_OPTIONS);
+    .slice(0, MAX_TRANSFER_OPTIONS)
+    .map((c) => c.option);
 
   const result: TransferRouteOptionData[] = [];
   if (directMinutes !== undefined) {
@@ -304,7 +353,7 @@ const buildRecommendations = (
       id: DIRECT_OPTION_ID,
       label: '직행 (환승 없음)',
       isDirect: true,
-      minutes: Math.max(1, Math.round(directMinutes)),
+      minutes: toDisplayMinutes(directMinutes),
       recommended: true,
       fastest: true,
     });
@@ -313,10 +362,14 @@ const buildRecommendations = (
     // fastest route, NOT an auto-forced first transfer — `isDirect: true` so it
     // persists an empty transferStations list (→ globally fastest path). The
     // transfer candidates below remain available as explicit overrides.
+    // Its minutes are that same saved path (selectCommuteRoute, no via).
     result.push({
       id: FASTEST_OPTION_ID,
       label: '최단 경로 (자동)',
       isDirect: true,
+      minutes: toDisplayMinutes(
+        selectCommuteRoute(dep.stationId, arr.stationId)?.totalMinutes,
+      ),
       recommended: true,
       fastest: true,
     });
