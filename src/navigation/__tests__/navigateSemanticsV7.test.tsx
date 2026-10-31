@@ -69,13 +69,20 @@ function HeadlessTabs(props: HeadlessTabProps): React.JSX.Element {
     TabRouter,
     props,
   );
-  // Keep every tab mounted like bottom-tabs does after first focus, so a
-  // nested stack keeps its state across tab switches.
+  // Like bottom-tabs (lazy): a tab mounts on first focus and then stays
+  // mounted, so a nested stack keeps its state across tab switches.
+  const loadedKeys = React.useRef(new Set<string>());
+  const focusedKey = state.routes[state.index]?.key;
+  if (focusedKey !== undefined) {
+    loadedKeys.current.add(focusedKey);
+  }
   return (
     <NavigationContent>
-      {state.routes.map((r) => (
-        <React.Fragment key={r.key}>{descriptors[r.key]?.render() ?? null}</React.Fragment>
-      ))}
+      {state.routes
+        .filter((r) => loadedKeys.current.has(r.key))
+        .map((r) => (
+          <React.Fragment key={r.key}>{descriptors[r.key]?.render() ?? null}</React.Fragment>
+        ))}
     </NavigationContent>
   );
 }
