@@ -553,4 +553,35 @@ describe('Commute Service', () => {
       expect('boardingPreferences' in evening).toBe(false);
     });
   });
+
+  describe('saveCommuteRoutes — routePreference', () => {
+    const writtenLegs = (): { morningRoute: Record<string, unknown>; eveningRoute: Record<string, unknown> } =>
+      mockSetDoc.mock.calls[0][1];
+
+    beforeEach(() => {
+      mockSetDoc.mockResolvedValue(undefined);
+    });
+
+    it("writes 'direct' on both legs when set", async () => {
+      await saveCommuteRoutes(
+        'user-123',
+        { ...mockCommuteRoute, routePreference: 'direct' },
+        { ...mockEveningRoute, routePreference: 'direct' },
+      );
+      expect(writtenLegs().morningRoute.routePreference).toBe('direct');
+      expect(writtenLegs().eveningRoute.routePreference).toBe('direct');
+    });
+
+    it('null → deleteField so setDoc(merge) removes a stale stored preference', async () => {
+      await saveCommuteRoutes('user-123', { ...mockCommuteRoute, routePreference: null }, mockEveningRoute);
+      expect(writtenLegs().morningRoute.routePreference).toEqual({ _type: 'deleteField' });
+    });
+
+    it('undefined → key omitted (merge preserves whatever is stored; legacy payload unchanged)', async () => {
+      await saveCommuteRoutes('user-123', mockCommuteRoute, mockEveningRoute);
+      expect('routePreference' in writtenLegs().morningRoute).toBe(false);
+      expect('routePreference' in writtenLegs().eveningRoute).toBe(false);
+    });
+  });
 });
+

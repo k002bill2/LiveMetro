@@ -491,10 +491,12 @@ describe('CommuteRouteScreen (step 2/4 redesign)', () => {
         <CommuteRouteScreen navigation={mockNavigation as never} route={route as never} />,
       );
       const ids = optionIds(utils);
-      expect(ids[0]).toBe('direct');
+      // 직행보다 빠른 SSOT 최단이 있으면 자동이 맨 위, 직행은 두 번째(직행 선택 보존).
+      expect(ids.slice(0, 2)).toEqual(['fastest', 'direct']);
       const mins = ids.map((id) => Number(minutesOf(utils, id)));
+      const directMin = mins[1]!;
       // 전제: 이 OD에선 SSOT상 환승 경로(신촌)가 직행보다 빠르다.
-      expect(Math.min(...mins.slice(1))).toBeLessThan(mins[0]!);
+      expect(Math.min(...mins.slice(2))).toBeLessThan(directMin);
       // 그러면 직행 행은 "가장 빠름"을 주장하지 않는다(배지는 최소 분 옵션에만).
       expect(
         within(utils.getByTestId('route-option-direct')).queryByText(/가장 빠름/),
@@ -810,3 +812,126 @@ describe('CommuteRouteScreen (step 2/4 redesign)', () => {
     });
   });
 });
+
+// 같은 노선 OD에서 SSOT 최단(환승)이 직행보다 빠를 때: 자동·직행·환승 후보를 모두 보이고,
+// 직행 선택은 routePreference='direct'로 저장돼야 설정 카드·홈이 그 경로를 안내한다.
+describe('같은 노선 OD 직행 선택 보존 (강남→홍대입구)', () => {
+  const GANGNAM = { stationId: '0222', stationName: '강남', lineId: '2', lineName: '' };
+  const HONGDAE = { stationId: '0239', stationName: '홍대입구', lineId: '2', lineName: '' };
+  const editRoute = (initialExtra: Record<string, unknown> = {}) => ({
+    name: 'EditCommuteRoute',
+    params: {
+      kind: 'morning',
+      initial: {
+        departureTime: '08:30',
+        departureStation: GANGNAM,
+        arrivalStation: HONGDAE,
+        transferStations: [],
+        ...initialExtra,
+      },
+    },
+  });
+  const renderEdit = (initialExtra?: Record<string, unknown>) =>
+    render(
+      <CommuteRouteScreen
+        navigation={mockNavigation as never}
+        route={editRoute(initialExtra) as never}
+      />,
+    );
+  const optionIds = (utils: ReturnType<typeof render>): string[] =>
+    utils
+      .getAllByTestId(/^route-option-(?!search-)[a-z0-9_]+$/)
+      .map((n) => String(n.props.testID).replace('route-option-', ''));
+  const labelOf = (utils: ReturnType<typeof render>, id: string): string =>
+    String(utils.getByTestId(`route-option-${id}`).props.accessibilityLabel);
+  const minutesOf = (utils: ReturnType<typeof render>, id: string): number =>
+    Number(labelOf(utils, id).match(/, (\d+)분/)?.[1]);
+  const isSelected = (utils: ReturnType<typeof render>, id: string): boolean =>
+    utils.getByTestId(`route-option-${id}`).props.accessibilityState?.selected === true;
+  const savedMorning = async (): Promise<Record<string, unknown>> => {
+    await waitFor(() => expect(saveCommuteRoutes).toHaveBeenCalledTimes(1));
+    return (saveCommuteRoutes as jest.Mock).mock.calls[0][1];
+  };
+
+  beforeEach(() => {
+    (saveCommuteRoutes as jest.Mock).mockReset();
+    (saveCommuteRoutes as jest.Mock).mockResolvedValue({ success: true });
+  });
+
+  it('자동(SSOT 분)·직행(직행 분)·환승 후보를 보이고 자동이 기본 선택이다', () => {
+    const utils = renderEdit();
+    const ids = optionIds(utils);
+    expect(ids.slice(0, 2)).toEqual(['fastest', 'direct']);
+    expect(ids.length).toBeGreaterThan(2);
+    const ssot = selectCommuteRoute('0222', '0239')!;
+    const direct = selectCommuteRoute('0222', '0239', undefined, 'direct')!;
+    expect(direct.transferCount).toBe(0);
+    expect(minutesOf(utils, 'fastest')).toBe(Math.max(1, Math.round(ssot.totalMinutes)));
+    expect(minutesOf(utils, 'direct')).toBe(Math.max(1, Math.round(direct.totalMinutes)));
+    expect(minutesOf(utils, 'fastest')).toBeLessThan(minutesOf(utils, 'direct'));
+    expect(isSelected(utils, 'fastest')).toBe(true);
+  });
+
+  it("직행을 골라 저장하면 routePreference:'direct' + 빈 환승으로 저장된다", async () => {
+    const utils = renderEdit();
+    fireEvent.press(utils.getByTestId('route-option-direct'));
+    fireEvent.press(utils.getByTestId('commute-next'));
+    const morning = await savedMorning();
+    expect(morning.routePreference).toBe('direct');
+    expect(morning.transferStations).toEqual([]);
+    // otherLeg 부재 → 역방향 leg도 같은 노선 직행이다.
+    const evening = (saveCommuteRoutes as jest.Mock).mock.calls[0][2];
+    expect(evening.routePreference).toBe('direct');
+  });
+
+  it('자동을 저장하면 routePreference를 명시적으로 지운다(null → deleteField)', async () => {
+    const utils = renderEdit({ routePreference: 'direct' });
+    fireEvent.press(utils.getByTestId('route-option-fastest'));
+    fireEvent.press(utils.getByTestId('commute-next'));
+    const morning = await savedMorning();
+    expect(morning.routePreference).toBeNull();
+    expect(morning.transferStations).toEqual([]);
+  });
+
+  it("저장값 'direct'는 직행 옵션 선택으로 복원된다", async () => {
+    const utils = renderEdit({ routePreference: 'direct' });
+    expect(isSelected(utils, 'direct')).toBe(true);
+    expect(isSelected(utils, 'fastest')).toBe(false);
+    fireEvent.press(utils.getByTestId('commute-next'));
+    expect((await savedMorning()).routePreference).toBe('direct');
+  });
+
+  it('"가장 빠름"은 표시 분 최소 옵션 하나에만(행 종류 무관) 붙고, 힌트가 그 승자와 일치한다', () => {
+    const utils = renderEdit();
+    const ids = optionIds(utils);
+    const tagged = ids.filter((id) => labelOf(utils, id).includes('가장 빠름'));
+    expect(tagged).toHaveLength(1);
+    const min = Math.min(...ids.map((id) => minutesOf(utils, id)));
+    expect(minutesOf(utils, tagged[0]!)).toBe(min);
+    expect(tagged[0]).not.toBe('direct');
+    expect(
+      within(utils.getByTestId(`route-option-${tagged[0]}`)).getByText(/가장 빠름/),
+    ).toBeTruthy();
+    expect(utils.getByText('가장 빠른 경로로 안내해 드려요. 필요시 환승역을 선택하세요')).toBeTruthy();
+    expect(utils.queryByText('직행이 가장 빨라요. 필요시 환승역을 선택하세요')).toBeNull();
+  });
+
+  it("온보딩 모드: 직행 선택이 CommuteTime으로 routePreference:'direct'를 넘긴다", () => {
+    const pick = (selectionType: 'departure' | 'arrival', station: typeof GANGNAM) => ({
+      name: 'CommuteRoute',
+      params: { pickedStation: { selectionType, station } },
+    });
+    const utils = render(
+      <CommuteRouteScreen navigation={mockNavigation as never} route={pick('departure', GANGNAM) as never} />,
+    );
+    utils.rerender(
+      <CommuteRouteScreen navigation={mockNavigation as never} route={pick('arrival', HONGDAE) as never} />,
+    );
+    fireEvent.press(utils.getByTestId('route-option-direct'));
+    fireEvent.press(utils.getByTestId('commute-next'));
+    const call = mockNavigate.mock.calls.find((c) => c[0] === 'CommuteTime');
+    expect(call?.[1].route.routePreference).toBe('direct');
+    expect(call?.[1].route.transferStations).toEqual([]);
+  });
+});
+

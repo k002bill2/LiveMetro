@@ -1207,4 +1207,61 @@ describe('CommuteSettingsScreen', () => {
     // 역방향 생성된 퇴근 leg도 마찬가지(reverseCommuteRoute는 미러하지 않는다).
     expect('boardingPreferences' in eveningArg).toBe(false);
   });
+
+  // 직행 선택 보존: routePreference='direct' 문서는 SSOT 최단(환승)이 아니라 직행
+  // 경로로 카드를 그린다. selectCommuteRoute에 선호가 전달되는지로 증명한다.
+  it("routePreference 'direct' 문서는 카드에 \"직행 · 환승 없음\"을 표시한다", async () => {
+    mockLoadCommuteRoutes.mockResolvedValue({
+      morningRoute: {
+        departureTime: '08:30',
+        departureStationId: '0222',
+        departureStationName: '강남',
+        departureLineId: '2',
+        arrivalStationId: '0239',
+        arrivalStationName: '홍대입구',
+        arrivalLineId: '2',
+        transferStations: [],
+        routePreference: 'direct',
+        notifications: {
+          transferAlert: true,
+          arrivalAlert: true,
+          delayAlert: true,
+          incidentAlert: true,
+          alertMinutesBefore: 5,
+        },
+        bufferMinutes: 10,
+      },
+      eveningRoute: null,
+      eveningEnabled: true,
+      createdAt: null,
+      updatedAt: null,
+    } as never);
+    const ride = (from: string, to: string, line: string) => ({
+      fromStationId: from, fromStationName: from, toStationId: to, toStationName: to,
+      lineId: line, lineName: `${line}호선`, estimatedMinutes: 10, isTransfer: false,
+    });
+    const TRANSFER_ROUTE = {
+      segments: [
+        ride('강남', '교대', '2'),
+        { ...ride('교대', '교대', '3'), isTransfer: true },
+        ride('교대', '홍대입구', '3'),
+      ],
+      totalMinutes: 38, transferCount: 1, lineIds: ['2', '3'],
+    };
+    const DIRECT_ROUTE = {
+      segments: [ride('강남', '홍대입구', '2')],
+      totalMinutes: 41, transferCount: 0, lineIds: ['2'],
+    };
+    (selectCommuteRoute as jest.Mock).mockImplementation(
+      (_f?: string, _t?: string, _v?: string, pref?: string) =>
+        pref === 'direct' ? DIRECT_ROUTE : TRANSFER_ROUTE,
+    );
+
+    const { getAllByText, queryByText } = render(<CommuteSettingsScreen {...createProps()} />);
+    await waitFor(() => {
+      expect(getAllByText('직행 · 환승 없음').length).toBeGreaterThan(0);
+    });
+    expect(queryByText('환승 1회 · 교대')).toBeNull();
+  });
 });
+

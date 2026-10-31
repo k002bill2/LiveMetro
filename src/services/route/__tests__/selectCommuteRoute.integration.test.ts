@@ -14,6 +14,7 @@ import { getDiverseRoutes } from '@services/route/kShortestPath';
 import { selectCommuteRoute } from '@services/route/selectCommuteRoute';
 import * as routeCache from '@services/route/routeCache';
 import { STATIONS } from '@/utils/subwayMapData';
+import { resolveInternalStationId } from '@utils/stationIdResolver';
 
 // 산곡(s_ec82b0ea)→선릉, 신길→선릉, 서울역→선릉 — the OD pairs measured in REPORT-R2.
 const ODS: readonly [string, string][] = [
@@ -50,3 +51,25 @@ describe('selectCommuteRoute (no via) — same Route as getDiverseRoutes[0]', ()
     expect(actual).toEqual(getDiverseRoutes(a, b)[0] ?? null);
   });
 });
+
+// 같은 노선 OD에서 사용자가 "직행 (환승 없음)"을 고르면 routePreference='direct'로
+// 저장된다. 강남→홍대입구는 SSOT 최단이 환승 경로라, 직행 선호가 없으면 설정 카드·홈이
+// 사용자가 고르지 않은 경로를 안내한다(#421 REPORT §8).
+describe("selectCommuteRoute routePreference 'direct' — real graph", () => {
+  it('강남(0222)→홍대입구(0239): direct preference yields a transfer-free route', () => {
+    const fastest = selectCommuteRoute('0222', '0239');
+    const direct = selectCommuteRoute('0222', '0239', undefined, 'direct');
+    expect(fastest?.transferCount).toBeGreaterThan(0);
+    expect(direct?.transferCount).toBe(0);
+    const from = resolveInternalStationId('0222')!;
+    const to = resolveInternalStationId('0239')!;
+    expect(direct).toEqual(getDiverseRoutes(from, to).find((r) => r.transferCount === 0));
+  });
+
+  it('cross-line OD without a direct ride falls back to the fastest route', () => {
+    expect(selectCommuteRoute('s_ec82b0ea', 'seolleung', undefined, 'direct')).toEqual(
+      selectCommuteRoute('s_ec82b0ea', 'seolleung'),
+    );
+  });
+});
+
