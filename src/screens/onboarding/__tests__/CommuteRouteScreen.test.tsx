@@ -85,8 +85,13 @@ jest.mock('@/services/commute/commuteService', () => ({
 
 // 검색 결과 1건당 calculateRoute를 2회 부른다. 디바운스가 걸렸는지는
 // "타이핑 직후 호출 0"으로만 직접 증명할 수 있어 이 seam을 센다.
+// getDiverseRoutes는 실제 구현을 쓴다 — 편집 화면의 "최단 경로 (자동)" 환승역
+// 표시는 설정 화면과 같은 path SSOT(selectCommuteRoute → getDiverseRoutes)로
+// 계산되므로, 이 seam을 목으로 바꾸면 두 화면이 같은 이름을 보이는지 증명할 수 없다.
 jest.mock('@/services/route', () => ({
   calculateRoute: jest.fn(() => ({ totalMinutes: 12, segments: [] })),
+  getDiverseRoutes: (...args: unknown[]) =>
+    jest.requireActual('@/services/route').getDiverseRoutes(...args),
 }));
 
 const mockGoBack = jest.fn();
@@ -374,6 +379,135 @@ describe('CommuteRouteScreen (step 2/4 redesign)', () => {
     // 손대지 않은 leg = 필드 생략 → merge가 저장된 선호를 그대로 보존한다.
     // (nav 파라미터 타입 OnboardingRouteData에 선호가 없어 여기서 {}를 쓰면 유실된다.)
     expect('boardingPreferences' in eveningArg).toBe(false);
+  });
+
+  // 편집 진입 시 저장된 환승역 복원. 산곡(7)→선릉(2)은 직행이 없는 교차 노선이라
+  // 추천 = [fastest, daelim, gangnam_gu_office, konkuk_univ]. 검색으로 고른 환승역은
+  // station_cd(강남구청 = 2732)로 저장되므로 그 ID로도 선택이 복원돼야 한다.
+  describe('편집 모드 환승역 복원', () => {
+    const editRouteWith = (transferStations: unknown[]) => ({
+      name: 'EditCommuteRoute',
+      params: {
+        kind: 'morning',
+        initial: {
+          departureTime: '08:30',
+          departureStation: { stationId: '3762', stationName: '산곡', lineId: '7', lineName: '' },
+          arrivalStation: { stationId: '0220', stationName: '선릉', lineId: '2', lineName: '' },
+          transferStations,
+        },
+      },
+    });
+    const renderEdit = (transferStations: unknown[]) =>
+      render(
+        <CommuteRouteScreen
+          navigation={mockNavigation as never}
+          route={editRouteWith(transferStations) as never}
+        />,
+      );
+    const isSelected = (
+      utils: ReturnType<typeof render>,
+      optionId: string,
+    ): boolean =>
+      utils.getByTestId(`route-option-${optionId}`).props.accessibilityState?.selected === true;
+    const savedMorningTransfers = async (): Promise<unknown[]> => {
+      await waitFor(() => expect(saveCommuteRoutes).toHaveBeenCalledTimes(1));
+      const [, morningArg] = (saveCommuteRoutes as jest.Mock).mock.calls[0];
+      return morningArg.transferStations;
+    };
+
+    beforeEach(() => {
+      (saveCommuteRoutes as jest.Mock).mockReset();
+      (saveCommuteRoutes as jest.Mock).mockResolvedValue({ success: true });
+    });
+
+    it('station_cd(2732)로 저장된 강남구청을 선택 상태로 복원하고 저장 시 유지한다', async () => {
+      const utils = renderEdit([
+        { stationId: '2732', stationName: '강남구청', lineId: '7', lineName: '', order: 1 },
+      ]);
+
+      expect(isSelected(utils, 'gangnam_gu_office')).toBe(true);
+      expect(isSelected(utils, 'fastest')).toBe(false);
+      expect(utils.getByText('강남구청 환승')).toBeTruthy();
+
+      fireEvent.press(utils.getByTestId('commute-next'));
+      const transfers = await savedMorningTransfers();
+      expect(transfers).toEqual([
+        expect.objectContaining({ stationName: '강남구청', order: 1 }),
+      ]);
+    });
+
+    it('그래프 ID로 저장된 환승역은 기존처럼 그대로 선택된다', async () => {
+      const utils = renderEdit([
+        { stationId: 'gangnam_gu_office', stationName: '강남구청', lineId: '7', lineName: '', order: 1 },
+      ]);
+
+      expect(isSelected(utils, 'gangnam_gu_office')).toBe(true);
+
+      fireEvent.press(utils.getByTestId('commute-next'));
+      const transfers = await savedMorningTransfers();
+      expect(transfers).toEqual([
+        expect.objectContaining({ stationId: 'gangnam_gu_office', stationName: '강남구청' }),
+      ]);
+    });
+
+    it('추천 목록 밖 환승역은 버리지 않고 선택된 옵션으로 보존해 그대로 저장한다', async () => {
+      const utils = renderEdit([
+        { stationId: '0208', stationName: '왕십리', lineId: '2', lineName: '', order: 1 },
+      ]);
+
+      expect(isSelected(utils, 'fastest')).toBe(false);
+      expect(utils.getByText('왕십리 환승')).toBeTruthy();
+
+      fireEvent.press(utils.getByTestId('commute-next'));
+      const transfers = await savedMorningTransfers();
+      expect(transfers).toEqual([
+        expect.objectContaining({ stationId: '0208', stationName: '왕십리', lineId: '2', order: 1 }),
+      ]);
+    });
+
+    it('저장값이 비어 있으면 fastest를 선택하고 SSOT로 계산한 환승역을 함께 보여준다', async () => {
+      const utils = renderEdit([]);
+
+      expect(isSelected(utils, 'fastest')).toBe(true);
+      // 설정 카드와 같은 seam(useCommuteRouteSteps)으로 계산한 실제 환승역.
+      expect(utils.getByText('최단 경로 (자동) · 강남구청 환승')).toBeTruthy();
+      expect(utils.getByTestId('commute-footer')).toHaveTextContent(
+        '산곡 → 선릉 · 최단 경로 (자동) · 강남구청 환승',
+      );
+
+      // 표시만 바뀐다 — fastest는 계속 빈 배열로 저장된다.
+      fireEvent.press(utils.getByTestId('commute-next'));
+      expect(await savedMorningTransfers()).toEqual([]);
+    });
+
+    it('도착역을 바꿔 저장된 선택이 무의미해지면 첫 옵션으로 리셋한다', () => {
+      const utils = renderEdit([
+        { stationId: '0208', stationName: '왕십리', lineId: '2', lineName: '', order: 1 },
+      ]);
+      expect(utils.queryByTestId('route-option-search-0208')).not.toBeNull();
+
+      const changed = editRouteWith([
+        { stationId: '0208', stationName: '왕십리', lineId: '2', lineName: '', order: 1 },
+      ]);
+      utils.rerender(
+        <CommuteRouteScreen
+          navigation={mockNavigation as never}
+          route={{
+            ...changed,
+            params: {
+              ...changed.params,
+              pickedStation: {
+                selectionType: 'arrival',
+                station: { stationId: '0222', stationName: '강남', lineId: '2', lineName: '' },
+              },
+            },
+          } as never}
+        />,
+      );
+
+      expect(utils.queryByTestId('route-option-search-0208')).toBeNull();
+      expect(utils.queryByText('왕십리 환승')).toBeNull();
+    });
   });
 
   describe('환승역 검색 디바운스', () => {

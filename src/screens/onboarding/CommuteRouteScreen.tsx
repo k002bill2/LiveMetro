@@ -80,6 +80,8 @@ import { calculateRoute } from '@/services/route';
 import { AVG_STATION_TRAVEL_TIME, AVG_TRANSFER_TIME } from '@/models/route';
 import { STATIONS, LINE_STATIONS } from '@/utils/subwayMapData';
 import { searchLocalStations } from '@/services/data/stationsDataService';
+import { useCommuteRouteSteps } from '@/hooks/useCommuteRouteSteps';
+import type { TransferStep } from '@/models/guidance';
 
 // CommuteRouteScreen serves TWO entry points:
 //   1. onboarding step 2/5 (OnboardingStack) — `route.name === 'CommuteRoute'`
@@ -332,6 +334,44 @@ const buildRecommendations = (
   return result;
 };
 
+/**
+ * Map a persisted transfer station back onto the option list so edit mode
+ * re-selects what the user saved. Persisted ids live in two spaces: graph IDs
+ * (recommendation picks, e.g. "gangnam_gu_office") and Seoul station_cd
+ * (search picks, e.g. "2732" — see the prefix strip in handleNext).
+ *   1. id already matches a recommendation → that option
+ *   2. stationName → graph ID matches a recommendation → that option
+ *   3. otherwise → a synthetic option carrying the stored values, so a pick
+ *      outside the top-K is preserved instead of silently reset to `fastest`.
+ *      It reuses the search prefix, so handleNext persists the original id.
+ */
+const resolveStoredTransfer = (
+  stored: TransferStation,
+  recommendations: readonly TransferRouteOptionData[],
+): { optionId: string; preserved: TransferRouteOptionData | null } => {
+  if (recommendations.some((r) => r.id === stored.stationId)) {
+    return { optionId: stored.stationId, preserved: null };
+  }
+  const graphId = NAME_TO_GRAPH_ID.get(stored.stationName);
+  if (graphId && recommendations.some((r) => r.id === graphId)) {
+    return { optionId: graphId, preserved: null };
+  }
+  const lines = NAME_TO_LINES.get(stored.stationName) ?? [];
+  const preserved: TransferRouteOptionData = {
+    id: `${SEARCH_RESULT_PREFIX}${stored.stationId}`,
+    label: stored.stationName,
+    isDirect: false,
+    fromLineId: stored.lineId,
+    toLineId: lines.find((l) => l !== stored.lineId),
+  };
+  return { optionId: preserved.id, preserved };
+};
+
+const isSameStation = (
+  a: StationSelection | null,
+  b: StationSelection | null | undefined,
+): boolean => !!a && !!b && a.stationId === b.stationId;
+
 export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
   const { isDark } = useTheme();
   const semantic = useSemanticTokens();
@@ -353,13 +393,19 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
   const [arrivalStation, setArrivalStation] = useState<StationSelection | null>(
     editParams?.initial?.arrivalStation ?? null,
   );
+  const initialDeparture = editParams?.initial?.departureStation;
+  const initialArrival = editParams?.initial?.arrivalStation;
+  const storedTransfer = editParams?.initial?.transferStations?.[0];
   const [selectedOptionId, setSelectedOptionId] = useState<string>(() => {
-    // Hydrate selected transfer option from initial route data. A non-empty
-    // transferStations array means the user previously chose a transfer
-    // station; we seed selection with that station's id so the radio list
-    // highlights it once recommendations are built. Empty → direct.
-    const first = editParams?.initial?.transferStations?.[0];
-    return first ? first.stationId : DIRECT_OPTION_ID;
+    // Hydrate selected transfer option from initial route data, resolved
+    // against the recommendations the first render will build (stored ids may
+    // be station_cd, which never equals a graph-ID recommendation). Empty →
+    // direct; the sync effect below maps that onto the first option.
+    if (!storedTransfer) return DIRECT_OPTION_ID;
+    return resolveStoredTransfer(
+      storedTransfer,
+      buildRecommendations(initialDeparture ?? null, initialArrival ?? null),
+    ).optionId;
   });
   const [query, setQuery] = useState('');
   // TextInput은 query로 즉시 갱신하고, 무거운 경로 계산만 이 값에 매단다.
@@ -382,10 +428,33 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
     navigation.setParams({ pickedStation: undefined });
   }, [route.params?.pickedStation, navigation]);
 
-  const recommendations = useMemo(
+  const baseRecommendations = useMemo(
     () => buildRecommendations(departureStation, arrivalStation),
     [departureStation, arrivalStation],
   );
+
+  // Keep a saved transfer that falls outside the top-K visible and selectable
+  // — but only while the edited OD is unchanged. Once the user picks a new
+  // departure/arrival the stored choice no longer applies and drops out, so
+  // the sync effect below resets selection as before.
+  const recommendations = useMemo(() => {
+    if (
+      !storedTransfer ||
+      !isSameStation(departureStation, initialDeparture) ||
+      !isSameStation(arrivalStation, initialArrival)
+    ) {
+      return baseRecommendations;
+    }
+    const { preserved } = resolveStoredTransfer(storedTransfer, baseRecommendations);
+    return preserved ? [...baseRecommendations, preserved] : baseRecommendations;
+  }, [
+    baseRecommendations,
+    storedTransfer,
+    departureStation,
+    arrivalStation,
+    initialDeparture,
+    initialArrival,
+  ]);
 
   // Search-derived options. Computed only when the user types a query —
   // lets users pick *any* station as a transfer point, not just the
@@ -475,6 +544,25 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
   const selectedOption =
     [...recommendations, ...searchOptions].find((r) => r.id === selectedOptionId) ??
     recommendations[0];
+
+  // "최단 경로 (자동)" persists no transfer, but the settings card derives the
+  // actual transfer from the path SSOT and shows e.g. "환승 1회 · 강남구청".
+  // Name it here through the same seam (useCommuteRouteSteps, no via) so both
+  // screens agree. Edit mode only; ids are withheld otherwise so the K-shortest
+  // search doesn't run. Empty steps (resolve failure) → keep the plain label.
+  const showFastestTransfers = isEditMode && selectedOption?.id === FASTEST_OPTION_ID;
+  const fastestSteps = useCommuteRouteSteps(
+    showFastestTransfers ? departureStation?.stationId : undefined,
+    showFastestTransfers ? arrivalStation?.stationId : undefined,
+  );
+  const fastestSummary = useMemo<string | null>(() => {
+    if (!selectedOption || fastestSteps.length === 0) return null;
+    const names = fastestSteps
+      .filter((s): s is TransferStep => s.kind === 'transfer')
+      .map((s) => s.stationName);
+    const via = names.length > 0 ? `${names.join(', ')} 환승` : '직행';
+    return `${selectedOption.label} · ${via}`;
+  }, [fastestSteps, selectedOption]);
 
   const getExcludedStationIds = useCallback((): string[] => {
     const ids: string[] = [];
@@ -785,7 +873,7 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
               </Text>
               <Text style={styles.transferGateValue} numberOfLines={1}>
                 {selectedOption?.isDirect
-                  ? (selectedOption.label ?? '직행 (환승 없음)')
+                  ? (fastestSummary ?? selectedOption.label ?? '직행 (환승 없음)')
                   : selectedOption?.label
                     ? `${selectedOption.label} 환승`
                     : '최단 경로 (자동)'}
@@ -881,7 +969,7 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
         {isValid && departureStation && arrivalStation ? (
           <Text style={styles.footerSummary} testID="commute-footer">
             {departureStation.stationName} → {arrivalStation.stationName} ·{' '}
-            {selectedOption?.isDirect ? '직행' : selectedOption?.label}
+            {selectedOption?.isDirect ? (fastestSummary ?? '직행') : selectedOption?.label}
           </Text>
         ) : null}
       </View>
