@@ -854,6 +854,26 @@ export function getDiverseRoutes(
  * shows once that via is saved.
  */
 export function getFastestRoute(fromStationId: string, toStationId: string): Route | null {
+  const key = `${fromStationId}|${toStationId}`;
+  if (fastestMemo.has(key)) return fastestMemo.get(key) ?? null;
+  const route = computeFastestRoute(fromStationId, toStationId);
+  // FIFO-bounded. Inputs are static map data (no congestion/realtime), so a
+  // memoized route never goes stale within a JS session.
+  if (fastestMemo.size >= FASTEST_MEMO_MAX) {
+    const oldest = fastestMemo.keys().next().value;
+    if (oldest !== undefined) fastestMemo.delete(oldest);
+  }
+  fastestMemo.set(key, route);
+  return route;
+}
+
+const FASTEST_MEMO_MAX = 256;
+const fastestMemo = new Map<string, Route | null>();
+// Congestion-free base graph, shared by every getFastestRoute call. Read-only:
+// dijkstra / hasFasterCappedPath never mutate it.
+let fastestBaseGraph: Map<string, Edge[]> | null = null;
+
+function computeFastestRoute(fromStationId: string, toStationId: string): Route | null {
   const cached = routeCache.get(
     routeCache.buildCacheKey(fromStationId, toStationId, DEFAULT_MAX_ROUTES),
   );
@@ -863,7 +883,8 @@ export function getFastestRoute(fromStationId: string, toStationId: string): Rou
   const endKeys = getStationNodeKeys(toStationId);
   if (startKeys.length === 0 || endKeys.length === 0) return null;
 
-  const graph = buildGraph();
+  fastestBaseGraph ??= buildGraph();
+  const graph = fastestBaseGraph;
   const first = dijkstra(graph, startKeys, endKeys);
   if (!first) return null;
 
