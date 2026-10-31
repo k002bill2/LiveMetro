@@ -1,13 +1,21 @@
 /**
  * routeVia unit tests — sub-route concatenation stitching logic.
- * getDiverseRoutes is mocked so the two legs are controlled; createRoute /
+ * getDiverseRoutes is mocked so the two legs are controlled (routeVia reads
+ * them through getFastestRoute ≡ getDiverseRoutes[0]); createRoute /
  * getLineName / AVG_TRANSFER_TIME run for real (pure model helpers).
  */
 import { getDiverseRoutes } from '../kShortestPath';
 import { routeVia } from '../routeVia';
 import type { RouteSegment } from '@models/route';
 
-jest.mock('../kShortestPath', () => ({ getDiverseRoutes: jest.fn() }));
+jest.mock('../kShortestPath', () => {
+  const getDiverseRoutes = jest.fn();
+  return {
+    getDiverseRoutes,
+    // Contract under test elsewhere (fastestRoute.integration): same route as [0].
+    getFastestRoute: (from: string, to: string) => getDiverseRoutes(from, to)?.[0] ?? null,
+  };
+});
 
 const mockDiverse = getDiverseRoutes as jest.Mock;
 

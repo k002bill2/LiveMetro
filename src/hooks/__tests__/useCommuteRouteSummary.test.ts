@@ -19,6 +19,14 @@ jest.mock('@services/route', () => ({
   getDiverseRoutes: jest.fn(),
 }));
 
+// selectCommuteRoute's no-via branch calls getFastestRoute, whose contract
+// (same Route as getDiverseRoutes[0]) is pinned by fastestRoute.integration /
+// selectCommuteRoute.integration — so it delegates to the mocked seam above.
+jest.mock('@services/route/kShortestPath', () => ({
+  getFastestRoute: (from: string, to: string) =>
+    jest.requireMock('@services/route').getDiverseRoutes(from, to)?.[0] ?? null,
+}));
+
 jest.mock('@services/route/routeVia', () => ({ routeVia: jest.fn() }));
 
 // resolver is exercised by its own unit tests (stationIdResolver.test.ts).

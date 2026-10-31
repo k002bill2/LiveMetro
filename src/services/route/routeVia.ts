@@ -8,7 +8,11 @@
  *
  *     getDiverseRoutes(from, V)[0]  +  [transfer @ V]  +  getDiverseRoutes(V, to)[0]
  *
- * and re-deriving totals via `createRoute` so totalMinutes / transferCount /
+ * Each leg comes from `getFastestRoute` — the same route as
+ * `getDiverseRoutes(leg)[0]`, usually without the full Yen search (the commute
+ * edit screen calls this once per transfer candidate during render).
+ *
+ * Totals are re-derived via `createRoute` so totalMinutes / transferCount /
  * lineIds stay consistent. The V transfer marker is inserted ONLY when the line
  * boarded into V differs from the line departing V — otherwise it is a
  * continuous ride and a marker would inflate transferCount (phantom transfer).
@@ -17,7 +21,7 @@
  *   - any id missing, or V collides with an endpoint (no meaningful via)
  *   - either leg has no path
  */
-import { getDiverseRoutes } from './kShortestPath';
+import { getFastestRoute } from './kShortestPath';
 import {
   createRoute,
   getLineName,
@@ -37,8 +41,8 @@ export function routeVia(
     return null;
   }
 
-  const legA = getDiverseRoutes(fromSlug, viaSlug)[0] ?? null;
-  const legB = getDiverseRoutes(viaSlug, toSlug)[0] ?? null;
+  const legA = getFastestRoute(fromSlug, viaSlug);
+  const legB = getFastestRoute(viaSlug, toSlug);
   if (!legA || !legB) return null;
   if (legA.segments.length === 0 || legB.segments.length === 0) return null;
 

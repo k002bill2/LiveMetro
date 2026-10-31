@@ -9,7 +9,9 @@
  *
  * Selection policy (identical to the two hooks it replaces):
  *   - via transfer chosen → `routeVia` constrains the path through it
- *   - otherwise → `getDiverseRoutes[0]` = Yen's K-shortest fastest path
+ *   - otherwise → `getFastestRoute` — the same Route as `getDiverseRoutes[0]`
+ *     (Yen's K-shortest fastest path), proven equal or computed by falling
+ *     back to it, without the full Yen search on the hot path
  *
  * Returns `null` (no throw — project error policy) when:
  *   - either station id is missing, or both are equal
@@ -18,7 +20,7 @@
  *   - graph search returns no path
  *   - any thrown error during calculation
  */
-import { getDiverseRoutes } from '@services/route';
+import { getFastestRoute } from '@services/route/kShortestPath';
 import { routeVia } from '@services/route/routeVia';
 import { resolveInternalStationId } from '@utils/stationIdResolver';
 import type { Route } from '@/models/route';
@@ -41,7 +43,7 @@ export function selectCommuteRoute(
     const viaSlug = viaTransferId ? resolveInternalStationId(viaTransferId) : null;
     const route = viaSlug
       ? routeVia(fromSlug, viaSlug, toSlug)
-      : getDiverseRoutes(fromSlug, toSlug)[0] ?? null;
+      : getFastestRoute(fromSlug, toSlug);
     return route ?? null;
   } catch {
     return null;

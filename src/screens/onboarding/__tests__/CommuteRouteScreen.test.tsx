@@ -7,10 +7,13 @@
  */
 
 import React from 'react';
-import { render, fireEvent, waitFor, act } from '@testing-library/react-native';
+import { render, fireEvent, waitFor, act, within } from '@testing-library/react-native';
 import { CommuteRouteScreen } from '../CommuteRouteScreen';
 import { saveCommuteRoutes } from '@/services/commute/commuteService';
-import { calculateRoute } from '@/services/route';
+import { routeVia } from '@/services/route/routeVia';
+import { resolveInternalStationId } from '@/utils/stationIdResolver';
+import { selectCommuteRoute } from '@/services/route/selectCommuteRoute';
+import { STATIONS } from '@/utils/subwayMapData';
 
 jest.mock('lucide-react-native', () => ({
   ArrowRight: 'ArrowRight',
@@ -83,16 +86,32 @@ jest.mock('@/services/commute/commuteService', () => ({
 // Keep the model module live so DEFAULT_COMMUTE_NOTIFICATIONS / TransferStation
 // type-check at compile time. Importing for real is fine — it has no native deps.
 
-// 검색 결과 1건당 calculateRoute를 2회 부른다. 디바운스가 걸렸는지는
-// "타이핑 직후 호출 0"으로만 직접 증명할 수 있어 이 seam을 센다.
-// getDiverseRoutes는 실제 구현을 쓴다 — 편집 화면의 "최단 경로 (자동)" 환승역
-// 표시는 설정 화면과 같은 path SSOT(selectCommuteRoute → getDiverseRoutes)로
-// 계산되므로, 이 seam을 목으로 바꾸면 두 화면이 같은 이름을 보이는지 증명할 수 없다.
+// 경로 서비스는 전부 실제 구현을 쓴다 — 옵션 분은 설정 카드·홈과 같은 path
+// SSOT(selectCommuteRoute → getDiverseRoutes / routeVia)로 계산되므로, 이 seam을
+// 목으로 바꾸면 두 화면이 같은 이름·분을 보이는지 증명할 수 없다.
 jest.mock('@/services/route', () => ({
-  calculateRoute: jest.fn(() => ({ totalMinutes: 12, segments: [] })),
   getDiverseRoutes: (...args: unknown[]) =>
     jest.requireActual('@/services/route').getDiverseRoutes(...args),
 }));
+// 검색 결과 1건당 routeVia를 1회 부른다. 디바운스가 걸렸는지는 "타이핑 직후
+// 호출 0"으로만 직접 증명할 수 있어 이 seam을 센다(구현은 실제 그대로).
+jest.mock('@/services/route/routeVia', () => {
+  const actual = jest.requireActual('@/services/route/routeVia');
+  return {
+    ...actual,
+    routeVia: jest.fn((...args: Parameters<typeof actual.routeVia>) =>
+      actual.routeVia(...args),
+    ),
+  };
+});
+
+/** 화면과 같은 반올림 규칙으로 계산한 SSOT 분 (via 경로). */
+const ssotViaMinutes = (depId: string, viaSlug: string, arrId: string): number => {
+  const route = jest
+    .requireActual('@/services/route/routeVia')
+    .routeVia(resolveInternalStationId(depId), viaSlug, resolveInternalStationId(arrId));
+  return Math.max(1, Math.round(route.totalMinutes));
+};
 
 const mockGoBack = jest.fn();
 const mockNavigate = jest.fn();
@@ -381,8 +400,209 @@ describe('CommuteRouteScreen (step 2/4 redesign)', () => {
     expect('boardingPreferences' in eveningArg).toBe(false);
   });
 
+  // 추천 목록의 분은 설정 카드·홈과 같은 path SSOT로 계산한다(실그래프, 서비스 목 없음).
+  // 근사치(LINE_STATIONS 인덱스 거리) 시절엔 산곡→선릉에서 자동이 "소요 시간 미상",
+  // 대림 77분이 강남구청 84분보다 위라 SSOT(강남구청 75.8분)와 순서가 뒤집혔다.
+  describe('환승역 추천 분 = 경로 SSOT', () => {
+    const SANGOK = { stationId: '3762', stationName: '산곡', lineId: '7', lineName: '' };
+    const SEOLLEUNG = { stationId: '0220', stationName: '선릉', lineId: '2', lineName: '' };
+    const editRoute = {
+      name: 'EditCommuteRoute',
+      params: {
+        kind: 'morning',
+        initial: {
+          departureTime: '08:30',
+          departureStation: SANGOK,
+          arrivalStation: SEOLLEUNG,
+          transferStations: [],
+        },
+      },
+    };
+    const optionIds = (utils: ReturnType<typeof render>): string[] =>
+      utils
+        .getAllByTestId(/^route-option-(?!search-)[a-z0-9_]+$/)
+        .map((n) => String(n.props.testID).replace('route-option-', ''));
+    const minutesOf = (utils: ReturnType<typeof render>, id: string): string | undefined =>
+      String(utils.getByTestId(`route-option-${id}`).props.accessibilityLabel).match(
+        /, (\d+)분$/,
+      )?.[1];
+
+    it('산곡→선릉: 자동 76분 ≤ 강남구청 76분 ≤ 대림 77분, 미상 없이 SSOT 순으로 보인다', () => {
+      const utils = render(
+        <CommuteRouteScreen navigation={mockNavigation as never} route={editRoute as never} />,
+      );
+
+      expect(optionIds(utils)).toEqual([
+        'fastest',
+        'gangnam_gu_office',
+        'daelim',
+        'konkuk_univ',
+      ]);
+      expect(minutesOf(utils, 'fastest')).toBe('76');
+      expect(minutesOf(utils, 'gangnam_gu_office')).toBe('76');
+      expect(minutesOf(utils, 'daelim')).toBe('77');
+      expect(minutesOf(utils, 'konkuk_univ')).toBe('89');
+      // 같은 역의 개별 옵션과 자동 옵션은 같은 SSOT 경로 → 같은 분.
+      expect(minutesOf(utils, 'gangnam_gu_office')).toBe(
+        String(ssotViaMinutes('3762', 'gangnam_gu_office', '0220')),
+      );
+      expect(utils.queryAllByText('소요 시간 미상')).toHaveLength(0);
+    });
+
+    it('온보딩 모드에서도 자동 옵션에 SSOT 분을 보인다 (라벨 확장은 편집 모드만)', () => {
+      const pick = (selectionType: 'departure' | 'arrival', station: typeof SANGOK) => ({
+        name: 'CommuteRoute',
+        params: { pickedStation: { selectionType, station } },
+      });
+      const utils = render(
+        <CommuteRouteScreen
+          navigation={mockNavigation as never}
+          route={pick('departure', SANGOK) as never}
+        />,
+      );
+      utils.rerender(
+        <CommuteRouteScreen
+          navigation={mockNavigation as never}
+          route={pick('arrival', SEOLLEUNG) as never}
+        />,
+      );
+
+      expect(minutesOf(utils, 'fastest')).toBe('76');
+      expect(utils.getByTestId('route-option-fastest').props.accessibilityLabel).toBe(
+        '최단 경로 (자동), 76분',
+      );
+      expect(utils.queryAllByText('소요 시간 미상')).toHaveLength(0);
+    });
+
+    it('"가장 빠름"은 표시 분이 가장 작은 옵션 하나에만 붙는다 (직행보다 빠른 환승)', () => {
+      const route = {
+        name: 'EditCommuteRoute',
+        params: {
+          kind: 'morning',
+          initial: {
+            departureTime: '08:30',
+            departureStation: { stationId: '0222', stationName: '강남', lineId: '2', lineName: '' },
+            arrivalStation: { stationId: '0239', stationName: '홍대입구', lineId: '2', lineName: '' },
+            transferStations: [],
+          },
+        },
+      };
+      const utils = render(
+        <CommuteRouteScreen navigation={mockNavigation as never} route={route as never} />,
+      );
+      const ids = optionIds(utils);
+      expect(ids[0]).toBe('direct');
+      const mins = ids.map((id) => Number(minutesOf(utils, id)));
+      // 전제: 이 OD에선 SSOT상 환승 경로(신촌)가 직행보다 빠르다.
+      expect(Math.min(...mins.slice(1))).toBeLessThan(mins[0]!);
+      // 그러면 직행 행은 "가장 빠름"을 주장하지 않는다(배지는 최소 분 옵션에만).
+      expect(
+        within(utils.getByTestId('route-option-direct')).queryByText(/가장 빠름/),
+      ).toBeNull();
+    });
+
+    it('검색으로 찾은 환승역 분도 같은 routeVia SSOT로 계산한다', () => {
+      jest.useFakeTimers();
+      try {
+        const utils = render(
+          <CommuteRouteScreen navigation={mockNavigation as never} route={editRoute as never} />,
+        );
+        fireEvent.changeText(utils.getByTestId('recommend-search'), '왕십리');
+        act(() => {
+          jest.advanceTimersByTime(200);
+        });
+
+        const expected = ssotViaMinutes('3762', 'wangsimni', '0220');
+        expect(utils.getByLabelText(`왕십리, ${expected}분`)).toBeTruthy();
+      } finally {
+        jest.useRealTimers();
+      }
+    });
+  });
+
+  // 불변식(R2): 편집 화면의 모든 분 == 그 선택을 저장했을 때 설정 카드·홈이 보일
+  // selectCommuteRoute 분(반올림). 후보는 사전 선별 없이 전부 SSOT로 재서 상위 4개를 보인다.
+  describe('불변식: 화면 분 == selectCommuteRoute 분 (대표 OD 3개)', () => {
+    const ODS = [
+      {
+        label: '산곡→선릉',
+        dep: { stationId: '3762', stationName: '산곡', lineId: '7', lineName: '' },
+        arr: { stationId: '0220', stationName: '선릉', lineId: '2', lineName: '' },
+      },
+      {
+        label: '신길→선릉',
+        dep: { stationId: 's_1032', stationName: '신길', lineId: '1', lineName: '' },
+        arr: { stationId: '0220', stationName: '선릉', lineId: '2', lineName: '' },
+      },
+      {
+        label: '서울역→선릉',
+        dep: { stationId: 'seoul', stationName: '서울역', lineId: '1', lineName: '' },
+        arr: { stationId: '0220', stationName: '선릉', lineId: '2', lineName: '' },
+      },
+    ];
+    const display = (m: number | undefined): number | undefined =>
+      m === undefined ? undefined : Math.max(1, Math.round(m));
+    const labelMinutes = (utils: ReturnType<typeof render>, id: string): number | undefined => {
+      const m = String(utils.getByTestId(`route-option-${id}`).props.accessibilityLabel).match(
+        /, (\d+)분$/,
+      )?.[1];
+      return m === undefined ? undefined : Number(m);
+    };
+    /** Every 1-transfer candidate the screen scans, measured by the path SSOT. */
+    const allCandidateMinutes = (depSlug: string, arrSlug: string): number[] => {
+      const dl = STATIONS[depSlug]?.lines ?? [];
+      const al = STATIONS[arrSlug]?.lines ?? [];
+      return Object.entries(STATIONS)
+        .filter(([id, s]) => {
+          if (id === depSlug || id === arrSlug) return false;
+          const a = dl.find((l) => s.lines?.includes(l));
+          return !!a && al.some((l) => l !== a && s.lines?.includes(l));
+        })
+        .map(([id]) => display(selectCommuteRoute(depSlug, arrSlug, id)?.totalMinutes))
+        .filter((m): m is number => m !== undefined)
+        .sort((x, y) => x - y);
+    };
+
+    it.each(ODS)('$label: 후보·자동 분이 selectCommuteRoute와 같고, SSOT 상위 4개를 보인다', ({ dep, arr }) => {
+      const utils = render(
+        <CommuteRouteScreen
+          navigation={mockNavigation as never}
+          route={
+            {
+              name: 'EditCommuteRoute',
+              params: {
+                kind: 'morning',
+                initial: {
+                  departureTime: '08:30',
+                  departureStation: dep,
+                  arrivalStation: arr,
+                  transferStations: [],
+                },
+              },
+            } as never
+          }
+        />,
+      );
+      const ids = utils
+        .getAllByTestId(/^route-option-(?!search-)[a-z0-9_]+$/)
+        .map((n) => String(n.props.testID).replace('route-option-', ''));
+      expect(ids[0]).toBe('fastest');
+      expect(labelMinutes(utils, 'fastest')).toBe(
+        display(selectCommuteRoute(dep.stationId, arr.stationId)?.totalMinutes),
+      );
+      const shown = ids.slice(1).map((id) => {
+        const m = labelMinutes(utils, id);
+        expect(m).toBe(display(selectCommuteRoute(dep.stationId, arr.stationId, id)?.totalMinutes));
+        return m;
+      });
+      const depSlug = resolveInternalStationId(dep.stationId) ?? dep.stationId;
+      const arrSlug = resolveInternalStationId(arr.stationId) ?? arr.stationId;
+      expect(shown).toEqual(allCandidateMinutes(depSlug, arrSlug).slice(0, 4));
+    });
+  });
+
   // 편집 진입 시 저장된 환승역 복원. 산곡(7)→선릉(2)은 직행이 없는 교차 노선이라
-  // 추천 = [fastest, daelim, gangnam_gu_office, konkuk_univ]. 검색으로 고른 환승역은
+  // 추천 = [fastest, gangnam_gu_office, daelim, konkuk_univ](SSOT 분 순). 검색으로 고른 환승역은
   // station_cd(강남구청 = 2732)로 저장되므로 그 ID로도 선택이 복원돼야 한다.
   describe('편집 모드 환승역 복원', () => {
     const editRouteWith = (transferStations: unknown[]) => ({
@@ -547,31 +767,31 @@ describe('CommuteRouteScreen (step 2/4 redesign)', () => {
     it('타이핑 직후에는 경로 계산을 돌리지 않는다', () => {
       jest.useFakeTimers();
       const { getByTestId } = renderWithBothStations();
-      (calculateRoute as jest.Mock).mockClear();
+      (routeVia as jest.Mock).mockClear();
 
       fireEvent.changeText(getByTestId('recommend-search'), '왕십리');
 
-      expect(calculateRoute).not.toHaveBeenCalled();
+      expect(routeVia).not.toHaveBeenCalled();
     });
 
     it('입력이 멈추면 그때 계산한다', () => {
       jest.useFakeTimers();
       const { getByTestId } = renderWithBothStations();
-      (calculateRoute as jest.Mock).mockClear();
+      (routeVia as jest.Mock).mockClear();
 
       fireEvent.changeText(getByTestId('recommend-search'), '왕십리');
       act(() => {
         jest.advanceTimersByTime(200);
       });
 
-      expect(calculateRoute).toHaveBeenCalled();
+      expect(routeVia).toHaveBeenCalled();
     });
 
     it('연속 입력은 마지막 한 번만 계산한다', () => {
       jest.useFakeTimers();
       const { getByTestId } = renderWithBothStations();
       const input = getByTestId('recommend-search');
-      (calculateRoute as jest.Mock).mockClear();
+      (routeVia as jest.Mock).mockClear();
 
       // 디바운스 창 안에서 연타 — 중간 값들은 계산되지 않아야 한다.
       // 마지막 값은 실제 역명이어야 한다("왕십리역"은 매칭 0건이라 계산 자체가 없다).
@@ -581,12 +801,12 @@ describe('CommuteRouteScreen (step 2/4 redesign)', () => {
           jest.advanceTimersByTime(50);
         });
       }
-      expect(calculateRoute).not.toHaveBeenCalled();
+      expect(routeVia).not.toHaveBeenCalled();
 
       act(() => {
         jest.advanceTimersByTime(200);
       });
-      expect(calculateRoute).toHaveBeenCalled();
+      expect(routeVia).toHaveBeenCalled();
     });
   });
 });
