@@ -309,7 +309,7 @@ const RootNavigatorContent: React.FC = () => {
   return (
     <Stack.Navigator
       id={ROOT_STACK_ID}
-      screenOptions={{ headerShown: false, headerBackTitleVisible: false }}
+      screenOptions={{ headerShown: false, headerBackButtonDisplayMode: 'minimal' }}
     >
       <Stack.Screen name="Main" component={MainTabNavigator} />
       <Stack.Screen

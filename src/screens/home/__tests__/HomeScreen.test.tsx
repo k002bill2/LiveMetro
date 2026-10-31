@@ -595,6 +595,7 @@ describe('HomeScreen', () => {
       expect(mockNavigate).toHaveBeenCalledWith('Profile', {
         screen: 'CommuteSettings',
         initial: false,
+        pop: true,
       });
     });
 
@@ -671,6 +672,7 @@ describe('HomeScreen', () => {
       expect(mockNavigate).toHaveBeenCalledWith('Profile', {
         screen: 'CommuteSettings',
         initial: false,
+        pop: true,
       });
     });
 
@@ -1346,6 +1348,7 @@ describe('HomeScreen', () => {
       expect(mockNavigate).toHaveBeenCalledWith('Profile', {
         screen: 'CommuteSettings',
         initial: false,
+        pop: true,
       });
       expect(mockShowInfo).not.toHaveBeenCalled();
     });
@@ -1364,6 +1367,7 @@ describe('HomeScreen', () => {
       expect(mockNavigate).toHaveBeenCalledWith('Profile', {
         screen: 'CommuteSettings',
         initial: false,
+        pop: true,
       });
     });
   });

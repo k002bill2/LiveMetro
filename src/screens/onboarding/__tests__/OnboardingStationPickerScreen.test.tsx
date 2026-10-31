@@ -4,7 +4,7 @@
  * Covers the dedicated station picker drilled into from CommuteRouteScreen:
  * slot-aware rendering, mode toggle (recommend ↔ browse), browse-mode line
  * tabs + station list, search filtering, selection return path via
- * `navigation.navigate(..., { merge: true })`, and back navigation.
+ * `navigation.navigate(..., { merge: true, pop: true })`, and back navigation.
  *
  * Mocks are inline inside `jest.mock()` factories (per memory's hoisting
  * safety pattern) and lucide icons use a Proxy so any icon resolves to a
@@ -356,9 +356,9 @@ describe('OnboardingStationPickerScreen', () => {
       );
       fireEvent.press(getByText('역삼'));
       expect(mockNavigate).toHaveBeenCalledTimes(1);
-      expect(mockNavigate).toHaveBeenCalledWith({
-        name: 'CommuteRoute',
-        params: {
+      expect(mockNavigate).toHaveBeenCalledWith(
+        'CommuteRoute',
+        {
           pickedStation: {
             selectionType: 'transfer',
             station: {
@@ -369,8 +369,8 @@ describe('OnboardingStationPickerScreen', () => {
             },
           },
         },
-        merge: true,
-      });
+        { merge: true, pop: true },
+      );
     });
 
     it('calls navigation.navigate with merged pickedStation on recommend pick', () => {
@@ -383,9 +383,9 @@ describe('OnboardingStationPickerScreen', () => {
       // Recommend mode shows commute favorites — pick 강남 from list
       fireEvent.press(getByText('강남'));
       expect(mockNavigate).toHaveBeenCalledTimes(1);
-      expect(mockNavigate).toHaveBeenCalledWith({
-        name: 'CommuteRoute',
-        params: {
+      expect(mockNavigate).toHaveBeenCalledWith(
+        'CommuteRoute',
+        {
           pickedStation: {
             selectionType: 'departure',
             station: {
@@ -396,8 +396,8 @@ describe('OnboardingStationPickerScreen', () => {
             },
           },
         },
-        merge: true,
-      });
+        { merge: true, pop: true },
+      );
     });
   });
 

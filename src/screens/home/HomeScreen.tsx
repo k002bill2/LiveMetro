@@ -255,11 +255,14 @@ export const HomeScreen: React.FC = () => {
   const handleOpenCommuteSettings = useCallback((): void => {
     const navigateToSettings = navigation.navigate as (
       route: 'Profile',
-      params: { screen: 'CommuteSettings'; initial: false },
+      params: { screen: 'CommuteSettings'; initial: false; pop: true },
     ) => void;
+    // pop: 7.x navigate pushes a duplicate CommuteSettings if the Profile
+    // stack already holds one deeper down; pop returns to it (6.x behavior).
     navigateToSettings('Profile', {
       screen: 'CommuteSettings',
       initial: false,
+      pop: true,
     });
   }, [navigation]);
 
