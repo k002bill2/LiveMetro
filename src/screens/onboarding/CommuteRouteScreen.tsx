@@ -80,6 +80,8 @@ import { calculateRoute } from '@/services/route';
 import { AVG_STATION_TRAVEL_TIME, AVG_TRANSFER_TIME } from '@/models/route';
 import { STATIONS, LINE_STATIONS } from '@/utils/subwayMapData';
 import { searchLocalStations } from '@/services/data/stationsDataService';
+import { useCommuteRouteSteps } from '@/hooks/useCommuteRouteSteps';
+import type { TransferStep } from '@/models/guidance';
 
 // CommuteRouteScreen serves TWO entry points:
 //   1. onboarding step 2/5 (OnboardingStack) — `route.name === 'CommuteRoute'`
@@ -543,6 +545,25 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
     [...recommendations, ...searchOptions].find((r) => r.id === selectedOptionId) ??
     recommendations[0];
 
+  // "최단 경로 (자동)" persists no transfer, but the settings card derives the
+  // actual transfer from the path SSOT and shows e.g. "환승 1회 · 강남구청".
+  // Name it here through the same seam (useCommuteRouteSteps, no via) so both
+  // screens agree. Edit mode only; ids are withheld otherwise so the K-shortest
+  // search doesn't run. Empty steps (resolve failure) → keep the plain label.
+  const showFastestTransfers = isEditMode && selectedOption?.id === FASTEST_OPTION_ID;
+  const fastestSteps = useCommuteRouteSteps(
+    showFastestTransfers ? departureStation?.stationId : undefined,
+    showFastestTransfers ? arrivalStation?.stationId : undefined,
+  );
+  const fastestSummary = useMemo<string | null>(() => {
+    if (!selectedOption || fastestSteps.length === 0) return null;
+    const names = fastestSteps
+      .filter((s): s is TransferStep => s.kind === 'transfer')
+      .map((s) => s.stationName);
+    const via = names.length > 0 ? `${names.join(', ')} 환승` : '직행';
+    return `${selectedOption.label} · ${via}`;
+  }, [fastestSteps, selectedOption]);
+
   const getExcludedStationIds = useCallback((): string[] => {
     const ids: string[] = [];
     if (departureStation) ids.push(departureStation.stationId);
@@ -852,7 +873,7 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
               </Text>
               <Text style={styles.transferGateValue} numberOfLines={1}>
                 {selectedOption?.isDirect
-                  ? (selectedOption.label ?? '직행 (환승 없음)')
+                  ? (fastestSummary ?? selectedOption.label ?? '직행 (환승 없음)')
                   : selectedOption?.label
                     ? `${selectedOption.label} 환승`
                     : '최단 경로 (자동)'}
@@ -948,7 +969,7 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
         {isValid && departureStation && arrivalStation ? (
           <Text style={styles.footerSummary} testID="commute-footer">
             {departureStation.stationName} → {arrivalStation.stationName} ·{' '}
-            {selectedOption?.isDirect ? '직행' : selectedOption?.label}
+            {selectedOption?.isDirect ? (fastestSummary ?? '직행') : selectedOption?.label}
           </Text>
         ) : null}
       </View>
