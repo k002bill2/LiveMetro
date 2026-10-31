@@ -80,7 +80,7 @@ import { getDiverseRoutes } from '@/services/route';
 import { routeVia } from '@/services/route/routeVia';
 import { selectCommuteRoute } from '@/services/route/selectCommuteRoute';
 import { resolveInternalStationId } from '@/utils/stationIdResolver';
-import { AVG_STATION_TRAVEL_TIME, AVG_TRANSFER_TIME } from '@/models/route';
+import { AVG_STATION_TRAVEL_TIME } from '@/models/route';
 import { STATIONS, LINE_STATIONS } from '@/utils/subwayMapData';
 import { searchLocalStations } from '@/services/data/stationsDataService';
 import { useCommuteRouteSteps } from '@/hooks/useCommuteRouteSteps';
@@ -106,8 +106,6 @@ const DIRECT_OPTION_ID = 'direct';
 // transferStations list, so home/ML render the globally fastest path.
 const FASTEST_OPTION_ID = 'fastest';
 const MAX_TRANSFER_OPTIONS = 4;
-// How many index-estimate-ranked candidates get a path-SSOT routeVia run.
-const SSOT_PRESELECT = 8;
 
 // stations.json (used by routeService graph) is keyed by English-slug IDs
 // like "gangnam"/"city_hall_1", whereas StationSelection.stationId comes from
@@ -139,9 +137,9 @@ const NAME_TO_LINES = (() => {
 
 const SEARCH_RESULT_PREFIX = 'search-';
 const MAX_SEARCH_RESULTS = 6;
-// 검색 결과 1건마다 routeVia(K-shortest 2회)를 돌린다(최대 6회/입력). 추천 목록과
-// 같은 경로 SSOT라 분이 일치하지만 비싸므로(측정: V8 routeVia 1회 ≈ 100ms, REPORT)
-// 타이핑이 멈춘 뒤에만 계산한다. 추천 목록의 문자열 필터는 디바운스하지
+// 검색 결과 1건마다 routeVia를 돌린다(최대 6회/입력). 추천 목록과 같은 경로
+// SSOT라 분이 일치한다. 1회는 보통 수 ms지만 fast path 검증이 실패한 구간은 Yen
+// 전체 탐색(≈100ms)으로 떨어지므로 타이핑이 멈춘 뒤에만 계산한다. 추천 목록의 문자열 필터는 디바운스하지
 // 않는다 — 그쪽은 includes() 한 번이라 즉시 반응이 낫다.
 const SEARCH_DEBOUNCE_MS = 200;
 
@@ -278,9 +276,9 @@ const withFastestBadge = (
  *      shortest line-index distance.
  *   3. For every (depLine × stationOnDepLine × arrLine) triplet, check
  *      whether `stationOnDepLine` also serves an arrLine. If yes, the
- *      station is a valid 1-transfer candidate; compute time as
- *      `(dep→transfer) + (transfer→arr) + AVG_TRANSFER_TIME` using line
- *      indices.
+ *      station is a valid 1-transfer candidate; its time is the path SSOT
+ *      `routeVia(dep, station, arr)` — what the settings card shows once the
+ *      station is saved.
  *   4. Dedupe by station, keep the fastest entry per station, sort by
  *      total minutes, prune any candidate slower than 2× the direct ride
  *      (kills uninteresting detours when a direct option exists).
@@ -326,7 +324,6 @@ const buildRecommendations = (
     name: string;
     fromLineId: string;
     toLineId: string;
-    approx: number | undefined;
   }[] = [];
   for (const [stnId, stnData] of Object.entries(STATIONS)) {
     if (stnId === depId || stnId === arrId) continue;
@@ -342,32 +339,18 @@ const buildRecommendations = (
     );
     if (!fromCandidate || !toCandidate) continue;
 
-    const fromTime = directMinutesOnLine(fromCandidate, depId, stnId);
-    const toTime = directMinutesOnLine(toCandidate, stnId, arrId);
     scanned.push({
       stnId,
       name: stnData.name,
       fromLineId: fromCandidate,
       toLineId: toCandidate,
-      approx:
-        fromTime !== undefined && toTime !== undefined
-          ? fromTime + toTime + AVG_TRANSFER_TIME
-          : undefined,
     });
   }
 
-  // Each routeVia runs two K-shortest searches (~100ms on V8), so only the
-  // SSOT_PRESELECT best candidates by the cheap index estimate get measured.
-  // The estimate only ranks the pre-selection; it is never displayed.
-  // Estimate-less candidates (LINE_STATIONS gaps) always stay in.
-  const preselected = [
-    ...scanned
-      .filter((s) => s.approx !== undefined)
-      .sort((a, b) => (a.approx ?? 0) - (b.approx ?? 0))
-      .slice(0, SSOT_PRESELECT),
-    ...scanned.filter((s) => s.approx === undefined),
-  ];
-  const candidates = preselected.map((s) => {
+  // Every candidate is measured by the path SSOT (routeVia ≈ 2–5ms per call
+  // via getFastestRoute), so the shown top-MAX_TRANSFER_OPTIONS is the true
+  // SSOT ranking — no index-estimate pre-selection.
+  const candidates = scanned.map((s) => {
     const raw = viaRouteMinutes(depSlug, s.stnId, arrSlug);
     const option: TransferRouteOptionData = {
       id: s.stnId,

@@ -835,6 +835,98 @@ export function getDiverseRoutes(
   return result;
 }
 
+/**
+ * Same route as `getDiverseRoutes(from, to)[0]` (default options), usually
+ * without running Yen's K=15 search (~50–110ms on V8 → ~2ms).
+ *
+ * `getDiverseRoutes[0]` is the minimum-`totalMinutes` route among Yen's
+ * candidates with ≤ MAX_ROUTE_TRANSFERS transfers (else Yen's first path).
+ * Yen's first path A0 is one plain Dijkstra on the transfer-penalised graph.
+ * A0 is provably that minimum when no ≤ MAX_ROUTE_TRANSFERS-transfer path is
+ * strictly faster in display minutes — checked by a bounded transfer-capped
+ * Dijkstra on the same graph. A0 is also the first candidate inserted and
+ * the sort is stable, so ties still resolve to A0. When the check fails
+ * (the penalty or the transfer cap made Yen pick a slower path), this falls
+ * back to the full `getDiverseRoutes` — results never differ, only the cost.
+ *
+ * Used by routeVia: the commute edit screen runs it per transfer candidate in
+ * a synchronous render, and its minutes must equal what selectCommuteRoute
+ * shows once that via is saved.
+ */
+export function getFastestRoute(fromStationId: string, toStationId: string): Route | null {
+  const cached = routeCache.get(
+    routeCache.buildCacheKey(fromStationId, toStationId, DEFAULT_MAX_ROUTES),
+  );
+  if (cached) return cached[0] ?? null;
+
+  const startKeys = getStationNodeKeys(fromStationId);
+  const endKeys = getStationNodeKeys(toStationId);
+  if (startKeys.length === 0 || endKeys.length === 0) return null;
+
+  const graph = buildGraph();
+  const first = dijkstra(graph, startKeys, endKeys);
+  if (!first) return null;
+
+  const route = convertToRoute(first);
+  const bound =
+    route.transferCount <= MAX_ROUTE_TRANSFERS ? route.totalMinutes : Number.POSITIVE_INFINITY;
+  if (!hasFasterCappedPath(graph, startKeys, endKeys, MAX_ROUTE_TRANSFERS, bound)) {
+    return { ...labelFastest(route), fare: deriveFare(route) };
+  }
+  return getDiverseRoutes(fromStationId, toStationId)[0] ?? null;
+}
+
+/**
+ * True when some path with ≤ `maxTransfers` transfers reaches `endKeys` in
+ * strictly fewer display minutes than `bound` (Infinity = any such path).
+ * Display minutes = what `convertToRoute` sums: edge minutes for rides,
+ * `getTransferTime(station)` for transfers (no ranking penalty). Additions run
+ * in path order from 0, exactly like `calculateRouteTotalTime`, so equal paths
+ * compare bit-for-bit. Graph must be built without congestion multipliers.
+ */
+function hasFasterCappedPath(
+  graph: Map<string, Edge[]>,
+  startKeys: readonly string[],
+  endKeys: readonly string[],
+  maxTransfers: number,
+  bound: number,
+): boolean {
+  interface State {
+    readonly node: string;
+    readonly transfers: number;
+    readonly minutes: number;
+  }
+  const best = new Map<string, number>();
+  const queue = new PriorityQueue<State>();
+  for (const node of startKeys) {
+    if (!graph.has(node)) continue;
+    best.set(`${node}|0`, 0);
+    queue.enqueue({ node, transfers: 0, minutes: 0 }, 0);
+  }
+
+  while (!queue.isEmpty()) {
+    const cur = queue.dequeue();
+    if (!cur) break;
+    if (cur.minutes >= bound) return false; // every remaining state is ≥ bound
+    if ((best.get(`${cur.node}|${cur.transfers}`) ?? Infinity) < cur.minutes) continue;
+    if (endKeys.includes(cur.node)) return true;
+
+    const station = cur.node.split('#')[0] ?? '';
+    for (const edge of graph.get(cur.node) ?? []) {
+      const transfers = cur.transfers + (edge.isTransfer ? 1 : 0);
+      if (transfers > maxTransfers) continue;
+      const minutes = cur.minutes + (edge.isTransfer ? getTransferTime(station) : edge.weight);
+      if (minutes >= bound) continue;
+      const key = `${edge.to}|${transfers}`;
+      if (minutes < (best.get(key) ?? Infinity)) {
+        best.set(key, minutes);
+        queue.enqueue({ node: edge.to, transfers, minutes }, minutes);
+      }
+    }
+  }
+  return false;
+}
+
 function computeDiverseRoutes(
   fromStationId: string,
   toStationId: string,
