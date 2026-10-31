@@ -59,8 +59,8 @@ export const TransferRouteOption: React.FC<TransferRouteOptionProps> = ({
       accessibilityRole="radio"
       accessibilityState={{ selected }}
       accessibilityLabel={
-        typeof option.minutes === 'number' && option.minutes > 0
-          ? `${option.label}, ${option.minutes}분`
+        hasMinutes
+          ? `${option.label}, ${option.minutes}분${option.fastest ? ', 가장 빠름' : ''}`
           : option.label
       }
       style={[
@@ -164,7 +164,7 @@ export const TransferRouteOption: React.FC<TransferRouteOptionProps> = ({
                     { color: semantic.labelAlt, fontFamily: weightToFontFamily('600') },
                   ]}
                 >
-                  · {option.minutes}분
+                  · {option.minutes}분{option.fastest ? ' · 가장 빠름' : ''}
                 </Text>
               ) : null}
             </>
