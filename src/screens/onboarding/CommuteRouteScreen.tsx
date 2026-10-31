@@ -392,22 +392,28 @@ const buildRecommendations = (
     directMinutes !== undefined ? selectCommuteRoute(dep.stationId, arr.stationId) : null;
   const directDiffersFromSsot = !!ssotRoute && ssotRoute.transferCount > 0;
   if (directMinutes !== undefined && directDiffersFromSsot) {
-    result.push(
-      {
-        id: FASTEST_OPTION_ID,
-        label: '최단 경로 (자동)',
-        isDirect: true,
-        minutes: toDisplayMinutes(ssotRoute?.totalMinutes),
-        recommended: true,
-        fastest: true,
-      },
-      {
+    result.push({
+      id: FASTEST_OPTION_ID,
+      label: '최단 경로 (자동)',
+      isDirect: true,
+      minutes: toDisplayMinutes(ssotRoute?.totalMinutes),
+      recommended: true,
+      fastest: true,
+    });
+    // 직행 is offered only when the saved preference can be honoured: the
+    // path SSOT (selectCommuteRoute 'direct') must yield a transfer-free route.
+    // When getDiverseRoutes' K/time filters drop the direct ride (e.g. 강남→
+    // 왕십리), an index-estimated 직행 would save but home/guidance would still
+    // show the transfer route — so it is not listed.
+    const directRoute = selectCommuteRoute(dep.stationId, arr.stationId, undefined, 'direct');
+    if (directRoute?.transferCount === 0) {
+      result.push({
         id: DIRECT_OPTION_ID,
         label: '직행 (환승 없음)',
         isDirect: true,
-        minutes: toDisplayMinutes(directMinutes),
-      },
-    );
+        minutes: toDisplayMinutes(directRoute.totalMinutes),
+      });
+    }
   } else if (directMinutes !== undefined) {
     result.push({
       id: DIRECT_OPTION_ID,

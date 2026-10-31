@@ -953,5 +953,24 @@ describe('같은 노선 OD 직행 선택 보존 (강남→홍대입구)', () => 
     expect(morning.transferStations).toEqual([]);
     expect(morning.routePreference).toBeNull();
   });
+
+  // Codex R1 P2: getDiverseRoutes의 K·시간 필터가 직행을 떨어뜨리는 OD(강남→왕십리)에선
+  // 직행 선호를 저장해도 SSOT가 환승 경로를 돌려준다 → 지킬 수 없는 직행은 보이지 않는다.
+  it('SSOT가 직행을 만들 수 없는 같은 노선 OD(강남→왕십리)는 직행 옵션을 내지 않는다', () => {
+    const WANGSIMNI = { stationId: '0208', stationName: '왕십리', lineId: '2', lineName: '' };
+    // 전제(실그래프): 자동은 환승, 'direct'도 직행을 찾지 못해 환승 경로로 fallback.
+    expect(selectCommuteRoute('0222', '0208')?.transferCount).toBeGreaterThan(0);
+    expect(selectCommuteRoute('0222', '0208', undefined, 'direct')?.transferCount).toBeGreaterThan(0);
+    const base = editRoute();
+    const utils = render(
+      <CommuteRouteScreen
+        navigation={mockNavigation as never}
+        route={{ ...base, params: { ...base.params, initial: { ...base.params.initial, arrivalStation: WANGSIMNI } } } as never}
+      />,
+    );
+    const ids = optionIds(utils);
+    expect(ids[0]).toBe('fastest');
+    expect(ids).not.toContain('direct');
+  });
 });
 
