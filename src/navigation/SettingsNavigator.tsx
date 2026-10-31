@@ -53,8 +53,9 @@ export const SettingsNavigator: React.FC = () => {
         },
         // `headerBackTitle: ''` let iOS fall back to the previous route's
         // name ("SettingsHome") or a wide empty pill; hiding the title gives
-        // the icon-only circular back button RootNavigator screens use.
-        headerBackTitleVisible: false,
+        // the icon-only circular back button RootNavigator screens use
+        // (7.x: `headerBackTitleVisible: false` → `headerBackButtonDisplayMode: 'minimal'`).
+        headerBackButtonDisplayMode: 'minimal',
         headerTintColor: semantic.labelStrong,
       }}
     >
