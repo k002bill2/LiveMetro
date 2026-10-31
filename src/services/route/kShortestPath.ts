@@ -461,24 +461,40 @@ export function findKShortestPaths(
     };
   }
 
+  const graph = buildGraph(undefined, undefined, congestionMultipliers);
+  // Convert internal paths to Route objects
+  const routes = [...yenPaths(graph, startKeys, endKeys, k)].map(convertToRoute);
+
+  return {
+    paths: routes,
+    k,
+    fromStationId,
+    toStationId,
+    executionTimeMs: Date.now() - startTime,
+  };
+}
+
+/**
+ * Yen's K-shortest paths as a lazy generator: yields A[0], A[1], … in the
+ * order findKShortestPaths returns them (at most `k`). Lazy so getFastestRoute
+ * can stop as soon as the remaining paths provably cannot change its answer;
+ * a full drain is exactly the old eager loop.
+ */
+function* yenPaths(
+  graph: Map<string, Edge[]>,
+  startKeys: string[],
+  endKeys: string[],
+  k: number,
+): Generator<InternalPath, void, undefined> {
   const A: InternalPath[] = []; // k shortest paths
   const B = new PriorityQueue<InternalPath>(); // Candidate paths
 
   // Find the first shortest path
-  const graph = buildGraph(undefined, undefined, congestionMultipliers);
   const firstPath = dijkstra(graph, startKeys, endKeys);
-
-  if (!firstPath) {
-    return {
-      paths: [],
-      k,
-      fromStationId,
-      toStationId,
-      executionTimeMs: Date.now() - startTime,
-    };
-  }
+  if (!firstPath) return;
 
   A.push(firstPath);
+  yield firstPath;
 
   // Track transfer signatures of accepted paths. Each K slot in A must
   // correspond to a topologically distinct transfer set — otherwise
@@ -578,18 +594,8 @@ export function findKShortestPaths(
     }
 
     A.push(nextPath);
+    yield nextPath;
   }
-
-  // Convert internal paths to Route objects
-  const routes = A.map(internalPath => convertToRoute(internalPath));
-
-  return {
-    paths: routes,
-    k,
-    fromStationId,
-    toStationId,
-    executionTimeMs: Date.now() - startTime,
-  };
 }
 
 // ============================================================================
@@ -892,9 +898,54 @@ function computeFastestRoute(fromStationId: string, toStationId: string): Route 
   const bound =
     route.transferCount <= MAX_ROUTE_TRANSFERS ? route.totalMinutes : Number.POSITIVE_INFINITY;
   if (!hasFasterCappedPath(graph, startKeys, endKeys, MAX_ROUTE_TRANSFERS, bound)) {
+    fastestStats.proven++;
     return { ...labelFastest(route), fare: deriveFare(route) };
   }
-  return getDiverseRoutes(fromStationId, toStationId)[0] ?? null;
+
+  // Early-stopping Yen. getDiverseRoutes[0] = first minimum-totalMinutes path
+  // among Yen's K=15 (≤2-transfer filtered). Yen paths are graph walks, so once
+  // hasFasterCappedPath finds no ≤2-transfer path strictly faster than the
+  // running best, no later Yen path can displace it (ties keep the earlier
+  // one) — stop. Same graph and same generator as getDiverseRoutes, so the
+  // emitted prefix is identical; rankRepresentatives is its own ranking code.
+  const prefix: Route[] = [];
+  let best = Number.POSITIVE_INFINITY;
+  let fasterExistsBelow = bound; // already checked: some path beats `bound`
+  for (const path of yenPaths(graph, startKeys, endKeys, K_SHORTEST_CANDIDATES)) {
+    const r = convertToRoute(path);
+    prefix.push(r);
+    if (r.transferCount > MAX_ROUTE_TRANSFERS || r.totalMinutes >= best) continue;
+    best = r.totalMinutes;
+    if (best >= fasterExistsBelow) continue; // check result for this bound is known
+    if (!hasFasterCappedPath(graph, startKeys, endKeys, MAX_ROUTE_TRANSFERS, best)) {
+      fastestStats.earlyStop++;
+      return finishFastest(prefix);
+    }
+    fasterExistsBelow = best;
+  }
+  fastestStats.fullYen++;
+  return finishFastest(prefix);
+}
+
+function finishFastest(paths: readonly Route[]): Route | null {
+  const fastest = rankRepresentatives(paths)[0];
+  return fastest ? { ...labelFastest(fastest), fare: deriveFare(fastest) } : null;
+}
+
+/** How getFastestRoute computations ended (memo hits not counted). */
+interface FastestRouteStats {
+  /** A0 proven fastest by the capped check — no Yen. */
+  proven: number;
+  /** Yen stopped early by the capped check. */
+  earlyStop: number;
+  /** Yen ran to K (or exhausted) — same work as getDiverseRoutes. */
+  fullYen: number;
+}
+const fastestStats: FastestRouteStats = { proven: 0, earlyStop: 0, fullYen: 0 };
+
+/** Instrumentation for tests/probes: counts per getFastestRoute exit path. */
+export function getFastestRouteStats(): Readonly<FastestRouteStats> {
+  return { ...fastestStats };
 }
 
 /**
@@ -962,21 +1013,7 @@ function computeDiverseRoutes(
   );
   if (result.paths.length === 0) return [];
 
-  const filtered = result.paths.filter((r) => r.transferCount <= MAX_ROUTE_TRANSFERS);
-  const candidates = filtered.length > 0 ? filtered : [result.paths[0]!];
-
-  // 1. Group by transfer signature, keep cost-min representative per group
-  const groupMap = new Map<string, Route>();
-  for (const c of candidates) {
-    const sig = buildTransferSignature(c);
-    const prev = groupMap.get(sig);
-    if (!prev || c.totalMinutes < prev.totalMinutes) {
-      groupMap.set(sig, c);
-    }
-  }
-  const representatives = [...groupMap.values()].sort(
-    (a, b) => a.totalMinutes - b.totalMinutes,
-  );
+  const representatives = rankRepresentatives(result.paths);
 
   // 2. Identify fastest (already first after sort)
   const fastest = representatives[0]!;
@@ -1032,6 +1069,29 @@ function computeDiverseRoutes(
   // Attach fare (regular type) so the 'min-fare' sort tab and the card meta
   // line read from a single domain field rather than recomputing per render.
   return selected.map((r) => ({ ...r, fare: deriveFare(r) }));
+}
+
+/**
+ * Steps 0–1 of computeDiverseRoutes, shared with getFastestRoute so both rank
+ * Yen output with the same code: ≤ MAX_ROUTE_TRANSFERS filter (else paths[0]),
+ * one cost-min representative per transfer signature (strict <), stable sort
+ * by totalMinutes. Empty input → [].
+ */
+function rankRepresentatives(paths: readonly Route[]): Route[] {
+  if (paths.length === 0) return [];
+  const filtered = paths.filter((r) => r.transferCount <= MAX_ROUTE_TRANSFERS);
+  const candidates = filtered.length > 0 ? filtered : [paths[0]!];
+
+  // 1. Group by transfer signature, keep cost-min representative per group
+  const groupMap = new Map<string, Route>();
+  for (const c of candidates) {
+    const sig = buildTransferSignature(c);
+    const prev = groupMap.get(sig);
+    if (!prev || c.totalMinutes < prev.totalMinutes) {
+      groupMap.set(sig, c);
+    }
+  }
+  return [...groupMap.values()].sort((a, b) => a.totalMinutes - b.totalMinutes);
 }
 
 /**
