@@ -11,7 +11,7 @@
  *   - browseMode toggle → 노선 탭 + 노선별 가나다순 역 목록 (manual selection)
  *
  * Returns the selection to CommuteRouteScreen via
- * `navigation.navigate('CommuteRoute', { pickedStation }, { merge: true })`.
+ * `navigation.navigate('CommuteRoute', { pickedStation }, { merge: true, pop: true })`.
  * The payload is JSON-serializable so React Navigation does not warn.
  */
 
@@ -133,11 +133,13 @@ export const OnboardingStationPickerScreen: React.FC<Props> = ({
         selectionType,
         station,
       };
-      (navigation as unknown as NavigationProp<ParamListBase>).navigate({
-        name: returnRouteName,
-        params: { pickedStation: payload },
-        merge: true,
-      });
+      // 7.x navigate pushes instead of returning to an existing route;
+      // pop: true restores the 6.x "go back to the host" behavior.
+      (navigation as unknown as NavigationProp<ParamListBase>).navigate(
+        returnRouteName,
+        { pickedStation: payload },
+        { merge: true, pop: true },
+      );
     },
     [navigation, selectionType, returnRouteName],
   );

@@ -145,13 +145,21 @@ export const WeeklyPredictionScreen: React.FC = () => {
       route: 'Main',
       params: {
         screen: 'Profile';
-        params: { screen: 'CommuteSettings'; initial: false };
+        params: { screen: 'CommuteSettings'; initial: false; pop: true };
       },
+      options: { pop: true },
     ) => void;
-    navigateToCommuteSettings('Main', {
-      screen: 'Profile',
-      params: { screen: 'CommuteSettings', initial: false },
-    });
+    // pop: 7.x navigate('Main') from this root-stack screen would push a
+    // second Main (6.x popped back to it); the inner pop does the same for
+    // a CommuteSettings already deeper in the Profile stack.
+    navigateToCommuteSettings(
+      'Main',
+      {
+        screen: 'Profile',
+        params: { screen: 'CommuteSettings', initial: false, pop: true },
+      },
+      { pop: true },
+    );
   }, [navigation]);
 
   const { user } = useAuth();

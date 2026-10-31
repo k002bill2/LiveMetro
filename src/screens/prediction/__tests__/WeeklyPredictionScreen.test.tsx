@@ -641,10 +641,14 @@ describe('WeeklyPredictionScreen', () => {
   it('navigates to commute settings when the settings gear is pressed', () => {
     const { getByTestId } = render(<WeeklyPredictionScreen />);
     fireEvent.press(getByTestId('commute-prediction-settings'));
-    expect(mockNavigate).toHaveBeenCalledWith('Main', {
-      screen: 'Profile',
-      params: { screen: 'CommuteSettings', initial: false },
-    });
+    expect(mockNavigate).toHaveBeenCalledWith(
+      'Main',
+      {
+        screen: 'Profile',
+        params: { screen: 'CommuteSettings', initial: false, pop: true },
+      },
+      { pop: true },
+    );
   });
 
   // Default mocks supply no commuteSchedule (useAuth preferences = {}) and
@@ -657,10 +661,14 @@ describe('WeeklyPredictionScreen', () => {
     // The configured-route row must be absent in the unconfigured state.
     expect(queryByTestId('commute-prediction-route-row')).toBeNull();
     fireEvent.press(getByTestId('commute-prediction-route-setup'));
-    expect(mockNavigate).toHaveBeenCalledWith('Main', {
-      screen: 'Profile',
-      params: { screen: 'CommuteSettings', initial: false },
-    });
+    expect(mockNavigate).toHaveBeenCalledWith(
+      'Main',
+      {
+        screen: 'Profile',
+        params: { screen: 'CommuteSettings', initial: false, pop: true },
+      },
+      { pop: true },
+    );
   });
 
   // Regression: the commute route is saved in two stores. Previously this
