@@ -40,7 +40,7 @@ export class BasePage {
    * Get element by React Native testID (Android: resource-id, iOS: accessibility id)
    * @param testId - The testID attribute value
    */
-  protected $(testId: string): Promise<WebdriverIO.Element> {
+  protected async $(testId: string): Promise<WebdriverIO.Element> {
     return $wdio(this.testIdLocator(testId));
   }
 
@@ -48,7 +48,7 @@ export class BasePage {
    * Get elements by React Native testID
    * @param testId - The testID attribute value
    */
-  protected $$(testId: string): Promise<WebdriverIO.ElementArray> {
+  protected async $$(testId: string): Promise<WebdriverIO.ElementArray> {
     return $$wdio(this.testIdLocator(testId));
   }
 

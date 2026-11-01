@@ -55,14 +55,9 @@ export const config: Partial<Options.Testrunner> = {
     timeout: 240000,
   },
 
-  // TypeScript support via autoCompileOpts
-  autoCompileOpts: {
-    autoCompile: true,
-    tsNodeOpts: {
-      transpileOnly: true,
-      project: join(__dirname, '../tsconfig.json'),
-    },
-  },
+  // TypeScript: wdio 9+는 ts-node/autoCompileOpts를 제거하고 tsx로 자동 컴파일한다
+  // (항상 transpile-only). 사용할 tsconfig만 지정한다.
+  tsConfigPath: join(__dirname, '../tsconfig.json'),
 
   // Reporters
   reporters: [
