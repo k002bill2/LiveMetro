@@ -10,16 +10,14 @@
  *   2. Ensure Firebase project is configured
  */
 
-import * as admin from 'firebase-admin';
+import { initializeApp, cert } from 'firebase-admin/app';
+import { getFirestore, FieldValue, Firestore } from 'firebase-admin/firestore';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
 
-// Load environment variables
-dotenv.config();
-
 // Types
-interface SeoulStationData {
+export interface SeoulStationData {
   line_num: string;
   station_nm: string;
   station_nm_eng: string;
@@ -34,7 +32,7 @@ interface SeoulStationsJson {
   DATA: SeoulStationData[];
 }
 
-interface FirestoreStation {
+export interface FirestoreStation {
   name: string;
   nameEn: string;
   nameCn: string;
@@ -48,17 +46,96 @@ interface FirestoreStation {
     longitude: number;
   };
   transfers: string[];
-  createdAt: admin.firestore.FieldValue;
-  updatedAt: admin.firestore.FieldValue;
+  createdAt: FieldValue;
+  updatedAt: FieldValue;
 }
 
+export interface FirestoreLineIndex {
+  name: string;
+  color: string;
+  stationCount: number;
+  stationIds: string[];
+  updatedAt: FieldValue;
+}
+
+export const STATIONS_COLLECTION = 'stations';
+export const LINES_COLLECTION = 'subwayLines';
+export const BATCH_SIZE = 450; // Firestore batch limit is 500, use 450 for safety
+
+const LINE_COLORS: Readonly<Record<string, string>> = {
+  '1': '#0052A4',
+  '2': '#00A84D',
+  '3': '#EF7C1C',
+  '4': '#00A5DE',
+  '5': '#996CAC',
+  '6': '#CD7C2F',
+  '7': '#747F00',
+  '8': '#E6186C',
+  '9': '#BDB092',
+};
+const DEFAULT_LINE_COLOR = '#888888';
+
 // Convert line_num to lineId
-const convertLineNumToLineId = (lineNum: string): string => {
+export const convertLineNumToLineId = (lineNum: string): string => {
   const match = lineNum.match(/^0?(\d+)호선$/);
   if (match && match[1]) {
     return match[1];
   }
   return lineNum.replace('호선', '');
+};
+
+// Build one station document (document ID = station_cd)
+export const buildStationDoc = (
+  station: SeoulStationData,
+  timestamp: FieldValue,
+): FirestoreStation => ({
+  name: station.station_nm,
+  nameEn: station.station_nm_eng,
+  nameCn: station.station_nm_chn,
+  nameJp: station.station_nm_jpn,
+  lineId: convertLineNumToLineId(station.line_num),
+  lineName: station.line_num,
+  stationCode: station.station_cd,
+  externalCode: station.fr_code,
+  coordinates: {
+    latitude: 37.5665, // Default - can be updated later
+    longitude: 126.9780,
+  },
+  transfers: [],
+  createdAt: timestamp,
+  updatedAt: timestamp,
+});
+
+// Group station codes by lineId (insertion order preserved) and build line docs
+export const buildLineIndexDocs = (
+  stations: readonly SeoulStationData[],
+  timestamp: FieldValue,
+): { lineId: string; doc: FirestoreLineIndex }[] => {
+  const lineMap = new Map<string, string[]>();
+  stations.forEach((station) => {
+    const lineId = convertLineNumToLineId(station.line_num);
+    lineMap.set(lineId, [...(lineMap.get(lineId) ?? []), station.station_cd]);
+  });
+
+  return [...lineMap].map(([lineId, stationIds]) => ({
+    lineId,
+    doc: {
+      name: `${lineId}호선`,
+      color: LINE_COLORS[lineId] || DEFAULT_LINE_COLOR,
+      stationCount: stationIds.length,
+      stationIds,
+      updatedAt: timestamp,
+    },
+  }));
+};
+
+// Split items into consecutive chunks of at most `size`
+export const chunkIntoBatches = <T>(items: readonly T[], size: number = BATCH_SIZE): T[][] => {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
 };
 
 // Initialize Firebase Admin
@@ -68,13 +145,13 @@ const initializeFirebase = (): void => {
 
   if (fs.existsSync(serviceAccountPath)) {
     const serviceAccount = JSON.parse(fs.readFileSync(serviceAccountPath, 'utf-8'));
-    admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
+    initializeApp({
+      credential: cert(serviceAccount),
     });
     console.log('✅ Firebase Admin initialized with service account');
   } else {
     // Use application default credentials
-    admin.initializeApp({
+    initializeApp({
       projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID,
     });
     console.log('✅ Firebase Admin initialized with default credentials');
@@ -82,115 +159,55 @@ const initializeFirebase = (): void => {
 };
 
 // Upload stations to Firestore
-const uploadStations = async (): Promise<void> => {
-  const db = admin.firestore();
-  const stationsCollection = db.collection('stations');
+export const uploadStations = async (
+  db: Firestore,
+  stations: readonly SeoulStationData[],
+): Promise<void> => {
+  const stationsCollection = db.collection(STATIONS_COLLECTION);
 
-  // Read local JSON data
-  const jsonPath = path.join(__dirname, '..', 'src', 'data', 'seoulStations.json');
-  const jsonData: SeoulStationsJson = JSON.parse(fs.readFileSync(jsonPath, 'utf-8'));
+  console.log(`📊 Found ${stations.length} stations to upload`);
 
-  console.log(`📊 Found ${jsonData.DATA.length} stations to upload`);
-
-  // Batch processing
-  let batch = db.batch();
-  let batchCount = 0;
   let totalUploaded = 0;
-  const BATCH_SIZE = 450; // Firestore batch limit is 500, use 450 for safety
-
-  for (const station of jsonData.DATA) {
-    const stationDoc: FirestoreStation = {
-      name: station.station_nm,
-      nameEn: station.station_nm_eng,
-      nameCn: station.station_nm_chn,
-      nameJp: station.station_nm_jpn,
-      lineId: convertLineNumToLineId(station.line_num),
-      lineName: station.line_num,
-      stationCode: station.station_cd,
-      externalCode: station.fr_code,
-      coordinates: {
-        latitude: 37.5665, // Default - can be updated later
-        longitude: 126.9780,
-      },
-      transfers: [],
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    };
-
-    // Use station code as document ID
-    const docRef = stationsCollection.doc(station.station_cd);
-    batch.set(docRef, stationDoc, { merge: true });
-    batchCount++;
-
-    // Commit batch when reaching limit
-    if (batchCount >= BATCH_SIZE) {
-      await batch.commit();
-      totalUploaded += batchCount;
-      console.log(`✅ Committed batch of ${batchCount} stations (total: ${totalUploaded})`);
-      batch = db.batch(); // Create new batch
-      batchCount = 0;
+  for (const chunk of chunkIntoBatches(stations)) {
+    const batch = db.batch();
+    for (const station of chunk) {
+      // Use station code as document ID
+      const docRef = stationsCollection.doc(station.station_cd);
+      batch.set(docRef, buildStationDoc(station, FieldValue.serverTimestamp()), { merge: true });
+    }
+    await batch.commit();
+    totalUploaded += chunk.length;
+    if (chunk.length >= BATCH_SIZE) {
+      console.log(`✅ Committed batch of ${chunk.length} stations (total: ${totalUploaded})`);
+    } else {
+      console.log(`✅ Committed final batch of ${chunk.length} stations`);
     }
   }
 
-  // Commit remaining
-  if (batchCount > 0) {
-    await batch.commit();
-    totalUploaded += batchCount;
-    console.log(`✅ Committed final batch of ${batchCount} stations`);
-  }
-
-  console.log(`\n🎉 Successfully uploaded ${jsonData.DATA.length} stations to Firestore!`);
+  console.log(`\n🎉 Successfully uploaded ${stations.length} stations to Firestore!`);
 };
 
 // Create line index
-const createLineIndex = async (): Promise<void> => {
-  const db = admin.firestore();
-  const linesCollection = db.collection('subwayLines');
-
-  const jsonPath = path.join(__dirname, '..', 'src', 'data', 'seoulStations.json');
-  const jsonData: SeoulStationsJson = JSON.parse(fs.readFileSync(jsonPath, 'utf-8'));
-
-  // Group stations by line
-  const lineMap = new Map<string, string[]>();
-
-  jsonData.DATA.forEach((station) => {
-    const lineId = convertLineNumToLineId(station.line_num);
-    if (!lineMap.has(lineId)) {
-      lineMap.set(lineId, []);
-    }
-    lineMap.get(lineId)!.push(station.station_cd);
-  });
-
-  // Line colors
-  const lineColors: Record<string, string> = {
-    '1': '#0052A4',
-    '2': '#00A84D',
-    '3': '#EF7C1C',
-    '4': '#00A5DE',
-    '5': '#996CAC',
-    '6': '#CD7C2F',
-    '7': '#747F00',
-    '8': '#E6186C',
-    '9': '#BDB092',
-  };
+export const createLineIndex = async (
+  db: Firestore,
+  stations: readonly SeoulStationData[],
+): Promise<void> => {
+  const linesCollection = db.collection(LINES_COLLECTION);
+  const lineDocs = buildLineIndexDocs(stations, FieldValue.serverTimestamp());
 
   const batch = db.batch();
-
-  for (const [lineId, stationIds] of lineMap) {
-    const lineDoc = {
-      name: `${lineId}호선`,
-      color: lineColors[lineId] || '#888888',
-      stationCount: stationIds.length,
-      stationIds,
-      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-    };
-
-    const docRef = linesCollection.doc(lineId);
-    batch.set(docRef, lineDoc, { merge: true });
+  for (const { lineId, doc } of lineDocs) {
+    batch.set(linesCollection.doc(lineId), doc, { merge: true });
   }
 
   await batch.commit();
-  console.log(`✅ Created ${lineMap.size} line indexes`);
+  console.log(`✅ Created ${lineDocs.length} line indexes`);
+};
+
+const readStations = (): SeoulStationData[] => {
+  const jsonPath = path.join(__dirname, '..', 'src', 'data', 'seoulStations.json');
+  const jsonData: SeoulStationsJson = JSON.parse(fs.readFileSync(jsonPath, 'utf-8'));
+  return jsonData.DATA;
 };
 
 // Main
@@ -198,13 +215,16 @@ const main = async (): Promise<void> => {
   try {
     console.log('🚇 Seoul Metro Station Data Uploader\n');
 
+    // Load environment variables
+    dotenv.config();
     initializeFirebase();
+    const db = getFirestore();
 
     console.log('\n📤 Uploading stations...');
-    await uploadStations();
+    await uploadStations(db, readStations());
 
     console.log('\n📋 Creating line indexes...');
-    await createLineIndex();
+    await createLineIndex(db, readStations());
 
     console.log('\n✨ All done!');
     process.exit(0);
@@ -214,4 +234,6 @@ const main = async (): Promise<void> => {
   }
 };
 
-main();
+if (require.main === module) {
+  void main();
+}
