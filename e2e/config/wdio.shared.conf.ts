@@ -21,6 +21,11 @@ export const config: Partial<Options.Testrunner> = {
   // Base URL for mock server
   baseUrl: 'http://localhost:3001',
 
+  // wdio 10은 `$`가 2개 이상 매칭되면 StrictSelectorError를 던진다(기본 true).
+  // getByClassName·getByPartialText(textContains)처럼 다중 매칭 전제의 셀렉터가 있어
+  // v8의 "첫 매칭" 동작을 유지한다. 셀렉터를 유일화한 뒤 제거한다.
+  strictSelectors: false,
+
   // Timeout configurations
   waitforTimeout: 10000,
   connectionRetryTimeout: 120000,
