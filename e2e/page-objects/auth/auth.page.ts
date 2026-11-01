@@ -2,6 +2,7 @@
  * Auth Page Object
  * Handles login and signup form interactions
  */
+import { $ } from '@wdio/globals';
 import { BasePage } from '../base.page';
 
 class AuthPage extends BasePage {
