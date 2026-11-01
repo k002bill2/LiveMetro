@@ -382,7 +382,39 @@ const buildRecommendations = (
     .map((c) => c.option);
 
   const result: TransferRouteOptionData[] = [];
-  if (directMinutes !== undefined) {
+  // Same-line OD whose path-SSOT fastest route (what an empty transfer list
+  // resolves to) is NOT the transfer-free ride: saving "직행" as `[]` would
+  // silently become that transfer route. So the default becomes "최단 경로
+  // (자동)" and 직행 is an explicit choice persisted as routePreference
+  // 'direct'. Judged on the route itself (transferCount), not on rounded
+  // minutes, so a tie in display minutes can't hide a different path.
+  const ssotRoute =
+    directMinutes !== undefined ? selectCommuteRoute(dep.stationId, arr.stationId) : null;
+  const directDiffersFromSsot = !!ssotRoute && ssotRoute.transferCount > 0;
+  if (directMinutes !== undefined && directDiffersFromSsot) {
+    result.push({
+      id: FASTEST_OPTION_ID,
+      label: '최단 경로 (자동)',
+      isDirect: true,
+      minutes: toDisplayMinutes(ssotRoute?.totalMinutes),
+      recommended: true,
+      fastest: true,
+    });
+    // 직행 is offered only when the saved preference can be honoured: the
+    // path SSOT (selectCommuteRoute 'direct') must yield a transfer-free route.
+    // When getDiverseRoutes' K/time filters drop the direct ride (e.g. 강남→
+    // 왕십리), an index-estimated 직행 would save but home/guidance would still
+    // show the transfer route — so it is not listed.
+    const directRoute = selectCommuteRoute(dep.stationId, arr.stationId, undefined, 'direct');
+    if (directRoute?.transferCount === 0) {
+      result.push({
+        id: DIRECT_OPTION_ID,
+        label: '직행 (환승 없음)',
+        isDirect: true,
+        minutes: toDisplayMinutes(directRoute.totalMinutes),
+      });
+    }
+  } else if (directMinutes !== undefined) {
     result.push({
       id: DIRECT_OPTION_ID,
       label: '직행 (환승 없음)',
@@ -484,12 +516,14 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
   const initialDeparture = editParams?.initial?.departureStation;
   const initialArrival = editParams?.initial?.arrivalStation;
   const storedTransfer = editParams?.initial?.transferStations?.[0];
+  const storedPrefersDirect = editParams?.initial?.routePreference === 'direct';
   const [selectedOptionId, setSelectedOptionId] = useState<string>(() => {
     // Hydrate selected transfer option from initial route data, resolved
     // against the recommendations the first render will build (stored ids may
     // be station_cd, which never equals a graph-ID recommendation). Empty →
-    // direct; the sync effect below maps that onto the first option.
-    if (!storedTransfer) return DIRECT_OPTION_ID;
+    // 자동 (or 직행 when routePreference 'direct' was saved); when that id is
+    // not in the list the sync effect below maps it onto the first option.
+    if (!storedTransfer) return storedPrefersDirect ? DIRECT_OPTION_ID : FASTEST_OPTION_ID;
     return resolveStoredTransfer(
       storedTransfer,
       buildRecommendations(initialDeparture ?? null, initialArrival ?? null),
@@ -698,6 +732,11 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
     const rawId = selectedOption.id.startsWith(SEARCH_RESULT_PREFIX)
       ? selectedOption.id.slice(SEARCH_RESULT_PREFIX.length)
       : selectedOption.id;
+    // 직행 is an explicit preference only when the list also offers 자동 (the
+    // SSOT fastest route transfers). Otherwise 직행 == 최단 and `[]` suffices.
+    const prefersDirect =
+      selectedOption.id === DIRECT_OPTION_ID &&
+      recommendations.some((r) => r.id === FASTEST_OPTION_ID);
     const transferStations: TransferStation[] = selectedOption.isDirect
       ? []
       : [
@@ -758,6 +797,9 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
         // `otherLeg`(아래)는 이 필드를 싣지 않는다 — 손대지 않은 leg의 선호는
         // merge 보존이 정답이고, 여기서 {}를 쓰면 그 leg의 선호가 통째로 날아간다.
         boardingPreferences: {},
+        // 편집 leg = 교체 → 선호를 항상 명시한다. null은 saveCommuteRoutes가
+        // deleteField()로 바꿔 merge가 옛 'direct'를 남기지 않게 한다.
+        routePreference: prefersDirect ? 'direct' : null,
       };
       const otherLegSrc = editParams.otherLeg;
       const otherLeg: CommuteRoute = otherLegSrc
@@ -778,6 +820,10 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
             })),
             notifications: otherLegSrc.notifications ?? DEFAULT_COMMUTE_NOTIFICATIONS,
             bufferMinutes: otherLegSrc.bufferMinutes ?? DEFAULT_BUFFER_MINUTES,
+            // 손대지 않은 leg: 원래 값 그대로(부재면 키 생략 → merge 보존).
+            ...(otherLegSrc.routePreference === 'direct' && {
+              routePreference: 'direct' as const,
+            }),
           }
         : reverseCommuteRoute(
             editedLeg,
@@ -821,6 +867,7 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
         departureStation,
         arrivalStation,
         transferStations,
+        ...(prefersDirect && { routePreference: 'direct' as const }),
       },
     });
   }, [
@@ -828,6 +875,7 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
     departureStation,
     arrivalStation,
     selectedOption,
+    recommendations,
     navigation,
     isEditMode,
     editParams,
@@ -986,7 +1034,8 @@ export const CommuteRouteScreen: React.FC<Props> = ({ navigation, route }) => {
           <View style={styles.recommendSection}>
             <Text style={styles.recommendTitle}>환승역 추천</Text>
             <Text style={styles.recommendHint}>
-              {recommendations.some((r) => r.id === DIRECT_OPTION_ID)
+              {(recommendations.find((r) => r.fastest) ?? recommendations[0])?.id ===
+              DIRECT_OPTION_ID
                 ? '직행이 가장 빨라요. 필요시 환승역을 선택하세요'
                 : '가장 빠른 경로로 안내해 드려요. 필요시 환승역을 선택하세요'}
             </Text>

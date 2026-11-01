@@ -90,6 +90,7 @@ const toCommuteRoute = (
   transferStations: data.transferStations,
   notifications,
   bufferMinutes: 5,
+  ...(data.routePreference === 'direct' && { routePreference: 'direct' as const }),
 });
 
 const toStationModel = (rec: RecommendedStation | { stationId: string; stationName: string; lineId: string }): Station => {

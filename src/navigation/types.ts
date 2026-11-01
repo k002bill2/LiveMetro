@@ -2,6 +2,7 @@ import {
   StationSelection,
   TransferStation,
   CommuteNotifications,
+  CommuteRoutePreference,
 } from '@/models/commute';
 
 export interface RouteSearchInitialParams {
@@ -59,6 +60,8 @@ export interface OnboardingRouteData {
   departureStation: StationSelection;
   arrivalStation: StationSelection;
   transferStations: TransferStation[];
+  // 같은 노선 직행 선택 보존('direct'). 부재 = 기존 의미(via 또는 최단).
+  routePreference?: CommuteRoutePreference;
   // Preserved across the in-settings edit round-trip so user-customized
   // values aren't reset to DEFAULT on save. Onboarding leaves them
   // undefined; the editor reads them from the loaded route and threads

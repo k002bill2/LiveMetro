@@ -133,3 +133,27 @@ describe('reverseCommuteRoute', () => {
     expect(forward.transferStations.map((t) => t.stationName)).toEqual(['T1', 'T2']);
   });
 });
+
+describe("reverseCommuteRoute — routePreference", () => {
+  it("mirrors 'direct' (a same-line direct ride reversed is still direct)", () => {
+    const reversed = reverseCommuteRoute(
+      { ...makeRoute([]), routePreference: 'direct' },
+      DEFAULT_EVENING_DEPARTURE_TIME,
+    );
+    expect(reversed.routePreference).toBe('direct');
+  });
+
+  it('mirrors an explicit clear (null) so the reversed leg drops a stale preference too', () => {
+    const reversed = reverseCommuteRoute(
+      { ...makeRoute([]), routePreference: null },
+      DEFAULT_EVENING_DEPARTURE_TIME,
+    );
+    expect(reversed.routePreference).toBeNull();
+  });
+
+  it('omits the key when the forward leg has none (legacy docs unchanged)', () => {
+    const reversed = reverseCommuteRoute(makeRoute([]), DEFAULT_EVENING_DEPARTURE_TIME);
+    expect('routePreference' in reversed).toBe(false);
+  });
+});
+

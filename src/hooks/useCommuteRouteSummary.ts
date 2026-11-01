@@ -22,6 +22,7 @@
  */
 import { useMemo } from 'react';
 import { fareService } from '@services/route';
+import type { CommuteRoutePreference } from '@/models/commute';
 import { selectCommuteRoute } from '@services/route/selectCommuteRoute';
 
 export interface CommuteRouteSummary {
@@ -52,12 +53,18 @@ export function useCommuteRouteSummary(
   fromStationId?: string,
   toStationId?: string,
   viaTransferId?: string,
+  routePreference?: CommuteRoutePreference,
 ): CommuteRouteSummary {
   return useMemo<CommuteRouteSummary>(() => {
     // Canonical route selection (single SSOT — see selectCommuteRoute):
     // id normalization + routeVia/getDiverseRoutes[0] selection + graceful
     // null on any failure (missing/same id, unresolved slug, no path, throw).
-    const route = selectCommuteRoute(fromStationId, toStationId, viaTransferId);
+    const route = selectCommuteRoute(
+      fromStationId,
+      toStationId,
+      viaTransferId,
+      routePreference,
+    );
     if (!route) return EMPTY;
     const stationCount = route.segments.filter((s) => !s.isTransfer).length;
     const lineId = route.segments.find((s) => !s.isTransfer)?.lineId;
@@ -70,7 +77,7 @@ export function useCommuteRouteSummary(
       lineId,
       ready: true,
     };
-  }, [fromStationId, toStationId, viaTransferId]);
+  }, [fromStationId, toStationId, viaTransferId, routePreference]);
 }
 
 export default useCommuteRouteSummary;

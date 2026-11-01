@@ -187,6 +187,7 @@ export const WeeklyPredictionScreen: React.FC = () => {
     morningCommute?.stationId,
     morningCommute?.destinationStationId,
     morningCommute?.transferStationId,
+    morningCommute?.routePreference,
   );
 
   // Hero predictedMinutes — shared single source with HomeScreen via
@@ -239,11 +240,13 @@ export const WeeklyPredictionScreen: React.FC = () => {
         morningCommute?.stationId,
         morningCommute?.destinationStationId,
         morningCommute?.transferStationId,
+        morningCommute?.routePreference,
       ),
     [
       morningCommute?.stationId,
       morningCommute?.destinationStationId,
       morningCommute?.transferStationId,
+      morningCommute?.routePreference,
     ],
   );
   const firstRideSeg = configuredRoute?.segments.find((s) => !s.isTransfer);

@@ -34,6 +34,14 @@ export interface CommuteNotifications {
 }
 
 /**
+ * User route preference for a leg with no via transfer.
+ * `'direct'` = the user picked "직행 (환승 없음)" on a same-line OD where the
+ * path SSOT's fastest route transfers. Absent = legacy meaning (via if saved,
+ * otherwise the globally fastest route).
+ */
+export type CommuteRoutePreference = 'direct';
+
+/**
  * Extended commute time with transfer stations and notifications
  */
 export interface CommuteRoute {
@@ -50,6 +58,10 @@ export interface CommuteRoute {
   /** 탑승 구간별 선호 종점행. 키 = `${stationId}|${lineId}` (출발역 + 환승역 각각).
    *  값 = 선호 종착역 이름 배열 (`Train.finalDestination` 도메인). 부재/빈 배열 = 전체 열차. */
   readonly boardingPreferences?: Readonly<Record<string, readonly string[]>>;
+  /** 경로 선호. `'direct'`는 `transferStations: []`와 함께만 저장된다. 부재 = 기존 의미.
+   *  `null`은 쓰기 전용 "지우기" 표식 — saveCommuteRoutes가 deleteField()로 바꿔
+   *  setDoc({merge:true})가 옛 'direct'를 남기지 않게 한다. 읽은 문서엔 null이 없다. */
+  readonly routePreference?: CommuteRoutePreference | null;
 }
 
 /**
@@ -237,6 +249,7 @@ export const reverseCommuteRoute = (
   });
 
   // boardingPreferences는 의도적으로 미러하지 않는다 — 반대 방향의 종점 집합은 별개다.
+  // routePreference는 미러한다 — 같은 노선 직행의 역방향도 같은 노선 직행이다.
   return {
     departureTime,
     departureStationId: route.arrivalStationId,
@@ -248,6 +261,7 @@ export const reverseCommuteRoute = (
     arrivalLineId: route.departureLineId,
     notifications: route.notifications,
     bufferMinutes: route.bufferMinutes,
+    ...(route.routePreference !== undefined && { routePreference: route.routePreference }),
   };
 };
 

@@ -713,7 +713,7 @@ describe('WeeklyPredictionScreen', () => {
     render(<WeeklyPredictionScreen />);
 
     await waitFor(() =>
-      expect(useCommuteRouteSteps).toHaveBeenCalledWith('0150', '0228', 'stn-via'),
+      expect(useCommuteRouteSteps).toHaveBeenCalledWith('0150', '0228', 'stn-via', undefined),
     );
   });
 

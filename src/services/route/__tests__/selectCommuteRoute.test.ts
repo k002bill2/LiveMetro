@@ -9,19 +9,23 @@
  * coupling to which fixture slugs exist in stations.json. Mirrors the approach
  * in useCommuteRouteSteps.test.ts.
  */
-import { getFastestRoute } from '@services/route/kShortestPath';
+import { getDiverseRoutes, getFastestRoute } from '@services/route/kShortestPath';
 import { routeVia } from '@services/route/routeVia';
 import { resolveInternalStationId } from '@utils/stationIdResolver';
 import type { Route } from '@/models/route';
 import { selectCommuteRoute } from '../selectCommuteRoute';
 
-jest.mock('@services/route/kShortestPath', () => ({ getFastestRoute: jest.fn() }));
+jest.mock('@services/route/kShortestPath', () => ({
+  getFastestRoute: jest.fn(),
+  getDiverseRoutes: jest.fn(() => []),
+}));
 jest.mock('@services/route/routeVia', () => ({ routeVia: jest.fn() }));
 jest.mock('@utils/stationIdResolver', () => ({
   resolveInternalStationId: jest.fn((id?: string | null) => id ?? null),
 }));
 
 const mockedFastest = getFastestRoute as jest.Mock;
+const mockedDiverse = getDiverseRoutes as jest.Mock;
 const mockedRouteVia = routeVia as jest.Mock;
 const mockedResolve = resolveInternalStationId as jest.Mock;
 
@@ -102,5 +106,35 @@ describe('selectCommuteRoute', () => {
     });
     expect(() => selectCommuteRoute('hongdae', 'gangnam')).not.toThrow();
     expect(selectCommuteRoute('hongdae', 'gangnam')).toBeNull();
+  });
+
+  describe("routePreference 'direct'", () => {
+    const TWO_TRANSFER = { ...VIA_ROUTE, transferCount: 2, totalMinutes: 38 } as unknown as Route;
+    const DIRECT = { ...ROUTE, transferCount: 0, totalMinutes: 41 } as unknown as Route;
+
+    it('returns the first transfer-free diverse route (same definition as the screen 직행 분)', () => {
+      mockedFastest.mockReturnValue(TWO_TRANSFER);
+      mockedDiverse.mockReturnValue([TWO_TRANSFER, DIRECT]);
+      expect(selectCommuteRoute('gangnam', 'hongdae', undefined, 'direct')).toBe(DIRECT);
+      expect(mockedDiverse).toHaveBeenCalledWith('gangnam', 'hongdae');
+    });
+
+    it('falls back to the fastest route when no direct ride exists', () => {
+      mockedFastest.mockReturnValue(TWO_TRANSFER);
+      mockedDiverse.mockReturnValue([TWO_TRANSFER]);
+      expect(selectCommuteRoute('gangnam', 'hongdae', undefined, 'direct')).toBe(TWO_TRANSFER);
+    });
+
+    it('a via transfer still wins (direct is only stored with an empty transfer list)', () => {
+      mockedRouteVia.mockReturnValue(VIA_ROUTE);
+      expect(selectCommuteRoute('hongdae', 'gangnam', 'sindorim', 'direct')).toBe(VIA_ROUTE);
+      expect(mockedDiverse).not.toHaveBeenCalled();
+    });
+
+    it('no preference keeps the existing fastest path (no diverse search)', () => {
+      mockedFastest.mockReturnValue(ROUTE);
+      expect(selectCommuteRoute('hongdae', 'gangnam')).toBe(ROUTE);
+      expect(mockedDiverse).not.toHaveBeenCalled();
+    });
   });
 });

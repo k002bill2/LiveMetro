@@ -466,7 +466,7 @@ describe('useCommuteHeroEstimate', () => {
 
     renderHook(() => useCommuteHeroEstimate());
 
-    expect(mockUseCommuteRouteSummary).toHaveBeenCalledWith('0150', '0220', 'stn-via');
+    expect(mockUseCommuteRouteSummary).toHaveBeenCalledWith('0150', '0220', 'stn-via', undefined);
   });
 
   it('drops a non-null profile commute with empty station ids and uses store #2 (isUsableCommuteTime gate)', () => {

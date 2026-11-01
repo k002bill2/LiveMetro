@@ -36,6 +36,7 @@ import type { TransferStep } from '@/models/guidance';
 import { truncateMinutes } from '@/utils/dateUtils';
 import {
   CommuteRoute,
+  type CommuteRoutePreference,
   DEFAULT_COMMUTE_NOTIFICATIONS,
   DEFAULT_BUFFER_MINUTES,
   DEFAULT_MORNING_DEPARTURE_TIME,
@@ -77,6 +78,9 @@ interface CommuteRouteData {
   // UI 형상에서 재구성해 넘기므로 여기서 실어 나르지 않으면 저장 시 증발한다.
   // 선호가 없던 route에서는 undefined — 저장 빌더에서 조건부 spread로 처리.
   boardingPreferences?: CommuteRoute['boardingPreferences'];
+  // 같은 노선 직행 선택('direct'). 이 화면은 편집하지 않지만 카드·히어로 경로
+  // 선택에 쓰고, 시각 변경 저장이 두 leg를 재구성하므로 실어 나른다.
+  routePreference?: CommuteRoutePreference;
 }
 
 const DAY_LABELS: readonly string[] = ['월', '화', '수', '목', '금', '토', '일'];
@@ -420,6 +424,8 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
   const heroRouteSummary = useCommuteRouteSummary(
     morningRoute?.departureStation.stationId,
     morningRoute?.arrivalStation.stationId,
+    undefined,
+    morningRoute?.routePreference,
   );
   // Scoped to the morning leg specifically: this number is labelled 출근 (hero
   // card + the morning RouteCard below), and the return trip runs measurably
@@ -454,11 +460,13 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
     morningRoute?.departureStation.stationId,
     morningRoute?.arrivalStation.stationId,
     morningRoute?.transferStations[0]?.stationId,
+    morningRoute?.routePreference,
   );
   const eveningSteps = useCommuteRouteSteps(
     eveningRoute?.departureStation.stationId,
     eveningRoute?.arrivalStation.stationId,
     eveningRoute?.transferStations[0]?.stationId,
+    eveningRoute?.routePreference,
   );
   const morningTransferNames = useMemo<readonly string[]>(
     () =>
@@ -511,6 +519,8 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
       ...(data.boardingPreferences !== undefined && {
         boardingPreferences: data.boardingPreferences,
       }),
+      // 키 생략 = merge가 저장값 보존. 'direct'면 그대로 다시 쓴다.
+      ...(data.routePreference === 'direct' && { routePreference: 'direct' as const }),
     }),
     [],
   );
@@ -713,6 +723,7 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
       ...(route.boardingPreferences !== undefined && {
         boardingPreferences: route.boardingPreferences,
       }),
+      ...(route.routePreference === 'direct' && { routePreference: 'direct' as const }),
     };
   };
 
@@ -783,6 +794,9 @@ export const CommuteSettingsScreen: React.FC<Props> = ({ navigation }) => {
               // round-trip (Gemini regression fix).
               notifications: data.notifications,
               bufferMinutes: data.bufferMinutes,
+              ...(data.routePreference === 'direct' && {
+                routePreference: 'direct' as const,
+              }),
             }
           : undefined;
       const initial = routeDataToOnboarding(

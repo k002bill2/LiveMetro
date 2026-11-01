@@ -84,6 +84,8 @@ export function useFirestoreCommuteLeg(
         // First chosen transfer drives the via-constrained canonical route.
         // Absent (no transfer saved) → undefined → globally fastest route.
         transferStationId: route.transferStations?.[0]?.stationId,
+        // 같은 노선 직행 선택 보존 — 부재(레거시) = 키 생략, 기존 결과 불변.
+        ...(route.routePreference === 'direct' && { routePreference: 'direct' as const }),
       });
     });
     return unsubscribe;

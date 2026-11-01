@@ -224,4 +224,18 @@ describe('useFirestoreMorningCommute', () => {
     expect(mockedSubscribe).toHaveBeenCalledTimes(1);
     expect(mockUnsubscribe).not.toHaveBeenCalled();
   });
+
+  it("projects routePreference 'direct' onto CommuteTime (drives the direct route)", async () => {
+    const { result } = renderHook(() => useFirestoreMorningCommute('uid-1'));
+    emit(settingsWith({ ...fullMorning, routePreference: 'direct' }));
+    await waitFor(() => expect(result.current?.routePreference).toBe('direct'));
+  });
+
+  it('leaves routePreference undefined for legacy rows without the field', async () => {
+    const { result } = renderHook(() => useFirestoreMorningCommute('uid-1'));
+    emit(settingsWith(fullMorning));
+    await waitFor(() => expect(result.current).not.toBeNull());
+    expect(result.current?.routePreference).toBeUndefined();
+  });
 });
+

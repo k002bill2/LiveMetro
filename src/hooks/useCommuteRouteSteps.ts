@@ -24,6 +24,7 @@
  *   - any thrown error during calculation
  */
 import { useMemo } from 'react';
+import type { CommuteRoutePreference } from '@/models/commute';
 import { selectCommuteRoute } from '@services/route/selectCommuteRoute';
 import { routeToGuidanceSteps } from '@/services/guidance/guidanceSteps';
 import type { GuidanceStep } from '@/models/guidance';
@@ -34,11 +35,17 @@ export function useCommuteRouteSteps(
   fromStationId?: string,
   toStationId?: string,
   viaTransferId?: string,
+  routePreference?: CommuteRoutePreference,
 ): readonly GuidanceStep[] {
   return useMemo<readonly GuidanceStep[]>(() => {
     // Canonical route selection (single SSOT — see selectCommuteRoute) so the
     // ML timeline and the home fact grid never diverge.
-    const route = selectCommuteRoute(fromStationId, toStationId, viaTransferId);
+    const route = selectCommuteRoute(
+      fromStationId,
+      toStationId,
+      viaTransferId,
+      routePreference,
+    );
     if (!route) return EMPTY;
     try {
       const steps = routeToGuidanceSteps(route);
@@ -53,7 +60,7 @@ export function useCommuteRouteSteps(
       }
       return EMPTY;
     }
-  }, [fromStationId, toStationId, viaTransferId]);
+  }, [fromStationId, toStationId, viaTransferId, routePreference]);
 }
 
 export default useCommuteRouteSteps;
