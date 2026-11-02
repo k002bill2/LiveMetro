@@ -8,6 +8,8 @@
  * 찾다 전멸했다.
  *
  * 탭 버튼은 react-navigation이 testID를 주지 않으므로 라벨 텍스트로 찾는다.
+ * 라벨('즐겨찾기'·'설정' 등)은 화면 제목·섹션 문구와 공존할 수 있어 wdio 10
+ * strict 조회 대신 첫 매칭(getFirstByText)을 명시한다 — v8 동작 유지.
  * 탭 이동 검증은 각 화면의 testID 마커로 한다 — 탭 버튼의 selected 속성은
  * 판정이 비결정적이라 쓰지 않는다 (run 31727330570에서 즐겨찾기만 true,
  * 홈·설정 false로 관측됨).
@@ -18,23 +20,23 @@ class BottomTabComponent extends BasePage {
   // ============ ACTIONS ============
 
   async tapHome(): Promise<void> {
-    await this.safeTap(await this.getByText('홈'));
+    await this.safeTap(await this.getFirstByText('홈'));
   }
 
   async tapFavorites(): Promise<void> {
-    await this.safeTap(await this.getByText('즐겨찾기'));
+    await this.safeTap(await this.getFirstByText('즐겨찾기'));
   }
 
   async tapRoutes(): Promise<void> {
-    await this.safeTap(await this.getByText('경로'));
+    await this.safeTap(await this.getFirstByText('경로'));
   }
 
   async tapReports(): Promise<void> {
-    await this.safeTap(await this.getByText('제보'));
+    await this.safeTap(await this.getFirstByText('제보'));
   }
 
   async tapSettings(): Promise<void> {
-    await this.safeTap(await this.getByText('설정'));
+    await this.safeTap(await this.getFirstByText('설정'));
   }
 
   // ============ ASSERTIONS ============
@@ -42,7 +44,7 @@ class BottomTabComponent extends BasePage {
   /** 탭 바 표시 여부 (홈 탭 라벨 기준) */
   async isVisible(): Promise<boolean> {
     try {
-      const homeTab = await this.getByText('홈');
+      const homeTab = await this.getFirstByText('홈');
       return await homeTab.isDisplayed();
     } catch {
       return false;
