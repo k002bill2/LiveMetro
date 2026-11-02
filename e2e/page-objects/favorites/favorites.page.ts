@@ -25,10 +25,12 @@ class FavoritesPage extends BasePage {
 
   /**
    * 즐겨찾기 카드 행 — FavoriteRow(design)가 `favorite-row-{역명}` 기본
-   * testID를 부여한다 (한글 역명 그대로).
+   * testID를 부여한다 (한글 역명 그대로). 홈 탭(HomeFavoriteRow)도 같은
+   * 기본 testID로 렌더하므로 두 탭이 함께 마운트되면 다중 매칭될 수 있어
+   * 첫 매칭을 명시한다.
    */
   favoriteRow(stationName: string): Promise<WebdriverIO.Element> {
-    return this.$(`favorite-row-${stationName}`);
+    return this.getFirstById(`favorite-row-${stationName}`);
   }
 
   /** 편집(선택) 모드의 행별 체크박스 — 행이 1개면 유일하게 매칭된다 */

@@ -192,7 +192,8 @@ export async function waitForLoadingComplete(
   await waitUntil(
     async () => {
       try {
-        const loading = await $(loadingSelector);
+        // 존재 판정 — strict 조회는 다중 매칭 시 throw→catch가 "완료"로 오판
+        const loading = await $(loadingSelector, { strict: false });
         return !(await loading.isDisplayed());
       } catch {
         return true; // Element not found means loading is complete

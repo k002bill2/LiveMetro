@@ -53,36 +53,68 @@ export class BasePage {
   }
 
   /**
+   * 다중 매칭을 허용하고 첫 매칭을 돌려준다 (wdio v8의 `$` 동작).
+   *
+   * wdio 10의 `$`는 strict라 2개 이상 매칭 시 StrictSelectorError를 던진다.
+   * `$$(sel)[0]`은 0개일 때 대기 없이 undefined가 돼 v8의 지연 대기와 다르므로,
+   * wdio가 제공하는 호출 단위 옵트아웃 `{ strict: false }`를 쓴다 — 미발견 시
+   * 지연 요소를 돌려주고 refetch에도 strict:false가 전파된다.
+   */
+  private async firstMatch(selector: string): Promise<WebdriverIO.Element> {
+    return $wdio(selector, { strict: false });
+  }
+
+  /**
+   * Get the first element with the given testID (다중 매칭 허용).
+   * 같은 testID가 여러 화면/행에 렌더될 수 있는 곳에서만 쓴다.
+   */
+  protected async getFirstById(testId: string): Promise<WebdriverIO.Element> {
+    return this.firstMatch(this.testIdLocator(testId));
+  }
+
+  private textLocator(text: string): string {
+    return this.isAndroid
+      ? `android=new UiSelector().text("${text}")`
+      : `-ios predicate string:label == "${text}"`;
+  }
+
+  /**
    * Get element by text content (cross-platform)
    * @param text - The exact text to search for
    */
   async getByText(text: string): Promise<WebdriverIO.Element> {
-    if (this.isAndroid) {
-      return $wdio(`android=new UiSelector().text("${text}")`);
-    }
-    return $wdio(`-ios predicate string:label == "${text}"`);
+    return $wdio(this.textLocator(text));
   }
 
   /**
-   * Get element by partial text
+   * Get the first element with the exact text (다중 매칭 허용).
+   * 탭 라벨·Alert 버튼처럼 화면 본문과 같은 문구가 공존할 수 있는 곳에 쓴다.
+   * @param text - The exact text to search for
+   */
+  async getFirstByText(text: string): Promise<WebdriverIO.Element> {
+    return this.firstMatch(this.textLocator(text));
+  }
+
+  /**
+   * Get the first element containing the partial text (부분 일치는 본질적으로 다중 매칭)
    * @param text - Partial text to search for
    */
-  protected async getByPartialText(text: string): Promise<WebdriverIO.Element> {
+  protected async getFirstByPartialText(text: string): Promise<WebdriverIO.Element> {
     if (this.isAndroid) {
-      return $wdio(`android=new UiSelector().textContains("${text}")`);
+      return this.firstMatch(`android=new UiSelector().textContains("${text}")`);
     }
-    return $wdio(`-ios predicate string:label CONTAINS "${text}"`);
+    return this.firstMatch(`-ios predicate string:label CONTAINS "${text}"`);
   }
 
   /**
-   * Get element by class name
+   * Get the first element of the class (클래스 조회는 본질적으로 다중 매칭)
    * @param className - The class name to search for
    */
-  protected async getByClassName(className: string): Promise<WebdriverIO.Element> {
+  protected async getFirstByClassName(className: string): Promise<WebdriverIO.Element> {
     if (this.isAndroid) {
-      return $wdio(`android=new UiSelector().className("${className}")`);
+      return this.firstMatch(`android=new UiSelector().className("${className}")`);
     }
-    return $wdio(`-ios class chain:**/${className}`);
+    return this.firstMatch(`-ios class chain:**/${className}`);
   }
 
   /**
@@ -280,10 +312,12 @@ export class BasePage {
   /**
    * Check if an element with the exact text is currently displayed.
    * 네이티브 Alert처럼 testID가 없는 요소의 존재 판정에 쓴다.
+   * 존재 = "1개 이상"이므로 첫 매칭 조회를 쓴다 — strict 조회는 다중 매칭 시
+   * StrictSelectorError를 catch가 삼켜 조용히 false가 된다.
    */
   async textExists(text: string): Promise<boolean> {
     try {
-      const element = await this.getByText(text);
+      const element = await this.getFirstByText(text);
       return await element.isDisplayed();
     } catch {
       return false;
@@ -292,11 +326,12 @@ export class BasePage {
 
   /**
    * Check if element exists without throwing error
+   * 존재 = "1개 이상"이므로 첫 매칭 조회를 쓴다 (textExists와 같은 이유).
    * @param accessibilityId - The testID to check
    */
   async elementExists(accessibilityId: string): Promise<boolean> {
     try {
-      const element = await this.$(accessibilityId);
+      const element = await this.getFirstById(accessibilityId);
       return await element.isDisplayed();
     } catch {
       return false;
@@ -358,7 +393,9 @@ export class BasePage {
     ) {
       return;
     }
-    const button = await this.getByText(label);
+    // 다이얼로그 뒤 화면에 같은 문구가 있을 수 있다 (예: 즐겨찾기 행의
+    // 스와이프 액션 라벨 '삭제') — v8과 같은 첫 매칭을 명시한다.
+    const button = await this.getFirstByText(label);
     await button.waitForDisplayed({ timeout });
     await button.click();
   }
@@ -371,7 +408,7 @@ export class BasePage {
       await browser.back();
     } else {
       // iOS: swipe from left edge or tap back button
-      const backButton = await this.getByText('Back');
+      const backButton = await this.getFirstByText('Back');
       if (await backButton.isDisplayed()) {
         await backButton.click();
       }

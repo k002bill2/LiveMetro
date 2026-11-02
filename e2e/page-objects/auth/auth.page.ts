@@ -2,7 +2,6 @@
  * Auth Page Object
  * Handles login and signup form interactions
  */
-import { $ } from '@wdio/globals';
 import { BasePage } from '../base.page';
 
 class AuthPage extends BasePage {
@@ -12,7 +11,8 @@ class AuthPage extends BasePage {
    * Login page title
    */
   get loginTitle(): Promise<WebdriverIO.Element> {
-    return this.getByText('로그인');
+    // 화면 제목과 제출 버튼이 같은 '로그인' 문구일 수 있어 첫 매칭을 명시
+    return this.getFirstByText('로그인');
   }
 
   /**
@@ -226,17 +226,11 @@ class AuthPage extends BasePage {
    */
   async isErrorAlertDisplayed(): Promise<boolean> {
     try {
-      if (this.isAndroid) {
-        const alert = await $(
-          'android=new UiSelector().text("오류")'
-        );
-        return await alert.isDisplayed();
-      } else {
-        const alert = await $(
-          '-ios predicate string:label CONTAINS "오류"'
-        );
-        return await alert.isDisplayed();
-      }
+      // 존재 판정 — 제목·본문 등 여러 요소가 '오류'를 포함할 수 있어 첫 매칭
+      const alert = this.isAndroid
+        ? await this.getFirstByText('오류')
+        : await this.getFirstByPartialText('오류');
+      return await alert.isDisplayed();
     } catch {
       return false;
     }
@@ -260,7 +254,7 @@ class AuthPage extends BasePage {
 
       for (const msg of errorMessages) {
         try {
-          const element = await this.getByText(msg);
+          const element = await this.getFirstByText(msg);
           if (await element.isDisplayed()) {
             return msg;
           }
@@ -279,7 +273,7 @@ class AuthPage extends BasePage {
    */
   async dismissAlert(): Promise<void> {
     try {
-      const okButton = await this.getByText('확인');
+      const okButton = await this.getFirstByText('확인');
       if (await okButton.isDisplayed()) {
         await okButton.click();
       }
