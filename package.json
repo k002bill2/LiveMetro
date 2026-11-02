@@ -45,7 +45,7 @@
     "restore:claude:list": "ts-node scripts/restoreClaudeConfig.ts --list",
     "clone:claude": "ts-node scripts/cloneClaudeConfig.ts",
     "clone:claude:check": "ts-node scripts/cloneClaudeConfig.ts --dry-run",
-    "e2e:install": "appium driver list --installed | grep -q uiautomator2 || appium driver install uiautomator2; appium driver list --installed | grep -q xcuitest || appium driver install xcuitest",
+    "e2e:install": "appium driver list --installed 2>&1 | grep -q uiautomator2 || appium driver install uiautomator2@8; appium driver list --installed 2>&1 | grep -q xcuitest || appium driver install xcuitest@12",
     "e2e:appium": "appium --port 4723 --allow-cors",
     "e2e:build:android": "expo run:android --variant debug",
     "e2e:build:ios": "expo run:ios --configuration Debug",
