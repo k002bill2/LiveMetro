@@ -111,6 +111,44 @@ describe('signInWithKakao', () => {
     expect(mockCallable).not.toHaveBeenCalled();
   });
 
+  // v6 native modules reject every failure with code 'RNKakaoLogins'; only the
+  // message distinguishes a cancel. iOS formats it as `ClientFailed(<reason>): …`
+  // (RNKakaoLogins.swift describe()); Android forwards the Kakao SDK message.
+  it('returns cancelled for the v6 iOS ClientFailed(Cancelled) rejection', async () => {
+    mockKakaoLogin.mockRejectedValue(
+      Object.assign(new Error('ClientFailed(Cancelled): no message'), { code: 'RNKakaoLogins' }),
+    );
+
+    const result = await signInWithKakao();
+
+    expect(result).toEqual({ status: 'cancelled' });
+    expect(mockCallable).not.toHaveBeenCalled();
+  });
+
+  it('rejects with unknown for a v6 non-cancel rejection (no foreground activity)', async () => {
+    mockKakaoLogin.mockRejectedValue(
+      Object.assign(
+        new Error('Current activity is null. Call login() while the app is in the foreground.'),
+        { code: 'RNKakaoLogins' },
+      ),
+    );
+
+    await expect(signInWithKakao()).rejects.toMatchObject({
+      code: 'unknown',
+      userMessage: '카카오 로그인에 실패했습니다.',
+    });
+    expect(mockCallable).not.toHaveBeenCalled();
+  });
+
+  it('rejects with unknown for a v6 iOS AuthFailed rejection', async () => {
+    mockKakaoLogin.mockRejectedValue(
+      Object.assign(new Error('AuthFailed(AccessDenied): denied'), { code: 'RNKakaoLogins' }),
+    );
+
+    await expect(signInWithKakao()).rejects.toMatchObject({ code: 'unknown' });
+    expect(mockCallable).not.toHaveBeenCalled();
+  });
+
   it('rejects with unknown on a generic login failure', async () => {
     mockKakaoLogin.mockRejectedValue({ code: 'E_UNKNOWN', message: 'boom' });
 
