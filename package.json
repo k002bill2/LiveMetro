@@ -4,7 +4,7 @@
   "description": "실시간 전철 알림 - Real-time subway notification app for Seoul metropolitan area",
   "main": "index.js",
   "engines": {
-    "node": "20"
+    "node": ">=22.19.0"
   },
   "scripts": {
     "prepare": "husky",
