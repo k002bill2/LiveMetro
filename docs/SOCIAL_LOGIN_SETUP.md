@@ -227,7 +227,7 @@ custom token을 발급합니다. 검증은 카카오가 돌려준 토큰의 `app
 | Apple 버튼이 안 보임 | 시뮬레이터 또는 iOS 13 미만 | 실기기 iOS 13+ 에서 확인 (정상 동작) |
 | Kakao `KOE101` | 플랫폼(패키지/키 해시/번들 ID) 미등록 | §4-② 재확인 (키 해시는 사용 keystore별로 등록) |
 | Kakao `KOE004` | 카카오 로그인 비활성화 | §4-③ 카카오 로그인 활성화 |
-| Android 빌드 Kotlin 버전 충돌 | kakao-login 플러그인 기본 `kotlinVersion`(1.5.10)이 RN 0.72의 Kotlin 1.8.x를 다운그레이드 | app.config.ts에서 `kotlinVersion: '1.8.10'` 명시 (이미 배선됨) |
+| Android 빌드 Kotlin 버전 충돌 | kakao-login **v5** 플러그인 기본 `kotlinVersion`(1.5.10)이 RN의 Kotlin을 다운그레이드 | kakao-login **v6** 부터 플러그인 `kotlinVersion` 옵션이 제거되어 루트 프로젝트 Kotlin을 따른다 — app.config.ts는 `kakaoAppKey`만 넘긴다 |
 | Android `Manifest merger failed: minSdkVersion 21 cannot be smaller than 23 (com.kakao.sdk:v2-talk)` | Kakao SDK v2가 **minSdk 23(Android 6.0+)** 요구, Expo 49 기본은 21 | app.json expo-build-properties에 `android.minSdkVersion: 23` (2026-07-18 배선). `tools:overrideLibrary` 강제 우회는 런타임 크래시 위험이라 금지 |
 | 로그인 시 "최신 버전의 앱이 필요합니다" / 크래시 | Expo Go 또는 네이티브 모듈 이전 빌드 | dev build 재빌드(§5). Expo Go는 소셜 로그인 미지원 |
 | Kakao 로그인 후 `permission-denied` | functions `KAKAO_APP_ID`가 실제 앱 ID와 불일치 | §6 `KAKAO_APP_ID` 재확인 후 재배포 |

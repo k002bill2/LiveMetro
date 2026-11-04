@@ -16,9 +16,6 @@
  * control sees JSON-shaped diffs. (Importing app.json directly instead of
  * using `config` trips expo-doctor's "app.config.ts is not using app.json".)
  */
-import { readFileSync } from 'fs';
-import { dirname, join } from 'path';
-
 import type { ConfigContext, ExpoConfig } from 'expo/config';
 
 /**
@@ -27,25 +24,12 @@ import type { ConfigContext, ExpoConfig } from 'expo/config';
  * - 조건부 주입 이유: 로컬/CI에서 키 없이도 `expo prebuild`가 성공해야 한다. 키는
  *   EAS 환경변수(`KAKAO_NATIVE_APP_KEY`)로 빌드 타임에만 주입되며, 그 값은 네이티브
  *   리소스(AndroidManifest / Info.plist)에만 쓰이고 JS 번들에는 포함되지 않는다.
- * - `kotlinVersion` 명시 이유: 플러그인은 값이 없으면 1.5.10 을 android.kotlinVersion 과
- *   kotlin-gradle-plugin classpath 에 강제로 쓴다. 고정값(예전 '1.8.10')은 RN 업그레이드 때마다
- *   Kotlin 을 다운그레이드해 빌드를 깨뜨리므로(SDK 54: "Can't find KSP version for Kotlin
- *   1.8.10"), 설치된 react-native 의 gradle 버전 카탈로그에서 읽는다. (kakao maven repo는
- *   라이브러리 자체 build.gradle이 선언하므로 extraMavenRepos 설정은 불필요.)
+ * - `kotlinVersion`을 넘기지 않는 이유: v6 플러그인은 옵션이 `kakaoAppKey`·`overrideKakaoSDKVersion`
+ *   뿐이고 Kotlin 버전을 더 이상 쓰지 않는다(v5 는 미지정 시 1.5.10 을 강제해 우리가 RN 카탈로그
+ *   값을 넘겼다). 라이브러리 build.gradle 은 루트 `ext.kotlinVersion` 이 있으면 그 값을, 없으면
+ *   자체 gradle.properties 기본값(`RNKakaoLogins_kotlinVersion=2.1.20`, RN 0.83 카탈로그와 동일)을 쓴다.
+ *   (kakao maven repo는 라이브러리 자체 build.gradle이 선언하므로 extraMavenRepos 설정은 불필요.)
  */
-const readReactNativeKotlinVersion = (): string => {
-  const catalog = join(
-    dirname(require.resolve('react-native/package.json')),
-    'gradle',
-    'libs.versions.toml'
-  );
-  const version = readFileSync(catalog, 'utf8').match(/^kotlin\s*=\s*"([^"]+)"/m)?.[1];
-  if (!version) {
-    throw new Error(`kotlin version not found in ${catalog}`);
-  }
-  return version;
-};
-
 export default ({ config: base }: ConfigContext): ExpoConfig => {
   const { name, slug } = base;
   if (!name || !slug) {
@@ -55,7 +39,7 @@ export default ({ config: base }: ConfigContext): ExpoConfig => {
   const kakaoAppKey = process.env.KAKAO_NATIVE_APP_KEY;
 
   const plugins: NonNullable<ExpoConfig['plugins']> = kakaoAppKey
-    ? [...(base.plugins ?? []), ['@react-native-seoul/kakao-login', { kakaoAppKey, kotlinVersion: readReactNativeKotlinVersion() }]]
+    ? [...(base.plugins ?? []), ['@react-native-seoul/kakao-login', { kakaoAppKey }]]
     : (base.plugins ?? []);
 
   return {
