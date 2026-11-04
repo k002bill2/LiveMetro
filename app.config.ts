@@ -26,7 +26,8 @@ import type { ConfigContext, ExpoConfig } from 'expo/config';
  *   리소스(AndroidManifest / Info.plist)에만 쓰이고 JS 번들에는 포함되지 않는다.
  * - `kotlinVersion`을 넘기지 않는 이유: v6 플러그인은 옵션이 `kakaoAppKey`·`overrideKakaoSDKVersion`
  *   뿐이고 Kotlin 버전을 더 이상 쓰지 않는다(v5 는 미지정 시 1.5.10 을 강제해 우리가 RN 카탈로그
- *   값을 넘겼다). 라이브러리 build.gradle 은 루트 프로젝트의 `kotlinVersion` ext 를 따른다.
+ *   값을 넘겼다). 라이브러리 build.gradle 은 루트 `ext.kotlinVersion` 이 있으면 그 값을, 없으면
+ *   자체 gradle.properties 기본값(`RNKakaoLogins_kotlinVersion=2.1.20`, RN 0.83 카탈로그와 동일)을 쓴다.
  *   (kakao maven repo는 라이브러리 자체 build.gradle이 선언하므로 extraMavenRepos 설정은 불필요.)
  */
 export default ({ config: base }: ConfigContext): ExpoConfig => {
