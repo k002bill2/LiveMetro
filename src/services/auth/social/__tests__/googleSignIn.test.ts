@@ -7,6 +7,11 @@
  * (configure → credential → Firebase bridge) plus every status-code branch is
  * reachable. The module-unavailable branch is simulated with a toggled factory
  * + resetModules so the running service re-requires the throwing module.
+ *
+ * SDK v16 shape: `signIn()` resolves `{ type: 'success', data: User }` or
+ * `{ type: 'cancelled', data: null }` (cancellation no longer rejects). The
+ * mock's type-guard helpers mirror the library's one-line implementations in
+ * `src/functions.ts` (requireActual would load the TurboModule spec and throw).
  */
 import { Platform } from 'react-native';
 
@@ -58,7 +63,16 @@ jest.mock('@react-native-google-signin/google-signin', () => {
       signIn: (...args: unknown[]) => mockGoogleSignInCall(...args),
     },
     statusCodes: mockGoogleStatusCodes,
+    isSuccessResponse: (response: { type: string }): boolean => response.type === 'success',
+    isCancelledResponse: (response: { type: string }): boolean => response.type === 'cancelled',
+    isErrorWithCode: (error: unknown): boolean =>
+      typeof error === 'object' && error !== null && 'code' in error,
   };
+});
+
+const successResponse = (idToken: string | null): unknown => ({
+  type: 'success',
+  data: { idToken, user: { id: 'google-uid' }, scopes: [], serverAuthCode: null },
 });
 
 const WEB_CLIENT_ID = 'web-client-id.apps.googleusercontent.com';
@@ -73,7 +87,7 @@ describe('signInWithGoogle', () => {
   beforeEach(() => {
     setOS('ios');
     process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID = WEB_CLIENT_ID;
-    mockGoogleSignInCall.mockResolvedValue({ idToken: 'id-token-123' });
+    mockGoogleSignInCall.mockResolvedValue(successResponse('id-token-123'));
     mockGoogleHasPlayServices.mockResolvedValue(true);
     mockSignInOrLink.mockResolvedValue(undefined);
   });
@@ -115,8 +129,20 @@ describe('signInWithGoogle', () => {
     expect(mockSignInOrLink).not.toHaveBeenCalled();
   });
 
-  it('returns cancelled (not an error) on SIGN_IN_CANCELLED', async () => {
-    mockGoogleSignInCall.mockRejectedValue({ code: mockGoogleStatusCodes.SIGN_IN_CANCELLED });
+  it('returns cancelled (not an error) when the SDK resolves a cancelled response', async () => {
+    mockGoogleSignInCall.mockResolvedValue({ type: 'cancelled', data: null });
+
+    const result = await signInWithGoogle();
+
+    expect(result).toEqual({ status: 'cancelled' });
+    expect(mockGoogleCredential).not.toHaveBeenCalled();
+    expect(mockSignInOrLink).not.toHaveBeenCalled();
+  });
+
+  it('still returns cancelled if the SDK rejects with SIGN_IN_CANCELLED', async () => {
+    mockGoogleSignInCall.mockRejectedValue(
+      Object.assign(new Error('cancelled'), { code: mockGoogleStatusCodes.SIGN_IN_CANCELLED }),
+    );
 
     const result = await signInWithGoogle();
 
@@ -125,7 +151,9 @@ describe('signInWithGoogle', () => {
   });
 
   it('rejects with unknown (in-progress message) on IN_PROGRESS', async () => {
-    mockGoogleSignInCall.mockRejectedValue({ code: mockGoogleStatusCodes.IN_PROGRESS });
+    mockGoogleSignInCall.mockRejectedValue(
+      Object.assign(new Error('in progress'), { code: mockGoogleStatusCodes.IN_PROGRESS }),
+    );
 
     await expect(signInWithGoogle()).rejects.toMatchObject({
       code: 'unknown',
@@ -141,6 +169,26 @@ describe('signInWithGoogle', () => {
       code: 'unknown',
       userMessage: expect.stringContaining('Google'),
     });
+  });
+
+  it('rejects with unknown on a sign-in error without a code', async () => {
+    mockGoogleSignInCall.mockRejectedValue(new Error('native failure'));
+
+    await expect(signInWithGoogle()).rejects.toMatchObject({
+      code: 'unknown',
+      userMessage: 'Google 로그인에 실패했습니다.',
+    });
+    expect(mockSignInOrLink).not.toHaveBeenCalled();
+  });
+
+  it('rejects with unknown when the SDK resolves an unexpected response type', async () => {
+    mockGoogleSignInCall.mockResolvedValue({ type: 'noSavedCredentialFound', data: null });
+
+    await expect(signInWithGoogle()).rejects.toMatchObject({
+      code: 'unknown',
+      userMessage: 'Google 로그인에 실패했습니다.',
+    });
+    expect(mockSignInOrLink).not.toHaveBeenCalled();
   });
 
   it('rejects with play-services-unavailable when Play services check fails on Android', async () => {
@@ -165,7 +213,7 @@ describe('signInWithGoogle', () => {
   });
 
   it('rejects with configuration when the SDK returns a null idToken', async () => {
-    mockGoogleSignInCall.mockResolvedValue({ idToken: null });
+    mockGoogleSignInCall.mockResolvedValue(successResponse(null));
 
     await expect(signInWithGoogle()).rejects.toMatchObject({ code: 'configuration' });
     expect(mockSignInOrLink).not.toHaveBeenCalled();

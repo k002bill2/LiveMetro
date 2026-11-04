@@ -7,6 +7,11 @@
  * OTA-updated binary. It is imported lazily inside the function; a failed import
  * yields `SocialAuthError('module-unavailable')` instead of a hard crash.
  * `import type` is compile-time only, so it does not pull the module at runtime.
+ *
+ * SDK v13+ (we target v16): `signIn()` resolves `{ type: 'success', data }` or
+ * `{ type: 'cancelled', data: null }` instead of rejecting on cancel; only real
+ * failures (IN_PROGRESS, NULL_PRESENTER, …) reject. The rejected-SIGN_IN_CANCELLED
+ * branch is kept as a defensive fallback for the same user-facing contract.
  */
 import { Platform } from 'react-native';
 import { GoogleAuthProvider } from 'firebase/auth';
@@ -30,18 +35,18 @@ export async function signInWithGoogle(): Promise<SocialSignInResult> {
     throw new SocialAuthError('configuration', '현재 Google 로그인을 사용할 수 없습니다.');
   }
 
-  let GoogleSignin: typeof import('@react-native-google-signin/google-signin').GoogleSignin;
-  let statusCodes: typeof import('@react-native-google-signin/google-signin').statusCodes;
+  let sdk: typeof import('@react-native-google-signin/google-signin');
   try {
-    const mod = await import('@react-native-google-signin/google-signin');
-    GoogleSignin = mod.GoogleSignin;
-    statusCodes = mod.statusCodes;
+    sdk = await import('@react-native-google-signin/google-signin');
   } catch {
     throw new SocialAuthError(
       'module-unavailable',
       '최신 버전의 앱이 필요합니다. 앱을 업데이트한 뒤 다시 시도해주세요.',
     );
   }
+
+  const { GoogleSignin, statusCodes, isSuccessResponse, isCancelledResponse, isErrorWithCode } =
+    sdk;
 
   GoogleSignin.configure({ webClientId });
 
@@ -58,10 +63,19 @@ export async function signInWithGoogle(): Promise<SocialSignInResult> {
 
   let idToken: string | null;
   try {
-    const result = await GoogleSignin.signIn();
-    idToken = result.idToken;
+    const response = await GoogleSignin.signIn();
+    if (isCancelledResponse(response)) {
+      return { status: 'cancelled' };
+    }
+    if (!isSuccessResponse(response)) {
+      throw new SocialAuthError('unknown', 'Google 로그인에 실패했습니다.');
+    }
+    idToken = response.data.idToken;
   } catch (error) {
-    const code = (error as { code?: string } | undefined)?.code;
+    if (error instanceof SocialAuthError) {
+      throw error;
+    }
+    const code = isErrorWithCode(error) ? error.code : undefined;
     if (code === statusCodes.SIGN_IN_CANCELLED) {
       return { status: 'cancelled' };
     }
