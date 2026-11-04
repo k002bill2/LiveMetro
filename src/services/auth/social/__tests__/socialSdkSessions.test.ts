@@ -194,6 +194,47 @@ describe('socialSdkSessions', () => {
     });
   });
 
+  describe('timed-out cleanup does not touch a later session', () => {
+    it('skips Google signOut when revokeAccess finishes after the timeout', async () => {
+      jest.useFakeTimers();
+      let finishRevoke: (() => void) | undefined;
+      mockGoogleRevokeAccess.mockReturnValue(
+        new Promise<null>((resolve) => {
+          finishRevoke = () => resolve(null);
+        }),
+      );
+
+      const pending = clearSocialSdkSessions({ google: true, kakao: false });
+      await jest.advanceTimersByTimeAsync(SOCIAL_SDK_CLEANUP_TIMEOUT_MS);
+      await pending;
+
+      // User signs in to a new Google account here; then the old revoke lands.
+      finishRevoke?.();
+      await jest.advanceTimersByTimeAsync(0);
+
+      expect(mockGoogleSignOut).not.toHaveBeenCalled();
+    });
+
+    it('skips Kakao logout fallback when unlink fails after the timeout', async () => {
+      jest.useFakeTimers();
+      let failUnlink: (() => void) | undefined;
+      mockKakaoUnlink.mockReturnValue(
+        new Promise<string>((_resolve, reject) => {
+          failUnlink = () => reject(new Error('network'));
+        }),
+      );
+
+      const pending = clearSocialSdkSessions({ google: false, kakao: true });
+      await jest.advanceTimersByTimeAsync(SOCIAL_SDK_CLEANUP_TIMEOUT_MS);
+      await pending;
+
+      failUnlink?.();
+      await jest.advanceTimersByTimeAsync(0);
+
+      expect(mockKakaoLogout).not.toHaveBeenCalled();
+    });
+  });
+
   describe('module unavailable (old OTA binary / Expo Go)', () => {
     it('resolves silently when both native modules are missing', async () => {
       mockGoogleImportThrows = true;

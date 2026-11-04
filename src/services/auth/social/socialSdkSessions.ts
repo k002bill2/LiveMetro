@@ -59,8 +59,20 @@ const logStep = (step: string, error: unknown): void => {
   console.warn(`[socialSdkSessions] ${step} failed`, typeof code === 'string' ? code : '');
 };
 
-/** Run one SDK call; resolves true on success, false on failure. Never rejects. */
-const attempt = async (step: string, call: () => Promise<unknown>): Promise<boolean> => {
+/** True once this provider's cleanup has timed out — later SDK calls must not start. */
+type IsExpired = () => boolean;
+
+/**
+ * Run one SDK call; resolves true on success, false on failure. Never rejects.
+ * Skips the call once the cleanup has timed out: a late-finishing revoke/unlink
+ * must not go on to sign out a session the user started after the timeout.
+ */
+const attempt = async (
+  step: string,
+  call: () => Promise<unknown>,
+  isExpired: IsExpired,
+): Promise<boolean> => {
+  if (isExpired()) return false;
   try {
     await call();
     return true;
@@ -70,30 +82,41 @@ const attempt = async (step: string, call: () => Promise<unknown>): Promise<bool
   }
 };
 
-/** Resolve after `ms` or when `task` settles, whichever is first. Never rejects. */
-const withTimeout = async (step: string, task: Promise<void>, ms: number): Promise<void> => {
+/**
+ * Run `run(isExpired)`; resolve when it settles or after `ms`, whichever is
+ * first. After the deadline `isExpired()` is true so the still-running task
+ * stops before its next SDK call. Never rejects (`run` is built from
+ * `attempt`, so there is no late unhandled rejection).
+ */
+const withTimeout = async (
+  step: string,
+  run: (isExpired: IsExpired) => Promise<void>,
+  ms: number,
+): Promise<void> => {
+  let expired = false;
   let timer: ReturnType<typeof setTimeout> | undefined;
   const timeout = new Promise<void>((resolve) => {
     timer = setTimeout(() => {
+      expired = true;
       logStep(`${step} (timeout)`, undefined);
       resolve();
     }, ms);
   });
   try {
-    // `task` is built from `attempt`, so it never rejects — no late unhandled rejection.
-    await Promise.race([task, timeout]);
+    await Promise.race([run(() => expired), timeout]);
   } finally {
     if (timer !== undefined) clearTimeout(timer);
   }
 };
 
-const clearGoogle = async (revoke: boolean): Promise<void> => {
+const clearGoogle = async (revoke: boolean, isExpired: IsExpired): Promise<void> => {
   let sdk: typeof import('@react-native-google-signin/google-signin');
   try {
     sdk = await import('@react-native-google-signin/google-signin');
   } catch {
     return; // native module absent in this binary
   }
+  if (isExpired()) return;
   const { GoogleSignin } = sdk;
 
   // Android rejects signOut/revokeAccess with "apiClient is null" until
@@ -110,12 +133,12 @@ const clearGoogle = async (revoke: boolean): Promise<void> => {
 
   // revokeAccess needs the live account, so it must precede signOut.
   if (revoke) {
-    await attempt('google.revokeAccess', () => GoogleSignin.revokeAccess());
+    await attempt('google.revokeAccess', () => GoogleSignin.revokeAccess(), isExpired);
   }
-  await attempt('google.signOut', () => GoogleSignin.signOut());
+  await attempt('google.signOut', () => GoogleSignin.signOut(), isExpired);
 };
 
-const clearKakao = async (unlink: boolean): Promise<void> => {
+const clearKakao = async (unlink: boolean, isExpired: IsExpired): Promise<void> => {
   let sdk: typeof import('@react-native-seoul/kakao-login');
   try {
     sdk = await import('@react-native-seoul/kakao-login');
@@ -125,10 +148,10 @@ const clearKakao = async (unlink: boolean): Promise<void> => {
 
   // unlink also discards the local token; fall back to logout if it fails
   // (offline, token already expired) so the local session is still cleared.
-  if (unlink && (await attempt('kakao.unlink', () => sdk.unlink()))) {
+  if (unlink && (await attempt('kakao.unlink', () => sdk.unlink(), isExpired))) {
     return;
   }
-  await attempt('kakao.logout', () => sdk.logout());
+  await attempt('kakao.logout', () => sdk.logout(), isExpired);
 };
 
 /**
@@ -141,7 +164,15 @@ export async function clearSocialSdkSessions(
 ): Promise<void> {
   if (Platform.OS === 'web') return;
   await Promise.all([
-    withTimeout('google', clearGoogle(revoke.google), SOCIAL_SDK_CLEANUP_TIMEOUT_MS),
-    withTimeout('kakao', clearKakao(revoke.kakao), SOCIAL_SDK_CLEANUP_TIMEOUT_MS),
+    withTimeout(
+      'google',
+      (isExpired) => clearGoogle(revoke.google, isExpired),
+      SOCIAL_SDK_CLEANUP_TIMEOUT_MS,
+    ),
+    withTimeout(
+      'kakao',
+      (isExpired) => clearKakao(revoke.kakao, isExpired),
+      SOCIAL_SDK_CLEANUP_TIMEOUT_MS,
+    ),
   ]);
 }

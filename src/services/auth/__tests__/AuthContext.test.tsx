@@ -115,6 +115,9 @@ describe('AuthContext', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    // clearAllMocks keeps implementations — reset to the real contract
+    // (always resolves) so no test inherits a previous rejection.
+    mockClearSocialSdkSessions.mockResolvedValue(undefined);
     authStateCallback = null;
     snapshotCallback = null;
 
