@@ -14,6 +14,10 @@
 import { httpsCallable, FunctionsError } from 'firebase/functions';
 import { auth, functions } from '@/services/firebase/config';
 import { purgeLocalUserData } from '@/services/account/localDataPurge';
+import {
+  clearSocialSdkSessions,
+  getSocialRevocationTargets,
+} from '@/services/auth/social/socialSdkSessions';
 
 interface DeleteAccountResponse {
   success: true;
@@ -73,6 +77,7 @@ export const deleteAccountAndPurgeLocalData =
     // 호출 **전에** 잡는다 — 서버가 계정을 지운 뒤에는 클라 auth 상태가
     // 비워질 수 있고, 그러면 다른 계정의 로컬 키까지 지우는 폴백으로 떨어진다.
     const deletedUid = auth.currentUser?.uid ?? null;
+    const revocation = getSocialRevocationTargets(auth.currentUser);
     try {
       const callable = httpsCallable<void, DeleteAccountResponse>(
         functions,
@@ -84,6 +89,10 @@ export const deleteAccountAndPurgeLocalData =
       logFailure('deleteAccount callable failed:', error);
       return { success: false, error: mapCallableError(error) };
     }
+
+    // 삭제된 계정의 Google 권한 철회·Kakao 연결 끊기(best-effort, never throws).
+    // 서버 deleteAccount는 Kakao 연결을 끊지 않는다 — 재가입 시 동의 화면 재표시.
+    await clearSocialSdkSessions(revocation).catch(() => undefined);
 
     const purge = await purgeLocalUserData(deletedUid);
     if (purge.hadFailure) {
