@@ -12,6 +12,7 @@ const mockSignInAnonymously = jest.fn();
 const mockSignInWithEmailAndPassword = jest.fn();
 const mockCreateUserWithEmailAndPassword = jest.fn();
 const mockSignOut = jest.fn();
+const mockDeleteUser = jest.fn();
 const mockOnAuthStateChanged = jest.fn();
 const mockUpdateProfile = jest.fn();
 const mockSendPasswordResetEmail = jest.fn();
@@ -23,13 +24,16 @@ const mockLinkWithCredential = jest.fn();
 const mockPhoneAuthProviderCredential = jest.fn(
   (..._args: unknown[]) => 'mockPhoneCredential' as unknown,
 );
-const mockCurrentUser: { value: { uid?: string } | null } = { value: null };
+const mockCurrentUser: {
+  value: { uid?: string; providerData?: { providerId: string }[] } | null;
+} = { value: null };
 
 jest.mock('firebase/auth', () => ({
   signInAnonymously: (...args: unknown[]) => mockSignInAnonymously(...args),
   signInWithEmailAndPassword: (...args: unknown[]) => mockSignInWithEmailAndPassword(...args),
   createUserWithEmailAndPassword: (...args: unknown[]) => mockCreateUserWithEmailAndPassword(...args),
   signOut: (...args: unknown[]) => mockSignOut(...args),
+  deleteUser: (...args: unknown[]) => mockDeleteUser(...args),
   onAuthStateChanged: (...args: unknown[]) => mockOnAuthStateChanged(...args),
   updateProfile: (...args: unknown[]) => mockUpdateProfile(...args),
   sendPasswordResetEmail: (...args: unknown[]) => mockSendPasswordResetEmail(...args),
@@ -93,6 +97,15 @@ jest.mock('@/services/auth/social/appleSignIn', () => ({
 }));
 jest.mock('@/services/auth/social/kakaoSignIn', () => ({
   signInWithKakao: (...args: unknown[]) => mockKakaoService(...args),
+}));
+
+// Native social SDK session cleanup has its own suite; here we only verify the
+// context wires it into sign-out / account deletion and that it never blocks
+// Firebase sign-out. getSocialRevocationTargets keeps its real (pure) logic.
+const mockClearSocialSdkSessions = jest.fn();
+jest.mock('@/services/auth/social/socialSdkSessions', () => ({
+  ...jest.requireActual('@/services/auth/social/socialSdkSessions'),
+  clearSocialSdkSessions: (...args: unknown[]) => mockClearSocialSdkSessions(...args),
 }));
 
 describe('AuthContext', () => {
@@ -266,6 +279,37 @@ describe('AuthContext', () => {
   });
 
   describe('signOut', () => {
+    it('clears Google/Kakao SDK sessions before Firebase signOut', async () => {
+      mockClearSocialSdkSessions.mockResolvedValue(undefined);
+      mockSignOut.mockResolvedValue(undefined);
+
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => {
+        await result.current.signOut();
+      });
+
+      expect(mockClearSocialSdkSessions).toHaveBeenCalledWith();
+      expect(mockClearSocialSdkSessions.mock.invocationCallOrder[0]).toBeLessThan(
+        mockSignOut.mock.invocationCallOrder[0] as number,
+      );
+    });
+
+    it('still calls Firebase signOut when SDK cleanup rejects', async () => {
+      mockClearSocialSdkSessions.mockRejectedValue(new Error('sdk boom'));
+      mockSignOut.mockResolvedValue(undefined);
+
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => {
+        await result.current.signOut();
+      });
+
+      expect(mockSignOut).toHaveBeenCalledTimes(1);
+    });
+
     it('should call Firebase signOut', async () => {
       mockSignOut.mockResolvedValue(undefined);
 
@@ -292,6 +336,59 @@ describe('AuthContext', () => {
           await result.current.signOut();
         })
       ).rejects.toThrow('로그아웃에 실패했습니다.');
+    });
+  });
+
+  describe('deleteCurrentUser', () => {
+    it('revokes the deleted account\'s social SDK grants after deleteUser succeeds', async () => {
+      mockClearSocialSdkSessions.mockResolvedValue(undefined);
+      mockDeleteUser.mockResolvedValue(undefined);
+      mockCurrentUser.value = { uid: 'g-uid', providerData: [{ providerId: 'google.com' }] };
+
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => {
+        await result.current.deleteCurrentUser();
+      });
+
+      expect(mockClearSocialSdkSessions).toHaveBeenCalledWith({ google: true, kakao: false });
+      expect(mockDeleteUser.mock.invocationCallOrder[0]).toBeLessThan(
+        mockClearSocialSdkSessions.mock.invocationCallOrder[0] as number,
+      );
+      mockCurrentUser.value = null;
+    });
+
+    it('does not touch SDK sessions when deleteUser fails', async () => {
+      mockDeleteUser.mockRejectedValue({ code: 'auth/requires-recent-login' });
+      mockCurrentUser.value = { uid: 'kakao:1', providerData: [] };
+
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await expect(
+        act(async () => {
+          await result.current.deleteCurrentUser();
+        }),
+      ).rejects.toThrow('보안을 위해 최근 인증이 필요합니다');
+      expect(mockClearSocialSdkSessions).not.toHaveBeenCalled();
+      mockCurrentUser.value = null;
+    });
+
+    it('reports success even when SDK cleanup rejects after deletion', async () => {
+      mockClearSocialSdkSessions.mockRejectedValue(new Error('sdk boom'));
+      mockDeleteUser.mockResolvedValue(undefined);
+      mockCurrentUser.value = { uid: 'kakao:1', providerData: [] };
+
+      const { result } = renderHook(() => useAuth(), { wrapper });
+      await waitFor(() => expect(result.current.loading).toBe(false));
+
+      await act(async () => {
+        await result.current.deleteCurrentUser();
+      });
+
+      expect(mockClearSocialSdkSessions).toHaveBeenCalledWith({ google: false, kakao: true });
+      mockCurrentUser.value = null;
     });
   });
 

@@ -16,7 +16,9 @@ jest.mock('firebase/functions', () => ({
   httpsCallable: (...args: unknown[]) => mockHttpsCallable(...args),
 }));
 
-const mockAuth: { currentUser: { uid: string } | null } = { currentUser: null };
+const mockAuth: {
+  currentUser: { uid: string; providerData?: { providerId: string }[] } | null;
+} = { currentUser: null };
 
 jest.mock('@/services/firebase/config', () => ({
   __esModule: true,
@@ -34,6 +36,14 @@ jest.mock('@/services/account/localDataPurge', () => ({
   purgeLocalUserData: (...args: unknown[]) => mockPurgeLocalUserData(...args),
 }));
 
+const mockClearSocialSdkSessions = jest.fn();
+
+jest.mock('@/services/auth/social/socialSdkSessions', () => ({
+  __esModule: true,
+  ...jest.requireActual('@/services/auth/social/socialSdkSessions'),
+  clearSocialSdkSessions: (...args: unknown[]) => mockClearSocialSdkSessions(...args),
+}));
+
 describe('deleteAccountAndPurgeLocalData', () => {
   let errorSpy: jest.SpyInstance;
 
@@ -41,6 +51,7 @@ describe('deleteAccountAndPurgeLocalData', () => {
     mockHttpsCallable.mockReturnValue((...args: unknown[]) => mockCallable(...args));
     mockCallable.mockResolvedValue({ data: { success: true } });
     mockPurgeLocalUserData.mockResolvedValue({ removedKeyCount: 12, hadFailure: false });
+    mockClearSocialSdkSessions.mockResolvedValue(undefined);
     errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
   });
 
@@ -95,6 +106,48 @@ describe('deleteAccountAndPurgeLocalData', () => {
     await deleteAccountAndPurgeLocalData();
 
     expect(mockPurgeLocalUserData).toHaveBeenCalledWith('gone-uid');
+  });
+
+  // 삭제된 계정의 소셜 앱 연결도 끊어야 재가입 시 동의 화면이 다시 뜬다.
+  // provider는 호출 **전** currentUser 기준(서버가 지운 뒤엔 비워질 수 있다).
+  it('서버 파기 성공 시 호출 전 계정의 provider 기준으로 소셜 SDK를 철회한다', async () => {
+    mockAuth.currentUser = { uid: 'g-uid', providerData: [{ providerId: 'google.com' }] };
+    mockCallable.mockImplementation(async () => {
+      mockAuth.currentUser = null;
+      return { data: { success: true } };
+    });
+
+    await deleteAccountAndPurgeLocalData();
+
+    expect(mockClearSocialSdkSessions).toHaveBeenCalledWith({ google: true, kakao: false });
+  });
+
+  it('kakao:{id} 계정이면 Kakao 연결 끊기를 요청한다', async () => {
+    mockAuth.currentUser = { uid: 'kakao:123' };
+
+    await deleteAccountAndPurgeLocalData();
+
+    expect(mockClearSocialSdkSessions).toHaveBeenCalledWith({ google: false, kakao: true });
+  });
+
+  it('서버 파기 실패 시 소셜 SDK를 건드리지 않는다', async () => {
+    mockAuth.currentUser = { uid: 'kakao:123' };
+    mockCallable.mockRejectedValue(
+      Object.assign(new Error('internal'), { code: 'functions/internal' }),
+    );
+
+    await deleteAccountAndPurgeLocalData();
+
+    expect(mockClearSocialSdkSessions).not.toHaveBeenCalled();
+  });
+
+  it('소셜 SDK 정리가 reject돼도 성공을 반환하고 로컬 파기를 진행한다', async () => {
+    mockClearSocialSdkSessions.mockRejectedValue(new Error('sdk boom'));
+
+    const result = await deleteAccountAndPurgeLocalData();
+
+    expect(mockPurgeLocalUserData).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ success: true });
   });
 
   it('서버 파기 실패 시 로컬 데이터를 건드리지 않는다', async () => {

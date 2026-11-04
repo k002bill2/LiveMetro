@@ -31,6 +31,10 @@ import { SocialSignInResult } from '@/services/auth/social/types';
 import { signInWithGoogle as googleSignInService } from '@/services/auth/social/googleSignIn';
 import { signInWithApple as appleSignInService } from '@/services/auth/social/appleSignIn';
 import { signInWithKakao as kakaoSignInService } from '@/services/auth/social/kakaoSignIn';
+import {
+  clearSocialSdkSessions,
+  getSocialRevocationTargets,
+} from '@/services/auth/social/socialSdkSessions';
 import { purgeLegacyPlaintextCredentials } from '@/services/auth/legacyCredentialPurge';
 
 interface AuthContextType {
@@ -354,6 +358,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   );
 
   const handleSignOut = useCallback(async (): Promise<void> => {
+    // Native Google/Kakao SDK sessions first (best-effort, bounded, never
+    // blocks Firebase sign-out) — otherwise the next Google sign-in silently
+    // reuses the cached account with no account chooser.
+    await clearSocialSdkSessions().catch(() => undefined);
     try {
       await signOut(auth);
     } catch (error) {
@@ -367,6 +375,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     if (!current) {
       throw new Error('삭제할 계정이 없습니다. 로그인 상태를 확인해주세요.');
     }
+    // Capture before deleteUser — the deleted account's own provider grant is
+    // revoked only after Firebase deletion succeeds.
+    const revocation = getSocialRevocationTargets(current);
     try {
       await deleteUser(current);
     } catch (error: unknown) {
@@ -379,6 +390,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
       throw new Error('계정 삭제에 실패했습니다.');
     }
+    await clearSocialSdkSessions(revocation).catch(() => undefined);
   }, []);
 
   const handleUpdateUserProfile = useCallback(async (updates: Partial<Omit<User, 'preferences'>>): Promise<void> => {
