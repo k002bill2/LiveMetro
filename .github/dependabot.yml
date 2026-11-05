@@ -88,6 +88,19 @@ updates:
       # 7.x는 React Compiler 규칙으로 177 errors(#399 triage) — 별도 정리 후 해제
       - dependency-name: "eslint-plugin-react-hooks"
         update-types: ["version-update:semver-major"]
+      # appium 드라이버 major 만 보류 — uiautomator2 9.x·xcuitest 13.x 는 peer 가 appium ^4.0.0-beta
+      # 인데 appium 4 는 정식 미출시(#430 이 올렸다가 되돌림). appium 자체 major 도 같은 조건으로
+      # 묶는다: 따로 올라오면 peer ^3 인 드라이버와 반대 방향으로 어긋난다.
+      # 해제 조건: npm `appium` dist-tag latest 가 4.x 가 되면 세 항목을 함께 지우고, 수동 PR 하나로
+      # appium·두 드라이버·package.json 의 e2e:install 고정(@8/@12)을 같이 올린다
+      # (e2e/config/__tests__/appiumDriverAlignment.test.ts 가 어긋나면 막는다).
+      # minor/patch(보안 수정 포함)는 계속 올라온다.
+      - dependency-name: "appium"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "appium-uiautomator2-driver"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "appium-xcuitest-driver"
+        update-types: ["version-update:semver-major"]
 
   # Firebase Functions(Node 20) — main 머지 시 firebase-deploy.yml 이 자동 배포하므로
   # 머지 전 functions 빌드·테스트 통과를 반드시 확인한다.
