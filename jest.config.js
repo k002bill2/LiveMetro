@@ -48,6 +48,8 @@ module.exports = {
     // e2e 하네스 헬퍼의 순수 단위 테스트. e2e/specs/**/*.spec.ts는 mocha 글로벌과
     // 실제 appium 세션을 요구하므로 __tests__ 디렉터리만 잡는다.
     '<rootDir>/e2e/**/__tests__/**/*.test.ts',
+    // 루트 app.config.ts(Firebase 서비스 파일 분기) 단위 테스트.
+    '<rootDir>/__tests__/**/*.test.ts',
   ],
 
   // babel-preset-expo@10 (SDK 50) treats NODE_ENV=test as "not dev" and

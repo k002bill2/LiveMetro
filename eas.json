@@ -24,7 +24,7 @@
       "distribution": "internal",
       "channel": "preview",
       "ios": {
-        "resourceClass": "m1-medium",
+        "resourceClass": "m-medium",
         "autoIncrement": true
       },
       "android": {
@@ -38,7 +38,7 @@
     "production": {
       "node": "22.23.4",
       "ios": {
-        "resourceClass": "m1-medium",
+        "resourceClass": "m-medium",
         "autoIncrement": "buildNumber"
       },
       "android": {
@@ -53,7 +53,7 @@
     "production-ios": {
       "extends": "production",
       "ios": {
-        "resourceClass": "m1-medium",
+        "resourceClass": "m-medium",
         "autoIncrement": "buildNumber",
         "distribution": "store"
       }
