@@ -10,13 +10,38 @@
  *   (`GOOGLE_SERVICES_JSON` / `GOOGLE_SERVICES_INFO_PLIST`) which contain
  *   the absolute path to the mounted temp file at build time.
  * - On local dev (no EAS env), we fall back to the project-root paths.
+ * - Off the EAS build server (GitHub runner `eas build`, `expo config`), a
+ *   missing file drops the key: the iOS Info.plist mod reads the plist during
+ *   config introspection and would otherwise die with ENOENT. On the build
+ *   server (`EAS_BUILD` set) the path is passed through unchecked so a missing
+ *   file still fails the build loudly instead of shipping without Firebase.
  *
  * Expo reads `app.json` first and passes its `expo` object to this function
  * as `config`, so all the static config lives in one place and version
  * control sees JSON-shaped diffs. (Importing app.json directly instead of
  * using `config` trips expo-doctor's "app.config.ts is not using app.json".)
  */
+import fs from 'fs';
+import path from 'path';
+
 import type { ConfigContext, ExpoConfig } from 'expo/config';
+
+/**
+ * Firebase 서비스 파일 경로 결정.
+ * - EAS 빌드 서버(`EAS_BUILD` 비어있지 않음 = fail-closed): 기존과 동일하게 env ?? 기본 경로.
+ * - 그 외(runner·로컬): 후보 경로가 projectRoot 기준으로 실재할 때만 반환, 없으면 undefined(키 생략).
+ */
+const resolveGoogleServicesFile = (
+  envPath: string | undefined,
+  defaultPath: string,
+  projectRoot: string,
+): string | undefined => {
+  const candidate = envPath ?? defaultPath;
+  if (process.env.EAS_BUILD) {
+    return candidate;
+  }
+  return fs.existsSync(path.resolve(projectRoot, candidate)) ? candidate : undefined;
+};
 
 /**
  * Kakao 로그인 config plugin은 네이티브 앱 키를 요구하므로 조건부로만 주입한다.
@@ -30,7 +55,7 @@ import type { ConfigContext, ExpoConfig } from 'expo/config';
  *   자체 gradle.properties 기본값(`RNKakaoLogins_kotlinVersion=2.1.20`, RN 0.83 카탈로그와 동일)을 쓴다.
  *   (kakao maven repo는 라이브러리 자체 build.gradle이 선언하므로 extraMavenRepos 설정은 불필요.)
  */
-export default ({ config: base }: ConfigContext): ExpoConfig => {
+export default ({ config: base, projectRoot }: ConfigContext): ExpoConfig => {
   const { name, slug } = base;
   if (!name || !slug) {
     throw new Error('app.json must define expo.name and expo.slug');
@@ -42,18 +67,28 @@ export default ({ config: base }: ConfigContext): ExpoConfig => {
     ? [...(base.plugins ?? []), ['@react-native-seoul/kakao-login', { kakaoAppKey }]]
     : (base.plugins ?? []);
 
+  const androidServicesFile = resolveGoogleServicesFile(
+    process.env.GOOGLE_SERVICES_JSON,
+    './google-services.json',
+    projectRoot,
+  );
+  const iosServicesFile = resolveGoogleServicesFile(
+    process.env.GOOGLE_SERVICES_INFO_PLIST,
+    './GoogleService-Info.plist',
+    projectRoot,
+  );
+  // app.json의 정적 android.googleServicesFile까지 지워야 생략이 실제로 적용된다.
+  const { googleServicesFile: _staticAndroid, ...androidBase } = base.android ?? {};
+  const { googleServicesFile: _staticIos, ...iosBase } = base.ios ?? {};
+
   return {
     ...base,
     name,
     slug,
     plugins,
-    android: {
-      ...base.android,
-      googleServicesFile: process.env.GOOGLE_SERVICES_JSON ?? './google-services.json',
-    },
-    ios: {
-      ...base.ios,
-      googleServicesFile: process.env.GOOGLE_SERVICES_INFO_PLIST ?? './GoogleService-Info.plist',
-    },
+    android: androidServicesFile
+      ? { ...androidBase, googleServicesFile: androidServicesFile }
+      : androidBase,
+    ios: iosServicesFile ? { ...iosBase, googleServicesFile: iosServicesFile } : iosBase,
   };
 };

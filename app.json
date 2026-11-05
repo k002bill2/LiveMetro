@@ -26,7 +26,6 @@
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "com.livemetro.app",
-      "buildNumber": "4",
       "usesAppleSignIn": true,
       "config": {
         "usesNonExemptEncryption": false
@@ -62,7 +61,6 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "versionCode": 6,
       "playStoreUrl": "https://play.google.com/store/apps/details?id=com.livemetro.app",
       "permissions": [
         "ACCESS_FINE_LOCATION",
