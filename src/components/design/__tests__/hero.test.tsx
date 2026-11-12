@@ -59,9 +59,22 @@ describe('MLHeroCard', () => {
 
   it('renders confidence subtext when confidence is provided', () => {
     const { getByText } = wrap(
+      <MLHeroCard
+        predictedMinutes={28}
+        confidence={0.87}
+        arrivalTime="9:00"
+        departureTime="8:32"
+      />,
+    );
+    expect(getByText('8:32 출발 시 9:00 도착 · 신뢰도 87%')).toBeTruthy();
+  });
+
+  it('says "도착 예정" (never "지금 출발하면") when no departure is known', () => {
+    const { getByText, queryByText } = wrap(
       <MLHeroCard predictedMinutes={28} confidence={0.87} arrivalTime="9:00" />,
     );
-    expect(getByText('지금 출발하면 9:00 도착 · 신뢰도 87%')).toBeTruthy();
+    expect(getByText('9:00 도착 예정 · 신뢰도 87%')).toBeTruthy();
+    expect(queryByText(/지금 출발하면/)).toBeNull();
   });
 
   it('fires onPress when tapped', () => {

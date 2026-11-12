@@ -418,6 +418,7 @@ export const HomeScreen: React.FC = () => {
             predictedMinutes={effectiveHero.predictedMinutes}
             deltaMinutes={effectiveHero.deltaMinutes}
             arrivalTime={effectiveHero.arrivalTime}
+            departureTime={effectiveHero.departureTime}
             confidence={effectiveHero.confidence}
             onPress={handleOpenPrediction}
           />
