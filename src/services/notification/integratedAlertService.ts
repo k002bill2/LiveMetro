@@ -393,9 +393,13 @@ class IntegratedAlertService {
     switch (type) {
       case 'delay_warning':
         if (delayStatus?.hasDelay) {
+          const delayLead = `${delayStatus.affectedLines.join(', ')} 노선 ${delayStatus.maxDelayMinutes}분 지연 중.`;
+          // 지연 서비스가 신뢰 불가 예측으로 출발 시각을 ''로 돌려주면 시각 없이 안내한다.
           return {
             title: '🚇 지연 알림',
-            body: `${delayStatus.affectedLines.join(', ')} 노선 ${delayStatus.maxDelayMinutes}분 지연 중. ${delayStatus.adjustedDepartureTime}까지 출발하세요.`,
+            body: delayStatus.adjustedDepartureTime
+              ? `${delayLead} ${delayStatus.adjustedDepartureTime}까지 출발하세요.`
+              : `${delayLead} 여유 있게 출발하세요.`,
           };
         }
         return {
@@ -435,7 +439,9 @@ class IntegratedAlertService {
 
     if (delayStatus?.hasDelay) {
       message += ` | 지연: ${delayStatus.maxDelayMinutes}분 (${delayStatus.affectedLines.join(', ')})`;
-      message += ` | 권장: ${delayStatus.adjustedDepartureTime} 출발`;
+      if (delayStatus.adjustedDepartureTime) {
+        message += ` | 권장: ${delayStatus.adjustedDepartureTime} 출발`;
+      }
     } else if (prediction.delayProbability > 0.3) {
       message += ` | 지연 가능성: ${Math.round(prediction.delayProbability * 100)}%`;
     }
