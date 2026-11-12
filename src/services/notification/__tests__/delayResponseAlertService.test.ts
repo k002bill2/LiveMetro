@@ -65,6 +65,7 @@ jest.mock('@/services/ml', () => ({
   modelService: {
     predict: jest.fn().mockResolvedValue({
       predictedDepartureTime: '08:00',
+      confidence: 0.85,
     }),
   },
 }));
@@ -77,6 +78,7 @@ jest.mock('../../pattern/commuteLogService', () => ({
 
 jest.mock('@/models/ml', () => ({
   generateAlertId: jest.fn().mockReturnValue('alert-123'),
+  isPredictionReliable: jest.requireActual('@/models/ml').isPredictionReliable,
 }));
 
 /**
@@ -137,6 +139,7 @@ describe('DelayResponseAlertService', () => {
     mockNotificationService.sendLocalNotification.mockResolvedValue('notif-123');
     mockModelService.predict.mockResolvedValue({
       predictedDepartureTime: '08:00',
+      confidence: 0.85,
     });
     mockCommuteLogService.getRecentLogsForAnalysis.mockResolvedValue([]);
     mockGenerateAlertId.mockReturnValue('alert-123');
@@ -158,10 +161,76 @@ describe('DelayResponseAlertService', () => {
   // ========================================================================
 
   describe('checkRouteDelays', () => {
+    // Codex P2: modelService returns a confidence-0 default (08:00/08:45) when
+    // no usable log survives — e.g. outlier-only logs (07:30→18:32, 662min,
+    // dropped by the 180min duration cap). That default must not become
+    // "07:40에 출발하세요" guidance; delay info itself is still reported.
+    const OUTLIER_ONLY_LOGS = Array.from({ length: 5 }, () => ({
+      dayOfWeek: 1,
+      departureTime: '07:30',
+      arrivalTime: '18:32',
+    }));
+    const NO_PREDICTION_DEFAULT = {
+      predictedDepartureTime: '08:00',
+      predictedArrivalTime: '08:45',
+      delayProbability: 0,
+      confidence: 0,
+      modelVersion: 'fallback',
+    };
+
+    it('should report the delay but no departure time when the prediction is unreliable (outlier-only logs)', async () => {
+      mockCommuteLogService.getRecentLogsForAnalysis.mockResolvedValue(OUTLIER_ONLY_LOGS);
+      mockModelService.predict.mockResolvedValue(NO_PREDICTION_DEFAULT);
+      mockArrivalService.getArrivals.mockResolvedValue(
+        makeArrivalInfo([{ lineId: '2', arrivalMessage: '10분 지연' }])
+      );
+
+      const result = await delayResponseAlertService.checkRouteDelays('user-1', mockRoute);
+
+      expect(result.hasDelays).toBe(true);
+      expect(result.maxDelayMinutes).toBe(10);
+      expect(result.recommendation).toContain('10분 지연');
+      expect(result.recommendation).not.toMatch(/\d{2}:\d{2}/);
+      expect(result.adjustedDepartureTime).toBe('');
+      expect(result.originalDepartureTime).toBe('');
+    });
+
+    it('should not derive a departure time when there are no logs at all', async () => {
+      mockCommuteLogService.getRecentLogsForAnalysis.mockResolvedValue([]);
+      mockModelService.predict.mockResolvedValue(NO_PREDICTION_DEFAULT);
+      mockArrivalService.getArrivals.mockResolvedValue(
+        makeArrivalInfo([{ lineId: '2', arrivalMessage: '20분 지연' }])
+      );
+
+      const result = await delayResponseAlertService.checkRouteDelays('user-1', mockRoute);
+
+      expect(result.recommendation).toContain('20분 지연');
+      expect(result.recommendation).not.toMatch(/\d{2}:\d{2}/);
+      expect(result.adjustedDepartureTime).toBe('');
+    });
+
+    it('should keep the adjusted departure guidance when the prediction is reliable', async () => {
+      mockModelService.predict.mockResolvedValue({
+        ...NO_PREDICTION_DEFAULT,
+        predictedDepartureTime: '08:00',
+        confidence: 0.85,
+        modelVersion: 'statistical',
+      });
+      mockArrivalService.getArrivals.mockResolvedValue(
+        makeArrivalInfo([{ lineId: '2', arrivalMessage: '10분 지연' }])
+      );
+
+      const result = await delayResponseAlertService.checkRouteDelays('user-1', mockRoute);
+
+      expect(result.adjustedDepartureTime).toBe('07:40');
+      expect(result.recommendation).toContain('07:40에 출발');
+    });
+
     it('should check for no delays when arrivals are empty', async () => {
       mockArrivalService.getArrivals.mockResolvedValue(makeArrivalInfo([]));
       mockModelService.predict.mockResolvedValue({
         predictedDepartureTime: '08:00',
+        confidence: 0.85,
       });
 
       const result = await delayResponseAlertService.checkRouteDelays('user-1', mockRoute);
@@ -178,6 +247,7 @@ describe('DelayResponseAlertService', () => {
       );
       mockModelService.predict.mockResolvedValue({
         predictedDepartureTime: '08:00',
+        confidence: 0.85,
       });
 
       const result = await delayResponseAlertService.checkRouteDelays('user-1', mockRoute);
@@ -194,6 +264,7 @@ describe('DelayResponseAlertService', () => {
       );
       mockModelService.predict.mockResolvedValue({
         predictedDepartureTime: '08:00',
+        confidence: 0.85,
       });
 
       const result = await delayResponseAlertService.checkRouteDelays('user-1', mockRoute);
@@ -207,6 +278,7 @@ describe('DelayResponseAlertService', () => {
       );
       mockModelService.predict.mockResolvedValue({
         predictedDepartureTime: '08:00',
+        confidence: 0.85,
       });
 
       const result = await delayResponseAlertService.checkRouteDelays('user-1', mockRoute);
@@ -224,6 +296,7 @@ describe('DelayResponseAlertService', () => {
       );
       mockModelService.predict.mockResolvedValue({
         predictedDepartureTime: '08:00',
+        confidence: 0.85,
       });
 
       const result = await delayResponseAlertService.checkRouteDelays('user-1', mockRoute);
@@ -258,6 +331,7 @@ describe('DelayResponseAlertService', () => {
       );
       mockModelService.predict.mockResolvedValue({
         predictedDepartureTime: '08:00',
+        confidence: 0.85,
       });
 
       const result = await delayResponseAlertService.checkRouteDelays('user-1', multiLineRoute);
@@ -272,6 +346,7 @@ describe('DelayResponseAlertService', () => {
       );
       mockModelService.predict.mockResolvedValue({
         predictedDepartureTime: '08:00',
+        confidence: 0.85,
       });
 
       const result = await delayResponseAlertService.checkRouteDelays('user-1', mockRoute);
@@ -283,6 +358,7 @@ describe('DelayResponseAlertService', () => {
       mockArrivalService.getArrivals.mockResolvedValue(makeArrivalInfo([]));
       mockModelService.predict.mockResolvedValue({
         predictedDepartureTime: '09:00',
+        confidence: 0.85,
       });
 
       await delayResponseAlertService.checkRouteDelays('user-1', mockRoute);
@@ -420,6 +496,7 @@ describe('DelayResponseAlertService', () => {
       mockArrivalService.getArrivals.mockResolvedValue(makeArrivalInfo([]));
       mockModelService.predict.mockResolvedValue({
         predictedDepartureTime: '08:00',
+        confidence: 0.85,
       });
 
       // Should not throw even with initial check
@@ -695,6 +772,7 @@ describe('DelayResponseAlertService', () => {
         mockArrivalService.getArrivals.mockResolvedValue(makeArrivalInfo([]));
         mockModelService.predict.mockResolvedValue({
           predictedDepartureTime: '08:00',
+          confidence: 0.85,
         });
 
         const unsubscribe = await delayResponseAlertService.subscribeToRouteDelays(
@@ -719,6 +797,7 @@ describe('DelayResponseAlertService', () => {
         mockArrivalService.getArrivals.mockResolvedValue(makeArrivalInfo([]));
         mockModelService.predict.mockResolvedValue({
           predictedDepartureTime: '08:00',
+          confidence: 0.85,
         });
 
         const unsubscribe = await delayResponseAlertService.subscribeToRouteDelays(
@@ -750,6 +829,7 @@ describe('DelayResponseAlertService', () => {
         mockArrivalService.getArrivals.mockResolvedValue(makeArrivalInfo([]));
         mockModelService.predict.mockResolvedValue({
           predictedDepartureTime: '08:00',
+          confidence: 0.85,
         });
 
         await delayResponseAlertService.subscribeToRouteDelays(
@@ -892,6 +972,7 @@ describe('DelayResponseAlertService', () => {
       );
       mockModelService.predict.mockResolvedValue({
         predictedDepartureTime: '08:00',
+        confidence: 0.85,
       });
 
       const result = await delayResponseAlertService.checkRouteDelays('user-1', mockRoute);
@@ -907,6 +988,7 @@ describe('DelayResponseAlertService', () => {
       );
       mockModelService.predict.mockResolvedValue({
         predictedDepartureTime: '08:00',
+        confidence: 0.85,
       });
 
       const result = await delayResponseAlertService.checkRouteDelays('user-1', mockRoute);
@@ -930,6 +1012,7 @@ describe('DelayResponseAlertService', () => {
         );
         mockModelService.predict.mockResolvedValue({
           predictedDepartureTime: '08:00',
+          confidence: 0.85,
         });
 
         const result = await delayResponseAlertService.checkRouteDelays('user-1', mockRoute);
@@ -946,6 +1029,7 @@ describe('DelayResponseAlertService', () => {
       );
       mockModelService.predict.mockResolvedValue({
         predictedDepartureTime: '08:00',
+        confidence: 0.85,
       });
 
       const result = await delayResponseAlertService.checkRouteDelays('user-1', mockRoute);
@@ -961,6 +1045,7 @@ describe('DelayResponseAlertService', () => {
       );
       mockModelService.predict.mockResolvedValue({
         predictedDepartureTime: '08:00',
+        confidence: 0.85,
       });
 
       const result = await delayResponseAlertService.checkRouteDelays('user-1', mockRoute);
@@ -974,6 +1059,7 @@ describe('DelayResponseAlertService', () => {
       );
       mockModelService.predict.mockResolvedValue({
         predictedDepartureTime: '08:00',
+        confidence: 0.85,
       });
 
       delayResponseAlertService.startDelayMonitoring({
@@ -990,6 +1076,7 @@ describe('DelayResponseAlertService', () => {
       );
       mockModelService.predict.mockResolvedValue({
         predictedDepartureTime: '08:00',
+        confidence: 0.85,
       });
 
       // Advance timer by 10 minutes (less than 30 minute cooldown)
@@ -1034,6 +1121,7 @@ describe('DelayResponseAlertService', () => {
         );
         mockModelService.predict.mockResolvedValue({
           predictedDepartureTime: '08:00',
+          confidence: 0.85,
         });
 
         const result = await delayResponseAlertService.checkRouteDelays('user-1', mockRoute);

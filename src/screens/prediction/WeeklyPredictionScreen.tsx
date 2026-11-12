@@ -4,7 +4,7 @@
  * Phase 7 — full hero redesign matching the design handoff
  * (livemetro/project/src/screens/commute-prediction.jsx).
  *
- * Information model: single hero answering "오늘 지금 출발하면 몇 분?"
+ * Information model: single hero answering "오늘 예측 출발 시각 기준 몇 분?"
  * (replaces the 7-day list). Route name 'WeeklyPrediction' kept for
  * navigation backward compatibility.
  *
@@ -53,7 +53,7 @@ import { deriveLoopDirection } from '@/utils/loopDirection';
  * time — the old `new Date()` value showed the wrong field (a night-time clock
  * on a "오늘 출근" card) and went stale because it was frozen at mount. It now
  * shows the predicted 도착 시각, the same field HomeScreen's card surfaces
- * ("지금 출발하면 ○ 도착"), so the two screens read consistently.
+ * ("○ 출발 시 ○ 도착" / "○ 도착 예정"), so the two screens read consistently.
  */
 const formatHHmmLabel = (hhmm?: string): string | null => {
   if (!hhmm) return null;
@@ -209,7 +209,7 @@ export const WeeklyPredictionScreen: React.FC = () => {
   const confidencePct =
     effectiveHero?.confidence != null ? Math.round(effectiveHero.confidence * 100) : 87;
   const arrivalTime = effectiveHero?.arrivalTime ?? '';
-  // 헤더 = 도착 시각(현재 벽시계 시각 아님). 홈 카드("지금 출발하면 ○ 도착")와
+  // 헤더 = 도착 시각(현재 벽시계 시각 아님). 홈 카드("○ 출발 시 ○ 도착")와
   // 동일한 effectiveHero.arrivalTime을 써서 두 화면 시각이 일치한다. 미설정이면
   // null → 라벨 자체를 생략한다.
   const arrivalLabel = formatHHmmLabel(arrivalTime);

@@ -25,6 +25,8 @@ interface MLHeroCardProps {
   deltaMinutes?: number;
   /** Predicted arrival HH:mm — shown in subtext */
   arrivalTime?: string;
+  /** Departure HH:mm the arrival is computed from — shown in subtext */
+  departureTime?: string;
   /** Confidence 0–1 */
   confidence?: number;
   /** Tap handler — typically navigates to WeeklyPrediction */
@@ -63,6 +65,7 @@ const MLHeroCardImpl: React.FC<MLHeroCardProps> = ({
   predictedMinutes,
   deltaMinutes,
   arrivalTime,
+  departureTime,
   confidence,
   onPress,
   style,
@@ -76,7 +79,15 @@ const MLHeroCardImpl: React.FC<MLHeroCardProps> = ({
 
   const subtext = (() => {
     const parts: string[] = [];
-    if (arrivalTime) parts.push(`지금 출발하면 ${arrivalTime} 도착`);
+    // The arrival is computed from the predicted/registered departure, not
+    // from "now" — at 01:00 a "지금 출발하면" claim was simply false.
+    if (arrivalTime) {
+      parts.push(
+        departureTime
+          ? `${departureTime} 출발 시 ${arrivalTime} 도착`
+          : `${arrivalTime} 도착 예정`,
+      );
+    }
     if (confidencePct !== null) parts.push(`신뢰도 ${confidencePct}%`);
     return parts.length > 0 ? parts.join(' · ') : null;
   })();

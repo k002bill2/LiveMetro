@@ -28,6 +28,7 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { useAuth } from '@/services/auth/AuthContext';
 import { trainService } from '@/services/train/trainService';
+import { MAX_PLAUSIBLE_COMMUTE_MINUTES } from '@/services/pattern/commuteDuration';
 import { useMLPrediction } from '@/hooks/useMLPrediction';
 import {
   useFirestoreMorningCommute,
@@ -42,6 +43,9 @@ import {
 } from '@screens/home/homeTimeFormat';
 import { resolveActiveCommuteType, type CommuteLeg } from '@/utils/commuteSchedule';
 
+/** Minimum ML confidence for the prediction to be promoted as the hero. */
+export const MIN_HERO_CONFIDENCE = 0.3;
+
 export interface CommuteHeroValue {
   /** Predicted commute minutes (display number). */
   predictedMinutes: number;
@@ -49,6 +53,8 @@ export interface CommuteHeroValue {
   deltaMinutes?: number;
   /** Predicted arrival HH:mm. */
   arrivalTime?: string;
+  /** Departure HH:mm the arrival is computed from (ML or registered commute). */
+  departureTime?: string;
   /** Model confidence 0–1 (ML only; undefined for the graph fallback). */
   confidence?: number;
   /** Origin station display name (when resolved). */
@@ -271,6 +277,10 @@ export function useCommuteHeroEstimate(
       mlPrediction.predictedArrivalTime,
     );
     if (minutes === null) return null;
+    // Promotion gate: an implausible duration or a low-confidence (thin-data)
+    // prediction must not become the headline — the graph fallback shows.
+    if (minutes > MAX_PLAUSIBLE_COMMUTE_MINUTES) return null;
+    if (mlPrediction.confidence < MIN_HERO_CONFIDENCE) return null;
     const baselineMinutes = baselineMinutesFor(
       commuteStationNames.origin,
       commuteStationNames.destination,
@@ -281,6 +291,7 @@ export function useCommuteHeroEstimate(
       predictedMinutes: minutes,
       deltaMinutes: delta,
       arrivalTime: mlPrediction.predictedArrivalTime,
+      departureTime: mlPrediction.predictedDepartureTime,
       confidence: mlPrediction.confidence,
       origin: commuteStationNames.origin,
       destination: commuteStationNames.destination,
@@ -303,6 +314,7 @@ export function useCommuteHeroEstimate(
       predictedMinutes: routeSummary.rideMinutes,
       deltaMinutes: undefined,
       arrivalTime: arrival,
+      departureTime: activeCommute.departureTime || undefined,
       confidence: undefined,
       origin: commuteStationNames.origin,
       destination: commuteStationNames.destination,

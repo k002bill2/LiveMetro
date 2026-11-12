@@ -10,7 +10,7 @@
  */
 import { renderHook, waitFor } from '@testing-library/react-native';
 
-import { useCommuteHeroEstimate } from '@/hooks/useCommuteHeroEstimate';
+import { useCommuteHeroEstimate, MIN_HERO_CONFIDENCE } from '@/hooks/useCommuteHeroEstimate';
 import { useMLPrediction } from '@/hooks/useMLPrediction';
 import {
   useFirestoreMorningCommute,
@@ -692,5 +692,78 @@ describe('useCommuteHeroEstimate direction=auto (evening switch)', () => {
     expect(result.current.commuteStationNames.destination).toBeUndefined();
     // The old-OD prediction must NOT be promoted onto the new commute.
     expect(result.current.hasRealPrediction).toBe(false);
+  });
+
+  // Promotion gate (fix for the 01:00 KST 662분/신뢰도 10% hero): an ML number
+  // is promoted only when it is plausible AND confident enough; otherwise the
+  // graph fallback shows.
+  describe('ML hero promotion gate', () => {
+    const setupOD = (prediction: Record<string, unknown>): void => {
+      mockUseMLPrediction.mockReturnValue({
+        prediction: {
+          originStationName: '서울역',
+          destinationStationName: '강남역',
+          ...prediction,
+        },
+        baselineMinutesFor: () => 31,
+      });
+      mockUseFirestoreMorningCommute.mockReturnValue({
+        departureTime: '08:00',
+        stationId: '0150',
+        destinationStationId: '0220',
+      });
+      mockGetStation.mockImplementation(async (id: string) =>
+        id === '0150'
+          ? { id: '0150', name: '서울역', lineId: '1' }
+          : { id: '0220', name: '강남역', lineId: '2' },
+      );
+      mockUseCommuteRouteSummary.mockReturnValue({ ready: true, rideMinutes: 25 });
+    };
+
+    it('exports MIN_HERO_CONFIDENCE = 0.3', () => {
+      expect(MIN_HERO_CONFIDENCE).toBe(0.3);
+    });
+
+    it('does not promote an ML prediction with confidence 0.29 — graph fallback shows', async () => {
+      setupOD({ predictedDepartureTime: '08:00', predictedArrivalTime: '08:28', confidence: 0.29 });
+      const { result } = renderHook(() => useCommuteHeroEstimate());
+
+      await waitFor(() => expect(result.current.effectiveHero?.predictedMinutes).toBe(25));
+      expect(result.current.hasRealPrediction).toBe(false);
+      expect(result.current.effectiveHero?.confidence).toBeUndefined();
+    });
+
+    it('promotes an ML prediction with confidence exactly 0.3', async () => {
+      setupOD({ predictedDepartureTime: '08:00', predictedArrivalTime: '08:28', confidence: 0.3 });
+      const { result } = renderHook(() => useCommuteHeroEstimate());
+
+      await waitFor(() => expect(result.current.effectiveHero?.predictedMinutes).toBe(28));
+      expect(result.current.hasRealPrediction).toBe(true);
+      expect(result.current.effectiveHero?.departureTime).toBe('08:00');
+    });
+
+    it('does not promote an implausible 181-minute ML prediction', async () => {
+      setupOD({ predictedDepartureTime: '08:00', predictedArrivalTime: '11:01', confidence: 0.9 });
+      const { result } = renderHook(() => useCommuteHeroEstimate());
+
+      await waitFor(() => expect(result.current.effectiveHero?.predictedMinutes).toBe(25));
+      expect(result.current.hasRealPrediction).toBe(false);
+    });
+
+    it('promotes a 180-minute ML prediction (boundary)', async () => {
+      setupOD({ predictedDepartureTime: '08:00', predictedArrivalTime: '11:00', confidence: 0.9 });
+      const { result } = renderHook(() => useCommuteHeroEstimate());
+
+      await waitFor(() => expect(result.current.effectiveHero?.predictedMinutes).toBe(180));
+      expect(result.current.hasRealPrediction).toBe(true);
+    });
+
+    it('carries the registered departure on the graph fallback hero', async () => {
+      setupOD({ predictedDepartureTime: '07:40', predictedArrivalTime: '08:28', confidence: 0.1 });
+      const { result } = renderHook(() => useCommuteHeroEstimate());
+
+      await waitFor(() => expect(result.current.effectiveHero?.predictedMinutes).toBe(25));
+      expect(result.current.effectiveHero?.departureTime).toBe('08:00');
+    });
   });
 });

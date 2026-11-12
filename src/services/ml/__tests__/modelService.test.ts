@@ -112,16 +112,43 @@ describe('ModelService', () => {
       expect(prediction.predictedArrivalTime).toBe('13:45');
     });
 
-    it('keeps the +0.05 arrival estimate when no log has a measured duration', async () => {
+    // No measured duration → no prediction. The old +0.05-day (72min) guess
+    // was promoted as if measured; now the route-less default (confidence 0)
+    // comes back, which every consumer already treats as "no prediction".
+    it('returns the route-less no-prediction default when no log has a measured duration', async () => {
       const logs: CommuteLog[] = [
         { ...mockCommuteLog, id: 'log-open', departureTime: '08:00', arrivalTime: undefined },
       ];
 
       const prediction = await modelService.predict(logs, MONDAY, { useCache: false });
 
-      expect(prediction.predictedDepartureTime).toBe('08:00');
-      // Legacy estimate preserved: 08:00 + 0.05 day (72 min) = 09:12.
-      expect(prediction.predictedArrivalTime).toBe('09:12');
+      expect(prediction.confidence).toBe(0);
+      expect(prediction.predictedArrivalTime).not.toBe('09:12');
+      expect(prediction.originStationName).toBeUndefined();
+    });
+
+    it('returns no prediction (no route tag) when the OD has only implausible-duration logs', async () => {
+      const logs: CommuteLog[] = [
+        {
+          ...mockCommuteLog,
+          id: 'log-outlier',
+          departureTime: '07:30',
+          arrivalTime: '18:32',
+          departureStationName: '산곡',
+          arrivalStationName: '선릉',
+        },
+      ];
+
+      const prediction = await modelService.predict(logs, MONDAY, {
+        useCache: false,
+        originStationName: '산곡',
+        destinationStationName: '선릉',
+      });
+
+      expect(prediction.confidence).toBe(0);
+      expect(prediction.originStationName).toBeUndefined();
+      expect(prediction.destinationStationName).toBeUndefined();
+      expect(prediction.predictedArrivalTime).not.toBe('18:32');
     });
 
     // Route context (OD scoping): when the caller names its leg, the fallback
@@ -314,8 +341,8 @@ describe('ModelService', () => {
       const before = await modelService.predict(openLog, MONDAY);
       const after = await modelService.predict(closedLog, MONDAY);
 
-      // No usable duration yet → the historical +0.05-of-a-day placeholder.
-      expect(before.predictedArrivalTime).toBe('09:12');
+      // No usable duration yet → the no-prediction default (confidence 0).
+      expect(before.confidence).toBe(0);
       // Measured 50min now drives the arrival; a stale cache would echo 09:12.
       expect(after.predictedArrivalTime).toBe('08:50');
     });
