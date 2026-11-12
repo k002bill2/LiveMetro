@@ -105,7 +105,8 @@ const renderAt01KST = async (): Promise<ReturnType<typeof useCommuteHeroEstimate
 
   // 'auto' = HomeScreen's call; resolveActiveCommuteType is real here.
   const { result } = renderHook(() => useCommuteHeroEstimate(0, 'auto'));
-  await waitFor(() => expect(result.current.effectiveHero).not.toBeNull());
+  // Wait until station names resolve (the hero decision depends on them).
+  await waitFor(() => expect(result.current.commuteStationNames.destination).toBe(DESTINATION));
   return result.current;
 };
 
@@ -117,23 +118,19 @@ describe('useCommuteHeroEstimate — night anomaly (diag)', () => {
     jest.useRealTimers();
   });
 
-  it('characterization: reproduces the device numbers 662 / +399 / 18:32 / 10% at 01:00 KST', async () => {
+  // After fix (A+B): the 662-minute outlier is excluded from measured
+  // durations, the Thursday OD has no plausible log left, so modelService
+  // returns the route-less no-prediction default and the hero is NOT the ML
+  // 662. With the graph summary unavailable here, the hero is simply empty.
+  it('after fix: at 01:00 KST the hero is not the ML 662 — no ML promotion, graph fallback (null here)', async () => {
     const estimate = await renderAt01KST();
 
     expect(estimate.activeCommuteType).toBe('morning');
-    expect(estimate.hasRealPrediction).toBe(true);
-    expect(estimate.effectiveHero).toMatchObject({
-      predictedMinutes: 662,
-      deltaMinutes: 399,
-      arrivalTime: '18:32',
-      confidence: 0.1,
-    });
+    expect(estimate.hasRealPrediction).toBe(false);
+    expect(estimate.effectiveHero).toBeNull();
   });
 
-  // Correct behavior: an 11-hour "commute" from one outlier log must not be
-  // promoted as the ML headline. Bound chosen as a clearly-implausible Seoul
-  // subway door-to-door ceiling (exact threshold is a fix-time decision).
-  it.failing('does not promote an implausible single-outlier duration as the ML hero', async () => {
+  it('does not promote an implausible single-outlier duration as the ML hero', async () => {
     const estimate = await renderAt01KST();
 
     const minutes = estimate.effectiveHero?.predictedMinutes ?? 0;

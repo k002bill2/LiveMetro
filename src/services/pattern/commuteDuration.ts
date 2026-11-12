@@ -13,6 +13,14 @@ import type { CommuteLog } from '@/models/pattern';
 const MIN_PER_DAY = 24 * 60;
 
 /**
+ * Ceiling for a believable door-to-door Seoul subway commute. Anything longer
+ * is an open log closed hours later (07:30→18:32 = 662min was promoted as the
+ * hero at 01:00 KST), not a ride — it must drop out instead of poisoning the
+ * average.
+ */
+export const MAX_PLAUSIBLE_COMMUTE_MINUTES = 180;
+
+/**
  * Strict `HH:mm` parse. Deliberately stricter than `parseTimeToMinutes` (which
  * is lenient and yields NaN on garbage): anything that is not a clean clock
  * time must drop out of the average rather than poison it.
@@ -29,7 +37,8 @@ const parseHHmm = (value?: string): number | null => {
  *
  * A zero-minute result is treated as unusable: departure and arrival landing in
  * the same minute means the log was opened and closed without a trip happening,
- * not that the trip took no time.
+ * not that the trip took no time. Durations above
+ * {@link MAX_PLAUSIBLE_COMMUTE_MINUTES} are likewise unusable.
  */
 export const commuteDurationMinutes = (
   log: Pick<CommuteLog, 'departureTime' | 'arrivalTime'>
@@ -38,7 +47,7 @@ export const commuteDurationMinutes = (
   const arrived = parseHHmm(log.arrivalTime);
   if (departed === null || arrived === null) return null;
   const diff = (((arrived - departed) % MIN_PER_DAY) + MIN_PER_DAY) % MIN_PER_DAY;
-  return diff > 0 ? diff : null;
+  return diff > 0 && diff <= MAX_PLAUSIBLE_COMMUTE_MINUTES ? diff : null;
 };
 
 /**

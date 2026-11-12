@@ -231,12 +231,16 @@ class ModelService {
     const durations = relevantLogs
       .map((log) => commuteDurationMinutes(log))
       .filter((minutes): minutes is number => minutes !== null);
+    if (durations.length === 0) {
+      // No plausible measured duration (open logs only, or outliers above the
+      // cap). A guessed +72min arrival would be promoted as if measured, so
+      // return the same route-less, confidence-0 default as "no data".
+      return createDefaultPrediction('08:00', '08:45');
+    }
     const avgArrival =
-      durations.length > 0
-        ? (avgDeparture +
-            durations.reduce((a, b) => a + b, 0) / durations.length / MINUTES_PER_DAY) %
-          1
-        : avgDeparture + 0.05;
+      (avgDeparture +
+        durations.reduce((a, b) => a + b, 0) / durations.length / MINUTES_PER_DAY) %
+      1;
 
     // Calculate delay probability
     const delayRate = featureExtractor.calculateDelayRate(relevantLogs);

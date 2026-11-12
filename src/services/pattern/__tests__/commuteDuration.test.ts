@@ -4,6 +4,7 @@
 import {
   commuteDurationMinutes,
   averageCommuteDurationFor,
+  MAX_PLAUSIBLE_COMMUTE_MINUTES,
 } from '../commuteDuration';
 import type { CommuteLog } from '@/models/pattern';
 
@@ -63,6 +64,28 @@ describe('commuteDurationMinutes', () => {
 
   it('returns null for an unparseable time', () => {
     expect(commuteDurationMinutes(log('산곡', '선릉', '아침', '09:14'))).toBeNull();
+  });
+
+  // Plausibility ceiling: an open commute closed hours later (07:30→18:32 =
+  // 662min) is not a subway ride and must not enter any average.
+  it('caps plausible durations at MAX_PLAUSIBLE_COMMUTE_MINUTES (180)', () => {
+    expect(MAX_PLAUSIBLE_COMMUTE_MINUTES).toBe(180);
+    expect(commuteDurationMinutes(log('산곡', '선릉', '07:00', '10:00'))).toBe(180);
+    expect(commuteDurationMinutes(log('산곡', '선릉', '07:00', '10:01'))).toBeNull();
+    expect(commuteDurationMinutes(log('산곡', '선릉', '07:30', '18:32'))).toBeNull();
+  });
+
+  it('keeps a plausible midnight-crossing ride within the cap', () => {
+    expect(commuteDurationMinutes(log('산곡', '선릉', '23:00', '01:00'))).toBe(120);
+  });
+
+  it('drops an outlier from the leg average instead of skewing it', () => {
+    const logs = [
+      log('산곡', '선릉', '07:30', '08:34'), // 64
+      log('산곡', '선릉', '07:31', '08:34'), // 63
+      log('산곡', '선릉', '07:32', '18:32'), // 660 → excluded
+    ];
+    expect(averageCommuteDurationFor(logs, '산곡', '선릉')).toBe(63.5);
   });
 });
 
