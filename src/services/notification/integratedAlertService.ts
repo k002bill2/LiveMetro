@@ -29,6 +29,7 @@ import {
   DEFAULT_MONITORING_SETTINGS,
   generateAlertId,
   calculateAlertPriority,
+  isPredictionReliable,
 } from '@/models/ml';
 
 // ============================================================================
@@ -100,6 +101,13 @@ class IntegratedAlertService {
 
       // Get ML prediction
       const prediction = await modelService.predict(logs, dayOfWeek);
+      // modelService returns a confidence-0 default (08:00) when no usable
+      // logs survive (none, or outlier-only). That is "no prediction", not a
+      // departure time — take the existing "no alert" path (same threshold as
+      // departureAlertService).
+      if (!isPredictionReliable(prediction)) {
+        return null;
+      }
 
       // Check for delays on route
       const delayStatus = await this.checkDelayStatus(userId, pattern.frequentRoute);

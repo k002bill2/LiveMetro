@@ -74,6 +74,7 @@ let mockIntegratedAlertIdCounter = 0;
 jest.mock('@/models/ml', () => ({
   generateAlertId: jest.fn(() => `alert-${++mockIntegratedAlertIdCounter}-${Date.now()}`),
   calculateAlertPriority: jest.fn(() => 'medium' as AlertPriority),
+  isPredictionReliable: jest.requireActual('@/models/ml').isPredictionReliable,
   DEFAULT_MONITORING_SETTINGS: {
     morningEnabled: true,
     morningStartHour: 6,
@@ -145,6 +146,72 @@ describe('IntegratedAlertService', () => {
       expect(alert?.type).toBe('departure');
       expect(alert?.priority).toBe('low');
       expect(alert?.prediction.predictedDepartureTime).toBe('08:30');
+    });
+
+    // Codex P2: modelService's confidence-0 default (08:00/08:45, returned
+    // for no-data and outlier-only logs) must not fire "08:00 출발 예정".
+    const NO_PREDICTION_DEFAULT = {
+      predictedDepartureTime: '08:00',
+      predictedArrivalTime: '08:45',
+      delayProbability: 0,
+      confidence: 0,
+      modelVersion: 'fallback',
+    };
+    const CONFIDENT_PATTERN = {
+      frequentRoute: { startStation: '강남', endStation: '신도림', lineIds: ['2'] },
+      confidence: 0.8,
+    };
+
+    it('should return null when the prediction is the no-prediction default (outlier-only logs)', async () => {
+      mockCommuteLogService.getRecentLogsForAnalysis.mockResolvedValue(
+        Array.from({ length: 5 }, () => ({
+          dayOfWeek: 1,
+          departureTime: '07:30',
+          arrivalTime: '18:32',
+        }))
+      );
+      mockPatternAnalysisService.getPatternForDay.mockResolvedValue(CONFIDENT_PATTERN);
+      mockModelService.predict.mockResolvedValue(NO_PREDICTION_DEFAULT);
+
+      const alert = await integratedAlertService.generateIntegratedAlert('user-123');
+
+      expect(alert).toBeNull();
+      expect(mockNotificationService.sendLocalNotification).not.toHaveBeenCalled();
+    });
+
+    it('should return null when the prediction confidence is below 0.5', async () => {
+      mockCommuteLogService.getRecentLogsForAnalysis.mockResolvedValue([
+        { departureTime: '08:30', dayOfWeek: 1 },
+      ]);
+      mockPatternAnalysisService.getPatternForDay.mockResolvedValue(CONFIDENT_PATTERN);
+      mockModelService.predict.mockResolvedValue({
+        ...NO_PREDICTION_DEFAULT,
+        predictedDepartureTime: '08:30',
+        confidence: 0.49,
+        modelVersion: 'statistical',
+      });
+
+      const alert = await integratedAlertService.generateIntegratedAlert('user-123');
+
+      expect(alert).toBeNull();
+    });
+
+    it('should still generate an alert when the prediction confidence is exactly 0.5', async () => {
+      mockCommuteLogService.getRecentLogsForAnalysis.mockResolvedValue([
+        { departureTime: '08:30', dayOfWeek: 1 },
+      ]);
+      mockPatternAnalysisService.getPatternForDay.mockResolvedValue(CONFIDENT_PATTERN);
+      mockModelService.predict.mockResolvedValue({
+        ...NO_PREDICTION_DEFAULT,
+        predictedDepartureTime: '08:30',
+        confidence: 0.5,
+        modelVersion: 'statistical',
+      });
+
+      const alert = await integratedAlertService.generateIntegratedAlert('user-123');
+
+      expect(alert).not.toBeNull();
+      expect(alert?.body).toContain('08:30');
     });
 
     it('should return null when no commute logs available', async () => {

@@ -14,7 +14,7 @@ import {
   formatMinutesToTime,
   FrequentRoute,
 } from '@/models/pattern';
-import { generateAlertId } from '@/models/ml';
+import { generateAlertId, isPredictionReliable } from '@/models/ml';
 
 // ============================================================================
 // Types
@@ -113,20 +113,27 @@ class DelayResponseAlertService {
       const dayOfWeek = getDayOfWeek(new Date());
       const prediction = await modelService.predict(logs, dayOfWeek);
 
-      const originalDepartureTime = prediction.predictedDepartureTime;
+      // An unreliable prediction (e.g. modelService's no-data / outlier-only
+      // default 08:00, confidence 0) is not a real departure time — never derive
+      // "HH:mm에 출발" guidance from it. Delay info is still reported; the
+      // departure-time fields carry '' (none).
+      const reliable = isPredictionReliable(prediction);
+      const originalDepartureTime = reliable ? prediction.predictedDepartureTime : '';
 
       // Calculate adjusted departure time
-      const adjustedDepartureTime = this.calculateAdjustedDeparture(
-        originalDepartureTime,
-        maxDelayMinutes,
-        DEFAULT_BUFFER_MINUTES
-      );
+      const adjustedDepartureTime = reliable
+        ? this.calculateAdjustedDeparture(
+            originalDepartureTime,
+            maxDelayMinutes,
+            DEFAULT_BUFFER_MINUTES
+          )
+        : '';
 
       // Generate recommendation
       const recommendation = this.generateRecommendation(
         maxDelayMinutes,
         affectedLines,
-        adjustedDepartureTime
+        reliable ? adjustedDepartureTime : null
       );
 
       return {
@@ -411,7 +418,7 @@ class DelayResponseAlertService {
   private generateRecommendation(
     delayMinutes: number,
     affectedLines: readonly string[],
-    adjustedTime: string
+    adjustedTime: string | null
   ): string {
     if (delayMinutes === 0 || affectedLines.length === 0) {
       return '현재 지연 없이 정상 운행 중입니다.';
@@ -420,9 +427,13 @@ class DelayResponseAlertService {
     const lineText = affectedLines.join(', ');
 
     if (delayMinutes >= 15) {
-      return `⚠️ ${lineText} 노선 약 ${delayMinutes}분 지연 중입니다. ${adjustedTime}까지 출발하세요!`;
+      return adjustedTime !== null
+        ? `⚠️ ${lineText} 노선 약 ${delayMinutes}분 지연 중입니다. ${adjustedTime}까지 출발하세요!`
+        : `⚠️ ${lineText} 노선 약 ${delayMinutes}분 지연 중입니다. 평소보다 일찍 출발하세요!`;
     } else if (delayMinutes >= 5) {
-      return `${lineText} 노선 약 ${delayMinutes}분 지연 중입니다. 여유 있게 ${adjustedTime}에 출발하세요.`;
+      return adjustedTime !== null
+        ? `${lineText} 노선 약 ${delayMinutes}분 지연 중입니다. 여유 있게 ${adjustedTime}에 출발하세요.`
+        : `${lineText} 노선 약 ${delayMinutes}분 지연 중입니다. 여유 있게 출발하세요.`;
     } else {
       return `${lineText} 노선 약간의 지연이 있습니다. 참고해주세요.`;
     }
