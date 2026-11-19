@@ -18,14 +18,14 @@
   "dependencies": {
     "@sendgrid/mail": "^8.1.0",
     "expo-server-sdk": "^8.0.0",
-    "firebase-admin": "^14.5.0",
+    "firebase-admin": "^14.5.1",
     "firebase-functions": "^7.4.0"
   },
   "devDependencies": {
     "@types/jest": "^30.0.0",
-    "@typescript-eslint/eslint-plugin": "^8.72.1",
-    "@typescript-eslint/parser": "^8.72.1",
-    "eslint": "^10.14.0",
+    "@typescript-eslint/eslint-plugin": "^8.72.2",
+    "@typescript-eslint/parser": "^8.72.2",
+    "eslint": "^10.15.0",
     "jest": "^30.5.0",
     "jest-util": "^30.5.0",
     "ts-jest": "^29.4.15",
