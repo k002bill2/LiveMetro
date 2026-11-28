@@ -23,6 +23,7 @@ import {
   Text,
   TextInput,
   TextInputKeyPressEventData,
+  TextInputSelectionChangeEventData,
   TouchableOpacity,
   View,
   ViewStyle,
@@ -41,6 +42,7 @@ import { RootStackParamList } from '@/navigation/RootNavigator';
 import { useAuth } from '@/services/auth/AuthContext';
 import { firebaseConfig } from '@/services/firebase/config';
 import { toE164KR } from '@/utils/phoneFormat';
+import { distributeOtpDigits, extractInsertedDigits, OtpCellSelection } from '@/screens/auth/otpInput';
 
 type Nav = NativeStackNavigationProp<RootStackParamList>;
 
@@ -100,6 +102,7 @@ export const SignupStep1Screen: React.FC = () => {
   const [otpDigits, setOtpDigits] = useState<string[]>(() => Array(OTP_LENGTH).fill(''));
   const [secondsLeft, setSecondsLeft] = useState(OTP_TIMEOUT_SECONDS);
   const otpRefs = useRef<(TextInput | null)[]>(Array(OTP_LENGTH).fill(null));
+  const otpSelectionsRef = useRef<(OtpCellSelection | null)[]>(Array(OTP_LENGTH).fill(null));
   const recaptchaRef = useRef<RecaptchaVerifierHandle>(null);
 
   const shouldReduceMotion = useShouldReduceMotion();
@@ -185,43 +188,41 @@ export const SignupStep1Screen: React.FC = () => {
   }, [phone, requestPhoneVerification]);
 
   const handleOtpChange = useCallback((index: number, value: string) => {
-    let digits = value.replace(/[^0-9]/g, '');
+    const digits = value.replace(/[^0-9]/g, '');
     const current = otpDigits[index] ?? '';
-    // 이미 채워진 칸에 입력하면 "기존 1자리 + 새 입력"이 온다 (한 자리 → 2자리,
-    // 전체 코드 붙여넣기 → OTP_LENGTH+1자리). 기존 숫자를 떼어내 새 입력만 남긴다.
-    // 커서 위치를 모르므로 기본 위치(끝)를 먼저 가정한다. selectTextOnFocus(#379)로 보통은
-    // 새 입력만 오며, 이 분기는 선택이 풀린 경우(이미 포커스된 칸을 다시 탭 등)의 안전망이다.
-    if (current && (digits.length === 2 || digits.length === OTP_LENGTH + 1)) {
-      if (digits.startsWith(current)) digits = digits.slice(1);
-      else if (digits.endsWith(current)) digits = digits.slice(0, -1);
-    }
-    if (digits.length > 1) {
-      // SMS autofill (키패드 위 "메시지에서" 제안) 이나 붙여넣기는 포커스된 칸 하나에
-      // 여러 자리가 한 번에 들어온다. 전체 코드면 어느 칸이든 첫 칸부터, 아니면
-      // 현재 칸부터 뒤로 분배한다.
-      const start = digits.length >= OTP_LENGTH ? 0 : index;
-      const chunk = digits.slice(0, OTP_LENGTH - start).split('');
-      setOtpDigits((prev) => {
-        const next = [...prev];
-        chunk.forEach((d, i) => {
-          next[start + i] = d;
-        });
-        return next;
-      });
-      const last = Math.min(start + chunk.length, OTP_LENGTH - 1);
-      otpRefs.current[last]?.focus();
-      return;
-    }
-    const digit = digits;
-    setOtpDigits((prev) => {
-      const next = [...prev];
-      next[index] = digit;
-      return next;
-    });
-    if (digit && index < OTP_LENGTH - 1) {
-      otpRefs.current[index + 1]?.focus();
+    // #379: 값만으로는 "기존 숫자가 선택된 채 붙여넣기"와 "기존 숫자 뒤에 입력"을 구분할 수 없다.
+    // 직전 선택(onSelectionChange 기록)으로 실제 삽입 문자열을 복원하고, 기록이 없거나
+    // 믿을 수 없으면 커서 끝을 가정한다. 한 번 쓴 선택은 버린다(다음 변경에 재사용 금지).
+    const inserted = extractInsertedDigits(current, digits, otpSelectionsRef.current[index] ?? null);
+    otpSelectionsRef.current[index] = null;
+    // SMS 자동완성·전체 코드 붙여넣기(≥6자리)는 첫 칸부터, 부분 붙여넣기는 현재 칸부터 뒤로 분배한다.
+    const { focusIndex } = distributeOtpDigits(otpDigits, index, inserted);
+    setOtpDigits((prev) => [...distributeOtpDigits(prev, index, inserted).cells]);
+    if (focusIndex !== null) {
+      otpRefs.current[focusIndex]?.focus();
     }
   }, [otpDigits]);
+
+  const handleOtpSelectionChange = useCallback(
+    (index: number, e: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
+      const { start, end } = e.nativeEvent.selection;
+      otpSelectionsRef.current[index] = { start, end, value: otpDigits[index] ?? '' };
+    },
+    [otpDigits],
+  );
+
+  // #379: iOS Fabric 은 사용자 탭 포커스에서 selectTextOnFocus 를 적용하지 않는다 → 직접 선택한다.
+  // JS 에서 건 선택은 onSelectionChange 로 돌아오지 않으므로(iOS _comingFromJS) 기록도 직접 남긴다.
+  const handleOtpFocus = useCallback(
+    (index: number) => {
+      const current = otpDigits[index] ?? '';
+      if (!current) return;
+      // jest mock·웹 구현에는 setSelection 이 없을 수 있다 → 있을 때만 호출(선택 기록은 그대로 남긴다).
+      otpRefs.current[index]?.setSelection?.(0, current.length);
+      otpSelectionsRef.current[index] = { start: 0, end: current.length, value: current };
+    },
+    [otpDigits],
+  );
 
   const handleOtpKeyPress = useCallback(
     (index: number, e: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
@@ -509,10 +510,12 @@ export const SignupStep1Screen: React.FC = () => {
                         value={digit}
                         onChangeText={(v) => handleOtpChange(idx, v)}
                         onKeyPress={(e) => handleOtpKeyPress(idx, e)}
+                        onSelectionChange={(e) => handleOtpSelectionChange(idx, e)}
+                        onFocus={() => handleOtpFocus(idx)}
                         keyboardType="number-pad"
                         // maxLength 1 이면 OS 가 자동완성한 6자리를 1자리로 잘라버린다. +1 은 채워진 칸에 붙여넣을 때 기존 숫자 몫.
                         maxLength={OTP_LENGTH + 1}
-                        // #379: 포커스 시 기존 값을 선택해 입력·붙여넣기가 "교체"가 되게 한다 → onChangeText 에는 새 입력만 온다.
+                        // #379: Android 는 탭 포커스 포함 기존 값을 선택한다(네이티브 setSelectAllOnFocus). iOS 탭 경로는 handleOtpFocus 가 맡는다.
                         selectTextOnFocus
                         textContentType="oneTimeCode"
                         autoComplete="sms-otp"

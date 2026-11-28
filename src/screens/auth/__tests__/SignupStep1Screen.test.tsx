@@ -227,9 +227,24 @@ describe('SignupStep1Screen', () => {
     });
   });
 
-  // #379: 포커스 시 기존 값이 선택되므로(selectTextOnFocus) 입력·붙여넣기는 "교체"가 되고
-  // onChangeText 에는 새 입력만 온다. 부분 붙여넣기는 현재 칸부터 뒤로 분배한다.
-  it('replaces the selected cell on partial paste and distributes forward (#379)', async () => {
+  // #379: 칸별 직전 선택(onSelectionChange)으로 삽입 문자열을 복원한다. 값만으로는
+  // "3 이 선택된 채 38 붙여넣기"와 "3 뒤에 8 타이핑"을 구분할 수 없다 (QA 경계 표).
+  it.each([
+    ['selected', { start: 0, end: 1 }, '98', '129856'],
+    ['selected', { start: 0, end: 1 }, '98765', '129876'],
+    ['selected', { start: 0, end: 1 }, '38', '123856'],
+    ['selected', { start: 0, end: 1 }, '83', '128356'],
+    ['selected', { start: 0, end: 1 }, '33', '123356'],
+    ['selected', { start: 0, end: 1 }, '5', '125456'],
+    ['cursor end', { start: 1, end: 1 }, '398', '129856'],
+    ['cursor end', { start: 1, end: 1 }, '35', '125456'],
+    ['cursor front', { start: 0, end: 0 }, '53', '125456'],
+    ['selected', { start: 0, end: 1 }, '654321', '654321'],
+    ['cursor end', { start: 1, end: 1 }, '3654321', '654321'],
+    ['cursor end', { start: 1, end: 1 }, '', '12_456'],
+    // 이벤트 순서 가드: 변경 후 선택(이전 값 길이 밖)이 먼저 기록돼도 커서 끝으로 안전하게 처리.
+    ['post-change selection first', { start: 3, end: 3 }, '398', '129856'],
+  ])('partial paste into cell 3 (%s %j) with "%s" → %s (#379)', async (_label, selection, value, expected) => {
     mockRequestPhoneVerification.mockResolvedValue('vid-123');
     const { getByTestId } = render(<SignupStep1Screen />);
 
@@ -242,29 +257,45 @@ describe('SignupStep1Screen', () => {
       fireEvent.press(getByTestId('request-otp-button'));
     });
 
-    for (let i = 0; i < 6; i++) {
-      expect(getByTestId(`otp-cell-${i}`).props.selectTextOnFocus).toBe(true);
-    }
+    act(() => {
+      fireEvent.changeText(getByTestId('otp-cell-0'), '123456');
+    });
+    act(() => {
+      fireEvent(getByTestId('otp-cell-2'), 'selectionChange', { nativeEvent: { selection } });
+    });
+    act(() => {
+      fireEvent.changeText(getByTestId('otp-cell-2'), value);
+    });
+    expected.split('').forEach((d, i) => {
+      expect(getByTestId(`otp-cell-${i}`).props.value).toBe(d === '_' ? '' : d);
+    });
+  });
+
+  // #379 보조 B: iOS 탭 포커스는 selectTextOnFocus 가 안 걸리므로 onFocus 에서 직접 선택·기록한다.
+  // JS 에서 건 선택은 onSelectionChange 로 돌아오지 않으므로 selectionChange 이벤트 없이 검증한다.
+  it('selects the existing digit on focus so a following paste replaces it (#379)', async () => {
+    mockRequestPhoneVerification.mockResolvedValue('vid-123');
+    const { getByTestId } = render(<SignupStep1Screen />);
+
+    fireEvent.press(getByTestId('carrier-skt'));
+    fireEvent.changeText(getByTestId('name-input'), '홍길동');
+    fireEvent.changeText(getByTestId('phone-input'), '01012345678');
+    fireEvent.changeText(getByTestId('birth-input'), '900101');
+
+    await act(async () => {
+      fireEvent.press(getByTestId('request-otp-button'));
+    });
 
     act(() => {
       fireEvent.changeText(getByTestId('otp-cell-0'), '123456');
     });
-    // 세 번째 칸("3")이 선택된 상태에서 "98" 붙여넣기 → "3" 이 교체된다.
     act(() => {
-      fireEvent.changeText(getByTestId('otp-cell-2'), '98');
+      fireEvent(getByTestId('otp-cell-2'), 'focus');
     });
-    ['1', '2', '9', '8', '5', '6'].forEach((d, i) => {
-      expect(getByTestId(`otp-cell-${i}`).props.value).toBe(d);
-    });
-
     act(() => {
-      fireEvent.changeText(getByTestId('otp-cell-0'), '123456');
+      fireEvent.changeText(getByTestId('otp-cell-2'), '38');
     });
-    // 세 번째 칸에 "98765" 붙여넣기 → 앞 칸은 유지, 6칸을 넘는 자리는 버린다.
-    act(() => {
-      fireEvent.changeText(getByTestId('otp-cell-2'), '98765');
-    });
-    ['1', '2', '9', '8', '7', '6'].forEach((d, i) => {
+    ['1', '2', '3', '8', '5', '6'].forEach((d, i) => {
       expect(getByTestId(`otp-cell-${i}`).props.value).toBe(d);
     });
   });
