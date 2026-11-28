@@ -348,6 +348,56 @@ describe('useRealtimeTrains', () => {
       expect(warnSpy).toHaveBeenCalledTimes(2);
       expect(onErrorMock).toHaveBeenCalledTimes(2);
     });
+
+    it('clears isRetrying when a generic failure is followed by quota exhaustion (D1)', async () => {
+      const { result } = renderHook(() =>
+        useRealtimeTrains('강남', { retryAttempts: 3 })
+      );
+
+      await tick(null);
+      expect(result.current.isRetrying).toBe(true);
+
+      await tick(null, quotaError());
+
+      expect(result.current.errorKind).toBe('quota');
+      expect(result.current.isRetrying).toBe(false);
+    });
+
+    it('reports the first error again after stationName changes (D2)', async () => {
+      const onErrorMock = jest.fn();
+      const { result, rerender } = renderHook(
+        ({ station }: { station: string }) =>
+          useRealtimeTrains(station, { onError: onErrorMock }),
+        { initialProps: { station: '강남' } }
+      );
+
+      await tick(null, quotaError());
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+
+      rerender({ station: '역삼' });
+      await tick(null, quotaError());
+
+      expect(result.current.errorKind).toBe('quota');
+      expect(warnSpy).toHaveBeenCalledTimes(2);
+      expect(onErrorMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps dedupe across refetch on the same station', async () => {
+      const onErrorMock = jest.fn();
+      const { result } = renderHook(() =>
+        useRealtimeTrains('강남', { onError: onErrorMock })
+      );
+
+      await tick(null, quotaError());
+      act(() => {
+        result.current.refetch();
+      });
+      await tick(null, quotaError());
+
+      expect(result.current.errorKind).toBe('quota');
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(onErrorMock).toHaveBeenCalledTimes(1);
+    });
   });
 
   describe('Lifecycle', () => {

@@ -78,7 +78,7 @@ export const useRealtimeTrains = (
   // Key of the error already logged / reported via onError. The dataManager
   // poll re-delivers the same failure every tick (#419: 985 log lines while the
   // daily quota was exhausted), so log + onError fire only on a state change.
-  // Cleared when data arrives.
+  // Cleared when data arrives or stationName changes.
   const reportedErrorKeyRef = useRef<string | null>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const staleTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -153,7 +153,9 @@ export const useRealtimeTrains = (
 
       onDataReceivedRef.current?.(data);
     } else if (isDailyQuotaExhausted(error)) {
-      // Not a retryable failure: leave retryCount alone so isRetrying stays false.
+      // Not a retryable failure: reset retryCount so isRetrying is false even
+      // after earlier generic failures.
+      retryCountRef.current = 0;
       handleError(DAILY_QUOTA_ERROR_MESSAGE, 'quota');
     } else {
       // Handle retry logic
@@ -207,6 +209,12 @@ export const useRealtimeTrains = (
       staleTimerRef.current = null;
     }
   }, []);
+
+  // A new station gets its own first error logged. refetch() / AppState return
+  // keep the key on purpose so a foreground return does not re-log the same failure.
+  useEffect(() => {
+    reportedErrorKeyRef.current = null;
+  }, [stationName]);
 
   // Effect for managing subscription lifecycle
   useEffect(() => {

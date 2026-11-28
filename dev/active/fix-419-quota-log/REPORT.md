@@ -48,3 +48,33 @@
 
 사용 스킬: test-driven-development — 테스트 선작성 후 원본 훅으로 RED(4 failed) 재현을 기록. (구현을 먼저 써버려 원본 복원 방식으로 RED를 확인함)
 기존 실패: 없음 (전체 jest EXIT=0). eslint EXIT=2는 중첩 worktree 환경 문제.
+
+
+## FIX 라운드 (QA 조건부 PASS D1·D2, base 9802df1)
+| 결함 | 반영 | 위치 |
+|---|---|---|
+| D1 일반 실패 뒤 쿼터면 isRetrying true | 쿼터 분기에서 `retryCountRef.current = 0` | `src/hooks/useRealtimeTrains.ts` 쿼터 분기 |
+| D2 역 변경 후 첫 오류 미기록 | `useEffect(() => { reportedErrorKeyRef.current = null }, [stationName])` — refetch·AppState 복귀는 초기화 안 함(기존 의도 유지) | 같은 파일, 구독 effect 앞 |
+
+테스트(`Daily quota exhausted (#419)` describe에 3건 추가, 기존 기대값 변경 없음):
+- D1: `(null)` 1회 → 쿼터 → errorKind 'quota'·isRetrying false
+- D2: '강남' 쿼터 1틱 → rerender '역삼' → 쿼터 1틱 → warn 2·onError 2
+- 고정: 같은 역 refetch 후 같은 쿼터 → warn 1·onError 1 (현 동작)
+
+RED → GREEN (로그: `logs/fix/`):
+- RED: `npx jest src/hooks/__tests__/useRealtimeTrains.test.ts --watchman=false --coverage=false -t "D1|D2|refetch on the same"` → EXIT=1, `2 failed, 1 passed` (D1 Expected false/Received true, D2 Expected 2/Received 1; refetch 고정 테스트는 현 동작이라 통과)
+- GREEN: 같은 파일 전체 → EXIT=0, `Tests: 36 passed, 36 total`
+
+검증 EXIT:
+| 명령 | EXIT |
+|---|---|
+| `npm run type-check` | 0 |
+| `npx eslint --no-eslintrc -c .eslintrc.js src/hooks/useRealtimeTrains.ts src/hooks/__tests__/useRealtimeTrains.test.ts` | 0 |
+| `npx jest src/hooks --watchman=false --silent` | 0 (47 suites, 842 passed) |
+
+사용 스킬: 없음(로드 생략) — TDD 절차(테스트 선작성→RED 기록→구현→GREEN)만 직접 적용. 시간 예산 15분.
+테스트: 위 3건 추가, RED(2 failed)→GREEN(36 passed).
+기존 실패: 없음.
+검증: 위 3개 명령 직접 실행. 전체 jest(Jarvis 담당)·실기기·Codex 리뷰는 미실행.
+위험·영향 범위: `useRealtimeTrains` 단일 훅. 역 변경 시 같은 오류의 console 로그·onError가 1회 더 발생(현재 onError 소비자 0곳). 쿼터 시 retry 카운트 초기화로 쿼터 이후 일반 실패는 1/N부터 다시 셈.
+되돌리는 법: `git revert <FIX 커밋 SHA>` (훅·테스트·REPORT 3파일).
