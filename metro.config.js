@@ -1,6 +1,8 @@
 // Learn more: https://docs.expo.dev/guides/customizing-metro/
 const { getDefaultConfig } = require('expo/metro-config');
 
+const { buildClaudeBlockPattern } = require('./metro.blocklist');
+
 const config = getDefaultConfig(__dirname);
 
 // Exclude the .claude/ harness directory from Metro's file crawl.
@@ -13,7 +15,9 @@ const config = getDefaultConfig(__dirname);
 // exports that internal path, so requiring it crashed config loading.
 config.resolver.blockList = [
   ...[].concat(config.resolver.blockList ?? []),
-  /[\/\\]\.claude[\/\\].*/,
+  // Anchored to this project root (#444): an unanchored pattern also blocked the
+  // project itself when Metro runs inside .claude/worktrees/<lane> (404 bundle).
+  buildClaudeBlockPattern(__dirname),
 ];
 
 // Workaround (SDK 53+ enables package.json "exports" by default): Firebase JS
