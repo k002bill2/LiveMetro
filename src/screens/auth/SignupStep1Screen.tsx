@@ -189,7 +189,8 @@ export const SignupStep1Screen: React.FC = () => {
     const current = otpDigits[index] ?? '';
     // 이미 채워진 칸에 입력하면 "기존 1자리 + 새 입력"이 온다 (한 자리 → 2자리,
     // 전체 코드 붙여넣기 → OTP_LENGTH+1자리). 기존 숫자를 떼어내 새 입력만 남긴다.
-    // 커서 위치를 모르므로 기본 위치(끝)를 먼저 가정한다.
+    // 커서 위치를 모르므로 기본 위치(끝)를 먼저 가정한다. selectTextOnFocus(#379)로 보통은
+    // 새 입력만 오며, 이 분기는 선택이 풀린 경우(이미 포커스된 칸을 다시 탭 등)의 안전망이다.
     if (current && (digits.length === 2 || digits.length === OTP_LENGTH + 1)) {
       if (digits.startsWith(current)) digits = digits.slice(1);
       else if (digits.endsWith(current)) digits = digits.slice(0, -1);
@@ -511,6 +512,8 @@ export const SignupStep1Screen: React.FC = () => {
                         keyboardType="number-pad"
                         // maxLength 1 이면 OS 가 자동완성한 6자리를 1자리로 잘라버린다. +1 은 채워진 칸에 붙여넣을 때 기존 숫자 몫.
                         maxLength={OTP_LENGTH + 1}
+                        // #379: 포커스 시 기존 값을 선택해 입력·붙여넣기가 "교체"가 되게 한다 → onChangeText 에는 새 입력만 온다.
+                        selectTextOnFocus
                         textContentType="oneTimeCode"
                         autoComplete="sms-otp"
                         style={[

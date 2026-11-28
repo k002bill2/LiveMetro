@@ -226,4 +226,46 @@ describe('SignupStep1Screen', () => {
       expect(getByTestId(`otp-cell-${i}`).props.value).toBe(d);
     });
   });
+
+  // #379: 포커스 시 기존 값이 선택되므로(selectTextOnFocus) 입력·붙여넣기는 "교체"가 되고
+  // onChangeText 에는 새 입력만 온다. 부분 붙여넣기는 현재 칸부터 뒤로 분배한다.
+  it('replaces the selected cell on partial paste and distributes forward (#379)', async () => {
+    mockRequestPhoneVerification.mockResolvedValue('vid-123');
+    const { getByTestId } = render(<SignupStep1Screen />);
+
+    fireEvent.press(getByTestId('carrier-skt'));
+    fireEvent.changeText(getByTestId('name-input'), '홍길동');
+    fireEvent.changeText(getByTestId('phone-input'), '01012345678');
+    fireEvent.changeText(getByTestId('birth-input'), '900101');
+
+    await act(async () => {
+      fireEvent.press(getByTestId('request-otp-button'));
+    });
+
+    for (let i = 0; i < 6; i++) {
+      expect(getByTestId(`otp-cell-${i}`).props.selectTextOnFocus).toBe(true);
+    }
+
+    act(() => {
+      fireEvent.changeText(getByTestId('otp-cell-0'), '123456');
+    });
+    // 세 번째 칸("3")이 선택된 상태에서 "98" 붙여넣기 → "3" 이 교체된다.
+    act(() => {
+      fireEvent.changeText(getByTestId('otp-cell-2'), '98');
+    });
+    ['1', '2', '9', '8', '5', '6'].forEach((d, i) => {
+      expect(getByTestId(`otp-cell-${i}`).props.value).toBe(d);
+    });
+
+    act(() => {
+      fireEvent.changeText(getByTestId('otp-cell-0'), '123456');
+    });
+    // 세 번째 칸에 "98765" 붙여넣기 → 앞 칸은 유지, 6칸을 넘는 자리는 버린다.
+    act(() => {
+      fireEvent.changeText(getByTestId('otp-cell-2'), '98765');
+    });
+    ['1', '2', '9', '8', '7', '6'].forEach((d, i) => {
+      expect(getByTestId(`otp-cell-${i}`).props.value).toBe(d);
+    });
+  });
 });
