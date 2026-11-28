@@ -8,10 +8,28 @@ import { AppState, AppStateStatus } from 'react-native';
 import { dataManager, RealtimeTrainData } from '../services/data/dataManager';
 import { Train } from '../models/train';
 
+/**
+ * 'quota' = every Seoul realtime key hit its daily cap (ERROR-337); nothing
+ * succeeds until KST midnight, so retry counting is meaningless.
+ * 'generic' = any other failure (null data, transient errors).
+ */
+export type RealtimeTrainsErrorKind = 'quota' | 'generic';
+
+export const DAILY_QUOTA_ERROR_MESSAGE =
+  '오늘 실시간 조회 한도를 모두 사용했어요. 실시간 도착정보는 자정에 다시 제공됩니다.';
+
+// Structural check (not instanceof SeoulApiError): seoulSubwayApi is globally
+// mocked in jest setup, and the flag is the contract dataManager forwards.
+const isDailyQuotaExhausted = (error: unknown): boolean =>
+  typeof error === 'object' &&
+  error !== null &&
+  (error as { dailyQuotaExhausted?: unknown }).dailyQuotaExhausted === true;
+
 interface UseRealtimeTrainsState {
   trains: Train[];
   loading: boolean;
   error: string | null;
+  errorKind: RealtimeTrainsErrorKind | null;
   lastUpdated: Date | null;
   isStale: boolean;
 }
@@ -51,11 +69,17 @@ export const useRealtimeTrains = (
     trains: [],
     loading: true,
     error: null,
+    errorKind: null,
     lastUpdated: null,
     isStale: false,
   });
 
   const retryCountRef = useRef(0);
+  // Key of the error already logged / reported via onError. The dataManager
+  // poll re-delivers the same failure every tick (#419: 985 log lines while the
+  // daily quota was exhausted), so log + onError fire only on a state change.
+  // Cleared when data arrives.
+  const reportedErrorKeyRef = useRef<string | null>(null);
   const unsubscribeRef = useRef<(() => void) | null>(null);
   const staleTimerRef = useRef<NodeJS.Timeout | null>(null);
   // Mirrors state.lastUpdated for the AppState listener — using state directly
@@ -84,22 +108,33 @@ export const useRealtimeTrains = (
     setState(prevState => ({ ...prevState, ...updates }));
   }, []);
 
-  const handleError = useCallback((error: string) => {
-    console.error('Realtime trains error:', error);
+  const handleError = useCallback((error: string, kind: RealtimeTrainsErrorKind = 'generic') => {
     updateState({
       error,
+      errorKind: kind,
       loading: false
     });
 
+    const errorKey = `${kind}:${error}`;
+    if (reportedErrorKeyRef.current === errorKey) return;
+    reportedErrorKeyRef.current = errorKey;
+
+    if (kind === 'quota') {
+      console.warn('Realtime trains paused: daily Seoul API quota exhausted');
+    } else {
+      console.error('Realtime trains error:', error);
+    }
     onErrorRef.current?.(error);
   }, [updateState]);
 
-  const handleDataReceived = useCallback((data: RealtimeTrainData | null) => {
+  const handleDataReceived = useCallback((data: RealtimeTrainData | null, error?: unknown) => {
     if (data) {
+      reportedErrorKeyRef.current = null;
       updateState({
         trains: data.trains,
         loading: false,
         error: null,
+        errorKind: null,
         lastUpdated: data.lastUpdated,
         isStale: false,
       });
@@ -117,6 +152,9 @@ export const useRealtimeTrains = (
       }, staleTime) as unknown as NodeJS.Timeout;
 
       onDataReceivedRef.current?.(data);
+    } else if (isDailyQuotaExhausted(error)) {
+      // Not a retryable failure: leave retryCount alone so isRetrying stays false.
+      handleError(DAILY_QUOTA_ERROR_MESSAGE, 'quota');
     } else {
       // Handle retry logic
       retryCountRef.current++;
@@ -126,7 +164,8 @@ export const useRealtimeTrains = (
       } else {
         updateState({
           loading: false,
-          error: `데이터 로드 실패, 재시도 중... (${retryCountRef.current}/${retryAttempts})`
+          error: `데이터 로드 실패, 재시도 중... (${retryCountRef.current}/${retryAttempts})`,
+          errorKind: 'generic',
         });
       }
     }
@@ -140,7 +179,7 @@ export const useRealtimeTrains = (
       unsubscribeRef.current();
     }
 
-    updateState({ loading: true, error: null });
+    updateState({ loading: true, error: null, errorKind: null });
 
     unsubscribeRef.current = pollInBackground
       ? dataManager.subscribeToRealtimeUpdates(
