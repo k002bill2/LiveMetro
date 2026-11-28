@@ -9,7 +9,7 @@
 | 기준 | 결과 | 증거 |
 |---|---|---|
 | #444 Metro가 blockList에 넘기는 경로 형식 | PASS — 절대경로, 구분자 정규화 없음 | `node_modules/metro/src/node-haste/DependencyGraph/createFileMap.js:40-41` (blockList→ignorePattern), `node_modules/metro-file-map/src/index.js:354-355` `ignoreForCrawl: ignorePattern.test(filePath)`, `crawlers/node/index.js:73` `path.join(directory, entry.name)` = 절대경로. `^` 앵커는 이 형식에서 맞다 |
-| #444 symlink·대소문자 시나리오 | PASS (실제 영향 없음) | projectRoot = `path.resolve('.')` (`@expo/cli/build/src/utils/args.js:102-103`) = `process.cwd()`. macOS getcwd는 물리 경로를 반환한다. 실측: 소문자 경로 `cd /users/younghwankang/work/livemetro/...` 후 `process.cwd()` → `/Users/younghwankang/Work/LiveMetro/...`(정규 대소문자). `__dirname`도 realpath라 둘이 같다. 어긋나더라도 패턴이 덜 막는 쪽이고 프로젝트 자신을 막지는 않는다(404 재발 불가) |
+| #444 symlink·대소문자 시나리오 | PASS (실제 영향 없음) | projectRoot = `path.resolve('.')` (`@expo/cli/build/src/utils/args.js:102-103`) = `process.cwd()`. macOS getcwd는 물리 경로를 반환한다. 실측: 소문자 경로 `cd <repo root, lowercased>/...` 후 `process.cwd()` → `<repo root>/...`(정규 대소문자). `__dirname`도 realpath라 둘이 같다. 어긋나더라도 패턴이 덜 막는 쪽이고 프로젝트 자신을 막지는 않는다(404 재발 불가) |
 | #444 메인 회귀(가짜 사본 차단) | PASS | 아래 실측 |
 | #445 Ruby 스코프 | PASS(정적) | `ios/Podfile:5`에서 `podfile_properties`를 최상위 지역변수로 정의. `post_install do`는 블록(클로저)이라 이 변수를 볼 수 있고, 같은 블록의 기존 코드(`ios/Podfile:60` `ccache_enabled?(podfile_properties)`)가 이미 쓰고 있다. 삽입 위치는 61-71행, `end` 앞 |
 | #445 nil / 더 높은 값 / to_f | PASS(부작용 무해) | `ruby -e`: `nil.to_f`=0.0 → 값이 없는 pod 타깃에는 명시적으로 15.1이 들어간다(어차피 `platform :ios`와 같은 값이라 무해). `"16.0".to_f < "15.1".to_f`=false → 더 높은 값은 유지. ios.deploymentTarget을 16.0으로 올리면 16 미만 pod을 모두 16으로 올린다(앱 하한과 같으니 의도에 맞음). 문자열 비교가 아니라 `to_f` 비교 |
