@@ -108,9 +108,11 @@ OTP TextInput 6칸에 `selectTextOnFocus`를 추가했다. 칸에 포커스가 �
 |---|---|---|
 | [P2] 같은 숫자 재입력이 칸을 비움 (G1 "3", G2 "3") | `extractInsertedDigits`: `prev` 가 비어 있지 않고 `next === prev` 이면 선택 기록과 무관하게 `prev` 를 삽입으로 반환 → 칸 유지 + 다음 칸 포커스. 삭제는 `next` 가 짧아져 구분됨 | `src/screens/auth/otpInput.ts` (extractInsertedDigits 첫 분기) |
 | [P2] 접힌 caret (1,1) 이 변경 전 선택 (0,1) 을 덮어 "38"/"33" 오분배 (G1) | 칸별 `otpReselectPendingRef`: onFocus 에서 설정, 첫 onSelectionChange 에서 소비, onBlur 에서 해제. 소비 시 접힌 선택이고 칸 값이 있으면 기록 대신 `setSelection(0,len)` 재호출 + (0,len) 기록. 비접힘(Android selectTextOnFocus (0,1))이면 플래그만 소비. 이후 선택(사용자 커서 이동, G3)은 그대로 기록 | `SignupStep1Screen.tsx` handleOtpSelectionChange·handleOtpFocus·handleOtpBlur, TextInput `onBlur` |
-| [P3] 재요청 시 선택 기록 미초기화 | `handleResend` 에서 `otpSelectionsRef`·`otpReselectPendingRef` 초기화 | `SignupStep1Screen.tsx` handleResend |
+| [P3] 재요청 시 선택 기록 미초기화 | `handleResend` 에서 `otpSelectionsRef`·`otpReselectPendingRef` 초기화. **테스트 없음** — 재요청 버튼이 `disabled={secondsLeft > 0}`(168초 타이머)라 fake timer 가 필요하고, 정적 검토 + QA r2 회귀(181초 후 재요청 OK)로 갈음 | `SignupStep1Screen.tsx` handleResend |
 
 기존 2슬롯(latest·earlier)·`isUsableSelection`·`isConsistentSelection` 가드는 **그대로 유지**. 단순화하지 않은 근거: G2(Android 변경 후 선택 선행: (0,1)→(1,1)→"5"/"8", (0,1)→(2,2)→"33"/"38")는 재선택 플래그가 닿지 않는 경로(포커스 무관)라 earlier 슬롯과 일관성 검사가 여전히 유일한 방어선이다.
+
+동작 변화(의도 외, 참고): `next === prev` 비교는 숫자만 남긴 값으로 한다. 그래서 "기존 숫자 + 비숫자"(원시 `"3-"` → `"3"`)도 이제 칸 유지 + 다음 칸 포커스가 된다. 이전에는 (1,1) 경로에서 빈 삽입 → 칸 비움이었다. 숫자 키패드(`keyboardType` number-pad)에서는 사실상 발생하지 않는다.
 
 ### 테스트 (RED → GREEN)
 - 추가 26건 (기존 89건 기대값 변경 없음):
@@ -133,10 +135,10 @@ OTP TextInput 6칸에 `selectTextOnFocus`를 추가했다. 칸에 포커스가 �
 4. **Android 순서 변형**: selectTextOnFocus 선택 이벤트가 오기 전에 타이핑 → 변경 후 접힌 선택이 첫 이벤트로 오면 재선택이 새 숫자에 걸린다(분배는 earlier/consistency 가드로 정상, 화면상 새 숫자 하이라이트만 남음 — 포커스가 다음 칸으로 이동하므로 영향 낮음).
 5. 기존: iOS 탭 "98"/"98765", SMS 자동완성 첫 칸/채워진 칸, 이미 포커스된 칸 재탭 "98".
 
-사용 스킬: test-driven-development(로드 안 함 — 15분 예산, 절차만 적용: RED 11 failed 기록 후 구현) · 나머지 없음 — 같은 4파일 결합 작업, 서브에이전트 분할 불필요(브리프).
+사용 스킬: 없음 — test-driven-development·verification-before-completion 모두 Skill 도구로 로드하지 않았다(판단 착오, 시간 부족 아님). 절차만 적용: RED 11 failed 기록 후 구현, 완료 주장마다 fresh EXIT 첨부. 서브에이전트 분할 불필요(브리프).
 테스트: +26건(위), RED EXIT=1 → GREEN EXIT=0.
 기존 실패: 없음 (src/screens/auth 기준).
 
 검증: type-check·eslint(변경 4파일)·`jest src/screens/auth` 모두 EXIT=0. 미검증 — 전체 jest, 실기기 iOS/Android 이벤트 순서(위 1~4).
-위험·영향 범위: 회원가입 1단계 OTP 칸 입력만. 틀리면 포커스 직후 첫 커서 이동이 전체 선택으로 바뀌거나(위 2), 같은 숫자 재입력 시 의도한 삭제가 아닌 유지로 처리될 수 있다(삭제는 길이로 구분되어 영향 없음 — 테스트 'deleting a digit' 고정).
-되돌리는 법: `git revert a5dd5df` (REPORT 커밋은 별도 revert).
+위험·영향 범위: 회원가입 1단계 OTP 칸 입력만. 틀리면 포커스 직후 첫 커서 이동이 전체 선택으로 바뀌거나(위 2), "숫자+비숫자" 입력이 칸 비움 대신 유지로 처리된다(위 동작 변화). 순수 삭제("")는 길이로 구분되어 영향 없음 — 테스트 'deleting a digit' 고정.
+되돌리는 법: `git revert <이 보정 커밋> eb30c0d a5dd5df` (코드만이면 `git revert a5dd5df`).
