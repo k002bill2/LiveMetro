@@ -55,7 +55,8 @@ OTP TextInput 6칸에 `selectTextOnFocus`를 추가했다. 칸에 포커스가 �
 - iOS JS 선택: `setTextAndSelection` 562-591이 `_comingFromJS`로 delegate 콜백 차단 → `ref.setSelection`은 onSelectionChange로 돌아오지 않음 → handleOtpFocus가 선택 기록을 직접 남긴다.
 - Android: `ReactTextInputTextWatcher.kt` 32-67(onTextChanged → ReactTextChangedEvent 60-67), `ReactTextSelectionWatcher.kt` 27-45(값이 바뀔 때만 발행 38-40), `ReactEditText.kt` 476-485(onSelectionChanged → selectionWatcher, hasFocus 조건). 두 이벤트의 상대 순서는 Android 프레임워크(Editable/SpanWatcher) 동작이라 이 저장소로 **확정 불가(추정)** → 가드 적용.
 - JS `Libraries/Components/TextInput/TextInput.js` 499-502(_onChange → onChangeText 동기), 518-519(_onSelectionChange) — 재정렬 없음. `setSelection(start, end)` 479-489 존재.
-- 가드: 선택 기록 시 그 칸 값도 저장(`OtpCellSelection.value`). onChangeText 시 저장 값 ≠ 이전 칸 값, 또는 범위가 이전 값 길이를 벗어나면(변경 후 선택이 먼저 온 경우의 전형) 버리고 커서 끝(append, 수정 전 기본 동작) 가정. 한 번 쓴 선택은 소거.
+- 가드(커밋 85a83d1에서 보강): 칸별 [최근, 직전] 선택 2슬롯. 각 선택은 ① 기록 시점 칸 값 = 이전 칸 값 ② 범위 ⊂ [0, len] ③ next 가 "prev 앞부분 + 삽입 + prev 뒷부분" 꼴(일관성)일 때만 사용, 최근→직전 순. 둘 다 안 되면 내용 추정(앞이 같으면 커서 끝·뒤가 같으면 커서 앞·아니면 교체). onChangeText 후 두 슬롯 소거. → Android에서 변경 후 (1,1)/(2,2)가 먼저 와도 직전 (0,1)을 써서 "5"→125456, "98"→129856, "38"→123856 (테스트 고정).
+- 인용 줄 번호는 `sed -n`으로 재확인(481/496/500/512-513/518/562/570, TextInput.js 479-481/499-502/518-519 일치).
 
 ## 결함별 반영
 | QA 결함 | 반영 |
@@ -67,7 +68,7 @@ OTP TextInput 6칸에 `selectTextOnFocus`를 추가했다. 칸에 포커스가 �
 ## 테스트 (RED→GREEN)
 - 추가: `src/screens/auth/__tests__/otpInput.test.ts`(경계 12건·가드·불변성/포커스), `SignupStep1Screen.test.tsx` 동작 테스트 13건 + onFocus 1건.
 - RED: 헬퍼 파일을 치운 상태(화면 미수정)에서 `npx jest src/screens/auth --watchman=false --silent` → EXIT=1, Suites 2 failed, Tests 5 failed / 61 passed (Cannot find module otpInput, 화면 38·83·33·398·가드 실패). 로그 `logs/fix/red.log`.
-- GREEN: 같은 명령 → EXIT=0, Suites 7/7, Tests 82/82. 기존 5건 기대값 불변(diff에서 기존 it 블록 미변경).
+- GREEN: 같은 명령 → EXIT=0, Suites 7/7, Tests 82/82 (7682c58). 가드 보강(85a83d1) 후 89/89 (순서 가드 화면 테스트 3건·헬퍼 5건 추가). 기존 5건 기대값 불변(diff에서 기존 it 블록 미변경).
 - 정직성 메모: 헬퍼 본체는 테스트 파일보다 먼저 작성했고, RED는 헬퍼를 치워 재현했다.
 
 ## EXIT 표 (로그: dev/active/fix-379-otp-paste/logs/fix/, 미커밋)
@@ -75,20 +76,22 @@ OTP TextInput 6칸에 `selectTextOnFocus`를 추가했다. 칸에 포커스가 �
 |---|---|
 | npm run type-check | 0 |
 | npx eslint --no-eslintrc -c .eslintrc.js --no-ignore (변경 4파일) | 0 |
-| npx jest src/screens/auth --watchman=false --silent (헬퍼 테스트 포함) | 0 (82/82) |
+| npx jest src/screens/auth --watchman=false --silent (헬퍼 테스트 포함) | 0 (89/89, 85a83d1 기준) |
 
 ## 실기기 미검증 범위
-- Android에서 onChangeText와 onSelectionChange의 실제 순서(가드로 커서 끝 폴백. 단 "변경 후 선택이 이전 값 길이 안"인 경우—예: 선택된 "3"을 "5"로 교체 후 (1,1)이 먼저 옴—는 가드가 못 거른다 → 칸이 비는 오동작 가능. 로그로 순서 확인 필요).
+- Android 실제 이벤트 순서(어느 순서든 2슬롯+일관성 가드로 처리하도록 설계·테스트했으나 실기기 로그 미확인). 남는 모호성: 직전 슬롯이 (0,1)인데 실제로는 커서 끝 입력인 경우(예: selectAll 후 사용자가 커서를 옮겨 "35" 입력·변경 후 선택 먼저) → 교체로 해석될 수 있음.
 - iOS 탭 시 UIKit의 커서 배치 선택 이벤트가 onFocus 이후에 오면 기록이 (1,1)로 덮이는데, 네이티브는 JS setSelection으로 (0,1) 선택 → 붙여넣기 "98"이 "8"만 남을 수 있음(경쟁 조건, 정적 판정 불가).
 - SMS 자동완성·삼성 키보드 클립보드 제안 경로.
 
 사용 스킬:
 - superpowers:test-driven-development → 경계 표를 테스트로 먼저 고정, RED(EXIT=1) 확인 후 화면 반영.
 - test-automation·react-native-development·verification-before-completion: 미로드 — 15분 예산. 검증은 브리프 3종 명령 fresh 실행으로 대신.
-- 서브에이전트: analyzer 1개(읽기 전용) — RN 이벤트 순서 조사, 결과를 위 근거 절에 통합.
+- 서브에이전트: analyzer 1개(읽기 전용) — RN 이벤트 순서 조사, 결과를 위 근거 절에 통합(줄 번호 메인이 재확인).
+- advisor 검토: Android 선택-먼저 순서에서 칸이 비는 결함 지적 → 85a83d1로 반영.
 테스트: 위 RED→GREEN.
 기존 실패: 없음 (src/screens/auth 범위. 전체 jest 미실행).
 
-검증: type-check·eslint(4파일)·jest src/screens/auth 실행, 전부 EXIT=0. 전체 jest·실기기(iOS/Android) 동작·Android 이벤트 순서는 미검증.
+검증: type-check·eslint(4파일)·jest src/screens/auth(89/89) 85a83d1 기준 fresh 실행, 전부 EXIT=0. 전체 jest·실기기(iOS/Android) 동작·Android 이벤트 순서는 미검증.
 위험·영향 범위: 회원가입 Step1 OTP 6칸 입력만. 잘못되면 부분 붙여넣기/교체 입력이 잘못 분배되거나 칸이 비어 인증 실패 → 재입력 필요. 인증 로직·네이티브·의존성 변경 없음.
-되돌리는 법: `git revert 7682c58` (d981e51 상태로 복귀) — REPORT 커밋은 별도로 revert.
+되돌리는 법: `git revert 85a83d1 7682c58` (d981e51 상태로 복귀) — REPORT 커밋은 별도로 revert.
+커밋: 7682c58(본 수정) · 9c2e650(REPORT) · 85a83d1(순서 가드 보강, advisor 지적 반영) · 이후 REPORT 갱신 커밋.
