@@ -23,7 +23,42 @@ describe('formatOtaInfo', () => {
       'OTA preview · 1.1.0 · 0195f2a1-7c3e-7b10-9d2a-4e5f6a7b8c9d\n2026-11-28 10:05 KST',
     );
     expect(info.accessibilityLabel).toBe(
+      'OTA 업데이트 ID 0195f2a1-7c3e-7b10-9d2a-4e5f6a7b8c9d, 채널 preview, 런타임 1.1.0, 생성 2026-11-28 10:05 KST',
+    );
+  });
+
+  it('en 접근성 라벨에도 createdAt 포함', () => {
+    const info = formatOtaInfo(base, 'en');
+    expect(info.accessibilityLabel).toBe(
+      'OTA update ID 0195f2a1-7c3e-7b10-9d2a-4e5f6a7b8c9d, channel preview, runtime 1.1.0, created 2026-11-28 10:05 KST',
+    );
+  });
+
+  it('createdAt null이면 접근성 라벨에서도 생성 시각 생략', () => {
+    const info = formatOtaInfo({ ...base, createdAt: null }, 'ko');
+    expect(info.accessibilityLabel).toBe(
       'OTA 업데이트 ID 0195f2a1-7c3e-7b10-9d2a-4e5f6a7b8c9d, 채널 preview, 런타임 1.1.0',
+    );
+  });
+
+  it('웹(platform web)은 OTA 대상이 아니므로 스텁 값과 무관하게 disabled', () => {
+    // expo-updates 웹 스텁: isEnabled true, channel '', runtimeVersion '', updateId undefined
+    const webStub = {
+      ...base,
+      isEnabled: true,
+      channel: '',
+      runtimeVersion: '',
+      updateId: undefined,
+      createdAt: null,
+    } as unknown as OtaSource;
+    const info = formatOtaInfo(webStub, 'ko', 'web');
+    expect(info.text).toBe('OTA disabled');
+    expect(info.accessibilityLabel).toBe('OTA 업데이트 비활성');
+  });
+
+  it('platform ios/android는 기존 표시 유지', () => {
+    expect(formatOtaInfo({ ...base, createdAt: null }, 'ko', 'android').text).toBe(
+      'OTA preview · 1.1.0 · 0195f2a1-7c3e-7b10-9d2a-4e5f6a7b8c9d',
     );
   });
 
@@ -52,7 +87,7 @@ describe('formatOtaInfo', () => {
     expect(info.accessibilityLabel).toBe('OTA 업데이트 비활성');
   });
 
-  it('모듈 접근이 throw해도 throw하지 않고 unavailable 반환', () => {
+  it('property access throw is absorbed — getter 예외는 unavailable로 흡수', () => {
     const throwing = {
       get isEnabled(): boolean {
         throw new Error('native module missing');

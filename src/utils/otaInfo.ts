@@ -4,6 +4,7 @@
  * QA 시 스크린샷 1장으로 서버 manifest update ID와 대조하기 위한 용도 — ID는 자르지 않는다.
  */
 import * as Updates from 'expo-updates';
+import { Platform } from 'react-native';
 
 export interface OtaSource {
   readonly isEnabled: boolean;
@@ -35,10 +36,18 @@ const formatKst = (date: Date | null): string | null => {
 
 const orDash = (v: string | null): string => (v ? v : '-');
 
-export const formatOtaInfo = (source: OtaSource, language: string): OtaInfo => {
+/**
+ * @param platform Platform.OS. 웹은 OTA 대상이 아니다 — expo-updates 웹 스텁이
+ *   isEnabled true를 돌려주므로 값이 아니라 플랫폼으로 판정한다.
+ */
+export const formatOtaInfo = (
+  source: OtaSource,
+  language: string,
+  platform?: string,
+): OtaInfo => {
   const ko = language === 'ko';
   try {
-    if (!source.isEnabled) {
+    if (platform === 'web' || !source.isEnabled) {
       return {
         text: 'OTA disabled',
         accessibilityLabel: ko ? 'OTA 업데이트 비활성' : 'OTA updates disabled',
@@ -52,8 +61,8 @@ export const formatOtaInfo = (source: OtaSource, language: string): OtaInfo => {
     return {
       text: created ? `${line}\n${created}` : line,
       accessibilityLabel: ko
-        ? `OTA 업데이트 ID ${id}, 채널 ${channel}, 런타임 ${runtime}`
-        : `OTA update ID ${id}, channel ${channel}, runtime ${runtime}`,
+        ? `OTA 업데이트 ID ${id}, 채널 ${channel}, 런타임 ${runtime}${created ? `, 생성 ${created}` : ''}`
+        : `OTA update ID ${id}, channel ${channel}, runtime ${runtime}${created ? `, created ${created}` : ''}`,
     };
   } catch (error) {
     console.warn('[otaInfo] failed to read expo-updates info', error);
@@ -64,5 +73,10 @@ export const formatOtaInfo = (source: OtaSource, language: string): OtaInfo => {
   }
 };
 
-/** 실행 중인 expo-updates 런타임 정보를 표시용으로 읽는다. 절대 throw하지 않는다. */
-export const getOtaInfo = (language: string): OtaInfo => formatOtaInfo(Updates, language);
+/**
+ * 실행 중인 expo-updates 런타임 정보를 표시용으로 읽는다.
+ * 흡수 범위: 프로퍼티 접근·포맷 중 예외만 'OTA unavailable'로 흡수한다.
+ * 범위 밖: expo-updates 모듈 import 실패 — iOS/Android/웹 모두 autolink·등록된다는 전제.
+ */
+export const getOtaInfo = (language: string): OtaInfo =>
+  formatOtaInfo(Updates, language, Platform.OS);

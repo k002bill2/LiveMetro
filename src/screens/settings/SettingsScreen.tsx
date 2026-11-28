@@ -85,6 +85,9 @@ const getAvatarInitial = (name?: string | null): string => {
 };
 
 // Storage keys
+/** Wanted handoff (rest.jsx:658) 아이콘 칸 32×32 — OTA 행 들여쓰기도 이 값을 공유한다 (#418). */
+const ICON_CONTAINER_SIZE = 32;
+
 const AUTO_LOGIN_ENABLED_KEY = '@livemetro_auto_login_enabled';
 const AUTO_LOGIN_EMAIL_KEY = 'livemetro_auto_login_email';
 
@@ -733,7 +736,7 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
               accessible
               accessibilityLabel={otaInfo.accessibilityLabel}
             >
-              <View style={styles.textContainer}>
+              <View style={styles.otaTextContainer}>
                 <Text style={styles.settingSubtitle} selectable>
                   {otaInfo.text}
                 </Text>
@@ -949,8 +952,8 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     iconContainer: {
       // Wanted handoff (rest.jsx:658): 32×32 rounded-square (r8 CSS = r4 token = 8px)
       // with 16px icon. Replaces the prior 36×36 r-pill / icon-20 form factor.
-      width: 32,
-      height: 32,
+      width: ICON_CONTAINER_SIZE,
+      height: ICON_CONTAINER_SIZE,
       backgroundColor: semantic.bgSubtle,
       borderRadius: WANTED_TOKENS.radius.r4,
       justifyContent: 'center',
@@ -959,6 +962,11 @@ const createStyles = (semantic: WantedSemanticTheme) =>
     },
     textContainer: {
       flex: 1,
+    },
+    otaTextContainer: {
+      // #418 OTA 행 텍스트를 위 "앱 정보" 제목과 같은 열에 맞춘다 = 아이콘 칸 폭 + 아이콘 오른쪽 간격.
+      flex: 1,
+      marginLeft: ICON_CONTAINER_SIZE + WANTED_TOKENS.spacing.s3,
     },
     settingTitle: {
       // Wanted handoff (rest.jsx:662): 14/600 labelStrong (label1 token).
