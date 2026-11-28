@@ -8,6 +8,11 @@ import { AppState, type AppStateStatus } from 'react-native';
 import { useRealtimeTrains } from '../useRealtimeTrains';
 import { dataManager, RealtimeTrainData } from '../../services/data/dataManager';
 import { Train, TrainStatus } from '../../models/train';
+import type { SeoulApiError as SeoulApiErrorType } from '@services/api/seoulSubwayApi';
+
+const { SeoulApiError } = jest.requireActual<typeof import('@services/api/seoulSubwayApi')>(
+  '@services/api/seoulSubwayApi'
+);
 
 // Mock dataManager
 jest.mock('../../services/data/dataManager', () => ({
@@ -55,7 +60,7 @@ const createMockRealtimeData = (trains: Train[]): RealtimeTrainData => ({
 
 describe('useRealtimeTrains', () => {
   let unsubscribeMock: jest.Mock;
-  let dataCallback: ((data: RealtimeTrainData | null) => void) | null = null;
+  let dataCallback: ((data: RealtimeTrainData | null, error?: unknown) => void) | null = null;
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -245,6 +250,153 @@ describe('useRealtimeTrains', () => {
       });
 
       expect(onErrorMock).toHaveBeenCalled();
+    });
+  });
+
+  describe('Daily quota exhausted (#419)', () => {
+    const quotaError = (): SeoulApiErrorType =>
+      new SeoulApiError('ERROR-337', '일일 한도 초과', {
+        retryable: false,
+        dailyQuotaExhausted: true,
+      });
+
+    let errorSpy: jest.SpyInstance;
+    let warnSpy: jest.SpyInstance;
+
+    beforeEach(() => {
+      errorSpy = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+      warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    });
+
+    afterEach(() => {
+      errorSpy.mockRestore();
+      warnSpy.mockRestore();
+    });
+
+    const tick = async (data: RealtimeTrainData | null, error?: unknown): Promise<void> => {
+      await act(async () => {
+        dataCallback?.(data, error);
+      });
+    };
+
+    it('logs one warning and calls onError once across repeated quota ticks', async () => {
+      const onErrorMock = jest.fn();
+      const { result } = renderHook(() =>
+        useRealtimeTrains('강남역', { retryAttempts: 3, onError: onErrorMock })
+      );
+
+      for (let i = 0; i < 6; i++) {
+        await tick(null, quotaError());
+      }
+
+      expect(result.current.errorKind).toBe('quota');
+      expect(result.current.error).toContain('한도');
+      expect(result.current.error).not.toContain('최대 재시도');
+      expect(result.current.loading).toBe(false);
+      expect(result.current.isRetrying).toBe(false);
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(errorSpy).not.toHaveBeenCalled();
+      expect(onErrorMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps the generic retry sequence for null data without an error', async () => {
+      const { result } = renderHook(() =>
+        useRealtimeTrains('강남역', { retryAttempts: 3 })
+      );
+
+      await tick(null);
+      expect(result.current.error).toContain('(1/3)');
+      expect(result.current.errorKind).toBe('generic');
+      await tick(null);
+      expect(result.current.error).toContain('(2/3)');
+      await tick(null);
+      expect(result.current.error).toContain('최대 재시도 횟수(3)');
+      expect(result.current.errorKind).toBe('generic');
+    });
+
+    it('logs the max-retry error once while failures continue', async () => {
+      const onErrorMock = jest.fn();
+      renderHook(() =>
+        useRealtimeTrains('강남역', { retryAttempts: 2, onError: onErrorMock })
+      );
+
+      for (let i = 0; i < 6; i++) {
+        await tick(null);
+      }
+
+      expect(errorSpy).toHaveBeenCalledTimes(1);
+      expect(onErrorMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('resets state and log dedupe after data arrives', async () => {
+      const onErrorMock = jest.fn();
+      const { result } = renderHook(() =>
+        useRealtimeTrains('강남역', { onError: onErrorMock })
+      );
+
+      await tick(null, quotaError());
+      await tick(null, quotaError());
+      await tick(createMockRealtimeData(createMockTrains()));
+
+      expect(result.current.error).toBeNull();
+      expect(result.current.errorKind).toBeNull();
+
+      await tick(null, quotaError());
+      await tick(null, quotaError());
+
+      expect(result.current.errorKind).toBe('quota');
+      expect(warnSpy).toHaveBeenCalledTimes(2);
+      expect(onErrorMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('clears isRetrying when a generic failure is followed by quota exhaustion (D1)', async () => {
+      const { result } = renderHook(() =>
+        useRealtimeTrains('강남', { retryAttempts: 3 })
+      );
+
+      await tick(null);
+      expect(result.current.isRetrying).toBe(true);
+
+      await tick(null, quotaError());
+
+      expect(result.current.errorKind).toBe('quota');
+      expect(result.current.isRetrying).toBe(false);
+    });
+
+    it('reports the first error again after stationName changes (D2)', async () => {
+      const onErrorMock = jest.fn();
+      const { result, rerender } = renderHook(
+        ({ station }: { station: string }) =>
+          useRealtimeTrains(station, { onError: onErrorMock }),
+        { initialProps: { station: '강남' } }
+      );
+
+      await tick(null, quotaError());
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+
+      rerender({ station: '역삼' });
+      await tick(null, quotaError());
+
+      expect(result.current.errorKind).toBe('quota');
+      expect(warnSpy).toHaveBeenCalledTimes(2);
+      expect(onErrorMock).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps dedupe across refetch on the same station', async () => {
+      const onErrorMock = jest.fn();
+      const { result } = renderHook(() =>
+        useRealtimeTrains('강남', { onError: onErrorMock })
+      );
+
+      await tick(null, quotaError());
+      act(() => {
+        result.current.refetch();
+      });
+      await tick(null, quotaError());
+
+      expect(result.current.errorKind).toBe('quota');
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(onErrorMock).toHaveBeenCalledTimes(1);
     });
   });
 
