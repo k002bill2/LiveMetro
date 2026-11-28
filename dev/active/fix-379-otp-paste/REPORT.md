@@ -95,3 +95,48 @@ OTP TextInput 6칸에 `selectTextOnFocus`를 추가했다. 칸에 포커스가 �
 위험·영향 범위: 회원가입 Step1 OTP 6칸 입력만. 잘못되면 부분 붙여넣기/교체 입력이 잘못 분배되거나 칸이 비어 인증 실패 → 재입력 필요. 인증 로직·네이티브·의존성 변경 없음.
 되돌리는 법: `git revert 85a83d1 7682c58` (d981e51 상태로 복귀) — REPORT 커밋은 별도로 revert.
 커밋: 7682c58(본 수정) · 9c2e650(REPORT) · 85a83d1(순서 가드 보강, advisor 지적 반영) · 이후 REPORT 갱신 커밋.
+
+
+---
+
+## FIX2 — QA r2 조건부 PASS P2 2건 + P3 (커밋 `a5dd5df`, base `09689e4`)
+
+원칙: 이벤트 순서를 추측하지 않고 상태를 결정론적으로 만든다.
+
+### 결함별 반영
+| QA r2 결함 | 반영 | 위치 |
+|---|---|---|
+| [P2] 같은 숫자 재입력이 칸을 비움 (G1 "3", G2 "3") | `extractInsertedDigits`: `prev` 가 비어 있지 않고 `next === prev` 이면 선택 기록과 무관하게 `prev` 를 삽입으로 반환 → 칸 유지 + 다음 칸 포커스. 삭제는 `next` 가 짧아져 구분됨 | `src/screens/auth/otpInput.ts` (extractInsertedDigits 첫 분기) |
+| [P2] 접힌 caret (1,1) 이 변경 전 선택 (0,1) 을 덮어 "38"/"33" 오분배 (G1) | 칸별 `otpReselectPendingRef`: onFocus 에서 설정, 첫 onSelectionChange 에서 소비, onBlur 에서 해제. 소비 시 접힌 선택이고 칸 값이 있으면 기록 대신 `setSelection(0,len)` 재호출 + (0,len) 기록. 비접힘(Android selectTextOnFocus (0,1))이면 플래그만 소비. 이후 선택(사용자 커서 이동, G3)은 그대로 기록 | `SignupStep1Screen.tsx` handleOtpSelectionChange·handleOtpFocus·handleOtpBlur, TextInput `onBlur` |
+| [P3] 재요청 시 선택 기록 미초기화 | `handleResend` 에서 `otpSelectionsRef`·`otpReselectPendingRef` 초기화 | `SignupStep1Screen.tsx` handleResend |
+
+기존 2슬롯(latest·earlier)·`isUsableSelection`·`isConsistentSelection` 가드는 **그대로 유지**. 단순화하지 않은 근거: G2(Android 변경 후 선택 선행: (0,1)→(1,1)→"5"/"8", (0,1)→(2,2)→"33"/"38")는 재선택 플래그가 닿지 않는 경로(포커스 무관)라 earlier 슬롯과 일관성 검사가 여전히 유일한 방어선이다.
+
+### 테스트 (RED → GREEN)
+- 추가 26건 (기존 89건 기대값 변경 없음):
+  - `otpInput.test.ts` +5: 같은 숫자 재입력 × 선택 (1,1)/(0,0)/(0,1)/null, 빈 prev+빈 next.
+  - `SignupStep1Screen.test.tsx` +21 (`describe('event-order independent OTP edits …')`): G1 98/5/38/33/3 (focus → selectionChange (1,1) → `setSelection(0,1)` 1회 단언 → changeText), G1 같은 숫자 후 포커스 이동, 재선택 1회 한정(두 번째 (1,1)은 기록만 → "35"=125456), Android 비접힘 첫 선택은 재선택 없음, blur 시 플래그 해제, G2 3/5/8/33/38, G3 35·35·53·98, G4 98(→128456), 회귀: 빈 칸 순차 타이핑 123456+confirmPhoneCode, 삭제 12_456. SMS 6자리는 기존 테스트 'distributes an SMS-autofilled 6-digit code' 로 커버.
+  - RN jest mock TextInput 에 `setSelection` 이 없어 해당 describe 안에서만 프로토타입 스텁(beforeEach 설치·afterEach 삭제).
+- RED (구현 전): `npx jest src/screens/auth --watchman=false --silent` → **11 failed, 104 passed, EXIT=1** (`logs/fix2/red.log`): 같은 숫자 3건, G1 5건(setSelection 0회), G1 포커스 이동, 재선택 1회, G2 "3".
+- GREEN: 같은 명령 → **7 suites, 115 passed, EXIT=0** (`logs/fix2/green.log`).
+
+### EXIT
+- `npm run type-check; echo EXIT=$?` → EXIT=0 (첫 실행 EXIT=2: 테스트 tuple 인덱스 `number | undefined` → `[number, number][]` 로 수정 후 0)
+- `npx eslint --no-eslintrc -c .eslintrc.js <변경 4파일>; echo EXIT=$?` → EXIT=0
+- `npx jest src/screens/auth --watchman=false --silent; echo EXIT=$?` → 115/115, EXIT=0
+- 전체 jest·merge-tree 는 미실행(브리프 검증 범위 밖, Jarvis 담당).
+
+### 남은 실기기 확인 (QA r2 5절 갱신)
+1. **iOS G1(머지 조건)**: 칸 123456 → 칸3 탭 → "38" 붙여넣기 → 123856, "3" 타이핑 → 칸 유지·다음 칸. 추가 확인: 탭 직후 네이티브 선택이 실제로 전체 선택(하이라이트)으로 보이는지 = 재선택 동작 증명.
+2. **iOS 플래그 잔존**: 탭 caret 이벤트가 onFocus 뒤에 오지 않는 기기라면 플래그가 첫 사용자 커서 이동까지 남아 그 1회 이동이 전체 선택으로 바뀐다(커서를 옮긴 뒤 입력하는 드문 경로). 칸3 탭 → 칸 안 다른 위치 탭 → "5" 입력 결과 확인.
+3. **Android G2(머지 조건)**: 칸3 탭(전체 선택) → "3" 타이핑 → 칸 유지·포커스 이동, "38" 붙여넣기 → 123856.
+4. **Android 순서 변형**: selectTextOnFocus 선택 이벤트가 오기 전에 타이핑 → 변경 후 접힌 선택이 첫 이벤트로 오면 재선택이 새 숫자에 걸린다(분배는 earlier/consistency 가드로 정상, 화면상 새 숫자 하이라이트만 남음 — 포커스가 다음 칸으로 이동하므로 영향 낮음).
+5. 기존: iOS 탭 "98"/"98765", SMS 자동완성 첫 칸/채워진 칸, 이미 포커스된 칸 재탭 "98".
+
+사용 스킬: test-driven-development(로드 안 함 — 15분 예산, 절차만 적용: RED 11 failed 기록 후 구현) · 나머지 없음 — 같은 4파일 결합 작업, 서브에이전트 분할 불필요(브리프).
+테스트: +26건(위), RED EXIT=1 → GREEN EXIT=0.
+기존 실패: 없음 (src/screens/auth 기준).
+
+검증: type-check·eslint(변경 4파일)·`jest src/screens/auth` 모두 EXIT=0. 미검증 — 전체 jest, 실기기 iOS/Android 이벤트 순서(위 1~4).
+위험·영향 범위: 회원가입 1단계 OTP 칸 입력만. 틀리면 포커스 직후 첫 커서 이동이 전체 선택으로 바뀌거나(위 2), 같은 숫자 재입력 시 의도한 삭제가 아닌 유지로 처리될 수 있다(삭제는 길이로 구분되어 영향 없음 — 테스트 'deleting a digit' 고정).
+되돌리는 법: `git revert a5dd5df` (REPORT 커밋은 별도 revert).
