@@ -408,6 +408,73 @@ describe('SignupStep1Screen', () => {
       focusSpy.mockRestore();
     });
 
+    // #379 FIX3: Android 는 선택된 "3" 위에 "3" 을 쳐도 텍스트 불변이라 onChangeText 가 오지 않는다.
+    // onKeyPress 의 같은 숫자로 다음 칸 이동을 보장하고, changeText 가 함께 와도 같은 칸으로 멱등이어야 한다.
+    describe('same-digit retype via onKeyPress (#379 FIX3)', () => {
+      const focusedIds = (spy: jest.SpyInstance): string[] =>
+        spy.mock.contexts.map((ctx) => (ctx as { props: { testID: string } }).props.testID);
+      const focusCell2With123456 = async (): Promise<ReturnType<typeof render>> => {
+        const utils = await enterOtpWith123456();
+        act(() => {
+          fireEvent(utils.getByTestId('otp-cell-2'), 'focus');
+        });
+        selectCell(utils, 2, 1, 1);
+        return utils;
+      };
+      const keyPress = (utils: ReturnType<typeof render>, idx: number, key: string): void => {
+        act(() => {
+          fireEvent(utils.getByTestId(`otp-cell-${idx}`), 'keyPress', { nativeEvent: { key } });
+        });
+      };
+
+      it('keyPress of the same digit without changeText moves focus to the next cell', async () => {
+        const utils = await focusCell2With123456();
+        const focusSpy = jest.spyOn(TextInput.prototype, 'focus');
+        focusSpy.mockClear();
+        keyPress(utils, 2, '3');
+        expect(cellValues(utils)).toBe('123456');
+        expect(focusedIds(focusSpy)).toEqual(['otp-cell-3']);
+        focusSpy.mockRestore();
+      });
+
+      it('keyPress of a different digit alone does not move focus (changeText handles it)', async () => {
+        const utils = await focusCell2With123456();
+        const focusSpy = jest.spyOn(TextInput.prototype, 'focus');
+        focusSpy.mockClear();
+        keyPress(utils, 2, '5');
+        expect(cellValues(utils)).toBe('123456');
+        expect(focusSpy).not.toHaveBeenCalled();
+        focusSpy.mockRestore();
+      });
+
+      it('keyPress + changeText of the same digit is idempotent (same value, same target)', async () => {
+        const utils = await focusCell2With123456();
+        const focusSpy = jest.spyOn(TextInput.prototype, 'focus');
+        focusSpy.mockClear();
+        keyPress(utils, 2, '3');
+        act(() => {
+          fireEvent.changeText(utils.getByTestId('otp-cell-2'), '3');
+        });
+        expect(cellValues(utils)).toBe('123456');
+        expect(new Set(focusedIds(focusSpy))).toEqual(new Set(['otp-cell-3']));
+        focusSpy.mockRestore();
+      });
+
+      it('keyPress of the same digit on the last cell does not move focus', async () => {
+        const utils = await enterOtpWith123456();
+        act(() => {
+          fireEvent(utils.getByTestId('otp-cell-5'), 'focus');
+        });
+        selectCell(utils, 5, 1, 1);
+        const focusSpy = jest.spyOn(TextInput.prototype, 'focus');
+        focusSpy.mockClear();
+        keyPress(utils, 5, '6');
+        expect(cellValues(utils)).toBe('123456');
+        expect(focusSpy).not.toHaveBeenCalled();
+        focusSpy.mockRestore();
+      });
+    });
+
     it('re-selects only once per focus — a second collapsed caret is recorded as a user move', async () => {
       const utils = await enterOtpWith123456();
       act(() => {
