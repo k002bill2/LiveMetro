@@ -141,4 +141,4 @@ OTP TextInput 6칸에 `selectTextOnFocus`를 추가했다. 칸에 포커스가 �
 
 검증: type-check·eslint(변경 4파일)·`jest src/screens/auth` 모두 EXIT=0. 미검증 — 전체 jest, 실기기 iOS/Android 이벤트 순서(위 1~4).
 위험·영향 범위: 회원가입 1단계 OTP 칸 입력만. 틀리면 포커스 직후 첫 커서 이동이 전체 선택으로 바뀌거나(위 2), "숫자+비숫자" 입력이 칸 비움 대신 유지로 처리된다(위 동작 변화). 순수 삭제("")는 길이로 구분되어 영향 없음 — 테스트 'deleting a digit' 고정.
-되돌리는 법: `git revert <이 보정 커밋> eb30c0d a5dd5df` (코드만이면 `git revert a5dd5df`).
+되돌리는 법: `git revert e40a829 eb30c0d a5dd5df` (코드만이면 `git revert a5dd5df`).
