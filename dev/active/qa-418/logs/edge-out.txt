@@ -1,0 +1,12 @@
+A_KO {"text":"OTA mock · mock · mock","accessibilityLabel":"OTA 업데이트 ID mock, 채널 mock, 런타임 mock"}
+A_EN {"text":"OTA mock · mock · mock","accessibilityLabel":"OTA update ID mock, channel mock, runtime mock"}
+B {"text":"OTA unavailable","accessibilityLabel":"OTA 업데이트 정보 없음"}
+C threw= Error: native module missing at import
+D_mid {"text":"OTA production · 1.1.0 · aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\n2026-11-29 00:00 KST","accessibilityLabel":"OTA 업데이트 ID aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee, 채널 production, 런타임 1.1.0"}
+D_pre {"text":"OTA production · 1.1.0 · aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\n2026-11-28 23:59 KST","accessibilityLabel":"OTA 업데이트 ID aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee, 채널 production, 런타임 1.1.0"}
+D_yr {"text":"OTA production · 1.1.0 · aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\n2027-01-01 00:30 KST","accessibilityLabel":"OTA update ID aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee, channel production, runtime 1.1.0"}
+D_inv {"text":"OTA production · 1.1.0 · aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee","accessibilityLabel":"OTA 업데이트 ID aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee, 채널 production, 런타임 1.1.0"}
+D_str {"text":"OTA production · 1.1.0 · aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee","accessibilityLabel":"OTA 업데이트 ID aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee, 채널 production, 런타임 1.1.0"}
+D_emb {"text":"OTA production · 1.1.0 · embedded","accessibilityLabel":"OTA update ID embedded, channel production, runtime 1.1.0"}
+D_dis {"text":"OTA disabled","accessibilityLabel":"OTA updates disabled"}
+D_web {"text":"OTA - · - · embedded","accessibilityLabel":"OTA 업데이트 ID embedded, 채널 -, 런타임 -"}
