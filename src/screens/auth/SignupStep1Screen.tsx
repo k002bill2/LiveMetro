@@ -106,6 +106,8 @@ export const SignupStep1Screen: React.FC = () => {
   const otpSelectionsRef = useRef<[OtpCellSelection | null, OtpCellSelection | null][]>(
     Array.from({ length: OTP_LENGTH }, () => [null, null]),
   );
+  // #379 FIX2: 칸별 "포커스 후 첫 선택 이벤트 재선택 1회" 플래그 (onFocus 설정, 첫 선택 이벤트·onBlur 에서 해제).
+  const otpReselectPendingRef = useRef<boolean[]>(Array(OTP_LENGTH).fill(false));
   const recordOtpSelection = useCallback((index: number, sel: OtpCellSelection) => {
     const [latest] = otpSelectionsRef.current[index] ?? [null, null];
     otpSelectionsRef.current[index] = [sel, latest];
@@ -186,6 +188,9 @@ export const SignupStep1Screen: React.FC = () => {
       setVerificationId(id);
       setOtpDigits(Array(OTP_LENGTH).fill(''));
       setSecondsLeft(OTP_TIMEOUT_SECONDS);
+      // 재요청 시 이전 코드에 대한 선택 기록·재선택 플래그를 버린다.
+      otpSelectionsRef.current = Array.from({ length: OTP_LENGTH }, () => [null, null]);
+      otpReselectPendingRef.current = Array(OTP_LENGTH).fill(false);
       otpRefs.current[0]?.focus();
     } catch (err) {
       Alert.alert('재전송 실패', err instanceof Error ? err.message : '잠시 후 다시 시도해주세요.');
@@ -214,7 +219,18 @@ export const SignupStep1Screen: React.FC = () => {
   const handleOtpSelectionChange = useCallback(
     (index: number, e: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
       const { start, end } = e.nativeEvent.selection;
-      recordOtpSelection(index, { start, end, value: otpDigits[index] ?? '' });
+      const current = otpDigits[index] ?? '';
+      const reselect = otpReselectPendingRef.current[index] === true;
+      otpReselectPendingRef.current[index] = false;
+      // #379 FIX2: 포커스 후 첫 선택이 접힌 커서면(iOS 탭 caret 배치가 onFocus 전체 선택을 덮음)
+      // 네이티브 선택 자체를 전체 선택으로 되돌린다 → 붙여넣기가 OS 에서도 교체로 처리된다.
+      // 1회 한정: 이후 선택 이벤트(사용자 커서 이동)는 그대로 기록한다.
+      if (reselect && start === end && current.length > 0) {
+        otpRefs.current[index]?.setSelection?.(0, current.length);
+        recordOtpSelection(index, { start: 0, end: current.length, value: current });
+        return;
+      }
+      recordOtpSelection(index, { start, end, value: current });
     },
     [otpDigits, recordOtpSelection],
   );
@@ -224,6 +240,7 @@ export const SignupStep1Screen: React.FC = () => {
   const handleOtpFocus = useCallback(
     (index: number) => {
       const current = otpDigits[index] ?? '';
+      otpReselectPendingRef.current[index] = true;
       if (!current) return;
       // jest mock·웹 구현에는 setSelection 이 없을 수 있다 → 있을 때만 호출(선택 기록은 그대로 남긴다).
       otpRefs.current[index]?.setSelection?.(0, current.length);
@@ -231,6 +248,10 @@ export const SignupStep1Screen: React.FC = () => {
     },
     [otpDigits, recordOtpSelection],
   );
+
+  const handleOtpBlur = useCallback((index: number) => {
+    otpReselectPendingRef.current[index] = false;
+  }, []);
 
   const handleOtpKeyPress = useCallback(
     (index: number, e: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
@@ -520,6 +541,7 @@ export const SignupStep1Screen: React.FC = () => {
                         onKeyPress={(e) => handleOtpKeyPress(idx, e)}
                         onSelectionChange={(e) => handleOtpSelectionChange(idx, e)}
                         onFocus={() => handleOtpFocus(idx)}
+                        onBlur={() => handleOtpBlur(idx)}
                         keyboardType="number-pad"
                         // maxLength 1 이면 OS 가 자동완성한 6자리를 1자리로 잘라버린다. +1 은 채워진 칸에 붙여넣을 때 기존 숫자 몫.
                         maxLength={OTP_LENGTH + 1}

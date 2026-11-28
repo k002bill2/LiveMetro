@@ -58,6 +58,18 @@ describe('otpInput (#379)', () => {
     expect(distributeOtpDigits(CELLS, 2, extractInsertedDigits('3', next, latest, sel(0, 1))).cells.join('')).toBe(expected);
   });
 
+  // #379 FIX2: 같은 숫자 재입력(next===prev)은 어떤 선택 기록이 와도 "그 숫자를 다시 씀"이다(삭제는 next 가 짧아짐).
+  it.each([[sel(1, 1)], [sel(0, 0)], [sel(0, 1)], [null]])('same-digit retype with %j keeps the digit and moves focus', (selection) => {
+    expect(extractInsertedDigits('3', '3', selection, sel(0, 1))).toBe('3');
+    const out = distributeOtpDigits(CELLS, 2, extractInsertedDigits('3', '3', selection));
+    expect(out.cells.join('')).toBe('123456');
+    expect(out.focusIndex).toBe(3);
+  });
+
+  it('empty prev with empty next stays an empty insertion', () => {
+    expect(extractInsertedDigits('', '', null)).toBe('');
+  });
+
   it('infers from content when no selection is usable', () => {
     expect(apply('53', null)).toBe('125456');
     expect(apply('98', null)).toBe('129856');

@@ -334,4 +334,210 @@ describe('SignupStep1Screen', () => {
       expect(getByTestId(`otp-cell-${i}`).props.value).toBe(d);
     });
   });
+
+// ── #379 FIX2: QA r2 G 표(셀 123456, 칸3="3") — 이벤트 순서 비의존 처리 ──
+  const enterOtpWith123456 = async (): Promise<ReturnType<typeof render>> => {
+    mockRequestPhoneVerification.mockResolvedValue('vid-123');
+    const utils = render(<SignupStep1Screen />);
+    fireEvent.press(utils.getByTestId('carrier-skt'));
+    fireEvent.changeText(utils.getByTestId('name-input'), '홍길동');
+    fireEvent.changeText(utils.getByTestId('phone-input'), '01012345678');
+    fireEvent.changeText(utils.getByTestId('birth-input'), '900101');
+    await act(async () => {
+      fireEvent.press(utils.getByTestId('request-otp-button'));
+    });
+    act(() => {
+      fireEvent.changeText(utils.getByTestId('otp-cell-0'), '123456');
+    });
+    return utils;
+  };
+  const selectCell = (utils: ReturnType<typeof render>, idx: number, start: number, end: number): void => {
+    act(() => {
+      fireEvent(utils.getByTestId(`otp-cell-${idx}`), 'selectionChange', { nativeEvent: { selection: { start, end } } });
+    });
+  };
+  const cellValues = (utils: ReturnType<typeof render>): string =>
+    Array.from({ length: 6 }, (_, i) => (utils.getByTestId(`otp-cell-${i}`).props.value as string) || '_').join('');
+
+  describe('event-order independent OTP edits (#379 FIX2, QA r2 G table)', () => {
+    // RN jest mock TextInput 에는 setSelection 이 없다 → 재선택 호출을 단언하려고 프로토타입에 스텁한다.
+    const { TextInput } = jest.requireActual('react-native');
+    const setSelection = jest.fn();
+    beforeEach(() => {
+      setSelection.mockClear();
+      TextInput.prototype.setSelection = setSelection;
+    });
+    afterEach(() => {
+      delete TextInput.prototype.setSelection;
+    });
+
+    // G1 iOS 탭: onFocus 기록 (0,1) 뒤 탭 caret (1,1) 이 온다 → 첫 접힌 선택은 전체 선택으로 되돌린다.
+    it.each([
+      ['98', '129856'],
+      ['5', '125456'],
+      ['38', '123856'],
+      ['33', '123356'],
+      ['3', '123456'],
+    ])('G1 focus → caret (1,1) → re-select → "%s" → %s', async (value, expected) => {
+      const utils = await enterOtpWith123456();
+      act(() => {
+        fireEvent(utils.getByTestId('otp-cell-2'), 'focus');
+      });
+      setSelection.mockClear();
+      selectCell(utils, 2, 1, 1);
+      expect(setSelection).toHaveBeenCalledTimes(1);
+      expect(setSelection).toHaveBeenCalledWith(0, 1);
+      act(() => {
+        fireEvent.changeText(utils.getByTestId('otp-cell-2'), value);
+      });
+      expect(cellValues(utils)).toBe(expected);
+    });
+
+    it('G1 same-digit retype keeps the cell and moves focus to the next cell', async () => {
+      const utils = await enterOtpWith123456();
+      act(() => {
+        fireEvent(utils.getByTestId('otp-cell-2'), 'focus');
+      });
+      selectCell(utils, 2, 1, 1);
+      const focusSpy = jest.spyOn(TextInput.prototype, 'focus');
+      act(() => {
+        fireEvent.changeText(utils.getByTestId('otp-cell-2'), '3');
+      });
+      expect(cellValues(utils)).toBe('123456');
+      expect(focusSpy).toHaveBeenCalled();
+      focusSpy.mockRestore();
+    });
+
+    it('re-selects only once per focus — a second collapsed caret is recorded as a user move', async () => {
+      const utils = await enterOtpWith123456();
+      act(() => {
+        fireEvent(utils.getByTestId('otp-cell-2'), 'focus');
+      });
+      setSelection.mockClear();
+      selectCell(utils, 2, 1, 1);
+      selectCell(utils, 2, 1, 1);
+      expect(setSelection).toHaveBeenCalledTimes(1);
+      act(() => {
+        fireEvent.changeText(utils.getByTestId('otp-cell-2'), '35');
+      });
+      // 두 번째 (1,1) 은 사용자 커서(끝)로 존중 → "5" 만 삽입.
+      expect(cellValues(utils)).toBe('125456');
+    });
+
+    it('does not re-select when the first post-focus selection already spans the digit (Android selectTextOnFocus)', async () => {
+      const utils = await enterOtpWith123456();
+      act(() => {
+        fireEvent(utils.getByTestId('otp-cell-2'), 'focus');
+      });
+      setSelection.mockClear();
+      selectCell(utils, 2, 0, 1); // 플래그 소비, 재선택 없음
+      selectCell(utils, 2, 1, 1); // 이후 접힌 선택 = 사용자 커서 이동(G3) → 존중
+      expect(setSelection).not.toHaveBeenCalled();
+      act(() => {
+        fireEvent.changeText(utils.getByTestId('otp-cell-2'), '35');
+      });
+      expect(cellValues(utils)).toBe('125456');
+    });
+
+    it('clears the re-select flag on blur', async () => {
+      const utils = await enterOtpWith123456();
+      act(() => {
+        fireEvent(utils.getByTestId('otp-cell-2'), 'focus');
+      });
+      act(() => {
+        fireEvent(utils.getByTestId('otp-cell-2'), 'blur');
+      });
+      setSelection.mockClear();
+      selectCell(utils, 2, 1, 1);
+      expect(setSelection).not.toHaveBeenCalled();
+    });
+
+    // G2 Android 변경 후 선택 먼저: (0,1) → post → 값
+    it.each([
+      [{ start: 1, end: 1 }, '3', '123456'],
+      [{ start: 1, end: 1 }, '5', '125456'],
+      [{ start: 1, end: 1 }, '8', '128456'],
+      [{ start: 2, end: 2 }, '33', '123356'],
+      [{ start: 2, end: 2 }, '38', '123856'],
+    ])('G2 (0,1) → post-change %j → "%s" → %s', async (post, value, expected) => {
+      const utils = await enterOtpWith123456();
+      selectCell(utils, 2, 0, 1);
+      selectCell(utils, 2, post.start, post.end);
+      act(() => {
+        fireEvent.changeText(utils.getByTestId('otp-cell-2'), value);
+      });
+      expect(cellValues(utils)).toBe(expected);
+    });
+
+    // G3 선택 후 사용자 커서 이동은 존중한다.
+    it.each([
+      [[[0, 1], [1, 1]], '35', '125456'],
+      [[[0, 1], [1, 1], [2, 2]], '35', '125456'],
+      [[[0, 1], [0, 0], [1, 1]], '53', '125456'],
+      [[[0, 1], [1, 1], [1, 1]], '98', '129856'],
+    ])('G3 selections %j → "%s" → %s', async (sels, value, expected) => {
+      const utils = await enterOtpWith123456();
+      (sels as [number, number][]).forEach(([s, e]) => selectCell(utils, 2, s, e));
+      act(() => {
+        fireEvent.changeText(utils.getByTestId('otp-cell-2'), value);
+      });
+      expect(cellValues(utils)).toBe(expected);
+    });
+
+    // G4 선택을 쓴 뒤 같은 칸 재변경(선택 기록 없음) → 커서 끝 가정.
+    it('G4 re-change after the selection was consumed, no selection, "98" → 128456', async () => {
+      const utils = await enterOtpWith123456();
+      selectCell(utils, 2, 0, 1);
+      act(() => {
+        fireEvent.changeText(utils.getByTestId('otp-cell-2'), '9');
+      });
+      expect(cellValues(utils)).toBe('129456');
+      act(() => {
+        fireEvent.changeText(utils.getByTestId('otp-cell-2'), '98');
+      });
+      expect(cellValues(utils)).toBe('128456');
+    });
+
+    // 회귀 (QA r2 2절): 순차 타이핑·삭제
+    it('sequential typing into empty cells fills 123456 and enables verify', async () => {
+      mockRequestPhoneVerification.mockResolvedValue('vid-123');
+      mockConfirmPhoneCode.mockResolvedValue(undefined);
+      const utils = render(<SignupStep1Screen />);
+      fireEvent.press(utils.getByTestId('carrier-skt'));
+      fireEvent.changeText(utils.getByTestId('name-input'), '홍길동');
+      fireEvent.changeText(utils.getByTestId('phone-input'), '01012345678');
+      fireEvent.changeText(utils.getByTestId('birth-input'), '900101');
+      await act(async () => {
+        fireEvent.press(utils.getByTestId('request-otp-button'));
+      });
+      '123456'.split('').forEach((d, i) => {
+        act(() => {
+          fireEvent(utils.getByTestId(`otp-cell-${i}`), 'focus');
+        });
+        selectCell(utils, i, 0, 0);
+        act(() => {
+          fireEvent.changeText(utils.getByTestId(`otp-cell-${i}`), d);
+        });
+      });
+      expect(cellValues(utils)).toBe('123456');
+      await act(async () => {
+        fireEvent.press(utils.getByTestId('verify-button'));
+      });
+      await waitFor(() => {
+        expect(mockConfirmPhoneCode).toHaveBeenCalledWith('vid-123', '123456');
+      });
+    });
+
+    it('deleting a digit clears only that cell', async () => {
+      const utils = await enterOtpWith123456();
+      act(() => {
+        fireEvent(utils.getByTestId('otp-cell-2'), 'focus');
+      });
+      selectCell(utils, 2, 1, 1);
+      act(() => {
+        fireEvent.changeText(utils.getByTestId('otp-cell-2'), '');
+      });
+      expect(cellValues(utils)).toBe('12_456');
+    });
+  });
 });

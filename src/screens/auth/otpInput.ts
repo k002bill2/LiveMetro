@@ -61,6 +61,9 @@ export const extractInsertedDigits = (
   earlier: OtpCellSelection | null = null,
 ): string => {
   const len = prev.length;
+  // 같은 값(비어 있지 않음) = 같은 숫자를 다시 씀. 삭제는 next 가 짧아지므로 구분된다.
+  // 선택 기록·이벤트 순서와 무관하게 결정론적으로 "prev 를 삽입"으로 본다(칸 유지 + 다음 칸 포커스).
+  if (len > 0 && next === prev) return prev;
   const chosen = [sel, earlier].find(
     (c): c is OtpCellSelection => isUsableSelection(prev, c) && isConsistentSelection(prev, next, c),
   );
