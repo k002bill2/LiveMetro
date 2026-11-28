@@ -72,6 +72,16 @@ jest.mock('@/services/account/accountDeletionService', () => ({
   deleteAccountAndPurgeLocalData: jest.fn(() => Promise.resolve({ success: true })),
 }));
 
+// #418 실행 중 OTA 정보 — expo-updates 런타임 상수를 모듈 경계에서 고정.
+jest.mock('expo-updates', () => ({
+  isEnabled: true,
+  isEmbeddedLaunch: false,
+  updateId: '0195f2a1-7c3e-7b10-9d2a-4e5f6a7b8c9d',
+  channel: 'preview',
+  runtimeVersion: '1.1.0',
+  createdAt: null,
+}));
+
 const mockNavigate = jest.fn();
 const mockGoBack = jest.fn();
 const mockRootStackNavigate = jest.fn();
@@ -372,6 +382,16 @@ describe('SettingsScreen', () => {
     const { getByText } = render(<SettingsScreen {...defaultProps} />);
 
     expect(getByText('버전 1.0.0')).toBeTruthy();
+  });
+
+  it('renders running OTA update info with full update ID (#418)', () => {
+    const { getByTestId } = render(<SettingsScreen {...defaultProps} />);
+
+    const row = getByTestId('settings-ota-info');
+    expect(row.props.accessibilityLabel).toBe(
+      'OTA 업데이트 ID 0195f2a1-7c3e-7b10-9d2a-4e5f6a7b8c9d, 채널 preview, 런타임 1.1.0',
+    );
+    expect(row).toHaveTextContent('OTA preview · 1.1.0 · 0195f2a1-7c3e-7b10-9d2a-4e5f6a7b8c9d');
   });
 
   describe('Navigation', () => {

@@ -71,6 +71,7 @@ import {
   clearDetectionMetrics,
 } from '@/services/guidance/guidanceDetectionMetrics';
 import { deleteAccountAndPurgeLocalData } from '@/services/account/accountDeletionService';
+import { getOtaInfo } from '@/utils/otaInfo';
 
 /**
  * Phase 42 (SE1): pick the first grapheme of the user's display name as
@@ -459,6 +460,8 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const styles = useMemo(() => createStyles(semantic), [semantic]);
+  // #418: 실행 중 번들 정보는 런치 동안 불변 — 언어 변경 시에만 재계산.
+  const otaInfo = useMemo(() => getOtaInfo(language), [language]);
 
   const SettingItem: React.FC<{
     Icon: React.ElementType;
@@ -724,6 +727,18 @@ export const SettingsScreen: React.FC<Props> = ({ navigation }) => {
               onPress={() => {}}
               showChevron={false}
             />
+            <View
+              style={styles.settingItem}
+              testID="settings-ota-info"
+              accessible
+              accessibilityLabel={otaInfo.accessibilityLabel}
+            >
+              <View style={styles.textContainer}>
+                <Text style={styles.settingSubtitle} selectable>
+                  {otaInfo.text}
+                </Text>
+              </View>
+            </View>
           </View>
         </View>
 
