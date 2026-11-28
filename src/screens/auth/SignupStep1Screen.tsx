@@ -102,7 +102,14 @@ export const SignupStep1Screen: React.FC = () => {
   const [otpDigits, setOtpDigits] = useState<string[]>(() => Array(OTP_LENGTH).fill(''));
   const [secondsLeft, setSecondsLeft] = useState(OTP_TIMEOUT_SECONDS);
   const otpRefs = useRef<(TextInput | null)[]>(Array(OTP_LENGTH).fill(null));
-  const otpSelectionsRef = useRef<(OtpCellSelection | null)[]>(Array(OTP_LENGTH).fill(null));
+  // 칸별 [최근, 그 직전] 선택. Android 는 변경 후 선택이 먼저 올 수 있어 직전 것도 보관한다.
+  const otpSelectionsRef = useRef<[OtpCellSelection | null, OtpCellSelection | null][]>(
+    Array.from({ length: OTP_LENGTH }, () => [null, null]),
+  );
+  const recordOtpSelection = useCallback((index: number, sel: OtpCellSelection) => {
+    const [latest] = otpSelectionsRef.current[index] ?? [null, null];
+    otpSelectionsRef.current[index] = [sel, latest];
+  }, []);
   const recaptchaRef = useRef<RecaptchaVerifierHandle>(null);
 
   const shouldReduceMotion = useShouldReduceMotion();
@@ -193,8 +200,9 @@ export const SignupStep1Screen: React.FC = () => {
     // #379: 값만으로는 "기존 숫자가 선택된 채 붙여넣기"와 "기존 숫자 뒤에 입력"을 구분할 수 없다.
     // 직전 선택(onSelectionChange 기록)으로 실제 삽입 문자열을 복원하고, 기록이 없거나
     // 믿을 수 없으면 커서 끝을 가정한다. 한 번 쓴 선택은 버린다(다음 변경에 재사용 금지).
-    const inserted = extractInsertedDigits(current, digits, otpSelectionsRef.current[index] ?? null);
-    otpSelectionsRef.current[index] = null;
+    const [latest, earlier] = otpSelectionsRef.current[index] ?? [null, null];
+    const inserted = extractInsertedDigits(current, digits, latest, earlier);
+    otpSelectionsRef.current[index] = [null, null];
     // SMS 자동완성·전체 코드 붙여넣기(≥6자리)는 첫 칸부터, 부분 붙여넣기는 현재 칸부터 뒤로 분배한다.
     const { focusIndex } = distributeOtpDigits(otpDigits, index, inserted);
     setOtpDigits((prev) => [...distributeOtpDigits(prev, index, inserted).cells]);
@@ -206,9 +214,9 @@ export const SignupStep1Screen: React.FC = () => {
   const handleOtpSelectionChange = useCallback(
     (index: number, e: NativeSyntheticEvent<TextInputSelectionChangeEventData>) => {
       const { start, end } = e.nativeEvent.selection;
-      otpSelectionsRef.current[index] = { start, end, value: otpDigits[index] ?? '' };
+      recordOtpSelection(index, { start, end, value: otpDigits[index] ?? '' });
     },
-    [otpDigits],
+    [otpDigits, recordOtpSelection],
   );
 
   // #379: iOS Fabric 은 사용자 탭 포커스에서 selectTextOnFocus 를 적용하지 않는다 → 직접 선택한다.
@@ -219,9 +227,9 @@ export const SignupStep1Screen: React.FC = () => {
       if (!current) return;
       // jest mock·웹 구현에는 setSelection 이 없을 수 있다 → 있을 때만 호출(선택 기록은 그대로 남긴다).
       otpRefs.current[index]?.setSelection?.(0, current.length);
-      otpSelectionsRef.current[index] = { start: 0, end: current.length, value: current };
+      recordOtpSelection(index, { start: 0, end: current.length, value: current });
     },
-    [otpDigits],
+    [otpDigits, recordOtpSelection],
   );
 
   const handleOtpKeyPress = useCallback(

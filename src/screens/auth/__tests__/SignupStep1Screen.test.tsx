@@ -271,6 +271,41 @@ describe('SignupStep1Screen', () => {
     });
   });
 
+  // #379 이벤트 순서 가드: Android 에서 변경 후 선택이 onChangeText 보다 먼저 와도 직전 (0,1) 선택을 쓴다.
+  it.each([
+    [{ start: 1, end: 1 }, '5', '125456'],
+    [{ start: 2, end: 2 }, '98', '129856'],
+    [{ start: 2, end: 2 }, '38', '123856'],
+  ])('handles post-change selection %j arriving before "%s" → %s (#379)', async (post, value, expected) => {
+    mockRequestPhoneVerification.mockResolvedValue('vid-123');
+    const { getByTestId } = render(<SignupStep1Screen />);
+
+    fireEvent.press(getByTestId('carrier-skt'));
+    fireEvent.changeText(getByTestId('name-input'), '홍길동');
+    fireEvent.changeText(getByTestId('phone-input'), '01012345678');
+    fireEvent.changeText(getByTestId('birth-input'), '900101');
+
+    await act(async () => {
+      fireEvent.press(getByTestId('request-otp-button'));
+    });
+
+    act(() => {
+      fireEvent.changeText(getByTestId('otp-cell-0'), '123456');
+    });
+    act(() => {
+      fireEvent(getByTestId('otp-cell-2'), 'selectionChange', { nativeEvent: { selection: { start: 0, end: 1 } } });
+    });
+    act(() => {
+      fireEvent(getByTestId('otp-cell-2'), 'selectionChange', { nativeEvent: { selection: post } });
+    });
+    act(() => {
+      fireEvent.changeText(getByTestId('otp-cell-2'), value);
+    });
+    expected.split('').forEach((d, i) => {
+      expect(getByTestId(`otp-cell-${i}`).props.value).toBe(d);
+    });
+  });
+
   // #379 보조 B: iOS 탭 포커스는 selectTextOnFocus 가 안 걸리므로 onFocus 에서 직접 선택·기록한다.
   // JS 에서 건 선택은 onSelectionChange 로 돌아오지 않으므로 selectionChange 이벤트 없이 검증한다.
   it('selects the existing digit on focus so a following paste replaces it (#379)', async () => {

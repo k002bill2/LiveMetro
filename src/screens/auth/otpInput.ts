@@ -30,20 +30,41 @@ const isUsableSelection = (prev: string, sel: OtpCellSelection | null): sel is O
   sel.end <= prev.length;
 
 /**
+ * 변경 전 선택이라면 next 는 "prev 앞부분 + 삽입 + prev 뒷부분" 꼴이어야 한다.
+ * 변경 후 선택이 먼저 기록된 경우(예: "3" 을 (0,1) 선택해 "5" 입력 → (1,1) 이 먼저 옴)를 걸러낸다.
+ */
+const isConsistentSelection = (prev: string, next: string, sel: OtpCellSelection): boolean =>
+  next.startsWith(prev.slice(0, sel.start)) &&
+  next.endsWith(prev.slice(sel.end)) &&
+  next.length >= sel.start + (prev.length - sel.end);
+
+/** 쓸 수 있는 선택이 없을 때 내용으로 추정: 앞이 같으면 커서 끝, 뒤가 같으면 커서 앞, 아니면 교체. */
+const inferSelection = (prev: string, next: string): { start: number; end: number } => {
+  const len = prev.length;
+  if (next.startsWith(prev)) return { start: len, end: len };
+  if (next.endsWith(prev)) return { start: 0, end: 0 };
+  return { start: 0, end: len };
+};
+
+/**
  * 이전 칸 값(prev)과 변경 후 값(next, 숫자만)에서 실제로 삽입된 문자열을 복원한다.
  * - 선택 (0,len): next 전체가 새 입력 (교체)
  * - 커서 끝 (len,len): next.slice(len)
  * - 커서 앞 (0,0): next.slice(0, next.length - len)
- * 선택을 쓸 수 없으면 커서 끝을 가정한다 (수정 전 기본 동작과 같음).
+ * 최근 선택(sel) → 그 직전 선택(earlier) 순으로, 쓸 수 있고 next 와 모순되지 않는 것을 쓴다.
+ * 둘 다 안 되면 내용으로 추정한다(inferSelection).
  */
 export const extractInsertedDigits = (
   prev: string,
   next: string,
   sel: OtpCellSelection | null,
+  earlier: OtpCellSelection | null = null,
 ): string => {
   const len = prev.length;
-  const start = isUsableSelection(prev, sel) ? sel.start : len;
-  const end = isUsableSelection(prev, sel) ? sel.end : len;
+  const chosen = [sel, earlier].find(
+    (c): c is OtpCellSelection => isUsableSelection(prev, c) && isConsistentSelection(prev, next, c),
+  );
+  const { start, end } = chosen ?? inferSelection(prev, next);
   const keptSuffix = len - end;
   const insertEnd = clamp(next.length - keptSuffix, 0, next.length);
   return next.slice(clamp(start, 0, insertEnd), insertEnd);

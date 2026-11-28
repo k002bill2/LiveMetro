@@ -50,6 +50,19 @@ describe('otpInput (#379)', () => {
     expect(apply('39', null)).toBe('129456');
   });
 
+  it.each([
+    [sel(1, 1), '5', '125456'],
+    [sel(2, 2), '98', '129856'],
+    [sel(2, 2), '38', '123856'],
+  ])('uses the earlier (0,1) selection when a post-change %j arrives first (%s → %s)', (latest, next, expected) => {
+    expect(distributeOtpDigits(CELLS, 2, extractInsertedDigits('3', next, latest, sel(0, 1))).cells.join('')).toBe(expected);
+  });
+
+  it('infers from content when no selection is usable', () => {
+    expect(apply('53', null)).toBe('125456');
+    expect(apply('98', null)).toBe('129856');
+  });
+
   it('does not mutate the input cells and reports the next focus cell', () => {
     const cells = [...CELLS];
     const single = distributeOtpDigits(cells, 2, '9');
