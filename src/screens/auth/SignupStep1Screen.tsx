@@ -255,8 +255,15 @@ export const SignupStep1Screen: React.FC = () => {
 
   const handleOtpKeyPress = useCallback(
     (index: number, e: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
-      if (e.nativeEvent.key === 'Backspace' && !otpDigits[index] && index > 0) {
+      const { key } = e.nativeEvent;
+      if (key === 'Backspace' && !otpDigits[index] && index > 0) {
         otpRefs.current[index - 1]?.focus();
+        return;
+      }
+      // #379 FIX3: 선택된 숫자 위에 같은 숫자를 치면 Android 는 텍스트 불변이라 onChangeText 를 내지 않는다
+      // → 키 입력으로 다음 칸 이동을 보장한다. changeText 가 함께 오는 플랫폼도 같은 칸(index+1)을 focus → 멱등.
+      if (/^[0-9]$/.test(key) && key === otpDigits[index] && index + 1 < OTP_LENGTH) {
+        otpRefs.current[index + 1]?.focus();
       }
     },
     [otpDigits],
