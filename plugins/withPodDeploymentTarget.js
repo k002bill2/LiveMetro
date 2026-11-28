@@ -11,7 +11,9 @@
  *   사라진다. 그래서 config plugin 으로 post_install 에 보정 스니펫을 삽입한다.
  *
  * 하한값은 Ruby 실행 시점에 Podfile.properties 의 ios.deploymentTarget(없으면 15.1)을
- * 읽는다. 하한보다 낮은 pod 타깃만 올리고 더 높은 값은 그대로 둔다.
+ * 읽는다. 하한보다 낮은 pod 타깃만 올리고 더 높은 값은 그대로 둔다. 비교는 Gem::Version
+ * (to_f 는 '15.10' 을 15.1 로 읽어 15.2 하한에서 잘못 올린다). 값이 nil/빈 문자열이면
+ * 하한 미만으로 보고 하한을 채운다.
  *
  * 멱등성: 마커 주석이 이미 있으면 아무것도 하지 않는다.
  * post_install 블록이 없으면 throw 하지 않고 경고만 남긴 채 원문을 그대로 반환한다.
@@ -26,7 +28,8 @@ const SNIPPET = [
   "    pod_min_ios = podfile_properties['ios.deploymentTarget'] || '15.1'",
   '    installer.pods_project.targets.each do |t|',
   '      t.build_configurations.each do |c|',
-  "        if c.build_settings['IPHONEOS_DEPLOYMENT_TARGET'].to_f < pod_min_ios.to_f",
+  "        current = c.build_settings['IPHONEOS_DEPLOYMENT_TARGET'].to_s",
+  "        if current.empty? || Gem::Version.new(current) < Gem::Version.new(pod_min_ios)",
   "          c.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = pod_min_ios",
   '        end',
   '      end',
@@ -85,3 +88,4 @@ const withPodDeploymentTarget = (config) =>
 module.exports = withPodDeploymentTarget;
 module.exports.MARKER_BEGIN = MARKER_BEGIN;
 module.exports.addPodDeploymentTargetClamp = addPodDeploymentTargetClamp;
+module.exports.SNIPPET = SNIPPET;
