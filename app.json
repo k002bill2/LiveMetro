@@ -121,6 +121,7 @@
       "expo-apple-authentication",
       "@react-native-google-signin/google-signin",
       "./plugins/withSeoulApiCleartext",
+      "./plugins/withPodDeploymentTarget",
       "@react-native-community/datetimepicker",
       "expo-font",
       "expo-secure-store",
