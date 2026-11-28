@@ -12,7 +12,11 @@
 - `.../ReactEditTextInputConnectionWrapper.kt:97-107` `commitText`: 길이 ≤2 텍스트면 `super.commitText` **이전에** `dispatchKeyEventOrEnqueue(inputKey)` → 텍스트 변경 여부와 무관하게 keyPress("3") 발생. 그래서 텍스트 불변(onChangeText 0건)인 A1-a 에서도 keyPress 는 온다.
 - 같은 파일 `:118-129` `sendKeyEvent`: 숫자 KeyEvent(ACTION_DOWN)도 `dispatchKeyEvent(event.number)`.
 - `:58-67` batch edit 중이면 endBatchEdit 에서 1회 dispatch (중복 아님).
-- 확인 필요(추정): `adb shell input text` 는 IME 경유 KeyEvent 주입이라 IME 가 commitText/sendKeyEvent 중 어느 쪽으로 넘기든 위 두 경로 모두 keyPress 를 낸다고 판단. 에뮬레이터 재측정은 브리프 지시로 미실시 → QA 레인 실측 필요.
+- **`adb shell input text` 는 keyPress 를 내지 않을 가능성이 높다(정정, L2·확인 필요).** keyPress 를 내는 곳은 이 래퍼뿐이고 래퍼는 `onCreateInputConnection`(IME→뷰 채널)에만 붙는다. `ReactEditText.kt` 에 `KeyPressEvent` dispatch 는 0건(`onKeyUp:328`, KeyListener `:1282-1288` 은 keyPress 미발행). `input text` 는 KeyEvent 를 입력 파이프라인에 주입(하드웨어 키 경로 → TextView.onKeyDown/KeyListener)하므로 래퍼를 거치지 않는다. 브리프의 "(IME commitText)" 는 가정. 결론: 소프트 키보드 숫자패드(commitText·sendKeyEvent) = keyPress 옴, `input text`·하드웨어 키보드 = 안 올 가능성 높음.
+- QA 계측: `evidence-js-r2.log` 의 `[QA379]` 로그에는 keyPress 이벤트 계측 자체가 없다(grep -i key 0건) → A1-a 에서 keyPress 발생 여부는 실측으로 미확정.
+- **QA 재현 지시: `input text 3` 로 재현하면 다시 FAIL 로 보일 수 있다 → 화면 숫자패드 탭(`adb shell input tap …`)으로 재현할 것.** 가능하면 `[QA379]` 에 keyPress 계측 추가.
+- QA 확인 항목(차단 아님): batch edit 중 keyPress 는 `endBatchEdit` 까지 지연(`:58-67`) → 칸2 reselect `setSelection(0,1)` 이 칸3 `focus()` 보다 늦게 와도 포커스가 칸3 에 머무는지(칸2 로 안 돌아가는지) 확인.
+- selection 기반 대안은 구현하지 않음: 실측 순서 selection(0,1)→focus→첫 접힌 caret(1,1) 은 단순 재탭과 같은 숫자 입력이 같은 이벤트 모양이라 구분 불가 → 구현 시 브리프의 오탐 금지 조건 위반. 소프트 키보드에서도 keyPress 가 없다는 실측이 나오면 재검토.
 - 오탐 검토: 단순 커서 탭은 keyPress 를 내지 않으므로(위 경로 모두 텍스트 입력/키 이벤트 한정) 포커스가 튀지 않는다. 다른 숫자는 이 분기를 타지 않고 기존 changeText 경로가 처리.
 
 ## 테스트 (RED→GREEN)
@@ -31,6 +35,6 @@
 위험·영향 범위: SignupStep1Screen OTP 칸 onKeyPress 만. 오류 시 같은 숫자 키에서 포커스가 다음 칸으로 한 번 더 이동(값은 불변) 정도. iOS 는 changeText 분기와 같은 대상 focus 라 멱등.
 되돌리는 법: `git revert 667b744`
 
-사용 스킬: 없음 — 15분 예산으로 Skill 로드 생략, TDD(RED 먼저)·검증 절차는 수동 적용
+사용 스킬: 없음 — Skill 도구로 로드하지 않음(작업 판단상 생략; 예산 부족 때문은 아님). TDD(RED 먼저)·fresh 검증 절차는 수동 적용. 조언자(advisor) 검토 1회 반영(adb input text 근거 정정)
 테스트: 신규 4건(위 RED→GREEN), 기존 기대값 변경 없음
 기존 실패: 없음 (auth 115건 기존 통과 유지)
